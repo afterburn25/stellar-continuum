@@ -213,6 +213,59 @@ void scope_filtering() {
           "Scope toggle did not restore intel view");
 }
 
+void entry_navigation() {
+  engine::EventHistory history;
+  const auto add = [&](double day, std::string category,
+                       std::uint64_t location,
+                       std::vector<std::uint64_t> visible) {
+    engine::HistoryEvent event;
+    event.at_day = day;
+    event.summary = category;
+    event.category = std::move(category);
+    event.location = location;
+    event.visible_to = std::move(visible);
+    history.record(std::move(event));
+  };
+  add(400., "exploration.system_surveyed", 9, {1});
+  add(410., "war.engagement_started", 0, {1}); // locationless
+  add(420., "war.fleet_destroyed", 4, {1});    // newest first
+
+  const auto snap = snapshot(history, 1);
+  require(snap.entries[0].system_id == 4 &&
+              snap.entries[1].system_id == 0 &&
+              snap.entries[2].system_id == 9,
+          "Snapshot dropped event locations");
+
+  NativeChronicleView view;
+  view.open(history, 1);
+  require(!view.navigation(), "Navigation pending before any click");
+
+  // Click inside the first (newest) card — located at system 4. The
+  // list viewport starts below the header+intro row; at 1280x800 the
+  // first card spans roughly x 419-861, y 124-175.
+  native_map::InputEvent press;
+  press.type = native_map::InputEventType::LeftPressed;
+  press.position = {450.f, 135.f};
+  native_map::InputEvent release = press;
+  release.type = native_map::InputEventType::LeftReleased;
+  require(view.handle(press, 1280, 800), "Card press not captured");
+  require(view.handle(release, 1280, 800), "Card release not captured");
+  const auto nav = view.navigation();
+  require(nav && *nav == 4, "Located entry did not navigate to system");
+  require(!view.navigation(), "Navigation did not clear after take");
+
+  // The locationless card navigates nowhere.
+  view.close();
+  view.open(history, 1);
+  // Second card sits directly below the first.
+  press.position = {450.f, 200.f};
+  release.position = press.position;
+  require(view.handle(press, 1280, 800), "Second card press not captured");
+  require(view.handle(release, 1280, 800),
+          "Second card release not captured");
+  require(!view.navigation(), "Locationless entry navigated");
+}
+
 void render_smoke() {
   auto history = make_history();
   NativeChronicleView view;
@@ -229,6 +282,7 @@ int main() {
     domain_filtering();
     significance_filtering();
     scope_filtering();
+    entry_navigation();
     view_lifecycle();
     render_smoke();
   } catch (const std::exception &error) {

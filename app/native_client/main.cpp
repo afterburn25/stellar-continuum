@@ -5877,7 +5877,13 @@ class NativeCampaign final {
         if(command.captured){gesture_.capture_for_ui();continue;}
       }
       if(can_notify&&chronicle_view_.visible()){
-        if(chronicle_view_.handle(event,width,height)){gesture_.capture_for_ui();continue;}
+        if(chronicle_view_.handle(event,width,height)){
+          if(const auto nav=chronicle_view_.navigation()){
+            chronicle_view_.close();
+            (void)enter_system(static_cast<int>(*nav),width,height);
+          }
+          gesture_.capture_for_ui();continue;
+        }
       }
       if(can_notify&&event.type==InputEventType::LeftPressed&&
          layout.notifications.contains(event.position)){

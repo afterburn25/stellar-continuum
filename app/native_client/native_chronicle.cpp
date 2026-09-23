@@ -239,7 +239,7 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
     ++snap.total;
     if (snap.entries.size() >= max_entries) continue;
     const char *label = category_label(event->category);
-    snap.entries.push_back({event->id,
+    snap.entries.push_back({event->id, event->location,
                             label ? std::string(label) : event->category,
                             native_campaign::format_campaign_date(
                                 event->at_day),
@@ -345,6 +345,14 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
       press_target_ = PressTarget::Significance;
     else if (layout.scope_button.contains(event.position))
       press_target_ = PressTarget::Scope;
+    else if (layout.list_viewport.contains(event.position)) {
+      for (std::size_t i = 0; i < layout.entries.size(); ++i)
+        if (layout.entries[i].bounds.contains(event.position)) {
+          press_target_ = PressTarget::Entry;
+          press_entry_ = i;
+          break;
+        }
+    }
     return true;
   }
   if (event.type == native_map::InputEventType::PointerMove &&
@@ -378,6 +386,11 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
   else if (target == PressTarget::Scope &&
            layout.scope_button.contains(event.position))
     toggle_scope();
+  else if (target == PressTarget::Entry &&
+           press_entry_ < layout.entries.size() &&
+           layout.entries[press_entry_].bounds.contains(event.position) &&
+           snapshot_.entries[press_entry_].system_id != 0)
+    navigation_ = snapshot_.entries[press_entry_].system_id;
   return true;
 }
 
@@ -521,13 +534,23 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
     const auto &card = layout.entries[i];
     if (!intersects(card.bounds, layout.list_viewport)) continue;
     const auto &entry = snapshot_.entries[i];
-    stellar::engine::ui_skin::surface(out, card.bounds, s, false,
-                                      layout.list_viewport);
+    stellar::engine::ui_skin::surface(
+        out, card.bounds, s,
+        entry.system_id != 0 && card.bounds.contains(pointer_),
+        layout.list_viewport);
     clipped_text(out, {card.metadata_bounds.x, card.metadata_bounds.y},
                  entry_label(entry.category, locale_) + "  " + entry.date,
                  label_color(entry.category),
                  std::max(9, static_cast<int>(std::lround(11.f * s))),
                  card.metadata_bounds.width, layout.list_viewport);
+    if (entry.system_id != 0)
+      clipped_text(
+          out,
+          {card.bounds.x + card.bounds.width - 16.f * s,
+           card.metadata_bounds.y},
+          "->", muted_color,
+          std::max(9, static_cast<int>(std::lround(11.f * s))), 0.f,
+          layout.list_viewport);
     clipped_text(out, {card.message_bounds.x, card.message_bounds.y},
                  entry.summary, message_color,
                  std::max(11, static_cast<int>(std::lround(13.f * s))),

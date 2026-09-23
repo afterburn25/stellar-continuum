@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,6 +34,7 @@ namespace stellar::native_chronicle {
 // time so the view never touches simulation state.
 struct ChronicleEntry {
   std::uint64_t id{};
+  std::uint64_t system_id{}; // event location; 0 = not located
   std::string category, date, summary;
 };
 
@@ -104,6 +106,16 @@ public:
   [[nodiscard]] const ChronicleSnapshot &current() const noexcept {
     return snapshot_;
   }
+  // Takes a pending system-navigation request (click on a located
+  // entry), clearing it — the client drains it like the debug
+  // background's navigation hook. Visibility is never re-derived:
+  // feed() already restricted entries to the observer, and the system
+  // workspace applies its own observation check on entry.
+  [[nodiscard]] std::optional<std::uint64_t> navigation() noexcept {
+    const auto pending = navigation_;
+    navigation_.reset();
+    return pending;
+  }
 
   // Returns true when the event was consumed by the view.
   [[nodiscard]] bool handle(const native_map::InputEvent &event, int width,
@@ -112,7 +124,7 @@ public:
 
 private:
   enum class PressTarget { None, Close, Refresh, Domain, Significance,
-                           Scope };
+                           Scope, Entry };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -122,6 +134,8 @@ private:
   std::string domain_filter_;
   double significance_floor_{};
   bool involved_only_{};
+  std::size_t press_entry_{};
+  std::optional<std::uint64_t> navigation_{};
   ChronicleSnapshot snapshot_;
   native_map::Point pointer_{}, press_origin_{};
   bool pointer_captured_{};

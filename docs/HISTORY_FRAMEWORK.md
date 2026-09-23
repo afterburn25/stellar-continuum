@@ -123,10 +123,14 @@ the notification view, and filterable by category domain via
 that distinguishes "all visible intel" (events the observer merely
 witnesses via known systems) from events listing the observer in
 `actors` — all three filters apply before the cap, so a filtered view
-still reaches deep history. Coverage: `native_chronicle` tests
-(snapshot ordering, observer privacy, cap + total, domain,
-significance and scope filtering, view lifecycle, refresh, render
-smoke).
+still reaches deep history. Entries with a `location` are clickable:
+the view returns the system id through `navigation()` (same drain
+contract as the debug background), the client closes the overlay and
+calls `enter_system` — the workspace's own observation check still
+gates what the observer actually sees there. Coverage:
+`native_chronicle` tests (snapshot ordering, observer privacy, cap +
+total, domain, significance and scope filtering, entry navigation,
+view lifecycle, refresh, render smoke).
 
 The admission seeding in `native_notification_events` applies a fixed
 0.35 report floor via `feed()`'s `min_significance` — the category

@@ -207,7 +207,10 @@ alongside the domain filter) and admission seeding uses a fixed 0.35
 report floor so high-volume trivia (damage ticks, detections) stays
 out of the transient feed. An actor-scope toggle (ALL ↔ MINE)
 distinguishes passive intel from events involving the observer via
-`actors`. Chronicle retention landed too: `maintain_chronicle` (in
+`actors`. Located entries navigate — clicking one returns its system
+through `navigation()` and the client enters that system (the
+workspace's observation check still gates visibility). Chronicle
+retention landed too: `maintain_chronicle` (in
 `campaign_event_history`) runs after each advance — once the history
 reaches 90% of capacity it prunes routine records (<0.35 significance)
 older than 365 days so the bounded oldest-first eviction cannot

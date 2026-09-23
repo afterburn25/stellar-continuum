@@ -170,7 +170,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   notification panel's CHRONICLE button with on-demand refresh, domain
   cycling, a significance cycle (0.0 → 0.3 → 0.5 → 0.7) and an ALL ↔
   MINE scope toggle ("all intel" vs events listing the observer in
-  `actors`) (`native_chronicle` tests). Admission
+  `actors`); clicking a located entry navigates the map to its system
+  via `navigation()` → `enter_system` (the workspace re-applies the
+  observation check) (`native_chronicle` tests). Admission
   seeding applies a fixed 0.35 report floor so high-volume trivia
   (damage ticks, detections) stays out of the transient feed. Voice
   announcement of the same step events already runs through
