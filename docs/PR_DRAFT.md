@@ -40,7 +40,7 @@ Core/engine projections, never re-derived in UI.
 | 7–8 | Planetary + terraforming | IMPLEMENTED (engine) — `HabitabilityProfile`/`evaluate_habitability`; `to_engine_environment` Core projection feeds it |
 | 9 | Strategic AI | IMPLEMENTED (engine) — `StrategicMind` utility machinery |
 | 10 | Strategic warfare | IMPLEMENTED (engine) — `WarfareModel` cohorts/interdiction/Lanchester; Core consumption via theater projection + `foreign_armed_presence` diagnostics |
-| 11 | Space rendering | **PARTIAL** — scene3d GPU path with planet/ring/star materials; instancing, HDR/tonemap, TextureStreamer residency pending (needs a GPU-equipped environment) |
+| 11 | Space rendering | **PARTIAL** — scene3d GPU path with planet/ring/star materials; **HDR/tonemap resolve landed** (RGBA16F scene targets + fullscreen resolve, capability-checked UNORM fallback); instancing (needs texture-array/bindless redesign), render-graph backend consumption, TextureStreamer residency pending |
 | 12 | Editor tools | **PARTIAL** — 16 shell tools (Projects…Galaxy incl. Simulation/Colony/Economy/Planet/AI/Warfare/Missions/Physics genre inspectors + the `GalaxyMap` debugger) + per-tool `--frames` ctest smoke; generated projects scaffold executor + persistence |
 | 13 | Scale benchmarks | IMPLEMENTED — `simulation_scale_250…5000`, `combined_scale` (400 settlements, ~870µs/tick, bit-identical) |
 | 14 | Event history | IMPLEMENTED — `EventHistory` observer-private chronicle; runtime records every advance incl. diplomatic journal entries; v17 save payload; retention policy |
@@ -52,6 +52,7 @@ Core/engine projections, never re-derived in UI.
 - `2026-09-23-chronicle-suite` receipt: **295/295** runnable tests green
   at `d68c98af` (15 `engine_shell_tool_*` tests need a display)
 - User desktop run (`ba7fbf05`): **310/310** including shell smoke tests
+- User desktop run (`d5c7e0d3`): **314/314** after GalaxyMap + replay chain
 - New this branch: `replay` unit tests for per-section checkpoint
   divergence localization
 - `stellar-continuum-native` builds `/W4 /WX` clean throughout
@@ -91,9 +92,11 @@ Core/engine projections, never re-derived in UI.
 
 ## Limitations (honest)
 
-- M11 space rendering is PARTIAL: no render-graph backend consumption,
-  instancing, or HDR path — requires a GPU-equipped environment to
-  develop and verify
+- M11 space rendering is PARTIAL: HDR/tonemap landed (RGBA16F +
+  resolve, UNORM fallback); remaining are render-graph backend
+  consumption, instancing (texture-array/bindless redesign), and
+  TextureStreamer residency — offscreen Vulkan captures verify in CI,
+  windowed shell smoke still needs a desktop display
 - Authoritative Core adoption of economy-catalog/colony/logistics/
   population/strategic-AI frameworks pending — current consumption is
   intentionally read-only projection to avoid dual authority
