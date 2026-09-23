@@ -37,6 +37,14 @@ struct SceneEntity {
   // Static blocker: gravity-affected entities falling onto a solid land on
   // its top surface (platforms, ground). Solids never move or fall.
   bool solid{false};
+  // Sprite-sheet animation: `sprite` is a horizontal strip of `frames`
+  // equal-sized cells played at `fps` frames per second of sim time.
+  // 1/0 (defaults) draw the whole sprite.
+  int frames{1};
+  float fps{0.0f};
+  // Clockwise rotation in degrees — sprites rotate about their rect's
+  // center; tinted rects ignore it (no rotated-fill primitive).
+  float rotation{0.0f};
 };
 
 struct SceneDocument {

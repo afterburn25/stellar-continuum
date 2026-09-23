@@ -197,6 +197,7 @@ struct Shell {
       hit_scene_size{}, hit_scene_color{}, hit_scene_layer{},
       hit_scene_parallax{}, hit_scene_text{}, hit_scene_grav{},
       hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
+      hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
@@ -1027,6 +1028,24 @@ void commit_scene_field(Shell &shell) {
       next.solid = false;
       ok = true;
     }
+  } else if (shell.scene_field == 14) {
+    try {
+      next.frames = std::max(1, std::stoi(shell.scene_buffer));
+      ok = true;
+    } catch (const std::exception &) {
+    }
+  } else if (shell.scene_field == 15) {
+    try {
+      next.fps = std::stof(shell.scene_buffer);
+      ok = true;
+    } catch (const std::exception &) {
+    }
+  } else if (shell.scene_field == 16) {
+    try {
+      next.rotation = std::stof(shell.scene_buffer);
+      ok = true;
+    } catch (const std::exception &) {
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1066,7 +1085,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
             shell.hit_scene_color = shell.hit_scene_layer =
                 shell.hit_scene_parallax = shell.hit_scene_text =
                     shell.hit_scene_grav = shell.hit_scene_gravity =
-                        shell.hit_scene_solid = shell.hit_scene_bg = {};
+                        shell.hit_scene_solid = shell.hit_scene_bg =
+                            shell.hit_scene_frames = shell.hit_scene_fps =
+                                shell.hit_scene_rot = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1249,6 +1270,18 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
             std::to_string((int)shell.scene_doc.bg_b),
         shell.editing_scene && shell.scene_field == 13,
         "scene clear color r,g,b");
+  field(shell.hit_scene_frames, "frames",
+        entity ? std::to_string(entity->frames) : "",
+        shell.editing_scene && shell.scene_field == 14,
+        "sprite strip cells");
+  field(shell.hit_scene_fps, "fps",
+        entity ? std::to_string(entity->fps) : "",
+        shell.editing_scene && shell.scene_field == 15,
+        "anim frames/sec - 0 still");
+  field(shell.hit_scene_rot, "rotation",
+        entity ? std::to_string(entity->rotation) : "",
+        shell.editing_scene && shell.scene_field == 16,
+        "degrees clockwise - sprites only");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2100,6 +2133,12 @@ int main(int argc, char **argv) {
                     std::to_string((int)shell.scene_doc.bg_r) + "," +
                     std::to_string((int)shell.scene_doc.bg_g) + "," +
                     std::to_string((int)shell.scene_doc.bg_b);
+              else if (field == 14 && e)
+                shell.scene_buffer = std::to_string(e->frames);
+              else if (field == 15 && e)
+                shell.scene_buffer = std::to_string(e->fps);
+              else if (field == 16 && e)
+                shell.scene_buffer = std::to_string(e->rotation);
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2129,6 +2168,12 @@ int main(int argc, char **argv) {
               edit_field(12);
             else if (shell.hit_scene_bg.contains(event.position))
               edit_field(13);
+            else if (shell.hit_scene_frames.contains(event.position))
+              edit_field(14);
+            else if (shell.hit_scene_fps.contains(event.position))
+              edit_field(15);
+            else if (shell.hit_scene_rot.contains(event.position))
+              edit_field(16);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

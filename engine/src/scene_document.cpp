@@ -30,6 +30,9 @@ std::string SceneDocument::to_json() const {
     if (!e.text.empty()) item["text"] = e.text;
     if (e.gravity_scale != 1.0f) item["gravityScale"] = e.gravity_scale;
     if (e.solid) item["solid"] = true;
+    if (e.frames != 1) item["frames"] = e.frames;
+    if (e.fps != 0.0f) item["fps"] = e.fps;
+    if (e.rotation != 0.0f) item["rotation"] = e.rotation;
     items.push_back(std::move(item));
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
@@ -81,6 +84,9 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       entity.text = item.value("text", std::string{});
       entity.gravity_scale = item.value("gravityScale", 1.0f);
       entity.solid = item.value("solid", false);
+      entity.frames = item.value("frames", 1);
+      entity.fps = item.value("fps", 0.0f);
+      entity.rotation = item.value("rotation", 0.0f);
       scene.entities.push_back(std::move(entity));
     }
     if (doc.contains("background")) {

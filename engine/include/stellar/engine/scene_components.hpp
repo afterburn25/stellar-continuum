@@ -55,6 +55,15 @@ struct GravityScale {
 // Marker component: gravity-affected entities land on Solid tops; solids
 // are exempt from integration (they never move or fall).
 struct Solid {};
+struct Anim {
+  // Sprite-strip animation: `frames` cells at `fps` per sim second.
+  int frames{1};
+  float fps{0.0f};
+};
+struct Rotation {
+  // Degrees clockwise about the entity rect's center (sprites only).
+  float value{0.0f};
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

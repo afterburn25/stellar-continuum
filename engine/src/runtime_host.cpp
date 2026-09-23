@@ -51,6 +51,9 @@ struct RuntimeHost::Impl {
   float world_w = 0.f, world_h = 0.f;
   // Entities resting on the floor or a solid — jump requires groundedness.
   std::set<std::uint64_t> grounded;
+  // Accumulated simulation seconds — drives sprite-strip animation so
+  // playback is deterministic under --fixed-hz.
+  double sim_time = 0.0;
 };
 
 RuntimeHost::RuntimeHost(RuntimeHostOptions options)
@@ -363,6 +366,7 @@ int RuntimeHost::run() {
                            : 0.f;
     auto simulate = [&](float dt_step) {
       dt_step *= static_cast<float>(impl.time_scale);
+      impl.sim_time += dt_step;
       if (on_update) on_update(world, dt_step);
       impl.grounded.clear();
       for (const auto entity : impl.entities) {
@@ -527,11 +531,30 @@ int RuntimeHost::run() {
       if (rect.x + rect.width < 0 || rect.y + rect.height < 0 ||
           rect.x > w || rect.y > h)
         continue;
-      if (i < impl.sprites.size() && impl.sprites[i])
-        draw.overlay.push_back(Image{impl.sprites[i], rect});
-      else
+      if (i < impl.sprites.size() && impl.sprites[i]) {
+        Image img{impl.sprites[i], rect};
+        if (const auto *anim = world.get<Anim>(impl.entities[i]);
+            anim != nullptr && anim->frames > 1) {
+          // Horizontal strip: cell width = sprite width / frames, current
+          // cell from accumulated sim time (deterministic in fixed-step).
+          const auto &res = *impl.sprites[i];
+          const float cell_w =
+              static_cast<float>(res.width()) / anim->frames;
+          const int frame = anim->fps > 0.f
+                                ? static_cast<int>(impl.sim_time *
+                                                   anim->fps) %
+                                      anim->frames
+                                : 0;
+          img.source = UiRect{frame * cell_w, 0.f, cell_w,
+                              static_cast<float>(res.height())};
+        }
+        if (const auto *rot = world.get<Rotation>(impl.entities[i]))
+          img.rotation_degrees = rot->value;
+        draw.overlay.push_back(std::move(img));
+      } else {
         draw.overlay.push_back(
             FilledRectangle{rect, {tint->r, tint->g, tint->b, 255}});
+      }
       if (const auto *label = world.get<Label>(impl.entities[i]);
           label != nullptr && !label->value.empty()) {
         const int font_px =

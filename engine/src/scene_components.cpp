@@ -73,6 +73,10 @@ void register_scene_components(World &world) {
                                   [](const std::vector<std::uint8_t> &) {
                                     return Solid{};
                                   });
+  world.register_component<Anim>("anim", encode_pod<Anim>,
+                                 decode_pod<Anim>);
+  world.register_component<Rotation>("rotation", encode_pod<Rotation>,
+                                     decode_pod<Rotation>);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -90,6 +94,9 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (!s.text.empty()) world.add(entity, Label{s.text});
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
+    if (s.frames != 1 || s.fps != 0.f)
+      world.add(entity, Anim{s.frames, s.fps});
+    if (s.rotation != 0.f) world.add(entity, Rotation{s.rotation});
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
@@ -128,6 +135,12 @@ SceneDocument scene_from_world(const World &world) {
     if (const auto *g = world.get<GravityScale>(entity))
       s.gravity_scale = g->value;
     s.solid = world.get<Solid>(entity) != nullptr;
+    if (const auto *a = world.get<Anim>(entity)) {
+      s.frames = a->frames;
+      s.fps = a->fps;
+    }
+    if (const auto *rot = world.get<Rotation>(entity))
+      s.rotation = rot->value;
     doc.entities.push_back(std::move(s));
   }
   return doc;
