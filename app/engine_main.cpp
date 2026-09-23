@@ -1692,8 +1692,9 @@ int main(int argc, char **argv) {
     shell.projects_root = find_path("projects");
     std::filesystem::create_directories(shell.projects_root);
     refresh_projects(shell);
-    scan_assets(shell, find_path("assets"));
-    // Headless pipeline ops run without creating the window.
+    // Headless pipeline ops run without creating the window — dispatched
+    // before scan_assets so --create/--cook/--build/--package/--run/--test
+    // never pay the full asset-tree walk they don't need.
     if (argc > 1) {
       std::vector<std::string> args;
       for (int i = 1; i < argc; ++i)
@@ -1702,11 +1703,33 @@ int main(int argc, char **argv) {
 #else
         args.emplace_back(argv[i]);
 #endif
-      if (args.front() == "--create" || args.front() == "--cook" ||
-          args.front() == "--build" || args.front() == "--package" ||
-          args.front() == "--run" || args.front() == "--test")
+      const auto is_verb = [](const std::string &a) {
+        return a == "--create" || a == "--cook" || a == "--build" ||
+               a == "--package" || a == "--run" || a == "--test";
+      };
+      // The verb may follow "--project <root>" — normalize so the verb is
+      // first and the project root becomes its positional argument.
+      for (std::size_t i = 0; i < args.size(); ++i) {
+        if (!is_verb(args[i])) continue;
+        if (i > 0) {
+          // Non-verb args first (a --create name stays positional), then
+          // the --project roots as the positional project arguments.
+          std::vector<std::string> reordered{args[i]}, roots;
+          for (std::size_t j = 0; j < args.size(); ++j) {
+            if (j == i) continue;
+            if (args[j] == "--project" && j + 1 < args.size()) {
+              roots.push_back(args[++j]);
+              continue;
+            }
+            reordered.push_back(args[j]);
+          }
+          for (auto &r : roots) reordered.push_back(std::move(r));
+          return run_headless(shell, reordered);
+        }
         return run_headless(shell, args);
+      }
     }
+    scan_assets(shell, find_path("assets"));
     auto arg_str = [&](int i) {
 #ifdef _WIN32
       return std::filesystem::path(argv[i]).generic_string();

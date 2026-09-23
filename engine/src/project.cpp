@@ -191,8 +191,17 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
        << "  host.on_update = [](engine::World &world, float dt) {\n"
        << "    (void)world; (void)dt;\n"
        << "  };\n\n"
+       << "  // The status line under the built-in help text; shows the live\n"
+       << "  // entity count and pause state. host.paused()/request_quit()/\n"
+       << "  // set_scene() give game code the same control the keys do.\n"
+       << "  host.on_status = [&host] {\n"
+       << "    return std::to_string(host.world().entities().size()) +\n"
+       << "           (host.paused() ? \" entities | PAUSED (P)\"\n"
+       << "                          : \" entities\");\n"
+       << "  };\n\n"
        << "  // '--frames N' renders N frames then exits (CI smoke tests);\n"
-       << "  // '--fixed-hz N' runs deterministic fixed-timestep simulation.\n"
+       << "  // '--fixed-hz N' runs deterministic fixed-timestep simulation;\n"
+       << "  // '--scene <path>' picks a different editor scene document.\n"
        << "  return host.run(argc, argv);\n"
        << "}\n";
   } else {
