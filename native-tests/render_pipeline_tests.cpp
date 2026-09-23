@@ -106,13 +106,14 @@ int main() {
   streamer.request(planet, 0, 10.0f); // wants full res, high priority
   streamer.request(nebula, 0, 1.0f);
   auto changes = streamer.advance_frame(1);
-  // Budget 1000: planet needs 1100 (over budget!), nebula 300.
-  // Neither fits? planet 1100 > 1000 alone -> skipped; nebula 300 fits.
+  // Budget 1000: planet's full 1100 chain does not fit, so the streamer
+  // degrades it to the {300,150,50} tail (mip 1, 500 bytes); nebula's 300
+  // fits fully. A denied texture keeps a blurry bind instead of unloading.
   check(streamer.finest_resident_mip(nebula).has_value(),
         "nebula resident under budget");
-  check(!streamer.finest_resident_mip(planet).has_value(),
-        "over-budget texture stays unloaded");
-  check(streamer.resident_bytes() == 300, "resident bytes tracked");
+  check(streamer.finest_resident_mip(planet) == 1u,
+        "over-budget texture did not degrade to a resident mip tail");
+  check(streamer.resident_bytes() == 800, "resident bytes tracked");
 
   // Next frame: request planet at mip 2 (150+50=200) — fits.
   streamer.request(planet, 2, 10.0f);

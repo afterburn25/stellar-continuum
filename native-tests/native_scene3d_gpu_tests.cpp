@@ -141,8 +141,8 @@ int main(int argc,char** argv)try{
   check(channel(*uv,40,80,0)>200&&channel(*uv,280,80,1)>200&&channel(*uv,40,280,2)>200,"3D texture coordinates are flipped or ignored");
   {
     // Texture streaming under a tight byte budget: each ~5.6MB mip chain
-    // cannot coexist, so the streamer evicts the unrequested texture and a
-    // denied bind falls back to the pinned white texture (visible pop-in).
+    // cannot coexist, so the streamer evicts unrequested textures and
+    // degrades denied ones to their coarsest fittable mip tail.
     window.set_scene3d_texture_budget(8u*1024u*1024u);
     const auto big=[&](std::uint8_t shade){
       std::vector<std::uint8_t> pixels(1024u*1024u*4u);
@@ -156,11 +156,17 @@ int main(int argc,char** argv)try{
     check(window.scene3d_statistics().texture_cache_entries<=2,"Texture streamer did not evict the unrequested texture under budget");
     const auto uploads=window.scene3d_statistics().texture_uploads;
     const auto pair=capture({dark,light},"stream-both.png");
-    // Equal distances tie; the earlier-registered texture wins admission and
-    // the denied bind serves the pinned fallback (white, not its 220 texels).
-    check(window.scene3d_statistics().streamed_fallbacks>stream_base,"Denied texture did not fall back under streamer budget pressure");
+    // Equal distances tie; the earlier-registered texture wins full residency
+    // (5.6MB), leaving ~2.4MB — the second chain degrades to its ~1.6MB mip-1
+    // tail and still binds its own 220 texels rather than the white fallback.
+    check(window.scene3d_statistics().streamed_partial_binds>0,"Streamer did not admit a degraded mip tail under budget pressure");
     check(window.scene3d_statistics().texture_uploads>uploads,"Evicted texture was not re-uploaded on re-admission");
-    check(channel(*pair,72,160,0)<30&&channel(*pair,248,160,0)>240,"Streaming fallback/admission pixels are wrong");
+    check(channel(*pair,72,160,0)<30&&channel(*pair,248,160,0)>150&&channel(*pair,248,160,0)<235,"Streaming degraded-bind pixels are wrong");
+    // A zero budget denies even the smallest tail: the pinned white fallback
+    // serves the bind, keeping the pop-in path reachable.
+    window.set_scene3d_texture_budget(0);
+    (void)capture({dark},"stream-denied.png");
+    check(window.scene3d_statistics().streamed_fallbacks>stream_base,"Fully denied texture did not fall back to the pinned texture");
     window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
   }
   {

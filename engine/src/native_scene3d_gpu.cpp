@@ -37,8 +37,25 @@ struct Geometry {
   ~Geometry(){if(vertices)SDL_ReleaseGPUBuffer(device,vertices);if(indices)SDL_ReleaseGPUBuffer(device,indices);}
   std::size_t bytes()const{return owner->byte_size()*2;}
 };
+// One 2x box-filter step matching the halving rule the GPU blit chain uses
+// (clamped edges make 1-wide/1-high tails safe). Partial residency uploads a
+// downsampled level 0 because RgbaImage keeps only full-resolution pixels.
+std::vector<std::uint8_t> downsample_rgba2x(const std::vector<std::uint8_t>& src,int w,int h,int& out_w,int& out_h){
+  out_w=std::max(1,w/2);out_h=std::max(1,h/2);
+  std::vector<std::uint8_t> out(static_cast<std::size_t>(out_w)*out_h*4);
+  for(int y=0;y<out_h;++y)for(int x=0;x<out_w;++x){
+    unsigned sum[4]{};
+    const int xs[2]{std::min(2*x,w-1),std::min(2*x+1,w-1)},ys[2]{std::min(2*y,h-1),std::min(2*y+1,h-1)};
+    for(const int sy:ys)for(const int sx:xs)for(int c=0;c<4;++c)sum[c]+=src[(static_cast<std::size_t>(sy)*w+sx)*4+c];
+    for(int c=0;c<4;++c)out[(static_cast<std::size_t>(y)*out_w+x)*4+c]=static_cast<std::uint8_t>((sum[c]+2)/4);
+  }
+  return out;
+}
 struct Texture {
   SDL_GPUDevice* device;std::shared_ptr<const RgbaImage> owner;SDL_GPUTexture* texture{};std::uint64_t use{};std::size_t gpu_bytes{};
+  // Finest mip level actually uploaded; the texture's level 0 holds source
+  // mip base_mip when the streamer admitted a partial tail under budget.
+  std::uint32_t base_mip{};
   explicit Texture(SDL_GPUDevice* d):device(d){}
   ~Texture(){if(texture)SDL_ReleaseGPUTexture(device,texture);}
   std::size_t bytes()const{return owner->byte_size()+gpu_bytes;}
@@ -172,20 +189,29 @@ struct Scene3DRenderer::Storage {
   // uploads. Unadmitted requests bind the pinned fallback, keeping GPU
   // residency under the streamer's byte budget.
   void apply_streaming(){
-    for(const auto& change:streamer.advance_frame(++stream_frame)){
-      if(change.load||change.mip!=0)continue;
-      const auto owner_it=stream_owners.find(change.id);
+    std::unordered_set<engine::TextureId> touched;
+    for(const auto& change:streamer.advance_frame(++stream_frame))touched.insert(change.id);
+    for(const auto id:touched){
+      const auto owner_it=stream_owners.find(id);
       if(owner_it==stream_owners.end())continue;
-      if(const auto it=textures.find(owner_it->second);it!=textures.end()){stats.texture_cache_bytes-=it->second->bytes();stats.streamed_evicted_bytes+=it->second->bytes();textures.erase(it);}
+      const auto it=textures.find(owner_it->second);if(it==textures.end())continue;
+      const auto finest=streamer.finest_resident_mip(id);
+      // Any residency change invalidates the cached granularity — demotions
+      // and promotions alike re-upload the new resident tail on next bind.
+      if(!finest||*finest!=it->second->base_mip){stats.texture_cache_bytes-=it->second->bytes();stats.streamed_evicted_bytes+=it->second->bytes();textures.erase(it);}
     }
   }
   std::shared_ptr<Texture> texture(std::shared_ptr<const RgbaImage> resource){
     if(!resource)resource=white;
     if(auto it=textures.find(resource.get());it!=textures.end()){it->second->use=++serial;return it->second;}
-    if(resource.get()!=white.get())if(const auto sid=stream_ids.find(resource.get());sid!=stream_ids.end()&&!streamer.finest_resident_mip(sid->second)){++stats.streamed_fallbacks;return texture(white);}
+    std::uint32_t base_mip=0;
+    if(resource.get()!=white.get())if(const auto sid=stream_ids.find(resource.get());sid!=stream_ids.end()){
+      const auto finest=streamer.finest_resident_mip(sid->second);
+      if(!finest){++stats.streamed_fallbacks;return texture(white);}
+      base_mip=*finest;if(base_mip)++stats.streamed_partial_binds;
+    }
     auto result=std::make_shared<Texture>(device);result->owner=std::move(resource);result->use=++serial;
     const auto& image=*result->owner;const auto layout=texture_mip_layout3d(&image);
-    result->gpu_bytes=layout.gpu_bytes;
     if(!image.cooked_mips().empty()){
       SDL_GPUTextureFormat format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
       switch(image.cooked_format()){
@@ -198,46 +224,54 @@ struct Scene3DRenderer::Storage {
       std::vector<Bc1MipLevel> fallback_mips;
       if(!supported){format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;for(const auto& m:image.cooked_mips())fallback_mips.push_back({m.width,m.height,decode_texture_level(image.cooked_format(),m)});}
       const auto& levels=supported?image.cooked_mips():fallback_mips;
+      const auto base=std::min(base_mip,static_cast<std::uint32_t>(levels.size()-1));result->base_mip=base;
       const bool block=format!=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-      result->gpu_bytes=0;for(const auto&m:levels)result->gpu_bytes+=m.blocks.size();
+      result->gpu_bytes=0;for(std::size_t i=base;i<levels.size();++i)result->gpu_bytes+=levels[i].blocks.size();
       if(textures.size()>=maximum_scene3d_resource_entries)evict(textures,stats.texture_cache_bytes,0,std::numeric_limits<std::size_t>::max());
-      result->texture=make_texture(device,image.width(),image.height(),format,SDL_GPU_TEXTUREUSAGE_SAMPLER,static_cast<Uint32>(levels.size()));
+      result->texture=make_texture(device,levels[base].width,levels[base].height,format,SDL_GPU_TEXTUREUSAGE_SAMPLER,static_cast<Uint32>(levels.size()-base));
       // Every transfer offset is aligned, including the tiny 1x1 RGBA tail.
-      std::size_t transfer_bytes=0;for(const auto&m:levels)transfer_bytes+=((m.blocks.size()+15)/16)*16;
+      std::size_t transfer_bytes=0;for(std::size_t i=base;i<levels.size();++i)transfer_bytes+=((levels[i].blocks.size()+15)/16)*16;
       Transfer transfer(device,static_cast<Uint32>(transfer_bytes));auto* memory=static_cast<std::uint8_t*>(transfer.map());std::size_t offset=0;
-      for(const auto&m:levels){std::memcpy(memory+offset,m.blocks.data(),m.blocks.size());offset+=((m.blocks.size()+15)/16)*16;}SDL_UnmapGPUTransferBuffer(device,transfer.value);
+      for(std::size_t i=base;i<levels.size();++i){std::memcpy(memory+offset,levels[i].blocks.data(),levels[i].blocks.size());offset+=((levels[i].blocks.size()+15)/16)*16;}SDL_UnmapGPUTransferBuffer(device,transfer.value);
       Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("Cooked texture upload failed");offset=0;
-      for(Uint32 level=0;level<levels.size();++level){const auto&m=levels[level];SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.offset=static_cast<Uint32>(offset);from.pixels_per_row=block?(m.width+3)/4*4:m.width;from.rows_per_layer=block?(m.height+3)/4*4:m.height;
-        SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=((m.blocks.size()+15)/16)*16;
+      for(Uint32 level=base;level<levels.size();++level){const auto&m=levels[level];SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.offset=static_cast<Uint32>(offset);from.pixels_per_row=block?(m.width+3)/4*4:m.width;from.rows_per_layer=block?(m.height+3)/4*4:m.height;
+        SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level-base;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=((m.blocks.size()+15)/16)*16;
       }SDL_EndGPUCopyPass(copy);command.submit();textures.emplace(result->owner.get(),result);stats.texture_cache_bytes+=result->bytes();++stats.texture_uploads;return result;
     }
     const bool compressed=!image.bc1_mips().empty()&&SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER);
-    if(compressed){result->gpu_bytes=0;for(const auto& m:image.bc1_mips())result->gpu_bytes+=m.blocks.size();}
+    const auto bc1_base=image.bc1_mips().empty()?0u:std::min(base_mip,static_cast<std::uint32_t>(image.bc1_mips().size()-1));result->base_mip=bc1_base;
+    if(compressed){result->gpu_bytes=0;for(std::size_t i=bc1_base;i<image.bc1_mips().size();++i)result->gpu_bytes+=image.bc1_mips()[i].blocks.size();}
     if(textures.size()>=maximum_scene3d_resource_entries)evict(textures,stats.texture_cache_bytes,0,std::numeric_limits<std::size_t>::max());
     if(compressed){
-      result->texture=make_texture(device,image.width(),image.height(),SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER,layout.levels);
+      const auto& tail=image.bc1_mips()[bc1_base];
+      result->texture=make_texture(device,tail.width,tail.height,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER,static_cast<Uint32>(image.bc1_mips().size()-bc1_base));
       Transfer transfer(device,static_cast<Uint32>(result->gpu_bytes));auto* data=static_cast<std::uint8_t*>(transfer.map());std::size_t offset=0;
-      for(const auto& m:image.bc1_mips()){std::memcpy(data+offset,m.blocks.data(),m.blocks.size());offset+=m.blocks.size();}SDL_UnmapGPUTransferBuffer(device,transfer.value);
+      for(std::size_t i=bc1_base;i<image.bc1_mips().size();++i){std::memcpy(data+offset,image.bc1_mips()[i].blocks.data(),image.bc1_mips()[i].blocks.size());offset+=image.bc1_mips()[i].blocks.size();}SDL_UnmapGPUTransferBuffer(device,transfer.value);
       Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("Compressed texture copy pass failed");offset=0;
-      for(Uint32 level=0;level<image.bc1_mips().size();++level){const auto& m=image.bc1_mips()[level];
+      for(Uint32 level=bc1_base;level<image.bc1_mips().size();++level){const auto& m=image.bc1_mips()[level];
         SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.offset=static_cast<Uint32>(offset);from.pixels_per_row=(m.width+3)/4*4;from.rows_per_layer=(m.height+3)/4*4;
-        SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=m.blocks.size();
+        SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level-bc1_base;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=m.blocks.size();
       }SDL_EndGPUCopyPass(copy);command.submit();
       textures.emplace(result->owner.get(),result);stats.texture_cache_bytes+=result->bytes();++stats.texture_uploads;return result;
     }
-    result->texture=make_texture(device,image.width(),image.height(),SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,layout.levels);
-    Transfer transfer(device,static_cast<Uint32>(image.pixels().size()));std::memcpy(transfer.map(),image.pixels().data(),image.pixels().size());SDL_UnmapGPUTransferBuffer(device,transfer.value);
+    const auto tail_levels=layout.levels-base_mip;result->base_mip=base_mip;
+    std::vector<std::uint8_t> degraded;int base_width=image.width(),base_height=image.height();
+    if(base_mip){degraded=image.pixels();for(std::uint32_t i=0;i<base_mip;++i)degraded=downsample_rgba2x(degraded,base_width,base_height,base_width,base_height);}
+    const auto& level0=base_mip?degraded:image.pixels();
+    result->gpu_bytes=0;{int w=base_width,h=base_height;for(std::uint32_t i=0;i<tail_levels;++i){result->gpu_bytes+=static_cast<std::size_t>(w)*h*4;if(w==1&&h==1)break;w=std::max(1,w/2);h=std::max(1,h/2);}}
+    result->texture=make_texture(device,base_width,base_height,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,tail_levels);
+    Transfer transfer(device,static_cast<Uint32>(level0.size()));std::memcpy(transfer.map(),level0.data(),level0.size());SDL_UnmapGPUTransferBuffer(device,transfer.value);
     Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D texture copy pass failed");
-    SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.pixels_per_row=image.width();from.rows_per_layer=image.height();
-    SDL_GPUTextureRegion to{};to.texture=result->texture;to.w=image.width();to.h=image.height();to.d=1;
+    SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.pixels_per_row=base_width;from.rows_per_layer=base_height;
+    SDL_GPUTextureRegion to{};to.texture=result->texture;to.w=base_width;to.h=base_height;to.d=1;
     SDL_UploadToGPUTexture(copy,&from,&to,false);SDL_EndGPUCopyPass(copy);
     // Generate once, outside the copy pass and before any consumer samples it.
     // All four channels are data: alpha may encode opacity OR surface height.
     // SDL 3.4.16's Vulkan GenerateMipmaps shifts dimensions without clamping
     // to one, yielding empty blits for rectangular tails and every 1D mip.
     // Explicit blit regions keep both axes valid through the final 1x1 level.
-    Uint32 width=image.width(),height=image.height();
-    for(Uint32 level=1;level<layout.levels;++level){
+    Uint32 width=base_width,height=base_height;
+    for(Uint32 level=1;level<tail_levels;++level){
       const auto next_width=std::max(1u,width/2),next_height=std::max(1u,height/2);
       SDL_GPUBlitInfo blit{};blit.source.texture=blit.destination.texture=result->texture;
       blit.source.mip_level=level-1;blit.source.w=width;blit.source.h=height;
