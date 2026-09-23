@@ -26,6 +26,10 @@ struct RuntimeHost::Impl {
   std::vector<EntityId> entities;
   std::vector<std::shared_ptr<const RgbaImage>> sprites;
   std::optional<EntityId> player;
+  bool quit_requested = false;
+  bool paused = false;
+  // Assigned inside run(); applies a scene switch immediately.
+  std::function<void(const std::string &)> switch_scene;
 };
 
 RuntimeHost::RuntimeHost(RuntimeHostOptions options)
@@ -41,6 +45,15 @@ World &RuntimeHost::world() { return impl_->world; }
 const ContentResolver &RuntimeHost::content() const { return *impl_->content; }
 audio::AudioOutput &RuntimeHost::audio() { return *impl_->audio; }
 std::optional<EntityId> RuntimeHost::player() const { return impl_->player; }
+void RuntimeHost::request_quit() { impl_->quit_requested = true; }
+void RuntimeHost::set_paused(bool paused) { impl_->paused = paused; }
+bool RuntimeHost::paused() const { return impl_->paused; }
+void RuntimeHost::set_scene(std::string scene_file) {
+  if (impl_->switch_scene)
+    impl_->switch_scene(scene_file);
+  else
+    impl_->options.scene_file = std::move(scene_file);
+}
 
 int RuntimeHost::run() {
   auto &impl = *impl_;
@@ -136,7 +149,7 @@ int RuntimeHost::run() {
   // Authored entities come from the scene file (the engine tools' Scene
   // tool); it is polled so saved edits apply live to the running game. One
   // demo entity when the document is absent.
-  const auto scene_file = options.project_root / options.scene_file;
+  auto scene_file = options.project_root / options.scene_file;
   auto scene_stamp = std::filesystem::file_time_type{};
   auto reload_scene = [&] {
     std::error_code ec;
@@ -146,6 +159,11 @@ int RuntimeHost::run() {
       scene_stamp = stamp;
       spawn_entities(*doc);
     }
+  };
+  impl.switch_scene = [&](const std::string &file) {
+    scene_file = options.project_root / file;
+    scene_stamp = {};
+    reload_scene();
   };
   reload_scene();
   if (impl.entities.empty())
@@ -174,21 +192,20 @@ int RuntimeHost::run() {
   };
 
   std::unordered_set<std::uint32_t> held_keys;
-  bool paused = false;
   float accumulator = 0.f;
   int rendered = 0;
   auto last = std::chrono::steady_clock::now();
   auto scene_poll = last;
   for (;;) {
     const auto snapshot = window.poll();
-    if (snapshot.quit_requested) break;
+    if (snapshot.quit_requested || impl.quit_requested) break;
     for (const auto &event : snapshot.events) {
       if (event.type == InputEventType::EscapePressed) return 0;
       if (event.type == InputEventType::KeyPressed) {
         held_keys.insert(event.key);
         if (event.key == 0x4000003e) save_world();   // F5
         if (event.key == 0x40000042) load_world();   // F9
-        if (event.key == 'p') paused = !paused;      // P pauses the sim
+        if (event.key == 'p') impl.paused = !impl.paused;  // P pauses the sim
       }
       if (event.type == InputEventType::KeyReleased)
         held_keys.erase(event.key);
@@ -252,7 +269,7 @@ int RuntimeHost::run() {
           audio.play_effect(bounce_clip);
       }
     };
-    if (paused) {
+    if (impl.paused) {
       // Rendering continues; the sim does not advance.
     } else if (step > 0.f) {
       // Frame-limited runs step once per rendered frame so --frames N
@@ -337,6 +354,8 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.fixed_timestep_hz = std::atof(argv[++i]);
     else if (arg == "--snapshot-out")
       impl_->options.snapshot_out = argv[++i];
+    else if (arg == "--scene")
+      impl_->options.scene_file = argv[++i];
   }
   return run();
 }

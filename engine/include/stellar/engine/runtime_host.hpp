@@ -74,6 +74,18 @@ public:
   // The entity named "player" in the active scene, if any.
   [[nodiscard]] std::optional<EntityId> player() const;
 
+  // Game-driven control, callable from the callbacks:
+  // ends the run loop after the current frame (the clean-exit path —
+  // window teardown, snapshot_out, exit code — all still run).
+  void request_quit();
+  // Pauses/resumes the simulation; rendering and callbacks continue.
+  // The P key toggles the same flag.
+  void set_paused(bool paused);
+  [[nodiscard]] bool paused() const;
+  // Switches the active scene document (project-relative path), respawning
+  // entities — level switching. Before run() it sets the initial scene.
+  void set_scene(std::string scene_file);
+
   // Runs each rendered frame after input handling and scene polling, before
   // the built-in velocity integration. The place for game logic.
   std::function<void(World &, float dt)> on_update;
