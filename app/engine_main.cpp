@@ -187,8 +187,8 @@ struct Shell {
   int scene_field{}; // 1=name, 2=pos "x,y", 3=vel "vx,vy"
   std::string scene_buffer;
   UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
-      hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, scene_preview{},
-      scene_rows{};
+      hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
+      scene_preview{}, scene_rows{};
   std::string status{"ready"};
 };
 
@@ -823,6 +823,9 @@ void commit_scene_field(Shell &shell) {
     ok = parse_pair(shell.scene_buffer, entity->x, entity->y);
   } else if (shell.scene_field == 3) {
     ok = parse_pair(shell.scene_buffer, entity->vx, entity->vy);
+  } else if (shell.scene_field == 4) {
+    entity->sprite = shell.scene_buffer;
+    ok = true;
   }
   if (ok) {
     shell.scene_modified = true;
@@ -841,7 +844,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   if (!shell.project) {
     line(out, x, y, "open project", "none - open one in Projects", font);
     shell.hit_scene_add = shell.hit_scene_del = shell.hit_scene_save = {};
-    shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel = {};
+    shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel =
+        shell.hit_scene_sprite = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -938,6 +942,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit_scene_vel, "vx,vy",
         entity ? fmt_pair(entity->vx, entity->vy) : "",
         shell.editing_scene && shell.scene_field == 3, "e.g. 240,150");
+  field(shell.hit_scene_sprite, "sprite", entity ? entity->sprite : "",
+        shell.editing_scene && shell.scene_field == 4,
+        "content-relative image path");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -1687,6 +1694,8 @@ int main(int argc, char **argv) {
               else if (field == 3 && e)
                 shell.scene_buffer = std::to_string((int)e->vx) + "," +
                                      std::to_string((int)e->vy);
+              else if (field == 4 && e)
+                shell.scene_buffer = e->sprite;
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -1696,6 +1705,8 @@ int main(int argc, char **argv) {
               edit_field(2);
             else if (shell.hit_scene_vel.contains(event.position))
               edit_field(3);
+            else if (shell.hit_scene_sprite.contains(event.position))
+              edit_field(4);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

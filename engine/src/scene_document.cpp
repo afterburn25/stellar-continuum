@@ -24,6 +24,7 @@ std::string SceneDocument::to_json() const {
     item["vx"] = e.vx;
     item["vy"] = e.vy;
     item["color"] = {e.r, e.g, e.b};
+    if (!e.sprite.empty()) item["sprite"] = e.sprite;
     items.push_back(std::move(item));
   }
   return doc.dump(2) + "\n";
@@ -66,6 +67,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
         entity.g = color[1].get<std::uint8_t>();
         entity.b = color[2].get<std::uint8_t>();
       }
+      entity.sprite = item.value("sprite", std::string{});
       scene.entities.push_back(std::move(entity));
     }
   } catch (const std::exception &e) {

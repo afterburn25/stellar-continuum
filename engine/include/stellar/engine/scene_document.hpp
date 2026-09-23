@@ -19,6 +19,9 @@ struct SceneEntity {
   float x{}, y{}, w{32.f}, h{32.f};
   float vx{}, vy{};
   std::uint8_t r{86}, g{196}, b{255};
+  // Optional content-relative image (e.g. "data/logo.png") rendered instead
+  // of the tinted rect; resolved under the project's content roots.
+  std::string sprite;
 };
 
 struct SceneDocument {
