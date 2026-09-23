@@ -2,10 +2,20 @@
 #include "native_campaign_calendar.hpp"
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <stdexcept>
 
 namespace stellar::native_notifications {
 namespace {
+const char* chronicle_category_label(std::string_view category){
+  if(category.starts_with("construction."))return "Construction";
+  if(category.starts_with("shipbuilding."))return "Ships";
+  if(category.starts_with("research."))return "Research";
+  if(category.starts_with("exploration."))return "Exploration";
+  if(category.starts_with("colony."))return "Colony";
+  if(category.starts_with("war."))return "Combat";
+  return nullptr;
+}
 const char* diplomatic_message(core::DiplomaticEventKind kind){
   using enum core::DiplomaticEventKind;
   switch(kind){
@@ -36,6 +46,22 @@ void publish_campaign_notifications(NativeNotificationFeed& feed,
     auto message=std::string(messages[index]);
     if(count>1)message+=" ("+std::to_string(count)+")";
     feed.publish(categories[index],date,std::move(message));
+  }
+}
+
+void seed_chronicle_notifications(NativeNotificationFeed& feed,
+    const engine::EventHistory& history,int observer_civilization_id,
+    std::size_t max_entries){
+  const auto events=history.feed(
+      static_cast<std::uint64_t>(observer_civilization_id),
+      -std::numeric_limits<double>::infinity());
+  const auto begin=events.size()>max_entries?events.end()-max_entries
+                                           :events.begin();
+  for(auto it=begin;it!=events.end();++it){
+    const auto* event=*it;
+    const char* label=chronicle_category_label(event->category);
+    feed.publish(label?std::string(label):event->category,
+        native_campaign::format_campaign_date(event->at_day),event->summary);
   }
 }
 

@@ -85,6 +85,21 @@ chronicle existed load with an empty history; corrupt states (non-
 ascending ids, `next_id` collisions, unsupported version) are rejected
 with `PlayerCampaignPersistenceDataError`.
 
+## Presentation consumer (milestone 15)
+
+The player notification panel is a bounded 32-item transient feed —
+before this integration it cleared on load, so the persisted chronicle
+was unreachable in-game. `seed_chronicle_notifications`
+(`native_notification_events`) now runs at campaign admission: it pulls
+`history().feed(player_civilization, -inf)` and publishes the most
+recent 16 entries with their recorded campaign dates and summaries,
+mapping history categories onto the feed's existing display vocabulary
+(Construction/Ships/Research/Exploration/Colony/Combat; unmapped
+categories keep their stable raw id). Observer privacy is the
+chronicle's own projection — the publisher never re-derives visibility.
+Coverage: `native_notification_events` tests (chronicle ordering,
+observer filtering, bound, category labels, empty history).
+
 ## Remaining limitations
 
 - `summary` is an opaque string — localization-key + argument binding
@@ -94,4 +109,7 @@ with `PlayerCampaignPersistenceDataError`.
 - Visibility widens at known-system granularity — a civ that merely
   detected a system sees its major events; delayed intel, survey-level
   gating and sensor-quality degradation are future refinements.
-- News/voice presentation on top of `feed()` remains app-level work.
+- The notification panel shows only the newest 16 chronicle entries at
+  admission — a dedicated scrollable chronicle/history browser over
+  `feed()` and `query()` remains app-level work, as does voice
+  presentation.

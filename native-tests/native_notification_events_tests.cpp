@@ -45,6 +45,37 @@ void observer_and_activation(){
   try{publisher.harvest(feed,other);}catch(const std::logic_error&){rejected=true;}
   require(rejected&&feed.items().empty(),"Observer changed without re-admission");
 }
+void chronicle_seeding(){
+  stellar::engine::EventHistory history;
+  const auto add=[&](double day,std::string category,std::string summary,
+                     std::vector<std::uint64_t> visible={}){
+    stellar::engine::HistoryEvent event;event.at_day=day;
+    event.category=std::move(category);event.summary=std::move(summary);
+    event.visible_to=std::move(visible);history.record(std::move(event));};
+  add(400.,"exploration.system_surveyed","System survey completed");
+  add(410.,"war.battle","FOREIGN BATTLE REPORT",{7});
+  add(420.,"colony.founded","Colony established",{1});
+  add(430.,"unknown.happening","Uncategorized record",{1});
+  NativeNotificationFeed feed;
+  seed_chronicle_notifications(feed,history,1);
+  require(feed.items().size()==3,"Observer-invisible chronicle entry leaked");
+  require(feed.items().front().category=="Exploration"&&
+      feed.items().front().message=="System survey completed",
+      "Chronicle order or summary mapping broken");
+  require(feed.items()[1].category=="Colony","Category label not mapped");
+  require(feed.items().back().category=="unknown.happening",
+      "Unmapped category lost its stable id");
+  require(feed.items().front().date!=feed.items().back().date,
+      "Recorded event dates not preserved");
+  NativeNotificationFeed bounded;
+  seed_chronicle_notifications(bounded,history,1,2);
+  require(bounded.items().size()==2&&
+      bounded.items().front().message=="Colony established",
+      "Chronicle seed bound kept wrong entries");
+  NativeNotificationFeed fresh;
+  seed_chronicle_notifications(fresh,stellar::engine::EventHistory{},1);
+  require(fresh.items().empty(),"Empty chronicle seeded phantom entries");
+}
 void bounded_categories(){
   using namespace stellar::native_campaign_feedback;
   NativeNotificationFeed feed;CampaignFeedbackSummary summary;
@@ -60,5 +91,5 @@ void bounded_categories(){
       "Accelerated event history exceeded its memory bound");
 }
 }
-int main(){try{observer_and_activation();bounded_categories();}
+int main(){try{observer_and_activation();chronicle_seeding();bounded_categories();}
   catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}return 0;}

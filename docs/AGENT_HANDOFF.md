@@ -185,6 +185,13 @@ body-flag tags) so engine frameworks evaluate real Core worlds;
 and `evaluate_habitability` over projected bodies. Core
 `assess_species_planet`/`species_environment` remains authoritative for
 campaign suitability — the adapter is a projection, not a replacement.
+Milestone 15 partially landed: `seed_chronicle_notifications`
+(native_notification_events) seeds the bounded player notification feed
+from `runtime().history().feed(player)` at campaign admission — the
+persisted chronicle now surfaces in-game after load with recorded dates
+and summaries; `native_notification_events` tests cover ordering,
+observer privacy, bounds and category labels. A scrollable chronicle
+browser and voice presentation remain.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

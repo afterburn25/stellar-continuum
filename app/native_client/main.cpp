@@ -6850,6 +6850,8 @@ class NativeCampaign final {
     auto& runtime=session_->frame().runtime();
     diplomatic_notifications_.seed(runtime.diplomacy().build_view_for(
         runtime.world().campaign().player_civilization_id));
+    native_notifications::seed_chronicle_notifications(notifications_,
+        runtime.history(),runtime.world().campaign().player_civilization_id);
     notification_refresh_elapsed_=0.;
   }
   void refresh_notifications(){

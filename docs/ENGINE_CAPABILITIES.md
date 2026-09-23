@@ -143,6 +143,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   rejection. `campaign_event_history` tests — category mapping for
   every step event type, actor/visibility/tags/at_day, feed privacy.
   `framework_state_codec` covers the JSON codec.
+  **Presentation consumer (M15):** `seed_chronicle_notifications` in
+  `native_notification_events` seeds the player notification feed from
+  `history().feed()` at campaign admission — recorded dates/summaries
+  survive load, category labels mapped, observer filtering delegated to
+  the chronicle (`native_notification_events` tests).
 - **Save/performance impact:** `EventHistory` field on the v17 payload
   (optional — absent in pre-chronicle saves); strict ordered decode
   with 1M-event bound and id-ordering validation on restore. Recording
