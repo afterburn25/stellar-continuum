@@ -53,6 +53,9 @@ struct SceneEntity {
   bool flip_y{false};
   // Invisible entities simulate and collide normally but are not drawn.
   bool visible{true};
+  // One-way platform: entities land on its top but pass through the
+  // sides and bottom. Independent of `solid` (which also side-blocks).
+  bool oneway{false};
 };
 
 struct SceneDocument {

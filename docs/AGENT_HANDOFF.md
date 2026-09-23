@@ -119,18 +119,28 @@ windowed starter is now a ~20-line `RuntimeHost` client: the engine's
 `stellar::runtime`) owns the SDL loop, package scan, `ContentResolver`
 (cooked `Content/` or `build/cooked/` first, loose
 `packages/<id>/content/` fallback, `pkg:path` qualified lookups
-for mod packages), `scene_components` ECS set
-(Transform2D/Velocity2D/Extent2D/Tint/EntityName/SpriteRef with
-registered codecs), `spawn_scene`/`scene_from_world`,
-scene-file hot reload, WASD player input, bounce+music audio, and
-F5/F9 `save_world_to_file`/`load_world_from_file` quicksave through
-`saves/quicksave.stw` (atomic write plus a rotated `.bak` history
-chain — load recovers through the slots; the player handle
-re-resolves by name). Game code hooks in via
-`on_update`/`on_event`/`on_status`/`on_draw` callbacks and drives
-the loop with `request_quit()`/`set_paused()`/`set_scene()`
-(level switching); `--scene <path>` overrides the scene at launch,
-P pauses the sim.
+for mod packages), the `scene_components` ECS set (registered codecs
+for every field), `spawn_scene`/`scene_from_world`, scene-file hot
+reload, WASD player input, music/effects audio, F5/F9 quicksave
+through `saves/quicksave.stw` (atomic write plus a rotated `.bak`
+history chain — load recovers through the slots), and
+`RuntimeDiagnostics` crash dumps in `<root>/logs/`. Game code hooks
+in via `on_update`/`on_event`/`on_status`/`on_collision`/`on_draw`
+callbacks and drives the loop with `request_quit()`/`set_paused()`/
+`set_time_scale()`/`set_scene()` (level switching)/`spawn_entity()`/
+`destroy_entity()`/`set_camera()`. Runtime options/args: `--scene`,
+`--fixed-hz` (deterministic N-step-per-frame under `--frames`),
+`--frames` (bounded CI runs), `--snapshot-out` (byte-comparable world
+dumps), `--world-w/--world-h`, `--speed`, `--width/--height`,
+`--fullscreen`; P pauses, F12 screenshots to `<root>/screenshots/`.
+`SceneEntity` authoring surface: name, position/extent/velocity,
+tint, sprite path, layer (stable-sorted draw order), parallax
+(0 = screen-pinned), text label, gravityScale + solid (platformer
+physics: doc-level gravity, landing on solid tops, side blocking,
+grounded W/Up jump), sprite-strip `frames`/`fps` (horizontal cells,
+sim-time indexed), `rotation`, `ttl` (sim-time self-destruct),
+`flipX`/`flipY`, `visible`. The Scene tool exposes every field in a
+two-column property list with an animated/flipped/rotated preview.
 `stellar-editor.exe` is the separate authoritative-world editor
 (galaxy/system/body workspaces, annotations, undo, atomic project
 documents, `--project` interop). Both are registry rows in

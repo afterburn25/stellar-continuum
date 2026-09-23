@@ -77,6 +77,9 @@ struct Flip {
 struct Hidden {
   // Marker: entity simulates and collides but is skipped by the renderer.
 };
+struct Oneway {
+  // Marker: landable from above, pass-through from sides and below.
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

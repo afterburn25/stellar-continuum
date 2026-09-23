@@ -207,6 +207,7 @@ int main() {
     scene.entities[0].flip_x = true;
     scene.entities[0].flip_y = true;
     scene.entities[0].visible = false;
+    scene.entities[0].oneway = true;
     const auto reparsed = engine::SceneDocument::from_json(scene.to_json());
     check(reparsed && reparsed->entities.size() == 1 &&
               reparsed->entities[0].name == "box" &&
@@ -225,6 +226,7 @@ int main() {
               reparsed->entities[0].flip_x &&
               reparsed->entities[0].flip_y &&
               !reparsed->entities[0].visible &&
+              reparsed->entities[0].oneway &&
               reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
               reparsed->bg_b == 40 && reparsed->gravity == 600.f,
           "scene document round-trips");

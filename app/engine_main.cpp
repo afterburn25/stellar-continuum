@@ -198,6 +198,7 @@ struct Shell {
       hit_scene_parallax{}, hit_scene_text{}, hit_scene_grav{},
       hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
       hit_scene_flipx{}, hit_scene_flipy{}, hit_scene_visible{},
+      hit_scene_oneway{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
@@ -1054,7 +1055,7 @@ void commit_scene_field(Shell &shell) {
     } catch (const std::exception &) {
     }
   } else if (shell.scene_field == 18 || shell.scene_field == 19 ||
-             shell.scene_field == 20) {
+             shell.scene_field == 20 || shell.scene_field == 21) {
     const auto b = shell.scene_buffer;
     bool value;
     if (b == "1" || b == "true" || b == "yes") {
@@ -1071,8 +1072,10 @@ void commit_scene_field(Shell &shell) {
         next.flip_x = value;
       else if (shell.scene_field == 19)
         next.flip_y = value;
-      else
+      else if (shell.scene_field == 20)
         next.visible = value;
+      else
+        next.oneway = value;
     }
   }
   if (ok) {
@@ -1118,7 +1121,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                                 shell.hit_scene_rot = shell.hit_scene_ttl =
                                     shell.hit_scene_flipx =
                                         shell.hit_scene_flipy =
-                                            shell.hit_scene_visible = {};
+                                            shell.hit_scene_visible =
+                                                shell.hit_scene_oneway = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1349,6 +1353,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? (entity->visible ? "true" : "false") : "",
         shell.editing_scene && shell.scene_field == 20,
         "false simulates but hides");
+  field(shell.hit_scene_oneway, "oneway",
+        entity ? (entity->oneway ? "true" : "false") : "",
+        shell.editing_scene && shell.scene_field == 21,
+        "land on top, pass through");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2214,6 +2222,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = e->flip_y ? "true" : "false";
               else if (field == 20 && e)
                 shell.scene_buffer = e->visible ? "true" : "false";
+              else if (field == 21 && e)
+                shell.scene_buffer = e->oneway ? "true" : "false";
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2257,6 +2267,8 @@ int main(int argc, char **argv) {
               edit_field(19);
             else if (shell.hit_scene_visible.contains(event.position))
               edit_field(20);
+            else if (shell.hit_scene_oneway.contains(event.position))
+              edit_field(21);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

@@ -383,10 +383,13 @@ int RuntimeHost::run() {
         const float prev_bottom = t->y + ext->h;
         t->x += v->dx * dt_step;
         // Horizontal blocking: a moving gravity-affected entity whose side
-        // crosses a solid's side stops against it (walls).
+        // crosses a solid's side stops against it (walls). One-way
+        // platforms never side-block.
         if (gscale != 0.f && v->dx != 0.f) {
           for (const auto other : impl.entities) {
-            if (other == entity || !world.get<Solid>(other)) continue;
+            if (other == entity || !world.get<Solid>(other) ||
+                world.get<Oneway>(other))
+              continue;
             const auto *st = world.get<Transform2D>(other);
             const auto *se = world.get<Extent2D>(other);
             if (!st || !se) continue;
@@ -407,10 +410,14 @@ int RuntimeHost::run() {
         }
         t->y += v->dy * dt_step;
         // Platform landings: a falling, gravity-affected entity whose
-        // bottom crossed a solid's top this step lands on it.
+        // bottom crossed a solid's top this step lands on it. One-way
+        // platforms land identically (crossing is only detected when
+        // falling, so rising/horizontal motion passes through).
         if (gscale != 0.f && v->dy > 0.f) {
           for (const auto other : impl.entities) {
-            if (other == entity || !world.get<Solid>(other)) continue;
+            if (other == entity ||
+                (!world.get<Solid>(other) && !world.get<Oneway>(other)))
+              continue;
             const auto *st = world.get<Transform2D>(other);
             const auto *se = world.get<Extent2D>(other);
             if (!st || !se) continue;
@@ -443,7 +450,9 @@ int RuntimeHost::run() {
           impl.grounded.insert(entity.value());
         else if (v->dy == 0.f) {
           for (const auto other : impl.entities) {
-            if (other == entity || !world.get<Solid>(other)) continue;
+            if (other == entity ||
+                (!world.get<Solid>(other) && !world.get<Oneway>(other)))
+              continue;
             const auto *st = world.get<Transform2D>(other);
             const auto *se = world.get<Extent2D>(other);
             if (st && se && t->x < st->x + se->w && t->x + ext->w > st->x &&
