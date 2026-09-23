@@ -15,7 +15,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Window and platform | IMPLEMENTED BUT NEEDS POLISH | Engine `native_map_platform.cpp`, runtime paths/lease; App video controller | `native_client_platform`, `native_video_platform`, `native_video_controller` | Verified Windows x64 only; portable platform interface and device recovery need work |
 | Native input | PARTIALLY IMPLEMENTED | Engine `native_map_platform.hpp` (keyboard/mouse/gamepad events), `input_actions.hpp` (`InputMapper`, action contexts incl. pad buttons/axes); App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `input_actions`, `native_ui_layout` | No rebinding UI, multi-pad, or accessibility input layer |
 | 2D/UI renderer | IMPLEMENTED BUT NEEDS POLISH | Engine native map platform, UI skin and text fit | `native_text_measure`, `native_navigation_visual` | Shared helpers, but application-driven widgets/layout and no general UI scene framework |
-| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/AABB sim, GPU composite under 2D HUD) | `engine_scene3d`, `native_scene3d_gpu`, scale3d tests; `engine_project`/`engine_world` 3D doc+component coverage | Bounded CPU submission and fixed caches; collision is world AABB of rotated local bounds, no rigid-body solver; no render graph/GPU-driven scene |
+| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/OBB sim, GPU composite under 2D HUD) | `engine_scene3d`, `native_scene3d_gpu`, scale3d tests; `engine_project`/`engine_world` 3D doc+component coverage | Bounded CPU submission and fixed caches; SAT OBB collision over mesh local bounds (no per-triangle or rigid-body solver); no render graph/GPU-driven scene |
 | Mesh/geometry and culling | IMPLEMENTED BUT NEEDS POLISH | Engine solid/triangle meshes, billboard batch, scene bounds | scene/triangle/scale tests | Procedural geometry and conservative limits, not a general imported geometry cooker |
 | Lighting/materials | IMPLEMENTED BUT NEEDS POLISH | Engine scene material/fragment shader; spherical material preparation | `engine_spherical_material`, `native_scene3d_gpu`, `native_planet_materials` | Approximate illumination/response from artwork; no full physically calibrated renderer |
 | Canonical planet classification/art | IMPLEMENTED | Core `planet_appearance.hpp/.cpp`, taxonomy/art catalogs | `planet_appearance`, `native_planet_materials` | Scoped registry/generation contract; 66 definitions do not mean every subclass has admitted art |
@@ -100,20 +100,23 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   with the rebindable "game" context (WASD move, Space/C up/down,
   right-drag look, wheel fov), integrates gravity + velocity at the
   fixed timestep, rests entities on `groundY` by their mesh's scaled
-  AABB bottom, clamps/bounces at `bounds` (`NoBounce` opts out), ticks
-  `Lifetime`, resolves `Parent3D` follow, and runs AABB contact events —
-  solid movers push out along the least-penetrated axis and zero inward
-  velocity; `on_collision`/`on_collision_exit`/`on_land` fire for the 3D
-  set. Public API: `scene3d()`, `entities3d()`, `entities3d_in_radius`,
-  `spawn_entity3d`, `on_spawn3d`, `set_camera3d` + getters,
-  `gravity3d()`, `ground_y()`, `raycast3d`, `entity3d_at`. F5/F9
-  snapshots capture the 3D set —
+  world-AABB bottom, clamps/bounces at `bounds` (`NoBounce` opts out),
+  ticks `Lifetime`, resolves `Parent3D` follow, and runs contact events
+  — solid movers push out along the least-penetrated axis and zero
+  inward velocity; `on_collision`/`on_collision_exit`/`on_land` fire for
+  the 3D set. Public API: `scene3d()`, `entities3d()`,
+  `entities3d_in_radius`, `spawn_entity3d`, `on_spawn3d`,
+  `set_camera3d` + getters, `gravity3d()`, `ground_y()`, `raycast3d`,
+  `entity3d_at`. F5/F9 snapshots capture the 3D set —
   including a `Camera3DState` carrier that restores the fly camera — and
-  `load_world` partitions it back out of the 2D list. Collision uses the
-  world AABB of each entity's rotated+scaled local mesh bounds
-  (`Mesh3D::bounds_min`/`bounds_max` × quaternion), so tipped boxes
-  contact on their corners; solid push-out resolves the least-penetrated
-  axis and doubles as the landing-on-solids path. A `lights` document
+  `load_world` partitions it back out of the 2D list. Narrow-phase
+  collision uses SAT over oriented bounding boxes (`ObBox3D` +
+  `obb_separation` in physics3d.hpp — each entity's local mesh bounds
+  transformed by its quaternion/scale): rotated boxes resolve on their
+  true faces instead of the conservative world AABB, and the returned
+  minimum translation vector drives push-out + landing. The world AABB
+  is still computed alongside for the ground plane, `bounds` clamping,
+  and broad-phase pair rejection. A `lights` document
   array (max 2) feeds `Material3D::additional_lights` as world-space
   directional fills. `create_project`'s windowed starter ships a ready
   `editor/scene3d.json` and documents `--scene3d` in the host comment.
@@ -140,16 +143,18 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   the same snapshot stream; meshes/textures cache per spec; contact scan
   is O(n²) over the 3D set (small scene counts); rendering reuses the
   existing bounded `Scene3D` submission path.
-- **Limitations:** collision is the world AABB of the rotated local
-  bounds (not OBBs or per-triangle); solids are blockers, not full rigid-
-  body dynamics (no stacking solver — `groundY` + the upward push-out
-  cover landing); `physics3d`/`spatial_index3d` exist engine-side but
-  are not yet wired into this mode (raycast uses `segment_triangle`
-  via `intersect_mesh_segment`); the Scene3D editor tab covers entity +
-  document fields with a live preview/pick but has no transform gizmos
-  or light/emitter authoring UI; lighting is one key light + up to two
-  directional fills per material; raycast is O(triangles) per entity
-  with no spatial partition — fine for queries, not per-frame sweeps.
+- **Limitations:** collision is OBB over the mesh's local AABB (not
+  per-triangle — a sphere mesh still collides as its box); solids are
+  blockers, not full rigid-body dynamics (no stacking solver — `groundY`
+  + the upward push-out cover landing); ground plane and `bounds` still
+  use the world AABB; `physics3d` kinematics/`spatial_index3d` exist
+  engine-side but are not wired into this mode (raycast uses
+  `segment_triangle` via `intersect_mesh_segment`); the Scene3D editor
+  tab covers entity + document fields with a live preview/pick but has
+  no transform gizmos or light/emitter authoring UI; lighting is one key
+  light + up to two directional fills per material; raycast is
+  O(triangles) per entity with no spatial partition — fine for queries,
+  not per-frame sweeps.
 
 ## Authored tilemap layers for generated 2D games (2026-09-21)
 

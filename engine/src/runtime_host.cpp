@@ -1491,12 +1491,14 @@ int RuntimeHost::run() {
         impl.cam3_y += (fwd.y * mz + my) * spd;
         impl.cam3_z += (fwd.z * mz + right.z * mx) * spd;
 
-        // World-space AABB of an entity's rotated + scaled local bounds:
-        // center = pos + R*(local_center*s), half-extents = |R|*(half*s).
-        // Rotation follows the mesh — a tipped box collides on its corner.
-        const auto world_box3d = [&](EntityId e, float &cx, float &cy,
-                                     float &cz, float &hx, float &hy,
-                                     float &hz) {
+        // An entity's collision geometry: the world AABB of its rotated
+        // + scaled local bounds (cheap broad-phase, ground rest, bounds
+        // clamp) plus the true OBB (narrow-phase SAT + MTV push-out).
+        struct EntityBox3D {
+          float cx{}, cy{}, cz{}, hx{}, hy{}, hz{};
+          ObBox3D obb;
+        };
+        const auto entity_box3d = [&](EntityId e) {
           const auto *t = world.get<Transform3D>(e);
           const auto *m = world.get<MeshRef>(e);
           const auto mesh = m ? mesh_of(m->spec) : nullptr;
@@ -1510,16 +1512,27 @@ int RuntimeHost::run() {
                       lz = (hi.z - lo.z) * .5f * s;
           const Vec3 lc{(lo.x + hi.x) * .5f * s, (lo.y + hi.y) * .5f * s,
                         (lo.z + hi.z) * .5f * s};
-          cx = t ? t->x : 0.f;
-          cy = t ? t->y : 0.f;
-          cz = t ? t->z : 0.f;
-          if (!t) {
-            hx = lx; hy = ly; hz = lz;
-            return;
-          }
+          EntityBox3D box;
+          box.cx = t ? t->x : 0.f;
+          box.cy = t ? t->y : 0.f;
+          box.cz = t ? t->z : 0.f;
+          box.obb.half[0] = lx;
+          box.obb.half[1] = ly;
+          box.obb.half[2] = lz;
           // Unit-quaternion rotation matrix rows (same convention as
-          // native_scene3d.cpp's column-major rotation_matrix).
-          const float qx = t->qx, qy = t->qy, qz = t->qz, qw = t->qw;
+          // native_scene3d.cpp's column-major rotation_matrix); the
+          // quaternion is normalized defensively.
+          float qx = 0.f, qy = 0.f, qz = 0.f, qw = 1.f;
+          if (t) {
+            const float ql = std::sqrt(t->qx * t->qx + t->qy * t->qy +
+                                       t->qz * t->qz + t->qw * t->qw);
+            if (ql > 1e-8f) {
+              qx = t->qx / ql;
+              qy = t->qy / ql;
+              qz = t->qz / ql;
+              qw = t->qw / ql;
+            }
+          }
           const float r00 = 1.f - 2.f * (qy * qy + qz * qz),
                       r01 = 2.f * (qx * qy - qz * qw),
                       r02 = 2.f * (qx * qz + qy * qw);
@@ -1529,15 +1542,21 @@ int RuntimeHost::run() {
           const float r20 = 2.f * (qx * qz - qy * qw),
                       r21 = 2.f * (qy * qz + qx * qw),
                       r22 = 1.f - 2.f * (qx * qx + qy * qy);
-          cx += r00 * lc.x + r01 * lc.y + r02 * lc.z;
-          cy += r10 * lc.x + r11 * lc.y + r12 * lc.z;
-          cz += r20 * lc.x + r21 * lc.y + r22 * lc.z;
-          hx = std::abs(r00) * lx + std::abs(r01) * ly +
-               std::abs(r02) * lz;
-          hy = std::abs(r10) * lx + std::abs(r11) * ly +
-               std::abs(r12) * lz;
-          hz = std::abs(r20) * lx + std::abs(r21) * ly +
-               std::abs(r22) * lz;
+          box.cx += r00 * lc.x + r01 * lc.y + r02 * lc.z;
+          box.cy += r10 * lc.x + r11 * lc.y + r12 * lc.z;
+          box.cz += r20 * lc.x + r21 * lc.y + r22 * lc.z;
+          box.hx = std::abs(r00) * lx + std::abs(r01) * ly +
+                   std::abs(r02) * lz;
+          box.hy = std::abs(r10) * lx + std::abs(r11) * ly +
+                   std::abs(r12) * lz;
+          box.hz = std::abs(r20) * lx + std::abs(r21) * ly +
+                   std::abs(r22) * lz;
+          // OBB: axes are the rotation matrix's columns (R·ê_i).
+          box.obb.center = {box.cx, box.cy, box.cz};
+          box.obb.axis[0] = {r00, r10, r20};
+          box.obb.axis[1] = {r01, r11, r21};
+          box.obb.axis[2] = {r02, r12, r22};
+          return box;
         };
 
         // Entity integration: gravity pulls -Y; the ground plane rests
@@ -1551,13 +1570,13 @@ int RuntimeHost::run() {
           auto *v = world.get<Velocity3D>(e);
           const auto *gs = world.get<GravityScale>(e);
           const float gscale = gs ? gs->value : 1.f;
-          float bcx, bcy, bcz, hx, hy, hz;
-          world_box3d(e, bcx, bcy, bcz, hx, hy, hz);
+          const auto box = entity_box3d(e);
           // Origin-relative AABB offsets (constant for a fixed
           // rotation/scale): entity-origin y that puts the world-AABB
           // bottom on ground_y, and the center's horizontal offset.
-          const float rest_y = impl.ground_y3 + hy - (bcy - t->y);
-          const float cx_off = bcx - t->x, cz_off = bcz - t->z;
+          const float rest_y =
+              impl.ground_y3 + box.hy - (box.cy - t->y);
+          const float cx_off = box.cx - t->x, cz_off = box.cz - t->z;
           if (v && gscale != 0.f) v->dy -= impl.gravity3 * gscale * dt_step;
           if (v && (v->dx != 0.f || v->dy != 0.f || v->dz != 0.f)) {
             t->x += v->dx * dt_step;
@@ -1576,8 +1595,8 @@ int RuntimeHost::run() {
             // XZ bounds: bounce the world-AABB edges unless NoBounce.
             if (impl.bounds3 > 0.f) {
               const bool nb = world.get<NoBounce>(e) != nullptr;
-              const float rx = std::min(hx, impl.bounds3),
-                          rz = std::min(hz, impl.bounds3);
+              const float rx = std::min(box.hx, impl.bounds3),
+                          rz = std::min(box.hz, impl.bounds3);
               if (t->x + cx_off < -impl.bounds3 + rx ||
                   t->x + cx_off > impl.bounds3 - rx) {
                 t->x = std::clamp(t->x + cx_off, -impl.bounds3 + rx,
@@ -1604,38 +1623,42 @@ int RuntimeHost::run() {
           world.destroy(id);
         }
         engine::resolve_hierarchy3d(world);
-        // AABB contacts on the 3D set using each entity's rotated world
-        // box (world_box3d). Solids push movers out along the least-
-        // penetrated axis. The scan always runs — solid resolution is
-        // needed even when no callbacks are registered.
+        // Contacts on the 3D set: world-AABB broad-phase, then SAT
+        // narrow-phase over the true OBBs — rotated meshes stop
+        // false-positive overlaps. Solid resolution pushes the mover
+        // out along the SAT minimum-translation vector (arbitrary axis,
+        // not just world axes). The scan always runs — solid resolution
+        // is needed even when no callbacks are registered.
         {
           std::set<std::pair<std::uint64_t, std::uint64_t>> now;
           std::vector<std::pair<EntityId, EntityId>> entered;
           for (std::size_t i = 0; i < impl.entities3d.size(); ++i) {
             auto *ta = world.get<Transform3D>(impl.entities3d[i]);
             if (!ta) continue;
-            float acx, acy, acz, hax, hay, haz;
-            world_box3d(impl.entities3d[i], acx, acy, acz, hax, hay,
-                        haz);
+            const auto abox = entity_box3d(impl.entities3d[i]);
             for (std::size_t j = i + 1; j < impl.entities3d.size(); ++j) {
               const auto *tb = world.get<Transform3D>(impl.entities3d[j]);
               if (!tb) continue;
-              float bcx, bcy, bcz, hbx, hby, hbz;
-              world_box3d(impl.entities3d[j], bcx, bcy, bcz, hbx, hby,
-                          hbz);
-              const float ox = hax + hbx - std::abs(acx - bcx);
-              const float oy = hay + hby - std::abs(acy - bcy);
-              const float oz = haz + hbz - std::abs(acz - bcz);
-              if (ox <= 0.f || oy <= 0.f || oz <= 0.f) continue;
+              const auto bbox = entity_box3d(impl.entities3d[j]);
+              // Broad-phase: world-AABB reject before the SAT scan.
+              if (abox.hx + bbox.hx - std::abs(abox.cx - bbox.cx) <= 0.f ||
+                  abox.hy + bbox.hy - std::abs(abox.cy - bbox.cy) <= 0.f ||
+                  abox.hz + bbox.hz - std::abs(abox.cz - bbox.cz) <= 0.f)
+                continue;
+              // Narrow-phase: true oriented boxes — a separating axis
+              // means the AABBs overlapped but the meshes do not.
+              const auto mtv_ab =
+                  obb_separation(abox.obb, bbox.obb);
+              if (!mtv_ab) continue;
               const auto a = impl.entities3d[i].value(),
                          b = impl.entities3d[j].value();
               now.insert(std::minmax(a, b));
               if (!impl.overlapping3d.count(std::minmax(a, b)))
                 entered.emplace_back(impl.entities3d[i],
                                      impl.entities3d[j]);
-              // Solid blocker resolution: the non-solid entity slides
-              // out along the least-penetrated axis and loses inward
-              // velocity on that axis.
+              // Solid blocker resolution: the non-solid entity is pushed
+              // out along the MTV and loses inward velocity along it. A
+              // dominantly-upward push counts as a landing surface.
               const bool sa =
                   world.get<Solid>(impl.entities3d[i]) != nullptr;
               const bool sb =
@@ -1645,29 +1668,38 @@ int RuntimeHost::run() {
                                       : impl.entities3d[i];
                 auto *tm = world.get<Transform3D>(mover);
                 auto *vm = world.get<Velocity3D>(mover);
-                // Mover/solid world-center positions for the push sign.
-                const float mcx = sa ? bcx : acx, scx = sa ? acx : bcx;
-                const float mcy = sa ? bcy : acy, scy = sa ? acy : bcy;
-                const float mcz = sa ? bcz : acz, scz = sa ? acz : bcz;
-                if (ox <= oy && ox <= oz) {
-                  const float sgn = mcx >= scx ? 1.f : -1.f;
-                  tm->x += sgn * ox;
-                  if (vm && vm->dx * sgn < 0.f) vm->dx = 0.f;
-                } else if (oy <= oz) {
-                  const float sgn = mcy >= scy ? 1.f : -1.f;
-                  tm->y += sgn * oy;
-                  if (vm && vm->dy * sgn < 0.f) vm->dy = 0.f;
-                  if (sgn > 0.f) {
-                    impl.grounded3d.insert(mover.value());
-                    if (on_land &&
-                        !impl.prev_grounded3d.count(mover.value()))
-                      on_land(mover, sa ? impl.entities3d[i]
-                                        : impl.entities3d[j]);
+                // obb_separation(a,b) returns the vector that pushes b
+                // out of a — call with the solid first.
+                const CollisionVector3 mtv =
+                    sa ? *mtv_ab : negate(*mtv_ab);
+                tm->x += static_cast<float>(mtv.x);
+                tm->y += static_cast<float>(mtv.y);
+                tm->z += static_cast<float>(mtv.z);
+                if (vm) {
+                  const double ml =
+                      std::sqrt(mtv.x * mtv.x + mtv.y * mtv.y +
+                                mtv.z * mtv.z);
+                  if (ml > 1e-9) {
+                    const double nx = mtv.x / ml, ny = mtv.y / ml,
+                                 nz = mtv.z / ml;
+                    const double inward =
+                        vm->dx * nx + vm->dy * ny + vm->dz * nz;
+                    if (inward < 0.) {
+                      vm->dx -= static_cast<float>(inward * nx);
+                      vm->dy -= static_cast<float>(inward * ny);
+                      vm->dz -= static_cast<float>(inward * nz);
+                    }
                   }
-                } else {
-                  const float sgn = mcz >= scz ? 1.f : -1.f;
-                  tm->z += sgn * oz;
-                  if (vm && vm->dz * sgn < 0.f) vm->dz = 0.f;
+                }
+                // Push is mostly +Y → the mover rests on top: grounded,
+                // and fire on_land on the touchdown transition.
+                if (mtv.y > std::abs(mtv.x) &&
+                    mtv.y > std::abs(mtv.z)) {
+                  impl.grounded3d.insert(mover.value());
+                  if (on_land &&
+                      !impl.prev_grounded3d.count(mover.value()))
+                    on_land(mover, sa ? impl.entities3d[i]
+                                      : impl.entities3d[j]);
                 }
               }
             }

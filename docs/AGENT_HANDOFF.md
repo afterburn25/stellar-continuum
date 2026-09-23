@@ -195,15 +195,20 @@ same World as a separate `Transform3D`/`Velocity3D`/`MeshRef`/
 F5/F9 snapshots cover it, `load_world` partitions it back out). Mesh
 specs are `box[:sx,sy,sz]`/`annulus:i,o[,seg]`/`sphere[:cols,rows]` or
 content-relative `.obj` paths (`load_obj_mesh`); `Mesh3D` carries local
-AABB bounds used for ground resting and solid push-out (least-penetrated
-axis). The host flies the camera via the rebindable "game" context
+AABB bounds that become each entity's `ObBox3D` under rotation+scale —
+`obb_separation` (SAT over the 15 candidate axes, physics3d.hpp) gives
+both the overlap test and the minimum translation vector for solid
+push-out/landing, while the rotated world AABB still drives ground
+resting, `bounds`, and broad-phase pair rejection. The host flies the
+camera via the rebindable "game" context
 (WASD + Space/C + right-drag look + wheel fov, `--fly-speed`),
 integrates gravity/velocity at the fixed timestep, fires
 `on_collision`/`on_land`/`on_spawn3d`, and renders through
 `Scene3DView` under the 2D pass (2D entities remain HUD). Helpers:
 `entities3d()`, `entities3d_in_radius`, `spawn_entity3d`,
-`set_camera3d` + getters. Collision uses each entity's rotated+scaled
-world AABB; the camera snapshots via a `Camera3DState` carrier;
+`set_camera3d` + getters. Narrow-phase collision is SAT OBB over each
+entity's rotated+scaled mesh bounds; the camera snapshots via a
+`Camera3DState` carrier;
 `lights` adds up to two directional fills; windowed projects ship a
 starter `editor/scene3d.json`. `raycast3d(origin,dir,max)` casts
 against actual mesh triangles in each mesh's local frame
@@ -214,10 +219,10 @@ screen-space pick counterpart of `entity_at`. The engine shell's
 all entity/document fields, undo history, a live `Scene3D` preview
 (shares `resolve_mesh_spec`/texture decode with the runtime), right-drag
 camera orbit, wheel fov, and click-select via `raycast_world3d` over a
-scratch `spawn_scene3d` world. Limitations: AABB (not OBB/triangle)
-collision, no rigid-body solver, raycast is O(tris) per entity with no
-spatial partition, editor has no transform gizmos — see the registry
-record.
+scratch `spawn_scene3d` world. Limitations: OBB-over-mesh-bounds (not
+per-triangle) collision, no rigid-body solver, ground/`bounds` still use
+the world AABB, raycast is O(tris) per entity with no spatial partition,
+editor has no transform gizmos — see the registry record.
 
 **Recommended next workstream: native validation and release reliability.**
 Start from this branch in an isolated checkout; fix the failures recorded in

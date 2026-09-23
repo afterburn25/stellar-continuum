@@ -32,6 +32,32 @@ void geometry_and_physics(){
   const auto& a=terrain->vertices()[0];require(std::abs(a.normal.z-.8728716f)<1e-5f,"Heightfield normals incorrect");
   const auto collision=segment_triangle({0,0,10},{0,0,-10},{-1,-1,0},{1,-1,0},{0,1,0});
   require(collision&&std::abs(*collision-.5)<1e-12,"Surface triangle collision failed");
+  // SAT oriented boxes: axis-aligned MTV direction/depth, the rotated
+  // false-positive AABB misses, and actual rotated-face contacts.
+  const double s45=std::sin(3.141592653589793/4),c45=std::cos(3.141592653589793/4);
+  const ObBox3D plank{{0,0,0},{{c45,s45,0},{-s45,c45,0},{0,0,1}},{4,.25,.5}};
+  const ObBox3D cube{{0,0,0},{{1,0,0},{0,1,0},{0,0,1}},{.5,.5,.5}};
+  // Conservative world AABB of the plank spans [-3,3]^2 — this cube's AABB
+  // overlaps it, but the true rotated box is separated: SAT must say miss.
+  const ObBox3D corner{{2.6,-2.6,0},{{1,0,0},{0,1,0},{0,0,1}},{.5,.5,.5}};
+  require(!obb_separation(plank,corner),"OBB matched the world-AABB false positive");
+  // Cube resting on the plank's rotated top face: center local (0,.45),
+  // projected half-extent on the face normal .25*(s45+c45) ≈ .354, so the
+  // MTV is the face normal (-s45,c45) scaled by .25+.354-.45 ≈ .1536.
+  const ObBox3D resting{{-.318,.318,0},{{1,0,0},{0,1,0},{0,0,1}},{.25,.25,.25}};
+  const auto mtv=obb_separation(plank,resting);
+  require(mtv.has_value(),"Rotated face contact missed");
+  require(std::abs(std::sqrt(length_squared(*mtv))-.1536)<1e-3,"OBB minimum translation depth wrong");
+  require(dot(*mtv,{-s45,c45,0})>0,"OBB pushed along the wrong face");
+  // Axis-aligned: least-penetration axis and sign; exact touch is disjoint.
+  const ObBox3D near{{.8,0,0},{{1,0,0},{0,1,0},{0,0,1}},{.5,.5,.5}};
+  const auto push=obb_separation(cube,near);
+  require(push.has_value()&&std::abs(push->x-.2)<1e-12&&push->y==0&&push->z==0,"Axis MTV wrong");
+  const ObBox3D touching{{1.0,0,0},{{1,0,0},{0,1,0},{0,0,1}},{.5,.5,.5}};
+  require(!obb_separation(cube,touching),"Touching boxes reported as overlap");
+  require(!obb_separation(cube,{{10,0,0},{{1,0,0},{0,1,0},{0,0,1}},{.5,.5,.5}}),"Separated boxes overlapped");
+  bool bad_obb=false;try{(void)obb_separation(cube,{{std::numeric_limits<double>::quiet_NaN(),0,0},{{1,0,0},{0,1,0},{0,0,1}},{.5,.5,.5}});}catch(const std::invalid_argument&){bad_obb=true;}
+  require(bad_obb,"Non-finite OBB accepted");
   const auto globe=radial_terrain_mesh([](Vec3){return .125f;});
   const auto globe_hit=intersect_mesh_segment(*globe,{0,0,2},{0,0,-2});
   require(globe_hit&&std::abs(globe_hit->position.z-1.125)<1e-6,"Radial mesh picking disagrees with rendered radius");
