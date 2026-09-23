@@ -73,6 +73,24 @@ FreshCampaignState make_state() {
   fleet.civilization_id = 5;
   fleet.current_system_id = 9;
   state.fleets.push_back(fleet);
+
+  CivilizationEconomy economy;
+  economy.civilization_id = 5;
+  state.economies.push_back(economy);
+  TechnologyState tech;
+  tech.civilization_id = 5;
+  state.technologies.push_back(tech);
+  ConstructionState construction;
+  construction.civilization_id = 5;
+  state.construction.push_back(construction);
+  ShipyardState shipyard;
+  shipyard.civilization_id = 5;
+  state.shipyards.push_back(shipyard);
+  // Orphaned economy row: civ 99 does not exist — the entity projects
+  // but stays unparented for the invariant pass to name.
+  CivilizationEconomy orphan_economy;
+  orphan_economy.civilization_id = 99;
+  state.economies.push_back(orphan_economy);
   return state;
 }
 
@@ -85,7 +103,7 @@ int main() {
   // Entity/tag counts, namespaced legacy identity, and hierarchy.
   {
     auto world = project_campaign_world(state);
-    check(world.size() == 8, "projection carries every domain row");
+    check(world.size() == 13, "projection carries every domain row");
     check(world.view<CampaignSystemTag>().size() == 2,
           "system tags present");
     check(world.view<CampaignBodyTag>().size() == 2, "body tags present");
@@ -94,6 +112,14 @@ int main() {
     check(world.view<CampaignColonyTag>().size() == 2,
           "colony tags present");
     check(world.view<CampaignFleetTag>().size() == 1, "fleet tag present");
+    check(world.view<CampaignEconomyTag>().size() == 2,
+          "economy tags present (incl. orphan)");
+    check(world.view<CampaignTechnologyTag>().size() == 1,
+          "technology tag present");
+    check(world.view<CampaignConstructionTag>().size() == 1,
+          "construction tag present");
+    check(world.view<CampaignShipyardTag>().size() == 1,
+          "shipyard tag present");
 
     // Namespaced legacy ids: system 5, civ 5 and colony 5 resolve to
     // three distinct entities.
@@ -135,6 +161,33 @@ int main() {
           "fleet parents to its current system");
     check(civ_entity && !world.parent(*civ_entity),
           "civilizations are unparented identity entities");
+
+    // Civ-scoped state rows parent under their civilization; the
+    // orphan economy has no civ to attach to.
+    const auto economy_entity = world.entity_for_legacy(
+        campaign_legacy_id(CampaignDomain::Economy, 5));
+    const auto tech_entity = world.entity_for_legacy(
+        campaign_legacy_id(CampaignDomain::Technology, 5));
+    const auto construction_entity = world.entity_for_legacy(
+        campaign_legacy_id(CampaignDomain::Construction, 5));
+    const auto shipyard_entity = world.entity_for_legacy(
+        campaign_legacy_id(CampaignDomain::Shipyard, 5));
+    const auto orphan_economy_entity = world.entity_for_legacy(
+        campaign_legacy_id(CampaignDomain::Economy, 99));
+    check(economy_entity && tech_entity && construction_entity &&
+              shipyard_entity && orphan_economy_entity,
+          "civ-scoped state rows all resolve");
+    check(economy_entity && *economy_entity != *civ_entity,
+          "economy namespace id is distinct from the civ entity");
+    check(economy_entity && world.parent(*economy_entity) == civ_entity &&
+              tech_entity && world.parent(*tech_entity) == civ_entity &&
+              construction_entity &&
+              world.parent(*construction_entity) == civ_entity &&
+              shipyard_entity &&
+              world.parent(*shipyard_entity) == civ_entity,
+          "civ-scoped rows parent to their civilization");
+    check(orphan_economy_entity && !world.parent(*orphan_economy_entity),
+          "orphaned state row stays unparented");
 
     // Tag fields round-trip the authoritative refs.
     const auto *tag = world.get<CampaignColonyTag>(*colony_entity);
@@ -241,13 +294,15 @@ int main() {
   // Census mirrors the projection contract on real-shaped state.
   {
     const auto census = campaign_world_projection_census(state);
-    check(census.entities == 8 && census.systems == 2 &&
+    check(census.entities == 13 && census.systems == 2 &&
               census.bodies == 2 && census.civilizations == 1 &&
-              census.colonies == 2 && census.fleets == 1,
+              census.colonies == 2 && census.fleets == 1 &&
+              census.economies == 2 && census.technologies == 1 &&
+              census.construction == 1 && census.shipyards == 1,
           "census counts every domain");
-    check(census.legacy_bound == 8, "every entity is legacy-bound");
-    check(census.parented == 5 && census.unparented == 3,
-          "census counts resolved parents (civs+systems unparented)");
+    check(census.legacy_bound == 13, "every entity is legacy-bound");
+    check(census.parented == 9 && census.unparented == 4,
+          "census counts resolved parents (civs+systems+orphan unparented)");
   }
 
   if (failures == 0)

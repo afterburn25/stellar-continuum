@@ -25,6 +25,13 @@ enum class CampaignDomain : std::int64_t {
   Civilization,
   Colony,
   Fleet,
+  // Per-civilization state rows are 1:1 with their owner, so their
+  // legacy key reuses the civilization id inside each domain's own
+  // namespace.
+  Economy,
+  Technology,
+  Construction,
+  Shipyard,
 };
 
 // The namespaced identity key used for World::bind_legacy /
@@ -54,8 +61,21 @@ struct CampaignColonyTag {
 struct CampaignFleetTag {
   int id{}, civilization_id{};
 };
+// Civilization-owned state rows: identity is the owner id.
+struct CampaignEconomyTag {
+  int civilization_id{};
+};
+struct CampaignTechnologyTag {
+  int civilization_id{};
+};
+struct CampaignConstructionTag {
+  int civilization_id{};
+};
+struct CampaignShipyardTag {
+  int civilization_id{};
+};
 
-// Registers the snapshot codecs for the five tag components under
+// Registers the snapshot codecs for the nine tag components under
 // canonical names ("campaign.system", ...). Consumers that snapshot a
 // projected world must register these first; components are POD and
 // serialize as raw bytes (same-build snapshots only — campaign
@@ -63,16 +83,18 @@ struct CampaignFleetTag {
 void register_campaign_world_components(engine::World &world);
 
 // Projects every authoritative domain row into the store in fixed
-// domain order (systems, bodies, civilizations, colonies, fleets)
+// domain order (systems, bodies, civilizations, civilization-owned
+// economy/technology/construction/shipyard rows, colonies, fleets)
 // and container order — the same state projects the same store.
 //
 // Hierarchy mirrors real containment: bodies parent to their system
-// (moons to their parent body when it resolves), colonies to their
-// occupied body — verified in-system, matching the authoritative
-// exact_body rule — else their system, fleets to their current
-// system. Refs that cannot resolve (absent or cross-domain ids, or a
-// parent cycle) leave the entity unparented; the projection never
-// invents entities for dangling ids.
+// (moons to their parent body when it resolves), civilization-owned
+// state rows to their civilization, colonies to their occupied body —
+// verified in-system, matching the authoritative exact_body rule —
+// else their system, fleets to their current system. Refs that
+// cannot resolve (absent or cross-domain ids, or a parent cycle)
+// leave the entity unparented; the projection never invents entities
+// for dangling ids.
 [[nodiscard]] engine::World
 project_campaign_world(const FreshCampaignState &state);
 
@@ -83,6 +105,7 @@ project_campaign_world(const FreshCampaignState &state);
 // rows, not that the store dropped anything.
 struct CampaignWorldProjectionCensus {
   int systems{}, bodies{}, civilizations{}, colonies{}, fleets{};
+  int economies{}, technologies{}, construction{}, shipyards{};
   int entities{}, legacy_bound{};
   int parented{}, unparented{};
 };

@@ -66,7 +66,9 @@ inline std::vector<Entry> capture_developer_report(stellar::core::CampaignFrame 
   const auto projected=campaign_world_projection_census(world);
   metadata["worldProjection"]={{"entities",projected.entities},{"systems",projected.systems},
     {"bodies",projected.bodies},{"civilizations",projected.civilizations},{"colonies",projected.colonies},
-    {"fleets",projected.fleets},{"legacyBound",projected.legacy_bound},
+    {"fleets",projected.fleets},{"economies",projected.economies},{"technologies",projected.technologies},
+    {"construction",projected.construction},{"shipyards",projected.shipyards},
+    {"legacyBound",projected.legacy_bound},
     {"parented",projected.parented},{"unparented",projected.unparented}};
   if(world.generation_metadata){const auto &g=*world.generation_metadata;metadata["generatorVersion"]=g.generator_version;
     metadata["galaxyShape"]=g.galaxy_shape;metadata["stellarProfileVersion"]=g.stellar_profile_version.value_or("legacy");}

@@ -50,6 +50,10 @@ void register_campaign_world_components(engine::World &world) {
   register_tag<CampaignCivilizationTag>(world, "campaign.civilization");
   register_tag<CampaignColonyTag>(world, "campaign.colony");
   register_tag<CampaignFleetTag>(world, "campaign.fleet");
+  register_tag<CampaignEconomyTag>(world, "campaign.economy");
+  register_tag<CampaignTechnologyTag>(world, "campaign.technology");
+  register_tag<CampaignConstructionTag>(world, "campaign.construction");
+  register_tag<CampaignShipyardTag>(world, "campaign.shipyard");
 }
 
 engine::World project_campaign_world(const FreshCampaignState &state) {
@@ -87,6 +91,44 @@ engine::World project_campaign_world(const FreshCampaignState &state) {
                              civilization.id));
     world.add(entity, CampaignCivilizationTag{
                           civilization.id, civilization.home_system_id});
+  }
+  // Civilization-owned state rows are 1:1 with their owner: the
+  // legacy key reuses the civ id inside each domain's namespace and
+  // the entity parents to its civilization when it resolves —
+  // orphaned rows (absent civ) stay unparented for the invariant
+  // pass to name.
+  for (const auto &economy : state.economies) {
+    const auto entity = world.create();
+    world.bind_legacy(
+        entity, legacy(CampaignDomain::Economy, economy.civilization_id));
+    world.add(entity, CampaignEconomyTag{economy.civilization_id});
+    try_parent(world, entity, find(CampaignDomain::Civilization,
+                                   economy.civilization_id));
+  }
+  for (const auto &technology : state.technologies) {
+    const auto entity = world.create();
+    world.bind_legacy(entity, legacy(CampaignDomain::Technology,
+                                     technology.civilization_id));
+    world.add(entity, CampaignTechnologyTag{technology.civilization_id});
+    try_parent(world, entity, find(CampaignDomain::Civilization,
+                                   technology.civilization_id));
+  }
+  for (const auto &construction : state.construction) {
+    const auto entity = world.create();
+    world.bind_legacy(entity, legacy(CampaignDomain::Construction,
+                                     construction.civilization_id));
+    world.add(entity,
+              CampaignConstructionTag{construction.civilization_id});
+    try_parent(world, entity, find(CampaignDomain::Civilization,
+                                   construction.civilization_id));
+  }
+  for (const auto &shipyard : state.shipyards) {
+    const auto entity = world.create();
+    world.bind_legacy(entity, legacy(CampaignDomain::Shipyard,
+                                     shipyard.civilization_id));
+    world.add(entity, CampaignShipyardTag{shipyard.civilization_id});
+    try_parent(world, entity, find(CampaignDomain::Civilization,
+                                   shipyard.civilization_id));
   }
   for (const auto &colony : state.colonies) {
     const auto entity = world.create();
@@ -129,6 +171,14 @@ campaign_world_projection_census(const FreshCampaignState &state) {
       static_cast<int>(world.view<CampaignCivilizationTag>().size());
   census.colonies = static_cast<int>(world.view<CampaignColonyTag>().size());
   census.fleets = static_cast<int>(world.view<CampaignFleetTag>().size());
+  census.economies =
+      static_cast<int>(world.view<CampaignEconomyTag>().size());
+  census.technologies =
+      static_cast<int>(world.view<CampaignTechnologyTag>().size());
+  census.construction =
+      static_cast<int>(world.view<CampaignConstructionTag>().size());
+  census.shipyards =
+      static_cast<int>(world.view<CampaignShipyardTag>().size());
   for (const auto entity : world.entities()) {
     if (world.legacy_for(entity)) ++census.legacy_bound;
     if (world.parent(entity))
