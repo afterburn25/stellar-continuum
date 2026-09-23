@@ -151,6 +151,8 @@ struct Shell {
   engine::PackageRegistry package_registry;
   // Tracked handle of the launched host process (Windows HANDLE).
   void *run_process{};
+  // New projects scaffold with the console ("blank") starter when set.
+  bool blank_template{};
   engine::PackageLoadPlan load_plan;
   std::vector<std::string> package_errors;
   // New-project name field and panel hit regions.
@@ -159,9 +161,8 @@ struct Shell {
   UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
       hit_project_close{}, hit_project_cook{}, hit_project_build{},
       hit_project_run{}, hit_project_editor{}, hit_project_package{},
-      hit_project_rename{},
-      hit_import_field{}, hit_import_button{}, hit_package_field{},
-      hit_package_button{};
+      hit_project_rename{}, hit_template_toggle{}, hit_import_field{},
+      hit_import_button{}, hit_package_field{}, hit_package_button{};
   UiRect project_rows{};
   // Content cooking, host builds and packaging run on the JobSystem; the
   // UI thread reads their status under the mutex.
@@ -633,8 +634,11 @@ void create_project_from_field(Shell &shell) {
       shell.project_name_buffer.empty() ? "untitled" : shell.project_name_buffer;
   const auto id = engine::sanitize_project_id(name);
   const auto dir = shell.projects_root / id.substr(5);
-  if (engine::create_project(dir, name, STELLAR_ENGINE_VERSION, &error)) {
-    shell.status = "created " + dir.filename().string();
+  if (engine::create_project(dir, name, STELLAR_ENGINE_VERSION, &error,
+                             shell.blank_template ? engine::kTemplateBlank
+                                                  : engine::kTemplateWindowed)) {
+    shell.status = "created " + dir.filename().string() +
+                   (shell.blank_template ? " (blank)" : " (windowed)");
     shell.project_name_buffer.clear();
     refresh_projects(shell);
   } else {
@@ -949,6 +953,11 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
   shell.hit_project_create = {x + field_w + 8 * s, y, 108 * s,
                               shell.hit_project_name.height};
   shell_button(out, shell.hit_project_create, "CREATE", false, font, s);
+  shell.hit_template_toggle = {body.x + body.width - 22 * s - 176 * s, y,
+                               176 * s, shell.hit_project_name.height};
+  shell_button(out, shell.hit_template_toggle,
+               shell.blank_template ? "TPL: BLANK" : "TPL: WINDOWED",
+               shell.blank_template, font, s);
   float bx = shell.hit_project_create.x + shell.hit_project_create.width +
              10 * s;
   if (shell.selected_project < shell.projects.size()) {
@@ -1291,6 +1300,8 @@ int main(int argc, char **argv) {
               start_package(shell, jobs);
             else if (shell.hit_project_rename.contains(event.position))
               rename_project(shell);
+            else if (shell.hit_template_toggle.contains(event.position))
+              shell.blank_template = !shell.blank_template;
             else if (shell.project_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y - shell.project_rows.y +

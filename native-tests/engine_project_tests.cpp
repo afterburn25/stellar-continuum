@@ -72,6 +72,32 @@ int main() {
               text.find("stellar::platform") != std::string::npos,
           "CMakeLists consumes the engine SDK");
   }
+  check(std::filesystem::exists(root / ".gitignore"),
+        "scaffold writes .gitignore");
+
+  // The blank template emits a console host linking stellar::engine only.
+  const auto blank = make_temp_dir("blank");
+  check(engine::create_project(blank, "Blank Game", "0.1.64", &error,
+                               engine::kTemplateBlank),
+        "blank template scaffolds");
+  {
+    std::ifstream input(blank / "CMakeLists.txt");
+    const std::string text{std::istreambuf_iterator<char>(input),
+                           std::istreambuf_iterator<char>()};
+    check(text.find("stellar::engine") != std::string::npos &&
+              text.find("stellar::platform") == std::string::npos,
+          "blank template links engine only");
+  }
+  {
+    std::ifstream input(blank / "src" / "main.cpp");
+    const std::string text{std::istreambuf_iterator<char>(input),
+                           std::istreambuf_iterator<char>()};
+    check(text.find("native_map_platform") == std::string::npos,
+          "blank host has no window dependency");
+  }
+  check(!engine::create_project(make_temp_dir("bogus"), "X", "0.1.64",
+                                &error, "no-such-template"),
+        "unknown template rejected");
 
   // The scaffolded package manifest parses and owns the project namespace.
   {

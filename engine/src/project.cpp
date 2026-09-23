@@ -123,11 +123,15 @@ void EngineProject::save() const {
 }
 
 bool create_project(const std::filesystem::path &root, std::string_view name,
-                    std::string_view engine_version, std::string *error) {
+                    std::string_view engine_version, std::string *error,
+                    std::string_view starter_template) {
   auto fail = [&](const std::string &message) {
     if (error != nullptr) *error = message;
     return false;
   };
+  const bool windowed = starter_template == kTemplateWindowed;
+  if (!windowed && starter_template != kTemplateBlank)
+    return fail("unknown starter template: " + std::string(starter_template));
   std::error_code ec;
   if (std::filesystem::exists(root / std::string(EngineProject::manifest_filename), ec))
     return fail("a project manifest already exists at " + root.string());
@@ -155,6 +159,8 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
   if (!write_text(root / std::string(EngineProject::manifest_filename),
                   project.to_json(), error))
     return false;
+  if (!write_text(root / ".gitignore", "build/\ndist/\n", error))
+    return false;
 
   nlohmann::json package;
   package["id"] = id;
@@ -167,6 +173,7 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
     return false;
 
   std::ostringstream stub;
+  if (windowed) {
   stub << "// " << display << " - Stellar Engine game host.\n"
        << "// Opens a native window through stellar::platform, resolves the\n"
        << "// project's content packages, and renders. Escape quits.\n"
@@ -265,6 +272,37 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
        << "  }\n"
        << "  return plan.ok ? 0 : 1;\n"
        << "}\n";
+  } else {
+    stub << "// " << display << " - Stellar Engine game host (blank "
+            "template).\n"
+         << "// Resolves the project's content packages and cooked manifest,\n"
+         << "// then exits. Replace main() with your game.\n"
+         << "#include <stellar/engine/asset_registry.hpp>\n"
+         << "#include <stellar/engine/package.hpp>\n\n"
+         << "#include <filesystem>\n"
+         << "#include <iostream>\n\n"
+         << "namespace engine = stellar::engine;\n\n"
+         << "int main() {\n"
+         << "  engine::PackageRegistry registry;\n"
+         << "  engine::scan_packages(registry, \"packages\");\n"
+         << "  registry.protect_namespace(\"" << id << "\");\n"
+         << "  engine::scan_packages(registry, \"mods\");\n"
+         << "  const auto plan = registry.resolve();\n\n"
+         << "  std::size_t cooked_assets = 0;\n"
+         << "  const auto manifest =\n"
+         << "      std::filesystem::path(\"build\") / \"cooked\" / \"Content\" /\n"
+         << "      \"runtime.stmanifest\";\n"
+         << "  if (std::filesystem::is_regular_file(manifest))\n"
+         << "    cooked_assets =\n"
+         << "        engine::AssetRegistry(manifest).records().size();\n\n"
+         << "  std::cout << \"" << display << " | \" << plan.order.size()\n"
+         << "            << \" content package(s), \" << cooked_assets\n"
+         << "            << \" cooked asset(s) - \"\n"
+         << "            << (plan.ok ? \"load plan ok\" : \"load plan FAILED\")\n"
+         << "            << '\\n';\n"
+         << "  return plan.ok ? 0 : 1;\n"
+         << "}\n";
+  }
   if (!write_text(root / "src" / "main.cpp", stub.str(), error))
     return false;
 
@@ -288,13 +326,15 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
         << "endif()\n"
         << "include(\"${STELLAR_ENGINE_SDK}/cmake/StellarEngineSdk.cmake\")\n"
         << "add_executable(" << id.substr(5) << " src/main.cpp)\n"
-        << "target_link_libraries(" << id.substr(5)
-        << " PRIVATE stellar::platform)\n"
-        << "# SDL3.dll and the default font ship in the SDK's bin directory.\n"
-        << "add_custom_command(TARGET " << id.substr(5) << " POST_BUILD\n"
-        << "  COMMAND ${CMAKE_COMMAND} -E copy_directory\n"
-        << "    \"${STELLAR_ENGINE_SDK}/bin\" \"$<TARGET_FILE_DIR:" << id.substr(5)
-        << ">\")\n";
+        << "target_link_libraries(" << id.substr(5) << " PRIVATE "
+        << (windowed ? "stellar::platform" : "stellar::engine") << ")\n";
+  if (windowed)
+    cmake << "# SDL3.dll and the default font ship in the SDK's bin "
+             "directory.\n"
+          << "add_custom_command(TARGET " << id.substr(5) << " POST_BUILD\n"
+          << "  COMMAND ${CMAKE_COMMAND} -E copy_directory\n"
+          << "    \"${STELLAR_ENGINE_SDK}/bin\" \"$<TARGET_FILE_DIR:"
+          << id.substr(5) << ">\")\n";
   if (!write_text(root / "CMakeLists.txt", cmake.str(), error))
     return false;
   return true;

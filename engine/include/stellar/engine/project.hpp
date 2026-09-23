@@ -39,12 +39,20 @@ struct EngineProject {
 // names fall back to "game.project".
 std::string sanitize_project_id(std::string_view name);
 
+// Starter templates create_project can emit. "windowed" generates a native
+// window + ECS loop host (links stellar::platform); "blank" generates a
+// minimal console host (links stellar::engine only).
+inline constexpr std::string_view kTemplateWindowed{"windowed"};
+inline constexpr std::string_view kTemplateBlank{"blank"};
+
 // Scaffolds a minimal project at `root`: the manifest, a base content
 // package under packages/<id>/ (owned namespace = the project id), an empty
 // content directory, and a starter host source file. Refuses to overwrite
-// an existing manifest. Returns false and reports `error` on failure.
+// an existing manifest or accept an unknown template. Returns false and
+// reports `error` on failure.
 bool create_project(const std::filesystem::path &root, std::string_view name,
-                    std::string_view engine_version, std::string *error);
+                    std::string_view engine_version, std::string *error,
+                    std::string_view starter_template = kTemplateWindowed);
 
 // Immediate child directories of `directory` containing a manifest file
 // (the manifest itself is not parsed here — EngineProject::load validates).
