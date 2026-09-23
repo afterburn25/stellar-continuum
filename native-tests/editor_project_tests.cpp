@@ -40,6 +40,9 @@ int main() {
     project.edits[77].name = "Kepler-\xc3\xa9toile"; // UTF-8: "Kepler-étoile"
     project.edits[300].note = "note only";
     project.edits[301].bookmarked = true;
+    project.edits[302].anomaly = true; // trait override: YES
+    project.edits[303].rare_resource = false; // trait override: NO
+    project.edits[303].pre_warp_civilization = true;
     project.edits[400]; // Fully empty row must not serialize.
     project.body_edits[3].name = "Earth";
     project.body_edits[3].bookmarked = true;
@@ -51,7 +54,7 @@ int main() {
     require(restored.seed == project.seed, "seed did not round-trip");
     require(restored.system_count == project.system_count,
             "system count did not round-trip");
-    require(restored.edits.size() == 4, "empty edit rows must be omitted");
+    require(restored.edits.size() == 6, "empty edit rows must be omitted");
     require(restored.edits.at(12).name == project.edits.at(12).name,
             "display name did not round-trip");
     require(restored.edits.at(12).note == project.edits.at(12).note,
@@ -60,6 +63,18 @@ int main() {
     require(restored.edits.at(77).name == project.edits.at(77).name,
             "unicode name did not round-trip");
     require(!restored.edits.contains(400), "empty edit row serialized");
+    require(restored.edits.at(302).anomaly && *restored.edits.at(302).anomaly,
+            "anomaly override did not round-trip");
+    require(restored.edits.at(303).rare_resource &&
+                !*restored.edits.at(303).rare_resource,
+            "explicit-false rare-resource override did not round-trip");
+    require(restored.edits.at(303).pre_warp_civilization &&
+                *restored.edits.at(303).pre_warp_civilization,
+            "pre-warp override did not round-trip");
+    require(!restored.edits.at(12).anomaly &&
+                !restored.edits.at(12).rare_resource &&
+                !restored.edits.at(12).pre_warp_civilization,
+            "unset trait overrides must stay unset (AUTO follows generated)");
     require(restored.body_edits.size() == 2, "body edits did not round-trip");
     require(restored.body_edits.at(3).name == "Earth" &&
                 restored.body_edits.at(3).bookmarked,

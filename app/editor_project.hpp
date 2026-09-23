@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -15,6 +16,10 @@ namespace stellar::editor {
 struct SystemEdit {
   std::string name, note;
   bool bookmarked{};
+  // Trait overrides: unset follows the generated record; a set value wins.
+  // They re-apply deterministically after regeneration because they live in
+  // the annotation layer, not the generated catalog.
+  std::optional<bool> anomaly, rare_resource, pre_warp_civilization;
 };
 
 struct EditorProject {

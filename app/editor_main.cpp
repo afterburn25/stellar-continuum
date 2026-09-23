@@ -243,6 +243,7 @@ struct Editor {
   std::vector<UiRect> hits;
   std::vector<int> hit_sizes;
   UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
+      hit_anomaly{}, hit_rare{}, hit_prewarp{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
       hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{};
   // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
@@ -339,6 +340,16 @@ std::optional<std::pair<int, bool>> annotation_target(const Editor &ed) {
 std::unordered_map<int, edproj::SystemEdit> &annotation_map(Editor &ed,
                                                           bool body) {
   return body ? ed.body_edits : ed.edits;
+}
+
+// Effective trait: an annotation override wins over the generated record.
+template <class Record>
+bool trait(const std::unordered_map<int, edproj::SystemEdit> &map,
+           const Record &record, bool Record::*generated,
+           std::optional<bool> edproj::SystemEdit::*override) {
+  const auto it = map.find(record.id);
+  if (it != map.end() && it->second.*override) return *(it->second.*override);
+  return record.*generated;
 }
 
 // Commits the in-progress field buffer into the annotation layer, recording
@@ -452,9 +463,16 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
         core::planet_appearance_display_name(*body.appearance));
   std::string flags;
   if (body.legacy_colonization_candidate) flags += "colonization-candidate ";
-  if (body.has_anomaly) flags += "anomaly ";
-  if (body.has_rare_resource) flags += "rare-resource ";
-  if (body.has_pre_warp_civilization) flags += "pre-warp-civ ";
+  if (trait(ed.body_edits, body, &core::PlanetaryBody::has_anomaly,
+            &edproj::SystemEdit::anomaly))
+    flags += "anomaly ";
+  if (trait(ed.body_edits, body, &core::PlanetaryBody::has_rare_resource,
+            &edproj::SystemEdit::rare_resource))
+    flags += "rare-resource ";
+  if (trait(ed.body_edits, body,
+            &core::PlanetaryBody::has_pre_warp_civilization,
+            &edproj::SystemEdit::pre_warp_civilization))
+    flags += "pre-warp-civ ";
   if (body.cracked_world) flags += "cracked ";
   row("traits", flags.empty() ? "none" : flags);
 
@@ -524,9 +542,15 @@ void rebuild_detail_rows(Editor &ed) {
   row("archetype", std::string(archetype_name(sys.archetype)));
   std::string flags;
   if (sys.has_habitable_world) flags += "habitable ";
-  if (sys.has_anomaly) flags += "anomaly ";
-  if (sys.has_rare_resource) flags += "rare-resource ";
-  if (sys.has_pre_warp_civilization) flags += "pre-warp-civ";
+  if (trait(ed.edits, sys, &core::StellarSystem::has_anomaly,
+            &edproj::SystemEdit::anomaly))
+    flags += "anomaly ";
+  if (trait(ed.edits, sys, &core::StellarSystem::has_rare_resource,
+            &edproj::SystemEdit::rare_resource))
+    flags += "rare-resource ";
+  if (trait(ed.edits, sys, &core::StellarSystem::has_pre_warp_civilization,
+            &edproj::SystemEdit::pre_warp_civilization))
+    flags += "pre-warp-civ";
   row("traits", flags.empty() ? "none" : flags);
   if (sys.stellar_region)
     row("region", std::string(core::stellar_region_name(*sys.stellar_region)));
@@ -589,9 +613,16 @@ void rebuild_detail_rows(Editor &ed) {
         value += ", " + fspec("%.2f", body.stellar_exposure->orbit_au) + " AU";
       if (body.stellar_exposure && body.stellar_exposure->in_habitable_zone)
         value += " [hz]";
-      if (body.has_anomaly) value += " [anomaly]";
-      if (body.has_rare_resource) value += " [rare]";
-      if (body.has_pre_warp_civilization) value += " [pre-warp]";
+      if (trait(ed.body_edits, body, &core::PlanetaryBody::has_anomaly,
+                &edproj::SystemEdit::anomaly))
+        value += " [anomaly]";
+      if (trait(ed.body_edits, body, &core::PlanetaryBody::has_rare_resource,
+                &edproj::SystemEdit::rare_resource))
+        value += " [rare]";
+      if (trait(ed.body_edits, body,
+                &core::PlanetaryBody::has_pre_warp_civilization,
+                &edproj::SystemEdit::pre_warp_civilization))
+        value += " [pre-warp]";
       if (body.cracked_world) value += " [cracked]";
       const auto bit = ed.body_edits.find(body.id);
       const auto marker =
@@ -678,6 +709,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
     out.overlay.push_back(Text{{x, y}, "No system selected", muted, font});
     y += font + 10 * s;
     ed.hit_name = ed.hit_note = ed.hit_bookmark = {};
+    ed.hit_anomaly = ed.hit_rare = ed.hit_prewarp = {};
     return;
   }
   const auto &sys = ed.systems[ed.selected];
@@ -723,7 +755,22 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   small_button(out, ed.hit_bookmark,
                stored.bookmarked ? "BOOKMARKED" : "BOOKMARK",
                stored.bookmarked, font);
-  y += ed.hit_bookmark.height + 10 * s;
+  y += ed.hit_bookmark.height + 8 * s;
+
+  // Trait overrides cycle AUTO -> YES -> NO -> AUTO: AUTO follows the
+  // generated record, YES/NO override it in the annotation layer.
+  const auto trait_button = [&](UiRect &hit, const char *label,
+                                const std::optional<bool> &value) {
+    hit = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto state = value ? (*value ? "YES" : "NO") : "AUTO";
+    small_button(out, hit, std::string(label) + ": " + state,
+                 value && *value, font);
+    y += hit.height + 6 * s;
+  };
+  trait_button(ed.hit_anomaly, "ANOMALY", stored.anomaly);
+  trait_button(ed.hit_rare, "RARE RESOURCE", stored.rare_resource);
+  trait_button(ed.hit_prewarp, "PRE-WARP CIV", stored.pre_warp_civilization);
+  y += 4 * s;
 
   // Scrollable authoritative detail rows fill the space above the docked
   // project/history buttons.
@@ -1735,6 +1782,26 @@ int main(int argc, char **argv) {
                   !map[target->first].bookmarked;
               rebuild_detail_rows(ed); // row bookmark markers refresh
               rebuild_filter(ed); // bookmarked-only view membership changes
+            }
+          } else if (ed.hit_anomaly.contains(event.position) ||
+                     ed.hit_rare.contains(event.position) ||
+                     ed.hit_prewarp.contains(event.position)) {
+            if (const auto target = annotation_target(ed)) {
+              ed.history.commit(
+                  {ed.seed, ed.system_count, ed.edits, ed.body_edits,
+                   ed.project_name});
+              auto &map = annotation_map(ed, target->second);
+              auto &field =
+                  ed.hit_anomaly.contains(event.position)
+                      ? map[target->first].anomaly
+                      : ed.hit_rare.contains(event.position)
+                            ? map[target->first].rare_resource
+                            : map[target->first].pre_warp_civilization;
+              // AUTO -> YES -> NO -> AUTO (unset restores the generated trait).
+              field = !field ? std::optional<bool>{true}
+                             : (*field ? std::optional<bool>{false}
+                                       : std::nullopt);
+              rebuild_detail_rows(ed); // trait markers refresh
             }
           } else if (ed.hit_undo.contains(event.position)) {
             apply_undo(ed);

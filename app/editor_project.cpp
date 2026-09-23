@@ -11,12 +11,18 @@ std::string serialize_project(const EditorProject &project) {
   auto serialize_map = [](const std::unordered_map<int, SystemEdit> &map) {
     auto rows = nlohmann::json::array();
     for (const auto &[id, edit] : map) {
-      if (edit.name.empty() && edit.note.empty() && !edit.bookmarked)
+      if (edit.name.empty() && edit.note.empty() && !edit.bookmarked &&
+          !edit.anomaly && !edit.rare_resource && !edit.pre_warp_civilization)
         continue;
-      rows.push_back({{"id", id},
-                      {"name", edit.name},
-                      {"note", edit.note},
-                      {"bookmarked", edit.bookmarked}});
+      auto row = nlohmann::json{{"id", id},
+                                {"name", edit.name},
+                                {"note", edit.note},
+                                {"bookmarked", edit.bookmarked}};
+      if (edit.anomaly) row["anomaly"] = *edit.anomaly;
+      if (edit.rare_resource) row["rareResource"] = *edit.rare_resource;
+      if (edit.pre_warp_civilization)
+        row["preWarpCivilization"] = *edit.pre_warp_civilization;
+      rows.push_back(std::move(row));
     }
     return rows;
   };
@@ -49,7 +55,17 @@ EditorProject parse_project(std::string_view text) {
         edit.name = row.value("name", std::string{});
         edit.note = row.value("note", std::string{});
         edit.bookmarked = row.value("bookmarked", false);
-        if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked)
+        const auto flag = [](const nlohmann::json &row, const char *key) {
+          const auto it = row.find(key);
+          return it != row.end() && it->is_boolean()
+                     ? std::optional<bool>{it->get<bool>()}
+                     : std::nullopt;
+        };
+        edit.anomaly = flag(row, "anomaly");
+        edit.rare_resource = flag(row, "rareResource");
+        edit.pre_warp_civilization = flag(row, "preWarpCivilization");
+        if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked ||
+            edit.anomaly || edit.rare_resource || edit.pre_warp_civilization)
           out[row.at("id").get<int>()] = std::move(edit);
       }
     };
