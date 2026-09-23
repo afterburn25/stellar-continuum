@@ -80,7 +80,8 @@ struct ChronicleFilter {
 // newest first, capped at `max_entries` (the tail end of history —
 // a chronicle can hold 100k records; the view shows the newest slice
 // and reports the true total). Visibility is delegated entirely to
-// `EventHistory::feed` — the projection never re-derives it.
+// `EventHistory::query`'s observer projection (the same one `feed()`
+// wraps, plus the `before_day` axis) — never re-derived here.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
          const ChronicleFilter &filter = {}, std::size_t max_entries = 4000);

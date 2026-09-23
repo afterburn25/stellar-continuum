@@ -243,7 +243,10 @@ significance, actor, tag, after_day, before_day) plus free-text
 search now has a browser surface — `snapshot()` moved from `feed()`
 to `query()` (the same observer projection plus the upper bound);
 the remaining
-presentation gap is multi-select filter composition.
+presentation gap is multi-select within an axis (e.g. Combat +
+Diplomacy domains together) — evaluated and deliberately deferred:
+cross-axis composition already covers the real cases, and a domain
+chip row cannot fit the panel at minimum scale.
 
 Replay save-checkpoints now localize divergence: the client's
 save-capture observer emits `engine::document_section_checkpoints`
