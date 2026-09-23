@@ -1,5 +1,6 @@
 #include <stellar/engine/texture_cook.hpp>
 #include <stellar/engine/draw_batcher.hpp>
+#include <stellar/engine/render_graph.hpp>
 #include "native_scene3d_gpu.hpp"
 #include "generated/scene3d_shaders.hpp"
 #include <SDL3/SDL.h>
@@ -294,6 +295,17 @@ struct Scene3DRenderer::Storage {
         fragment.absorption={d.absorption.x,d.absorption.y,d.absorption.z,d.environment_strength};fragment.view_options[1]=d.specular_strength;
         fragment.view_options[2]=d.surface_relief*draw.instance->scale;}
     }
+    // Pass scheduling goes through the engine RenderGraph: resources and
+    // dependencies are declared per frame, compile() validates the DAG and
+    // emits the execution order, and the backend binds routines by tag.
+    engine::RenderGraph graph;
+    const auto hdr_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"hdr-scene",view.destination.width,view.destination.height,"rgba16f",true});
+    const auto color_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"color",view.destination.width,view.destination.height,"rgba8",true});
+    const auto depth_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"depth",view.destination.width,view.destination.height,"d32",true});
+    graph.add_pass({"scene3d",{},{target.hdr?hdr_target:color_target,depth_target},{},"scene3d"});
+    graph.add_pass({"tonemap",{hdr_target},{color_target},{},"tonemap",target.hdr!=nullptr});
+    std::vector<std::string> order;std::vector<engine::RenderGraphDiagnostic> diagnostics;
+    if(!graph.compile(&order,&diagnostics))throw gpu_error("3D render graph compile failed: "+(diagnostics.empty()?"unknown":diagnostics.front().message));
     Command command(device);
     if(!sorted.empty()){
       const auto vertex_bytes=static_cast<Uint32>(vertex_data.size()*sizeof(VertexUniform)),fragment_bytes=static_cast<Uint32>(fragment_data.size()*sizeof(FragmentUniform));
@@ -313,30 +325,33 @@ struct Scene3DRenderer::Storage {
       from.offset=vertex_bytes;to={fragment_buffer,0,fragment_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);
       SDL_EndGPUCopyPass(copy);
     }
-    SDL_GPUColorTargetInfo color{};color.texture=target.hdr?target.hdr:target.color;color.load_op=SDL_GPU_LOADOP_CLEAR;color.store_op=SDL_GPU_STOREOP_STORE;
-    SDL_GPUDepthStencilTargetInfo depth{};depth.texture=target.depth;depth.clear_depth=1;depth.load_op=SDL_GPU_LOADOP_CLEAR;depth.store_op=SDL_GPU_STOREOP_DONT_CARE;depth.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;depth.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
-    auto* pass=SDL_BeginGPURenderPass(command.value,&color,1,&depth);if(!pass)throw gpu_error("3D render pass failed");
-    if(!sorted.empty()){
-      SDL_BindGPUVertexStorageBuffers(pass,0,&vertex_buffer,1);SDL_BindGPUFragmentStorageBuffers(pass,0,&fragment_buffer,1);
-      for(const auto& batch:batcher.batches()){
-        const auto& draw=draws[sorted[batch.first_item].instance_index];const auto& material=draw.instance->material;
-        SDL_BindGPUGraphicsPipeline(pass,pipelines[(material.transparent?1:0)+(material.double_sided?2:0)]);
-        const SDL_GPUBufferBinding vertices{draw.mesh->vertices,0},indices{draw.mesh->indices,0};
-        SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
-        const SDL_GPUTextureSamplerBinding sampled[]{{draw.image->texture,material.anisotropic_texture?detail_sampler:sampler},{draw.optical->texture,sampler},{draw.environment->texture,environment_sampler},{draw.normal->texture,environment_sampler},{draw.properties->texture,environment_sampler},{draw.cloud->texture,environment_sampler},{draw.shadow->texture,sampler},{draw.next->texture,sampler}};
-        SDL_BindGPUFragmentSamplers(pass,0,sampled,8);
-        SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(draw.mesh->owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
+    for(const auto& name:order){
+      if(name=="scene3d"){
+        SDL_GPUColorTargetInfo color{};color.texture=target.hdr?target.hdr:target.color;color.load_op=SDL_GPU_LOADOP_CLEAR;color.store_op=SDL_GPU_STOREOP_STORE;
+        SDL_GPUDepthStencilTargetInfo depth{};depth.texture=target.depth;depth.clear_depth=1;depth.load_op=SDL_GPU_LOADOP_CLEAR;depth.store_op=SDL_GPU_STOREOP_DONT_CARE;depth.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;depth.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
+        auto* pass=SDL_BeginGPURenderPass(command.value,&color,1,&depth);if(!pass)throw gpu_error("3D render pass failed");
+        if(!sorted.empty()){
+          SDL_BindGPUVertexStorageBuffers(pass,0,&vertex_buffer,1);SDL_BindGPUFragmentStorageBuffers(pass,0,&fragment_buffer,1);
+          for(const auto& batch:batcher.batches()){
+            const auto& draw=draws[sorted[batch.first_item].instance_index];const auto& material=draw.instance->material;
+            SDL_BindGPUGraphicsPipeline(pass,pipelines[(material.transparent?1:0)+(material.double_sided?2:0)]);
+            const SDL_GPUBufferBinding vertices{draw.mesh->vertices,0},indices{draw.mesh->indices,0};
+            SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
+            const SDL_GPUTextureSamplerBinding sampled[]{{draw.image->texture,material.anisotropic_texture?detail_sampler:sampler},{draw.optical->texture,sampler},{draw.environment->texture,environment_sampler},{draw.normal->texture,environment_sampler},{draw.properties->texture,environment_sampler},{draw.cloud->texture,environment_sampler},{draw.shadow->texture,sampler},{draw.next->texture,sampler}};
+            SDL_BindGPUFragmentSamplers(pass,0,sampled,8);
+            SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(draw.mesh->owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
+          }
+        }
+        SDL_EndGPURenderPass(pass);
+      }else if(name=="tonemap"){
+        SDL_GPUColorTargetInfo resolve{};resolve.texture=target.color;resolve.load_op=SDL_GPU_LOADOP_DONT_CARE;resolve.store_op=SDL_GPU_STOREOP_STORE;
+        auto* resolve_pass=SDL_BeginGPURenderPass(command.value,&resolve,1,nullptr);if(!resolve_pass)throw gpu_error("3D tonemap pass failed");
+        SDL_BindGPUGraphicsPipeline(resolve_pass,tonemap_pipeline);
+        const SDL_GPUTextureSamplerBinding sampled[]{{target.hdr,sampler}};
+        SDL_BindGPUFragmentSamplers(resolve_pass,0,sampled,1);
+        SDL_DrawGPUPrimitives(resolve_pass,3,1,0,0);
+        SDL_EndGPURenderPass(resolve_pass);
       }
-    }
-    SDL_EndGPURenderPass(pass);
-    if(target.hdr){
-      SDL_GPUColorTargetInfo resolve{};resolve.texture=target.color;resolve.load_op=SDL_GPU_LOADOP_DONT_CARE;resolve.store_op=SDL_GPU_STOREOP_STORE;
-      auto* resolve_pass=SDL_BeginGPURenderPass(command.value,&resolve,1,nullptr);if(!resolve_pass)throw gpu_error("3D tonemap pass failed");
-      SDL_BindGPUGraphicsPipeline(resolve_pass,tonemap_pipeline);
-      const SDL_GPUTextureSamplerBinding sampled[]{{target.hdr,sampler}};
-      SDL_BindGPUFragmentSamplers(resolve_pass,0,sampled,1);
-      SDL_DrawGPUPrimitives(resolve_pass,3,1,0,0);
-      SDL_EndGPURenderPass(resolve_pass);
     }
     command.submit();
   }
