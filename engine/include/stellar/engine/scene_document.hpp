@@ -48,6 +48,9 @@ struct SceneEntity {
   // Seconds of sim time before the entity self-destructs; 0 = immortal.
   // For spawned effects (sparks, pickups) that should not persist.
   float ttl{0.0f};
+  // Mirror the sprite horizontally/vertically (sprites only).
+  bool flip_x{false};
+  bool flip_y{false};
 };
 
 struct SceneDocument {

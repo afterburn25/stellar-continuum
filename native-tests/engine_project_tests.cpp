@@ -204,6 +204,8 @@ int main() {
     scene.entities[0].fps = 6.0f;
     scene.entities[0].rotation = 45.0f;
     scene.entities[0].ttl = 2.5f;
+    scene.entities[0].flip_x = true;
+    scene.entities[0].flip_y = true;
     const auto reparsed = engine::SceneDocument::from_json(scene.to_json());
     check(reparsed && reparsed->entities.size() == 1 &&
               reparsed->entities[0].name == "box" &&
@@ -219,6 +221,8 @@ int main() {
               reparsed->entities[0].fps == 6.0f &&
               reparsed->entities[0].rotation == 45.0f &&
               reparsed->entities[0].ttl == 2.5f &&
+              reparsed->entities[0].flip_x &&
+              reparsed->entities[0].flip_y &&
               reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
               reparsed->bg_b == 40 && reparsed->gravity == 600.f,
           "scene document round-trips");

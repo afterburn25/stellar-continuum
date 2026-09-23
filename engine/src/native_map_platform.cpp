@@ -272,10 +272,13 @@ struct Window::Storage {
     require(SDL_SetTextureColorMod(cached.texture,command.tint.r,command.tint.g,command.tint.b),"SDL image color modulation failed");require(SDL_SetTextureAlphaMod(cached.texture,command.tint.a),"SDL image alpha modulation failed");
     if(command.clip){const SDL_Rect clip{static_cast<int>(std::floor(command.clip->x)),static_cast<int>(std::floor(command.clip->y)),static_cast<int>(std::ceil(command.clip->width)),static_cast<int>(std::ceil(command.clip->height))};require(SDL_SetRenderClipRect(renderer,&clip),"SDL image clip setup failed");}
     const auto destination=sdl_rect(command.destination);
-    const auto rendered=command.rotation_degrees==0.f
+    const auto flip=static_cast<SDL_FlipMode>(
+        (command.flip_horizontal?SDL_FLIP_HORIZONTAL:0)|
+        (command.flip_vertical?SDL_FLIP_VERTICAL:0));
+    const auto rendered=(command.rotation_degrees==0.f&&flip==SDL_FLIP_NONE)
         ?SDL_RenderTexture(renderer,cached.texture,source?&*source:nullptr,&destination)
         :SDL_RenderTextureRotated(renderer,cached.texture,source?&*source:nullptr,&destination,
-            std::fmod(static_cast<double>(command.rotation_degrees),360.),nullptr,SDL_FLIP_NONE);
+            std::fmod(static_cast<double>(command.rotation_degrees),360.),nullptr,flip);
     if(command.clip)require(SDL_SetRenderClipRect(renderer,nullptr),"SDL image clip reset failed");require(rendered,"SDL cached image draw failed");
   }
   void draw_triangle_mesh(const TriangleMesh &mesh) {

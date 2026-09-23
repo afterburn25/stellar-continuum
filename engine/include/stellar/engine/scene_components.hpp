@@ -69,6 +69,11 @@ struct Lifetime {
   // each sim step. Absent component = immortal.
   float remaining{0.0f};
 };
+struct Flip {
+  // Sprite mirroring across the destination axes.
+  bool x{false};
+  bool y{false};
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

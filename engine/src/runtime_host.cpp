@@ -560,6 +560,10 @@ int RuntimeHost::run() {
         }
         if (const auto *rot = world.get<Rotation>(impl.entities[i]))
           img.rotation_degrees = rot->value;
+        if (const auto *fl = world.get<Flip>(impl.entities[i])) {
+          img.flip_horizontal = fl->x;
+          img.flip_vertical = fl->y;
+        }
         draw.overlay.push_back(std::move(img));
       } else {
         draw.overlay.push_back(

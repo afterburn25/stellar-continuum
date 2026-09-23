@@ -80,6 +80,10 @@ struct Image {
   // Clockwise rotation about the destination center, in drawable space.
   // Appended with a neutral default to preserve existing image callers.
   float rotation_degrees{};
+  // Mirror the source rect across the destination's axes. Flips compose
+  // with rotation exactly as SDL applies them (flip after rotate).
+  bool flip_horizontal{};
+  bool flip_vertical{};
 };
 class Scene3D;
 struct Scene3DStatistics;

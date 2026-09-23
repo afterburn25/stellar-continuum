@@ -197,6 +197,7 @@ struct Shell {
       hit_scene_size{}, hit_scene_color{}, hit_scene_layer{},
       hit_scene_parallax{}, hit_scene_text{}, hit_scene_grav{},
       hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
+      hit_scene_flipx{}, hit_scene_flipy{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
@@ -1052,6 +1053,24 @@ void commit_scene_field(Shell &shell) {
       ok = true;
     } catch (const std::exception &) {
     }
+  } else if (shell.scene_field == 18 || shell.scene_field == 19) {
+    const auto b = shell.scene_buffer;
+    bool value;
+    if (b == "1" || b == "true" || b == "yes") {
+      value = true;
+      ok = true;
+    } else if (b == "0" || b == "false" || b == "no") {
+      value = false;
+      ok = true;
+    } else {
+      value = false;
+    }
+    if (ok) {
+      if (shell.scene_field == 18)
+        next.flip_x = value;
+      else
+        next.flip_y = value;
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1094,7 +1113,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                         shell.hit_scene_solid = shell.hit_scene_bg =
                             shell.hit_scene_frames = shell.hit_scene_fps =
                                 shell.hit_scene_rot = shell.hit_scene_ttl =
-                                    {};
+                                    shell.hit_scene_flipx =
+                                        shell.hit_scene_flipy = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1293,6 +1313,14 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->ttl) : "",
         shell.editing_scene && shell.scene_field == 17,
         "seconds until despawn - 0 immortal");
+  field(shell.hit_scene_flipx, "flipX",
+        entity ? (entity->flip_x ? "true" : "false") : "",
+        shell.editing_scene && shell.scene_field == 18,
+        "mirror sprite horizontally");
+  field(shell.hit_scene_flipy, "flipY",
+        entity ? (entity->flip_y ? "true" : "false") : "",
+        shell.editing_scene && shell.scene_field == 19,
+        "mirror sprite vertically");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2152,6 +2180,10 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = std::to_string(e->rotation);
               else if (field == 17 && e)
                 shell.scene_buffer = std::to_string(e->ttl);
+              else if (field == 18 && e)
+                shell.scene_buffer = e->flip_x ? "true" : "false";
+              else if (field == 19 && e)
+                shell.scene_buffer = e->flip_y ? "true" : "false";
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2189,6 +2221,10 @@ int main(int argc, char **argv) {
               edit_field(16);
             else if (shell.hit_scene_ttl.contains(event.position))
               edit_field(17);
+            else if (shell.hit_scene_flipx.contains(event.position))
+              edit_field(18);
+            else if (shell.hit_scene_flipy.contains(event.position))
+              edit_field(19);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);
