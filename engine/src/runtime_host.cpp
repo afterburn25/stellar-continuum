@@ -400,21 +400,13 @@ RuntimeHost::raycast3d(double ox, double oy, double oz, float dx,
     const CollisionVector3 to{lo.x + ld.x * max_distance,
                               lo.y + ld.y * max_distance,
                               lo.z + ld.z * max_distance};
-    // ld is 1/scale long, so segment fraction t == world-distance frac.
-    const auto &verts = mesh->vertices();
-    const auto &idx = mesh->indices();
-    double nearest = 2.0;
-    for (std::size_t i = 0; i + 2 < idx.size(); i += 3) {
-      const auto &pa = verts[idx[i]].position;
-      const auto &pb = verts[idx[i + 1]].position;
-      const auto &pc = verts[idx[i + 2]].position;
-      const auto hit = segment_triangle(
-          from, to, {pa.x, pa.y, pa.z}, {pb.x, pb.y, pb.z},
-          {pc.x, pc.y, pc.z});
-      if (hit && *hit < nearest) nearest = *hit;
-    }
-    if (nearest <= 1.0) {
-      const float dist = static_cast<float>(nearest) * max_distance;
+    // ld is 1/scale long, so the segment fraction == world-distance
+    // fraction; intersect_mesh_segment sphere-rejects before scanning
+    // triangles and returns the nearest face.
+    const auto hit = intersect_mesh_segment(*mesh, from, to);
+    if (hit) {
+      const float dist =
+          static_cast<float>(hit->fraction) * max_distance;
       if (!best || dist < best->distance)
         best = RaycastHit3D{e, dist,
                             static_cast<float>(ox + dx * dist),
