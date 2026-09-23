@@ -129,8 +129,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   and scheduler state survives coordinator moves; the 28-case
   coordinator parity matrix, fresh/persistable/integrated-adaptive
   campaign parity and player17 v17 parity all pass unchanged (behavior
-  identical — only the dispatch mechanism changed). The shell tool is
-  UI-only over real engine state (manual launch).
+  identical — only the dispatch mechanism changed). The shell tools are
+  UI inspectors over real engine state; `--frames N` renders N frames
+  and exits, and ctest `engine_shell_tool_*` smoke-runs every tool's
+  init+render path (15/15 pass).
 - **Save/performance impact:** executor state (tick, task elapsed/
   deferred/dirty/wake flags) is runtime-only — coordinator saves were
   already driven by authoritative domain state; `capture_state`/

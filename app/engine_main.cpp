@@ -4743,6 +4743,12 @@ int main(int argc, char **argv) {
             shell.tool = kTools[t];
             break;
           }
+    // --frames N renders N frames then exits 0 — CI smoke coverage that
+    // every tool initializes and renders without crashing.
+    int frame_limit = 0;
+    for (int i = 1; i + 1 < argc; ++i)
+      if (arg_str(i) == "--frames")
+        frame_limit = std::max(0, std::atoi(arg_str(i + 1).c_str()));
     for (const char *probe :
          {"GENERAL_TITLE", "STARTUP_TITLE", "MENU_RESUME", "ECONOMY_TITLE",
           "RESEARCH_TITLE", "FLEET_TITLE", "SYSTEM_BACK",
@@ -4767,7 +4773,9 @@ int main(int argc, char **argv) {
     double fps{};
     std::string last_input = "none";
 
+    int frames_rendered = 0;
     for (;;) {
+      if (frame_limit > 0 && frames_rendered >= frame_limit) break;
       const auto snapshot = window.poll();
       if (snapshot.quit_requested) break;
       shell.pointer_x = snapshot.pointer.x;
@@ -6201,6 +6209,7 @@ int main(int argc, char **argv) {
 
       FrameTiming timing;
       window.draw(draw, std::nullopt, &timing);
+      ++frames_rendered;
       profiler.set_gauge("frame.submission_ms", timing.submission_ms);
       profiler.set_gauge("frame.present_ms", timing.present_ms);
       profiler.set_gauge("frame.fps", fps);

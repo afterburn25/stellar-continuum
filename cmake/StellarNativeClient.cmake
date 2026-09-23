@@ -51,6 +51,18 @@ if(MSVC)
     STELLAR_CMAKE_COMMAND="${CMAKE_COMMAND}")
 endif()
 
+# Per-tool smoke coverage: --frames N renders N frames and exits, so each
+# tool's init+render path runs under ctest without interaction.
+if(BUILD_TESTING)
+  foreach(tool IN ITEMS Projects Dashboard Scene Scene3D Assets Profiler
+                        Localization Simulation Colony Economy Planet AI
+                        Warfare Missions Physics)
+    string(TOLOWER "${tool}" tool_lower)
+    add_test(NAME "engine_shell_tool_${tool_lower}"
+      COMMAND stellar-engine --tool "${tool}" --frames 20)
+  endforeach()
+endif()
+
 # Engine SDK export: stages the redistributable headers, prebuilt libraries,
 # SDL3 runtime and the consumer CMake config under engine-sdk/ beside the
 # shell, so scaffolded game projects can compile and link without this
