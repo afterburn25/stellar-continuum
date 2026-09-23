@@ -46,6 +46,7 @@ int main() {
     project.edits[400]; // Fully empty row must not serialize.
     project.body_edits[3].name = "Earth";
     project.body_edits[3].bookmarked = true;
+    project.body_edits[3].radius_earth = 1.25; // numeric override
     project.body_edits[9].note = "moon survey";
     project.name = "Survey Run \"Kestrel\"";
     const auto text = serialize_project(project);
@@ -81,6 +82,11 @@ int main() {
             "body name/bookmark did not round-trip");
     require(restored.body_edits.at(9).note == "moon survey",
             "body note did not round-trip");
+    require(restored.body_edits.at(3).radius_earth &&
+                *restored.body_edits.at(3).radius_earth == 1.25,
+            "radius override did not round-trip");
+    require(!restored.body_edits.at(9).radius_earth,
+            "unset radius override must stay unset (AUTO follows generated)");
 
     // Documents without the additive bodyEdits array still parse.
     const auto legacy = parse_project(

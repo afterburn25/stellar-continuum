@@ -183,7 +183,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
 
 enum class WorkspaceView { Galaxy, System, Body };
 
-enum class Field { None, Name, Note, Search, ProjectName };
+enum class Field { None, Name, Note, Search, ProjectName, BodyRadius };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
@@ -250,7 +250,8 @@ struct Editor {
   UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
       hit_anomaly{}, hit_rare{}, hit_prewarp{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
-      hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{};
+      hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{},
+      hit_radius{};
   // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
   bool menu_open{};
   UiRect menu_rect{};
@@ -287,6 +288,14 @@ std::string display_name(const Editor &ed, const core::PlanetaryBody &body) {
       it != ed.body_edits.end() && !it->second.name.empty())
     return it->second.name;
   return body.name;
+}
+
+// Radius override: the annotation layer wins over the generated record.
+double body_radius_earth(const Editor &ed, const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.radius_earth)
+    return *it->second.radius_earth;
+  return body.radius_earth;
 }
 
 bool matches(const Editor &ed, const core::StellarSystem &sys) {
@@ -407,6 +416,38 @@ void commit_active_field(Editor &ed) {
                          ed.project_name});
       ed.project_name = ed.edit_buffer;
     }
+  } else if (ed.editing == Field::BodyRadius) {
+    // Body-only numeric override: empty restores AUTO, otherwise a positive
+    // finite number wins over the generated radius_earth.
+    if (const auto target = annotation_target(ed); target && target->second) {
+      const auto it = ed.body_edits.find(target->first);
+      const auto current = it != ed.body_edits.end()
+                               ? it->second.radius_earth
+                               : std::optional<double>{};
+      if (ed.edit_buffer.empty()) {
+        if (current) {
+          ed.history.commit({ed.seed, ed.system_count, ed.edits,
+                             ed.body_edits, ed.project_name});
+          ed.body_edits[target->first].radius_earth.reset();
+          rebuild_detail_rows(ed);
+        }
+      } else {
+        try {
+          const auto value = std::stod(ed.edit_buffer);
+          if (!std::isfinite(value) || value <= 0.)
+            throw std::runtime_error("radius must be positive");
+          if (!current || *current != value) {
+            ed.history.commit({ed.seed, ed.system_count, ed.edits,
+                               ed.body_edits, ed.project_name});
+            ed.body_edits[target->first].radius_earth = value;
+            rebuild_detail_rows(ed);
+          }
+        } catch (const std::exception &) {
+          ed.status = "radius must be a positive number";
+          return; // keep the field open so the input is not silently dropped
+        }
+      }
+    }
   } else if (const auto target = annotation_target(ed)) {
     auto &map = annotation_map(ed, target->second);
     const auto it = map.find(target->first);
@@ -469,7 +510,7 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
   row("name", body.name);
   row("id", std::to_string(body.id));
   row("kind", std::string(body_kind_name(body.kind)));
-  row("radius", fspec("%.3f", body.radius_earth) + " Re");
+  row("radius", fspec("%.3f", body_radius_earth(ed, body)) + " Re");
   row("mass", fspec("%.3f", body.mass_earth) + " Me");
   row("gravity", fspec("%.3f", body.environment.gravity_g) + " g");
   row("temperature",
@@ -643,7 +684,7 @@ void rebuild_detail_rows(Editor &ed) {
     for (const auto body_index : bodies->second) {
       const auto &body = ed.bodies[body_index];
       std::string value = std::string(body_kind_name(body.kind)) + ", " +
-                          fspec("%.2f", body.radius_earth) + " Re, " +
+                          fspec("%.2f", body_radius_earth(ed, body)) + " Re, " +
                           fspec("%.2f", body.environment.gravity_g) + " g, " +
                           fspec("%.0f", body.environment.temperature_kelvin) +
                           " K, " + std::string(atmosphere_name(
@@ -810,6 +851,26 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   trait_button(ed.hit_rare, "RARE RESOURCE", stored.rare_resource);
   trait_button(ed.hit_prewarp, "PRE-WARP CIV", stored.pre_warp_civilization);
   y += 4 * s;
+
+  // Body-only numeric override: radius in Earth radii; empty restores AUTO.
+  if (body_context) {
+    const auto &body = ed.bodies[ed.selected_body];
+    out.overlay.push_back(
+        Text{{x, y}, "radius override (Earth radii)", muted, font - 1});
+    y += font + 4;
+    ed.hit_radius = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto radius_value =
+        ed.editing == Field::BodyRadius
+            ? ed.edit_buffer
+            : (stored.radius_earth
+                   ? fspec("%.3f", *stored.radius_earth)
+                   : fspec("%.3f", body.radius_earth) + " (auto)");
+    field_box(out, ed.hit_radius, radius_value,
+              ed.editing == Field::BodyRadius, "earth radii, empty = auto...",
+              font);
+    y += ed.hit_radius.height + 8 * s;
+  } else
+    ed.hit_radius = {};
 
   // Embedded assets: files dropped under <project>/assets/ ride with the
   // project; the first png previews here.
@@ -1470,7 +1531,8 @@ Point body_to_screen(const Editor &ed, double x_km, double y_km) {
 void fit_body_camera(Editor &ed) {
   if (ed.focus_body >= ed.bodies.size()) return;
   const auto &body = ed.bodies[ed.focus_body];
-  const double radius_km = std::max(50.0, body.radius_earth * 6371.0);
+  const double radius_km =
+      std::max(50.0, body_radius_earth(ed, body) * 6371.0);
   double extent = radius_km * 30.0;
   for (const auto mi : moon_indices(ed, ed.focus_body))
     try {
@@ -1520,7 +1582,8 @@ void render_body_view(DrawList &out, Editor &ed, float s) {
   // Parent disc at its true angular size, floored for legibility.
   const auto pc = to_screen(0.0, 0.0);
   const float parent_px = std::max(
-      5.f, static_cast<float>(body.radius_earth * 6371.0 * ed.body_ppa));
+      5.f,
+      static_cast<float>(body_radius_earth(ed, body) * 6371.0 * ed.body_ppa));
   const bool in_hz =
       body.stellar_exposure && body.stellar_exposure->in_habitable_zone;
   if (ed.focus_body == ed.selected_body)
@@ -1544,7 +1607,7 @@ void render_body_view(DrawList &out, Editor &ed, float s) {
           core::satellite_relative_position(orbit, ed.system_days);
       const auto p = to_screen(rel[0], rel[1]);
       const float moon_px = std::clamp(
-          static_cast<float>(moon.radius_earth * 6371.0 * ed.body_ppa),
+          static_cast<float>(body_radius_earth(ed, moon) * 6371.0 * ed.body_ppa),
           2.5f, 10.f);
       if (mi == ed.selected_body)
         out.world.push_back(Circle{p, moon_px + 5.f, accent});
@@ -1972,6 +2035,17 @@ int main(int argc, char **argv) {
               const auto it = map.find(target->first);
               ed.edit_buffer =
                   it != map.end() ? it->second.note : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_radius.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyRadius;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.radius_earth
+                      ? fspec("%.3f", *it->second.radius_earth)
+                      : std::string{};
               window.set_text_input(true);
             }
           } else if (ed.hit_project_name.contains(event.position)) {

@@ -20,6 +20,9 @@ struct SystemEdit {
   // They re-apply deterministically after regeneration because they live in
   // the annotation layer, not the generated catalog.
   std::optional<bool> anomaly, rare_resource, pre_warp_civilization;
+  // Numeric property override (body edits only): unset follows the
+  // generated radius_earth; a set value wins everywhere the editor reads it.
+  std::optional<double> radius_earth;
 };
 
 struct EditorProject {
