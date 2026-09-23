@@ -268,7 +268,11 @@ checkpoint with a label mismatch — recordings are session artifacts,
 not save files. On `--replay` the parsed header's seed/game_version is
 now compared against the session and a mismatch prints a provenance
 warning to stderr (advisory — cross-build replay is a legitimate
-compatibility probe). Coverage: `replay` unit tests.
+compatibility probe). `build_id` now carries `STELLAR_SOURCE_COMMIT`
+(the generated git hash) instead of duplicating the version, so the
+check also catches same-version/different-commit replays; headers
+whose build_id equals their game_version are treated as legacy and
+skip the commit check. Coverage: `replay` unit tests.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

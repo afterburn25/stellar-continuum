@@ -8317,7 +8317,7 @@ int main(int argc,char **argv){
     ReplayState replay;
     if(!options.record_path.empty())
       replay.recorder.emplace(stellar::engine::ReplayHeader{
-          static_cast<std::uint64_t>(options.seed),STELLAR_GAME_VERSION,
+          static_cast<std::uint64_t>(options.seed),STELLAR_SOURCE_COMMIT,
           STELLAR_GAME_VERSION});
     if(!options.replay_path.empty()){
       std::ifstream replay_file(options.replay_path,std::ios::binary);
@@ -8330,10 +8330,17 @@ int main(int argc,char **argv){
       // cannot reproduce this session — flag it so a divergence is read as
       // a provenance mismatch, not a simulation defect. Advisory only:
       // cross-build replay is a legitimate compatibility probe.
+      // build_id carries the source commit in new recordings; older ones
+      // stamped the game version there — skip the commit check for those.
+      const bool legacy_header=
+          parsed->header().build_id==parsed->header().game_version;
       if(parsed->header().seed!=static_cast<std::uint64_t>(options.seed)||
+         (!legacy_header&&parsed->header().build_id!=STELLAR_SOURCE_COMMIT)||
          parsed->header().game_version!=STELLAR_GAME_VERSION)
         std::cerr<<"Stellar Continuum native client: replay provenance differs "
                    "(recorded seed "<<parsed->header().seed<<" vs "<<options.seed
+                 <<", recorded build "<<parsed->header().build_id
+                 <<" vs "<<STELLAR_SOURCE_COMMIT
                  <<", recorded version "<<parsed->header().game_version
                  <<" vs "<<STELLAR_GAME_VERSION
                  <<") — divergence may reflect the mismatch.\n";
