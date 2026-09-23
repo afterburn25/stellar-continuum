@@ -214,6 +214,7 @@ int main() {
     scene.entities[0].data = "checkpoint-7";
     scene.entities[0].opacity = 0.5f;
     scene.entities[0].spin = 90.f;
+    scene.entities[0].bounce = false;
     scene.tilemap = engine::SceneTilemap{};
     scene.tilemap->tileset = "sprites/tiles.png";
     scene.tilemap->tile_w = 32;
@@ -243,6 +244,7 @@ int main() {
               reparsed->entities[0].data == "checkpoint-7" &&
               reparsed->entities[0].opacity == 0.5f &&
               reparsed->entities[0].spin == 90.f &&
+              !reparsed->entities[0].bounce &&
               reparsed->tilemap &&
               reparsed->tilemap->tileset == "sprites/tiles.png" &&
               reparsed->tilemap->columns == 4 && reparsed->tilemap->collide &&

@@ -63,6 +63,8 @@ struct SceneEntity {
   float opacity{1.0f};
   // Angular velocity in deg/s — integrates `rotation` each sim step.
   float spin{0.0f};
+  // false = clamp dead at world bounds instead of rebounding (projectiles).
+  bool bounce{true};
 };
 
 // Grid terrain layer: a tileset image sliced into tile_w/tile_h cells

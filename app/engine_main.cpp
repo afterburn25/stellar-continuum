@@ -207,7 +207,7 @@ struct Shell {
       hit_scene_tilecollide{}, hit_scene_tilelayer{},
       hit_scene_tilepar{}, hit_scene_tilecells{},
       hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_music{},
-      hit_scene_spin{}, hit_scene_worldsize{},
+      hit_scene_spin{}, hit_scene_worldsize{}, hit_scene_bounce{},
       scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
@@ -1170,7 +1170,8 @@ void commit_scene_field(Shell &shell) {
     } catch (const std::exception &) {
     }
   } else if (shell.scene_field == 18 || shell.scene_field == 19 ||
-             shell.scene_field == 20 || shell.scene_field == 21) {
+             shell.scene_field == 20 || shell.scene_field == 21 ||
+             shell.scene_field == 25) {
     const auto b = shell.scene_buffer;
     bool value;
     if (b == "1" || b == "true" || b == "yes") {
@@ -1189,8 +1190,10 @@ void commit_scene_field(Shell &shell) {
         next.flip_y = value;
       else if (shell.scene_field == 20)
         next.visible = value;
-      else
+      else if (shell.scene_field == 21)
         next.oneway = value;
+      else
+        next.bounce = value;
     }
   } else if (shell.scene_field == 22) {
     next.data = shell.scene_buffer;
@@ -1280,7 +1283,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                 shell.hit_scene_tilepar = shell.hit_scene_tilecells =
                     shell.hit_scene_paint = shell.hit_scene_paintcell =
                         shell.hit_scene_music = shell.hit_scene_spin =
-                            shell.hit_scene_worldsize = {};
+                            shell.hit_scene_worldsize =
+                                shell.hit_scene_bounce = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1638,6 +1642,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->spin) : "",
         shell.editing_scene && shell.scene_field == 24,
         "deg/s rotation velocity");
+  field(shell.hit_scene_bounce, "bounce",
+        entity ? (entity->bounce ? "true" : "false") : "",
+        shell.editing_scene && shell.scene_field == 25,
+        "false stops dead at level edges");
   // Tilemap fields (doc-level) — editing creates the tilemap on demand.
   const auto *tm = shell.scene_doc.tilemap
                        ? &*shell.scene_doc.tilemap
@@ -2578,6 +2586,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = std::to_string(e->opacity);
               else if (field == 24 && e)
                 shell.scene_buffer = std::to_string(e->spin);
+              else if (field == 25 && e)
+                shell.scene_buffer = e->bounce ? "true" : "false";
               else if (field == 38)
                 shell.scene_buffer = shell.scene_doc.music;
               else if (field == 39)
@@ -2686,6 +2696,8 @@ int main(int argc, char **argv) {
               edit_field(24);
             else if (shell.hit_scene_worldsize.contains(event.position))
               edit_field(39);
+            else if (shell.hit_scene_bounce.contains(event.position))
+              edit_field(25);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

@@ -84,6 +84,10 @@ struct Hidden {
 struct Oneway {
   // Marker: landable from above, pass-through from sides and below.
 };
+struct NoBounce {
+  // Marker: clamps at world bounds instead of rebounding (projectiles,
+  // debris — anything that should stop dead at the level edge).
+};
 struct UserData {
   // Freeform per-entity payload authored in the scene ("data" field).
   std::string value;

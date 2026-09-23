@@ -90,6 +90,13 @@ public:
   [[nodiscard]] audio::AudioOutput &audio();
   // The entity named "player" in the active scene, if any.
   [[nodiscard]] std::optional<EntityId> player() const;
+  // A tracked entity by its authored scene name — doors, waypoints,
+  // triggers. "player" is just the conventional movement-driven one.
+  [[nodiscard]] std::optional<EntityId>
+  find_entity(std::string_view name) const;
+  // Seconds of simulated time elapsed since run() started — fixed-step
+  // deterministic under --fixed-hz (scaled by --speed).
+  [[nodiscard]] double sim_time() const;
   // The rebindable action layer: built-in "game" context
   // (move_left/right/up/down, jump) drives the player, and games can push
   // their own contexts or load a map file (RuntimeHostOptions::input_map).
@@ -144,6 +151,10 @@ public:
   // follow-cameras need it to center: set_camera(px - vw/2, py - vh/2).
   [[nodiscard]] int viewport_width() const;
   [[nodiscard]] int viewport_height() const;
+  // Resolved level bounds (--world-w/h argv > scene worldSize > viewport)
+  // — spawn limits, AI roam ranges, minimap scaling.
+  [[nodiscard]] float world_width() const;
+  [[nodiscard]] float world_height() const;
 
   // Spawns one entity at runtime (bullets, pickups, effects) — it joins the
   // tracked set: velocity integration, wall bounce, rendering, collisions.

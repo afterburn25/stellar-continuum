@@ -124,6 +124,15 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   per-frame game code. Snapshot-verified (spin advances the serialized
   rotation); the Scene tool exposes a `spin` field and the preview shows
   live rotation.
+- **Entity bounce opt-out:** `SceneEntity::bounce=false` adds the `NoBounce`
+  marker — the entity clamps dead at world bounds instead of rebounding
+  (projectiles, debris). Snapshot-verified: a `bounce:false` mover stops at
+  `world_w - w`; the Scene tool exposes a `bounce` bool field.
+- **Runtime query surface:** `host.find_entity(name)` locates a tracked
+  entity by authored name (doors, waypoints, triggers — "player" is just the
+  conventional one); `host.sim_time()` reports deterministic elapsed sim
+  seconds; `host.world_width()`/`world_height()` expose the resolved level
+  bounds for spawn limits, AI roam ranges and minimap math.
 - **Consumers:** `RuntimeHost` generated hosts (rendering, gravity landing,
   wall blocking, grounded jumps, hot reload); the shell Scene tool (TILES
   toggle button, tileset/tilesize/columns/collide/layer/parallax/cells/paint

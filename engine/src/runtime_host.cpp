@@ -96,6 +96,15 @@ World &RuntimeHost::world() { return impl_->world; }
 const ContentResolver &RuntimeHost::content() const { return *impl_->content; }
 audio::AudioOutput &RuntimeHost::audio() { return *impl_->audio; }
 std::optional<EntityId> RuntimeHost::player() const { return impl_->player; }
+std::optional<EntityId>
+RuntimeHost::find_entity(std::string_view name) const {
+  for (const auto entity : impl_->entities)
+    if (const auto *n = impl_->world.get<EntityName>(entity);
+        n != nullptr && n->value == name)
+      return entity;
+  return std::nullopt;
+}
+double RuntimeHost::sim_time() const { return impl_->sim_time; }
 InputMapper &RuntimeHost::input() { return impl_->input; }
 std::optional<EntityId> RuntimeHost::tilemap_entity() const {
   return impl_->tilemap_e;
@@ -174,6 +183,8 @@ int RuntimeHost::viewport_width() const {
 int RuntimeHost::viewport_height() const {
   return impl_->view_h > 0 ? impl_->view_h : impl_->options.height;
 }
+float RuntimeHost::world_width() const { return impl_->world_w; }
+float RuntimeHost::world_height() const { return impl_->world_h; }
 
 int RuntimeHost::run() {
   RuntimeDiagnostics::context("runtime:package-scan");
@@ -738,16 +749,20 @@ int RuntimeHost::run() {
             }
           }
         }
+        // The Bounce marker opts out of wall rebound — projectiles and
+        // debris stop dead at the level edge instead of returning.
+        const bool rebound = world.get<NoBounce>(entity) == nullptr;
         bool bounced = false;
         if (t->x < 0 || t->x > world_w - ext->w) {
-          v->dx = -v->dx;
-          bounced = true;
+          v->dx = rebound ? -v->dx : 0.f;
+          bounced = rebound;
           t->x = std::clamp(t->x, 0.f, world_w - ext->w);
         }
         if (t->y < 0 || t->y > world_h - ext->h) {
           // Gravity-affected entities come to rest on the floor instead of
           // bouncing forever; the ceiling still deflects them downward.
-          const bool rests = gscale != 0.f && t->y > world_h - ext->h;
+          const bool rests =
+              !rebound || (gscale != 0.f && t->y > world_h - ext->h);
           v->dy = rests ? 0.f : -v->dy;
           bounced = !rests;
           t->y = std::clamp(t->y, 0.f, world_h - ext->h);

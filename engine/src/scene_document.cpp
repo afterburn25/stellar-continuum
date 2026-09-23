@@ -41,6 +41,7 @@ std::string SceneDocument::to_json() const {
     if (!e.data.empty()) item["data"] = e.data;
     if (e.opacity != 1.0f) item["opacity"] = e.opacity;
     if (e.spin != 0.0f) item["spin"] = e.spin;
+    if (!e.bounce) item["bounce"] = false;
     items.push_back(std::move(item));
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
@@ -117,6 +118,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       entity.data = item.value("data", std::string{});
       entity.opacity = item.value("opacity", 1.0f);
       entity.spin = item.value("spin", 0.0f);
+      entity.bounce = item.value("bounce", true);
       scene.entities.push_back(std::move(entity));
     }
     if (doc.contains("background")) {
