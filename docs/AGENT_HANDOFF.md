@@ -205,8 +205,13 @@ integrates gravity/velocity at the fixed timestep, fires
 `set_camera3d` + getters. Collision uses each entity's rotated+scaled
 world AABB; the camera snapshots via a `Camera3DState` carrier;
 `lights` adds up to two directional fills; windowed projects ship a
-starter `editor/scene3d.json`. Limitations: AABB (not OBB/triangle)
-collision, no rigid-body solver, no editor 3D tool — see the registry
+starter `editor/scene3d.json`. `raycast3d(origin,dir,max)` casts
+against actual mesh triangles in each mesh's local frame
+(`physics3d::segment_triangle`, rotation+scale aware) and returns the
+nearest `{entity,distance,point}`; `entity3d_at(sx,sy)` is the
+screen-space pick counterpart of `entity_at`. Limitations: AABB (not
+OBB/triangle) collision, no rigid-body solver, raycast is O(tris) per
+entity with no spatial partition, no editor 3D tool — see the registry
 record.
 
 **Recommended next workstream: native validation and release reliability.**

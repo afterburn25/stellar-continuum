@@ -106,7 +106,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   velocity; `on_collision`/`on_collision_exit`/`on_land` fire for the 3D
   set. Public API: `scene3d()`, `entities3d()`, `entities3d_in_radius`,
   `spawn_entity3d`, `on_spawn3d`, `set_camera3d` + getters,
-  `gravity3d()`, `ground_y()`. F5/F9 snapshots capture the 3D set —
+  `gravity3d()`, `ground_y()`, `raycast3d`, `entity3d_at`. F5/F9
+  snapshots capture the 3D set —
   including a `Camera3DState` carrier that restores the fly camera — and
   `load_world` partitions it back out of the 2D list. Collision uses the
   world AABB of each entity's rotated+scaled local mesh bounds
@@ -116,6 +117,15 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   array (max 2) feeds `Material3D::additional_lights` as world-space
   directional fills. `create_project`'s windowed starter ships a ready
   `editor/scene3d.json` and documents `--scene3d` in the host comment.
+  `raycast3d(origin, dir, max_distance)` casts a ray against actual
+  mesh triangles (`physics3d::segment_triangle`) — the ray transforms
+  into each mesh's local frame (rotation + scale aware) and the nearest
+  hit returns `{entity, distance, world point}`; `entity3d_at(sx, sy)`
+  builds the camera ray through a viewport pixel for mouse picking.
+  Verified live: vertical rays hit box tops exactly, a 45°-rolled plank
+  reports its true rotated face (local y≈0.25), a sphere occludes the
+  plank behind it, and a screen-center pick through the pitched camera
+  lands at the analytically-correct floor point.
 - **Consumers/tests:** any generated host passes `--scene3d`;
   `engine_project` tests cover document round-trip/malformed/save-load,
   `engine_world` covers spawn/components/codecs/hierarchy/export/
@@ -130,9 +140,11 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   bounds (not OBBs or per-triangle); solids are blockers, not full rigid-
   body dynamics (no stacking solver — `groundY` + the upward push-out
   cover landing); `physics3d`/`spatial_index3d` exist engine-side but
-  are not yet wired into this mode; no editor 3D scene tool yet
-  (hand-author `scene3d.json` — generated projects ship a starter);
-  lighting is one key light + up to two directional fills per material.
+  are not yet wired into this mode (raycast uses `segment_triangle`
+  directly); no editor 3D scene tool yet (hand-author `scene3d.json` —
+  generated projects ship a starter); lighting is one key light + up to
+  two directional fills per material; raycast is O(triangles) per entity
+  with no spatial partition — fine for queries, not per-frame sweeps.
 
 ## Authored tilemap layers for generated 2D games (2026-09-21)
 

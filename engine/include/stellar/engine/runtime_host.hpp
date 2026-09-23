@@ -248,6 +248,23 @@ public:
   // Scene-level 3D tuning the document owns (readable for game logic).
   [[nodiscard]] float gravity3d() const;
   [[nodiscard]] float ground_y() const;
+  // Hit record from a 3D ray query.
+  struct RaycastHit3D {
+    EntityId entity{};
+    float distance{};
+    float x{}, y{}, z{}; // world-space hit point
+  };
+  // Casts a ray against the 3D set's actual mesh triangles (hitscan
+  // weapons, LOS checks, mouse picking). The ray transforms into each
+  // mesh's local space (rotation+scale aware); returns the nearest hit.
+  // O(triangles) per entity — fine for queries, not per-frame sweeps.
+  [[nodiscard]] std::optional<RaycastHit3D>
+  raycast3d(double ox, double oy, double oz, float dx, float dy,
+            float dz, float max_distance) const;
+  // Screen-space pick: builds the camera ray through a viewport pixel
+  // and raycasts it — the 3D counterpart of entity_at().
+  [[nodiscard]] std::optional<RaycastHit3D>
+  entity3d_at(float screen_x, float screen_y) const;
 
   // Named game-data blobs under <root>/saves/data/<key>.dat — quest flags,
   // inventories, settings, anything the world snapshot doesn't cover.
