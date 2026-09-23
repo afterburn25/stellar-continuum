@@ -92,6 +92,10 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   `set_tile_at` take an optional document-order map index (default 0 =
   the primary grid) and `tilemap_count()` reports the layer count;
   `tilemap_entities()` exposes the carriers for direct component work.
+  `spawn_tilemap(SceneTilemap)`/`destroy_tilemap` add and remove layers
+  at runtime (procedural terrain) — they join the same tracked set, so
+  they render, collide and snapshot identically to scene-authored maps
+  (scene hot-reload rebuilds all layers, like respawned entities).
 - **RuntimeHost input actions:** the host now feeds every platform event into
   an `InputMapper` — a built-in "game" context (move_left/right/up/down on
   WASD+arrows+D-pad, `move_x`/`move_y` analog Axis1D on the left stick with a

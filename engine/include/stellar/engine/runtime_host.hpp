@@ -126,6 +126,13 @@ public:
                    int value);
   // Number of tilemap layers in the loaded scene.
   [[nodiscard]] std::size_t tilemap_count() const;
+  // Spawns a new tilemap layer at runtime (procedural terrain): creates
+  // a dedicated Tilemap-component entity that renders, collides and
+  // snapshots like a scene-authored map, appended after the existing
+  // layers. Returns a default (null) id when called outside run().
+  EntityId spawn_tilemap(const SceneTilemap &map);
+  // Destroys a tilemap carrier — scene-authored or runtime-spawned.
+  bool destroy_tilemap(EntityId id);
   // The deterministic particle system — games define() emitters then
   // spawn_emitter() to run them; the host steps it in sim time and
   // renders particles as tinted rects above the scene.

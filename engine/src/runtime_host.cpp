@@ -44,6 +44,8 @@ struct RuntimeHost::Impl {
   // Assigned inside run(); runtime entity spawn/destroy entry points.
   std::function<EntityId(const SceneEntity &)> spawn_fn;
   std::function<bool(EntityId)> destroy_fn;
+  std::function<EntityId(const SceneTilemap &)> spawn_tilemap_fn;
+  std::function<bool(EntityId)> destroy_tilemap_fn;
   // AABB pairs currently overlapping — collision-enter events only fire
   // on the transition into this set.
   std::set<std::pair<std::uint64_t, std::uint64_t>> overlapping;
@@ -187,6 +189,13 @@ EntityId RuntimeHost::spawn_entity(const SceneEntity &entity) {
 }
 bool RuntimeHost::destroy_entity(EntityId id) {
   return impl_->destroy_fn && impl_->destroy_fn(id);
+}
+EntityId RuntimeHost::spawn_tilemap(const SceneTilemap &map) {
+  return impl_->spawn_tilemap_fn ? impl_->spawn_tilemap_fn(map)
+                                 : EntityId{};
+}
+bool RuntimeHost::destroy_tilemap(EntityId id) {
+  return impl_->destroy_tilemap_fn && impl_->destroy_tilemap_fn(id);
 }
 
 namespace {
@@ -423,6 +432,28 @@ int RuntimeHost::run() {
         p = impl.overlapping.erase(p);
       else
         ++p;
+    world.destroy(id);
+    return true;
+  };
+  // Runtime-spawned tilemaps (procedural terrain) join the same tracked
+  // set as scene-authored layers — render, collision and snapshots all
+  // treat them identically.
+  impl.spawn_tilemap_fn = [&](const SceneTilemap &s) -> EntityId {
+    const auto e = world.create();
+    world.add(e, Tilemap{s.tileset, s.tile_w, s.tile_h, s.columns,
+                         s.layer, s.parallax, s.collide, s.cells});
+    impl.tilemap_es.push_back(e);
+    impl.tileset_imgs.push_back(
+        s.tileset.empty() ? nullptr : decode_sprite(s.tileset));
+    return e;
+  };
+  impl.destroy_tilemap_fn = [&](EntityId id) -> bool {
+    const auto it = std::find(impl.tilemap_es.begin(),
+                              impl.tilemap_es.end(), id);
+    if (it == impl.tilemap_es.end()) return false;
+    impl.tileset_imgs.erase(impl.tileset_imgs.begin() +
+                            (it - impl.tilemap_es.begin()));
+    impl.tilemap_es.erase(it);
     world.destroy(id);
     return true;
   };
