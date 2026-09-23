@@ -41,7 +41,7 @@ Core/engine projections, never re-derived in UI.
 | 9 | Strategic AI | IMPLEMENTED (engine) — `StrategicMind` utility machinery |
 | 10 | Strategic warfare | IMPLEMENTED (engine) — `WarfareModel` cohorts/interdiction/Lanchester; Core consumption via theater projection + `foreign_armed_presence` diagnostics |
 | 11 | Space rendering | **PARTIAL** — scene3d GPU path with planet/ring/star materials; instancing, HDR/tonemap, TextureStreamer residency pending (needs a GPU-equipped environment) |
-| 12 | Editor tools | **PARTIAL** — 15 shell tools (Projects…Physics incl. Simulation/Colony/Economy/Planet/AI/Warfare/Missions/Physics genre inspectors) + per-tool `--frames` ctest smoke; generated projects scaffold executor + persistence; galaxy debugger pending |
+| 12 | Editor tools | **PARTIAL** — 16 shell tools (Projects…Galaxy incl. Simulation/Colony/Economy/Planet/AI/Warfare/Missions/Physics genre inspectors + the `GalaxyMap` debugger) + per-tool `--frames` ctest smoke; generated projects scaffold executor + persistence |
 | 13 | Scale benchmarks | IMPLEMENTED — `simulation_scale_250…5000`, `combined_scale` (400 settlements, ~870µs/tick, bit-identical) |
 | 14 | Event history | IMPLEMENTED — `EventHistory` observer-private chronicle; runtime records every advance incl. diplomatic journal entries; v17 save payload; retention policy |
 | 15 | Public-information hooks | IMPLEMENTED — `feed()` substrate; notification seeding + scrollable chronicle browser with every query axis exposed (domain/significance/actor/tag/search/time-window paging); map + diplomacy navigation; voice announcements |
@@ -77,6 +77,15 @@ Core/engine projections, never re-derived in UI.
 - `route_unreachable`/`power_brownout`/`sustenance_shortfall`/
   `foreign_armed_presence` operational diagnostics over authoritative
   reach/economy/warfare projections
+- `engine::GalaxyMap` — reusable game-agnostic star-chart model
+  (systems/lanes/markers, deterministic ascending-id queries, lazy
+  adjacency, spatial queries, versioned `State` + framework JSON
+  codec); `project_galaxy_map` fills it from authoritative Core
+  geography; GALAXY shell tool debugs a synthetic chart
+- Diplomatic chronicle privacy hardening — an empty restored journal
+  audience falls back to involved parties instead of leaking the event
+  to all observers (`visible_to` empty = public by `EventHistory`
+  contract)
 - `IntegratedAdaptiveCampaignRuntime` records chronicle entries every
   advance; `DiplomacyState` read-only journal accessors
 
@@ -90,8 +99,12 @@ Core/engine projections, never re-derived in UI.
   intentionally read-only projection to avoid dual authority
 - `physics`/`mission_graph` have shell-tool consumers only; no game
   path consumes them yet
-- Galaxy debugger pending; engine has no galaxy model (Core owns
-  astronomy authority — read-only projection under way)
+- `engine::GalaxyMap` (systems/lanes/markers, deterministic adjacency,
+  spatial queries, versioned persistence + framework codec) landed
+  with a Core `project_galaxy_map` projection and a shell debugger —
+  full-authority projection; observer filtering is a consumer
+  responsibility and the native client's map is not yet migrated onto
+  it
 - Chronicle browser: multi-select filter composition unexposed;
   `HistoryEvent::summary` is opaque text (structured localization is an
   upstream event-pipeline change)
