@@ -211,7 +211,43 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
         r.values["coverageRatio"]=colony.coverage_ratio;
         records.push_back(std::move(r));
       }
+      // Treasury: Arrears/Depleted are the severe states the economy
+      // workspace and voice bridge already classify via the same
+      // authoritative assess_treasury; Surplus/Deficit are normal.
       if(records.size()<maximum){
+        const auto eit=std::find_if(world.economies.begin(),world.economies.end(),
+            [&](const auto &e){return e.civilization_id==civ.id;});
+        if(eit!=world.economies.end()&&std::isfinite(eit->credits)&&eit->credits>=0.0){
+          const auto flow=economy_credit_flow(econ,world.colonies,world.economies,civ.id);
+          const auto health=assess_treasury(eit->credits,flow.net_credits_per_day,eit->operating_arrears);
+          if(health.state==TreasuryHealthState::Arrears||health.state==TreasuryHealthState::Depleted){
+            DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="economy";
+            r.event_type=health.state==TreasuryHealthState::Arrears?"treasury_arrears":"treasury_depleted";
+            r.severity=DiagnosticSeverity::Warning;
+            r.civilization_id=civ.id;
+            char message[192];
+            if(health.state==TreasuryHealthState::Arrears)
+              std::snprintf(message,sizeof(message),
+                            "Treasury carries %.2f credits of unpaid operating arrears (net %.2f/day).",
+                            eit->operating_arrears,flow.net_credits_per_day);
+            else
+              std::snprintf(message,sizeof(message),
+                            "Treasury depleted with a %.2f/day deficit.",
+                            flow.net_credits_per_day);
+            r.message=message;
+            r.values["balance"]=eit->credits;
+            r.values["netCreditsPerDay"]=flow.net_credits_per_day;
+            r.values["operatingArrears"]=eit->operating_arrears;
+            records.push_back(std::move(r));
+          }
+        }
+      }
+      // Corridor coverage is only meaningful for civs with colonies
+      // outside their home system — skip the heavier computation for
+      // homebound civilizations.
+      const auto has_external=std::any_of(world.colonies.begin(),world.colonies.end(),
+          [&](const auto &c){return c.civilization_id==civ.id&&c.system_id!=civ.home_system_id;});
+      if(records.size()<maximum&&has_external){
         const auto coverage=civilization_logistics_coverage(econ,world.colonies,world.economies,civ.id);
         if(coverage.has_unrepresented_interstellar_support_gap){
           DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="logistics";

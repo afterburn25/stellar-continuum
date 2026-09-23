@@ -455,8 +455,9 @@ catalog definitions + the authoritative powered allocation) into an
 `degraded_structures` findings for complete+enabled buildings at or below
 the operational condition floor — a finding class no previous check
 covered — plus authoritative logistics findings
-(`logistics_strained`/`logistics_critical` per under-covered colony and
-`freight_corridor_gap` when external imports have no represented corridor;
+(`logistics_strained`/`logistics_critical` per under-covered colony,
+`freight_corridor_gap` when external imports have no represented corridor,
+and `treasury_arrears`/`treasury_depleted` from `assess_treasury`;
 severity stays Warning — Critical is invariant-reserved). The second frontier is an architecture
 decision: authoritative Core adoption of the economy-catalog/colony/logistics/
 population/strategic-AI frameworks — Core consumption today is read-only

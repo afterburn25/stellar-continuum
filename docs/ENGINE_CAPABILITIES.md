@@ -665,9 +665,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   logistics model rates under-covered (import requirement + coverage
   ratio in `values`; severity stays Warning — Critical is reserved for
   invariants) and `freight_corridor_gap` when a civilization's
-  external colonies import support no represented corridor carries —
-  previously surfaced only as a player-scoped voice event for
-  criticals, never in developer diagnostics. `campaign_colony_projection`
+  external colonies import support no represented corridor carries
+  (skipped for homebound civs — coverage is only meaningful with
+  external systems), and `treasury_arrears`/`treasury_depleted` from
+  the authoritative `assess_treasury` — all previously surfaced only
+  in workspace view-models or a player-scoped voice event, never in
+  developer diagnostics. `campaign_colony_projection`
   tests — spec synthesis, flag fidelity, remaining-industry accounting,
   powered-set operating flags, unknown-type fallback, hub-less capacity
   floor, and the consumer paths (only worn/under-covered colonies

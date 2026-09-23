@@ -241,6 +241,18 @@ int main() {
     con2.civilization_id = 2;
     world.construction.push_back(con2);
     // civ 3 deliberately has no economy or construction rows.
+    Civilization overdrawn;
+    overdrawn.id = 4;
+    overdrawn.name = "Overdrawn League";
+    overdrawn.home_system_id = 7;
+    world.civilizations.push_back(overdrawn);
+    CivilizationEconomy broke;
+    broke.civilization_id = 4;
+    broke.operating_arrears = 25.0;
+    world.economies.push_back(broke);
+    ConstructionState con4;
+    con4.civilization_id = 4;
+    world.construction.push_back(con4);
 
     Colony critical = make_colony(20, 1);
     critical.population_millions = 1000.0; // demand 1.25, local .72 -> .58
@@ -255,9 +267,12 @@ int main() {
     fine.infrastructure = 2.0; // coverage ~1.31 -> Healthy
     world.colonies.push_back(fine);
     world.colonies.push_back(make_colony(23, 3));
+    auto solvent = make_colony(24, 4);
+    solvent.infrastructure = 2.0; // healthy colony; the arrears is treasury-side
+    world.colonies.push_back(solvent);
 
     const auto findings = inspect_campaign_operations(world, 0, 100.0);
-    int critical_n = 0, strained_n = 0, gap_n = 0;
+    int critical_n = 0, strained_n = 0, gap_n = 0, arrears_n = 0;
     for (const auto &finding : findings) {
       if (finding.event_type == "logistics_critical") {
         ++critical_n;
@@ -272,10 +287,20 @@ int main() {
         ++gap_n;
         check(finding.civilization_id && *finding.civilization_id == 1,
               "corridor gap names the importing civilization");
+      } else if (finding.event_type == "treasury_arrears") {
+        ++arrears_n;
+        check(finding.civilization_id && *finding.civilization_id == 4,
+              "arrears finding names the overdrawn civilization");
+        check(finding.values.count("operatingArrears") &&
+                  near(std::get<double>(
+                           finding.values.at("operatingArrears")),
+                       25.0),
+              "arrears finding reports the unpaid amount");
       }
     }
-    check(critical_n == 1 && strained_n == 1 && gap_n == 1,
-          "logistics conditions and corridor gap each fire once");
+    check(critical_n == 1 && strained_n == 1 && gap_n == 1 &&
+              arrears_n == 1,
+          "logistics conditions, corridor gap and arrears each fire once");
   }
 
   if (failures == 0)
