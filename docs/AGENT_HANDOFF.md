@@ -482,6 +482,15 @@ projection adapters landed: `campaign_logistics_projection` (engine
 freight network snapshot → `logistics_link_saturated` findings) and
 `campaign_population_projection` (cohort query model →
 `population_unrest` findings), each with dedicated ctest coverage.
+A 317-test run at `f676a47b` records 317/317 green after the second
+shipped locale: `data/locale/de.json` (full 1418-key German table with
+English fallback), `Data/locale/<id>.json` enumeration, persisted
+`GeneralPreferences::locale` + LANGUAGE cycler in General Settings,
+in-place `LocalizationTable` rebuild on save, and shipped-catalog
+key/placeholder parity asserted in `localization`. Earlier commits in
+the lane added the `advisor_spotlight` diagnostic (StrategicMind picks
+the civ's top operational finding) and the editor `massEarth` override
+with derived effective gravity.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
