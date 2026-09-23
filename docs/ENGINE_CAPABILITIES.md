@@ -62,6 +62,52 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Massive simulation scheduler + simulation LOD executor (2026-09-23)
+
+- **Purpose:** the space-strategy specialization's foundation — drive
+  thousands of systems/colonies/fleets at relevance-scaled cadences
+  without per-frame cost or nondeterminism. See
+  [SIMULATION_LOD.md](SIMULATION_LOD.md) and
+  [SPACE_STRATEGY_ENGINE.md](SPACE_STRATEGY_ENGINE.md).
+- **Engine APIs/ownership:** `SimulationScheduler`
+  (simulation_scheduler.hpp) — the existing tier-cadence core, now with
+  deterministic sorted due lists and a peek/mark split
+  (`begin_tick`/`collect_due`/`mark_ran`/`elapsed_since_run`/
+  `dormant_keys`) so deferred and event-woken execution keeps exact
+  elapsed accounting. `SimulationExecutor` (simulation_executor.hpp) —
+  registers `SimulationTask`s (callback + `SimulationTier` +
+  `JobPriority` + domain tag + `depends_on` ordering edges) and runs
+  authoritative ticks: eligibility = cadence-due + `mark_dirty` +
+  `wake`/`wake_domain`/`wake_all` (Dormant items are the event-driven
+  tier — a wake runs them once with accumulated dormant elapsed);
+  ordering = topo over due dependencies, ties by priority then **aging**
+  (largest elapsed first — sustained budgets cannot starve keys) then
+  key; `SimulationBudget{max_wall_time, max_tasks}` defers overflow with
+  `elapsed_ticks` catch-up; `advance_parallel(JobSystem&)` executes
+  dependency waves as tagged/prioritized jobs; `set_paused` freezes the
+  tick; `set_tier`/`evaluate_tiers` handle LOD promotion/demotion;
+  `dormant_items()` feeds bulk analytic propagation. Reports/stats:
+  `SimulationStepReport` (eligible/ran/deferred/wakeups/wall/jobs),
+  per-domain run/ns stats, `tick_history` percentiles, `tier_counts`,
+  `total_wakeups`.
+- **Consumers/tests:** `simulation_executor` functional tests (cadence,
+  elapsed catch-up, dirty/event/dormant wakes, ordering, budgets,
+  pause, promotion, parallel≡serial state) and
+  `stellar_simulation_scale_tests` benchmarks registered as ctest
+  `simulation_scale_250/500/1000/2500/5000` — serial and parallel
+  checksums verified identical. Core/game phases are not yet consumers.
+- **Save/performance impact:** tasks are code — re-registered on load,
+  never serialized; cadence bookkeeping is derivable. 5000-task
+  registration ≈ 320 KB task-state in the benchmark model; serial
+  5000-system tick ≈ 536 µs mean on the dev machine.
+- **Limitations:** ordering-only dependencies (no cross-tick dataflow);
+  wall budget checked between tasks/waves (a single oversized task is
+  never preempted); parallel waves wait fully between levels; cadence is
+  owner policy, not adaptive; no game consumer yet.
+- **Future reuse:** the executor is the intended host for economy,
+  population, colony, logistics and civilization-AI cadences in
+  milestones 2–9 of the space-strategy specialization.
+
 Records below retain purpose, API, consumers, tests, save/performance impact and
 limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
 [celestial status](CELESTIAL_CONTENT_STATUS.md) resolve superseded descriptions.

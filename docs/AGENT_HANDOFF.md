@@ -91,6 +91,20 @@ lookup/image-memory optimizations. [Progress](DEVELOPMENT_PROGRESS.md) links the
 owners and evidence. Do not infer that a historical report describes the latest
 behavior when a newer correction supersedes it.
 
+**Space-strategy specialization (branch
+`engine/space-strategy-simulation-specialization`):** Stellar Engine is being
+specialized into a space strategy/simulation engine — see
+[SPACE_STRATEGY_ENGINE.md](SPACE_STRATEGY_ENGINE.md) for the charter and
+milestone map. Milestone 1 landed at engine level: `SimulationExecutor`
+(simulation_executor.hpp) drives `SimulationTask`s through the existing
+tier-cadence `SimulationScheduler` — dependency ordering, dirty/event wakeups
+(Dormant is the event-driven tier), aging under budgets so deferral cannot
+starve keys, `elapsed_ticks` catch-up, JobSystem dependency-wave execution,
+per-domain timing, pause, LOD promotion/demotion. Design/contracts in
+[SIMULATION_LOD.md](SIMULATION_LOD.md); benchmarks are the
+`simulation_scale_250…5000` ctest entries. Next: adopt it for real Core/game
+phases, then Milestone 2 (economy framework on `resource_economy.cpp`).
+
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
 `engine::EngineProject` manifests (`project.stellar.json`, `EngineProject::save`

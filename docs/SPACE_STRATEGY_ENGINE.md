@@ -1,0 +1,87 @@
+# Stellar Engine — Space Strategy & Simulation Engine
+
+> **Mission:** a deterministic, data-driven C++ engine designed for
+> massive space simulations, grand strategy, 4X, colony management,
+> economic simulation and civilization-scale games.
+
+This document is the specialization charter for the
+`engine/space-strategy-simulation-specialization` workstream. It defines
+what the engine optimizes for, what it explicitly deprioritizes, and the
+milestone map. Factual status lives in
+[ENGINE_CAPABILITIES.md](ENGINE_CAPABILITIES.md); active handoff notes in
+[AGENT_HANDOFF.md](AGENT_HANDOFF.md); the numbered engineering roadmap in
+[ROADMAP.md](ROADMAP.md).
+
+## Identity
+
+Stellar Engine targets games in the category of Stellaris, Surviving
+Mars, space colony simulators, economic strategy games, city builders
+and civilization/empire managers. It is **not** a general-purpose
+shooter/action engine and does not aim to be Unreal.
+
+The engine is unusually strong at:
+
+- thousands–tens-of-thousands of star systems
+- hundreds/thousands of colonies and large populations (cohort models,
+  not per-citizen entities)
+- many civilizations, huge fleets, long-running economies
+- production chains and interplanetary/interstellar logistics
+- centuries of accelerated deterministic game time
+- procedural astronomical environments
+
+## Non-negotiable principles
+
+1. **Determinism** — simulation outcomes never depend on render
+   framerate or wall-clock speed. Fixed/strategic clocks are
+   authoritative; save→load→resume preserves state; acceleration changes
+   pacing, never results.
+2. **Simulation/presentation separation** — rendering is not a second
+   simulation. Authoritative state lives in engine/Core systems;
+   presentation reads observer-safe state.
+3. **Massive scale** — nothing updates every frame by default. Every
+   system considers cadence, batching, dirty-state propagation,
+   event-driven updates, spatial locality, simulation LOD, background
+   processing and aggregate representations.
+4. **Data-driven** — resources, buildings, species, recipes, tech,
+   events are content, not code. Strict validation: file/record/field/
+   reason errors, no duplicate IDs, no dependency cycles.
+5. **Reusable services, honest boundaries** — engine supplies mechanics
+   and frameworks; Core/game defines specific rules. No game-specific
+   monoliths in the engine, and no pretend-generality.
+6. **No fake implementation** — a capability is not implemented until a
+   real consumer and validation exist.
+
+## Deprioritized directions
+
+Working generic capabilities (2D scenes, tilemaps, platformer-style
+movement, raycast picking, basic 3D) remain — they are useful and
+reusable — but new effort does not go into FPS mechanics, weapon
+handling, humanoid hitboxes, ragdoll, cover shooters, racing vehicles,
+melee combos, or increasingly elaborate platformer/shooter systems.
+Renderer effort prioritizes space content (planets, atmospheres, rings,
+stars, belts, fleets, stations, colony lights, strategic overlays), not
+character fidelity.
+
+## Milestone map
+
+| # | Milestone | Status | Notes |
+| --- | --- | --- | --- |
+| 1 | Simulation scheduler + simulation LOD | PARTIAL → IMPLEMENTED (engine layer) | `SimulationScheduler` (tier cadence) + `SimulationExecutor` (tasks, dependencies, wakeups, budgets, JobSystem waves, per-domain stats). `simulation_scale_250…5000` benchmarks. Core/game adoption is the remaining work. See [SIMULATION_LOD.md](SIMULATION_LOD.md). |
+| 2 | Generic resource + economy framework | PARTIAL | `resource_economy.cpp` substrate exists (definitions, inventories, recipes, producers, transfer orders, shortages); needs metadata breadth, graph diagnostics, validation, editor. |
+| 3 | Population framework | PLANNED | Cohort/aggregate model; births/deaths/migration/employment; 10k–10M+ benchmark. |
+| 4 | Colony/city framework | PLANNED | Districts/structures/utilities/storage/construction/services; reusable definitions. |
+| 5 | Infrastructure networks | PLANNED | Power/water/logistics graphs; dirty updates, component caching, flow diagnostics. |
+| 6 | Strategic logistics | PLANNED | Freight routes/convoys/capacity; adapters onto Core lanes/reach/freight. |
+| 7 | Planetary development model | PLANNED | Adapters around authoritative Core planet state; habitability queries. |
+| 8 | Terraforming framework | PLANNED | Physical staged projects; species-relative habitability; no universal progress bar. |
+| 9 | Civilization/empire AI | PLANNED | Hierarchical planning cadence, goals/utility/budgets, decision journal (developer-only). |
+| 10 | Strategic fleet/warfare | PLANNED | Fleet→battle-group→ship model preserved; cohorts/formations for scale; interdiction (not presence) gates warp. |
+| 11 | Space-specific rendering | PARTIAL | Native scene3d GPU path, planet/ring/star materials exist; render-graph consumption, instancing, HDR pending. |
+| 12 | Specialized editor tools | PARTIAL | stellar-engine.exe shell with Projects/Scene/Scene3D/Assets/Profiler/Localization; genre tools (galaxy/planet/colony/economy/AI debugger) pending. |
+| 13 | Galaxy-scale benchmarks | PARTIAL | simulation_scale_* ctest entries; combined-workload scenarios pending. |
+| 14 | Event/history framework | PARTIAL | `event_bus` + `mission_graph` engine libraries exist; strategic-event vocabulary/observer filtering pending. |
+| 15 | GNN/public information hooks | PLANNED | News feed over the event framework using native voice infra. |
+
+Statuses use PLANNED / PARTIAL / IMPLEMENTED BUT NEEDS POLISH /
+IMPLEMENTED — a library with tests and a benchmark but no game consumer
+is reported as such, never as a finished feature.

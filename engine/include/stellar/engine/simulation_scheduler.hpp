@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <functional>
@@ -58,13 +59,33 @@ public:
     [[nodiscard]] std::size_t size() const noexcept { return items_.size(); }
     void clear();
 
-    // Advance one tick; returns due keys per tier (index = tier). Dormant
-    // items never appear — query dormant_elapsed() for bulk propagation.
+    // Advance one tick; returns due keys per tier (index = tier), each
+    // sorted ascending — iteration order is deterministic regardless of
+    // registration order or map internals. Dormant items never appear —
+    // query dormant_elapsed() for bulk propagation.
     std::array<std::vector<Key>, static_cast<std::size_t>(SimulationTier::Count)>
         advance();
+
+    // Peek/mark split used by SimulationExecutor for deferred (budget-
+    // capped) execution and event wakeups: begin_tick() increments the
+    // clock, collect_due() lists eligible items *without* marking them
+    // run, and mark_ran() records execution so elapsed accounting stays
+    // exact when an item is deferred past its due tick.
+    struct DueItem {
+        Key key;
+        SimulationTier tier;
+        std::uint64_t elapsed{}; // ticks since the item last ran
+    };
+    Tick begin_tick() { return ++tick_; }
+    [[nodiscard]] std::vector<DueItem> collect_due() const;
+    void mark_ran(Key key);
+    [[nodiscard]] std::uint64_t elapsed_since_run(Key key) const;
+
     [[nodiscard]] Tick tick() const noexcept { return tick_; }
     [[nodiscard]] std::uint64_t dormant_elapsed(Key key) const;
     void dormant_consumed(Key key) { dormant_since_[key] = tick_; }
+    // All dormant keys, sorted — bulk analytic propagation source.
+    [[nodiscard]] std::vector<Key> dormant_keys() const;
 
     [[nodiscard]] std::array<std::size_t, static_cast<std::size_t>(SimulationTier::Count)>
         tier_counts() const;
