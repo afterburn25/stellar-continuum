@@ -1,6 +1,7 @@
 #include "stellar/engine/scene_components.hpp"
 
 #include "stellar/engine/atomic_file_write.hpp"
+#include "stellar/engine/save_history.hpp"
 
 #include <cstring>
 #include <fstream>
@@ -111,23 +112,34 @@ std::optional<EntityId> find_entity_by_name(const World &world,
 void save_world_to_file(const World &world,
                         const std::filesystem::path &path) {
   const auto bytes = world.snapshot();
+  // Shift the .bak chain first so the atomic replace's outgoing-primary
+  // backup becomes slot 1; then sidecar every slot for integrity checks.
+  rotate_save_history(path);
   write_file_atomically(
       path,
       std::span<const std::byte>(
           reinterpret_cast<const std::byte *>(bytes.data()), bytes.size()));
+  write_history_sidecars(path);
 }
 
 bool load_world_from_file(World &world, const std::filesystem::path &path) {
-  std::ifstream in(path, std::ios::binary);
-  if (!in) return false;
-  const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(in),
-                                        std::istreambuf_iterator<char>()};
-  try {
-    world.restore(bytes);
-  } catch (const std::exception &) {
-    return false;
-  }
-  return true;
+  const auto try_load = [&world](const std::filesystem::path &p) {
+    std::ifstream in(p, std::ios::binary);
+    if (!in) return false;
+    const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(in),
+                                          std::istreambuf_iterator<char>()};
+    try {
+      world.restore(bytes);
+    } catch (const std::exception &) {
+      return false;
+    }
+    return true;
+  };
+  if (try_load(path)) return true;
+  // Durable recovery: walk the rotated .bak chain newest-first.
+  for (std::size_t slot = 1; slot <= k_default_save_history_depth; ++slot)
+    if (try_load(history_slot_path(path, slot))) return true;
+  return false;
 }
 
 } // namespace stellar::engine

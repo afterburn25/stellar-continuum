@@ -57,11 +57,13 @@ SceneDocument scene_from_world(const World &world);
 std::optional<EntityId> find_entity_by_name(const World &world,
                                             std::string_view name);
 
-// File-backed snapshot helpers: save_world_to_file snapshots the world and
-// writes the checksummed binary atomically (throws on failure);
-// load_world_from_file returns false instead of throwing when the file is
-// absent, truncated, corrupt or version-mismatched, leaving the world
-// untouched.
+// File-backed snapshot helpers: save_world_to_file snapshots the world,
+// rotates the .bak history chain (save_history.hpp) and writes the
+// checksummed binary atomically (throws on failure). load_world_from_file
+// returns false instead of throwing when the primary is absent, truncated,
+// corrupt or version-mismatched — and first falls back through the rotated
+// history slots newest-to-oldest, leaving the world untouched when every
+// candidate fails.
 void save_world_to_file(const World &world,
                         const std::filesystem::path &path);
 bool load_world_from_file(World &world, const std::filesystem::path &path);

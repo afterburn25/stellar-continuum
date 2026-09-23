@@ -263,15 +263,41 @@ int main() {
                   world, std::filesystem::temp_directory_path() /
                              "stellar_scene_missing.stw"),
               "missing save returns false");
+        // A second save rotates the first into the .bak history chain.
+        save_world_to_file(world, path);
         {
             std::ofstream bad(path, std::ios::binary | std::ios::trunc);
             bad << "not-a-snapshot";
         }
-        check(!load_world_from_file(world, path),
-              "corrupt save returns false");
-        check(world.get<Transform2D>(*rep)->x == 10.f,
-              "failed load leaves world untouched");
+        // The rotated .bak chain from the earlier save recovers the world.
+        world.get<Transform2D>(*rep)->x = 7777.f;
+        check(load_world_from_file(world, path),
+              "corrupt primary recovers from history");
+        check(world.get<Transform2D>(
+                  *find_entity_by_name(world, "player"))
+                      ->x == 10.f,
+              "history slot restores saved state");
+        // With every slot gone too, load fails and the world stays intact.
         std::filesystem::remove(path);
+        for (std::size_t slot = 1; slot <= 8; ++slot) {
+            std::error_code ec;
+            std::filesystem::remove(
+                slot == 1 ? path.parent_path() /
+                                (path.filename().string() + ".bak")
+                          : path.parent_path() /
+                                (path.filename().string() + ".bak." +
+                                 std::to_string(slot)),
+                ec);
+        }
+        world.get<Transform2D>(
+            *find_entity_by_name(world, "player"))
+            ->x = 5555.f;
+        check(!load_world_from_file(world, path),
+              "exhausted history returns false");
+        check(world.get<Transform2D>(
+                  *find_entity_by_name(world, "player"))
+                      ->x == 5555.f,
+              "failed load leaves world untouched");
     }
 
     if (failures != 0) {
