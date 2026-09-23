@@ -89,7 +89,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   (2 district types, 6 structures) builds against a real `Inventory`
   stockpile, districts/structures are inspected and toggled/demolished,
   and ADV 1D/30D reports jobs, housing, completions, outputs, upkeep/
-  input shortfalls and utility balance.
+  input shortfalls and utility balance. The ECONOMY tab inspects the
+  economy framework: `EconomyCatalog` validation (with an injectable
+  dangling recipe), `to_runtime_recipe` bridging into a live
+  `ResourceNetwork` (producers, transfer lane, shortages) and an
+  `analyze_economy` bottleneck table rolled up from real network state.
+  Generated game projects scaffold a `SimulationExecutor` demo — new
+  games start with deterministic LOD scheduling wired into the loop.
 - **Consumers/tests:** `campaign_coordinator` tests assert all 12 phase
   domains execute through the executor, empty campaigns advance safely,
   and scheduler state survives coordinator moves; the 28-case
