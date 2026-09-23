@@ -94,6 +94,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   dangling recipe), `to_runtime_recipe` bridging into a live
   `ResourceNetwork` (producers, transfer lane, shortages) and an
   `analyze_economy` bottleneck table rolled up from real network state.
+  The WARFARE tab is a theater inspector over `WarfareModel` — three
+  ship classes (line/escort/transport), two hostile fleets and an
+  interdictor on a strategic plane; rows select a fleet, ORDER cycles
+  Hold/Move/Interdict/Retreat (Move steers at the opposing fleet),
+  ENGAGE runs deterministic Lanchester resolution between the two
+  combatants, STEP 5D/RUN advance movement + supply burn, and the panel
+  shows per-fleet aggregate reports, cohort detail and whether the
+  hostile fleet's position is interdiction-gated.
   Generated game projects scaffold a `SimulationExecutor` demo — new
   games start with deterministic LOD scheduling wired into the loop.
 - **Consumers/tests:** `campaign_coordinator` tests assert all 12 phase

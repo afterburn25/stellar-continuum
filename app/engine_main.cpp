@@ -33,6 +33,7 @@
 #include <stellar/engine/economy_catalog.hpp>
 #include <stellar/engine/resource_economy.hpp>
 #include <stellar/engine/strategic_ai.hpp>
+#include <stellar/engine/warfare.hpp>
 #include <stellar/engine/terraforming.hpp>
 #include <stellar/engine/flow_network.hpp>
 #include <stellar/engine/logistics.hpp>
@@ -77,16 +78,16 @@ constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
                   Localization, Simulation, Colony, Economy, Planet,
-                  Ai };
+                  Ai, Warfare };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
                             Tool::Localization, Tool::Simulation,
                             Tool::Colony, Tool::Economy, Tool::Planet,
-                            Tool::Ai};
-constexpr std::array<const char *, 12> kToolNames{
+                            Tool::Ai, Tool::Warfare};
+constexpr std::array<const char *, 13> kToolNames{
     "Projects", "Dashboard", "Scene",     "Scene3D",
     "Assets",   "Profiler",  "Localization", "Simulation", "Colony",
-    "Economy",  "Planet",    "AI"};
+    "Economy",  "Planet",    "AI",        "Warfare"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -397,6 +398,24 @@ struct Shell {
   UiRect hit_ai_decide{}, hit_ai_run{}, hit_ai_threat_dn{},
       hit_ai_threat_up{}, hit_ai_reset{};
   std::vector<UiRect> hit_ai_actions;
+
+  // Warfare tool: a theater inspector over WarfareModel — two hostile
+  // fleets plus an interdictor on a strategic plane. Rows select a
+  // fleet; ORDER cycles its order kind (Move steers at the hostile
+  // fleet); ENGAGE resolves deterministic Lanchester attrition; STEP/RUN
+  // advance movement + supply burn at the theater clock.
+  struct WarfareDemo {
+    bool initialized{false};
+    engine::WarfareModel model;
+    double day{0.0};
+    bool running{false};
+    double run_accum{0.0};
+    std::uint64_t selected{1};
+    std::string last_engagement{"none"};
+  } war;
+  UiRect hit_war_step{}, hit_war_run{}, hit_war_order{}, hit_war_engage{},
+      hit_war_reset{};
+  std::vector<UiRect> hit_war_fleets;
   std::string status{"ready"};
 };
 
@@ -3857,6 +3876,159 @@ void render_ai(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
+void init_warfare(Shell::WarfareDemo &war) {
+  auto &m = war.model;
+  m.define_class({.id = "class.destroyer",
+                  .role = "line",
+                  .attack = 14.0,
+                  .defense = 2.0,
+                  .hull = 90.0,
+                  .speed = 8.0,
+                  .supply_per_day = 0.4,
+                  .interdiction = 0.0});
+  m.define_class({.id = "class.escort",
+                  .role = "escort",
+                  .attack = 6.0,
+                  .defense = 5.0,
+                  .hull = 45.0,
+                  .speed = 10.0,
+                  .supply_per_day = 0.2,
+                  .interdiction = 3.0});
+  m.define_class({.id = "class.transport",
+                  .role = "transport",
+                  .attack = 0.0,
+                  .defense = 0.0,
+                  .hull = 120.0,
+                  .speed = 5.0,
+                  .supply_per_day = 0.6,
+                  .interdiction = 0.0});
+  m.add_fleet(1, 1, 0.0, 0.0);
+  m.add_ships(1, "class.destroyer", 40.0, 1.0, 0.2);
+  m.add_ships(1, "class.escort", 12.0, 0.9, 0.1);
+  m.add_fleet(2, 2, 90.0, 60.0);
+  m.add_ships(2, "class.destroyer", 32.0, 0.85, 0.0);
+  m.add_ships(2, "class.transport", 8.0, 1.0, 0.0);
+  m.add_fleet(3, 1, 45.0, 30.0);
+  m.add_ships(3, "class.escort", 20.0, 1.0, 0.4);
+  m.set_order(3, {engine::FleetOrderKind::Interdict, 45.0, 30.0});
+  m.set_order(2, {engine::FleetOrderKind::Move, 0.0, 0.0});
+  war.day = 0.0;
+  war.running = false;
+  war.run_accum = 0.0;
+  war.selected = 1;
+  war.last_engagement = "none";
+  war.initialized = true;
+}
+
+const char *war_order_name(engine::FleetOrderKind kind) {
+  switch (kind) {
+    case engine::FleetOrderKind::Hold: return "HOLD";
+    case engine::FleetOrderKind::Move: return "MOVE";
+    case engine::FleetOrderKind::Interdict: return "INTERDICT";
+    case engine::FleetOrderKind::Retreat: return "RETREAT";
+  }
+  return "?";
+}
+
+void render_warfare(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &war = shell.war;
+  if (!war.initialized) init_warfare(war);
+  auto &m = war.model;
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "WARFARE THEATER");
+
+  shell.hit_war_step = {x, y, 86 * s, 24 * s};
+  shell_button(out, shell.hit_war_step, "STEP 5D", !war.running, font, s);
+  shell.hit_war_run = {x + 94 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_war_run, war.running ? "PAUSE" : "RUN",
+               war.running, font, s);
+  shell.hit_war_order = {x + 184 * s, y, 96 * s, 24 * s};
+  shell_button(out, shell.hit_war_order, "ORDER", !war.running, font, s);
+  shell.hit_war_engage = {x + 288 * s, y, 96 * s, 24 * s};
+  shell_button(out, shell.hit_war_engage, "ENGAGE", !war.running, font, s);
+  shell.hit_war_reset = {x + 392 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_war_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[160];
+  std::snprintf(buf, sizeof(buf), "day %.0f", war.day);
+  line(out, x, y, "date", buf, font);
+  line(out, x, y, "last engagement", war.last_engagement, font);
+  {
+    const auto *sel = m.fleet(war.selected);
+    std::snprintf(buf, sizeof(buf), "fleet %llu %s",
+                  static_cast<unsigned long long>(war.selected),
+                  sel ? war_order_name(sel->order.kind) : "(gone)");
+    line(out, x, y, "selected", buf, font);
+  }
+  y += 6 * s;
+
+  // Fleet table — click a row to select it for ORDER/ENGAGE.
+  heading(out, x, y, "FLEETS");
+  const float row_h = 22 * s;
+  const auto fleets = m.fleets();
+  shell.hit_war_fleets.clear();
+  for (const auto *fleet : fleets) {
+    const auto report = m.report(fleet->id);
+    UiRect row{x, y, body.width * 0.62f, row_h};
+    shell.hit_war_fleets.push_back(row);
+    out.overlay.push_back(FilledRectangle{
+        row, fleet->id == war.selected ? Color{26, 48, 76, 255}
+                                       : Color{6, 16, 26, 255}});
+    std::snprintf(buf, sizeof(buf),
+                  "fleet %-2llu owner %-2llu pos (%5.0f,%5.0f)  %-9s%s",
+                  static_cast<unsigned long long>(fleet->id),
+                  static_cast<unsigned long long>(fleet->owner),
+                  fleet->x, fleet->y, war_order_name(fleet->order.kind),
+                  fleet->engaged ? "  ENGAGED" : "");
+    out.overlay.push_back(Text{{x + 8 * s, y + 4 * s}, buf, ink, font});
+    std::snprintf(buf, sizeof(buf),
+                  "ships %.0f  atk %.0f/d  hull %.0f  spd %.1f  int %.1f  "
+                  "sup %.1f/d",
+                  report.ships, report.attack, report.hull, report.speed,
+                  report.interdiction_radius, report.supply_per_day);
+    out.overlay.push_back(
+        Text{{x + 8 * s, y + 4 * s + row_h}, buf, muted, font});
+    y += row_h * 2 + 4 * s;
+  }
+  if (fleets.empty()) {
+    out.overlay.push_back(Text{{x, y}, "no fleets in theater", muted,
+                               font});
+    y += row_h;
+  }
+  y += 8 * s;
+
+  // Cohort detail for the selected fleet.
+  heading(out, x, y, "SELECTED FLEET COHORTS");
+  const auto cohorts = m.cohorts(war.selected);
+  for (const auto *cohort : cohorts) {
+    std::snprintf(buf, sizeof(buf),
+                  "%-16s ships %6.0f  cond %.2f  exp %.2f",
+                  cohort->ship_class.c_str(), cohort->count,
+                  cohort->condition, cohort->experience);
+    out.overlay.push_back(Text{{x, y}, buf, muted, font});
+    y += 16 * s;
+  }
+  if (cohorts.empty()) {
+    out.overlay.push_back(Text{{x, y}, "no cohorts", muted, font});
+    y += 16 * s;
+  }
+
+  // Interdiction check at the hostile fleet's position.
+  if (const auto *hostile = m.fleet(2)) {
+    const bool gated =
+        m.interdicted(hostile->x, hostile->y, hostile->owner, hostile->id);
+    std::snprintf(buf, sizeof(buf), "fleet 2 position %s by hostile "
+                  "interdiction", gated ? "GATED" : "clear of");
+    y += 8 * s;
+    out.overlay.push_back(Text{{x, y}, buf, gated ? ink : muted, font});
+    y += 16 * s;
+  }
+}
+
 // Summarizes project content freshness: source file count and whether the
 // newest change postdates the cooked manifest (i.e. needs a recook).
 void update_content_status(Shell &shell) {
@@ -5171,6 +5343,9 @@ int main(int argc, char **argv) {
       case Tool::Ai:
         render_ai(draw, shell, body, s);
         break;
+      case Tool::Warfare:
+        render_warfare(draw, shell, body, s);
+        break;
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
@@ -5520,6 +5695,60 @@ int main(int argc, char **argv) {
             }
           }
         }
+        if (shell.tool == Tool::Warfare &&
+            event.type == InputEventType::LeftReleased) {
+          auto &war = shell.war;
+          auto &m = war.model;
+          if (shell.hit_war_step.contains(event.position)) {
+            m.advance(5.0);
+            war.day += 5.0;
+          } else if (shell.hit_war_run.contains(event.position)) {
+            war.running = !war.running;
+            war.run_accum = 0.0;
+          } else if (shell.hit_war_order.contains(event.position)) {
+            if (const auto *fleet = m.fleet(war.selected)) {
+              const auto next = static_cast<engine::FleetOrderKind>(
+                  (static_cast<int>(fleet->order.kind) + 1) % 4);
+              engine::FleetOrder order{next, 0.0, 0.0};
+              if (next == engine::FleetOrderKind::Move) {
+                // Steer at the other side's fleet.
+                const std::uint64_t target =
+                    war.selected == 1 ? 2 : 1;
+                if (const auto *foe = m.fleet(target)) {
+                  order.target_x = foe->x;
+                  order.target_y = foe->y;
+                }
+              } else if (next == engine::FleetOrderKind::Interdict) {
+                order.target_x = fleet->x;
+                order.target_y = fleet->y;
+              }
+              m.set_order(war.selected, order);
+            }
+          } else if (shell.hit_war_engage.contains(event.position)) {
+            const auto result = m.resolve(1, 2, 5.0);
+            char buf[160];
+            std::snprintf(buf, sizeof(buf),
+                          "%.0fd: -%.1f vs -%.1f ships%s%s",
+                          result.elapsed_days, result.a_ships_lost,
+                          result.b_ships_lost,
+                          result.a_destroyed ? " [A destroyed]" : "",
+                          result.b_destroyed ? " [B destroyed]" : "");
+            war.last_engagement = buf;
+          } else if (shell.hit_war_reset.contains(event.position)) {
+            war = Shell::WarfareDemo{};
+            init_warfare(war);
+          } else {
+            const auto fleets = m.fleets();
+            for (std::size_t i = 0; i < shell.hit_war_fleets.size() &&
+                                   i < fleets.size();
+                 ++i) {
+              if (shell.hit_war_fleets[i].contains(event.position)) {
+                war.selected = fleets[i]->id;
+                break;
+              }
+            }
+          }
+        }
       }
 
       FrameTiming timing;
@@ -5539,6 +5768,14 @@ int main(int argc, char **argv) {
         if (shell.sim.run_accum >= 0.5) {
           shell.sim.run_accum = 0.0;
           shell.sim.last = shell.sim.executor.advance();
+        }
+      }
+      if (shell.tool == Tool::Warfare && shell.war.running) {
+        shell.war.run_accum += elapsed;
+        if (shell.war.run_accum >= 0.5) {
+          shell.war.run_accum = 0.0;
+          shell.war.model.advance(5.0);
+          shell.war.day += 5.0;
         }
       }
       if (shell.tool == Tool::Ai && shell.ai.running) {
