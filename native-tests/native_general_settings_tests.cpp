@@ -573,6 +573,25 @@ int main() {
       require(reloaded.draft().locale=="en","Language cycle did not wrap to English");
       reloaded.cancel();
     }
+#ifdef STELLAR_LOCALE_DIR
+    {
+      // Layout expansion: render General Settings under the shipped German
+      // catalog — translations run longer than the English literals, so this
+      // exercises the same label paths against the longest shipped strings.
+      stellar::engine::LocalizationTable german{"de","en"};
+      std::string gerr;
+      require(german.load_file(std::string(STELLAR_LOCALE_DIR)+"/de.json",&gerr),("de.json rejected: "+gerr).c_str());
+      NativeGeneralSettings settings(temp.path/"german-render.json");
+      settings.set_localization(&german);
+      settings.set_locales({"en","de"});
+      settings.open();
+      DrawList draw;settings.render(draw,1280,720);
+      require(find_text_label(draw,"ALLGEMEINE EINSTELLUNGEN").value=="ALLGEMEINE EINSTELLUNGEN","German title was not rendered");
+      require(find_text_label(draw,"Sprache: English").value=="Sprache: English","German language label was not rendered");
+      require(find_text_label(draw,"SPEICHERN").value=="SPEICHERN","German save label was not rendered");
+      settings.cancel();
+    }
+#endif
     invalid_files_use_default(temp);
     rejected_saves_retain_saved_preference(temp);
     picker_save_cancel_and_default_flow(temp);
