@@ -5751,6 +5751,20 @@ class NativeCampaign final {
         raw.kind=stellar::engine::RawInputEvent::Kind::KeyRelease;
         (void)input_mapper_.feed(raw);
       }
+      // Completeness: once every recorded command is consumed, a recorded
+      // checkpoint whose tick has passed without the capture firing means the
+      // replay skipped a save the original session produced.
+      if(replay_->divergence.empty()&&
+         replay_->command_cursor>=commands.size()){
+        const auto &expected=replay_->recording->checkpoints();
+        if(replay_->checkpoint_cursor<expected.size()&&
+           expected[replay_->checkpoint_cursor].tick<tick)
+          replay_->divergence=
+              "replay skipped recorded checkpoint at tick "+
+              std::to_string(expected[replay_->checkpoint_cursor].tick)+
+              (expected[replay_->checkpoint_cursor].label.empty()?"":
+               " ("+expected[replay_->checkpoint_cursor].label+")");
+      }
     }
     for(const auto &event:input.events){
       if(developer_session()&&stellar_activity_panel_.handle(event,width,height,session_->frame())){

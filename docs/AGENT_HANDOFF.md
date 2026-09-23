@@ -257,9 +257,13 @@ in the replay divergence message. On divergence the client also
 dumps the actual canonical document to
 `replay-divergence-<tick>.json` next to the save and appends the
 path to the message — diffing it against the original capture names
-the changed leaf. Older recordings diverge at the first checkpoint
-with a label mismatch — recordings are session artifacts, not save
-files. Coverage: `replay` unit tests.
+the changed leaf. A completeness check closes the other direction:
+once every recorded command is consumed, a recorded checkpoint whose
+tick passes without the capture firing is reported as a skipped save
+(the smoke line's `verified_checkpoints`/`of` pair already surfaced
+the count; now it also fails). Older recordings diverge at the first
+checkpoint with a label mismatch — recordings are session artifacts,
+not save files. Coverage: `replay` unit tests.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
