@@ -101,6 +101,7 @@ void clipped_text(DrawList &out, Point at, std::string value, Color color,
 
 struct CardLayout {
   UiRect bounds, metadata_bounds, message_bounds;
+  std::optional<UiRect> contact_button;
 };
 
 // Same geometry contract as the notification panel: cards stacked
@@ -167,9 +168,12 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
                         std::nullopt, TextAlign::Left, FontFace::Interface};
     const auto metadata_height =
         static_cast<float>(measure(measurer, metadata).height);
+    // A single foreign actor reserves a right-side strip for the DIP
+    // action so the button never underlays message text.
+    const float contact_reserve = entry.contact_id != 0 ? 54.f * s : 0.f;
     const Text message{{}, entry.summary, message_color, body_pixels,
-                       measure_clip.width, std::nullopt, TextAlign::Left,
-                       FontFace::Interface};
+                       std::max(1.f, measure_clip.width - contact_reserve),
+                       std::nullopt, TextAlign::Left, FontFace::Interface};
     const float message_height =
         static_cast<float>(measure(measurer, message).height);
     const float card_height =
@@ -185,6 +189,14 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
                            card.metadata_bounds.y + metadata_height + 3.f * s,
                            card.bounds.width - card_pad * 2.f,
                            message_height};
+    if (entry.contact_id != 0) {
+      const float bw = 44.f * s, bh = 20.f * s;
+      card.contact_button = UiRect{
+          card.bounds.x + card.bounds.width - card_pad - bw,
+          card.message_bounds.y +
+              std::max(0.f, (message_height - bh) * .5f),
+          bw, bh};
+    }
     layout.entries.push_back(card);
     cursor += card_height + 7.f * s;
   }
@@ -199,6 +211,7 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
     card.bounds.y -= layout.scroll;
     card.metadata_bounds.y -= layout.scroll;
     card.message_bounds.y -= layout.scroll;
+    if (card.contact_button) card.contact_button->y -= layout.scroll;
   }
   return layout;
 }
@@ -239,7 +252,16 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
     ++snap.total;
     if (snap.entries.size() >= max_entries) continue;
     const char *label = category_label(event->category);
-    snap.entries.push_back({event->id, event->location,
+    // Exactly one foreign actor → the entry can offer a diplomatic
+    // jump (first contacts, battles, treaties). Multiple or zero
+    // foreign actors carry no unambiguous contact.
+    std::uint64_t contact = 0;
+    for (const auto id : event->actors)
+      if (id != observer) {
+        if (contact != 0 && contact != id) { contact = 0; break; }
+        contact = id;
+      }
+    snap.entries.push_back({event->id, event->location, contact,
                             label ? std::string(label) : event->category,
                             native_campaign::format_campaign_date(
                                 event->at_day),
@@ -366,7 +388,12 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
     else if (layout.list_viewport.contains(event.position)) {
       for (std::size_t i = 0; i < layout.entries.size(); ++i)
         if (layout.entries[i].bounds.contains(event.position)) {
-          press_target_ = PressTarget::Entry;
+          press_target_ =
+              layout.entries[i].contact_button &&
+                      layout.entries[i].contact_button->contains(
+                          event.position)
+                  ? PressTarget::Contact
+                  : PressTarget::Entry;
           press_entry_ = i;
           break;
         }
@@ -409,6 +436,12 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
            layout.entries[press_entry_].bounds.contains(event.position) &&
            snapshot_.entries[press_entry_].system_id != 0)
     navigation_ = snapshot_.entries[press_entry_].system_id;
+  else if (target == PressTarget::Contact &&
+           press_entry_ < layout.entries.size() &&
+           layout.entries[press_entry_].contact_button &&
+           layout.entries[press_entry_].contact_button->contains(
+               event.position))
+    contact_navigation_ = snapshot_.entries[press_entry_].contact_id;
   return true;
 }
 
@@ -583,6 +616,29 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
           "->", muted_color,
           std::max(9, static_cast<int>(std::lround(11.f * s))), 0.f,
           layout.list_viewport);
+    if (card.contact_button &&
+        intersects(*card.contact_button, layout.list_viewport)) {
+      stellar::engine::ui_skin::control(
+          out, *card.contact_button,
+          card.contact_button->contains(pointer_), false, true, s);
+      const auto dip_text =
+          resolve(locale_, "CHRONICLE_CONTACT", "DIP");
+      const int dip_pixels =
+          std::max(9, static_cast<int>(std::lround(10.f * s)));
+      const Text dip_probe{{}, dip_text, title_color, dip_pixels,
+                           card.contact_button->width - 4.f * s,
+                           std::nullopt, TextAlign::Center,
+                           FontFace::Interface};
+      const auto dip_extent = measure(measure_, dip_probe);
+      clipped_text(
+          out,
+          {card.contact_button->x + card.contact_button->width * .5f,
+           card.contact_button->y +
+               (card.contact_button->height - dip_extent.height) * .5f},
+          dip_text, title_color, dip_pixels,
+          card.contact_button->width - 4.f * s, *card.contact_button,
+          TextAlign::Center);
+    }
     clipped_text(out, {card.message_bounds.x, card.message_bounds.y},
                  entry.summary, message_color,
                  std::max(11, static_cast<int>(std::lround(13.f * s))),

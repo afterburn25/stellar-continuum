@@ -5891,6 +5891,15 @@ class NativeCampaign final {
             chronicle_view_.close();
             (void)enter_system(static_cast<int>(*nav),width,height);
           }
+          if(const auto contact=chronicle_view_.contact_navigation()){
+            chronicle_view_.close();
+            system_workspace_.close();colony_workspace_.close();
+            research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
+            colony_roster_.close();economy_workspace_.close();supply_workspace_.close();diplomacy_workspace_.open();refresh_diplomacy(true);
+            if(!diplomacy_workspace_.select_contact_civilization(static_cast<int>(*contact)))
+              diplomacy_workspace_.set_notice(tr("DIPLOMACY_NOTICE_UNIDENTIFIED","This contact is no longer identified. Review the contact list."),false);
+            refresh_diplomacy(true);
+          }
           gesture_.capture_for_ui();continue;
         }
       }

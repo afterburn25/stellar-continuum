@@ -35,7 +35,8 @@ namespace stellar::native_chronicle {
 // time so the view never touches simulation state.
 struct ChronicleEntry {
   std::uint64_t id{};
-  std::uint64_t system_id{}; // event location; 0 = not located
+  std::uint64_t system_id{};  // event location; 0 = not located
+  std::uint64_t contact_id{}; // single non-observer actor; 0 = none
   std::string category, date, summary;
 };
 
@@ -124,6 +125,13 @@ public:
     navigation_.reset();
     return pending;
   }
+  // Same drain contract for the diplomatic-contact action on cards
+  // with exactly one foreign actor (first contacts, battles, treaties).
+  [[nodiscard]] std::optional<std::uint64_t> contact_navigation() noexcept {
+    const auto pending = contact_navigation_;
+    contact_navigation_.reset();
+    return pending;
+  }
 
   // Returns true when the event was consumed by the view.
   [[nodiscard]] bool handle(const native_map::InputEvent &event, int width,
@@ -132,7 +140,7 @@ public:
 
 private:
   enum class PressTarget { None, Close, Refresh, Domain, Significance,
-                           Actor, Entry };
+                           Actor, Entry, Contact };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -143,7 +151,7 @@ private:
   double significance_floor_{};
   std::uint64_t actor_filter_{};
   std::size_t press_entry_{};
-  std::optional<std::uint64_t> navigation_{};
+  std::optional<std::uint64_t> navigation_{}, contact_navigation_{};
   std::function<std::string(std::uint64_t)> actor_name_resolver_;
   ChronicleSnapshot snapshot_;
   native_map::Point pointer_{}, press_origin_{};

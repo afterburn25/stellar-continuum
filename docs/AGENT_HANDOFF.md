@@ -210,7 +210,9 @@ each civilization appearing in the visible feed (`actors` exact-match
 with name resolution) — "what is civ 7 up to" is one button away.
 Located entries navigate — clicking one returns its system
 through `navigation()` and the client enters that system (the
-workspace's observation check still gates visibility). The transient
+workspace's observation check still gates visibility); entries with
+exactly one foreign actor get a DIP action opening the diplomacy
+workspace on that contact. The transient
 feed mirrors it: chronicle-seeded reports carry `system_id` and render
 a VIEW SYSTEM action; the coalesced feedback path stays id-free.
 Chronicle

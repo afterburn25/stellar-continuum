@@ -227,24 +227,30 @@ void entry_navigation() {
   engine::EventHistory history;
   const auto add = [&](double day, std::string category,
                        std::uint64_t location,
+                       std::vector<std::uint64_t> actors,
                        std::vector<std::uint64_t> visible) {
     engine::HistoryEvent event;
     event.at_day = day;
     event.summary = category;
     event.category = std::move(category);
     event.location = location;
+    event.actors = std::move(actors);
     event.visible_to = std::move(visible);
     history.record(std::move(event));
   };
-  add(400., "exploration.system_surveyed", 9, {1});
-  add(410., "war.engagement_started", 0, {1}); // locationless
-  add(420., "war.fleet_destroyed", 4, {1});    // newest first
+  add(400., "exploration.system_surveyed", 9, {1}, {1});
+  add(410., "war.engagement_started", 0, {7, 9}, {1}); // two foreign
+  add(420., "war.fleet_destroyed", 4, {7}, {1, 7});    // newest first
 
   const auto snap = snapshot(history, 1);
   require(snap.entries[0].system_id == 4 &&
               snap.entries[1].system_id == 0 &&
               snap.entries[2].system_id == 9,
           "Snapshot dropped event locations");
+  require(snap.entries[0].contact_id == 7 &&
+              snap.entries[1].contact_id == 0 &&
+              snap.entries[2].contact_id == 0,
+          "Contact id wrong: single foreign actor only");
 
   NativeChronicleView view;
   view.open(history, 1);
@@ -274,6 +280,16 @@ void entry_navigation() {
   require(view.handle(release, 1280, 800),
           "Second card release not captured");
   require(!view.navigation(), "Locationless entry navigated");
+  // The first card's DIP action (right edge of the message area)
+  // routes the single foreign actor as a contact.
+  press.position = {830.f, 152.f};
+  release.position = press.position;
+  require(view.handle(press, 1280, 800), "DIP press not captured");
+  require(view.handle(release, 1280, 800), "DIP release not captured");
+  const auto contact = view.contact_navigation();
+  require(contact && *contact == 7,
+          "DIP action did not route the foreign actor");
+  require(!view.contact_navigation(), "Contact nav did not clear");
 }
 
 void render_smoke() {

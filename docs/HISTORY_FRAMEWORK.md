@@ -131,7 +131,11 @@ before the cap, so a filtered view still reaches deep history. Entries with a `l
 the view returns the system id through `navigation()` (same drain
 contract as the debug background), the client closes the overlay and
 calls `enter_system` — the workspace's own observation check still
-gates what the observer actually sees there. Coverage:
+gates what the observer actually sees there. Entries with exactly one
+foreign actor additionally render a DIP action: `contact_navigation()`
+drains the civilization id and the client opens the diplomacy
+workspace on that contact (first contacts, battles, treaties become
+one-click relations). Coverage:
 `native_chronicle` tests (snapshot ordering, observer privacy, cap +
 total, domain, significance and scope filtering, entry navigation,
 view lifecycle, refresh, render smoke).
