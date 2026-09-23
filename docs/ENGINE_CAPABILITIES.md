@@ -101,7 +101,16 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   ENGAGE runs deterministic Lanchester resolution between the two
   combatants, STEP 5D/RUN advance movement + supply burn, and the panel
   shows per-fleet aggregate reports, cohort detail and whether the
-  hostile fleet's position is interdiction-gated.
+  hostile fleet's position is interdiction-gated. The MISSIONS tab is a
+  `MissionRuntime` debugger over a real `EventBus` — two mission
+  definitions parsed from JSON (trigger conditions, stage timers,
+  timeout stages, choice effects), FIRE EVENT cycles canned domain
+  events through `handle_event` (including a non-matching one), rows
+  select an instance for CHOOSE, STEP 10D/RUN advance stage timers, and
+  SAVE/LOAD exercise `serialize()`/`restore()`; every
+  `MissionEffectEvent` the runtime publishes lands in the effect log —
+  the first consumer of the previously unwired `mission_graph`
+  framework.
   Generated game projects scaffold a `SimulationExecutor` demo — new
   games start with deterministic LOD scheduling wired into the loop —
   plus a persistence example: the starter host captures/restores

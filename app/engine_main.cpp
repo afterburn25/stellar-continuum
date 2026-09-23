@@ -34,6 +34,8 @@
 #include <stellar/engine/resource_economy.hpp>
 #include <stellar/engine/strategic_ai.hpp>
 #include <stellar/engine/warfare.hpp>
+#include <stellar/engine/mission_graph.hpp>
+#include <stellar/engine/event_bus.hpp>
 #include <stellar/engine/terraforming.hpp>
 #include <stellar/engine/flow_network.hpp>
 #include <stellar/engine/logistics.hpp>
@@ -78,16 +80,16 @@ constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
                   Localization, Simulation, Colony, Economy, Planet,
-                  Ai, Warfare };
+                  Ai, Warfare, Missions };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
                             Tool::Localization, Tool::Simulation,
                             Tool::Colony, Tool::Economy, Tool::Planet,
-                            Tool::Ai, Tool::Warfare};
-constexpr std::array<const char *, 13> kToolNames{
+                            Tool::Ai, Tool::Warfare, Tool::Missions};
+constexpr std::array<const char *, 14> kToolNames{
     "Projects", "Dashboard", "Scene",     "Scene3D",
     "Assets",   "Profiler",  "Localization", "Simulation", "Colony",
-    "Economy",  "Planet",    "AI",        "Warfare"};
+    "Economy",  "Planet",    "AI",        "Warfare",   "Missions"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -416,6 +418,28 @@ struct Shell {
   UiRect hit_war_step{}, hit_war_run{}, hit_war_order{}, hit_war_engage{},
       hit_war_reset{};
   std::vector<UiRect> hit_war_fleets;
+
+  // Missions tool: a MissionRuntime debugger over a real EventBus — two
+  // data-driven mission definitions parsed from JSON, canned domain
+  // events fired through handle_event, stage timers advanced on the
+  // demo clock, choices applied through choose(), and every
+  // MissionEffectEvent the runtime publishes captured into a log.
+  struct MissionDemo {
+    bool initialized{false};
+    engine::EventBus bus;
+    engine::MissionRuntime runtime{&bus};
+    engine::Subscription effects_sub;
+    double day{0.0};
+    std::size_t event_cursor{0};
+    std::uint64_t selected{0};
+    bool running{false};
+    double run_accum{0.0};
+    std::string saved_state;
+    std::vector<std::string> log;
+  } missions;
+  UiRect hit_mis_fire{}, hit_mis_step{}, hit_mis_run{}, hit_mis_choose{},
+      hit_mis_save{}, hit_mis_load{}, hit_mis_reset{};
+  std::vector<UiRect> hit_mis_instances;
   std::string status{"ready"};
 };
 
@@ -4029,6 +4053,165 @@ void render_warfare(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
+void mission_log(Shell::MissionDemo &mis, std::string entry) {
+  mis.log.push_back(std::move(entry));
+  if (mis.log.size() > 14) mis.log.erase(mis.log.begin());
+}
+
+void init_missions(Shell::MissionDemo &mis) {
+  mis.runtime.clear(); // drops definitions + instances; keeps the bus
+  mis.effects_sub.unsubscribe();
+  mis.log.clear();
+  // Data-driven definitions parsed from JSON — the same path a game's
+  // content packages would take.
+  constexpr const char *kSurvey = R"json({
+    "id": "survey.helion",
+    "triggers": [{"event": "SurveyComplete",
+                  "conditions": [{"field": "system_id", "equals": "7"}],
+                  "stage": "briefing"}],
+    "stages": {
+      "briefing": {"title_key": "M_HEL_B_T", "body_key": "M_HEL_B_B",
+                   "timer_days": 20, "timeout_stage": "expired",
+                   "choices": [{"id": "investigate", "next": "dig",
+                                "effects": ["spawn_excavation"]},
+                               {"id": "ignore", "next": "", "effects": []}]},
+      "dig": {"title_key": "M_HEL_D_T", "body_key": "M_HEL_D_B",
+              "choices": [{"id": "open_vault", "next": "",
+                           "effects": ["reveal_vault", "grant_artifact"]}]},
+      "expired": {"title_key": "M_HEL_E_T", "body_key": "M_HEL_E_B"}
+    }
+  })json";
+  constexpr const char *kAnomaly = R"json({
+    "id": "anomaly.whisper",
+    "triggers": [{"event": "AnomalyFound", "conditions": [],
+                  "stage": "arrival"}],
+    "stages": {
+      "arrival": {"title_key": "M_W_A_T", "body_key": "M_W_A_B",
+                  "timer_days": 30, "timeout_stage": "expired",
+                  "choices": [{"id": "investigate", "next": "dig",
+                               "effects": ["spawn_excavation"]},
+                              {"id": "dismiss", "next": "", "effects": []}]},
+      "dig": {"title_key": "M_W_D_T", "body_key": "M_W_D_B",
+              "choices": [{"id": "catalog", "next": "",
+                           "effects": ["grant_data"]}]},
+      "expired": {"title_key": "M_W_E_T", "body_key": "M_W_E_B"}
+    }
+  })json";
+  std::string error;
+  auto survey = engine::MissionDefinition::parse(kSurvey, &error);
+  if (survey) mis.runtime.add_definition(std::move(*survey), &error);
+  auto anomaly = engine::MissionDefinition::parse(kAnomaly, &error);
+  if (anomaly) mis.runtime.add_definition(std::move(*anomaly), &error);
+  if (!error.empty()) mission_log(mis, "definition error: " + error);
+  mis.effects_sub = mis.bus.subscribe<engine::MissionEffectEvent>(
+      [&mis](const engine::MissionEffectEvent &e) {
+        std::string entry = "#" + std::to_string(e.instance_id) + " " +
+                            e.mission_id + " -> " + e.stage_id;
+        for (const auto &fx : e.effects) entry += "  [" + fx + "]";
+        mission_log(mis, std::move(entry));
+      });
+  mis.day = 0.0;
+  mis.event_cursor = 0;
+  mis.selected = 0;
+  mis.running = false;
+  mis.run_accum = 0.0;
+  mis.saved_state.clear();
+  mis.initialized = true;
+}
+
+// Canned domain events FIRE cycles through: one matching each definition
+// and one that matches nothing, so filtering is visible.
+void fire_mission_event(Shell::MissionDemo &mis) {
+  static constexpr std::array<std::pair<const char *, const char *>, 3>
+      kEvents{{{"SurveyComplete", "{\"system_id\":7}"},
+               {"AnomalyFound", "{\"sector\":\"drift\"}"},
+               {"SurveyComplete", "{\"system_id\":12}"}}};
+  const auto &[name, payload] = kEvents[mis.event_cursor % kEvents.size()];
+  ++mis.event_cursor;
+  mission_log(mis, std::string("event ") + name + " " + payload);
+  mis.runtime.handle_event(name, payload);
+}
+
+void render_missions(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &mis = shell.missions;
+  if (!mis.initialized) init_missions(mis);
+  auto &rt = mis.runtime;
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "MISSION RUNTIME");
+
+  shell.hit_mis_fire = {x, y, 100 * s, 24 * s};
+  shell_button(out, shell.hit_mis_fire, "FIRE EVENT", !mis.running, font, s);
+  shell.hit_mis_step = {x + 108 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_mis_step, "STEP 10D", !mis.running, font, s);
+  shell.hit_mis_run = {x + 208 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_mis_run, mis.running ? "PAUSE" : "RUN",
+               mis.running, font, s);
+  shell.hit_mis_choose = {x + 298 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_mis_choose, "CHOOSE", !mis.running, font, s);
+  shell.hit_mis_save = {x + 398 * s, y, 72 * s, 24 * s};
+  shell_button(out, shell.hit_mis_save, "SAVE", false, font, s);
+  shell.hit_mis_load = {x + 478 * s, y, 72 * s, 24 * s};
+  shell_button(out, shell.hit_mis_load, "LOAD", mis.saved_state.empty(),
+               font, s);
+  shell.hit_mis_reset = {x + 558 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_mis_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[200];
+  std::snprintf(buf, sizeof(buf), "day %.0f", mis.day);
+  line(out, x, y, "date", buf, font);
+  std::snprintf(buf, sizeof(buf), "%zu bytes",
+                mis.saved_state.size());
+  line(out, x, y, "saved snapshot",
+       mis.saved_state.empty() ? "(none)" : buf, font);
+  y += 6 * s;
+
+  heading(out, x, y, "INSTANCES");
+  const float row_h = 20 * s;
+  const auto instances = rt.instances();
+  shell.hit_mis_instances.clear();
+  for (const auto &inst : instances) {
+    UiRect row{x, y, body.width * 0.62f, row_h};
+    shell.hit_mis_instances.push_back(row);
+    out.overlay.push_back(FilledRectangle{
+        row, inst.id == mis.selected ? Color{26, 48, 76, 255}
+                                     : Color{6, 16, 26, 255}});
+    std::string choices;
+    if (const auto *def = rt.definition(inst.mission_id)) {
+      const auto stage = def->stages.find(inst.stage_id);
+      if (stage != def->stages.end())
+        for (const auto &c : stage->second.choices)
+          choices += "  <" + c.id + ">";
+    }
+    std::snprintf(buf, sizeof(buf), "#%-3llu %-16s stage %-10s %.0fd left%s",
+                  static_cast<unsigned long long>(inst.id),
+                  inst.mission_id.c_str(), inst.stage_id.c_str(),
+                  inst.days_remaining, choices.c_str());
+    out.overlay.push_back(Text{{x + 8 * s, y + 3 * s}, buf, ink, font});
+    y += row_h + 3 * s;
+  }
+  if (instances.empty()) {
+    out.overlay.push_back(Text{{x, y}, "no running instances - fire an "
+                               "event to trigger one", muted, font});
+    y += row_h;
+  }
+  y += 8 * s;
+
+  heading(out, x, y, "EFFECT LOG");
+  for (const auto &entry : mis.log) {
+    out.overlay.push_back(Text{{x, y}, entry, muted, font});
+    y += 16 * s;
+  }
+  if (mis.log.empty()) {
+    out.overlay.push_back(Text{{x, y}, "no MissionEffectEvents yet",
+                               muted, font});
+    y += 16 * s;
+  }
+}
+
 // Summarizes project content freshness: source file count and whether the
 // newest change postdates the cooked manifest (i.e. needs a recook).
 void update_content_status(Shell &shell) {
@@ -5346,6 +5529,9 @@ int main(int argc, char **argv) {
       case Tool::Warfare:
         render_warfare(draw, shell, body, s);
         break;
+      case Tool::Missions:
+        render_missions(draw, shell, body, s);
+        break;
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
@@ -5749,6 +5935,59 @@ int main(int argc, char **argv) {
             }
           }
         }
+        if (shell.tool == Tool::Missions &&
+            event.type == InputEventType::LeftReleased) {
+          auto &mis = shell.missions;
+          if (shell.hit_mis_fire.contains(event.position)) {
+            fire_mission_event(mis);
+          } else if (shell.hit_mis_step.contains(event.position)) {
+            mis.runtime.advance(10.0);
+            mis.day += 10.0;
+          } else if (shell.hit_mis_run.contains(event.position)) {
+            mis.running = !mis.running;
+            mis.run_accum = 0.0;
+          } else if (shell.hit_mis_choose.contains(event.position)) {
+            if (const auto *def = [&]() -> const engine::MissionDefinition * {
+                  for (const auto &inst : mis.runtime.instances())
+                    if (inst.id == mis.selected)
+                      return mis.runtime.definition(inst.mission_id);
+                  return nullptr;
+                }()) {
+              for (const auto &inst : mis.runtime.instances()) {
+                if (inst.id != mis.selected) continue;
+                const auto stage = def->stages.find(inst.stage_id);
+                if (stage != def->stages.end() &&
+                    !stage->second.choices.empty())
+                  mis.runtime.choose(inst.id, stage->second.choices.front().id);
+                break;
+              }
+            }
+          } else if (shell.hit_mis_save.contains(event.position)) {
+            mis.saved_state = mis.runtime.serialize();
+            mission_log(mis, "snapshot saved (" +
+                        std::to_string(mis.saved_state.size()) + " bytes)");
+          } else if (shell.hit_mis_load.contains(event.position)) {
+            std::string error;
+            if (!mis.saved_state.empty() &&
+                mis.runtime.restore(mis.saved_state, &error)) {
+              mission_log(mis, "snapshot restored");
+            } else if (!error.empty()) {
+              mission_log(mis, "restore failed: " + error);
+            }
+          } else if (shell.hit_mis_reset.contains(event.position)) {
+            init_missions(mis);
+          } else {
+            const auto instances = mis.runtime.instances();
+            for (std::size_t i = 0;
+                 i < shell.hit_mis_instances.size() && i < instances.size();
+                 ++i) {
+              if (shell.hit_mis_instances[i].contains(event.position)) {
+                mis.selected = instances[i].id;
+                break;
+              }
+            }
+          }
+        }
       }
 
       FrameTiming timing;
@@ -5776,6 +6015,14 @@ int main(int argc, char **argv) {
           shell.war.run_accum = 0.0;
           shell.war.model.advance(5.0);
           shell.war.day += 5.0;
+        }
+      }
+      if (shell.tool == Tool::Missions && shell.missions.running) {
+        shell.missions.run_accum += elapsed;
+        if (shell.missions.run_accum >= 0.5) {
+          shell.missions.run_accum = 0.0;
+          shell.missions.runtime.advance(10.0);
+          shell.missions.day += 10.0;
         }
       }
       if (shell.tool == Tool::Ai && shell.ai.running) {
