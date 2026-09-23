@@ -191,6 +191,17 @@ public:
   [[nodiscard]] std::optional<EntityId> entity_at(float screen_x,
                                                   float screen_y) const;
 
+  // World-space region queries — AoE damage, aggro ranges, selection
+  // boxes, trigger zones. Every tracked entity is tested (Hidden
+  // included: they still simulate and collide); tilemap carriers are
+  // skipped (query maps with tile_at). Returned in document order.
+  // entities_in_rect intersects each entity's bounds; entities_in_radius
+  // tests center points.
+  [[nodiscard]] std::vector<EntityId>
+  entities_in_rect(float x, float y, float w, float h) const;
+  [[nodiscard]] std::vector<EntityId>
+  entities_in_radius(float x, float y, float radius) const;
+
   // Spawns one entity at runtime (bullets, pickups, effects) — it joins the
   // tracked set: velocity integration, wall bounce, rendering, collisions.
   // Returns a default (null) id when called outside run().

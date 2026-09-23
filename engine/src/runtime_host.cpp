@@ -305,6 +305,35 @@ std::optional<EntityId> RuntimeHost::entity_at(float screen_x,
   return best;
 }
 
+std::vector<EntityId> RuntimeHost::entities_in_rect(float x, float y,
+                                                    float w, float h) const {
+  std::vector<EntityId> out;
+  for (const auto e : impl_->entities) {
+    const auto *t = impl_->world.get<Transform2D>(e);
+    const auto *ext = impl_->world.get<Extent2D>(e);
+    if (!t || !ext) continue;
+    if (t->x < x + w && x < t->x + ext->w && t->y < y + h &&
+        y < t->y + ext->h)
+      out.push_back(e);
+  }
+  return out;
+}
+
+std::vector<EntityId> RuntimeHost::entities_in_radius(float x, float y,
+                                                      float radius) const {
+  std::vector<EntityId> out;
+  const float r2 = radius * radius;
+  for (const auto e : impl_->entities) {
+    const auto *t = impl_->world.get<Transform2D>(e);
+    const auto *ext = impl_->world.get<Extent2D>(e);
+    if (!t || !ext) continue;
+    const float cx = t->x + ext->w * .5f - x;
+    const float cy = t->y + ext->h * .5f - y;
+    if (cx * cx + cy * cy <= r2) out.push_back(e);
+  }
+  return out;
+}
+
 int RuntimeHost::run() {
   RuntimeDiagnostics::context("runtime:package-scan");
   auto &impl = *impl_;

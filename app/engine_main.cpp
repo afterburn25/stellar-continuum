@@ -45,6 +45,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace {
@@ -1491,6 +1492,20 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
            shell.scene_doc.tilemaps[tm_order[next_tm]].layer <= layer)
       draw_tilemap(tm_order[next_tm++]);
   };
+  // Parent links: child center -> parent center, under the entity pass.
+  for (const auto &e : shell.scene_doc.entities) {
+    if (e.parent.empty()) continue;
+    for (const auto &p : shell.scene_doc.entities)
+      if (p.name == e.parent) {
+        out.overlay.push_back(
+            Line{{pv.x + (e.x + e.w * .5f) * sx,
+                  pv.y + (e.y + e.h * .5f) * sy},
+                 {pv.x + (p.x + p.w * .5f) * sx,
+                  pv.y + (p.y + p.h * .5f) * sy},
+                 {140, 200, 255, 110}});
+        break;
+      }
+  }
   for (const auto i : scene_draw_order(shell.scene_doc)) {
     const auto &e = shell.scene_doc.entities[i];
     draw_tilemaps_below(e.layer);
@@ -2492,12 +2507,35 @@ int main(int argc, char **argv) {
               shell.scene_preview.contains(event.position)) {
             if (auto *e = selected_scene_entity(shell); e != nullptr) {
               const auto &pv = shell.scene_preview;
-              e->x = std::clamp(
+              const float nx = std::clamp(
                   (event.position.x - pv.x) / pv.width * 1280.f, 0.f,
                   1280.f - e->w);
-              e->y = std::clamp(
+              const float ny = std::clamp(
                   (event.position.y - pv.y) / pv.height * 720.f, 0.f,
                   720.f - e->h);
+              const float dx = nx - e->x, dy = ny - e->y;
+              e->x = nx;
+              e->y = ny;
+              // Descendants follow so authored child offsets survive the
+              // drag (they re-derive at spawn from the new positions).
+              if (dx != 0.f || dy != 0.f)
+                for (auto &c : shell.scene_doc.entities) {
+                  std::unordered_set<std::string> seen{c.name};
+                  for (std::string cur = c.parent; !cur.empty();) {
+                    if (cur == e->name) {
+                      c.x += dx;
+                      c.y += dy;
+                      break;
+                    }
+                    if (!seen.insert(cur).second) break;
+                    const auto it = std::find_if(
+                        shell.scene_doc.entities.begin(),
+                        shell.scene_doc.entities.end(),
+                        [&](const auto &p) { return p.name == cur; });
+                    if (it == shell.scene_doc.entities.end()) break;
+                    cur = it->parent;
+                  }
+                }
               shell.scene_modified = true;
             }
           }
