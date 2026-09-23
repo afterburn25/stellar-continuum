@@ -174,7 +174,17 @@ cadence demotion, budgets and wakeups are now configuration instead of
 restructuring. Next: further Core/game
 adoption — per-entity executor cadence inside heavy phases and
 framework consumers (population/colony/flow/logistics/AI/warfare)
-against real campaign state.
+against real campaign state. Second Core adoption landed:
+`core/planetary_adapter` — `to_engine_environment(const
+PlanetaryBody&)` projects authoritative planet environment into engine
+`PlanetEnvironment` (direct temperature/gravity, kPa→atm pressure,
+binary water-solvent presence, deterministic sorted
+`atmosphere.*`/`solvent.*`/`high_radiation`/`immersed`/`gas_giant`/
+body-flag tags) so engine frameworks evaluate real Core worlds;
+`planetary_adapter` tests cover field conversion, the tag vocabulary
+and `evaluate_habitability` over projected bodies. Core
+`assess_species_planet`/`species_environment` remains authoritative for
+campaign suitability — the adapter is a projection, not a replacement.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

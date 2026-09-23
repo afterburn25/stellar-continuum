@@ -5,13 +5,32 @@ habitability evaluation, and staged terraforming. Modules:
 `engine/include/stellar/engine/planetary.hpp` (environment +
 habitability), `engine/include/stellar/engine/terraforming.hpp`
 (staged projects); `engine/src/planetary.cpp`,
-`engine/src/terraforming.cpp`. Tests: `planetary`, `terraforming`
-(ctest).
+`engine/src/terraforming.cpp`. Tests: `planetary`, `terraforming`,
+`planetary_adapter` (ctest).
 
 Status: IMPLEMENTED at engine level. These are ADAPTER surfaces —
 authoritative planet state remains Core `PlanetaryBody`/planetary
-catalog; adapters project it into `PlanetEnvironment` and write the
-mutated result back.
+catalog; the Core-side adapter
+(`core/include/stellar/core/planetary_adapter.hpp`,
+`core/src/planetary_adapter.cpp`) projects it into
+`PlanetEnvironment` via `to_engine_environment(const PlanetaryBody&)`.
+Write-back is the reverse direction: a terraformed `PlanetEnvironment`
+is applied to the authoritative body by the caller.
+
+Projection semantics (all deterministic, no RNG):
+
+- `temperature_kelvin` → `temperature_k`, `gravity_g` → `gravity_g`
+  (direct); `pressure_kpa` → `atmosphere_atm` (÷101.325).
+- `available_solvent == Water` → `water_fraction = 1`, otherwise 0 —
+  the catalog stores solvent *regime*, not coverage, so presence is
+  binary; per-body coverage detail stays a Core concern.
+- Tags: `atmosphere.<regime>` (e.g. `atmosphere.oxygen_nitrogen`,
+  `atmosphere.vacuum`), `solvent.<regime>`, `high_radiation` when
+  `radiation_hazard > 0.10` (Core's existing hazard threshold),
+  `immersed` for `is_immersed_environment`, `gas_giant` when the body
+  lacks a solid surface, plus body flags (`anomaly`, `cracked`,
+  `rare_resource`, `native_civilization`). Tags are emitted sorted and
+  unique, matching the engine invariant.
 
 ## Habitability (milestone 7)
 

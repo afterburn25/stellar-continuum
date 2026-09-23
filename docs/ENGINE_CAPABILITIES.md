@@ -193,11 +193,23 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   planet owns the adapted environment; `TerraformProject` stages apply
   linear deltas over durations and discrete tag changes at completion;
   cancel preserves applied deltas; multi-stage completion per step.
+- **Core adapter:** `stellar::core::to_engine_environment(PlanetaryBody)`
+  (`core/planetary_adapter.*`) projects authoritative environment data
+  into `PlanetEnvironment` — direct temperature/gravity, kPa→atm
+  pressure, binary water-solvent presence, deterministic sorted tags
+  (`atmosphere.*`, `solvent.*`, `high_radiation` at Core's >0.10
+  threshold, `immersed`, `gas_giant`, `anomaly`, `cracked`,
+  `rare_resource`, `native_civilization`). Core
+  `assess_species_planet`/`species_environment` remains authoritative
+  for campaign suitability; the engine evaluator serves reusable
+  framework consumers (population needs, colony tags, terraforming).
 - **Consumers/tests:** `planetary` tests — range scoring, soft margins,
   tag gates, water floor, determinism. `terraforming` tests — staged
   progression, interpolation, tag mutation, habitability improvement,
-  cancel persistence, step-size invariance, determinism. Core planet
-  adapters pending.
+  cancel persistence, step-size invariance, determinism.
+  `planetary_adapter` tests — field conversion, tag vocabulary,
+  sorted-tag invariant, and `evaluate_habitability` over a projected
+  real body.
 - **Save/performance impact:** plain data everywhere; per-advance cost
   is O(stages completed), evaluation O(tags + params).
 - **Limitations:** linear deltas only — no feedback loops, atmosphere
