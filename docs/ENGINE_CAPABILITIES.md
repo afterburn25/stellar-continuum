@@ -633,6 +633,47 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   engagement previews are what-if math, not committed combat outcomes;
   no strategic interdiction radius exists in Core to project.
 
+## Core campaign colony projection + degraded-structure diagnostics (2026-09-24)
+
+- **Purpose:** make the engine Colony settlement framework (M4:
+  spec/structure/utility substrate) reachable over authoritative
+  campaign colonies without a second settlement authority. Core surface
+  economy (`surface_economy.hpp`) stays authoritative;
+  `core/campaign_colony_projection.*` reshapes `SurfaceBuilding`s +
+  `surface_building_catalog()` definitions + the authoritative
+  power/staffing allocation into an `engine::Colony` so aggregate
+  structure/utility/workforce accounting serves diagnostics and tooling
+  on a copy — never mutating campaign state.
+- **Core adapter:** `project_colony_settlement(colony)` — one
+  `SurfaceBuilding` → one standalone `Structure` (Core has no
+  districts); spec `surface.<type_id>` synthesized from the catalog row
+  (power → `power` utility supply/demand, workforce → jobs, housing,
+  per-day outputs, `credits` upkeep, `industry` build cost);
+  unknown type ids fall back to a bare `surface.unknown` spec. Flags
+  map exactly (`is_complete`/`is_enabled`/`condition`); in-progress
+  buildings carry `construction_remaining` in Core industry units;
+  `operating` mirrors the authoritative `surface_colony_output()`
+  powered set (zero when the allocator cannot run on unknown types);
+  `standalone_slots` = `surface_building_capacity`, floored to the
+  structure count for hub-less colonies (engine 0 == unlimited).
+- **Consumers/tests:** `inspect_campaign_operations` emits
+  `degraded_structures` findings — complete+enabled structures at or
+  below `minimum_operational_condition` silently contribute nothing to
+  surface output; the finding reports count and worst condition per
+  colony. `campaign_colony_projection` tests — spec synthesis, flag
+  fidelity, remaining-industry accounting, powered-set operating flags,
+  unknown-type fallback, hub-less capacity floor, and the consumer path
+  (only worn colonies flagged).
+- **Save/performance impact:** read-only projection — zero persistent
+  state; settlement build is O(buildings) once per colony per daily
+  diagnostics pass.
+- **Limitations:** `utility_balance()` reports nameplate spec
+  supply/demand — Core's effective supply is condition-efficiency
+  scaled plus a base 2, so the balances differ by design (documented in
+  the adapter contract); food/water capacity and credit/industry build
+  *time* have no engine analog; the projection carries no districts —
+  Core's flat building list maps to standalone slots only.
+
 ## Massive simulation scheduler + simulation LOD executor (2026-09-23)
 
 - **Purpose:** the space-strategy specialization's foundation — drive

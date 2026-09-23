@@ -1,10 +1,12 @@
 #include <stellar/core/campaign_diagnostics.hpp>
 #include <stellar/core/campaign_calendar.hpp>
+#include <stellar/core/campaign_colony_projection.hpp>
 #include <stellar/core/campaign_economy_projection.hpp>
 #include <stellar/core/campaign_warfare_projection.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/settlement_body_index.hpp>
+#include <stellar/core/surface_economy.hpp>
 #include <cmath>
 #include <cstdio>
 #include <unordered_set>
@@ -53,6 +55,36 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
         r.values["reserveDays"]=d.reserve_days;
         records.push_back(std::move(r));
       }
+    }
+  }
+  // Degraded structures: complete+enabled buildings worn at or below the
+  // operational condition floor silently contribute nothing to surface
+  // output (they fail `operational()` before power/staffing allocation).
+  // The engine settlement projection carries the authoritative
+  // per-structure condition — no rules are re-derived here.
+  if(records.size()<maximum){
+    for(const auto &colony:world.colonies){
+      if(records.size()>=maximum)break;
+      if(colony.surface_buildings.empty())continue;
+      const auto settlement=project_colony_settlement(colony);
+      std::size_t degraded=0;double worst=1.0;
+      for(const auto *structure:settlement.structures()){
+        if(!structure->complete||!structure->enabled)continue;
+        if(structure->condition>minimum_operational_condition)continue;
+        ++degraded;worst=std::min(worst,structure->condition);
+      }
+      if(!degraded)continue;
+      DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="colony";
+      r.event_type="degraded_structures";r.severity=DiagnosticSeverity::Warning;
+      r.entity_id=colony.id;r.civilization_id=colony.civilization_id;r.system_id=colony.system_id;
+      char message[160];
+      std::snprintf(message,sizeof(message),
+                    "%llu surface structures at or below operational condition (worst %.0f%%).",
+                    static_cast<unsigned long long>(degraded),worst*100.0);
+      r.message=message;
+      r.values["degradedCount"]=static_cast<double>(degraded);
+      r.values["worstCondition"]=worst;
+      records.push_back(std::move(r));
     }
   }
   // Armed foreign presence: an armed fleet stationed in a system that

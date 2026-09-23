@@ -442,7 +442,14 @@ render limitations: no indirect draw, no per-mip partial residency (LOD
 clamping), bounded CPU submission. A parallel-lane fix landed in `GalaxyMap::route_length_light_years`:
 Dijkstra relaxes each lane independently, so the edge a route uses is the
 cheapest connecting lane — the length helper now sums the minimum rather
-than the first lane id (test: parallel lanes of 9/2 ly report 2). The second frontier is an architecture
+than the first lane id (test: parallel lanes of 9/2 ly report 2). The
+read-only projection family gained a third adapter:
+`campaign_colony_projection.*` reshapes a Core colony (surface buildings +
+catalog definitions + the authoritative powered allocation) into an
+`engine::Colony`; `inspect_campaign_operations` now emits
+`degraded_structures` findings for complete+enabled buildings at or below
+the operational condition floor — a finding class no previous check
+covered. The second frontier is an architecture
 decision: authoritative Core adoption of the economy-catalog/colony/logistics/
 population/strategic-AI frameworks — Core consumption today is read-only
 projection adapters (the safe pattern; replacing bespoke Core systems wholesale
