@@ -77,6 +77,8 @@ int RuntimeHost::run() {
   Window window(options.window_title, options.width, options.height,
                 options.fullscreen, exe_dir / "engine-default-font.ttf");
   window.set_auto_frame_cap();
+  // F12/PrintScreen captures land in the project's screenshots/ dir.
+  window.set_screenshot_directory(options.project_root / "screenshots");
 
   // Scoped to run() so its SDL audio teardown precedes ~Window's SDL_Quit.
   audio::AudioOutput audio_output;
@@ -356,6 +358,12 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.snapshot_out = argv[++i];
     else if (arg == "--scene")
       impl_->options.scene_file = argv[++i];
+    else if (arg == "--width")
+      impl_->options.width = std::atoi(argv[++i]);
+    else if (arg == "--height")
+      impl_->options.height = std::atoi(argv[++i]);
+    else if (arg == "--fullscreen")
+      impl_->options.fullscreen = std::atoi(argv[++i]) != 0;
   }
   return run();
 }

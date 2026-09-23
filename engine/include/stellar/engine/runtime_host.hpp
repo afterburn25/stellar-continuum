@@ -97,7 +97,8 @@ public:
   std::function<void(native_map::DrawList &, float w, float h)> on_draw;
 
   // Owns the SDL loop; returns the process exit code. The argv overload
-  // applies `--frames N` / `--fixed-hz N` overrides to the options.
+  // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /
+  // `--scene <path>` / `--width` / `--height` / `--fullscreen` overrides.
   int run();
   int run(int argc, char **argv);
 
