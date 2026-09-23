@@ -183,7 +183,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
 
 enum class WorkspaceView { Galaxy, System, Body };
 
-enum class Field { None, Name, Note, Search, ProjectName, BodyRadius };
+enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
@@ -251,7 +251,7 @@ struct Editor {
       hit_anomaly{}, hit_rare{}, hit_prewarp{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
       hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{},
-      hit_radius{};
+      hit_radius{}, hit_orbit{};
   // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
   bool menu_open{};
   UiRect menu_rect{};
@@ -291,6 +291,38 @@ std::string display_name(const Editor &ed, const core::PlanetaryBody &body) {
 }
 
 // Radius override: the annotation layer wins over the generated record.
+// Stellar orbit with the annotation-layer radius override applied: the
+// generated orbit's elements stay; a set orbit_au wins for the ring and
+// the day-phased position (habitable-zone tagging remains generated).
+engine::AnalyticOrbit body_orbit(const Editor &ed,
+                                 const core::StellarSystem &sys,
+                                 const core::PlanetaryBody &body) {
+  auto orbit = core::planetary_stellar_orbit(sys, body);
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.orbit_au)
+    orbit.radius = *it->second.orbit_au;
+  return orbit;
+}
+core::StellarPosition body_position(const Editor &ed,
+                                    const core::StellarSystem &sys,
+                                    const core::PlanetaryBody &body) {
+  const auto host = core::planetary_stellar_host(sys, body.id);
+  const auto star = core::stellar_positions(sys, ed.system_days)
+      [static_cast<std::size_t>(std::clamp(host, 0, 3))];
+  const auto rel =
+      engine::analytic_orbit_position(body_orbit(ed, sys, body), ed.system_days);
+  return {star[0] + rel[0], star[1] + rel[1], star[2] + rel[2]};
+}
+// Effective stellar orbit radius for display: the annotation wins, then the
+// generated exposure record; nullopt when the body has no stellar orbit.
+std::optional<double> body_orbit_au(const Editor &ed,
+                                    const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.orbit_au)
+    return it->second.orbit_au;
+  if (body.stellar_exposure) return body.stellar_exposure->orbit_au;
+  return std::nullopt;
+}
 double body_radius_earth(const Editor &ed, const core::PlanetaryBody &body) {
   if (const auto it = ed.body_edits.find(body.id);
       it != ed.body_edits.end() && it->second.radius_earth)
@@ -416,34 +448,38 @@ void commit_active_field(Editor &ed) {
                          ed.project_name});
       ed.project_name = ed.edit_buffer;
     }
-  } else if (ed.editing == Field::BodyRadius) {
-    // Body-only numeric override: empty restores AUTO, otherwise a positive
-    // finite number wins over the generated radius_earth.
+  } else if (ed.editing == Field::BodyRadius || ed.editing == Field::BodyOrbit) {
+    // Body-only numeric overrides: empty restores AUTO, otherwise a positive
+    // finite number wins over the generated property.
+    const auto member = ed.editing == Field::BodyRadius
+                            ? &edproj::SystemEdit::radius_earth
+                            : &edproj::SystemEdit::orbit_au;
+    const auto label = ed.editing == Field::BodyRadius ? "radius" : "orbit";
     if (const auto target = annotation_target(ed); target && target->second) {
       const auto it = ed.body_edits.find(target->first);
       const auto current = it != ed.body_edits.end()
-                               ? it->second.radius_earth
+                               ? it->second.*member
                                : std::optional<double>{};
       if (ed.edit_buffer.empty()) {
         if (current) {
           ed.history.commit({ed.seed, ed.system_count, ed.edits,
                              ed.body_edits, ed.project_name});
-          ed.body_edits[target->first].radius_earth.reset();
+          (ed.body_edits[target->first].*member).reset();
           rebuild_detail_rows(ed);
         }
       } else {
         try {
           const auto value = std::stod(ed.edit_buffer);
           if (!std::isfinite(value) || value <= 0.)
-            throw std::runtime_error("radius must be positive");
+            throw std::runtime_error("not positive");
           if (!current || *current != value) {
             ed.history.commit({ed.seed, ed.system_count, ed.edits,
                                ed.body_edits, ed.project_name});
-            ed.body_edits[target->first].radius_earth = value;
+            ed.body_edits[target->first].*member = value;
             rebuild_detail_rows(ed);
           }
         } catch (const std::exception &) {
-          ed.status = "radius must be a positive number";
+          ed.status = std::string(label) + " must be a positive number";
           return; // keep the field open so the input is not silently dropped
         }
       }
@@ -531,7 +567,7 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
   row("inclination",
       fspec("%.1f", body.orbital_inclination_degrees) + " deg");
   if (body.stellar_exposure) {
-    row("orbit", fspec("%.3f", body.stellar_exposure->orbit_au) + " AU");
+    row("orbit", fspec("%.3f", *body_orbit_au(ed, body)) + " AU");
     row("incident flux", fspec("%.3f", body.stellar_exposure->incident_flux));
     row("habitable zone",
         body.stellar_exposure->in_habitable_zone ? "inside" : "outside");
@@ -689,8 +725,8 @@ void rebuild_detail_rows(Editor &ed) {
                           fspec("%.0f", body.environment.temperature_kelvin) +
                           " K, " + std::string(atmosphere_name(
                                        body.environment.atmosphere));
-      if (body.stellar_exposure)
-        value += ", " + fspec("%.2f", body.stellar_exposure->orbit_au) + " AU";
+      if (const auto au = body_orbit_au(ed, body))
+        value += ", " + fspec("%.2f", *au) + " AU";
       if (body.stellar_exposure && body.stellar_exposure->in_habitable_zone)
         value += " [hz]";
       if (trait(ed.body_edits, body, &core::PlanetaryBody::has_anomaly,
@@ -869,8 +905,31 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
               ed.editing == Field::BodyRadius, "earth radii, empty = auto...",
               font);
     y += ed.hit_radius.height + 8 * s;
-  } else
+    // Star-orbiting bodies only: moons ride their parent's satellite orbit.
+    if (!body.parent_body_id) {
+      out.overlay.push_back(
+          Text{{x, y}, "orbit override (AU)", muted, font - 1});
+      y += font + 4;
+      ed.hit_orbit = {x, y, r.width - 28 * s, (font + 12) * s};
+      const auto orbit_value =
+          ed.editing == Field::BodyOrbit
+              ? ed.edit_buffer
+              : (stored.orbit_au
+                     ? fspec("%.4f", *stored.orbit_au)
+                     : (body.stellar_exposure
+                            ? fspec("%.4f", body.stellar_exposure->orbit_au) +
+                                  " (auto)"
+                            : std::string{"none"}));
+      field_box(out, ed.hit_orbit, orbit_value,
+                ed.editing == Field::BodyOrbit, "orbit radius AU, empty = auto...",
+                font);
+      y += ed.hit_orbit.height + 8 * s;
+    } else
+      ed.hit_orbit = {};
+  } else {
     ed.hit_radius = {};
+    ed.hit_orbit = {};
+  }
 
   // Embedded assets: files dropped under <project>/assets/ ride with the
   // project; the first png previews here.
@@ -1451,11 +1510,10 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
           const int host = core::planetary_stellar_host(sys, body.id);
           const auto &hc = hosts[static_cast<std::size_t>(
               std::clamp(host, 0, 3))];
-          orbit_ring(out, ed, core::planetary_stellar_orbit(sys, body), hc[0],
+          orbit_ring(out, ed, body_orbit(ed, sys, body), hc[0],
                      hc[1], {60, 100, 122, 120});
         }
-        const auto bp =
-            core::stellar_planet_position(sys, body, ed.system_days);
+        const auto bp = body_position(ed, sys, body);
         const auto p = system_to_screen(ed, bp[0], bp[1]);
         if (!v.contains(p)) continue;
         const bool in_hz =
@@ -2045,6 +2103,17 @@ int main(int argc, char **argv) {
               ed.edit_buffer =
                   it != ed.body_edits.end() && it->second.radius_earth
                       ? fspec("%.3f", *it->second.radius_earth)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_orbit.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyOrbit;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.orbit_au
+                      ? fspec("%.4f", *it->second.orbit_au)
                       : std::string{};
               window.set_text_input(true);
             }

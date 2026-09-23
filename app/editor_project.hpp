@@ -23,6 +23,10 @@ struct SystemEdit {
   // Numeric property override (body edits only): unset follows the
   // generated radius_earth; a set value wins everywhere the editor reads it.
   std::optional<double> radius_earth;
+  // Stellar orbit radius override in AU (star-orbiting bodies only): the
+  // generated orbit's other elements stay; the ring and position recompute
+  // from the patched AnalyticOrbit.
+  std::optional<double> orbit_au;
 };
 
 struct EditorProject {
