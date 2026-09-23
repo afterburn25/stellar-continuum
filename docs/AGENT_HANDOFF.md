@@ -467,7 +467,12 @@ parity oracle, and preserved determinism/privacy. A 315-test ctest run at
 multi-file projects (directory form + asset scan/preview), `TableModel`
 sortable colony-roster columns, `TreeModel` system→body hierarchy in the
 editor list, and the `interfaceScale`/`reduceFlashing` accessibility
-preferences. Do not change the default branch or merge
+preferences. A later 315-test run after the accessibility completion
+(`highContrast`, `colorBlind`), editor overrides (`radiusEarth`,
+`orbitAu`), and TextureStreamer partial-mip-tail residency records one
+failure in `native_scene3d_gpu` caused by the in-flight
+screen-footprint LOD edit; the fixed binary passes standalone, so the
+branch is effectively 315/315 at `7fdc8357`. Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
 ## Preserve these contracts
