@@ -1,3 +1,4 @@
+#include <stellar/core/campaign_diagnostics.hpp>
 #include <stellar/core/campaign_economy_projection.hpp>
 #include <stellar/core/surface_economy.hpp>
 
@@ -184,6 +185,58 @@ int main() {
                   first[i].unmet_per_day == second[i].unmet_per_day &&
                   first[i].reserve_days == second[i].reserve_days,
               "rollup diagnostics bit-equal");
+  }
+
+  // Consumer: inspect_campaign_operations surfaces the bottleneck as a
+  // sustenance_shortfall finding on the operations diagnostics channel.
+  {
+    PlanetaryBody rock;
+    rock.id = 4;
+    rock.system_id = 1;
+    rock.name = "Barren";
+    rock.kind = PlanetaryBodyKind::Planet;
+    rock.radius_earth = 0.5;
+    rock.mass_earth = 0.3;
+    rock.environment.temperature_kelvin = 40.0;
+    rock.environment.pressure_kpa = 0.0;
+    rock.environment.gravity_g = 0.3;
+    rock.environment.atmosphere = PlanetaryAtmosphereRegime::Vacuum;
+    rock.environment.available_solvent = PlanetarySolventRegime::None;
+    rock.environment.has_solid_surface = true;
+
+    FreshCampaignState world;
+    world.bodies.push_back(rock);
+    auto colonies = seed_legacy_colonies(civs);
+    auto &colony = colonies.front();
+    colony.system_id = 1;
+    colony.planetary_body_id = 4;
+    colony.population_millions = 2000.0;
+    world.colonies = std::move(colonies);
+    // A small body-less colony stays covered by the sealed fallback —
+    // it must not produce a finding.
+    Colony fine;
+    fine.id = 50;
+    fine.civilization_id = 7;
+    fine.population_millions = 100.0;
+    world.colonies.push_back(fine);
+
+    const auto findings =
+        inspect_campaign_operations(world, 0, 100.0, 128);
+    int food_findings = 0;
+    int water_findings = 0;
+    for (const auto &finding : findings) {
+      if (finding.event_type != "sustenance_shortfall") continue;
+      check(finding.entity_id && *finding.entity_id == 0,
+            "finding names the starving colony");
+      check(finding.civilization_id && *finding.civilization_id == 7,
+            "finding names the owning civilization");
+      if (finding.message.find("res.food") != std::string::npos)
+        ++food_findings;
+      if (finding.message.find("res.water") != std::string::npos)
+        ++water_findings;
+    }
+    check(food_findings == 1, "one food shortfall finding");
+    check(water_findings == 1, "one water shortfall finding");
   }
 
   if (failures == 0)

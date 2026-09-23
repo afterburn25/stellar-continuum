@@ -19,16 +19,28 @@ int main(int argc,char **argv)try{
   auto clean=inspect_campaign_invariants(world,0,0);
   for(const auto &r:clean)std::cerr<<r.subsystem<<" "<<r.event_type<<" "<<r.entity_id.value_or(-1)<<" "<<r.message<<'\n';
   check(clean.empty(),"Fresh canonical world failed invariants.");
-  check(inspect_campaign_operations(world,0,0).empty(),"Clean world invented an AI stall.");
+  auto operations=inspect_campaign_operations(world,0,0);
+  for(const auto &r:operations)std::cerr<<r.subsystem<<" "<<r.event_type<<" "<<r.entity_id.value_or(-1)<<" "<<r.message<<'\n';
+  check(std::none_of(operations.begin(),operations.end(),[](const auto &r){return r.event_type=="return_route_unavailable";}),"Clean world invented an AI stall.");
+  // Seeded colonies may legitimately report sustenance shortfalls (an
+  // under-provisioned settlement is an operational fact, not a stall). Any
+  // such finding must still name a real colony.
+  for(const auto &r:operations)if(r.event_type=="sustenance_shortfall"){
+    check(r.entity_id.has_value()&&r.civilization_id.has_value(),"Sustenance finding lacks identity.");
+    check(std::any_of(world.colonies.begin(),world.colonies.end(),[&](const Colony &c){return c.id==*r.entity_id;}),"Sustenance finding names a nonexistent colony.");
+  }
   auto stalled=world;FleetState fleet;fleet.id=917;fleet.civilization_id=world.player_civilization_id;
   fleet.current_system_id=world.systems.front().id;fleet.fuel_remaining_light_years=8;
   fleet.return_to_base_failure_reason="No owned refuelling settlement is reachable with current fuel.";stalled.fleets.push_back(fleet);
   auto warnings=inspect_campaign_operations(stalled,24,6);
-  check(warnings.size()==1&&warnings[0].severity==DiagnosticSeverity::Warning&&warnings[0].entity_id==917&&
-      warnings[0].event_type=="return_route_unavailable","Canonical return failure was not reported separately from invariants.");
+  const auto stalls=std::count_if(warnings.begin(),warnings.end(),[](const auto &r){return r.event_type=="return_route_unavailable";});
+  const auto stall=std::find_if(warnings.begin(),warnings.end(),[](const auto &r){return r.event_type=="return_route_unavailable";});
+  check(stalls==1&&stall!=warnings.end()&&stall->severity==DiagnosticSeverity::Warning&&stall->entity_id==917,
+      "Canonical return failure was not reported separately from invariants.");
   check(stalled.fleets.back().fuel_remaining_light_years==8,"Diagnostic repaired fuel.");
   stalled.fleets.back().is_active=false;
-  check(inspect_campaign_operations(stalled,24,6).empty(),"Inactive historical ship reported as currently stranded.");
+  const auto settled=inspect_campaign_operations(stalled,24,6);
+  check(std::none_of(settled.begin(),settled.end(),[](const auto &r){return r.event_type=="return_route_unavailable";}),"Inactive historical ship reported as currently stranded.");
   check(rejects([&]{(void)inspect_campaign_operations(world,0,0,0);}),"Invalid operational finding bound accepted.");
   auto corrupt=world;corrupt.systems.push_back(corrupt.systems.front());
   corrupt.colonies.front().civilization_id=99999;

@@ -1,6 +1,9 @@
 #include <stellar/core/campaign_diagnostics.hpp>
 #include <stellar/core/campaign_calendar.hpp>
+#include <stellar/core/campaign_economy_projection.hpp>
+#include <stellar/core/settlement_body_index.hpp>
 #include <cmath>
+#include <cstdio>
 #include <unordered_set>
 
 namespace stellar::core {
@@ -17,6 +20,36 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
     r.message=*fleet.return_to_base_failure_reason;
     r.values["fuelLightYears"]=fleet.fuel_remaining_light_years;
     records.push_back(std::move(r));if(records.size()==maximum)break;
+  }
+  // Sustenance shortfalls: colonies whose food/water demand outruns
+  // installed supply over a 30-day horizon. The engine economy-analysis
+  // framework does the demand/bottleneck math; the projection adapter
+  // reshapes authoritative sustenance state (same functions the economy
+  // phase calls) — no rules are duplicated or re-derived here.
+  if(records.size()<maximum){
+    static const auto catalog=sustenance_economy_catalog();
+    const SettlementBodyIndex sustenance_index(world.colonies,world.bodies);
+    for(const auto &colony:world.colonies){
+      if(records.size()>=maximum)break;
+      if(colony.kind!=SettlementKind::Colony)continue;
+      for(const auto &d:analyze_colony_sustenance(
+             colony,sustenance_index.bodies_for(colony),30.0,catalog)){
+        if(!d.bottleneck)continue;
+        if(records.size()>=maximum)break;
+        DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="colony";
+        r.event_type="sustenance_shortfall";r.severity=DiagnosticSeverity::Warning;
+        r.entity_id=colony.id;r.civilization_id=colony.civilization_id;r.system_id=colony.system_id;
+        char message[160];
+        std::snprintf(message,sizeof(message),
+                      "%s demand exceeds installed supply (%.0f/day unmet, %.1f days reserve).",
+                      d.resource.c_str(),d.unmet_per_day,d.reserve_days);
+        r.message=message;
+        r.values["demandPerDay"]=d.demand_per_day;
+        r.values["supplyPerDay"]=d.supply_per_day;
+        r.values["reserveDays"]=d.reserve_days;
+        records.push_back(std::move(r));
+      }
+    }
   }
   return records;
 }
