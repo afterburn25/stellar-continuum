@@ -196,7 +196,7 @@ struct Shell {
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
       hit_scene_size{}, hit_scene_color{}, hit_scene_layer{},
       hit_scene_parallax{}, hit_scene_text{}, hit_scene_grav{},
-      hit_scene_gravity{}, hit_scene_solid{},
+      hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
       scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
@@ -944,7 +944,7 @@ bool parse_color(std::string_view text, std::uint8_t &r, std::uint8_t &g,
 }
 
 void commit_scene_field(Shell &shell) {
-  // Field 11 is document-level (scene gravity) — no entity needed.
+  // Fields 11/13 are document-level — no entity needed.
   if (shell.scene_field == 11) {
     try {
       const float g = std::stof(shell.scene_buffer);
@@ -955,6 +955,21 @@ void commit_scene_field(Shell &shell) {
                      " - SAVE to persist";
     } catch (const std::exception &) {
       shell.status = "invalid value - use a number like 600";
+    }
+    shell.scene_buffer.clear();
+    return;
+  }
+  if (shell.scene_field == 13) {
+    std::uint8_t r, g, b;
+    if (parse_color(shell.scene_buffer, r, g, b)) {
+      shell.scene_history.commit(shell.scene_doc);
+      shell.scene_doc.bg_r = r;
+      shell.scene_doc.bg_g = g;
+      shell.scene_doc.bg_b = b;
+      shell.scene_modified = true;
+      shell.status = "scene background updated - SAVE to persist";
+    } else {
+      shell.status = "invalid value - use \"r,g,b\"";
     }
     shell.scene_buffer.clear();
     return;
@@ -1051,7 +1066,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
             shell.hit_scene_color = shell.hit_scene_layer =
                 shell.hit_scene_parallax = shell.hit_scene_text =
                     shell.hit_scene_grav = shell.hit_scene_gravity =
-                        shell.hit_scene_solid = {};
+                        shell.hit_scene_solid = shell.hit_scene_bg = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1118,7 +1133,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   const float px = list_rect.x + list_rect.width + 16 * s;
   const float pw = body.x + body.width - px - 22 * s;
   const float ph = pw * 720.f / 1280.f;
-  shell.scene_preview = {px, y, pw, std::min(ph, body.height * 0.55f)};
+  shell.scene_preview = {px, y, pw, std::min(ph, body.height * 0.5f)};
   const auto &pv = shell.scene_preview;
   out.overlay.push_back(FilledRectangle{
       pv, {shell.scene_doc.bg_r, shell.scene_doc.bg_g, shell.scene_doc.bg_b,
@@ -1166,15 +1181,21 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
 
   // Property fields for the selected entity.
   const auto *entity = selected_scene_entity(shell);
-  float fy = pv.y + pv.height + 14 * s;
-  const float fw = pv.width;
+  const float fy0 = pv.y + pv.height + 14 * s;
+  const float col_w = pv.width * .5f - 8 * s;
+  float fy = fy0, fx = px;
   auto field = [&](UiRect &hit, const char *label, const std::string &value,
                    bool editing, const char *hint) {
-    out.overlay.push_back(Text{{px, fy}, label, muted, font});
-    hit = {px + 90 * s, fy - 4 * s, fw - 90 * s, (font + 12) * s};
+    // Wrap to a second column when the list reaches the window bottom.
+    if (fx == px && fy + (font + 20) * s > body.y + body.height) {
+      fy = fy0;
+      fx = px + col_w + 16 * s;
+    }
+    out.overlay.push_back(Text{{fx, fy}, label, muted, font});
+    hit = {fx + 90 * s, fy - 4 * s, col_w - 90 * s, (font + 10) * s};
     field_box(out, hit, editing ? shell.scene_buffer : value, editing, hint,
               font, s);
-    fy += hit.height + 8 * s;
+    fy += hit.height + 5 * s;
   };
   const auto fmt_pair = [](float a, float b) {
     return std::to_string(static_cast<int>(a)) + "," +
@@ -1222,6 +1243,12 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         std::to_string(shell.scene_doc.gravity),
         shell.editing_scene && shell.scene_field == 11,
         "scene px/s^2 - 0 disables");
+  field(shell.hit_scene_bg, "background",
+        std::to_string((int)shell.scene_doc.bg_r) + "," +
+            std::to_string((int)shell.scene_doc.bg_g) + "," +
+            std::to_string((int)shell.scene_doc.bg_b),
+        shell.editing_scene && shell.scene_field == 13,
+        "scene clear color r,g,b");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2068,6 +2095,11 @@ int main(int argc, char **argv) {
                     std::to_string(shell.scene_doc.gravity);
               else if (field == 12 && e)
                 shell.scene_buffer = e->solid ? "true" : "false";
+              else if (field == 13)
+                shell.scene_buffer =
+                    std::to_string((int)shell.scene_doc.bg_r) + "," +
+                    std::to_string((int)shell.scene_doc.bg_g) + "," +
+                    std::to_string((int)shell.scene_doc.bg_b);
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2095,6 +2127,8 @@ int main(int argc, char **argv) {
               edit_field(11);
             else if (shell.hit_scene_solid.contains(event.position))
               edit_field(12);
+            else if (shell.hit_scene_bg.contains(event.position))
+              edit_field(13);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);
