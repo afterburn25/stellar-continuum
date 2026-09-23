@@ -6312,6 +6312,8 @@ class NativeCampaign final {
     }
     if(general_settings_&&general_settings_->saved().high_contrast)
       stellar::native_ui::apply_high_contrast(out);
+    if(general_settings_&&general_settings_->saved().color_blind)
+      stellar::native_ui::apply_color_blind(out,static_cast<stellar::engine::ColorBlindMode>(general_settings_->saved().color_blind));
     return out;
   }
   [[nodiscard]] DrawList scene_content(int width,int height){

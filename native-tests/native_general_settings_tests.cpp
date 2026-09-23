@@ -6,6 +6,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -512,6 +513,34 @@ int main() {
       stellar::native_ui::apply_high_contrast(sample);
       require(sample.text.front().color.r>200,"High contrast pass left dim text dim");
       require(std::get_if<Text>(&sample.overlay.front())->color.r==230,"High contrast pass recolored bright text");
+    }
+    {
+      NativeGeneralSettings colorblind(temp.path/"colorblind.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      colorblind.open();click_button(colorblind,l.colorblind,"color-blind cycle");
+      click_button(colorblind,l.colorblind,"color-blind cycle to deuteranopia");
+      require(colorblind.draft().color_blind==2&&colorblind.saved().color_blind==0,"Color-blind clicks did not stay in draft");
+      click_button(colorblind,l.save,"save color-blind mode");
+      NativeGeneralSettings reloaded(temp.path/"colorblind.json");
+      require(reloaded.saved().color_blind==2,"Color-blind preference did not persist");
+      reloaded.open();click_button(reloaded,l.colorblind,"color-blind to tritanopia");
+      require(reloaded.draft().color_blind==3,"Color-blind cycle did not reach Tritanopia");
+      click_button(reloaded,l.colorblind,"color-blind wrap");
+      require(reloaded.draft().color_blind==0,"Color-blind cycle did not wrap to Off");
+      reloaded.cancel();
+      DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
+      require(find_text_label(draw,"Color-blind mode: Deuteranopia").value.size()>0,"Color-blind state was not rendered");
+      // Daltonization keeps red/green accents distinguishable: the lost
+      // red-green contrast lands in the blue channel a deuteranope sees.
+      DrawList pair;
+      pair.overlay.emplace_back(FilledRectangle{{0,0,10,10},Color{220,40,40,255}});
+      pair.overlay.emplace_back(FilledRectangle{{0,0,10,10},Color{40,180,60,255}});
+      stellar::native_ui::apply_color_blind(pair,stellar::engine::ColorBlindMode::Deuteranopia);
+      const auto* red=std::get_if<FilledRectangle>(&pair.overlay.front());
+      const auto* green=std::get_if<FilledRectangle>(&pair.overlay.back());
+      require(red&&green&&std::abs(int(red->color.b)-int(green->color.b))>40,"Color-blind pass left a confused red/green pair indistinguishable");
+      DrawList untouched;untouched.overlay.emplace_back(FilledRectangle{{0,0,10,10},Color{220,40,40,255}});
+      stellar::native_ui::apply_color_blind(untouched,stellar::engine::ColorBlindMode::None);
+      require(std::get_if<FilledRectangle>(&untouched.overlay.front())->color.r==220,"Color-blind None mode altered a color");
     }
     {
       // Localization: loaded keys override literals; missing keys fall back.

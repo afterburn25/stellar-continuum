@@ -1,8 +1,10 @@
 #pragma once
 
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/accessibility.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <utility>
@@ -10,15 +12,18 @@
 
 namespace stellar::native_ui {
 
+using native_map::Circle;
 using native_map::Color;
 using native_map::DrawList;
 using native_map::FilledRectangle;
+using native_map::Image;
 using native_map::FontFace;
 using native_map::Line;
 using native_map::Point;
 using native_map::StrokedRectangle;
 using native_map::Text;
 using native_map::TextAlign;
+using native_map::TriangleMesh;
 using native_map::UiRect;
 
 namespace color {
@@ -62,6 +67,50 @@ inline void apply_high_contrast(DrawList &draw) {
     if (auto *text = std::get_if<Text>(&command)) boost(text->color);
   for (auto &command : draw.world)
     if (auto *text = std::get_if<Text>(&command)) boost(text->color);
+}
+
+// Every color-bearing field a draw-command variant can hold. Shared by the
+// world and overlay variants; Scene3DView carries no CPU color to rewrite.
+template <typename Command, typename Fn>
+inline void for_each_command_color(Command &command, const Fn &fn) {
+  std::visit([&](auto &value) {
+    if constexpr (requires { value.color; }) fn(value.color);
+    else if constexpr (requires { value.tint; }) fn(value.tint);
+  }, command);
+}
+
+// Global color-blind pass over a finished DrawList: Machado et al. (2009)
+// severity-1 simulation matrices measure the contrast the deficiency loses,
+// then the standard error redistribution pushes it into the channels the
+// mode still perceives (blue + luminance) — semantic accent hues stay
+// distinguishable instead of merely being simulated away. Covers every
+// CPU-side surface (text, primitives, image tints, mesh tints); GPU-rendered
+// 3D scene content is out of scope until a post-process pass exists.
+inline void apply_color_blind(DrawList &draw, engine::ColorBlindMode mode) {
+  if (mode == engine::ColorBlindMode::None) return;
+  const float *m;
+  switch (mode) {
+  case engine::ColorBlindMode::Protanopia: {
+    static constexpr float matrix[]{.152286f,1.052583f,-.204868f,.114503f,.786281f,.099216f,-.003882f,-.048116f,1.051998f};
+    m=matrix;break; }
+  case engine::ColorBlindMode::Deuteranopia: {
+    static constexpr float matrix[]{.367322f,.860646f,-.227968f,.280085f,.672501f,.047413f,-.011820f,.042940f,.968881f};
+    m=matrix;break; }
+  default: {
+    static constexpr float matrix[]{1.255528f,-.076749f,-.178779f,-.078411f,.930809f,.147602f,.004733f,.691367f,.303900f};
+    m=matrix;break; }
+  }
+  const auto daltonize = [&](Color &c) {
+    const float r=static_cast<float>(c.r),g=static_cast<float>(c.g),b=static_cast<float>(c.b);
+    const float eg=g-(m[3]*r+m[4]*g+m[5]*b),eb=b-(m[6]*r+m[7]*g+m[8]*b);
+    const auto channel=[](float v){return static_cast<std::uint8_t>(std::clamp(std::lround(v),0l,255l));};
+    c.r=channel(r+.7f*eg+.7f*eb);c.g=channel(g+eg+.7f*eb);c.b=channel(b+.7f*eg+eb);
+  };
+  for (auto &line : draw.lines) daltonize(line.color);
+  for (auto &circle : draw.circles) daltonize(circle.color);
+  for (auto &text : draw.text) daltonize(text.color);
+  for (auto &command : draw.overlay) for_each_command_color(command,daltonize);
+  for (auto &command : draw.world) for_each_command_color(command,daltonize);
 }
 
 enum class Tone { Neutral, Selected, Success, Caution, Danger, Science, Economy, Construction, Diplomacy, Military, Unknown };
