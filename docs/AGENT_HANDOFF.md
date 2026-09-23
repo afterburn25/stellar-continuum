@@ -381,7 +381,11 @@ editor has no transform gizmos — see the registry record.
 **Recommended next workstream: the M11 render frontier.**
 The 2026-09-24 validation receipt records 294/294 native tests green on this
 branch — the failures in the 2026-09-20 receipt were resolved through the
-integration merge. Remaining deep work: SDL_GPU instanced rendering (requires
+integration merge. A 2026-09-23 supplement
+(`validation/2026-09-23-chronicle-suite.md`) records 295/295 runnable
+tests green at `d68c98af` after the chronicle/history increments; the
+15 `engine_shell_tool_*` smoke tests registered there need a desktop
+run (no display in that environment). Remaining deep work: SDL_GPU instanced rendering (requires
 a texture-array or bindless design before DrawBatcher batches pay off), an
 HDR/tonemap pass (first multi-pass consumer of RenderGraph + ShaderLibrary),
 and TextureStreamer residency wiring. The second frontier is an architecture
