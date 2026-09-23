@@ -84,6 +84,10 @@ struct UserData {
   // Freeform per-entity payload authored in the scene ("data" field).
   std::string value;
 };
+struct Opacity {
+  // Draw alpha multiplier 0-1.
+  float value{1.0f};
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

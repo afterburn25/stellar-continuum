@@ -643,8 +643,14 @@ int RuntimeHost::run() {
           rect.x + rect.width < 0 || rect.y + rect.height < 0 ||
           rect.x > w || rect.y > h)
         continue;
+      const auto *op = world.get<Opacity>(impl.entities[i]);
+      const auto alpha = static_cast<std::uint8_t>(
+          std::clamp(op ? op->value : 1.f, 0.f, 1.f) * 255.f);
       if (i < impl.sprites.size() && impl.sprites[i]) {
         Image img{impl.sprites[i], rect};
+        // The entity color tints the sprite (default white = unchanged);
+        // opacity modulates alpha.
+        img.tint = {tint->r, tint->g, tint->b, alpha};
         if (const auto *anim = world.get<Anim>(impl.entities[i]);
             anim != nullptr && anim->frames > 1) {
           // Horizontal strip: cell width = sprite width / frames, current
@@ -669,7 +675,7 @@ int RuntimeHost::run() {
         draw.overlay.push_back(std::move(img));
       } else {
         draw.overlay.push_back(
-            FilledRectangle{rect, {tint->r, tint->g, tint->b, 255}});
+            FilledRectangle{rect, {tint->r, tint->g, tint->b, alpha}});
       }
       if (const auto *label = world.get<Label>(impl.entities[i]);
           label != nullptr && !label->value.empty()) {
@@ -759,6 +765,8 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.snapshot_out = argv[++i];
     else if (arg == "--scene")
       impl_->options.scene_file = argv[++i];
+    else if (arg == "--save")
+      impl_->options.save_file = argv[++i];
     else if (arg == "--width")
       impl_->options.width = std::atoi(argv[++i]);
     else if (arg == "--height")

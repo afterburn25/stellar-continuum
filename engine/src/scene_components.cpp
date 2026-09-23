@@ -95,6 +95,8 @@ void register_scene_components(World &world) {
                                    decode_pod<Oneway>);
   world.register_component<UserData>("userdata", encode_user_data,
                                      decode_user_data);
+  world.register_component<Opacity>("opacity", encode_pod<Opacity>,
+                                    decode_pod<Opacity>);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -120,6 +122,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (!s.visible) world.add(entity, Hidden{});
     if (s.oneway) world.add(entity, Oneway{});
     if (!s.data.empty()) world.add(entity, UserData{s.data});
+    if (s.opacity != 1.f) world.add(entity, Opacity{s.opacity});
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
@@ -172,6 +175,7 @@ SceneDocument scene_from_world(const World &world) {
     s.visible = world.get<Hidden>(entity) == nullptr;
     s.oneway = world.get<Oneway>(entity) != nullptr;
     if (const auto *d = world.get<UserData>(entity)) s.data = d->value;
+    if (const auto *o = world.get<Opacity>(entity)) s.opacity = o->value;
     doc.entities.push_back(std::move(s));
   }
   return doc;

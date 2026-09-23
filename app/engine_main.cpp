@@ -199,7 +199,7 @@ struct Shell {
       hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
       hit_scene_flipx{}, hit_scene_flipy{}, hit_scene_visible{},
       hit_scene_oneway{}, hit_scene_up{}, hit_scene_down{},
-      hit_scene_data{},
+      hit_scene_data{}, hit_scene_opacity{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
@@ -1081,6 +1081,12 @@ void commit_scene_field(Shell &shell) {
   } else if (shell.scene_field == 22) {
     next.data = shell.scene_buffer;
     ok = true;
+  } else if (shell.scene_field == 23) {
+    try {
+      next.opacity = std::clamp(std::stof(shell.scene_buffer), 0.f, 1.f);
+      ok = true;
+    } catch (const std::exception &) {
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1130,7 +1136,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                                                     shell.hit_scene_up =
                                                         shell.hit_scene_down =
                                                             shell.hit_scene_data =
-                                                                {};
+                                                                shell.hit_scene_opacity =
+                                                                    {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1251,11 +1258,16 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
       img.rotation_degrees = e.rotation;
       img.flip_horizontal = e.flip_x;
       img.flip_vertical = e.flip_y;
-      if (!e.visible) img.tint = {255, 255, 255, 70};
+      const auto a = static_cast<std::uint8_t>(
+          std::clamp(e.opacity, 0.f, 1.f) * (e.visible ? 255.f : 70.f));
+      img.tint = {e.r, e.g, e.b, a};
       out.overlay.push_back(std::move(img));
     } else {
       out.overlay.push_back(FilledRectangle{
-          rect, {e.r, e.g, e.b, static_cast<std::uint8_t>(e.visible ? 200 : 60)}});
+          rect, {e.r, e.g, e.b,
+                 static_cast<std::uint8_t>(
+                     std::clamp(e.opacity, 0.f, 1.f) *
+                     (e.visible ? 200.f : 60.f))}});
     }
     if (!e.text.empty()) {
       const int font_px = std::max(8, (int)(rect.height * .5f));
@@ -1378,6 +1390,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? entity->data : "",
         shell.editing_scene && shell.scene_field == 22,
         "freeform game payload");
+  field(shell.hit_scene_opacity, "opacity",
+        entity ? std::to_string(entity->opacity) : "",
+        shell.editing_scene && shell.scene_field == 23,
+        "0-1 draw alpha");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2247,6 +2263,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = e->oneway ? "true" : "false";
               else if (field == 22 && e)
                 shell.scene_buffer = e->data;
+              else if (field == 23 && e)
+                shell.scene_buffer = std::to_string(e->opacity);
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2294,6 +2312,8 @@ int main(int argc, char **argv) {
               edit_field(21);
             else if (shell.hit_scene_data.contains(event.position))
               edit_field(22);
+            else if (shell.hit_scene_opacity.contains(event.position))
+              edit_field(23);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

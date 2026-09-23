@@ -59,6 +59,8 @@ struct SceneEntity {
   // Freeform game data — spawn tags, patrol notes, door ids. The engine
   // carries it verbatim; games interpret it via the UserData component.
   std::string data;
+  // Draw opacity 0-1 — sprites tint-modulate, rects use it directly.
+  float opacity{1.0f};
 };
 
 struct SceneDocument {

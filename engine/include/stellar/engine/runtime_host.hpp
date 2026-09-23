@@ -149,8 +149,8 @@ public:
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /
   // `--scene <path>` / `--width` / `--height` / `--fullscreen` /
-  // `--world-w` / `--world-h` / `--speed` / `--move-speed` / `--jump`
-  // overrides.
+  // `--world-w` / `--world-h` / `--speed` / `--move-speed` / `--jump` /
+  // `--save <path>` overrides.
   int run();
   int run(int argc, char **argv);
 

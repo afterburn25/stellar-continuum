@@ -225,6 +225,7 @@ int main() {
         hero.visible = false;
         hero.oneway = true;
         hero.data = "checkpoint-7";
+        hero.opacity = 0.5f;
         SceneDocument doc{{hero, SceneEntity{"rock", 200.f, 100.f}}};
         World world;
         register_scene_components(world);
@@ -278,6 +279,10 @@ int main() {
                   world.get<UserData>(spawned[0])->value == "checkpoint-7" &&
                   world.get<UserData>(spawned[1]) == nullptr,
               "spawn_scene user data");
+        check(world.get<Opacity>(spawned[0]) &&
+                  world.get<Opacity>(spawned[0])->value == 0.5f &&
+                  world.get<Opacity>(spawned[1]) == nullptr,
+              "spawn_scene opacity");
         check(world.get<SpriteRef>(spawned[1]) == nullptr,
               "empty sprite leaves no SpriteRef");
 
@@ -313,7 +318,8 @@ int main() {
                   ex_player->rotation == 45.f && ex_player->ttl == 2.5f &&
                   ex_player->flip_x && !ex_player->flip_y &&
                   !ex_player->visible && ex_player->oneway &&
-                  ex_player->data == "checkpoint-7",
+                  ex_player->data == "checkpoint-7" &&
+                  ex_player->opacity == 0.5f,
               "scene_from_world round-trips fields");
 
         // Failure paths: absent and corrupt files return false, world intact.
