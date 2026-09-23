@@ -51,6 +51,8 @@ struct SceneEntity {
   // Mirror the sprite horizontally/vertically (sprites only).
   bool flip_x{false};
   bool flip_y{false};
+  // Invisible entities simulate and collide normally but are not drawn.
+  bool visible{true};
 };
 
 struct SceneDocument {

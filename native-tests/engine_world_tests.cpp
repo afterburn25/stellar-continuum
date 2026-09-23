@@ -222,6 +222,7 @@ int main() {
         hero.rotation = 45.f;
         hero.ttl = 2.5f;
         hero.flip_x = true;
+        hero.visible = false;
         SceneDocument doc{{hero, SceneEntity{"rock", 200.f, 100.f}}};
         World world;
         register_scene_components(world);
@@ -265,6 +266,9 @@ int main() {
                   !world.get<Flip>(spawned[0])->y &&
                   world.get<Flip>(spawned[1]) == nullptr,
               "spawn_scene flip");
+        check(world.get<Hidden>(spawned[0]) != nullptr &&
+                  world.get<Hidden>(spawned[1]) == nullptr,
+              "spawn_scene hidden flag");
         check(world.get<SpriteRef>(spawned[1]) == nullptr,
               "empty sprite leaves no SpriteRef");
 
@@ -298,7 +302,8 @@ int main() {
                   ex_player->gravity_scale == 0.0f && ex_player->solid &&
                   ex_player->frames == 4 && ex_player->fps == 6.f &&
                   ex_player->rotation == 45.f && ex_player->ttl == 2.5f &&
-                  ex_player->flip_x && !ex_player->flip_y,
+                  ex_player->flip_x && !ex_player->flip_y &&
+                  !ex_player->visible,
               "scene_from_world round-trips fields");
 
         // Failure paths: absent and corrupt files return false, world intact.

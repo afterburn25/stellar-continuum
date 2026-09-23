@@ -81,6 +81,8 @@ void register_scene_components(World &world) {
                                      decode_pod<Lifetime>);
   world.register_component<Flip>("flip", encode_pod<Flip>,
                                  decode_pod<Flip>);
+  world.register_component<Hidden>("hidden", encode_pod<Hidden>,
+                                   decode_pod<Hidden>);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -103,6 +105,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (s.rotation != 0.f) world.add(entity, Rotation{s.rotation});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
     if (s.flip_x || s.flip_y) world.add(entity, Flip{s.flip_x, s.flip_y});
+    if (!s.visible) world.add(entity, Hidden{});
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
@@ -152,6 +155,7 @@ SceneDocument scene_from_world(const World &world) {
       s.flip_x = fl->x;
       s.flip_y = fl->y;
     }
+    s.visible = world.get<Hidden>(entity) == nullptr;
     doc.entities.push_back(std::move(s));
   }
   return doc;

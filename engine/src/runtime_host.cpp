@@ -537,8 +537,10 @@ int RuntimeHost::run() {
       const UiRect rect{(t->x - impl.cam_x * parallax) * impl.cam_zoom,
                         (t->y - impl.cam_y * parallax) * impl.cam_zoom,
                         ext->w * impl.cam_zoom, ext->h * impl.cam_zoom};
-      // View culling: skip entities fully outside the window.
-      if (rect.x + rect.width < 0 || rect.y + rect.height < 0 ||
+      // View culling: skip entities fully outside the window, and
+      // Hidden-marked entities entirely (they still simulate/collide).
+      if (world.get<Hidden>(impl.entities[i]) != nullptr ||
+          rect.x + rect.width < 0 || rect.y + rect.height < 0 ||
           rect.x > w || rect.y > h)
         continue;
       if (i < impl.sprites.size() && impl.sprites[i]) {

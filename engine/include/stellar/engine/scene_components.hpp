@@ -74,6 +74,9 @@ struct Flip {
   bool x{false};
   bool y{false};
 };
+struct Hidden {
+  // Marker: entity simulates and collides but is skipped by the renderer.
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

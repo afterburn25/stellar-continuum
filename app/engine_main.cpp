@@ -197,7 +197,7 @@ struct Shell {
       hit_scene_size{}, hit_scene_color{}, hit_scene_layer{},
       hit_scene_parallax{}, hit_scene_text{}, hit_scene_grav{},
       hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
-      hit_scene_flipx{}, hit_scene_flipy{},
+      hit_scene_flipx{}, hit_scene_flipy{}, hit_scene_visible{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
@@ -1053,7 +1053,8 @@ void commit_scene_field(Shell &shell) {
       ok = true;
     } catch (const std::exception &) {
     }
-  } else if (shell.scene_field == 18 || shell.scene_field == 19) {
+  } else if (shell.scene_field == 18 || shell.scene_field == 19 ||
+             shell.scene_field == 20) {
     const auto b = shell.scene_buffer;
     bool value;
     if (b == "1" || b == "true" || b == "yes") {
@@ -1068,8 +1069,10 @@ void commit_scene_field(Shell &shell) {
     if (ok) {
       if (shell.scene_field == 18)
         next.flip_x = value;
-      else
+      else if (shell.scene_field == 19)
         next.flip_y = value;
+      else
+        next.visible = value;
     }
   }
   if (ok) {
@@ -1114,7 +1117,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                             shell.hit_scene_frames = shell.hit_scene_fps =
                                 shell.hit_scene_rot = shell.hit_scene_ttl =
                                     shell.hit_scene_flipx =
-                                        shell.hit_scene_flipy = {};
+                                        shell.hit_scene_flipy =
+                                            shell.hit_scene_visible = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1188,6 +1192,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
            255}});
   out.overlay.push_back(StrokedRectangle{pv, panel_edge});
   const float sx = pv.width / 1280.f, sy = pv.height / 720.f;
+  const auto preview_now = std::chrono::duration<float>(
+      std::chrono::steady_clock::now().time_since_epoch())
+                               .count();
   for (const auto i : scene_draw_order(shell.scene_doc)) {
     const auto &e = shell.scene_doc.entities[i];
     const UiRect rect{pv.x + e.x * sx, pv.y + e.y * sy, e.w * sx, e.h * sy};
@@ -1208,10 +1215,27 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         shell.scene_sprites[key] = sprite;
       }
     }
-    if (sprite)
-      out.overlay.push_back(Image{sprite, rect});
-    else
-      out.overlay.push_back(FilledRectangle{rect, {e.r, e.g, e.b, 200}});
+    if (sprite) {
+      Image img{sprite, rect};
+      if (e.frames > 1) {
+        const float cell_w =
+            static_cast<float>(sprite->width()) / e.frames;
+        const int frame = e.fps > 0.f
+                              ? static_cast<int>(preview_now * e.fps) %
+                                    e.frames
+                              : 0;
+        img.source = UiRect{frame * cell_w, 0.f, cell_w,
+                            static_cast<float>(sprite->height())};
+      }
+      img.rotation_degrees = e.rotation;
+      img.flip_horizontal = e.flip_x;
+      img.flip_vertical = e.flip_y;
+      if (!e.visible) img.tint = {255, 255, 255, 70};
+      out.overlay.push_back(std::move(img));
+    } else {
+      out.overlay.push_back(FilledRectangle{
+          rect, {e.r, e.g, e.b, static_cast<std::uint8_t>(e.visible ? 200 : 60)}});
+    }
     if (!e.text.empty()) {
       const int font_px = std::max(8, (int)(rect.height * .5f));
       out.overlay.push_back(Text{
@@ -1321,6 +1345,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? (entity->flip_y ? "true" : "false") : "",
         shell.editing_scene && shell.scene_field == 19,
         "mirror sprite vertically");
+  field(shell.hit_scene_visible, "visible",
+        entity ? (entity->visible ? "true" : "false") : "",
+        shell.editing_scene && shell.scene_field == 20,
+        "false simulates but hides");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2184,6 +2212,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = e->flip_x ? "true" : "false";
               else if (field == 19 && e)
                 shell.scene_buffer = e->flip_y ? "true" : "false";
+              else if (field == 20 && e)
+                shell.scene_buffer = e->visible ? "true" : "false";
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2225,6 +2255,8 @@ int main(int argc, char **argv) {
               edit_field(18);
             else if (shell.hit_scene_flipy.contains(event.position))
               edit_field(19);
+            else if (shell.hit_scene_visible.contains(event.position))
+              edit_field(20);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);
