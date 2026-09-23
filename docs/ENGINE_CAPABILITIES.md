@@ -62,6 +62,34 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Colony/settlement structural framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 4 — the reusable
+  substrate a settlement is built from (districts host structures;
+  structures draw utilities, offer jobs/housing, consume inputs and
+  produce outputs). See [COLONY_FRAMEWORK.md](COLONY_FRAMEWORK.md).
+- **Engine APIs/ownership:** `DistrictSpec`/`StructureSpec` (data-driven
+  templates: slots, build cost/time, utility demand+supply, upkeep,
+  inputs/outputs per day, jobs, housing, condition decay/repair,
+  `required_tags`); `Colony` (caller-supplied instance ids, district
+  slot enforcement, construction inside `advance`, shared utility
+  satisfaction pools, uniform workforce scaling, `Inventory`-backed
+  upkeep/input draws and output depositing, condition decay/repair,
+  district gating of hosted structures). `ColonyDelta` reports jobs,
+  housing, outputs, shortfalls, utility balance and completions.
+- **Consumers/tests:** `colony` tests — spec validation, district slots,
+  requirement tags, construction timing, utility/workforce/input gating,
+  condition repair, bit-equal determinism, 1000-colony × 30-tick scale
+  (~4µs per colony-tick). Core `Colony`/`surface_economy` remain
+  authoritative; adoption pending.
+- **Save/performance impact:** specs and instances are plain data with
+  caller-supplied ids — serialize directly; per-advance cost is
+  structures × elapsed-steps with two sorted passes.
+- **Limitations:** utility supply ignores `operating` (no supply →
+  operating circularity; disable structures to cut supply); mid-step
+  completions produce for the whole step; no spatial adjacency or
+  upgrade chains; workforce is one undifferentiated pool.
+
 ## Population cohort framework (2026-09-23)
 
 - **Purpose:** space-strategy specialization milestone 3 — aggregate

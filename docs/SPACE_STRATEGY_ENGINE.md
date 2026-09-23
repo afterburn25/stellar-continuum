@@ -67,9 +67,9 @@ character fidelity.
 | # | Milestone | Status | Notes |
 | --- | --- | --- | --- |
 | 1 | Simulation scheduler + simulation LOD | PARTIAL → IMPLEMENTED (engine layer) | `SimulationScheduler` (tier cadence) + `SimulationExecutor` (tasks, dependencies, wakeups, budgets, JobSystem waves, per-domain stats). `simulation_scale_250…5000` benchmarks. Core/game adoption is the remaining work. See [SIMULATION_LOD.md](SIMULATION_LOD.md). |
-| 2 | Generic resource + economy framework | PARTIAL | `resource_economy.cpp` substrate exists (definitions, inventories, recipes, producers, transfer orders, shortages); needs metadata breadth, graph diagnostics, validation, editor. |
-| 3 | Population framework | PLANNED | Cohort/aggregate model; births/deaths/migration/employment; 10k–10M+ benchmark. |
-| 4 | Colony/city framework | PLANNED | Districts/structures/utilities/storage/construction/services; reusable definitions. |
+| 2 | Generic resource + economy framework | IMPLEMENTED (engine layer) | `EconomyCatalog`/`EconomyGraph`/`analyze_economy` over `ResourceNetwork`: validated specs, dependency queries, bottleneck diagnostics, `to_runtime_recipe` bridge. Core catalog adoption pending. See [ECONOMY_FRAMEWORK.md](ECONOMY_FRAMEWORK.md). |
+| 3 | Population framework | IMPLEMENTED (engine layer) | `Population` cohort model: demographics, mortality/fertility attribution, aging, employment, education migration, explicit emigrant slices; 17M-headcount scale test. Colony consumption pending. See [POPULATION_FRAMEWORK.md](POPULATION_FRAMEWORK.md). |
+| 4 | Colony/city framework | IMPLEMENTED (engine layer) | `Colony` districts/structures/utilities: slot-bounded construction, shared utility pools, workforce scaling, upkeep/input draws, condition repair; 1000-colony scale test. Core `Colony` adoption pending. See [COLONY_FRAMEWORK.md](COLONY_FRAMEWORK.md). |
 | 5 | Infrastructure networks | PLANNED | Power/water/logistics graphs; dirty updates, component caching, flow diagnostics. |
 | 6 | Strategic logistics | PLANNED | Freight routes/convoys/capacity; adapters onto Core lanes/reach/freight. |
 | 7 | Planetary development model | PLANNED | Adapters around authoritative Core planet state; habitability queries. |

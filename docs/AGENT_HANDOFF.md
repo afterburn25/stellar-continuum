@@ -107,9 +107,20 @@ level: `EconomyCatalog`/`EconomyGraph`/`analyze_economy`
 (economy_catalog.hpp) add validated `ResourceSpec`/`RecipeSpec`
 definitions, dependency-graph queries and bottleneck/reserve/import
 diagnostics, bridged to runtime via `to_runtime_recipe` — see
-[ECONOMY_FRAMEWORK.md](ECONOMY_FRAMEWORK.md). Next: Milestone 3
-(population cohort framework), then colony/infrastructure/logistics;
-adopt the executor for real Core/game phases when consuming these.
+[ECONOMY_FRAMEWORK.md](ECONOMY_FRAMEWORK.md). Milestone 1's persistence
+completion added `capture_state`/`restore_state` to both scheduler and
+executor (exact tick/timer round-trip, pending dirty/wake sets, pause;
+callbacks re-register after load — `simulation_persistence` tests).
+Milestone 3 landed: `Population` cohort demographics (population.hpp) —
+attributed births/deaths, aging, employment, education, explicit
+migration slices; ~38M-headcount scale test — see
+[POPULATION_FRAMEWORK.md](POPULATION_FRAMEWORK.md). Milestone 4 landed:
+`Colony` settlement substrate (colony.hpp) — DistrictSpec/StructureSpec
+templates, slot-bounded construction, shared utility pools, workforce
+scaling, upkeep/input draws, condition repair — see
+[COLONY_FRAMEWORK.md](COLONY_FRAMEWORK.md). Next: Milestone 5
+(infrastructure networks), then strategic logistics; adopt the executor
+for real Core/game phases when consuming these.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
