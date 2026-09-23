@@ -429,7 +429,10 @@ pass landed: RGBA16F scene targets + fullscreen resolve with a knee+headroom
 curve, capability-checked with UNORM fallback; the embedded-shader pipeline
 was regenerated with a verified glslang 16.6.0 toolchain (byte-identical
 scene3d output; `tools/compile_scene3d_shaders.py` now covers all shader
-pairs). The second frontier is an architecture
+pairs). A parallel-lane fix landed in `GalaxyMap::route_length_light_years`:
+Dijkstra relaxes each lane independently, so the edge a route uses is the
+cheapest connecting lane — the length helper now sums the minimum rather
+than the first lane id (test: parallel lanes of 9/2 ly report 2). The second frontier is an architecture
 decision: authoritative Core adoption of the economy-catalog/colony/logistics/
 population/strategic-AI frameworks — Core consumption today is read-only
 projection adapters (the safe pattern; replacing bespoke Core systems wholesale
