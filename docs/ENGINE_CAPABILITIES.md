@@ -715,6 +715,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   building `condition`/`stored_power_days`, and economy
   `operating_arrears` so such corruption is caught as a Critical
   invariant finding instead of escaping the operations pass.
+  The same hardening applies to the reference surface the
+  authoritative queries validate: the orphaned-body check is now
+  system-scoped (a body id that exists in another system is still
+  unresolvable for the colony), populated colonies flag
+  `unknown_species`, surface buildings flag `unknown_building_type`,
+  and negative colony ids flag `invalid_nonnegative_value`. Every
+  throwing call in the operations pass (sustenance analysis, the
+  logistics snapshot/coverage/home-network queries, the population
+  projection) is now wrapped so a corrupt colony or duplicate-id
+  skip degrades to "invariant finding + skipped entity" instead of
+  discarding the entire pass's findings — the monitor collects
+  invariants and operations in one batch, so an escape previously
+  lost both.
   `campaign_colony_projection`
   tests — spec synthesis, flag fidelity, remaining-industry accounting,
   powered-set operating flags, unknown-type fallback, hub-less capacity

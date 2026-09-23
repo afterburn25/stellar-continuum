@@ -321,21 +321,41 @@ int main() {
 
     auto bad = make_colony(30, 1);
     bad.stability = -1.0;
+    bad.population_species_id = "voidborne"; // uncatalogued
+    bad.planetary_body_id = 9; // body 9 exists but lives in system 8
     bad.surface_buildings = {
-        building(1, "power_generator", true, true, /*condition=*/-0.5)};
+        building(1, "power_generator", true, true, /*condition=*/-0.5),
+        building(2, "xeno_relic")}; // uncatalogued type
     world.colonies.push_back(bad);
+    PlanetaryBody foreign;
+    foreign.id = 9;
+    foreign.system_id = 8;
+    foreign.radius_earth = 1.0;
+    foreign.mass_earth = 1.0;
+    world.bodies.push_back(foreign);
     CivilizationEconomy broken;
     broken.civilization_id = 1;
     broken.operating_arrears = -3.0;
     world.economies.push_back(broken);
+    ConstructionState con;
+    con.civilization_id = 1;
+    world.construction.push_back(con);
 
     const auto findings = inspect_campaign_invariants(world, 0, 100.0);
-    int invalid = 0;
-    for (const auto &finding : findings)
+    int invalid = 0, species = 0, type = 0, orphan = 0;
+    for (const auto &finding : findings) {
       if (finding.event_type == "invalid_nonnegative_value") ++invalid;
+      else if (finding.event_type == "unknown_species") ++species;
+      else if (finding.event_type == "unknown_building_type") ++type;
+      else if (finding.event_type == "orphaned_colony") ++orphan;
+    }
     check(invalid == 3,
           "stability, condition and arrears each flag invalid values");
-    // The ops pass skips the corrupt economy rather than throwing.
+    check(species == 1 && type == 1 && orphan == 1,
+          "uncatalogued species/type and cross-system body are flagged");
+    // The ops pass skips the corrupt colony/economy rather than
+    // throwing — before the guards, the unknown species and building
+    // type escaped the whole pass.
     (void)inspect_campaign_operations(world, 0, 100.0);
   }
 

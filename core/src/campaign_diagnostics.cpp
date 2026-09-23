@@ -1,6 +1,7 @@
 #include <stellar/core/campaign_diagnostics.hpp>
 #include <stellar/core/campaign_calendar.hpp>
 #include <stellar/core/campaign_colony_projection.hpp>
+#include <stellar/core/colony_biology.hpp>
 #include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/campaign_economy_projection.hpp>
 #include <stellar/core/campaign_logistics_projection.hpp>
@@ -16,6 +17,7 @@
 #include <stellar/engine/strategic_ai.hpp>
 #include <cmath>
 #include <cstdio>
+#include <exception>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -45,8 +47,13 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
     for(const auto &colony:world.colonies){
       if(records.size()>=maximum)break;
       if(colony.kind!=SettlementKind::Colony)continue;
-      for(const auto &d:analyze_colony_sustenance(
-             colony,sustenance_index.bodies_for(colony),30.0,catalog)){
+      // The authoritative queries refuse corrupt colonies (uncatalogued
+      // building types, unresolved bodies, negative ids) — invariants
+      // report them; skip rather than fail the whole pass.
+      std::vector<engine::EconomyDiagnostic> demands;
+      try{demands=analyze_colony_sustenance(colony,sustenance_index.bodies_for(colony),30.0,catalog);}
+      catch(const std::exception&){continue;}
+      for(const auto &d:demands){
         if(!d.bottleneck)continue;
         if(records.size()>=maximum)break;
         DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="colony";
@@ -195,7 +202,11 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       const auto has_construction=std::any_of(econ_construction.begin(),econ_construction.end(),
           [&](const auto &s){return s.civilization_id==civ.id;});
       if(!has_economy||!has_construction)continue;
-      const auto snapshot=economy_logistics(econ,world.colonies,world.economies,civ.id);
+      // Snapshot assembly also refuses duplicate colony ids — an
+      // invariant finding; skip the civ rather than fail the pass.
+      CivilizationLogisticsSnapshot snapshot;
+      try{snapshot=economy_logistics(econ,world.colonies,world.economies,civ.id);}
+      catch(const std::exception&){continue;}
       for(const auto &colony:snapshot.colonies){
         if(records.size()>=maximum)break;
         if(colony.condition==SupplyCondition::Healthy)continue;
@@ -256,7 +267,9 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       const auto has_external=std::any_of(world.colonies.begin(),world.colonies.end(),
           [&](const auto &c){return c.civilization_id==civ.id&&c.system_id!=civ.home_system_id;});
       if(records.size()<maximum&&has_external){
-        const auto coverage=civilization_logistics_coverage(econ,world.colonies,world.economies,civ.id);
+        CivilizationLogisticsCoverage coverage;
+        try{coverage=civilization_logistics_coverage(econ,world.colonies,world.economies,civ.id);}
+        catch(const std::exception&){coverage={};}
         if(coverage.has_unrepresented_interstellar_support_gap){
           DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="logistics";
           r.event_type="freight_corridor_gap";r.severity=DiagnosticSeverity::Warning;
@@ -278,7 +291,9 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       // is projected from the same authoritative home_system_logistics
       // the workspace consumes; nothing is re-derived here.
       if(records.size()<maximum){
-        const auto home=home_system_logistics(econ,world.colonies,world.economies,civ.id);
+        HomeSystemLogisticsNetwork home;
+        try{home=home_system_logistics(econ,world.colonies,world.economies,civ.id);}
+        catch(const std::exception&){home={};}
         const auto projected=project_home_logistics_network(home);
         for(const auto& [route_id,utilization]:projected.route_utilization()){
           if(records.size()>=maximum)break;
@@ -317,8 +332,13 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
         for(const auto &colony:world.colonies){
           if(records.size()>=maximum)break;
           if(colony.civilization_id!=civ.id||colony.kind!=SettlementKind::Colony)continue;
-          const auto projected=project_colony_population(
-              colony,population_index.bodies_for(colony),30.0,automation);
+          // The projection refuses corrupt colonies (uncatalogued
+          // species/building types, unresolved bodies, negative ids) —
+          // invariants report them; skip rather than fail the pass.
+          ColonyPopulationProjection projected;
+          try{projected=project_colony_population(
+              colony,population_index.bodies_for(colony),30.0,automation);}
+          catch(const std::exception&){continue;}
           const double pressure=projected.population.migration_pressure(
               projected.cohort,projected.conditions);
           if(pressure<0.10)continue;
@@ -426,6 +446,17 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   const auto positive=[&](double value,std::string_view name,int id,std::string_view subsystem){
     if(!std::isfinite(value)||value< -1e-6)emit(std::string(subsystem),"invalid_nonnegative_value",id,std::string(name)+" is non-finite or negative.");
   };
+  // Reference lookups the operations pass relies on: bodies keyed by
+  // (system,id) — a body that exists in another system is still
+  // unresolvable for the colony — plus catalogued building types and
+  // species so the checks below flag what the ops pass must skip.
+  std::unordered_set<std::uint64_t> body_keys;body_keys.reserve(w.bodies.size());
+  for(const auto &b:w.bodies)
+    body_keys.insert((std::uint64_t{static_cast<std::uint32_t>(b.system_id)}<<32)|
+                     static_cast<std::uint32_t>(b.id));
+  std::unordered_set<std::string_view> known_types,known_species;
+  for(const auto &d:surface_building_catalog())known_types.insert(d.id);
+  for(const auto &p:species_biology_profiles())known_species.insert(p.id);
   for(const auto &s:w.systems)if(!std::isfinite(s.position.x)||!std::isfinite(s.position.y)||
       (s.position.depth_light_years&&!std::isfinite(*s.position.depth_light_years)))
     emit("galaxy","invalid_position",s.id,"System position is not finite.");
@@ -436,7 +467,12 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   }
   for(const auto &c:w.colonies){
     if(!systems.contains(c.system_id)||!civilizations.contains(c.civilization_id)||
-        (c.planetary_body_id&&!bodies.contains(*c.planetary_body_id)))emit("colony","orphaned_colony",c.id,"Colony has an absent owner, system or body.");
+        (c.planetary_body_id&&!body_keys.contains((std::uint64_t{static_cast<std::uint32_t>(c.system_id)}<<32)|
+                                                 static_cast<std::uint32_t>(*c.planetary_body_id))))
+      emit("colony","orphaned_colony",c.id,"Colony has an absent owner, system or body.");
+    if(c.id<0)emit("colony","invalid_nonnegative_value",c.id,"Colony ID is negative.");
+    if(c.population_millions>0.0&&!known_species.contains(c.population_species_id))
+      emit("colony","unknown_species",c.id,"Populated colony references an uncatalogued species.");
     positive(c.population_millions,"Population",c.id,"colony");positive(c.infrastructure,"Infrastructure",c.id,"colony");
     positive(c.stability,"Stability",c.id,"colony");
     positive(c.stored_food_population_days_millions,"Food reserve",c.id,"colony");
@@ -446,6 +482,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     for(const auto &b:c.surface_buildings){positive(b.industry_progress,"Building progress",b.id,"construction");
       positive(b.condition,"Building condition",b.id,"construction");
       positive(b.stored_power_days,"Building power reserve",b.id,"construction");
+      if(!known_types.contains(b.type_id))emit("construction","unknown_building_type",b.id,"Surface building has an uncatalogued type.");
       if(!std::isfinite(b.x)||!std::isfinite(b.z))emit("construction","invalid_position",b.id,"Surface building position is not finite.");}
   }
   for(const auto &e:w.economies){
