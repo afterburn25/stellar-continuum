@@ -200,9 +200,11 @@ struct Editor {
   std::size_t selected{static_cast<std::size_t>(-1)};
   std::size_t selected_body{static_cast<std::size_t>(-1)}; // index into bodies
   WorkspaceView view{WorkspaceView::Galaxy};
-  // System-view camera: AU coordinates -> drawable pixels.
+  // System-view camera: AU coordinates -> drawable pixels; day scrubber
+  // drives analytic positions deterministically.
   Point sys_camera{0, 0};
   float sys_ppa{48.f};
+  double system_days{};
   engine::VirtualizedList system_list;
   std::vector<std::size_t> filtered;
 
@@ -816,7 +818,7 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
     return;
   }
   const auto &sys = ed.systems[ed.selected];
-  const auto hosts = core::stellar_positions(sys, 0.0);
+  const auto hosts = core::stellar_positions(sys, ed.system_days);
 
   // Companion relative orbits: inner pair around the AB barycentre, outer
   // around the system barycentre.
@@ -864,7 +866,8 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
           orbit_ring(out, ed, core::planetary_stellar_orbit(sys, body), hc[0],
                      hc[1], {60, 100, 122, 120});
         }
-        const auto bp = core::stellar_planet_position(sys, body, 0.0);
+        const auto bp =
+            core::stellar_planet_position(sys, body, ed.system_days);
         const auto p = system_to_screen(ed, bp[0], bp[1]);
         if (!v.contains(p)) continue;
         const bool in_hz =
@@ -904,6 +907,10 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
                static_cast<int>(12 * s), 0, v});
   }
   out.overlay.push_back(StrokedRectangle{v, panel_edge});
+  out.text.push_back(
+      Text{{v.x + 10 * s, v.y + 8 * s},
+           "day " + fspec("%.0f", ed.system_days), accent,
+           static_cast<int>(13 * s), 0, v});
 }
 
 // Runs the same world-assembly pipeline as fresh campaign generation —
@@ -1090,6 +1097,56 @@ int main(int argc, char **argv) {
             continue;
           }
         }
+        // Keyboard navigation: arrows scrub analytic time in the system
+        // workspace and move selection through the filtered list otherwise.
+        if (event.type == InputEventType::KeyPressed &&
+            ed.editing == Field::None) {
+          constexpr std::uint32_t key_left = 0x40000050,
+                                  key_right = 0x4000004f,
+                                  key_up = 0x40000052,
+                                  key_down = 0x40000051,
+                                  key_pageup = 0x4000004b,
+                                  key_pagedown = 0x4000004e,
+                                  key_home = 0x4000004a;
+          if (ed.view == WorkspaceView::System) {
+            if (event.key == key_left || event.key == key_right) {
+              ed.system_days =
+                  std::max(0.0, ed.system_days +
+                                    (event.key == key_right ? 1.0 : -1.0) *
+                                        (event.shift ? 10.0 : 1.0));
+              continue;
+            }
+            if (event.key == key_pageup || event.key == key_pagedown) {
+              ed.system_days =
+                  std::max(0.0, ed.system_days +
+                                    (event.key == key_pagedown ? 30.0
+                                                               : -30.0));
+              continue;
+            }
+            if (event.key == key_home) {
+              ed.system_days = 0;
+              continue;
+            }
+          } else if ((event.key == key_up || event.key == key_down) &&
+                     !ed.filtered.empty()) {
+            std::size_t pos = ed.filtered.size();
+            for (std::size_t i = 0; i < ed.filtered.size(); ++i)
+              if (ed.filtered[i] == ed.selected) pos = i;
+            if (event.key == key_down)
+              pos = pos >= ed.filtered.size() ? 0
+                                              : std::min(pos + 1,
+                                                         ed.filtered.size() - 1);
+            else
+              pos = pos == 0 || pos >= ed.filtered.size()
+                        ? ed.filtered.size() - 1
+                        : pos - 1;
+            ed.selected = ed.filtered[pos];
+            ed.selected_body = static_cast<std::size_t>(-1);
+            ed.system_list.ensure_visible(pos);
+            rebuild_detail_rows(ed);
+            continue;
+          }
+        }
         if (event.type == InputEventType::LeftPressed) {
           // Commit whatever field was being edited before handling the click,
           // so switching fields never silently drops the buffer.
@@ -1189,7 +1246,7 @@ int main(int argc, char **argv) {
                 for (const auto body_index : it->second) {
                   try {
                     const auto bp = core::stellar_planet_position(
-                        sys, ed.bodies[body_index], 0.0);
+                        sys, ed.bodies[body_index], ed.system_days);
                     const auto p = system_to_screen(ed, bp[0], bp[1]);
                     const float d = std::hypot(p.x - event.position.x,
                                                p.y - event.position.y);
@@ -1368,7 +1425,12 @@ int main(int argc, char **argv) {
       render_system_list(draw, ed, s);
       draw.text.push_back(
           Text{{ed.viewport.x + 6 * s, ed.viewport.y + ed.viewport.height - 22 * s},
-               ed.status + "  |  drag to pan, wheel to zoom, click to select",
+               ed.status +
+                   (ed.view == WorkspaceView::System
+                        ? "  |  drag pan, wheel zoom, click body, "
+                              "left/right +/-1d, pgup/pgdn +/-30d, home reset, esc galaxy"
+                        : "  |  drag to pan, wheel to zoom, click to select, "
+                              "up/down moves selection"),
                muted, static_cast<int>(12 * s), 0, ed.viewport});
       profiler.set_gauge("editor.systems",
                          static_cast<double>(ed.systems.size()));
