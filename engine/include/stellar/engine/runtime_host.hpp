@@ -100,6 +100,10 @@ public:
   // world().get<Tilemap>(...) for destructible terrain — it snapshots with
   // F5/F9 quicksaves and hot-reloads with the scene document.
   [[nodiscard]] std::optional<EntityId> tilemap_entity() const;
+  // World-space cell queries: tile value under a point (-1 = empty or no
+  // tilemap), and write the cell under a point (false out of bounds).
+  [[nodiscard]] int tile_at(float world_x, float world_y) const;
+  bool set_tile_at(float world_x, float world_y, int value);
   // The deterministic particle system — games define() emitters then
   // spawn_emitter() to run them; the host steps it in sim time and
   // renders particles as tinted rects above the scene.
@@ -129,6 +133,9 @@ public:
   // (world_pos - camera) * zoom. A platformer follows its player by calling
   // this from on_update. Zoom 1 is the identity view; the built-in HUD text
   // stays screen-space.
+  // When true, set_camera clamps to the resolved world bounds so the view
+  // never scrolls past the level edges.
+  bool clamp_camera{false};
   void set_camera(float x, float y, float zoom = 1.0f);
   [[nodiscard]] float camera_x() const;
   [[nodiscard]] float camera_y() const;

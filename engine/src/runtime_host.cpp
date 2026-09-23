@@ -98,6 +98,29 @@ InputMapper &RuntimeHost::input() { return impl_->input; }
 std::optional<EntityId> RuntimeHost::tilemap_entity() const {
   return impl_->tilemap_e;
 }
+int RuntimeHost::tile_at(float world_x, float world_y) const {
+  const auto *tm = impl_->tilemap();
+  if (!tm || tm->tile_w <= 0 || tm->tile_h <= 0 || tm->columns <= 0)
+    return -1;
+  const int cx = static_cast<int>(std::floor(world_x / tm->tile_w));
+  const int cy = static_cast<int>(std::floor(world_y / tm->tile_h));
+  if (cx < 0 || cy < 0 || cx >= tm->columns) return -1;
+  const auto idx = static_cast<std::size_t>(cy * tm->columns + cx);
+  return idx < tm->cells.size() ? tm->cells[idx] : -1;
+}
+bool RuntimeHost::set_tile_at(float world_x, float world_y, int value) {
+  auto *tm = impl_->tilemap();
+  if (!tm || tm->tile_w <= 0 || tm->tile_h <= 0 || tm->columns <= 0)
+    return false;
+  const int cx = static_cast<int>(std::floor(world_x / tm->tile_w));
+  const int cy = static_cast<int>(std::floor(world_y / tm->tile_h));
+  if (cx < 0 || cy < 0 || cx >= tm->columns) return false;
+  const auto idx = static_cast<std::size_t>(cy * tm->columns + cx);
+  if (idx >= tm->cells.size())
+    tm->cells.resize(static_cast<std::size_t>(cy + 1) * tm->columns, -1);
+  tm->cells[idx] = value;
+  return true;
+}
 VfxSystem &RuntimeHost::vfx() { return impl_->vfx; }
 VfxInstanceId RuntimeHost::spawn_emitter(std::string_view definition_id,
                                        float x, float y,
@@ -131,6 +154,14 @@ void RuntimeHost::set_camera(float x, float y, float zoom) {
   impl_->cam_x = x;
   impl_->cam_y = y;
   impl_->cam_zoom = zoom > 0.f ? zoom : 1.f;
+  if (clamp_camera && impl_->world_w > 0.f && impl_->world_h > 0.f) {
+    const float span_x = impl_->view_w / impl_->cam_zoom;
+    const float span_y = impl_->view_h / impl_->cam_zoom;
+    impl_->cam_x = std::clamp(
+        impl_->cam_x, 0.f, std::max(0.f, impl_->world_w - span_x));
+    impl_->cam_y = std::clamp(
+        impl_->cam_y, 0.f, std::max(0.f, impl_->world_h - span_y));
+  }
 }
 float RuntimeHost::camera_x() const { return impl_->cam_x; }
 float RuntimeHost::camera_y() const { return impl_->cam_y; }
