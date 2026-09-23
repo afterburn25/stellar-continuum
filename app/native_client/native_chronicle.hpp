@@ -45,13 +45,15 @@ struct ChronicleSnapshot {
 // newest first, capped at `max_entries` (the tail end of history —
 // a chronicle can hold 100k records; the view shows the newest slice
 // and reports the true total). `category_prefix` restricts to one
-// domain ("war.", "exploration.", ...) — the cap applies after the
-// filter so a filtered view still reaches deep history. `total`
-// reports the filtered visible count.
+// domain ("war.", "exploration.", ...) and `min_significance` is the
+// feed's own floor — both apply before the cap so a filtered view
+// still reaches deep history. `total` reports the filtered visible
+// count.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
          std::size_t max_entries = 4000,
-         std::string_view category_prefix = {});
+         std::string_view category_prefix = {},
+         double min_significance = 0.0);
 
 class NativeChronicleView final {
 public:
@@ -82,6 +84,13 @@ public:
   [[nodiscard]] std::string_view domain_filter() const noexcept {
     return domain_filter_;
   }
+  // Cycles the significance floor (0.0 → 0.3 → 0.5 → 0.7 → 0.0) —
+  // the feed's own axis, so "major events only" drops trivia without
+  // the presentation re-scoring anything.
+  void cycle_significance();
+  [[nodiscard]] double significance_floor() const noexcept {
+    return significance_floor_;
+  }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
   [[nodiscard]] const ChronicleSnapshot &current() const noexcept {
@@ -94,7 +103,7 @@ public:
   void render(native_map::DrawList &out, int width, int height) const;
 
 private:
-  enum class PressTarget { None, Close, Refresh, Domain };
+  enum class PressTarget { None, Close, Refresh, Domain, Significance };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -102,6 +111,7 @@ private:
   const engine::EventHistory *history_{};
   int observer_{-1};
   std::string domain_filter_;
+  double significance_floor_{};
   ChronicleSnapshot snapshot_;
   native_map::Point pointer_{}, press_origin_{};
   bool pointer_captured_{};

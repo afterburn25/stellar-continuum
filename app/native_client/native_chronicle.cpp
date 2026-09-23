@@ -7,6 +7,7 @@
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <utility>
 
@@ -106,7 +107,7 @@ struct CardLayout {
 // top-down (entries already newest-first), translated by scroll.
 struct ChronicleLayout {
   UiRect panel, header, close_button, refresh_button, domain_button,
-      list_viewport, empty_hint;
+      significance_button, list_viewport, empty_hint;
   std::vector<CardLayout> entries;
   float scale{}, content_height{}, max_scroll{}, scroll{};
 };
@@ -140,6 +141,9 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
       layout.panel.x + layout.panel.width - pad - 120.f * s,
       layout.header.y + layout.header.height + 4.f * s, 120.f * s,
       24.f * s};
+  layout.significance_button = {layout.domain_button.x - 76.f * s,
+                                layout.domain_button.y, 70.f * s,
+                                layout.domain_button.height};
   const float intro_height = 32.f * s;
   layout.list_viewport = {
       layout.panel.x + pad, layout.header.y + layout.header.height + intro_height,
@@ -211,10 +215,11 @@ const char *category_label(std::string_view category) noexcept {
 ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            int observer_civilization_id,
                            std::size_t max_entries,
-                           std::string_view category_prefix) {
+                           std::string_view category_prefix,
+                           double min_significance) {
   const auto events = history.feed(
       static_cast<std::uint64_t>(observer_civilization_id),
-      -std::numeric_limits<double>::infinity());
+      -std::numeric_limits<double>::infinity(), min_significance);
   ChronicleSnapshot snap;
   snap.entries.reserve(std::min(max_entries, events.size()));
   for (auto it = events.end(); it != events.begin();) {
@@ -247,6 +252,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   history_ = &history;
   observer_ = observer_civilization_id;
   domain_filter_.clear();
+  significance_floor_ = 0.0;
   snapshot_ = snapshot(history, observer_civilization_id);
   cancel_press();
 }
@@ -259,8 +265,17 @@ void NativeChronicleView::close() noexcept {
 
 void NativeChronicleView::refresh() {
   if (!history_) return;
-  snapshot_ = snapshot(*history_, observer_, 4000, domain_filter_);
+  snapshot_ = snapshot(*history_, observer_, 4000, domain_filter_,
+                       significance_floor_);
   scroll_ = 0.f;
+}
+
+void NativeChronicleView::cycle_significance() {
+  static constexpr std::array<double, 4> floors{0.0, 0.3, 0.5, 0.7};
+  const auto it = std::ranges::find_if(
+      floors, [&](double f) { return significance_floor_ < f - 1e-9; });
+  significance_floor_ = it == floors.end() ? 0.0 : *it;
+  refresh();
 }
 
 void NativeChronicleView::cycle_domain() {
@@ -312,6 +327,8 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
       press_target_ = PressTarget::Refresh;
     else if (layout.domain_button.contains(event.position))
       press_target_ = PressTarget::Domain;
+    else if (layout.significance_button.contains(event.position))
+      press_target_ = PressTarget::Significance;
     return true;
   }
   if (event.type == native_map::InputEventType::PointerMove &&
@@ -339,6 +356,9 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
   else if (target == PressTarget::Domain &&
            layout.domain_button.contains(event.position))
     cycle_domain();
+  else if (target == PressTarget::Significance &&
+           layout.significance_button.contains(event.position))
+    cycle_significance();
   return true;
 }
 
@@ -406,6 +426,29 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                domain_text, muted_color, domain_pixels,
                layout.domain_button.width - 4.f * s, layout.domain_button,
                TextAlign::Center);
+  stellar::engine::ui_skin::control(
+      out, layout.significance_button,
+      layout.significance_button.contains(pointer_),
+      significance_floor_ > 0.0, true, s);
+  char sig_buf[16];
+  if (significance_floor_ > 0.0)
+    std::snprintf(sig_buf, sizeof(sig_buf), ">=%.1f", significance_floor_);
+  const std::string sig_text =
+      significance_floor_ > 0.0
+          ? std::string(sig_buf)
+          : resolve(locale_, "CHRONICLE_FILTER_ALL", "ALL");
+  const Text sig_probe{{}, sig_text, muted_color, domain_pixels,
+                       layout.significance_button.width - 4.f * s,
+                       std::nullopt, TextAlign::Center, FontFace::Interface};
+  const auto sig_extent = measure(measure_, sig_probe);
+  clipped_text(
+      out,
+      {layout.significance_button.x + layout.significance_button.width * .5f,
+       layout.significance_button.y +
+           (layout.significance_button.height - sig_extent.height) * .5f},
+      sig_text, muted_color, domain_pixels,
+      layout.significance_button.width - 4.f * s, layout.significance_button,
+      TextAlign::Center);
   const std::array<std::string, 2> args{
       std::to_string(snapshot_.entries.size()),
       std::to_string(snapshot_.total)};
@@ -426,7 +469,9 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                 layout.header.y + layout.header.height + 13.f * s},
                subtitle, muted_color,
                std::max(9, static_cast<int>(std::lround(11.f * s))),
-               layout.list_viewport.width, layout.panel);
+               std::max(1.f, layout.significance_button.x -
+                                 layout.list_viewport.x - 8.f * s),
+               layout.panel);
   if (snapshot_.entries.empty()) {
     clipped_text(out, {layout.empty_hint.x, layout.empty_hint.y},
                  resolve(locale_, "CHRONICLE_EMPTY",

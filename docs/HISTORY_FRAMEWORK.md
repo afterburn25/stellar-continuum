@@ -102,16 +102,23 @@ observer filtering, bound, category labels, empty history).
 
 For history beyond the transient window, `native_chronicle` adds the
 scrollable chronicle browser: `snapshot()` projects
-`feed(observer, -inf)` into display entries (newest first, capped at
-4000 with the true total reported) and `NativeChronicleView` renders
-them as a scrollable overlay — opened from a CHRONICLE button in the
-notification panel header, refreshed on demand while open, closed on
-every session/modal transition alongside the notification view, and
-filterable by category domain via `snapshot()`'s `category_prefix`
-(the cap applies after filtering, so a domain view still reaches deep
-history). Coverage: `native_chronicle` tests (snapshot ordering,
-observer privacy, cap + total, domain filtering, view lifecycle,
-refresh, render smoke).
+`feed(observer, -inf, min_significance)` into display entries (newest
+first, capped at 4000 with the true total reported) and
+`NativeChronicleView` renders them as a scrollable overlay — opened
+from a CHRONICLE button in the notification panel header, refreshed on
+demand while open, closed on every session/modal transition alongside
+the notification view, and filterable by category domain via
+`snapshot()`'s `category_prefix` plus a significance floor that cycles
+0.0 → 0.3 → 0.5 → 0.7 (both filters apply before the cap, so a
+filtered view still reaches deep history). Coverage: `native_chronicle`
+tests (snapshot ordering, observer privacy, cap + total, domain and
+significance filtering, view lifecycle, refresh, render smoke).
+
+The admission seeding in `native_notification_events` applies a fixed
+0.35 report floor via `feed()`'s `min_significance` — the category
+vocabulary assigns high-volume trivia (war.damage_applied 0.1,
+signature/system detections <=0.3, survey_started 0.2) below it, so
+the transient feed surfaces reports, not noise.
 
 Voice presentation is the pre-existing `NativeGameplayVoiceBridge`:
 `route_events` announces every significant chronicle category per
@@ -130,6 +137,6 @@ recording and voice announce the same authoritative step events.
   detected a system sees its major events; delayed intel, survey-level
   gating and sensor-quality degradation are future refinements.
 - The chronicle browser snapshots the newest 4000 visible entries and
-  filters by whole category domains — per-significance, per-actor and
-  tag filtering (`query()`'s other axes) remain unused at the
-  presentation layer.
+  filters by whole category domains plus a coarse significance floor
+  (0.0/0.3/0.5/0.7) — continuous floors, per-actor and tag filtering
+  (`query()`'s other axes) remain unused at the presentation layer.

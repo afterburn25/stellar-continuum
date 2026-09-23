@@ -48,12 +48,15 @@ void observer_and_activation(){
 void chronicle_seeding(){
   stellar::engine::EventHistory history;
   const auto add=[&](double day,std::string category,std::string summary,
-                     std::vector<std::uint64_t> visible={}){
+                     std::vector<std::uint64_t> visible={},
+                     double significance=0.5){
     stellar::engine::HistoryEvent event;event.at_day=day;
     event.category=std::move(category);event.summary=std::move(summary);
+    event.significance=significance;
     event.visible_to=std::move(visible);history.record(std::move(event));};
   add(400.,"exploration.system_surveyed","System survey completed");
   add(410.,"war.battle","FOREIGN BATTLE REPORT",{7});
+  add(415.,"war.damage_applied","TRIVIA DAMAGE TICK",{1},0.1);
   add(420.,"colony.founded","Colony established",{1});
   add(430.,"unknown.happening","Uncategorized record",{1});
   NativeNotificationFeed feed;

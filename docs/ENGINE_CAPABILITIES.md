@@ -156,11 +156,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   the chronicle (`native_notification_events` tests).
   `native_chronicle` adds the scrollable chronicle browser —
   `snapshot()` projects `feed()` newest-first (4000-entry cap applied
-  after an optional category-domain filter, true filtered total
-  reported) and `NativeChronicleView` renders it as an overlay opened
-  from the notification panel's CHRONICLE button with on-demand refresh
-  and domain cycling (`native_chronicle` tests). Voice announcement of
-  the same step events already runs through
+  after optional category-domain and significance-floor filters, true
+  filtered total reported) and `NativeChronicleView` renders it as an
+  overlay opened from the notification panel's CHRONICLE button with
+  on-demand refresh, domain cycling, and a significance cycle
+  (0.0 → 0.3 → 0.5 → 0.7) (`native_chronicle` tests). Admission
+  seeding applies a fixed 0.35 report floor so high-volume trivia
+  (damage ticks, detections) stays out of the transient feed. Voice
+  announcement of the same step events already runs through
   `NativeGameplayVoiceBridge::route_events`.
 - **Save/performance impact:** `EventHistory` field on the v17 payload
   (optional — absent in pre-chronicle saves); strict ordered decode

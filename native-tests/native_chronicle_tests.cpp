@@ -89,6 +89,47 @@ void domain_filtering() {
           "Full cycle did not restore unfiltered view");
 }
 
+void significance_filtering() {
+  engine::EventHistory history;
+  const auto add = [&](double day, std::string category, double sig) {
+    engine::HistoryEvent event;
+    event.at_day = day;
+    event.summary = category;
+    event.category = std::move(category);
+    event.significance = sig;
+    event.visible_to = {1};
+    history.record(std::move(event));
+  };
+  add(400., "war.damage_applied", 0.1);       // trivia
+  add(410., "exploration.sensor_contact", 0.35);
+  add(420., "war.engagement_started", 0.7);   // major
+  const auto all = snapshot(history, 1);
+  require(all.total == 3, "Unfiltered snapshot dropped events");
+  const auto routine = snapshot(history, 1, 4000, {}, 0.3);
+  require(routine.total == 2, "Routine floor kept trivia");
+  const auto major = snapshot(history, 1, 4000, {}, 0.7);
+  require(major.total == 1 &&
+              major.entries.front().summary == "war.engagement_started",
+          "Major floor kept routine events");
+  // Domain + significance compose.
+  const auto major_war = snapshot(history, 1, 4000, "war.", 0.5);
+  require(major_war.total == 1, "Combined filters did not compose");
+
+  NativeChronicleView view;
+  view.open(history, 1);
+  require(view.significance_floor() == 0.0, "Open kept a stale floor");
+  view.cycle_significance();
+  require(view.significance_floor() > 0.29 &&
+              view.current().entries.size() == 2,
+          "Floor cycle did not filter");
+  view.cycle_significance();
+  view.cycle_significance();
+  view.cycle_significance();
+  require(view.significance_floor() == 0.0 &&
+              view.current().entries.size() == 3,
+          "Floor cycle did not wrap to unfiltered");
+}
+
 void view_lifecycle() {
   auto history = make_history();
   NativeChronicleView view;
@@ -141,6 +182,7 @@ int main() {
   try {
     snapshot_projection();
     domain_filtering();
+    significance_filtering();
     view_lifecycle();
     render_smoke();
   } catch (const std::exception &error) {
