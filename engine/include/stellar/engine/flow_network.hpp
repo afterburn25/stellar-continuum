@@ -104,6 +104,38 @@ public:
     // Convenience: 0..1 served fraction for a node over its last demand.
     [[nodiscard]] double served_fraction(std::uint64_t id) const;
 
+    // --- persistence -------------------------------------------------
+    // Serializable network state: full topology plus rates, storage and
+    // enable flags — enough to rebuild a network without re-running the
+    // mutator sequence. Per-advance diagnostics (last_*) are
+    // observability, not authoritative state, and are not persisted.
+    struct NodeState {
+        std::uint64_t id{};
+        double supply_per_day{0.0};
+        double demand_per_day{0.0};
+        double storage_capacity{0.0};
+        double storage{0.0};
+        bool enabled{true};
+    };
+    struct EdgeState {
+        std::uint64_t id{};
+        std::uint64_t from{0};
+        std::uint64_t to{0};
+        double capacity_per_day{0.0};
+        bool enabled{true};
+    };
+    struct State {
+        std::uint32_t version{1};
+        std::string resource;
+        std::vector<NodeState> nodes; // sorted by id
+        std::vector<EdgeState> edges; // sorted by id
+    };
+    [[nodiscard]] State capture_state() const;
+    // Replaces topology and state with the snapshot. Throws
+    // invalid_argument on resource-id mismatch, an edge endpoint absent
+    // from the snapshot, or a duplicate (from,to) pair.
+    void restore_state(const State& state);
+
 private:
     void rebuild_components();
 

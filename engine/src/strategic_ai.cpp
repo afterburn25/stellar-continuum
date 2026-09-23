@@ -104,4 +104,36 @@ double StrategicMind::last_commit_day(std::string_view domain) const {
     return it == last_commit_.end() ? 0.0 : it->second;
 }
 
+StrategicMind::State StrategicMind::capture_state() const {
+    State state;
+    for (const auto& [domain, action] : incumbents_)
+        state.incumbents.push_back({domain, action});
+    std::sort(state.incumbents.begin(), state.incumbents.end(),
+              [](const DomainIncumbent& a, const DomainIncumbent& b) {
+                  return a.domain < b.domain;
+              });
+    for (const auto& [action, day] : last_commit_)
+        state.last_commits.push_back({action, day});
+    std::sort(state.last_commits.begin(), state.last_commits.end(),
+              [](const CooldownStamp& a, const CooldownStamp& b) {
+                  return a.action_id < b.action_id;
+              });
+    state.journal = journal_;
+    return state;
+}
+
+void StrategicMind::restore_state(const State& state) {
+    incumbents_.clear();
+    last_commit_.clear();
+    journal_.clear();
+    for (const DomainIncumbent& i : state.incumbents)
+        incumbents_[i.domain] = i.action_id;
+    for (const CooldownStamp& c : state.last_commits)
+        last_commit_[c.action_id] = c.last_day;
+    for (const Decision& d : state.journal) {
+        journal_.push_back(d);
+        if (journal_.size() > journal_capacity_) journal_.pop_front();
+    }
+}
+
 } // namespace stellar::engine

@@ -87,6 +87,31 @@ public:
         return journal_;
     }
 
+    // --- persistence -------------------------------------------------
+    // Serializable mind state: domain incumbents, per-action cooldown
+    // stamps and the bounded decision journal. Actions are code —
+    // re-registered on load; the journal is kept because it is part of
+    // the AI's explainable history, not just diagnostics.
+    struct DomainIncumbent {
+        std::string domain;
+        std::string action_id;
+    };
+    struct CooldownStamp {
+        std::string action_id;
+        double last_day{0.0};
+    };
+    struct State {
+        std::uint32_t version{1};
+        std::vector<DomainIncumbent> incumbents;   // sorted by domain
+        std::vector<CooldownStamp> last_commits;   // sorted by action id
+        std::deque<Decision> journal;
+    };
+    [[nodiscard]] State capture_state() const;
+    // Restores incumbents/cooldowns/journal. Stamps for actions that are
+    // not registered are kept — an action re-registered later resumes
+    // its cooldown rather than escaping it.
+    void restore_state(const State& state);
+
 private:
     std::unordered_map<std::string, UtilityAction> actions_;
     std::unordered_map<std::string, std::string> incumbents_; // domain->action

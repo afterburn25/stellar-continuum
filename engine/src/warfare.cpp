@@ -266,4 +266,29 @@ EngagementResult WarfareModel::resolve(std::uint64_t a, std::uint64_t b,
     return result;
 }
 
+WarfareModel::State WarfareModel::capture_state() const {
+    State state;
+    for (const FleetState* f : fleets()) {
+        FleetEntry entry;
+        entry.state = *f;
+        for (const ShipCohort* c : cohorts(f->id))
+            entry.cohorts.push_back(*c);
+        state.fleets.push_back(std::move(entry));
+    }
+    return state;
+}
+
+void WarfareModel::restore_state(const State& state) {
+    fleets_.clear();
+    cohorts_.clear();
+    for (const FleetEntry& entry : state.fleets) {
+        for (const ShipCohort& c : entry.cohorts)
+            if (!classes_.count(c.ship_class))
+                throw std::invalid_argument(
+                    "WarfareModel snapshot references undefined ship class");
+        fleets_[entry.state.id] = entry.state;
+        cohorts_[entry.state.id] = entry.cohorts;
+    }
+}
+
 } // namespace stellar::engine

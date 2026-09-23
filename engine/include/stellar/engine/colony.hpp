@@ -162,6 +162,39 @@ public:
     // ascending-id processing, expected-value math.
     ColonyDelta advance(double elapsed_days, const ColonyInputs& inputs);
 
+    // --- persistence -------------------------------------------------
+    // Serializable colony state: district/structure instances with their
+    // construction/condition bookkeeping. DistrictSpec/StructureSpec are
+    // definitions — re-registered on load like recipes.
+    struct DistrictState {
+        std::uint64_t id{};
+        std::string spec_id;
+        double construction_remaining{0.0};
+        bool complete{false};
+        bool enabled{true};
+    };
+    struct StructureState {
+        std::uint64_t id{};
+        std::string spec_id;
+        std::uint64_t district_id{0};
+        double construction_remaining{0.0};
+        bool complete{false};
+        bool enabled{true};
+        double condition{1.0};
+        double operating{1.0};
+    };
+    struct State {
+        std::uint32_t version{1};
+        std::uint32_t standalone_slots{0};
+        std::vector<DistrictState> districts;   // sorted by id
+        std::vector<StructureState> structures; // sorted by id
+    };
+    [[nodiscard]] State capture_state() const;
+    // Replaces all instances with the snapshot. Throws invalid_argument
+    // on unknown spec ids (content mismatch) or a structure whose
+    // district_id is not present in the snapshot.
+    void restore_state(const State& state);
+
 private:
     std::unordered_map<std::string, DistrictSpec> district_specs_;
     std::unordered_map<std::string, StructureSpec> structure_specs_;

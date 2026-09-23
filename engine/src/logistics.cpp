@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <stdexcept>
 
 namespace stellar::engine {
 
@@ -209,6 +210,77 @@ LogisticsAdvance LogisticsNetwork::advance(double elapsed_days) {
         transit_.erase(s->id);
     }
     return result;
+}
+
+LogisticsNetwork::State LogisticsNetwork::capture_state() const {
+    State state;
+    state.now = now_;
+    state.nodes = node_ids();
+    for (const FreightRoute* r : routes())
+        state.routes.push_back({r->id, r->path, r->leg_days, r->capacity,
+                                r->enabled, r->in_flight});
+    const auto snap = [](const Shipment* s) {
+        return ShipmentState{s->id, s->route, s->resource, s->quantity,
+                             s->departed, s->eta};
+    };
+    for (const Shipment* s : queued()) state.queued.push_back(snap(s));
+    for (const Shipment* s : in_transit())
+        state.in_transit.push_back(snap(s));
+    return state;
+}
+
+void LogisticsNetwork::restore_state(const State& state) {
+    nodes_.clear();
+    routes_.clear();
+    queue_.clear();
+    transit_.clear();
+    for (const std::uint64_t id : state.nodes) nodes_[id] = true;
+    for (const RouteState& rs : state.routes) {
+        if (rs.path.size() < 2 || rs.leg_days.size() != rs.path.size() - 1 ||
+            rs.capacity < 0.0)
+            throw std::invalid_argument(
+                "LogisticsNetwork snapshot malformed route");
+        double total = 0.0;
+        for (const double d : rs.leg_days) {
+            if (d < 0.0)
+                throw std::invalid_argument(
+                    "LogisticsNetwork snapshot negative leg");
+            total += d;
+        }
+        for (const std::uint64_t n : rs.path)
+            if (!nodes_.count(n))
+                throw std::invalid_argument(
+                    "LogisticsNetwork snapshot route references missing node");
+        FreightRoute r;
+        r.id = rs.id;
+        r.path = rs.path;
+        r.leg_days = rs.leg_days;
+        r.capacity = rs.capacity;
+        r.enabled = rs.enabled;
+        r.in_flight = rs.in_flight;
+        r.total_days = total;
+        routes_.emplace(rs.id, std::move(r));
+    }
+    const auto load_shipment = [&](const ShipmentState& ss,
+                                   std::unordered_map<std::uint64_t, Shipment>&
+                                       dest) {
+        if (!routes_.count(ss.route))
+            throw std::invalid_argument(
+                "LogisticsNetwork snapshot shipment references missing route");
+        Shipment s;
+        s.id = ss.id;
+        s.route = ss.route;
+        s.resource = ss.resource;
+        s.quantity = ss.quantity;
+        s.departed = ss.departed;
+        s.eta = ss.eta;
+        dest.emplace(s.id, std::move(s));
+    };
+    for (const ShipmentState& ss : state.queued)
+        load_shipment(ss, queue_);
+    for (const ShipmentState& ss : state.in_transit)
+        load_shipment(ss, transit_);
+    now_ = state.now;
 }
 
 std::vector<std::pair<std::uint64_t, double>>

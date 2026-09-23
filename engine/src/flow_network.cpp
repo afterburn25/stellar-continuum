@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <set>
 #include <stdexcept>
 
 namespace stellar::engine {
@@ -286,6 +287,49 @@ double FlowNetwork::served_fraction(std::uint64_t id) const {
     const auto* n = node(id);
     if (!n || n->last_demand <= 0.0) return 1.0;
     return n->last_served / n->last_demand;
+}
+
+FlowNetwork::State FlowNetwork::capture_state() const {
+    State state;
+    state.resource = resource_;
+    for (const std::uint64_t id : node_ids()) {
+        const FlowNodeState& n = nodes_.at(id);
+        state.nodes.push_back({id, n.supply_per_day, n.demand_per_day,
+                               n.storage_capacity, n.storage, n.enabled});
+    }
+    for (const std::uint64_t id : edge_ids()) {
+        const FlowEdgeState& e = edges_.at(id);
+        state.edges.push_back({id, e.from, e.to, e.capacity_per_day,
+                               e.enabled});
+    }
+    return state;
+}
+
+void FlowNetwork::restore_state(const State& state) {
+    if (state.resource != resource_)
+        throw std::invalid_argument(
+            "FlowNetwork snapshot resource mismatch");
+    nodes_.clear();
+    edges_.clear();
+    components_.clear();
+    for (const NodeState& n : state.nodes)
+        nodes_[n.id] = {n.supply_per_day,
+                        n.demand_per_day,
+                        n.storage_capacity,
+                        n.storage,
+                        n.enabled,
+                        0.0, 0.0, 0.0, 0.0, 0.0};
+    std::set<std::pair<std::uint64_t, std::uint64_t>> seen_pairs;
+    for (const EdgeState& e : state.edges) {
+        if (!nodes_.count(e.from) || !nodes_.count(e.to))
+            throw std::invalid_argument(
+                "FlowNetwork snapshot edge references missing node");
+        if (!seen_pairs.emplace(e.from, e.to).second)
+            throw std::invalid_argument(
+                "FlowNetwork snapshot duplicate directed edge pair");
+        edges_[e.id] = {e.from, e.to, e.capacity_per_day, e.enabled, 0.0};
+    }
+    topology_dirty_ = true;
 }
 
 } // namespace stellar::engine

@@ -114,6 +114,36 @@ public:
   std::vector<Shortage> shortages() const { return shortages_; }
   std::vector<TransferOrder> transfers() const;
 
+  // --- persistence ---------------------------------------------------
+  // Serializable network state: node inventories, producer progress and
+  // open transfer orders, plus the id counters so post-load ids never
+  // collide with restored ones. ResourceDefinition/Recipe rows are
+  // definitions — re-registered on load.
+  struct NodeState {
+    std::uint64_t id{};
+    double capacity{0.0};
+    std::vector<std::pair<std::string, double>> resources; // sorted by id
+  };
+  struct ProducerState {
+    std::uint64_t id{};
+    std::uint64_t node_id{};
+    std::string recipe_id;
+    double progress_days{0.0};
+    bool enabled{true};
+  };
+  struct State {
+    std::uint32_t version{1};
+    std::uint64_t next_producer_id{1};
+    std::uint64_t next_order_id{1};
+    std::vector<NodeState> nodes;            // sorted by id
+    std::vector<ProducerState> producers;    // sorted by id
+    std::vector<TransferOrder> transfers;    // sorted by id
+  };
+  [[nodiscard]] State capture_state() const;
+  // Replaces runtime state with the snapshot. Throws invalid_argument on
+  // a producer referencing an unknown recipe or node.
+  void restore_state(const State& state);
+
 private:
   std::unordered_map<std::string, ResourceDefinition> definitions_;
   // deque keeps node references stable as nodes are added.

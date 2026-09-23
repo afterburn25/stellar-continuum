@@ -98,6 +98,40 @@ public:
     [[nodiscard]] std::vector<std::pair<std::uint64_t, double>>
     route_utilization() const;
 
+    // --- persistence -------------------------------------------------
+    // Serializable logistics state: waypoint set, routes with in-flight
+    // tonnage, queued and in-transit shipments, and the network clock.
+    struct RouteState {
+        std::uint64_t id{};
+        std::vector<std::uint64_t> path;
+        std::vector<double> leg_days;
+        double capacity{0.0};
+        bool enabled{true};
+        double in_flight{0.0};
+    };
+    struct ShipmentState {
+        std::uint64_t id{};
+        std::uint64_t route{0};
+        std::string resource;
+        double quantity{0.0};
+        double departed{0.0};
+        double eta{0.0};
+    };
+    struct State {
+        std::uint32_t version{1};
+        double now{0.0};
+        std::vector<std::uint64_t> nodes;      // sorted
+        std::vector<RouteState> routes;        // sorted by id
+        std::vector<ShipmentState> queued;     // sorted by id
+        std::vector<ShipmentState> in_transit; // sorted by id
+    };
+    [[nodiscard]] State capture_state() const;
+    // Replaces the whole network with the snapshot. Throws
+    // invalid_argument on a route referencing an unknown node, a
+    // malformed route (bad path/leg lengths), or a shipment referencing
+    // an unknown route.
+    void restore_state(const State& state);
+
 private:
     std::unordered_map<std::uint64_t, bool> nodes_; // id set
     std::unordered_map<std::uint64_t, FreightRoute> routes_;

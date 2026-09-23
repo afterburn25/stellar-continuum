@@ -375,6 +375,47 @@ double Population::food_demand_per_day() const {
     return sum;
 }
 
+Population::State Population::capture_state() const {
+    State state;
+    state.cohorts.reserve(cohorts_.size());
+    for (const PopulationCohort* c : cohorts()) {
+        CohortState s;
+        s.key = c->key;
+        s.size = c->size;
+        s.age_distribution = c->age_distribution;
+        s.health = c->health;
+        s.happiness = c->happiness;
+        s.morale = c->morale;
+        s.housing_coverage = c->housing_coverage;
+        s.employment_rate = c->employment_rate;
+        s.environment_suitability = c->environment_suitability;
+        s.political_tendency = c->political_tendency;
+        state.cohorts.push_back(std::move(s));
+    }
+    return state;
+}
+
+void Population::restore_state(const State& state) {
+    cohorts_.clear();
+    for (const CohortState& s : state.cohorts) {
+        if (!profiles_.count(s.key.profile))
+            throw std::invalid_argument(
+                "Population snapshot references undefined profile");
+        PopulationCohort c;
+        c.key = s.key;
+        c.size = s.size;
+        c.age_distribution = s.age_distribution;
+        c.health = s.health;
+        c.happiness = s.happiness;
+        c.morale = s.morale;
+        c.housing_coverage = s.housing_coverage;
+        c.employment_rate = s.employment_rate;
+        c.environment_suitability = s.environment_suitability;
+        c.political_tendency = s.political_tendency;
+        cohorts_.emplace(c.key, c);
+    }
+}
+
 double Population::goods_demand_per_day() const {
     double sum = 0.0;
     for (const auto& [key, c] : cohorts_)

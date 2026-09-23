@@ -134,6 +134,23 @@ public:
     EngagementResult resolve(std::uint64_t a, std::uint64_t b,
                              double elapsed_days);
 
+    // --- persistence -------------------------------------------------
+    // Serializable warfare state: fleets (position, orders, engaged
+    // flag) and their ship cohorts (count/condition/experience).
+    // ShipClass rows are definitions — re-registered on load.
+    struct FleetEntry {
+        FleetState state;
+        std::vector<ShipCohort> cohorts; // sorted by ship_class
+    };
+    struct State {
+        std::uint32_t version{1};
+        std::vector<FleetEntry> fleets; // sorted by fleet id
+    };
+    [[nodiscard]] State capture_state() const;
+    // Replaces all fleets with the snapshot. Throws invalid_argument on
+    // a cohort referencing an undefined ship class.
+    void restore_state(const State& state);
+
 private:
     std::unordered_map<std::string, ShipClass> classes_;
     std::unordered_map<std::uint64_t, FleetState> fleets_;

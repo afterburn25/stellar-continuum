@@ -365,4 +365,47 @@ ColonyDelta Colony::advance(double elapsed_days, const ColonyInputs& inputs) {
     return delta;
 }
 
+Colony::State Colony::capture_state() const {
+    State state;
+    state.standalone_slots = standalone_slots_;
+    for (const District* d : districts())
+        state.districts.push_back({d->id, d->spec_id,
+                                   d->construction_remaining, d->complete,
+                                   d->enabled});
+    for (const Structure* s : structures())
+        state.structures.push_back({s->id, s->spec_id, s->district_id,
+                                    s->construction_remaining, s->complete,
+                                    s->enabled, s->condition, s->operating});
+    return state;
+}
+
+void Colony::restore_state(const State& state) {
+    districts_.clear();
+    structures_.clear();
+    standalone_slots_ = state.standalone_slots;
+    for (const DistrictState& d : state.districts) {
+        if (!district_specs_.count(d.spec_id))
+            throw std::invalid_argument(
+                "Colony snapshot references undefined district spec");
+        districts_[d.id] = {d.id, d.spec_id, d.construction_remaining,
+                            d.complete, d.enabled};
+    }
+    for (const StructureState& s : state.structures) {
+        if (!structure_specs_.count(s.spec_id))
+            throw std::invalid_argument(
+                "Colony snapshot references undefined structure spec");
+        if (s.district_id != 0 && !districts_.count(s.district_id))
+            throw std::invalid_argument(
+                "Colony snapshot structure references missing district");
+        structures_[s.id] = {s.id,
+                             s.spec_id,
+                             s.district_id,
+                             s.construction_remaining,
+                             s.complete,
+                             s.enabled,
+                             s.condition,
+                             s.operating};
+    }
+}
+
 } // namespace stellar::engine

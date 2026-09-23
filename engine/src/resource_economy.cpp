@@ -1,6 +1,7 @@
 #include <stellar/engine/resource_economy.hpp>
 
 #include <algorithm>
+#include <stdexcept>
 #include <utility>
 
 namespace stellar::engine {
@@ -188,6 +189,69 @@ void ResourceNetwork::advance(double elapsed_days) {
 
 std::vector<TransferOrder> ResourceNetwork::transfers() const {
   return transfers_;
+}
+
+ResourceNetwork::State ResourceNetwork::capture_state() const {
+  State state;
+  state.next_producer_id = next_producer_id_;
+  state.next_order_id = next_order_id_;
+  std::vector<std::uint64_t> node_ids;
+  node_ids.reserve(nodes_.size());
+  for (const auto& n : nodes_) node_ids.push_back(n.id);
+  std::sort(node_ids.begin(), node_ids.end());
+  for (const std::uint64_t id : node_ids) {
+    const auto& n = *node(id);
+    NodeState ns;
+    ns.id = id;
+    ns.capacity = n.inventory.capacity();
+    auto snap = n.inventory.snapshot();
+    ns.resources.assign(snap.begin(), snap.end());
+    std::sort(ns.resources.begin(), ns.resources.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    state.nodes.push_back(std::move(ns));
+  }
+  std::vector<const ProducerBinding*> bindings;
+  bindings.reserve(producers_.size());
+  for (const auto& b : producers_) bindings.push_back(&b);
+  std::sort(bindings.begin(), bindings.end(),
+            [](const auto* a, const auto* b) {
+              return a->producer.id < b->producer.id;
+            });
+  for (const auto* b : bindings)
+    state.producers.push_back({b->producer.id, b->node_id,
+                               b->producer.recipe_id,
+                               b->producer.progress_days,
+                               b->producer.enabled});
+  state.transfers = transfers_;
+  std::sort(state.transfers.begin(), state.transfers.end(),
+            [](const auto& a, const auto& b) { return a.id < b.id; });
+  return state;
+}
+
+void ResourceNetwork::restore_state(const State& state) {
+  nodes_.clear();
+  producers_.clear();
+  transfers_.clear();
+  shortages_.clear();
+  for (const NodeState& ns : state.nodes) {
+    EconomyNode& n = add_node(ns.id, ns.capacity);
+    for (const auto& [res, qty] : ns.resources)
+      n.inventory.add(res, qty);
+  }
+  for (const ProducerState& ps : state.producers) {
+    if (!recipes_.count(ps.recipe_id))
+      throw std::invalid_argument(
+          "ResourceNetwork snapshot references unknown recipe");
+    if (!node(ps.node_id))
+      throw std::invalid_argument(
+          "ResourceNetwork snapshot producer references missing node");
+    producers_.push_back({Producer{ps.id, ps.recipe_id, ps.progress_days,
+                                   ps.enabled},
+                          ps.node_id});
+  }
+  transfers_ = state.transfers;
+  next_producer_id_ = state.next_producer_id;
+  next_order_id_ = state.next_order_id;
 }
 
 } // namespace stellar::engine

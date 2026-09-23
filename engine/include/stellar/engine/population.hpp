@@ -146,6 +146,32 @@ public:
     [[nodiscard]] double food_demand_per_day() const;
     [[nodiscard]] double goods_demand_per_day() const;
 
+    // --- persistence -------------------------------------------------
+    // Serializable population state: every cohort's identity key and
+    // mutable fields. Profiles are definitions — content, re-registered
+    // on load like recipes — so the state carries cohorts only.
+    struct CohortState {
+        CohortKey key;
+        double size{0.0};
+        std::array<double, kAgeBuckets> age_distribution{};
+        double health{0.0};
+        double happiness{0.0};
+        double morale{0.0};
+        double housing_coverage{0.0};
+        double employment_rate{0.0};
+        double environment_suitability{0.0};
+        double political_tendency{0.0};
+    };
+    struct State {
+        std::uint32_t version{1};
+        std::vector<CohortState> cohorts; // sorted by CohortKey
+    };
+    [[nodiscard]] State capture_state() const;
+    // Replaces all cohorts with the snapshot. Throws invalid_argument if
+    // a cohort references an undefined profile — that is a content
+    // mismatch, not a partial-load case.
+    void restore_state(const State& state);
+
 private:
     std::unordered_map<std::string, DemographicProfile> profiles_;
     std::unordered_map<CohortKey, PopulationCohort, CohortKeyHash> cohorts_;
