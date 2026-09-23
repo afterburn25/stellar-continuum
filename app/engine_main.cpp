@@ -130,15 +130,16 @@ struct Shell {
   std::string project_name_buffer, import_buffer, package_buffer;
   UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
       hit_project_close{}, hit_project_cook{}, hit_project_build{},
-      hit_project_run{}, hit_project_editor{}, hit_import_field{},
-      hit_import_button{}, hit_package_field{}, hit_package_button{};
+      hit_project_run{}, hit_project_editor{}, hit_project_package{},
+      hit_import_field{}, hit_import_button{}, hit_package_field{},
+      hit_package_button{};
   UiRect project_rows{};
-  // Content cooking and host builds run on the JobSystem; the UI thread
-  // reads their status under the mutex.
-  std::atomic<bool> cooking{}, building{};
+  // Content cooking, host builds and packaging run on the JobSystem; the
+  // UI thread reads their status under the mutex.
+  std::atomic<bool> cooking{}, building{}, packaging{};
   std::atomic<std::size_t> cook_done{}, cook_total{};
   std::mutex project_mutex;
-  std::string cook_status, build_status;
+  std::string cook_status, build_status, package_status;
   std::string status{"ready"};
 };
 
@@ -274,6 +275,8 @@ void close_project(Shell &shell) {
   {
     std::lock_guard lock(shell.project_mutex);
     shell.cook_status.clear();
+    shell.build_status.clear();
+    shell.package_status.clear();
   }
   shell.status = "project closed - browsing host assets";
 }
@@ -390,6 +393,84 @@ void run_project(Shell &shell) {
   shell.status = "no built host - run BUILD first";
 }
 
+// Assembles a distributable folder: the built host plus its runtime files,
+// the cooked Content/ tree, and the source packages the host scans at
+// startup — everything a player needs in dist/<name>/.
+void start_package(Shell &shell, engine::JobSystem &jobs) {
+  if (!shell.project || shell.packaging.exchange(true)) return;
+  const auto root = shell.project->root;
+  const auto exe_name = shell.project->id.substr(5);
+  {
+    std::lock_guard lock(shell.project_mutex);
+    shell.package_status = "packaging " + exe_name + "...";
+  }
+  (void)jobs.submit("project.package", engine::JobPriority::Normal, {},
+                    [&shell, root, exe_name] {
+                      std::string message;
+                      try {
+                        std::filesystem::path exe;
+                        for (const auto dir :
+                             {root / "build" / "host" / "Release",
+                              root / "build" / "host"})
+                          if (std::filesystem::is_regular_file(
+                                  dir / (exe_name + ".exe"))) {
+                            exe = dir / (exe_name + ".exe");
+                            break;
+                          }
+                        if (exe.empty())
+                          throw std::runtime_error(
+                              "no built host - run BUILD first");
+                        const auto dist = root / "dist" / exe_name;
+                        std::error_code ec;
+                        std::filesystem::remove_all(dist, ec);
+                        std::filesystem::create_directories(dist, ec);
+                        std::size_t files = 0;
+                        std::uintmax_t bytes = 0;
+                        auto copy_tree = [&](const std::filesystem::path &src,
+                                             const std::filesystem::path &dst) {
+                          if (!std::filesystem::is_directory(src)) return;
+                          for (const auto &entry :
+                               std::filesystem::recursive_directory_iterator(
+                                   src)) {
+                            if (!entry.is_regular_file()) continue;
+                            const auto target =
+                                dst /
+                                std::filesystem::relative(entry.path(), src);
+                            std::filesystem::create_directories(
+                                target.parent_path(), ec);
+                            std::filesystem::copy_file(
+                                entry.path(), target,
+                                std::filesystem::copy_options::
+                                    overwrite_existing,
+                                ec);
+                            if (ec)
+                              throw std::runtime_error("copy failed: " +
+                                                       ec.message());
+                            ++files;
+                            bytes += entry.file_size();
+                          }
+                        };
+                        copy_tree(exe.parent_path(), dist);
+                        // The cooker writes <output>/Content/; copying the
+                        // cooked root yields Content/ beside the exe, which
+                        // is where the starter probes in packaged layout.
+                        copy_tree(root / "build" / "cooked", dist);
+                        copy_tree(root / "packages", dist / "packages");
+                        message = "packaged " + std::to_string(files) +
+                                  " files, " + human_bytes(bytes) +
+                                  " - dist/" + exe_name;
+                      } catch (const std::exception &error) {
+                        message =
+                            std::string("package failed: ") + error.what();
+                      }
+                      {
+                        std::lock_guard lock(shell.project_mutex);
+                        shell.package_status = std::move(message);
+                      }
+                      shell.packaging = false;
+                    });
+}
+
 // Launches the native editor on the open project: the editor stores its
 // annotation documents under <project>/editor/ and seeds the name from
 // the project manifest.
@@ -416,6 +497,9 @@ void run_project(Shell &shell) {
 }
 void open_editor(Shell &shell) {
   shell.status = "editor launch unavailable on this platform";
+}
+void start_package(Shell &shell, engine::JobSystem &) {
+  shell.status = "packaging unavailable on this platform";
 }
 #endif
 
@@ -715,6 +799,8 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
       }
       if (!shell.build_status.empty())
         line(out, x, y, "build", shell.build_status, font);
+      if (!shell.package_status.empty())
+        line(out, x, y, "package", shell.package_status, font);
     }
   } else {
     line(out, x, y, "open project", "none - browsing host assets", font);
@@ -746,23 +832,36 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
     shell.hit_project_cook = {bx, y, 96 * s, shell.hit_project_name.height};
     shell_button(out, shell.hit_project_cook,
                  shell.cooking ? "COOKING" : "COOK", shell.cooking, font, s);
-    bx += 106 * s;
-    shell.hit_project_build = {bx, y, 96 * s, shell.hit_project_name.height};
+
+    // Pipeline row 2: build, run, edit, package.
+    const float y2 = y + shell.hit_project_name.height + 8 * s;
+    float bx2 = x;
+    shell.hit_project_build = {bx2, y2, 96 * s,
+                               shell.hit_project_name.height};
     shell_button(out, shell.hit_project_build,
                  shell.building ? "BUILDING" : "BUILD", shell.building, font,
                  s);
-    bx += 106 * s;
-    shell.hit_project_run = {bx, y, 80 * s, shell.hit_project_name.height};
+    bx2 += 106 * s;
+    shell.hit_project_run = {bx2, y2, 80 * s, shell.hit_project_name.height};
     shell_button(out, shell.hit_project_run, "RUN", false, font, s);
-    bx += 90 * s;
-    shell.hit_project_editor = {bx, y, 104 * s, shell.hit_project_name.height};
+    bx2 += 90 * s;
+    shell.hit_project_editor = {bx2, y2, 104 * s,
+                                shell.hit_project_name.height};
     shell_button(out, shell.hit_project_editor, "EDITOR", false, font, s);
+    bx2 += 114 * s;
+    shell.hit_project_package = {bx2, y2, 116 * s,
+                                 shell.hit_project_name.height};
+    shell_button(out, shell.hit_project_package,
+                 shell.packaging ? "PACKAGING" : "PACKAGE", shell.packaging,
+                 font, s);
+    y = y2;
   } else {
     shell.hit_project_close = {};
     shell.hit_project_cook = {};
     shell.hit_project_build = {};
     shell.hit_project_run = {};
     shell.hit_project_editor = {};
+    shell.hit_project_package = {};
   }
   y += shell.hit_project_name.height + 14 * s;
 
@@ -1008,6 +1107,8 @@ int main(int argc, char **argv) {
               run_project(shell);
             else if (shell.hit_project_editor.contains(event.position))
               open_editor(shell);
+            else if (shell.hit_project_package.contains(event.position))
+              start_package(shell, jobs);
             else if (shell.project_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y - shell.project_rows.y +
