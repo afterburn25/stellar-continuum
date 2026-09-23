@@ -30,6 +30,7 @@
 #include <stellar/engine/project.hpp>
 #include <stellar/engine/population.hpp>
 #include <stellar/engine/colony.hpp>
+#include <stellar/engine/resource_economy.hpp>
 #include <stellar/engine/flow_network.hpp>
 #include <stellar/engine/logistics.hpp>
 #include <stellar/engine/simulation_executor.hpp>
@@ -72,13 +73,14 @@ constexpr Color row_hover{16, 40, 56, 255};
 constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
-                  Localization, Simulation };
+                  Localization, Simulation, Colony };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
-                            Tool::Localization, Tool::Simulation};
-constexpr std::array<const char *, 8> kToolNames{
+                            Tool::Localization, Tool::Simulation,
+                            Tool::Colony};
+constexpr std::array<const char *, 9> kToolNames{
     "Projects", "Dashboard", "Scene", "Scene3D",
-    "Assets",   "Profiler",  "Localization", "Simulation"};
+    "Assets",   "Profiler",  "Localization", "Simulation", "Colony"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -296,6 +298,34 @@ struct Shell {
   engine::VirtualizedList sim_list;
   UiRect hit_sim_step{}, hit_sim_run{}, hit_sim_wake{}, hit_sim_tier{},
       hit_sim_list{};
+
+  // Colony tool: a live engine::Colony designer — author districts and
+  // structures from the spec catalog, advance construction/operations
+  // over days, and watch jobs/housing/utilities/upkeep resolve against a
+  // real Inventory stockpile. Demonstrates the specialization colony
+  // framework end to end (specs -> construction -> operation ->
+  // shortfalls), not a mockup.
+  struct ColonyDemo {
+    bool initialized{false};
+    engine::Colony colony;
+    engine::Inventory stockpile{10000.0};
+    std::uint64_t next_id{1};
+    double workers{400.0};
+    double maintenance{1.0};
+    double day{0.0};
+    engine::ColonyDelta last{};
+    // Flattened row model rebuilt each render: districts first, each
+    // followed by its hosted structures, then standalone structures.
+    // (is_district, id) — selection + hit testing index into this.
+    std::vector<std::pair<bool, std::uint64_t>> rows;
+    std::size_t selected{0};
+    std::string notice;
+  } col;
+  UiRect hit_col_step{}, hit_col_run30{}, hit_col_workers_dn{},
+      hit_col_workers_up{}, hit_col_maint{}, hit_col_resupply{},
+      hit_col_enable{}, hit_col_demolish{};
+  std::vector<UiRect> hit_col_build;
+  std::vector<UiRect> hit_col_rows;
   std::string status{"ready"};
 };
 
@@ -2889,6 +2919,339 @@ void render_simulation(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
+// ---- Colony tool: live settlement designer over engine::Colony -------
+
+void init_colony(Shell::ColonyDemo &col) {
+  namespace eng = engine;
+  col.colony.define_district(
+      {.id = "district.residential",
+       .category = "residential",
+       .structure_slots = 4,
+       .build_cost = {{"res.alloys", 20}},
+       .build_days = 15,
+       .utility_demand_per_day = {{"power", 1}},
+       .upkeep_per_day = {{"res.alloys", 0.02}}});
+  col.colony.define_district(
+      {.id = "district.industrial",
+       .category = "industrial",
+       .structure_slots = 6,
+       .build_cost = {{"res.alloys", 40}},
+       .build_days = 25,
+       .utility_demand_per_day = {{"power", 2}},
+       .upkeep_per_day = {{"res.alloys", 0.05}}});
+  col.colony.define_structure(
+      {.id = "structure.hab_block",
+       .category = "civic",
+       .district = "district.residential",
+       .build_cost = {{"res.alloys", 10}},
+       .build_days = 10,
+       .utility_demand_per_day = {{"power", 1}},
+       .jobs = 10,
+       .housing = 500});
+  col.colony.define_structure(
+      {.id = "structure.hydroponics",
+       .category = "food",
+       .district = "district.residential",
+       .build_cost = {{"res.alloys", 12}},
+       .build_days = 10,
+       .utility_demand_per_day = {{"power", 2}},
+       .inputs_per_day = {{"res.water", 1}},
+       .outputs_per_day = {{"res.food", 3}},
+       .jobs = 25});
+  col.colony.define_structure(
+      {.id = "structure.mine",
+       .category = "industry",
+       .district = "district.industrial",
+       .build_cost = {{"res.alloys", 15}},
+       .build_days = 12,
+       .utility_demand_per_day = {{"power", 3}},
+       .upkeep_per_day = {{"res.alloys", 0.1}},
+       .outputs_per_day = {{"res.ore", 2}},
+       .jobs = 60});
+  col.colony.define_structure(
+      {.id = "structure.smelter",
+       .category = "industry",
+       .district = "district.industrial",
+       .build_cost = {{"res.alloys", 25}},
+       .build_days = 20,
+       .utility_demand_per_day = {{"power", 5}},
+       .inputs_per_day = {{"res.ore", 2}},
+       .outputs_per_day = {{"res.alloys", 1}},
+       .jobs = 80});
+  col.colony.define_structure(
+      {.id = "structure.solar_array",
+       .category = "power",
+       .build_cost = {{"res.alloys", 8}},
+       .build_days = 5,
+       .utility_supply_per_day = {{"power", 6}},
+       .jobs = 2});
+  col.colony.define_structure(
+      {.id = "structure.fusion_plant",
+       .category = "power",
+       .build_cost = {{"res.alloys", 50}},
+       .build_days = 30,
+       .utility_supply_per_day = {{"power", 20}},
+       .upkeep_per_day = {{"res.fuel", 0.2}},
+       .jobs = 40});
+  col.colony.set_standalone_slots(6);
+  col.stockpile.add("res.alloys", 200);
+  col.stockpile.add("res.food", 50);
+  col.stockpile.add("res.fuel", 100);
+  col.stockpile.add("res.water", 100);
+  // A starter settlement so the tool opens live.
+  col.colony.build_district(col.next_id++, "district.residential");
+  col.colony.build_district(col.next_id++, "district.industrial");
+  col.colony.build_structure(col.next_id++, "structure.solar_array");
+  col.initialized = true;
+}
+
+struct ColonyBuildRow {
+  const char *spec;
+  const char *label;
+  bool district;
+};
+constexpr std::array<ColonyBuildRow, 8> kColonyBuild{{
+    {"district.residential", "Residential district", true},
+    {"district.industrial", "Industrial district", true},
+    {"structure.hab_block", "Hab block", false},
+    {"structure.hydroponics", "Hydroponics", false},
+    {"structure.mine", "Mine", false},
+    {"structure.smelter", "Smelter", false},
+    {"structure.solar_array", "Solar array", false},
+    {"structure.fusion_plant", "Fusion plant", false},
+}};
+
+bool pay_build_cost(engine::Inventory &stockpile,
+                    const std::vector<engine::ResourceAmount> &cost) {
+  std::vector<engine::ResourceAmount> paid;
+  for (const auto &[resource, amount] : cost) {
+    const double got = stockpile.remove(resource, amount);
+    if (got < amount - 1e-9) {
+      for (const auto &[r, a] : paid) stockpile.add(r, a);
+      if (got > 0) stockpile.add(resource, got);
+      return false;
+    }
+    paid.push_back({resource, got});
+  }
+  return true;
+}
+
+std::string cost_text(const std::vector<engine::ResourceAmount> &cost) {
+  std::string out;
+  for (const auto &[resource, amount] : cost) {
+    if (!out.empty()) out += " ";
+    const auto slash = resource.find_last_of('.');
+    out += resource.substr(slash == std::string::npos ? 0 : slash + 1);
+    out += " " + std::to_string(static_cast<int>(amount));
+  }
+  return out.empty() ? std::string("free") : out;
+}
+
+void render_colony(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &col = shell.col;
+  if (!col.initialized) init_colony(col);
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "COLONY DESIGNER");
+
+  shell.hit_col_step = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_col_step, "ADV 1D", false, font, s);
+  shell.hit_col_run30 = {x + 100 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_col_run30, "ADV 30D", false, font, s);
+  shell.hit_col_workers_dn = {x + 200 * s, y, 30 * s, 24 * s};
+  shell_button(out, shell.hit_col_workers_dn, "-", false, font, s);
+  shell.hit_col_workers_up = {x + 234 * s, y, 30 * s, 24 * s};
+  shell_button(out, shell.hit_col_workers_up, "+", false, font, s);
+  shell.hit_col_maint = {x + 272 * s, y, 128 * s, 24 * s};
+  shell_button(out, shell.hit_col_maint,
+               col.maintenance > 0.5 ? "UPKEEP: FULL" : "UPKEEP: LOW",
+               col.maintenance > 0.5, font, s);
+  shell.hit_col_resupply = {x + 408 * s, y, 104 * s, 24 * s};
+  shell_button(out, shell.hit_col_resupply, "RESUPPLY", false, font, s);
+  y += 32 * s;
+
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), "day %.0f", col.day);
+  line(out, x, y, "date", buf, font);
+  line(out, x, y, "workers", std::to_string(static_cast<int>(col.workers)),
+       font);
+  line(out, x, y, "jobs",
+       std::to_string(static_cast<int>(col.last.jobs_filled)) + " / " +
+           std::to_string(static_cast<int>(col.colony.jobs_total())),
+       font);
+  line(out, x, y, "housing",
+       std::to_string(static_cast<int>(col.colony.housing_capacity())),
+       font);
+  if (!col.notice.empty()) {
+    out.overlay.push_back(
+        Text{{x, y}, col.notice, {255, 180, 90, 255}, font});
+    y += 18 * s;
+  }
+  y += 4 * s;
+
+  // Left column: build catalog.
+  const float row_h = 22 * s;
+  const UiRect build_rect{x, y, 240 * s,
+                          kColonyBuild.size() * row_h + 26 * s};
+  out.overlay.push_back(FilledRectangle{build_rect, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{build_rect, panel_edge});
+  out.overlay.push_back(Text{{build_rect.x + 8 * s, build_rect.y + 5 * s},
+                             "BUILD", muted, font});
+  shell.hit_col_build.resize(kColonyBuild.size());
+  for (std::size_t i = 0; i < kColonyBuild.size(); ++i) {
+    const float by = build_rect.y + 24 * s + i * row_h;
+    shell.hit_col_build[i] = {build_rect.x + 4 * s, by,
+                              build_rect.width - 8 * s, row_h - 2 * s};
+    const auto &row = kColonyBuild[i];
+    const auto &cost =
+        row.district ? col.colony.district_spec(row.spec)->build_cost
+                     : col.colony.structure_spec(row.spec)->build_cost;
+    std::string label =
+        std::string(row.label) + "  (" + cost_text(cost) + ")";
+    out.overlay.push_back(
+        Text{{build_rect.x + 10 * s, by + 4 * s}, label, ink, font});
+  }
+
+  // Middle: settlement rows (districts, their structures, standalones).
+  const float mx = build_rect.x + build_rect.width + 16 * s;
+  const UiRect rows_rect{mx, y, body.x + body.width - mx - 20 * s,
+                         300 * s};
+  out.overlay.push_back(FilledRectangle{rows_rect, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{rows_rect, panel_edge});
+  col.rows.clear();
+  for (const auto *district : col.colony.districts()) {
+    col.rows.push_back({true, district->id});
+    for (const auto *structure :
+         col.colony.structures_in(district->id))
+      col.rows.push_back({false, structure->id});
+  }
+  for (const auto *structure : col.colony.structures())
+    if (structure->district_id == 0)
+      col.rows.push_back({false, structure->id});
+  if (col.selected >= col.rows.size()) col.selected = 0;
+
+  shell.hit_col_rows.resize(col.rows.size());
+  float ry = rows_rect.y + 6 * s;
+  const float row_step = 20 * s;
+  for (std::size_t i = 0; i < col.rows.size(); ++i) {
+    if (ry + row_step > rows_rect.y + rows_rect.height) break;
+    const auto [is_district, id] = col.rows[i];
+    shell.hit_col_rows[i] = {rows_rect.x + 2 * s, ry,
+                             rows_rect.width - 4 * s, row_step};
+    const bool selected = i == col.selected;
+    if (selected)
+      out.overlay.push_back(FilledRectangle{shell.hit_col_rows[i],
+                                            row_selected});
+    std::string text;
+    if (is_district) {
+      const auto *district = col.colony.district(id);
+      text = "[" + std::to_string(id) + "] " +
+             district->spec_id +
+             (district->construction_remaining > 0
+                  ? "  building " +
+                        std::to_string(
+                            static_cast<int>(
+                                district->construction_remaining)) +
+                        "d"
+                  : "") +
+             (district->enabled ? "" : "  DISABLED");
+    } else {
+      const auto *structure = col.colony.structure(id);
+      char line_buf[160];
+      std::snprintf(
+          line_buf, sizeof(line_buf),
+          "  %s[%llu] %s  cond %.0f%%  op %.0f%%%s%s",
+          structure->district_id == 0 ? "" : "    ",
+          static_cast<unsigned long long>(id), structure->spec_id.c_str(),
+          structure->condition * 100.0, structure->operating * 100.0,
+          structure->construction_remaining > 0 ? "  building" : "",
+          structure->enabled ? "" : "  DISABLED");
+      text = line_buf;
+    }
+    out.overlay.push_back(Text{{rows_rect.x + 8 * s, ry + 3 * s}, text,
+                               selected ? ink : muted, font});
+    ry += row_step;
+  }
+  if (col.rows.empty())
+    out.overlay.push_back(Text{{rows_rect.x + 8 * s, ry + 3 * s},
+                               "empty settlement — build a district",
+                               muted, font});
+
+  // Selection actions.
+  const float ay = rows_rect.y + rows_rect.height + 10 * s;
+  if (!col.rows.empty()) {
+    const auto [is_district, id] = col.rows[col.selected];
+    bool enabled = true;
+    if (is_district) {
+      const auto *district = col.colony.district(id);
+      enabled = district && district->enabled;
+    } else {
+      const auto *structure = col.colony.structure(id);
+      enabled = structure && structure->enabled;
+    }
+    shell.hit_col_enable = {mx, ay, 110 * s, 24 * s};
+    shell_button(out, shell.hit_col_enable,
+                 enabled ? "DISABLE" : "ENABLE", false, font, s);
+    shell.hit_col_demolish = {mx + 118 * s, ay, 110 * s, 24 * s};
+    shell_button(out, shell.hit_col_demolish, "DEMOLISH", false, font, s);
+  } else {
+    shell.hit_col_enable = {};
+    shell.hit_col_demolish = {};
+  }
+
+  // Right-of-build column: last step report + stockpile + utilities.
+  float sy = y + build_rect.height + 14 * s;
+  heading(out, x, sy, "LAST STEP");
+  if (col.last.elapsed_days > 0) {
+    line(out, x, sy, "elapsed",
+         std::to_string(static_cast<int>(col.last.elapsed_days)) + " d",
+         font);
+    line(out, x, sy, "completed",
+         std::to_string(col.last.districts_completed) + " district  " +
+             std::to_string(col.last.structures_completed) + " structure",
+         font);
+    auto amounts_text = [](const std::vector<engine::ResourceAmount> &v) {
+      std::string text;
+      for (const auto &[resource, amount] : v) {
+        if (!text.empty()) text += "  ";
+        const auto slash = resource.find_last_of('.');
+        text += resource.substr(slash == std::string::npos ? 0 : slash + 1);
+        char num[32];
+        std::snprintf(num, sizeof(num), " %+.1f", amount);
+        text += num;
+      }
+      return text.empty() ? std::string("none") : text;
+    };
+    line(out, x, sy, "outputs", amounts_text(col.last.outputs_produced),
+         font);
+    line(out, x, sy, "upkeep short",
+         amounts_text(col.last.upkeep_shortfall), font);
+    line(out, x, sy, "input short",
+         amounts_text(col.last.input_shortfall), font);
+    for (const auto &[utility, sd] : col.last.utilities) {
+      char ubuf[80];
+      std::snprintf(ubuf, sizeof(ubuf), "supply %.1f  demand %.1f",
+                    sd.first, sd.second);
+      line(out, x, sy, utility, ubuf, font);
+    }
+  } else {
+    line(out, x, sy, "state", "advance to run operations", font);
+  }
+
+  const auto snapshot = col.stockpile.snapshot();
+  std::vector<std::pair<std::string, double>> stock(snapshot.begin(),
+                                                   snapshot.end());
+  std::sort(stock.begin(), stock.end());
+  heading(out, x, sy, "STOCKPILE");
+  for (const auto &[resource, amount] : stock) {
+    char sbuf[64];
+    std::snprintf(sbuf, sizeof(sbuf), "%.1f", amount);
+    line(out, x, sy, resource, sbuf, font);
+  }
+}
+
 // Summarizes project content freshness: source file count and whether the
 // newest change postdates the cooked manifest (i.e. needs a recook).
 void update_content_status(Shell &shell) {
@@ -4191,6 +4554,9 @@ int main(int argc, char **argv) {
       case Tool::Simulation:
         render_simulation(draw, shell, body, s);
         break;
+      case Tool::Colony:
+        render_colony(draw, shell, body, s);
+        break;
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
@@ -4260,6 +4626,124 @@ int main(int argc, char **argv) {
             const auto row =
                 static_cast<std::size_t>(std::max(0.f, local / (22 * s)));
             if (row < kSimTasks.size()) shell.sim.selected = row;
+          }
+        }
+        if (shell.tool == Tool::Colony &&
+            event.type == InputEventType::LeftReleased) {
+          auto &col = shell.col;
+          auto advance_days = [&col](double days) {
+            engine::ColonyInputs inputs;
+            inputs.workers_available = col.workers;
+            inputs.stockpile = &col.stockpile;
+            inputs.maintenance = col.maintenance;
+            col.last = col.colony.advance(days, inputs);
+            col.day += days;
+            col.notice.clear();
+          };
+          if (shell.hit_col_step.contains(event.position)) {
+            advance_days(1.0);
+          } else if (shell.hit_col_run30.contains(event.position)) {
+            advance_days(30.0);
+          } else if (shell.hit_col_workers_dn.contains(event.position)) {
+            col.workers = std::max(0.0, col.workers - 100.0);
+          } else if (shell.hit_col_workers_up.contains(event.position)) {
+            col.workers += 100.0;
+          } else if (shell.hit_col_maint.contains(event.position)) {
+            col.maintenance = col.maintenance > 0.5 ? 0.2 : 1.0;
+          } else if (shell.hit_col_resupply.contains(event.position)) {
+            col.stockpile.add("res.alloys", 200);
+            col.stockpile.add("res.food", 50);
+            col.stockpile.add("res.fuel", 100);
+            col.stockpile.add("res.water", 100);
+          } else if (shell.hit_col_enable.contains(event.position) &&
+                     !col.rows.empty()) {
+            const auto [is_district, id] = col.rows[col.selected];
+            if (is_district) {
+              const auto *district = col.colony.district(id);
+              if (district)
+                col.colony.set_district_enabled(id, !district->enabled);
+            } else {
+              const auto *structure = col.colony.structure(id);
+              if (structure)
+                col.colony.set_enabled(id, !structure->enabled);
+            }
+          } else if (shell.hit_col_demolish.contains(event.position) &&
+                     !col.rows.empty()) {
+            const auto [is_district, id] = col.rows[col.selected];
+            const bool ok =
+                is_district ? col.colony.demolish_district(id)
+                            : col.colony.demolish_structure(id);
+            col.notice =
+                ok ? "" : "demolish failed — district still hosts structures";
+          } else {
+            for (std::size_t i = 0; i < shell.hit_col_build.size(); ++i) {
+              if (!shell.hit_col_build[i].contains(event.position))
+                continue;
+              const auto &row = kColonyBuild[i];
+              const auto &cost =
+                  row.district
+                      ? col.colony.district_spec(row.spec)->build_cost
+                      : col.colony.structure_spec(row.spec)->build_cost;
+              if (!pay_build_cost(col.stockpile, cost)) {
+                col.notice = std::string("insufficient stockpile for ") +
+                             row.label + " (" + cost_text(cost) + ")";
+                break;
+              }
+              const std::uint64_t id = col.next_id;
+              bool ok = false;
+              if (row.district) {
+                ok = col.colony.build_district(id, row.spec);
+              } else {
+                const auto *spec = col.colony.structure_spec(row.spec);
+                if (spec->district.empty()) {
+                  ok = col.colony.build_structure(id, row.spec);
+                } else {
+                  // Prefer the selected district if compatible and open,
+                  // else first matching district with a free slot.
+                  std::uint64_t target = 0;
+                  auto compatible = [&col, &spec](std::uint64_t did) {
+                    const auto *district = col.colony.district(did);
+                    return district && district->spec_id == spec->district &&
+                           district->construction_remaining <= 0.0 &&
+                           district->enabled &&
+                           col.colony.structures_in(did).size() <
+                               col.colony.district_spec(spec->district)
+                                   ->structure_slots;
+                  };
+                  if (!col.rows.empty() &&
+                      col.rows[col.selected].first &&
+                      compatible(col.rows[col.selected].second))
+                    target = col.rows[col.selected].second;
+                  if (target == 0)
+                    for (const auto *district : col.colony.districts())
+                      if (compatible(district->id)) {
+                        target = district->id;
+                        break;
+                      }
+                  if (target != 0)
+                    ok = col.colony.build_structure(id, row.spec, target);
+                  else
+                    col.notice = std::string("no open ") + spec->district +
+                                 " slot for " + row.label;
+                }
+              }
+              if (ok) {
+                ++col.next_id;
+                col.notice.clear();
+              } else if (col.notice.empty()) {
+                col.notice = std::string("cannot build ") + row.label;
+              }
+              if (!ok) // refund — nothing was constructed
+                for (const auto &[resource, amount] : cost)
+                  col.stockpile.add(resource, amount);
+              break;
+            }
+            for (std::size_t i = 0; i < shell.hit_col_rows.size(); ++i) {
+              if (shell.hit_col_rows[i].contains(event.position)) {
+                col.selected = i;
+                break;
+              }
+            }
           }
         }
       }
