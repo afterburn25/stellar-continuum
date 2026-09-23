@@ -212,7 +212,9 @@ Located entries navigate — clicking one returns its system
 through `navigation()` and the client enters that system (the
 workspace's observation check still gates visibility); entries with
 exactly one foreign actor get a DIP action opening the diplomacy
-workspace on that contact. The transient
+workspace on that contact, and recorded reference tags render as
+clickable chips applying `HistoryQuery::tag`'s exact-match focus. The
+transient
 feed mirrors it: chronicle-seeded reports carry `system_id` and render
 a VIEW SYSTEM action; the coalesced feedback path stays id-free.
 Chronicle

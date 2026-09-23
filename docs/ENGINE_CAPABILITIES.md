@@ -181,7 +181,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   navigates the map to its system
   via `navigation()` → `enter_system` (the workspace re-applies the
   observation check) and single-foreign-actor entries expose a DIP
-  action opening the diplomacy workspace on that contact
+  action opening the diplomacy workspace on that contact; recorded
+  reference tags render as clickable chips — clicking one applies
+  `HistoryQuery::tag`'s exact-match focus ("everything fleet:12 did
+  that we can see"), toggleable via the chip or an X focus button
   (`native_chronicle` tests). Admission
   seeding applies a fixed 0.35 report floor so high-volume trivia
   (damage ticks, detections) stays out of the transient feed. Voice

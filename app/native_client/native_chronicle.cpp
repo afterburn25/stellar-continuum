@@ -99,9 +99,15 @@ void clipped_text(DrawList &out, Point at, std::string value, Color color,
                                 clip, align, FontFace::Interface});
 }
 
+struct TagChip {
+  std::string tag;
+  UiRect bounds;
+};
+
 struct CardLayout {
   UiRect bounds, metadata_bounds, message_bounds;
   std::optional<UiRect> contact_button;
+  std::vector<TagChip> tag_chips;
 };
 
 // Same geometry contract as the notification panel: cards stacked
@@ -109,6 +115,7 @@ struct CardLayout {
 struct ChronicleLayout {
   UiRect panel, header, close_button, refresh_button, domain_button,
       significance_button, actor_button, list_viewport, empty_hint;
+  std::optional<UiRect> focus_button; // clears the active tag focus
   std::vector<CardLayout> entries;
   float scale{}, content_height{}, max_scroll{}, scroll{};
 };
@@ -116,7 +123,8 @@ struct ChronicleLayout {
 ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
                                      int width, int height,
                                      const TextMeasurer &measurer,
-                                     float requested_scroll) {
+                                     float requested_scroll,
+                                     std::string_view tag_filter) {
   ChronicleLayout layout;
   if (width <= 0 || height <= 0) return layout;
   const float sw = static_cast<float>(width), sh = static_cast<float>(height);
@@ -148,6 +156,9 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
   layout.actor_button = {layout.significance_button.x - 76.f * s,
                          layout.domain_button.y, 70.f * s,
                          layout.domain_button.height};
+  if (!tag_filter.empty())
+    layout.focus_button = {layout.panel.x + pad, layout.domain_button.y,
+                           104.f * s, layout.domain_button.height};
   const float intro_height = 32.f * s;
   layout.list_viewport = {
       layout.panel.x + pad, layout.header.y + layout.header.height + intro_height,
@@ -176,8 +187,10 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
                        std::nullopt, TextAlign::Left, FontFace::Interface};
     const float message_height =
         static_cast<float>(measure(measurer, message).height);
-    const float card_height =
-        card_pad + metadata_height + 3.f * s + message_height + card_pad;
+    const float chip_height =
+        entry.tags.empty() ? 0.f : 3.f * s + 16.f * s;
+    const float card_height = card_pad + metadata_height + 3.f * s +
+                              message_height + chip_height + card_pad;
     CardLayout card;
     card.bounds = {layout.list_viewport.x, layout.list_viewport.y + cursor,
                    layout.list_viewport.width, card_height};
@@ -197,6 +210,25 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
               std::max(0.f, (message_height - bh) * .5f),
           bw, bh};
     }
+    // Reference tags render as clickable chips — clicking one focuses
+    // the browser on that exact entity reference (HistoryQuery::tag
+    // semantics). Flow left-to-right; chips that would overflow the
+    // card are simply not shown (the tag still exists on the record).
+    float chip_x = card.bounds.x + card_pad;
+    const float chip_y =
+        card.message_bounds.y + message_height + 3.f * s;
+    const float chip_right = card.bounds.x + card.bounds.width - card_pad;
+    for (const auto &tag : entry.tags) {
+      const Text probe{{}, upper(tag), muted_color, small_pixels, 0.f,
+                       std::nullopt, TextAlign::Left, FontFace::Interface};
+      const float chip_width =
+          std::clamp(static_cast<float>(measure(measurer, probe).width) +
+                         10.f * s,
+                     28.f * s, 96.f * s);
+      if (chip_x + chip_width > chip_right) break;
+      card.tag_chips.push_back({tag, {chip_x, chip_y, chip_width, 16.f * s}});
+      chip_x += chip_width + 5.f * s;
+    }
     layout.entries.push_back(card);
     cursor += card_height + 7.f * s;
   }
@@ -212,6 +244,7 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
     card.metadata_bounds.y -= layout.scroll;
     card.message_bounds.y -= layout.scroll;
     if (card.contact_button) card.contact_button->y -= layout.scroll;
+    for (auto &chip : card.tag_chips) chip.bounds.y -= layout.scroll;
   }
   return layout;
 }
@@ -232,7 +265,8 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            int observer_civilization_id,
                            std::size_t max_entries,
                            std::string_view category_prefix,
-                           double min_significance, std::uint64_t actor) {
+                           double min_significance, std::uint64_t actor,
+                           std::string_view tag) {
   const auto observer =
       static_cast<std::uint64_t>(observer_civilization_id);
   const auto events = history.feed(
@@ -248,6 +282,9 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
       continue;
     if (actor != 0 && std::ranges::find(event->actors, actor) ==
                           event->actors.end())
+      continue;
+    if (!tag.empty() && std::ranges::find(event->tags, tag) ==
+                            event->tags.end())
       continue;
     ++snap.total;
     if (snap.entries.size() >= max_entries) continue;
@@ -265,7 +302,7 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
                             label ? std::string(label) : event->category,
                             native_campaign::format_campaign_date(
                                 event->at_day),
-                            event->summary});
+                            event->summary, event->tags});
   }
   return snap;
 }
@@ -284,6 +321,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   domain_filter_.clear();
   significance_floor_ = 0.0;
   actor_filter_ = 0;
+  tag_filter_.clear();
   snapshot_ = snapshot(history, observer_civilization_id);
   cancel_press();
 }
@@ -297,7 +335,7 @@ void NativeChronicleView::close() noexcept {
 void NativeChronicleView::refresh() {
   if (!history_) return;
   snapshot_ = snapshot(*history_, observer_, 4000, domain_filter_,
-                       significance_floor_, actor_filter_);
+                       significance_floor_, actor_filter_, tag_filter_);
   scroll_ = 0.f;
 }
 
@@ -351,8 +389,9 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
                                  int width, int height) {
   if (!visible_) return false;
   pointer_ = event.position;
-  const auto layout =
-      chronicle_layout_for(snapshot_, width, height, measure_, scroll_);
+  const auto layout = chronicle_layout_for(snapshot_, width, height,
+                                           measure_, scroll_,
+                                           tag_filter_);
   scroll_ = layout.scroll;
   if (event.type == native_map::InputEventType::EscapePressed) {
     close();
@@ -385,16 +424,26 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
       press_target_ = PressTarget::Significance;
     else if (layout.actor_button.contains(event.position))
       press_target_ = PressTarget::Actor;
+    else if (layout.focus_button &&
+             layout.focus_button->contains(event.position))
+      press_target_ = PressTarget::FocusClear;
     else if (layout.list_viewport.contains(event.position)) {
       for (std::size_t i = 0; i < layout.entries.size(); ++i)
         if (layout.entries[i].bounds.contains(event.position)) {
-          press_target_ =
-              layout.entries[i].contact_button &&
-                      layout.entries[i].contact_button->contains(
-                          event.position)
-                  ? PressTarget::Contact
-                  : PressTarget::Entry;
+          press_target_ = PressTarget::Entry;
           press_entry_ = i;
+          for (std::size_t c = 0;
+               c < layout.entries[i].tag_chips.size(); ++c)
+            if (layout.entries[i].tag_chips[c].bounds.contains(
+                    event.position)) {
+              press_target_ = PressTarget::Tag;
+              press_tag_ = c;
+              break;
+            }
+          if (press_target_ == PressTarget::Entry &&
+              layout.entries[i].contact_button &&
+              layout.entries[i].contact_button->contains(event.position))
+            press_target_ = PressTarget::Contact;
           break;
         }
     }
@@ -442,13 +491,30 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
            layout.entries[press_entry_].contact_button->contains(
                event.position))
     contact_navigation_ = snapshot_.entries[press_entry_].contact_id;
+  else if (target == PressTarget::Tag &&
+           press_entry_ < layout.entries.size() &&
+           press_tag_ < layout.entries[press_entry_].tag_chips.size() &&
+           layout.entries[press_entry_]
+               .tag_chips[press_tag_]
+               .bounds.contains(event.position)) {
+    // Toggle: re-clicking the focused chip clears the focus.
+    const auto &tag =
+        layout.entries[press_entry_].tag_chips[press_tag_].tag;
+    tag_filter_ = (tag_filter_ == tag) ? std::string{} : tag;
+    refresh();
+  } else if (target == PressTarget::FocusClear && layout.focus_button &&
+             layout.focus_button->contains(event.position)) {
+    tag_filter_.clear();
+    refresh();
+  }
   return true;
 }
 
 void NativeChronicleView::render(DrawList &out, int width, int height) const {
   if (!visible_) return;
-  const auto layout =
-      chronicle_layout_for(snapshot_, width, height, measure_, scroll_);
+  const auto layout = chronicle_layout_for(snapshot_, width, height,
+                                           measure_, scroll_,
+                                           tag_filter_);
   const float s = layout.scale;
   stellar::engine::ui_skin::surface(out, layout.panel, s);
   const int title_pixels = std::max(13, static_cast<int>(std::lround(18.f * s)));
@@ -564,6 +630,25 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
       actor_text, muted_color, domain_pixels,
       layout.actor_button.width - 4.f * s, layout.actor_button,
       TextAlign::Center);
+  if (layout.focus_button) {
+    stellar::engine::ui_skin::control(
+        out, *layout.focus_button,
+        layout.focus_button->contains(pointer_), true, true, s);
+    const std::string focus_text = "X " + upper(tag_filter_);
+    const Text focus_probe{{}, focus_text, muted_color, domain_pixels,
+                           layout.focus_button->width - 4.f * s,
+                           std::nullopt, TextAlign::Center,
+                           FontFace::Interface};
+    const auto focus_extent = measure(measure_, focus_probe);
+    clipped_text(
+        out,
+        {layout.focus_button->x + layout.focus_button->width * .5f,
+         layout.focus_button->y +
+             (layout.focus_button->height - focus_extent.height) * .5f},
+        focus_text, muted_color, domain_pixels,
+        layout.focus_button->width - 4.f * s, *layout.focus_button,
+        TextAlign::Center);
+  }
   const std::array<std::string, 2> args{
       std::to_string(snapshot_.entries.size()),
       std::to_string(snapshot_.total)};
@@ -579,13 +664,17 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                                             .subspan(1))
                        : "Recorded history — " + args[1] + " events.";
   }
+  const float subtitle_x =
+      layout.focus_button ? layout.focus_button->x +
+                                layout.focus_button->width + 8.f * s
+                          : layout.list_viewport.x;
   clipped_text(out,
-               {layout.list_viewport.x,
+               {subtitle_x,
                 layout.header.y + layout.header.height + 13.f * s},
                subtitle, muted_color,
                std::max(9, static_cast<int>(std::lround(11.f * s))),
-               std::max(1.f, layout.actor_button.x -
-                                 layout.list_viewport.x - 8.f * s),
+               std::max(1.f, layout.actor_button.x - subtitle_x -
+                                 8.f * s),
                layout.panel);
   if (snapshot_.entries.empty()) {
     clipped_text(out, {layout.empty_hint.x, layout.empty_hint.y},
@@ -638,6 +727,27 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
           dip_text, title_color, dip_pixels,
           card.contact_button->width - 4.f * s, *card.contact_button,
           TextAlign::Center);
+    }
+    for (const auto &chip : card.tag_chips) {
+      if (!intersects(chip.bounds, layout.list_viewport)) continue;
+      const bool focused = chip.tag == tag_filter_;
+      stellar::engine::ui_skin::control(
+          out, chip.bounds, chip.bounds.contains(pointer_), focused,
+          true, s);
+      const std::string chip_text = upper(chip.tag);
+      const int chip_pixels =
+          std::max(9, static_cast<int>(std::lround(10.f * s)));
+      const Text chip_probe{{}, chip_text, muted_color, chip_pixels,
+                            chip.bounds.width - 4.f * s, std::nullopt,
+                            TextAlign::Center, FontFace::Interface};
+      const auto chip_extent = measure(measure_, chip_probe);
+      clipped_text(
+          out,
+          {chip.bounds.x + chip.bounds.width * .5f,
+           chip.bounds.y +
+               (chip.bounds.height - chip_extent.height) * .5f},
+          chip_text, muted_color, chip_pixels,
+          chip.bounds.width - 4.f * s, chip.bounds, TextAlign::Center);
     }
     clipped_text(out, {card.message_bounds.x, card.message_bounds.y},
                  entry.summary, message_color,

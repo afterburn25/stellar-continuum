@@ -292,6 +292,76 @@ void entry_navigation() {
   require(!view.contact_navigation(), "Contact nav did not clear");
 }
 
+void tag_focus() {
+  engine::EventHistory history;
+  const auto add = [&](double day, std::string category,
+                       std::vector<std::string> tags) {
+    engine::HistoryEvent event;
+    event.at_day = day;
+    event.summary = category;
+    event.category = std::move(category);
+    event.tags = std::move(tags);
+    event.visible_to = {1};
+    history.record(std::move(event));
+  };
+  add(400., "war.battle", {"fleet:12", "system:5"});
+  add(410., "colony.founded", {"colony:9"});
+  add(420., "war.engagement_started", {"fleet:12"});
+  add(430., "exploration.system_surveyed", {"system:5"}); // newest
+
+  // The snapshot's tag axis is HistoryQuery::tag semantics — exact
+  // match on the recorded reference.
+  auto snap = snapshot(history, 1, 4000, {}, 0., 0, "fleet:12");
+  require(snap.total == 2 && snap.entries.size() == 2 &&
+              snap.entries[0].summary == "war.engagement_started",
+          "Tag filter did not isolate fleet:12 events");
+  snap = snapshot(history, 1, 4000, {}, 0., 0, "system:5");
+  require(snap.total == 2, "Tag filter missed system:5 events");
+  snap = snapshot(history, 1, 4000, "war.", 0., 0, "fleet:12");
+  require(snap.total == 2, "Tag filter did not compose with domain");
+  require(snapshot(history, 1).entries[0].tags.size() == 1 &&
+              snapshot(history, 1).entries[0].tags[0] == "system:5",
+          "Snapshot dropped recorded tags");
+
+  // Clicking the newest card's tag chip focuses the browser on it;
+  // re-clicking the focused chip toggles it off.
+  NativeChronicleView view;
+  native_map::InputEvent press;
+  press.type = native_map::InputEventType::LeftPressed;
+  native_map::InputEvent release = press;
+  release.type = native_map::InputEventType::LeftReleased;
+  view.open(history, 1);
+  press.position = {450.f, 175.f}; // first chip of the newest card
+  release.position = press.position;
+  require(view.handle(press, 1280, 800), "Chip press not captured");
+  require(view.handle(release, 1280, 800), "Chip release not captured");
+  require(view.tag_filter() == "system:5",
+          "Chip click did not set the tag focus");
+  require(view.current().entries.size() == 2,
+          "Focused snapshot not restricted to the tag");
+  require(view.handle(press, 1280, 800), "Focused chip press missed");
+  require(view.handle(release, 1280, 800),
+          "Focused chip release missed");
+  require(view.tag_filter().empty(),
+          "Re-clicking the focused chip did not clear it");
+  require(view.current().entries.size() == 4,
+          "Unfocused snapshot did not restore all entries");
+
+  // Focus again, then clear via the X focus button in the intro row.
+  require(view.handle(press, 1280, 800) &&
+              view.handle(release, 1280, 800),
+          "Second chip click missed");
+  require(view.tag_filter() == "system:5", "Focus not re-set");
+  press.position = {460.f, 110.f}; // focus button (intro row left)
+  release.position = press.position;
+  require(view.handle(press, 1280, 800), "Focus button press missed");
+  require(view.handle(release, 1280, 800),
+          "Focus button release missed");
+  require(view.tag_filter().empty() &&
+              view.current().entries.size() == 4,
+          "Focus button did not clear the tag focus");
+}
+
 void render_smoke() {
   auto history = make_history();
   NativeChronicleView view;
@@ -309,6 +379,7 @@ int main() {
     significance_filtering();
     actor_filtering();
     entry_navigation();
+    tag_focus();
     view_lifecycle();
     render_smoke();
   } catch (const std::exception &error) {

@@ -38,6 +38,7 @@ struct ChronicleEntry {
   std::uint64_t system_id{};  // event location; 0 = not located
   std::uint64_t contact_id{}; // single non-observer actor; 0 = none
   std::string category, date, summary;
+  std::vector<std::string> tags; // recorded entity references
 };
 
 struct ChronicleSnapshot {
@@ -54,13 +55,17 @@ struct ChronicleSnapshot {
 // still reaches deep history. `actor` (0 = all) further restricts to
 // events listing that civilization in `actors` — the difference
 // between "all intel" (events merely visible via known systems) and
-// "what a given empire actually did". `total` reports the filtered
+// "what a given empire actually did". `tag` (empty = off) restricts to
+// events carrying that exact reference tag ("fleet:12", "system:5") —
+// HistoryQuery::tag's semantics — so a tag chip becomes "everything
+// this entity did that we can see". `total` reports the filtered
 // visible count.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
          std::size_t max_entries = 4000,
          std::string_view category_prefix = {},
-         double min_significance = 0.0, std::uint64_t actor = 0);
+         double min_significance = 0.0, std::uint64_t actor = 0,
+         std::string_view tag = {});
 
 class NativeChronicleView final {
 public:
@@ -110,6 +115,11 @@ public:
       std::function<std::string(std::uint64_t)> resolver) {
     actor_name_resolver_ = std::move(resolver);
   }
+  // Active entity-focus tag (set by clicking a card's tag chip, or
+  // cleared via the focus button / re-clicking the focused chip).
+  [[nodiscard]] std::string_view tag_filter() const noexcept {
+    return tag_filter_;
+  }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
   [[nodiscard]] const ChronicleSnapshot &current() const noexcept {
@@ -140,7 +150,7 @@ public:
 
 private:
   enum class PressTarget { None, Close, Refresh, Domain, Significance,
-                           Actor, Entry, Contact };
+                           Actor, Entry, Contact, Tag, FocusClear };
   void cancel_press() noexcept;
 
   bool visible_{};
@@ -150,7 +160,8 @@ private:
   std::string domain_filter_;
   double significance_floor_{};
   std::uint64_t actor_filter_{};
-  std::size_t press_entry_{};
+  std::string tag_filter_;
+  std::size_t press_entry_{}, press_tag_{};
   std::optional<std::uint64_t> navigation_{}, contact_navigation_{};
   std::function<std::string(std::uint64_t)> actor_name_resolver_;
   ChronicleSnapshot snapshot_;

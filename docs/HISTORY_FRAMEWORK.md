@@ -135,10 +135,14 @@ gates what the observer actually sees there. Entries with exactly one
 foreign actor additionally render a DIP action: `contact_navigation()`
 drains the civilization id and the client opens the diplomacy
 workspace on that contact (first contacts, battles, treaties become
-one-click relations). Coverage:
+one-click relations). Recorded reference tags render as clickable
+chips on each card: clicking one sets `snapshot()`'s `tag` filter —
+HistoryQuery::tag's exact-match semantics — so "everything fleet:12
+did that we can see" is one click away; re-clicking the focused chip
+or the X focus button in the intro row clears it. Coverage:
 `native_chronicle` tests (snapshot ordering, observer privacy, cap +
-total, domain, significance and scope filtering, entry navigation,
-view lifecycle, refresh, render smoke).
+total, domain, significance, actor and tag filtering, entry and
+contact navigation, view lifecycle, refresh, render smoke).
 
 The admission seeding in `native_notification_events` applies a fixed
 0.35 report floor via `feed()`'s `min_significance` — the category
