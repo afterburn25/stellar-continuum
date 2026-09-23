@@ -44,6 +44,10 @@ struct RuntimeHost::Impl {
   int view_w = 0, view_h = 0;
   // Clear color from the active scene document (defaults when absent).
   std::uint8_t bg_r = 8, bg_g = 16, bg_b = 26;
+  // Scene gravity in px/s² (document-level sim setting, like the bg color).
+  float gravity = 0.f;
+  // Resolved bounce bounds — viewport-sized unless world_width/height set.
+  float world_w = 0.f, world_h = 0.f;
 };
 
 RuntimeHost::RuntimeHost(RuntimeHostOptions options)
@@ -184,6 +188,7 @@ int RuntimeHost::run() {
     impl.bg_r = doc.bg_r;
     impl.bg_g = doc.bg_g;
     impl.bg_b = doc.bg_b;
+    impl.gravity = doc.gravity;
     for (const auto e : impl.entities) world.destroy(e);
     impl.entities = spawn_scene(world, doc);
     impl.player = find_entity_by_name(world, "player");
@@ -275,6 +280,14 @@ int RuntimeHost::run() {
   int rendered = 0;
   auto last = std::chrono::steady_clock::now();
   auto scene_poll = last;
+  // Resolve world bounds up front too so the jump handler works before the
+  // first rendered frame.
+  impl.world_w = options.world_width > 0.f
+                     ? options.world_width
+                     : static_cast<float>(options.width);
+  impl.world_h = options.world_height > 0.f
+                     ? options.world_height
+                     : static_cast<float>(options.height);
   RuntimeDiagnostics::context("runtime:loop");
   for (;;) {
     const auto snapshot = window.poll();
@@ -286,6 +299,17 @@ int RuntimeHost::run() {
         if (event.key == 0x4000003e) save_world();   // F5
         if (event.key == 0x40000042) load_world();   // F9
         if (event.key == 'p') impl.paused = !impl.paused;  // P pauses the sim
+        // Platformer jump: with gravity on, up/W gives a grounded player an
+        // impulse instead of held-key velocity.
+        if (impl.gravity != 0.f && impl.player &&
+            (event.key == 'w' || event.key == 0x40000052)) {
+          const auto *t = world.get<Transform2D>(*impl.player);
+          const auto *ext = world.get<Extent2D>(*impl.player);
+          auto *v = world.get<Velocity2D>(*impl.player);
+          if (t && ext && v &&
+              t->y >= impl.world_h - ext->h - 1.f)
+            v->dy = -520.f;
+        }
       }
       if (event.type == InputEventType::KeyReleased)
         held_keys.erase(event.key);
@@ -306,10 +330,10 @@ int RuntimeHost::run() {
     impl.view_h = static_cast<int>(h);
     // World bounds default to the viewport (single-screen world); camera
     // games set world_width/height for larger levels.
-    const float world_w =
-        options.world_width > 0.f ? options.world_width : w;
-    const float world_h =
-        options.world_height > 0.f ? options.world_height : h;
+    impl.world_w = options.world_width > 0.f ? options.world_width : w;
+    impl.world_h = options.world_height > 0.f ? options.world_height : h;
+    const float world_w = impl.world_w;
+    const float world_h = impl.world_h;
 
     // Input system: WASD/arrow keys drive the entity named "player"
     // (SDL3 keycodes: arrows are 0x4000004f-0x40000052).
@@ -321,10 +345,14 @@ int RuntimeHost::run() {
         };
         const float dx = (held('d') || held(0x4000004f) ? 1.f : 0.f) -
                          (held('a') || held(0x40000050) ? 1.f : 0.f);
-        const float dy = (held('s') || held(0x40000051) ? 1.f : 0.f) -
-                         (held('w') || held(0x40000052) ? 1.f : 0.f);
         v->dx = dx * 320.f;
-        v->dy = dy * 320.f;
+        // With scene gravity active the player is a platformer: dy is
+        // owned by gravity/jump, not held-key velocity.
+        if (impl.gravity == 0.f) {
+          const float dy = (held('s') || held(0x40000051) ? 1.f : 0.f) -
+                           (held('w') || held(0x40000052) ? 1.f : 0.f);
+          v->dy = dy * 320.f;
+        }
       }
     }
 
@@ -341,6 +369,10 @@ int RuntimeHost::run() {
         auto *v = world.get<Velocity2D>(entity);
         const auto *ext = world.get<Extent2D>(entity);
         if (!t || !v || !ext) continue;
+        if (impl.gravity != 0.f) {
+          const auto *gs = world.get<GravityScale>(entity);
+          v->dy += impl.gravity * (gs ? gs->value : 1.f) * dt_step;
+        }
         t->x += v->dx * dt_step;
         t->y += v->dy * dt_step;
         bool bounced = false;
@@ -350,8 +382,14 @@ int RuntimeHost::run() {
           t->x = std::clamp(t->x, 0.f, world_w - ext->w);
         }
         if (t->y < 0 || t->y > world_h - ext->h) {
-          v->dy = -v->dy;
-          bounced = true;
+          // Gravity-affected entities come to rest on the floor instead of
+          // bouncing forever; the ceiling still deflects them downward.
+          const auto *gs = world.get<GravityScale>(entity);
+          const bool rests = impl.gravity != 0.f &&
+                             (gs ? gs->value : 1.f) != 0.f &&
+                             t->y > world_h - ext->h;
+          v->dy = rests ? 0.f : -v->dy;
+          bounced = !rests;
           t->y = std::clamp(t->y, 0.f, world_h - ext->h);
         }
         if (bounced && impl.player && entity == *impl.player && bounce_clip)

@@ -195,8 +195,8 @@ struct Shell {
   UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
       hit_scene_size{}, hit_scene_color{}, hit_scene_layer{},
-      hit_scene_parallax{}, hit_scene_text{},
-      scene_preview{}, scene_rows{};
+      hit_scene_parallax{}, hit_scene_text{}, hit_scene_grav{},
+      hit_scene_gravity{}, scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
@@ -943,6 +943,21 @@ bool parse_color(std::string_view text, std::uint8_t &r, std::uint8_t &g,
 }
 
 void commit_scene_field(Shell &shell) {
+  // Field 11 is document-level (scene gravity) — no entity needed.
+  if (shell.scene_field == 11) {
+    try {
+      const float g = std::stof(shell.scene_buffer);
+      shell.scene_history.commit(shell.scene_doc);
+      shell.scene_doc.gravity = g;
+      shell.scene_modified = true;
+      shell.status = "scene gravity " + std::to_string(g) +
+                     " - SAVE to persist";
+    } catch (const std::exception &) {
+      shell.status = "invalid value - use a number like 600";
+    }
+    shell.scene_buffer.clear();
+    return;
+  }
   auto *entity = selected_scene_entity(shell);
   if (entity == nullptr) {
     shell.scene_buffer.clear();
@@ -981,6 +996,12 @@ void commit_scene_field(Shell &shell) {
   } else if (shell.scene_field == 9) {
     next.text = shell.scene_buffer;
     ok = true;
+  } else if (shell.scene_field == 10) {
+    try {
+      next.gravity_scale = std::stof(shell.scene_buffer);
+      ok = true;
+    } catch (const std::exception &) {
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1018,7 +1039,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
     shell.hit_scene_name = shell.hit_scene_pos = shell.hit_scene_vel =
         shell.hit_scene_sprite = shell.hit_scene_size =
             shell.hit_scene_color = shell.hit_scene_layer =
-                shell.hit_scene_parallax = shell.hit_scene_text = {};
+                shell.hit_scene_parallax = shell.hit_scene_text =
+                    shell.hit_scene_grav = shell.hit_scene_gravity = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1177,6 +1199,14 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit_scene_text, "text", entity ? entity->text : "",
         shell.editing_scene && shell.scene_field == 9,
         "centered label drawn in the rect");
+  field(shell.hit_scene_grav, "grav",
+        entity ? std::to_string(entity->gravity_scale) : "",
+        shell.editing_scene && shell.scene_field == 10,
+        "gravity multiplier - 0 ignores scene gravity");
+  field(shell.hit_scene_gravity, "gravity",
+        std::to_string(shell.scene_doc.gravity),
+        shell.editing_scene && shell.scene_field == 11,
+        "scene px/s^2 - 0 disables");
   if (entity == nullptr)
     line(out, px, fy, "", "select or add an entity", font);
 }
@@ -2016,6 +2046,11 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = std::to_string(e->parallax);
               else if (field == 9 && e)
                 shell.scene_buffer = e->text;
+              else if (field == 10 && e)
+                shell.scene_buffer = std::to_string(e->gravity_scale);
+              else if (field == 11)
+                shell.scene_buffer =
+                    std::to_string(shell.scene_doc.gravity);
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2037,6 +2072,10 @@ int main(int argc, char **argv) {
               edit_field(8);
             else if (shell.hit_scene_text.contains(event.position))
               edit_field(9);
+            else if (shell.hit_scene_grav.contains(event.position))
+              edit_field(10);
+            else if (shell.hit_scene_gravity.contains(event.position))
+              edit_field(11);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

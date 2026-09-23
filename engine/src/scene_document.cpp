@@ -28,10 +28,12 @@ std::string SceneDocument::to_json() const {
     if (e.layer != 0) item["layer"] = e.layer;
     if (e.parallax != 1.0f) item["parallax"] = e.parallax;
     if (!e.text.empty()) item["text"] = e.text;
+    if (e.gravity_scale != 1.0f) item["gravityScale"] = e.gravity_scale;
     items.push_back(std::move(item));
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
+  if (gravity != 0.0f) doc["gravity"] = gravity;
   return doc.dump(2) + "\n";
 }
 
@@ -76,6 +78,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       entity.layer = item.value("layer", 0);
       entity.parallax = item.value("parallax", 1.0f);
       entity.text = item.value("text", std::string{});
+      entity.gravity_scale = item.value("gravityScale", 1.0f);
       scene.entities.push_back(std::move(entity));
     }
     if (doc.contains("background")) {
@@ -86,6 +89,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       scene.bg_g = bg[1].get<std::uint8_t>();
       scene.bg_b = bg[2].get<std::uint8_t>();
     }
+    scene.gravity = doc.value("gravity", 0.0f);
   } catch (const std::exception &e) {
     return fail(std::string("malformed entity: ") + e.what());
   }

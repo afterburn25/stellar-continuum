@@ -48,6 +48,10 @@ struct Label {
   // Centered text drawn inside the entity's rect (button/caption text).
   std::string value;
 };
+struct GravityScale {
+  // Multiplies the scene's gravity on this entity (0 ignores gravity).
+  float value{1.0f};
+};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

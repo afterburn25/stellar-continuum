@@ -31,12 +31,18 @@ struct SceneEntity {
   // Optional centered text label drawn inside the entity's rect (after any
   // sprite) — turns a tinted rect into a button or caption.
   std::string text;
+  // Multiplies the document's gravity on this entity: 0 ignores gravity
+  // (HUD, static scenery), 1 is full strength, 2 falls twice as fast.
+  float gravity_scale{1.0f};
 };
 
 struct SceneDocument {
   std::vector<SceneEntity> entities;
   // Background clear color; defaults to the engine's dark space blue.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
+  // Downward acceleration in px/s² applied to entities' velocity each sim
+  // step (scaled per entity by gravityScale). 0 disables gravity.
+  float gravity{0.0f};
 
   static constexpr std::string_view filename{"scene.json"};
 
