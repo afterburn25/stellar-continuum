@@ -1,9 +1,0 @@
-{
-  "id": "game.e2e-tile",
-  "name": "e2e-tile",
-  "priority": 0,
-  "provides": [
-    "game.e2e-tile"
-  ],
-  "version": "0.1.0"
-}
