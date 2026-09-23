@@ -129,16 +129,20 @@ int main(int argc,char**argv){try{
   write(project/"game.demo/content/nested/data.json","{\"v\":1}");
   fs::create_directories(project/"game.demo/content/img");
   fs::copy_file(root/"source/moon.png",project/"game.demo/content/img/moon.png");
+  // A second package stands in for a mod — its content must be reachable
+  // through the resolver's package-qualified lookups.
+  write(project/"mod.expansion/content/mod-note.txt","mod payload");
+  write(project/"mod.expansion/package.json","{}");
   AssetCookOptions g;g.scan_content=true;g.package_group="game.demo";g.root=project;
   g.output=project/"build/cooked";g.cache=project/"build/cache";g.report=project/"build/report.json";g.threads=2;
   std::size_t last_done=0,last_total=0;
   g.progress=[&](std::size_t d,std::size_t t){last_done=d;last_total=t;};
   cook_asset_repository(g);
-  require(last_done==4&&last_total==4,"Cook progress callback not fired");
+  require(last_done==6&&last_total==6,"Cook progress callback not fired");
   const auto gm=g.output/"Content/runtime.stmanifest";
   require(fs::is_regular_file(gm),"Scan-mode manifest missing");
   AssetRegistry gr(gm);gr.validate_all();
-  require(gr.records().size()==4,"Scan-mode asset count wrong");
+  require(gr.records().size()==6,"Scan-mode asset count wrong");
   const auto*img=gr.find("game.demo/content/img/moon.png");
   require(img&&img->type=="texture","Scan-mode image not texture-cooked");
   const auto*doc=gr.find("game.demo/content/readme.txt");
@@ -150,13 +154,21 @@ int main(int argc,char**argv){try{
   // ContentResolver serves the same paths from the dev-layout cooked
   // manifest (project/build/cooked) and the loose source tree.
   ContentResolver resolver{"game.demo",project,project/"build/host"};
-  require(resolver.cooked_count()==4,"ContentResolver cooked count wrong");
+  require(resolver.cooked_count()==6,"ContentResolver cooked count wrong");
   const auto*resolved_rec=resolver.find_cooked("readme.txt");
   require(resolved_rec&&resolved_rec->id==doc->id,"ContentResolver cooked lookup missed");
   const auto resolved=resolver.read_bytes("readme.txt");
   require(resolved&&std::string(resolved->begin(),resolved->end())=="hello engine","ContentResolver cooked bytes wrong");
   require(resolver.loose_path("readme.txt")==project/"packages/game.demo/content/readme.txt","ContentResolver loose path wrong");
   require(!resolver.read_bytes("missing.bin").has_value(),"ContentResolver should miss absent assets");
+  // Package-qualified lookups reach non-base packages (mod content).
+  const auto*mod_rec=resolver.find_cooked("mod.expansion","mod-note.txt");
+  require(mod_rec!=nullptr,"ContentResolver qualified cooked lookup missed");
+  const auto mod_bytes=resolver.read_bytes("mod.expansion","mod-note.txt");
+  require(mod_bytes&&std::string(mod_bytes->begin(),mod_bytes->end())=="mod payload","ContentResolver qualified bytes wrong");
+  const auto qual=resolver.read_bytes("mod.expansion:mod-note.txt");
+  require(qual&&std::string(qual->begin(),qual->end())=="mod payload","ContentResolver pkg:path form wrong");
+  require(resolver.loose_path("mod.expansion","mod-note.txt")==project/"packages/mod.expansion/content/mod-note.txt","ContentResolver qualified loose path wrong");
  }
  std::cout<<"Asset cooker, mip loading, deterministic cache and integrity checks passed\n";return 0;
 }catch(const std::exception&e){unmount_asset_registry();std::cerr<<e.what()<<'\n';return 1;}}

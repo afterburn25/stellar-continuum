@@ -23,15 +23,26 @@ ContentResolver::ContentResolver(std::string package_id,
 }
 
 const AssetRecord *ContentResolver::find_cooked(std::string_view relpath) const {
+  return find_cooked(package_id_, relpath);
+}
+
+const AssetRecord *ContentResolver::find_cooked(std::string_view package,
+                                                std::string_view relpath) const {
   if (!cooked_) return nullptr;
   std::string alias{relpath};
   std::replace(alias.begin(), alias.end(), '\\', '/');
-  return cooked_->find(package_id_ + "/content/" + alias);
+  return cooked_->find(std::string{package} + "/content/" + alias);
 }
 
 std::optional<std::vector<std::uint8_t>>
 ContentResolver::read_cooked(std::string_view relpath, std::size_t chunk) const {
-  const auto *record = find_cooked(relpath);
+  return read_cooked(package_id_, relpath, chunk);
+}
+
+std::optional<std::vector<std::uint8_t>>
+ContentResolver::read_cooked(std::string_view package, std::string_view relpath,
+                             std::size_t chunk) const {
+  const auto *record = find_cooked(package, relpath);
   if (record == nullptr || chunk >= record->chunks.size()) return std::nullopt;
   try {
     return cooked_->read(*record, chunk);
@@ -42,14 +53,38 @@ ContentResolver::read_cooked(std::string_view relpath, std::size_t chunk) const 
 
 std::filesystem::path
 ContentResolver::loose_path(std::string_view relpath) const {
-  return project_root_ / "packages" / package_id_ / "content" /
-         std::filesystem::path(std::string{relpath});
+  return loose_path(package_id_, relpath);
+}
+
+std::filesystem::path
+ContentResolver::loose_path(std::string_view package,
+                            std::string_view relpath) const {
+  return project_root_ / "packages" / std::filesystem::path(std::string{package}) /
+         "content" / std::filesystem::path(std::string{relpath});
 }
 
 std::optional<std::vector<std::uint8_t>>
 ContentResolver::read_bytes(std::string_view relpath) const {
-  if (const auto cooked = read_cooked(relpath, 0)) return cooked;
-  const auto path = loose_path(relpath);
+  // "package:relpath" qualifies the lookup against another package's
+  // content (e.g. a mod); a bare relpath uses the base package.
+  if (const auto sep = relpath.find(':'); sep != std::string_view::npos) {
+    const auto package = relpath.substr(0, sep);
+    const auto rest = relpath.substr(sep + 1);
+    if (sep > 1 && !rest.empty() &&
+        package.find('/') == std::string_view::npos &&
+        package.find('\\') == std::string_view::npos &&
+        rest.find(':') == std::string_view::npos) {
+      return read_bytes(package, rest);
+    }
+  }
+  return read_bytes(package_id_, relpath);
+}
+
+std::optional<std::vector<std::uint8_t>>
+ContentResolver::read_bytes(std::string_view package,
+                            std::string_view relpath) const {
+  if (const auto cooked = read_cooked(package, relpath, 0)) return cooked;
+  const auto path = loose_path(package, relpath);
   std::ifstream in(path, std::ios::binary);
   if (!in) return std::nullopt;
   return std::vector<std::uint8_t>{std::istreambuf_iterator<char>(in),

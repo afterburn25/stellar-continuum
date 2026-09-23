@@ -26,18 +26,30 @@ public:
 
   [[nodiscard]] const std::string &package_id() const { return package_id_; }
   // Cooked manifest record for the content-relative path, or nullptr.
+  // The two-arg overload resolves against an explicit package (e.g. a
+  // mod); the single-arg form resolves against the base package.
   [[nodiscard]] const AssetRecord *find_cooked(std::string_view relpath) const;
+  [[nodiscard]] const AssetRecord *find_cooked(std::string_view package,
+                                               std::string_view relpath) const;
   // Decoded bytes of a cooked chunk; nullopt when uncooked or absent.
   [[nodiscard]] std::optional<std::vector<std::uint8_t>>
   read_cooked(std::string_view relpath, std::size_t chunk = 0) const;
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>>
+  read_cooked(std::string_view package, std::string_view relpath,
+              std::size_t chunk = 0) const;
   // Loose source path under packages/<id>/content/ (may not exist).
   [[nodiscard]] std::filesystem::path loose_path(std::string_view relpath) const;
+  [[nodiscard]] std::filesystem::path loose_path(std::string_view package,
+                                               std::string_view relpath) const;
   // The asset's primary bytes — cooked chunk 0 (file-like payloads such as
   // audio) or the whole loose file; nullopt if neither layer serves the
   // path. Multi-chunk payloads (e.g. BC7 mip chains) should use
-  // find_cooked + per-chunk reads instead.
+  // find_cooked + per-chunk reads instead. The single-arg form also
+  // accepts a qualified "package:relpath" string for mod content.
   [[nodiscard]] std::optional<std::vector<std::uint8_t>>
   read_bytes(std::string_view relpath) const;
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>>
+  read_bytes(std::string_view package, std::string_view relpath) const;
   [[nodiscard]] std::size_t cooked_count() const;
 
 private:
