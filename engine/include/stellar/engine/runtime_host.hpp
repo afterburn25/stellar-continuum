@@ -253,6 +253,10 @@ public:
   std::function<void(EntityId entity, std::size_t map, int cx, int cy,
                      int tile)>
       on_tile_land;
+  // Fires once per entity when a scene spawns (load, hot-reload, runtime
+  // spawn_entity) — attach game-defined components keyed off the authored
+  // `data`/`name` fields. Runs synchronously during the spawn call.
+  std::function<void(World &, EntityId, const SceneEntity &)> on_spawn;
 
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /

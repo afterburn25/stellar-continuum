@@ -503,6 +503,10 @@ int RuntimeHost::run() {
           sp != nullptr && !sp->value.empty())
         impl.sprites[i] = decode_sprite(sp->value);
       attach_vfx(impl.entities[i]);
+      // Game-defined component attach: zip the spawned id with its
+      // authored record (spawn order matches document order).
+      if (on_spawn && i < doc.entities.size())
+        on_spawn(world, impl.entities[i], doc.entities[i]);
     }
   };
 
@@ -535,6 +539,7 @@ int RuntimeHost::run() {
     impl.sprites.push_back(
         entity.sprite.empty() ? nullptr : decode_sprite(entity.sprite));
     attach_vfx(ids.front());
+    if (on_spawn) on_spawn(world, ids.front(), entity);
     return ids.front();
   };
   impl.destroy_fn = [&](EntityId id) -> bool {
