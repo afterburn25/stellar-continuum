@@ -101,6 +101,16 @@ std::vector<std::string> InputMapper::context_stack() const {
   return stack_;
 }
 
+std::vector<std::string> InputMapper::context_names() const {
+  std::vector<std::string> names;
+  names.reserve(contexts_.size());
+  for (const auto &[name, ctx] : contexts_) {
+    (void)ctx;
+    names.push_back(name);
+  }
+  return names;
+}
+
 bool InputMapper::binding_matches(const InputBinding &binding,
                                   const RawInputEvent &event) const {
   // A release event resolves bindings registered for the matching press

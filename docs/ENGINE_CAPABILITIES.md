@@ -86,6 +86,16 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   path, honors camera transform and per-tilemap parallax, and runs tile
   collision inside the same authoritative movement pass as solid/oneway
   entities — not a parallel approximation.
+- **RuntimeHost input actions:** the host now feeds every platform event into
+  an `InputMapper` — a built-in "game" context (move_left/right/up/down on
+  WASD+arrows, jump on Space/W/Up, fire on Space/LMB, mine on C) drives the
+  player, so `RuntimeHostOptions::input_map`/`--input-map` JSON stacks
+  project contexts on top and `host.input()` exposes `pressed`/`just_pressed`/
+  `axis`/`rebind` to game code. `InputMapper::context_names()` enumerates
+  registered contexts so a loaded map activates without name plumbing.
+  Covered by `input_actions` tests (context_names enumeration plus the
+  existing feed/axis/chord/rebind suite); verified `--input-map` loads and
+  degrades to defaults on missing/malformed files.
 - **Consumers:** `RuntimeHost` generated hosts (rendering, gravity landing,
   wall blocking, grounded jumps, hot reload); the shell Scene tool (TILES
   toggle button, tileset/tilesize/columns/collide/layer/parallax/cells/paint

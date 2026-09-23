@@ -81,6 +81,9 @@ public:
   void pop_context();
   void clear_contexts();
   std::vector<std::string> context_stack() const;
+  // All registered context names (unordered) — needed to activate a
+  // freshly loaded map file.
+  std::vector<std::string> context_names() const;
 
   // Feeds one raw event. Returns true when a context consumed it.
   bool feed(const RawInputEvent &event);

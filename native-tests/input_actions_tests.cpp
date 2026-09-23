@@ -1,5 +1,6 @@
 #include <stellar/engine/input_actions.hpp>
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -120,6 +121,14 @@ int main() {
   check(!mapper.just_pressed("confirm"), "old binding gone");
   mapper.feed(key(RawInputEvent::Kind::KeyPress, 90));
   check(mapper.just_pressed("confirm"), "new binding works");
+
+  // Registered-context enumeration (activating a freshly loaded map).
+  const auto names = mapper.context_names();
+  check(names.size() == 2 &&
+            std::find(names.begin(), names.end(), "GALAXY") !=
+                names.end() &&
+            std::find(names.begin(), names.end(), "UI") != names.end(),
+        "context_names lists registered contexts");
 
   if (failures == 0)
     std::cout << "InputMapper tests passed\n";

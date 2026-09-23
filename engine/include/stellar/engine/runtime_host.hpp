@@ -1,6 +1,7 @@
 #pragma once
 
 #include "stellar/engine/content_resolver.hpp"
+#include "stellar/engine/input_actions.hpp"
 #include "stellar/engine/scene_components.hpp"
 #include "stellar/engine/vfx.hpp"
 #include "stellar/engine/world.hpp"
@@ -60,6 +61,10 @@ struct RuntimeHostOptions {
   // impulse, both in world units/second.
   float player_move_speed{320.f};
   float player_jump_impulse{520.f};
+  // Optional project-relative input map JSON (InputMapper contexts). When
+  // absent/unreadable the built-in defaults apply: move_left/right/up/down
+  // on WASD+arrows, jump on Space/W/Up.
+  std::string input_map;
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content
@@ -85,6 +90,11 @@ public:
   [[nodiscard]] audio::AudioOutput &audio();
   // The entity named "player" in the active scene, if any.
   [[nodiscard]] std::optional<EntityId> player() const;
+  // The rebindable action layer: built-in "game" context
+  // (move_left/right/up/down, jump) drives the player, and games can push
+  // their own contexts or load a map file (RuntimeHostOptions::input_map).
+  // Action state updates from the same events the callbacks observe.
+  [[nodiscard]] InputMapper &input();
   // The entity carrying the scene's Tilemap component (grid terrain), if
   // the document has one. Cell state is authoritative: mutate it through
   // world().get<Tilemap>(...) for destructible terrain — it snapshots with
@@ -155,7 +165,7 @@ public:
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /
   // `--scene <path>` / `--width` / `--height` / `--fullscreen` /
   // `--world-w` / `--world-h` / `--speed` / `--move-speed` / `--jump` /
-  // `--save <path>` overrides.
+  // `--save <path>` / `--input-map <path>` overrides.
   int run();
   int run(int argc, char **argv);
 

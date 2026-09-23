@@ -11,6 +11,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <set>
 #include <string_view>
 #include <unordered_set>
@@ -30,6 +32,8 @@ struct RuntimeHost::Impl {
   std::vector<EntityId> entities;
   std::vector<std::shared_ptr<const RgbaImage>> sprites;
   std::optional<EntityId> player;
+  // Rebindable action layer; built-in "game" context feeds player movement.
+  InputMapper input;
   bool quit_requested = false;
   bool paused = false;
   double time_scale = 1.0;
@@ -90,6 +94,7 @@ World &RuntimeHost::world() { return impl_->world; }
 const ContentResolver &RuntimeHost::content() const { return *impl_->content; }
 audio::AudioOutput &RuntimeHost::audio() { return *impl_->audio; }
 std::optional<EntityId> RuntimeHost::player() const { return impl_->player; }
+InputMapper &RuntimeHost::input() { return impl_->input; }
 std::optional<EntityId> RuntimeHost::tilemap_entity() const {
   return impl_->tilemap_e;
 }
@@ -332,7 +337,50 @@ int RuntimeHost::run() {
     }
   };
 
-  std::unordered_set<std::uint32_t> held_keys;
+  // Default input context — the player-control actions. A project input
+  // map JSON replaces/extends these via input_mapper.load_contexts.
+  {
+    InputContext game{"game"};
+    auto key = [](int code) {
+      return InputBinding{RawInputEvent::Kind::KeyPress, code, 1.f, {}};
+    };
+    game.actions.push_back(
+        InputAction{"move_left", InputAction::Type::Button,
+                    {key('a'), key(0x40000050)}});
+    game.actions.push_back(
+        InputAction{"move_right", InputAction::Type::Button,
+                    {key('d'), key(0x4000004f)}});
+    game.actions.push_back(
+        InputAction{"move_up", InputAction::Type::Button,
+                    {key('w'), key(0x40000052)}});
+    game.actions.push_back(
+        InputAction{"move_down", InputAction::Type::Button,
+                    {key('s'), key(0x40000051)}});
+    game.actions.push_back(
+        InputAction{"jump", InputAction::Type::Button,
+                    {key(' '), key('w'), key(0x40000052)}});
+    game.actions.push_back(
+        InputAction{"fire", InputAction::Type::Button,
+                    {key(' '),
+                     {RawInputEvent::Kind::MouseButton, 1, 1.f, {}}}});
+    game.actions.push_back(
+        InputAction{"mine", InputAction::Type::Button, {key('c')}});
+    impl.input.add_context(std::move(game));
+    impl.input.push_context("game");
+    if (!options.input_map.empty()) {
+      const auto path = options.project_root / options.input_map;
+      std::ifstream in(path);
+      if (in) {
+        const std::string text{std::istreambuf_iterator<char>(in),
+                               std::istreambuf_iterator<char>()};
+        // Loaded contexts stack on top of "game": non-exclusive ones fall
+        // through to the defaults, exclusive ones take over.
+        if (impl.input.load_contexts(text))
+          for (const auto &name : impl.input.context_names())
+            if (name != "game") impl.input.push_context(name);
+      }
+    }
+  }
   float accumulator = 0.f;
   int rendered = 0;
   auto last = std::chrono::steady_clock::now();
@@ -349,25 +397,73 @@ int RuntimeHost::run() {
   for (;;) {
     const auto snapshot = window.poll();
     if (snapshot.quit_requested || impl.quit_requested) break;
+    impl.input.begin_frame();
     for (const auto &event : snapshot.events) {
       if (event.type == InputEventType::EscapePressed) return 0;
+      // Feed the action mapper with a normalized raw event so game
+      // actions (and the built-in player controls) see every input.
+      RawInputEvent raw{};
+      bool feed_raw = true;
+      switch (event.type) {
+      case InputEventType::KeyPressed:
+        raw.kind = RawInputEvent::Kind::KeyPress;
+        raw.code = static_cast<int>(event.key);
+        break;
+      case InputEventType::KeyReleased:
+        raw.kind = RawInputEvent::Kind::KeyRelease;
+        raw.code = static_cast<int>(event.key);
+        break;
+      case InputEventType::LeftPressed:
+      case InputEventType::RightPressed:
+      case InputEventType::LeftReleased:
+      case InputEventType::RightReleased:
+        raw.kind = RawInputEvent::Kind::MouseButton;
+        raw.code = (event.type == InputEventType::LeftPressed ||
+                    event.type == InputEventType::LeftReleased)
+                       ? 1
+                       : 3;
+        raw.pressed = (event.type == InputEventType::LeftPressed ||
+                       event.type == InputEventType::RightPressed);
+        break;
+      case InputEventType::PointerMove:
+        raw.kind = RawInputEvent::Kind::MouseMotion;
+        raw.x = event.delta.x;
+        raw.y = event.delta.y;
+        break;
+      case InputEventType::Wheel:
+        raw.kind = RawInputEvent::Kind::MouseWheel;
+        raw.y = event.wheel_y;
+        break;
+      case InputEventType::BackspacePressed:
+        raw.kind = RawInputEvent::Kind::KeyPress;
+        raw.code = 8;
+        break;
+      default:
+        feed_raw = false;
+        break;
+      }
+      if (feed_raw) {
+        impl.input.feed(raw);
+        // Instantaneous key events clear held state immediately.
+        if (event.type == InputEventType::BackspacePressed) {
+          raw.kind = RawInputEvent::Kind::KeyRelease;
+          impl.input.feed(raw);
+        }
+      }
       if (event.type == InputEventType::KeyPressed) {
-        held_keys.insert(event.key);
         if (event.key == 0x4000003e) save_world();   // F5
         if (event.key == 0x40000042) load_world();   // F9
         if (event.key == 'p') impl.paused = !impl.paused;  // P pauses the sim
-        // Platformer jump: with gravity on, up/W gives a grounded player an
-        // impulse instead of held-key velocity.
-        if (impl.gravity != 0.f && impl.player &&
-            (event.key == 'w' || event.key == 0x40000052)) {
-          auto *v = world.get<Velocity2D>(*impl.player);
-          if (v && impl.grounded.count(impl.player->value()))
-            v->dy = -options.player_jump_impulse;
-        }
       }
-      if (event.type == InputEventType::KeyReleased)
-        held_keys.erase(event.key);
       if (on_event) on_event(event);
+    }
+    // Platformer jump: with gravity on, the jump action gives a grounded
+    // player an impulse instead of held-key velocity.
+    if (impl.gravity != 0.f && impl.player &&
+        impl.input.just_pressed("jump")) {
+      auto *v = world.get<Velocity2D>(*impl.player);
+      if (v && impl.grounded.count(impl.player->value()))
+        v->dy = -options.player_jump_impulse;
     }
     if (!snapshot.renderable()) continue;
 
@@ -389,22 +485,21 @@ int RuntimeHost::run() {
     const float world_w = impl.world_w;
     const float world_h = impl.world_h;
 
-    // Input system: WASD/arrow keys drive the entity named "player"
-    // (SDL3 keycodes: arrows are 0x4000004f-0x40000052).
+    // Input system: the "game" context's move actions drive the entity
+    // named "player" — rebindable via the project input map.
     if (impl.player) {
       auto *v = world.get<Velocity2D>(*impl.player);
       if (v) {
-        const auto held = [&](std::uint32_t k) {
-          return held_keys.count(k) != 0;
-        };
-        const float dx = (held('d') || held(0x4000004f) ? 1.f : 0.f) -
-                         (held('a') || held(0x40000050) ? 1.f : 0.f);
+        const float dx =
+            (impl.input.pressed("move_right") ? 1.f : 0.f) -
+            (impl.input.pressed("move_left") ? 1.f : 0.f);
         v->dx = dx * options.player_move_speed;
         // With scene gravity active the player is a platformer: dy is
         // owned by gravity/jump, not held-key velocity.
         if (impl.gravity == 0.f) {
-          const float dy = (held('s') || held(0x40000051) ? 1.f : 0.f) -
-                           (held('w') || held(0x40000052) ? 1.f : 0.f);
+          const float dy =
+              (impl.input.pressed("move_down") ? 1.f : 0.f) -
+              (impl.input.pressed("move_up") ? 1.f : 0.f);
           v->dy = dy * options.player_move_speed;
         }
       }
@@ -928,6 +1023,8 @@ int RuntimeHost::run(int argc, char **argv) {
     else if (arg == "--jump")
       impl_->options.player_jump_impulse =
           static_cast<float>(std::atof(argv[++i]));
+    else if (arg == "--input-map")
+      impl_->options.input_map = argv[++i];
   }
   return run();
 }
