@@ -42,6 +42,7 @@
 #include <iostream>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -189,6 +190,10 @@ struct Shell {
   UiRect hit_scene_add{}, hit_scene_del{}, hit_scene_save{},
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
       scene_preview{}, scene_rows{};
+  // Decoded scene sprites keyed by resolved content path; cleared on
+  // document reload so re-imported art refreshes.
+  std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
+      scene_sprites;
   std::string status{"ready"};
 };
 
@@ -771,6 +776,7 @@ void load_scene(Shell &shell) {
   shell.scene_doc = engine::SceneDocument{};
   shell.selected_entity = static_cast<std::size_t>(-1);
   shell.scene_modified = false;
+  shell.scene_sprites.clear();
   if (!shell.project) return;
   std::string error;
   if (auto doc = engine::SceneDocument::load(scene_path(shell), &error))
@@ -910,7 +916,27 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   for (std::size_t i = 0; i < shell.scene_doc.entities.size(); ++i) {
     const auto &e = shell.scene_doc.entities[i];
     const UiRect rect{pv.x + e.x * sx, pv.y + e.y * sy, e.w * sx, e.h * sy};
-    out.overlay.push_back(FilledRectangle{rect, {e.r, e.g, e.b, 200}});
+    std::shared_ptr<const RgbaImage> sprite;
+    if (!e.sprite.empty()) {
+      const auto full = (shell.project->root / "packages" /
+                         shell.project->id / "content" / e.sprite)
+                            .lexically_normal();
+      const auto key = full.generic_string();
+      if (const auto it = shell.scene_sprites.find(key);
+          it != shell.scene_sprites.end()) {
+        sprite = it->second;
+      } else {
+        try {
+          sprite = decode_rgba_image(full, 1024);
+        } catch (const std::exception &) {
+        }
+        shell.scene_sprites[key] = sprite;
+      }
+    }
+    if (sprite)
+      out.overlay.push_back(Image{sprite, rect});
+    else
+      out.overlay.push_back(FilledRectangle{rect, {e.r, e.g, e.b, 200}});
     if (i == shell.selected_entity)
       out.overlay.push_back(StrokedRectangle{rect, accent});
   }

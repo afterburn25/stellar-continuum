@@ -257,6 +257,7 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
        << "  auto spawn_entities = [&](const engine::SceneDocument &doc) {\n"
        << "    for (const auto e : entities) world.destroy(e);\n"
        << "    entities.clear();\n"
+       << "    player.reset();\n"
        << "    sprites.assign(doc.entities.size(), {});\n"
        << "    for (std::size_t i = 0; i < doc.entities.size(); ++i) {\n"
        << "      const auto &s = doc.entities[i];\n"
