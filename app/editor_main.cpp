@@ -11,6 +11,7 @@
 #include "editor_project.hpp"
 
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/stellar_population_profiles.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/native_map_platform.hpp>
@@ -155,6 +156,10 @@ struct Editor {
   engine::VirtualizedList system_list;
   std::vector<std::size_t> filtered;
 
+  // Scrollable authoritative detail rows for the selected system.
+  engine::VirtualizedList detail_list;
+  std::vector<std::pair<std::string, std::string>> detail_rows;
+
   // Annotation layer + text editing state.
   std::unordered_map<int, edproj::SystemEdit> edits;
   engine::UndoHistory<std::unordered_map<int, edproj::SystemEdit>> history{64};
@@ -166,7 +171,7 @@ struct Editor {
   std::vector<int> hit_sizes;
   UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{};
-  UiRect viewport{}, inspector{}, list_rect{}, rows_rect{};
+  UiRect viewport{}, inspector{}, list_rect{}, rows_rect{}, detail_rect{};
   std::filesystem::path project_path;
   float pointer_x{}, pointer_y{};
 
@@ -241,6 +246,91 @@ void apply_redo(Editor &ed) {
   }
 }
 
+std::string fspec(const char *format, double value) {
+  char buffer[48];
+  std::snprintf(buffer, sizeof(buffer), format, value);
+  return buffer;
+}
+
+// Flattens the selected system's authoritative generated record into
+// label/value rows for the scrollable inspector detail list.
+void rebuild_detail_rows(Editor &ed) {
+  ed.detail_rows.clear();
+  ed.detail_list.scroll_to(0);
+  if (ed.selected >= ed.systems.size()) {
+    ed.detail_list.row_count = 0;
+    return;
+  }
+  const auto &sys = ed.systems[ed.selected];
+  auto row = [&ed](std::string label, std::string value) {
+    ed.detail_rows.emplace_back(std::move(label), std::move(value));
+  };
+  row("name", sys.name);
+  row("id", std::to_string(sys.id));
+  row("position",
+      fspec("%.1f", sys.position.x) + ", " + fspec("%.1f", sys.position.y));
+  if (sys.primary)
+    row("primary", std::string(class_name(*sys.primary)));
+  if (sys.secondary)
+    row("secondary", std::string(class_name(*sys.secondary)));
+  if (sys.tertiary)
+    row("tertiary", std::string(class_name(*sys.tertiary)));
+  row("archetype", std::string(archetype_name(sys.archetype)));
+  std::string flags;
+  if (sys.has_habitable_world) flags += "habitable ";
+  if (sys.has_anomaly) flags += "anomaly ";
+  if (sys.has_rare_resource) flags += "rare-resource ";
+  if (sys.has_pre_warp_civilization) flags += "pre-warp-civ";
+  row("traits", flags.empty() ? "none" : flags);
+  if (sys.stellar_region)
+    row("region", std::string(core::stellar_region_name(*sys.stellar_region)));
+
+  if (sys.stellar_object) {
+    const auto &o = *sys.stellar_object;
+    row("object", std::string(core::stellar_object_definition(o.type).name));
+    row("mass", fspec("%.3f", o.mass_solar) + " M");
+    row("radius", fspec("%.3f", o.radius_solar) + " R");
+    row("luminosity", fspec("%.3f", o.luminosity_solar) + " L");
+    row("temperature", fspec("%.0f", o.effective_temperature_kelvin) + " K");
+    row("age", fspec("%.0f", o.age_myr) + " Myr");
+    row("habitable zone",
+        fspec("%.2f", o.inner_hz_au) + " - " + fspec("%.2f", o.outer_hz_au) +
+            " AU");
+    row("safe approach", fspec("%.3f", o.safe_approach_au) + " AU");
+    if (o.active) row("state", "active");
+    if (o.measured_anchor) row("anchor", "measured catalog");
+  }
+
+  if (sys.stellar_orbits) {
+    const auto &orb = *sys.stellar_orbits;
+    row("companions", std::to_string(orb.companions.size()));
+    for (std::size_t i = 0; i < orb.companions.size(); ++i)
+      row("companion " + std::to_string(i + 1),
+          std::string(
+              core::stellar_object_definition(orb.companions[i].type).name));
+    row("planet bindings", std::to_string(orb.planets.size()));
+    row("relative orbits", std::to_string(orb.relative_orbits.size()));
+    row("belt host", core::stellar_host_name(orb.belt_host));
+  }
+
+  if (sys.small_body_fields) {
+    row("small-body fields", std::to_string(sys.small_body_fields->size()));
+    for (const auto &field : *sys.small_body_fields)
+      row(std::string(core::small_body_field_name(field.type)),
+          std::to_string(field.body_count) + " bodies, " +
+              fspec("%.1f", field.inner_radius_au) + "-" +
+              fspec("%.1f", field.outer_radius_au) + " AU");
+  }
+
+  if (sys.stellar_activity)
+    for (std::size_t i = 0; i < sys.stellar_activity->size(); ++i)
+      row("activity " + core::stellar_host_name(static_cast<int>(i)),
+          std::string(core::stellar_activity_name(
+              (*sys.stellar_activity)[i].profile.level)));
+
+  ed.detail_list.row_count = ed.detail_rows.size();
+}
+
 Point world_to_screen(const Editor &ed, float x, float y) {
   const auto &v = ed.viewport;
   return {v.x + v.width * .5f + (x - ed.camera.x) * ed.pixels_per_unit,
@@ -262,13 +352,6 @@ void fit_camera(Editor &ed) {
   const float span_y = std::max(1.f, max_y - min_y);
   ed.pixels_per_unit =
       std::min(ed.viewport.width / span_x, ed.viewport.height / span_y) * .9f;
-}
-
-void line(DrawList &out, float x, float &y, std::string label,
-          std::string value, int font = 13) {
-  out.text.push_back(Text{{x, y}, std::move(label), muted, font});
-  out.text.push_back(Text{{x + 130.f, y}, std::move(value), ink, font});
-  y += font + 8.f;
 }
 
 void field_box(DrawList &out, UiRect r, const std::string &value, bool active,
@@ -349,29 +432,38 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   small_button(out, ed.hit_bookmark,
                stored.bookmarked ? "BOOKMARKED" : "BOOKMARK",
                stored.bookmarked, font);
-  y += ed.hit_bookmark.height + 12 * s;
+  y += ed.hit_bookmark.height + 10 * s;
 
-  line(out, x, y, "name", sys.name, font);
-  line(out, x, y, "id", std::to_string(sys.id), font);
-  char buffer[64];
-  std::snprintf(buffer, sizeof(buffer), "%.1f, %.1f", sys.position.x,
-                sys.position.y);
-  line(out, x, y, "position", buffer, font);
-  if (sys.primary)
-    line(out, x, y, "primary", std::string(class_name(*sys.primary)), font);
-  if (sys.secondary)
-    line(out, x, y, "secondary",
-         std::string(class_name(*sys.secondary)), font);
-  if (sys.tertiary)
-    line(out, x, y, "tertiary", std::string(class_name(*sys.tertiary)), font);
-  line(out, x, y, "archetype", std::string(archetype_name(sys.archetype)),
-       font);
-  std::string flags;
-  if (sys.has_habitable_world) flags += "habitable ";
-  if (sys.has_anomaly) flags += "anomaly ";
-  if (sys.has_rare_resource) flags += "rare-resource ";
-  if (sys.has_pre_warp_civilization) flags += "pre-warp-civ";
-  line(out, x, y, "traits", flags.empty() ? "none" : flags, font);
+  // Scrollable authoritative detail rows fill the space above the docked
+  // project/history buttons.
+  const UiRect detail{x, y, r.width - 28 * s,
+                      std::max(0.f, ed.hit_undo.y - 8 * s - y)};
+  ed.detail_rect = detail;
+  out.overlay.push_back(FilledRectangle{detail, {5, 13, 22, 255}});
+  out.overlay.push_back(StrokedRectangle{detail, panel_edge});
+  ed.detail_list.viewport_height = detail.height;
+  ed.detail_list.row_height = font + 8.f;
+  const auto range = ed.detail_list.visible_range();
+  float ry = detail.y + 4 * s - ed.detail_list.scroll_offset +
+             range.first * ed.detail_list.row_height;
+  for (std::size_t i = range.first; i < range.last;
+       ++i, ry += ed.detail_list.row_height) {
+    const auto &[label, value] = ed.detail_rows[i];
+    out.text.push_back(Text{{detail.x + 8 * s, ry + 2}, label, muted,
+                            font - 1, 100 * s, detail});
+    out.text.push_back(Text{{detail.x + 112 * s, ry + 2}, value, ink,
+                            font - 1, 0, detail});
+  }
+  if (ed.detail_list.max_scroll() > 0) {
+    const float track = detail.height;
+    const float thumb = std::max(
+        20.f, track * track / (track + ed.detail_list.max_scroll()));
+    const float t = ed.detail_list.scroll_offset / ed.detail_list.max_scroll();
+    out.overlay.push_back(
+        FilledRectangle{{detail.x + detail.width - 5.f,
+                         detail.y + t * (track - thumb), 4.f, thumb},
+                        accent});
+  }
 }
 
 void render_system_list(DrawList &out, Editor &ed, float s) {
@@ -590,6 +682,7 @@ int main(int argc, char **argv) {
           // Annotations survive regeneration: ids are deterministic for the
           // same seed+count, and a new seed simply orphans old edits.
           rebuild_filter(ed);
+          rebuild_detail_rows(ed);
           ed.system_list.scroll_to(0);
           fit_camera(ed);
           ed.status = "ready - " + std::to_string(ed.systems.size()) +
@@ -720,6 +813,7 @@ int main(int argc, char **argv) {
               }
             }
             ed.selected = best_index;
+            rebuild_detail_rows(ed);
           }
         }
         // List row clicks select and center; wheel scrolls the list.
@@ -732,11 +826,16 @@ int main(int argc, char **argv) {
           if (row < ed.filtered.size()) {
             ed.selected = ed.filtered[row];
             ed.system_list.ensure_visible(row);
+            rebuild_detail_rows(ed);
           }
         }
         if (event.type == InputEventType::Wheel &&
             ed.list_rect.contains(event.position))
           ed.system_list.scroll_to(ed.system_list.scroll_offset -
+                                   event.wheel_y * 40.f);
+        if (event.type == InputEventType::Wheel &&
+            ed.detail_rect.contains(event.position))
+          ed.detail_list.scroll_to(ed.detail_list.scroll_offset -
                                    event.wheel_y * 40.f);
         if (event.type == InputEventType::PointerMove && ed.dragging)
           ed.camera = {ed.camera_origin.x -
