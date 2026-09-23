@@ -489,6 +489,15 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   for(const auto &b:w.bodies){
     if(!systems.contains(b.system_id))emit("planet","orphaned_body",b.id,"Planetary body references an absent system.");
     if(b.parent_body_id&&!bodies.contains(*b.parent_body_id))emit("planet","orphaned_parent",b.id,"Moon references an absent parent body.");
+    // Parent chains that revisit a body can never resolve to a host.
+    if(b.parent_body_id){
+      std::unordered_set<int> seen{b.id};std::optional<int> cur=b.parent_body_id;
+      while(cur&&seen.insert(*cur).second){
+        const auto it=std::find_if(w.bodies.begin(),w.bodies.end(),[&](const auto &x){return x.id==*cur;});
+        cur=it==w.bodies.end()?std::nullopt:it->parent_body_id;
+      }
+      if(cur)emit("planet","cyclic_parent",b.id,"Body parent chain revisits a body.");
+    }
     positive(b.radius_earth,"Body radius",b.id,"planet");positive(b.mass_earth,"Body mass",b.id,"planet");
   }
   for(const auto &c:w.colonies){
