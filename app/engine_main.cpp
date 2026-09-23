@@ -663,7 +663,7 @@ void import_asset(Shell &shell) {
 // Headless project pipeline — no window is created, so the full loop is
 // scriptable (CI, external tools, testing). Returns a process exit code.
 //   --create <name> [--root <dir>] [--template windowed|blank]
-//   --cook|--build|--package <project-root>
+//   --cook|--build|--package|--run <project-root>
 int run_headless(Shell &shell, const std::vector<std::string> &args) {
   const auto &op = args.front();
   if (op == "--create") {
@@ -732,6 +732,31 @@ int run_headless(Shell &shell, const std::vector<std::string> &args) {
       const auto message = package_project_sync(project->root, exe_name);
       std::cout << message << '\n';
       return message.starts_with("packaged") ? 0 : 1;
+    }
+    if (op == "--run") {
+      for (const auto dir : {project->root / "build" / "host" / "Release",
+                             project->root / "build" / "host"}) {
+        const auto exe = dir / (exe_name + ".exe");
+        if (std::filesystem::is_regular_file(exe)) {
+          SHELLEXECUTEINFOA info{};
+          info.cbSize = sizeof(info);
+          info.fMask = SEE_MASK_NOCLOSEPROCESS;
+          info.lpVerb = "open";
+          info.lpFile = exe.string().c_str();
+          info.lpDirectory = project->root.string().c_str();
+          info.nShow = SW_SHOW;
+          if (ShellExecuteExA(&info) && info.hProcess != nullptr) {
+            std::cout << "running " << exe_name << ".exe (pid "
+                      << GetProcessId(info.hProcess) << ")\n";
+            CloseHandle(info.hProcess);
+            return 0;
+          }
+          std::cerr << "launch failed: " << exe_name << ".exe\n";
+          return 1;
+        }
+      }
+      std::cerr << "no built host - run --build first\n";
+      return 1;
     }
   } catch (const std::exception &e) {
     std::cerr << op << " failed: " << e.what() << '\n';
@@ -1573,7 +1598,8 @@ int main(int argc, char **argv) {
         args.emplace_back(argv[i]);
 #endif
       if (args.front() == "--create" || args.front() == "--cook" ||
-          args.front() == "--build" || args.front() == "--package")
+          args.front() == "--build" || args.front() == "--package" ||
+          args.front() == "--run")
         return run_headless(shell, args);
     }
     auto arg_str = [&](int i) {
