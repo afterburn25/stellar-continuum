@@ -110,6 +110,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   SAVE/LOAD exercise `serialize()`/`restore()`; every
   `MissionEffectEvent` the runtime publishes lands in the effect log —
   the first consumer of the previously unwired `mission_graph`
+  framework. The PHYSICS tab is a `PhysicsWorld` inspector — a
+  drifting mover crossing a trigger volume (enter/exit events logged
+  from `advance()`), layer-masked bodies, RAYCAST/SWEEP queries from
+  the selected body to the target, STEP/RUN integration and a body
+  table — the first consumer of the previously unwired `physics`
   framework.
   Generated game projects scaffold a `SimulationExecutor` demo — new
   games start with deterministic LOD scheduling wired into the loop —

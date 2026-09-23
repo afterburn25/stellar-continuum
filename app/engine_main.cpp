@@ -36,6 +36,7 @@
 #include <stellar/engine/warfare.hpp>
 #include <stellar/engine/mission_graph.hpp>
 #include <stellar/engine/event_bus.hpp>
+#include <stellar/engine/physics.hpp>
 #include <stellar/engine/terraforming.hpp>
 #include <stellar/engine/flow_network.hpp>
 #include <stellar/engine/logistics.hpp>
@@ -80,16 +81,18 @@ constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
                   Localization, Simulation, Colony, Economy, Planet,
-                  Ai, Warfare, Missions };
+                  Ai, Warfare, Missions, Physics };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
                             Tool::Localization, Tool::Simulation,
                             Tool::Colony, Tool::Economy, Tool::Planet,
-                            Tool::Ai, Tool::Warfare, Tool::Missions};
-constexpr std::array<const char *, 14> kToolNames{
+                            Tool::Ai, Tool::Warfare, Tool::Missions,
+                            Tool::Physics};
+constexpr std::array<const char *, 15> kToolNames{
     "Projects", "Dashboard", "Scene",     "Scene3D",
     "Assets",   "Profiler",  "Localization", "Simulation", "Colony",
-    "Economy",  "Planet",    "AI",        "Warfare",   "Missions"};
+    "Economy",  "Planet",    "AI",        "Warfare",   "Missions",
+    "Physics"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -440,6 +443,26 @@ struct Shell {
   UiRect hit_mis_fire{}, hit_mis_step{}, hit_mis_run{}, hit_mis_choose{},
       hit_mis_save{}, hit_mis_load{}, hit_mis_reset{};
   std::vector<UiRect> hit_mis_instances;
+
+  // Physics tool: a PhysicsWorld inspector — circles/AABBs with layers,
+  // a drifting mover crossing a trigger volume, raycast and swept-circle
+  // queries against the live broadphase, and the trigger enter/exit
+  // event log produced by advance().
+  struct PhysicsDemo {
+    bool initialized{false};
+    engine::PhysicsWorld world{128.0f};
+    double seconds{0.0};
+    bool running{false};
+    double run_accum{0.0};
+    engine::PhysicsBodyId selected{0};
+    engine::PhysicsBodyId mover{0};
+    engine::PhysicsBodyId target{0};
+    std::string last_query{"none"};
+    std::vector<std::string> log;
+  } phys;
+  UiRect hit_phys_step{}, hit_phys_run{}, hit_phys_ray{},
+      hit_phys_sweep{}, hit_phys_reset{};
+  std::vector<UiRect> hit_phys_bodies;
   std::string status{"ready"};
 };
 
@@ -4212,6 +4235,125 @@ void render_missions(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
+void phys_log(Shell::PhysicsDemo &phys, std::string entry) {
+  phys.log.push_back(std::move(entry));
+  if (phys.log.size() > 12) phys.log.erase(phys.log.begin());
+}
+
+void init_physics(Shell::PhysicsDemo &phys) {
+  phys.world = engine::PhysicsWorld{128.0f};
+  // A drifting mover that crosses a trigger volume, a wall AABB and a
+  // static target the raycast/sweep queries aim at.
+  phys.mover = phys.world.add_body(
+      {engine::PhysicsShapeKind::Circle, 24.0f, 0.0f, 0.0f},
+      40.0f, 200.0f, /*layer*/ 1, /*trigger*/ false);
+  phys.world.set_velocity(phys.mover, 90.0f, 6.0f);
+  phys.world.add_body({engine::PhysicsShapeKind::Aabb, 0.0f, 16.0f, 90.0f},
+                      320.0f, 60.0f, 1, false); // wall
+  phys.world.add_body(
+      {engine::PhysicsShapeKind::Circle, 70.0f, 0.0f, 0.0f},
+      430.0f, 160.0f, 2, true); // trigger zone (own layer)
+  phys.target = phys.world.add_body(
+      {engine::PhysicsShapeKind::Circle, 30.0f, 0.0f, 0.0f},
+      560.0f, 260.0f, 1, false);
+  phys.world.add_body({engine::PhysicsShapeKind::Aabb, 0.0f, 20.0f, 20.0f},
+                      180.0f, 420.0f, 4, false); // off-mask platform
+  phys.seconds = 0.0;
+  phys.selected = phys.mover;
+  phys.last_query = "none";
+  phys.log.clear();
+  phys.running = false;
+  phys.run_accum = 0.0;
+  phys.initialized = true;
+}
+
+void phys_step(Shell::PhysicsDemo &phys, double dt) {
+  const auto events = phys.world.advance(static_cast<float>(dt));
+  phys.seconds += dt;
+  for (const auto &e : events) {
+    char buf[160];
+    std::snprintf(buf, sizeof(buf), "trigger %llu %s body %llu",
+                  static_cast<unsigned long long>(e.trigger),
+                  e.entered ? "ENTER" : "EXIT",
+                  static_cast<unsigned long long>(e.other));
+    phys_log(phys, buf);
+  }
+}
+
+void render_physics(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &phys = shell.phys;
+  if (!phys.initialized) init_physics(phys);
+  auto &w = phys.world;
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "PHYSICS WORLD");
+
+  shell.hit_phys_step = {x, y, 96 * s, 24 * s};
+  shell_button(out, shell.hit_phys_step, "STEP 0.5", !phys.running, font, s);
+  shell.hit_phys_run = {x + 104 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_phys_run, phys.running ? "PAUSE" : "RUN",
+               phys.running, font, s);
+  shell.hit_phys_ray = {x + 194 * s, y, 96 * s, 24 * s};
+  shell_button(out, shell.hit_phys_ray, "RAYCAST", !phys.running, font, s);
+  shell.hit_phys_sweep = {x + 298 * s, y, 84 * s, 24 * s};
+  shell_button(out, shell.hit_phys_sweep, "SWEEP", !phys.running, font, s);
+  shell.hit_phys_reset = {x + 390 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_phys_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[200];
+  std::snprintf(buf, sizeof(buf), "t=%.1fs  bodies %zu", phys.seconds,
+                w.size());
+  line(out, x, y, "world", buf, font);
+  line(out, x, y, "last query", phys.last_query, font);
+  y += 6 * s;
+
+  heading(out, x, y, "BODIES");
+  const float row_h = 20 * s;
+  shell.hit_phys_bodies.clear();
+  std::vector<const engine::PhysicsBody *> bodies;
+  // PhysicsWorld exposes ids via queries, not an iterator — gather the
+  // live set with a broad overlap query over the demo bounds.
+  for (const auto id : w.overlap_aabb(-1000.0f, -1000.0f, 2000.0f,
+                                      2000.0f)) {
+    if (const auto *b = w.body(id)) bodies.push_back(b);
+  }
+  std::sort(bodies.begin(), bodies.end(),
+            [](const auto *a, const auto *b) { return a->id < b->id; });
+  for (const auto *b : bodies) {
+    UiRect row{x, y, body.width * 0.62f, row_h};
+    shell.hit_phys_bodies.push_back(row);
+    out.overlay.push_back(FilledRectangle{
+        row, b->id == phys.selected ? Color{26, 48, 76, 255}
+                                    : Color{6, 16, 26, 255}});
+    std::snprintf(buf, sizeof(buf),
+                  "#%-3llu %-6s pos (%5.0f,%5.0f) vel (%4.0f,%4.0f) "
+                  "layer %u%s",
+                  static_cast<unsigned long long>(b->id),
+                  b->shape.kind == engine::PhysicsShapeKind::Circle
+                      ? "circle" : "aabb",
+                  b->x, b->y, b->velocity_x, b->velocity_y, b->layer,
+                  b->trigger ? "  TRIGGER" : "");
+    out.overlay.push_back(Text{{x + 8 * s, y + 3 * s}, buf, ink, font});
+    y += row_h + 3 * s;
+  }
+  y += 8 * s;
+
+  heading(out, x, y, "TRIGGER EVENT LOG");
+  for (const auto &entry : phys.log) {
+    out.overlay.push_back(Text{{x, y}, entry, muted, font});
+    y += 16 * s;
+  }
+  if (phys.log.empty()) {
+    out.overlay.push_back(
+        Text{{x, y}, "no trigger events yet - the mover crosses a "
+              "trigger volume as time advances", muted, font});
+    y += 16 * s;
+  }
+}
+
 // Summarizes project content freshness: source file count and whether the
 // newest change postdates the cooked manifest (i.e. needs a recook).
 void update_content_status(Shell &shell) {
@@ -5532,6 +5674,9 @@ int main(int argc, char **argv) {
       case Tool::Missions:
         render_missions(draw, shell, body, s);
         break;
+      case Tool::Physics:
+        render_physics(draw, shell, body, s);
+        break;
       }
 
       draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
@@ -5988,6 +6133,70 @@ int main(int argc, char **argv) {
             }
           }
         }
+        if (shell.tool == Tool::Physics &&
+            event.type == InputEventType::LeftReleased) {
+          auto &phys = shell.phys;
+          auto &world = phys.world;
+          if (shell.hit_phys_step.contains(event.position)) {
+            phys_step(phys, 0.5);
+          } else if (shell.hit_phys_run.contains(event.position)) {
+            phys.running = !phys.running;
+            phys.run_accum = 0.0;
+          } else if (shell.hit_phys_ray.contains(event.position)) {
+            if (const auto *from = world.body(phys.selected)) {
+              if (const auto *to = world.body(phys.target)) {
+                const float dx = to->x - from->x;
+                const float dy = to->y - from->y;
+                const float dist = std::sqrt(dx * dx + dy * dy);
+                if (const auto hit =
+                        world.raycast(from->x, from->y, dx, dy, dist)) {
+                  char buf[160];
+                  std::snprintf(buf, sizeof(buf),
+                                "ray -> body %llu at %.0f (%.0f,%.0f)",
+                                static_cast<unsigned long long>(hit->body),
+                                hit->distance, hit->x, hit->y);
+                  phys.last_query = buf;
+                } else {
+                  phys.last_query = "ray -> no hit";
+                }
+              }
+            }
+          } else if (shell.hit_phys_sweep.contains(event.position)) {
+            if (const auto *from = world.body(phys.selected)) {
+              if (const auto *to = world.body(phys.target)) {
+                const float dx = to->x - from->x;
+                const float dy = to->y - from->y;
+                const float dist = std::sqrt(dx * dx + dy * dy);
+                if (const auto hit =
+                        world.sweep_circle(from->x, from->y, 12.0f, dx, dy,
+                                       dist)) {
+                  char buf[160];
+                  std::snprintf(buf, sizeof(buf),
+                                "sweep r12 -> body %llu at %.0f",
+                                static_cast<unsigned long long>(hit->body),
+                                hit->distance);
+                  phys.last_query = buf;
+                } else {
+                  phys.last_query = "sweep -> no hit";
+                }
+              }
+            }
+          } else if (shell.hit_phys_reset.contains(event.position)) {
+            phys = Shell::PhysicsDemo{};
+            init_physics(phys);
+          } else {
+            auto ids = world.overlap_aabb(-1000.0f, -1000.0f, 2000.0f,
+                                          2000.0f);
+            std::sort(ids.begin(), ids.end());
+            for (std::size_t i = 0;
+                 i < shell.hit_phys_bodies.size() && i < ids.size(); ++i) {
+              if (shell.hit_phys_bodies[i].contains(event.position)) {
+                phys.selected = ids[i];
+                break;
+              }
+            }
+          }
+        }
       }
 
       FrameTiming timing;
@@ -6015,6 +6224,13 @@ int main(int argc, char **argv) {
           shell.war.run_accum = 0.0;
           shell.war.model.advance(5.0);
           shell.war.day += 5.0;
+        }
+      }
+      if (shell.tool == Tool::Physics && shell.phys.running) {
+        shell.phys.run_accum += elapsed;
+        if (shell.phys.run_accum >= 0.25) {
+          shell.phys.run_accum = 0.0;
+          phys_step(shell.phys, 0.25);
         }
       }
       if (shell.tool == Tool::Missions && shell.missions.running) {
