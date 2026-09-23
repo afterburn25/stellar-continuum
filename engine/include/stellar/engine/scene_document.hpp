@@ -71,6 +71,8 @@ struct SceneEntity {
 // (indexed left-to-right, top-to-bottom) painted at grid positions.
 struct SceneTilemap {
   std::string tileset;      // content-relative image path
+  float x{0.f}, y{0.f};     // grid origin in world px — chunked/procedural
+                            // maps place tiles at nonzero offsets
   int tile_w{32}, tile_h{32};
   int columns{0};           // map cells per row (rows = cells.size()/columns)
   int layer{-100};          // draw order vs entities (default: behind all)

@@ -102,6 +102,7 @@ struct Opacity {
 // (destructible terrain) part of the authoritative world snapshot.
 struct Tilemap {
   std::string tileset;    // content-relative tile sheet image
+  float x{0.f}, y{0.f};   // grid origin in world px
   int tile_w{32}, tile_h{32};
   int columns{0};         // cells per row; rows = cells.size()/columns
   int layer{-100};        // draw order vs entities

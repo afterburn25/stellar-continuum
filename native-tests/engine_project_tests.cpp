@@ -227,6 +227,8 @@ int main() {
     scene.tilemaps.push_back(engine::SceneTilemap{});
     auto &tm1 = scene.tilemaps.back();
     tm1.tileset = "sprites/deco.png";
+    tm1.x = 64.f;
+    tm1.y = -128.f;
     tm1.tile_w = 16;
     tm1.tile_h = 16;
     tm1.columns = 8;
@@ -263,6 +265,8 @@ int main() {
               reparsed->tilemaps[0].cells.size() == 8 &&
               reparsed->tilemaps[0].cells[5] == 1 &&
               reparsed->tilemaps[1].tileset == "sprites/deco.png" &&
+              reparsed->tilemaps[1].x == 64.f &&
+              reparsed->tilemaps[1].y == -128.f &&
               reparsed->tilemaps[1].tile_w == 16 &&
               reparsed->tilemaps[1].layer == 5 &&
               reparsed->tilemaps[1].parallax == 0.5f &&

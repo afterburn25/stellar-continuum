@@ -73,8 +73,10 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   layer between entities, and optionally participating in authoritative
   collision (side-blocking, top landing, grounded detection for jump).
 - **Engine APIs/ownership:** `SceneDocument::tilemaps` is a vector of
-  `SceneTilemap` (tileset path, `tileW`/`tileH` cell size, `columns`,
-  `layer`, `parallax`, `collide`, `cells` with `-1` empty) serialized as a
+  `SceneTilemap` (tileset path, `x`/`y` grid origin in world px —
+  chunked/procedural maps place tiles at nonzero offsets, `tileW`/`tileH`
+  cell size, `columns`, `layer`, `parallax`, `collide`, `cells` with `-1`
+  empty) serialized as a
   `"tilemaps"` JSON array with strict per-entry validation (positive
   dimensions, cell count divisible by columns); legacy single-`"tilemap"`
   documents still parse as a one-element array. `spawn_scene` carries each

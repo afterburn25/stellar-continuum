@@ -137,8 +137,10 @@ int RuntimeHost::tile_at(std::size_t map, float world_x,
   const auto *tm = impl_->world.get<Tilemap>(impl_->tilemap_es[map]);
   if (!tm || tm->tile_w <= 0 || tm->tile_h <= 0 || tm->columns <= 0)
     return -1;
-  const int cx = static_cast<int>(std::floor(world_x / tm->tile_w));
-  const int cy = static_cast<int>(std::floor(world_y / tm->tile_h));
+  const int cx =
+      static_cast<int>(std::floor((world_x - tm->x) / tm->tile_w));
+  const int cy =
+      static_cast<int>(std::floor((world_y - tm->y) / tm->tile_h));
   if (cx < 0 || cy < 0 || cx >= tm->columns) return -1;
   const auto idx = static_cast<std::size_t>(cy * tm->columns + cx);
   return idx < tm->cells.size() ? tm->cells[idx] : -1;
@@ -152,8 +154,10 @@ bool RuntimeHost::set_tile_at(std::size_t map, float world_x,
   auto *tm = impl_->world.get<Tilemap>(impl_->tilemap_es[map]);
   if (!tm || tm->tile_w <= 0 || tm->tile_h <= 0 || tm->columns <= 0)
     return false;
-  const int cx = static_cast<int>(std::floor(world_x / tm->tile_w));
-  const int cy = static_cast<int>(std::floor(world_y / tm->tile_h));
+  const int cx =
+      static_cast<int>(std::floor((world_x - tm->x) / tm->tile_w));
+  const int cy =
+      static_cast<int>(std::floor((world_y - tm->y) / tm->tile_h));
   if (cx < 0 || cy < 0 || cx >= tm->columns) return false;
   const auto idx = static_cast<std::size_t>(cy * tm->columns + cx);
   if (idx >= tm->cells.size())
@@ -475,8 +479,9 @@ int RuntimeHost::run() {
   // treat them identically.
   impl.spawn_tilemap_fn = [&](const SceneTilemap &s) -> EntityId {
     const auto e = world.create();
-    world.add(e, Tilemap{s.tileset, s.tile_w, s.tile_h, s.columns,
-                         s.layer, s.parallax, s.collide, s.cells});
+    world.add(e, Tilemap{s.tileset, s.x, s.y, s.tile_w, s.tile_h,
+                         s.columns, s.layer, s.parallax, s.collide,
+                         s.cells});
     impl.tilemap_es.push_back(e);
     impl.tileset_imgs.push_back(
         s.tileset.empty() ? nullptr : decode_sprite(s.tileset));
@@ -748,8 +753,10 @@ int RuntimeHost::run() {
       // One map's cell test — per-map geometry means each layer needs
       // its own grid lookup (not the any-layer solid_cell).
       const auto cell_of = [](const Tilemap &tm, float px, float py) {
-        const int cx = static_cast<int>(std::floor(px / tm.tile_w));
-        const int cy = static_cast<int>(std::floor(py / tm.tile_h));
+        const int cx =
+            static_cast<int>(std::floor((px - tm.x) / tm.tile_w));
+        const int cy =
+            static_cast<int>(std::floor((py - tm.y) / tm.tile_h));
         if (cx < 0 || cy < 0 || cx >= tm.columns) return false;
         const auto idx = static_cast<std::size_t>(cy * tm.columns + cx);
         return idx < tm.cells.size() && tm.cells[idx] >= 0;
@@ -874,10 +881,11 @@ int RuntimeHost::run() {
           }
           if (blocker) {
             const auto &tm = *blocker;
-            const int col = static_cast<int>(std::floor(lead / tm.tile_w));
+            const int col = static_cast<int>(
+                std::floor((lead - tm.x) / tm.tile_w));
             t->x = v->dx > 0.f
-                       ? col * tm.tile_w - ext->w
-                       : (col + 1) * static_cast<float>(tm.tile_w);
+                       ? tm.x + col * tm.tile_w - ext->w
+                       : tm.x + (col + 1) * static_cast<float>(tm.tile_w);
             v->dx = 0.f;
           }
         }
@@ -913,10 +921,11 @@ int RuntimeHost::run() {
             for (float px = t->x + 1.f; px <= t->x + ext->w - 1.f;
                  px += step_x) {
               const int row = static_cast<int>(
-                  std::floor((t->y + ext->h) / tm.tile_h));
+                  std::floor((t->y + ext->h - tm.y) / tm.tile_h));
               if (cell_of(tm, px, t->y + ext->h) &&
-                  prev_bottom <= row * tm.tile_h + 1.f) {
-                t->y = row * static_cast<float>(tm.tile_h) - ext->h;
+                  prev_bottom <= tm.y + row * tm.tile_h + 1.f) {
+                t->y = tm.y + row * static_cast<float>(tm.tile_h) -
+                       ext->h;
                 v->dy = 0.f;
                 break;
               }
@@ -967,9 +976,10 @@ int RuntimeHost::run() {
                 continue;
               const auto &tm = *ground_tm;
               const float below = t->y + ext->h + 0.5f;
-              const int row =
-                  static_cast<int>(std::floor(below / tm.tile_h));
-              if (std::abs(t->y + ext->h - row * tm.tile_h) > 1.5f)
+              const int row = static_cast<int>(
+                  std::floor((below - tm.y) / tm.tile_h));
+              if (std::abs(t->y + ext->h - (tm.y + row * tm.tile_h)) >
+                  1.5f)
                 continue;
               const float step_x = std::max(1.f, tm.tile_w - 1.f);
               for (float px = t->x + 1.f; px <= t->x + ext->w - 1.f;
@@ -1125,8 +1135,8 @@ int RuntimeHost::run() {
         for (int cx = 0; cx < tm.columns; ++cx) {
           const int cell = tm.cells[cy * tm.columns + cx];
           if (cell < 0) continue;
-          const UiRect dest{(cx * tm.tile_w - px) * impl.cam_zoom,
-                            (cy * tm.tile_h - py) * impl.cam_zoom,
+          const UiRect dest{(tm.x + cx * tm.tile_w - px) * impl.cam_zoom,
+                            (tm.y + cy * tm.tile_h - py) * impl.cam_zoom,
                             tm.tile_w * impl.cam_zoom,
                             tm.tile_h * impl.cam_zoom};
           if (dest.x + dest.width < 0 || dest.y + dest.height < 0 ||

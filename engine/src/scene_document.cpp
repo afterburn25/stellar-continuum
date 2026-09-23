@@ -54,6 +54,8 @@ std::string SceneDocument::to_json() const {
     for (const auto &tilemap : tilemaps) {
       nlohmann::json tm;
       tm["tileset"] = tilemap.tileset;
+      if (tilemap.x != 0.f) tm["x"] = tilemap.x;
+      if (tilemap.y != 0.f) tm["y"] = tilemap.y;
       tm["tileW"] = tilemap.tile_w;
       tm["tileH"] = tilemap.tile_h;
       tm["columns"] = tilemap.columns;
@@ -149,6 +151,8 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
         return false;
       }
       map.tileset = tm.value("tileset", std::string{});
+      map.x = tm.value("x", 0.0f);
+      map.y = tm.value("y", 0.0f);
       map.tile_w = tm.value("tileW", 32);
       map.tile_h = tm.value("tileH", 32);
       map.columns = tm.value("columns", 0);

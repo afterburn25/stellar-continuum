@@ -147,9 +147,10 @@ physics: doc-level gravity, landing on solid tops, side blocking,
 grounded W/Up jump), sprite-strip `frames`/`fps` (horizontal cells,
 sim-time indexed), `rotation`, `ttl` (sim-time self-destruct),
 `flipX`/`flipY`, `visible`. Scenes also carry a `tilemaps`
-array (`SceneTilemap`: tileset image path, `tileW`/`tileH`,
-`columns`, `layer`, `parallax`, `collide`, row-major `cells` with
-`-1` empty; legacy single-`"tilemap"` documents still parse) —
+array (`SceneTilemap`: tileset image path, `x`/`y` grid origin in
+world px, `tileW`/`tileH`, `columns`, `layer`, `parallax`, `collide`,
+row-major `cells` with `-1` empty; legacy single-`"tilemap"` documents
+still parse) —
 each tilemap lives in the world as a `Tilemap` component on its own
 dedicated entity in document order (`host.tilemap_entities()`,
 `tilemap_entity()` returns the first), so cell state is authoritative:

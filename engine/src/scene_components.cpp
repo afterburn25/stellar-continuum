@@ -91,6 +91,9 @@ std::vector<std::uint8_t> encode_tilemap(const Tilemap &t) {
   out.push_back(t.collide ? 1 : 0);
   put_u32(out, static_cast<std::uint32_t>(t.cells.size()));
   for (const int c : t.cells) put_i32(out, c);
+  // Appended fields decode as 0 on pre-origin payloads.
+  put_f32(out, t.x);
+  put_f32(out, t.y);
   return out;
 }
 
@@ -112,6 +115,11 @@ Tilemap decode_tilemap(const std::vector<std::uint8_t> &b) {
   t.cells.reserve(count);
   for (std::uint32_t i = 0; i < count; ++i)
     t.cells.push_back(static_cast<int>(get_u32(b, at)));
+  // Grid origin was appended after the cell array — absent on old saves.
+  const std::uint32_t xb = get_u32(b, at);
+  std::memcpy(&t.x, &xb, 4);
+  const std::uint32_t yb = get_u32(b, at);
+  std::memcpy(&t.y, &yb, 4);
   return t;
 }
 
@@ -200,8 +208,8 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
   // semantics stay stable.
   for (const auto &s : doc.tilemaps)
     world.add(world.create(),
-              Tilemap{s.tileset, s.tile_w, s.tile_h, s.columns, s.layer,
-                      s.parallax, s.collide, s.cells});
+              Tilemap{s.tileset, s.x, s.y, s.tile_w, s.tile_h, s.columns,
+                      s.layer, s.parallax, s.collide, s.cells});
   return spawned;
 }
 
@@ -221,10 +229,11 @@ SceneDocument scene_from_world(const World &world) {
   SceneDocument doc;
   for (const auto entity : world.entities()) {
     if (const auto *tm = world.get<Tilemap>(entity)) {
-      doc.tilemaps.push_back(SceneTilemap{tm->tileset, tm->tile_w,
-                                          tm->tile_h, tm->columns,
-                                          tm->layer, tm->parallax,
-                                          tm->collide, tm->cells});
+      doc.tilemaps.push_back(SceneTilemap{tm->tileset, tm->x, tm->y,
+                                          tm->tile_w, tm->tile_h,
+                                          tm->columns, tm->layer,
+                                          tm->parallax, tm->collide,
+                                          tm->cells});
       continue;
     }
     const auto *name = world.get<EntityName>(entity);

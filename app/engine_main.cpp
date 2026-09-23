@@ -207,6 +207,7 @@ struct Shell {
       hit_scene_tilesize{}, hit_scene_tilecols{},
       hit_scene_tilecollide{}, hit_scene_tilelayer{},
       hit_scene_tilepar{}, hit_scene_tilecells{},
+      hit_scene_tileorigin{},
       hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_music{},
       hit_scene_spin{}, hit_scene_worldsize{}, hit_scene_bounce{},
       scene_preview{}, scene_rows{};
@@ -1077,6 +1078,8 @@ void commit_scene_field(Shell &shell) {
         ok = true;
       } catch (const std::exception &) {
       }
+    } else if (shell.scene_field == 40) {
+      ok = parse_pair(shell.scene_buffer, tm.x, tm.y);
     } else if (shell.scene_field == 36) {
       tm.cells.clear();
       std::stringstream ss(shell.scene_buffer);
@@ -1267,8 +1270,10 @@ void paint_tile_at(Shell &shell, float wx, float wy) {
   if (tmap == nullptr) return;
   auto &tm = *tmap;
   if (tm.tile_w <= 0 || tm.tile_h <= 0 || tm.columns <= 0) return;
-  const int cx = static_cast<int>(std::floor(wx / tm.tile_w));
-  const int cy = static_cast<int>(std::floor(wy / tm.tile_h));
+  const int cx =
+      static_cast<int>(std::floor((wx - tm.x) / tm.tile_w));
+  const int cy =
+      static_cast<int>(std::floor((wy - tm.y) / tm.tile_h));
   if (cx < 0 || cy < 0 || cx >= tm.columns) return;
   const std::size_t idx = static_cast<std::size_t>(cy) * tm.columns + cx;
   if (idx >= tm.cells.size())
@@ -1309,6 +1314,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         shell.hit_scene_tilesize = shell.hit_scene_tilecols =
             shell.hit_scene_tilecollide = shell.hit_scene_tilelayer =
                 shell.hit_scene_tilepar = shell.hit_scene_tilecells =
+                shell.hit_scene_tileorigin =
                     shell.hit_scene_paint = shell.hit_scene_paintcell =
                         shell.hit_scene_music = shell.hit_scene_spin =
                             shell.hit_scene_worldsize =
@@ -1455,8 +1461,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
       for (int cx = 0; cx < tm.columns; ++cx) {
         const int cell = tm.cells[cy * tm.columns + cx];
         if (cell < 0) continue;
-        const UiRect rect{pv.x + cx * tm.tile_w * sx,
-                          pv.y + cy * tm.tile_h * sy,
+        const UiRect rect{pv.x + (tm.x + cx * tm.tile_w) * sx,
+                          pv.y + (tm.y + cy * tm.tile_h) * sy,
                           tm.tile_w * sx, tm.tile_h * sy};
         if (tiles && set_cols > 0) {
           out.overlay.push_back(Image{
@@ -1549,21 +1555,26 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
       const Color grid{120, 140, 160, 60};
       for (int cx = 0; cx <= tm.columns; ++cx)
         out.overlay.push_back(FilledRectangle{
-            {pv.x + cx * tm.tile_w * sx, pv.y, 1.f, pv.height}, grid});
+            {pv.x + (tm.x + cx * tm.tile_w) * sx, pv.y + tm.y * sy,
+             1.f, pv.height - tm.y * sy},
+            grid});
       const int rows =
           std::max((int)(tm.cells.size() / tm.columns),
-                   (int)(720.f / tm.tile_h));
+                   (int)((720.f - tm.y) / tm.tile_h));
       for (int cy = 0; cy <= rows; ++cy)
         out.overlay.push_back(FilledRectangle{
-            {pv.x, pv.y + cy * tm.tile_h * sy, pv.width, 1.f}, grid});
+            {pv.x + tm.x * sx, pv.y + (tm.y + cy * tm.tile_h) * sy,
+             pv.width - tm.x * sx, 1.f},
+            grid});
       const int hx = static_cast<int>(std::floor(
-          (shell.pointer_x - pv.x) / sx / tm.tile_w));
+          ((shell.pointer_x - pv.x) / sx - tm.x) / tm.tile_w));
       const int hy = static_cast<int>(std::floor(
-          (shell.pointer_y - pv.y) / sy / tm.tile_h));
+          ((shell.pointer_y - pv.y) / sy - tm.y) / tm.tile_h));
       if (hx >= 0 && hx < tm.columns && hy >= 0)
         out.overlay.push_back(StrokedRectangle{
-            {pv.x + hx * tm.tile_w * sx, pv.y + hy * tm.tile_h * sy,
-             tm.tile_w * sx, tm.tile_h * sy},
+            {pv.x + (tm.x + hx * tm.tile_w) * sx,
+             pv.y + (tm.y + hy * tm.tile_h) * sy, tm.tile_w * sx,
+             tm.tile_h * sy},
             accent});
     }
   }
@@ -1580,7 +1591,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   const float row_pitch = (font + 12) * s + 4 * s;
   const int rows_per_col = std::max(
       1, static_cast<int>((body.y + body.height - fy0) / row_pitch));
-  const int field_count = 31;
+  const int field_count = 32;
   const int cols =
       std::max(2, (field_count + rows_per_col - 1) / rows_per_col);
   const float col_w = pv.width / cols - 8 * s;
@@ -1733,6 +1744,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         tm ? std::to_string(tm->parallax) : "",
         shell.editing_scene && shell.scene_field == 35,
         "camera scroll factor");
+  field(shell.hit_scene_tileorigin, "tileorigin",
+        tm ? fmt_pair(tm->x, tm->y) : "",
+        shell.editing_scene && shell.scene_field == 40,
+        "grid origin x,y in world px");
   field(shell.hit_scene_tilecells, "tilecells", cell_list(),
         shell.editing_scene && shell.scene_field == 36,
         "csv cells, -1 empty");
@@ -2672,6 +2687,10 @@ int main(int argc, char **argv) {
                 } else if (field == 37)
                   shell.scene_buffer =
                       std::to_string(shell.scene_paint_cell);
+                else if (field == 40)
+                  shell.scene_buffer =
+                      std::to_string((int)tm->x) + "," +
+                      std::to_string((int)tm->y);
                 else
                   shell.scene_buffer.clear();
               } else shell.scene_buffer.clear();
@@ -2735,6 +2754,8 @@ int main(int argc, char **argv) {
               edit_field(34);
             else if (shell.hit_scene_tilepar.contains(event.position))
               edit_field(35);
+            else if (shell.hit_scene_tileorigin.contains(event.position))
+              edit_field(40);
             else if (shell.hit_scene_tilecells.contains(event.position))
               edit_field(36);
             else if (shell.hit_scene_paintcell.contains(event.position))

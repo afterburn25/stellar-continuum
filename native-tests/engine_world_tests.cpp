@@ -240,6 +240,8 @@ int main() {
         doc.tilemaps.push_back(SceneTilemap{});
         auto &deco = doc.tilemaps.back();
         deco.tileset = "sprites/deco.png";
+        deco.x = 96.f;
+        deco.y = -64.f;
         deco.tile_w = 16;
         deco.tile_h = 16;
         deco.columns = 8;
@@ -268,6 +270,8 @@ int main() {
               "spawn_scene tilemap component");
         check(world.get<Tilemap>(tile_es[1])->tileset ==
                       "sprites/deco.png" &&
+                  world.get<Tilemap>(tile_es[1])->x == 96.f &&
+                  world.get<Tilemap>(tile_es[1])->y == -64.f &&
                   world.get<Tilemap>(tile_es[1])->tile_w == 16 &&
                   world.get<Tilemap>(tile_es[1])->layer == -3 &&
                   world.get<Tilemap>(tile_es[1])->cells.size() == 16,
@@ -382,6 +386,8 @@ int main() {
                   exported.tilemaps[0].cells[1] == 7 &&
                   exported.tilemaps[0].tileset == "sprites/tiles.png" &&
                   exported.tilemaps[1].tileset == "sprites/deco.png" &&
+                  exported.tilemaps[1].x == 96.f &&
+                  exported.tilemaps[1].y == -64.f &&
                   exported.tilemaps[1].tile_w == 16 &&
                   exported.tilemaps[1].cells[0] == 9,
               "scene_from_world exports every tilemap");
