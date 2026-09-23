@@ -90,7 +90,10 @@ each entry to `diplomacy.<kind>` (`diplomacy.war_declared`,
   (`known_to_civilization_ids`) verbatim — diplomacy already decided
   who knows, and knowledge widening is deliberately *not* applied to
   `diplomacy.` records (a civ that merely knows the system must not
-  learn excluded belligerents' identities)
+  learn excluded belligerents' identities). A restored journal entry
+  can carry an *empty* audience; `EventHistory` reads empty
+  `visible_to` as public, so the adapter falls back to the involved
+  parties — a diplomatic record must never widen to all observers
 - the record's summary is generic kind text; the journal's raw summary
   is internal phrasing (the notification feed substitutes it for the
   same reason) and actors/location/tags carry the detail

@@ -213,6 +213,26 @@ int main() {
           "agreement audience includes observers");
   }
 
+  // A restored journal entry can carry an empty audience — EventHistory
+  // reads empty visible_to as public, so the adapter falls back to the
+  // involved parties instead of leaking the event to every observer.
+  {
+    DiplomaticHistoryEventSnapshot secret;
+    secret.event_id = 14;
+    secret.tick = 152500;
+    secret.kind = DiplomaticEventKind::proposal_sent;
+    secret.primary_civilization_id = 4;
+    secret.secondary_civilization_id = 8;
+    secret.summary = "internal";
+    secret.known_to_civilization_ids = {};
+    const auto mapped =
+        history_events_for_step(step, end_day,
+                                std::vector{secret});
+    const auto *e = only(mapped, "diplomacy.proposal_sent");
+    check(e && e->visible_to == std::vector<std::uint64_t>{4, 8},
+          "empty journal audience falls back to involved parties");
+  }
+
   // The journal watermark accessors feed exactly-once recording.
   {
     DiplomacyStateSnapshot snap;

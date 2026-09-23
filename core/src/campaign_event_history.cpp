@@ -307,9 +307,13 @@ history_events_for_step(const IntegratedAdaptiveCampaignStepResult &step,
     }
     e.significance = diplomacy_significance(ev.kind);
     // The journal entry's own audience list IS the visibility set —
-    // diplomacy already decided who knows.
+    // diplomacy already decided who knows. A restored entry can carry an
+    // empty audience; EventHistory reads empty visible_to as public, so
+    // fall back to the involved parties — never widen diplomacy to all.
     e.visible_to.assign(ev.known_to_civilization_ids.begin(),
                         ev.known_to_civilization_ids.end());
+    if (e.visible_to.empty())
+      e.visible_to = e.actors;
     out.push_back(std::move(e));
   }
   return out;
