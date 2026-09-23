@@ -226,7 +226,11 @@ int main() {
         hero.oneway = true;
         hero.data = "checkpoint-7";
         hero.opacity = 0.5f;
-        SceneDocument doc{{hero, SceneEntity{"rock", 200.f, 100.f}}};
+        // A child attached to the player at a (+64,+16) authored offset.
+        SceneEntity turret{"turret", 74.f, 36.f};
+        turret.parent = "player";
+        SceneDocument doc{
+            {hero, SceneEntity{"rock", 200.f, 100.f}, turret}};
         doc.tilemaps.push_back(SceneTilemap{});
         auto &ground = doc.tilemaps.back();
         ground.tileset = "sprites/tiles.png";
@@ -251,7 +255,7 @@ int main() {
         World world;
         register_scene_components(world);
         const auto spawned = spawn_scene(world, doc);
-        check(spawned.size() == 2, "spawn_scene creates all entities");
+        check(spawned.size() == 3, "spawn_scene creates all entities");
         const auto tile_es = tilemap_entities(world);
         check(tile_es.size() == 2, "each tilemap spawns its own entity");
         check(std::find(spawned.begin(), spawned.end(), tile_es[0]) ==
@@ -330,6 +334,36 @@ int main() {
               "spawn_scene opacity");
         check(world.get<SpriteRef>(spawned[1]) == nullptr,
               "empty sprite leaves no SpriteRef");
+        // Hierarchy: the Parent component derives its offset from the
+        // authored document positions, already resolved at spawn.
+        const auto *par = world.get<Parent>(spawned[2]);
+        check(par != nullptr && par->name == "player" &&
+                  par->off_x == 64.f && par->off_y == 16.f &&
+                  par->resolved,
+              "spawn_scene derives parent offset");
+        // Follow: moving the parent then resolving carries the child.
+        world.get<Transform2D>(spawned[0])->x = 110.f;
+        world.get<Transform2D>(spawned[0])->y = 60.f;
+        resolve_hierarchy(world);
+        check(world.get<Transform2D>(spawned[2])->x == 174.f &&
+                  world.get<Transform2D>(spawned[2])->y == 76.f,
+              "child follows the resolved parent");
+        // Drift: the child's own world-space edits re-bake into its
+        // offset rather than being lost on the next resolve.
+        world.get<Transform2D>(spawned[2])->x += 8.f;
+        resolve_hierarchy(world);
+        check(world.get<Parent>(spawned[2])->off_x == 72.f &&
+                  world.get<Transform2D>(spawned[2])->x == 182.f,
+              "child drift re-bakes into the local offset");
+        world.get<Transform2D>(spawned[0])->x = 10.f;
+        world.get<Transform2D>(spawned[0])->y = 20.f;
+        world.get<Transform2D>(spawned[2])->x = 74.f;
+        world.get<Transform2D>(spawned[2])->y = 36.f;
+        world.get<Parent>(spawned[2])->last_px = 10.f;
+        world.get<Parent>(spawned[2])->last_py = 20.f;
+        resolve_hierarchy(world);
+        check(world.get<Transform2D>(spawned[2])->x == 74.f,
+              "hierarchy reset restores authored offset");
 
         const auto path = std::filesystem::temp_directory_path() /
                           "stellar_scene_roundtrip.stw";
@@ -347,6 +381,18 @@ int main() {
               "restore revives destroyed entity");
         check(world.get<SpriteRef>(*rep)->value == "data/logo.png",
               "restore revives sprite path");
+        // Attachments survive restore — the Parent codec is name-keyed so
+        // it resolves against the regenerated entity ids.
+        const auto rep_tur = find_entity_by_name(world, "turret");
+        check(rep_tur.has_value() &&
+                  world.get<Parent>(*rep_tur) != nullptr &&
+                  world.get<Parent>(*rep_tur)->name == "player",
+              "parent attachment survives restore");
+        world.get<Transform2D>(*rep)->x = 60.f;
+        resolve_hierarchy(world);
+        check(world.get<Transform2D>(*rep_tur)->x == 124.f,
+              "restored child still follows its parent");
+        world.get<Transform2D>(*rep)->x = 10.f;
         // Destructible terrain: runtime cell edits survive restore.
         // (Entity ids regenerate on restore — re-resolve the carriers.)
         const auto tile_es2 = tilemap_entities(world);
@@ -365,9 +411,10 @@ int main() {
 
         // scene_from_world exports live state back to an editable document.
         const auto exported = scene_from_world(world);
-        check(exported.entities.size() == 2, "scene_from_world exports all");
+        check(exported.entities.size() == 3, "scene_from_world exports all");
         const auto *ex_player = &exported.entities[0];
-        if (ex_player->name != "player") ex_player = &exported.entities[1];
+        for (const auto &e : exported.entities)
+          if (e.name == "player") ex_player = &e;
         check(ex_player->name == "player" && ex_player->x == 10.f &&
                   ex_player->vx == 30.f &&
                   ex_player->sprite == "data/logo.png" &&
@@ -381,6 +428,11 @@ int main() {
                   ex_player->data == "checkpoint-7" &&
                   ex_player->opacity == 0.5f,
               "scene_from_world round-trips fields");
+        const auto *ex_turret = &exported.entities[0];
+        for (const auto &e : exported.entities)
+          if (e.name == "turret") ex_turret = &e;
+        check(ex_turret->parent == "player",
+              "scene_from_world exports the parent link");
         check(exported.tilemaps.size() == 2 &&
                   exported.tilemaps[0].columns == 4 &&
                   exported.tilemaps[0].cells[1] == 7 &&

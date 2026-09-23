@@ -215,6 +215,7 @@ int main() {
     scene.entities[0].opacity = 0.5f;
     scene.entities[0].spin = 90.f;
     scene.entities[0].bounce = false;
+    scene.entities[0].parent = "carrier";
     scene.tilemaps.push_back(engine::SceneTilemap{});
     auto &tm0 = scene.tilemaps.back();
     tm0.tileset = "sprites/tiles.png";
@@ -258,6 +259,7 @@ int main() {
               reparsed->entities[0].opacity == 0.5f &&
               reparsed->entities[0].spin == 90.f &&
               !reparsed->entities[0].bounce &&
+              reparsed->entities[0].parent == "carrier" &&
               reparsed->tilemaps.size() == 2 &&
               reparsed->tilemaps[0].tileset == "sprites/tiles.png" &&
               reparsed->tilemaps[0].columns == 4 &&

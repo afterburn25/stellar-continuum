@@ -412,6 +412,7 @@ int RuntimeHost::run() {
     impl.entities = spawn_scene(world, doc);
     impl.player = find_entity_by_name(world, "player");
     impl.overlapping.clear();
+    engine::resolve_hierarchy(world);
     impl.tilemap_es = engine::tilemap_entities(world);
     impl.tileset_imgs.clear();
     for (const auto e : impl.tilemap_es) {
@@ -1013,6 +1014,10 @@ int RuntimeHost::run() {
         }
         for (const auto id : expired) impl.destroy_fn(id);
       }
+      // Hierarchy: parented entities snap to parent+offset, folding their
+      // own world-space drift into the offset — runs before contacts so
+      // overlap events see final positions.
+      engine::resolve_hierarchy(world);
       // AABB contact events: collect overlaps during the scan, then fire
       // callbacks afterwards so handlers may spawn/destroy entities safely.
       if (on_collision || on_collision_exit) {

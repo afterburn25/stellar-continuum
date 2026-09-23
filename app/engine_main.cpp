@@ -200,7 +200,7 @@ struct Shell {
       hit_scene_gravity{}, hit_scene_solid{}, hit_scene_bg{},
       hit_scene_flipx{}, hit_scene_flipy{}, hit_scene_visible{},
       hit_scene_oneway{}, hit_scene_up{}, hit_scene_down{},
-      hit_scene_data{}, hit_scene_opacity{},
+      hit_scene_data{}, hit_scene_opacity{}, hit_scene_parent{},
       hit_scene_frames{}, hit_scene_fps{}, hit_scene_rot{},
       hit_scene_ttl{}, hit_scene_tilemap{}, hit_scene_tilesel{},
       hit_scene_tiledel{}, hit_scene_tileset{},
@@ -1238,6 +1238,9 @@ void commit_scene_field(Shell &shell) {
       ok = true;
     } catch (const std::exception &) {
     }
+  } else if (shell.scene_field == 26) {
+    next.parent = shell.scene_buffer;
+    ok = true;
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1318,7 +1321,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                     shell.hit_scene_paint = shell.hit_scene_paintcell =
                         shell.hit_scene_music = shell.hit_scene_spin =
                             shell.hit_scene_worldsize =
-                                shell.hit_scene_bounce = {};
+                                shell.hit_scene_bounce =
+                                    shell.hit_scene_parent = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1709,6 +1713,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? (entity->bounce ? "true" : "false") : "",
         shell.editing_scene && shell.scene_field == 25,
         "false stops dead at level edges");
+  field(shell.hit_scene_parent, "parent",
+        entity ? entity->parent : "",
+        shell.editing_scene && shell.scene_field == 26,
+        "follow this entity at authored offset");
   // Tilemap fields (doc-level, selected layer) — editing creates the
   // tilemap on demand.
   const auto *tm = scene_tile(shell);
@@ -2654,6 +2662,8 @@ int main(int argc, char **argv) {
                 shell.scene_buffer = std::to_string(e->spin);
               else if (field == 25 && e)
                 shell.scene_buffer = e->bounce ? "true" : "false";
+              else if (field == 26 && e)
+                shell.scene_buffer = e->parent;
               else if (field == 38)
                 shell.scene_buffer = shell.scene_doc.music;
               else if (field == 39)
@@ -2768,6 +2778,8 @@ int main(int argc, char **argv) {
               edit_field(39);
             else if (shell.hit_scene_bounce.contains(event.position))
               edit_field(25);
+            else if (shell.hit_scene_parent.contains(event.position))
+              edit_field(26);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

@@ -96,6 +96,20 @@ struct Opacity {
   // Draw alpha multiplier 0-1.
   float value{1.0f};
 };
+// Parent-child attachment: the entity follows the EntityName'd entity at a
+// local offset. resolve_hierarchy folds any world-space edits since the
+// last resolve (velocity integration, collision clamps, game writes) back
+// into off_x/off_y, then snaps the transform to parent_pos + offset — so
+// children follow AND can move locally. The string key survives snapshot
+// id regeneration; `resolved` distinguishes a freshly attached component
+// (use the offset verbatim) from a steady-state one (accumulate drift).
+// Missing parents and cycles leave the child at its last position.
+struct Parent {
+  std::string name;
+  float off_x{0.f}, off_y{0.f};     // local offset from the parent's origin
+  float last_px{0.f}, last_py{0.f}; // parent's resolved pos at last resolve
+  bool resolved{false};
+};
 // Grid terrain state, carried on dedicated world entities — one per
 // document tilemap, absent from spawn_scene's return list (locate via
 // tilemap_entities). Holding it as a component makes runtime cell edits
@@ -138,6 +152,13 @@ SceneDocument scene_from_world(const World &world);
 // First live entity whose EntityName matches, or nullopt.
 std::optional<EntityId> find_entity_by_name(const World &world,
                                             std::string_view name);
+
+// Applies every Parent attachment: resolves each chain root-first (cycles
+// ignored), folds the child's world-space drift since the previous resolve
+// into its stored offset, and snaps its transform to parent+offset. Hosts
+// call it once after spawning and each sim step after velocity/collision
+// so contacts and rendering see final positions.
+void resolve_hierarchy(World &world);
 
 // File-backed snapshot helpers: save_world_to_file snapshots the world,
 // rotates the .bak history chain (save_history.hpp) and writes the

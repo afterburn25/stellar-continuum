@@ -5,7 +5,10 @@
 
 #include <cstring>
 #include <fstream>
+#include <functional>
 #include <iterator>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace stellar::engine {
 namespace {
@@ -123,6 +126,40 @@ Tilemap decode_tilemap(const std::vector<std::uint8_t> &b) {
   return t;
 }
 
+// Parent codec: name string, offset, last-resolved parent pos, flag.
+std::vector<std::uint8_t> encode_parent(const Parent &p) {
+  std::vector<std::uint8_t> out;
+  put_u32(out, static_cast<std::uint32_t>(p.name.size()));
+  out.insert(out.end(), p.name.begin(), p.name.end());
+  put_f32(out, p.off_x);
+  put_f32(out, p.off_y);
+  put_f32(out, p.last_px);
+  put_f32(out, p.last_py);
+  out.push_back(p.resolved ? 1 : 0);
+  return out;
+}
+
+Parent decode_parent(const std::vector<std::uint8_t> &b) {
+  Parent p;
+  std::size_t at = 0;
+  const std::uint32_t len = get_u32(b, at);
+  if (len <= b.size() - at)
+    p.name.assign(reinterpret_cast<const char *>(b.data() + at), len);
+  at += len;
+  const auto f = [&b, &at] {
+    float v = 0.f;
+    const std::uint32_t bits = get_u32(b, at);
+    std::memcpy(&v, &bits, 4);
+    return v;
+  };
+  p.off_x = f();
+  p.off_y = f();
+  p.last_px = f();
+  p.last_py = f();
+  p.resolved = at < b.size() && b[at] != 0;
+  return p;
+}
+
 } // namespace
 
 void register_scene_components(World &world) {
@@ -172,11 +209,17 @@ void register_scene_components(World &world) {
                                     decode_pod<Opacity>);
   world.register_component<Tilemap>("tilemap", encode_tilemap,
                                     decode_tilemap);
+  world.register_component<Parent>("parent", encode_parent, decode_parent);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
   std::vector<EntityId> spawned;
   spawned.reserve(doc.entities.size());
+  // Authored positions by name — parent offsets derive from the document
+  // so chains resolve identically regardless of spawn order.
+  std::unordered_map<std::string, const SceneEntity *> authored;
+  authored.reserve(doc.entities.size());
+  for (const auto &s : doc.entities) authored.try_emplace(s.name, &s);
   for (const auto &s : doc.entities) {
     const auto entity = world.create();
     world.add(entity, Transform2D{s.x, s.y});
@@ -201,6 +244,23 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     if (!s.data.empty()) world.add(entity, UserData{s.data});
     if (s.opacity != 1.f) world.add(entity, Opacity{s.opacity});
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
+    if (!s.parent.empty()) {
+      // Offset derives from the parent's authored position, or its live
+      // world position when the parent isn't in this document (runtime
+      // spawn_entity against an existing parent).
+      float px = s.x, py = s.y;
+      if (const auto it = authored.find(s.parent); it != authored.end()) {
+        px = it->second->x;
+        py = it->second->y;
+      } else if (const auto pe = find_entity_by_name(world, s.parent)) {
+        if (const auto *pt = world.get<Transform2D>(*pe)) {
+          px = pt->x;
+          py = pt->y;
+        }
+      }
+      world.add(entity,
+                Parent{s.parent, s.x - px, s.y - py, px, py, true});
+    }
     spawned.push_back(entity);
   }
   // Each tilemap lives on its own entity (not returned) so runtime cell
@@ -282,6 +342,7 @@ SceneDocument scene_from_world(const World &world) {
     s.bounce = world.get<NoBounce>(entity) == nullptr;
     if (const auto *d = world.get<UserData>(entity)) s.data = d->value;
     if (const auto *o = world.get<Opacity>(entity)) s.opacity = o->value;
+    if (const auto *par = world.get<Parent>(entity)) s.parent = par->name;
     doc.entities.push_back(std::move(s));
   }
   return doc;
@@ -295,6 +356,45 @@ std::optional<EntityId> find_entity_by_name(const World &world,
       return entity;
   }
   return std::nullopt;
+}
+
+void resolve_hierarchy(World &world) {
+  // Resolve chains root-first with memoization; the on-stack set breaks
+  // cycles (a cyclic child keeps its last position).
+  std::unordered_set<std::uint64_t> done;
+  const std::function<void(EntityId, std::unordered_set<std::uint64_t> &)>
+      resolve = [&](EntityId e, std::unordered_set<std::uint64_t> &stack) {
+        const auto key = e.value();
+        if (done.contains(key) || !stack.insert(key).second) return;
+        auto *p = world.get<Parent>(e);
+        auto *t = world.get<Transform2D>(e);
+        if (p != nullptr && t != nullptr && !p->name.empty()) {
+          if (const auto pe = find_entity_by_name(world, p->name);
+              pe && *pe != e) {
+            resolve(*pe, stack);
+            // Skip when the parent is still on the stack (cycle back
+            // through this entity) — its position isn't resolved yet.
+            if (!stack.contains(pe->value()))
+              if (const auto *pt = world.get<Transform2D>(*pe)) {
+                if (p->resolved) {
+                  // World-space edits since the last resolve (velocity,
+                  // clamps, game writes) re-bake into the local offset.
+                  p->off_x = t->x - p->last_px;
+                  p->off_y = t->y - p->last_py;
+                }
+                p->last_px = pt->x;
+                p->last_py = pt->y;
+                p->resolved = true;
+                t->x = pt->x + p->off_x;
+                t->y = pt->y + p->off_y;
+              }
+          }
+        }
+        stack.erase(key);
+        done.insert(key);
+      };
+  std::unordered_set<std::uint64_t> stack;
+  for (const auto e : world.entities()) resolve(e, stack);
 }
 
 void save_world_to_file(const World &world,

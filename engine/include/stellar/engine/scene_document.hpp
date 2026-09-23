@@ -65,6 +65,12 @@ struct SceneEntity {
   float spin{0.0f};
   // false = clamp dead at world bounds instead of rebounding (projectiles).
   bool bounce{true};
+  // Name of another entity this one follows, keeping its authored offset —
+  // riders on moving platforms, weapons on ships. Resolution folds the
+  // child's own world-space motion (velocity, collisions) into the offset,
+  // so children can also drift relative to their parent. Cycles and
+  // missing parents are ignored (child keeps its last world position).
+  std::string parent;
 };
 
 // Grid terrain layer: a tileset image sliced into tile_w/tile_h cells

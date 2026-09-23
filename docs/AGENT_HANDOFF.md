@@ -146,7 +146,14 @@ tint, sprite path, layer (stable-sorted draw order), parallax
 physics: doc-level gravity, landing on solid tops, side blocking,
 grounded W/Up jump), sprite-strip `frames`/`fps` (horizontal cells,
 sim-time indexed), `rotation`, `ttl` (sim-time self-destruct),
-`flipX`/`flipY`, `visible`. Scenes also carry a `tilemaps`
+`flipX`/`flipY`, `visible`, `bounce`, `spin`, `data`, `opacity`,
+`oneway`, and `parent` — name-keyed attachment resolved by
+`resolve_hierarchy` each sim step: children keep their authored
+offset and follow the resolved parent (chains root-first; cycles
+and missing parents keep the last position), while a child's own
+world-space motion re-bakes into its stored offset. Attachments
+survive save/load since the component stores the parent's name, not
+its entity id. Scenes also carry a `tilemaps`
 array (`SceneTilemap`: tileset image path, `x`/`y` grid origin in
 world px, `tileW`/`tileH`, `columns`, `layer`, `parallax`, `collide`,
 row-major `cells` with `-1` empty; legacy single-`"tilemap"` documents
