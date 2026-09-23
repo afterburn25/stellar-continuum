@@ -252,6 +252,13 @@ struct Editor {
   std::vector<UiRect> menu_item_rects;
   UiRect viewport{}, inspector{}, list_rect{}, rows_rect{}, detail_rect{};
   std::filesystem::path projects_dir, project_path;
+  // Multi-file projects: a saved directory holds project.json plus an
+  // assets/ folder of embedded files (dropped in by the user). The folder
+  // scan is the manifest — discovered pngs preview in the inspector.
+  bool project_dir_form{};
+  std::vector<std::filesystem::path> embedded_assets;
+  std::shared_ptr<const RgbaImage> asset_preview;
+  std::string asset_preview_name;
   // Project open picker: *.json files under projects_dir, modal overlay.
   std::vector<std::filesystem::path> project_files;
   engine::VirtualizedList picker_list;
@@ -772,6 +779,27 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   trait_button(ed.hit_prewarp, "PRE-WARP CIV", stored.pre_warp_civilization);
   y += 4 * s;
 
+  // Embedded assets: files dropped under <project>/assets/ ride with the
+  // project; the first png previews here.
+  if (!ed.embedded_assets.empty()) {
+    out.overlay.push_back(
+        Text{{x, y},
+             "assets: " + std::to_string(ed.embedded_assets.size()) +
+                 " embedded",
+             muted, font - 1});
+    y += font + 4;
+    const float thumb = 48 * s;
+    if (ed.asset_preview)
+      out.overlay.push_back(Image{ed.asset_preview,
+                                  {x, y, thumb, thumb}, std::nullopt,
+                                  {255, 255, 255, 255}});
+    out.overlay.push_back(Text{{x + (ed.asset_preview ? thumb + 8 * s : 0),
+                                y + (thumb - font) * .5f},
+                               ed.asset_preview_name, ink, font - 1,
+                               r.width - thumb - 40 * s});
+    y += thumb + 8 * s;
+  }
+
   // Scrollable authoritative detail rows fill the space above the docked
   // project/history buttons.
   const UiRect detail{x, y, r.width - 28 * s,
@@ -913,7 +941,9 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
     out.overlay.push_back(
         Text{{row.x + 8 * s, ry + 4 * s},
              ed.project_files[i].filename().string(), ink, font, 0, rows});
-    if (ed.project_files[i] == ed.project_path)
+    if (ed.project_files[i] == ed.project_path ||
+        (ed.project_dir_form &&
+         ed.project_files[i] == ed.project_path.parent_path()))
       out.overlay.push_back(Text{{row.x + row.width - 66 * s, ry + 5 * s},
                               "current", accent, font - 2, 0, rows});
   }
@@ -932,21 +962,68 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
   }
 }
 
+// Discovers embedded assets under a project directory's assets/ folder and
+// decodes the first png for the inspector preview.
+void refresh_embedded_assets(Editor &ed) {
+  ed.embedded_assets.clear();
+  ed.asset_preview.reset();
+  ed.asset_preview_name.clear();
+  const auto dir = ed.project_path.parent_path() / "assets";
+  std::error_code ec;
+  if (std::filesystem::is_directory(dir, ec))
+    for (const auto &entry : std::filesystem::directory_iterator(dir, ec))
+      if (entry.is_regular_file() && entry.path().extension() == ".png")
+        ed.embedded_assets.push_back(entry.path());
+  std::sort(ed.embedded_assets.begin(), ed.embedded_assets.end());
+  if (!ed.embedded_assets.empty()) {
+    try {
+      ed.asset_preview = decode_rgba_image(ed.embedded_assets.front(), 256);
+      ed.asset_preview_name = ed.embedded_assets.front().filename().string();
+    } catch (const std::exception &) {
+      ed.asset_preview_name = "unreadable: " +
+                              ed.embedded_assets.front().filename().string();
+    }
+  }
+}
+
 void save_project(Editor &ed) {
   try {
     // Save-As by name: the document name drives the filename inside the
     // projects directory, so renaming a project never clobbers another.
     const auto slug = edproj::sanitize_project_name(ed.project_name);
-    ed.project_path = ed.projects_dir /
-                      ((slug.empty() ? "editor-project" : slug) + ".json");
+    const auto stem = slug.empty() ? "editor-project" : slug;
+    const auto dir = ed.projects_dir / stem;
+    // Multi-file form: a project directory holding project.json + assets/.
+    // Chosen when the project already lives in one or an assets folder
+    // exists — the user embeds files by dropping them under <slug>/assets/.
+    const auto assets_dir = dir / "assets";
+    ed.project_dir_form =
+        ed.project_dir_form || std::filesystem::is_directory(assets_dir);
+    if (ed.project_dir_form) {
+      std::filesystem::create_directories(assets_dir);
+      ed.project_path = dir / "project.json";
+    } else {
+      ed.project_path = ed.projects_dir / (stem + ".json");
+    }
     const edproj::EditorProject project{ed.seed, ed.system_count, ed.edits,
                                         ed.body_edits, ed.project_name};
     const auto text = edproj::serialize_project(project);
     engine::write_file_atomically(ed.project_path,
                                   std::as_bytes(std::span(text)));
+    // Upgrading a flat save to a directory retires the old single file.
+    if (ed.project_dir_form) {
+      const auto stale = ed.projects_dir / (stem + ".json");
+      std::error_code ec;
+      std::filesystem::remove(stale, ec);
+    }
+    refresh_embedded_assets(ed);
     ed.status = "saved " + ed.project_path.filename().string() + " - " +
                 std::to_string(ed.edits.size() + ed.body_edits.size()) +
-                " annotations";
+                " annotations" +
+                (ed.embedded_assets.empty()
+                     ? ""
+                     : ", " + std::to_string(ed.embedded_assets.size()) +
+                           " assets");
   } catch (const std::exception &error) {
     ed.status = std::string("save failed: ") + error.what();
   }
@@ -954,7 +1031,10 @@ void save_project(Editor &ed) {
 
 void load_project(Editor &ed, const std::filesystem::path &path) {
   try {
-    std::ifstream in(path, std::ios::binary);
+    std::error_code ec;
+    const bool dir_form = std::filesystem::is_directory(path, ec);
+    const auto file = dir_form ? path / "project.json" : path;
+    std::ifstream in(file, std::ios::binary);
     if (!in) {
       ed.status = "no project file at " + path.filename().string();
       return;
@@ -967,13 +1047,19 @@ void load_project(Editor &ed, const std::filesystem::path &path) {
                        ed.project_name});
     ed.edits = std::move(project.edits);
     ed.body_edits = std::move(project.body_edits);
-    ed.project_path = path;
+    ed.project_path = file;
+    ed.project_dir_form = dir_form;
     if (!project.name.empty()) ed.project_name = std::move(project.name);
+    refresh_embedded_assets(ed);
     rebuild_filter(ed);
     rebuild_detail_rows(ed);
     ed.status = "loaded " + path.filename().string() + " - " +
                 std::to_string(ed.edits.size() + ed.body_edits.size()) +
-                " annotations";
+                " annotations" +
+                (ed.embedded_assets.empty()
+                     ? ""
+                     : ", " + std::to_string(ed.embedded_assets.size()) +
+                           " assets");
   } catch (const std::exception &error) {
     ed.status = std::string("load failed: ") + error.what();
   }
@@ -985,9 +1071,14 @@ void open_picker(Editor &ed) {
   std::error_code ec;
   if (std::filesystem::exists(ed.projects_dir, ec))
     for (const auto &entry :
-         std::filesystem::directory_iterator(ed.projects_dir, ec))
+         std::filesystem::directory_iterator(ed.projects_dir, ec)) {
       if (entry.is_regular_file() && entry.path().extension() == ".json")
         ed.project_files.push_back(entry.path());
+      else if (entry.is_directory() &&
+               std::filesystem::is_regular_file(entry.path() / "project.json",
+                                                ec))
+        ed.project_files.push_back(entry.path());
+    }
   std::sort(ed.project_files.begin(), ed.project_files.end());
   ed.picker_list.row_count = ed.project_files.size();
   ed.picker_list.scroll_to(0);
