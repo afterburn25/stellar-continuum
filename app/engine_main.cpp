@@ -253,7 +253,9 @@ struct Shell {
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
       scene3_textures;
   std::unique_ptr<engine::ContentResolver> scene3_content;
-  bool scene3_looking{}; // right-drag orbit is active in the preview
+  bool scene3_looking{};  // right-drag orbit is active in the preview
+  bool scene3_dragging{}; // left-drag moves the picked entity on its
+                          // current-Y plane
   UiRect scene3_preview{}, scene3_rows{};
   UiRect hit3_add{}, hit3_del{}, hit3_save{}, hit3_undo{}, hit3_redo{},
       hit3_dup{}, hit3_name{}, hit3_mesh{}, hit3_pos{}, hit3_rot{},
@@ -1729,8 +1731,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   out.overlay.push_back(StrokedRectangle{pv, panel_edge});
   out.overlay.push_back(
       Text{{pv.x + 8 * s, pv.y + 6 * s},
-           "drag RMB: orbit camera | wheel: fov | click: select", muted,
-           font - 2});
+           "click/drag: pick + move | RMB drag: orbit | wheel: fov",
+           muted, font - 2});
 
   // Fields under the list: entity props, then document-level props.
   const auto *entity = selected_scene3_entity(shell);
@@ -3133,6 +3135,23 @@ int main(int argc, char **argv) {
             d.cam_pitch_deg = std::clamp(
                 d.cam_pitch_deg - event.delta.y * 0.3f, -89.f, 89.f);
             shell.scene3_modified = true;
+          } else if (shell.scene3_dragging &&
+                     shell.scene3_preview.contains(event.position)) {
+            // Drag along the entity's current-Y plane: unproject the
+            // cursor ray onto y = e.y and write back x,z.
+            auto &d = shell.scene3_doc;
+            if (auto *e = selected_scene3_entity(shell)) {
+              const Vec3 dir =
+                  scene3_ray(d, shell.scene3_preview, event.position);
+              if (std::abs(dir.y) > 1e-5f) {
+                const float t = (e->y - d.cam_y) / dir.y;
+                if (t > 0.f) {
+                  e->x = d.cam_x + dir.x * t;
+                  e->z = d.cam_z + dir.z * t;
+                  shell.scene3_modified = true;
+                }
+              }
+            }
           } else if (shell.scene_painting &&
               scene_tile(shell) != nullptr &&
               shell.scene_preview.contains(event.position)) {
@@ -3202,6 +3221,10 @@ int main(int argc, char **argv) {
               shell.status =
                   "picked " +
                   shell.scene3_doc.entities[*picked].name;
+            shell.scene3_dragging =
+                picked.has_value();
+            if (shell.scene3_dragging)
+              shell.scene3_history.commit(shell.scene3_doc);
             break;
           }
           if (shell.tool == Tool::Scene &&
@@ -3261,6 +3284,7 @@ int main(int argc, char **argv) {
         case InputEventType::LeftReleased: {
           last_input = "left release";
           shell.scene_painting = false;
+          shell.scene3_dragging = false;
           if (!shell.scene_preview.contains(event.position))
             shell.scene_dragging = false;
           for (std::size_t i = 0; i < shell.tool_hits.size(); ++i)
