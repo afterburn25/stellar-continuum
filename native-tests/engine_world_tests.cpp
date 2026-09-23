@@ -1,3 +1,5 @@
+#include <stellar/engine/mesh3d_loader.hpp>
+#include <stellar/engine/native_geometry3d.hpp>
 #include <stellar/engine/scene_components.hpp>
 #include <stellar/engine/world.hpp>
 
@@ -493,6 +495,135 @@ int main() {
                   *find_entity_by_name(world, "player"))
                       ->x == 5555.f,
               "failed load leaves world untouched");
+    }
+
+    // 3D scene components: spawn_scene3d builds the 3D set, codecs
+    // snapshot/restore it, entities3d finds the set, resolve_hierarchy3d
+    // applies parent-follow, scene3d_from_world exports it back.
+    {
+        World world3;
+        register_scene_components(world3);
+        Scene3dDocument doc;
+        Scene3dEntity ship;
+        ship.name = "ship";
+        ship.mesh = "box:2,1,1";
+        ship.x = 10.f;
+        ship.y = 5.f;
+        ship.z = -3.f;
+        ship.yaw_deg = 90.f;
+        ship.scale = 2.f;
+        ship.vx = 1.f;
+        ship.vy = -2.f;
+        ship.vz = 0.5f;
+        ship.r = 10;
+        ship.g = 200;
+        ship.b = 90;
+        ship.texture = "models/ship.png";
+        ship.solid = true;
+        ship.data = "flagship";
+        doc.entities.push_back(ship);
+        Scene3dEntity turret;
+        turret.name = "turret";
+        turret.mesh = "sphere:8,4";
+        turret.x = 12.f;
+        turret.y = 7.f;
+        turret.z = -3.f;
+        turret.double_sided = true;
+        turret.opacity = 0.5f;
+        turret.ttl = 3.f;
+        turret.parent = "ship";
+        doc.entities.push_back(turret);
+        const auto spawned = spawn_scene3d(world3, doc);
+        check(spawned.size() == 2, "spawn_scene3d creates all entities");
+        const auto ship_e = spawned[0];
+        const auto turret_e = spawned[1];
+        check(world3.get<Transform3D>(ship_e) != nullptr &&
+                  world3.get<Transform3D>(ship_e)->x == 10.f &&
+                  world3.get<Transform3D>(ship_e)->scale == 2.f,
+              "spawn_scene3d transform3d");
+        check(world3.get<Velocity3D>(ship_e) != nullptr &&
+                  world3.get<Velocity3D>(ship_e)->dy == -2.f,
+              "spawn_scene3d velocity3d");
+        check(world3.get<MeshRef>(ship_e)->spec == "box:2,1,1",
+              "spawn_scene3d mesh ref");
+        check(world3.get<TextureRef>(ship_e)->value == "models/ship.png",
+              "spawn_scene3d texture ref");
+        check(world3.get<Solid>(ship_e) != nullptr,
+              "spawn_scene3d solid flag");
+        check(world3.get<UserData>(ship_e)->value == "flagship",
+              "spawn_scene3d user data");
+        check(world3.get<DoubleSided>(turret_e) != nullptr,
+              "spawn_scene3d double-sided marker");
+        check(world3.get<Lifetime>(turret_e)->remaining == 3.f,
+              "spawn_scene3d lifetime");
+        const auto *pt = world3.get<Parent3D>(turret_e);
+        check(pt != nullptr && pt->name == "ship" && pt->resolved &&
+                  pt->off_x == 2.f && pt->off_y == 2.f && pt->off_z == 0.f,
+              "spawn_scene3d derives parent offset");
+        check(entities3d(world3).size() == 2, "entities3d finds the set");
+
+        // Hierarchy: moving the parent re-anchors the child at offset.
+        world3.get<Transform3D>(ship_e)->x = 20.f;
+        resolve_hierarchy3d(world3);
+        check(world3.get<Transform3D>(turret_e)->x == 22.f,
+              "3d child follows parent x");
+
+        // Snapshot/restore: every 3D component survives the codec round.
+        const auto bytes = world3.snapshot();
+        World restored;
+        register_scene_components(restored);
+        restored.restore(bytes);
+        check(restored.size() == 2, "3d snapshot restores");
+        const auto re_ship = find_entity_by_name(restored, "ship");
+        check(re_ship.has_value(), "3d entity survives restore");
+        if (re_ship) {
+            const auto *rt = restored.get<Transform3D>(*re_ship);
+            check(rt != nullptr && rt->x == 20.f && rt->z == -3.f &&
+                      rt->scale == 2.f,
+                  "transform3d codec round-trips");
+            check(restored.get<Velocity3D>(*re_ship)->dx == 1.f,
+                  "velocity3d codec round-trips");
+            check(restored.get<MeshRef>(*re_ship)->spec == "box:2,1,1",
+                  "meshref codec round-trips");
+        }
+        const auto re_turret = find_entity_by_name(restored, "turret");
+        check(re_turret.has_value() &&
+                  restored.get<Parent3D>(*re_turret) != nullptr,
+              "parent3d attachment survives restore");
+        if (re_turret) {
+            resolve_hierarchy3d(restored);
+            check(restored.get<Transform3D>(*re_turret)->x == 22.f,
+                  "restored 3d child still follows");
+        }
+
+        // Export: live world → editable document.
+        const auto out = scene3d_from_world(restored);
+        check(out.entities.size() == 2, "scene3d_from_world exports all");
+        check(out.entities[0].name == "ship" &&
+                  out.entities[0].mesh == "box:2,1,1" &&
+                  out.entities[0].x == 20.f && out.entities[0].scale == 2.f &&
+                  out.entities[0].vx == 1.f && out.entities[0].solid &&
+                  out.entities[0].data == "flagship",
+              "scene3d_from_world round-trips fields");
+        check(out.entities[1].parent == "ship",
+              "scene3d_from_world exports the parent link");
+
+        // Geometry: box primitive topology + OBJ parse/malformed reject.
+        const auto box = stellar::native_map::box_mesh(2.f, 1.f, 1.f);
+        check(box != nullptr && box->indices().size() == 36 &&
+                  box->vertices().size() == 24,
+              "box_mesh produces 6 quad faces");
+        const auto obj = load_obj_mesh(
+            "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+        check(obj != nullptr && obj->indices().size() == 3,
+              "obj loader parses a triangle");
+        bool threw = false;
+        try {
+            (void)load_obj_mesh("v 0 0\nf 1 2 3\n");
+        } catch (const std::exception &) {
+            threw = true;
+        }
+        check(threw, "obj loader rejects malformed input");
     }
 
     if (failures != 0) {

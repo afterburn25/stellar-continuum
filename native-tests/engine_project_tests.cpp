@@ -367,6 +367,132 @@ int main() {
           "malformed emitter curve rejected");
   }
 
+  // Scene3dDocument: round-trip, malformed rejection, save/load.
+  {
+    engine::Scene3dDocument scene;
+    engine::Scene3dEntity cube;
+    cube.name = "crate";
+    cube.mesh = "box:2,1,1";
+    cube.x = 1.f;
+    cube.y = 2.f;
+    cube.z = -3.f;
+    cube.yaw_deg = 45.f;
+    cube.pitch_deg = 10.f;
+    cube.roll_deg = -5.f;
+    cube.scale = 2.f;
+    cube.vx = 3.f;
+    cube.vy = -1.f;
+    cube.vz = 0.5f;
+    cube.r = 200;
+    cube.g = 100;
+    cube.b = 50;
+    cube.a = 200;
+    cube.texture = "models/crate.png";
+    cube.opacity = 0.75f;
+    cube.double_sided = true;
+    cube.gravity_scale = 0.5f;
+    cube.solid = true;
+    cube.ttl = 12.f;
+    cube.data = "loot:gold";
+    cube.parent = "ship";
+    scene.entities.push_back(cube);
+    engine::Scene3dEntity ship;
+    ship.name = "ship";
+    ship.mesh = "models/ship.obj";
+    ship.z = 10.f;
+    scene.entities.push_back(ship);
+    scene.cam_x = 0.f;
+    scene.cam_y = 2.f;
+    scene.cam_z = 8.f;
+    scene.cam_yaw_deg = 30.f;
+    scene.cam_pitch_deg = -15.f;
+    scene.fov_deg = 75.f;
+    scene.near_plane = 0.05f;
+    scene.far_plane = 500.f;
+    scene.light_x = -0.3f;
+    scene.light_y = 0.8f;
+    scene.light_z = 0.4f;
+    scene.light_intensity = 1.4f;
+    scene.bg_r = 4;
+    scene.bg_g = 8;
+    scene.bg_b = 20;
+    scene.gravity = 9.8f;
+    scene.ground_y = -2.f;
+    scene.bounds = 40.f;
+    scene.music = "audio/space.ogg";
+    scene.emitters.push_back(engine::SceneEmitterDef{});
+    scene.emitters.back().id = "trail";
+    scene.emitters.back().rate = 12.f;
+    const auto reparsed =
+        engine::Scene3dDocument::from_json(scene.to_json());
+    check(reparsed.has_value(), "scene3d json round-trips");
+    if (reparsed) {
+      check(reparsed->entities.size() == 2, "scene3d entity count");
+      const auto &rc = reparsed->entities[0];
+      check(rc.name == "crate" && rc.mesh == "box:2,1,1" &&
+                rc.x == 1.f && rc.y == 2.f && rc.z == -3.f &&
+                rc.yaw_deg == 45.f && rc.pitch_deg == 10.f &&
+                rc.roll_deg == -5.f && rc.scale == 2.f &&
+                rc.vx == 3.f && rc.vy == -1.f && rc.vz == 0.5f &&
+                rc.r == 200 && rc.g == 100 && rc.b == 50 &&
+                rc.a == 200 && rc.texture == "models/crate.png" &&
+                rc.opacity == 0.75f && rc.double_sided &&
+                rc.gravity_scale == 0.5f && rc.solid &&
+                rc.ttl == 12.f && rc.data == "loot:gold" &&
+                rc.parent == "ship",
+            "scene3d entity fields round-trip");
+      check(reparsed->cam_y == 2.f && reparsed->cam_z == 8.f &&
+                reparsed->cam_yaw_deg == 30.f &&
+                reparsed->cam_pitch_deg == -15.f &&
+                reparsed->fov_deg == 75.f &&
+                reparsed->near_plane == 0.05f &&
+                reparsed->far_plane == 500.f,
+            "scene3d camera round-trips");
+      check(reparsed->light_x == -0.3f && reparsed->light_y == 0.8f &&
+                reparsed->light_z == 0.4f &&
+                reparsed->light_intensity == 1.4f,
+            "scene3d light round-trips");
+      check(reparsed->bg_r == 4 && reparsed->bg_g == 8 &&
+                reparsed->bg_b == 20 && reparsed->gravity == 9.8f &&
+                reparsed->ground_y == -2.f && reparsed->bounds == 40.f &&
+                reparsed->music == "audio/space.ogg" &&
+                reparsed->emitters.size() == 1 &&
+                reparsed->emitters[0].id == "trail" &&
+                reparsed->emitters[0].rate == 12.f,
+            "scene3d world fields round-trip");
+      const auto path = root / "editor" / "scene3d.json";
+      scene.save(path);
+      const auto loaded = engine::Scene3dDocument::load(path);
+      check(loaded.has_value() && loaded->entities.size() == 2 &&
+                loaded->entities[1].mesh == "models/ship.obj",
+            "scene3d save/load round-trips");
+    }
+    check(!engine::Scene3dDocument::from_json("{not json").has_value(),
+          "scene3d malformed json rejected");
+    check(!engine::Scene3dDocument::from_json(R"({"camera":{}})")
+              .has_value(),
+          "scene3d missing entities rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x"}]})")
+              .has_value(),
+          "scene3d entity without pos rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2]}]})")
+              .has_value(),
+          "scene3d short pos rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"camera":{"fov":190}})")
+              .has_value(),
+          "scene3d bad fov rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"camera":{"near":10,"far":5}})")
+              .has_value(),
+          "scene3d near>=far rejected");
+    check(!engine::Scene3dDocument::load(root / "nonexistent3d.json")
+              .has_value(),
+          "scene3d missing file rejected");
+  }
+
   if (failures == 0) std::cout << "engine_project tests passed\n";
   return failures == 0 ? 0 : 1;
 }

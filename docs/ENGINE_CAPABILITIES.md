@@ -15,7 +15,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Window and platform | IMPLEMENTED BUT NEEDS POLISH | Engine `native_map_platform.cpp`, runtime paths/lease; App video controller | `native_client_platform`, `native_video_platform`, `native_video_controller` | Verified Windows x64 only; portable platform interface and device recovery need work |
 | Native input | PARTIALLY IMPLEMENTED | Engine `native_map_platform.hpp` (keyboard/mouse/gamepad events), `input_actions.hpp` (`InputMapper`, action contexts incl. pad buttons/axes); App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `input_actions`, `native_ui_layout` | No rebinding UI, multi-pad, or accessibility input layer |
 | 2D/UI renderer | IMPLEMENTED BUT NEEDS POLISH | Engine native map platform, UI skin and text fit | `native_text_measure`, `native_navigation_visual` | Shared helpers, but application-driven widgets/layout and no general UI scene framework |
-| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp` | `engine_scene3d`, `native_scene3d_gpu`, scale3d tests | Bounded CPU submission and fixed caches; no render graph/GPU-driven scene |
+| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/AABB sim, GPU composite under 2D HUD) | `engine_scene3d`, `native_scene3d_gpu`, scale3d tests; `engine_project`/`engine_world` 3D doc+component coverage | Bounded CPU submission and fixed caches; collision is unrotated scaled AABB, no rigid-body solver; no render graph/GPU-driven scene |
 | Mesh/geometry and culling | IMPLEMENTED BUT NEEDS POLISH | Engine solid/triangle meshes, billboard batch, scene bounds | scene/triangle/scale tests | Procedural geometry and conservative limits, not a general imported geometry cooker |
 | Lighting/materials | IMPLEMENTED BUT NEEDS POLISH | Engine scene material/fragment shader; spherical material preparation | `engine_spherical_material`, `native_scene3d_gpu`, `native_planet_materials` | Approximate illumination/response from artwork; no full physically calibrated renderer |
 | Canonical planet classification/art | IMPLEMENTED | Core `planet_appearance.hpp/.cpp`, taxonomy/art catalogs | `planet_appearance`, `native_planet_materials` | Scoped registry/generation contract; 66 definitions do not mean every subclass has admitted art |
@@ -65,6 +65,66 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 Records below retain purpose, API, consumers, tests, save/performance impact and
 limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
 [celestial status](CELESTIAL_CONTENT_STATUS.md) resolve superseded descriptions.
+
+## Reusable 3D scene mode for generated games (2026-09-23)
+
+- **Purpose:** the same generated-project loop (author → cook → build →
+  run → save) now supports 3D worlds — a `scene3d.json` document drives a
+  world of mesh entities simulated and rendered by the engine's existing
+  GPU `Scene3D` pipeline, composited under the 2D pass so scene entities
+  remain usable as HUD/overlay.
+- **Engine APIs/ownership:** `Scene3dDocument` (scene_document.hpp) is
+  the 3D counterpart of `SceneDocument`: camera (pos + yaw/pitch deg +
+  fov + near/far), directional key light (world-space dir + intensity),
+  background, `gravity` (−Y), `groundY` rest plane, `bounds` XZ
+  half-extent, `music`, and the shared `emitters` table — serialized as
+  strict all-or-nothing JSON. `Scene3dEntity` covers name, mesh spec,
+  pos/rot (yaw-pitch-roll deg)/scale, velocity, color/opacity/texture,
+  `doubleSided`, `gravityScale`, `solid`, `ttl`, `data`, `parent`.
+  ECS: `Transform3D` (pos + quaternion + scale), `Velocity3D`,
+  `MeshRef`, `TextureRef`, `DoubleSided`, `Parent3D` — all snapshot-
+  persisted via registered codecs alongside the existing 2D set.
+  `spawn_scene3d`/`entities3d`/`scene3d_from_world`/`resolve_hierarchy3d`
+  mirror the 2D helpers; `Mesh3D` now carries local AABB bounds
+  (`bounds_min`/`bounds_max`) computed in `create()`.
+- **Mesh sources:** `MeshRef::spec` accepts `box[:sx,sy,sz]` and
+  `annulus:inner,outer[,segments]` primitives
+  (native_geometry3d.hpp), `sphere[:cols,rows]` (`Mesh3D::uv_sphere`),
+  or a content-relative `.obj` path loaded through `ContentResolver`
+  (cooked bytes or loose file) by `load_obj_mesh` — a minimal Wavefront
+  OBJ parser (v/vn/vt/f, fan triangulation, generated flat normals).
+- **RuntimeHost --scene3d:** `RuntimeHostOptions::scene3d` /
+  `scene3d_file` (`--scene3d`, `--scene3d-file`, `--fly-speed`). The host
+  loads the document into the same World (3D entities form a separate
+  tracked set), hot-reloads it with the 2D scene poll, flies the camera
+  with the rebindable "game" context (WASD move, Space/C up/down,
+  right-drag look, wheel fov), integrates gravity + velocity at the
+  fixed timestep, rests entities on `groundY` by their mesh's scaled
+  AABB bottom, clamps/bounces at `bounds` (`NoBounce` opts out), ticks
+  `Lifetime`, resolves `Parent3D` follow, and runs AABB contact events —
+  solid movers push out along the least-penetrated axis and zero inward
+  velocity; `on_collision`/`on_collision_exit`/`on_land` fire for the 3D
+  set. Public API: `scene3d()`, `entities3d()`, `entities3d_in_radius`,
+  `spawn_entity3d`, `on_spawn3d`, `set_camera3d` + getters,
+  `gravity3d()`, `ground_y()`. F5/F9 snapshots capture the 3D set and
+  `load_world` partitions it back out of the 2D list.
+- **Consumers/tests:** any generated host passes `--scene3d`;
+  `engine_project` tests cover document round-trip/malformed/save-load,
+  `engine_world` covers spawn/components/codecs/hierarchy/export/
+  box_mesh/OBJ. Verified live: a gravity ball falls and rests on the
+  ground plane (AABB bottom), static solids stay put, the scene renders
+  through `Scene3DView` under the 2D HUD.
+- **Save/performance impact:** 3D components are POD/string codecs in
+  the same snapshot stream; meshes/textures cache per spec; contact scan
+  is O(n²) over the 3D set (small scene counts); rendering reuses the
+  existing bounded `Scene3D` submission path.
+- **Limitations:** collision uses unrotated scaled AABBs (rotated
+  entities do not get tighter fits); solids are blockers, not full rigid-
+  body dynamics (no stacking/resting contact solver — `groundY` + the
+  upward push-out cover landing); camera state is runtime-owned and does
+  not snapshot; `physics3d`/`spatial_index3d` exist engine-side but are
+  not yet wired into this mode; no editor 3D scene tool yet (hand-author
+  `scene3d.json`); light is a single directional key light per scene.
 
 ## Authored tilemap layers for generated 2D games (2026-09-21)
 

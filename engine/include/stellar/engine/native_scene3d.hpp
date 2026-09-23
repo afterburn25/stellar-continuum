@@ -43,11 +43,17 @@ class Mesh3D final {
   [[nodiscard]] const auto& vertices()const noexcept{return vertices_;}
   [[nodiscard]] const auto& indices()const noexcept{return indices_;}
   [[nodiscard]] float bounding_radius()const noexcept{return radius_;}
+  // Local-space axis-aligned bounds — collision and ground resting use
+  // these (scaled by instance scale) instead of the bounding sphere so
+  // boxes collide as boxes.
+  [[nodiscard]] Vec3 bounds_min()const noexcept{return bounds_min_;}
+  [[nodiscard]] Vec3 bounds_max()const noexcept{return bounds_max_;}
   [[nodiscard]] std::size_t byte_size()const noexcept{return vertices_.size()*sizeof(Vertex3D)+indices_.size()*sizeof(std::uint32_t);}
  private:
-  Mesh3D(std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices,float radius)
-      :vertices_(std::move(vertices)),indices_(std::move(indices)),radius_(radius){}
+  Mesh3D(std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices,float radius,Vec3 bounds_min,Vec3 bounds_max)
+      :vertices_(std::move(vertices)),indices_(std::move(indices)),radius_(radius),bounds_min_(bounds_min),bounds_max_(bounds_max){}
   std::vector<Vertex3D> vertices_;std::vector<std::uint32_t> indices_;float radius_{};
+  Vec3 bounds_min_{},bounds_max_{};
 };
 enum class Projection3D { Perspective,Orthographic };
 struct Camera3D {

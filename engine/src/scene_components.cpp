@@ -1,8 +1,10 @@
 #include "stellar/engine/scene_components.hpp"
 
 #include "stellar/engine/atomic_file_write.hpp"
+#include "stellar/engine/native_scene3d.hpp"
 #include "stellar/engine/save_history.hpp"
 
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <functional>
@@ -239,6 +241,69 @@ void register_scene_components(World &world) {
       [](const std::vector<std::uint8_t> &b) {
         return VfxRef{{b.begin(), b.end()}};
       });
+  world.register_component<Transform3D>("transform3",
+                                        encode_pod<Transform3D>,
+                                        decode_pod<Transform3D>);
+  world.register_component<Velocity3D>("velocity3",
+                                       encode_pod<Velocity3D>,
+                                       decode_pod<Velocity3D>);
+  world.register_component<MeshRef>(
+      "meshref",
+      [](const MeshRef &m) {
+        return std::vector<std::uint8_t>{m.spec.begin(), m.spec.end()};
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        return MeshRef{{b.begin(), b.end()}};
+      });
+  world.register_component<TextureRef>(
+      "textureref",
+      [](const TextureRef &t) {
+        return std::vector<std::uint8_t>{t.value.begin(), t.value.end()};
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        return TextureRef{{b.begin(), b.end()}};
+      });
+  world.register_component<Parent3D>(
+      "parent3",
+      [](const Parent3D &p) {
+        std::vector<std::uint8_t> out;
+        put_u32(out, static_cast<std::uint32_t>(p.name.size()));
+        out.insert(out.end(), p.name.begin(), p.name.end());
+        put_f32(out, p.off_x);
+        put_f32(out, p.off_y);
+        put_f32(out, p.off_z);
+        put_f32(out, p.last_px);
+        put_f32(out, p.last_py);
+        put_f32(out, p.last_pz);
+        out.push_back(p.resolved ? 1 : 0);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        Parent3D p;
+        std::size_t at = 0;
+        const std::uint32_t len = get_u32(b, at);
+        if (at + len > b.size()) return p;
+        p.name.assign(reinterpret_cast<const char *>(b.data() + at), len);
+        at += len;
+        const auto f = [&] {
+          const std::uint32_t bits = get_u32(b, at);
+          float v{};
+          std::memcpy(&v, &bits, sizeof(v));
+          return v;
+        };
+        p.off_x = f();
+        p.off_y = f();
+        p.off_z = f();
+        p.last_px = f();
+        p.last_py = f();
+        p.last_pz = f();
+        p.resolved = at < b.size() && b[at] != 0;
+        return p;
+      });
+  world.register_component<DoubleSided>(
+      "doublesided",
+      [](const DoubleSided &) { return std::vector<std::uint8_t>{1}; },
+      [](const std::vector<std::uint8_t> &) { return DoubleSided{}; });
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -420,6 +485,166 @@ void resolve_hierarchy(World &world) {
                 p->resolved = true;
                 t->x = pt->x + p->off_x;
                 t->y = pt->y + p->off_y;
+              }
+          }
+        }
+        stack.erase(key);
+        done.insert(key);
+      };
+  std::unordered_set<std::uint64_t> stack;
+  for (const auto e : world.entities()) resolve(e, stack);
+}
+
+namespace {
+// Authored rotation is euler degrees (yaw about +Y, pitch about +X, roll
+// about +Z, applied roll→pitch→yaw) — the quaternion form is what the
+// renderer and hierarchy consume.
+native_map::Quaternion euler_to_quat3(float yaw_deg, float pitch_deg,
+                                      float roll_deg) {
+  constexpr float deg = 3.14159265358979f / 180.f;
+  const auto yq = native_map::rotation_axis_angle({0, 1, 0},
+                                                  yaw_deg * deg);
+  const auto xq = native_map::rotation_axis_angle({1, 0, 0},
+                                                  pitch_deg * deg);
+  const auto zq = native_map::rotation_axis_angle({0, 0, 1},
+                                                  roll_deg * deg);
+  return native_map::compose_rotation(
+      native_map::compose_rotation(yq, xq), zq);
+}
+
+// Inverse of euler_to_quat3 for the same Y∘X∘Z order.
+void quat_to_euler3(const native_map::Quaternion &q, float &yaw_deg,
+                    float &pitch_deg, float &roll_deg) {
+  constexpr float rad = 180.f / 3.14159265358979f;
+  const float x = q.x, y = q.y, z = q.z, w = q.w;
+  const float m02 = 2.f * (x * z + w * y);
+  const float m12 = 2.f * (y * z - w * x);
+  const float m22 = 1.f - 2.f * (x * x + y * y);
+  const float m10 = 2.f * (x * y + w * z);
+  const float m11 = 1.f - 2.f * (x * x + z * z);
+  pitch_deg = -std::asin(std::clamp(m12, -1.f, 1.f)) * rad;
+  yaw_deg = std::atan2(m02, m22) * rad;
+  roll_deg = std::atan2(m10, m11) * rad;
+}
+} // namespace
+
+std::vector<EntityId> spawn_scene3d(World &world,
+                                    const Scene3dDocument &doc) {
+  std::vector<EntityId> spawned;
+  spawned.reserve(doc.entities.size());
+  std::unordered_map<std::string, const Scene3dEntity *> authored;
+  authored.reserve(doc.entities.size());
+  for (const auto &s : doc.entities) authored.try_emplace(s.name, &s);
+  for (const auto &s : doc.entities) {
+    const auto entity = world.create();
+    const auto q = euler_to_quat3(s.yaw_deg, s.pitch_deg, s.roll_deg);
+    world.add(entity,
+              Transform3D{s.x, s.y, s.z, q.x, q.y, q.z, q.w, s.scale});
+    world.add(entity, Velocity3D{s.vx, s.vy, s.vz});
+    world.add(entity, EntityName{s.name});
+    world.add(entity, MeshRef{s.mesh});
+    world.add(entity, Tint{s.r, s.g, s.b});
+    if (s.a != 255 || s.opacity != 1.f)
+      world.add(entity, Opacity{s.opacity * (s.a / 255.f)});
+    if (!s.texture.empty()) world.add(entity, TextureRef{s.texture});
+    if (s.double_sided) world.add(entity, DoubleSided{});
+    world.add(entity, GravityScale{s.gravity_scale});
+    if (s.solid) world.add(entity, Solid{});
+    if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
+    if (!s.data.empty()) world.add(entity, UserData{s.data});
+    if (!s.parent.empty()) {
+      float px = s.x, py = s.y, pz = s.z;
+      if (const auto it = authored.find(s.parent); it != authored.end()) {
+        px = it->second->x;
+        py = it->second->y;
+        pz = it->second->z;
+      } else if (const auto pe = find_entity_by_name(world, s.parent)) {
+        if (const auto *pt = world.get<Transform3D>(*pe)) {
+          px = pt->x;
+          py = pt->y;
+          pz = pt->z;
+        }
+      }
+      world.add(entity, Parent3D{s.parent, s.x - px, s.y - py, s.z - pz,
+                                 px, py, pz, true});
+    }
+    spawned.push_back(entity);
+  }
+  return spawned;
+}
+
+std::vector<EntityId> entities3d(const World &world) {
+  std::vector<EntityId> out;
+  for (const auto entity : world.entities())
+    if (world.get<Transform3D>(entity) != nullptr) out.push_back(entity);
+  return out;
+}
+
+Scene3dDocument scene3d_from_world(const World &world) {
+  Scene3dDocument doc;
+  for (const auto entity : world.entities()) {
+    const auto *t = world.get<Transform3D>(entity);
+    if (t == nullptr) continue;
+    Scene3dEntity s;
+    if (const auto *n = world.get<EntityName>(entity)) s.name = n->value;
+    if (const auto *m = world.get<MeshRef>(entity)) s.mesh = m->spec;
+    s.x = t->x;
+    s.y = t->y;
+    s.z = t->z;
+    quat_to_euler3({t->qx, t->qy, t->qz, t->qw}, s.yaw_deg, s.pitch_deg,
+                   s.roll_deg);
+    s.scale = t->scale;
+    if (const auto *v = world.get<Velocity3D>(entity)) {
+      s.vx = v->dx;
+      s.vy = v->dy;
+      s.vz = v->dz;
+    }
+    if (const auto *tint = world.get<Tint>(entity)) {
+      s.r = tint->r;
+      s.g = tint->g;
+      s.b = tint->b;
+    }
+    if (const auto *o = world.get<Opacity>(entity)) s.opacity = o->value;
+    if (const auto *tx = world.get<TextureRef>(entity))
+      s.texture = tx->value;
+    s.double_sided = world.get<DoubleSided>(entity) != nullptr;
+    if (const auto *g = world.get<GravityScale>(entity))
+      s.gravity_scale = g->value;
+    s.solid = world.get<Solid>(entity) != nullptr;
+    if (const auto *lt = world.get<Lifetime>(entity)) s.ttl = lt->remaining;
+    if (const auto *d = world.get<UserData>(entity)) s.data = d->value;
+    if (const auto *p = world.get<Parent3D>(entity)) s.parent = p->name;
+    doc.entities.push_back(std::move(s));
+  }
+  return doc;
+}
+
+void resolve_hierarchy3d(World &world) {
+  std::unordered_set<std::uint64_t> done;
+  const std::function<void(EntityId, std::unordered_set<std::uint64_t> &)>
+      resolve = [&](EntityId e, std::unordered_set<std::uint64_t> &stack) {
+        const auto key = e.value();
+        if (done.contains(key) || !stack.insert(key).second) return;
+        auto *p = world.get<Parent3D>(e);
+        auto *t = world.get<Transform3D>(e);
+        if (p != nullptr && t != nullptr && !p->name.empty()) {
+          if (const auto pe = find_entity_by_name(world, p->name);
+              pe && *pe != e) {
+            resolve(*pe, stack);
+            if (!stack.contains(pe->value()))
+              if (const auto *pt = world.get<Transform3D>(*pe)) {
+                if (p->resolved) {
+                  p->off_x = t->x - p->last_px;
+                  p->off_y = t->y - p->last_py;
+                  p->off_z = t->z - p->last_pz;
+                }
+                p->last_px = pt->x;
+                p->last_py = pt->y;
+                p->last_pz = pt->z;
+                p->resolved = true;
+                t->x = pt->x + p->off_x;
+                t->y = pt->y + p->off_y;
+                t->z = pt->z + p->off_z;
               }
           }
         }

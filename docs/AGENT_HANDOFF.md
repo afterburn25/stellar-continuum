@@ -185,6 +185,27 @@ make it the brush), and one undo step per stroke.
 documents, `--project` interop). Both are registry rows in
 [ENGINE_CAPABILITIES.md](ENGINE_CAPABILITIES.md).
 
+**3D scene mode:** generated projects can also run 3D worlds —
+`RuntimeHostOptions::scene3d` / `--scene3d` loads
+`editor/scene3d.json` (`engine::Scene3dDocument`: camera pos/yaw/pitch/
+fov/near/far, world-space key light + intensity, background, `gravity`,
+`groundY` rest plane, `bounds`, `music`, shared `emitters`) into the
+same World as a separate `Transform3D`/`Velocity3D`/`MeshRef`/
+`TextureRef`/`DoubleSided`/`Parent3D` entity set (registered codecs —
+F5/F9 snapshots cover it, `load_world` partitions it back out). Mesh
+specs are `box[:sx,sy,sz]`/`annulus:i,o[,seg]`/`sphere[:cols,rows]` or
+content-relative `.obj` paths (`load_obj_mesh`); `Mesh3D` carries local
+AABB bounds used for ground resting and solid push-out (least-penetrated
+axis). The host flies the camera via the rebindable "game" context
+(WASD + Space/C + right-drag look + wheel fov, `--fly-speed`),
+integrates gravity/velocity at the fixed timestep, fires
+`on_collision`/`on_land`/`on_spawn3d`, and renders through
+`Scene3DView` under the 2D pass (2D entities remain HUD). Helpers:
+`entities3d()`, `entities3d_in_radius`, `spawn_entity3d`,
+`set_camera3d` + getters. Limitations: unrotated-AABB collision, no
+rigid-body solver, camera state is not snapshot, no editor 3D tool —
+see the registry record.
+
 **Recommended next workstream: native validation and release reliability.**
 Start from this branch in an isolated checkout; fix the failures recorded in
 the receipt before beginning the 30-item engine expansion. Use a descriptive

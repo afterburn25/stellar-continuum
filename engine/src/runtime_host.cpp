@@ -1,8 +1,11 @@
 #include "stellar/engine/runtime_host.hpp"
 
 #include "stellar/engine/atomic_file_write.hpp"
+#include "stellar/engine/mesh3d_loader.hpp"
 #include "stellar/engine/native_audio.hpp"
+#include "stellar/engine/native_geometry3d.hpp"
 #include "stellar/engine/native_map_platform.hpp"
+#include "stellar/engine/native_scene3d.hpp"
 #include "stellar/engine/package.hpp"
 #include "stellar/engine/runtime_diagnostics.hpp"
 #include "stellar/engine/runtime_paths.hpp"
@@ -18,6 +21,7 @@
 #include <iterator>
 #include <set>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -96,6 +100,30 @@ struct RuntimeHost::Impl {
     EntityId attached;
   };
   std::vector<VfxTrack> vfx_tracks;
+
+  // --- 3D scene mode (--scene3d) ---
+  // The 3D tracked set lives beside the 2D one: scene-spawned and
+  // runtime-spawned mesh entities. Meshes/textures cache by spec/path.
+  std::vector<EntityId> entities3d;
+  std::unordered_map<std::string,
+                     std::shared_ptr<const native_map::Mesh3D>>
+      mesh_cache;
+  std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
+      tex3d_cache;
+  // Fly camera — the document seeds it; input mutates yaw/pitch/pos.
+  double cam3_x = 0, cam3_y = 0, cam3_z = 3;
+  float cam3_yaw = 0.f, cam3_pitch = 0.f; // degrees
+  float cam3_fov = 60.f, cam3_near = .01f, cam3_far = 1000.f;
+  native_map::Vec3 light3{.42f, .2f, .87f};
+  float light3_intensity = 1.f;
+  float gravity3 = 0.f, ground_y3 = 0.f, bounds3 = 0.f;
+  bool look_held = false; // right-button mouse-look
+  // 3D contact/ground tracking — separate sets: a pair can be in contact
+  // in one dimensionality and not the other.
+  std::set<std::pair<std::uint64_t, std::uint64_t>> overlapping3d;
+  std::set<std::uint64_t> grounded3d, prev_grounded3d;
+  std::function<EntityId(const Scene3dEntity &)> spawn3_fn;
+  std::function<void(const std::string &)> switch_scene3d;
 };
 
 RuntimeHost::RuntimeHost(RuntimeHostOptions options)
@@ -228,6 +256,45 @@ EntityId RuntimeHost::spawn_tilemap(const SceneTilemap &map) {
 bool RuntimeHost::destroy_tilemap(EntityId id) {
   return impl_->destroy_tilemap_fn && impl_->destroy_tilemap_fn(id);
 }
+bool RuntimeHost::scene3d() const { return impl_->options.scene3d; }
+EntityId RuntimeHost::spawn_entity3d(const Scene3dEntity &entity) {
+  return impl_->spawn3_fn ? impl_->spawn3_fn(entity) : EntityId{};
+}
+std::vector<EntityId> RuntimeHost::entities3d() const {
+  return impl_->entities3d;
+}
+std::vector<EntityId>
+RuntimeHost::entities3d_in_radius(float x, float y, float z,
+                                  float radius) const {
+  std::vector<EntityId> out;
+  const float r2 = radius * radius;
+  for (const auto e : impl_->entities3d) {
+    const auto *t = impl_->world.get<Transform3D>(e);
+    if (!t) continue;
+    const float dx = t->x - x, dy = t->y - y, dz = t->z - z;
+    if (dx * dx + dy * dy + dz * dz <= r2) out.push_back(e);
+  }
+  return out;
+}
+void RuntimeHost::set_camera3d(double x, double y, double z,
+                               float yaw_deg, float pitch_deg) {
+  impl_->cam3_x = x;
+  impl_->cam3_y = y;
+  impl_->cam3_z = z;
+  impl_->cam3_yaw = yaw_deg;
+  impl_->cam3_pitch = std::clamp(pitch_deg, -89.f, 89.f);
+}
+double RuntimeHost::camera3d_x() const { return impl_->cam3_x; }
+double RuntimeHost::camera3d_y() const { return impl_->cam3_y; }
+double RuntimeHost::camera3d_z() const { return impl_->cam3_z; }
+float RuntimeHost::camera3d_yaw() const { return impl_->cam3_yaw; }
+float RuntimeHost::camera3d_pitch() const { return impl_->cam3_pitch; }
+float RuntimeHost::camera3d_fov() const { return impl_->cam3_fov; }
+void RuntimeHost::set_camera3d_fov(float fov_deg) {
+  impl_->cam3_fov = std::clamp(fov_deg, 1.f, 175.f);
+}
+float RuntimeHost::gravity3d() const { return impl_->gravity3; }
+float RuntimeHost::ground_y() const { return impl_->ground_y3; }
 
 namespace {
 std::optional<std::filesystem::path>
@@ -468,13 +535,13 @@ int RuntimeHost::run() {
   // load, converting the document's degrees/key-list form to the engine's
   // radians/FloatCurve form — entity `vfx` fields then attach with no
   // game code at all.
-  const auto register_emitters = [&](const SceneDocument &doc) {
+  const auto register_emitters = [&](const std::vector<SceneEmitterDef> &emitters) {
     const auto curve_of = [](const auto &keys) {
       FloatCurve c;
       for (const auto &[t, v] : keys) c.add_key(t, v);
       return c;
     };
-    for (const auto &em : doc.emitters) {
+    for (const auto &em : emitters) {
       EmitterDefinition def;
       def.id = em.id;
       def.sprite = em.sprite;
@@ -500,7 +567,7 @@ int RuntimeHost::run() {
   // host-side since it depends on this project's content roots.
   std::string scene_music;
   auto spawn_entities = [&](const SceneDocument &doc) {
-    register_emitters(doc);
+    register_emitters(doc.emitters);
     impl.bg_r = doc.bg_r;
     impl.bg_g = doc.bg_g;
     impl.bg_b = doc.bg_b;
@@ -614,9 +681,131 @@ int RuntimeHost::run() {
     world.destroy(id);
     return true;
   };
+
+  // --- 3D scene mode -------------------------------------------------
+  // Mesh spec: a primitive name ("box[:sx,sy,sz]", "sphere[:cols,rows]",
+  // "annulus:inner,outer[,segments]") or a content-relative .obj path
+  // resolved through the content package (cooked bytes or loose file).
+  const auto mesh_of = [&](const std::string &spec)
+      -> std::shared_ptr<const Mesh3D> {
+    if (spec.empty()) return nullptr;
+    if (const auto it = impl.mesh_cache.find(spec);
+        it != impl.mesh_cache.end())
+      return it->second;
+    std::shared_ptr<const Mesh3D> mesh;
+    const auto csv = [](std::string_view s) {
+      std::vector<float> out;
+      for (std::size_t p = 0; p <= s.size();) {
+        const auto c = s.find(',', p);
+        const auto part = s.substr(
+            p, c == std::string_view::npos ? s.size() - p : c - p);
+        if (!part.empty()) out.push_back(
+            static_cast<float>(std::atof(std::string(part).c_str())));
+        if (c == std::string_view::npos) break;
+        p = c + 1;
+      }
+      return out;
+    };
+    const auto colon = spec.find(':');
+    const std::string head =
+        colon == std::string::npos ? spec : spec.substr(0, colon);
+    const auto args =
+        colon == std::string::npos ? std::vector<float>{}
+                                   : csv(std::string_view{spec}.substr(colon + 1));
+    try {
+      if (head == "box")
+        mesh = box_mesh(args.size() > 0 ? args[0] : 1.f,
+                        args.size() > 1 ? args[1] : 1.f,
+                        args.size() > 2 ? args[2] : 1.f);
+      else if (head == "sphere")
+        mesh = Mesh3D::uv_sphere(
+            args.size() > 0 ? static_cast<int>(args[0]) : 16,
+            args.size() > 1 ? static_cast<int>(args[1]) : 8);
+      else if (head == "annulus" && args.size() >= 2)
+        mesh = annulus_mesh(
+            args[0], args[1],
+            args.size() > 2 ? static_cast<int>(args[2]) : 64);
+      else if (spec.size() > 4 &&
+               spec.substr(spec.size() - 4) == ".obj")
+        if (const auto bytes = impl.content->read_bytes(spec))
+          mesh = load_obj_mesh(std::string_view{
+              reinterpret_cast<const char *>(bytes->data()),
+              bytes->size()});
+    } catch (const std::exception &) {
+      mesh = nullptr;
+    }
+    impl.mesh_cache.emplace(spec, mesh);
+    return mesh;
+  };
+  const auto tex3d_of = [&](const std::string &path)
+      -> std::shared_ptr<const RgbaImage> {
+    if (path.empty()) return nullptr;
+    if (const auto it = impl.tex3d_cache.find(path);
+        it != impl.tex3d_cache.end())
+      return it->second;
+    auto img = decode_sprite(path);
+    impl.tex3d_cache.emplace(path, img);
+    return img;
+  };
+
+  // (Re)spawns the 3D entity set from a Scene3dDocument. 3D entities are
+  // a separate tracked list — they never mix into the 2D gameplay set.
+  auto spawn_entities3d = [&](const Scene3dDocument &doc) {
+    register_emitters(doc.emitters);
+    impl.cam3_x = doc.cam_x;
+    impl.cam3_y = doc.cam_y;
+    impl.cam3_z = doc.cam_z;
+    impl.cam3_yaw = doc.cam_yaw_deg;
+    impl.cam3_pitch = std::clamp(doc.cam_pitch_deg, -89.f, 89.f);
+    impl.cam3_fov = std::clamp(doc.fov_deg, 1.f, 175.f);
+    impl.cam3_near = doc.near_plane;
+    impl.cam3_far = doc.far_plane;
+    impl.light3 = {doc.light_x, doc.light_y, doc.light_z};
+    impl.light3_intensity = doc.light_intensity;
+    impl.gravity3 = doc.gravity;
+    impl.ground_y3 = doc.ground_y;
+    impl.bounds3 = doc.bounds;
+    for (const auto e : impl.entities3d) world.destroy(e);
+    impl.entities3d = spawn_scene3d(world, doc);
+    for (std::size_t i = 0; i < impl.entities3d.size(); ++i) {
+      // Pre-resolve meshes/textures so a bad spec surfaces at load, and
+      // so spawn3_fn shares the warm caches.
+      const auto *mr = world.get<MeshRef>(impl.entities3d[i]);
+      if (mr) mesh_of(mr->spec);
+      const auto *tr = world.get<TextureRef>(impl.entities3d[i]);
+      if (tr) tex3d_of(tr->value);
+      if (on_spawn3d && i < doc.entities.size())
+        on_spawn3d(world, impl.entities3d[i], doc.entities[i]);
+    }
+  };
+  auto scene3d_file = options.project_root / options.scene3d_file;
+  auto scene3d_stamp = std::filesystem::file_time_type{};
+  auto reload_scene3d = [&] {
+    if (!options.scene3d) return;
+    std::error_code ec;
+    const auto stamp = std::filesystem::last_write_time(scene3d_file, ec);
+    if (ec || stamp == scene3d_stamp) return;
+    if (const auto doc = Scene3dDocument::load(scene3d_file)) {
+      scene3d_stamp = stamp;
+      spawn_entities3d(*doc);
+    }
+  };
+  impl.switch_scene3d = [&](const std::string &file) {
+    scene3d_file = options.project_root / file;
+    scene3d_stamp = {};
+    reload_scene3d();
+  };
+  impl.spawn3_fn = [&](const Scene3dEntity &entity) -> EntityId {
+    const auto ids = spawn_scene3d(world, Scene3dDocument{{entity}});
+    if (ids.empty()) return {};
+    impl.entities3d.push_back(ids.front());
+    if (on_spawn3d) on_spawn3d(world, ids.front(), entity);
+    return ids.front();
+  };
   RuntimeDiagnostics::context("runtime:scene-init");
   reload_scene();
-  if (impl.entities.empty())
+  reload_scene3d();
+  if (impl.entities.empty() && impl.entities3d.empty())
     spawn_entities(SceneDocument{{SceneEntity{"demo", 120.f, 160.f, 96.f,
                                              96.f, 240.f, 150.f}}});
 
@@ -632,6 +821,20 @@ int RuntimeHost::run() {
   auto load_world = [&] {
     if (!load_world_from_file(world, save_path)) return;
     impl.entities = world.entities();
+    // 3D entities restore with the snapshot too — split them out of the
+    // 2D tracked set before the tilemap partition below.
+    impl.entities3d = engine::entities3d(world);
+    impl.entities.erase(
+        std::remove_if(impl.entities.begin(), impl.entities.end(),
+                       [&](EntityId e) {
+                         return std::find(impl.entities3d.begin(),
+                                          impl.entities3d.end(),
+                                          e) != impl.entities3d.end();
+                       }),
+        impl.entities.end());
+    impl.overlapping3d.clear();
+    impl.grounded3d.clear();
+    impl.prev_grounded3d.clear();
     // Tilemap entities restore with the snapshot — pull them out of the
     // tracked set and re-resolve each tileset image.
     impl.tilemap_es = engine::tilemap_entities(world);
@@ -810,6 +1013,21 @@ int RuntimeHost::run() {
         if (event.key == 0x40000042) load_world();   // F9
         if (event.key == 'p') impl.paused = !impl.paused;  // P pauses the sim
       }
+      // 3D camera look: right-drag turns, the wheel adjusts fov.
+      if (options.scene3d) {
+        if (event.type == InputEventType::RightPressed)
+          impl.look_held = true;
+        else if (event.type == InputEventType::RightReleased)
+          impl.look_held = false;
+        else if (event.type == InputEventType::PointerMove &&
+                 impl.look_held) {
+          impl.cam3_yaw += event.delta.x * .2f;
+          impl.cam3_pitch = std::clamp(
+              impl.cam3_pitch - event.delta.y * .2f, -89.f, 89.f);
+        } else if (event.type == InputEventType::Wheel)
+          impl.cam3_fov =
+              std::clamp(impl.cam3_fov - event.wheel_y * 2.f, 1.f, 175.f);
+      }
       if (on_event) on_event(event);
     }
     // Platformer jump: with gravity on, the jump action gives a grounded
@@ -828,6 +1046,7 @@ int RuntimeHost::run() {
     if (now - scene_poll > std::chrono::milliseconds(500)) {
       scene_poll = now;
       reload_scene();
+      reload_scene3d();
     }
     const float w = static_cast<float>(snapshot.drawable_width);
     const float h = static_cast<float>(snapshot.drawable_height);
@@ -1207,6 +1426,202 @@ int RuntimeHost::run() {
       // own world-space drift into the offset — runs before contacts so
       // overlap events see final positions.
       engine::resolve_hierarchy(world);
+      // --- 3D scene mode sim ----------------------------------------
+      // Fly camera: WASD strafe/forward in the yaw plane (pitch applies
+      // to forward flight), Space/C up/down — all through the rebindable
+      // "game" context so input maps can remap them.
+      if (options.scene3d) {
+        constexpr float kDeg = 3.14159265f / 180.f;
+        const float sy = std::sin(impl.cam3_yaw * kDeg),
+                    cy = std::cos(impl.cam3_yaw * kDeg);
+        const float sp = std::sin(impl.cam3_pitch * kDeg),
+                    cp = std::cos(impl.cam3_pitch * kDeg);
+        const Vec3 fwd{-cp * sy, sp, -cp * cy};
+        const Vec3 right{cy, 0.f, -sy};
+        float mx = (impl.input.pressed("move_right") ? 1.f : 0.f) -
+                   (impl.input.pressed("move_left") ? 1.f : 0.f);
+        if (const float s = impl.input.axis("move_x");
+            std::abs(s) > 0.18f)
+          mx += s;
+        float mz = (impl.input.pressed("move_up") ? 1.f : 0.f) -
+                   (impl.input.pressed("move_down") ? 1.f : 0.f);
+        if (const float s = impl.input.axis("move_y");
+            std::abs(s) > 0.18f)
+          mz -= s;
+        const float my = (impl.input.pressed("jump") ? 1.f : 0.f) -
+                         (impl.input.pressed("mine") ? 1.f : 0.f);
+        const float spd = options.fly_speed * dt_step;
+        impl.cam3_x += (fwd.x * mz + right.x * mx) * spd;
+        impl.cam3_y += (fwd.y * mz + my) * spd;
+        impl.cam3_z += (fwd.z * mz + right.z * mx) * spd;
+
+        // Entity integration: gravity pulls -Y; the ground plane rests
+        // at ground_y + the mesh's local AABB bottom * scale (boxes sit
+        // on their face, spheres on their bottom).
+        impl.prev_grounded3d = std::move(impl.grounded3d);
+        impl.grounded3d.clear();
+        std::vector<EntityId> expired3d;
+        for (const auto e : impl.entities3d) {
+          auto *t = world.get<Transform3D>(e);
+          if (!t) continue;
+          auto *v = world.get<Velocity3D>(e);
+          const auto *gs = world.get<GravityScale>(e);
+          const float gscale = gs ? gs->value : 1.f;
+          const auto *mr = world.get<MeshRef>(e);
+          const auto mesh = mr ? mesh_of(mr->spec) : nullptr;
+          // Scaled half-extents (local AABB); rotation is ignored for
+          // collision in this mode.
+          const float hx =
+              (mesh ? std::max(-mesh->bounds_min().x,
+                               mesh->bounds_max().x)
+                    : .5f) * t->scale;
+          const float hz =
+              (mesh ? std::max(-mesh->bounds_min().z,
+                               mesh->bounds_max().z)
+                    : .5f) * t->scale;
+          const float bottom =
+              (mesh ? -mesh->bounds_min().y : .5f) * t->scale;
+          if (v && gscale != 0.f) v->dy -= impl.gravity3 * gscale * dt_step;
+          if (v && (v->dx != 0.f || v->dy != 0.f || v->dz != 0.f)) {
+            t->x += v->dx * dt_step;
+            t->y += v->dy * dt_step;
+            t->z += v->dz * dt_step;
+            // Ground plane: rest with the mesh's bottom on ground_y,
+            // fire on_land on the touchdown transition like the 2D path.
+            if (const float rest = impl.ground_y3 + bottom;
+                t->y <= rest && v->dy <= 0.f) {
+              t->y = rest;
+              v->dy = 0.f;
+              impl.grounded3d.insert(e.value());
+              if (on_land &&
+                  !impl.prev_grounded3d.count(e.value()))
+                on_land(e, EntityId{});
+            }
+            // XZ bounds: bounce unless NoBounce.
+            if (impl.bounds3 > 0.f) {
+              const bool nb = world.get<NoBounce>(e) != nullptr;
+              const float rx = std::min(hx, impl.bounds3),
+                          rz = std::min(hz, impl.bounds3);
+              if (t->x < -impl.bounds3 + rx ||
+                  t->x > impl.bounds3 - rx) {
+                t->x = std::clamp(t->x, -impl.bounds3 + rx,
+                                  impl.bounds3 - rx);
+                v->dx = nb ? 0.f : -v->dx;
+              }
+              if (t->z < -impl.bounds3 + rz ||
+                  t->z > impl.bounds3 - rz) {
+                t->z = std::clamp(t->z, -impl.bounds3 + rz,
+                                  impl.bounds3 - rz);
+                v->dz = nb ? 0.f : -v->dz;
+              }
+            }
+          }
+          if (auto *life = world.get<Lifetime>(e)) {
+            life->remaining -= dt_step;
+            if (life->remaining <= 0.f) expired3d.push_back(e);
+          }
+        }
+        for (const auto id : expired3d) {
+          const auto it = std::find(impl.entities3d.begin(),
+                                    impl.entities3d.end(), id);
+          if (it != impl.entities3d.end()) impl.entities3d.erase(it);
+          world.destroy(id);
+        }
+        engine::resolve_hierarchy3d(world);
+        // AABB contacts on the 3D set (mesh local bounds * scale; unrotated).
+        // Solids push movers out along the least-penetrated axis. The scan
+        // always runs — solid resolution is needed even when no callbacks
+        // are registered.
+        {
+          const auto extents = [&](EntityId e, float &hx, float &hy,
+                                   float &hz) {
+            const auto *t = world.get<Transform3D>(e);
+            const auto *m = world.get<MeshRef>(e);
+            const auto mesh = m ? mesh_of(m->spec) : nullptr;
+            const float s = t ? t->scale : 1.f;
+            hx = (mesh ? std::max(-mesh->bounds_min().x,
+                                  mesh->bounds_max().x)
+                       : .5f) * s;
+            hy = (mesh ? std::max(-mesh->bounds_min().y,
+                                  mesh->bounds_max().y)
+                       : .5f) * s;
+            hz = (mesh ? std::max(-mesh->bounds_min().z,
+                                  mesh->bounds_max().z)
+                       : .5f) * s;
+          };
+          std::set<std::pair<std::uint64_t, std::uint64_t>> now;
+          std::vector<std::pair<EntityId, EntityId>> entered;
+          for (std::size_t i = 0; i < impl.entities3d.size(); ++i) {
+            auto *ta = world.get<Transform3D>(impl.entities3d[i]);
+            if (!ta) continue;
+            float hax, hay, haz;
+            extents(impl.entities3d[i], hax, hay, haz);
+            for (std::size_t j = i + 1; j < impl.entities3d.size(); ++j) {
+              const auto *tb = world.get<Transform3D>(impl.entities3d[j]);
+              if (!tb) continue;
+              float hbx, hby, hbz;
+              extents(impl.entities3d[j], hbx, hby, hbz);
+              const float ox = hax + hbx - std::abs(ta->x - tb->x);
+              const float oy = hay + hby - std::abs(ta->y - tb->y);
+              const float oz = haz + hbz - std::abs(ta->z - tb->z);
+              if (ox <= 0.f || oy <= 0.f || oz <= 0.f) continue;
+              const auto a = impl.entities3d[i].value(),
+                         b = impl.entities3d[j].value();
+              now.insert(std::minmax(a, b));
+              if (!impl.overlapping3d.count(std::minmax(a, b)))
+                entered.emplace_back(impl.entities3d[i],
+                                     impl.entities3d[j]);
+              // Solid blocker resolution: the non-solid entity slides
+              // out along the least-penetrated axis and loses inward
+              // velocity on that axis.
+              const bool sa =
+                  world.get<Solid>(impl.entities3d[i]) != nullptr;
+              const bool sb =
+                  world.get<Solid>(impl.entities3d[j]) != nullptr;
+              if (sa != sb) {
+                const auto mover = sa ? impl.entities3d[j]
+                                      : impl.entities3d[i];
+                auto *tm = world.get<Transform3D>(mover);
+                auto *vm = world.get<Velocity3D>(mover);
+                const auto *ts = sa ? ta : tb;
+                // Sign: push the mover away from the solid's center.
+                if (ox <= oy && ox <= oz) {
+                  const float sgn = tm->x >= ts->x ? 1.f : -1.f;
+                  tm->x += sgn * ox;
+                  if (vm && vm->dx * sgn < 0.f) vm->dx = 0.f;
+                } else if (oy <= oz) {
+                  const float sgn = tm->y >= ts->y ? 1.f : -1.f;
+                  tm->y += sgn * oy;
+                  if (vm && vm->dy * sgn < 0.f) vm->dy = 0.f;
+                  if (sgn > 0.f) {
+                    impl.grounded3d.insert(mover.value());
+                    if (on_land &&
+                        !impl.prev_grounded3d.count(mover.value()))
+                      on_land(mover, sa ? impl.entities3d[i]
+                                        : impl.entities3d[j]);
+                  }
+                } else {
+                  const float sgn = tm->z >= ts->z ? 1.f : -1.f;
+                  tm->z += sgn * oz;
+                  if (vm && vm->dz * sgn < 0.f) vm->dz = 0.f;
+                }
+              }
+            }
+          }
+          if (on_collision_exit) {
+            const auto unpack = [](std::uint64_t v) {
+              return EntityId{static_cast<std::uint32_t>(v & 0xffffffffu),
+                              static_cast<std::uint32_t>(v >> 32)};
+            };
+            for (const auto &key : impl.overlapping3d)
+              if (!now.count(key))
+                on_collision_exit(unpack(key.first), unpack(key.second));
+          }
+          impl.overlapping3d = std::move(now);
+          if (on_collision)
+            for (const auto &[a, b] : entered) on_collision(a, b);
+        }
+      }
       // AABB contact events: collect overlaps during the scan, then fire
       // callbacks afterwards so handlers may spawn/destroy entities safely.
       if (on_collision || on_collision_exit) {
@@ -1293,6 +1708,76 @@ int RuntimeHost::run() {
     DrawList draw;
     draw.overlay.push_back(
         FilledRectangle{{0, 0, w, h}, {impl.bg_r, impl.bg_g, impl.bg_b, 255}});
+    // 3D scene mode: build this frame's scene graph and composite it
+    // under the 2D pass — 2D entities/HUD still draw on top.
+    if (options.scene3d && !impl.entities3d.empty()) {
+      // Camera orientation = yaw about +Y then pitch about local +X.
+      const auto quat_mul = [](Quaternion a, Quaternion b) {
+        return Quaternion{
+            a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+            a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+            a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+            a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z};
+      };
+      constexpr float kDeg = 3.14159265f / 180.f;
+      const Quaternion q_yaw =
+          rotation_axis_angle({0.f, 1.f, 0.f}, impl.cam3_yaw * kDeg);
+      const Quaternion q_pitch =
+          rotation_axis_angle({1.f, 0.f, 0.f}, impl.cam3_pitch * kDeg);
+      const Quaternion cam_q = quat_mul(q_yaw, q_pitch);
+      Camera3D cam;
+      cam.position = {impl.cam3_x, impl.cam3_y, impl.cam3_z};
+      cam.orientation = cam_q;
+      cam.vertical_fov_radians = impl.cam3_fov * kDeg;
+      cam.near_plane = std::max(impl.cam3_near, 1e-6f);
+      cam.far_plane = std::clamp(impl.cam3_far, cam.near_plane + 1e-3f,
+                                 1e7f);
+      std::vector<MeshInstance3D> instances;
+      instances.reserve(impl.entities3d.size());
+      for (const auto e : impl.entities3d) {
+        const auto *t = world.get<Transform3D>(e);
+        const auto *mr = world.get<MeshRef>(e);
+        if (!t || !mr) continue;
+        const auto mesh = mesh_of(mr->spec);
+        if (!mesh) continue;
+        MeshInstance3D inst;
+        inst.mesh = mesh;
+        inst.position = {t->x, t->y, t->z};
+        inst.rotation = {t->qx, t->qy, t->qz, t->qw};
+        inst.scale = t->scale;
+        const auto *tint = world.get<Tint>(e);
+        const auto *op = world.get<Opacity>(e);
+        const auto *tex = world.get<TextureRef>(e);
+        inst.material.tint = tint ? Color{tint->r, tint->g, tint->b, 255}
+                                : Color{255, 255, 255, 255};
+        inst.material.opacity = op ? op->value : 1.f;
+        inst.material.transparent = inst.material.opacity < 1.f;
+        inst.material.texture = tex ? tex3d_of(tex->value) : nullptr;
+        inst.material.double_sided =
+            world.get<DoubleSided>(e) != nullptr;
+        inst.material.light_intensity = impl.light3_intensity;
+        inst.material.linear_light = true;
+        instances.push_back(std::move(inst));
+      }
+      // The pipeline expects a camera-space light direction — rotate the
+      // document's world-space dir by the camera's inverse orientation.
+      const Quaternion inv{-cam_q.x, -cam_q.y, -cam_q.z, cam_q.w};
+      const auto rot = [](Quaternion q, Vec3 v) {
+        // v' = q ⊗ (v,0) ⊗ q* for unit q.
+        const float tx = 2.f * (q.y * v.z - q.z * v.y);
+        const float ty = 2.f * (q.z * v.x - q.x * v.z);
+        const float tz = 2.f * (q.x * v.y - q.y * v.x);
+        return Vec3{v.x + q.w * tx + q.y * tz - q.z * ty,
+                    v.y + q.w * ty + q.z * tx - q.x * tz,
+                    v.z + q.w * tz + q.x * ty - q.y * tx};
+      };
+      const Vec3 light_cam = rot(inv, impl.light3);
+      if (auto scene =
+              Scene3D::create(cam, std::move(instances), light_cam))
+        draw.overlay.insert(
+            draw.overlay.begin() + 1,
+            Scene3DView{std::move(scene), {0, 0, w, h}});
+    }
     // Draw in layer order (stable — same-layer entities keep spawn order).
     std::vector<std::size_t> order(impl.entities.size());
     for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
@@ -1531,6 +2016,13 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.input_map = argv[++i];
     else if (arg == "--seed")
       impl_->options.seed = std::strtoull(argv[++i], nullptr, 10);
+    else if (arg == "--scene3d")
+      impl_->options.scene3d = true;
+    else if (arg == "--scene3d-file")
+      impl_->options.scene3d_file = argv[++i];
+    else if (arg == "--fly-speed")
+      impl_->options.fly_speed =
+          static_cast<float>(std::atof(argv[++i]));
   }
   return run();
 }

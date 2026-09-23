@@ -73,6 +73,17 @@ struct RuntimeHostOptions {
   // varies it. The state lives on a world entity, so F5/F9 snapshots
   // capture it: restoring a save restores the RNG position too.
   std::uint64_t seed{0x9E3779B97F4A7C15ull};
+  // 3D scene mode: when true the host loads `scene3d_file` (a
+  // Scene3dDocument) into the same World — entities carry Transform3D/
+  // Velocity3D/MeshRef components, integrate velocity + gravity, collide
+  // as spheres (on_collision/on_land), and render through the engine's
+  // GPU Scene3D pipeline composited under the 2D overlay (2D scene
+  // entities still draw on top as HUD). The camera is a fly camera:
+  // WASD move, Space/Ctrl up/down, right-drag mouse-look, arrows turn.
+  bool scene3d{false};
+  std::string scene3d_file{"editor/scene3d.json"};
+  // Fly-camera move speed in 3D world units/second.
+  float fly_speed{4.0f};
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content
@@ -214,6 +225,30 @@ public:
   // Destroys a tracked entity; false for untracked/stale ids.
   bool destroy_entity(EntityId id);
 
+  // --- 3D scene mode (--scene3d) ---
+  // True when a Scene3dDocument drives the world. spawn_entity3d adds a
+  // mesh entity mid-game; entities3d lists the 3D tracked set (kept
+  // separate from the 2D gameplay list); entities3d_in_radius runs a
+  // sphere query (aggro/AoE/pick volumes).
+  [[nodiscard]] bool scene3d() const;
+  EntityId spawn_entity3d(const Scene3dEntity &entity);
+  [[nodiscard]] std::vector<EntityId> entities3d() const;
+  [[nodiscard]] std::vector<EntityId>
+  entities3d_in_radius(float x, float y, float z, float radius) const;
+  // Fly camera: world position + yaw/pitch degrees (0,0 looks down -Z).
+  void set_camera3d(double x, double y, double z, float yaw_deg,
+                    float pitch_deg);
+  [[nodiscard]] double camera3d_x() const;
+  [[nodiscard]] double camera3d_y() const;
+  [[nodiscard]] double camera3d_z() const;
+  [[nodiscard]] float camera3d_yaw() const;
+  [[nodiscard]] float camera3d_pitch() const;
+  [[nodiscard]] float camera3d_fov() const;
+  void set_camera3d_fov(float fov_deg);
+  // Scene-level 3D tuning the document owns (readable for game logic).
+  [[nodiscard]] float gravity3d() const;
+  [[nodiscard]] float ground_y() const;
+
   // Named game-data blobs under <root>/saves/data/<key>.dat — quest flags,
   // inventories, settings, anything the world snapshot doesn't cover.
   // save_data writes atomically through the same rotating .bak history
@@ -257,6 +292,8 @@ public:
   // spawn_entity) — attach game-defined components keyed off the authored
   // `data`/`name` fields. Runs synchronously during the spawn call.
   std::function<void(World &, EntityId, const SceneEntity &)> on_spawn;
+  // 3D counterpart — fires per spawned Scene3dEntity (scene3d mode).
+  std::function<void(World &, EntityId, const Scene3dEntity &)> on_spawn3d;
 
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /

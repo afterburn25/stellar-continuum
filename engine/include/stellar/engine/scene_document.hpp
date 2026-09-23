@@ -119,6 +119,74 @@ struct SceneEmitterDef {
   float lod_min_rate_scale{0.f};
 };
 
+// A 3D scene entity: a mesh instance placed in world space. `mesh` names a
+// primitive ("box", "sphere", "annulus:inner,outer[,segments]") or a
+// content-relative OBJ path ("models/ship.obj"). Rotation is authored as
+// euler degrees (yaw Y, pitch X, roll Z — applied in that order).
+struct Scene3dEntity {
+  std::string name;
+  std::string mesh{"box"};
+  float x{}, y{}, z{};
+  float yaw_deg{}, pitch_deg{}, roll_deg{};
+  float scale{1.0f};
+  float vx{}, vy{}, vz{};
+  std::uint8_t r{255}, g{255}, b{255}, a{255};
+  // Optional content-relative texture applied to the mesh.
+  std::string texture;
+  float opacity{1.0f};
+  bool double_sided{false};
+  // Multiplies the document's gravity (pulls -Y); 0 ignores it.
+  float gravity_scale{1.0f};
+  // Static blocker for sphere-collision events; solids never move.
+  bool solid{false};
+  // Seconds of sim time before self-destruct; 0 = immortal.
+  float ttl{0.0f};
+  // Freeform game data, carried verbatim into the UserData component.
+  std::string data;
+  // Name of another 3D entity to follow at its authored offset.
+  std::string parent;
+};
+
+// A 3D scene: camera, key light, and mesh entities — the 3D counterpart of
+// SceneDocument, authored by tools and consumed by RuntimeHost's --scene3d
+// mode. Same contract: diffable JSON, all-or-nothing parse.
+struct Scene3dDocument {
+  std::vector<Scene3dEntity> entities;
+  // Camera: world position + yaw/pitch (degrees; 0,0 looks down -Z),
+  // vertical fov and clip planes.
+  float cam_x{0.f}, cam_y{0.f}, cam_z{3.f};
+  float cam_yaw_deg{0.f}, cam_pitch_deg{0.f};
+  float fov_deg{60.f};
+  float near_plane{0.01f}, far_plane{1000.f};
+  // Key light direction (world-space; the host rotates it into camera
+  // space at render time) + intensity multiplier.
+  float light_x{0.42f}, light_y{0.2f}, light_z{0.87f};
+  float light_intensity{1.0f};
+  // Background clear color.
+  std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
+  // Downward (-Y) acceleration in units/s²; 0 disables gravity.
+  float gravity{0.0f};
+  // Ground plane height — gravity entities rest at rest_height + their
+  // mesh radius * scale. Defaults to 0 (the XZ plane).
+  float ground_y{0.0f};
+  // XZ play-bounds half-extent — 0 disables clamping.
+  float bounds{0.0f};
+  // Content-relative music track played when the scene loads.
+  std::string music;
+  // Reuses the 2D emitter table — attached emitters anchor to entity
+  // centers in the 3D view's projected space.
+  std::vector<SceneEmitterDef> emitters;
+
+  static constexpr std::string_view filename{"scene3d.json"};
+
+  std::string to_json() const;
+  static std::optional<Scene3dDocument>
+  from_json(std::string_view text, std::string *error = nullptr);
+  void save(const std::filesystem::path &path) const;
+  static std::optional<Scene3dDocument>
+  load(const std::filesystem::path &path, std::string *error = nullptr);
+};
+
 struct SceneDocument {
   std::vector<SceneEntity> entities;
   // Grid terrain layers — empty in most scenes; each draws at its own

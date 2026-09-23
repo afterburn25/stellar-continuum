@@ -119,6 +119,37 @@ struct VfxRef {
   // spawns it on scene load/runtime spawn and stops it on destroy.
   std::string name;
 };
+// 3D scene components — the spatial counterparts spawned from a
+// Scene3dDocument. Transforms carry a normalized quaternion orientation
+// (authored euler degrees are converted at spawn) and uniform scale.
+struct Transform3D {
+  float x{}, y{}, z{};
+  float qx{}, qy{}, qz{}, qw{1.f};
+  float scale{1.f};
+};
+struct Velocity3D {
+  float dx{}, dy{}, dz{};
+};
+struct MeshRef {
+  // Mesh spec: "box", "sphere[:cols,rows]", "annulus:inner,outer[,seg]",
+  // or a content-relative OBJ path ("models/ship.obj").
+  std::string spec;
+};
+struct TextureRef {
+  // Content-relative image applied as the 3D material's texture.
+  std::string value;
+};
+struct DoubleSided {
+  // Marker: render the mesh's back faces too (foliage, paper, debug).
+};
+// 3D positional attachment — same contract as Parent, with a z offset.
+struct Parent3D {
+  std::string name;
+  float off_x{}, off_y{}, off_z{};
+  float last_px{}, last_py{}, last_pz{};
+  bool resolved{false};
+};
+
 // Grid terrain state, carried on dedicated world entities — one per
 // document tilemap, absent from spawn_scene's return list (locate via
 // tilemap_entities). Holding it as a component makes runtime cell edits
@@ -168,6 +199,14 @@ std::optional<EntityId> find_entity_by_name(const World &world,
 // call it once after spawning and each sim step after velocity/collision
 // so contacts and rendering see final positions.
 void resolve_hierarchy(World &world);
+
+// Scene3dDocument counterparts: spawn/export/hierarchy over the 3D
+// component set. spawn_scene3d returns the spawned ids in document order;
+// scene3d_from_world exports every entity carrying a Transform3D.
+std::vector<EntityId> spawn_scene3d(World &world, const Scene3dDocument &doc);
+Scene3dDocument scene3d_from_world(const World &world);
+std::vector<EntityId> entities3d(const World &world);
+void resolve_hierarchy3d(World &world);
 
 // File-backed snapshot helpers: save_world_to_file snapshots the world,
 // rotates the .bak history chain (save_history.hpp) and writes the
