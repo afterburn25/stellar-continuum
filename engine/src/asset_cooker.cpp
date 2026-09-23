@@ -143,7 +143,8 @@ void cook_asset_repository(const AssetCookOptions&o){
    for(const auto&ch:meta.at("chunks")){AssetChunk chunk;chunk.hash=ch.at("hash");chunk.raw_bytes=ch.at("raw");chunk.stored_bytes=ch.at("stored");chunk.codec=static_cast<AssetCodec>(ch.at("codec").get<unsigned>());chunk.width=ch.at("width");chunk.height=ch.at("height");a.chunks.push_back(chunk);c.files.push_back(o.cache/ch.at("file").get<std::string>());}
    a.width=a.canvas_width=a.chunks.front().width;a.height=a.canvas_height=a.chunks.front().height;
   }catch(const std::exception&e){c.error=e.what();}
-  const auto finished=++done;if(finished%100==0||finished==ordered.size()){std::lock_guard lock(console);std::cout<<"Cooked "<<finished<<" / "<<ordered.size()<<" assets\n"<<std::flush;}
+  const auto finished=++done;if(o.progress)o.progress(finished,ordered.size());
+  if(finished%100==0||finished==ordered.size()){std::lock_guard lock(console);std::cout<<"Cooked "<<finished<<" / "<<ordered.size()<<" assets\n"<<std::flush;}
  }});
  workers.clear();Json errors=Json::array();for(std::size_t i=0;i<cooked.size();++i)if(!cooked[i].error.empty())errors.push_back({{"asset",ordered[i].alias},{"error",cooked[i].error}});
  if(!errors.empty()){write_json(o.report,{{"errors",errors},{"excluded",excluded}});throw std::runtime_error("Asset cooking failed; see "+asset_path_utf8(o.report));}

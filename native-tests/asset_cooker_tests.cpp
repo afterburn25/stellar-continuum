@@ -130,7 +130,10 @@ int main(int argc,char**argv){try{
   fs::copy_file(root/"source/moon.png",project/"game.demo/content/img/moon.png");
   AssetCookOptions g;g.scan_content=true;g.package_group="game.demo";g.root=project;
   g.output=project/"build/cooked";g.cache=project/"build/cache";g.report=project/"build/report.json";g.threads=2;
+  std::size_t last_done=0,last_total=0;
+  g.progress=[&](std::size_t d,std::size_t t){last_done=d;last_total=t;};
   cook_asset_repository(g);
+  require(last_done==4&&last_total==4,"Cook progress callback not fired");
   const auto gm=g.output/"Content/runtime.stmanifest";
   require(fs::is_regular_file(gm),"Scan-mode manifest missing");
   AssetRegistry gr(gm);gr.validate_all();

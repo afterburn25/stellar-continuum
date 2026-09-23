@@ -136,6 +136,7 @@ struct Shell {
   // Content cooking and host builds run on the JobSystem; the UI thread
   // reads their status under the mutex.
   std::atomic<bool> cooking{}, building{};
+  std::atomic<std::size_t> cook_done{}, cook_total{};
   std::mutex project_mutex;
   std::string cook_status, build_status;
   std::string status{"ready"};
@@ -290,6 +291,12 @@ void start_cook(Shell &shell, engine::JobSystem &jobs) {
   options.report = shell.project->root / "build" / "cook-report.json";
   options.scan_content = true;
   options.package_group = shell.project->id;
+  shell.cook_done = 0;
+  shell.cook_total = 0;
+  options.progress = [&shell](std::size_t done, std::size_t total) {
+    shell.cook_done = done;
+    shell.cook_total = total;
+  };
   {
     std::lock_guard lock(shell.project_mutex);
     shell.cook_status = "cooking " + options.root.generic_string();
@@ -678,8 +685,13 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
       line(out, x, y, "  scan error", e, font);
     {
       std::lock_guard lock(shell.project_mutex);
-      if (!shell.cook_status.empty())
-        line(out, x, y, "cook", shell.cook_status, font);
+      if (!shell.cook_status.empty()) {
+        std::string status = shell.cook_status;
+        if (shell.cooking && shell.cook_total > 0)
+          status += "  " + std::to_string(shell.cook_done.load()) + "/" +
+                    std::to_string(shell.cook_total.load());
+        line(out, x, y, "cook", status, font);
+      }
       if (!shell.build_status.empty())
         line(out, x, y, "build", shell.build_status, font);
     }

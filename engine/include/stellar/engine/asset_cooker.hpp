@@ -1,5 +1,7 @@
 #pragma once
+#include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <string>
 namespace stellar::engine {
 struct AssetCookOptions {
@@ -13,6 +15,9 @@ struct AssetCookOptions {
   std::string package_group{"Game"};
   unsigned threads{4};
   bool clean{},package{true},validate{true},scan_content{};
+  // Optional per-asset progress hook invoked from cook workers as each
+  // recipe finishes; used by tools to stream cook progress.
+  std::function<void(std::size_t done,std::size_t total)> progress;
 };
 void cook_asset_repository(const AssetCookOptions&);
 }
