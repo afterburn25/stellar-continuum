@@ -75,6 +75,15 @@ int main() {
   }
   check(std::filesystem::exists(root / ".gitignore"),
         "scaffold writes .gitignore");
+  {
+    std::ifstream input(root / "src" / "main.cpp");
+    const std::string text{std::istreambuf_iterator<char>(input),
+                           std::istreambuf_iterator<char>()};
+    check(text.find("world.snapshot()") != std::string::npos &&
+              text.find("world.restore(bytes)") != std::string::npos &&
+              text.find("register_component<Named>") != std::string::npos,
+          "windowed starter wires codec-based quicksave/quickload");
+  }
 
   // The blank template emits a console host linking stellar::engine only.
   const auto blank = make_temp_dir("blank");

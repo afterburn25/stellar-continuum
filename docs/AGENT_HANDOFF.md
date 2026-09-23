@@ -114,7 +114,10 @@ entities with position/extent/velocity/tint/optional sprite); the
 windowed starter spawns them into `World`, polls the file for hot
 reload, decodes `sprite` images from the base package content, drives an
 entity named `player` with WASD/arrow keys, and plays
-`audio/bounce.wav|mp3` on player bounce via `engine::audio`.
+`audio/bounce.wav|mp3` on player bounce via `engine::audio`. The
+starter registers codecs for all its components and binds F5/F9 to
+`World::snapshot()`/`World::restore()` through `saves/quicksave.stw`
+(corrupt files fail safely; the player handle re-resolves by name).
 `stellar-editor.exe` is the separate authoritative-world editor
 (galaxy/system/body workspaces, annotations, undo, atomic project
 documents, `--project` interop). Both are registry rows in
