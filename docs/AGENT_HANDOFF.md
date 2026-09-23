@@ -93,15 +93,23 @@ behavior when a newer correction supersedes it.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
-`engine::EngineProject` manifests (`project.stellar.json`), `create_project`
-scaffolding (base package, content dirs, `mods/`, generated consumer
-`CMakeLists.txt`, windowed ECS starter `src/main.cpp`), asset import,
-generic `scan_content` cooking into project-namespaced packages, and
-BUILD/RUN against the exported `engine-sdk/` beside the shell (headers,
-prebuilt libs, SDL3 runtime + default font, `stellar::engine`/`stellar::cooker`/
-`stellar::platform` consumer targets). `stellar-editor.exe` is the separate
-authoritative-world editor (galaxy/system/body workspaces, annotations,
-undo, atomic project documents). Both are registry rows in
+`engine::EngineProject` manifests (`project.stellar.json`, `EngineProject::save`
+atomic rewrite), `create_project` scaffolding (base package, content dirs,
+`mods/`, generated consumer `CMakeLists.txt`, windowed ECS starter
+`src/main.cpp` running a `World` Transform/Velocity loop), asset import,
+generic `scan_content` cooking into project-namespaced packages with
+streamed `done/total` progress, BUILD with a live `build.log` tail, RUN,
+EDITOR (launches `stellar-editor.exe --project <root>`; its documents live
+in `<project>/editor/`), PACKAGE (distributable `dist/<name>/` = host +
+runtime + `Content/` + `packages/`), and RENAME via the name field.
+BUILD/RUN consume the exported `engine-sdk/` beside the shell (headers,
+prebuilt libs, SDL3 runtime + default font, `stellar::engine`/
+`stellar::cooker`/`stellar::platform` consumer targets); the shell itself
+accepts `--project <root>`. The Assets tool re-roots to project content
+and can toggle between SOURCE files and COOKED `runtime.stmanifest`
+records. `stellar-editor.exe` is the separate authoritative-world editor
+(galaxy/system/body workspaces, annotations, undo, atomic project
+documents, `--project` interop). Both are registry rows in
 [ENGINE_CAPABILITIES.md](ENGINE_CAPABILITIES.md).
 
 **Recommended next workstream: native validation and release reliability.**
