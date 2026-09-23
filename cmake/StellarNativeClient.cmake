@@ -35,6 +35,23 @@ if(MSVC)
   target_compile_options(stellar-engine PRIVATE /W4 /WX /permissive-)
 endif()
 
+# Native C++23 editor host: engine + core libraries linked directly (the WPF
+# 0.1.9 editor on work/stellar-engine-editor drove a pinned runtime as a
+# hidden child process; this host calls the same generation APIs in-process).
+add_executable(stellar-editor app/editor_main.cpp)
+target_include_directories(stellar-editor PRIVATE "${CMAKE_BINARY_DIR}/generated")
+configure_file(app/editor_version.rc.in generated/editor_version.rc @ONLY)
+if(WIN32)
+  target_sources(stellar-editor PRIVATE "${CMAKE_BINARY_DIR}/generated/editor_version.rc")
+endif()
+target_link_libraries(stellar-editor PRIVATE stellar_native_platform stellar_core stellar_engine stellar_json)
+add_custom_command(TARGET stellar-editor POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-editor>/SDL3.dll")
+if(MSVC)
+  target_compile_options(stellar-editor PRIVATE /W4 /WX /permissive-)
+endif()
+
 add_executable(stellar-continuum-native app/native_client/main.cpp
   app/native_client/native_phenomena.cpp
   app/native_client/native_campaign_session.cpp app/native_client/native_research_controller.cpp

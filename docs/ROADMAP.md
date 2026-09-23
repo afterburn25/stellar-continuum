@@ -53,7 +53,7 @@ preserved as [historical design/status text](history/ROADMAP.pre-native-sync-202
 | 27 | Platform Layer | PARTIALLY IMPLEMENTED — Windows/SDL services, paths/leases and settings | Explicit portable interfaces and platform tests; Linux/macOS support is not yet established |
 | 28 | Steam Integration Layer | PARTIALLY IMPLEMENTED — engine `PlatformServices` facade + null backend + `package_platform_tests`; client owns the facade and reports backend status in diagnostic bundles | A real Steamworks backend for lifecycle/cloud/achievements after offline save/release contracts stabilize; no executable plugin trust |
 | 29 | Mod Architecture | PLANNED — versioned data catalogs are not a mod loader | Namespaces/overrides/dependencies/validation and save compatibility; no executable plugin trust assumed |
-| 30 | Engine Editor / Stellar Tools | PARTIALLY IMPLEMENTED — cooker/import CLI and Developer inspectors | Unified editor/tool document lifecycle and reuse of Engine APIs; other editor branches are not integrated evidence |
+| 30 | Engine Editor / Stellar Tools | PARTIALLY IMPLEMENTED — cooker/import CLI and Developer inspectors; `stellar-engine.exe` standalone tools host (engine-only link) and `stellar-editor.exe` native C++23 editor host (galaxy workspace via authoritative generation, class-colored map, inspector) now ship beside the client | Grow the editor toward the stranded WPF feature set (PR #326): annotations/bookmarks, project save/load, asset embedding, body-level editing; unified tool document lifecycle |
 
 ## Dependency and completion policy
 
