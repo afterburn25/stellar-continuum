@@ -87,6 +87,7 @@
 #include "native_ui_layout.hpp"
 #include "native_command_hud.hpp"
 #include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 #include "native_startup_entry.hpp"
 #include "native_galaxy_backdrop.hpp"
 #include "native_territory_overlay.hpp"
@@ -6309,6 +6310,8 @@ class NativeCampaign final {
       stellar::native_menu_style::text(out,{banner.x+10*s,banner.y+6*s,banner.width-20*s,banner.height-12*s},
           developer_fault_capture_.notice(),std::max(12,static_cast<int>(16*s)),{255,180,110,255});
     }
+    if(general_settings_&&general_settings_->saved().high_contrast)
+      stellar::native_ui::apply_high_contrast(out);
     return out;
   }
   [[nodiscard]] DrawList scene_content(int width,int height){

@@ -1,5 +1,6 @@
 #include "native_general_settings.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/engine/localization.hpp>
 
 #include <array>
@@ -494,6 +495,23 @@ int main() {
       require(reloaded.saved().reduce_flashing,"Reduce flashing preference did not persist");
       DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
       require(find_text_label(draw,"Reduce flashing: On").value.size()>0,"Reduce flashing state was not rendered");
+    }
+    {
+      NativeGeneralSettings contrast(temp.path/"contrast.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      contrast.open();click_button(contrast,l.contrast,"high contrast toggle");
+      require(contrast.draft().high_contrast&&!contrast.saved().high_contrast,"High contrast click did not stay in draft");
+      click_button(contrast,l.save,"save high contrast");
+      NativeGeneralSettings reloaded(temp.path/"contrast.json");
+      require(reloaded.saved().high_contrast,"High contrast preference did not persist");
+      DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
+      require(find_text_label(draw,"High contrast: On").value.size()>0,"High contrast state was not rendered");
+      // The global pass snaps dim text to the primary ink, leaves bright text.
+      DrawList sample;
+      sample.text.push_back(Text{{0,0},"dim",Color{111,132,148,255},15});
+      sample.overlay.emplace_back(Text{{0,0},"bright",Color{230,240,246,255},15});
+      stellar::native_ui::apply_high_contrast(sample);
+      require(sample.text.front().color.r>200,"High contrast pass left dim text dim");
+      require(std::get_if<Text>(&sample.overlay.front())->color.r==230,"High contrast pass recolored bright text");
     }
     {
       // Localization: loaded keys override literals; missing keys fall back.

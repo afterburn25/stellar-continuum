@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 
 namespace stellar::native_ui {
 
@@ -45,6 +46,22 @@ inline constexpr Color construction{241, 151, 91, 255};
 inline constexpr Color diplomacy{95, 210, 192, 255};
 inline constexpr Color military{255, 119, 110, 255};
 inline constexpr Color shadow{0, 4, 9, 168};
+}
+
+// Global high-contrast pass over a finished DrawList: snaps low-luminance
+// text to the primary ink so every surface gains readability without
+// per-screen palette plumbing. Colored accents above the threshold keep
+// their semantic hue; dim labels/disabled text become legible.
+inline void apply_high_contrast(DrawList &draw) {
+  const auto boost = [](Color &c) {
+    const float luminance = .299f * c.r + .587f * c.g + .114f * c.b;
+    if (luminance < 160.f) c = color::text_primary;
+  };
+  for (auto &text : draw.text) boost(text.color);
+  for (auto &command : draw.overlay)
+    if (auto *text = std::get_if<Text>(&command)) boost(text->color);
+  for (auto &command : draw.world)
+    if (auto *text = std::get_if<Text>(&command)) boost(text->color);
 }
 
 enum class Tone { Neutral, Selected, Success, Caution, Danger, Science, Economy, Construction, Diplomacy, Military, Unknown };

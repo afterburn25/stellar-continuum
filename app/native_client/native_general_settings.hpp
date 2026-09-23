@@ -25,6 +25,8 @@ struct GeneralPreferences final {
   bool reduce_motion{};
   // Accessibility: holds pulsing emissive artwork at steady luminance.
   bool reduce_flashing{};
+  // Accessibility: snaps low-luminance text to the primary ink globally.
+  bool high_contrast{};
   // Accessibility: interface scale preset 0=Compact,1=Standard,2=Large,3=Huge.
   // Applied as a user multiplier on top of the viewport-derived UI scale.
   int interface_scale{1};
@@ -46,7 +48,7 @@ struct GeneralSettingsLayout final {
   stellar::native_map::UiRect panel, audio, video, folder, status;
   stellar::native_map::UiRect browse, defaults, cancel, save;
   stellar::native_map::UiRect nebula,eruptions;
-  stellar::native_map::UiRect motion,iscale,flashing;
+  stellar::native_map::UiRect motion,iscale,flashing,contrast;
   [[nodiscard]] static GeneralSettingsLayout for_viewport(int width,int height) noexcept;
 };
 class NativeGeneralSettings final {
