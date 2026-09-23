@@ -38,7 +38,7 @@ endif()
 # Native C++23 editor host: engine + core libraries linked directly (the WPF
 # 0.1.9 editor on work/stellar-engine-editor drove a pinned runtime as a
 # hidden child process; this host calls the same generation APIs in-process).
-add_executable(stellar-editor app/editor_main.cpp)
+add_executable(stellar-editor app/editor_main.cpp app/editor_project.cpp)
 target_include_directories(stellar-editor PRIVATE "${CMAKE_BINARY_DIR}/generated")
 configure_file(app/editor_version.rc.in generated/editor_version.rc @ONLY)
 if(WIN32)

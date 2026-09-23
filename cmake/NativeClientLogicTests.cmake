@@ -450,6 +450,15 @@ add_test(NAME native_new_campaign_generation COMMAND stellar_new_generation_test
 add_test(NAME native_new_game_workspace COMMAND stellar_new_ui_tests)
 set_tests_properties(native_new_campaign_setup native_new_campaign_generation PROPERTIES TIMEOUT 180)
 
+add_executable(stellar_editor_project_tests
+  app/editor_project.cpp native-tests/editor_project_tests.cpp)
+target_include_directories(stellar_editor_project_tests PRIVATE app)
+target_link_libraries(stellar_editor_project_tests PRIVATE stellar_json)
+add_test(NAME editor_project COMMAND stellar_editor_project_tests)
+if(MSVC)
+  target_compile_options(stellar_editor_project_tests PRIVATE /W4 /WX /permissive-)
+endif()
+
 add_executable(stellar_startup_tests
   app/native_client/native_new_campaign_setup.cpp
   app/native_client/native_new_campaign_generation.cpp

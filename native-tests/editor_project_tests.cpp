@@ -1,0 +1,86 @@
+// Coverage for the editor project document: round-trip fidelity and
+// all-or-nothing rejection of malformed input. The document is the
+// editor's annotation layer (names/notes/bookmarks); generated system
+// properties never enter it.
+
+#include "../app/editor_project.hpp"
+
+#include <iostream>
+#include <stdexcept>
+#include <string>
+
+using namespace stellar::editor;
+
+namespace {
+
+void require(bool condition, const char *message) {
+  if (!condition) throw std::runtime_error(message);
+}
+
+void rejects(std::string_view text, const char *message) {
+  try {
+    (void)parse_project(text);
+  } catch (const std::runtime_error &) {
+    return;
+  }
+  throw std::runtime_error(message);
+}
+
+} // namespace
+
+int main() {
+  try {
+    // Round-trip preserves every field, including escapes and unicode.
+    EditorProject project;
+    project.seed = 8374837;
+    project.system_count = 500;
+    project.edits[12].name = "Sol Prime \"North\"";
+    project.edits[12].note = "survey target \\ alpha";
+    project.edits[12].bookmarked = true;
+    project.edits[77].name = "Kepler-\xc3\xa9toile"; // UTF-8: "Kepler-étoile"
+    project.edits[300].note = "note only";
+    project.edits[301].bookmarked = true;
+    project.edits[400]; // Fully empty row must not serialize.
+    const auto text = serialize_project(project);
+    const auto restored = parse_project(text);
+    require(restored.seed == project.seed, "seed did not round-trip");
+    require(restored.system_count == project.system_count,
+            "system count did not round-trip");
+    require(restored.edits.size() == 4, "empty edit rows must be omitted");
+    require(restored.edits.at(12).name == project.edits.at(12).name,
+            "display name did not round-trip");
+    require(restored.edits.at(12).note == project.edits.at(12).note,
+            "note did not round-trip");
+    require(restored.edits.at(12).bookmarked, "bookmark did not round-trip");
+    require(restored.edits.at(77).name == project.edits.at(77).name,
+            "unicode name did not round-trip");
+    require(!restored.edits.contains(400), "empty edit row serialized");
+
+    // Malformed and unsupported inputs reject wholesale.
+    rejects("not json at all", "non-JSON input was accepted");
+    rejects("{", "truncated JSON was accepted");
+    rejects(R"({"schemaVersion":1,"seed":5,"systems":250})",
+            "missing edits array was accepted");
+    rejects(R"({"schemaVersion":2,"seed":5,"systems":250,"edits":[]})",
+            "unsupported schema version was accepted");
+    rejects(R"({"seed":5,"systems":250,"edits":[]})",
+            "missing schemaVersion was accepted");
+    rejects(R"({"schemaVersion":1,"systems":250,"edits":[]})",
+            "missing seed was accepted");
+    rejects(R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[{"name":"x"}]})",
+            "edit row without id was accepted");
+    rejects(R"({"schemaVersion":1,"seed":5,"systems":250,"edits":{"a":1}})",
+            "non-array edits was accepted");
+
+    // A documented empty project is valid.
+    const auto empty = parse_project(
+        serialize_project(EditorProject{.seed = 1, .system_count = 250}));
+    require(empty.edits.empty(), "empty project parsed with edits");
+
+    std::cout << "Editor project document checks passed.\n";
+    return 0;
+  } catch (const std::exception &error) {
+    std::cerr << "Editor project checks failed: " << error.what() << '\n';
+    return 1;
+  }
+}

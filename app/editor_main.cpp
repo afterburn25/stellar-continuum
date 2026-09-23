@@ -8,7 +8,10 @@
 
 #include "stellar/build_version.hpp"
 
+#include "editor_project.hpp"
+
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/engine/atomic_file_write.hpp>
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/profiler.hpp>
@@ -20,16 +23,22 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <initializer_list>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <random>
+#include <span>
+#include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -37,6 +46,7 @@ namespace {
 using namespace stellar::native_map;
 namespace engine = stellar::engine;
 namespace core = stellar::core;
+namespace edproj = stellar::editor;
 
 constexpr Color ink{210, 230, 244, 255};
 constexpr Color muted{122, 170, 190, 255};
@@ -123,6 +133,8 @@ std::string_view archetype_name(core::StarArchetype value) {
   return "unknown";
 }
 
+enum class Field { None, Name, Note, Search };
+
 struct Editor {
   std::vector<core::CatalogStar> catalog;
   std::vector<core::StellarSystem> systems;
@@ -140,15 +152,51 @@ struct Editor {
 
   std::size_t selected{static_cast<std::size_t>(-1)};
   engine::VirtualizedList system_list;
+  std::vector<std::size_t> filtered;
 
-  // Toolbar hit regions, rebuilt each frame.
+  // Annotation layer + text editing state.
+  std::unordered_map<int, edproj::SystemEdit> edits;
+  Field editing{Field::None};
+  std::string edit_buffer, search;
+
+  // Toolbar + panel hit regions, rebuilt each frame.
   std::vector<UiRect> hits;
-  std::vector<int> hit_sizes; // system count choices for the first N buttons
-  UiRect hit_regen{}, hit_seed{};
-  UiRect viewport{}, inspector{};
+  std::vector<int> hit_sizes;
+  UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
+      hit_save{}, hit_load{}, hit_search{};
+  UiRect viewport{}, inspector{}, list_rect{}, rows_rect{};
+  std::filesystem::path project_path;
+  float pointer_x{}, pointer_y{};
 
   std::shared_ptr<const RgbaImage> emblem;
 };
+
+std::string display_name(const Editor &ed, const core::StellarSystem &sys) {
+  if (const auto it = ed.edits.find(sys.id);
+      it != ed.edits.end() && !it->second.name.empty())
+    return it->second.name;
+  return sys.name;
+}
+
+bool matches(const Editor &ed, const core::StellarSystem &sys) {
+  if (ed.search.empty()) return true;
+  const auto lower = [](std::string text) {
+    std::ranges::transform(text, text.begin(), [](unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+    return text;
+  };
+  const auto needle = lower(ed.search);
+  return lower(sys.name).find(needle) != std::string::npos ||
+         lower(display_name(ed, sys)).find(needle) != std::string::npos;
+}
+
+void rebuild_filter(Editor &ed) {
+  ed.filtered.clear();
+  for (std::size_t i = 0; i < ed.systems.size(); ++i)
+    if (matches(ed, ed.systems[i])) ed.filtered.push_back(i);
+  ed.system_list.row_count = ed.filtered.size();
+}
 
 Point world_to_screen(const Editor &ed, float x, float y) {
   const auto &v = ed.viewport;
@@ -180,6 +228,25 @@ void line(DrawList &out, float x, float &y, std::string label,
   y += font + 8.f;
 }
 
+void field_box(DrawList &out, UiRect r, const std::string &value, bool active,
+               const std::string &hint, int font) {
+  out.overlay.push_back(
+      FilledRectangle{r, active ? row_selected : Color{10, 24, 36, 255}});
+  out.overlay.push_back(StrokedRectangle{r, active ? accent : panel_edge});
+  out.text.push_back(Text{{r.x + 8, r.y + (r.height - font) * .5f - 2},
+                          value.empty() ? hint : value,
+                          value.empty() ? muted : ink, font, 0, r});
+}
+
+void small_button(DrawList &out, UiRect r, const std::string &label, bool active,
+                  int font) {
+  out.overlay.push_back(
+      FilledRectangle{r, active ? row_selected : button_fill});
+  out.overlay.push_back(StrokedRectangle{r, panel_edge});
+  out.text.push_back(Text{{r.x, r.y + (r.height - font) * .5f - 2}, label, ink,
+                          font, r.width, r, TextAlign::Center});
+}
+
 void render_inspector(DrawList &out, Editor &ed, float s) {
   const auto &r = ed.inspector;
   out.overlay.push_back(FilledRectangle{r, {6, 16, 26, 255}});
@@ -189,11 +256,53 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   out.text.push_back(Text{{x, y}, "SYSTEM", accent, font + 2, 0, std::nullopt,
                           TextAlign::Left, FontFace::Heading});
   y += (font + 14) * s;
+
+  // Project actions docked at the inspector bottom (drawn unconditionally).
+  const float bw = (r.width - 34 * s) * .5f;
+  ed.hit_save = {x, r.y + r.height - (font + 20) * s, bw, (font + 12) * s};
+  ed.hit_load = {x + bw + 6 * s, ed.hit_save.y, bw, ed.hit_save.height};
+  small_button(out, ed.hit_save, "SAVE PROJECT", false, font);
+  small_button(out, ed.hit_load, "LOAD PROJECT", false, font);
+
   if (ed.selected >= ed.systems.size()) {
     out.text.push_back(Text{{x, y}, "No system selected", muted, font});
+    y += font + 10 * s;
+    ed.hit_name = ed.hit_note = ed.hit_bookmark = {};
     return;
   }
   const auto &sys = ed.systems[ed.selected];
+
+  // Editable display name.
+  out.text.push_back(Text{{x, y}, "display name", muted, font - 1});
+  y += font + 4;
+  ed.hit_name = {x, y, r.width - 28 * s, (font + 12) * s};
+  const auto name_value =
+      ed.editing == Field::Name ? ed.edit_buffer : display_name(ed, sys);
+  field_box(out, ed.hit_name, name_value, ed.editing == Field::Name,
+            sys.name, font);
+  y += ed.hit_name.height + 8 * s;
+
+  // Editable note.
+  out.text.push_back(Text{{x, y}, "note", muted, font - 1});
+  y += font + 4;
+  ed.hit_note = {x, y, r.width - 28 * s, (font + 12) * s};
+  const auto edit_it = ed.edits.find(sys.id);
+  const edproj::SystemEdit empty_edit{};
+  const auto &stored =
+      edit_it != ed.edits.end() ? edit_it->second : empty_edit;
+  const auto note_value =
+      ed.editing == Field::Note ? ed.edit_buffer : stored.note;
+  field_box(out, ed.hit_note, note_value, ed.editing == Field::Note,
+            "add a note...", font);
+  y += ed.hit_note.height + 8 * s;
+
+  // Bookmark toggle.
+  ed.hit_bookmark = {x, y, r.width - 28 * s, (font + 12) * s};
+  small_button(out, ed.hit_bookmark,
+               stored.bookmarked ? "BOOKMARKED" : "BOOKMARK",
+               stored.bookmarked, font);
+  y += ed.hit_bookmark.height + 12 * s;
+
   line(out, x, y, "name", sys.name, font);
   line(out, x, y, "id", std::to_string(sys.id), font);
   char buffer[64];
@@ -215,10 +324,95 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   if (sys.has_rare_resource) flags += "rare-resource ";
   if (sys.has_pre_warp_civilization) flags += "pre-warp-civ";
   line(out, x, y, "traits", flags.empty() ? "none" : flags, font);
-  if (sys.stellar_object) {
-    const auto &star = *sys.stellar_object;
-    line(out, x, y, "mass", std::to_string(star.mass_solar), font);
-    line(out, x, y, "luminosity", std::to_string(star.luminosity_solar), font);
+}
+
+void render_system_list(DrawList &out, Editor &ed, float s) {
+  const auto &r = ed.list_rect;
+  out.overlay.push_back(FilledRectangle{r, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{r, panel_edge});
+  float x = r.x + 14 * s;
+  float y = r.y + 10 * s;
+  const int font = static_cast<int>(12 * s);
+  out.text.push_back(Text{{x, y}, "SYSTEMS", accent, font + 1, 0, std::nullopt,
+                          TextAlign::Left, FontFace::Heading});
+  y += (font + 12) * s;
+
+  ed.hit_search = {x, y, r.width - 28 * s, (font + 12) * s};
+  field_box(out, ed.hit_search, ed.search, ed.editing == Field::Search,
+            "search systems...", font);
+  y += ed.hit_search.height + 8 * s;
+
+  const UiRect list{x, y, r.width - 28 * s, r.y + r.height - y - 10 * s};
+  ed.rows_rect = list;
+  out.overlay.push_back(FilledRectangle{list, {5, 13, 22, 255}});
+  out.overlay.push_back(StrokedRectangle{list, panel_edge});
+  ed.system_list.viewport_height = list.height;
+  ed.system_list.row_height = 20.f;
+  const auto range = ed.system_list.visible_range();
+  float ry = list.y - ed.system_list.scroll_offset +
+             range.first * ed.system_list.row_height;
+  for (std::size_t i = range.first; i < range.last;
+       ++i, ry += ed.system_list.row_height) {
+    const auto sys_index = ed.filtered[i];
+    const auto &sys = ed.systems[sys_index];
+    const UiRect row{list.x, ry, list.width, ed.system_list.row_height};
+    if (sys_index == ed.selected)
+      out.overlay.push_back(FilledRectangle{row, row_selected});
+    else if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
+      out.overlay.push_back(FilledRectangle{row, row_hover});
+    const auto marker =
+        ed.edits.contains(sys.id) && ed.edits[sys.id].bookmarked ? "* " : "";
+    out.text.push_back(
+        Text{{row.x + 8 * s, row.y + 3 * s},
+             marker + display_name(ed, sys), ink, font, 0, list});
+    if (sys.primary)
+      out.text.push_back(
+          Text{{row.x + row.width - 86 * s, row.y + 3 * s},
+               std::string(class_name(*sys.primary)), muted, font, 84 * s,
+               list});
+  }
+  if (ed.system_list.max_scroll() > 0) {
+    const float track = list.height;
+    const float thumb = std::max(
+        20.f, track * track / (track + ed.system_list.max_scroll()));
+    const float t = ed.system_list.scroll_offset / ed.system_list.max_scroll();
+    out.overlay.push_back(
+        FilledRectangle{{list.x + list.width - 5.f,
+                         list.y + t * (track - thumb), 4.f, thumb},
+                        accent});
+  }
+}
+
+void save_project(Editor &ed) {
+  try {
+    const edproj::EditorProject project{ed.seed, ed.system_count, ed.edits};
+    const auto text = edproj::serialize_project(project);
+    engine::write_file_atomically(ed.project_path,
+                                  std::as_bytes(std::span(text)));
+    ed.status = "project saved - " +
+                std::to_string(ed.edits.size()) + " annotations";
+  } catch (const std::exception &error) {
+    ed.status = std::string("save failed: ") + error.what();
+  }
+}
+
+void load_project(Editor &ed) {
+  try {
+    std::ifstream in(ed.project_path, std::ios::binary);
+    if (!in) {
+      ed.status = "no project file at " + ed.project_path.filename().string();
+      return;
+    }
+    const std::string text{std::istreambuf_iterator<char>(in),
+                           std::istreambuf_iterator<char>()};
+    auto project = edproj::parse_project(text);
+    // Swap only on full success: a malformed file leaves existing work intact.
+    ed.edits = std::move(project.edits);
+    rebuild_filter(ed);
+    ed.status = "project loaded - " + std::to_string(ed.edits.size()) +
+                " annotations";
+  } catch (const std::exception &error) {
+    ed.status = std::string("load failed: ") + error.what();
   }
 }
 
@@ -243,14 +437,14 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
     out.overlay.push_back(StrokedRectangle{
         {p.x - 10, p.y - 10, 20, 20}, accent});
     out.text.push_back(
-        Text{{p.x + 14, p.y - 8}, sys.name, accent, static_cast<int>(13 * s), 0,
-             v});
+        Text{{p.x + 14, p.y - 8}, display_name(ed, sys), accent,
+             static_cast<int>(13 * s), 0, v});
   }
   if (ed.pixels_per_unit > 6.f)
     for (const auto &sys : ed.systems) {
       const auto p = world_to_screen(ed, sys.position.x, sys.position.y);
       if (!v.contains(p)) continue;
-      out.text.push_back(Text{{p.x + 7, p.y - 6}, sys.name,
+      out.text.push_back(Text{{p.x + 7, p.y - 6}, display_name(ed, sys),
                               {150, 180, 195, 220}, static_cast<int>(11 * s), 0,
                               v});
     }
@@ -280,6 +474,8 @@ int main(int argc, char **argv) {
     profiler.set_enabled(true);
 
     Editor ed;
+    ed.project_path =
+        engine::executable_directory() / "projects" / "editor-project.json";
     const auto catalog_path = find_path(
         {"Data/astronomy/hyg-nearby-500-v1.json",
          "data/astronomy/hyg-nearby-500-v1.json"});
@@ -301,6 +497,8 @@ int main(int argc, char **argv) {
     std::atomic<int> pending_count{ed.system_count};
     std::mutex result_mutex;
     std::vector<core::StellarSystem> result;
+    std::int64_t result_seed{};
+    int result_count{};
     double result_ms{};
 
     auto submit_generate = [&] {
@@ -319,6 +517,8 @@ int main(int argc, char **argv) {
                                   .count();
                           std::lock_guard lock(result_mutex);
                           result = std::move(systems);
+                          result_seed = seed;
+                          result_count = count;
                           result_ms = elapsed;
                           generating.store(false);
                         });
@@ -334,9 +534,13 @@ int main(int argc, char **argv) {
         if (!result.empty()) {
           ed.systems = std::move(result);
           result.clear();
+          ed.seed = result_seed;
+          ed.system_count = result_count;
           ed.generate_ms = result_ms;
           ed.selected = static_cast<std::size_t>(-1);
-          ed.system_list.row_count = ed.systems.size();
+          // Annotations survive regeneration: ids are deterministic for the
+          // same seed+count, and a new seed simply orphans old edits.
+          rebuild_filter(ed);
           ed.system_list.scroll_to(0);
           fit_camera(ed);
           ed.status = "ready - " + std::to_string(ed.systems.size()) +
@@ -344,14 +548,95 @@ int main(int argc, char **argv) {
         }
       }
 
+      ed.pointer_x = snapshot.pointer.x;
+      ed.pointer_y = snapshot.pointer.y;
       for (const auto &event : snapshot.events) {
-        if (event.type == InputEventType::EscapePressed) return 0;
+        if (event.type == InputEventType::EscapePressed) {
+          if (ed.editing != Field::None) {
+            ed.editing = Field::None;
+            window.set_text_input(false);
+          } else {
+            return 0;
+          }
+          continue;
+        }
+        // Text editing takes precedence while a field has focus.
+        if (ed.editing != Field::None) {
+          if (event.type == InputEventType::TextEntered) {
+            if (ed.edit_buffer.size() < 120) ed.edit_buffer += event.text;
+            if (ed.editing == Field::Search) {
+              ed.search = ed.edit_buffer;
+              rebuild_filter(ed);
+            }
+            continue;
+          }
+          if (event.type == InputEventType::BackspacePressed) {
+            if (!ed.edit_buffer.empty()) ed.edit_buffer.pop_back();
+            if (ed.editing == Field::Search) {
+              ed.search = ed.edit_buffer;
+              rebuild_filter(ed);
+            }
+            continue;
+          }
+          if (event.type == InputEventType::KeyPressed && event.key == '\r') {
+            // Enter commits.
+            if (ed.editing == Field::Search) {
+              ed.search = ed.edit_buffer;
+              rebuild_filter(ed);
+            } else if (ed.selected < ed.systems.size()) {
+              auto &edit = ed.edits[ed.systems[ed.selected].id];
+              if (ed.editing == Field::Name) edit.name = ed.edit_buffer;
+              if (ed.editing == Field::Note) edit.note = ed.edit_buffer;
+            }
+            ed.editing = Field::None;
+            window.set_text_input(false);
+            continue;
+          }
+        }
         if (event.type == InputEventType::LeftPressed) {
+          // Commit whatever field was being edited before handling the click,
+          // so switching fields never silently drops the buffer.
+          if (ed.editing != Field::None) {
+            if (ed.editing == Field::Search) {
+              ed.search = ed.edit_buffer;
+              rebuild_filter(ed);
+            } else if (ed.selected < ed.systems.size()) {
+              auto &edit = ed.edits[ed.systems[ed.selected].id];
+              if (ed.editing == Field::Name) edit.name = ed.edit_buffer;
+              if (ed.editing == Field::Note) edit.note = ed.edit_buffer;
+            }
+            ed.editing = Field::None;
+            window.set_text_input(false);
+          }
           if (ed.hit_regen.contains(event.position)) {
             submit_generate();
           } else if (ed.hit_seed.contains(event.position)) {
             pending_seed.store(std::random_device{}());
             submit_generate();
+          } else if (ed.hit_save.contains(event.position)) {
+            save_project(ed);
+          } else if (ed.hit_load.contains(event.position)) {
+            load_project(ed);
+          } else if (ed.hit_bookmark.contains(event.position) &&
+                     ed.selected < ed.systems.size()) {
+            auto &edit = ed.edits[ed.systems[ed.selected].id];
+            edit.bookmarked = !edit.bookmarked;
+          } else if (ed.hit_name.contains(event.position) &&
+                     ed.selected < ed.systems.size()) {
+            ed.editing = Field::Name;
+            ed.edit_buffer =
+                ed.edits[ed.systems[ed.selected].id].name;
+            window.set_text_input(true);
+          } else if (ed.hit_note.contains(event.position) &&
+                     ed.selected < ed.systems.size()) {
+            ed.editing = Field::Note;
+            ed.edit_buffer =
+                ed.edits[ed.systems[ed.selected].id].note;
+            window.set_text_input(true);
+          } else if (ed.hit_search.contains(event.position)) {
+            ed.editing = Field::Search;
+            ed.edit_buffer = ed.search;
+            window.set_text_input(true);
           } else {
             for (std::size_t i = 0; i < ed.hits.size(); ++i)
               if (ed.hits[i].contains(event.position)) {
@@ -387,6 +672,22 @@ int main(int argc, char **argv) {
             ed.selected = best_index;
           }
         }
+        // List row clicks select and center; wheel scrolls the list.
+        if (event.type == InputEventType::LeftReleased &&
+            ed.rows_rect.contains(event.position)) {
+          const float local = event.position.y - ed.rows_rect.y +
+                              ed.system_list.scroll_offset;
+          const auto row = static_cast<std::size_t>(std::max(
+              0.f, std::floor(local / ed.system_list.row_height)));
+          if (row < ed.filtered.size()) {
+            ed.selected = ed.filtered[row];
+            ed.system_list.ensure_visible(row);
+          }
+        }
+        if (event.type == InputEventType::Wheel &&
+            ed.list_rect.contains(event.position))
+          ed.system_list.scroll_to(ed.system_list.scroll_offset -
+                                   event.wheel_y * 40.f);
         if (event.type == InputEventType::PointerMove && ed.dragging)
           ed.camera = {ed.camera_origin.x -
                            (event.position.x - ed.drag_origin.x) /
@@ -475,16 +776,23 @@ int main(int argc, char **argv) {
           Text{{bx, bar.y + 18 * s}, "seed " + std::to_string(ed.seed), muted,
                static_cast<int>(13 * s)});
 
-      // Workspace: viewport + inspector.
-      ed.inspector = {w - 320 * s, bar.y + bar.height + 10 * s, 304 * s,
-                      h - bar.height - 46 * s};
-      ed.viewport = {16 * s, bar.y + bar.height + 10 * s,
-                     w - 340 * s - 32 * s, ed.inspector.height};
+      // Workspace: viewport + right column split into inspector and the
+      // searchable systems list.
+      const float column_w = 304 * s;
+      const float column_x = w - column_w - 16 * s;
+      const float column_top = bar.y + bar.height + 10 * s;
+      const float column_h = h - column_top - 16 * s;
+      ed.inspector = {column_x, column_top, column_w, column_h * .55f};
+      ed.list_rect = {column_x, column_top + ed.inspector.height + 8 * s,
+                      column_w,
+                      column_h - ed.inspector.height - 8 * s};
+      ed.viewport = {16 * s, column_top, column_x - 32 * s, column_h};
 
       profiler.begin_frame();
       const auto frame_scope = profiler.span("editor.frame", "frame");
       render_viewport(draw, ed, s);
       render_inspector(draw, ed, s);
+      render_system_list(draw, ed, s);
       draw.text.push_back(
           Text{{ed.viewport.x + 6 * s, ed.viewport.y + ed.viewport.height - 22 * s},
                ed.status + "  |  drag to pan, wheel to zoom, click to select",
