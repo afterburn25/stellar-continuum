@@ -1,0 +1,102 @@
+#include "stellar/engine/scene_components.hpp"
+
+#include "stellar/engine/atomic_file_write.hpp"
+
+#include <cstring>
+#include <fstream>
+#include <iterator>
+
+namespace stellar::engine {
+namespace {
+
+template <class T> std::vector<std::uint8_t> encode_pod(const T &v) {
+  std::vector<std::uint8_t> bytes(sizeof(T));
+  std::memcpy(bytes.data(), &v, sizeof(T));
+  return bytes;
+}
+
+template <class T> T decode_pod(const std::vector<std::uint8_t> &b) {
+  T v{};
+  if (b.size() == sizeof(T)) std::memcpy(&v, b.data(), sizeof(T));
+  return v;
+}
+
+std::vector<std::uint8_t> encode_name(const EntityName &n) {
+  return {n.value.begin(), n.value.end()};
+}
+
+std::vector<std::uint8_t> encode_sprite(const SpriteRef &s) {
+  return {s.value.begin(), s.value.end()};
+}
+
+EntityName decode_name(const std::vector<std::uint8_t> &b) {
+  return EntityName{{b.begin(), b.end()}};
+}
+
+SpriteRef decode_sprite(const std::vector<std::uint8_t> &b) {
+  return SpriteRef{{b.begin(), b.end()}};
+}
+
+} // namespace
+
+void register_scene_components(World &world) {
+  world.register_component<Transform2D>("transform", encode_pod<Transform2D>,
+                                        decode_pod<Transform2D>);
+  world.register_component<Velocity2D>("velocity", encode_pod<Velocity2D>,
+                                       decode_pod<Velocity2D>);
+  world.register_component<Extent2D>("extent", encode_pod<Extent2D>,
+                                     decode_pod<Extent2D>);
+  world.register_component<Tint>("tint", encode_pod<Tint>, decode_pod<Tint>);
+  world.register_component<EntityName>("name", encode_name, decode_name);
+  world.register_component<SpriteRef>("sprite", encode_sprite, decode_sprite);
+}
+
+std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
+  std::vector<EntityId> spawned;
+  spawned.reserve(doc.entities.size());
+  for (const auto &s : doc.entities) {
+    const auto entity = world.create();
+    world.add(entity, Transform2D{s.x, s.y});
+    world.add(entity, Velocity2D{s.vx, s.vy});
+    world.add(entity, Extent2D{s.w, s.h});
+    world.add(entity, Tint{s.r, s.g, s.b});
+    world.add(entity, EntityName{s.name});
+    if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
+    spawned.push_back(entity);
+  }
+  return spawned;
+}
+
+std::optional<EntityId> find_entity_by_name(const World &world,
+                                            std::string_view name) {
+  for (const auto entity : world.entities()) {
+    if (const auto *n = world.get<EntityName>(entity);
+        n != nullptr && n->value == name)
+      return entity;
+  }
+  return std::nullopt;
+}
+
+void save_world_to_file(const World &world,
+                        const std::filesystem::path &path) {
+  const auto bytes = world.snapshot();
+  write_file_atomically(
+      path,
+      std::span<const std::byte>(
+          reinterpret_cast<const std::byte *>(bytes.data()), bytes.size()));
+}
+
+bool load_world_from_file(World &world, const std::filesystem::path &path) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return false;
+  const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(in),
+                                        std::istreambuf_iterator<char>()};
+  try {
+    world.restore(bytes);
+  } catch (const std::exception &) {
+    return false;
+  }
+  return true;
+}
+
+} // namespace stellar::engine

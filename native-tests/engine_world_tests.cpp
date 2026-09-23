@@ -1,6 +1,9 @@
+#include <stellar/engine/scene_components.hpp>
 #include <stellar/engine/world.hpp>
 
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -205,6 +208,60 @@ int main() {
         again.set_parent(p2, s2);
         again.bind_legacy(s2, 7);
         check(again.snapshot() == bytes, "snapshot bytes are deterministic");
+    }
+    // Scene components: spawn_scene builds the full component set,
+    // find_entity_by_name resolves handles, and the file-backed snapshot
+    // helpers round-trip the spawned world (corrupt files fail safely).
+    {
+        SceneDocument doc{{SceneEntity{"player", 10.f, 20.f, 64.f, 64.f,
+                                       30.f, -15.f, 255, 220, 60,
+                                       "data/logo.png"},
+                           SceneEntity{"rock", 200.f, 100.f}}};
+        World world;
+        register_scene_components(world);
+        const auto spawned = spawn_scene(world, doc);
+        check(spawned.size() == 2, "spawn_scene creates all entities");
+        const auto player = find_entity_by_name(world, "player");
+        check(player.has_value() && *player == spawned[0],
+              "find_entity_by_name resolves");
+        check(world.get<Transform2D>(spawned[0])->x == 10.f,
+              "spawn_scene transform");
+        check(world.get<SpriteRef>(spawned[0])->value == "data/logo.png",
+              "spawn_scene sprite ref");
+        check(world.get<SpriteRef>(spawned[1]) == nullptr,
+              "empty sprite leaves no SpriteRef");
+
+        const auto path = std::filesystem::temp_directory_path() /
+                          "stellar_scene_roundtrip.stw";
+        save_world_to_file(world, path);
+        check(std::filesystem::is_regular_file(path), "save file written");
+
+        // Mutate then restore: the world returns to the saved state.
+        world.get<Transform2D>(spawned[0])->x = 999.f;
+        world.destroy(spawned[1]);
+        check(load_world_from_file(world, path), "load_world_from_file");
+        const auto rep = find_entity_by_name(world, "player");
+        check(rep.has_value() && world.get<Transform2D>(*rep)->x == 10.f,
+              "restore revives saved transform");
+        check(find_entity_by_name(world, "rock").has_value(),
+              "restore revives destroyed entity");
+        check(world.get<SpriteRef>(*rep)->value == "data/logo.png",
+              "restore revives sprite path");
+
+        // Failure paths: absent and corrupt files return false, world intact.
+        check(!load_world_from_file(
+                  world, std::filesystem::temp_directory_path() /
+                             "stellar_scene_missing.stw"),
+              "missing save returns false");
+        {
+            std::ofstream bad(path, std::ios::binary | std::ios::trunc);
+            bad << "not-a-snapshot";
+        }
+        check(!load_world_from_file(world, path),
+              "corrupt save returns false");
+        check(world.get<Transform2D>(*rep)->x == 10.f,
+              "failed load leaves world untouched");
+        std::filesystem::remove(path);
     }
 
     if (failures != 0) {
