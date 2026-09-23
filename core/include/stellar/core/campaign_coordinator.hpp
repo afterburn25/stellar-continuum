@@ -14,6 +14,7 @@
 #include <stellar/core/shipbuilding.hpp>
 #include <stellar/core/strategic_runtime.hpp>
 #include <stellar/engine/phase_timing.hpp>
+#include <stellar/engine/simulation_executor.hpp>
 #include <array>
 
 #include <cstddef>
@@ -158,6 +159,15 @@ public:
       CivilizationStrategicRuntimeCoordinator strategic,
       CombatSimulation raw_combat,
       CampaignSubsystemRuntime subsystems = {});
+  // Executor phase tasks capture `this`, so a moved coordinator rebinds
+  // them rather than carrying callbacks that still target the
+  // moved-from object.
+  GalaxySimulationStepCoordinator(GalaxySimulationStepCoordinator &&other);
+  GalaxySimulationStepCoordinator &
+  operator=(GalaxySimulationStepCoordinator &&other);
+  GalaxySimulationStepCoordinator(const GalaxySimulationStepCoordinator &) = delete;
+  GalaxySimulationStepCoordinator &
+  operator=(const GalaxySimulationStepCoordinator &) = delete;
 
 [[nodiscard]] CombatOrderResult issue_military_order(
     CampaignSimulationState *campaign, int civilization_id, int fleet_id,
@@ -237,8 +247,28 @@ issue_civilian_return_to_base_order(
   [[nodiscard]] const CombatSimulation &combat_simulation() const noexcept;
 
 private:
+  // Engine-level phase pipeline: every strategic step runs the 12
+  // coordinator phases as SimulationExecutor tasks (Active tier,
+  // dependency-chained to the historical order). This is the Core
+  // consumer of the engine simulation LOD machinery — per-phase domain
+  // statistics, wakeups and future tier demotion without restructuring
+  // advance(). Per-step inputs flow through StepPhaseContext; task
+  // callbacks never capture stack state.
+  struct StepPhaseContext {
+    CampaignSimulationState *state{};
+    double simulation_days{};
+    SimulationStepResult *result{};
+    std::vector<IndustryReserve> existing_reserves;
+    std::vector<EconomyConstructionState> economic_construction;
+    std::vector<EconomyFleetState> economic_fleets;
+    std::vector<ConstructionIndustryBudget> construction_budgets;
+    std::vector<ConstructionIndustryBudget> shipbuilding_budgets;
+  };
+  void configure_phase_tasks();
   bool profiling_enabled_{};
   std::array<stellar::engine::PerformanceCounter,phase_names.size()> performance_{};
+  StepPhaseContext step_{};
+  stellar::engine::SimulationExecutor executor_;
   bool advance_legacy_research_{};
   bool use_strategic_shipbuilding_preferences_{};
   std::shared_ptr<CampaignConstructionCapabilityQuery>

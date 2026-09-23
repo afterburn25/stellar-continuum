@@ -365,7 +365,9 @@ GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
                     technologies, civilization_id, capability_id);
               }})),
       strategic_(make_default_strategic_runtime(shipbuilding_capability_)),
-      combat_(std::in_place_type<CombatCommandRuntime>), subsystems_{} {}
+      combat_(std::in_place_type<CombatCommandRuntime>), subsystems_{} {
+  configure_phase_tasks();
+}
 
 GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
     SourceCompatibleCampaignConfiguration configuration,
@@ -392,7 +394,9 @@ GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
       strategic_(make_default_strategic_runtime(shipbuilding_capability_)),
       combat_(std::in_place_type<CombatCommandRuntime>,
               std::move(matched_combat)),
-      subsystems_(std::move(subsystems)) {}
+      subsystems_(std::move(subsystems)) {
+  configure_phase_tasks();
+}
 
 GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
     SourceCompatibleCampaignConfiguration configuration,
@@ -418,7 +422,9 @@ GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
               }})),
       strategic_(make_default_strategic_runtime(shipbuilding_capability_)),
       combat_(std::in_place_type<CombatSimulation>, std::move(raw_combat)),
-      subsystems_(std::move(subsystems)) {}
+      subsystems_(std::move(subsystems)) {
+  configure_phase_tasks();
+}
 
 GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
     SourceCompatibleCampaignConfiguration configuration,
@@ -446,7 +452,9 @@ GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
       strategic_(std::move(strategic)),
       combat_(std::in_place_type<CombatCommandRuntime>,
               std::move(matched_combat)),
-      subsystems_(std::move(subsystems)) {}
+      subsystems_(std::move(subsystems)) {
+  configure_phase_tasks();
+}
 
 GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
     SourceCompatibleCampaignConfiguration configuration,
@@ -473,7 +481,246 @@ GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
               }})),
       strategic_(std::move(strategic)),
       combat_(std::in_place_type<CombatSimulation>, std::move(raw_combat)),
-      subsystems_(std::move(subsystems)) {}
+      subsystems_(std::move(subsystems)) {
+  configure_phase_tasks();
+}
+
+GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
+    GalaxySimulationStepCoordinator &&other)
+    : profiling_enabled_(other.profiling_enabled_),
+      performance_(other.performance_), step_(std::move(other.step_)),
+      executor_(),
+      advance_legacy_research_(other.advance_legacy_research_),
+      use_strategic_shipbuilding_preferences_(
+          other.use_strategic_shipbuilding_preferences_),
+      construction_capability_(std::move(other.construction_capability_)),
+      shipbuilding_capability_(std::move(other.shipbuilding_capability_)),
+      strategic_(std::move(other.strategic_)),
+      combat_(std::move(other.combat_)),
+      subsystems_(std::move(other.subsystems_)) {
+  // Rebind phase tasks to this object, then carry the source executor's
+  // scheduler state (tick/cadence bookkeeping, pending wakeups).
+  const auto carried = other.executor_.capture_state();
+  configure_phase_tasks();
+  executor_.restore_state(carried);
+}
+
+GalaxySimulationStepCoordinator &
+GalaxySimulationStepCoordinator::operator=(
+    GalaxySimulationStepCoordinator &&other) {
+  if (this == &other)
+    return *this;
+  profiling_enabled_ = other.profiling_enabled_;
+  performance_ = other.performance_;
+  step_ = std::move(other.step_);
+  advance_legacy_research_ = other.advance_legacy_research_;
+  use_strategic_shipbuilding_preferences_ =
+      other.use_strategic_shipbuilding_preferences_;
+  construction_capability_ = std::move(other.construction_capability_);
+  shipbuilding_capability_ = std::move(other.shipbuilding_capability_);
+  strategic_ = std::move(other.strategic_);
+  combat_ = std::move(other.combat_);
+  subsystems_ = std::move(other.subsystems_);
+  const auto carried = other.executor_.capture_state();
+  executor_.clear();
+  configure_phase_tasks();
+  executor_.restore_state(carried);
+  return *this;
+}
+
+void GalaxySimulationStepCoordinator::configure_phase_tasks() {
+  namespace eng = stellar::engine;
+  // One task per phase, chained in the historical phase order. All
+  // phases are Active tier today — the executor is the host so cadence
+  // can be demoted per phase later without restructuring advance().
+  const std::array<eng::SimulationTask, phase_names.size()> phases{{
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         advance_colony_economies(
+             economy_world(campaign, step_.economic_construction,
+                           step_.economic_fleets),
+             campaign.colonies, campaign.economies, step_.simulation_days,
+             advance_legacy_research_);
+         timing.finish(performance_[0]);
+       },
+       .domain = "economy"},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         (void)strategic_.advance(
+             {campaign.seed,
+              strategic_input_world(campaign, step_.state->lanes()),
+              campaign_civilization_control(campaign)},
+             step_.simulation_days);
+         timing.finish(performance_[1]);
+       },
+       .domain = "strategic_ai"},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         ensure_automatic_construction_orders(
+             construction_world(campaign, construction_capability_));
+         ensure_automatic_ship_orders(shipbuilding_world(
+             campaign, shipbuilding_capability_, strategic_,
+             use_strategic_shipbuilding_preferences_));
+         timing.finish(performance_[2]);
+       },
+       .domain = "automatic_orders"},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         for (const auto &civilization : campaign.civilizations) {
+           if (civilization.is_seeded_ancient)
+             continue;
+           const auto economy = std::find_if(
+               campaign.economies.begin(), campaign.economies.end(),
+               [&](const auto &candidate) {
+                 return candidate.civilization_id == civilization.id;
+               });
+           if (economy == campaign.economies.end())
+             throw std::runtime_error("Sequence contains no matching element");
+           const auto construction =
+               construction_world(campaign, construction_capability_);
+           const auto shipbuilding = shipbuilding_world(
+               campaign, shipbuilding_capability_, strategic_,
+               use_strategic_shipbuilding_preferences_);
+           const IndustryAllocationContext context{
+               civilization.id,
+               std::max(economy->industry, 0.0),
+               construction_industry_demand(construction.read(),
+                                            civilization.id,
+                                            step_.simulation_days),
+               shipbuilding_industry_demand(shipbuilding.read(),
+                                            civilization.id,
+                                            step_.simulation_days)};
+           validate_allocation_value(context.available_industry,
+                                     "AvailableIndustry");
+           validate_allocation_value(context.construction_demand,
+                                     "ConstructionDemand");
+           validate_allocation_value(context.shipbuilding_demand,
+                                     "ShipbuildingDemand");
+           const auto weights = campaign_industry_weights(
+               campaign.economies, civilization.id,
+               strategic_.get_industry_weights(civilization.id));
+           auto allocation = allocate_industry(context, weights);
+           upsert_budget(step_.construction_budgets, civilization.id,
+                         allocation.construction_allocated);
+           upsert_budget(step_.shipbuilding_budgets, civilization.id,
+                         allocation.shipbuilding_allocated);
+           step_.result->industry_allocations.push_back(
+               std::move(allocation));
+         }
+         timing.finish(performance_[3]);
+       },
+       .domain = "industry_allocation", .depends_on = {2}},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         step_.result->construction_events = advance_construction(
+             construction_world(campaign, construction_capability_),
+             std::span<const ConstructionIndustryBudget>{
+                 step_.construction_budgets},
+             step_.simulation_days);
+         timing.finish(performance_[4]);
+       },
+       .domain = "construction", .depends_on = {3}},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         step_.result->shipbuilding_events = advance_shipbuilding(
+             shipbuilding_world(campaign, shipbuilding_capability_,
+                                strategic_,
+                                use_strategic_shipbuilding_preferences_),
+             std::span<const ConstructionIndustryBudget>{
+                 step_.shipbuilding_budgets},
+             step_.simulation_days);
+         timing.finish(performance_[5]);
+       },
+       .domain = "shipbuilding", .depends_on = {3}},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         if (advance_legacy_research_)
+           step_.result->research_events = subsystems_.research.advance(
+               {campaign.civilizations, campaign.technologies,
+                campaign.construction, campaign.economies,
+                campaign_civilization_control(campaign)});
+         timing.finish(performance_[6]);
+       },
+       .domain = "legacy_research", .depends_on = {5}},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         step_.result->exploration_events = subsystems_.exploration.advance(
+             {campaign.systems, campaign.bodies, campaign.civilizations,
+              campaign.fleets, campaign.colonies, campaign.economies,
+              campaign.knowledge, step_.state->lanes(),
+              campaign_civilization_control(campaign),
+              campaign.generation_metadata &&
+                      campaign.generation_metadata->phenomena
+                  ? &*campaign.generation_metadata->phenomena
+                  : nullptr},
+             step_.simulation_days);
+         timing.finish(performance_[7]);
+       },
+       .domain = "exploration", .depends_on = {6}},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         subsystems_.freight.advance(
+             {campaign.systems, campaign.civilizations, campaign.bodies,
+              campaign.construction, campaign.fleets, campaign.colonies,
+              campaign.economies, step_.state->lanes()},
+             step_.simulation_days);
+         timing.finish(performance_[8]);
+       },
+       .domain = "freight", .depends_on = {7}},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         step_.result->combat_events = simulation(combat_).advance(
+             {campaign.systems, campaign.fleets}, step_.simulation_days);
+         timing.finish(performance_[9]);
+       },
+       .domain = "combat", .depends_on = {8}},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         step_.result->colonization_events = subsystems_.colonization.advance(
+             {campaign.systems, campaign.bodies, campaign.civilizations,
+              campaign.colonies, campaign.fleets, campaign.economies,
+              campaign.knowledge, step_.state->lanes(),
+              campaign_civilization_control(campaign)},
+             step_.simulation_days);
+         timing.finish(performance_[10]);
+       },
+       .domain = "colonization", .depends_on = {9}},
+      {.run = [this](const eng::SimulationTickContext &) {
+         eng::PhaseTimer timing(profiling_enabled_);
+         auto &campaign = step_.state->campaign();
+         step_.economic_construction =
+             economic_construction_projection(campaign.construction);
+         step_.economic_fleets =
+             economic_fleet_projection(campaign.fleets);
+         apply_industry_storage_caps(
+             economy_world(campaign, step_.economic_construction,
+                           step_.economic_fleets),
+             campaign.colonies, campaign.economies,
+             step_.existing_reserves);
+         timing.finish(performance_[11]);
+       },
+       .domain = "economy_storage", .depends_on = {10}},
+  }};
+  for (std::size_t i = 0; i < phase_names.size(); ++i) {
+    auto task = phases[i];
+    task.tier = eng::SimulationTier::Active;
+    if (i > 0 && task.depends_on.empty())
+      task.depends_on = {static_cast<eng::SimulationExecutor::Key>(i - 1)};
+    executor_.add(static_cast<eng::SimulationExecutor::Key>(i),
+                  std::move(task));
+  }
+}
 
 SimulationStepResult GalaxySimulationStepCoordinator::advance(
     CampaignSimulationState *state, double simulation_days) {
@@ -487,12 +734,17 @@ SimulationStepResult GalaxySimulationStepCoordinator::advance(
   if (simulation_days <= 0.0)
     return {};
 
-  stellar::engine::PhaseTimer timing(profiling_enabled_);
   auto &campaign = state->campaign();
-  std::vector<IndustryReserve> existing_reserves;
-  existing_reserves.reserve(campaign.economies.size());
+  step_.state = state;
+  step_.simulation_days = simulation_days;
+  step_.construction_budgets.clear();
+  step_.shipbuilding_budgets.clear();
+
+  step_.existing_reserves.clear();
+  step_.existing_reserves.reserve(campaign.economies.size());
   for (const auto &economy : campaign.economies) {
-    if (std::any_of(existing_reserves.begin(), existing_reserves.end(),
+    if (std::any_of(step_.existing_reserves.begin(),
+                    step_.existing_reserves.end(),
                     [&](const auto &reserve) {
                       return reserve.civilization_id ==
                              economy.civilization_id;
@@ -500,124 +752,18 @@ SimulationStepResult GalaxySimulationStepCoordinator::advance(
       throw std::invalid_argument(
           "An item with the same key has already been added. Key: " +
           std::to_string(economy.civilization_id));
-    existing_reserves.push_back(
+    step_.existing_reserves.push_back(
         {economy.civilization_id, economy.industry});
   }
 
-  auto economic_construction =
+  step_.economic_construction =
       economic_construction_projection(campaign.construction);
-  auto economic_fleets = economic_fleet_projection(campaign.fleets);
-  advance_colony_economies(
-      economy_world(campaign, economic_construction, economic_fleets),
-      campaign.colonies, campaign.economies, simulation_days,
-      advance_legacy_research_);
-  timing.finish(performance_[0]);
+  step_.economic_fleets = economic_fleet_projection(campaign.fleets);
 
-  (void)strategic_.advance(
-      {campaign.seed, strategic_input_world(campaign, state->lanes()),
-       campaign_civilization_control(campaign)},
-      simulation_days);
-
-  timing.finish(performance_[1]);
-  ensure_automatic_construction_orders(
-      construction_world(campaign, construction_capability_));
-  ensure_automatic_ship_orders(shipbuilding_world(
-      campaign, shipbuilding_capability_, strategic_,
-      use_strategic_shipbuilding_preferences_));
-  timing.finish(performance_[2]);
-
-  std::vector<ConstructionIndustryBudget> construction_budgets;
-  std::vector<ConstructionIndustryBudget> shipbuilding_budgets;
   SimulationStepResult result;
   result.simulation_days = simulation_days;
-  for (const auto &civilization : campaign.civilizations) {
-    if (civilization.is_seeded_ancient)
-      continue;
-    const auto economy =
-        std::find_if(campaign.economies.begin(), campaign.economies.end(),
-                     [&](const auto &candidate) {
-                       return candidate.civilization_id == civilization.id;
-                     });
-    if (economy == campaign.economies.end())
-      throw std::runtime_error("Sequence contains no matching element");
-    const auto construction =
-        construction_world(campaign, construction_capability_);
-    const auto shipbuilding = shipbuilding_world(
-        campaign, shipbuilding_capability_, strategic_,
-        use_strategic_shipbuilding_preferences_);
-    const IndustryAllocationContext context{
-        civilization.id,
-        std::max(economy->industry, 0.0),
-        construction_industry_demand(construction.read(), civilization.id,
-                                     simulation_days),
-        shipbuilding_industry_demand(shipbuilding.read(), civilization.id,
-                                     simulation_days)};
-    validate_allocation_value(context.available_industry,
-                              "AvailableIndustry");
-    validate_allocation_value(context.construction_demand,
-                              "ConstructionDemand");
-    validate_allocation_value(context.shipbuilding_demand,
-                              "ShipbuildingDemand");
-    const auto weights = campaign_industry_weights(
-        campaign.economies, civilization.id,
-        strategic_.get_industry_weights(civilization.id));
-    auto allocation = allocate_industry(context, weights);
-    upsert_budget(construction_budgets, civilization.id,
-                  allocation.construction_allocated);
-    upsert_budget(shipbuilding_budgets, civilization.id,
-                  allocation.shipbuilding_allocated);
-    result.industry_allocations.push_back(std::move(allocation));
-  }
-  timing.finish(performance_[3]);
-
-  result.construction_events = advance_construction(
-      construction_world(campaign, construction_capability_),
-      std::span<const ConstructionIndustryBudget>{construction_budgets},
-      simulation_days);
-  timing.finish(performance_[4]);
-  result.shipbuilding_events = advance_shipbuilding(
-      shipbuilding_world(campaign, shipbuilding_capability_, strategic_,
-                         use_strategic_shipbuilding_preferences_),
-      std::span<const ConstructionIndustryBudget>{shipbuilding_budgets},
-      simulation_days);
-  timing.finish(performance_[5]);
-
-  if (advance_legacy_research_)
-    result.research_events = subsystems_.research.advance(
-        {campaign.civilizations, campaign.technologies, campaign.construction,
-         campaign.economies, campaign_civilization_control(campaign)});
-  timing.finish(performance_[6]);
-
-  result.exploration_events = subsystems_.exploration.advance(
-      {campaign.systems, campaign.bodies, campaign.civilizations,
-       campaign.fleets, campaign.colonies, campaign.economies,
-       campaign.knowledge, state->lanes(), campaign_civilization_control(campaign),
-       campaign.generation_metadata&&campaign.generation_metadata->phenomena?&*campaign.generation_metadata->phenomena:nullptr},
-      simulation_days);
-  timing.finish(performance_[7]);
-  subsystems_.freight.advance(
-      {campaign.systems, campaign.civilizations, campaign.bodies,
-       campaign.construction, campaign.fleets, campaign.colonies,
-       campaign.economies, state->lanes()},
-      simulation_days);
-  timing.finish(performance_[8]);
-  result.combat_events = simulation(combat_).advance(
-      {campaign.systems, campaign.fleets}, simulation_days);
-  timing.finish(performance_[9]);
-  result.colonization_events = subsystems_.colonization.advance(
-      {campaign.systems, campaign.bodies, campaign.civilizations,
-       campaign.colonies, campaign.fleets, campaign.economies,
-       campaign.knowledge, state->lanes(), campaign_civilization_control(campaign)},
-      simulation_days);
-  timing.finish(performance_[10]);
-
-  economic_construction =
-      economic_construction_projection(campaign.construction);
-  economic_fleets = economic_fleet_projection(campaign.fleets);
-  apply_industry_storage_caps(
-      economy_world(campaign, economic_construction, economic_fleets),
-      campaign.colonies, campaign.economies, existing_reserves);
-  timing.finish(performance_[11]);
+  step_.result = &result;
+  executor_.advance();
   return result;
 }
 
