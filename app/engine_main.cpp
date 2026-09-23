@@ -196,7 +196,8 @@ struct Shell {
       hit_scene_name{}, hit_scene_pos{}, hit_scene_vel{}, hit_scene_sprite{},
       hit_scene_size{}, hit_scene_color{}, hit_scene_layer{},
       hit_scene_parallax{}, hit_scene_text{}, hit_scene_grav{},
-      hit_scene_gravity{}, scene_preview{}, scene_rows{};
+      hit_scene_gravity{}, hit_scene_solid{},
+      scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
   // document reload so re-imported art refreshes.
   std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
@@ -1002,6 +1003,15 @@ void commit_scene_field(Shell &shell) {
       ok = true;
     } catch (const std::exception &) {
     }
+  } else if (shell.scene_field == 12) {
+    const auto b = shell.scene_buffer;
+    if (b == "1" || b == "true" || b == "yes") {
+      next.solid = true;
+      ok = true;
+    } else if (b == "0" || b == "false" || b == "no") {
+      next.solid = false;
+      ok = true;
+    }
   }
   if (ok) {
     shell.scene_history.commit(shell.scene_doc);
@@ -1040,7 +1050,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         shell.hit_scene_sprite = shell.hit_scene_size =
             shell.hit_scene_color = shell.hit_scene_layer =
                 shell.hit_scene_parallax = shell.hit_scene_text =
-                    shell.hit_scene_grav = shell.hit_scene_gravity = {};
+                    shell.hit_scene_grav = shell.hit_scene_gravity =
+                        shell.hit_scene_solid = {};
     shell.scene_preview = shell.scene_rows = {};
     return;
   }
@@ -1203,6 +1214,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->gravity_scale) : "",
         shell.editing_scene && shell.scene_field == 10,
         "gravity multiplier - 0 ignores scene gravity");
+  field(shell.hit_scene_solid, "solid",
+        entity ? (entity->solid ? "true" : "false") : "",
+        shell.editing_scene && shell.scene_field == 12,
+        "platform/ground - things land on it");
   field(shell.hit_scene_gravity, "gravity",
         std::to_string(shell.scene_doc.gravity),
         shell.editing_scene && shell.scene_field == 11,
@@ -2051,6 +2066,8 @@ int main(int argc, char **argv) {
               else if (field == 11)
                 shell.scene_buffer =
                     std::to_string(shell.scene_doc.gravity);
+              else if (field == 12 && e)
+                shell.scene_buffer = e->solid ? "true" : "false";
               else shell.scene_buffer.clear();
               window.set_text_input(true);
             };
@@ -2076,6 +2093,8 @@ int main(int argc, char **argv) {
               edit_field(10);
             else if (shell.hit_scene_gravity.contains(event.position))
               edit_field(11);
+            else if (shell.hit_scene_solid.contains(event.position))
+              edit_field(12);
             else if (shell.editing_scene) {
               shell.editing_scene = false;
               window.set_text_input(false);

@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <set>
 #include <string_view>
@@ -48,6 +49,8 @@ struct RuntimeHost::Impl {
   float gravity = 0.f;
   // Resolved bounce bounds — viewport-sized unless world_width/height set.
   float world_w = 0.f, world_h = 0.f;
+  // Entities resting on the floor or a solid — jump requires groundedness.
+  std::set<std::uint64_t> grounded;
 };
 
 RuntimeHost::RuntimeHost(RuntimeHostOptions options)
@@ -303,11 +306,8 @@ int RuntimeHost::run() {
         // impulse instead of held-key velocity.
         if (impl.gravity != 0.f && impl.player &&
             (event.key == 'w' || event.key == 0x40000052)) {
-          const auto *t = world.get<Transform2D>(*impl.player);
-          const auto *ext = world.get<Extent2D>(*impl.player);
           auto *v = world.get<Velocity2D>(*impl.player);
-          if (t && ext && v &&
-              t->y >= impl.world_h - ext->h - 1.f)
+          if (v && impl.grounded.count(impl.player->value()))
             v->dy = -520.f;
         }
       }
@@ -364,17 +364,37 @@ int RuntimeHost::run() {
     auto simulate = [&](float dt_step) {
       dt_step *= static_cast<float>(impl.time_scale);
       if (on_update) on_update(world, dt_step);
+      impl.grounded.clear();
       for (const auto entity : impl.entities) {
         auto *t = world.get<Transform2D>(entity);
         auto *v = world.get<Velocity2D>(entity);
         const auto *ext = world.get<Extent2D>(entity);
         if (!t || !v || !ext) continue;
-        if (impl.gravity != 0.f) {
-          const auto *gs = world.get<GravityScale>(entity);
-          v->dy += impl.gravity * (gs ? gs->value : 1.f) * dt_step;
-        }
+        if (world.get<Solid>(entity)) continue;  // solids never move
+        const auto *gs = world.get<GravityScale>(entity);
+        const float gscale = impl.gravity != 0.f ? (gs ? gs->value : 1.f)
+                                                 : 0.f;
+        if (gscale != 0.f) v->dy += impl.gravity * gscale * dt_step;
+        const float prev_bottom = t->y + ext->h;
         t->x += v->dx * dt_step;
         t->y += v->dy * dt_step;
+        // Platform landings: a falling, gravity-affected entity whose
+        // bottom crossed a solid's top this step lands on it.
+        if (gscale != 0.f && v->dy > 0.f) {
+          for (const auto other : impl.entities) {
+            if (other == entity || !world.get<Solid>(other)) continue;
+            const auto *st = world.get<Transform2D>(other);
+            const auto *se = world.get<Extent2D>(other);
+            if (!st || !se) continue;
+            const bool overlap_x =
+                t->x < st->x + se->w && t->x + ext->w > st->x;
+            if (overlap_x && prev_bottom <= st->y + 1.f &&
+                t->y + ext->h >= st->y) {
+              t->y = st->y - ext->h;
+              v->dy = 0.f;
+            }
+          }
+        }
         bool bounced = false;
         if (t->x < 0 || t->x > world_w - ext->w) {
           v->dx = -v->dx;
@@ -384,13 +404,26 @@ int RuntimeHost::run() {
         if (t->y < 0 || t->y > world_h - ext->h) {
           // Gravity-affected entities come to rest on the floor instead of
           // bouncing forever; the ceiling still deflects them downward.
-          const auto *gs = world.get<GravityScale>(entity);
-          const bool rests = impl.gravity != 0.f &&
-                             (gs ? gs->value : 1.f) != 0.f &&
-                             t->y > world_h - ext->h;
+          const bool rests = gscale != 0.f && t->y > world_h - ext->h;
           v->dy = rests ? 0.f : -v->dy;
           bounced = !rests;
           t->y = std::clamp(t->y, 0.f, world_h - ext->h);
+        }
+        // Grounded when resting: at the floor (or platform top) with no
+        // downward velocity remaining.
+        if (v->dy == 0.f && t->y + ext->h >= world_h - 1.f)
+          impl.grounded.insert(entity.value());
+        else if (v->dy == 0.f) {
+          for (const auto other : impl.entities) {
+            if (other == entity || !world.get<Solid>(other)) continue;
+            const auto *st = world.get<Transform2D>(other);
+            const auto *se = world.get<Extent2D>(other);
+            if (st && se && t->x < st->x + se->w && t->x + ext->w > st->x &&
+                std::abs(t->y + ext->h - st->y) <= 1.5f) {
+              impl.grounded.insert(entity.value());
+              break;
+            }
+          }
         }
         if (bounced && impl.player && entity == *impl.player && bounce_clip)
           audio.play_effect(bounce_clip);

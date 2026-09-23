@@ -29,6 +29,7 @@ std::string SceneDocument::to_json() const {
     if (e.parallax != 1.0f) item["parallax"] = e.parallax;
     if (!e.text.empty()) item["text"] = e.text;
     if (e.gravity_scale != 1.0f) item["gravityScale"] = e.gravity_scale;
+    if (e.solid) item["solid"] = true;
     items.push_back(std::move(item));
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
@@ -79,6 +80,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       entity.parallax = item.value("parallax", 1.0f);
       entity.text = item.value("text", std::string{});
       entity.gravity_scale = item.value("gravityScale", 1.0f);
+      entity.solid = item.value("solid", false);
       scene.entities.push_back(std::move(entity));
     }
     if (doc.contains("background")) {

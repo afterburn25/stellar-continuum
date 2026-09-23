@@ -34,6 +34,9 @@ struct SceneEntity {
   // Multiplies the document's gravity on this entity: 0 ignores gravity
   // (HUD, static scenery), 1 is full strength, 2 falls twice as fast.
   float gravity_scale{1.0f};
+  // Static blocker: gravity-affected entities falling onto a solid land on
+  // its top surface (platforms, ground). Solids never move or fall.
+  bool solid{false};
 };
 
 struct SceneDocument {

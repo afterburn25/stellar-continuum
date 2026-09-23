@@ -52,6 +52,9 @@ struct GravityScale {
   // Multiplies the scene's gravity on this entity (0 ignores gravity).
   float value{1.0f};
 };
+// Marker component: gravity-affected entities land on Solid tops; solids
+// are exempt from integration (they never move or fall).
+struct Solid {};
 
 // Registers codecs for all scene components on `world`. Must run before
 // snapshot()/restore() if those components are in use.

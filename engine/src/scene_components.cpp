@@ -66,6 +66,13 @@ void register_scene_components(World &world) {
   world.register_component<GravityScale>("gravityScale",
                                          encode_pod<GravityScale>,
                                          decode_pod<GravityScale>);
+  world.register_component<Solid>("solid",
+                                  [](const Solid &) {
+                                    return std::vector<std::uint8_t>{1};
+                                  },
+                                  [](const std::vector<std::uint8_t> &) {
+                                    return Solid{};
+                                  });
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -82,6 +89,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
     world.add(entity, Parallax{s.parallax});
     if (!s.text.empty()) world.add(entity, Label{s.text});
     world.add(entity, GravityScale{s.gravity_scale});
+    if (s.solid) world.add(entity, Solid{});
     if (!s.sprite.empty()) world.add(entity, SpriteRef{s.sprite});
     spawned.push_back(entity);
   }
@@ -119,6 +127,7 @@ SceneDocument scene_from_world(const World &world) {
     if (const auto *l = world.get<Label>(entity)) s.text = l->value;
     if (const auto *g = world.get<GravityScale>(entity))
       s.gravity_scale = g->value;
+    s.solid = world.get<Solid>(entity) != nullptr;
     doc.entities.push_back(std::move(s));
   }
   return doc;

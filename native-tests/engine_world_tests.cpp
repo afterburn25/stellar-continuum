@@ -216,7 +216,7 @@ int main() {
         SceneDocument doc{{SceneEntity{"player", 10.f, 20.f, 64.f, 64.f,
                                        30.f, -15.f, 255, 220, 60,
                                        "data/logo.png", -1, 0.0f,
-                                       "hero", 0.0f},
+                                       "hero", 0.0f, true},
                            SceneEntity{"rock", 200.f, 100.f}}};
         World world;
         register_scene_components(world);
@@ -241,6 +241,9 @@ int main() {
         check(world.get<GravityScale>(spawned[0]) &&
                   world.get<GravityScale>(spawned[0])->value == 0.0f,
               "spawn_scene gravity scale");
+        check(world.get<Solid>(spawned[0]) != nullptr &&
+                  world.get<Solid>(spawned[1]) == nullptr,
+              "spawn_scene solid flag");
         check(world.get<SpriteRef>(spawned[1]) == nullptr,
               "empty sprite leaves no SpriteRef");
 
@@ -271,7 +274,7 @@ int main() {
                   ex_player->sprite == "data/logo.png" &&
                   ex_player->layer == -1 && ex_player->parallax == 0.0f &&
                   ex_player->text == "hero" &&
-                  ex_player->gravity_scale == 0.0f,
+                  ex_player->gravity_scale == 0.0f && ex_player->solid,
               "scene_from_world round-trips fields");
 
         // Failure paths: absent and corrupt files return false, world intact.
