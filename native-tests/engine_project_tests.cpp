@@ -83,6 +83,9 @@ int main() {
               text.find("host.run(argc, argv)") != std::string::npos &&
               text.find("on_update") != std::string::npos,
           "windowed starter is a RuntimeHost client");
+    check(text.find("engine::SimulationExecutor") != std::string::npos &&
+              text.find("sim.advance()") != std::string::npos,
+          "windowed starter demonstrates the simulation executor");
   }
 
   // The blank template emits a console host linking stellar::engine only.
