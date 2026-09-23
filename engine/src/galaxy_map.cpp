@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -232,6 +233,76 @@ double GalaxyMap::distance_light_years(std::uint64_t first,
     const double dy = a->y_light_years - b->y_light_years;
     const double dz = a->depth_light_years - b->depth_light_years;
     return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+std::vector<std::uint64_t> GalaxyMap::find_route(std::uint64_t from,
+                                               std::uint64_t to) const {
+    if (!systems_.contains(from) || !systems_.contains(to))
+        return {};
+    if (from == to)
+        return {from};
+    if (topology_dirty_)
+        rebuild_adjacency();
+
+    // Dijkstra with (distance, id) heap keys so equal-cost paths resolve
+    // by lowest system id — deterministic regardless of map order.
+    std::unordered_map<std::uint64_t, double> dist;
+    std::unordered_map<std::uint64_t, std::uint64_t> prev;
+    std::vector<std::pair<double, std::uint64_t>> heap;
+    const auto push = [&](double d, std::uint64_t id) {
+        heap.emplace_back(d, id);
+        std::push_heap(heap.begin(), heap.end(), std::greater<>{});
+    };
+    dist[from] = 0.0;
+    push(0.0, from);
+    while (!heap.empty()) {
+        std::pop_heap(heap.begin(), heap.end(), std::greater<>{});
+        const auto [d, id] = heap.back();
+        heap.pop_back();
+        if (d > dist.at(id))
+            continue; // stale entry
+        if (id == to)
+            break;
+        for (const auto lane_id : adjacency_lanes_.at(id)) {
+            const auto &l = lanes_.at(lane_id);
+            const auto next = l.other(id);
+            const double alt = d + l.length_light_years;
+            const auto it = dist.find(next);
+            if (it == dist.end() || alt < it->second) {
+                dist[next] = alt;
+                prev[next] = id;
+                push(alt, next);
+            }
+        }
+    }
+    if (!dist.contains(to))
+        return {};
+    std::vector<std::uint64_t> route;
+    for (std::uint64_t at = to;; at = prev.at(at)) {
+        route.push_back(at);
+        if (at == from)
+            break;
+    }
+    std::reverse(route.begin(), route.end());
+    return route;
+}
+
+double GalaxyMap::route_length_light_years(std::uint64_t from,
+                                           std::uint64_t to) const {
+    const auto route = find_route(from, to);
+    if (route.empty())
+        return -1.0;
+    double total = 0.0;
+    for (std::size_t i = 1; i < route.size(); ++i) {
+        for (const auto lane_id : lanes_for(route[i - 1])) {
+            const auto *l = lane(lane_id);
+            if (l->other(route[i - 1]) == route[i]) {
+                total += l->length_light_years;
+                break;
+            }
+        }
+    }
+    return total;
 }
 
 GalaxyMap::State GalaxyMap::capture_state() const {

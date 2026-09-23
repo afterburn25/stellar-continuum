@@ -477,6 +477,7 @@ struct Shell {
     bool running{false};
     double run_accum{0.0};
     std::uint64_t selected{0};
+    std::uint64_t destination{0}; // right-click sets a route target
     float zoom{1.0f};
     // Fleet markers in transit between neighbor systems.
     struct Traveller {
@@ -4461,6 +4462,7 @@ void init_galaxy(Shell::GalaxyDemo &gal) {
   gal.running = false;
   gal.run_accum = 0.0;
   gal.selected = ids.front();
+  gal.destination = ids.back();
   gal.zoom = 1.0f;
   gal.initialized = true;
 }
@@ -4494,6 +4496,30 @@ void gal_step(Shell::GalaxyDemo &gal, double days) {
           a->y_light_years + (b->y_light_years - a->y_light_years) * f);
     }
   }
+}
+
+// Inverse of the canvas transform: screen point -> light-year position
+// under the same fit+zoom projection render_galaxy applies.
+std::optional<std::pair<double, double>>
+gal_unproject(const engine::GalaxyMap &map, const UiRect &canvas,
+              const Point &position, float zoom) {
+  double min_x = 1e30, min_y = 1e30, max_x = -1e30, max_y = -1e30;
+  for (const auto id : map.system_ids()) {
+    const auto *sys = map.system(id);
+    min_x = std::min(min_x, sys->x_light_years);
+    max_x = std::max(max_x, sys->x_light_years);
+    min_y = std::min(min_y, sys->y_light_years);
+    max_y = std::max(max_y, sys->y_light_years);
+  }
+  const double span_x = std::max(1e-6, max_x - min_x);
+  const double span_y = std::max(1e-6, max_y - min_y);
+  const double scale =
+      std::min(canvas.width / span_x, canvas.height / span_y) * 0.86 * zoom;
+  if (scale <= 0) return std::nullopt;
+  return std::pair{(min_x + max_x) / 2.0 +
+                       (position.x - canvas.x - canvas.width / 2.0) / scale,
+                   (min_y + max_y) / 2.0 +
+                       (position.y - canvas.y - canvas.height / 2.0) / scale};
 }
 
 void render_galaxy(DrawList &out, Shell &shell, UiRect body, float s) {
@@ -4574,6 +4600,28 @@ void render_galaxy(DrawList &out, Shell &shell, UiRect body, float s) {
   } else {
     line(out, x, y, "selection", "click a system on the chart", font);
   }
+  // Lane-graph route from the selected system to the right-clicked
+  // destination, via engine::GalaxyMap::find_route (weighted Dijkstra).
+  y += 6 * s;
+  heading(out, x, y, "ROUTE");
+  std::vector<std::uint64_t> route;
+  if (gal.destination && map.system(gal.destination))
+    route = map.find_route(gal.selected, gal.destination);
+  if (route.empty()) {
+    line(out, x, y, "route", "unreachable", font);
+  } else {
+    const double length =
+        map.route_length_light_years(gal.selected, gal.destination);
+    std::snprintf(buf, sizeof(buf), "%zu legs  %.1f ly", route.size() - 1,
+                  length);
+    line(out, x, y, "route", buf, font);
+    std::string path;
+    for (const auto hop : route) {
+      if (!path.empty()) path += " -> ";
+      path += std::to_string(hop);
+    }
+    line(out, x, y, "", path, font);
+  }
 
   // Chart canvas: right side of the body, dark field, lanes as lines,
   // systems as rings, colony markers filled, fleet markers accent.
@@ -4603,14 +4651,26 @@ void render_galaxy(DrawList &out, Shell &shell, UiRect body, float s) {
             static_cast<float>(canvas.y + canvas.height / 2.0 +
                                (wy - cy) * scale)};
   };
+  // Lanes on the computed route draw bright; everything else stays dim.
+  std::set<std::pair<std::uint64_t, std::uint64_t>> route_legs;
+  for (std::size_t i = 1; i < route.size(); ++i)
+    route_legs.emplace(std::min(route[i - 1], route[i]),
+                       std::max(route[i - 1], route[i]));
   for (const auto lane_id : map.lane_ids()) {
     const auto *l = map.lane(lane_id);
     const auto *a = map.system(l->first_system_id);
     const auto *b = map.system(l->second_system_id);
+    const bool on_route =
+        route_legs.contains({std::min(l->first_system_id,
+                                      l->second_system_id),
+                             std::max(l->first_system_id,
+                                      l->second_system_id)});
     out.lines.push_back(
         {project(a->x_light_years, a->y_light_years),
          project(b->x_light_years, b->y_light_years),
-         l->enabled ? Color{36, 58, 86, 255} : Color{70, 30, 30, 255}});
+         on_route ? Color{120, 200, 240, 255}
+         : l->enabled ? Color{36, 58, 86, 255}
+                      : Color{70, 30, 30, 255}});
   }
   for (const auto id : map.system_ids()) {
     const auto *sys = map.system(id);
@@ -4620,6 +4680,7 @@ void render_galaxy(DrawList &out, Shell &shell, UiRect body, float s) {
       anomaly = anomaly || tag == "anomaly";
     }
     const Color color = id == gal.selected   ? Color{140, 200, 255, 255}
+                        : id == gal.destination ? Color{250, 180, 90, 255}
                         : anomaly            ? Color{220, 120, 120, 255}
                         : habitable          ? Color{110, 190, 140, 255}
                                              : Color{190, 200, 214, 255};
@@ -4647,7 +4708,8 @@ void render_galaxy(DrawList &out, Shell &shell, UiRect body, float s) {
          Color{180, 220, 255, 255}, font});
   out.overlay.push_back(
       Text{{canvas.x + 8 * s, canvas.y + canvas.height - 20 * s},
-           "click: select nearest | wheel: zoom", muted, font});
+           "L-click: select | R-click: route target | wheel: zoom", muted,
+           font});
 }
 
 // Summarizes project content freshness: source file count and whether the
@@ -6521,31 +6583,23 @@ int main(int argc, char **argv) {
               gal = Shell::GalaxyDemo{};
               init_galaxy(gal);
             } else if (shell.hit_gal_map.contains(event.position)) {
-              // Unproject the click through the same fit+zoom transform
-              // render_galaxy applied, then select the nearest system.
-              const auto &canvas = shell.hit_gal_map;
-              double min_x = 1e30, min_y = 1e30, max_x = -1e30,
-                     max_y = -1e30;
-              for (const auto id : gal.map.system_ids()) {
-                const auto *sys = gal.map.system(id);
-                min_x = std::min(min_x, sys->x_light_years);
-                max_x = std::max(max_x, sys->x_light_years);
-                min_y = std::min(min_y, sys->y_light_years);
-                max_y = std::max(max_y, sys->y_light_years);
-              }
-              const double span_x = std::max(1e-6, max_x - min_x);
-              const double span_y = std::max(1e-6, max_y - min_y);
-              const double scale =
-                  std::min(canvas.width / span_x, canvas.height / span_y) *
-                  0.86 * gal.zoom;
-              if (scale > 0) {
-                const double wx = (min_x + max_x) / 2.0 +
-                    (event.position.x - canvas.x - canvas.width / 2.0) / scale;
-                const double wy = (min_y + max_y) / 2.0 +
-                    (event.position.y - canvas.y - canvas.height / 2.0) / scale;
-                if (const auto hit = gal.map.nearest_system(wx, wy))
+              if (const auto world =
+                      gal_unproject(gal.map, shell.hit_gal_map,
+                                    event.position, gal.zoom)) {
+                if (const auto hit =
+                        gal.map.nearest_system(world->first, world->second))
                   gal.selected = *hit;
               }
+            }
+          }
+          if (event.type == InputEventType::RightReleased &&
+              shell.hit_gal_map.contains(event.position)) {
+            if (const auto world =
+                    gal_unproject(gal.map, shell.hit_gal_map,
+                                  event.position, gal.zoom)) {
+              if (const auto hit =
+                      gal.map.nearest_system(world->first, world->second))
+                gal.destination = *hit;
             }
           }
         }

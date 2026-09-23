@@ -83,8 +83,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `neighbors`/`lanes_for` over a lazily rebuilt enabled-lane adjacency;
   `systems_in_radius`, `nearest_system` (id tie-break),
   `markers_in_system`, `markers_for_owner`, `distance_light_years`
-  (3D euclidean); versioned `capture_state`/`restore_state` (v1) that
-  rejects duplicate ids and dangling lane endpoints atomically.
+  (3D euclidean); `find_route`/`route_length_light_years` — weighted
+  Dijkstra over enabled lanes with lowest-id tie-breaks, so non-Core
+  games get deterministic routing without `InterstellarLaneNetwork`;
+  versioned `capture_state`/`restore_state` (v1) that rejects duplicate
+  ids and dangling lane endpoints atomically.
   `project_galaxy_map(const FreshCampaignState&)` maps systems (name,
   position, stellar-class label, habitable/anomaly/rare/pre-warp tags),
   `InterstellarLaneNetwork::build()` lanes, colonies (anchored markers)
@@ -94,9 +97,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Consumers:** engine-shell GALAXY tab (deterministic synthetic
   chart — golden-angle spiral, two-nearest-neighbor lanes deduplicated,
   colony markers every fifth system, three fleet travellers hopping the
-  lane graph; click selects the nearest system via `nearest_system`,
-  wheel zooms, STEP DAY/RUN/RESET; detail panel lists class/tags/lane
-  neighbors/markers-in-system). `project_galaxy_map` is the Core-side
+  lane graph; left-click selects the nearest system, right-click sets a
+  route target with the `find_route` path highlighted, wheel zooms,
+  STEP DAY/RUN/RESET; detail panel lists class/tags/lane
+  neighbors/markers-in-system plus the weighted route). `project_galaxy_map` is the Core-side
   adapter a game/map surface feeds through — first consumer wiring
   beyond tests is the shell demo + adapter tests.
 - **Tests:** `galaxy_map` (topology, deterministic ordering, adjacency
@@ -109,13 +113,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   model — `capture_state`/`restore_state` exist for embedders that
   persist charts; the Core projection allocates per call and is not on
   the per-frame path.
-- **Limitations:** adjacency is a query cache — no pathfinding inside
-  the engine map (Core routes through `InterstellarLaneNetwork`; a
-  generic engine route search is a future addition if a non-Core game
-  needs it); markers are render data — no gameplay rules; the
-  projection is omniscient, observer filtering stays a consumer
-  responsibility; no native-client consumer yet (the client's own star
-  map predates the framework — migration is a separate decision).
+- **Limitations:** routing is lane-length-weighted only (no
+  fuel/range/policy constraints — those stay with
+  `InterstellarLaneNetwork`'s RoutePolicy/FuelRouteRequest); markers are
+  render data — no gameplay rules; the projection is omniscient,
+  observer filtering stays a consumer responsibility; no native-client
+  consumer yet (the client's own star map predates the framework —
+  migration is a separate decision).
 - **Future reuse:** 4X/strategy star charts, jump-lane editors,
   sector/region overlays (tags + radius queries already support them),
   and the pending galaxy debugger tool in the standalone editor.

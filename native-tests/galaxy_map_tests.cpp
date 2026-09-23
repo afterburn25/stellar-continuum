@@ -101,6 +101,56 @@ int main() {
         check(threw, "unknown-system distance throws");
     }
 
+    // --- Lane-graph routing ---------------------------------------------------
+    {
+        // 1-2-3 direct is 9+9=18 vs 1-4-3 via hub: 2+2=4 — weight wins
+        // over hop count.
+        GalaxyMap map;
+        map.add_system(sys(1, 0.0, 0.0));
+        map.add_system(sys(2, 5.0, 0.0));
+        map.add_system(sys(3, 8.0, 0.0));
+        map.add_system(sys(4, 4.0, 1.0));
+        map.add_lane(lane(1, 1, 2, 9.0));
+        map.add_lane(lane(2, 2, 3, 9.0));
+        map.add_lane(lane(3, 1, 4, 2.0));
+        map.add_lane(lane(4, 4, 3, 2.0));
+        check((map.find_route(1, 3) == std::vector<std::uint64_t>{1, 4, 3}),
+              "weighted route beats hop count");
+        check(near(map.route_length_light_years(1, 3), 4.0),
+              "route length sums lanes");
+        check((map.find_route(3, 1) == std::vector<std::uint64_t>{3, 4, 1}),
+              "reverse route");
+        check((map.find_route(1, 1) == std::vector<std::uint64_t>{1}),
+              "identity route");
+        check(map.find_route(1, 99).empty(), "missing endpoint empty");
+        check(map.route_length_light_years(1, 99) < 0.0,
+              "unreachable length -1");
+
+        // Disabled lanes re-route; fully cut systems report unreachable.
+        check(map.set_lane_enabled(3, false), "cut lane 3");
+        check((map.find_route(1, 3) == std::vector<std::uint64_t>{1, 2, 3}),
+              "disabled lane re-routes");
+
+        // Identical graph built in reverse insertion order routes the
+        // same way — no hash-order variance.
+        GalaxyMap reversed;
+        reversed.add_system(sys(4, 4.0, 1.0));
+        reversed.add_system(sys(3, 8.0, 0.0));
+        reversed.add_system(sys(2, 5.0, 0.0));
+        reversed.add_system(sys(1, 0.0, 0.0));
+        reversed.add_lane(lane(4, 4, 3, 2.0));
+        reversed.add_lane(lane(3, 1, 4, 2.0));
+        reversed.add_lane(lane(2, 2, 3, 9.0));
+        reversed.add_lane(lane(1, 1, 2, 9.0));
+        reversed.set_lane_enabled(3, false);
+        check((reversed.find_route(1, 3) == map.find_route(1, 3)) &&
+                  !reversed.find_route(1, 3).empty(),
+              "insertion-order-independent routing");
+
+        check(map.set_lane_enabled(2, false), "cut lane 2");
+        check(map.find_route(1, 3).empty(), "disconnected unreachable");
+    }
+
     // --- Markers --------------------------------------------------------------
     {
         GalaxyMap map;

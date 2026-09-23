@@ -127,6 +127,22 @@ public:
     distance_light_years(std::uint64_t first_system_id,
                          std::uint64_t second_system_id) const;
 
+    // Shortest path over ENABLED lanes measured by lane length
+    // (Dijkstra). Returns the inclusive system-id route, or empty when
+    // no route exists or an endpoint is missing. Ties resolve by lowest
+    // system id so results never depend on hash order. Lane-length
+    // weighting means routes can differ from hop-count intuition when a
+    // longer-hop path is geometrically shorter.
+    [[nodiscard]] std::vector<std::uint64_t>
+    find_route(std::uint64_t from_system_id,
+               std::uint64_t to_system_id) const;
+    // Total lane length of find_route(); -1 when unreachable. Cheap
+    // convenience over re-summing the route for consumers that only
+    // need feasibility/distance.
+    [[nodiscard]] double
+    route_length_light_years(std::uint64_t from_system_id,
+                             std::uint64_t to_system_id) const;
+
     // --- persistence -------------------------------------------------
     // Versioned snapshot: full topology plus markers — enough to rebuild
     // the map without re-running the mutator sequence. The adjacency
