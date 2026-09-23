@@ -217,6 +217,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/campaign_massive_combat.cpp
   core/src/campaign_event_history.cpp
   core/src/planetary_adapter.cpp
+  core/src/campaign_economy_projection.cpp
   core/src/campaign_frame.cpp
   core/src/strategic_clock.cpp
   core/src/fleet_persistence.cpp
@@ -703,6 +704,9 @@ if(BUILD_TESTING)
   add_executable(stellar_planetary_adapter_tests native-tests/planetary_adapter_tests.cpp)
   target_link_libraries(stellar_planetary_adapter_tests PRIVATE stellar_core)
   add_test(NAME planetary_adapter COMMAND stellar_planetary_adapter_tests)
+  add_executable(stellar_campaign_economy_projection_tests native-tests/campaign_economy_projection_tests.cpp)
+  target_link_libraries(stellar_campaign_economy_projection_tests PRIVATE stellar_core)
+  add_test(NAME campaign_economy_projection COMMAND stellar_campaign_economy_projection_tests)
 
   foreach(scale 250 500 1000 2500 5000)
     add_test(NAME simulation_scale_${scale} COMMAND stellar_simulation_scale_tests ${scale} 120)
