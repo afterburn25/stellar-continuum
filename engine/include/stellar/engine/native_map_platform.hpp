@@ -116,7 +116,8 @@ struct FolderDialogResult {
 enum class InputEventType { PointerMove, LeftPressed, LeftReleased,
                             RightPressed, RightReleased, Wheel,
                             EscapePressed, BackspacePressed, KeyPressed,
-                            KeyReleased, TextEntered, PointerCancelled };
+                            KeyReleased, TextEntered, PointerCancelled,
+                            GamepadPressed, GamepadReleased, GamepadAxis };
 struct InputEvent {
   InputEventType type{};
   Point position{}, delta{};
@@ -126,6 +127,9 @@ struct InputEvent {
   // SDL_Keycode for non-repeating KeyPressed events.
   std::uint32_t key{};
   bool control{}, shift{}, alt{};
+  // SDL_GamepadButton / SDL_GamepadAxis codes; axis_value is -1..1.
+  std::uint8_t gamepad_button{}, gamepad_axis{};
+  float gamepad_axis_value{};
 };
 struct InputSnapshot {
   std::vector<InputEvent> events;

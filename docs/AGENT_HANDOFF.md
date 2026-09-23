@@ -121,18 +121,25 @@ windowed starter is now a ~20-line `RuntimeHost` client: the engine's
 `packages/<id>/content/` fallback, `pkg:path` qualified lookups
 for mod packages), the `scene_components` ECS set (registered codecs
 for every field), `spawn_scene`/`scene_from_world`, scene-file hot
-reload, WASD player input, music/effects audio, F5/F9 quicksave
+reload, action-mapped player input, music/effects audio, F5/F9 quicksave
 through `saves/quicksave.stw` (atomic write plus a rotated `.bak`
 history chain — load recovers through the slots), and
-`RuntimeDiagnostics` crash dumps in `<root>/logs/`. Game code hooks
+`RuntimeDiagnostics` crash dumps in `<root>/logs/`. Input runs through
+`InputMapper`: a built-in "game" context binds WASD/arrows/D-pad,
+left-stick `move_x`/`move_y` axes, Space/LMB/pad-RB fire and C/pad-West
+mine; `host.input()` exposes the mapper and `--input-map` stacks project
+contexts (gamepads hot-plug via `SDL_INIT_GAMEPAD`, first pad wins).
+Game code hooks
 in via `on_update`/`on_event`/`on_status`/`on_collision`/`on_draw`
 callbacks and drives the loop with `request_quit()`/`set_paused()`/
 `set_time_scale()`/`set_scene()` (level switching)/`spawn_entity()`/
-`destroy_entity()`/`set_camera()`. Runtime options/args: `--scene`,
+`destroy_entity()`/`set_camera()`/`tile_at()`/`set_tile_at()`.
+Runtime options/args: `--scene`,
 `--fixed-hz` (deterministic N-step-per-frame under `--frames`),
 `--frames` (bounded CI runs), `--snapshot-out` (byte-comparable world
 dumps), `--world-w/--world-h`, `--speed`, `--width/--height`,
-`--fullscreen`; P pauses, F12 screenshots to `<root>/screenshots/`.
+`--fullscreen`, `--input-map`, `--move-speed`, `--jump`, `--save`;
+P pauses, F12 screenshots to `<root>/screenshots/`.
 `SceneEntity` authoring surface: name, position/extent/velocity,
 tint, sprite path, layer (stable-sorted draw order), parallax
 (0 = screen-pinned), text label, gravityScale + solid (platformer

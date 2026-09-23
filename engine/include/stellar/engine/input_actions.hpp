@@ -112,6 +112,9 @@ private:
   std::vector<std::string> stack_;
   std::unordered_map<std::string, ActionState> states_;
   std::unordered_map<int, bool> held_keys_; // for chord evaluation
+  // Latest value per gamepad axis — persists across frames since devices
+  // only emit axis events on change; begin_frame must not clear them.
+  std::unordered_map<int, float> gamepad_axes_;
 };
 
 } // namespace stellar::engine

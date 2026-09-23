@@ -13,7 +13,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Capability | Status | Owner / important source | Tests | Known limitation / next work |
 | --- | --- | --- | --- | --- |
 | Window and platform | IMPLEMENTED BUT NEEDS POLISH | Engine `native_map_platform.cpp`, runtime paths/lease; App video controller | `native_client_platform`, `native_video_platform`, `native_video_controller` | Verified Windows x64 only; portable platform interface and device recovery need work |
-| Native input | PARTIALLY IMPLEMENTED | Engine `native_map_platform.hpp`, `input_actions.hpp` (`InputMapper`, action contexts); App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `input_actions`, `native_ui_layout` | No rebinding UI, gamepad or accessibility input layer |
+| Native input | PARTIALLY IMPLEMENTED | Engine `native_map_platform.hpp` (keyboard/mouse/gamepad events), `input_actions.hpp` (`InputMapper`, action contexts incl. pad buttons/axes); App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `input_actions`, `native_ui_layout` | No rebinding UI, multi-pad, or accessibility input layer |
 | 2D/UI renderer | IMPLEMENTED BUT NEEDS POLISH | Engine native map platform, UI skin and text fit | `native_text_measure`, `native_navigation_visual` | Shared helpers, but application-driven widgets/layout and no general UI scene framework |
 | 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp` | `engine_scene3d`, `native_scene3d_gpu`, scale3d tests | Bounded CPU submission and fixed caches; no render graph/GPU-driven scene |
 | Mesh/geometry and culling | IMPLEMENTED BUT NEEDS POLISH | Engine solid/triangle meshes, billboard batch, scene bounds | scene/triangle/scale tests | Procedural geometry and conservative limits, not a general imported geometry cooker |
@@ -88,14 +88,27 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   entities — not a parallel approximation.
 - **RuntimeHost input actions:** the host now feeds every platform event into
   an `InputMapper` — a built-in "game" context (move_left/right/up/down on
-  WASD+arrows, jump on Space/W/Up, fire on Space/LMB, mine on C) drives the
-  player, so `RuntimeHostOptions::input_map`/`--input-map` JSON stacks
-  project contexts on top and `host.input()` exposes `pressed`/`just_pressed`/
-  `axis`/`rebind` to game code. `InputMapper::context_names()` enumerates
-  registered contexts so a loaded map activates without name plumbing.
-  Covered by `input_actions` tests (context_names enumeration plus the
+  WASD+arrows+D-pad, `move_x`/`move_y` analog Axis1D on the left stick with a
+  0.18 deadzone folded into player velocity, jump on Space/W/Up/pad-South,
+  fire on Space/LMB/pad-RB, mine on C/pad-West) drives the player, so
+  `RuntimeHostOptions::input_map`/`--input-map` JSON stacks project contexts
+  on top and `host.input()` exposes `pressed`/`just_pressed`/`axis`/`rebind`
+  to game code. `InputMapper::context_names()` enumerates registered contexts
+  so a loaded map activates without name plumbing.
+- **Gamepad input:** the platform layer opens the first attached SDL gamepad
+  (`SDL_INIT_GAMEPAD`, hot-plug add/remove), normalizes buttons and
+  clamped -1..1 axis motion into `GamepadPressed`/`GamepadReleased`/
+  `GamepadAxis` `InputEvent`s, and `RuntimeHost` converts them into mapper
+  `RawInputEvent`s — so generated games read pad input through the same
+  action names as keyboard/mouse. `InputMapper` keeps per-axis last-value
+  state (`gamepad_axes_`) because devices only emit axis events on change;
+  `axis()` folds live GamepadAxis bindings into the per-frame result.
+  Covered by `input_actions` tests (context_names enumeration, pad button
+  press/release edges, axis persistence/update across frames, plus the
   existing feed/axis/chord/rebind suite); verified `--input-map` loads and
-  degrades to defaults on missing/malformed files.
+  degrades to defaults on missing/malformed files. Remaining gap: no
+  rebinding UI or pad-specific glyphs in the tools; only the first pad is
+  used.
 - **Consumers:** `RuntimeHost` generated hosts (rendering, gravity landing,
   wall blocking, grounded jumps, hot reload); the shell Scene tool (TILES
   toggle button, tileset/tilesize/columns/collide/layer/parallax/cells/paint

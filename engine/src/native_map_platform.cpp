@@ -185,6 +185,7 @@ struct Window::Storage {
   std::unordered_map<const RgbaImage*,CachedImage> image_cache;std::size_t image_cache_resident_bytes{};std::uint64_t image_use{},image_uploads{};
   int width{},height{},windowed_x{},windowed_y{},windowed_width{},windowed_height{};bool has_windowed_bounds{},initialized{},left_down{},focused{true},minimized{},vsync{},auto_frame_cap{},text_input_requested{},text_input_active{};Point pointer{};std::filesystem::path screenshot_directory;std::optional<std::filesystem::path> player_screenshot;std::optional<std::string> screenshot_status;std::uint64_t screenshot_status_until_ns{},screenshot_serial{};Uint64 fallback_interval_ns{},frame_cap_interval_ns{},last_present_ns{};
   SDL_Texture* scene_target{};
+  SDL_Gamepad *gamepad{};SDL_JoystickID gamepad_id{};
   std::unique_ptr<Scene3DRenderer> scene3d;
   int scene_width{},scene_height{},scene_percent{100},scene_samples{1};
   void prepare_scene_target(int percent,int samples) {
@@ -207,7 +208,7 @@ struct Window::Storage {
     for(auto &[key,cached]:text_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(const auto &[size,font_value]:fonts){(void)size;if(font_value)DeleteObject(font_value);}
     if(text_dc)DeleteDC(text_dc);if(private_font_handle)RemoveFontMemResourceEx(private_font_handle);
-    if(renderer)SDL_DestroyRenderer(renderer);if(device)SDL_DestroyGPUDevice(device);if(window)SDL_DestroyWindow(window);if(initialized)SDL_Quit();
+    if(renderer)SDL_DestroyRenderer(renderer);if(gamepad)SDL_CloseGamepad(gamepad);if(device)SDL_DestroyGPUDevice(device);if(window)SDL_DestroyWindow(window);if(initialized)SDL_Quit();
   }
   [[nodiscard]] HFONT font(int pixel_size,FontFace role){
     pixel_size=std::clamp(pixel_size,8,72);const auto font_key=pixel_size*2+(role==FontFace::Heading?1:0);if(const auto found=fonts.find(font_key);found!=fonts.end())return found->second;
@@ -321,7 +322,7 @@ Window::Window(std::string title,int width,int height,bool fullscreen,std::files
     SDL_SetHintWithPriority(SDL_HINT_WINDOWS_INTRESOURCE_ICON,icon_id.c_str(),SDL_HINT_OVERRIDE);
     SDL_SetHintWithPriority(SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL,icon_id.c_str(),SDL_HINT_OVERRIDE);
   }
-  auto candidate=std::make_unique<Storage>();require(SDL_Init(SDL_INIT_VIDEO),"SDL video initialization failed");candidate->initialized=true;const auto flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY|(fullscreen?SDL_WINDOW_FULLSCREEN:0);candidate->window=SDL_CreateWindow(title.c_str(),width,height,flags);if(!candidate->window)throw sdl_error("SDL window creation failed");candidate->device=SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV,false,"vulkan");if(!candidate->device)throw sdl_error("Vulkan SDL GPU device creation failed");const char *driver=SDL_GetGPUDeviceDriver(candidate->device);if(!driver||std::string(driver)!="vulkan")throw std::runtime_error("Vulkan SDL GPU device creation returned an unexpected backend");candidate->renderer=SDL_CreateGPURenderer(candidate->device,candidate->window);if(!candidate->renderer)throw sdl_error("Vulkan SDL GPU renderer creation failed");require(SDL_SetRenderDrawBlendMode(candidate->renderer,SDL_BLENDMODE_BLEND),"SDL renderer blend setup failed");
+  auto candidate=std::make_unique<Storage>();require(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMEPAD),"SDL initialization failed");candidate->initialized=true;const auto flags=SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY|(fullscreen?SDL_WINDOW_FULLSCREEN:0);candidate->window=SDL_CreateWindow(title.c_str(),width,height,flags);if(!candidate->window)throw sdl_error("SDL window creation failed");candidate->device=SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV,false,"vulkan");if(!candidate->device)throw sdl_error("Vulkan SDL GPU device creation failed");const char *driver=SDL_GetGPUDeviceDriver(candidate->device);if(!driver||std::string(driver)!="vulkan")throw std::runtime_error("Vulkan SDL GPU device creation returned an unexpected backend");candidate->renderer=SDL_CreateGPURenderer(candidate->device,candidate->window);if(!candidate->renderer)throw sdl_error("Vulkan SDL GPU renderer creation failed");require(SDL_SetRenderDrawBlendMode(candidate->renderer,SDL_BLENDMODE_BLEND),"SDL renderer blend setup failed");
   candidate->text_dc=CreateCompatibleDC(nullptr);if(!candidate->text_dc)throw std::runtime_error("Windows text device creation failed.");if(font_path.empty())throw std::invalid_argument("A bundled native UI font path is required.");candidate->private_font_bytes=stellar::engine::read_resource(font_path,16u*1024u*1024u);DWORD added_fonts=0;candidate->private_font_handle=AddFontMemResourceEx(candidate->private_font_bytes.data(),static_cast<DWORD>(candidate->private_font_bytes.size()),nullptr,&added_fonts);if(!candidate->private_font_handle)throw std::runtime_error("Bundled Rajdhani font could not be loaded.");
   candidate->vsync=SDL_SetRenderVSync(candidate->renderer,1);if(!candidate->vsync){const std::string reason=SDL_GetError();float refresh=60.f;const auto display=SDL_GetDisplayForWindow(candidate->window);if(display){if(const auto *mode=SDL_GetDesktopDisplayMode(display);mode&&mode->refresh_rate>1.f)refresh=mode->refresh_rate;}candidate->fallback_interval_ns=static_cast<Uint64>(1000000000./static_cast<double>(refresh));SDL_LogWarn(SDL_LOG_CATEGORY_RENDER,"Renderer VSync unavailable (%s); pacing presents at %.2f Hz",reason.c_str(),static_cast<double>(refresh));}
   require(SDL_GetCurrentRenderOutputSize(candidate->renderer,&candidate->width,&candidate->height),"SDL drawable pixel query failed");const auto window_flags=SDL_GetWindowFlags(candidate->window);candidate->focused=(window_flags&SDL_WINDOW_INPUT_FOCUS)!=0;candidate->minimized=(window_flags&SDL_WINDOW_MINIMIZED)!=0;storage_=candidate.release();
@@ -344,6 +345,16 @@ InputSnapshot Window::poll(){
     case SDL_EVENT_MOUSE_BUTTON_DOWN:storage_->pointer=convert(event.button.x,event.button.y);if(event.button.button==SDL_BUTTON_LEFT){storage_->left_down=true;input.events.push_back({InputEventType::LeftPressed,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});}else if(event.button.button==SDL_BUTTON_RIGHT)input.events.push_back({InputEventType::RightPressed,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});break;
     case SDL_EVENT_MOUSE_BUTTON_UP:storage_->pointer=convert(event.button.x,event.button.y);if(event.button.button==SDL_BUTTON_LEFT){storage_->left_down=false;input.events.push_back({InputEventType::LeftReleased,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});}else if(event.button.button==SDL_BUTTON_RIGHT)input.events.push_back({InputEventType::RightReleased,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});break;
     case SDL_EVENT_MOUSE_WHEEL:{storage_->pointer=convert(event.wheel.mouse_x,event.wheel.mouse_y);const auto wheel=event.wheel.direction==SDL_MOUSEWHEEL_FLIPPED?-event.wheel.y:event.wheel.y;input.events.push_back({InputEventType::Wheel,storage_->pointer,{},wheel});break;}
+    case SDL_EVENT_GAMEPAD_ADDED:
+      // First attached pad wins; extra devices are ignored for now.
+      if(!storage_->gamepad){storage_->gamepad=SDL_OpenGamepad(event.gdevice.which);if(storage_->gamepad)storage_->gamepad_id=SDL_GetGamepadID(storage_->gamepad);}break;
+    case SDL_EVENT_GAMEPAD_REMOVED:
+      if(storage_->gamepad&&event.gdevice.which==storage_->gamepad_id){SDL_CloseGamepad(storage_->gamepad);storage_->gamepad=nullptr;}break;
+    case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+    case SDL_EVENT_GAMEPAD_BUTTON_UP:
+      if(storage_->gamepad&&event.gbutton.which==storage_->gamepad_id){InputEvent pad{};pad.type=event.type==SDL_EVENT_GAMEPAD_BUTTON_DOWN?InputEventType::GamepadPressed:InputEventType::GamepadReleased;pad.gamepad_button=event.gbutton.button;input.events.push_back(pad);}break;
+    case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+      if(storage_->gamepad&&event.gaxis.which==storage_->gamepad_id){InputEvent pad{};pad.type=InputEventType::GamepadAxis;pad.gamepad_axis=event.gaxis.axis;pad.gamepad_axis_value=std::clamp(static_cast<float>(event.gaxis.value)/32767.f,-1.f,1.f);input.events.push_back(pad);}break;
     case SDL_EVENT_WINDOW_MOUSE_LEAVE:
       // A captured drag may cross the window edge. Ordinary hover must stop
       // immediately rather than leaving its last control highlighted.

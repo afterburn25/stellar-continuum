@@ -186,7 +186,10 @@ bool InputMapper::feed(const RawInputEvent &event) {
         }
         switch (event.kind) {
         case RawInputEvent::Kind::GamepadAxis:
-          state.axis = event.value * binding.scale;
+          // Sticks only emit on change; keep the latest value so held
+          // deflection stays readable between events. axis() folds this
+          // live value into the result for GamepadAxis-bound actions.
+          gamepad_axes_[event.code] = event.value;
           consumed = true;
           break;
         case RawInputEvent::Kind::MouseMotion:
@@ -238,7 +241,26 @@ bool InputMapper::just_released(std::string_view action) const {
   return state(action).released_this_frame;
 }
 float InputMapper::axis(std::string_view action) const {
-  return state(action).axis;
+  float result = state(action).axis;
+  // Gamepad axes hold their last value; add each bound axis's live
+  // reading. First context in the stack that defines the action wins.
+  for (const auto &name : stack_) {
+    const auto ctx = contexts_.find(name);
+    if (ctx == contexts_.end())
+      continue;
+    for (const auto &candidate : ctx->second.actions) {
+      if (candidate.name != action)
+        continue;
+      for (const auto &binding : candidate.bindings)
+        if (binding.kind == RawInputEvent::Kind::GamepadAxis) {
+          const auto found = gamepad_axes_.find(binding.code);
+          if (found != gamepad_axes_.end())
+            result += found->second * binding.scale;
+        }
+      return result;
+    }
+  }
+  return result;
 }
 float InputMapper::axis_y(std::string_view action) const {
   return state(action).axis_y;

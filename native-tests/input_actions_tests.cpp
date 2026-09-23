@@ -35,6 +35,10 @@ int main() {
          "bindings": [{"kind": "MouseMotion", "scale": 1.0}]},
         {"name": "zoom", "type": "Axis1D",
          "bindings": [{"kind": "MouseWheel", "scale": 0.5}]},
+        {"name": "thrust", "type": "Axis1D",
+         "bindings": [{"kind": "GamepadAxis", "code": 0}]},
+        {"name": "boost", "type": "Button",
+         "bindings": [{"kind": "GamepadButton", "code": 0}]},
         {"name": "pause", "type": "Button",
          "bindings": [{"kind": "KeyPress", "code": 32}]}
       ]},
@@ -86,6 +90,33 @@ int main() {
         "2D motion accumulates");
   mapper.begin_frame();
   check(mapper.axis("zoom") == 0.0f, "axes reset per frame");
+
+  // Gamepad buttons behave like keys; axes hold their last value across
+  // frames because devices only emit change events.
+  mapper.begin_frame();
+  RawInputEvent pad_press;
+  pad_press.kind = RawInputEvent::Kind::GamepadButton;
+  pad_press.code = 0;
+  check(mapper.feed(pad_press), "pad button consumed");
+  check(mapper.just_pressed("boost") && mapper.pressed("boost"),
+        "pad button edge + hold");
+  pad_press.pressed = false;
+  mapper.feed(pad_press);
+  check(mapper.just_released("boost"), "pad button release edge");
+  RawInputEvent stick;
+  stick.kind = RawInputEvent::Kind::GamepadAxis;
+  stick.code = 0;
+  stick.value = 0.75f;
+  mapper.feed(stick);
+  check(mapper.axis("thrust") == 0.75f, "pad axis reads value");
+  mapper.begin_frame();
+  check(mapper.axis("thrust") == 0.75f,
+        "pad axis persists between events");
+  stick.value = -0.25f;
+  mapper.feed(stick);
+  check(mapper.axis("thrust") == -0.25f, "pad axis updates on change");
+  mapper.begin_frame();
+  check(mapper.axis("thrust") == -0.25f, "pad axis keeps new value");
 
   // Context stack: exclusive UI swallows keys meant for GALAXY.
   mapper.push_context("UI");

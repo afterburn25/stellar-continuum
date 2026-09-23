@@ -375,27 +375,39 @@ int RuntimeHost::run() {
     auto key = [](int code) {
       return InputBinding{RawInputEvent::Kind::KeyPress, code, 1.f, {}};
     };
+    auto pad = [](int button) {
+      return InputBinding{RawInputEvent::Kind::GamepadButton, button, 1.f, {}};
+    };
+    // SDL_GamepadButton: SOUTH=0, WEST=2, DPAD_UP=11..DPAD_RIGHT=14;
+    // axes: LEFTX=0, LEFTY=1.
     game.actions.push_back(
         InputAction{"move_left", InputAction::Type::Button,
-                    {key('a'), key(0x40000050)}});
+                    {key('a'), key(0x40000050), pad(13)}});
     game.actions.push_back(
         InputAction{"move_right", InputAction::Type::Button,
-                    {key('d'), key(0x4000004f)}});
+                    {key('d'), key(0x4000004f), pad(14)}});
     game.actions.push_back(
         InputAction{"move_up", InputAction::Type::Button,
-                    {key('w'), key(0x40000052)}});
+                    {key('w'), key(0x40000052), pad(11)}});
     game.actions.push_back(
         InputAction{"move_down", InputAction::Type::Button,
-                    {key('s'), key(0x40000051)}});
+                    {key('s'), key(0x40000051), pad(12)}});
+    game.actions.push_back(
+        InputAction{"move_x", InputAction::Type::Axis1D,
+                    {{RawInputEvent::Kind::GamepadAxis, 0, 1.f, {}}}});
+    game.actions.push_back(
+        InputAction{"move_y", InputAction::Type::Axis1D,
+                    {{RawInputEvent::Kind::GamepadAxis, 1, 1.f, {}}}});
     game.actions.push_back(
         InputAction{"jump", InputAction::Type::Button,
-                    {key(' '), key('w'), key(0x40000052)}});
+                    {key(' '), key('w'), key(0x40000052), pad(0)}});
     game.actions.push_back(
         InputAction{"fire", InputAction::Type::Button,
-                    {key(' '),
+                    {key(' '), pad(10),
                      {RawInputEvent::Kind::MouseButton, 1, 1.f, {}}}});
     game.actions.push_back(
-        InputAction{"mine", InputAction::Type::Button, {key('c')}});
+        InputAction{"mine", InputAction::Type::Button,
+                    {key('c'), pad(2)}});
     impl.input.add_context(std::move(game));
     impl.input.push_context("game");
     if (!options.input_map.empty()) {
@@ -469,6 +481,17 @@ int RuntimeHost::run() {
         raw.kind = RawInputEvent::Kind::KeyPress;
         raw.code = 8;
         break;
+      case InputEventType::GamepadPressed:
+      case InputEventType::GamepadReleased:
+        raw.kind = RawInputEvent::Kind::GamepadButton;
+        raw.code = event.gamepad_button;
+        raw.pressed = event.type == InputEventType::GamepadPressed;
+        break;
+      case InputEventType::GamepadAxis:
+        raw.kind = RawInputEvent::Kind::GamepadAxis;
+        raw.code = event.gamepad_axis;
+        raw.value = event.gamepad_axis_value;
+        break;
       default:
         feed_raw = false;
         break;
@@ -521,17 +544,20 @@ int RuntimeHost::run() {
     if (impl.player) {
       auto *v = world.get<Velocity2D>(*impl.player);
       if (v) {
-        const float dx =
-            (impl.input.pressed("move_right") ? 1.f : 0.f) -
-            (impl.input.pressed("move_left") ? 1.f : 0.f);
-        v->dx = dx * options.player_move_speed;
+        // Digital buttons plus the analog stick (deadzone on the stick).
+        float dx = (impl.input.pressed("move_right") ? 1.f : 0.f) -
+                   (impl.input.pressed("move_left") ? 1.f : 0.f);
+        const float stick_x = impl.input.axis("move_x");
+        if (std::abs(stick_x) > 0.18f) dx += stick_x;
+        v->dx = std::clamp(dx, -1.f, 1.f) * options.player_move_speed;
         // With scene gravity active the player is a platformer: dy is
         // owned by gravity/jump, not held-key velocity.
         if (impl.gravity == 0.f) {
-          const float dy =
-              (impl.input.pressed("move_down") ? 1.f : 0.f) -
-              (impl.input.pressed("move_up") ? 1.f : 0.f);
-          v->dy = dy * options.player_move_speed;
+          float dy = (impl.input.pressed("move_down") ? 1.f : 0.f) -
+                     (impl.input.pressed("move_up") ? 1.f : 0.f);
+          const float stick_y = impl.input.axis("move_y");
+          if (std::abs(stick_y) > 0.18f) dy += stick_y;
+          v->dy = std::clamp(dy, -1.f, 1.f) * options.player_move_speed;
         }
       }
     }
