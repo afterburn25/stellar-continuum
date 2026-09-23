@@ -160,18 +160,48 @@ bool create_project(const std::filesystem::path &root, std::string_view name,
 
   std::ostringstream stub;
   stub << "// " << display << " - Stellar Engine game host.\n"
-       << "// Link stellar_engine (+ stellar_native_platform for a window)\n"
-       << "// and drive your content through the package registry.\n"
+       << "// Cooked content loads through the asset registry; packages resolve\n"
+       << "// through the package registry. Link stellar::platform for a window.\n"
        << "#include <stellar/engine/foundation.hpp>\n"
        << "#include <stellar/engine/package.hpp>\n\n"
+       << "#include <cstdio>\n\n"
        << "int main() {\n"
        << "  stellar::engine::PackageRegistry registry;\n"
        << "  registry.protect_namespace(\"" << id << "\");\n"
        << "  stellar::engine::scan_packages(registry, \"packages\");\n"
        << "  const auto plan = registry.resolve();\n"
+       << "  std::printf(\"" << display << " | %zu package(s), load plan %s\\n\",\n"
+       << "              plan.order.size(), plan.ok ? \"ok\" : \"FAILED\");\n"
+       << "  std::printf(\"press enter to exit\\n\");\n"
+       << "  (void)std::getchar();\n"
        << "  return plan.ok ? 0 : 1;\n"
        << "}\n";
   if (!write_text(root / "src" / "main.cpp", stub.str(), error))
+    return false;
+
+  // Consumer build file: compiles the host against the exported engine SDK
+  // (engine-sdk/, staged by the stellar-engine-sdk target next to the tools).
+  std::ostringstream cmake;
+  cmake << "cmake_minimum_required(VERSION 3.24)\n"
+        << "project(" << id.substr(5) << " LANGUAGES CXX)\n"
+        << "# The exported SDK ships Release-built static-CRT libraries only.\n"
+        << "set(CMAKE_MSVC_RUNTIME_LIBRARY \"MultiThreaded\")\n"
+        << "if(NOT CMAKE_CONFIGURATION_TYPES)\n"
+        << "  set(CMAKE_BUILD_TYPE Release CACHE STRING \"Build type\" FORCE)\n"
+        << "endif()\n"
+        << "if(NOT DEFINED STELLAR_ENGINE_SDK)\n"
+        << "  if(DEFINED ENV{STELLAR_ENGINE_SDK})\n"
+        << "    set(STELLAR_ENGINE_SDK \"$ENV{STELLAR_ENGINE_SDK}\")\n"
+        << "  else()\n"
+        << "    message(FATAL_ERROR \"Set -DSTELLAR_ENGINE_SDK=<engine-sdk dir> or the "
+           "STELLAR_ENGINE_SDK environment variable\")\n"
+        << "  endif()\n"
+        << "endif()\n"
+        << "include(\"${STELLAR_ENGINE_SDK}/cmake/StellarEngineSdk.cmake\")\n"
+        << "add_executable(" << id.substr(5) << " src/main.cpp)\n"
+        << "target_link_libraries(" << id.substr(5)
+        << " PRIVATE stellar::engine)\n";
+  if (!write_text(root / "CMakeLists.txt", cmake.str(), error))
     return false;
   return true;
 }

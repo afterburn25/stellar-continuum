@@ -36,6 +36,41 @@ add_custom_command(TARGET stellar-engine POST_BUILD
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-engine>/SDL3.dll")
 if(MSVC)
   target_compile_options(stellar-engine PRIVATE /W4 /WX /permissive-)
+  target_compile_definitions(stellar-engine PRIVATE
+    STELLAR_CMAKE_COMMAND="${CMAKE_COMMAND}")
+endif()
+
+# Engine SDK export: stages the redistributable headers, prebuilt libraries,
+# SDL3 runtime and the consumer CMake config under engine-sdk/ beside the
+# shell, so scaffolded game projects can compile and link without this
+# source tree. Building stellar-engine keeps the SDK fresh.
+if(WIN32 AND TARGET stellar_asset_cooker)
+  set(STELLAR_ENGINE_SDK_DIR "${CMAKE_BINARY_DIR}/engine-sdk")
+  add_custom_target(stellar-engine-sdk
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${STELLAR_ENGINE_SDK_DIR}/include"
+      "${STELLAR_ENGINE_SDK_DIR}/lib" "${STELLAR_ENGINE_SDK_DIR}/bin"
+      "${STELLAR_ENGINE_SDK_DIR}/cmake"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/engine/include"
+      "${STELLAR_ENGINE_SDK_DIR}/include"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/third_party/nlohmann"
+      "${STELLAR_ENGINE_SDK_DIR}/include/nlohmann"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${STELLAR_SDL_ROOT}/include"
+      "${STELLAR_ENGINE_SDK_DIR}/include"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:stellar_engine>"
+      "$<TARGET_FILE:stellar_native_platform>" "$<TARGET_FILE:stellar_native_image>"
+      "$<TARGET_FILE:stellar_texture_codecs>" "$<TARGET_FILE:stellar_asset_cooker>"
+      "${STELLAR_ENGINE_SDK_DIR}/lib/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STELLAR_SDL_importLibrary}"
+      "${STELLAR_ENGINE_SDK_DIR}/lib/SDL3.lib"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STELLAR_SDL_runtime}"
+      "${STELLAR_ENGINE_SDK_DIR}/bin/SDL3.dll"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_CURRENT_LIST_DIR}/StellarEngineSdk.cmake"
+      "${STELLAR_ENGINE_SDK_DIR}/cmake/StellarEngineSdk.cmake"
+    DEPENDS stellar_engine stellar_native_platform stellar_native_image
+      stellar_texture_codecs stellar_asset_cooker
+    COMMENT "Exporting engine SDK to engine-sdk/")
+  add_dependencies(stellar-engine stellar-engine-sdk)
 endif()
 
 # Native C++23 editor host: engine + core libraries linked directly (the WPF

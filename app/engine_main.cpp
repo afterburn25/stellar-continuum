@@ -12,6 +12,9 @@
 
 #if defined(_WIN32)
 #include <stellar/engine/asset_cooker.hpp>
+#define NOMINMAX
+#include <windows.h>
+#include <shellapi.h>
 #endif
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/localization.hpp>
@@ -31,6 +34,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <mutex>
@@ -124,13 +128,14 @@ struct Shell {
   bool editing_project_name{};
   std::string project_name_buffer;
   UiRect hit_project_name{}, hit_project_create{}, hit_project_open{},
-      hit_project_close{}, hit_project_cook{};
+      hit_project_close{}, hit_project_cook{}, hit_project_build{},
+      hit_project_run{};
   UiRect project_rows{};
-  // Content cooking runs on the JobSystem; the UI thread reads the state
-  // under the mutex.
-  std::atomic<bool> cooking{};
-  std::mutex cook_mutex;
-  std::string cook_status;
+  // Content cooking and host builds run on the JobSystem; the UI thread
+  // reads their status under the mutex.
+  std::atomic<bool> cooking{}, building{};
+  std::mutex project_mutex;
+  std::string cook_status, build_status;
   std::string status{"ready"};
 };
 
@@ -209,7 +214,7 @@ void close_project(Shell &shell) {
   shell.project.reset();
   scan_assets(shell, find_path("assets"));
   {
-    std::lock_guard lock(shell.cook_mutex);
+    std::lock_guard lock(shell.project_mutex);
     shell.cook_status.clear();
   }
   shell.status = "project closed - browsing host assets";
@@ -229,7 +234,7 @@ void start_cook(Shell &shell, engine::JobSystem &jobs) {
   options.scan_content = true;
   options.package_group = shell.project->id;
   {
-    std::lock_guard lock(shell.cook_mutex);
+    std::lock_guard lock(shell.project_mutex);
     shell.cook_status = "cooking " + options.root.generic_string();
   }
   (void)jobs.submit("project.cook", engine::JobPriority::Normal, {},
@@ -249,7 +254,7 @@ void start_cook(Shell &shell, engine::JobSystem &jobs) {
                         message = std::string("cook failed: ") + error.what();
                       }
                       {
-                        std::lock_guard lock(shell.cook_mutex);
+                        std::lock_guard lock(shell.project_mutex);
                         shell.cook_status = std::move(message);
                       }
                       shell.cooking = false;
@@ -258,6 +263,74 @@ void start_cook(Shell &shell, engine::JobSystem &jobs) {
 #else
 void start_cook(Shell &shell, engine::JobSystem &) {
   shell.status = "cook unavailable on this platform";
+}
+#endif
+
+#if defined(_WIN32)
+// Configures and builds the open project's host executable (src/main.cpp via
+// its generated CMakeLists.txt) against the exported engine SDK. Runs on the
+// JobSystem; output goes to build/host/build.log inside the project.
+void start_build(Shell &shell, engine::JobSystem &jobs) {
+  if (!shell.project || shell.building.exchange(true)) return;
+  const auto root = shell.project->root;
+  const auto exe_name = shell.project->id.substr(5);
+  {
+    std::lock_guard lock(shell.project_mutex);
+    shell.build_status = "building " + exe_name + "...";
+  }
+  (void)jobs.submit("project.build", engine::JobPriority::Normal, {},
+                    [&shell, root, exe_name] {
+                      const auto sdk = find_path("engine-sdk");
+                      const auto host = root / "build" / "host";
+                      const auto log = (host / "build.log").string();
+                      std::filesystem::create_directories(host);
+                      const std::string cmake = "\"" STELLAR_CMAKE_COMMAND "\"";
+                      auto run = [&](const std::string &command) {
+                        return std::system((command + " >\"" + log + "\" 2>&1")
+                                               .c_str());
+                      };
+                      std::string message;
+                      if (run(cmake + " -S \"" + root.string() + "\" -B \"" +
+                              host.string() + "\" -DCMAKE_BUILD_TYPE=Release "
+                              "-DSTELLAR_ENGINE_SDK=\"" +
+                              sdk.generic_string() + "\"") != 0)
+                        message = "configure failed - see build/host/build.log";
+                      else if (run(cmake + " --build \"" + host.string() +
+                                   "\" --config Release") != 0)
+                        message = "build failed - see build/host/build.log";
+                      else
+                        message = "build ok - " + exe_name + ".exe ready";
+                      {
+                        std::lock_guard lock(shell.project_mutex);
+                        shell.build_status = std::move(message);
+                      }
+                      shell.building = false;
+                    });
+}
+
+// Launches the built host executable with the project root as its working
+// directory, so relative content paths resolve.
+void run_project(Shell &shell) {
+  if (!shell.project) return;
+  const auto exe_name = shell.project->id.substr(5) + ".exe";
+  for (const auto dir : {shell.project->root / "build" / "host" / "Release",
+                         shell.project->root / "build" / "host"}) {
+    const auto exe = dir / exe_name;
+    if (std::filesystem::is_regular_file(exe)) {
+      ShellExecuteA(nullptr, "open", exe.string().c_str(), nullptr,
+                    shell.project->root.string().c_str(), SW_SHOW);
+      shell.status = "launched " + exe_name;
+      return;
+    }
+  }
+  shell.status = "no built host - run BUILD first";
+}
+#else
+void start_build(Shell &shell, engine::JobSystem &) {
+  shell.status = "build unavailable on this platform";
+}
+void run_project(Shell &shell) {
+  shell.status = "run unavailable on this platform";
 }
 #endif
 
@@ -517,9 +590,11 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
     for (const auto &e : shell.package_errors)
       line(out, x, y, "  scan error", e, font);
     {
-      std::lock_guard lock(shell.cook_mutex);
+      std::lock_guard lock(shell.project_mutex);
       if (!shell.cook_status.empty())
         line(out, x, y, "cook", shell.cook_status, font);
+      if (!shell.build_status.empty())
+        line(out, x, y, "build", shell.build_status, font);
     }
   } else {
     line(out, x, y, "open project", "none - browsing host assets", font);
@@ -551,9 +626,19 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
     shell.hit_project_cook = {bx, y, 96 * s, shell.hit_project_name.height};
     shell_button(out, shell.hit_project_cook,
                  shell.cooking ? "COOKING" : "COOK", shell.cooking, font, s);
+    bx += 106 * s;
+    shell.hit_project_build = {bx, y, 96 * s, shell.hit_project_name.height};
+    shell_button(out, shell.hit_project_build,
+                 shell.building ? "BUILDING" : "BUILD", shell.building, font,
+                 s);
+    bx += 106 * s;
+    shell.hit_project_run = {bx, y, 80 * s, shell.hit_project_name.height};
+    shell_button(out, shell.hit_project_run, "RUN", false, font, s);
   } else {
     shell.hit_project_close = {};
     shell.hit_project_cook = {};
+    shell.hit_project_build = {};
+    shell.hit_project_run = {};
   }
   y += shell.hit_project_name.height + 14 * s;
 
@@ -721,6 +806,10 @@ int main(int argc, char **argv) {
               close_project(shell);
             else if (shell.hit_project_cook.contains(event.position))
               start_cook(shell, jobs);
+            else if (shell.hit_project_build.contains(event.position))
+              start_build(shell, jobs);
+            else if (shell.hit_project_run.contains(event.position))
+              run_project(shell);
             else if (shell.project_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y - shell.project_rows.y +

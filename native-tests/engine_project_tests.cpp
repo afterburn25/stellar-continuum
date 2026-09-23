@@ -62,6 +62,16 @@ int main() {
         "content directory created");
   check(std::filesystem::exists(root / "src" / "main.cpp"),
         "starter host source written");
+  check(std::filesystem::exists(root / "CMakeLists.txt"),
+        "consumer CMakeLists written");
+  {
+    std::ifstream input(root / "CMakeLists.txt");
+    const std::string text{std::istreambuf_iterator<char>(input),
+                           std::istreambuf_iterator<char>()};
+    check(text.find("StellarEngineSdk.cmake") != std::string::npos &&
+              text.find("stellar::engine") != std::string::npos,
+          "CMakeLists consumes the engine SDK");
+  }
 
   // The scaffolded package manifest parses and owns the project namespace.
   {
