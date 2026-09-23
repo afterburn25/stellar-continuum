@@ -263,7 +263,10 @@ tick passes without the capture firing is reported as a skipped save
 (the smoke line's `verified_checkpoints`/`of` pair already surfaced
 the count; now it also fails). Older recordings diverge at the first
 checkpoint with a label mismatch — recordings are session artifacts,
-not save files. Coverage: `replay` unit tests.
+not save files. On `--replay` the parsed header's seed/game_version is
+now compared against the session and a mismatch prints a provenance
+warning to stderr (advisory — cross-build replay is a legitimate
+compatibility probe). Coverage: `replay` unit tests.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

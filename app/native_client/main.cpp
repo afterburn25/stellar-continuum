@@ -8326,6 +8326,17 @@ int main(int argc,char **argv){
       std::string parse_error;
       auto parsed=stellar::engine::ReplayRecorder::parse(contents.str(),&parse_error);
       if(!parsed)throw std::invalid_argument("Replay file is not a valid recording: "+parse_error);
+      // Provenance check: a recording made under a different seed or build
+      // cannot reproduce this session — flag it so a divergence is read as
+      // a provenance mismatch, not a simulation defect. Advisory only:
+      // cross-build replay is a legitimate compatibility probe.
+      if(parsed->header().seed!=static_cast<std::uint64_t>(options.seed)||
+         parsed->header().game_version!=STELLAR_GAME_VERSION)
+        std::cerr<<"Stellar Continuum native client: replay provenance differs "
+                   "(recorded seed "<<parsed->header().seed<<" vs "<<options.seed
+                 <<", recorded version "<<parsed->header().game_version
+                 <<" vs "<<STELLAR_GAME_VERSION
+                 <<") — divergence may reflect the mismatch.\n";
       replay.recording=std::move(parsed);
     }
     // Fixed-step: record/replay share one deterministic advance quantum so
