@@ -102,8 +102,14 @@ tier-cadence `SimulationScheduler` — dependency ordering, dirty/event wakeups
 starve keys, `elapsed_ticks` catch-up, JobSystem dependency-wave execution,
 per-domain timing, pause, LOD promotion/demotion. Design/contracts in
 [SIMULATION_LOD.md](SIMULATION_LOD.md); benchmarks are the
-`simulation_scale_250…5000` ctest entries. Next: adopt it for real Core/game
-phases, then Milestone 2 (economy framework on `resource_economy.cpp`).
+`simulation_scale_250…5000` ctest entries. Milestone 2 landed at engine
+level: `EconomyCatalog`/`EconomyGraph`/`analyze_economy`
+(economy_catalog.hpp) add validated `ResourceSpec`/`RecipeSpec`
+definitions, dependency-graph queries and bottleneck/reserve/import
+diagnostics, bridged to runtime via `to_runtime_recipe` — see
+[ECONOMY_FRAMEWORK.md](ECONOMY_FRAMEWORK.md). Next: Milestone 3
+(population cohort framework), then colony/infrastructure/logistics;
+adopt the executor for real Core/game phases when consuming these.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

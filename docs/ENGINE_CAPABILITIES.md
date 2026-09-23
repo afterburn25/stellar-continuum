@@ -62,6 +62,37 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Generic resource + economy catalog framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 2 — a reusable,
+  data-driven economy definition layer over the runtime
+  `ResourceNetwork`. See [ECONOMY_FRAMEWORK.md](ECONOMY_FRAMEWORK.md).
+- **Engine APIs/ownership:** `ResourceSpec` (id, localization key,
+  category, physical flag, mass/volume, storage class, perishability,
+  transportability, base valuation, substitution group, tags, unit) and
+  `RecipeSpec` (inputs/outputs/catalysts/byproducts, labor, energy,
+  facility tags, duration, efficiency, substitution). `EconomyCatalog`
+  validates without throwing — malformed/duplicate ids, unknown
+  references, nonpositive quantities, zero-output recipes, dependency
+  cycles and unreachable production chains (fixpoint over chain
+  categories). `EconomyGraph` answers producers/consumers/downstream/
+  upstream/unproducible and exposes edges for editor graphs.
+  `analyze_economy` turns demand + caller observations into per-resource
+  bottleneck/unmet/reserve/utilization/import-dependence diagnostics.
+  `to_runtime_recipe` bridges specs into `ResourceNetwork` recipes.
+- **Consumers/tests:** `economy_catalog` tests — valid catalog clean,
+  graph closures, every validation class, diagnostics math, live
+  `ResourceNetwork` production through the bridge, deterministic issue
+  ordering. Editor economy tool and Core catalog adoption pending.
+- **Save/performance impact:** pure data + derived immutable graph —
+  catalog contents serialize through the package/data layer, nothing
+  runtime-persistent. Validation and fixpoint are catalog-scale
+  (resources × recipes), not per-tick.
+- **Limitations:** substitution groups validated but not resolved at
+  runtime; catalysts/labor/facility tags are metadata until the colony
+  framework gates on them; diagnostics consume caller-supplied
+  observations (no automatic rollup yet).
+
 ## Massive simulation scheduler + simulation LOD executor (2026-09-23)
 
 - **Purpose:** the space-strategy specialization's foundation — drive
