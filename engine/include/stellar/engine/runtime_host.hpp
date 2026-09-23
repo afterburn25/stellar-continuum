@@ -45,6 +45,9 @@ struct RuntimeHostOptions {
   // 0 = run until quit; >0 exits after that many rendered frames — lets CI
   // and scripts smoke-test that a built game starts and ticks.
   int frame_limit{0};
+  // Simulation speed multiplier — 1.0 default; 0.5 half-speed, 2.0 double.
+  // Scales the dt each step sees, so fixed-step determinism is preserved.
+  double time_scale{1.0};
   // When non-empty, the world snapshot is written here on exit — combine
   // with --fixed-hz/--frames to compare runs byte-for-byte.
   std::filesystem::path snapshot_out;
@@ -82,6 +85,9 @@ public:
   // The P key toggles the same flag.
   void set_paused(bool paused);
   [[nodiscard]] bool paused() const;
+  // Runtime-adjustable sim speed (RuntimeHostOptions::time_scale).
+  void set_time_scale(double scale);
+  [[nodiscard]] double time_scale() const;
   // Switches the active scene document (project-relative path), respawning
   // entities — level switching. Before run() it sets the initial scene.
   void set_scene(std::string scene_file);

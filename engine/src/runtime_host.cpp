@@ -28,6 +28,7 @@ struct RuntimeHost::Impl {
   std::optional<EntityId> player;
   bool quit_requested = false;
   bool paused = false;
+  double time_scale = 1.0;
   // Assigned inside run(); applies a scene switch immediately.
   std::function<void(const std::string &)> switch_scene;
 };
@@ -48,6 +49,10 @@ std::optional<EntityId> RuntimeHost::player() const { return impl_->player; }
 void RuntimeHost::request_quit() { impl_->quit_requested = true; }
 void RuntimeHost::set_paused(bool paused) { impl_->paused = paused; }
 bool RuntimeHost::paused() const { return impl_->paused; }
+void RuntimeHost::set_time_scale(double scale) {
+  impl_->time_scale = scale > 0.0 ? scale : 1.0;
+}
+double RuntimeHost::time_scale() const { return impl_->time_scale; }
 void RuntimeHost::set_scene(std::string scene_file) {
   if (impl_->switch_scene)
     impl_->switch_scene(scene_file);
@@ -70,6 +75,7 @@ int RuntimeHost::run() {
   const auto plan = registry.resolve();
 
   const auto exe_dir = executable_directory();
+  impl.time_scale = options.time_scale;
   impl.content = std::make_unique<ContentResolver>(
       options.package_id, options.project_root, exe_dir);
   const std::size_t cooked_assets = impl.content->cooked_count();
@@ -248,6 +254,7 @@ int RuntimeHost::run() {
                            ? static_cast<float>(1.0 / options.fixed_timestep_hz)
                            : 0.f;
     auto simulate = [&](float dt_step) {
+      dt_step *= static_cast<float>(impl.time_scale);
       if (on_update) on_update(world, dt_step);
       for (const auto entity : impl.entities) {
         auto *t = world.get<Transform2D>(entity);
@@ -364,6 +371,8 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.height = std::atoi(argv[++i]);
     else if (arg == "--fullscreen")
       impl_->options.fullscreen = std::atoi(argv[++i]) != 0;
+    else if (arg == "--speed")
+      impl_->options.time_scale = std::atof(argv[++i]);
   }
   return run();
 }
