@@ -273,6 +273,14 @@ compatibility probe). `build_id` now carries `STELLAR_SOURCE_COMMIT`
 check also catches same-version/different-commit replays; headers
 whose build_id equals their game_version are treated as legacy and
 skip the commit check. Coverage: `replay` unit tests.
+Leaf-level localization: `--record` now also writes each capture's
+canonical document to `<recording>.expected/<tick>.json`; on divergence
+`--replay` leaf-diffs it against the actual dump via the engine's
+`document_leaf_diff` and writes `replay-divergence-<tick>.diff.txt`
+(`path` + expected/actual values, first 32 leaves) — the divergence
+message names the first leaf path. Sidecars are dev artifacts alongside
+the recording; their absence degrades to the previous section-only
+report.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

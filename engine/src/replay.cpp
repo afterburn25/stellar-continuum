@@ -101,6 +101,71 @@ document_section_checkpoints(std::uint64_t tick,
   return out;
 }
 
+namespace {
+
+void leaf_diff_walk(std::string_view path, const nlohmann::ordered_json &a,
+                    const nlohmann::ordered_json &b,
+                    std::vector<LeafDivergence> &out, std::size_t limit) {
+  if (out.size() >= limit) return;
+  const auto report = [&](std::string leaf_path,
+                          const nlohmann::ordered_json *expected,
+                          const nlohmann::ordered_json *actual) {
+    out.push_back(LeafDivergence{
+        std::move(leaf_path),
+        expected != nullptr ? expected->dump() : std::string("<absent>"),
+        actual != nullptr ? actual->dump() : std::string("<absent>")});
+  };
+  if (a.is_object() && b.is_object()) {
+    for (const auto &[key, value] : a.items()) {
+      const auto child = path.empty() ? key : std::string(path) + "." + key;
+      const auto it = b.find(key);
+      if (it == b.end()) {
+        report(child, &value, nullptr);
+        if (out.size() >= limit) return;
+        continue;
+      }
+      leaf_diff_walk(child, value, *it, out, limit);
+      if (out.size() >= limit) return;
+    }
+    for (const auto &[key, value] : b.items())
+      if (!a.contains(key)) {
+        report(path.empty() ? key : std::string(path) + "." + key, nullptr,
+               &value);
+        if (out.size() >= limit) return;
+      }
+    return;
+  }
+  if (a.is_array() && b.is_array()) {
+    const auto shared = std::min(a.size(), b.size());
+    for (std::size_t i = 0; i < shared; ++i) {
+      leaf_diff_walk(std::string(path) + "[" + std::to_string(i) + "]", a[i],
+                     b[i], out, limit);
+      if (out.size() >= limit) return;
+    }
+    for (std::size_t i = shared; i < a.size(); ++i) {
+      report(std::string(path) + "[" + std::to_string(i) + "]", &a[i], nullptr);
+      if (out.size() >= limit) return;
+    }
+    for (std::size_t i = shared; i < b.size(); ++i) {
+      report(std::string(path) + "[" + std::to_string(i) + "]", nullptr, &b[i]);
+      if (out.size() >= limit) return;
+    }
+    return;
+  }
+  if (a != b) report(std::string(path), &a, &b);
+}
+
+} // namespace
+
+std::vector<LeafDivergence>
+document_leaf_diff(const nlohmann::ordered_json &expected,
+                   const nlohmann::ordered_json &actual, std::size_t limit) {
+  std::vector<LeafDivergence> out;
+  if (limit == 0) return out;
+  leaf_diff_walk("", expected, actual, out, limit);
+  return out;
+}
+
 CheckpointVerification verify_checkpoint_sequence(
     std::span<const ReplayCheckpoint> expected, std::size_t &cursor,
     std::span<const ReplayCheckpoint> actual) {

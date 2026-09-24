@@ -132,6 +132,44 @@ int main() {
           "overrun reported as unrecorded checkpoint");
   }
 
+  // Leaf diff: identical documents produce no entries; a changed scalar
+  // names its full path; member and array-length asymmetries report the
+  // missing side as <absent>.
+  {
+    check(document_leaf_diff(document, document).empty(),
+          "identical documents reported leaves");
+    auto changed = document;
+    changed["World"]["Fleets"][1] = 99;
+    changed["Diplomacy"].erase("Contacts");
+    changed["Extra"] = true;
+    const auto leaves = document_leaf_diff(document, changed);
+    check(leaves.size() == 3, "leaf diff counted the three divergences");
+    bool paths_ok = false;
+    for (const auto &leaf : leaves) {
+      if (leaf.path == "World.Fleets[1]") {
+        paths_ok = leaf.expected == "2" && leaf.actual == "99";
+      }
+    }
+    check(paths_ok, "leaf diff named the changed scalar with both values");
+    check(leaves[1].path == "Diplomacy.Contacts" &&
+              leaves[1].actual == "<absent>",
+          "missing member reports <absent> on the actual side");
+    check(leaves[2].path == "Extra" && leaves[2].expected == "<absent>",
+          "extra member reports <absent> on the expected side");
+    const auto capped = document_leaf_diff(document, changed, 1);
+    check(capped.size() == 1, "leaf diff honors the limit");
+  }
+  {
+    // Type changes and array-length drift report whole nodes/leaves.
+    const nlohmann::ordered_json a{{"list", {1, 2, 3}}, {"kind", "x"}};
+    const nlohmann::ordered_json b{{"list", {1, 2}}, {"kind", 7}};
+    const auto leaves = document_leaf_diff(a, b);
+    check(leaves.size() == 2 && leaves[0].path == "list[2]" &&
+              leaves[0].actual == "<absent>" &&
+              leaves[1].path == "kind" && leaves[1].actual == "7",
+          "array shrink and scalar type change localized");
+  }
+
   if (failures != 0) {
     std::cerr << failures << " replay checks failed\n";
     return 1;

@@ -90,6 +90,23 @@ document_section_checkpoints(std::uint64_t tick,
                              const nlohmann::ordered_json &document,
                              std::string_view label_prefix);
 
+// Leaf-level divergence report. Section checkpoints name the subsystem;
+// when both the recorded (expected) and replayed (actual) canonical
+// documents are available, document_leaf_diff walks them in lockstep and
+// reports the first `limit` diverging leaves — a changed scalar names the
+// exact member ("World.Fleets[3].Fuel"), a member present on one side only
+// reports "<absent>" for the missing side. Objects compare member-wise in
+// expected document order; arrays compare index-wise.
+struct LeafDivergence {
+  std::string path;
+  std::string expected;
+  std::string actual;
+};
+[[nodiscard]] std::vector<LeafDivergence>
+document_leaf_diff(const nlohmann::ordered_json &expected,
+                   const nlohmann::ordered_json &actual,
+                   std::size_t limit = 32);
+
 struct CheckpointVerification {
   std::size_t verified{};
   std::string divergence; // empty = all entries verified

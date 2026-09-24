@@ -681,6 +681,10 @@ struct ReplayState {
   std::size_t checkpoint_cursor{};
   std::uint64_t verified_checkpoints{};
   std::string divergence;
+  // <recording>.expected/<tick>.json sidecars: record mode writes the
+  // canonical capture per checkpoint so a replay divergence can leaf-diff
+  // the expected document instead of stopping at the section hash.
+  std::filesystem::path expected_directory;
 };
 
 // Writes the recording on scope exit, including early returns and failures.
@@ -960,6 +964,16 @@ class NativeCampaign final {
             for(const auto &checkpoint:actual)
               replay_->recorder->checkpoint(checkpoint.tick,checkpoint.hash,
                                             checkpoint.label);
+            // Retain the expected-side document so a later replay can
+            // leaf-diff the divergence instead of needing a hand capture.
+            if(!replay_->expected_directory.empty()){
+              const auto expected_path=replay_->expected_directory/
+                  (std::to_string(tick)+".json");
+              std::error_code ec;
+              std::filesystem::create_directories(expected_path.parent_path(),ec);
+              if(std::ofstream out{expected_path,std::ios::binary|std::ios::trunc};out)
+                out<<document.dump(2);
+            }
             return;
           }
           auto cursor=replay_->checkpoint_cursor;
@@ -978,6 +992,33 @@ class NativeCampaign final {
               out<<document.dump(2);
               replay_->divergence+=" (actual state dumped to "+
                   dump_path.generic_string()+")";
+            }
+            // Leaf-diff against the recorded capture when it was retained.
+            const auto expected_path=replay_->expected_directory/
+                (std::to_string(tick)+".json");
+            if(std::ifstream in{expected_path,std::ios::binary};in){
+              std::ostringstream contents;contents<<in.rdbuf();
+              try{
+                const auto expected_doc=
+                    nlohmann::ordered_json::parse(contents.str());
+                const auto leaves=stellar::engine::document_leaf_diff(
+                    expected_doc,document);
+                if(!leaves.empty()){
+                  const auto diff_path=session_->save_path().parent_path()/
+                      ("replay-divergence-"+std::to_string(tick)+".diff.txt");
+                  std::ostringstream report;
+                  for(const auto&leaf:leaves)
+                    report<<leaf.path<<"\n  expected: "<<leaf.expected
+                          <<"\n  actual:   "<<leaf.actual<<'\n';
+                  if(std::ofstream out{diff_path,std::ios::binary|std::ios::trunc};out){
+                    out<<report.str();
+                    replay_->divergence+=" (first leaf: "+leaves.front().path+
+                        "; full diff in "+diff_path.generic_string()+")";
+                  }
+                }
+              }catch(const std::exception&){
+                // A corrupt expected sidecar still leaves the section name.
+              }
             }
           }
         });
@@ -8647,6 +8688,12 @@ int main(int argc,char **argv){
                  <<") — divergence may reflect the mismatch.\n";
       replay.recording=std::move(parsed);
     }
+    // Expected-document sidecars live next to the recording: record writes
+    // <path>.expected/<tick>.json, replay reads them for leaf-level diffs.
+    if(!options.record_path.empty())
+      replay.expected_directory=options.record_path.generic_string()+".expected";
+    else if(!options.replay_path.empty())
+      replay.expected_directory=options.replay_path.generic_string()+".expected";
     // Fixed-step: record/replay share one deterministic advance quantum so
     // command ticks and checkpoint days reproduce exactly.
     constexpr double kReplayStepSeconds=1./60.;
