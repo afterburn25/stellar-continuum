@@ -15,6 +15,7 @@
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/fleet_state.hpp>
+#include <stellar/core/galaxy_generation_metadata.hpp>
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/legacy_technology.hpp>
 #include <stellar/core/logistics.hpp>
@@ -578,6 +579,14 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   try{validate_small_body_catalog(w.systems,w.bodies);}
   catch(const std::exception&){
     emit("galaxy","invalid_small_body",0,"Small-body fields fail their authoritative validation.");}
+  // Generation metadata: the persistence boundary validates the whole
+  // record (seed/system-count agreement, configuration consistency,
+  // phenomena, core landmark agreement) — mirror it as one guarded
+  // umbrella finding rather than re-deriving each rule.
+  try{(void)capture_galaxy_persistence_metadata(
+      w.generation_metadata,w.galactic_core,w.seed,w.systems);}
+  catch(const std::exception&){
+    emit("galaxy","invalid_generation_metadata",0,"Generation metadata fails the persistence validator.");}
   if(w.galactic_core){
     if(!std::isfinite(w.galactic_core->x)||!std::isfinite(w.galactic_core->y))
       emit("galaxy","invalid_position",0,"Galactic core metadata position is not finite.");

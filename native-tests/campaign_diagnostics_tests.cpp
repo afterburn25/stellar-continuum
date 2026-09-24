@@ -116,7 +116,7 @@ int main(int argc,char **argv)try{
   corrupt.colonies.front().civilization_id=99999;
   corrupt.economies.front().credits=std::numeric_limits<double>::quiet_NaN();
   const auto faults=inspect_campaign_invariants(corrupt,20,5);
-  check(faults.size()==3,"Duplicate ID, orphaned colony and nonfinite credits were not detected.");
+  check(faults.size()==4,"Duplicate ID, orphaned colony, nonfinite credits and the generation-metadata system-count disagreement were not detected.");
   check(faults.front().tick==20&&faults.front().severity==DiagnosticSeverity::Critical,"Invariant lost severity/tick.");
   const auto capped=inspect_campaign_invariants(corrupt,20,5,2);
   check(capped.size()==3&&capped.back().event_type=="findings_truncated",

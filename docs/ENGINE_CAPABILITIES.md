@@ -801,6 +801,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   (`invalid_kind`/`invalid_companion`), region index bounds,
   guarded `validate_stellar_physics`/`validate_stellar_orbits`/
   `validate_stellar_activity` per system (`invalid_stellar`),
+  plus a guarded `capture_galaxy_persistence_metadata` umbrella that
+  flags `invalid_generation_metadata` when the generation record
+  disagrees with the galaxy (seed, system count, configuration,
+  phenomena or core-landmark agreement),
   cross-system orbit bindings via `validate_stellar_orbit_catalog`
   (`invalid_orbit_binding`), `validate_central_black_hole` on the
   galactic-core metadata (`invalid_black_hole`), galactic-core
