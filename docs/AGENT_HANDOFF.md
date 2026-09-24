@@ -843,6 +843,16 @@ pointer presses and cancels reset the ring. `native_controlled_assets`
 covers cycling/wrap/Home/End, edit-mode ownership, header collapse
 via keyboard, row selection via Space, ring rendering, pointer reset
 and hidden-mode restore; suite green.
+Diagnostics TableModel (row-24 sort-model adoption): the default
+view's phase table (Phase/Samples/Mean ms/Maximum ms) now sorts
+through `TableModel` — header clicks cycle ascending→descending with
+the roster's `^`/`v` marker and reset the scroll. Rows are rebuilt
+each frame into `set_rows` (numeric cells carry the timing values, so
+mean/maximum sort numerically and "Unmeasured" rows order at zero);
+`sort_state_` survives the per-frame refresh, and the model's stable
+tie-break is the row id (phase name). `native_developer_diagnostics`
+asserts the first-row phase flips between ascending and descending and
+the direction marker renders.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

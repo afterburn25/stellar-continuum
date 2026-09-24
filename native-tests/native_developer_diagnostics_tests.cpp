@@ -6,6 +6,7 @@
 #include <stellar/core/developer_campaign.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <iostream>
+#include <limits>
 using namespace stellar::core;
 using namespace stellar::native_map;
 void check(bool v,const char *s){if(!v)throw std::runtime_error(s);}
@@ -74,6 +75,29 @@ int main(int argc,char **argv)try{
       (void)window.handle(scroll,w,h,monitor);
       (void)control(draw(),"client/test.phase");
       profiler.set_enabled(false);profiler.reset_aggregates();
+    }
+    // The phase table sorts through TableModel — clicking a column
+    // header cycles ascending→descending and resets the scroll. The
+    // first rendered row's phase text is the oracle.
+    {
+      const auto top_phase=[&](const DrawList &d){
+        // Rows sit below the "Phase" header; the first row's phase text
+        // is the leftmost cell at the smallest row y.
+        float header_y=-1.f;
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value.starts_with("Phase"))header_y=t->clip->y;
+        float top=std::numeric_limits<float>::max();
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->clip->y>header_y)top=std::min(top,t->clip->y);
+        std::string phase;float left=std::numeric_limits<float>::max();
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->clip->y==top&&t->clip->x<left){left=t->clip->x;phase=t->value;}
+        return phase;};
+      click("Phase");
+      const auto ascending_top=top_phase(draw());
+      click("Phase");
+      const auto descending_top=top_phase(draw());
+      check(!ascending_top.empty()&&!descending_top.empty()&&ascending_top<descending_top,"Column sort did not reorder the phase table.");
+      bool marker=false;
+      for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value=="Phase v")marker=true;
+      check(marker,"Sort direction marker missing from the phase header.");
     }
     for(const auto &c:view.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){const auto &r=*t->clip;
       check(r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h,"Diagnostics text escaped viewport.");}

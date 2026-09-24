@@ -48,6 +48,16 @@ public:
     if(e.type==InputEventType::LeftPressed){
       if(l.detail.contains(e.position)){dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));return true;}
       pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
+      // Sortable phase-table headers (default view) — same click
+      // convention as the colony roster: press cycles asc→desc and the
+      // scroll returns to the top.
+      if(pressed_<0&&!events_&&!generation_&&!assets_&&!entities_)
+        for(int col=0;col<4;++col)if(phase_header_rect(l,col).contains(e.position)){
+          static constexpr std::string_view ids[]{"phase","samples","mean","maximum"};
+          const auto &state=phase_table_.sort_state();
+          phase_table_.sort_by(ids[col],!(state&&state->first==ids[col]&&state->second));
+          list_view_.scroll_offset=0;break;
+        }
       if(pressed_<0&&entities_&&!entities_dirty_&&entity_rows_rect(l).contains(e.position)){
         const int row=static_cast<int>((e.position.y-l.list.y+list_view_.scroll_offset)/list_view_.row_height);
         if(row>=0&&row<static_cast<int>(entity_flat_.size()))pressed_=100+row;
@@ -252,24 +262,35 @@ public:
         else if(const auto*shipyard_tag=projected.get<CampaignShipyardTag>(e)){line("tag campaign.shipyard",native_menu_style::cyan);line("civ "+std::to_string(shipyard_tag->civilization_id));}
       }else label(detail,"Select a row — the projected entity's index, refs and tag fields list here.",native_menu_style::muted);
     }else if(!events_){
-      label({l.list.x+8*s,l.list.y-31*s,400*s,27*s},"Phase",native_menu_style::muted);
-      label({l.list.x+430*s,l.list.y-31*s,140*s,27*s},"Samples",native_menu_style::muted);
-      label({l.list.x+600*s,l.list.y-31*s,170*s,27*s},"Mean ms",native_menu_style::muted);
-      label({l.list.x+810*s,l.list.y-31*s,190*s,27*s},"Maximum ms",native_menu_style::muted);
+      const auto sort_mark=[&](std::string_view id){const auto &st=phase_table_.sort_state();return st&&st->first==id?(st->second?" ^":" v"):"";};
+      label(phase_header_rect(l,0),std::string("Phase")+sort_mark("phase"),native_menu_style::muted);
+      label(phase_header_rect(l,1),std::string("Samples")+sort_mark("samples"),native_menu_style::muted);
+      label(phase_header_rect(l,2),std::string("Mean ms")+sort_mark("mean"),native_menu_style::muted);
+      label(phase_header_rect(l,3),std::string("Maximum ms")+sort_mark("maximum"),native_menu_style::muted);
+      // Sortable table through TableModel — the same view-model the
+      // colony roster uses; set_rows preserves the sort across frames.
       const auto samples=frame.runtime().performance_samples();
-      struct Row{std::string phase;std::uint64_t n,total,maximum;};
-      std::vector<Row> rows;rows.reserve(samples.size()+8);
-      for(const auto&p:samples)rows.push_back({std::string(p.phase),p.timing.samples,p.timing.total_nanoseconds,p.timing.maximum_nanoseconds});
-      for(const auto&a:stellar::engine::Profiler::instance().aggregates())
-        rows.push_back({"client/"+a.name,a.calls,a.total_nanoseconds,a.max_nanoseconds});
+      std::vector<stellar::engine::TableModel::Row> table_rows;table_rows.reserve(samples.size()+8);
+      const auto push_row=[&](std::string phase,std::uint64_t n,std::uint64_t total,std::uint64_t maximum){
+        std::vector<stellar::engine::TableModel::Cell> cells{
+          {phase,0.,false},
+          {std::to_string(n),static_cast<double>(n),true},
+          {n?number(static_cast<double>(total)/n/1e6):std::string("Unmeasured"),n?static_cast<double>(total)/n:0.,true},
+          {n?number(maximum/1e6):std::string("Unmeasured"),static_cast<double>(maximum),true}};
+        table_rows.push_back({std::move(phase),std::move(cells)});};
+      for(const auto&p:samples)push_row(std::string(p.phase),p.timing.samples,p.timing.total_nanoseconds,p.timing.maximum_nanoseconds);
+      for(const auto&a:stellar::engine::Profiler::instance().aggregates())push_row("client/"+a.name,a.calls,a.total_nanoseconds,a.max_nanoseconds);
+      if(phase_table_.columns().empty())phase_table_.set_columns({{"phase","phase"},{"samples","samples"},{"mean","mean"},{"maximum","maximum"}});
+      phase_table_.set_rows(std::move(table_rows));
+      const auto &rows=phase_table_.display_rows();
       const auto range=scroll_window(l,33.f,rows.size(),14);
       for(auto i=range.first;i<range.last;++i){
-        const auto &p=rows[i];const auto y=l.list.y+static_cast<float>(i)*33*s-list_view_.scroll_offset;
+        const auto &cells=rows[i]->second;const auto y=l.list.y+static_cast<float>(i)*33*s-list_view_.scroll_offset;
         if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
-        label({l.list.x+8*s,y+4*s,400*s,25*s},p.phase);
-        label({l.list.x+430*s,y+4*s,140*s,25*s},std::to_string(p.n));
-        label({l.list.x+600*s,y+4*s,170*s,25*s},p.n?number(static_cast<double>(p.total)/p.n/1e6):"Unmeasured");
-        label({l.list.x+810*s,y+4*s,190*s,25*s},p.n?number(p.maximum/1e6):"Unmeasured");
+        label({l.list.x+8*s,y+4*s,400*s,25*s},cells[0].text);
+        label({l.list.x+430*s,y+4*s,140*s,25*s},cells[1].text);
+        label({l.list.x+600*s,y+4*s,170*s,25*s},cells[2].text);
+        label({l.list.x+810*s,y+4*s,190*s,25*s},cells[3].text);
       }
     }else{
       label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(snapshot_.size())+" retained events · newest first · snapshot captured on refresh",native_menu_style::muted);
@@ -304,6 +325,12 @@ private:
   // In the entities view the list splits: rows left, selected-entity
   // detail right — row hit-testing bounds to the rows region.
   static UiRect entity_rows_rect(const Layout &l){return {l.list.x,l.list.y,l.list.width*.62f,l.list.height};}
+  // Phase-table column headers sit one row above the list (the rects
+  // the header labels draw into).
+  static UiRect phase_header_rect(const Layout &l,int col){
+    constexpr float xs[]{8.f,430.f,600.f,810.f},ws[]{400.f,140.f,170.f,190.f};
+    return {l.list.x+xs[col]*l.scale,l.list.y-31*l.scale,ws[col]*l.scale,27*l.scale};
+  }
   // Configures the shared VirtualizedList for the active view, re-clamps
   // the offset (collapses/refreshes shrink content), publishes the row
   // count for handle(), and returns the visible range capped at the
@@ -361,5 +388,6 @@ private:
   std::vector<stellar::engine::DiagnosticRecord> snapshot_;stellar::native_ui::Dropdown dropdown_;
   bool visible_{},events_{};int pressed_{-1};Point pointer_{};
   mutable stellar::engine::VirtualizedList list_view_;mutable std::size_t list_rows_{};
+  mutable stellar::engine::TableModel phase_table_;
 };
 }
