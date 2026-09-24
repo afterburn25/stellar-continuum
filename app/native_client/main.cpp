@@ -9234,6 +9234,26 @@ int main(int argc,char **argv){
         }
         out<<"}";
       }
+      // Pointer commands carry drawable-pixel positions — any landing
+      // outside the recorded drawable can never hit the same UI cell on
+      // replay (hand-edited or corrupt fixture), so count them.
+      if(recording->header().window_width!=0||recording->header().window_height!=0){
+        std::size_t out_of_bounds=0;
+        for(const auto &command:recording->commands()){
+          if(command.name!="pointer_button")continue;
+          int type=0;float x=0.f,y=0.f;
+          const char *const begin=command.payload.data();
+          const char *const end=begin+command.payload.size();
+          const auto pt=std::from_chars(begin,end,type);
+          if(pt.ec!=std::errc{}||pt.ptr>=end||*pt.ptr!=',')continue;
+          const auto px=std::from_chars(pt.ptr+1,end,x);
+          if(px.ec!=std::errc{}||px.ptr>=end||*px.ptr!=',')continue;
+          if(std::from_chars(px.ptr+1,end,y).ec!=std::errc{})continue;
+          if(x<0.f||y<0.f||x>=recording->header().window_width||
+             y>=recording->header().window_height)++out_of_bounds;
+        }
+        out<<",\"pointer_out_of_bounds\":"<<out_of_bounds;
+      }
       // Checkpoints emit one entry per section per capture — group by tick
       // and report whether the canonical expected document is on disk.
       std::map<std::uint64_t,std::size_t> checkpoint_ticks;
