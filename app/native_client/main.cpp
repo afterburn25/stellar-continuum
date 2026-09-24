@@ -7239,7 +7239,7 @@ class NativeCampaign final {
         if(star!=battle_world.systems.end()){DrawList environment;system_background_.append(environment,sid,width,height,starfield_quality(),starfield_density());phenomena_.append_system(environment,sid,star->position.x,star->position.y,width,height,1.,phenomena_options(sid),true);
           std::vector<UiOverlayCommand> commands;for(const auto& command:environment.world)std::visit([&](const auto& c){using T=std::decay_t<decltype(c)>;if constexpr(std::is_same_v<T,Image>||std::is_same_v<T,Scene3DView>)commands.emplace_back(c);},command);
           tactical.overlay.insert(tactical.overlay.begin()+std::min<std::size_t>(1,tactical.overlay.size()),commands.begin(),commands.end());
-          if(!system_background_.ready()||!phenomena_.ready()){tactical={};tactical.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},"Loading system environment…",{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
+          if(!system_background_.ready()||!phenomena_.ready()){tactical={};tactical.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},tr("MAP_ENVIRONMENT_LOADING","Loading system environment…"),{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
         }
       }
       return tactical;
@@ -7263,7 +7263,7 @@ class NativeCampaign final {
       system_workspace_.set_motion_running(session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!world.active_combat_encounter||world.active_combat_encounter->reconciled));
       system_workspace_.render(out,width,height,false);
       render_system_environment(out,width,height);
-      if(!system_background_.ready()||!phenomena_.ready()){out={};out.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},"Loading system environment…",{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
+      if(!system_background_.ready()||!phenomena_.ready()){out={};out.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},tr("MAP_ENVIRONMENT_LOADING","Loading system environment…"),{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
     }else{
     galaxy_backdrop_.append(out,{cache.generation,width,height,camera_,fitted_pixels_per_world_,true});
     phenomena_.append_map(out,camera_,width,height,phenomena_options(),surveyed_phenomena());
@@ -7279,7 +7279,7 @@ class NativeCampaign final {
       stellar_art_.append(out,point,radius,std::string(*central_art),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),UiRect{0,0,static_cast<float>(width),static_cast<float>(height)});
       label_obstacles.push_back({{point.x-radius,point.y-radius,radius*2,radius*2},NativeGalaxyLabelObstacleKind::star});
       label_candidates.push_back({NativeGalaxyLabelKind::central_object,0,point,radius,
-          Text{{},"Supermassive black hole",{205,222,245,255},13},false,1e12});
+          Text{{},tr("GALAXY_CENTRAL_OBJECT","Supermassive black hole"),{205,222,245,255},13},false,1e12});
     }
     for (const auto &system : world.systems) {
       const auto point = camera_.project(
@@ -7575,9 +7575,9 @@ class NativeCampaign final {
       draw_navigation(layout.zoom_in,UiAction::ZoomIn,false,tr("NAV_ZOOM_IN","Zoom in"));
       draw_navigation(layout.zoom_out,UiAction::ZoomOut,false,tr("NAV_ZOOM_OUT","Zoom out"));
       draw_navigation(layout.economy,UiAction::Economy,economy_workspace_.visible(),tr("NAV_ECONOMY","Economy"));
-      draw_navigation(layout.research,UiAction::Research,research_workspace_.visible(),"Research");
-      draw_navigation(layout.construction,UiAction::Construction,construction_workspace_.visible(),"Construction");
-      draw_navigation(layout.shipyard,UiAction::Shipyard,shipyard_workspace_.visible(),"Shipyard");
+      draw_navigation(layout.research,UiAction::Research,research_workspace_.visible(),tr("NAV_RESEARCH","Research"));
+      draw_navigation(layout.construction,UiAction::Construction,construction_workspace_.visible(),tr("NAV_CONSTRUCTION","Construction"));
+      draw_navigation(layout.shipyard,UiAction::Shipyard,shipyard_workspace_.visible(),tr("NAV_SHIPYARD","Shipyard"));
       draw_navigation(layout.explore,UiAction::Explore,fleet_controller_.selection().has_value(),tr("NAV_EXPLORE","Explore"));
       draw_navigation(layout.missions,UiAction::Missions,mission_view_.visible(),tr("NAV_MISSIONS","Missions"));
       {const UiRect icon_rect{layout.missions.x+6.f*layout.scale,layout.missions.y+4.f*layout.scale,layout.missions.width-12.f*layout.scale,layout.missions.height-8.f*layout.scale};out.overlay.emplace_back(Text{{icon_rect.x+icon_rect.width*.5f,icon_rect.y+icon_rect.height*.5f-8.f*layout.scale},"M",{245,250,255,255},static_cast<int>(16.f*layout.scale),0,icon_rect,TextAlign::Center,FontFace::Heading});}
@@ -7607,13 +7607,14 @@ class NativeCampaign final {
        !colony_workspace_.visible()&&!diplomacy_workspace_.visible()&&
        !shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
        !economy_workspace_.visible()&&!supply_workspace_.visible()&&!menu_){
-      std::ostringstream zoom;
-      zoom << "Map zoom " << std::fixed << std::setprecision(1)
-           << camera_.pixels_per_world / fitted_pixels_per_world_ << "x";
+      std::ostringstream zoom_factor;
+      zoom_factor << std::fixed << std::setprecision(1)
+                  << camera_.pixels_per_world / fitted_pixels_per_world_;
       const auto zoom_bounds=map_zoom_bounds(width,height);
       out.overlay.emplace_back(Text{
           {zoom_bounds.x, zoom_bounds.y + 2.f * layout.scale},
-          zoom.str(), {184, 223, 239, 255}, layout.metric_font_pixels,
+          trf("HUD_MAP_ZOOM", {zoom_factor.str()}, "Map zoom {0}x"),
+          {184, 223, 239, 255}, layout.metric_font_pixels,
           zoom_bounds.width, zoom_bounds});
     }
     if(inspection_visible())inspection_card_.render(out,inspection_bounds(width,height));
@@ -7626,18 +7627,20 @@ class NativeCampaign final {
     const bool quiet_workspace_notice=(research_workspace_.visible()||colony_workspace_.visible()) && !support_notice &&
         (notice.kind==SessionNoticeKind::Saved||notice.kind==SessionNoticeKind::Loaded);
     if (!quiet_workspace_notice && (notice.kind != SessionNoticeKind::None || preparing_galaxy || support_notice)) {
-      auto message = notice.message;
+      auto message = notice.message_key.empty()
+                         ? notice.message
+                         : tr(notice.message_key, notice.message);
       if(preparing_galaxy&&(notice.kind==SessionNoticeKind::None||notice.kind==SessionNoticeKind::Saved||notice.kind==SessionNoticeKind::Loaded))
-        message="Updating star chart...";
+        message=tr("HUD_UPDATING_CHART","Updating star chart...");
       if (notice.kind == SessionNoticeKind::Loading) {
         message += " " +
                    std::to_string(static_cast<int>(notice.progress * 100.)) +
                    "%";
       }
-      if(support_notice)message=support_.busy()?"Preparing local diagnostics...":
+      if(support_notice)message=support_.busy()?tr("SUPPORT_PREPARING","Preparing local diagnostics..."):
           support_.state()==stellar::native_support::SupportExportState::Succeeded?
-          "Diagnostics exported. See the location in the pause menu.":
-          "Diagnostic export failed. Open the pause menu for details.";
+          tr("SUPPORT_EXPORTED","Diagnostics exported. See the location in the pause menu."):
+          tr("SUPPORT_FAILED","Diagnostic export failed. Open the pause menu for details.");
       const auto status_bounds=colony_workspace_.visible()?PlanetaryLayout::make(width,height).notice:layout.status_text;
       if(colony_workspace_.visible())fill(out,status_bounds,{3,12,18,255});
       out.overlay.emplace_back(Text{
