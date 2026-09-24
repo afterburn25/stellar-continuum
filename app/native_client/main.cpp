@@ -364,6 +364,9 @@ struct Options {
   std::filesystem::path replay_path;
   std::filesystem::path replay_info_path;
   std::optional<std::uint64_t> replay_until_tick;
+  // --replay-exit: a scripted verification run exits once the recording
+  // verifies (replay_verified, exit 0) instead of continuing the session.
+  bool replay_exit{};
 };
 
 [[nodiscard]] Options parse_options(int argc,
@@ -435,6 +438,7 @@ struct Options {
     else if(arg==L"--replay"&&i+1<argc) result.replay_path=argv[++i];
     else if(arg==L"--replay-until"&&i+1<argc) result.replay_until_tick=std::stoull(argv[++i]);
     else if(arg==L"--replay-info"&&i+1<argc) result.replay_info_path=argv[++i];
+    else if(arg==L"--replay-exit") result.replay_exit=true;
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -495,6 +499,7 @@ struct Options {
     else if(arg=="--replay"&&i+1<argc) result.replay_path=argv[++i];
     else if(arg=="--replay-until"&&i+1<argc) result.replay_until_tick=std::stoull(argv[++i]);
     else if(arg=="--replay-info"&&i+1<argc) result.replay_info_path=argv[++i];
+    else if(arg=="--replay-exit") result.replay_exit=true;
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
@@ -537,6 +542,7 @@ struct Options {
     result.save_path=default_native_campaign_save_path().parent_path()/"developer"/"campaign.dev17.json";
   if(!result.record_path.empty()&&!result.replay_path.empty())throw std::invalid_argument("--record and --replay are mutually exclusive.");
   if(result.replay_until_tick&&result.replay_path.empty())throw std::invalid_argument("--replay-until requires --replay.");
+  if(result.replay_exit&&result.replay_path.empty())throw std::invalid_argument("--replay-exit requires --replay.");
   if(!result.replay_info_path.empty()&&(!result.replay_path.empty()||!result.record_path.empty()))throw std::invalid_argument("--replay-info is a standalone inspection flag.");
   return result;
 }
@@ -718,6 +724,15 @@ struct ReplayState {
   // --replay run greps replay_verified={...} instead of watching for the
   // absence of a divergence over a timeout.
   bool completion_reported{};
+  // --replay-exit: a scripted verification run exits once the recording
+  // verifies (exit 0 after replay_verified) instead of continuing the
+  // session, and a run that stalls with work pending reports it rather
+  // than hanging. The trackers record the last tick/cursor positions so
+  // "no progress" is measurable across frames.
+  bool exit_on_completion{};
+  std::uint64_t verification_last_tick{std::numeric_limits<std::uint64_t>::max()};
+  std::size_t verification_last_command{}, verification_last_checkpoint{};
+  std::uint32_t verification_stalled_frames{};
 };
 
 // Writes the recording on scope exit, including early returns and failures.
@@ -6029,6 +6044,40 @@ class NativeCampaign final {
         replay_->completion_reported=true;
         std::cout<<"replay_verified={\"commands\":"<<commands.size()
                  <<",\"checkpoints\":"<<replay_->verified_checkpoints<<"}\n";
+        // --replay-exit: a scripted verification run ends here — exit 0
+        // with the verified line, rather than continuing the session.
+        if(replay_->exit_on_completion)return false;
+      }
+    }
+    // --replay-exit stall detection, outside the input gate: pending
+    // commands or checkpoints whose tick can never arrive (frozen
+    // simulation, held-closed input gate) mean the verification cannot
+    // complete — report it instead of hanging. Same 600-frame idiom as
+    // the --replay-until stall guard.
+    if(replay_&&replay_->recording&&session_&&replay_->exit_on_completion&&
+       !replay_->completion_reported&&replay_->divergence.empty()){
+      const auto&recording=*replay_->recording;
+      const auto tick=replay_tick();
+      const bool pending=
+          replay_->command_cursor<recording.commands().size()||
+          replay_->checkpoint_cursor<recording.checkpoints().size();
+      const bool progressed=
+          tick!=replay_->verification_last_tick||
+          replay_->command_cursor!=replay_->verification_last_command||
+          replay_->checkpoint_cursor!=replay_->verification_last_checkpoint;
+      replay_->verification_last_tick=tick;
+      replay_->verification_last_command=replay_->command_cursor;
+      replay_->verification_last_checkpoint=replay_->checkpoint_cursor;
+      if(!pending||progressed){
+        replay_->verification_stalled_frames=0;
+      }else if(++replay_->verification_stalled_frames>=600){
+        throw std::runtime_error(
+            "Replay verification stalled: "+
+            std::to_string(recording.commands().size()-replay_->command_cursor)+
+            " command(s) and "+
+            std::to_string(recording.checkpoints().size()-replay_->checkpoint_cursor)+
+            " checkpoint(s) pending with no progress for 600 frames — the "
+            "recording cannot finish verifying.");
       }
     }
     // --replay-until: once the simulated tick reaches the requested stop,
@@ -9278,6 +9327,7 @@ int main(int argc,char **argv){
       replay.expected_directory=options.record_path.generic_string()+".expected";
     else if(!options.replay_path.empty())
       replay.expected_directory=options.replay_path.generic_string()+".expected";
+    replay.exit_on_completion=options.replay_exit;
     if(options.replay_until_tick){
       replay.stop_at_tick=options.replay_until_tick;
       replay.stop_dump_path=options.replay_path.parent_path()/

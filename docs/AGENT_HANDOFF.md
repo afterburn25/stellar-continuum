@@ -313,6 +313,10 @@ capacity growth on the last accepted entry may overshoot by one step.
 "checkpoints":M}` line once the recorded stream is fully consumed and
 every recorded checkpoint verified without divergence — a scripted run
 can grep it instead of timing out on the absence of failure.
+`--replay-exit` closes the scripted loop: the run exits 0 on that line
+instead of continuing the session, and a stall guard (600 frames with
+pending commands/checkpoints and no tick or cursor progress) throws an
+inconclusive-verification error rather than hanging.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
