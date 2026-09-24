@@ -47,6 +47,27 @@ inline std::optional<double> segment_sphere(CollisionVector3 from,CollisionVecto
   // This form avoids cancellation for a near surface and distant endpoint.
   const double t=c/(-b+std::sqrt(discriminant));if(t<0||t>1)return {};return t;
 }
+// Segment vs axis-aligned box (slab method): entry fraction in [0,1] —
+// 0 when the segment starts inside. Tighter than a bounding sphere for
+// elongated geometry, so callers cull with the mesh's local AABB.
+inline std::optional<double> segment_aabb(CollisionVector3 from,CollisionVector3 to,CollisionVector3 bmin,CollisionVector3 bmax){
+  for(auto p:{from,to,bmin,bmax})validate_collision(p);
+  const auto d=subtract(to,from);
+  const double fo[3]{from.x,from.y,from.z},fd[3]{d.x,d.y,d.z};
+  const double lo[3]{bmin.x,bmin.y,bmin.z},hi[3]{bmax.x,bmax.y,bmax.z};
+  double t0=0.,t1=1.;
+  for(int i=0;i<3;++i){
+    if(std::abs(fd[i])<1e-15){
+      if(fo[i]<lo[i]||fo[i]>hi[i])return {};
+      continue;
+    }
+    double ta=(lo[i]-fo[i])/fd[i],tb=(hi[i]-fo[i])/fd[i];
+    if(ta>tb)std::swap(ta,tb);
+    t0=std::max(t0,ta);t1=std::min(t1,tb);
+    if(t0>t1)return {};
+  }
+  return t0;
+}
 inline std::optional<double> segment_triangle(CollisionVector3 from,CollisionVector3 to,CollisionVector3 a,CollisionVector3 b,CollisionVector3 c){
   for(auto p:{from,to,a,b,c})validate_collision(p);
   const auto d=subtract(to,from),e1=subtract(b,a),e2=subtract(c,a),p=cross(d,e2);

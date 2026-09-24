@@ -1132,7 +1132,9 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   mesh triangles — shared `raycast_world3d` (scene_components) +
   `resolve_mesh_spec` (mesh3d_loader) transform the ray into each
   mesh's local frame (rotation + scale aware) and test triangles via
-  `intersect_mesh_segment` (bounding-sphere reject); the nearest hit
+  `intersect_mesh_segment` (bounding-sphere reject, then a slab-test
+  reject against the mesh's local AABB — strictly tighter on elongated
+  meshes where the sphere encloses large empty volumes); the nearest hit
   returns `{entity, distance, world point}`. `entity3d_at(sx, sy)`
   builds the camera ray through a viewport pixel for mouse picking.
   Both shared functions are reusable by tools — e.g. a scratch world
@@ -1163,8 +1165,10 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   to `Scene3dDocument::lights` slots A/B, empty direction removes the
   slot) but has no transform gizmos or emitter authoring UI; lighting is
   one key light + up to two directional fills per material; raycast is
-  O(triangles) per entity with no spatial partition — fine for queries,
-  not per-frame sweeps.
+  O(triangles) per surviving entity — sphere + local-AABB rejects cull
+  most meshes, but there is no entity-level spatial partition, so a
+  scene of many meshes still pays a ray transform per entity — fine
+  for queries, not per-frame sweeps.
 
 ## Authored tilemap layers for generated 2D games (2026-09-21)
 
