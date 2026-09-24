@@ -85,6 +85,16 @@ int main(int argc,char **argv)try{
     click("Record:");click("Errors only");check(monitor.history().detail()==stellar::engine::DiagnosticDetail::ErrorsOnly,"Recording dropdown did not commit.");
     click("Record:");click("Normal");
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Diagnostics UI modified world/discovery/time.");
+    click("ENTITIES");
+    {
+      const auto entity_view=draw();bool census=false,domain_row=false;
+      for(const auto &c:entity_view.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){
+        if(t->value.find("projected entities")!=std::string::npos&&t->value.find("KiB")!=std::string::npos)census=true;
+        if(t->value.starts_with("system ")||t->value.starts_with("civilization "))domain_row=true;
+      }
+      check(census&&domain_row,"Entities inspector did not project the campaign world.");
+    }
+    check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Entities inspector modified world state.");
     click("CLOSE");check(!window.visible()&&!window.handle({InputEventType::LeftPressed},w,h,monitor),"Closed diagnostics captured gameplay.");
     panel.toggle();controls={};panel.render(controls,w,h,frame);point=control(controls,"EMPIRE MONITOR");
     (void)panel.handle({InputEventType::LeftPressed,point},w,h,frame);(void)panel.handle({InputEventType::LeftReleased,point},w,h,frame);
