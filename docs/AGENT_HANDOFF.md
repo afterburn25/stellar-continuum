@@ -514,6 +514,17 @@ RuntimeHost defaults to 64k), the shell's scene3d preview decodes
 textures on the JobSystem, and dielectric environment maps keep
 full-chain residency (view-independent texel demand). The other agent's
 `campaign_world_projection` test built and passes in this tree.
+A 319-test run at `c633aec7` records 319/319 green after the keyboard-focus
+accessibility lane: `native_menu_hover.hpp` gained a dedicated focus-cue path
+(pointer-hover memory stays pointer-only) and a span `hit` overload for
+ordered focusable arrays. Tab/Shift+Tab traversal, Home/End, Enter/Space
+activation, rendered focus rings, and keep-focus semantics for
+non-navigating actions now cover the settings hub, General/Audio/Video/Voice
+Settings (sliders adjust via arrows, Home/End clamp to min/max), and the
+startup workspace across Entry/ModeSelection/LoadSlots/Busy/Failure/
+Development screens with per-screen focusable collection and transition
+resets routed through `reset_pointer()`. Screen-reader/AT contracts and the
+new-game Setup sub-surface remain open.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
