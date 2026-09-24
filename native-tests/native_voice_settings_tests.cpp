@@ -226,6 +226,45 @@ void localized_labels(const fs::path& path) {
 }
 } // namespace
 
+void keyboard_focus_and_sliders(const fs::path& path) {
+  int replays{};
+  NativeVoiceSettings settings(path, {}, [&] { ++replays; }, {});
+  settings.open();
+  const auto press = [&](std::uint32_t k, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = k;
+    event.shift = shift;
+    return settings.handle(event, 1280, 720);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u, kUp = 0x40000052u;
+  constexpr std::uint32_t kEnd = 0x4000004du;
+  require(settings.focused() < 0, "voice settings opened with stale focus");
+  require(press(kTab) && settings.focused() == 0, "Tab did not focus ENABLE VOICES");
+  require(press(kSpace) && !settings.values().enabled && settings.focused() == 0,
+          "Space did not toggle ENABLE VOICES in place");
+  // The volume slider (index 1) adjusts on arrows, snaps on Home/End.
+  require(press(kTab) && settings.focused() == 1, "Tab did not reach the volume slider");
+  const float volume = settings.values().volume;
+  require(press(kLeft) && settings.values().volume == volume - .05f,
+          "Left arrow did not lower the focused volume slider");
+  require(press(kRight) && settings.values().volume == volume,
+          "Right arrow did not restore the volume slider");
+  require(press(kEnd) && settings.values().volume == 1.f,
+          "End did not maximize the focused slider");
+  // Off a slider, arrows navigate the ring.
+  require(press(kTab) && settings.focused() == 2 && press(kLeft) && settings.focused() == 1,
+          "arrow keys did not move focus around sliders");
+  // REPLAY (index 9) activates its callback through the shared dispatch.
+  for (int i = 0; i < 8; ++i) (void)press(kTab);
+  require(settings.focused() == 9, "Tab chain did not reach REPLAY");
+  require(press(kReturn) && replays == 1, "Return on REPLAY did not invoke the callback");
+  // SAVE (index 13) wraps from the last control.
+  require(press(kEnd) && settings.focused() == 13, "End did not reach SAVE");
+  require(press(kTab) && settings.focused() == 0, "focus did not wrap to the first control");
+}
+
 int main(int argc, char** argv) try {
   if (argc != 2) throw std::invalid_argument("Usage: native_voice_settings_tests <scratch>");
   const auto scratch = fs::absolute(argv[1]) /
@@ -235,6 +274,7 @@ int main(int argc, char** argv) try {
   input_preview_callbacks_and_rollback(scratch / "input.json");
   persistence_and_failed_save(scratch);
   malformed_preferences(scratch);
+  keyboard_focus_and_sliders(scratch / "focus.json");
   owner_guard(scratch / "owner.json");
   localized_labels(scratch / "localized.json");
   std::cout << "Native voice settings tests passed\n";

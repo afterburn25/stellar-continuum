@@ -55,6 +55,7 @@ class NativeVoiceSettings final {
   void set_localization(const stellar::engine::LocalizationTable* table){locale_=table;}
   void open();
   [[nodiscard]] bool visible() const;
+  [[nodiscard]] int focused() const noexcept { return focus_; }
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
   void cancel();
@@ -71,6 +72,7 @@ class NativeVoiceSettings final {
   void save();
   void preview();
   void set_from_track(Dragged, stellar::native_map::Point, const VoiceSettingsLayout&);
+  void activate_at(const VoiceSettingsLayout&, stellar::native_map::Point);
   [[nodiscard]] std::string tr(std::string_view key, std::string_view fallback) const;
 
   std::thread::id owner_{std::this_thread::get_id()};
@@ -86,6 +88,7 @@ class NativeVoiceSettings final {
   int viewport_height_{};
   std::string status_;
   bool save_diagnostic_emitted_{};
+  int focus_{-1};
   const stellar::engine::LocalizationTable* locale_{};
 };
 

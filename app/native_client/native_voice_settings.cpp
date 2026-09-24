@@ -196,7 +196,7 @@ void NativeVoiceSettings::load() {
 void NativeVoiceSettings::preview() { if (apply_) apply_(values_); }
 void NativeVoiceSettings::open() {
   require_owner(); dropdown_.close(); hover_feedback_.reset(); visible_ = true; dragging_ = Dragged::None;
-  viewport_width_ = viewport_height_ = 0; preview();
+  focus_ = -1; viewport_width_ = viewport_height_ = 0; preview();
 }
 bool NativeVoiceSettings::visible() const { require_owner(); return visible_; }
 VoicePreferences NativeVoiceSettings::values() const { require_owner(); return values_; }
@@ -237,35 +237,77 @@ bool NativeVoiceSettings::handle(const InputEvent& event, int width, int height)
     set_from_track(dragging_, event.position, layout); return true;
   }
   if (event.type == InputEventType::LeftReleased) { dragging_ = Dragged::None; return true; }
+  if (event.type == InputEventType::KeyPressed) {
+    // SDL_Keycode. Tab/Up/Down move the focus ring; on a focused slider
+    // Left/Right nudge the value and Home/End snap to min/max.
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u, kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    constexpr int count = 14;
+    const bool slider = focus_ == 1 || focus_ == 4 || focus_ == 6;
+    if (slider && (event.key == kLeft || event.key == kRight || event.key == kHome || event.key == kEnd)) {
+      constexpr float step = .05f;
+      auto& value = focus_ == 1 ? values_.volume :
+                    focus_ == 4 ? values_.subtitle_background_opacity : values_.communication_filter;
+      value = event.key == kHome ? 0.f : event.key == kEnd ? 1.f
+              : clamp_unit(value + (event.key == kRight ? step : -step));
+      preview(); return true;
+    }
+    if (event.key == kHome || event.key == kEnd) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      hover_feedback_.cue(static_cast<std::uint64_t>(focus_) + 1); return true;
+    }
+    const bool fwd = (event.key == kTab && !event.shift) || event.key == kDown ||
+                     (!slider && event.key == kRight);
+    const bool bwd = (event.key == kTab && event.shift) || event.key == kUp ||
+                     (!slider && event.key == kLeft);
+    if (fwd || bwd) {
+      if (focus_ < 0) focus_ = bwd ? count - 1 : 0;
+      else focus_ = (focus_ + (bwd ? -1 : 1) + count) % count;
+      hover_feedback_.cue(static_cast<std::uint64_t>(focus_) + 1); return true;
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 && !slider) {
+      const std::array<UiRect, count> focusables{layout.enable_voices, layout.volume_track, layout.subtitles,
+        layout.subtitle_size, layout.background_track, layout.speaker_labels, layout.filter_track,
+        layout.frequency, layout.no_interruptions, layout.replay, layout.stop, layout.defaults,
+        layout.cancel, layout.save};
+      const auto& rect = focusables[static_cast<std::size_t>(focus_)];
+      activate_at(layout, {rect.x + rect.width * .5f, rect.y + rect.height * .5f}); return true;
+    }
+    return true;
+  }
   if (event.type != InputEventType::LeftPressed) return true;
-  if (layout.volume_track.contains(event.position)) {
-    dragging_ = Dragged::Volume; set_from_track(dragging_, event.position, layout); return true;
+  focus_ = -1;
+  activate_at(layout, event.position); return true;
+}
+void NativeVoiceSettings::activate_at(const VoiceSettingsLayout& layout, stellar::native_map::Point position) {
+  if (layout.volume_track.contains(position)) {
+    dragging_ = Dragged::Volume; set_from_track(dragging_, position, layout); return;
   }
-  if (layout.background_track.contains(event.position)) {
-    dragging_ = Dragged::Background; set_from_track(dragging_, event.position, layout); return true;
+  if (layout.background_track.contains(position)) {
+    dragging_ = Dragged::Background; set_from_track(dragging_, position, layout); return;
   }
-  if (layout.filter_track.contains(event.position)) {
-    dragging_ = Dragged::Filter; set_from_track(dragging_, event.position, layout); return true;
+  if (layout.filter_track.contains(position)) {
+    dragging_ = Dragged::Filter; set_from_track(dragging_, position, layout); return;
   }
   dragging_ = Dragged::None;
-  if (layout.enable_voices.contains(event.position)) values_.enabled = !values_.enabled;
-  else if (layout.subtitles.contains(event.position)) values_.subtitles = !values_.subtitles;
-  else if (layout.subtitle_size.contains(event.position)) {
+  if (layout.enable_voices.contains(position)) values_.enabled = !values_.enabled;
+  else if (layout.subtitles.contains(position)) values_.subtitles = !values_.subtitles;
+  else if (layout.subtitle_size.contains(position)) {
     constexpr std::array sizes{14,18,22,26,32};const auto found=std::ranges::find(sizes,values_.subtitle_size);
-    dropdown_.open(0,{"14 px","18 px","22 px","26 px","32 px"},static_cast<int>(found-sizes.begin()));return true;
+    dropdown_.open(0,{"14 px","18 px","22 px","26 px","32 px"},static_cast<int>(found-sizes.begin()));return;
   }
-  else if (layout.speaker_labels.contains(event.position)) values_.speaker_labels = !values_.speaker_labels;
-  else if (layout.frequency.contains(event.position)) {dropdown_.open(1,{"Minimal","Normal","Frequent"},static_cast<int>(values_.frequency));return true;}
-  else if (layout.no_interruptions.contains(event.position)) values_.no_interruptions = !values_.no_interruptions;
-  else if (layout.replay.contains(event.position)) { if (replay_) replay_(); return true; }
-  else if (layout.stop.contains(event.position)) { if (stop_) stop_(); return true; }
-  else if (layout.defaults.contains(event.position)) {
+  else if (layout.speaker_labels.contains(position)) values_.speaker_labels = !values_.speaker_labels;
+  else if (layout.frequency.contains(position)) {dropdown_.open(1,{"Minimal","Normal","Frequent"},static_cast<int>(values_.frequency));return;}
+  else if (layout.no_interruptions.contains(position)) values_.no_interruptions = !values_.no_interruptions;
+  else if (layout.replay.contains(position)) { if (replay_) replay_(); return; }
+  else if (layout.stop.contains(position)) { if (stop_) stop_(); return; }
+  else if (layout.defaults.contains(position)) {
     values_ = {}; status_ = "Default voice and subtitle settings previewed.";
-  } else if (layout.cancel.contains(event.position)) { cancel(); return true; }
-  else if (layout.save.contains(event.position)) { save(); return true; }
-  else return true;
+  } else if (layout.cancel.contains(position)) { cancel(); return; }
+  else if (layout.save.contains(position)) { save(); return; }
+  else return;
   preview();
-  return true;
 }
 
 void NativeVoiceSettings::save() {
@@ -290,7 +332,7 @@ void NativeVoiceSettings::save() {
 }
 
 void NativeVoiceSettings::cancel() {
-  require_owner(); dropdown_.close(); dragging_ = Dragged::None; values_ = saved_; preview(); visible_ = false;
+  require_owner(); dropdown_.close(); dragging_ = Dragged::None; focus_ = -1; values_ = saved_; preview(); visible_ = false;
 }
 
 std::string NativeVoiceSettings::tr(std::string_view key, std::string_view fallback) const {
@@ -347,6 +389,13 @@ void NativeVoiceSettings::render(DrawList& draw, int width, int height) const {
                                              : status_,
         std::max(11, layout.body_font_pixels - 2), native_menu_style::muted);
   if(dropdown_.visible())dropdown_.render(draw,dropdown_.id()==0?layout.subtitle_size:layout.frequency,width,height,layout.body_font_pixels);
+  if (focus_ >= 0) {
+    const std::array<UiRect, 14> focusables{layout.enable_voices, layout.volume_track, layout.subtitles,
+      layout.subtitle_size, layout.background_track, layout.speaker_labels, layout.filter_track,
+      layout.frequency, layout.no_interruptions, layout.replay, layout.stop, layout.defaults,
+      layout.cancel, layout.save};
+    draw.overlay.emplace_back(StrokedRectangle{focusables[static_cast<std::size_t>(focus_)], {160, 210, 255, 255}});
+  }
 }
 
 } // namespace stellar::native_audio

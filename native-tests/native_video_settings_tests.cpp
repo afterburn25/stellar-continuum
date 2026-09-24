@@ -295,6 +295,57 @@ void apply_confirm_revert_flow() {
           "closed view captured input");
 }
 
+void keyboard_focus_traversal() {
+  constexpr int width = 1280, height = 720;
+  NativeVideoSettingsView view;
+  view.open(NativeVideoSettings{});
+  int panel_calls{};
+  view.set_adapter("Adapter", [&] { ++panel_calls; });
+  const auto key = [&](std::uint32_t k, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = k;
+    event.shift = shift;
+    return view.handle(event, width, height);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kDown = 0x40000051u, kUp = 0x40000052u;
+  constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+  require(view.focused() < 0, "video settings opened with stale focus");
+  // Borderless hides RESOLUTION: the ring is 7 choices + NVIDIA + APPLY + CANCEL.
+  require(key(kTab).captured && view.focused() == 0, "Tab did not focus DISPLAY");
+  require(key(kEnd).captured && view.focused() == 9, "End did not focus the last control");
+  require(key(kTab).captured && view.focused() == 0, "focus did not wrap to DISPLAY");
+  require(key(kTab, true).captured && view.focused() == 9,
+          "Shift+Tab did not wrap to the last control");
+  require(key(kHome).captured && view.focused() == 0, "Home did not focus DISPLAY");
+  // Space opens the focused row's dropdown; the dropdown then owns the keys.
+  require(key(kSpace).captured, "Space on DISPLAY was not captured");
+  require(key(kDown).captured && key(kReturn).captured,
+          "open dropdown did not consume its keys");
+  require(view.values().display == VideoDisplayMode::Exclusive,
+          "keyboard dropdown selection failed");
+  // Exclusive reveals RESOLUTION; the ring grows and focus resumes on DISPLAY.
+  require(key(kTab).captured && view.focused() == 1,
+          "focus did not advance after the dropdown closed");
+  require(key(kEnd).captured && view.focused() == 10, "End did not reach CANCEL");
+  require(key(kUp).captured && key(kUp).captured && view.focused() == 8,
+          "Up arrows did not reach NVIDIA");
+  require(key(kReturn).command == VideoSettingsCommand::None && panel_calls == 1,
+          "Return on NVIDIA did not invoke the panel callback");
+  require(key(kTab).captured && view.focused() == 9 &&
+              key(kReturn).command == VideoSettingsCommand::Apply,
+          "Return on APPLY did not emit Apply");
+  // The rollback confirm overlay narrows the ring to KEEP/REVERT.
+  view.set_confirming(true);
+  require(view.focused() < 0, "confirming kept a stale focus index");
+  require(key(kTab).captured && view.focused() == 0 &&
+              key(kTab).captured && view.focused() == 1,
+          "confirm ring did not cover KEEP/REVERT");
+  require(key(kSpace).command == VideoSettingsCommand::Revert,
+          "Space on REVERT did not emit Revert");
+}
+
 } // namespace
 
 int main() {
@@ -305,6 +356,7 @@ int main() {
     dropdown_choices();
     long_dropdown_navigation();
     apply_confirm_revert_flow();
+    keyboard_focus_traversal();
   } catch (const std::exception &error) {
     std::cerr << "native video settings tests failed: " << error.what() << '\n';
     return 1;
