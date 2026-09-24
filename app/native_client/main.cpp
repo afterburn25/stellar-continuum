@@ -5568,7 +5568,8 @@ class NativeCampaign final {
            (notification_view_.visible()&&notification_view_.focus()>=0)||
            (colony_roster_.visible()&&colony_roster_.focus()>=0)||
            (map_hud_visible()&&assets_.focus()>=0)||
-           system_workspace_.small_body_keyboard_focus();
+           system_workspace_.small_body_keyboard_focus()||
+           inspection_card_.focus()>=0;
   }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
@@ -6143,6 +6144,7 @@ class NativeCampaign final {
         else if(construction_workspace_.visible())construction_workspace_.close();
         else if(shipyard_workspace_.visible()){if(shipyard_workspace_.popover_open())(void)shipyard_workspace_.handle(event,width,height);else shipyard_workspace_.close();}
         else if(research_workspace_.visible()){if(research_workspace_.popover_open())(void)research_workspace_.handle(event,width,height);else research_workspace_.close();}
+        else if(inspection_card_.visible())inspection_card_.clear();
         else toggle_menu();
         gesture_.cancel();
         continue;

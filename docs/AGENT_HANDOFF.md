@@ -886,6 +886,21 @@ buttons (pending mode clamps to index 0). Note: the pause menu lives
 in the windowed campaign class — no headless test drives its event
 loop, so this slice is verified by the client build + inspection
 rather than a unit test.
+Inspection-card keyboard contract (row-26 accessibility): the map
+inspection card's close control joins the focus contract — Tab/arrows/
+Home/End land the single-target ring (drawn over the X button),
+Return/Space replay the press dispatch so `closed`/`selected_id_
+reset` flows identically to a click, and pointer presses/cancels plus
+clear() reset focus. Escape now dismisses a visible card before the
+Escape chain falls through to the menu. `inspection_card_.focus()`
+feeds `wants_keyboard_focus()`. `native_inspection` covers Tab focus,
+ring rendering, single-target cycling, pointer reset, and Return
+dismissal; the pre-existing "card does not swallow unmapped keys"
+assertion still passes (zero-key events stay uncaptured).
+Remaining unwired surface: `NativeMissionView` (missions/settlement
+panel) is a tested component never instantiated by the client — it
+has no dispatch context, so a focus ring would be speculative until
+it is integrated.
 Entities search (row-24 diagnostics tree usability): the ENTITIES
 inspector gained a pointer-focused search field in the census header
 band (navigator contract — StrokedRectangle chrome, cyan focus ring,

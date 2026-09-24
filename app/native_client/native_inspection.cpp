@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <iomanip>
 #include <ranges>
 #include <sstream>
@@ -257,14 +258,22 @@ void SystemInspectionCard::set_inspection(SystemInspection value) {
   inspection_ = std::move(value);
   if (last_bounds_) clamp_scroll(scroll_, *inspection_, *last_bounds_,text_measurer_,locale_);
 }
-void SystemInspectionCard::clear() noexcept { inspection_.reset(); scroll_ = 0.f; last_bounds_.reset(); pointer_owned_ = false; }
+void SystemInspectionCard::clear() noexcept { inspection_.reset(); scroll_ = 0.f; last_bounds_.reset(); pointer_owned_ = false; focus_ = -1; }
 UiRect SystemInspectionCard::close_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+bounds.width-30.f*s,bounds.y+7.f*s,24.f*s,24.f*s}; }
 UiRect SystemInspectionCard::body_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+10.f*s,bounds.y+62.f*s,std::max(0.f,bounds.width-20.f*s),std::max(0.f,bounds.height-70.f*s)}; }
 InspectionHandleResult SystemInspectionCard::handle(const InputEvent& event, UiRect bounds) {
-  if (!inspection_) return {};
+  if (!inspection_) { focus_ = -1; return {}; }
   last_bounds_ = bounds;
   clamp_scroll(scroll_, *inspection_, bounds,text_measurer_,locale_);
   const auto close=close_bounds(bounds);
+  if (event.type == InputEventType::LeftPressed || event.type == InputEventType::PointerCancelled) focus_ = -1;
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u,kHome=0x4000004au,kEnd=0x4000004du;
+    if (event.key==kTab||event.key==kRight||event.key==kLeft||event.key==kDown||event.key==kUp||event.key==kHome||event.key==kEnd) { focus_=0; return {true,false}; }
+    if ((event.key==kReturn||event.key==kSpace)&&focus_>=0)
+      return handle({InputEventType::LeftPressed,{close.x+close.width*.5f,close.y+close.height*.5f}},bounds);
+    return {};
+  }
   if (event.type == InputEventType::LeftPressed && close.contains(event.position)) { clear(); return {true, true}; }
   if (event.type == InputEventType::PointerCancelled) { const bool captured=pointer_owned_; pointer_owned_=false; return {captured,false}; }
   if (pointer_owned_) {
@@ -321,5 +330,6 @@ void SystemInspectionCard::render(DrawList& out, UiRect bounds) const {
   }
   const auto close=close_bounds(bounds);
   text(out,close,"X",{235,244,255,255},small);
+  if(focus_>=0)out.overlay.emplace_back(StrokedRectangle{close,{164,221,237,255}});
 }
 } // namespace stellar::native_inspection

@@ -46,6 +46,7 @@ public:
   [[nodiscard]] static stellar::native_map::UiRect body_bounds(stellar::native_map::UiRect) noexcept;
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
   [[nodiscard]] bool visible() const noexcept { return inspection_.has_value(); }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
   [[nodiscard]] InspectionHandleResult handle(const stellar::native_map::InputEvent&,
                                               stellar::native_map::UiRect);
   void render(stellar::native_map::DrawList&, stellar::native_map::UiRect) const;
@@ -57,5 +58,6 @@ private:
       const stellar::native_map::Text&)> text_measurer_;
   const stellar::engine::LocalizationTable *locale_{};
   bool pointer_owned_{};
+  int focus_{-1};
 };
 } // namespace stellar::native_inspection
