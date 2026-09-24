@@ -223,6 +223,16 @@ std::optional<std::size_t>
 RuntimeHost::tilemap_index(std::string_view name) const {
   return engine::tilemap_index(impl_->world, name);
 }
+int RuntimeHost::tile_at(std::string_view map_name, float world_x,
+                         float world_y) const {
+  const auto index = tilemap_index(map_name);
+  return index ? tile_at(*index, world_x, world_y) : -1;
+}
+bool RuntimeHost::set_tile_at(std::string_view map_name, float world_x,
+                              float world_y, int value) {
+  const auto index = tilemap_index(map_name);
+  return index ? set_tile_at(*index, world_x, world_y, value) : false;
+}
 int RuntimeHost::tile_at(float world_x, float world_y) const {
   return tile_at(0, world_x, world_y);
 }

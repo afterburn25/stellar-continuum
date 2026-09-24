@@ -1288,7 +1288,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   exposes the carriers; `SceneTilemap::name` attaches `EntityName` to the
   carrier so `tilemap_index(world, name)` / `RuntimeHost::tilemap_index`
   resolve authored layers ("ground", "decor") by name — the index feeds
-  the existing indexed tile calls; the editor selects but cannot reorder
+  the indexed tile calls, and `tile_at`/`set_tile_at` name overloads
+  cover infrequent queries directly; the editor selects but cannot reorder
   tilemap layers (edit `layer` for draw order);
   collision is cell-level solid only (no per-tile slopes/one-way flags);
   paint strokes stamp an NxN brush (1..8, `brushsz` field — the footprint

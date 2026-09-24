@@ -143,12 +143,18 @@ public:
                             float world_y) const;
   bool set_tile_at(std::size_t map, float world_x, float world_y,
                    int value);
+  // Name overloads resolve through tilemap_index() each call — the right
+  // shape for infrequent queries; hot loops should hoist the index.
+  [[nodiscard]] int tile_at(std::string_view map_name, float world_x,
+                            float world_y) const;
+  bool set_tile_at(std::string_view map_name, float world_x,
+                   float world_y, int value);
   // Number of tilemap layers in the loaded scene.
   [[nodiscard]] std::size_t tilemap_count() const;
   // Document-order index of the tilemap named in the scene document
   // (SceneTilemap::name attaches EntityName to the carrier), or nullopt —
-  // feed the result to the indexed tile_at/set_tile_at overloads so games
-  // address authored layers by name, not position.
+  // feed the result to the indexed tile_at/set_tile_at overloads, or call
+  // their name overloads directly for infrequent queries.
   [[nodiscard]] std::optional<std::size_t>
   tilemap_index(std::string_view name) const;
   // Spawns a new tilemap layer at runtime (procedural terrain): creates
