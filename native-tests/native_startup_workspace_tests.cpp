@@ -139,13 +139,14 @@ void menu_hover_feedback(){
     require(!hub.visible(),"Return on focused Back did not close the hub");
     hub.open();require(key(kTab)&&key(kSpace),"keyboard activation sequence failed");
     require(child,"Space on a focused category did not open it");child=false;
-    require(hub.focused()<0,"opening a child kept a stale focus index");
-    // The Controls help view exposes Back as its only focusable.
+    require(hub.focused()==0,"activated category did not retain focus");
+    // The Controls help view exposes Back as its only focusable; leaving it
+    // lands back on the Controls category that invoked it.
     hub.close();hub.open();
     (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[4])},w,h);
     require(key(kTab)&&hub.focused()==0,"Controls view did not focus Back");
-    require(key(kReturn),"Return on Controls Back was not consumed");
-    require(key(kTab)&&hub.focused()==0,"focus did not return to the category list");
+    require(key(kReturn)&&hub.focused()==4,"Controls Back did not restore focus to its invoker");
+    require(key(kTab)&&hub.focused()==5,"focus did not resume on the category list");
     // Pointer clicks take over from the focus ring.
     (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[0])},w,h);child=false;
     require(hub.focused()<0,"pointer activation did not clear keyboard focus");

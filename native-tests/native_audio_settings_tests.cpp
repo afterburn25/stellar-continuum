@@ -153,6 +153,53 @@ void constructor_applies_loaded_preferences(const fs::path& scratch) {
           "constructor did not apply default preferences for a missing file");
 }
 
+void keyboard_focus_and_sliders(const fs::path& path) {
+  std::vector<AudioPreferences> previews;
+  NativeAudioSettings settings(path, [&](const AudioPreferences& values) { previews.push_back(values); });
+  settings.open();
+  const auto press = [&](std::uint32_t k, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = k;
+    event.shift = shift;
+    return settings.handle(event, 1280, 720);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u, kUp = 0x40000052u;
+  constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+  require(settings.focused() < 0, "audio settings opened with stale focus");
+  require(press(kTab) && settings.focused() == 0, "Tab did not focus the master slider");
+  // Focused sliders take Left/Right/Home/End as gain adjustments.
+  const float master = settings.values().master;
+  const auto before = previews.size();
+  require(press(kRight) && settings.values().master == master + .05f,
+          "Right arrow did not nudge the focused master slider");
+  require(previews.size() == before + 1, "slider nudge did not preview the change");
+  require(press(kLeft) && settings.values().master == master,
+          "Left arrow did not restore the focused master slider");
+  require(press(kEnd) && settings.values().master == 1.f,
+          "End did not maximize the focused slider");
+  require(press(kHome) && settings.values().master == 0.f,
+          "Home did not minimize the focused slider");
+  // Return/Space on a slider adjusts nothing; Up/Down move the ring.
+  require(press(kReturn) && settings.values().master == 0.f && settings.focused() == 0,
+          "Return altered a focused slider");
+  require(press(kTab) && settings.focused() == 1 && press(kUp) && settings.focused() == 0,
+          "Up did not move focus back across sliders");
+  // Off a slider, Left/Right navigate; activation dispatches like a click.
+  require(press(kTab) && press(kTab) && press(kTab) && settings.focused() == 3,
+          "Tab chain did not reach MUTE");
+  require(press(kSpace) && settings.values().muted, "Space did not toggle MUTE");
+  require(press(kRight) && settings.focused() == 4 && press(kLeft) && settings.focused() == 3,
+          "arrows did not navigate the button row");
+  // Focus wraps to SAVE, activates it, and the panel closes.
+  for (int i = 0; i < 3; ++i) (void)press(kTab);
+  require(settings.focused() == 6, "Tab chain did not reach SAVE");
+  require(press(kReturn) && !settings.visible(), "Return on SAVE did not save and close");
+  settings.open();
+  require(settings.focused() < 0, "reopened panel kept a stale focus index");
+}
+
 void owner_guard(const fs::path& path) {
   NativeAudioSettings settings(path);
   bool rejected{};
@@ -171,6 +218,7 @@ int main(int argc, char** argv) try {
   dragging_mute_and_cancel(scratch / "drag.json");
   save_reopen_and_invalid_files(scratch);
   constructor_applies_loaded_preferences(scratch);
+  keyboard_focus_and_sliders(scratch / "focus.json");
   owner_guard(scratch / "owner.json");
   std::cout << "Native audio settings overlay tests passed\n";
   return 0;

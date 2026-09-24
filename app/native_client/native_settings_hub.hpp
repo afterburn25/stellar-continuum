@@ -43,7 +43,7 @@ public:
     auto target=stellar::native_menu_audio::hit(e.position,{l.back});
     if(!controls_)for(std::size_t i=0;i<l.categories.size();++i)if(l.categories[i].contains(e.position))target=10+i;
     hover_feedback_.update(e,target);
-    if(e.type==InputEventType::EscapePressed){if(controls_)controls_=false;else close();return true;}
+    if(e.type==InputEventType::EscapePressed){if(controls_){controls_=false;focus_=4;}else close();return true;}
     if(e.type==InputEventType::KeyPressed){
       // SDL_Keycode: Tab/arrows move the focus ring, Return/Space activate.
       constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
@@ -98,10 +98,9 @@ private:
   }
   void activate_focus(){
     const int last=controls_?0:5;
-    if(focus_==last){if(controls_)controls_=false;else close();}
-    else if(focus_==4)controls_=true;
+    if(focus_==last){if(controls_){controls_=false;focus_=4;}else close();}
+    else if(focus_==4){controls_=true;focus_=-1;}
     else if(open_)open_(static_cast<Category>(focus_));
-    focus_=-1;
   }
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
   bool visible_{},controls_{};Point pointer_{};int focus_{-1};Open open_;std::function<bool()> child_visible_;

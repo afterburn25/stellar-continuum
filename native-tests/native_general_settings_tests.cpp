@@ -379,10 +379,11 @@ void keyboard_focus_traversal(const TempDirectory& temp) {
   for (int i = 0; i < 5; ++i) (void)press(kTab);
   require(settings.focused() == 4, "Tab chain did not reach REDUCE MOTION");
   const bool motion = settings.draft().reduce_motion;
-  require(press(kSpace) && settings.draft().reduce_motion == !motion,
-          "Space did not toggle the focused preference");
+  require(press(kSpace) && settings.draft().reduce_motion == !motion &&
+              settings.focused() == 4,
+          "Space did not toggle the focused preference in place");
   // Focus wraps past SAVE (index 13) back onto AUDIO.
-  for (int i = 0; i < 14; ++i) (void)press(kTab);
+  for (int i = 0; i < 9; ++i) (void)press(kTab);
   require(settings.focused() == 13, "Tab chain did not reach SAVE");
   require(press(kTab) && settings.focused() == 0,
           "focus did not wrap to the first control");

@@ -185,7 +185,6 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
     }
     if((event.key==kReturn||event.key==kSpace)&&focus_>=0){
       const auto& rect=browsing()?layout.cancel:focusables[static_cast<std::size_t>(focus_)];
-      focus_=-1;
       activate_at(layout,{rect.x+rect.width*.5f,rect.y+rect.height*.5f});return true;
     }
   }

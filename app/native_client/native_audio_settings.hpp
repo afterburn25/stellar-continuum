@@ -47,6 +47,7 @@ class NativeAudioSettings final {
   void set_localization(const stellar::engine::LocalizationTable* table){locale_=table;}
   void open();
   [[nodiscard]] bool visible() const;
+  [[nodiscard]] int focused() const noexcept { return focus_; }
   // While visible this consumes every event, including events outside the panel.
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
@@ -65,6 +66,7 @@ class NativeAudioSettings final {
   void save();
   void set_from_track(Dragged, stellar::native_map::Point,
                       const AudioSettingsLayout&);
+  void activate_at(const AudioSettingsLayout&, stellar::native_map::Point);
   [[nodiscard]] std::string tr(std::string_view key, std::string_view fallback) const;
 
   std::thread::id owner_{std::this_thread::get_id()};
@@ -82,6 +84,7 @@ class NativeAudioSettings final {
   int viewport_width_{};
   int viewport_height_{};
   bool save_diagnostic_emitted_{};
+  int focus_{-1};
   const stellar::engine::LocalizationTable* locale_{};
 };
 
