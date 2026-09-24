@@ -107,6 +107,7 @@ public:
   [[nodiscard]] bool visible()const noexcept{return snapshot_.has_value();}
   [[nodiscard]] std::optional<int> system_id()const noexcept;
   [[nodiscard]] std::optional<int> selected_body_id()const noexcept{return selected_body_id_;}
+  [[nodiscard]] bool small_body_keyboard_focus()const noexcept{return small_body_ring_>=0;}
   [[nodiscard]] std::optional<stellar::core::SmallBodyInstance> focused_small_body()const{
     if(!snapshot_||!small_body_focus_||snapshot_->small_body_fields.empty())return std::nullopt;
     const auto& f=snapshot_->small_body_fields[small_body_field_%snapshot_->small_body_fields.size()];
@@ -161,6 +162,7 @@ private:
   bool small_body_panel_{},small_body_debug_{},small_body_focus_{};
   std::size_t small_body_field_{};
   std::uint32_t small_body_index_{};
+  int small_body_ring_{-1};
   std::optional<stellar::native_system::NativeSystemSnapshot> snapshot_;
   std::optional<stellar::native_system::SystemSpatialSnapshot> spatial_;
   std::optional<stellar::native_system::SystemSpatialViewport> viewport_;

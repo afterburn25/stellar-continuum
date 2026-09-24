@@ -1,8 +1,10 @@
 #include "native_system_workspace.hpp"
 #include "native_ui_layout.hpp"
 #include <algorithm>
+#include <cstdint>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 
 namespace stellar::native_system_ui {
 using namespace stellar::native_map;
@@ -29,6 +31,16 @@ Layout layout_for(int w,int h){
   for(int i=0;i<4;++i)l.spawn[i]={p.x+(10+(i%2)*(half/s+10))*s,p.y+(362+(i/2)*33)*s,half,27*s};
   return l;
 }
+std::vector<UiRect> ring_targets(const Layout&l,bool panel,std::size_t fields,bool developer){
+  std::vector<UiRect> t{l.launcher,l.motion};
+  if(panel){
+    t.push_back(l.close);
+    if(fields){t.push_back(l.previous);t.push_back(l.next);t.push_back(l.body);t.push_back(l.large);t.push_back(l.focus);}
+    if(developer){t.push_back(l.debug);for(const auto r:l.spawn)t.push_back(r);}
+  }
+  std::sort(t.begin(),t.end(),[](const UiRect&a,const UiRect&b){return a.y!=b.y?a.y<b.y:a.x<b.x;});
+  return t;
+}
 std::string number(double n,int precision=2){std::ostringstream s;s<<std::fixed<<std::setprecision(precision)<<n;return s.str();}
 void label(DrawList& out,UiRect r,std::string value,Color c={207,224,238,255},int size=13){out.overlay.emplace_back(Text{{r.x+8,r.y+5},std::move(value),c,size,r.width-16,r});}
 void button(DrawList& out,UiRect r,std::string value){out.overlay.emplace_back(FilledRectangle{r,{13,35,51,252}});out.overlay.emplace_back(StrokedRectangle{r,{65,130,157,255}});label(out,r,std::move(value));}
@@ -44,8 +56,25 @@ void NativeSystemWorkspace::focus_small_body(int width,int height){tracked_body_
   dragging_=false;pending_initial_travel_fit_=false;small_body_panel_=false;
 }
 std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies(const InputEvent& e,int width,int height){
-  if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return std::nullopt;
+  if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed){small_body_ring_=-1;return std::nullopt;}
   const auto l=layout_for(width,height);const SystemWorkspaceCommand handled{SystemWorkspaceCommandKind::none,true};
+  if(e.type==InputEventType::LeftPressed||e.type==InputEventType::PointerCancelled)small_body_ring_=-1;
+  if(e.type==InputEventType::KeyPressed&&e.key){
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u,kHome=0x4000004au,kEnd=0x4000004du;
+    const auto targets=ring_targets(l,small_body_panel_,snapshot_->small_body_fields.size(),snapshot_->developer);
+    const int count=static_cast<int>(targets.size());
+    const bool backward=e.key==kLeft||e.key==kUp||(e.key==kTab&&e.shift);
+    if(e.key==kTab||e.key==kRight||e.key==kDown||backward){small_body_ring_=small_body_ring_<0?0:(backward?small_body_ring_+count-1:small_body_ring_+1)%count;return handled;}
+    if(e.key==kHome||e.key==kEnd){small_body_ring_=e.key==kHome?0:count-1;return handled;}
+    if((e.key==kReturn||e.key==kSpace)&&small_body_ring_>=0&&small_body_ring_<count){
+      const auto r=targets[small_body_ring_];const int keep=small_body_ring_;
+      InputEvent press{InputEventType::LeftPressed,{r.x+r.width*.5f,r.y+r.height*.5f}};
+      const auto command=handle_small_bodies(press,width,height);
+      small_body_ring_=keep;
+      return command?*command:handled;
+    }
+    return std::nullopt;
+  }
   if(l.motion.contains(e.position)){
     dragging_=false;
     if(e.type==InputEventType::LeftPressed)return SystemWorkspaceCommand{SystemWorkspaceCommandKind::toggle_motion,true};
@@ -86,7 +115,12 @@ void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int 
   if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return;
   const auto l=layout_for(width,height);button(out,l.launcher,trf("SMALLBODY_LAUNCHER",{std::to_string(snapshot_->small_body_fields.size())},"BELTS & DEBRIS  {0}"));
   button(out,l.motion,motion_running_?tr("SMALLBODY_MOTION_ON","Motion ON / Pause"):tr("SMALLBODY_MOTION_OFF","Paused / Resume"));
-  if(!small_body_panel_)return;
+  const auto ring=[&]{
+    if(small_body_ring_<0)return;
+    const auto t=ring_targets(l,small_body_panel_,snapshot_->small_body_fields.size(),snapshot_->developer);
+    if(small_body_ring_<static_cast<int>(t.size()))out.overlay.emplace_back(StrokedRectangle{t[small_body_ring_],{164,221,237,255}});
+  };
+  if(!small_body_panel_){ring();return;}
   out.overlay.emplace_back(FilledRectangle{l.panel,{5,17,28,252}});out.overlay.emplace_back(StrokedRectangle{l.panel,{77,151,178,255}});
   label(out,{l.panel.x,l.panel.y+6*l.scale,l.panel.width-76*l.scale,32*l.scale},tr("SMALLBODY_TITLE","SMALL-BODY SURVEY"),{164,221,237,255},15);
   button(out,l.close,tr("SMALLBODY_CLOSE","Close"));button(out,l.previous,tr("SMALLBODY_PREV","Previous field"));button(out,l.next,tr("SMALLBODY_NEXT","Next field"));
@@ -120,5 +154,6 @@ void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int 
     for(std::size_t i=0;i<4;++i)button(out,l.spawn[i],spawn_names[i]);
     const auto& cfg=small_body_configuration();label(out,{l.panel.x,l.panel.y+429*l.scale,l.panel.width,17*l.scale},trf("SMALLBODY_CFG",{number(cfg.orbit_exponent),number(cfg.planet_scale),std::to_string(small_bodies_.statistics().batches)},"Orbit exponent {0} / planet x{1} / draws {2}"),{137,176,195,255},11);
   }
+  ring();
 }
 }

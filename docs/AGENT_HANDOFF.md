@@ -853,6 +853,26 @@ mean/maximum sort numerically and "Unmeasured" rows order at zero);
 tie-break is the row id (phase name). `native_developer_diagnostics`
 asserts the first-row phase flips between ascending and descending and
 the direction marker renders.
+Small-body panel keyboard contract + focus suppression (row-26
+accessibility): the system workspace's small-body survey panel joins
+the focus contract — `small_body_ring_` cycles the always-on
+launcher/motion chrome plus the open panel's close, field/body/focus
+controls and developer debug/spawn buttons in (y,x) order;
+Return/Space replay the press dispatch so toggle_motion, field/body
+cycling, focus_small_body and spawn commands emit unchanged, and the
+ring keeps focus after activation. Pointer presses/cancels and
+close()/survey-loss reset it; the ring renders over launcher/motion
+when the panel is closed too. Dispatch plumbing: the new
+`wants_keyboard_focus()` guard joins `wants_text_input()` in the
+galaxy input-mapper suppression, so a focused ring on any post-mapper
+surface (research/shipyard/economy/supply/fleet/construction
+workspaces, colony roster, controlled assets, small-body panel) keeps
+bound galaxy actions — notably Space→toggle_pause — from preempting
+Return/Space activation. Pre-mapper surfaces (notifications,
+chronicle, navigator) already claim their keys first.
+`native_system_workspace` covers ring traversal, motion-toggle
+activation emitting toggle_motion, launcher Return opening the panel,
+ring-on-close rendering, Next-field cycling, and pointer/cancel resets.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

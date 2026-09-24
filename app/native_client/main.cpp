@@ -5555,6 +5555,21 @@ class NativeCampaign final {
     return !menu_ && !battle_workspace_.visible() && (research_workspace_.wants_text_input() || shipyard_workspace_.wants_text_input() || chronicle_view_.wants_text_input() || colony_roster_.wants_text_input() || (map_hud_visible()&&assets_.wants_text_input())) &&
            !construction_workspace_.visible();
   }
+  // true while a focus-ring surface owns keyboard activation, so bound galaxy
+  // actions (Space -> toggle_pause) do not preempt Return/Space activation.
+  [[nodiscard]] bool wants_keyboard_focus() const noexcept {
+    return (research_workspace_.visible()&&research_workspace_.focus()>=0)||
+           (shipyard_workspace_.visible()&&shipyard_workspace_.focus()>=0)||
+           (economy_workspace_.visible()&&economy_workspace_.focus()>=0)||
+           (supply_workspace_.visible()&&supply_workspace_.focus()>=0)||
+           fleet_workspace_.focus()>=0||
+           (construction_workspace_.visible()&&construction_workspace_.focus()>=0)||
+           (chronicle_view_.visible()&&chronicle_view_.focus()>=0)||
+           (notification_view_.visible()&&notification_view_.focus()>=0)||
+           (colony_roster_.visible()&&colony_roster_.focus()>=0)||
+           (map_hud_visible()&&assets_.focus()>=0)||
+           system_workspace_.small_body_keyboard_focus();
+  }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
     input_mapper_.begin_frame();
@@ -5961,6 +5976,7 @@ class NativeCampaign final {
          !menu_&&!diplomacy_workspace_.visible()&&
          !colony_workspace_.planetary_modal()&&
          !settlement_workspace_.visible()&&!wants_text_input()&&
+         !wants_keyboard_focus()&&
          !shipyard_workspace_.confirmation_open()&&
          !construction_workspace_.confirmation_open()&&!fleet_workspace_.preview()){
         stellar::engine::RawInputEvent raw;

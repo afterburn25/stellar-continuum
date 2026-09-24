@@ -74,6 +74,39 @@ int main(int argc,char**argv)try{
       require(std::ranges::any_of(solids->instances(),[](const auto& instance){return instance.material.dielectric.has_value();}),"Focused icy solid lost its dielectric optics");
   }
   {
+    NativeSystemWorkspace keys;keys.open(reference,1920,1080);
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kRight=0x4000004fu,kHome=0x4000004au,kEnd=0x4000004du;
+    const auto key=[&](std::uint32_t code){InputEvent e{InputEventType::KeyPressed};e.key=code;return keys.handle(e,1920,1080);};
+    const auto field_rect=SystemWorkspaceLayout::for_viewport(1920,1080).world_field;
+    const float s=NativeUiLayout::for_viewport(1920,1080).scale;
+    const UiRect motion{field_rect.x+field_rect.width-168*s,field_rect.y+field_rect.height-69*s,156*s,29*s};
+    const UiRect launcher{field_rect.x+12*s,field_rect.y+field_rect.height-35*s,180*s,29*s};
+    const auto ring_at=[&](const DrawList&scene,UiRect r){return std::ranges::any_of(scene.overlay,[&](const UiOverlayCommand&item){const auto*stroke=std::get_if<StrokedRectangle>(&item);return stroke&&stroke->bounds.x==r.x&&stroke->bounds.y==r.y&&stroke->bounds.width==r.width&&stroke->color.r==164;});};
+    require(!keys.small_body_keyboard_focus(),"small-body ring started focused");
+    require(key(kTab).captured&&keys.small_body_keyboard_focus(),"Tab did not focus the small-body ring");
+    DrawList closed_draw;keys.render(closed_draw,1920,1080);
+    require(ring_at(closed_draw,motion),"focus ring did not land on the motion toggle first");
+    require(key(kReturn).kind==SystemWorkspaceCommandKind::toggle_motion,"Return did not activate the focused motion toggle");
+    require(key(kEnd).captured,"End did not reach the launcher");
+    (void)key(kReturn);
+    require(key(kHome).captured,"Home did not reach the close control");
+    DrawList open_draw;keys.render(open_draw,1920,1080);
+    require(has_overlay_text(open_draw,"SMALL-BODY SURVEY"),"Return on the launcher did not open the survey panel");
+    const UiRect close_rect{field_rect.x+12*s+std::min(450*s,field_rect.width-24*s)-65*s,field_rect.y+8*s+9*s,55*s,25*s};
+    require(ring_at(open_draw,close_rect),"open-panel ring did not follow focus onto the close control");
+    require(key(kRight).captured&&key(kRight).captured,"ring traversal across the panel headers failed");
+    const auto next_id=reference.small_body_fields[1%reference.small_body_fields.size()].id;
+    (void)key(kReturn);
+    DrawList next_draw;keys.render(next_draw,1920,1080);
+    require(has_overlay_text(next_draw,"#"+std::to_string(next_id)),"Return on Next field did not cycle the surveyed field");
+    (void)keys.handle({InputEventType::LeftPressed,{field_rect.x+20*s,field_rect.y+200*s}},1920,1080);
+    require(!keys.small_body_keyboard_focus(),"pointer press did not reset the small-body ring");
+    require(key(kTab).captured&&keys.small_body_keyboard_focus(),"Tab did not refocus the small-body ring");
+    (void)keys.handle({InputEventType::PointerCancelled},1920,1080);
+    require(!keys.small_body_keyboard_focus(),"pointer cancel did not reset the small-body ring");
+    keys.close();
+  }
+  {
     NativeSystemWorkspace tracked;tracked.open(reference,1920,1080);
     const auto earth=std::ranges::find_if(reference.bodies,[](const auto& b){return b.sol_texture_key==std::optional<std::string>{"earth"};});require(earth!=reference.bodies.end(),"Earth missing for hourly motion test");
     require(tracked.select_body(earth->id),"Could not select Earth");
