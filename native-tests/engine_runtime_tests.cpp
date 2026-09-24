@@ -389,6 +389,39 @@ int main() {
           "particles accumulate in sim time");
   }
 
+  // spawn_entity3d + the 3D region queries track a separate entity set.
+  {
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    EntityId spawned{};
+    std::size_t in_box = 0, in_radius = 0, out_of_radius = 0;
+    host.on_update = [&](World &, float) {
+      ++updates;
+      if (updates == 1) {
+        Scene3dEntity e{};
+        e.name = "crate";
+        e.mesh = "box";
+        e.x = 50.f;
+        e.y = 0.f;
+        e.z = -30.f;
+        spawned = host.spawn_entity3d(e);
+        in_box = host.entities3d_in_box(50.f, 0.f, -30.f, 5.f, 5.f, 5.f)
+                     .size();
+        in_radius =
+            host.entities3d_in_radius(50.f, 0.f, -30.f, 10.f).size();
+        out_of_radius =
+            host.entities3d_in_radius(-500.f, 0.f, 0.f, 10.f).size();
+      }
+    };
+    check(host.run() == 0, "3D spawn run exits cleanly");
+    check(spawned != EntityId{}, "spawn_entity3d returns an id");
+    check(host.entities3d().size() == 1,
+          "the spawned entity joins the tracked 3D set");
+    check(in_box == 1, "entities3d_in_box finds the crate");
+    check(in_radius == 1, "entities3d_in_radius finds the crate");
+    check(out_of_radius == 0, "entities3d_in_radius excludes far entities");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
