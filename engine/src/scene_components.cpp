@@ -396,10 +396,13 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
   // Each tilemap lives on its own entity (not returned) so runtime cell
   // edits snapshot with the world; order matches the document so layer
   // semantics stay stable.
-  for (const auto &s : doc.tilemaps)
-    world.add(world.create(),
+  for (const auto &s : doc.tilemaps) {
+    const auto entity = world.create();
+    world.add(entity,
               Tilemap{s.tileset, s.x, s.y, s.tile_w, s.tile_h, s.columns,
                       s.layer, s.parallax, s.collide, s.cells});
+    if (!s.name.empty()) world.add(entity, EntityName{s.name});
+  }
   return spawned;
 }
 
@@ -419,11 +422,12 @@ SceneDocument scene_from_world(const World &world) {
   SceneDocument doc;
   for (const auto entity : world.entities()) {
     if (const auto *tm = world.get<Tilemap>(entity)) {
-      doc.tilemaps.push_back(SceneTilemap{tm->tileset, tm->x, tm->y,
-                                          tm->tile_w, tm->tile_h,
-                                          tm->columns, tm->layer,
-                                          tm->parallax, tm->collide,
-                                          tm->cells});
+      auto &map = doc.tilemaps.emplace_back(
+          SceneTilemap{tm->tileset, tm->x, tm->y, tm->tile_w, tm->tile_h,
+                       tm->columns, tm->layer, tm->parallax, tm->collide,
+                       tm->cells});
+      if (const auto *n = world.get<EntityName>(entity))
+        map.name = n->value;
       continue;
     }
     const auto *name = world.get<EntityName>(entity);
@@ -490,6 +494,17 @@ std::optional<EntityId> find_entity_by_name(const World &world,
       return entity;
   }
   return std::nullopt;
+}
+
+std::optional<std::size_t> tilemap_index(const World &world,
+                                         std::string_view name) {
+  const auto entity = find_entity_by_name(world, name);
+  if (!entity) return std::nullopt;
+  const auto all = tilemap_entities(world);
+  const auto it = std::find(all.begin(), all.end(), *entity);
+  return it != all.end()
+             ? std::optional<std::size_t>{it - all.begin()}
+             : std::nullopt;
 }
 
 void resolve_hierarchy(World &world) {

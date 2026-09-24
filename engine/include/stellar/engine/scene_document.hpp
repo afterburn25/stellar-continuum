@@ -101,6 +101,10 @@ struct SceneTilemap {
   bool collide{false};
   // One tileset cell index per grid cell, row-major; <0 = empty.
   std::vector<int> cells;
+  // Optional map name ("ground", "decor") — attaches EntityName to the
+  // spawned carrier so games can resolve layers with tilemap_index()
+  // instead of tracking document-order indices.
+  std::string name;
 };
 
 // Named scalar-track animation shared by entities — keyframed motion,

@@ -226,6 +226,7 @@ std::string SceneDocument::to_json() const {
       if (tilemap.parallax != 1.0f) tm["parallax"] = tilemap.parallax;
       if (tilemap.collide) tm["collide"] = true;
       tm["cells"] = tilemap.cells;
+      if (!tilemap.name.empty()) tm["name"] = tilemap.name;
       list.push_back(std::move(tm));
     }
     doc["tilemaps"] = std::move(list);
@@ -330,6 +331,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       map.layer = tm.value("layer", -100);
       map.parallax = tm.value("parallax", 1.0f);
       map.collide = tm.value("collide", false);
+      map.name = tm.value("name", std::string{});
       if (tm.contains("cells")) {
         const auto &cells = tm.at("cells");
         if (!cells.is_array()) {

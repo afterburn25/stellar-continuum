@@ -145,6 +145,12 @@ public:
                    int value);
   // Number of tilemap layers in the loaded scene.
   [[nodiscard]] std::size_t tilemap_count() const;
+  // Document-order index of the tilemap named in the scene document
+  // (SceneTilemap::name attaches EntityName to the carrier), or nullopt —
+  // feed the result to the indexed tile_at/set_tile_at overloads so games
+  // address authored layers by name, not position.
+  [[nodiscard]] std::optional<std::size_t>
+  tilemap_index(std::string_view name) const;
   // Spawns a new tilemap layer at runtime (procedural terrain): creates
   // a dedicated Tilemap-component entity that renders, collides and
   // snapshots like a scene-authored map, appended after the existing

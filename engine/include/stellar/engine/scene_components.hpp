@@ -207,6 +207,11 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc);
 std::optional<EntityId> tilemap_entity(const World &world);
 // All entities carrying a Tilemap component, in spawn order.
 std::vector<EntityId> tilemap_entities(const World &world);
+// Document-order index of the tilemap whose EntityName matches, or nullopt
+// — composes find_entity_by_name with tilemap_entities so games address
+// authored layers ("ground", "decor") by name instead of position.
+std::optional<std::size_t> tilemap_index(const World &world,
+                                         std::string_view name);
 
 // The inverse of spawn_scene: every live entity carrying EntityName (or, when
 // unnamed, every entity with a Transform2D) becomes a SceneEntity built from

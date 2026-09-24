@@ -219,6 +219,10 @@ std::vector<EntityId> RuntimeHost::tilemap_entities() const {
 std::size_t RuntimeHost::tilemap_count() const {
   return impl_->tilemap_es.size();
 }
+std::optional<std::size_t>
+RuntimeHost::tilemap_index(std::string_view name) const {
+  return engine::tilemap_index(impl_->world, name);
+}
 int RuntimeHost::tile_at(float world_x, float world_y) const {
   return tile_at(0, world_x, world_y);
 }
@@ -776,6 +780,7 @@ int RuntimeHost::run() {
     world.add(e, Tilemap{s.tileset, s.x, s.y, s.tile_w, s.tile_h,
                          s.columns, s.layer, s.parallax, s.collide,
                          s.cells});
+    if (!s.name.empty()) world.add(e, EntityName{s.name});
     impl.tilemap_es.push_back(e);
     impl.tileset_imgs.push_back(
         s.tileset.empty() ? nullptr : decode_sprite(s.tileset));

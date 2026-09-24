@@ -243,7 +243,7 @@ struct Shell {
       hit_scene_tilesize{}, hit_scene_tilecols{},
       hit_scene_tilecollide{}, hit_scene_tilelayer{},
       hit_scene_tilepar{}, hit_scene_tilecells{},
-      hit_scene_tileorigin{},
+      hit_scene_tileorigin{}, hit_scene_tilename{},
       hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_music{},
       hit_scene_spin{}, hit_scene_worldsize{}, hit_scene_bounce{},
       scene_preview{}, scene_rows{};
@@ -1370,6 +1370,9 @@ void commit_scene_field(Shell &shell) {
       }
     } else if (shell.scene_field == 40) {
       ok = parse_pair(shell.scene_buffer, tm.x, tm.y);
+    } else if (shell.scene_field == 41) {
+      tm.name = shell.scene_buffer;
+      ok = true;
     } else if (shell.scene_field == 36) {
       tm.cells.clear();
       std::stringstream ss(shell.scene_buffer);
@@ -2183,7 +2186,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         shell.hit_scene_tilesize = shell.hit_scene_tilecols =
             shell.hit_scene_tilecollide = shell.hit_scene_tilelayer =
                 shell.hit_scene_tilepar = shell.hit_scene_tilecells =
-                shell.hit_scene_tileorigin =
+                shell.hit_scene_tileorigin = shell.hit_scene_tilename =
                     shell.hit_scene_paint = shell.hit_scene_paintcell =
                         shell.hit_scene_music = shell.hit_scene_spin =
                             shell.hit_scene_worldsize =
@@ -2239,11 +2242,13 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   shell.hit_scene_tilemap = {x + 876 * s, y, 86 * s, bh};
   shell_button(out, shell.hit_scene_tilemap, "TILES +", false, font, s);
   shell.hit_scene_tilesel = {x + 970 * s, y, 104 * s, bh};
+  const auto sel_tile = std::min(shell.scene_tile_index, ntiles - 1);
   const std::string map_label =
-      ntiles ? "MAP " +
-                   std::to_string(
-                       std::min(shell.scene_tile_index, ntiles - 1) + 1) +
-                   "/" + std::to_string(ntiles)
+      ntiles ? "MAP " + std::to_string(sel_tile + 1) + "/" +
+                   std::to_string(ntiles) +
+                   (shell.scene_doc.tilemaps[sel_tile].name.empty()
+                        ? ""
+                        : ":" + shell.scene_doc.tilemaps[sel_tile].name)
              : "MAP -";
   shell_button(out, shell.hit_scene_tilesel, map_label.c_str(),
                ntiles == 0, font, s);
@@ -2687,6 +2692,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         tm ? fmt_pair(tm->x, tm->y) : "",
         shell.editing_scene && shell.scene_field == 40,
         "grid origin x,y in world px");
+  field(shell.hit_scene_tilename, "tilename", tm ? tm->name : "",
+        shell.editing_scene && shell.scene_field == 41,
+        "layer name for tilemap_index lookups");
   field(shell.hit_scene_tilecells, "tilecells", cell_list(),
         shell.editing_scene && shell.scene_field == 36,
         "csv cells, -1 empty");
@@ -5687,6 +5695,8 @@ int main(int argc, char **argv) {
               edit_field(35);
             else if (shell.hit_scene_tileorigin.contains(event.position))
               edit_field(40);
+            else if (shell.hit_scene_tilename.contains(event.position))
+              edit_field(41);
             else if (shell.hit_scene_tilecells.contains(event.position))
               edit_field(36);
             else if (shell.hit_scene_paintcell.contains(event.position))

@@ -259,6 +259,7 @@ int main() {
         deco.layer = -3;
         deco.parallax = 0.5f;
         deco.cells.assign(16, 1);
+        deco.name = "decor";
         SceneAnimationDef patrol;
         patrol.id = "patrol";
         patrol.loop = "pingpong";
@@ -311,6 +312,21 @@ int main() {
                   world.get<Tilemap>(tile_es[1])->layer == -3 &&
                   world.get<Tilemap>(tile_es[1])->cells.size() == 16,
               "spawn_scene second tilemap component");
+        check(tilemap_index(world, "decor").has_value() &&
+                  *tilemap_index(world, "decor") == 1,
+              "named tilemap resolves its document-order index");
+        check(!tilemap_index(world, "ground").has_value(),
+              "unnamed tilemap has no named index");
+        check(world.get<EntityName>(tile_es[1]) != nullptr &&
+                  world.get<EntityName>(tile_es[1])->value == "decor",
+              "tilemap name attaches EntityName to the carrier");
+        const auto reparsed_tm =
+            SceneDocument::from_json(doc.to_json());
+        check(reparsed_tm.has_value() &&
+                  reparsed_tm->tilemaps[1].name == "decor",
+              "tilemap name survives the document codec");
+        check(scene_from_world(world).tilemaps[1].name == "decor",
+              "scene_from_world exports the tilemap name");
         const auto player = find_entity_by_name(world, "player");
         check(player.has_value() && *player == spawned[0],
               "find_entity_by_name resolves");
