@@ -510,7 +510,9 @@ int main() {
     std::filesystem::create_directories(sub / "editor");
     {
       std::ofstream out(sub / "editor" / "scene3d.json");
-      out << R"({"entities":[{"name":"ball","mesh":"box","pos":[0,4,0]}],
+      out << R"({"entities":[{"name":"ball","mesh":"box","pos":[0,4,0]},
+                  {"name":"marker","mesh":"box","pos":[0,0,-5],
+                   "gravityScale":0}],
                   "gravity":40.0,"groundY":0.0})";
     }
     auto opts = headless_options(sub);
@@ -520,6 +522,7 @@ int main() {
     int landings = 0;
     EntityId landed{}, ground_arg{42u, 7u};
     bool spawn3d_cb = false;
+    bool pick_hit = false, pick_miss = false;
     float rest_y = -999.f;
     host.on_spawn3d = [&](World &, EntityId id, const Scene3dEntity &s) {
       if (s.name == "ball") spawn3d_cb = id != EntityId{};
@@ -529,14 +532,24 @@ int main() {
       landed = e;
       ground_arg = ground;
     };
+    int pick_updates = 0;
     host.on_update = [&](World &world, float) {
       if (!host.entities3d().empty())
         if (const auto *t =
                 world.get<Transform3D>(host.entities3d().front()))
           rest_y = t->y;
+      // The marker sits dead-center on the -Z camera axis; the corner
+      // of the viewport misses every entity.
+      if (++pick_updates == 1 && host.entities3d().size() == 2) {
+        const auto hit = host.entity3d_at(320.f, 240.f);
+        pick_hit = hit.has_value() && hit->entity == host.entities3d()[1];
+        pick_miss = !host.entity3d_at(5.f, 5.f).has_value();
+      }
     };
     check(host.run() == 0, "3D land run exits cleanly");
     check(spawn3d_cb, "on_spawn3d fires for the document entity");
+    check(pick_hit, "entity3d_at picks the centered marker");
+    check(pick_miss, "entity3d_at misses the viewport corner");
     check(landings == 1 && landed == host.entities3d().front(),
           "on_land fires once on touchdown");
     check(ground_arg == EntityId{},
