@@ -56,6 +56,33 @@ std::optional<UiRect> NativeShipyardWorkspace::design_bounds(std::string_view id
   const auto l=ShipyardWorkspaceLayout::for_viewport(w,h);const auto designs=filtered_designs();
   for(std::size_t i=0;i<designs.size();++i)if(designs[i]->id==id)return intersection(card(i,l),l.designs);return {};
 }
+std::vector<NativeShipyardWorkspace::FocusItem> NativeShipyardWorkspace::focusables(const ShipyardWorkspaceLayout& l)const{
+  std::vector<FocusItem> items;const float s=l.scale;
+  const auto push=[&](UiRect r,std::uint64_t t){if(r.width>0&&r.height>0)items.push_back({r,t});};
+  push(l.close,1);
+  for(int i=0;i<static_cast<int>(ship_categories.size());++i)push({l.categories.x,l.categories.y+i*54*s,l.categories.width,48*s},10+i);
+  push(l.search,20);push(l.sort,21);push(l.filter,22);
+  const auto designs=filtered_designs();
+  for(std::size_t i=0;i<designs.size();++i){const auto r=card(i,l);if(l.designs.contains({r.x+r.width*.5f,r.y+r.height*.5f}))push(r,100+i);}
+  if(view_){
+    const UiRect clip{l.orders.x,l.orders.y+30*s,l.orders.width,l.orders.height-30*s};
+    const UiRect queue{l.orders.x+5*s,l.orders.y+30*s,l.orders.width-10*s,l.orders.height-35*s};
+    for(std::size_t i=0;i<view_->orders.size();++i){const auto&o=view_->orders[i];
+      const UiRect r{clip.x,clip.y+order_scroll_+i*64*s,clip.width,60*s};
+      const auto hit=intersection(r,clip);if(!hit)continue;
+      push(*hit,200+i*10);
+      const float bx=r.x+r.width-110*s;
+      if(queue.contains({bx,r.y+12*s})&&queue.contains({bx+102*s,r.y+42*s})){
+        if(!o.active){push({bx,r.y+12*s,30*s,30*s},200+i*10+1);push({bx+36*s,r.y+12*s,30*s,30*s},200+i*10+2);}
+        if(o.can_cancel)push({bx+72*s,r.y+12*s,30*s,30*s},200+i*10+3);
+      }
+    }
+  }
+  if(selected_design()){push(l.minus,30);push(l.plus,31);push(l.favorite,32);}
+  if(selected_design()||selected_order())push(l.action,33);
+  std::stable_sort(items.begin(),items.end(),[](const auto&a,const auto&b){return a.rect.y!=b.rect.y?a.rect.y<b.rect.y:a.rect.x<b.rect.x;});
+  return items;
+}
 std::string NativeShipyardWorkspace::batch_blocker()const{
   const auto* d=selected_design();if(!d)return tr("SHIPYARD_SELECT_DESIGN","Select a ship design.");
   const auto q=std::ranges::find(d->batch_quotes,quantity_,&stellar::core::ShipbuildingBatchAssessment::quantity);
@@ -88,6 +115,30 @@ ShipyardWorkspaceCommand NativeShipyardWorkspace::handle(const InputEvent& e,int
     else if(e.type==InputEventType::TextEntered&&search_.size()+e.text.size()<=128)search_+=e.text;
     design_scroll_=0;return {ShipyardWorkspaceCommandKind::None,true};
   }
+  if(e.type==InputEventType::KeyPressed&&e.key){
+    if(search_focused_){
+      // While editing the search field it owns key input; Tab/Return commit
+      // and leave edit mode, everything else is captured.
+      if(e.key==9u)search_focused_=false;
+      else if(e.key==13u){search_focused_=false;return {ShipyardWorkspaceCommandKind::None,true};}
+      else return {ShipyardWorkspaceCommandKind::None,true};
+    }
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const auto items=focusables(l);const int count=static_cast<int>(items.size());
+    const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
+    const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
+    if(count>0&&(e.key==kHome||e.key==kEnd)){focus_=e.key==kHome?0:count-1;return {ShipyardWorkspaceCommandKind::None,true};}
+    if(count>0&&(fwd||bwd)){focus_=focus_<0||focus_>=count?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;return {ShipyardWorkspaceCommandKind::None,true};}
+    if((e.key==kReturn||e.key==kSpace)&&focus_>=0&&focus_<count){
+      const auto&r=items[static_cast<std::size_t>(focus_)].rect;
+      InputEvent press{InputEventType::LeftPressed};press.position={r.x+r.width*.5f,r.y+r.height*.5f};
+      const int keep=focus_;auto command=handle(press,w,h);
+      if(visible_)focus_=keep;return command;
+    }
+    return {};
+  }
   if(e.type==InputEventType::Wheel){
     if(l.designs.contains(e.position)){const auto designs=filtered_designs();const float content=designs.empty()?0:card(designs.size()-1,l).y-design_scroll_-l.designs.y+268*s;design_scroll_=std::clamp(design_scroll_+e.wheel_y*66*s,std::min(0.f,l.designs.height-content),0.f);}
     else if(l.orders.contains(e.position))order_scroll_=std::clamp(order_scroll_+e.wheel_y*50*s,std::min(0.f,l.orders.height-30*s-(view_?view_->orders.size():0)*64*s),0.f);
@@ -97,6 +148,7 @@ ShipyardWorkspaceCommand NativeShipyardWorkspace::handle(const InputEvent& e,int
   if(e.type!=InputEventType::LeftPressed)return {ShipyardWorkspaceCommandKind::None,l.surface.contains(e.position)};
   if(l.close.contains(e.position)){close();return {ShipyardWorkspaceCommandKind::None,true};}
   if(!l.surface.contains(e.position))return {};
+  focus_=-1;
   search_focused_=l.search.contains(e.position);if(search_focused_)return {ShipyardWorkspaceCommandKind::None,true};
   if(l.sort.contains(e.position)||l.filter.contains(e.position)){const bool sort=l.sort.contains(e.position);std::vector<std::string> options;if(sort)for(std::size_t i=0;i<ship_sorts.size();++i)options.emplace_back(tr(ship_sort_keys[i],ship_sorts[i]));else for(std::size_t i=0;i<ship_filters.size();++i)options.emplace_back(tr(ship_filter_keys[i],ship_filters[i]));dropdown_.open(sort?1:2,std::move(options),sort?sort_:filter_);return {ShipyardWorkspaceCommandKind::None,true};}
   for(int i=0;i<static_cast<int>(ship_categories.size());++i){UiRect r{l.categories.x,l.categories.y+i*54*s,l.categories.width,48*s};if(r.contains(e.position)){category_=i;design_scroll_=0;return {ShipyardWorkspaceCommandKind::None,true};}}
@@ -180,5 +232,7 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
   if(o){enabled=o->can_cancel;action=cancel_confirmation_id_==o->order_id?tr("SHIPYARD_CONFIRM_REFUND","CONFIRM CANCEL + REFUND"):tr("SHIPYARD_CANCEL_ORDER","CANCEL ORDER");}
   else if(d){enabled=batch_blocker().empty();action=enabled?(d->will_queue?tr("SHIPYARD_QUEUE_BUILD","QUEUE BUILD"):tr("SHIPYARD_START_BUILD","START BUILD")):tr("SHIPYARD_BUILD_UNAVAILABLE","BUILD UNAVAILABLE");}
   if(!action.empty())button(l.action,action,enabled);
+  const auto focus_items=focusables(l);
+  if(focus_>=0&&focus_<static_cast<int>(focus_items.size()))stroke(out,focus_items[static_cast<std::size_t>(focus_)].rect,{160,210,255,255});
   dropdown_.render(out,dropdown_.id()==1?l.sort:l.filter,w,h,l.body_font_pixels);
 }

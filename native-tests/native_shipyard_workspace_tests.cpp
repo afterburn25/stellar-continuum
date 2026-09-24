@@ -319,6 +319,33 @@ int run_tests() {
   REQUIRE(!batch.design_bounds("scout",1920,1080));
   (void)batch.handle({InputEventType::LeftPressed,center(layout.sort)},1920,1080);REQUIRE(batch.popover_open());
   (void)batch.handle({InputEventType::EscapePressed},1920,1080);REQUIRE(batch.visible()&&!batch.popover_open());
+  {
+    // Keyboard focus: (y,x)-ordered ring over the whole dashboard.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kHome=0x4000004au,kEnd=0x4000004du,kDigit5='5';
+    const int width=1920,height=1080;
+    NativeShipyardWorkspace w;w.open();w.set_view(view());
+    const auto key=[&](std::uint32_t k,bool shift=false){InputEvent e{InputEventType::KeyPressed};e.key=k;e.shift=shift;return w.handle(e,width,height);};
+    REQUIRE(w.focus()<0);
+    REQUIRE(key(kTab).captured&&w.focus()==0);
+    REQUIRE(key(kTab).captured&&w.focus()==1);
+    REQUIRE(key(kTab,true).captured&&w.focus()==0);
+    REQUIRE(key(kEnd).captured&&w.focus()>1);
+    REQUIRE(key(kHome).captured&&w.focus()==0);
+    (void)key(kTab);(void)key(kTab);REQUIRE(w.focus()==2);
+    REQUIRE(key(kReturn).captured&&w.wants_text_input()&&w.focus()==2);
+    InputEvent edit{InputEventType::TextEntered};edit.text="zz";(void)w.handle(edit,width,height);
+    REQUIRE(!w.design_bounds("scout",width,height));
+    (void)key(kDigit5);REQUIRE(w.wants_text_input()&&w.focus()==2);
+    (void)key(kTab);REQUIRE(!w.wants_text_input()&&w.focus()==3);
+    REQUIRE(!key(kDigit5).captured);
+    (void)key(kEnd);const int at=w.focus();const auto started=key(kReturn);
+    REQUIRE(started.kind==ShipyardWorkspaceCommandKind::Start&&w.focus()==at&&w.visible());
+    (void)key(kHome);REQUIRE(key(kReturn).captured&&!w.visible());
+    w.open();w.set_view(view());
+    (void)key(kTab);
+    (void)w.handle({InputEventType::LeftPressed,center(ShipyardWorkspaceLayout::for_viewport(width,height).designs)},width,height);
+    REQUIRE(w.focus()<0);
+  }
   return 0;
 }
 

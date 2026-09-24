@@ -52,6 +52,7 @@ public:
   [[nodiscard]] bool popover_open()const{return dropdown_.visible();}
   void bind_preferences(std::filesystem::path);
   [[nodiscard]] bool wants_text_input()const{return visible_&&search_focused_;}
+  [[nodiscard]] int focus() const noexcept { return focus_; }
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
   [[nodiscard]] bool confirmation_open() const noexcept {
@@ -91,6 +92,14 @@ private:
   [[nodiscard]] const stellar::native_shipyard::NativeShipyardOrder *
   selected_order() const noexcept;
   void reconcile_selection();
+  // Keyboard-focus contract: (y,x)-ordered controls across the whole
+  // dashboard; activation replays the authoritative click dispatch.
+  struct FocusItem {
+    stellar::native_map::UiRect rect;
+    std::uint64_t target;
+  };
+  [[nodiscard]] std::vector<FocusItem> focusables(
+      const ShipyardWorkspaceLayout &) const;
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
   [[nodiscard]] std::string
@@ -114,6 +123,7 @@ private:
   std::string search_;
   int category_{},sort_{},filter_{},quantity_{1};
   bool search_focused_{};
+  int focus_{-1};
   float detail_scroll_{};
   mutable float detail_limit_{};
   stellar::native_ui::Dropdown dropdown_;
