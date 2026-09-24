@@ -392,17 +392,38 @@ int main() {
     yard.reserved_population_species_id = "voidborn";
     yard.reserved_population_source_colony_id = 999;
     world.shipyards.push_back(yard);
+    // Persisted combat intelligence: absent observer civ, absent
+    // target fleet, corrupt magnitudes.
+    FleetPowerObservation ghost;
+    ghost.observer_id = 99;
+    ghost.fleet_id = 999;
+    ghost.power = -5.0;
+    ghost.observed_day = -1.0;
+    world.combat_intelligence.push_back(ghost);
+    // Knowledge state: absent observer civ knowing an absent system.
+    (void)world.knowledge.reveal_system(99, 999);
 
     const auto findings = inspect_campaign_invariants(world, 0, 100.0);
     int invalid = 0, species = 0, type = 0, orphan = 0, positive = 0,
         duplicate = 0, orphans = 0, tech = 0, overflow_n = 0,
-        fleet_refs = 0, ranged = 0, route_refs = 0, positions = 0;
+        fleet_refs = 0, ranged = 0, route_refs = 0, positions = 0,
+        knowledge_refs = 0, intel_refs = 0;
     for (const auto &finding : findings) {
       if (finding.event_type == "out_of_range") ++ranged;
       else if (finding.event_type == "invalid_nonnegative_value") ++invalid;
       else if (finding.event_type == "invalid_position") ++positions;
       else if (finding.event_type == "orphaned_route_hop" ||
                finding.event_type == "route_overflow") ++route_refs;
+      else if (finding.subsystem == "knowledge" &&
+               (finding.event_type == "orphaned_observer" ||
+                finding.event_type == "orphaned_known_system" ||
+                finding.event_type == "orphaned_known_civilization"))
+        ++knowledge_refs;
+      else if (finding.subsystem == "combat" &&
+               (finding.event_type == "orphaned_observer" ||
+                finding.event_type == "orphaned_observed_fleet" ||
+                finding.event_type == "observation_overflow"))
+        ++intel_refs;
       else if (finding.event_type == "invalid_positive_value") ++positive;
       else if (finding.event_type == "unknown_species") ++species;
       else if (finding.event_type == "unknown_building_type") ++type;
@@ -417,9 +438,11 @@ int main() {
       else if (finding.event_type == "orphaned_freight" ||
                finding.event_type == "orphaned_target") ++fleet_refs;
     }
-    check(invalid == 6,
-          "stability, condition, arrears, hull, sensor and revision "
-          "flag invalid values");
+    check(invalid == 8,
+          "stability, condition, arrears, hull, sensor, revision and "
+          "observation magnitudes flag invalid values");
+    check(knowledge_refs == 2 && intel_refs == 2,
+          "absent knowledge/intel observers and targets are flagged");
     check(positions == 1 && route_refs == 2,
           "non-finite transit vector, absent route hop and path "
           "overflow are flagged");

@@ -8,6 +8,7 @@
 #include <stellar/core/campaign_population_projection.hpp>
 #include <stellar/core/campaign_warfare_projection.hpp>
 #include <stellar/core/construction_state.hpp>
+#include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/fleet_state.hpp>
 #include <stellar/core/lane_network.hpp>
@@ -641,6 +642,49 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       if(f.combat->disengaged_system_id&&!systems.contains(*f.combat->disengaged_system_id))
         emit("fleet","orphaned_disengagement",f.id,"Disengagement references an absent system.");
     }
+  }
+  // Knowledge state: observers must be civilizations and known
+  // ids must resolve — observers dereference these per tick.
+  {
+    const auto knowledge=w.knowledge.snapshot();
+    for(const auto &entry:knowledge.systems){
+      if(!civilizations.contains(entry.observer_id))
+        emit("knowledge","orphaned_observer",entry.observer_id,"Knowledge observer is an absent civilization.");
+      for(const auto id:entry.values)
+        if(!systems.contains(id)){emit("knowledge","orphaned_known_system",entry.observer_id,"Knowledge references an absent system.");break;}
+    }
+    for(const auto &entry:knowledge.civilizations){
+      if(!civilizations.contains(entry.observer_id))
+        emit("knowledge","orphaned_observer",entry.observer_id,"Knowledge observer is an absent civilization.");
+      for(const auto id:entry.values)
+        if(!civilizations.contains(id)){emit("knowledge","orphaned_known_civilization",entry.observer_id,"Knowledge references an absent civilization.");break;}
+    }
+  }
+  // Combat intelligence is persisted: observers must be
+  // civilizations, observed ids must be fleets, magnitudes bounded.
+  std::unordered_map<int,int> observation_counts;
+  for(const auto &o:w.combat_intelligence){
+    if(!civilizations.contains(o.observer_id))
+      emit("combat","orphaned_observer",o.fleet_id,"Power observation observer is an absent civilization.");
+    if(!fleet_ids.contains(o.fleet_id))
+      emit("combat","orphaned_observed_fleet",o.fleet_id,"Power observation references an absent fleet.");
+    positive(o.power,"Observed power",o.fleet_id,"combat");
+    positive(o.observed_day,"Observed day",o.fleet_id,"combat");
+    if(++observation_counts[o.observer_id]==maximum_fleet_power_observations_per_observer+1)
+      emit("combat","observation_overflow",o.observer_id,"Power observations exceed the per-observer bound.");
+  }
+  // An active massive encounter is persisted mid-battle: its system
+  // and every vessel binding must resolve.
+  if(w.active_combat_encounter){
+    const auto &e=*w.active_combat_encounter;
+    if(!systems.contains(e.system_id))
+      emit("combat","orphaned_encounter",e.system_id,"Active encounter references an absent system.");
+    positive(e.started_day,"Encounter start day",e.system_id,"combat");
+    if(e.last_observed_event_sequence<0)
+      emit("combat","invalid_nonnegative_value",e.system_id,"Observed event sequence is negative.");
+    for(const auto &v:e.vessels)
+      if(!fleet_ids.contains(v.fleet_id))
+        emit("combat","orphaned_encounter_vessel",v.fleet_id,"Encounter vessel binds an absent fleet.");
   }
   if(!civilizations.contains(w.player_civilization_id))emit("civilization","missing_player",w.player_civilization_id,"Player empire ID does not exist.");
   if(dropped>0){
