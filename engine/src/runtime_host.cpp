@@ -8,6 +8,7 @@
 #include "stellar/engine/native_map_platform.hpp"
 #include "stellar/engine/native_scene3d.hpp"
 #include "stellar/engine/package.hpp"
+#include "stellar/engine/replay.hpp"
 #include "stellar/engine/runtime_diagnostics.hpp"
 #include "stellar/engine/runtime_paths.hpp"
 #include "stellar/engine/save_history.hpp"
@@ -16,11 +17,13 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iterator>
 #include <set>
+#include <sstream>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -38,6 +41,81 @@ Quaternion quat_mul(Quaternion a, Quaternion b) {
           a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
           a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
           a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z};
+}
+
+// InputEvent <-> journal payload. Positional CSV of every field that
+// affects dispatch, then the TextEntered payload hex-encoded (commas are
+// legal text) as the trailing field.
+std::string encode_input_event(const InputEvent &e) {
+  static const char hex[] = "0123456789abcdef";
+  std::string text_hex;
+  text_hex.reserve(e.text.size() * 2);
+  for (const unsigned char ch : e.text) {
+    text_hex += hex[ch >> 4];
+    text_hex += hex[ch & 15];
+  }
+  char buf[256];
+  std::snprintf(buf, sizeof buf, "%d,%u,%g,%g,%g,%g,%g,%u,%d,%d,%d,%u,%u,%u,%g",
+                static_cast<int>(e.type), e.key, e.position.x, e.position.y,
+                e.delta.x, e.delta.y, e.wheel_y, e.click_count,
+                e.control ? 1 : 0, e.shift ? 1 : 0, e.alt ? 1 : 0,
+                e.gamepad_button, e.gamepad_device, e.gamepad_axis,
+                e.gamepad_axis_value);
+  std::string out{buf};
+  out += ',';
+  out += text_hex;
+  return out;
+}
+
+std::optional<InputEvent> decode_input_event(std::string_view payload) {
+  InputEvent e;
+  // Split into at most 16 fields; the last field is the hex text.
+  std::vector<std::string_view> fields;
+  std::size_t pos = 0;
+  while (fields.size() < 15) {
+    const auto comma = payload.find(',', pos);
+    if (comma == std::string_view::npos) return std::nullopt;
+    fields.push_back(payload.substr(pos, comma - pos));
+    pos = comma + 1;
+  }
+  fields.push_back(payload.substr(pos));
+  const auto num = [](std::string_view s, double &v) {
+    try {
+      v = std::stod(std::string(s));
+      return true;
+    } catch (const std::exception &) {
+      return false;
+    }
+  };
+  double v[15];
+  for (int i = 0; i < 15; ++i)
+    if (!num(fields[i], v[i])) return std::nullopt;
+  e.type = static_cast<InputEventType>(static_cast<int>(v[0]));
+  e.key = static_cast<std::uint32_t>(v[1]);
+  e.position = {static_cast<float>(v[2]), static_cast<float>(v[3])};
+  e.delta = {static_cast<float>(v[4]), static_cast<float>(v[5])};
+  e.wheel_y = static_cast<float>(v[6]);
+  e.click_count = static_cast<std::uint8_t>(v[7]);
+  e.control = v[8] != 0;
+  e.shift = v[9] != 0;
+  e.alt = v[10] != 0;
+  e.gamepad_button = static_cast<std::uint8_t>(v[11]);
+  e.gamepad_device = static_cast<std::uint8_t>(v[12]);
+  e.gamepad_axis = static_cast<std::uint8_t>(v[13]);
+  e.gamepad_axis_value = static_cast<float>(v[14]);
+  const std::string_view text_hex = fields[15];
+  if (text_hex.size() % 2 != 0) return std::nullopt;
+  for (std::size_t i = 0; i < text_hex.size(); i += 2) {
+    const auto nib = [](char c) -> int {
+      if (c >= '0' && c <= '9') return c - '0';
+      if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+      return -1;
+    };
+    const int hi = nib(text_hex[i]), lo = nib(text_hex[i + 1]);
+    if (hi < 0 || lo < 0) return std::nullopt;
+    e.text += static_cast<char>((hi << 4) | lo);
+  }
+  return e;
 }
 } // namespace
 
@@ -154,6 +232,14 @@ struct RuntimeHost::Impl {
   std::vector<Scene3dLight> lights3;
   float gravity3 = 0.f, ground_y3 = 0.f, bounds3 = 0.f;
   bool look_held = false; // right-button mouse-look
+  // Input journaling: --record fills `recorder` with frame-indexed input
+  // commands + periodic world-hash checkpoints; --replay parses a
+  // recording into `replay` and injects its commands ahead of live input.
+  std::optional<ReplayRecorder> recorder;
+  ReplayRecorder replay{ReplayHeader{}};
+  std::size_t replay_cursor = 0, replay_cp_cursor = 0;
+  bool replaying = false, replay_diverged = false,
+       replay_verified_printed = false;
   // 3D contact/ground tracking — separate sets: a pair can be in contact
   // in one dimensionality and not the other.
   std::set<std::pair<std::uint64_t, std::uint64_t>> overlapping3d;
@@ -545,6 +631,58 @@ int RuntimeHost::run() {
   impl.content = std::make_unique<ContentResolver>(
       options.package_id, options.project_root, exe_dir);
   const std::size_t cooked_assets = impl.content->cooked_count();
+
+  // --replay parses before the window opens so a corrupt recording fails
+  // fast instead of looking like a game hang.
+  if (!options.replay_file.empty()) {
+    std::ifstream in(options.replay_file, std::ios::binary);
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    std::string error;
+    auto parsed = ReplayRecorder::parse(ss.str(), &error);
+    if (!parsed) {
+      std::fprintf(stderr, "replay: cannot parse %s: %s\n",
+                   options.replay_file.generic_string().c_str(),
+                   error.c_str());
+      return 1;
+    }
+    impl.replay = std::move(*parsed);
+    impl.replaying = true;
+    if (impl.replay.truncated())
+      std::fprintf(stderr,
+                   "replay: recording truncated — entries past the "
+                   "retained prefix are absent\n");
+    if (const auto &h = impl.replay.header();
+        h.window_width != 0 &&
+        (h.window_width != static_cast<std::uint32_t>(options.width) ||
+         h.window_height != static_cast<std::uint32_t>(options.height)))
+      std::fprintf(stderr,
+                   "replay: recorded drawable %ux%u differs from this "
+                   "window — pointer positions may not land identically\n",
+                   h.window_width, h.window_height);
+  }
+  if (!options.record_file.empty()) {
+    ReplayHeader header;
+    header.seed = options.seed;
+    header.window_width = static_cast<std::uint32_t>(options.width);
+    header.window_height = static_cast<std::uint32_t>(options.height);
+    impl.recorder.emplace(header);
+  }
+  // Writes the finished journal; false on failure.
+  const auto flush_recorder = [&]() -> bool {
+    if (!impl.recorder) return true;
+    try {
+      const auto text = impl.recorder->serialize();
+      write_file_atomically(
+          options.record_file,
+          std::as_bytes(std::span{text.data(), text.size()}));
+      return true;
+    } catch (const std::exception &) {
+      std::fprintf(stderr, "record: cannot write %s\n",
+                   options.record_file.generic_string().c_str());
+      return false;
+    }
+  };
 
   RuntimeDiagnostics::context("runtime:window-ctor");
   Window window(options.window_title, options.width, options.height,
@@ -1075,8 +1213,29 @@ int RuntimeHost::run() {
     const auto snapshot = window.poll();
     if (snapshot.quit_requested || impl.quit_requested) break;
     impl.input.begin_frame();
-    for (const auto &event : snapshot.events) {
-      if (event.type == InputEventType::EscapePressed) return 0;
+    // The frame index is the journal tick — a replayed command lands in
+    // the same frame it was recorded on, ahead of this frame's live
+    // input (a live Escape still quits).
+    const auto frame_tick = static_cast<std::uint64_t>(rendered);
+    std::vector<InputEvent> frame_events;
+    if (impl.replaying) {
+      const auto &cmds = impl.replay.commands();
+      while (impl.replay_cursor < cmds.size() &&
+             cmds[impl.replay_cursor].tick <= frame_tick) {
+        if (cmds[impl.replay_cursor].name == "input")
+          if (auto decoded =
+                  decode_input_event(cmds[impl.replay_cursor].payload))
+            frame_events.push_back(*decoded);
+        ++impl.replay_cursor;
+      }
+    }
+    for (const auto &live : snapshot.events) frame_events.push_back(live);
+    for (const auto &event : frame_events) {
+      if (impl.recorder)
+        impl.recorder->record(frame_tick, "input",
+                              encode_input_event(event));
+      if (event.type == InputEventType::EscapePressed)
+        return flush_recorder() ? 0 : 1;
       // Feed the action mapper with a normalized raw event so game
       // actions (and the built-in player controls) see every input.
       RawInputEvent raw{};
@@ -1992,6 +2151,49 @@ int RuntimeHost::run() {
     }
     audio.service();
 
+    // World checkpoints: --record hashes the post-step world snapshot
+    // every 30 frames; --replay consumes each recorded checkpoint once
+    // the frame reaches its tick (a frozen minimized window keeps the
+    // world identical, so a late consume still verifies).
+    if (impl.recorder && rendered % 30 == 0) {
+      const auto bytes = world.snapshot();
+      impl.recorder->checkpoint(
+          frame_tick,
+          fnv1a64({reinterpret_cast<const char *>(bytes.data()),
+                   bytes.size()}),
+          "world");
+    }
+    if (impl.replaying) {
+      const auto &cps = impl.replay.checkpoints();
+      while (impl.replay_cp_cursor < cps.size() &&
+             cps[impl.replay_cp_cursor].tick <= frame_tick) {
+        const auto &cp = cps[impl.replay_cp_cursor++];
+        const auto bytes = world.snapshot();
+        const auto actual = fnv1a64(
+            {reinterpret_cast<const char *>(bytes.data()), bytes.size()});
+        if (actual != cp.hash) {
+          std::fprintf(stderr,
+                       "replay_diverged={\"frame\":%llu,\"label\":\"%s\"}\n",
+                       static_cast<unsigned long long>(cp.tick),
+                       cp.label.c_str());
+          impl.replay_diverged = true;
+        }
+      }
+      // The recording is fully verified once its command stream and every
+      // retained checkpoint have been consumed without a divergence.
+      if (!impl.replay_verified_printed && !impl.replay_diverged &&
+          impl.replay_cursor >= impl.replay.commands().size() &&
+          impl.replay_cp_cursor >= cps.size()) {
+        impl.replay_verified_printed = true;
+        std::printf("replay_verified={\"commands\":%llu,\"checkpoints\":%llu}"
+                    "\n",
+                    static_cast<unsigned long long>(
+                        impl.replay.commands().size()),
+                    static_cast<unsigned long long>(cps.size()));
+        std::fflush(stdout);
+      }
+    }
+
     DrawList draw;
     draw.overlay.push_back(
         FilledRectangle{{0, 0, w, h}, {impl.bg_r, impl.bg_g, impl.bg_b, 255}});
@@ -2250,6 +2452,8 @@ int RuntimeHost::run() {
       break;
   }
   RuntimeDiagnostics::context("runtime:teardown");
+  if (!flush_recorder()) return 1;
+  if (impl.replaying && impl.replay_diverged) return 1;
   if (!options.snapshot_out.empty()) {
     try {
       save_world_to_file(world, options.snapshot_out);
@@ -2298,6 +2502,10 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.input_map = argv[++i];
     else if (arg == "--seed")
       impl_->options.seed = std::strtoull(argv[++i], nullptr, 10);
+    else if (arg == "--record")
+      impl_->options.record_file = argv[++i];
+    else if (arg == "--replay")
+      impl_->options.replay_file = argv[++i];
     else if (arg == "--scene3d")
       impl_->options.scene3d = true;
     else if (arg == "--scene3d-file")

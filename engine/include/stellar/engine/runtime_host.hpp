@@ -84,6 +84,15 @@ struct RuntimeHostOptions {
   std::string scene3d_file{"editor/scene3d.json"};
   // Fly-camera move speed in 3D world units/second.
   float fly_speed{4.0f};
+  // Input journaling (CLI: --record <file> / --replay <file>). --record
+  // journals every input event against the frame it arrived on plus a
+  // world-snapshot hash every 30 frames; --replay injects the recorded
+  // stream ahead of live input and verifies each retained checkpoint,
+  // reporting replay_verified/replay_diverged on stderr. Replays are only
+  // deterministic under --fixed-hz — wall-clock stepping makes frame
+  // boundaries nondeterministic.
+  std::filesystem::path record_file;
+  std::filesystem::path replay_file;
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content
