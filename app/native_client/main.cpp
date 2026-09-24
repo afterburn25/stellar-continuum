@@ -1154,15 +1154,18 @@ class NativeCampaign final {
     if(candidates.empty()){
       research_candidate_index_=0;
       session_->publish_status(
-          "No research choices are currently available. A construction "
-          "prerequisite may be missing.");
+          tr("STATUS_NO_RESEARCH_CHOICES",
+             "No research choices are currently available. A construction "
+             "prerequisite may be missing."));
       return;
     }
     research_candidate_index_=
         (research_candidate_index_+1)%
         static_cast<int>(candidates.size());
-    session_->publish_status("Research candidate: "+
-        candidates[research_candidate_index_]->display_name);
+    session_->publish_status(
+        trf("STATUS_RESEARCH_CANDIDATE",
+            {candidates[research_candidate_index_]->display_name},
+            "Research candidate: {0}"));
   }
   void start_research_candidate(){
     const auto view=research_controller_.build(
@@ -1171,8 +1174,9 @@ class NativeCampaign final {
     if(candidates.empty()){
       research_candidate_index_=0;
       session_->publish_status(
-          "No available research project selected. Check construction "
-          "prerequisites.");
+          tr("STATUS_NO_RESEARCH_SELECTED",
+             "No available research project selected. Check construction "
+             "prerequisites."));
       return;
     }
     research_candidate_index_=std::clamp(research_candidate_index_,0,
@@ -1208,23 +1212,27 @@ class NativeCampaign final {
     if(construction_project_active(view)){
       construction_candidate_index_=0;
       session_->publish_status(
-          "Complete the current construction project before selecting "
-          "another.");
+          tr("STATUS_CONSTRUCTION_IN_PROGRESS",
+             "Complete the current construction project before selecting "
+             "another."));
       return;
     }
     const auto candidates=construction_candidates(view);
     if(candidates.empty()){
       construction_candidate_index_=0;
       session_->publish_status(
-          "No construction choices are currently available. Research may be "
-          "required.");
+          tr("STATUS_NO_CONSTRUCTION_CHOICES",
+             "No construction choices are currently available. Research may be "
+             "required."));
       return;
     }
     construction_candidate_index_=
         (construction_candidate_index_+1)%
         static_cast<int>(candidates.size());
-    session_->publish_status("Construction candidate: "+
-        candidates[construction_candidate_index_]->name);
+    session_->publish_status(
+        trf("STATUS_CONSTRUCTION_CANDIDATE",
+            {candidates[construction_candidate_index_]->name},
+            "Construction candidate: {0}"));
   }
   void start_construction_candidate(){
     const auto view=construction_controller_.build(
@@ -1232,14 +1240,16 @@ class NativeCampaign final {
     if(construction_project_active(view)){
       construction_candidate_index_=0;
       session_->publish_status(
-          "No available construction project selected.");
+          tr("STATUS_NO_CONSTRUCTION_SELECTED",
+             "No available construction project selected."));
       return;
     }
     const auto candidates=construction_candidates(view);
     if(candidates.empty()){
       construction_candidate_index_=0;
       session_->publish_status(
-          "No available construction project selected.");
+          tr("STATUS_NO_CONSTRUCTION_SELECTED",
+             "No available construction project selected."));
       return;
     }
     construction_candidate_index_=std::clamp(construction_candidate_index_,0,
@@ -8392,7 +8402,8 @@ class NativeCampaign final {
     if(!enter_system(colony->system_id,width,height)||
        !system_workspace_.select_body(*colony->planetary_body_id)){
       session_->publish_status(
-          "The colony world is not available in the current orbital survey.");
+          tr("STATUS_COLONY_WORLD_UNAVAILABLE",
+             "The colony world is not available in the current orbital survey."));
       return;
     }
     refresh_colony_entry(true);
