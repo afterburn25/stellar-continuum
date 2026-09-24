@@ -476,26 +476,30 @@ NativeDiplomacyWorkspace::filtered_contacts() const {
 // buttons, the tab strip, and the detail region's buttons (proposal card
 // actions, the intelligence FOCUS link) — narrowed to the modal's own
 // controls while one is open. Inert surfaces never focus.
-std::vector<UiRect> NativeDiplomacyWorkspace::focusables(
+std::vector<NativeDiplomacyWorkspace::FocusRect>
+NativeDiplomacyWorkspace::focusables(
     const DiplomacyWorkspaceLayout &layout) const {
-  std::vector<UiRect> out;
+  std::vector<FocusRect> out;
   if (modal_) {
     if (modal_->negotiation)
       for (std::size_t index = 0; index < modal_->terms.size(); ++index)
-        out.push_back(modal_term_button(layout, index));
+        out.push_back({modal_term_button(layout, index),
+                       modal_->terms[index].first});
     else
-      out.push_back(modal_confirm_button(layout));
-    out.push_back(modal_cancel_button(layout));
+      out.push_back({modal_confirm_button(layout), modal_->confirm_label});
+    out.push_back({modal_cancel_button(layout),
+                   tr("SETTINGS_CANCEL", "Cancel")});
   } else {
-    out.push_back(layout.close);
+    out.push_back({layout.close, tr("DIPLOMACY_RETURN", "RETURN")});
     for (std::size_t index = 0; index < std::size(filter_labels); ++index)
-      out.push_back(filter_button(layout, index));
+      out.push_back({filter_button(layout, index),
+                     tr(filter_keys[index], filter_labels[index].second)});
     const auto rows = filtered_contacts();
     for (std::size_t index = 0; index < rows.size(); ++index)
       if (const auto clipped =
               intersection(contact_row(layout, index, contact_scroll_.scroll_offset),
                            layout.contact_rows))
-        out.push_back(*clipped);
+        out.push_back({*clipped, rows[index]->display_name});
     const auto &sel = view_->selected;
     if (sel.present) {
       // Same enumeration order as the click dispatch and renderer.
@@ -505,14 +509,29 @@ std::vector<UiRect> NativeDiplomacyWorkspace::focusables(
       const bool negotiate = sel.can_offer_non_aggression ||
                              sel.can_request_access || sel.can_offer_peace ||
                              sel.can_offer_ceasefire || sel.can_set_access;
+      const std::string action_names[] = {
+          sel.has_visible_communication
+              ? tr("DIPLOMACY_OPEN_TRANSMISSION", "Open transmission")
+              : tr("DIPLOMACY_ESTABLISH_COMMUNICATION",
+                   "Establish communication"),
+          tr("DIPLOMACY_NEGOTIATE", "Negotiate"),
+          tr("DIPLOMACY_DECLARE_WAR_ACTION", "Declare war")};
+      std::size_t which = 0;
       for (const bool enabled : {transmission, negotiate, sel.can_declare_war}) {
-        if (!enabled) continue;
-        out.push_back(action_button(layout, action_index++));
+        if (!enabled) { ++which; continue; }
+        out.push_back({action_button(layout, action_index++),
+                       action_names[which++]});
       }
     }
     for (std::size_t index = 0; index < std::size(tab_labels); ++index)
-      out.push_back(tab_button(layout, index));
+      out.push_back({tab_button(layout, index),
+                     tr(tab_keys[index], tab_labels[index].second)});
     if (tab_ == DiplomacyWorkspaceTab::proposals) {
+      const char *const proposal_names[] = {"DIPLOMACY_ACCEPT",
+                                            "DIPLOMACY_REJECT",
+                                            "DIPLOMACY_WITHDRAW"};
+      const char *const proposal_fallbacks[] = {"Accept", "Reject",
+                                                "Withdraw"};
       for (std::size_t card = 0; card < view_->proposals.size(); ++card) {
         const auto &proposal = view_->proposals[card];
         const bool legal[] = {proposal.can_accept, proposal.can_reject,
@@ -523,7 +542,9 @@ std::vector<UiRect> NativeDiplomacyWorkspace::focusables(
                     intersection(proposal_button(layout, card, which,
                                                  detail_scroll_.scroll_offset),
                                  layout.detail_rows))
-              out.push_back(*clipped);
+              out.push_back(
+                  {*clipped, tr(proposal_names[which],
+                                proposal_fallbacks[which])});
       }
     }
     if (tab_ == DiplomacyWorkspaceTab::intelligence && sel.present) {
@@ -534,14 +555,29 @@ std::vector<UiRect> NativeDiplomacyWorkspace::focusables(
                           layout.detail_rows.y + 78.f * s - detail_scroll_.scroll_offset,
                           layout.detail_rows.width - 32.f * s, 34.f * s};
         if (const auto clipped = intersection(link, layout.detail_rows))
-          out.push_back(*clipped);
+          out.push_back(
+              {*clipped,
+               trf("DIPLOMACY_LAST_OBSERVATION",
+                   {contact.last_observed_system_name},
+                   "Last observation · {0}")});
       }
     }
   }
-  std::sort(out.begin(), out.end(), [](const UiRect &a, const UiRect &b) {
-    return a.y == b.y ? a.x < b.x : a.y < b.y;
+  std::sort(out.begin(), out.end(), [](const FocusRect &a, const FocusRect &b) {
+    return a.bounds.y == b.bounds.y ? a.bounds.x < b.bounds.x
+                                    : a.bounds.y < b.bounds.y;
   });
   return out;
+}
+
+std::string NativeDiplomacyWorkspace::focused_label(int width,
+                                                    int height) const {
+  if (focus_ < 0) return {};
+  const auto items =
+      focusables(DiplomacyWorkspaceLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
 }
 
 DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
@@ -580,7 +616,7 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
         focus_ < count) {
-      const auto &rect = rects[static_cast<std::size_t>(focus_)];
+      const auto &rect = rects[static_cast<std::size_t>(focus_)].bounds;
       InputEvent press{InputEventType::LeftPressed};
       press.position = {rect.x + rect.width * .5f,
                         rect.y + rect.height * .5f};
@@ -1354,7 +1390,7 @@ void NativeDiplomacyWorkspace::render(
   if (focus_ >= 0) {
     const auto rects = focusables(layout);
     if (focus_ < static_cast<int>(rects.size()))
-      stroke(out, rects[static_cast<std::size_t>(focus_)], accent);
+      stroke(out, rects[static_cast<std::size_t>(focus_)].bounds, accent);
   }
 }
 

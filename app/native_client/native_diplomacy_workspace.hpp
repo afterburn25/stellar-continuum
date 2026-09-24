@@ -99,6 +99,9 @@ public:
   [[nodiscard]] bool select_contact_civilization(int civilization_id);
   [[nodiscard]] const std::string &notice() const noexcept;
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control — the announcement surface for
+  // screen-reader/live-region consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
 
   [[nodiscard]] DiplomacyWorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);
@@ -123,7 +126,11 @@ private:
   };
 
   void reconcile_selection();
-  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+  };
+  [[nodiscard]] std::vector<FocusRect>
   focusables(const DiplomacyWorkspaceLayout &layout) const;
   [[nodiscard]] float
   detail_content_height(const DiplomacyWorkspaceLayout &layout) const noexcept;

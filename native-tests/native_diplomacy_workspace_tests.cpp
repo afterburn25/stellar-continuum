@@ -467,6 +467,14 @@ int main() try {
             "Down did not wrap from the last control to the first.");
     require(!key(kF5).captured, "An unrelated key was captured.");
 
+    // The ring carries announcement labels for screen-reader consumers.
+    require(keys.focused_label(1280, 720) == "RETURN",
+            "Focused close control announced the wrong label.");
+    require(key(kEnd).captured &&
+                !keys.focused_label(1280, 720).empty(),
+            "Last ring control announced an empty label.");
+    (void)key(kHome);
+
     // Activate the negotiate action: walk the ring until it lands on the
     // negotiate button, then Return replays the click dispatch.
     const UiRect negotiate_rect{layout.actions.x + 8.f * s,
