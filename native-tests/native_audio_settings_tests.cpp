@@ -168,7 +168,9 @@ void keyboard_focus_and_sliders(const fs::path& path) {
   constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u, kUp = 0x40000052u;
   constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
   require(settings.focused() < 0, "audio settings opened with stale focus");
+  require(settings.focused_label().empty(), "unfocused panel reported a label");
   require(press(kTab) && settings.focused() == 0, "Tab did not focus the master slider");
+  require(settings.focused_label() == "Master volume", "focused_label did not name the master slider");
   // Focused sliders take Left/Right/Home/End as gain adjustments.
   const float master = settings.values().master;
   const auto before = previews.size();
@@ -189,12 +191,15 @@ void keyboard_focus_and_sliders(const fs::path& path) {
   // Off a slider, Left/Right navigate; activation dispatches like a click.
   require(press(kTab) && press(kTab) && press(kTab) && settings.focused() == 3,
           "Tab chain did not reach MUTE");
+  require(settings.focused_label() == "Mute", "focused_label did not name MUTE");
   require(press(kSpace) && settings.values().muted, "Space did not toggle MUTE");
+  require(settings.focused_label() == "Unmute", "focused_label did not track the mute state");
   require(press(kRight) && settings.focused() == 4 && press(kLeft) && settings.focused() == 3,
           "arrows did not navigate the button row");
   // Focus wraps to SAVE, activates it, and the panel closes.
   for (int i = 0; i < 3; ++i) (void)press(kTab);
-  require(settings.focused() == 6, "Tab chain did not reach SAVE");
+  require(settings.focused() == 6 && settings.focused_label() == "Save",
+          "Tab chain did not reach SAVE");
   require(press(kReturn) && !settings.visible(), "Return on SAVE did not save and close");
   settings.open();
   require(settings.focused() < 0, "reopened panel kept a stale focus index");

@@ -170,14 +170,18 @@ void menu_hover_feedback(){
     hub.close();hub.open();require(hub.focused()<0,"hub opened with stale focus");
     constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
     constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    require(hub.focused_label().empty(),"unfocused hub reported a label");
     require(key(kTab),"Tab was not consumed by the settings hub");
     require(hub.focused()==0,"Tab did not focus the first category");
+    require(hub.focused_label()=="General","focused_label did not name the General category");
     require(cues==8,"focus change did not play the hover cue");
     require(key(kTab)&&hub.focused()==1&&cues==9,"second Tab did not advance focus");
+    require(hub.focused_label()=="Audio","focused_label did not name the Audio category");
     require(key(kTab,true)&&hub.focused()==0,"Shift+Tab did not move focus back");
     require(key(kDown)&&hub.focused()==1&&key(kRight)&&hub.focused()==2,"arrow keys did not advance focus");
     require(key(kUp)&&hub.focused()==1&&key(kLeft)&&hub.focused()==0,"arrow keys did not retreat focus");
     require(key(kTab,true)&&hub.focused()==5,"Shift+Tab did not wrap focus to Back");
+    require(hub.focused_label()=="Back","focused_label did not name the Back control");
     require(key(kReturn),"Return on focused Back was not consumed");
     require(!hub.visible(),"Return on focused Back did not close the hub");
     hub.open();require(key(kTab)&&key(kSpace),"keyboard activation sequence failed");
@@ -187,8 +191,9 @@ void menu_hover_feedback(){
     // lands back on the Controls category that invoked it.
     hub.close();hub.open();
     (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[4])},w,h);
-    require(key(kTab)&&hub.focused()==0,"Controls view did not focus Back");
+    require(key(kTab)&&hub.focused()==0&&hub.focused_label()=="Back","Controls view did not focus Back");
     require(key(kReturn)&&hub.focused()==4,"Controls Back did not restore focus to its invoker");
+    require(hub.focused_label()=="Controls","focused_label did not name the Controls category");
     require(key(kTab)&&hub.focused()==5,"focus did not resume on the category list");
     // Pointer clicks take over from the focus ring.
     (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[0])},w,h);child=false;

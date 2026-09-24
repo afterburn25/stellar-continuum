@@ -243,6 +243,24 @@ void NativeAudioSettings::cancel() {
   visible_ = false;
 }
 
+std::string NativeAudioSettings::focused_label() const {
+  if (focus_ < 0) return {};
+  switch (focus_) {
+  case 0: return tr("SETTINGS_AUDIO_MASTER", "Master volume");
+  case 1: return tr("SETTINGS_AUDIO_MUSIC", "Music volume");
+  case 2: return tr("SETTINGS_AUDIO_EFFECTS", "Effects volume");
+  case 3: return tr(values_.muted ? "SETTINGS_AUDIO_UNMUTE" : "SETTINGS_AUDIO_MUTE",
+                   values_.muted ? "Unmute" : "Mute");
+  case 4: return tr("SETTINGS_DEFAULTS", "Defaults");
+  case 5: return tr("SETTINGS_CANCEL", "Cancel");
+  case 6: return tr("SETTINGS_SAVE", "Save");
+  default: break;
+  }
+  int extra = focus_ - 7;
+  if (video_navigation_ && extra-- == 0) return tr("SETTINGS_NAV_VIDEO", "Video");
+  if (general_navigation_ && extra-- == 0) return tr("SETTINGS_NAV_GENERAL", "General");
+  return {};
+}
 std::string NativeAudioSettings::tr(std::string_view key, std::string_view fallback) const {
   if (locale_ && locale_->contains(key)) return std::string(locale_->translate(key));
   return std::string(fallback);

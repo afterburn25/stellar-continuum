@@ -241,11 +241,18 @@ void keyboard_focus_and_sliders(const fs::path& path) {
   constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u;
   constexpr std::uint32_t kEnd = 0x4000004du;
   require(settings.focused() < 0, "voice settings opened with stale focus");
+  require(settings.focused_label().empty(), "unfocused panel reported a label");
   require(press(kTab) && settings.focused() == 0, "Tab did not focus ENABLE VOICES");
+  require(settings.focused_label() == "Enable voices: On",
+          "focused_label did not name ENABLE VOICES with its state");
   require(press(kSpace) && !settings.values().enabled && settings.focused() == 0,
           "Space did not toggle ENABLE VOICES in place");
+  require(settings.focused_label() == "Enable voices: Off",
+          "focused_label did not track the toggle");
   // The volume slider (index 1) adjusts on arrows, snaps on Home/End.
   require(press(kTab) && settings.focused() == 1, "Tab did not reach the volume slider");
+  require(settings.focused_label() == "Voice volume: 100%",
+          "focused_label did not announce the slider value");
   const float volume = settings.values().volume;
   require(press(kLeft) && settings.values().volume == volume - .05f,
           "Left arrow did not lower the focused volume slider");
@@ -261,7 +268,9 @@ void keyboard_focus_and_sliders(const fs::path& path) {
   require(settings.focused() == 9, "Tab chain did not reach REPLAY");
   require(press(kReturn) && replays == 1, "Return on REPLAY did not invoke the callback");
   // SAVE (index 13) wraps from the last control.
-  require(press(kEnd) && settings.focused() == 13, "End did not reach SAVE");
+  require(press(kEnd) && settings.focused() == 13 &&
+              settings.focused_label() == "Save",
+          "End did not reach SAVE");
   require(press(kTab) && settings.focused() == 0, "focus did not wrap to the first control");
 }
 

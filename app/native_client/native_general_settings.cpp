@@ -219,6 +219,36 @@ void NativeGeneralSettings::activate_at(const GeneralSettingsLayout& layout,stel
   } else if(layout.defaults.contains(position)){draft_.screenshot_directory.clear();path_scroll_={};error_.clear();}
   else if(layout.save.contains(position)&&save(draft_))visible_=false;
 }
+std::string NativeGeneralSettings::focused_label()const{
+  if(focus_<0)return{};
+  if(browsing())return tr("SETTINGS_CANCEL","Cancel");
+  const auto quality_name=[&](std::string_view key,std::string_view fallback){return tr(key,fallback);};
+  const std::array<std::string,3> densities{quality_name("SETTINGS_QUALITY_LOW","Low"),quality_name("SETTINGS_QUALITY_MEDIUM","Medium"),quality_name("SETTINGS_QUALITY_HIGH","High")};
+  const std::array<std::string,4> details{densities[0],densities[1],densities[2],quality_name("SETTINGS_QUALITY_ULTRA","Ultra")};
+  const std::array<std::string,4> scale_names{quality_name("SETTINGS_SCALE_COMPACT","Compact"),quality_name("SETTINGS_SCALE_STANDARD","Standard"),
+    quality_name("SETTINGS_SCALE_LARGE","Large"),quality_name("SETTINGS_SCALE_HUGE","Huge")};
+  const std::array<std::string,4> colorblind_names{quality_name("SETTINGS_COLORBLIND_NONE","Off"),quality_name("SETTINGS_COLORBLIND_PROTANOPIA","Protanopia"),
+    quality_name("SETTINGS_COLORBLIND_DEUTERANOPIA","Deuteranopia"),quality_name("SETTINGS_COLORBLIND_TRITANOPIA","Tritanopia")};
+  const auto locale_name=[](std::string_view id){if(id=="en")return std::string("English");if(id=="de")return std::string("Deutsch");return std::string(id);};
+  const auto on_off=[&](bool v){return tr(v?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",v?"On":"Off");};
+  switch(focus_){
+  case 0:return tr("SETTINGS_NAV_AUDIO","Audio");
+  case 1:return tr("SETTINGS_NAV_VIDEO","Video");
+  case 2:return trf("SETTINGS_NEBULA_DENSITY",{densities.at(draft_.nebula_density)},"Space phenomena density: {0}");
+  case 3:return trf("SETTINGS_ERUPTION_DETAIL",{details.at(draft_.eruption_quality)},"Stellar eruption detail: {0}");
+  case 4:return trf("SETTINGS_REDUCE_MOTION",{on_off(draft_.reduce_motion)},"Reduced motion (decorative animation): {0}");
+  case 5:return trf("SETTINGS_INTERFACE_SCALE",{scale_names.at(static_cast<std::size_t>(draft_.interface_scale))},"Interface scale: {0}");
+  case 6:return trf("SETTINGS_REDUCE_FLASHING",{on_off(draft_.reduce_flashing)},"Reduce flashing: {0}");
+  case 7:return trf("SETTINGS_HIGH_CONTRAST",{on_off(draft_.high_contrast)},"High contrast: {0}");
+  case 8:return trf("SETTINGS_COLOR_BLIND",{colorblind_names.at(static_cast<std::size_t>(draft_.color_blind))},"Color-blind mode: {0}");
+  case 9:return trf("SETTINGS_LANGUAGE",{locale_name(draft_.locale)},"Language: {0}");
+  case 10:return tr("SETTINGS_BROWSE","Browse");
+  case 11:return tr("SETTINGS_USE_DEFAULT","Use default");
+  case 12:return tr("SETTINGS_CANCEL","Cancel");
+  case 13:return tr("SETTINGS_SAVE","Save");
+  default:return{};
+  }
+}
 void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   if(!visible_)return;
   const auto l=GeneralSettingsLayout::for_viewport(width,height);const auto s=l.scale;

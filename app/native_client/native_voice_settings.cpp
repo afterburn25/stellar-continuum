@@ -280,6 +280,38 @@ bool NativeVoiceSettings::handle(const InputEvent& event, int width, int height)
   focus_ = -1;
   activate_at(layout, event.position); return true;
 }
+std::string NativeVoiceSettings::focused_label() const {
+  if (focus_ < 0) return {};
+  const auto state = [&](bool v) {
+    return tr(v ? "SETTINGS_STATE_ON" : "SETTINGS_STATE_OFF", v ? "On" : "Off");
+  };
+  const auto named = [&](std::string_view key, std::string_view fallback,
+                         std::string value) {
+    return tr(key, fallback) + ": " + std::move(value);
+  };
+  switch (focus_) {
+  case 0: return named("SETTINGS_VOICE_ENABLE", "Enable voices", state(values_.enabled));
+  case 1: return named("SETTINGS_VOICE_VOLUME", "Voice volume", percentage(values_.volume));
+  case 2: return named("SETTINGS_VOICE_SUBTITLES", "Subtitles", state(values_.subtitles));
+  case 3: return named("SETTINGS_VOICE_SUBTITLE_SIZE", "Subtitle size",
+                       std::to_string(values_.subtitle_size) + " px");
+  case 4: return named("SETTINGS_VOICE_SUBTITLE_BACKGROUND", "Subtitle background",
+                       percentage(values_.subtitle_background_opacity));
+  case 5: return named("SETTINGS_VOICE_SPEAKER_LABELS", "Speaker labels", state(values_.speaker_labels));
+  case 6: return named("SETTINGS_VOICE_COMMS_FILTER", "Communication filter",
+                       percentage(values_.communication_filter));
+  case 7: return named("SETTINGS_VOICE_FREQUENCY", "Announcement frequency",
+                       frequency_name(values_.frequency));
+  case 8: return named("SETTINGS_VOICE_NO_INTERRUPTIONS", "Do not interrupt dialogue",
+                       state(values_.no_interruptions));
+  case 9: return tr("SETTINGS_VOICE_REPLAY", "Replay last announcement");
+  case 10: return tr("SETTINGS_VOICE_STOP", "Stop");
+  case 11: return tr("SETTINGS_DEFAULTS", "Defaults");
+  case 12: return tr("SETTINGS_CANCEL", "Cancel");
+  case 13: return tr("SETTINGS_SAVE", "Save");
+  default: return {};
+  }
+}
 void NativeVoiceSettings::activate_at(const VoiceSettingsLayout& layout, stellar::native_map::Point position) {
   if (layout.volume_track.contains(position)) {
     dragging_ = Dragged::Volume; set_from_track(dragging_, position, layout); return;

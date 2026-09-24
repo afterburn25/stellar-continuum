@@ -35,6 +35,15 @@ public:
   bool visible()const{return visible_;}
   bool showing_categories()const{return visible_&&(!child_visible_||!child_visible_());}
   int focused()const noexcept{return focus_;}
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label()const{
+    if(focus_<0)return {};
+    if(controls_||focus_==5)return tr("SETTINGS_BACK","Back");
+    constexpr std::array keys{"SETTINGS_NAV_GENERAL","SETTINGS_NAV_AUDIO","SETTINGS_NAV_VIDEO","SETTINGS_NAV_VOICE","SETTINGS_NAV_CONTROLS"};
+    constexpr std::array names{"General","Audio","Video","Voice & subtitles","Controls"};
+    return focus_<5?tr(keys[static_cast<std::size_t>(focus_)],names[static_cast<std::size_t>(focus_)]):std::string{};
+  }
   bool handle(const InputEvent&e,int width,int height){
     if(!showing_categories())return false;
     if(e.type==InputEventType::PointerMove)pointer_=e.position;

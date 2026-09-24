@@ -86,6 +86,9 @@ class NativeGeneralSettings final {
   void cancel();
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] int focused() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label() const;
   [[nodiscard]] bool browsing() const noexcept { return pending_request_.has_value(); }
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&,int,int);
   void render(stellar::native_map::DrawList&,int,int) const;

@@ -100,6 +100,10 @@ public:
   void set_windowed_choices(std::vector<VideoDisplayChoice> choices);
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] int focused() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Choice rows announce "LABEL: value" like they render.
+  // Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
   [[nodiscard]] const NativeVideoSettings &values() const noexcept {
     return values_;
   }

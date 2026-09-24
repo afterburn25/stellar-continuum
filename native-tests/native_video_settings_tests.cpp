@@ -312,9 +312,15 @@ void keyboard_focus_traversal() {
   constexpr std::uint32_t kDown = 0x40000051u, kUp = 0x40000052u;
   constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
   require(view.focused() < 0, "video settings opened with stale focus");
+  require(view.focused_label(width, height).empty(),
+          "unfocused view reported a label");
   // Borderless hides RESOLUTION: the ring is 7 choices + NVIDIA + APPLY + CANCEL.
   require(key(kTab).captured && view.focused() == 0, "Tab did not focus DISPLAY");
+  require(view.focused_label(width, height) == "DISPLAY: Borderless fullscreen",
+          "focused_label did not announce DISPLAY with its value");
   require(key(kEnd).captured && view.focused() == 9, "End did not focus the last control");
+  require(view.focused_label(width, height) == "Cancel",
+          "focused_label did not name CANCEL");
   require(key(kTab).captured && view.focused() == 0, "focus did not wrap to DISPLAY");
   require(key(kTab, true).captured && view.focused() == 9,
           "Shift+Tab did not wrap to the last control");
@@ -340,7 +346,9 @@ void keyboard_focus_traversal() {
   view.set_confirming(true);
   require(view.focused() < 0, "confirming kept a stale focus index");
   require(key(kTab).captured && view.focused() == 0 &&
-              key(kTab).captured && view.focused() == 1,
+              view.focused_label(width, height) == "Keep" &&
+              key(kTab).captured && view.focused() == 1 &&
+              view.focused_label(width, height) == "Revert",
           "confirm ring did not cover KEEP/REVERT");
   require(key(kSpace).command == VideoSettingsCommand::Revert,
           "Space on REVERT did not emit Revert");

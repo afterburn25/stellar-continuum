@@ -5853,23 +5853,40 @@ class NativeCampaign final {
       menu_hover_feedback_.update(event,static_cast<std::uint64_t>(hover_action));
       if(session_->new_campaign_pending()) break;
       if(event.type==InputEventType::PointerCancelled){settlement_workspace_.cancel_pending_input();(void)colony_roster_.handle(event,width,height);fleet_workspace_.cancel_recovery();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();}
-      if(voice_settings_&&voice_settings_->visible()){(void)voice_settings_->handle(event,width,height);gesture_.capture_for_ui();continue;}
-      if(settings_hub_&&settings_hub_->handle(event,width,height)){gesture_.capture_for_ui();continue;}
+      if(voice_settings_&&voice_settings_->visible()){
+        const int focus_before=voice_settings_->focused();
+        (void)voice_settings_->handle(event,width,height);
+        if(voice_settings_->focused()!=focus_before)announcer_.announce(voice_settings_->focused_label());
+        gesture_.capture_for_ui();continue;
+      }
+      if(settings_hub_){
+        const int focus_before=settings_hub_->focused();
+        if(settings_hub_->handle(event,width,height)){
+          if(settings_hub_->focused()!=focus_before)announcer_.announce(settings_hub_->focused_label());
+          gesture_.capture_for_ui();continue;
+        }
+      }
       if(general_settings_&&general_settings_->visible()){
         notification_view_.close();chronicle_view_.close();
+        const int focus_before=general_settings_->focused();
         (void)general_settings_->handle(event,width,height);
+        if(general_settings_->focused()!=focus_before)announcer_.announce(general_settings_->focused_label());
         gesture_.capture_for_ui();
         continue;
       }
       if(video_settings_&&video_settings_->visible()){
         notification_view_.close();chronicle_view_.close();
+        const int focus_before=video_settings_->focused();
         (void)video_settings_->handle(event,width,height);
+        if(video_settings_->focused()!=focus_before)announcer_.announce(video_settings_->focused_label(width,height));
         gesture_.capture_for_ui();
         continue;
       }
       if(audio_settings_&&audio_settings_->visible()){
         notification_view_.close();chronicle_view_.close();
+        const int focus_before=audio_settings_->focused();
         (void)audio_settings_->handle(event,width,height);
+        if(audio_settings_->focused()!=focus_before)announcer_.announce(audio_settings_->focused_label());
         gesture_.capture_for_ui();
         continue;
       }

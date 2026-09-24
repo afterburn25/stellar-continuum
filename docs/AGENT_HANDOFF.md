@@ -1050,6 +1050,16 @@ coordinates (`5f5684e7`); `native_colony_workspace` green again. Same
 session: focused_label adoption batch 2 — chronicle, colony roster,
 colony freight modal and notification feed expose `focused_label()`
 and the dispatcher announces on focus change (`2581fbd8`).
+The general-settings `path_scroll_` ScrollView migration noted above
+landed once the editor's file lock cleared (`141d8408`). Same session:
+settings surfaces complete the focused_label sweep — the settings hub
+and General/Audio/Video/Voice panels expose `focused_label()` (dynamic
+controls announce "Name: value" like they render; modal states narrow
+to their live controls) and both dispatch layers announce on focus
+change (the client's settings block and the startup entry's
+`route_settings`). `native_audio_settings`, `native_general_settings`,
+`native_video_settings`, `native_voice_settings`,
+`native_startup_workspace` all green.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

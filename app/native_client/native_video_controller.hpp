@@ -30,6 +30,8 @@ public:
   void set_display_choices(std::vector<VideoDisplayChoice> choices,std::string label);
   void set_windowed_display_choices(std::vector<VideoDisplayChoice> choices);
   [[nodiscard]] bool visible()const noexcept{return view_.visible();}
+  [[nodiscard]] int focused()const noexcept{return view_.focused();}
+  [[nodiscard]] std::string focused_label(int width,int height)const{return view_.focused_label(width,height);}
   [[nodiscard]] bool previewing()const noexcept{return previous_.has_value();}
   [[nodiscard]] bool backend_state_known() const noexcept{return !faulted_;}
   [[nodiscard]] const NativeVideoSettings& active()const noexcept{return active_;}

@@ -63,11 +63,23 @@ StartupEntryResult run_native_startup_entry(Window &window,
   const std::string system_info="Stellar Continuum "+config.host.game_version+"\n"+window.graphics_adapter()+"\nDisplay: "+std::to_string(window.drawable_width())+" x "+std::to_string(window.drawable_height());
   workspace.set_diagnostics(window.graphics_adapter()+"\nDisplay: "+std::to_string(window.drawable_width())+" x "+std::to_string(window.drawable_height()));
   const auto route_settings = [&](const InputEvent& e,int w,int h) {
-    if(config.voice_settings&&config.voice_settings->visible())return config.voice_settings->handle(e,w,h);
-    if(config.general_settings&&config.general_settings->visible())return config.general_settings->handle(e,w,h);
-    if(config.video_settings&&config.video_settings->visible())return config.video_settings->handle(e,w,h);
-    if(config.audio_settings&&config.audio_settings->visible())return config.audio_settings->handle(e,w,h);
-    return config.settings_hub&&config.settings_hub->handle(e,w,h);
+    const auto route=[&](auto*settings,const auto&label){
+      const int focus_before=settings->focused();
+      const bool captured=settings->handle(e,w,h);
+      if(config.announcer&&settings->focused()!=focus_before)config.announcer->announce(label());
+      return captured;
+    };
+    if(config.voice_settings&&config.voice_settings->visible())
+      return route(config.voice_settings,[&]{return config.voice_settings->focused_label();});
+    if(config.general_settings&&config.general_settings->visible())
+      return route(config.general_settings,[&]{return config.general_settings->focused_label();});
+    if(config.video_settings&&config.video_settings->visible())
+      return route(config.video_settings,[&]{return config.video_settings->focused_label(w,h);});
+    if(config.audio_settings&&config.audio_settings->visible())
+      return route(config.audio_settings,[&]{return config.audio_settings->focused_label();});
+    if(config.settings_hub)
+      return route(config.settings_hub,[&]{return config.settings_hub->focused_label();});
+    return false;
   };
   const auto saved_slots=host.slots();
   if(!saved_slots.slots.empty())workspace.set_continue_save(saved_slots.slots.front().path);

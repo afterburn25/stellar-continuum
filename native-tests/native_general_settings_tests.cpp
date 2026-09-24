@@ -363,8 +363,10 @@ void keyboard_focus_traversal(const TempDirectory& temp) {
   constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
   constexpr std::uint32_t kRight = 0x4000004fu, kUp = 0x40000052u;
   require(settings.focused() < 0, "General Settings opened with stale focus");
+  require(settings.focused_label().empty(), "unfocused panel reported a label");
   require(press(kTab) && settings.focused() == 0 && cues == 1,
           "Tab did not focus AUDIO");
+  require(settings.focused_label() == "Audio", "focused_label did not name AUDIO");
   require(press(kTab) && settings.focused() == 1, "second Tab did not reach VIDEO");
   require(press(kTab, true) && settings.focused() == 0,
           "Shift+Tab did not retreat focus");
@@ -379,12 +381,21 @@ void keyboard_focus_traversal(const TempDirectory& temp) {
   for (int i = 0; i < 5; ++i) (void)press(kTab);
   require(settings.focused() == 4, "Tab chain did not reach REDUCE MOTION");
   const bool motion = settings.draft().reduce_motion;
+  require(settings.focused_label() ==
+              std::string("Reduced motion (decorative animation): ") +
+                  (motion ? "On" : "Off"),
+          "focused_label did not name REDUCE MOTION with its state");
   require(press(kSpace) && settings.draft().reduce_motion == !motion &&
               settings.focused() == 4,
           "Space did not toggle the focused preference in place");
+  require(settings.focused_label() ==
+              std::string("Reduced motion (decorative animation): ") +
+                  (!motion ? "On" : "Off"),
+          "focused_label did not track the toggled state");
   // Focus wraps past SAVE (index 13) back onto AUDIO.
   for (int i = 0; i < 9; ++i) (void)press(kTab);
-  require(settings.focused() == 13, "Tab chain did not reach SAVE");
+  require(settings.focused() == 13 && settings.focused_label() == "Save",
+          "Tab chain did not reach SAVE");
   require(press(kTab) && settings.focused() == 0,
           "focus did not wrap to the first control");
   // Pointer presses take focus back; Return without focus activates nothing.

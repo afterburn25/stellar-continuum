@@ -337,6 +337,37 @@ int NativeVideoSettingsView::collect_focusables(
   out[count++] = {layout.cancel, -3, 2};
   return count;
 }
+std::string NativeVideoSettingsView::focused_label(int width, int height) const {
+  if (!visible_ || focus_ < 0) return {};
+  const auto layout = VideoSettingsLayout::for_viewport(width, height);
+  std::array<Focusable, 11> focusables{};
+  const int count = collect_focusables(layout, focusables);
+  if (focus_ >= count) return {};
+  const int target = focusables[static_cast<std::size_t>(focus_)].target;
+  switch (target) {
+  case -1: return tr("SETTINGS_VIDEO_OPEN_NVIDIA", "Open NVIDIA Control Panel");
+  case -2: return tr("SETTINGS_VIDEO_APPLY", "Apply");
+  case -3: return tr("SETTINGS_CANCEL", "Cancel");
+  case -4: return tr("SETTINGS_VIDEO_KEEP", "Keep");
+  case -5: return tr("SETTINGS_VIDEO_REVERT", "Revert");
+  default: break;
+  }
+  if (target < 0 || target >= 8) return {};
+  const std::array<std::string, 8> choice_values = {
+      std::string(display_name(values_.display)),
+      resolution_name(values_, actual_display_label_), std::string(vsync_name(values_.vsync)),
+      std::string(frame_cap_name(values_.frame_cap))+(values_.frame_cap==VideoFrameCap::Automatic?" · "+actual_display_label_:""),
+      values_.scene_samples==1?"Off":std::to_string(values_.scene_samples)+"x supersampling",
+      std::to_string(values_.scene_resolution_percent)+"%"+(values_.scene_resolution_percent==100?" · Native":" · Reduced"),
+      std::array<std::string,4>{"Low","Medium","High","Ultra"}[values_.starfield_quality],
+      std::array<std::string,3>{"Low","Normal","High"}[values_.starfield_density]};
+  const std::array<std::string_view, 8> choice_keys = {
+      "SETTINGS_VIDEO_DISPLAY", "SETTINGS_VIDEO_RESOLUTION", "SETTINGS_VIDEO_VSYNC",
+      "SETTINGS_VIDEO_FRAME_CAP", "SETTINGS_VIDEO_SMOOTHING", "SETTINGS_VIDEO_SCENE_RES",
+      "SETTINGS_VIDEO_STARFIELD_QUALITY", "SETTINGS_VIDEO_STARFIELD_DENSITY"};
+  const auto index = static_cast<std::size_t>(target);
+  return tr(choice_keys[index], choice_names[index]) + ": " + choice_values[index];
+}
 void NativeVideoSettingsView::set_display_choices(
     std::vector<VideoDisplayChoice> choices, std::string actual_display_label) {
   choices.erase(std::remove_if(choices.begin(), choices.end(),

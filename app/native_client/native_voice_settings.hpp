@@ -56,6 +56,10 @@ class NativeVoiceSettings final {
   void open();
   [[nodiscard]] bool visible() const;
   [[nodiscard]] int focused() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers; toggles/choices/sliders include their current value.
+  // Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label() const;
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
   void cancel();
