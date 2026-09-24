@@ -9238,6 +9238,12 @@ int main(int argc,char **argv){
                  <<", recorded version "<<parsed->header().game_version
                  <<" vs "<<STELLAR_GAME_VERSION
                  <<") — divergence may reflect the mismatch.\n";
+      // A truncated recording is an honest prefix: its command stream and
+      // checkpoints end mid-session, so nothing past them is verified.
+      if(parsed->truncated())
+        std::cerr<<"Stellar Continuum native client: recording is truncated "
+                   "(memory budget) — commands and checkpoints end "
+                   "mid-session; nothing past the prefix is verified.\n";
       replay.recording=std::move(parsed);
     }
     // Expected-document sidecars live next to the recording: record writes
