@@ -43,6 +43,8 @@ int main() {
     project.edits[302].anomaly = true; // trait override: YES
     project.edits[303].rare_resource = false; // trait override: NO
     project.edits[303].pre_warp_civilization = true;
+    project.edits[303].position_x = -42.5; // map position override
+    project.edits[303].position_y = 7.25;
     project.edits[400]; // Fully empty row must not serialize.
     project.body_edits[3].name = "Earth";
     project.body_edits[3].bookmarked = true;
@@ -80,6 +82,14 @@ int main() {
                 !restored.edits.at(12).rare_resource &&
                 !restored.edits.at(12).pre_warp_civilization,
             "unset trait overrides must stay unset (AUTO follows generated)");
+    require(restored.edits.at(303).position_x &&
+                *restored.edits.at(303).position_x == -42.5 &&
+            restored.edits.at(303).position_y &&
+                *restored.edits.at(303).position_y == 7.25,
+            "position overrides did not round-trip");
+    require(!restored.edits.at(12).position_x &&
+                !restored.edits.at(12).position_y,
+            "unset position overrides must stay unset (AUTO follows generated)");
     require(restored.body_edits.size() == 2, "body edits did not round-trip");
     require(restored.body_edits.at(3).name == "Earth" &&
                 restored.body_edits.at(3).bookmarked,

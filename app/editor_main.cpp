@@ -183,7 +183,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
 
 enum class WorkspaceView { Galaxy, System, Body };
 
-enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass, BodyEccentricity, BodyInclination };
+enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass, BodyEccentricity, BodyInclination, SystemPositionX, SystemPositionY };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
@@ -252,7 +252,7 @@ struct Editor {
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
       hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{},
       hit_radius{}, hit_orbit{}, hit_mass{}, hit_eccentricity{},
-      hit_inclination{};
+      hit_inclination{}, hit_position_x{}, hit_position_y{};
   // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
   bool menu_open{};
   UiRect menu_rect{};
@@ -458,6 +458,22 @@ std::unordered_map<int, edproj::SystemEdit> &annotation_map(Editor &ed,
   return body ? ed.body_edits : ed.edits;
 }
 
+// Effective galactic position axes: the annotation layer wins per axis over
+// the generated StarPosition — map markers, click picking, camera fit and
+// the inspector all read it.
+float system_position_x(const Editor &ed, const core::StellarSystem &sys) {
+  if (const auto it = ed.edits.find(sys.id);
+      it != ed.edits.end() && it->second.position_x)
+    return static_cast<float>(*it->second.position_x);
+  return sys.position.x;
+}
+float system_position_y(const Editor &ed, const core::StellarSystem &sys) {
+  if (const auto it = ed.edits.find(sys.id);
+      it != ed.edits.end() && it->second.position_y)
+    return static_cast<float>(*it->second.position_y);
+  return sys.position.y;
+}
+
 // Effective trait: an annotation override wins over the generated record.
 template <class Record>
 bool trait(const std::unordered_map<int, edproj::SystemEdit> &map,
@@ -487,48 +503,61 @@ void commit_active_field(Editor &ed) {
   } else if (ed.editing == Field::BodyRadius ||
              ed.editing == Field::BodyOrbit || ed.editing == Field::BodyMass ||
              ed.editing == Field::BodyEccentricity ||
-             ed.editing == Field::BodyInclination) {
-    // Body-only numeric overrides: empty restores AUTO, otherwise a finite
-    // in-range number wins over the generated property. Eccentricity accepts
-    // zero (circular) but is bounded below AnalyticOrbit's 0.95 rejection;
-    // inclination is bounded to the generated 0-180 degree domain.
+             ed.editing == Field::BodyInclination ||
+             ed.editing == Field::SystemPositionX ||
+             ed.editing == Field::SystemPositionY) {
+    // Numeric overrides: empty restores AUTO, otherwise a finite in-range
+    // number wins over the generated property. Eccentricity accepts zero
+    // (circular) but is bounded below AnalyticOrbit's 0.95 rejection;
+    // inclination is bounded to the generated 0-180 degree domain; map
+    // positions are unbounded (the galaxy is centered on the origin).
     struct OverrideSpec {
       std::optional<double> edproj::SystemEdit::*member;
       const char *label;
+      // [lo, hi] with lo_inclusive/hi_inclusive endpoints; unbounded fields
+      // carry bounded=false and accept any finite value.
       double lo, hi;
-      bool lo_inclusive, hi_inclusive;
+      bool lo_inclusive, hi_inclusive, bounded;
+      // true: the field writes the body edit map; false: the system map.
+      bool body_field;
     };
     const auto spec = [&]() -> OverrideSpec {
       switch (ed.editing) {
       case Field::BodyRadius:
-        return {&edproj::SystemEdit::radius_earth, "radius", 0., 0., false, false};
+        return {&edproj::SystemEdit::radius_earth, "radius", 0., 0., false, false, true, true};
       case Field::BodyOrbit:
-        return {&edproj::SystemEdit::orbit_au, "orbit", 0., 0., false, false};
+        return {&edproj::SystemEdit::orbit_au, "orbit", 0., 0., false, false, true, true};
       case Field::BodyEccentricity:
-        return {&edproj::SystemEdit::eccentricity, "eccentricity", 0., 0.95, true, false};
+        return {&edproj::SystemEdit::eccentricity, "eccentricity", 0., 0.95, true, false, true, true};
       case Field::BodyInclination:
-        return {&edproj::SystemEdit::inclination_degrees, "inclination", 0., 180., true, true};
+        return {&edproj::SystemEdit::inclination_degrees, "inclination", 0., 180., true, true, true, true};
+      case Field::SystemPositionX:
+        return {&edproj::SystemEdit::position_x, "position x", 0., 0., false, false, false, false};
+      case Field::SystemPositionY:
+        return {&edproj::SystemEdit::position_y, "position y", 0., 0., false, false, false, false};
       default:
-        return {&edproj::SystemEdit::mass_earth, "mass", 0., 0., false, false};
+        return {&edproj::SystemEdit::mass_earth, "mass", 0., 0., false, false, true, true};
       }
     }();
     const auto member = spec.member;
     const auto label = spec.label;
     const auto valid = [&spec](double v) {
-      return (spec.lo_inclusive ? v >= spec.lo : v > spec.lo) &&
-             (spec.hi == 0. ||
+      return !spec.bounded ||
+             ((spec.lo_inclusive ? v >= spec.lo : v > spec.lo) &&
               (spec.hi_inclusive ? v <= spec.hi : v < spec.hi));
     };
-    if (const auto target = annotation_target(ed); target && target->second) {
-      const auto it = ed.body_edits.find(target->first);
-      const auto current = it != ed.body_edits.end()
+    if (const auto target = annotation_target(ed);
+        target && target->second == spec.body_field) {
+      auto &map = annotation_map(ed, target->second);
+      const auto it = map.find(target->first);
+      const auto current = it != map.end()
                                ? it->second.*member
                                : std::optional<double>{};
       if (ed.edit_buffer.empty()) {
         if (current) {
           ed.history.commit({ed.seed, ed.system_count, ed.edits,
                              ed.body_edits, ed.project_name});
-          (ed.body_edits[target->first].*member).reset();
+          (map[target->first].*member).reset();
           rebuild_detail_rows(ed);
         }
       } else {
@@ -539,7 +568,7 @@ void commit_active_field(Editor &ed) {
           if (!current || *current != value) {
             ed.history.commit({ed.seed, ed.system_count, ed.edits,
                                ed.body_edits, ed.project_name});
-            ed.body_edits[target->first].*member = value;
+            map[target->first].*member = value;
             rebuild_detail_rows(ed);
           }
         } catch (const std::exception &) {
@@ -548,6 +577,9 @@ void commit_active_field(Editor &ed) {
                            ? " must be between 0 and 0.95"
                        : ed.editing == Field::BodyInclination
                            ? " must be between 0 and 180"
+                       : ed.editing == Field::SystemPositionX ||
+                               ed.editing == Field::SystemPositionY
+                           ? " must be a finite number"
                            : " must be a positive number");
           return; // keep the field open so the input is not silently dropped
         }
@@ -717,7 +749,7 @@ void rebuild_detail_rows(Editor &ed) {
   row("name", sys.name);
   row("id", std::to_string(sys.id));
   row("position",
-      fspec("%.1f", sys.position.x) + ", " + fspec("%.1f", sys.position.y));
+      fspec("%.1f", system_position_x(ed, sys)) + ", " + fspec("%.1f", system_position_y(ed, sys)));
   if (sys.primary)
     row("primary", std::string(class_name(*sys.primary)));
   if (sys.secondary)
@@ -831,10 +863,10 @@ void fit_camera(Editor &ed) {
   float min_x = ed.systems.front().position.x,
         max_x = min_x, min_y = ed.systems.front().position.y, max_y = min_y;
   for (const auto &s : ed.systems) {
-    min_x = std::min(min_x, s.position.x);
-    max_x = std::max(max_x, s.position.x);
-    min_y = std::min(min_y, s.position.y);
-    max_y = std::max(max_y, s.position.y);
+    min_x = std::min(min_x, system_position_x(ed, s));
+    max_x = std::max(max_x, system_position_x(ed, s));
+    min_y = std::min(min_y, system_position_y(ed, s));
+    max_y = std::max(max_y, system_position_y(ed, s));
   }
   ed.camera = {(min_x + max_x) * .5f, (min_y + max_y) * .5f};
   const float span_x = std::max(1.f, max_x - min_x);
@@ -895,6 +927,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
     y += font + 10 * s;
     ed.hit_name = ed.hit_note = ed.hit_bookmark = {};
     ed.hit_anomaly = ed.hit_rare = ed.hit_prewarp = {};
+    ed.hit_position_x = ed.hit_position_y = {};
     return;
   }
   const auto &sys = ed.systems[ed.selected];
@@ -959,6 +992,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
 
   // Body-only numeric override: radius in Earth radii; empty restores AUTO.
   if (body_context) {
+    ed.hit_position_x = ed.hit_position_y = {};
     const auto &body = ed.bodies[ed.selected_body];
     out.overlay.push_back(
         Text{{x, y}, "radius override (Earth radii)", muted, font - 1});
@@ -1047,6 +1081,37 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
     ed.hit_mass = {};
     ed.hit_eccentricity = {};
     ed.hit_inclination = {};
+    // Galactic map position: system-level overrides move the star marker,
+    // click picking, camera fit and the inspector row — every consumer reads
+    // the effective axis.
+    out.overlay.push_back(
+        Text{{x, y}, "position x override (ly)", muted, font - 1});
+    y += font + 4;
+    ed.hit_position_x = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto position_x_value =
+        ed.editing == Field::SystemPositionX
+            ? ed.edit_buffer
+            : (stored.position_x
+                   ? fspec("%.2f", *stored.position_x)
+                   : fspec("%.2f", sys.position.x) + " (auto)");
+    field_box(out, ed.hit_position_x, position_x_value,
+              ed.editing == Field::SystemPositionX, "light-years, empty = auto...",
+              font);
+    y += ed.hit_position_x.height + 8 * s;
+    out.overlay.push_back(
+        Text{{x, y}, "position y override (ly)", muted, font - 1});
+    y += font + 4;
+    ed.hit_position_y = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto position_y_value =
+        ed.editing == Field::SystemPositionY
+            ? ed.edit_buffer
+            : (stored.position_y
+                   ? fspec("%.2f", *stored.position_y)
+                   : fspec("%.2f", sys.position.y) + " (auto)");
+    field_box(out, ed.hit_position_y, position_y_value,
+              ed.editing == Field::SystemPositionY, "light-years, empty = auto...",
+              font);
+    y += ed.hit_position_y.height + 8 * s;
   }
 
   // Embedded assets: files dropped under <project>/assets/ ride with the
@@ -1445,7 +1510,7 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
   // window fill doubles as the viewport background; only chrome sits in the
   // overlay here.
   for (const auto &sys : ed.systems) {
-    const auto p = world_to_screen(ed, sys.position.x, sys.position.y);
+    const auto p = world_to_screen(ed, system_position_x(ed, sys), system_position_y(ed, sys));
     if (!v.contains(p)) continue;
     const auto color = sys.primary ? class_color(*sys.primary) : muted;
     out.circles.push_back(
@@ -1456,7 +1521,7 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
   }
   if (ed.selected < ed.systems.size()) {
     const auto &sys = ed.systems[ed.selected];
-    const auto p = world_to_screen(ed, sys.position.x, sys.position.y);
+    const auto p = world_to_screen(ed, system_position_x(ed, sys), system_position_y(ed, sys));
     out.overlay.push_back(StrokedRectangle{
         {p.x - 10, p.y - 10, 20, 20}, accent});
     out.world.push_back(
@@ -1465,7 +1530,7 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
   }
   if (ed.pixels_per_unit > 6.f)
     for (const auto &sys : ed.systems) {
-      const auto p = world_to_screen(ed, sys.position.x, sys.position.y);
+      const auto p = world_to_screen(ed, system_position_x(ed, sys), system_position_y(ed, sys));
       if (!v.contains(p)) continue;
       out.world.push_back(Text{{p.x + 7, p.y - 6}, display_name(ed, sys),
                                {150, 180, 195, 220}, static_cast<int>(11 * s),
@@ -2267,6 +2332,24 @@ int main(int argc, char **argv) {
                       : std::string{};
               window.set_text_input(true);
             }
+          } else if (ed.hit_position_x.contains(event.position) ||
+                     ed.hit_position_y.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && !target->second) {
+              const auto member =
+                  ed.hit_position_x.contains(event.position)
+                      ? &edproj::SystemEdit::position_x
+                      : &edproj::SystemEdit::position_y;
+              ed.editing = member == &edproj::SystemEdit::position_x
+                               ? Field::SystemPositionX
+                               : Field::SystemPositionY;
+              const auto it = ed.edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.edits.end() && it->second.*member
+                      ? fspec("%.2f", *(it->second.*member))
+                      : std::string{};
+              window.set_text_input(true);
+            }
           } else if (ed.hit_project_name.contains(event.position)) {
             ed.editing = Field::ProjectName;
             ed.edit_buffer = ed.project_name;
@@ -2305,8 +2388,8 @@ int main(int argc, char **argv) {
               float best = 14.f;
               std::size_t best_index = ed.systems.size();
               for (std::size_t i = 0; i < ed.systems.size(); ++i) {
-                const auto p = world_to_screen(ed, ed.systems[i].position.x,
-                                               ed.systems[i].position.y);
+                const auto p = world_to_screen(ed, system_position_x(ed, ed.systems[i]),
+                                               system_position_y(ed, ed.systems[i]));
                 const float d = std::hypot(p.x - event.position.x,
                                            p.y - event.position.y);
                 if (d < best) {

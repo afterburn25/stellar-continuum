@@ -43,6 +43,12 @@ struct SystemEdit {
   // value wins for the ring tilt and day-phased position. Bounded to the
   // generated domain 0-180 (values past 90 are retrograde).
   std::optional<double> inclination_degrees;
+  // Galactic map position override (system edits only): each axis unset
+  // follows the generated StarPosition component; a set value wins for the
+  // map marker, click picking, camera fit and the inspector row. Any finite
+  // value is legal — the galaxy is centered on the origin so negatives are
+  // normal coordinates.
+  std::optional<double> position_x, position_y;
 };
 
 struct EditorProject {

@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cctype>
+#include <cmath>
 #include <stdexcept>
 
 namespace stellar::editor {
@@ -29,6 +30,8 @@ std::string serialize_project(const EditorProject &project) {
       if (edit.eccentricity) row["eccentricity"] = *edit.eccentricity;
       if (edit.inclination_degrees)
         row["inclinationDeg"] = *edit.inclination_degrees;
+      if (edit.position_x) row["positionX"] = *edit.position_x;
+      if (edit.position_y) row["positionY"] = *edit.position_y;
       rows.push_back(std::move(row));
     }
     return rows;
@@ -91,10 +94,23 @@ EditorProject parse_project(std::string_view text) {
             it != row.end() && it->is_number() && it->get<double>() >= 0. &&
             it->get<double>() <= 180.)
           edit.inclination_degrees = it->get<double>();
+        // Map position axes are unbounded finite numbers — the galaxy is
+        // centered on the origin so negatives are normal coordinates.
+        const auto finite_number = [](const nlohmann::json &row,
+                                      const char *key) {
+          const auto it = row.find(key);
+          return it != row.end() && it->is_number() &&
+                         std::isfinite(it->get<double>())
+                     ? std::optional<double>{it->get<double>()}
+                     : std::nullopt;
+        };
+        edit.position_x = finite_number(row, "positionX");
+        edit.position_y = finite_number(row, "positionY");
         if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked ||
             edit.anomaly || edit.rare_resource || edit.pre_warp_civilization ||
             edit.radius_earth || edit.orbit_au || edit.mass_earth ||
-            edit.eccentricity || edit.inclination_degrees)
+            edit.eccentricity || edit.inclination_degrees ||
+            edit.position_x || edit.position_y)
           out[row.at("id").get<int>()] = std::move(edit);
       }
     };
