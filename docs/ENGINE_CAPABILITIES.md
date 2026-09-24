@@ -739,7 +739,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   the invariant catches hand-built/corrupt in-memory state),
   and civilization `species_id` must resolve in the species
   catalog (`unknown_species` — the loader's `require_species`
-  rejects blank and uncatalogued ids),
+  rejects blank and uncatalogued ids), and leadership entries flag
+  `invalid_character` when office, character id, display name,
+  voice profile or portrait metadata violate the persisted
+  blank/UTF-16-length bounds,
   research/construction/shipyard rows (duplicate civilization ids,
   `orphaned_research`/`orphaned_construction`/`orphaned_shipyard`,
   non-negative progress/authorization/reserved-population fields,

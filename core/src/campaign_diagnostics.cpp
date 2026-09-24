@@ -464,6 +464,20 @@ std::vector<stellar::engine::DiagnosticRecord> campaign_step_diagnostics(
   }
   return records;
 }
+namespace {
+// UTF-16 code-unit length of a UTF-8 string — the persisted
+// character-metadata bounds are expressed in UTF-16 units.
+std::size_t utf16_units(std::string_view value) noexcept {
+  std::size_t units=0;
+  for(std::size_t i=0;i<value.size();){
+    const auto c=static_cast<unsigned char>(value[i]);
+    const std::size_t length=c<0x80?1:(c&0xe0)==0xc0?2:(c&0xf0)==0xe0?3:(c&0xf8)==0xf0?4:1;
+    units+=length==4?2:1;
+    i+=length;
+  }
+  return units;
+}
+} // namespace
 std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     const FreshCampaignState &w,std::uint64_t tick,double day,std::size_t maximum){
   using namespace stellar::engine;
@@ -674,6 +688,16 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     // The loader's require_species rejects blank and uncatalogued ids.
     if(!known_species.contains(c.species_id))
       emit("civilization","unknown_species",c.id,"Civilization references an uncatalogued species.");
+    // Leadership metadata bounds mirror the persistence validator's
+    // office/character checks (blank names, UTF-16 length caps).
+    for(const auto &o:c.leadership){
+      const bool bad=o.office.find_first_not_of(" \t\n\r\f\v")==std::string::npos||utf16_units(o.office)>64||
+          o.character.id.find_first_not_of(" \t\n\r\f\v")==std::string::npos||utf16_units(o.character.id)>128||
+          o.character.display_name.find_first_not_of(" \t\n\r\f\v")==std::string::npos||utf16_units(o.character.display_name)>160||
+          (o.character.voice_profile_id&&utf16_units(*o.character.voice_profile_id)>128)||
+          (o.character.portrait&&utf16_units(*o.character.portrait)>512);
+      if(bad){emit("civilization","invalid_character",c.id,"Leadership entry carries invalid character metadata.");break;}
+    }
   }
   for(const auto &t:w.technologies){
     if(!civilizations.contains(t.civilization_id))emit("research","orphaned_research",t.civilization_id,"Research state references an absent civilization.");
