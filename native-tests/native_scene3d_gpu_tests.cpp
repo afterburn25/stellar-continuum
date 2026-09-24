@@ -205,7 +205,9 @@ int main(int argc,char** argv)try{
     fine.position={};fine.material.texture=RgbaImage::create(1024,1,std::move(bands));fine.material.transparent=true;
     const auto ring=capture({fine},"mip-ring-alpha.png");
     check(channel(*ring,160,160,0)==5&&std::abs(channel(*ring,138,160,0)-130)<=3,"Thin mip texture lost ring gap or mean opacity");
+    const auto uploads_before_promotion=window.scene3d_statistics().texture_uploads;
     fine.scale=1;const auto close_ring=capture({fine},"mip-ring-close.png");
+    check(window.scene3d_statistics().texture_uploads==uploads_before_promotion+1,"Footprint growth did not promote the resident mip tail");
     check(channel(*close_ring,160,160,0)==5,"Magnification filled a transparent ring gap");
     // The 160px views demand a coarser mip than the 360px capture did —
     // warm the resident tail at their footprint so the two-view draw below
