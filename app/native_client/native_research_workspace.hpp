@@ -94,6 +94,7 @@ public:
   card_bounds(std::string_view node_id, int width, int height) const;
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   first_actionable_card(int width, int height) const;
+  [[nodiscard]] int focus() const noexcept { return focus_; }
 
 private:
   struct NodePlacement {
@@ -113,6 +114,8 @@ private:
   void render_dashboard(stellar::native_map::DrawList&,const ResearchWorkspaceLayout&);
   void render_controls(stellar::native_map::DrawList&,const ResearchWorkspaceLayout&);
   std::optional<WorkspaceCommand> handle_controls(const stellar::native_map::InputEvent&,const ResearchWorkspaceLayout&,int,int);
+  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  focusables(const ResearchWorkspaceLayout&)const;
   stellar::core::AdaptiveResearchPlan plan_;
   ResearchViewMode mode_{ResearchViewMode::Guided};
   int filter_{},sort_{};bool list_view_{},why_open_{};
@@ -153,6 +156,7 @@ private:
   bool notice_accepted_{};
   float inspector_scroll_{};
   float inspector_scroll_limit_{};
+  int focus_{-1};
   int inspector_viewport_width_{}, inspector_viewport_height_{};
   TextMeasurer text_measurer_;
   ArtworkResolver artwork_resolver_;

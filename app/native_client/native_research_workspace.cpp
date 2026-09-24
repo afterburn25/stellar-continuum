@@ -333,6 +333,7 @@ void NativeResearchWorkspace::open() {
   center_selection_ = true;
   inspector_scroll_ = 0.f;
   inspector_scroll_limit_ = 0.f;
+  focus_ = -1;
 }
 
 void NativeResearchWorkspace::close() {
@@ -342,6 +343,7 @@ void NativeResearchWorkspace::close() {
   dropdown_.close();
   inspector_scroll_ = 0.f;
   inspector_scroll_limit_ = 0.f;
+  focus_ = -1;
 }
 
 bool NativeResearchWorkspace::visible() const noexcept { return visible_; }
@@ -373,6 +375,7 @@ void NativeResearchWorkspace::set_window(NativeResearchWindow window) {
     notice_.clear();
     notice_accepted_ = false;
     inspector_scroll_ = 0.f;
+    focus_ = -1;
   }
   if (query_.domain_id) {
     const auto known =
@@ -427,6 +430,7 @@ void NativeResearchWorkspace::discard_campaign() {
   inspector_scroll_limit_ = 0.f;
   inspector_viewport_width_ = 0;
   inspector_viewport_height_ = 0;
+  focus_ = -1;
   refresh_requested_ = visible_;
 }
 
@@ -589,6 +593,39 @@ NativeResearchWorkspace::first_actionable_card(int width, int height) const {
   return std::nullopt;
 }
 
+std::vector<UiRect> NativeResearchWorkspace::focusables(
+    const ResearchWorkspaceLayout &l) const {
+  std::vector<UiRect> out;
+  out.push_back(l.close);
+  out.push_back(l.search);
+  for (const auto &tab : l.tabs)
+    out.push_back(tab.bounds);
+  for (const auto &hit : interface_hits_)
+    out.push_back(hit.bounds);
+  if (window_) {
+    if (mode_ != ResearchViewMode::Tree) {
+      const UiRect content{l.graph.x, l.graph.y + 80.f * l.scale,
+                           l.graph.width, l.graph.height - 80.f * l.scale};
+      for (const auto &card : guided_cards(l))
+        if (const auto clip = intersection(card.bounds, content))
+          out.push_back(*clip);
+    } else {
+      for (const auto &placement : placements_)
+        if (const auto clip =
+                intersection(l.graph, transformed_card(placement, l)))
+          out.push_back(*clip);
+    }
+    if (selected_node())
+      out.push_back(l.action);
+  }
+  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
+    if (a.y != b.y)
+      return a.y < b.y;
+    return a.x < b.x;
+  });
+  return out;
+}
+
 WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
                                                  int width, int height) {
   if (!visible_)
@@ -605,6 +642,7 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
 
   if (event.type == InputEventType::PointerCancelled) {
     dragging_ = false;
+    focus_ = -1;
     return result;
   }
   if (event.type == InputEventType::TextEntered && search_focused_) {
@@ -645,9 +683,55 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
                                    0.f, inspector_scroll_limit_);
     return result;
   }
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    if (search_focused_) {
+      // While editing the search field it owns key input; Tab/Return commit
+      // and leave edit mode, everything else is captured.
+      if (event.key == 9u)
+        search_focused_ = false;
+      else if (event.key == 13u) {
+        search_focused_ = false;
+        return {WorkspaceCommandKind::None, true};
+      } else
+        return {WorkspaceCommandKind::None, true};
+    }
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const auto items = focusables(layout);
+    const int count = static_cast<int>(items.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      return {WorkspaceCommandKind::None, true};
+    }
+    if (count > 0 && (fwd || bwd)) {
+      focus_ = focus_ < 0 || focus_ >= count
+                   ? (bwd ? count - 1 : 0)
+                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      return {WorkspaceCommandKind::None, true};
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto &r = items[static_cast<std::size_t>(focus_)];
+      InputEvent press{InputEventType::LeftPressed};
+      press.position = {r.x + r.width * .5f, r.y + r.height * .5f};
+      const int keep = focus_;
+      auto command = handle(press, width, height);
+      if (visible_)
+        focus_ = keep;
+      return command;
+    }
+    return {};
+  }
   if (event.type != InputEventType::LeftPressed)
     return result;
 
+  focus_ = -1;
   if (layout.close.contains(event.position)) {
     close();
     return {WorkspaceCommandKind::Close, true};
@@ -1111,6 +1195,12 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
   if (!feedback_text.empty())
     text(out, layout.feedback, feedback_text,
          notice_accepted_ ? positive : warning, layout.small_font_pixels);
+  if (focus_ >= 0) {
+    const auto items = focusables(layout);
+    if (focus_ < static_cast<int>(items.size()))
+      stroke(out, items[static_cast<std::size_t>(focus_)],
+             {160, 210, 255, 255});
+  }
   dropdown_.render(out,dropdown_.id()==1?layout.filter:dropdown_.id()==2?layout.sort:layout.toolbar,width,height,layout.small_font_pixels);
 }
 
