@@ -2,6 +2,7 @@
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/world.hpp>
+#include <stellar/engine/history.hpp>
 
 #include <atomic>
 #include <iostream>
@@ -150,6 +151,21 @@ int main() {
               "world census tracks container growth");
         check(MemoryTracker::instance().snapshot().subsystems.size() >= 3,
               "subsystems persist across census calls");
+    }
+
+    // EventHistory occupancy census — payloads, not just the event count.
+    {
+        EventHistory history;
+        const auto empty = history.estimated_memory_bytes();
+        check(empty == 0, "empty history reports no footprint");
+        HistoryEvent event;
+        event.category = "colony.founded";
+        event.summary = "a longer-than-sso summary payload string";
+        event.actors = {1, 2, 3};
+        event.tags = {"alpha", "beta"};
+        history.record(std::move(event));
+        check(history.estimated_memory_bytes() > sizeof(HistoryEvent),
+              "history census counts payload storage");
     }
 
     if (failures != 0) {

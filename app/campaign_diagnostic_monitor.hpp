@@ -2,6 +2,7 @@
 #include <stellar/core/campaign_frame.hpp>
 #include <stellar/core/campaign_diagnostics.hpp>
 #include <stellar/core/campaign_calendar.hpp>
+#include <stellar/engine/memory_tracker.hpp>
 #include <set>
 #include <tuple>
 #include <cmath>
@@ -51,6 +52,11 @@ public:
         if(!active_findings_.contains(key))add(std::move(finding));
       }
       active_findings_=std::move(current);last_inspected_day_=day;
+      // The event journal is capacity-bounded but payload-heavy — report
+      // its occupancy on the daily inspection cadence so memory.json and
+      // the tools overlay track chronicle growth over long campaigns.
+      static const auto history_subsystem=MemoryTracker::instance().register_subsystem("campaign-event-history");
+      MemoryTracker::instance().report(history_subsystem,frame.history().estimated_memory_bytes());
     }
   }
   // Records an advance() throw reported by CampaignFrame::last_advance_failure —

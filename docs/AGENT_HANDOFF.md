@@ -625,6 +625,13 @@ open/refresh, listing every entity as `domain id · tag fields ← parent`
 with census counts and `estimated_memory_bytes` in the header.
 `native_developer_diagnostics` clicks through the view and verifies the
 campaign stays byte-identical.
+Event-history memory census: `EventHistory::estimated_memory_bytes()`
+counts inline deque storage plus per-event payload heap (strings,
+actor/visibility/tag vectors); the diagnostic monitor reports it as the
+`campaign-event-history` subsystem on the daily inspection cadence —
+the journal is capacity-bounded but payload-heavy, so this tracks
+chronicle growth over long campaigns. `engine_diagnostics` covers
+payload accounting; 4/4 diagnostics/report/QA green (qa_host 32 s).
 Caveat: `stellar_campaign_phase_profile_tests`/`campaign_phase_cadence`
 compile-fail on `set_phase_tier`/`wake_phase` — the coordinator API is
 mid-refactor in the other agent's lane, not a diagnostics regression.

@@ -66,6 +66,20 @@ public:
     [[nodiscard]] std::size_t size() const { return events_.size(); }
     [[nodiscard]] std::size_t capacity() const { return capacity_; }
     [[nodiscard]] std::uint64_t next_id() const { return next_id_; }
+    // Container-storage footprint for MemoryTracker::report — inline
+    // deque storage plus per-event string/vector heap payloads. The
+    // journal is capacity-bounded but payload-heavy, so occupancy grows
+    // with campaign length long before capacity_ is reached.
+    [[nodiscard]] std::size_t estimated_memory_bytes() const noexcept {
+        std::size_t total = events_.size() * sizeof(HistoryEvent);
+        for (const auto &event : events_) {
+            total += event.category.capacity() + event.summary.capacity();
+            total += (event.actors.capacity() + event.visible_to.capacity()) * sizeof(std::uint64_t);
+            total += event.tags.capacity() * sizeof(std::string);
+            for (const auto &tag : event.tags) total += tag.capacity();
+        }
+        return total;
+    }
 
     // Observer-filtered significance feed — the M15 news substrate:
     // events at/after `since_day`, at or above `min_significance`,
