@@ -653,6 +653,46 @@ int main() {
           "the x track owns Transform2D.x while playing");
   }
 
+  // Injected input drives the "player" entity through the real
+  // action-mapper path: a held 'd' (move_right) sets velocity while
+  // held, release stops it — the same path live keyboard input takes.
+  {
+    const auto sub = root / "input-player";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[{"name":"player","x":100,"y":200}]})";
+    }
+    ReplayRecorder journal;
+    // KeyPressed=8 / KeyReleased=9; 'd' = 100.
+    journal.record(1, "input", "8,100,0,0,0,0,0,0,0,0,0,0,0,0,0,");
+    journal.record(5, "input", "9,100,0,0,0,0,0,0,0,0,0,0,0,0,0,");
+    const auto journal_path = sub / "input_journal.json";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 8;
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    std::vector<float> xs;
+    host.on_update = [&](World &world, float) {
+      const auto player = host.player();
+      if (player)
+        if (const auto *t = world.get<Transform2D>(*player))
+          xs.push_back(t->x);
+    };
+    check(host.run() == 0, "player-input replay exits cleanly");
+    check(xs.size() == 8, "the player resolves every frame");
+    if (xs.size() == 8) {
+      check(xs[0] == 100.f, "the player starts at rest");
+      check(xs[4] > xs[0], "held move_right advances the player");
+      check(xs[7] == xs[5],
+            "releasing move_right stops the player");
+    }
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
