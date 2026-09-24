@@ -649,6 +649,16 @@ int RuntimeHost::run() {
     }
     impl.replay = std::move(*parsed);
     impl.replaying = true;
+    // The recorded seed is part of the run's identity — the RNG stream
+    // lives on a world entity, so a different seed changes checkpoint
+    // hashes even when the game never draws from it. Apply the recorded
+    // seed so replays verify regardless of a --seed flag.
+    if (impl.replay.header().seed != options.seed) {
+      std::fprintf(stderr, "replay: applying recorded seed %llu\n",
+                   static_cast<unsigned long long>(
+                       impl.replay.header().seed));
+      impl.options.seed = impl.replay.header().seed;
+    }
     if (impl.replay.truncated())
       std::fprintf(stderr,
                    "replay: recording truncated — entries past the "
