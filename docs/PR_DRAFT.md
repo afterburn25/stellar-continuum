@@ -120,9 +120,18 @@ Core/engine projections, never re-derived in UI.
   activation replays the pointer dispatch paths. The settings hub Controls
   view is a real rebind UI on the live `InputMapper`: it lists every
   bindable GALAXY action with `describe_bindings` labels, captures the next
-  keypress (modifiers fold into chords, alternates survive, Escape/click
-  cancels), and persists through `save_contexts` to galaxy-controls.json
-  loaded over the defaults at startup
+  keypress, right-click or gamepad button (modifiers fold into chords,
+  alternates survive, Escape/click cancels, conflicting primaries are
+  stolen with a reassignment notice), and persists through
+  `save_contexts` to galaxy-controls.json loaded over the defaults at
+  startup. Non-keyboard bindings actually fire: the client feeds
+  `GamepadButton`/`MouseButton` through the same gameplay gate as keys
+  and records them for replay as `gamepad_button`/`mouse_button`
+  commands. The navigation smoke exercises pad and right-click rebinding
+  end-to-end — and caught a real defect: Escape cleared the inspection
+  card without resetting `selected_id_`, so `refresh_inspection()`
+  reopened it the same frame; the card now deselects on Escape like its
+  own close path does
 - Screen-reader substrate — `AccessibilityAnnouncer` is the bounded
   live-region queue (polite/assertive, dedup, capacity eviction,
   monotonic sequences) a platform AT bridge will drain; live consumers

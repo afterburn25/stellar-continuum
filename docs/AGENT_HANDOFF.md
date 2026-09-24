@@ -1159,8 +1159,18 @@ Without a mapper the view falls back to the static help card. Engine-side:
 (ring, capture, rebind + alternate preservation, chord, cancels, persist).
 Capture now also accepts right mouse and gamepad buttons, and a captured
 binding that conflicts with a sibling action's primary steals it — the
-hub surfaces a "reassigned from X" notice the client announces. Open:
-multi-pad disambiguation and axis bindings in the UI — mapper-level
+hub surfaces a "reassigned from X" notice the client announces. The
+client's update loop now feeds GamepadButton/MouseButton raw events under
+the same gameplay gate as keys (releases + axis state feed unconditionally
+so held state clears), closing the gap where captured non-keyboard
+bindings could never fire; `--record`/`--replay` journal them as
+`gamepad_button`/`mouse_button` commands. Verified end-to-end by the
+navigation smoke's pad/right-click rebind exercise. Note: commit
+5cca8444 left a real defect the smoke exposed — Escape cleared the
+inspection card without resetting `selected_id_`, so the unconditional
+`refresh_inspection()` reopened it the same frame; the chain now clears
+the selection with the card, matching the card's own close path.
+Open: multi-pad disambiguation and axis bindings in the UI — mapper-level
 follow-ups, not blockers.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
