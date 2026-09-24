@@ -261,6 +261,37 @@ int main() {
           "set_tile_at/tile_at round-trip by name");
   }
 
+  // Contact events: two spawned overlapping entities fire on_collision
+  // on the entering step and on_collision_exit once separated.
+  {
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    int enters = 0, exits = 0;
+    EntityId mover{};
+    host.on_collision = [&](EntityId, EntityId) { ++enters; };
+    host.on_collision_exit = [&](EntityId, EntityId) { ++exits; };
+    host.on_update = [&](World &world, float) {
+      ++updates;
+      if (updates == 1) {
+        SceneEntity a{};
+        a.name = "contact-a";
+        a.x = 500.f;
+        a.y = 500.f;
+        SceneEntity b{};
+        b.name = "contact-b";
+        b.x = 505.f;
+        b.y = 505.f;
+        host.spawn_entity(a);
+        mover = host.spawn_entity(b);
+      }
+      if (updates == 3)
+        if (auto *t = world.get<Transform2D>(mover)) t->x = 3000.f;
+    };
+    check(host.run() == 0, "contact run exits cleanly");
+    check(enters >= 1, "on_collision fires on overlap entry");
+    check(exits >= 1, "on_collision_exit fires on separation");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
