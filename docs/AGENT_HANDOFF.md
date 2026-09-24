@@ -525,6 +525,23 @@ startup workspace across Entry/ModeSelection/LoadSlots/Busy/Failure/
 Development screens with per-screen focusable collection and transition
 resets routed through `reset_pointer()`. Screen-reader/AT contracts and the
 new-game Setup sub-surface remain open.
+A diagnostics-hardening lane through `34243eae` mirrors every authoritative
+validator inside `inspect_campaign_invariants`: `validate_galaxy_references`
+(settlement kind/hub/capacity/site, freight/route/order/site consistency,
+design and tactical validation, endurance bounds, work-progress ceilings,
+combat-intel pairs/evidence/4096 bound), `validate_surface_construction`
+(slots, placement, progress/upgrade consistency, catalog bounds),
+`validate_construction` (project catalog, overlap, duplicates, cost bound),
+shipyard `validate_for_capture`/`validate_identities`/population safety,
+stellar physics/orbits/activity/small-body/core validators, leadership
+character bounds, economy DTO bounds, and `out_of_range` semantic bounds
+the loaders clamp. Deep mutable validators run on clones so diagnostics
+stay read-only; the extended `campaign_colony_projection` corrupt fixture
+classifies ~150 findings while seeded worlds stay finding-free (both
+parity suites green). The 15 `engine_shell_tool_*` frame-render smokes
+block on window creation in this agent session and were not exercised;
+all other ~285 tests pass including every campaign/projection/parity
+suite.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
