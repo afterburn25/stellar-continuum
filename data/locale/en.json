@@ -48,6 +48,7 @@
     "SETTINGS_HUB_CONTROLS_REBIND_DESC": "Activate a command, then press the key to bind. Escape cancels.",
     "SETTINGS_CONTROLS_PRESS_KEY": "press a key\u2026",
     "SETTINGS_CONTROLS_CAPTURE": "Press a key for",
+    "SETTINGS_CONTROLS_STOLEN": "Rebound — removed from",
     "SETTINGS_ACTION_TOGGLE_PAUSE": "Pause / resume",
     "SETTINGS_ACTION_SPEED_NORMAL": "Speed: normal",
     "SETTINGS_ACTION_SPEED_FAST": "Speed: fast",

@@ -5921,6 +5921,7 @@ class NativeCampaign final {
         const int focus_before=settings_hub_->focused();
         if(settings_hub_->handle(event,width,height)){
           if(settings_hub_->focused()!=focus_before)announcer_.announce_focus(settings_hub_->focused_label());
+          if(auto notice=settings_hub_->take_notice();!notice.empty())announcer_.announce(std::move(notice));
           gesture_.capture_for_ui();continue;
         }
       }

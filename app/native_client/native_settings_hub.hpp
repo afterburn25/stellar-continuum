@@ -3,6 +3,7 @@
 #include "native_menu_style.hpp"
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/input_actions.hpp>
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <functional>
@@ -42,8 +43,12 @@ public:
   // Invoked after every successful rebind so the owner persists
   // save_contexts() wherever it keeps settings files.
   void set_bindings_persist(std::function<void()> persist){persist_=std::move(persist);}
-  void open(){hover_feedback_.reset();visible_=true;controls_=false;pointer_={};focus_=-1;capture_=-1;}
-  void close(){visible_=false;controls_=false;focus_=-1;capture_=-1;}
+  // One-shot status note set when a rebind steals a key from another
+  // action — the dispatcher announces it (focus stays on the row, so it
+  // cannot surface through focused_label change detection).
+  [[nodiscard]] std::string take_notice(){auto s=std::move(notice_);notice_.clear();return s;}
+  void open(){hover_feedback_.reset();visible_=true;controls_=false;pointer_={};focus_=-1;capture_=-1;notice_.clear();}
+  void close(){visible_=false;controls_=false;focus_=-1;capture_=-1;notice_.clear();}
   bool visible()const{return visible_;}
   bool showing_categories()const{return visible_&&(!child_visible_||!child_visible_());}
   int focused()const noexcept{return focus_;}
@@ -91,12 +96,30 @@ public:
         }
         const auto rows=control_actions();
         if(capture_<static_cast<int>(rows.size())&&mapper_){
-          auto bound=mapper_->bindings(rows[static_cast<std::size_t>(capture_)]->name);
           stellar::engine::InputBinding primary{stellar::engine::RawInputEvent::Kind::KeyPress,
                                                 static_cast<int>(e.key)};
           if(e.control)primary.chord_keys.push_back(0x400000e0);
           if(e.shift)primary.chord_keys.push_back(0x400000e1);
           if(e.alt)primary.chord_keys.push_back(0x400000e2);
+          // Steal: the same trigger+chord is removed from any sibling action
+          // so two commands never silently share one key.
+          notice_.clear();
+          for(const auto* other:rows){
+            const auto& target_action=*rows[static_cast<std::size_t>(capture_)];
+            if(other==&target_action)continue;
+            auto others=mapper_->bindings(other->name);
+            const auto clash=std::find_if(others.begin(),others.end(),[&](const stellar::engine::InputBinding& b){
+              return b.kind==primary.kind&&b.code==primary.code&&b.chord_keys==primary.chord_keys;});
+            if(clash!=others.end()){
+              others.erase(clash);
+              mapper_->rebind(other->name,std::move(others));
+              if(!notice_.empty())notice_+=", ";
+              notice_+=action_label(other->name);
+            }
+          }
+          if(!notice_.empty())
+            notice_=tr("SETTINGS_CONTROLS_STOLEN","Rebound — removed from")+" "+notice_;
+          auto bound=mapper_->bindings(rows[static_cast<std::size_t>(capture_)]->name);
           if(bound.empty())bound.push_back(primary);else bound.front()=primary;
           mapper_->rebind(rows[static_cast<std::size_t>(capture_)]->name,std::move(bound));
           if(persist_)persist_();
@@ -155,6 +178,8 @@ public:
               :stellar::engine::describe_bindings(bindings);
           button(out,rects[i],action_label(rows[i]->name)+" — "+value,static_cast<int>(16*s),hot||capture_==static_cast<int>(i),true,s);
         }
+        if(!notice_.empty())
+          text(out,{l.categories[0].x,l.back.y-26.f*s,l.categories[0].width,22.f*s},notice_,static_cast<int>(14*s),muted);
       }
     }else{
       constexpr std::array keys{"SETTINGS_NAV_GENERAL","SETTINGS_NAV_AUDIO","SETTINGS_NAV_VIDEO","SETTINGS_NAV_VOICE","SETTINGS_NAV_CONTROLS"};
@@ -218,6 +243,6 @@ private:
   bool visible_{},controls_{};Point pointer_{};int focus_{-1};Open open_;std::function<bool()> child_visible_;
   const stellar::engine::LocalizationTable* locale_{};
   stellar::engine::InputMapper* mapper_{};std::string context_name_{"GALAXY"};
-  std::function<void()> persist_{};int capture_{-1};
+  std::function<void()> persist_{};int capture_{-1};std::string notice_;
 };
 }

@@ -261,6 +261,17 @@ void menu_hover_feedback(){
     require(key(kReturn),"second capture did not start");
     (void)hub.handle({InputEventType::LeftPressed,{1,1}},w,h);
     require(mapper.bindings("toggle_pause")[0].code=='x',"click did not cancel capture");
+    // Conflict steal: binding a key already bound elsewhere strips it from
+    // the other action and raises a one-shot notice for the announcer.
+    (void)key(kTab);(void)key(kReturn); // capture quicksave (row 1)
+    InputEvent steal{};steal.type=InputEventType::KeyPressed;steal.key='x';
+    (void)hub.handle(steal,w,h);
+    const auto pause_keys=mapper.bindings("toggle_pause");
+    require(pause_keys.size()==1&&pause_keys[0].code==112,
+            "conflicting key was not stripped from the sibling action");
+    require(mapper.bindings("quicksave")[0].code=='x',"steal did not bind the captured key");
+    require(hub.take_notice()=="Rebound — removed from Toggle pause","steal notice missing");
+    require(hub.take_notice().empty(),"notice did not drain once");
     DrawList draw;hub.render(draw,w,h);
   }
 }
