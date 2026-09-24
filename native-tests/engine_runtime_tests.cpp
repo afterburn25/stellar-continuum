@@ -432,6 +432,61 @@ int main() {
     check(!miss.has_value(), "raycast3d misses off-axis");
   }
 
+  // Injected F5/F9 drive the in-run quicksave/quicksave-load path: a
+  // crafted journal presses F5 at tick 2, the world keeps simulating,
+  // then F9 at tick 6 restores the saved snapshot — the observed
+  // position jumps back to the tick-2 state.
+  {
+    ReplayRecorder journal;
+    // Positional CSV: type 8 = KeyPressed; 0x4000003e = F5,
+    // 0x40000042 = F9 (SDL keycodes).
+    journal.record(2, "input",
+                   "8,1073741886,0,0,0,0,0,0,0,0,0,0,0,0,0,");
+    journal.record(6, "input",
+                   "8,1073741890,0,0,0,0,0,0,0,0,0,0,0,0,0,");
+    // A dedicated root keeps this block independent of the scene files
+    // earlier blocks wrote under `root`.
+    const auto sub_root = root / "save-load";
+    std::filesystem::create_directories(sub_root);
+    const auto journal_path = sub_root / "save_journal.json";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(sub_root);
+    opts.frame_limit = 8;
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    int updates = 0;
+    bool demo_found = false;
+    std::vector<Transform2D> positions;
+    host.on_update = [&](World &world, float) {
+      ++updates;
+      const auto demo = host.find_entity("demo");
+      if (demo) {
+        demo_found = true;
+        if (const auto *t = world.get<Transform2D>(*demo))
+          positions.push_back(*t);
+      }
+    };
+    check(host.run() == 0, "save/load replay exits cleanly");
+    check(updates == 8 && demo_found,
+          "the demo entity resolves every frame");
+    check(positions.size() == 8, "every frame reports a position");
+    if (positions.size() == 8) {
+      // F5 at tick 2 saves the state update 2 observed; stepping from
+      // that snapshot reproduces update 3's position, so update 7
+      // (post-F9) must equal update 3 exactly — while update 6 had
+      // already drifted.
+      check(positions[5].x != positions[2].x ||
+                positions[5].y != positions[2].y,
+            "the world drifts between save and restore");
+      check(positions[6].x == positions[2].x &&
+                positions[6].y == positions[2].y,
+            "F9 restores the F5 snapshot exactly");
+    }
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
