@@ -799,16 +799,19 @@ void start_build(Shell &shell, engine::JobSystem &jobs) {
                     });
 }
 
-// Smoke-tests the built host: launches it hidden with `--frames N`, waits up
-// to 30s, and reports pass/fail. Shared by the UI TEST job and the headless
-// --test path.
+// Smoke-tests the built host: launches it hidden with `--frames N
+// --headless`, waits up to 30s, and reports pass/fail. Headless skips
+// Window/audio entirely, so TEST also works on machines with no display
+// or GPU; hosts built against an older SDK ignore the flag and still run
+// hidden. Shared by the UI TEST job and the headless --test path.
 std::string test_project_sync(const std::filesystem::path &root,
                               const std::string &exe_name, int frames) {
   for (const auto dir : {root / "build" / "host" / "Release",
                          root / "build" / "host"}) {
     const auto exe = dir / (exe_name + ".exe");
     if (std::filesystem::is_regular_file(exe)) {
-      const std::string frames_arg = "--frames " + std::to_string(frames);
+      const std::string frames_arg =
+          "--frames " + std::to_string(frames) + " --headless";
       SHELLEXECUTEINFOA info{};
       info.cbSize = sizeof(info);
       info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE;
