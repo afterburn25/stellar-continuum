@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -35,6 +36,10 @@ struct RawInputEvent {
   // For MouseButton/GamepadButton: true = pressed, false = released.
   // KeyPress/KeyRelease encode direction in the kind itself.
   bool pressed{true};
+  // Gamepad slot for GamepadButton/GamepadAxis events. -1 = device
+  // unspecified (synthetic/replayed input) — a wildcard that still matches
+  // device-pinned bindings.
+  int device{-1};
 };
 
 struct InputBinding {
@@ -43,6 +48,9 @@ struct InputBinding {
   float scale{1.0f};
   // Optional chord: all chord keys must be held for the binding to fire.
   std::vector<int> chord_keys;
+  // Gamepad slot this binding answers (-1 = any pad). A gamepad event whose
+  // own device is unset still matches a pinned binding.
+  int device{-1};
 };
 
 struct InputAction {
@@ -124,7 +132,9 @@ private:
   std::unordered_map<int, bool> held_keys_; // for chord evaluation
   // Latest value per gamepad axis — persists across frames since devices
   // only emit axis events on change; begin_frame must not clear them.
-  std::unordered_map<int, float> gamepad_axes_;
+  // Live stick values keyed by (device slot, axis) — device -1 is the
+  // wildcard bucket for events that carry no pad index.
+  std::map<std::pair<int, int>, float> gamepad_axes_;
 };
 
 // SDL-style keycode → display name ("Space", "F5", "A"; unknown codes render

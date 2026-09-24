@@ -186,7 +186,14 @@ struct Window::Storage {
   std::unordered_map<const RgbaImage*,CachedImage> image_cache;std::size_t image_cache_resident_bytes{};std::uint64_t image_use{},image_uploads{};
   int width{},height{},windowed_x{},windowed_y{},windowed_width{},windowed_height{};bool has_windowed_bounds{},initialized{},left_down{},focused{true},minimized{},vsync{},auto_frame_cap{},text_input_requested{},text_input_active{};Point pointer{};std::filesystem::path screenshot_directory;std::optional<std::filesystem::path> player_screenshot;std::optional<std::string> screenshot_status;std::uint64_t screenshot_status_until_ns{},screenshot_serial{};Uint64 fallback_interval_ns{},frame_cap_interval_ns{},last_present_ns{};
   SDL_Texture* scene_target{};
-  SDL_Gamepad *gamepad{};SDL_JoystickID gamepad_id{};
+  // Up to four simultaneous pads; a slot index rides on each emitted
+  // InputEvent so bindings can pin a device (unset = any pad).
+  std::array<SDL_Gamepad*,4> gamepads{};std::array<SDL_JoystickID,4> gamepad_ids{};
+  [[nodiscard]] int gamepad_slot(SDL_JoystickID which)const{
+    for(int i=0;i<static_cast<int>(gamepad_ids.size());++i)
+      if(gamepads[static_cast<std::size_t>(i)]&&gamepad_ids[static_cast<std::size_t>(i)]==which)return i;
+    return -1;
+  }
   std::unique_ptr<Scene3DRenderer> scene3d;
   // MemoryTracker VRAM attribution — the 3D backend reports its resident
   // texture/mesh/render-target bytes once a scene3d view draws.
@@ -216,7 +223,7 @@ struct Window::Storage {
     for(auto &[key,cached]:text_cache){(void)key;if(cached.texture)SDL_DestroyTexture(cached.texture);}
     for(const auto &[size,font_value]:fonts){(void)size;if(font_value)DeleteObject(font_value);}
     if(text_dc)DeleteDC(text_dc);if(private_font_handle)RemoveFontMemResourceEx(private_font_handle);
-    if(renderer)SDL_DestroyRenderer(renderer);if(gamepad)SDL_CloseGamepad(gamepad);if(device)SDL_DestroyGPUDevice(device);if(window)SDL_DestroyWindow(window);if(initialized)SDL_Quit();
+    if(renderer)SDL_DestroyRenderer(renderer);for(auto* pad:gamepads)if(pad)SDL_CloseGamepad(pad);if(device)SDL_DestroyGPUDevice(device);if(window)SDL_DestroyWindow(window);if(initialized)SDL_Quit();
   }
   [[nodiscard]] HFONT font(int pixel_size,FontFace role){
     pixel_size=std::clamp(pixel_size,8,72);const auto font_key=pixel_size*2+(role==FontFace::Heading?1:0);if(const auto found=fonts.find(font_key);found!=fonts.end())return found->second;
@@ -354,15 +361,21 @@ InputSnapshot Window::poll(){
     case SDL_EVENT_MOUSE_BUTTON_UP:storage_->pointer=convert(event.button.x,event.button.y);if(event.button.button==SDL_BUTTON_LEFT){storage_->left_down=false;input.events.push_back({InputEventType::LeftReleased,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});}else if(event.button.button==SDL_BUTTON_RIGHT)input.events.push_back({InputEventType::RightReleased,storage_->pointer,{},0.f,{},static_cast<std::uint8_t>(event.button.clicks)});break;
     case SDL_EVENT_MOUSE_WHEEL:{storage_->pointer=convert(event.wheel.mouse_x,event.wheel.mouse_y);const auto wheel=event.wheel.direction==SDL_MOUSEWHEEL_FLIPPED?-event.wheel.y:event.wheel.y;input.events.push_back({InputEventType::Wheel,storage_->pointer,{},wheel});break;}
     case SDL_EVENT_GAMEPAD_ADDED:
-      // First attached pad wins; extra devices are ignored for now.
-      if(!storage_->gamepad){storage_->gamepad=SDL_OpenGamepad(event.gdevice.which);if(storage_->gamepad)storage_->gamepad_id=SDL_GetGamepadID(storage_->gamepad);}break;
+      // First free slot wins; the slot index is the stable device id
+      // emitted on every pad event.
+      for(int i=0;i<static_cast<int>(storage_->gamepads.size());++i)
+        if(!storage_->gamepads[static_cast<std::size_t>(i)]){
+          if(auto* pad=SDL_OpenGamepad(event.gdevice.which)){storage_->gamepads[static_cast<std::size_t>(i)]=pad;storage_->gamepad_ids[static_cast<std::size_t>(i)]=SDL_GetGamepadID(pad);}
+          break;
+        }
+      break;
     case SDL_EVENT_GAMEPAD_REMOVED:
-      if(storage_->gamepad&&event.gdevice.which==storage_->gamepad_id){SDL_CloseGamepad(storage_->gamepad);storage_->gamepad=nullptr;}break;
+      if(const int slot=storage_->gamepad_slot(event.gdevice.which);slot>=0){SDL_CloseGamepad(storage_->gamepads[static_cast<std::size_t>(slot)]);storage_->gamepads[static_cast<std::size_t>(slot)]=nullptr;}break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
     case SDL_EVENT_GAMEPAD_BUTTON_UP:
-      if(storage_->gamepad&&event.gbutton.which==storage_->gamepad_id){InputEvent pad{};pad.type=event.type==SDL_EVENT_GAMEPAD_BUTTON_DOWN?InputEventType::GamepadPressed:InputEventType::GamepadReleased;pad.gamepad_button=event.gbutton.button;input.events.push_back(pad);}break;
+      if(const int slot=storage_->gamepad_slot(event.gbutton.which);slot>=0){InputEvent pad{};pad.type=event.type==SDL_EVENT_GAMEPAD_BUTTON_DOWN?InputEventType::GamepadPressed:InputEventType::GamepadReleased;pad.gamepad_button=event.gbutton.button;pad.gamepad_device=static_cast<std::uint8_t>(slot);input.events.push_back(pad);}break;
     case SDL_EVENT_GAMEPAD_AXIS_MOTION:
-      if(storage_->gamepad&&event.gaxis.which==storage_->gamepad_id){InputEvent pad{};pad.type=InputEventType::GamepadAxis;pad.gamepad_axis=event.gaxis.axis;pad.gamepad_axis_value=std::clamp(static_cast<float>(event.gaxis.value)/32767.f,-1.f,1.f);input.events.push_back(pad);}break;
+      if(const int slot=storage_->gamepad_slot(event.gaxis.which);slot>=0){InputEvent pad{};pad.type=InputEventType::GamepadAxis;pad.gamepad_axis=event.gaxis.axis;pad.gamepad_device=static_cast<std::uint8_t>(slot);pad.gamepad_axis_value=std::clamp(static_cast<float>(event.gaxis.value)/32767.f,-1.f,1.f);input.events.push_back(pad);}break;
     case SDL_EVENT_WINDOW_MOUSE_LEAVE:
       // A captured drag may cross the window edge. Ordinary hover must stop
       // immediately rather than leaving its last control highlighted.

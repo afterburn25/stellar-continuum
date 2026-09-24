@@ -132,7 +132,11 @@ Core/engine projections, never re-derived in UI.
   same surface gate as wheel input) — injected on user-map load only
   when the saved map lacks it. The axis rows are rebindable in the
   Controls view: capture accepts a stick deflection or wheel scroll.
-  The navigation smoke exercises pad/right-click rebinding and stick
+  Multi-pad is plumbed end-to-end — up to four pads open into stable
+  slots, events carry the slot, and `InputBinding.device` pins a
+  binding to one pad (device-unset events stay wildcards, so replays
+  still match). The navigation smoke exercises pad/right-click
+  rebinding and stick
   pan/zoom end-to-end — and caught a real defect: Escape cleared the
   inspection card without resetting `selected_id_`, so
   `refresh_inspection()` reopened it the same frame; the card now

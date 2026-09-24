@@ -105,6 +105,7 @@ bool InputMapper::load_contexts(std::string_view json_document,
         binding.kind = found->second;
         binding.code = binding_json.value("code", 0);
         binding.scale = binding_json.value("scale", 1.0f);
+        binding.device = binding_json.value("device", -1);
         for (const auto &chord :
              binding_json.value("chord", nlohmann::json::array()))
           binding.chord_keys.push_back(chord.get<int>());
@@ -156,10 +157,15 @@ bool InputMapper::binding_matches(const InputBinding &binding,
   case RawInputEvent::Kind::KeyPress:
   case RawInputEvent::Kind::KeyRelease:
   case RawInputEvent::Kind::MouseButton:
+    return binding.code == event.code;
   case RawInputEvent::Kind::GamepadButton:
-    return binding.code == event.code;
   case RawInputEvent::Kind::GamepadAxis:
-    return binding.code == event.code;
+    // Device pinning: a binding with device >= 0 answers only that pad;
+    // an event with device < 0 (synthetic/replayed input) is a wildcard
+    // that still matches pinned bindings.
+    return binding.code == event.code &&
+           (binding.device < 0 || event.device < 0 ||
+            binding.device == event.device);
   case RawInputEvent::Kind::MouseMotion:
   case RawInputEvent::Kind::MouseWheel:
     return true; // code-agnostic; scale decides magnitude
@@ -221,7 +227,7 @@ bool InputMapper::feed(const RawInputEvent &event) {
           // Sticks only emit on change; keep the latest value so held
           // deflection stays readable between events. axis() folds this
           // live value into the result for GamepadAxis-bound actions.
-          gamepad_axes_[event.code] = event.value;
+          gamepad_axes_[{event.device, event.code}] = event.value;
           consumed = true;
           break;
         case RawInputEvent::Kind::MouseMotion:
@@ -285,9 +291,18 @@ float InputMapper::axis(std::string_view action) const {
         continue;
       for (const auto &binding : candidate.bindings)
         if (binding.kind == RawInputEvent::Kind::GamepadAxis) {
-          const auto found = gamepad_axes_.find(binding.code);
-          if (found != gamepad_axes_.end())
-            result += found->second * binding.scale;
+          if (binding.device >= 0) {
+            const auto found = gamepad_axes_.find({binding.device, binding.code});
+            if (found != gamepad_axes_.end())
+              result += found->second * binding.scale;
+            const auto wild = gamepad_axes_.find({-1, binding.code});
+            if (wild != gamepad_axes_.end())
+              result += wild->second * binding.scale;
+          } else {
+            for (const auto &[key, value] : gamepad_axes_)
+              if (key.second == binding.code)
+                result += value * binding.scale;
+          }
         }
       return result;
     }
@@ -348,6 +363,8 @@ std::string InputMapper::save_contexts() const {
         nlohmann::json b{{"kind", kind_name(binding.kind)},
                          {"code", binding.code},
                          {"scale", binding.scale}};
+        if (binding.device >= 0)
+          b["device"] = binding.device;
         if (!binding.chord_keys.empty())
           b["chord"] = binding.chord_keys;
         bindings.push_back(std::move(b));

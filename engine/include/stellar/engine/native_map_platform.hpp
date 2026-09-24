@@ -128,7 +128,10 @@ struct InputEvent {
   std::uint32_t key{};
   bool control{}, shift{}, alt{};
   // SDL_GamepadButton / SDL_GamepadAxis codes; axis_value is -1..1.
-  std::uint8_t gamepad_button{}, gamepad_axis{};
+  // gamepad_device is the platform slot index (0..3) of the pad that
+  // produced the event — bindings can pin a slot, -wildcard consumers
+  // treat all pads alike.
+  std::uint8_t gamepad_button{}, gamepad_axis{}, gamepad_device{};
   float gamepad_axis_value{};
 };
 struct InputSnapshot {

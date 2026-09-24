@@ -219,6 +219,86 @@ int main() {
         "describe_bindings renders chord then trigger");
   check(describe_bindings({}) == "Unbound", "empty bindings render Unbound");
 
+  // Multi-pad device pinning: a binding with "device" answers only that
+  // pad slot; unpinned bindings answer any pad; device-unset events
+  // (synthetic/replayed input) are wildcards that still match pins.
+  {
+    InputMapper devices;
+    check(devices.load_contexts(R"({"contexts":[{"name":"PADS","actions":[
+        {"name":"pad0_fire","type":"Button","bindings":[{"kind":"GamepadButton","code":1,"device":0}]},
+        {"name":"any_fire","type":"Button","bindings":[{"kind":"GamepadButton","code":2}]},
+        {"name":"pad1_stick","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":0,"device":1}]},
+        {"name":"any_stick","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":1}]}]}]})",
+                             &error),
+          error.c_str());
+    devices.push_context("PADS");
+    devices.begin_frame();
+    RawInputEvent button{};
+    button.kind = RawInputEvent::Kind::GamepadButton;
+    button.code = 1;
+    button.device = 1;
+    devices.feed(button);
+    check(!devices.just_pressed("pad0_fire"),
+          "pinned binding ignored a different pad");
+    button.device = 0;
+    devices.feed(button);
+    check(devices.just_pressed("pad0_fire"), "pinned binding fired on its pad");
+    RawInputEvent any_button{};
+    any_button.kind = RawInputEvent::Kind::GamepadButton;
+    any_button.code = 2;
+    any_button.device = 3;
+    devices.feed(any_button);
+    check(devices.just_pressed("any_fire"),
+          "unpinned binding fired on any pad");
+    // A device-unset (replayed/synthetic) event still matches pinned
+    // bindings.
+    button.device = -1;
+    button.pressed = false;
+    devices.feed(button);
+    button.pressed = true;
+    devices.begin_frame();
+    devices.feed(button);
+    check(devices.just_pressed("pad0_fire"),
+          "device-unset event matched a pinned binding");
+    // Per-device axis state: a pinned axis reads only its pad plus
+    // wildcard events; an unpinned axis sums every pad.
+    RawInputEvent axis{};
+    axis.kind = RawInputEvent::Kind::GamepadAxis;
+    axis.code = 0;
+    axis.device = 0;
+    axis.value = 0.4f;
+    devices.feed(axis);
+    check(devices.axis("pad1_stick") == 0.0f,
+          "pinned axis ignored another pad");
+    axis.device = 1;
+    axis.value = 0.6f;
+    devices.feed(axis);
+    check(devices.axis("pad1_stick") == 0.6f, "pinned axis read its pad");
+    axis.device = -1;
+    axis.value = 0.2f;
+    devices.feed(axis);
+    check(devices.axis("pad1_stick") == 0.8f,
+          "wildcard axis event fed the pinned binding");
+    axis.code = 1;
+    axis.device = 0;
+    axis.value = 0.25f;
+    devices.feed(axis);
+    axis.device = 2;
+    axis.value = 0.5f;
+    devices.feed(axis);
+    check(devices.axis("any_stick") == 0.75f,
+          "unpinned axis summed every pad");
+    // JSON round-trip preserves the device pin; unpinned bindings stay
+    // absent from the document.
+    const auto document = devices.save_contexts();
+    InputMapper reloaded_devices;
+    check(reloaded_devices.load_contexts(document, &error), error.c_str());
+    check(reloaded_devices.bindings("pad0_fire")[0].device == 0 &&
+              reloaded_devices.bindings("pad1_stick")[0].device == 1 &&
+              reloaded_devices.bindings("any_fire")[0].device < 0,
+          "device pin survived the save/load round-trip");
+  }
+
   if (failures == 0)
     std::cout << "InputMapper tests passed\n";
   return failures == 0 ? 0 : 1;

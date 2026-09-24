@@ -1091,11 +1091,13 @@ int RuntimeHost::run() {
       case InputEventType::GamepadReleased:
         raw.kind = RawInputEvent::Kind::GamepadButton;
         raw.code = event.gamepad_button;
+        raw.device = event.gamepad_device;
         raw.pressed = event.type == InputEventType::GamepadPressed;
         break;
       case InputEventType::GamepadAxis:
         raw.kind = RawInputEvent::Kind::GamepadAxis;
         raw.code = event.gamepad_axis;
+        raw.device = event.gamepad_device;
         raw.value = event.gamepad_axis_value;
         break;
       default:

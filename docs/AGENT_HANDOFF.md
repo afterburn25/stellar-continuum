@@ -1217,7 +1217,15 @@ and capturing an axis row accepts a stick deflection past a 0.5 dead
 zone or a wheel scroll (discrete keys are swallowed — they cannot drive
 an axis). Startup workspace tests cover the axis ring, deflection
 capture, cross-context steal and wheel binding.
-Open: multi-pad disambiguation — mapper-level follow-up, not a blocker.
+Multi-pad is plumbed end-to-end: the platform opens up to four pads into
+stable slots, `InputEvent.gamepad_device`/`RawInputEvent.device` carry
+the slot, and `InputBinding.device` pins a binding to one pad via the
+input-map JSON `device` field (omitted when unset). Device-unset events
+are wildcards — replayed recordings still match pinned bindings — and
+live stick values key on (device, axis); unpinned axis bindings sum
+every pad. Captured bindings stay unpinned so either pad drives.
+Open: an accessibility input layer and device-policy/focus-capture
+tests — no pad-picker UI yet, so pinning is a JSON-level feature.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
