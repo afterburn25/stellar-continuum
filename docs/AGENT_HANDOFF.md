@@ -926,6 +926,18 @@ visible set, and the header appends the kept count. The test
 isolates the always-present session record by needle, asserts the
 filtered card count and census, and covers Escape-blur.
 `native_developer_diagnostics` green; client builds clean.
+Developer-panel VirtualizedList sweep (row 24): the celestial index,
+planet-type index, empire monitor (empire + active-research lists),
+and phenomena debug dump all migrated from hand-rolled `first_`/`scroll_`
+windows to the engine `VirtualizedList` — configured per handle/render
+call so rebuilds that shrink the row set can never leave a stale
+offset past the tail, and whole-row scrolling preserved by quantizing
+the pixel offset. The phenomena dump's old offset had no upper clamp
+at all; the model's `scroll_to` bounds it now. Tests gained wheel
+oracles asserting rows shift on scroll and the view returns to the
+head / clamps at the tail. `native_developer_index`,
+`native_developer_diagnostics`, `galaxy_phenomena` green; client
+builds clean.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

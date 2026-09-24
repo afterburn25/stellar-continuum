@@ -3,7 +3,10 @@
 #include "native_developer_simulation_panel.hpp"
 #include "native_stellar_observation.hpp"
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <algorithm>
 #include <iostream>
+#include <string>
+#include <vector>
 
 using namespace stellar::native_map;
 using namespace stellar::core;
@@ -56,6 +59,27 @@ int main(int argc,char **argv)try{
       const auto &r=*text->clip;
       check(r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h,"Index text escaped viewport.");
     }
+    // The engine VirtualizedList owns the scroll offset — wheel deltas
+    // scroll whole rows and the offset clamps at both ends.
+    {
+      Point list_point{};bool found=false;
+      for(const auto &command:draw.overlay)if(const auto *text=std::get_if<Text>(&command);text&&text->clip&&text->value.find(" objects")!=std::string::npos){
+        list_point={text->clip->x+5,text->clip->y+text->clip->height+5};found=true;}
+      check(found,"Index census label missing.");
+      const auto texts=[](const DrawList &d){std::vector<std::string> v;for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)v.push_back(t->value);std::ranges::sort(v);return v;};
+      const auto at_top=texts(render());
+      InputEvent wheel{InputEventType::Wheel,list_point,{},-10.f};
+      (void)index.handle(wheel,w,h,frame);
+      check(texts(render())!=at_top,"Wheel did not scroll the celestial index.");
+      InputEvent up{InputEventType::Wheel,list_point,{},10.f};
+      (void)index.handle(up,w,h,frame);
+      check(texts(render())==at_top,"Wheel scroll did not return to the head.");
+      InputEvent far{InputEventType::Wheel,list_point,{},-10000.f};
+      (void)index.handle(far,w,h,frame);
+      const auto tail=texts(render());
+      (void)index.handle(far,w,h,frame);
+      check(texts(render())==tail,"Scrolling past the tail did not clamp.");
+    }
     auto click=[&](Point p){check(index.handle({InputEventType::LeftPressed,p},w,h,frame),"Index press leaked through modal.");
       check(index.handle({InputEventType::LeftReleased,p},w,h,frame),"Index release leaked through modal.");};
     click(control(draw,"Search name"));
@@ -85,6 +109,19 @@ int main(int argc,char **argv)try{
     NativeDeveloperPlanetIndex planet_index;planet_index.open(frame.runtime().world().campaign());
     const auto planet_render=[&]{DrawList d;planet_index.render(d,w,h);return d;};
     auto planet_click=[&](Point point){check(planet_index.handle({InputEventType::LeftPressed,point},w,h,frame),"Planet index leaked input");check(planet_index.handle({InputEventType::LeftReleased,point},w,h,frame),"Planet index release leaked input");};
+    // The planet list scrolls through the same engine VirtualizedList —
+    // wheel deltas move whole rows and clamp at both ends.
+    {
+      const auto planet_texts=[](const DrawList &d){std::vector<std::string> v;for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)v.push_back(t->value);std::ranges::sort(v);return v;};
+      const auto planet_top=planet_texts(planet_render());
+      const auto anchor=control(planet_render(),"Ancient Grey Crater");
+      InputEvent wheel{InputEventType::Wheel,anchor,{},-10.f};
+      (void)planet_index.handle(wheel,w,h,frame);
+      check(planet_texts(planet_render())!=planet_top,"Wheel did not scroll the planet index.");
+      InputEvent up{InputEventType::Wheel,anchor,{},10.f};
+      (void)planet_index.handle(up,w,h,frame);
+      check(planet_texts(planet_render())==planet_top,"Planet index scroll did not return to the head.");
+    }
     const auto before_planets=saved();planet_click(control(planet_render(),"Ancient Grey Crater"));
     const auto& indexed_world=frame.runtime().world().campaign();
     std::size_t imported_count=0,habitable_count=0;

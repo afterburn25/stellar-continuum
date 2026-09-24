@@ -2,6 +2,8 @@
 #include "native_dropdown.hpp"
 #include <stellar/core/developer_planet_index.hpp>
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
+#include <cmath>
 #include <sstream>
 #include <iomanip>
 #include <utility>
@@ -9,30 +11,41 @@ namespace stellar::native_map {
 class NativeDeveloperPlanetIndex {
  using Entry=stellar::core::DeveloperPlanetTypeEntry;
  std::vector<Entry> entries_;std::vector<int> rows_;stellar::native_ui::Dropdown dropdown_;
- bool visible_{},rules_{},giant_request_{};int selected_{-1},first_{},filter_{-1},pressed_{-1};Point pointer_{};std::string notice_;
+ bool visible_{},rules_{},giant_request_{};int selected_{-1},filter_{-1},pressed_{-1};Point pointer_{};std::string notice_;
+ mutable stellar::engine::VirtualizedList list_view_{};
  std::optional<std::pair<int,int>> focus_;
  struct Layout{UiRect panel,close,filter,list,details,go,force_class,force_sub,rules,giants;float scale;};
  static Layout layout(int w,int h){const float s=std::clamp(std::min(w/1280.f,h/720.f),.7f,2.f);Layout l{};l.scale=s;l.panel={w*.5f-545*s,h*.5f-300*s,1090*s,600*s};const auto p=l.panel;
   l.giants={p.x+478*s,p.y+14*s,300*s,32*s};l.close={p.x+974*s,p.y+14*s,96*s,32*s};l.rules={p.x+794*s,p.y+14*s,164*s,32*s};l.filter={p.x+18*s,p.y+54*s,440*s,36*s};l.list={p.x+18*s,p.y+106*s,440*s,392*s};l.details={p.x+478*s,p.y+60*s,590*s,442*s};l.go={p.x+18*s,p.y+516*s,230*s,36*s};l.force_class={p.x+266*s,p.y+516*s,344*s,36*s};l.force_sub={p.x+628*s,p.y+516*s,440*s,36*s};return l;}
  static UiRect row(const Layout& l,int i){return {l.list.x,l.list.y+i*49*l.scale,l.list.width,45*l.scale};}
  stellar::core::DeveloperPlanetFilter mode()const{return filter_==16?stellar::core::DeveloperPlanetFilter::ImportedArtwork:filter_==17?stellar::core::DeveloperPlanetFilter::Habitable:stellar::core::DeveloperPlanetFilter::All;}
- void rebuild(){rows_.clear();for(std::size_t i=0;i<entries_.size();++i)if(filter_<0||(filter_>=16&&entries_[i].count>0)||static_cast<int>(entries_[i].type)==filter_)rows_.push_back(static_cast<int>(i));first_=std::clamp(first_,0,std::max(0,static_cast<int>(rows_.size())-8));}
+ void rebuild(){rows_.clear();for(std::size_t i=0;i<entries_.size();++i)if(filter_<0||(filter_>=16&&entries_[i].count>0)||static_cast<int>(entries_[i].type)==filter_)rows_.push_back(static_cast<int>(i));}
+ // The engine VirtualizedList owns the scroll offset — configured per
+ // call so a rebuild that shrinks rows can never leave a stale offset
+ // past the tail; the panel scrolls whole rows.
+ int first_row(const Layout& l)const{
+  list_view_.row_height=49*l.scale;list_view_.viewport_height=l.list.height;list_view_.row_count=rows_.size();
+  list_view_.scroll_to(list_view_.scroll_offset);
+  if(list_view_.row_height>0)list_view_.scroll_offset=std::floor(list_view_.scroll_offset/list_view_.row_height)*list_view_.row_height;
+  return list_view_.row_height>0?static_cast<int>(list_view_.scroll_offset/list_view_.row_height):0;
+ }
  static std::string number(double v,int precision=2){std::ostringstream o;o<<std::fixed<<std::setprecision(precision)<<v;return o.str();}
  public:
- void open(const stellar::core::FreshCampaignState& w){entries_=stellar::core::build_developer_planet_index(w);visible_=true;rules_=false;selected_=-1;filter_=-1;first_=0;notice_.clear();focus_.reset();rebuild();}
+ void open(const stellar::core::FreshCampaignState& w){entries_=stellar::core::build_developer_planet_index(w);visible_=true;rules_=false;selected_=-1;filter_=-1;list_view_.scroll_offset=0;notice_.clear();focus_.reset();rebuild();}
  void close(){visible_=false;dropdown_.close();pressed_=-1;}
  bool visible()const{return visible_;}
  bool take_giant_request(){return std::exchange(giant_request_,false);}
  std::optional<std::pair<int,int>> take_focus_request(){return std::exchange(focus_,{});}
  bool handle(const InputEvent& e,int w,int h,stellar::core::CampaignFrame& frame){
   if(!visible_)return false;const auto l=layout(w,h);pointer_=e.position;
-  if(dropdown_.visible()){if(const auto choice=dropdown_.handle(e,l.filter,w,h)){filter_=*choice-1;first_=0;selected_=-1;entries_=stellar::core::build_developer_planet_index(frame.runtime().world().campaign(),mode());rebuild();}return true;}
+  if(dropdown_.visible()){if(const auto choice=dropdown_.handle(e,l.filter,w,h)){filter_=*choice-1;selected_=-1;list_view_.scroll_offset=0;entries_=stellar::core::build_developer_planet_index(frame.runtime().world().campaign(),mode());rebuild();}return true;}
   if(e.type==InputEventType::EscapePressed){close();return true;}
   if(e.type==InputEventType::PointerCancelled){pressed_=-1;return true;}
-  if(e.type==InputEventType::Wheel&&l.list.contains(e.position))first_=std::clamp(first_-static_cast<int>(e.wheel_y),0,std::max(0,static_cast<int>(rows_.size())-8));
+  if(e.type==InputEventType::Wheel&&l.list.contains(e.position)){(void)first_row(l);list_view_.scroll_to(list_view_.scroll_offset-std::round(e.wheel_y)*list_view_.row_height);}
   if(e.type==InputEventType::LeftPressed){
    if(l.filter.contains(e.position)){std::vector<std::string> options{"All planet classes"};for(const auto& d:stellar::core::planet_class_definitions())options.push_back(d.name+" · "+number(d.weight,1)+"%");options.push_back("Imported artwork in this campaign");options.push_back("Habitable for your species (unsettled)");dropdown_.open(0,std::move(options),filter_+1);return true;}
-   for(int i=0;i<8&&first_+i<static_cast<int>(rows_.size());++i)if(row(l,i).contains(e.position)){selected_=rows_[first_+i];notice_.clear();return true;}
+   const int first=first_row(l);
+   for(int i=0;i<8&&first+i<static_cast<int>(rows_.size());++i)if(row(l,i).contains(e.position)){selected_=rows_[first+i];notice_.clear();return true;}
    pressed_=l.close.contains(e.position)?0:l.go.contains(e.position)?1:l.force_class.contains(e.position)?2:l.force_sub.contains(e.position)?3:l.rules.contains(e.position)?4:l.giants.contains(e.position)?5:-1;
   }
   if(e.type==InputEventType::LeftReleased){const int p=std::exchange(pressed_,-1);if(p==0&&l.close.contains(e.position)){close();return true;}
@@ -55,7 +68,8 @@ class NativeDeveloperPlanetIndex {
   native_menu_style::button(out,l.close,"CLOSE",font,l.close.contains(pointer_),true,s);
   native_menu_style::button(out,l.rules,rules_?"VIEW EXAMPLE":"VIEW RULES",font,l.rules.contains(pointer_),selected_>=0,s);
   native_menu_style::button(out,l.filter,filter_<0?"All planet classes":filter_==16?"Imported artwork in this campaign":filter_==17?"Habitable for your species (unsettled)":stellar::core::planet_class_definition(static_cast<stellar::core::PlanetClass>(filter_)).name,font,l.filter.contains(pointer_),true,s);
-  for(int i=0;i<8&&first_+i<static_cast<int>(rows_.size());++i){const auto& entry=entries_[rows_[first_+i]];const auto r=row(l,i);if(rows_[first_+i]==selected_)out.overlay.emplace_back(FilledRectangle{r,{17,50,68,245}});text({r.x+7*s,r.y+3*s,r.width-14*s,22*s},entry.name);text({r.x+7*s,r.y+24*s,r.width-14*s,20*s},stellar::core::planet_class_definition(entry.type).name+" · "+std::to_string(entry.count)+" examples",native_menu_style::muted);}
+  const int first=first_row(l);
+  for(int i=0;i<8&&first+i<static_cast<int>(rows_.size());++i){const auto& entry=entries_[rows_[first+i]];const auto r=row(l,i);if(rows_[first+i]==selected_)out.overlay.emplace_back(FilledRectangle{r,{17,50,68,245}});text({r.x+7*s,r.y+3*s,r.width-14*s,22*s},entry.name);text({r.x+7*s,r.y+24*s,r.width-14*s,20*s},stellar::core::planet_class_definition(entry.type).name+" · "+std::to_string(entry.count)+" examples",native_menu_style::muted);}
   if(selected_>=0){const auto& entry=entries_[selected_];const auto& d=stellar::core::planet_class_definition(entry.type);const auto& sub=stellar::core::planet_subclass_definition(entry.type,entry.subclass);float y=l.details.y;
    const auto line=[&](std::string value){text({l.details.x,y,l.details.width,25*s},std::move(value));y+=27*s;};
    if(rules_){const auto& r=stellar::core::planet_type_record(entry.type,entry.subclass);const auto& atmosphere=r.atmosphere_rules;

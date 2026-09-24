@@ -3,6 +3,7 @@
 #include <stellar/core/developer_celestial_index.hpp>
 #include <stellar/core/developer_campaign.hpp>
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 #include <algorithm>
 #include <cctype>
 #include <iomanip>
@@ -12,7 +13,7 @@ namespace stellar::native_map {
 class NativeDeveloperCelestialIndex {
 public:
   void open(const stellar::core::FreshCampaignState &world){
-    index_=stellar::core::build_developer_celestial_index(world);visible_=true;selected_=-1;first_=0;filter_=-1;search_.clear();search_focused_=false;pressed_=-1;focus_.reset();dropdown_.close();rebuild();
+    index_=stellar::core::build_developer_celestial_index(world);visible_=true;selected_=-1;list_view_.scroll_offset=0;filter_=-1;search_.clear();search_focused_=false;pressed_=-1;focus_.reset();dropdown_.close();rebuild();
   }
   void close(){visible_=false;dropdown_.close();search_focused_=false;pressed_=-1;}
   [[nodiscard]] bool visible()const{return visible_;}
@@ -23,15 +24,15 @@ public:
     const auto l=layout(w,h);pointer_=e.position;
     if(dropdown_.visible()){
       const int id=dropdown_.id();if(const auto chosen=dropdown_.handle(e,id==0?l.filter:l.state,w,h)){
-        if(id==0){filter_=*chosen-1;first_=0;rebuild();}
+        if(id==0){filter_=*chosen-1;list_view_.scroll_offset=0;rebuild();}
         else stellar::core::set_developer_central_black_hole_state(frame.runtime(),static_cast<stellar::core::CentralBlackHoleState>(*chosen));
       }return true;
     }
     if(e.type==InputEventType::EscapePressed){close();return true;}
     if(e.type==InputEventType::PointerCancelled){pressed_=-1;search_focused_=false;return true;}
-    if(search_focused_&&e.type==InputEventType::TextEntered){if(search_.size()+e.text.size()<=96){search_+=e.text;first_=0;rebuild();}return true;}
-    if(search_focused_&&e.type==InputEventType::BackspacePressed){if(!search_.empty()){auto pos=search_.size()-1;while(pos&&(static_cast<unsigned char>(search_[pos])&0xc0)==0x80)--pos;search_.resize(pos);first_=0;rebuild();}return true;}
-    if(e.type==InputEventType::Wheel&&l.list.contains(e.position))first_=std::clamp(first_-static_cast<int>(std::round(e.wheel_y)),0,std::max(0,static_cast<int>(rows_.size())-8));
+    if(search_focused_&&e.type==InputEventType::TextEntered){if(search_.size()+e.text.size()<=96){search_+=e.text;list_view_.scroll_offset=0;rebuild();}return true;}
+    if(search_focused_&&e.type==InputEventType::BackspacePressed){if(!search_.empty()){auto pos=search_.size()-1;while(pos&&(static_cast<unsigned char>(search_[pos])&0xc0)==0x80)--pos;search_.resize(pos);list_view_.scroll_offset=0;rebuild();}return true;}
+    if(e.type==InputEventType::Wheel&&l.list.contains(e.position)){(void)first_row(l);list_view_.scroll_to(list_view_.scroll_offset-std::round(e.wheel_y)*list_view_.row_height);}
     if(e.type==InputEventType::LeftPressed){
       search_focused_=l.search.contains(e.position);
       if(l.filter.contains(e.position)){
@@ -42,7 +43,8 @@ public:
         const auto &core=frame.runtime().world().campaign().galactic_core;
         dropdown_.open(1,{"Quiescent","Accreting / Active","Relativistic Jets"},static_cast<int>(core->black_hole->state));return true;
       }
-      for(int i=0;i<8&&first_+i<static_cast<int>(rows_.size());++i)if(row(l,i).contains(e.position)){selected_=rows_[first_+i];return true;}
+      const int first=first_row(l);
+      for(int i=0;i<8&&first+i<static_cast<int>(rows_.size());++i)if(row(l,i).contains(e.position)){selected_=rows_[first+i];return true;}
       pressed_=l.close.contains(e.position)?0:l.focus.contains(e.position)?1:-1;
     }
     if(e.type==InputEventType::LeftReleased){
@@ -62,9 +64,10 @@ public:
     out.overlay.emplace_back(FilledRectangle{l.search,{3,13,23,255}});out.overlay.emplace_back(StrokedRectangle{l.search,search_focused_?native_menu_style::cyan:Color{62,121,146,225}});
     text({l.search.x+9*s,l.search.y+6*s,l.search.width-18*s,l.search.height},search_.empty()?"Search name, class or region...":search_);
     text({l.list.x,l.list.y-25*s,l.list.width,24*s},std::to_string(rows_.size())+(rows_.size()==1?" object":" objects")+" · Natural / Developer coverage",native_menu_style::muted);
-    for(int i=0;i<8&&first_+i<static_cast<int>(rows_.size());++i){
-      const auto r=row(l,i);const auto &e=index_.entries[rows_[first_+i]];
-      if(rows_[first_+i]==selected_)out.overlay.emplace_back(FilledRectangle{r,{18,54,73,245}});
+    const int first=first_row(l);
+    for(int i=0;i<8&&first+i<static_cast<int>(rows_.size());++i){
+      const auto r=row(l,i);const auto &e=index_.entries[rows_[first+i]];
+      if(rows_[first+i]==selected_)out.overlay.emplace_back(FilledRectangle{r,{18,54,73,245}});
       out.overlay.emplace_back(StrokedRectangle{r,{62,121,146,225}});
       text({r.x+8*s,r.y+5*s,r.width-16*s,22*s},e.name+(e.forced?" · QA":""),e.forced?Color{240,189,93,255}:native_menu_style::ink);
       text({r.x+8*s,r.y+28*s,r.width-16*s,22*s},e.type_name,native_menu_style::muted);
@@ -96,12 +99,22 @@ private:
       {p.x+550*s,p.y+600*s,540*s,40*s},{p.x+550*s,p.y+505*s,540*s,40*s}};
   }
   static UiRect row(const Layout &l,int i){return {l.list.x,l.list.y+i*55*l.scale,l.list.width,52*l.scale};}
+  // The engine VirtualizedList owns the scroll offset — configured per
+  // call so a rebuild that shrinks rows can never leave a stale offset
+  // past the tail; the panel scrolls whole rows.
+  int first_row(const Layout &l)const{
+    list_view_.row_height=55*l.scale;list_view_.viewport_height=l.list.height;list_view_.row_count=rows_.size();
+    list_view_.scroll_to(list_view_.scroll_offset);
+    if(list_view_.row_height>0)list_view_.scroll_offset=std::floor(list_view_.scroll_offset/list_view_.row_height)*list_view_.row_height;
+    return list_view_.row_height>0?static_cast<int>(list_view_.scroll_offset/list_view_.row_height):0;
+  }
   static std::string number(double value){std::ostringstream out;out<<std::setprecision(3)<<std::scientific<<value;return out.str();}
   static std::string lower(std::string value){for(auto &c:value)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));return value;}
   const stellar::core::DeveloperCelestialEntry *selected()const{return selected_>=0&&selected_<static_cast<int>(index_.entries.size())?&index_.entries[selected_]:nullptr;}
   void rebuild(){rows_.clear();const auto query=lower(search_);for(std::size_t i=0;i<index_.entries.size();++i){const auto &e=index_.entries[i];if(filter_>=0&&e.type_id!=index_.counts[filter_].type_id)continue;if(!query.empty()&&lower(e.name+" "+e.type_name+" "+e.region).find(query)==std::string::npos)continue;rows_.push_back(static_cast<int>(i));}if(std::ranges::find(rows_,selected_)==rows_.end())selected_=rows_.empty()?-1:rows_.front();}
   stellar::core::DeveloperCelestialIndex index_;stellar::native_ui::Dropdown dropdown_;std::vector<int> rows_;
   std::optional<stellar::core::DeveloperCelestialEntry> focus_;std::string search_;
-  bool visible_{},search_focused_{};int selected_{-1},filter_{-1},first_{},pressed_{-1};Point pointer_{};
+  bool visible_{},search_focused_{};int selected_{-1},filter_{-1},pressed_{-1};Point pointer_{};
+  mutable stellar::engine::VirtualizedList list_view_{};
 };
 }

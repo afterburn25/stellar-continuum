@@ -3,6 +3,8 @@
 #include "native_campaign_calendar.hpp"
 #include <stellar/core/campaign_frame.hpp>
 #include <stellar/core/developer_campaign.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
+#include <cmath>
 #include <chrono>
 #include <iomanip>
 #include <map>
@@ -18,7 +20,7 @@ public:
     baseline_.clear();for(const auto &r:rows_)baseline_[r.civilization_id]=r;
     selected_=rows_.empty()?0:rows_.front().civilization_id;
     for(const auto &r:rows_)if(!r.player){selected_=r.civilization_id;break;}
-    first_=project_first_=0;visible_=true;refresh(frame);
+    empire_view_.scroll_offset=project_view_.scroll_offset=0;visible_=true;refresh(frame);
   }
   void close(){visible_=false;pressed_=-1;focus_.reset();}
   bool visible()const{return visible_;}
@@ -28,18 +30,19 @@ public:
     if(e.type==InputEventType::EscapePressed){close();return true;}
     if(e.type==InputEventType::PointerCancelled){pressed_=-1;return true;}
     if(e.type==InputEventType::Wheel){
-      const int delta=static_cast<int>(std::round(e.wheel_y));
-      if(l.list.contains(e.position))first_=std::clamp(first_-delta,0,std::max(0,static_cast<int>(rows_.size())-12));
-      if(l.projects.contains(e.position))project_first_=std::clamp(project_first_-delta,0,std::max(0,static_cast<int>(research_.active_projects.size())-4));
+      const float delta=std::round(e.wheel_y);
+      if(l.list.contains(e.position)){(void)first_row(l);empire_view_.scroll_to(empire_view_.scroll_offset-delta*empire_view_.row_height);}
+      if(l.projects.contains(e.position)){(void)project_row(l);project_view_.scroll_to(project_view_.scroll_offset-delta*project_view_.row_height);}
     }
     int hit=l.close.contains(e.position)?0:l.focus.contains(e.position)?1:l.refresh.contains(e.position)?2:-1;
-    for(int i=0;i<12&&first_+i<static_cast<int>(rows_.size());++i)if(row_rect(l,i).contains(e.position))hit=10+i;
+    const int first=first_row(l);
+    for(int i=0;i<12&&first+i<static_cast<int>(rows_.size());++i)if(row_rect(l,i).contains(e.position))hit=10+i;
     if(e.type==InputEventType::LeftPressed)pressed_=hit;
     if(e.type==InputEventType::LeftReleased&&std::exchange(pressed_,-1)==hit){
       if(hit==0)close();
       else if(hit==1){for(const auto &r:rows_)if(r.civilization_id==selected_){const int id=r.home_system_id;close();focus_=id;break;}}
       else if(hit==2)refresh(frame);
-      else if(hit>=10){selected_=rows_.at(first_+hit-10).civilization_id;project_first_=0;refresh(frame);}
+      else if(hit>=10){selected_=rows_.at(first+hit-10).civilization_id;project_view_.scroll_offset=0;refresh(frame);}
     }
     return true;
   }
@@ -53,8 +56,9 @@ public:
     text({l.panel.x+20*s,l.panel.y+16*s,890*s,28*s},"DEVELOPER · EMPIRE MONITOR",native_menu_style::cyan);
     button(l.close,"CLOSE");button(l.focus,"SHOW HOME SYSTEM");button(l.refresh,"REFRESH NOW");
     text({l.panel.x+20*s,l.panel.y+64*s,1040*s,26*s},"Live simulation day "+number(day_)+" · "+std::to_string(rows_.size())+" empires · Scroll the empire and research lists",native_menu_style::muted);
-    for(int i=0;i<12&&first_+i<static_cast<int>(rows_.size());++i){
-      const auto &r=rows_[first_+i];const auto rect=row_rect(l,i);
+    const int first=first_row(l);
+    for(int i=0;i<12&&first+i<static_cast<int>(rows_.size());++i){
+      const auto &r=rows_[first+i];const auto rect=row_rect(l,i);
       button(rect,r.name+(r.player?" (player)":""));
       if(r.civilization_id==selected_)out.overlay.emplace_back(StrokedRectangle{rect,native_menu_style::cyan});
     }
@@ -73,8 +77,9 @@ public:
     line(192,"Research spending/day: "+number(r.research_spending_per_day)+"   Funding: "+number(r.research_funding_fraction*100)+"%");
     line(224,"Established research: "+std::to_string(r.established_research)+" ("+delta(r.established_research-base.established_research)+")   Active: "+std::to_string(r.active_projects));
     line(260,"ACTIVE RESEARCH · progress within the current stage",native_menu_style::cyan);
-    for(int i=0;i<4&&project_first_+i<static_cast<int>(research_.active_projects.size());++i){
-      const auto &p=research_.active_projects[project_first_+i];const auto py=l.projects.y+i*56*s;
+    const int project_first=project_row(l);
+    for(int i=0;i<4&&project_first+i<static_cast<int>(research_.active_projects.size());++i){
+      const auto &p=research_.active_projects[project_first+i];const auto py=l.projects.y+i*56*s;
       const auto &name=frame.runtime().research_runtime().authority().catalog().get_node(p.node_id).name;
       text({x,py,width,25*s},name);
       text({x,py+25*s,width,25*s},number(p.stage_progress*100)+"% · "+number(p.assigned_effective_labs)+" labs · "+(p.paused?"Paused: "+p.pause_reason.value_or("unspecified"):"Running"),native_menu_style::muted);
@@ -91,6 +96,17 @@ private:
       {p.x+20*s,p.y+110*s,330*s,408*s},{p.x+370*s,p.y+404*s,700*s,224*s}};
   }
   static UiRect row_rect(const Layout &l,int i){return {l.list.x,l.list.y+i*34*l.s,l.list.width,30*l.s};}
+  // Engine VirtualizedList scroll models — configured per call so a
+  // refresh that shrinks a list can never leave a stale offset past the
+  // tail; both panels scroll whole rows.
+  int first_row(const Layout &l)const{return first_of(empire_view_,l,34.f,l.list.height,rows_.size());}
+  int project_row(const Layout &l)const{return first_of(project_view_,l,56.f,l.projects.height,research_.active_projects.size());}
+  static int first_of(stellar::engine::VirtualizedList &v,const Layout &l,float stride,float viewport,std::size_t rows){
+    v.row_height=stride*l.s;v.viewport_height=viewport;v.row_count=rows;
+    v.scroll_to(v.scroll_offset);
+    if(v.row_height>0)v.scroll_offset=std::floor(v.scroll_offset/v.row_height)*v.row_height;
+    return v.row_height>0?static_cast<int>(v.scroll_offset/v.row_height):0;
+  }
   static std::string number(double v){std::ostringstream o;o<<std::fixed<<std::setprecision(2)<<v;return o.str();}
   static std::string delta(double v){return (v>=0?"+":"")+number(v);}
   void refresh(stellar::core::CampaignFrame &frame){
@@ -98,7 +114,8 @@ private:
     if(!rows_.empty())research_=stellar::core::developer_empire_research(frame.runtime(),selected_);
     day_=frame.clock().simulation_days();next_refresh_=std::chrono::steady_clock::now()+std::chrono::milliseconds(250);
   }
-  bool visible_{};int selected_{},pressed_{-1},first_{},project_first_{};Point pointer_{};
+  bool visible_{};int selected_{},pressed_{-1};Point pointer_{};
+  mutable stellar::engine::VirtualizedList empire_view_{},project_view_{};
   double day_{};std::optional<int> focus_;std::chrono::steady_clock::time_point next_refresh_{};
   std::vector<stellar::core::DeveloperEmpireSummary> rows_;
   std::map<int,stellar::core::DeveloperEmpireSummary> baseline_;

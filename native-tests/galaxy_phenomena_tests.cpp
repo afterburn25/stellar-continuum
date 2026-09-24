@@ -4,11 +4,14 @@
 #include <stellar/core/exploration_advance.hpp>
 #include "native_phenomena.hpp"
 #include "native_phenomena_debug.hpp"
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <set>
 #include <stdexcept>
+#include <string>
+#include <vector>
 using namespace stellar::core;
 using namespace stellar::native_phenomena;
 using namespace stellar::native_map;
@@ -114,6 +117,27 @@ int main(int argc,char** argv)try{
     panel.toggle();click(490,128);check(panel.options.membership,"System overlap toggle failed");click(800,128);check(panel.options.filenames,"Artwork filename toggle failed");
     click(460,72);check(!panel.visible&&panel.take_navigation(3)==2,"Previous phenomenon did not wrap");check(!panel.take_navigation(3),"Navigation repeated without input");
     panel.toggle();click(620,72);check(panel.take_navigation(3)==0,"Next phenomenon did not wrap");panel.toggle();click(780,72);check(panel.take_navigation(3)==0,"Go To changed selected phenomenon");
+    // Scroll contract: the engine VirtualizedList clamps the dump window —
+    // the old unbounded int offset could scroll past the end into blank space.
+    {
+      PhenomenaDebug dump_panel;dump_panel.visible=true;
+      std::string dump;for(int i=0;i<40;++i)dump+="phenomena line "+std::to_string(i)+"\n";
+      dump_panel.data(std::move(dump));
+      const auto texts=[](const DrawList &d){std::vector<std::string> v;for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)v.push_back(t->value);std::ranges::sort(v);return v;};
+      const auto render=[&]{DrawList d;dump_panel.render(d,size.first,size.second);return d;};
+      const auto top=texts(render());
+      InputEvent wheel{InputEventType::Wheel,{},{},-3.f};
+      check(dump_panel.handle(wheel,size.first,size.second),"Phenomena debug dropped wheel input.");
+      check(texts(render())!=top,"Phenomena debug wheel did not scroll the dump.");
+      InputEvent up{InputEventType::Wheel,{},{},3.f};
+      (void)dump_panel.handle(up,size.first,size.second);
+      check(texts(render())==top,"Phenomena debug scroll did not return to the head.");
+      InputEvent far{InputEventType::Wheel,{},{},-10000.f};
+      (void)dump_panel.handle(far,size.first,size.second);
+      const auto tail=texts(render());
+      (void)dump_panel.handle(far,size.first,size.second);
+      check(texts(render())==tail,"Phenomena debug scroll did not clamp at the tail.");
+    }
   }
   DrawList system;native.append_system(system,7,0,0,1280,720,.2,{});check(system.overlay.empty(),"Phenomena drew over UI");system.world.emplace_back(Circle{{640,360},16,{255,255,255,255}});check(std::holds_alternative<Circle>(system.world.back()),"Objects cannot render above clouds");
   DrawList close_system;native.append_system(close_system,7,0,0,1280,720,10,{});
