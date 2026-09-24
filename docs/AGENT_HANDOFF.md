@@ -1216,6 +1216,23 @@ ring, Escape layering, activation replay and modal narrowing;
 `native_colony_workspace` pins the delegation. Note: client-side the fragment resolves with
 the host HWND runtime id `{42, hwnd}`, not our appended `{3, 1}` — the
 bridge test walks raw children matching that shape.
+Developer celestial index ring (row 26): `NativeDeveloperCelestialIndex` —
+the first developer-tool surface to adopt the contract — rings its
+rendered controls in (y,x) order: close, category filter, the search
+field (Edit; activation enters edit mode, Tab/Return commit out), every
+rendered row (scroll-follow via `VirtualizedList::ensure_visible`), the
+central-state dropdown (central objects only) and the center-map action.
+Keyboard activation replays the shared hit dispatch — dropdown opens,
+row selection, `set_developer_central_black_hole_state` and the
+focus-request path emit unchanged. Escape layers edit → ring → close;
+pointer press/cancel clear the ring. The dispatcher announces focus
+moves through `focused_label`/`focused_bounds`/`focused_control` and the
+panel joins `wants_keyboard_focus()`. `native_developer_index` pins the
+ring, Edit classification, edit commit, activation replay, pointer
+reset and Escape layering. The remaining developer panels (diagnostics,
+planet index, empire monitor, simulation panel, phenomena/background
+debug, giant test, stellar activity) stay pointer-only — they predate
+the contract and adopt it incrementally from here.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

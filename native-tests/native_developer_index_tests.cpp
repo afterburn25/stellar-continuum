@@ -106,6 +106,46 @@ int main(int argc,char **argv)try{
     check(!index.take_focus_request()&&index.visible(),"Empty search activated navigation.");
     (void)index.handle({InputEventType::EscapePressed},w,h,frame);
     check(!index.visible()&&!index.handle({InputEventType::LeftPressed},w,h,frame),"Closed index captured gameplay input.");
+    // Keyboard ring: the panel's rendered controls walk in (y,x) order —
+    // close, category filter, search field, visible rows, then the
+    // conditional central-state and center-map actions. Activation replays
+    // the same dispatch pointer input takes; the search field enters edit
+    // mode on Return and owns its keys until Tab commits out.
+    {
+      index.open(frame.runtime().world().campaign());
+      const auto press=[&](std::uint32_t key,bool shift=false){
+        InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;ev.shift=shift;
+        return index.handle(ev,w,h,frame);};
+      constexpr std::uint32_t kTab=9u,kReturn=13u,kDown=0x40000051u;
+      check(index.focus()<0,"Reopened index retained keyboard focus.");
+      check(press(kTab),"Index Tab press leaked.");
+      check(index.focus()>=0&&!index.focused_label(w,h).empty(),"Tab did not focus a labelled index control.");
+      check(index.focused_bounds(w,h).has_value(),"Focused index control lacks bounds.");
+      check(press(kReturn),"Index Return leaked.");
+      check(!index.visible(),"Close activation did not close the index.");
+      index.open(frame.runtime().world().campaign());
+      check(press(kTab)&&press(kTab)&&press(kTab),"Index navigation leaked.");
+      check(index.focused_control(w,h)==stellar::engine::AnnouncementControl::Edit,"Search field was not classified as an Edit control.");
+      check(press(kReturn)&&index.wants_text_input(),"Search activation did not enter edit mode.");
+      check(index.handle({InputEventType::TextEntered,{}, {},0,"Galactic center"},w,h,frame),"Search text leaked.");
+      check(press(kTab)&&!index.wants_text_input(),"Tab did not commit out of search editing.");
+      check(press(kDown)&&press(kReturn),"Row activation leaked.");
+      int guard=0;
+      while(index.visible()&&index.focused_label(w,h).find("Center galaxy map")!=0&&guard++<64)
+        check(press(kDown),"Index navigation past the row leaked.");
+      check(index.focused_label(w,h).find("Center galaxy map")==0,"Ring did not reach the center-map action.");
+      check(press(kReturn),"Center-map activation leaked.");
+      const auto keyed=index.take_focus_request();
+      check(keyed&&keyed->central&&!index.visible(),"Keyboard center-map activation produced the wrong target.");
+      index.open(frame.runtime().world().campaign());
+      check(press(kTab)&&index.focus()>=0,"Tab did not re-enter the index ring.");
+      (void)index.handle({InputEventType::LeftPressed,{w*.5f,h*.5f}},w,h,frame);
+      check(index.focus()<0,"Pointer press did not clear the index ring.");
+      check(press(kTab),"Index Tab press leaked.");
+      check(index.handle({InputEventType::EscapePressed},w,h,frame)&&index.focus()<0&&index.visible(),
+        "Escape closed the index instead of releasing its ring.");
+      check(index.handle({InputEventType::EscapePressed},w,h,frame)&&!index.visible(),"Second Escape did not close the index.");
+    }
     NativeDeveloperPlanetIndex planet_index;planet_index.open(frame.runtime().world().campaign());
     const auto planet_render=[&]{DrawList d;planet_index.render(d,w,h);return d;};
     auto planet_click=[&](Point point){check(planet_index.handle({InputEventType::LeftPressed,point},w,h,frame),"Planet index leaked input");check(planet_index.handle({InputEventType::LeftReleased,point},w,h,frame),"Planet index release leaked input");};

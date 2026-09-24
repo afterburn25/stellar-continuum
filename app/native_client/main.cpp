@@ -5802,6 +5802,7 @@ class NativeCampaign final {
            (colony_workspace_.visible()&&colony_workspace_.focus()>=0)||
            (mission_view_.visible()&&mission_view_.focus()>=0)||
            (map_hud_visible()&&assets_.focus()>=0)||
+           (developer_index_.visible()&&developer_index_.focus()>=0)||
            hud_focus_>=0||
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
@@ -6176,18 +6177,25 @@ class NativeCampaign final {
         }
         gesture_.capture_for_ui();continue;
       }
-      if(developer_session()&&developer_index_.handle(event,width,height,session_->frame())){
-        if(const auto target=developer_index_.take_focus_request()){
-          colony_roster_.close();economy_workspace_.close();supply_workspace_.close();
-          research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
-          diplomacy_workspace_.close();colony_workspace_.close();
-          settlement_workspace_.clear();colony_entry_view_.reset();system_workspace_.close();
-          camera_.center={target->x,target->y};
-          camera_.pixels_per_world=std::max(camera_.pixels_per_world,fitted_pixels_per_world_*8.);
-          selected_id_=target->system_id;constrain_galaxy_camera(width,height);
-          if(menu_)toggle_menu();
+      if(developer_session()){
+        const int developer_index_focus_before=developer_index_.focus();
+        if(developer_index_.handle(event,width,height,session_->frame())){
+          if(const auto target=developer_index_.take_focus_request()){
+            colony_roster_.close();economy_workspace_.close();supply_workspace_.close();
+            research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
+            diplomacy_workspace_.close();colony_workspace_.close();
+            settlement_workspace_.clear();colony_entry_view_.reset();system_workspace_.close();
+            camera_.center={target->x,target->y};
+            camera_.pixels_per_world=std::max(camera_.pixels_per_world,fitted_pixels_per_world_*8.);
+            selected_id_=target->system_id;constrain_galaxy_camera(width,height);
+            if(menu_)toggle_menu();
+          }
+          if(developer_index_.focus()!=developer_index_focus_before)
+            announcer_.announce_focus(developer_index_.focused_label(width,height),
+              announcement_bounds(developer_index_.focused_bounds(width,height)),
+              std::nullopt,developer_index_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
         }
-        gesture_.capture_for_ui();continue;
       }
       if(developer_session()&&developer_panel_.handle(event,width,height,session_->frame())){
         if(developer_panel_.take_stellar_request()){
