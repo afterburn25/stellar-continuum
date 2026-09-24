@@ -117,6 +117,31 @@ int main(int argc,char** argv)try{
     panel.toggle();click(490,128);check(panel.options.membership,"System overlap toggle failed");click(800,128);check(panel.options.filenames,"Artwork filename toggle failed");
     click(460,72);check(!panel.visible&&panel.take_navigation(3)==2,"Previous phenomenon did not wrap");check(!panel.take_navigation(3),"Navigation repeated without input");
     panel.toggle();click(620,72);check(panel.take_navigation(3)==0,"Next phenomenon did not wrap");panel.toggle();click(780,72);check(panel.take_navigation(3)==0,"Go To changed selected phenomenon");
+    // Keyboard ring: close, density dropdown, region navigation and the six
+    // option toggles walk in (y,x) order; toggles announce as CheckBox and
+    // activation replays the same dispatch as a pointer press.
+    {
+      panel.toggle();
+      const auto press=[&](std::uint32_t key,bool shift=false){InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;ev.shift=shift;return panel.handle(ev,size.first,size.second);};
+      check(panel.focus()<0,"Phenomena debug retained keyboard focus.");
+      check(press(9)&&panel.focus()>=0,"Tab did not enter the phenomena ring.");
+      check(panel.focused_label(size.first,size.second)=="Close phenomena debug","First phenomena target is not the close control.");
+      check(panel.focused_bounds(size.first,size.second).has_value(),"Focused phenomena control lacks bounds.");
+      int ring_guard=0;
+      while(panel.focused_control(size.first,size.second)!=stellar::engine::AnnouncementControl::CheckBox&&ring_guard++<32)
+        check(press(9),"Phenomena ring navigation leaked.");
+      check(panel.focused_control(size.first,size.second)==stellar::engine::AnnouncementControl::CheckBox,"Option toggle was not classified as a CheckBox.");
+      const bool bounds_before=panel.options.bounds;
+      check(press(13),"Phenomena toggle activation leaked.");
+      check(panel.options.bounds!=bounds_before,"Keyboard activation did not flip the toggle.");
+      check(press(9)&&panel.focus()>=0,"Phenomena ring did not stay live after activation.");
+      InputEvent pointer_press{};pointer_press.type=InputEventType::LeftPressed;pointer_press.position={4,4};
+      check(panel.handle(pointer_press,size.first,size.second),"Phenomena debug dropped pointer input.");
+      check(panel.focus()<0,"Pointer press did not clear the phenomena ring.");
+      check(press(9)&&panel.focus()>=0,"Phenomena ring did not re-enter.");
+      check(panel.handle({InputEventType::EscapePressed},size.first,size.second)&&panel.focus()<0&&panel.visible,"Escape closed the panel instead of releasing its ring.");
+      check(panel.handle({InputEventType::EscapePressed},size.first,size.second)&&!panel.visible,"Second Escape did not close the phenomena panel.");
+    }
     // Scroll contract: the engine VirtualizedList clamps the dump window —
     // the old unbounded int offset could scroll past the end into blank space.
     {

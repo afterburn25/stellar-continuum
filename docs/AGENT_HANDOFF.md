@@ -1234,10 +1234,14 @@ contract: header actions, class filter, rendered rows and the
 conditional rules/go/generate footer ring in (y,x) order; keyboard
 activation replays the press/release dispatch so the canonical
 `force_developer_planet_type` command and the GO TO EXAMPLE focus
-request emit unchanged. The remaining developer panels (diagnostics,
-empire monitor, simulation panel, phenomena/background debug, giant
-test, stellar activity) stay pointer-only — they predate the contract
-and adopt it incrementally from here.
+request emit unchanged. The phenomena-debug overlay (close, density
+dropdown, region navigation, six CheckBox-classified option toggles)
+and the system-background debug overlay (eight option/region buttons
+through a shared `activate_button` dispatch) adopted the same contract;
+`galaxy_phenomena` and `system_background` pin their rings. The
+remaining developer panels (diagnostics, empire monitor, simulation
+panel, giant test, stellar activity) stay pointer-only — they predate
+the contract and adopt it incrementally from here.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

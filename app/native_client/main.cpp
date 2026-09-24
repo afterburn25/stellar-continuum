@@ -5804,6 +5804,8 @@ class NativeCampaign final {
            (map_hud_visible()&&assets_.focus()>=0)||
            (developer_index_.visible()&&developer_index_.focus()>=0)||
            (developer_planet_index_.visible()&&developer_planet_index_.focus()>=0)||
+           (phenomena_debug_.visible&&phenomena_debug_.focus()>=0)||
+           (background_debug_.visible()&&background_debug_.focus()>=0)||
            hud_focus_>=0||
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
@@ -6452,12 +6454,30 @@ class NativeCampaign final {
       // Strategic shortcuts precede system-view capture, but never take keys
       // from text entry, a confirmation or a gameplay-blocking view.
       if(developer_session()&&event.type==InputEventType::KeyPressed&&event.control&&event.alt&&event.key=='b'){background_debug_.toggle(system_background_);gesture_.capture_for_ui();continue;}
-      if(developer_session()&&background_debug_.handle(event,width,height,system_background_)){if(auto id=background_debug_.navigation())(void)enter_system(*id,width,height);gesture_.capture_for_ui();continue;}
+      if(developer_session()){
+        const int background_debug_focus_before=background_debug_.focus();
+        if(background_debug_.handle(event,width,height,system_background_)){
+          if(auto id=background_debug_.navigation())(void)enter_system(*id,width,height);
+          if(background_debug_.focus()!=background_debug_focus_before)
+            announcer_.announce_focus(background_debug_.focused_label(width,height,system_background_),
+              announcement_bounds(background_debug_.focused_bounds(width,height)),
+              std::nullopt,background_debug_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
+        }
+      }
       if(developer_session()&&event.type==InputEventType::KeyPressed&&event.control&&event.alt&&event.key=='n'){phenomena_debug_.toggle();gesture_.capture_for_ui();continue;}
-      if(developer_session()&&phenomena_debug_.handle(event,width,height)){
-        if(const auto* field=phenomena_.field())if(auto index=phenomena_debug_.take_navigation(field->regions.size())){
-          const auto& r=field->regions[*index];system_workspace_.close();camera_.center={r.shape.x,r.shape.y};camera_.pixels_per_world=std::max(galaxy_overview_camera(width,height).pixels_per_world,std::min(width,height)/(5*std::max(r.shape.extent_x,r.shape.extent_y)));selected_id_.reset();refresh_inspection();
-        }gesture_.capture_for_ui();continue;
+      if(developer_session()){
+        const int phenomena_debug_focus_before=phenomena_debug_.focus();
+        if(phenomena_debug_.handle(event,width,height)){
+          if(const auto* field=phenomena_.field())if(auto index=phenomena_debug_.take_navigation(field->regions.size())){
+            const auto& r=field->regions[*index];system_workspace_.close();camera_.center={r.shape.x,r.shape.y};camera_.pixels_per_world=std::max(galaxy_overview_camera(width,height).pixels_per_world,std::min(width,height)/(5*std::max(r.shape.extent_x,r.shape.extent_y)));selected_id_.reset();refresh_inspection();
+          }
+          if(phenomena_debug_.focus()!=phenomena_debug_focus_before)
+            announcer_.announce_focus(phenomena_debug_.focused_label(width,height),
+              announcement_bounds(phenomena_debug_.focused_bounds(width,height)),
+              std::nullopt,phenomena_debug_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
+        }
       }
       // Key releases always reach the input mapper so held state clears even
       // when a menu or workspace suppressed the matching press.
