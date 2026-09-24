@@ -68,7 +68,7 @@ void empty_default_and_unicode_round_trip(const TempDirectory& temp) {
   require(json.find("\"schemaVersion\":1") != std::string::npos,
           "schema version was not persisted");
   require(reloaded.saved().nebula_density==1,"Nebula preference did not default to Medium");
-  auto navigator=reloaded.saved();navigator.asset_categories_collapsed={true,false,true,false,true};navigator.assets_hidden=true;navigator.nebula_density=2;navigator.reduce_motion=true;
+  auto navigator=reloaded.saved();navigator.asset_categories_collapsed={true,false,true,false,true};navigator.assets_hidden=true;navigator.nebula_density=2;navigator.accessibility.reduce_motion=true;
   require(reloaded.save(navigator),"Navigator preferences failed to save");
   NativeGeneralSettings navigator_reload(file);
   require(navigator_reload.saved()==navigator,"Category collapse/hide preferences did not round-trip with screenshot path");
@@ -380,12 +380,12 @@ void keyboard_focus_traversal(const TempDirectory& temp) {
   // Space activates the focused toggle through the same dispatch as a click.
   for (int i = 0; i < 5; ++i) (void)press(kTab);
   require(settings.focused() == 4, "Tab chain did not reach REDUCE MOTION");
-  const bool motion = settings.draft().reduce_motion;
+  const bool motion = settings.draft().accessibility.reduce_motion;
   require(settings.focused_label() ==
               std::string("Reduced motion (decorative animation): ") +
                   (motion ? "On" : "Off"),
           "focused_label did not name REDUCE MOTION with its state");
-  require(press(kSpace) && settings.draft().reduce_motion == !motion &&
+  require(press(kSpace) && settings.draft().accessibility.reduce_motion == !motion &&
               settings.focused() == 4,
           "Space did not toggle the focused preference in place");
   require(settings.focused_label() ==
@@ -533,12 +533,12 @@ int main() {
     {
       NativeGeneralSettings motion(temp.path/"motion.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
       motion.open();click_button(motion,l.motion,"reduced motion toggle");
-      require(motion.draft().reduce_motion&&!motion.saved().reduce_motion,"Reduced motion click did not stay in draft");
+      require(motion.draft().accessibility.reduce_motion&&!motion.saved().accessibility.reduce_motion,"Reduced motion click did not stay in draft");
       click_button(motion,l.save,"save reduced motion");
       NativeGeneralSettings reloaded(temp.path/"motion.json");
-      require(reloaded.saved().reduce_motion,"Reduced motion preference did not persist");
+      require(reloaded.saved().accessibility.reduce_motion,"Reduced motion preference did not persist");
       reloaded.open();click_button(reloaded,l.motion,"reduced motion off");reloaded.cancel();
-      require(reloaded.saved().reduce_motion,"Cancel changed reduced motion");
+      require(reloaded.saved().accessibility.reduce_motion,"Cancel changed reduced motion");
       DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
       require(find_text_label(draw,"Reduced motion (decorative animation): On").value.size()>0,"Reduced motion state was not rendered");
     }
@@ -563,20 +563,20 @@ int main() {
     {
       NativeGeneralSettings flash(temp.path/"flash.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
       flash.open();click_button(flash,l.flashing,"reduce flashing toggle");
-      require(flash.draft().reduce_flashing&&!flash.saved().reduce_flashing,"Reduce flashing click did not stay in draft");
+      require(flash.draft().accessibility.reduce_flashing&&!flash.saved().accessibility.reduce_flashing,"Reduce flashing click did not stay in draft");
       click_button(flash,l.save,"save reduce flashing");
       NativeGeneralSettings reloaded(temp.path/"flash.json");
-      require(reloaded.saved().reduce_flashing,"Reduce flashing preference did not persist");
+      require(reloaded.saved().accessibility.reduce_flashing,"Reduce flashing preference did not persist");
       DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
       require(find_text_label(draw,"Reduce flashing: On").value.size()>0,"Reduce flashing state was not rendered");
     }
     {
       NativeGeneralSettings contrast(temp.path/"contrast.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
       contrast.open();click_button(contrast,l.contrast,"high contrast toggle");
-      require(contrast.draft().high_contrast&&!contrast.saved().high_contrast,"High contrast click did not stay in draft");
+      require(contrast.draft().accessibility.high_contrast&&!contrast.saved().accessibility.high_contrast,"High contrast click did not stay in draft");
       click_button(contrast,l.save,"save high contrast");
       NativeGeneralSettings reloaded(temp.path/"contrast.json");
-      require(reloaded.saved().high_contrast,"High contrast preference did not persist");
+      require(reloaded.saved().accessibility.high_contrast,"High contrast preference did not persist");
       DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
       require(find_text_label(draw,"High contrast: On").value.size()>0,"High contrast state was not rendered");
       // The global pass snaps dim text to the primary ink, leaves bright text.
@@ -591,14 +591,14 @@ int main() {
       NativeGeneralSettings colorblind(temp.path/"colorblind.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
       colorblind.open();click_button(colorblind,l.colorblind,"color-blind cycle");
       click_button(colorblind,l.colorblind,"color-blind cycle to deuteranopia");
-      require(colorblind.draft().color_blind==2&&colorblind.saved().color_blind==0,"Color-blind clicks did not stay in draft");
+      require(colorblind.draft().accessibility.color_blind==stellar::engine::ColorBlindMode::Deuteranopia&&colorblind.saved().accessibility.color_blind==stellar::engine::ColorBlindMode::None,"Color-blind clicks did not stay in draft");
       click_button(colorblind,l.save,"save color-blind mode");
       NativeGeneralSettings reloaded(temp.path/"colorblind.json");
-      require(reloaded.saved().color_blind==2,"Color-blind preference did not persist");
+      require(reloaded.saved().accessibility.color_blind==stellar::engine::ColorBlindMode::Deuteranopia,"Color-blind preference did not persist");
       reloaded.open();click_button(reloaded,l.colorblind,"color-blind to tritanopia");
-      require(reloaded.draft().color_blind==3,"Color-blind cycle did not reach Tritanopia");
+      require(reloaded.draft().accessibility.color_blind==stellar::engine::ColorBlindMode::Tritanopia,"Color-blind cycle did not reach Tritanopia");
       click_button(reloaded,l.colorblind,"color-blind wrap");
-      require(reloaded.draft().color_blind==0,"Color-blind cycle did not wrap to Off");
+      require(reloaded.draft().accessibility.color_blind==stellar::engine::ColorBlindMode::None,"Color-blind cycle did not wrap to Off");
       reloaded.cancel();
       DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
       require(find_text_label(draw,"Color-blind mode: Deuteranopia").value.size()>0,"Color-blind state was not rendered");

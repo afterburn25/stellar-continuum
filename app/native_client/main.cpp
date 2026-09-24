@@ -16,6 +16,7 @@
 #include "native_voice_playback.hpp"
 #include "native_voice_settings.hpp"
 #include "native_general_settings.hpp"
+#include "native_accessibility_bridge.hpp"
 #include "native_video_controller.hpp"
 #include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
@@ -714,7 +715,8 @@ class NativeCampaign final {
                  stellar::native_video_settings::NativeVideoController* video_settings=nullptr,
                  stellar::native_general::NativeGeneralSettings* general_settings=nullptr,
                  stellar::native_settings::NativeSettingsHub* settings_hub=nullptr,
-                 stellar::native_audio::NativeVoiceSettings* voice_settings=nullptr)
+                 stellar::native_audio::NativeVoiceSettings* voice_settings=nullptr,
+                 stellar::native_client::NativeAccessibilityBridge* accessibility_bridge=nullptr)
       : session_(std::move(session)),
         navigation_art_(std::filesystem::absolute(asset_root)),
         research_art_(std::filesystem::absolute(asset_root)),
@@ -800,6 +802,7 @@ class NativeCampaign final {
     if(general_settings_){const auto& preferences=general_settings_->saved();assets_.set_preferences({preferences.asset_categories_collapsed,preferences.assets_hidden});
       assets_.set_persist([this](const stellar::native_assets::Preferences& p){auto prefs=general_settings_->saved();prefs.asset_categories_collapsed=p.collapsed;prefs.assets_hidden=p.hidden;return general_settings_->save(prefs);});}
     settings_hub_=settings_hub;voice_settings_=voice_settings;
+    accessibility_bridge_=accessibility_bridge;
     presentation_audio_=presentation_audio;
     menu_hover_feedback_.set_callback([this]{if(presentation_audio_)presentation_audio_->hover();});
     configure_input_actions();
@@ -6428,7 +6431,7 @@ class NativeCampaign final {
     if(advance_simulation){
       const auto& tumble_world=session_->frame().runtime().world().campaign();
       system_workspace_.advance_tumble(elapsed,!menu_&&session_->frame().clock().speed()!=StrategicSpeed::Paused&&
-          (!general_settings_||!general_settings_->saved().reduce_motion)&&
+          (!general_settings_||!general_settings_->saved().accessibility.reduce_motion)&&
           (!tumble_world.active_combat_encounter||tumble_world.active_combat_encounter->reconciled));
       const bool single_step=developer_panel_.take_step_request()&&session_->frame().can_step_developer();
       const auto frame_result=[&]{
@@ -6546,10 +6549,10 @@ class NativeCampaign final {
       stellar::native_menu_style::text(out,{banner.x+10*s,banner.y+6*s,banner.width-20*s,banner.height-12*s},
           developer_fault_capture_.notice(),std::max(12,static_cast<int>(16*s)),{255,180,110,255});
     }
-    if(general_settings_&&general_settings_->saved().high_contrast)
+    if(general_settings_&&general_settings_->saved().accessibility.high_contrast)
       stellar::native_ui::apply_high_contrast(out);
-    if(general_settings_&&general_settings_->saved().color_blind)
-      stellar::native_ui::apply_color_blind(out,static_cast<stellar::engine::ColorBlindMode>(general_settings_->saved().color_blind));
+    if(general_settings_&&general_settings_->saved().accessibility.color_blind!=stellar::engine::ColorBlindMode::None)
+      stellar::native_ui::apply_color_blind(out,general_settings_->saved().accessibility.color_blind);
     return out;
   }
   [[nodiscard]] DrawList scene_content(int width,int height){
@@ -6583,9 +6586,9 @@ class NativeCampaign final {
     stellar::engine::RuntimeDiagnostics::context(crash_context);
     const auto screen_height=static_cast<float>(height);
     last_galaxy_label_stats_ = {};
-    stellar_art_.set_reduce_flashing(general_settings_&&general_settings_->saved().reduce_flashing);
+    stellar_art_.set_reduce_flashing(general_settings_&&general_settings_->saved().accessibility.reduce_flashing);
     stellar_art_.begin_frame();
-    eruption_art_.begin_frame(session_->cache().generation,session_->frame().runtime().stellar_activity_day(),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!general_settings_||!general_settings_->saved().reduce_motion),general_settings_?general_settings_->saved().eruption_quality:2);
+    eruption_art_.begin_frame(session_->cache().generation,session_->frame().runtime().stellar_activity_day(),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!general_settings_||!general_settings_->saved().accessibility.reduce_motion),general_settings_?general_settings_->saved().eruption_quality:2);
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     if(system_workspace_.visible()){
       const auto sid=*system_workspace_.system_id();const auto system=std::ranges::find(world.systems,sid,&StellarSystem::id);
@@ -7928,6 +7931,7 @@ class NativeCampaign final {
   }
   std::optional<stellar::native_audio::VoiceCaption> announcement_caption(){
     while(auto item=announcer_.take()){
+      if(accessibility_bridge_)accessibility_bridge_->announce(item->text);
       if(voice_playback_&&presentation_audio_&&
          presentation_audio_->voice_preferences().interface_announcements){
         stellar::native_voice::NativeSpeechRequest request;
@@ -8494,6 +8498,7 @@ class NativeCampaign final {
   stellar::native_general::NativeGeneralSettings* general_settings_{};
   stellar::native_settings::NativeSettingsHub* settings_hub_{};
   stellar::native_audio::NativeVoiceSettings* voice_settings_{};
+  stellar::native_client::NativeAccessibilityBridge* accessibility_bridge_{};
   stellar::native_video_settings::NativeVideoController* video_settings_{};
   stellar::native_audio::NativeAudioSettings* audio_settings_{};
   bool menu_{};int menu_focus_{-1};int map_focus_group_{-1};int hud_focus_{-1};bool smoke_save_pending_{};bool smoke_shortcut_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
@@ -8547,6 +8552,8 @@ int main(int argc,char **argv){
     Window window("Stellar Continuum - Native Galaxy",options.window_width,
                   options.window_height,!options.windowed&&initial_video.display!=stellar::native_video_settings::VideoDisplayMode::Windowed,
                   asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
+    stellar::native_client::NativeAccessibilityBridge accessibility_bridge;
+    accessibility_bridge.attach(window.native_window_handle());
     // English is the built-in baseline; a shipped Data/locale/<locale>.json
     // table overrides panel text through the engine localization service and
     // falls back to English for any key it does not cover.
@@ -8664,7 +8671,7 @@ int main(int argc,char **argv){
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
       config.developer_access=&developer_access;config.locale=&locale_table;
-      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take())startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
+      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){accessibility_bridge.announce(item->text);startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
     StartupEntryEvidence startup_evidence,restart_evidence;
@@ -8762,7 +8769,7 @@ int main(int argc,char **argv){
     const auto restart_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(60);
     while(session){
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
-                             [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings,&settings_hub,&voice_settings);
+                             [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings,&settings_hub,&voice_settings,&accessibility_bridge);
     campaign.attach_replay(&replay);
     campaign.set_locale(locale_table);
     active_voice_playback=campaign.voice_playback();

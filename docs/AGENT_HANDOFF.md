@@ -1083,6 +1083,18 @@ identical labels still speak), 10s expiry and `interruptible` honoring
 preference. Startup-flow announcements stay caption-only because the
 voice pipeline starts with the campaign session. Platform AT bridging
 (UIA/AT-SPI) remains the open slice.
+Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
+the engine `AccessibilitySettings` struct as the canonical accessibility
+carrier (`accessibility` member — reduce-motion/flashing, high-contrast
+and the typed `ColorBlindMode`, plus text/subtitle scale fields reserved
+for per-surface text scaling) instead of shadowing the same concepts as
+loose fields. The persisted JSON shape is unchanged (same keys, same
+validation); `effective()` folds the interface-scale preset into
+`ui_scale` and sanitizes for consumers. `AccessibilitySettings` gains a
+defaulted `operator==` for draft/saved comparison. Client reads moved
+from `saved().reduce_motion`-style fields to `saved().accessibility.*`;
+the daltonization site no longer casts an int ordinal. `AccessibilitySettings`
+is no longer dead engine surface.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

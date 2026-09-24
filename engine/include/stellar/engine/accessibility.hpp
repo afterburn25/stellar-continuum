@@ -29,6 +29,8 @@ struct AccessibilitySettings {
   bool subtitles_enabled{true};
   float subtitle_scale{1.0f};  // clamped 0.75..2.0
 
+  bool operator==(const AccessibilitySettings &) const = default;
+
   // Clamps every field into its supported range.
   void sanitize();
 

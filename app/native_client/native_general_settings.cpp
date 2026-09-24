@@ -66,11 +66,11 @@ NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(s
     if(json.contains("assetCategoriesCollapsed")){saved_.asset_categories_collapsed=json.at("assetCategoriesCollapsed").get<std::array<bool,5>>();saved_.assets_hidden=json.at("assetsHidden").get<bool>();}
     if(json.contains("eruptionQuality")){if(!json.at("eruptionQuality").is_number_integer())throw std::runtime_error("Invalid eruption quality");saved_.eruption_quality=json.at("eruptionQuality").get<int>();if(saved_.eruption_quality<0||saved_.eruption_quality>3)throw std::runtime_error("Invalid eruption quality");}
     if(json.contains("nebulaDensity")){if(!json.at("nebulaDensity").is_number_integer())throw std::runtime_error("Invalid visual density");const auto density=json.at("nebulaDensity").get<int>();if(density<0||density>2)throw std::runtime_error("Invalid visual density");saved_.nebula_density=density;}
-    if(json.contains("reduceMotion")){if(!json.at("reduceMotion").is_boolean())throw std::runtime_error("Invalid reduced motion flag");saved_.reduce_motion=json.at("reduceMotion").get<bool>();}
+    if(json.contains("reduceMotion")){if(!json.at("reduceMotion").is_boolean())throw std::runtime_error("Invalid reduced motion flag");saved_.accessibility.reduce_motion=json.at("reduceMotion").get<bool>();}
     if(json.contains("interfaceScale")){if(!json.at("interfaceScale").is_number_integer())throw std::runtime_error("Invalid interface scale");const auto scale=json.at("interfaceScale").get<int>();if(scale<0||scale>3)throw std::runtime_error("Invalid interface scale");saved_.interface_scale=scale;}
-    if(json.contains("reduceFlashing")){if(!json.at("reduceFlashing").is_boolean())throw std::runtime_error("Invalid reduced flashing flag");saved_.reduce_flashing=json.at("reduceFlashing").get<bool>();}
-    if(json.contains("highContrast")){if(!json.at("highContrast").is_boolean())throw std::runtime_error("Invalid high contrast flag");saved_.high_contrast=json.at("highContrast").get<bool>();}
-    if(json.contains("colorBlind")){if(!json.at("colorBlind").is_number_integer())throw std::runtime_error("Invalid color-blind mode");const auto mode=json.at("colorBlind").get<int>();if(mode<0||mode>3)throw std::runtime_error("Invalid color-blind mode");saved_.color_blind=mode;}
+    if(json.contains("reduceFlashing")){if(!json.at("reduceFlashing").is_boolean())throw std::runtime_error("Invalid reduced flashing flag");saved_.accessibility.reduce_flashing=json.at("reduceFlashing").get<bool>();}
+    if(json.contains("highContrast")){if(!json.at("highContrast").is_boolean())throw std::runtime_error("Invalid high contrast flag");saved_.accessibility.high_contrast=json.at("highContrast").get<bool>();}
+    if(json.contains("colorBlind")){if(!json.at("colorBlind").is_number_integer())throw std::runtime_error("Invalid color-blind mode");const auto mode=json.at("colorBlind").get<int>();if(mode<0||mode>3)throw std::runtime_error("Invalid color-blind mode");saved_.accessibility.color_blind=static_cast<stellar::engine::ColorBlindMode>(mode);}
     if(json.contains("locale")){if(!json.at("locale").is_string())throw std::runtime_error("Invalid locale id");const auto id=json.at("locale").get<std::string>();if(id.empty()||id.size()>16||id.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-")!=std::string::npos)throw std::runtime_error("Invalid locale id");saved_.locale=id;}
   } catch(const std::exception& error) {
     error_="Saved screenshot folder unavailable. The default location is active.";
@@ -80,12 +80,12 @@ NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(s
 bool NativeGeneralSettings::save(GeneralPreferences value) {
   if(value.eruption_quality<0||value.eruption_quality>3){error_="Choose a stellar eruption quality.";return false;}
   if(value.interface_scale<0||value.interface_scale>3){error_="Choose an interface scale.";return false;}
-  if(value.color_blind<0||value.color_blind>3){error_="Choose a color-blind mode.";return false;}
+  if(const auto mode=static_cast<int>(value.accessibility.color_blind);mode<0||mode>3){error_="Choose a color-blind mode.";return false;}
   if(value.locale.empty()||value.locale.size()>16||value.locale.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-")!=std::string::npos){error_="Choose a language.";return false;}
   if(value.nebula_density<0||value.nebula_density>2){error_="Choose Low, Medium or High nebula density.";return false;}
   if(!valid_directory(value.screenshot_directory)){error_="Choose an existing absolute folder.";return false;}
   try {
-    const auto text=nlohmann::json{{"schemaVersion",1},{"screenshotDirectory",utf8(value.screenshot_directory)},{"assetCategoriesCollapsed",value.asset_categories_collapsed},{"assetsHidden",value.assets_hidden},{"nebulaDensity",value.nebula_density},{"eruptionQuality",value.eruption_quality},{"reduceMotion",value.reduce_motion},{"interfaceScale",value.interface_scale},{"reduceFlashing",value.reduce_flashing},{"highContrast",value.high_contrast},{"colorBlind",value.color_blind},{"locale",value.locale}}.dump();
+    const auto text=nlohmann::json{{"schemaVersion",1},{"screenshotDirectory",utf8(value.screenshot_directory)},{"assetCategoriesCollapsed",value.asset_categories_collapsed},{"assetsHidden",value.assets_hidden},{"nebulaDensity",value.nebula_density},{"eruptionQuality",value.eruption_quality},{"reduceMotion",value.accessibility.reduce_motion},{"interfaceScale",value.interface_scale},{"reduceFlashing",value.accessibility.reduce_flashing},{"highContrast",value.accessibility.high_contrast},{"colorBlind",static_cast<int>(value.accessibility.color_blind)},{"locale",value.locale}}.dump();
     if(text.size()>maximum_bytes)throw std::runtime_error("settings are oversized");
     stellar::engine::write_file_atomically(path_,std::span{reinterpret_cast<const std::byte*>(text.data()),text.size()});
   } catch(const std::exception& error) {
@@ -197,11 +197,11 @@ void NativeGeneralSettings::activate_at(const GeneralSettingsLayout& layout,stel
   if(browsing())return;
   if(layout.eruptions.contains(position)){eruption_dropdown_.open(0,{"Low","Medium","High","Ultra"},draft_.eruption_quality);return;}
   if(layout.nebula.contains(position)){nebula_dropdown_.open(0,{"Low","Medium","High"},draft_.nebula_density);return;}
-  if(layout.motion.contains(position)){draft_.reduce_motion=!draft_.reduce_motion;return;}
+  if(layout.motion.contains(position)){draft_.accessibility.reduce_motion=!draft_.accessibility.reduce_motion;return;}
   if(layout.iscale.contains(position)){draft_.interface_scale=(draft_.interface_scale+1)%4;return;}
-  if(layout.flashing.contains(position)){draft_.reduce_flashing=!draft_.reduce_flashing;return;}
-  if(layout.contrast.contains(position)){draft_.high_contrast=!draft_.high_contrast;return;}
-  if(layout.colorblind.contains(position)){draft_.color_blind=(draft_.color_blind+1)%4;return;}
+  if(layout.flashing.contains(position)){draft_.accessibility.reduce_flashing=!draft_.accessibility.reduce_flashing;return;}
+  if(layout.contrast.contains(position)){draft_.accessibility.high_contrast=!draft_.accessibility.high_contrast;return;}
+  if(layout.colorblind.contains(position)){draft_.accessibility.color_blind=static_cast<stellar::engine::ColorBlindMode>((static_cast<int>(draft_.accessibility.color_blind)+1)%4);return;}
   if(layout.language.contains(position)&&!locales_.empty()){
     const auto at=std::find(locales_.begin(),locales_.end(),draft_.locale);
     const auto index=at==locales_.end()?std::size_t{0}:(static_cast<std::size_t>(at-locales_.begin())+1)%locales_.size();
@@ -236,11 +236,11 @@ std::string NativeGeneralSettings::focused_label()const{
   case 1:return tr("SETTINGS_NAV_VIDEO","Video");
   case 2:return trf("SETTINGS_NEBULA_DENSITY",{densities.at(draft_.nebula_density)},"Space phenomena density: {0}");
   case 3:return trf("SETTINGS_ERUPTION_DETAIL",{details.at(draft_.eruption_quality)},"Stellar eruption detail: {0}");
-  case 4:return trf("SETTINGS_REDUCE_MOTION",{on_off(draft_.reduce_motion)},"Reduced motion (decorative animation): {0}");
+  case 4:return trf("SETTINGS_REDUCE_MOTION",{on_off(draft_.accessibility.reduce_motion)},"Reduced motion (decorative animation): {0}");
   case 5:return trf("SETTINGS_INTERFACE_SCALE",{scale_names.at(static_cast<std::size_t>(draft_.interface_scale))},"Interface scale: {0}");
-  case 6:return trf("SETTINGS_REDUCE_FLASHING",{on_off(draft_.reduce_flashing)},"Reduce flashing: {0}");
-  case 7:return trf("SETTINGS_HIGH_CONTRAST",{on_off(draft_.high_contrast)},"High contrast: {0}");
-  case 8:return trf("SETTINGS_COLOR_BLIND",{colorblind_names.at(static_cast<std::size_t>(draft_.color_blind))},"Color-blind mode: {0}");
+  case 6:return trf("SETTINGS_REDUCE_FLASHING",{on_off(draft_.accessibility.reduce_flashing)},"Reduce flashing: {0}");
+  case 7:return trf("SETTINGS_HIGH_CONTRAST",{on_off(draft_.accessibility.high_contrast)},"High contrast: {0}");
+  case 8:return trf("SETTINGS_COLOR_BLIND",{colorblind_names.at(static_cast<std::size_t>(draft_.accessibility.color_blind))},"Color-blind mode: {0}");
   case 9:return trf("SETTINGS_LANGUAGE",{locale_name(draft_.locale)},"Language: {0}");
   case 10:return tr("SETTINGS_BROWSE","Browse");
   case 11:return tr("SETTINGS_USE_DEFAULT","Use default");
@@ -261,15 +261,15 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   button(draw,l.audio,tr("SETTINGS_NAV_AUDIO","AUDIO"),l.font_pixels,false,browsing());button(draw,l.video,tr("SETTINGS_NAV_VIDEO","VIDEO"),l.font_pixels,false,browsing());
   button(draw,l.nebula,trf("SETTINGS_NEBULA_DENSITY",{densities.at(draft_.nebula_density)},"Space phenomena density: {0} ▾"),l.font_pixels,false,browsing());
   button(draw,l.eruptions,trf("SETTINGS_ERUPTION_DETAIL",{details.at(draft_.eruption_quality)},"Stellar eruption detail: {0} ▾"),l.font_pixels,false,browsing());
-  button(draw,l.motion,trf("SETTINGS_REDUCE_MOTION",{tr(draft_.reduce_motion?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.reduce_motion?"On":"Off")},"Reduced motion (decorative animation): {0}"),l.font_pixels,false,browsing());
+  button(draw,l.motion,trf("SETTINGS_REDUCE_MOTION",{tr(draft_.accessibility.reduce_motion?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.reduce_motion?"On":"Off")},"Reduced motion (decorative animation): {0}"),l.font_pixels,false,browsing());
   const std::array<std::string,4> scale_names{quality_name("SETTINGS_SCALE_COMPACT","Compact"),quality_name("SETTINGS_SCALE_STANDARD","Standard"),
     quality_name("SETTINGS_SCALE_LARGE","Large"),quality_name("SETTINGS_SCALE_HUGE","Huge")};
   button(draw,l.iscale,trf("SETTINGS_INTERFACE_SCALE",{scale_names.at(static_cast<std::size_t>(draft_.interface_scale))},"Interface scale: {0}"),l.font_pixels,false,browsing());
-  button(draw,l.flashing,trf("SETTINGS_REDUCE_FLASHING",{tr(draft_.reduce_flashing?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.reduce_flashing?"On":"Off")},"Reduce flashing: {0}"),l.font_pixels,false,browsing());
-  button(draw,l.contrast,trf("SETTINGS_HIGH_CONTRAST",{tr(draft_.high_contrast?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.high_contrast?"On":"Off")},"High contrast: {0}"),l.font_pixels,false,browsing());
+  button(draw,l.flashing,trf("SETTINGS_REDUCE_FLASHING",{tr(draft_.accessibility.reduce_flashing?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.reduce_flashing?"On":"Off")},"Reduce flashing: {0}"),l.font_pixels,false,browsing());
+  button(draw,l.contrast,trf("SETTINGS_HIGH_CONTRAST",{tr(draft_.accessibility.high_contrast?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.high_contrast?"On":"Off")},"High contrast: {0}"),l.font_pixels,false,browsing());
   const std::array<std::string,4> colorblind_names{quality_name("SETTINGS_COLORBLIND_NONE","Off"),quality_name("SETTINGS_COLORBLIND_PROTANOPIA","Protanopia"),
     quality_name("SETTINGS_COLORBLIND_DEUTERANOPIA","Deuteranopia"),quality_name("SETTINGS_COLORBLIND_TRITANOPIA","Tritanopia")};
-  button(draw,l.colorblind,trf("SETTINGS_COLOR_BLIND",{colorblind_names.at(static_cast<std::size_t>(draft_.color_blind))},"Color-blind mode: {0}"),l.font_pixels,false,browsing());
+  button(draw,l.colorblind,trf("SETTINGS_COLOR_BLIND",{colorblind_names.at(static_cast<std::size_t>(draft_.accessibility.color_blind))},"Color-blind mode: {0}"),l.font_pixels,false,browsing());
   // Native-language names for shipped locale ids; unknown ids display raw.
   const auto locale_name=[&](std::string_view id){if(id=="en")return std::string("English");if(id=="de")return std::string("Deutsch");return std::string(id);};
   button(draw,l.language,trf("SETTINGS_LANGUAGE",{locale_name(draft_.locale)},"Language: {0}"),l.font_pixels,false,browsing());

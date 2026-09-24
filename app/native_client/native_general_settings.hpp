@@ -5,6 +5,7 @@
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
 #include <stellar/engine/localization.hpp>
+#include <stellar/engine/accessibility.hpp>
 #include <filesystem>
 #include <array>
 #include <functional>
@@ -15,31 +16,6 @@
 #include <vector>
 
 namespace stellar::native_general {
-// Application preference only. Empty means the platform Pictures default.
-struct GeneralPreferences final {
-  std::filesystem::path screenshot_directory;
-  std::array<bool,5> asset_categories_collapsed{false,true,false,true,false};
-  bool assets_hidden{};
-  int eruption_quality{2}; // Low / Medium / High / Ultra; rendering only.
-  int nebula_density{1}; // Low / Medium / High; presentation only.
-  // Accessibility: pauses decorative motion (system tumble, planet spin,
-  // eruption animation) without touching simulation or authoritative clocks.
-  bool reduce_motion{};
-  // Accessibility: holds pulsing emissive artwork at steady luminance.
-  bool reduce_flashing{};
-  // Accessibility: snaps low-luminance text to the primary ink globally.
-  bool high_contrast{};
-  // Accessibility: daltonization mode 0=None,1=Protanopia,2=Deuteranopia,
-  // 3=Tritanopia — ordinal-matched to engine::ColorBlindMode.
-  int color_blind{};
-  // Accessibility: interface scale preset 0=Compact,1=Standard,2=Large,3=Huge.
-  // Applied as a user multiplier on top of the viewport-derived UI scale.
-  int interface_scale{1};
-  // Presentation: active UI locale id (a Data/locale/<id>.json table shipped
-  // with the install). "en" is the baseline; other tables fall back to it.
-  std::string locale{"en"};
-  bool operator==(const GeneralPreferences&) const = default;
-};
 // Presentation multiplier each interface_scale preset contributes to UI
 // layout scale. Kept inside the engine accessibility clamp (0.75..2.0).
 [[nodiscard]] inline float interface_scale_multiplier(int preset) noexcept {
@@ -50,6 +26,35 @@ struct GeneralPreferences final {
     default: return 1.f;
   }
 }
+// Application preference only. Empty means the platform Pictures default.
+struct GeneralPreferences final {
+  std::filesystem::path screenshot_directory;
+  std::array<bool,5> asset_categories_collapsed{false,true,false,true,false};
+  bool assets_hidden{};
+  int eruption_quality{2}; // Low / Medium / High / Ultra; rendering only.
+  int nebula_density{1}; // Low / Medium / High; presentation only.
+  // Accessibility substrate — the engine's canonical settings: decorative
+  // motion/flashing suppression, high-contrast ink snap, daltonization mode,
+  // and text/subtitle scale fields reserved for per-surface text scaling.
+  // `accessibility.ui_scale` stays 1.0 — the interface_scale preset below is
+  // the UI-facing control; `effective()` folds the preset multiplier in.
+  stellar::engine::AccessibilitySettings accessibility{};
+  // Accessibility: interface scale preset 0=Compact,1=Standard,2=Large,3=Huge.
+  // Applied as a user multiplier on top of the viewport-derived UI scale.
+  int interface_scale{1};
+  // Presentation: active UI locale id (a Data/locale/<id>.json table shipped
+  // with the install). "en" is the baseline; other tables fall back to it.
+  std::string locale{"en"};
+  // The settings consumers should honor — accessibility substrate with the
+  // interface-scale preset folded into `ui_scale`, fully sanitized.
+  [[nodiscard]] stellar::engine::AccessibilitySettings effective() const noexcept {
+    auto result=accessibility;
+    result.ui_scale=interface_scale_multiplier(interface_scale);
+    result.sanitize();
+    return result;
+  }
+  bool operator==(const GeneralPreferences&) const = default;
+};
 struct GeneralSettingsLayout final {
   float scale{};
   int font_pixels{}, heading_pixels{};

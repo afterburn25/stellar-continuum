@@ -136,10 +136,13 @@ Core/engine projections, never re-derived in UI.
   continuation inspection, fault capture for developer step throws,
   authoritative logistics/treasury findings
 - Engine hardening — profiler recording off the global mutex, replay
-  document checkpointing (no re-parse), occupancy censuses
-  (MemoryTracker world/event-history/replay-recorder), pull-based audio
-  stream decoder + equal-power panning, phase-cadence oracle pinning
-  the per-phase activity matrix for minimal + seeded worlds
+  document checkpointing (no re-parse) with expected-document sidecars
+  (`<recording>.expected/<tick>.json`) and `document_leaf_diff` leaf-level
+  divergence reports (`replay-divergence-<tick>.diff.txt`), occupancy
+  censuses (MemoryTracker world/event-history/replay-recorder),
+  pull-based audio stream decoder + equal-power panning, phase-cadence
+  oracle pinning the per-phase activity matrix for minimal + seeded
+  worlds plus event-driven command wakes
 - Editor annotation layer — trait overrides (anomaly/rare/pre-warp),
   numeric `radiusEarth`/`orbitAu` overrides, multi-file projects
   (`project.json` + `assets/` with embedded png discovery)
