@@ -74,8 +74,11 @@ public:
   [[nodiscard]] ConstructionWorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);
   void render(stellar::native_map::DrawList &out, int width, int height) const;
+  [[nodiscard]] int focus() const noexcept { return focus_; }
 
 private:
+  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  focusables(const ConstructionWorkspaceLayout &layout) const;
   [[nodiscard]] const stellar::native_construction::NativeConstructionProject *
   selected_project() const noexcept;
   void reconcile_selection();
@@ -101,6 +104,7 @@ private:
   float project_scroll_{};
   float order_scroll_{};
   std::vector<std::size_t> status_order_;
+  int focus_{-1};
 };
 
 } // namespace stellar::native_construction_ui

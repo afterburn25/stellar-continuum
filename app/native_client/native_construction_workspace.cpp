@@ -205,10 +205,14 @@ std::string NativeConstructionWorkspace::category_label(
   return tr(category_key(category), category_name(category));
 }
 
-void NativeConstructionWorkspace::open() noexcept { visible_ = true; }
+void NativeConstructionWorkspace::open() noexcept {
+  visible_ = true;
+  focus_ = -1;
+}
 void NativeConstructionWorkspace::close() noexcept {
   visible_ = false;
   cancel_confirmation_id_.reset();
+  focus_ = -1;
 }
 bool NativeConstructionWorkspace::visible() const noexcept { return visible_; }
 
@@ -222,6 +226,7 @@ void NativeConstructionWorkspace::set_view(NativeConstructionView view) {
     notice_.clear();
     project_scroll_ = 0.f;
     order_scroll_ = 0.f;
+    focus_ = -1;
   }
   if (generation_changed || revision_changed) cancel_confirmation_id_.reset();
   view_ = std::move(view);
@@ -237,6 +242,7 @@ void NativeConstructionWorkspace::discard_campaign() {
   project_scroll_ = 0.f;
   order_scroll_ = 0.f;
   status_order_.clear();
+  focus_ = -1;
 }
 
 void NativeConstructionWorkspace::set_notice(std::string message,
@@ -324,6 +330,53 @@ void NativeConstructionWorkspace::rebuild_status_order() {
       status_order_.push_back(index);
 }
 
+std::vector<UiRect> NativeConstructionWorkspace::focusables(
+    const ConstructionWorkspaceLayout &layout) const {
+  std::vector<UiRect> out;
+  out.push_back(layout.close);
+  const UiRect project_rows{layout.projects.x,
+                            layout.projects.y + 27.f * layout.scale,
+                            layout.projects.width,
+                            layout.projects.height - 27.f * layout.scale};
+  const UiRect order_rows{layout.orders.x,
+                          layout.orders.y + 27.f * layout.scale,
+                          layout.orders.width,
+                          layout.orders.height - 27.f * layout.scale};
+  if (view_) {
+    for (std::size_t index = 0; index < view_->projects.size(); ++index) {
+      const UiRect bounds{project_rows.x,
+                          project_rows.y + project_scroll_ +
+                                  static_cast<float>(index) * 58.f * layout.scale,
+                          project_rows.width, 54.f * layout.scale};
+      if (const auto clipped = intersection(bounds, project_rows))
+        out.push_back(*clipped);
+    }
+    for (std::size_t order_index = 0; order_index < status_order_.size();
+         ++order_index) {
+      const UiRect bounds{
+          order_rows.x,
+          order_rows.y + order_scroll_ +
+              static_cast<float>(order_index) * 72.f * layout.scale,
+          order_rows.width, 68.f * layout.scale};
+      if (const auto clipped = intersection(bounds, order_rows))
+        out.push_back(*clipped);
+    }
+  }
+  if (const auto *project = selected_project()) {
+    if (project->active || project->queued) {
+      out.push_back(layout.secondary_action);
+    } else if (!project->complete) {
+      out.push_back(layout.primary_action);
+      out.push_back(layout.secondary_action);
+    }
+  }
+  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
+    if (a.y != b.y) return a.y < b.y;
+    return a.x < b.x;
+  });
+  return out;
+}
+
 ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
     const InputEvent &event, int width, int height) {
   if (!visible_) return {};
@@ -331,6 +384,7 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
   const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
   if (event.type == InputEventType::PointerCancelled) {
     cancel_confirmation_id_.reset();
+    focus_ = -1;
     return {ConstructionWorkspaceCommandKind::None, true};
   }
   const UiRect project_rows{layout.projects.x,
@@ -362,6 +416,46 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
     return {ConstructionWorkspaceCommandKind::None,
             layout.surface.contains(event.position)};
   }
+  if (event.type == InputEventType::KeyPressed) {
+    constexpr std::uint32_t kTab = 9u;
+    constexpr std::uint32_t kReturn = 13u;
+    constexpr std::uint32_t kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu;
+    constexpr std::uint32_t kLeft = 0x40000050u;
+    constexpr std::uint32_t kDown = 0x40000051u;
+    constexpr std::uint32_t kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au;
+    constexpr std::uint32_t kEnd = 0x4000004du;
+    const auto items = focusables(layout);
+    const auto count = static_cast<int>(items.size());
+    const bool forward = (event.key == kTab && !event.shift) ||
+                         event.key == kRight || event.key == kDown;
+    const bool backward = (event.key == kTab && event.shift) ||
+                          event.key == kLeft || event.key == kUp;
+    if (count > 0 && (forward || backward)) {
+      focus_ = focus_ < 0 ? (forward ? 0 : count - 1)
+                          : (focus_ + (forward ? 1 : -1) + count) % count;
+      return {ConstructionWorkspaceCommandKind::None, true};
+    }
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      return {ConstructionWorkspaceCommandKind::None, true};
+    }
+    if (focus_ >= 0 && focus_ < count &&
+        (event.key == kReturn || event.key == kSpace)) {
+      const UiRect target = items[static_cast<std::size_t>(focus_)];
+      InputEvent press{InputEventType::LeftPressed};
+      press.position = {target.x + target.width * .5f,
+                        target.y + target.height * .5f};
+      const int keep = focus_;
+      auto command = handle(press, width, height);
+      focus_ = visible_ ? keep : -1;
+      command.captured = true;
+      return command;
+    }
+    return {ConstructionWorkspaceCommandKind::None,
+            layout.surface.contains(event.position)};
+  }
   if (event.type != InputEventType::LeftPressed)
     return {ConstructionWorkspaceCommandKind::None,
             layout.surface.contains(event.position)};
@@ -370,6 +464,7 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
     return {ConstructionWorkspaceCommandKind::None, true};
   }
   if (!layout.surface.contains(event.position)) return {};
+  focus_ = -1;
   if (view_) {
     for (std::size_t index = 0; index < view_->projects.size(); ++index) {
       const UiRect bounds{project_rows.x,
@@ -650,6 +745,13 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
       action(layout.primary_action,
              tr("CONSTRUCTION_STATE_COMPLETED", "COMPLETED"), false);
     }
+  }
+
+  if (focus_ >= 0) {
+    const auto items = focusables(layout);
+    if (focus_ < static_cast<int>(items.size()))
+      stroke(out, items[static_cast<std::size_t>(focus_)],
+             {160, 210, 255, 255});
   }
 }
 

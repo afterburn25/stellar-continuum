@@ -288,6 +288,66 @@ void long_status_list_uses_72_pitch_and_canonical_presentation_order() {
   REQUIRE(workspace.selected_project_id() ==
           std::optional<std::string>{"completed-2"});
 }
+void keyboard_focus_traversal() {
+  constexpr std::uint32_t kTab = 9u;
+  constexpr std::uint32_t kReturn = 13u;
+  constexpr std::uint32_t kSpace = 32u;
+  constexpr std::uint32_t kHome = 0x4000004au;
+  constexpr std::uint32_t kEnd = 0x4000004du;
+  constexpr std::uint32_t kDigit5 = '5';
+  const int width = 1280, height = 720;
+  NativeConstructionWorkspace workspace;
+  workspace.open();
+  workspace.set_view(view());
+  const auto key = [&](std::uint32_t k, bool shift = false) {
+    InputEvent event{InputEventType::KeyPressed};
+    event.key = k;
+    event.shift = shift;
+    return workspace.handle(event, width, height);
+  };
+  REQUIRE(workspace.focus() < 0);
+  // Ordered ring: close, project row, primary action, secondary action.
+  REQUIRE(key(kTab).captured && workspace.focus() == 0);
+  REQUIRE(key(kTab).captured && workspace.focus() == 1);
+  REQUIRE(key(kTab, true).captured && workspace.focus() == 0);
+  REQUIRE(key(kEnd).captured && workspace.focus() == 3);
+  REQUIRE(key(kHome).captured && workspace.focus() == 0);
+  // Row activation keeps focus and selects without a command.
+  (void)key(kTab);
+  REQUIRE(key(kSpace).captured &&
+          workspace.focus() == 1 && workspace.visible());
+  // Primary action issues Start through the pointer dispatch.
+  (void)key(kTab);
+  auto command = key(kReturn);
+  REQUIRE(command.kind == ConstructionWorkspaceCommandKind::Start);
+  REQUIRE(command.project_id == "yard" && workspace.focus() == 2);
+  // Active project narrows the ring; secondary drives the two-stage cancel.
+  auto active = view(1, 4);
+  active.projects.front().active = true;
+  workspace.set_view(std::move(active));
+  REQUIRE(workspace.focus() == 2);
+  command = key(kEnd);
+  const int secondary = workspace.focus();
+  command = key(kReturn);
+  REQUIRE(command.kind == ConstructionWorkspaceCommandKind::PrepareCancel &&
+          workspace.focus() == secondary);
+  REQUIRE(workspace.arm_cancel_confirmation(command.project_id));
+  command = key(kReturn);
+  REQUIRE(command.kind == ConstructionWorkspaceCommandKind::Cancel &&
+          workspace.focus() == secondary);
+  // Close activation closes the surface; unrelated keys pass through.
+  REQUIRE(!key(kDigit5).captured);
+  (void)key(kHome);
+  REQUIRE(key(kReturn).captured && !workspace.visible());
+  // Pointer presses inside the surface clear focus.
+  workspace.open();
+  workspace.set_view(view());
+  (void)key(kTab);
+  const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
+  (void)workspace.handle(
+      {InputEventType::LeftPressed, center(layout.projects)}, width, height);
+  REQUIRE(workspace.focus() < 0);
+}
 } // namespace
 
 int main() try {
@@ -297,6 +357,7 @@ int main() try {
   full_720p_content_keeps_cost_feedback_and_actions_clipped();
   progress_bar_clamps_nonfinite_fraction_inside_orders();
   long_status_list_uses_72_pitch_and_canonical_presentation_order();
+  keyboard_focus_traversal();
   return 0;
 } catch (const std::exception &error) {
   std::cerr << error.what() << '\n';
