@@ -151,6 +151,116 @@ int main() {
     check(host.run() == 1, "forged checkpoint diverges and exits nonzero");
   }
 
+  // Runtime spawn/destroy, camera transform, tilemap queries and the
+  // control surface (request_quit, set_paused, sim_time, rng) — all only
+  // reachable inside run(), so headless mode is what makes them testable.
+  {
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    EntityId spawned{};
+    bool destroyed_ok = false, found_spawned = false;
+    double time_at_two = -1.0;
+    host.on_update = [&](World &, float) {
+      ++updates;
+      if (updates == 1) {
+        SceneEntity entity{};
+        entity.name = "runtime-spawned";
+        entity.x = 400.f;
+        entity.y = 300.f;
+        spawned = host.spawn_entity(entity);
+        found_spawned =
+            host.find_entity("runtime-spawned") == spawned;
+        // Camera: pan + zoom, then screen_to_world round-trips a point.
+        host.set_camera(100.f, 50.f, 2.f);
+      }
+      if (updates == 2) {
+        destroyed_ok = host.destroy_entity(spawned);
+        time_at_two = host.sim_time();
+      }
+    };
+    check(host.run() == 0, "control-surface run exits cleanly");
+    check(found_spawned, "spawn_entity + find_entity resolve by name");
+    check(destroyed_ok, "destroy_entity removes the runtime entity");
+    check(std::abs(host.camera_x() - 100.f) < 1e-4f &&
+              std::abs(host.camera_y() - 50.f) < 1e-4f &&
+              std::abs(host.camera_zoom() - 2.f) < 1e-4f,
+          "set_camera getters round-trip");
+    const auto [wx, wy] = host.screen_to_world(200.f, 150.f);
+    check(std::abs(wx - 200.f) < 1e-3f && std::abs(wy - 125.f) < 1e-3f,
+          "screen_to_world applies camera + zoom");
+    check(time_at_two > 0.03 && time_at_two < 0.05,
+          "sim_time advances one fixed step per frame");
+  }
+
+  // request_quit ends the loop cleanly before --frames is exhausted.
+  {
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    host.on_update = [&](World &, float) {
+      if (++updates == 2) host.request_quit();
+    };
+    check(host.run() == 0, "request_quit exits cleanly");
+    check(updates == 2, "request_quit stops before the frame budget");
+  }
+
+  // set_paused halts the sim step while the frame loop keeps running.
+  {
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    host.set_paused(true);
+    host.on_update = [&](World &, float) { ++updates; };
+    check(host.run() == 0, "paused run exits on --frames");
+    check(updates == 0, "set_paused suppresses the sim step");
+    check(host.paused(), "paused() reports the set state");
+  }
+
+  // rng() is a world-carried deterministic stream — same seed, same
+  // draws across separate hosts.
+  {
+    std::uint64_t draws[2]{};
+    for (int i = 0; i < 2; ++i) {
+      RuntimeHost host{headless_options(root)};
+      bool drawn = false;
+      host.on_update = [&](World &, float) {
+        if (!drawn) {
+          draws[i] = host.rng().next_u64();
+          drawn = true;
+        }
+      };
+      check(host.run() == 0, "rng probe run exits cleanly");
+    }
+    check(draws[0] == draws[1] && draws[0] != 0,
+          "rng() reproduces the same stream for the same seed");
+  }
+
+  // Runtime tilemap spawn + cell queries by index and name.
+  {
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    int read_back = -2;
+    bool wrote = false;
+    std::size_t map_count = 0;
+    host.on_update = [&](World &, float) {
+      if (++updates != 1) return;
+      SceneTilemap map{};
+      map.name = "runtime-ground";
+      map.columns = 4;
+      map.cells = {1, -1, 1, -1, -1, 1, -1, 1};
+      const auto id = host.spawn_tilemap(map);
+      map_count = host.tilemap_count();
+      wrote = host.set_tile_at("runtime-ground", 5.f, 5.f, 7);
+      read_back = host.tile_at("runtime-ground", 5.f, 5.f);
+      check(host.tilemap_index("runtime-ground").has_value(),
+            "tilemap_index resolves the runtime map by name");
+      check(host.world().get<Tilemap>(id) != nullptr,
+            "spawn_tilemap returns a carrier with a Tilemap");
+    };
+    check(host.run() == 0, "tilemap run exits cleanly");
+    check(map_count == 1, "spawn_tilemap joins the map list");
+    check(wrote && read_back == 7,
+          "set_tile_at/tile_at round-trip by name");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
