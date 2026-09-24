@@ -873,6 +873,19 @@ chronicle, navigator) already claim their keys first.
 `native_system_workspace` covers ring traversal, motion-toggle
 activation emitting toggle_motion, launcher Return opening the panel,
 ring-on-close rendering, Next-field cycling, and pointer/cancel resets.
+Pause-menu keyboard contract (row-26 accessibility): `menu_focus_`
+rings the seven stacked pause-menu actions in layout order; Tab/arrows
+cycle with `menu_hover_feedback_.cue` playing the hover audio,
+Home/End jump the ends, and Return/Space dispatch through the new
+shared `activate_menu_action` (extracted from the pointer chain so
+keyboard and click take identical paths). Pointer presses/cancels,
+toggle_menu, and new-game pending/cancel transitions reset focus; the
+pending menu narrows to Continue and Return/Space cancel the pending
+campaign exactly like Escape/click. The ring renders only over drawn
+buttons (pending mode clamps to index 0). Note: the pause menu lives
+in the windowed campaign class — no headless test drives its event
+loop, so this slice is verified by the client build + inspection
+rather than a unit test.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

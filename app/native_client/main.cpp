@@ -1154,7 +1154,7 @@ class NativeCampaign final {
       {session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,"2044-05-06T07:08:12Z"}));
     return out.str();
   }
-  void cancel_new_game(){session_->cancel_new_campaign();gesture_.capture_for_ui();}
+  void cancel_new_game(){session_->cancel_new_campaign();menu_focus_=-1;gesture_.capture_for_ui();}
 
 
   void prepare_developer_smoke(){
@@ -5552,7 +5552,7 @@ class NativeCampaign final {
   [[nodiscard]] bool wants_text_input() const noexcept {
     if(developer_planet_index_.visible()||giant_test_panel_.visible())return false;
     if(developer_index_.visible())return developer_index_.wants_text_input();
-    return !menu_ && !battle_workspace_.visible() && (research_workspace_.wants_text_input() || shipyard_workspace_.wants_text_input() || chronicle_view_.wants_text_input() || colony_roster_.wants_text_input() || (map_hud_visible()&&assets_.wants_text_input())) &&
+    return !menu_ && !battle_workspace_.visible() && (research_workspace_.wants_text_input() || shipyard_workspace_.wants_text_input() || chronicle_view_.wants_text_input() || colony_roster_.wants_text_input() || developer_diagnostics_.wants_text_input() || (map_hud_visible()&&assets_.wants_text_input())) &&
            !construction_workspace_.visible();
   }
   // true while a focus-ring surface owns keyboard activation, so bound galaxy
@@ -5661,6 +5661,7 @@ class NativeCampaign final {
       const auto pending_layout=NativeUiLayout::for_viewport(width,height);
       for(const auto& event:input.events)
         if((event.type==InputEventType::EscapePressed)||
+           (event.type==InputEventType::KeyPressed&&(event.key==13u||event.key==32u))||
            (event.type==InputEventType::LeftPressed&&pending_layout.continue_button.contains(event.position))){
           cancel_new_game();if(audio_confirm_)audio_confirm_();break;
         }
@@ -5868,6 +5869,29 @@ class NativeCampaign final {
         (void)audio_settings_->handle(event,width,height);
         gesture_.capture_for_ui();
         continue;
+      }
+      if(menu_){
+        if(event.type==InputEventType::LeftPressed||event.type==InputEventType::PointerCancelled)menu_focus_=-1;
+        if(event.type==InputEventType::KeyPressed&&event.key){
+          constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u,kHome=0x4000004au,kEnd=0x4000004du;
+          const bool backward=event.key==kLeft||event.key==kUp||(event.key==kTab&&event.shift);
+          if(event.key==kTab||event.key==kRight||event.key==kDown||backward){
+            menu_focus_=menu_focus_<0?0:(backward?menu_focus_+menu_action_count-1:menu_focus_+1)%menu_action_count;
+            menu_hover_feedback_.cue(static_cast<std::uint64_t>(menu_actions_[menu_focus_]));
+            gesture_.capture_for_ui();continue;
+          }
+          if(event.key==kHome||event.key==kEnd){
+            menu_focus_=event.key==kHome?0:menu_action_count-1;
+            menu_hover_feedback_.cue(static_cast<std::uint64_t>(menu_actions_[menu_focus_]));
+            gesture_.capture_for_ui();continue;
+          }
+          if((event.key==kReturn||event.key==kSpace)&&menu_focus_>=0&&menu_focus_<menu_action_count){
+            if(audio_confirm_)audio_confirm_();
+            activate_menu_action(menu_actions_[menu_focus_],width,height);
+            gesture_.capture_for_ui();continue;
+          }
+          gesture_.capture_for_ui();continue;
+        }
       }
       if(!map_hud_visible()){hud_switch_pressed_=false;assets_.cancel_input();}
       if(map_hud_visible()){
@@ -6206,15 +6230,9 @@ class NativeCampaign final {
       if(event.type==InputEventType::LeftPressed){
         const auto action=layout.hit(event.position,menu_);bool captured=menu_||action!=UiAction::None;
         if(action!=UiAction::None&&audio_confirm_)audio_confirm_();
-        if(action==UiAction::Continue)toggle_menu();
-        else if(action==UiAction::NewGame){gesture_.capture_for_ui();(void)session_->request_new_campaign();}
-        else if(action==UiAction::Save)session_->request_save();
-        else if(action==UiAction::Load)session_->request_load();
-        else if(action==UiAction::Settings){if(settings_hub_)settings_hub_->open();else if(audio_settings_)audio_settings_->open();}
-        else if(action==UiAction::Support)request_support(width,height);
-        else if(action==UiAction::Exit)session_->request_exit();
-        else if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
+        if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
         else if(action==UiAction::Speed)cycle_speed();
+        else activate_menu_action(action,width,height);
         if(colony_roster_.visible()||economy_workspace_.visible()||supply_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible())captured=true;
         gesture_.begin(captured);continue;
       }
@@ -6790,6 +6808,10 @@ class NativeCampaign final {
       draw_button(layout.support_button, tr(support_.busy()?"MENU_EXPORTING":"MENU_EXPORT",support_.busy()?"EXPORTING...":"EXPORT DIAGNOSTICS"));
       draw_button(layout.new_game_button, tr("MENU_NEW_GAME","NEW GAME"));
       draw_button(layout.exit_button, tr("MENU_EXIT","EXIT TO WINDOWS"));
+      }
+      if(menu_focus_>=0&&menu_focus_<menu_action_count&&(!session_->new_campaign_pending()||menu_focus_==0)){
+        const std::array<UiRect,7> focus_rects{layout.continue_button,layout.save_button,layout.load_button,layout.settings_button,layout.support_button,layout.new_game_button,layout.exit_button};
+        out.overlay.emplace_back(StrokedRectangle{focus_rects[menu_focus_],{164,221,237,255}});
       }
       const float footer_y=layout.menu_panel.y+layout.menu_panel.height+8.f*layout.scale;
       const UiRect footer{36.f*layout.scale,footer_y,
@@ -7665,7 +7687,18 @@ class NativeCampaign final {
     constrain_galaxy_camera(width,height);
   }
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_overview_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();chronicle_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  static constexpr std::array<UiAction,7> menu_actions_{UiAction::Continue,UiAction::Save,UiAction::Load,UiAction::Settings,UiAction::Support,UiAction::NewGame,UiAction::Exit};
+  static constexpr int menu_action_count=static_cast<int>(menu_actions_.size());
+  void activate_menu_action(UiAction action,int width,int height){
+    if(action==UiAction::Continue)toggle_menu();
+    else if(action==UiAction::NewGame){gesture_.capture_for_ui();menu_focus_=-1;(void)session_->request_new_campaign();}
+    else if(action==UiAction::Save)session_->request_save();
+    else if(action==UiAction::Load)session_->request_load();
+    else if(action==UiAction::Settings){if(settings_hub_)settings_hub_->open();else if(audio_settings_)audio_settings_->open();}
+    else if(action==UiAction::Support)request_support(width,height);
+    else if(action==UiAction::Exit)session_->request_exit();
+  }
+  void toggle_menu(){menu_focus_=-1;settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();chronicle_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());
     if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));
     std::unordered_set<int> owned;
@@ -8211,7 +8244,7 @@ class NativeCampaign final {
   stellar::native_audio::NativeVoiceSettings* voice_settings_{};
   stellar::native_video_settings::NativeVideoController* video_settings_{};
   stellar::native_audio::NativeAudioSettings* audio_settings_{};
-  bool menu_{};bool smoke_save_pending_{};bool smoke_shortcut_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  bool menu_{};int menu_focus_{-1};bool smoke_save_pending_{};bool smoke_shortcut_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
   double smoke_galaxy_day_{},smoke_galaxy_fitted_scale_{},smoke_galaxy_regional_scale_{};
   GalaxyArtSceneEvidence smoke_galaxy_overview_{},smoke_galaxy_regional_{},smoke_galaxy_system_{};
