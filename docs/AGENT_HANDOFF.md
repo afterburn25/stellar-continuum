@@ -366,7 +366,16 @@ Runtime options/args: `--scene`,
 `--frames` (bounded CI runs), `--snapshot-out` (byte-comparable world
 dumps), `--world-w/--world-h`, `--speed`, `--width/--height`,
 `--fullscreen`, `--input-map`, `--move-speed`, `--jump`, `--save`;
-P pauses, F12 screenshots to `<root>/screenshots/`.
+P pauses, F12 screenshots to `<root>/screenshots/`. Input journaling:
+`--record`/`--replay` (frame-indexed input + world-hash checkpoints
+every 30 frames, `replay_verified`/`replay_diverged`), `--replay-info`
+(headless inventory), `--replay-exit` (0 verified / 1 diverged), and
+`--headless` runs the loop with no Window/Vulkan/audio — synthetic
+input snapshot at the configured drawable size, one deterministic sim
+step per frame, so generated games smoke-test and replay-verify on
+CI machines without a display (`engine_runtime` covers stepping,
+region queries, snapshot parity and the replay contract headlessly;
+the Projects tool's TEST passes `--headless` by default).
 `SceneEntity` authoring surface: name, position/extent/velocity,
 tint, sprite path, layer (stable-sorted draw order), parallax
 (0 = screen-pinned), text label, gravityScale + solid (platformer
