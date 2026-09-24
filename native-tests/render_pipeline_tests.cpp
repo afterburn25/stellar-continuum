@@ -216,6 +216,32 @@ int main() {
   check(std::abs(visual.opacity - 0.5f) < 1e-5,
         "opacity curve midpoint");
 
+  // Global budget: spawn rates taper as residency approaches the cap and
+  // the live count stays bounded above it.
+  VfxSystem vfx_budget;
+  vfx_budget.define(flare);
+  const auto budgeted = vfx_budget.spawn("stellar_flare", {0, 0, 0});
+  vfx_budget.set_particle_budget(8);
+  check(vfx_budget.particle_budget() == 8, "particle budget stored");
+  vfx_budget.advance(0.5); // unconstrained would be ~10 particles
+  const auto budgeted_count = vfx_budget.particles(budgeted).size();
+  check(budgeted_count <= 8, "live particles exceeded the global budget");
+  const auto budget_stats = vfx_budget.stats();
+  check(budget_stats.particle_budget == 8 &&
+            budget_stats.budget_scale < 1.0f,
+        "budget pressure did not scale spawn rates");
+  vfx_budget.advance(0.5); // still capped as particles age out
+  check(vfx_budget.stats().live_particles <= 8,
+        "budget cap not sustained across advances");
+  VfxSystem vfx_unlimited;
+  vfx_unlimited.define(flare);
+  const auto free = vfx_unlimited.spawn("stellar_flare", {0, 0, 0});
+  vfx_unlimited.advance(0.5);
+  check(vfx_unlimited.particles(free).size() > budgeted_count,
+        "unlimited system was incorrectly budget-scaled");
+  check(vfx_unlimited.stats().budget_scale == 1.0f,
+        "unlimited system reported budget pressure");
+
   if (failures == 0)
     std::cout << "Render graph, streaming, shader and VFX tests passed\n";
   return failures == 0 ? 0 : 1;

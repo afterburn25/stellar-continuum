@@ -104,7 +104,9 @@ struct RuntimeHost::Impl {
   // Deterministic particle system stepped inside simulate() and rendered
   // as tinted rects. The host tracks every spawned instance so it can
   // re-anchor attachments, stop emitters whose entity died, and render.
-  VfxSystem vfx;
+  // The global budget keeps runaway scenes bounded; consumers opt out via
+  // vfx().set_particle_budget(0).
+  VfxSystem vfx{default_particle_budget};
   struct VfxTrack {
     VfxInstanceId instance;
     std::string definition_id;
