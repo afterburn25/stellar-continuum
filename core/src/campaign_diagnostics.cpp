@@ -1223,20 +1223,22 @@ inspect_research_invariants(
   try{
     AdaptiveResearchCampaignSnapshotCodec codec(runtime);
     snapshot=codec.capture(research);captured=true;
-    // The codec's restore is the authoritative save-path validation —
-    // replay it on the capture so corrupt in-memory state surfaces
-    // instead of waiting for the next save/load cycle.
-    (void)codec.restore(w,snapshot);
+    if(captured){
+      // Campaign-entity refs first — precise findings before the
+      // umbrella, since restore rejects absent-civilization rows too.
+      std::unordered_set<int> civ_ids;
+      for(const auto &c:w.civilizations)civ_ids.insert(c.id);
+      for(const auto &row:snapshot.civilizations)
+        if(!civ_ids.contains(row.civilization_id)){
+          emit("orphaned_civilization",row.civilization_id,"Research row references an absent civilization.");break;}
+      // The codec's restore is the authoritative save-path validation —
+      // replay it on the capture so corrupt in-memory state surfaces
+      // instead of waiting for the next save/load cycle.
+      (void)codec.restore(w,snapshot);
+    }
   }catch(const std::exception &error){
     emit("invalid_research",0,
          std::string("Research state fails its snapshot validation: ")+error.what());}
-  if(captured&&findings.empty()){
-    std::unordered_set<int> civ_ids;
-    for(const auto &c:w.civilizations)civ_ids.insert(c.id);
-    for(const auto &row:snapshot.civilizations)
-      if(!civ_ids.contains(row.civilization_id)){
-        emit("orphaned_civilization",row.civilization_id,"Research row references an absent civilization.");break;}
-  }
   if(dropped>0){
     DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
     r.subsystem="diagnostics";r.event_type="findings_truncated";
