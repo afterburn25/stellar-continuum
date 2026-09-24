@@ -594,7 +594,15 @@ host, zero findings on seeded campaigns (4/4 diagnostics surface green,
 qa_host 31 s). Runtime-held state coverage is now complete:
 `FreshCampaignState`, diplomacy, adaptive research, continuation/schedules
 — event history excluded as legitimately historical, lane caches as
-derived/ephemeral. Verified: `campaign_frame_parity` asserts the record
+derived/ephemeral. `90541065` moved profiler span/aggregate recording off
+the global mutex into per-thread buffers (merged at frame boundaries and
+thread exit; `aggregates()`/`export_json` merge un-drained buffers on
+read; `enabled_` atomic) with a 4-thread recording test — row-19
+lower-perturbation item, 5/5 profiler/diagnostics/shell green.
+`e54d4177` exported `encode_player_campaign_v17_document` so the replay
+checkpoint builds the canonical DOM once instead of serialize+re-parse
+— identical document, hash-compatible recordings; 6/6 save-parity/
+session tests green. Verified: `campaign_frame_parity` asserts the record
 on its real StrategicFailure throw and its absence after the moved-owner
 advance; 8/8 across diagnostics/fault/session/QA surface green
 (qa_host 29 s).
