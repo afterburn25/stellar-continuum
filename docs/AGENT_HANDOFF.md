@@ -648,6 +648,24 @@ diagnostics lane — both binaries were built from their unstaged
 `inspect_diplomacy_invariants` mid-flight changes, not committed code;
 every accessibility suite passes. Remaining accessibility gaps:
 screen-reader contracts and per-surface text scaling.
+Incremental audio streaming (`6c189626`): `AudioStreamDecoder` +
+`open_audio_stream` pull-decode 48 kHz stereo F32 on demand through a
+lazy Media Foundation reader (first `read()` binds COM on the consuming
+thread), `rewind()` loops without rebinding, and neither the 16 MiB
+source nor the 96 MiB decoded caps apply — music memory is bounded
+regardless of track length. `AudioOutput::play_music` gained a decoder
+overload feeding the same 0.75 s bounded SDL queue; `AudioDiagnostics`
+reports `music_streaming`; `AudioStreamError` types stream failures so
+the director classifies them as permanent asset faults instead of
+arming device recovery. The client's music track now streams through
+`open_audio_stream` — the largest whole-file decode is gone from the
+startup job (`NativeAudioStats::music_streaming` exposes it). Effects
+and voice stay on whole-clip decode. Coverage: chunked PCM parity vs
+whole-file decode (wav+mp3), rewind replay, >16 MiB source streaming,
+missing-source rejection, streamed-music queue/diagnostics, plus the
+existing recovery/queue-bound tests; 3/3 audio suites and the full
+native client build green. The phase-cadence caveat above is stale —
+`campaign_phase_cadence`/`phase_profile` compile and pass at HEAD.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
