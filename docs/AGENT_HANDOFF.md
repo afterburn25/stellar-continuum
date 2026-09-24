@@ -1038,6 +1038,18 @@ their wheel delta is not a row multiple). `native_diplomacy_workspace`,
 scroll is the general-settings screenshot-path field (file was
 write-locked by a concurrent editor session during the sweep — migrate
 `path_scroll_` to `ScrollView` when free).
+ScrollView sweep follow-up (row 24): the planetary screen kept the
+negative-offset measurement formula after the convention inversion —
+its facts/queue/details cursors start at `pane.y - scroll_offset`, so
+`height = cursor - pane.y - scroll_offset` produced `H - 2*offset`,
+content height became scroll-dependent, `sync` clamped to a moving
+maximum, and wheel scrolling oscillated instead of converging (the
+economy pane could never reach "Collect materials"). The trailing term
+now adds the offset back so heights are measured in unscrolled content
+coordinates (`5f5684e7`); `native_colony_workspace` green again. Same
+session: focused_label adoption batch 2 — chronicle, colony roster,
+colony freight modal and notification feed expose `focused_label()`
+and the dispatcher announces on focus change (`2581fbd8`).
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
