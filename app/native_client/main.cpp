@@ -5810,6 +5810,7 @@ class NativeCampaign final {
            (stellar_activity_panel_.visible()&&stellar_activity_panel_.focus()>=0)||
            (developer_empires_.visible()&&developer_empires_.focus()>=0)||
            (developer_panel_.visible()&&developer_panel_.focus()>=0)||
+           (developer_diagnostics_.visible()&&developer_diagnostics_.focus()>=0)||
            hud_focus_>=0||
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
@@ -6229,7 +6230,16 @@ class NativeCampaign final {
           gesture_.capture_for_ui();continue;
         }
       }
-      if(developer_session()&&developer_diagnostics_.handle(event,width,height,developer_monitor_)){gesture_.capture_for_ui();continue;}
+      if(developer_session()){
+        const int developer_diagnostics_focus_before=developer_diagnostics_.focus();
+        if(developer_diagnostics_.handle(event,width,height,developer_monitor_)){
+          if(developer_diagnostics_.focus()!=developer_diagnostics_focus_before)
+            announcer_.announce_focus(developer_diagnostics_.focused_label(width,height),
+              announcement_bounds(developer_diagnostics_.focused_bounds(width,height)),
+              std::nullopt,developer_diagnostics_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
+        }
+      }
       if(developer_session()){
         const int giant_test_focus_before=giant_test_panel_.focus();
         if(giant_test_panel_.handle(event,width,height,session_->frame())){

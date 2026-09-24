@@ -2,6 +2,7 @@
 #include "native_dropdown.hpp"
 #include "../campaign_diagnostic_monitor.hpp"
 #include <stellar/core/campaign_world_projection.hpp>
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
@@ -27,18 +28,39 @@ const char *campaign_domain_name(std::int64_t domain){
 } // namespace
 class NativeDeveloperDiagnostics {
 public:
-  void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;refresh(monitor);}
-  void close(){visible_=false;pressed_=-1;dropdown_.close();entity_search_focused_=event_search_focused_=false;}
+  void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;ring_=-1;refresh(monitor);}
+  void close(){visible_=false;pressed_=-1;ring_=-1;dropdown_.close();entity_search_focused_=event_search_focused_=false;}
   bool visible()const{return visible_;}
   bool wants_text_input()const{return visible_&&(entity_search_focused_||event_search_focused_);}
+  // Keyboard-focus contract: Tab enters a ring over the chrome, the
+  // view's search field (entities/events, classified Edit), the sortable
+  // phase headers (performance view) and the rendered entity rows;
+  // activation replays the same dispatch pointer input takes. The
+  // entity tree keeps its existing arrow/Home/End selection model while
+  // the ring is inactive — once focused, arrows/Home/End move the ring
+  // and Escape releases it before the search fields, then the panel.
+  [[nodiscard]] bool wants_keyboard_focus()const noexcept{return visible_&&ring_>=0;}
+  [[nodiscard]] int focus()const noexcept{return visible_?ring_:-1;}
+  [[nodiscard]] std::string focused_label(int w,int h)const{
+    const auto targets=focusables(layout(w,h));
+    return ring_>=0&&ring_<static_cast<int>(targets.size())?targets[static_cast<std::size_t>(ring_)].label:std::string{};
+  }
+  [[nodiscard]] std::optional<UiRect> focused_bounds(int w,int h)const{
+    const auto targets=focusables(layout(w,h));
+    return ring_>=0&&ring_<static_cast<int>(targets.size())?std::optional<UiRect>{targets[static_cast<std::size_t>(ring_)].rect}:std::nullopt;
+  }
+  [[nodiscard]] stellar::engine::AnnouncementControl focused_control(int w,int h)const{
+    const auto targets=focusables(layout(w,h));
+    return ring_>=0&&ring_<static_cast<int>(targets.size())?targets[static_cast<std::size_t>(ring_)].control:stellar::engine::AnnouncementControl::Custom;
+  }
   bool handle(const InputEvent &e,int w,int h,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     if(!visible_)return false;const auto l=layout(w,h);pointer_=e.position;
     if(dropdown_.visible()){
       if(const auto choice=dropdown_.handle(e,l.detail,w,h))monitor.history().set_detail(static_cast<stellar::engine::DiagnosticDetail>(*choice));
       return true;
     }
-    if(e.type==InputEventType::EscapePressed){if(entity_search_focused_||event_search_focused_){entity_search_focused_=event_search_focused_=false;return true;}close();return true;}
-    if(e.type==InputEventType::PointerCancelled){pressed_=-1;return true;}
+    if(e.type==InputEventType::EscapePressed){if(entity_search_focused_||event_search_focused_){entity_search_focused_=event_search_focused_=false;return true;}if(ring_>=0){ring_=-1;return true;}close();return true;}
+    if(e.type==InputEventType::PointerCancelled){pressed_=-1;ring_=-1;return true;}
     // Shared scroll model — row stride/count are view-dependent, so the
     // engine VirtualizedList is configured per event/render against the
     // last rendered row set (list_rows_ refreshes every frame).
@@ -47,7 +69,8 @@ public:
     list_view_.row_count=list_rows_;
     if(e.type==InputEventType::Wheel&&l.list.contains(e.position))list_view_.scroll_to(list_view_.scroll_offset-std::round(e.wheel_y)*list_view_.row_height);
     if(e.type==InputEventType::LeftPressed){
-      if(l.detail.contains(e.position)){dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));return true;}
+      ring_=-1;
+      if(l.detail.contains(e.position)){open_detail_dropdown(monitor);return true;}
       pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
       entity_search_focused_=entities_&&header_search_rect(l).contains(e.position);
       event_search_focused_=events_&&header_search_rect(l).contains(e.position);
@@ -55,12 +78,7 @@ public:
       // convention as the colony roster: press cycles asc→desc and the
       // scroll returns to the top.
       if(pressed_<0&&!events_&&!generation_&&!assets_&&!entities_)
-        for(int col=0;col<4;++col)if(phase_header_rect(l,col).contains(e.position)){
-          static constexpr std::string_view ids[]{"phase","samples","mean","maximum"};
-          const auto &state=phase_table_.sort_state();
-          phase_table_.sort_by(ids[col],!(state&&state->first==ids[col]&&state->second));
-          list_view_.scroll_offset=0;break;
-        }
+        for(int col=0;col<4;++col)if(phase_header_rect(l,col).contains(e.position)){activate_phase_header(col);break;}
       if(pressed_<0&&entities_&&!entities_dirty_&&entity_rows_rect(l).contains(e.position)){
         const int row=static_cast<int>((e.position.y-l.list.y+list_view_.scroll_offset)/list_view_.row_height);
         if(row>=0&&row<static_cast<int>(entity_flat_.size()))pressed_=100+row;
@@ -68,21 +86,13 @@ public:
     }
     if(e.type==InputEventType::LeftReleased){
       const int hit=std::exchange(pressed_,-1);
-      if(hit==0&&l.close.contains(e.position))close();
-      if(hit==1&&l.performance.contains(e.position)){events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;}
-      if(hit==2&&l.events.contains(e.position)){events_=true;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;refresh(monitor);}
-      if(hit==3&&l.refresh.contains(e.position)){list_view_.scroll_offset=0;refresh(monitor);entities_dirty_=true;}
-      if(hit==4&&l.generation.contains(e.position)){generation_=true;assets_=false;entities_=false;list_view_.scroll_offset=0;}
-      if(hit==5&&l.assets.contains(e.position)){assets_=true;generation_=false;entities_=false;list_view_.scroll_offset=0;}
-      if(hit==6&&l.entities.contains(e.position)){entities_=true;events_=false;generation_=false;assets_=false;list_view_.scroll_offset=0;entities_dirty_=true;}
-      if(hit>=100){
+      if(hit>=0&&hit<=6){
+        const std::array<UiRect,7> rects{l.close,l.performance,l.events,l.refresh,l.generation,l.assets,l.entities};
+        if(rects[static_cast<std::size_t>(hit)].contains(e.position))activate_button(hit,monitor);
+      }else if(hit>=100){
         const int row=hit-100;
         const int released=static_cast<int>((e.position.y-l.list.y+list_view_.scroll_offset)/list_view_.row_height);
-        if(released==row&&entity_rows_rect(l).contains(e.position)&&row<static_cast<int>(entity_flat_.size())){
-          const auto *node=entity_flat_[row].first;
-          entity_selected_=node->id;entity_tree_.select(node->id);
-          if(!node->children.empty())set_entity_expanded(*node,!node->expanded);
-        }
+        if(released==row&&entity_rows_rect(l).contains(e.position))activate_entity_row(row);
       }
     }
     if(entity_search_focused_||event_search_focused_){
@@ -95,6 +105,29 @@ public:
       else if(e.type==InputEventType::KeyPressed&&(e.key==9u||e.key==13u))entity_search_focused_=event_search_focused_=false;
       if(entity_search_focused_&&(e.type==InputEventType::TextEntered||e.type==InputEventType::BackspacePressed))entities_dirty_=true;
       return true;
+    }
+    if(e.type==InputEventType::KeyPressed&&e.key){
+      // The ring owns Tab always (entry/traversal) and the remaining nav
+      // keys only while focused — an inactive ring leaves arrows, Home,
+      // End, Return and Space to the entity tree's selection model below.
+      constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+      constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+      constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+      const auto targets=focusables(l);const int count=static_cast<int>(targets.size());
+      if(count){
+        const bool fwd=(e.key==kTab&&!e.shift)||(ring_>=0&&(e.key==kRight||e.key==kDown));
+        const bool bwd=(e.key==kTab&&e.shift)||(ring_>=0&&(e.key==kLeft||e.key==kUp));
+        const bool home=ring_>=0&&e.key==kHome,end=ring_>=0&&e.key==kEnd;
+        if(fwd||bwd||home||end){
+          if(ring_<0)ring_=bwd||end?count-1:0;
+          else if(fwd)ring_=(ring_+1)%count;
+          else if(bwd)ring_=(ring_+count-1)%count;
+          else if(home)ring_=0;
+          else ring_=count-1;
+          return true;
+        }
+        if((e.key==kReturn||e.key==kSpace)&&ring_>=0){activate_target(targets[static_cast<std::size_t>(ring_)],monitor);return true;}
+      }
     }
     if(e.type==InputEventType::KeyPressed&&entities_&&!entities_dirty_){
       // SDL_Keycode arrows/Home/End/Return/Space drive the tree's
@@ -359,6 +392,15 @@ public:
     label({l.panel.x+20*s,l.panel.y+681*s,l.panel.width-40*s,24*s},
       "CPU timings are observations, not FPS. core_total includes its child phases.",native_menu_style::muted);
     label({l.panel.x+20*s,l.panel.y+710*s,l.panel.width-40*s,24*s},"Scroll for more. Export includes full retained event text.",native_menu_style::muted);
+    if(ring_>=0){
+      const auto targets=focusables(l);
+      if(ring_<static_cast<int>(targets.size())){
+        const auto &r=targets[static_cast<std::size_t>(ring_)].rect;
+        const UiRect outer{r.x-3*s,r.y-3*s,r.width+6*s,r.height+6*s};
+        out.overlay.emplace_back(StrokedRectangle{outer,native_menu_style::cyan});
+        out.overlay.emplace_back(StrokedRectangle{r,native_menu_style::cyan});
+      }
+    }
     if(dropdown_.visible())dropdown_.render(out,l.detail,w,h,font);
   }
 private:
@@ -373,6 +415,64 @@ private:
   // In the entities view the list splits: rows left, selected-entity
   // detail right — row hit-testing bounds to the rows region.
   static UiRect entity_rows_rect(const Layout &l){return {l.list.x,l.list.y,l.list.width*.62f,l.list.height};}
+  struct FocusTarget{UiRect rect;int hit{-1};stellar::engine::AnnouncementControl control{stellar::engine::AnnouncementControl::Button};std::string label;};
+  std::vector<FocusTarget> focusables(const Layout &l)const{
+    std::vector<FocusTarget> out;
+    const auto push=[&](UiRect r,int hit,std::string label,stellar::engine::AnnouncementControl c=stellar::engine::AnnouncementControl::Button){
+      if(r.width>0&&r.height>0)out.push_back({r,hit,c,std::move(label)});};
+    push(l.close,0,"Close diagnostics");
+    push(l.performance,1,"Live performance");push(l.events,2,"Recent events");push(l.refresh,3,"Refresh events");
+    push(l.detail,7,"Record detail level");
+    push(l.generation,4,"Galaxy details");push(l.assets,5,"Cooked assets");push(l.entities,6,"Entities");
+    if(entities_){
+      push(header_search_rect(l),50,"Search entities",stellar::engine::AnnouncementControl::Edit);
+      if(!entities_dirty_){
+        (void)list_view_.sync_rows(entity_flat_.size(),33.f*l.scale,l.list.height);
+        auto range=list_view_.visible_range();range.last=std::min(range.last,range.first+14);
+        const auto rows=entity_rows_rect(l);
+        for(auto i=range.first;i<range.last&&i<entity_flat_.size();++i)
+          push({rows.x,l.list.y+static_cast<float>(i)*33.f*l.scale-list_view_.scroll_offset,rows.width,31.f*l.scale},100+static_cast<int>(i),entity_flat_[i].first->label_key);
+      }
+    }else if(events_)push(header_search_rect(l),51,"Search events",stellar::engine::AnnouncementControl::Edit);
+    if(!events_&&!generation_&&!assets_&&!entities_){
+      static const char *names[]{"phase","samples","mean ms","maximum ms"};
+      for(int col=0;col<4;++col)push(phase_header_rect(l,col),200+col,std::string("Sort by ")+names[col]);
+    }
+    std::ranges::sort(out,[](const FocusTarget&a,const FocusTarget&b){return a.rect.y==b.rect.y?a.rect.x<b.rect.x:a.rect.y<b.rect.y;});
+    return out;
+  }
+  void activate_button(int hit,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
+    if(hit==0)close();
+    else if(hit==1){events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;}
+    else if(hit==2){events_=true;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;refresh(monitor);}
+    else if(hit==3){list_view_.scroll_offset=0;refresh(monitor);entities_dirty_=true;}
+    else if(hit==4){generation_=true;assets_=false;entities_=false;list_view_.scroll_offset=0;}
+    else if(hit==5){assets_=true;generation_=false;entities_=false;list_view_.scroll_offset=0;}
+    else if(hit==6){entities_=true;events_=false;generation_=false;assets_=false;list_view_.scroll_offset=0;entities_dirty_=true;}
+  }
+  void open_detail_dropdown(stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
+    dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));
+  }
+  void activate_phase_header(int col){
+    static constexpr std::string_view ids[]{"phase","samples","mean","maximum"};
+    const auto &state=phase_table_.sort_state();
+    phase_table_.sort_by(ids[col],!(state&&state->first==ids[col]&&state->second));
+    list_view_.scroll_offset=0;
+  }
+  void activate_entity_row(int row){
+    if(row<0||row>=static_cast<int>(entity_flat_.size()))return;
+    const auto *node=entity_flat_[static_cast<std::size_t>(row)].first;
+    entity_selected_=node->id;entity_tree_.select(node->id);
+    if(!node->children.empty())set_entity_expanded(*node,!node->expanded);
+  }
+  void activate_target(const FocusTarget &t,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
+    if(t.hit==50){entity_search_focused_=true;ring_=-1;}
+    else if(t.hit==51){event_search_focused_=true;ring_=-1;}
+    else if(t.hit==7)open_detail_dropdown(monitor);
+    else if(t.hit>=200)activate_phase_header(t.hit-200);
+    else if(t.hit>=100)activate_entity_row(t.hit-100);
+    else activate_button(t.hit,monitor);
+  }
   // The entities/events search fields share the header band (right
   // edge, above the list) — pointer-focused like the roster's.
   static UiRect header_search_rect(const Layout &l){return {l.list.x+l.list.width-250*l.scale,l.list.y-34*l.scale,250*l.scale,28*l.scale};}
@@ -445,7 +545,7 @@ private:
   }
   static std::string number(double value){std::ostringstream out;out<<std::fixed<<std::setprecision(3)<<value;return out.str();}
   std::vector<stellar::engine::DiagnosticRecord> snapshot_;stellar::native_ui::Dropdown dropdown_;
-  bool visible_{},events_{};int pressed_{-1};Point pointer_{};
+  bool visible_{},events_{};int pressed_{-1},ring_{-1};Point pointer_{};
   std::string entity_search_,event_search_;bool entity_search_focused_{},event_search_focused_{};
   mutable std::size_t entity_shown_{};
   mutable std::vector<std::size_t> event_view_;

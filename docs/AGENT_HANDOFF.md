@@ -1261,9 +1261,16 @@ pause/resume runs the tactical/strategic clock toggle, AI control runs
 `set_developer_ai_control`, and the index/diagnostics/empire/stellar
 requests emit unchanged — while disabled controls (ADVANCE ONE TICK
 without a pending step, EXPORT while busy) skip the ring exactly like
-pointer input; `native_developer_index` pins it. The remaining
-developer panel (diagnostics) stays pointer-only — it predates the
-contract and adopts it incrementally from here.
+pointer input; `native_developer_index` pins it. The developer
+diagnostics panel closes the sweep: the chrome, record-detail
+dropdown, sortable phase headers, entities/events search fields
+(Edit), and rendered entity rows ring in (y,x) order through shared
+activate helpers — row activation replays the select+toggle dispatch,
+the entity tree's arrow/Home/End selection model keeps its keys while
+the ring is inactive (Tab enters the ring; arrows join it once
+focused), and an open dropdown or focused search owns its keys first;
+`native_developer_diagnostics` pins it. Every native panel — player
+and developer — now carries the keyboard focus contract.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

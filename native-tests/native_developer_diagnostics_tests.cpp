@@ -273,6 +273,53 @@ int main(int argc,char **argv)try{
       check(!window.wants_text_input()&&window.visible(),"Escape in event search closed the panel.");
     }
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Events search modified world state.");
+    // Keyboard focus ring: chrome, the record-detail dropdown, sort
+    // headers, the search field (Edit) and rendered entity rows ring in
+    // (y,x) order; activation replays the same dispatch pointer input
+    // takes, and Escape releases the ring before closing.
+    {
+      const auto ring_key=[&](std::uint32_t k){InputEvent e{InputEventType::KeyPressed};e.key=k;return window.handle(e,w,h,monitor);};
+      click("LIVE PERFORMANCE");
+      check(window.focus()<0,"Diagnostics ring persisted across view switches.");
+      check(ring_key(9)&&window.focus()>=0,"Tab did not enter the diagnostics ring.");
+      check(window.focused_label(w,h)=="Close diagnostics","First diagnostics target is not the close control.");
+      check(window.focused_bounds(w,h).has_value(),"Focused diagnostics control lacks bounds.");
+      check(window.focused_control(w,h)==stellar::engine::AnnouncementControl::Button,"Diagnostics chrome misclassified.");
+      int ring_guard=0;
+      while(window.focused_label(w,h)!="Sort by phase"&&ring_guard++<24)check(ring_key(9),"Diagnostics navigation leaked.");
+      check(window.focused_label(w,h)=="Sort by phase","Phase sort header never joined the ring.");
+      check(ring_key(13),"Sort activation leaked.");
+      bool sort_marker=false;
+      for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value=="Phase ^")sort_marker=true;
+      check(sort_marker,"Keyboard sort activation did not replay the header dispatch.");
+      check(window.handle({InputEventType::EscapePressed},w,h,monitor)&&window.focus()<0&&window.visible(),"Escape closed diagnostics instead of releasing its ring.");
+      check(window.handle({InputEventType::EscapePressed},w,h,monitor)&&!window.visible(),"Second Escape did not close diagnostics.");
+      window.open(monitor);
+      click("RECENT EVENTS");
+      check(ring_key(9)&&window.focus()>=0,"Tab did not re-enter the diagnostics ring.");
+      ring_guard=0;
+      while(window.focused_label(w,h)!="Search events"&&ring_guard++<24)check(ring_key(9),"Diagnostics navigation leaked.");
+      check(window.focused_control(w,h)==stellar::engine::AnnouncementControl::Edit,"Events search misclassified.");
+      check(ring_key(13)&&window.wants_text_input(),"Keyboard activation did not focus the events search.");
+      check(window.handle({InputEventType::EscapePressed},w,h,monitor)&&!window.wants_text_input()&&window.focus()<0,"Escape did not release the events search.");
+      click("ENTITIES");(void)draw();
+      check(ring_key(9)&&window.focus()>=0,"Tab did not enter the diagnostics ring in entities view.");
+      const auto entity_labels=[](const DrawList &d){
+        std::vector<std::string> out;
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)
+          if(t->value.starts_with("\xE2\x96\xBE ")||t->value.starts_with("\xE2\x80\xBA ")||t->value.starts_with("\xC2\xB7 "))out.push_back(t->value.substr(t->value.find(' ')+1));
+        return out;};
+      const auto labels=entity_labels(draw());
+      check(!labels.empty(),"Entities view rendered no rows for the ring test.");
+      ring_guard=0;
+      while(window.focused_label(w,h)!=labels.front()&&ring_guard++<40)check(ring_key(9),"Diagnostics navigation leaked.");
+      check(window.focused_label(w,h)==labels.front(),"Entity row never joined the ring.");
+      check(ring_key(13),"Entity row activation leaked.");
+      bool row_selected=false;
+      for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->color.g==221&&t->color.b==240&&t->value.find(labels.front())!=std::string::npos)row_selected=true;
+      check(row_selected,"Keyboard row activation did not select the entity row.");
+    }
+    check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Diagnostics keyboard ring modified world state.");
     click("CLOSE");check(!window.visible()&&!window.handle({InputEventType::LeftPressed},w,h,monitor),"Closed diagnostics captured gameplay.");
     panel.toggle();controls={};panel.render(controls,w,h,frame);point=control(controls,"EMPIRE MONITOR");
     (void)panel.handle({InputEventType::LeftPressed,point},w,h,frame);(void)panel.handle({InputEventType::LeftReleased,point},w,h,frame);
