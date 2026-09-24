@@ -229,6 +229,7 @@ void NativeNewGameWorkspace::reset_interaction() noexcept {
   hover_feedback_.reset();
   seed_focused_ = false;
   pressed_ = false;
+  focus_ = -1;
   pointer_ = {};
 }
 void NativeNewGameWorkspace::set_assessment_message(std::string message,
@@ -426,13 +427,111 @@ std::optional<std::size_t> NativeNewGameWorkspace::size_hit(
   return std::nullopt;
 }
 
+std::vector<NativeNewGameWorkspace::FocusItem>
+NativeNewGameWorkspace::configuration_focusables(
+    const NativeNewGameMeasuredLayout &measured) const {
+  std::vector<FocusItem> items;
+  if (!view_) return items;
+  const auto &layout = measured.base;
+  const auto push = [&](UiRect rect, std::uint64_t target) {
+    if (rect.width > 0 && rect.height > 0) items.push_back({rect, target});
+  };
+  push(layout.cancel, 1);
+  push(layout.morphology, 2);
+  push(layout.population, 3);
+  push(layout.mode_story, 4);
+  push(layout.mode_sandbox, 5);
+  if (view_->developer_mode) {
+    push(layout.developer_normal_research, 6);
+    push(layout.developer_special_research, 7);
+    push(layout.developer_coverage, 8);
+    push(layout.developer_exploration, 9);
+  }
+  for (std::size_t index = 0; index < measured.species_rows.size(); ++index) {
+    const auto &row = measured.species_rows[index];
+    const Point center{row.x + row.width * .5f, row.y + row.height * .5f};
+    if (layout.species_rows.contains(center)) items.push_back({row, 100 + index});
+  }
+  const auto sizes =
+      std::min(view_->size_presets.size(), layout.size_buttons.size());
+  for (std::size_t index = 0; index < sizes; ++index)
+    items.push_back({layout.size_buttons[index], 200 + index});
+  push(layout.seed_input, 10);
+  push(layout.randomize_seed, 11);
+  push(layout.restore_defaults, 12);
+  push(layout.copy_setup, 13);
+  push(layout.create, 14);
+  std::stable_sort(items.begin(), items.end(), [](const auto &a, const auto &b) {
+    return a.rect.y != b.rect.y ? a.rect.y < b.rect.y : a.rect.x < b.rect.x;
+  });
+  return items;
+}
+
+std::vector<NativeNewGameWorkspace::FocusItem>
+NativeNewGameWorkspace::galaxy_focusables(const GalaxyChoiceLayout &layout) const {
+  std::vector<FocusItem> items;
+  if (page_ == SandboxPage::GalaxyType)
+    for (std::size_t index = 0; index < layout.cards.size(); ++index)
+      items.push_back({layout.cards[index], 100 + index});
+  else
+    items.push_back({layout.population, 3});
+  items.push_back({layout.back, 1});
+  if (page_ == SandboxPage::Population || morphology_selected_)
+    items.push_back({layout.next, 2});
+  std::stable_sort(items.begin(), items.end(), [](const auto &a, const auto &b) {
+    return a.rect.y != b.rect.y ? a.rect.y < b.rect.y : a.rect.x < b.rect.x;
+  });
+  return items;
+}
+
+NativeNewGameIntent NativeNewGameWorkspace::handle_focus_key(
+    const InputEvent &event, std::span<const FocusItem> items, int width,
+    int height, const TextMeasurer &measure) {
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                          kDown = 0x40000051u, kUp = 0x40000052u;
+  constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+  const int count = static_cast<int>(items.size());
+  if (count == 0 || !event.key) return {NativeNewGameIntentKind::None, true};
+  if (event.key == kHome || event.key == kEnd) {
+    focus_ = event.key == kHome ? 0 : count - 1;
+    hover_feedback_.cue(items[static_cast<std::size_t>(focus_)].target);
+    return {NativeNewGameIntentKind::None, true};
+  }
+  const bool fwd = (event.key == kTab && !event.shift) || event.key == kRight ||
+                   event.key == kDown;
+  const bool bwd = (event.key == kTab && event.shift) || event.key == kLeft ||
+                   event.key == kUp;
+  if (fwd || bwd) {
+    if (focus_ < 0 || focus_ >= count) focus_ = bwd ? count - 1 : 0;
+    else focus_ = (focus_ + (bwd ? -1 : 1) + count) % count;
+    hover_feedback_.cue(items[static_cast<std::size_t>(focus_)].target);
+    return {NativeNewGameIntentKind::None, true};
+  }
+  if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+      focus_ < count) {
+    const auto &rect = items[static_cast<std::size_t>(focus_)].rect;
+    InputEvent press{InputEventType::LeftPressed},
+        release{InputEventType::LeftReleased};
+    press.position = release.position = {rect.x + rect.width * .5f,
+                                         rect.y + rect.height * .5f};
+    const int keep = focus_;
+    const auto page = page_;
+    auto intent = handle(press, width, height, measure);
+    static_cast<void>(handle(release, width, height, measure));
+    if (page_ == page) focus_ = keep;
+    return intent;
+  }
+  return {NativeNewGameIntentKind::None, true};
+}
+
 #include "native_galaxy_creation.inl"
 
 NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
                                                     int width, int height,
                                                     const TextMeasurer &measure) {
   if (!view_) return {};
-  if(page_!=SandboxPage::Configuration)return handle_galaxy_page(event,width,height);
+  if(page_!=SandboxPage::Configuration)return handle_galaxy_page(event,width,height,measure);
   const auto measured = measure_layout(width, height, measure);
   const auto &layout = measured.base;
   const std::array choice_bounds{layout.mode_story,layout.mode_sandbox,layout.morphology,layout.population};
@@ -491,6 +590,24 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
       return {NativeNewGameIntentKind::None, true};
     }
   }
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    if (seed_focused_) {
+      // While editing the seed the field owns key input; Tab/Return commit and
+      // leave edit mode, everything else is captured.
+      if (event.key == 9u) {
+        seed_focused_ = false;
+        seed_replace_pending_ = false;
+      } else if (event.key == 13u) {
+        seed_focused_ = false;
+        seed_replace_pending_ = false;
+        return {NativeNewGameIntentKind::None, true};
+      } else {
+        return {NativeNewGameIntentKind::None, true};
+      }
+    }
+    return handle_focus_key(event, configuration_focusables(measured), width,
+                            height, measure);
+  }
   if (event.type == InputEventType::LeftReleased) {
     pressed_ = false;
     return {NativeNewGameIntentKind::None, layout.panel.contains(event.position)};
@@ -498,6 +615,7 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
   if (event.type != InputEventType::LeftPressed)
     return {NativeNewGameIntentKind::None, layout.panel.contains(event.position)};
   pressed_ = true;
+  focus_ = -1;
   pointer_ = event.position;
   seed_focused_ = layout.seed_input.contains(event.position);
   if (seed_focused_) seed_replace_pending_ = true;
@@ -886,6 +1004,10 @@ void NativeNewGameWorkspace::render(
        layout.body_font, TextAlign::Center);
   const std::array choice_bounds{layout.mode_story,layout.mode_sandbox,layout.morphology,layout.population};
   for(const auto r:choice_bounds)text(out,{r.x+r.width-24*s,r.y+(r.height-layout.small_font)*.5f,20*s,24*s},"▼",accent,layout.small_font,TextAlign::Center);
+  const auto focus_items = configuration_focusables(measured);
+  if (focus_ >= 0 && focus_ < static_cast<int>(focus_items.size()))
+    stroke(out, focus_items[static_cast<std::size_t>(focus_)].rect,
+           {160, 210, 255, 255});
   if(dropdown_.visible())dropdown_.render(out,choice_bounds[dropdown_.id()],width,height,layout.body_font);
 }
 

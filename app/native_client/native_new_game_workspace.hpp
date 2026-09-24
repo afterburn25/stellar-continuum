@@ -7,9 +7,11 @@
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -121,6 +123,7 @@ public:
     return seed_text_;
   }
   [[nodiscard]] bool seed_focused() const noexcept { return seed_focused_; }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
   [[nodiscard]] float detail_scroll() const noexcept { return detail_scroll_; }
 
   [[nodiscard]] NativeNewGameMeasuredLayout measure_layout(
@@ -135,7 +138,7 @@ public:
                   {}) const;
 
 private:
-  NativeNewGameIntent handle_galaxy_page(const stellar::native_map::InputEvent&,int,int);
+  NativeNewGameIntent handle_galaxy_page(const stellar::native_map::InputEvent&,int,int,const TextMeasurer&);
   void render_galaxy_page(stellar::native_map::DrawList&,int,int,const PortraitProvider*,std::shared_ptr<const stellar::native_map::RgbaImage>)const;
   SandboxPage page_{SandboxPage::Configuration};
   bool morphology_selected_{};
@@ -150,6 +153,19 @@ private:
   void reconcile();
   void restore_defaults();
   void reset_interaction() noexcept;
+  // Keyboard-focus contract: ordered (y,x) focusables per page. Targets are
+  // nonzero cue ids; activation replays through the authoritative click path.
+  struct FocusItem {
+    stellar::native_map::UiRect rect;
+    std::uint64_t target;
+  };
+  [[nodiscard]] std::vector<FocusItem> configuration_focusables(
+      const NativeNewGameMeasuredLayout &) const;
+  [[nodiscard]] std::vector<FocusItem> galaxy_focusables(
+      const GalaxyChoiceLayout &) const;
+  [[nodiscard]] NativeNewGameIntent handle_focus_key(
+      const stellar::native_map::InputEvent &, std::span<const FocusItem>,
+      int, int, const TextMeasurer &);
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
   [[nodiscard]] std::string trf(std::string_view key,
@@ -166,6 +182,7 @@ private:
       selected_ancient_civilization_count_{};
   float species_scroll_{}, detail_scroll_{};
   bool seed_focused_{}, seed_replace_pending_{}, assessment_accepted_{}, pressed_{};
+  int focus_{-1};
   stellar::native_map::Point pointer_{};
   const stellar::engine::LocalizationTable *locale_{};
 };

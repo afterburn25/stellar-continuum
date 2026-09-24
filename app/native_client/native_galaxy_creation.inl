@@ -32,7 +32,7 @@ std::optional<stellar::core::GalaxyGenerationConfig> NativeNewGameWorkspace::gen
   stellar::core::GalaxyGenerationConfig c;c.base_seed=*seed;c.morphology=population_.morphology;c.requested_population=requested_population_;c.system_count=selected_system_count_;c.pre_warp_count=selected_pre_warp_civilization_count_;c.ancient_count=selected_ancient_civilization_count_;c.player_species_id=selected_species_id_;c.developer_full_coverage=developer_coverage_;
   return stellar::core::resolve_galaxy_configuration(std::move(c));
 }
-NativeNewGameIntent NativeNewGameWorkspace::handle_galaxy_page(const InputEvent& e,int width,int height){
+NativeNewGameIntent NativeNewGameWorkspace::handle_galaxy_page(const InputEvent& e,int width,int height,const TextMeasurer& measure){
   const auto l=GalaxyChoiceLayout::for_viewport(width,height);
   if(e.type==InputEventType::PointerMove)pointer_=e.position;
   if(dropdown_.visible()){
@@ -47,8 +47,10 @@ NativeNewGameIntent NativeNewGameWorkspace::handle_galaxy_page(const InputEvent&
   if(e.type==InputEventType::EscapePressed||(e.type==InputEventType::LeftPressed&&l.back.contains(e.position))){
     const bool first=page_==SandboxPage::GalaxyType;page_=SandboxPage::GalaxyType;reset_interaction();return {first?NativeNewGameIntentKind::Cancel:NativeNewGameIntentKind::None,true};
   }
+  if(e.type==InputEventType::KeyPressed&&e.key)return handle_focus_key(e,galaxy_focusables(l),width,height,measure);
   if(e.type!=InputEventType::LeftPressed)return {NativeNewGameIntentKind::None,true};
   pointer_=e.position;
+  focus_=-1;
   if(page_==SandboxPage::GalaxyType){
     for(std::size_t i=0;i<l.cards.size();++i)if(l.cards[i].contains(e.position)){population_.morphology=galaxy_card_order[i];morphology_selected_=true;return {NativeNewGameIntentKind::None,true};}
     if(l.next.contains(e.position)&&morphology_selected_){page_=SandboxPage::Population;reset_interaction();}
@@ -86,5 +88,8 @@ void NativeNewGameWorkspace::render_galaxy_page(DrawList& out,int width,int heig
   }
   native_menu_style::button(out,l.back,tr("STARTUP_BACK","BACK"),body,l.back.contains(pointer_),true,s);
   native_menu_style::button(out,l.next,tr("SETUP_NEXT","NEXT"),body,l.next.contains(pointer_),page_==SandboxPage::Population||morphology_selected_,s);
+  const auto focus_items=galaxy_focusables(l);
+  if(focus_>=0&&focus_<static_cast<int>(focus_items.size()))
+    stroke(out,focus_items[static_cast<std::size_t>(focus_)].rect,{160,210,255,255});
   if(dropdown_.visible())dropdown_.render(out,l.population,width,height,body);
 }
