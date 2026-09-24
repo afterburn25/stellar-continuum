@@ -38,7 +38,7 @@ struct View {
                              nullptr);
 
 struct RosterLayout {
-  stellar::native_map::UiRect panel, list, close, refresh;
+  stellar::native_map::UiRect panel, list, close, refresh, search;
   float scale{}, row_height{};
   [[nodiscard]] static RosterLayout for_viewport(int width,
                                                  int height) noexcept;
@@ -60,6 +60,9 @@ public:
   void discard_campaign() noexcept;
   void cancel_pending_input() noexcept { clear_press(); }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] bool wants_text_input() const noexcept {
+    return visible_ && search_focused_;
+  }
   [[nodiscard]] float scroll_offset() const noexcept { return list_.scroll_offset; }
   void set_notice(std::string value) { notice_ = std::move(value); }
   void set_localization(
@@ -81,6 +84,7 @@ private:
                                std::string_view fallback) const;
   void rebuild_table();
   void apply_display_order();
+  void apply_filter();
   // 0=colony,1=world,2=population; -1 when the point misses the headers.
   [[nodiscard]] int header_column(stellar::native_map::Point,
                                   const RosterLayout &) const noexcept;
@@ -90,7 +94,8 @@ private:
   mutable stellar::engine::VirtualizedList list_{};
   stellar::engine::TableModel table_{};
   std::vector<int> display_order_{}; // display position -> view_.rows index
-  std::string notice_;
+  std::string notice_, search_;
+  bool search_focused_{};
   std::optional<int> pressed_row_;
   PressTarget pressed_target_{PressTarget::none};
   bool pointer_owned_{};

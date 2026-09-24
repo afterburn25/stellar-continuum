@@ -219,6 +219,8 @@ RosterLayout RosterLayout::for_viewport(int width, int height) noexcept {
            28.f * s},
           {panel.x + panel.width - 166.f * s, panel.y + 12.f * s, 112.f * s,
            28.f * s},
+          {panel.x + panel.width - 500.f * s, panel.y + 12.f * s, 320.f * s,
+           28.f * s},
           s,
           std::max(58.f * s, height <= 800 ? 66.f * s : 60.f * s)};
 }
@@ -268,7 +270,13 @@ void RosterWorkspace::rebuild_table() {
           {r.population, numeric ? r.population_millions : 0., numeric}}});
   }
   table_.set_rows(std::move(rows));
+  table_.refilter(search_); // filter survives live refresh like sort does
   apply_display_order();
+}
+void RosterWorkspace::apply_filter() {
+  table_.refilter(search_);
+  apply_display_order();
+  list_.scroll_offset = 0;
 }
 void RosterWorkspace::apply_display_order() {
   display_order_.clear();
@@ -305,16 +313,21 @@ int RosterWorkspace::header_column(Point point,
 void RosterWorkspace::open() noexcept {
   visible_ = true;
   list_.scroll_offset = 0;
+  search_.clear();
+  search_focused_ = false;
+  apply_filter();
   clear_press();
 }
 void RosterWorkspace::close() noexcept {
   visible_ = false;
+  search_focused_ = false;
   clear_press();
 }
 void RosterWorkspace::discard_campaign() noexcept {
   close();
   view_ = {};
   notice_.clear();
+  search_.clear();
   list_.scroll_offset = 0;
   display_order_.clear();
 }
@@ -359,7 +372,29 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
     return {true};
   }
   if (event.type == InputEventType::EscapePressed) {
+    if (search_focused_) {
+      search_focused_ = false;
+      return {true};
+    }
     close();
+    return {true};
+  }
+  if (search_focused_ &&
+      (event.type == InputEventType::TextEntered ||
+       event.type == InputEventType::BackspacePressed)) {
+    if (event.type == InputEventType::TextEntered &&
+        search_.size() + event.text.size() <= 64) {
+      search_ += event.text;
+    } else if (event.type == InputEventType::BackspacePressed &&
+               !search_.empty()) {
+      // Drop whole UTF-8 sequences, not single bytes.
+      auto n = search_.size() - 1;
+      while (n > 0 &&
+             (static_cast<unsigned char>(search_[n]) & 0xc0) == 0x80)
+        --n;
+      search_.resize(n);
+    }
+    apply_filter();
     return {true};
   }
   if (!pointer(event.type))
@@ -416,6 +451,9 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
   }
   if (event.type == InputEventType::LeftPressed) {
     pointer_owned_ = true;
+    search_focused_ = layout.search.contains(event.position);
+    if (search_focused_)
+      return {true};
     if (layout.close.contains(event.position)) {
       pressed_target_ = PressTarget::close;
       return {true};
@@ -461,12 +499,23 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
   stellar::native_ui_style::menu_panel(out, p);
   text(out,
        {p.x + 16.f * layout.scale, p.y + 12.f * layout.scale,
-        p.width - 190.f * layout.scale, 29.f * layout.scale},
+        p.width - 520.f * layout.scale, 29.f * layout.scale},
        view_.developer_inspection
            ? tr("ROSTER_TITLE_ALL", "ALL COLONIES")
            : tr("ROSTER_TITLE_OWNED", "OWNED COLONIES"),
        std::max(15, static_cast<int>(23.f * layout.scale)),
        ink, p);
+  out.overlay.emplace_back(FilledRectangle{layout.search, {3, 13, 22, 245}});
+  out.overlay.emplace_back(StrokedRectangle{
+      layout.search,
+      search_focused_ ? cyan : Color{54, 111, 140, 255}});
+  text(out,
+       {layout.search.x + 8.f * layout.scale, layout.search.y + 5.f * layout.scale,
+        layout.search.width - 16.f * layout.scale, 20.f * layout.scale},
+       search_.empty()
+           ? tr("ROSTER_SEARCH", "Search colonies…")
+           : search_,
+       font, search_.empty() ? muted : ink, layout.search);
   stellar::native_ui_style::panel(out, layout.refresh,
                                   layout.refresh.contains(pointer_), false);
   text(out,

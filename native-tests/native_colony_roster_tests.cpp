@@ -339,6 +339,61 @@ void column_sort_orders_rows() {
   });
   require(sorted_marker, "sorted column header did not show direction");
 }
+
+void search_filters_rows() {
+  constexpr int width = 1920, height = 1080;
+  RosterWorkspace workspace;
+  workspace.set_view(build(world(40), 4));
+  workspace.open();
+  const auto layout = RosterLayout::for_viewport(width, height);
+  const auto open_row = [&](std::size_t index) {
+    const auto box = workspace.row_button(static_cast<int>(index), width, height);
+    (void)workspace.handle({InputEventType::LeftPressed, center(box)}, width,
+                           height);
+    return workspace
+        .handle({InputEventType::LeftReleased, center(box)}, width, height)
+        .open_colony_id;
+  };
+  require(!workspace.wants_text_input(), "unfocused roster requested text input");
+  (void)workspace.handle({InputEventType::LeftPressed, center(layout.search)},
+                         width, height);
+  (void)workspace.handle({InputEventType::LeftReleased, center(layout.search)},
+                         width, height);
+  require(workspace.wants_text_input(), "search field did not take text focus");
+  // "Colony 9" is a contained-needle unique to "Terra Colony 9".
+  for (const char ch : std::string_view{"Colony 9"})
+    (void)workspace.handle(
+        {InputEventType::TextEntered, {}, {}, 0.f, std::string(1, ch)}, width,
+        height);
+  require(workspace.row_button(0, width, height).height > 0 &&
+              workspace.row_button(1, width, height).height == 0,
+          "search did not narrow the roster to one row");
+  const auto opened = open_row(0);
+  require(opened && *opened == 9, "filtered row opened the wrong colony");
+  // The filter survives a live refresh, like the column sort does.
+  workspace.set_view(build(world(40), 4));
+  require(workspace.row_button(1, width, height).height == 0,
+          "live refresh dropped the active filter");
+  // Escape blurs the field instead of closing the workspace (the row
+  // click above dropped focus, so focus the field first).
+  (void)workspace.handle({InputEventType::LeftPressed, center(layout.search)},
+                         width, height);
+  (void)workspace.handle({InputEventType::LeftReleased, center(layout.search)},
+                         width, height);
+  require(workspace.wants_text_input(), "refocus did not retake text input");
+  (void)workspace.handle({InputEventType::EscapePressed}, width, height);
+  require(workspace.visible() && !workspace.wants_text_input(),
+          "escape closed the workspace instead of blurring search");
+  // Refocus and clear the needle — the full list returns.
+  (void)workspace.handle({InputEventType::LeftPressed, center(layout.search)},
+                         width, height);
+  (void)workspace.handle({InputEventType::LeftReleased, center(layout.search)},
+                         width, height);
+  for (int i = 0; i < 8; ++i)
+    (void)workspace.handle({InputEventType::BackspacePressed}, width, height);
+  require(workspace.row_button(39, width, height).height > 0,
+          "clearing the search did not restore the full roster");
+}
 } // namespace
 
 int main() {
@@ -350,6 +405,7 @@ int main() {
     live_refresh_preserves_scroll_but_invalidates_press();
     cancellation_and_compact_hover_are_bounded();
     column_sort_orders_rows();
+    search_filters_rows();
     std::cout << "native colony roster tests passed\n";
     return 0;
   } catch (const std::exception &error) {

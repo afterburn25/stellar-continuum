@@ -691,6 +691,19 @@ screen x — the first engine-side consumer of positional effects.
 the other agent's diagnostics/replay lane — the earlier
 `campaign_diagnostics`/`native_developer_diagnostics` failures resolved
 once that lane committed.
+Roster search (row-24 Table filtering UI): `RosterWorkspace` gained a
+pointer-focused search field driving `TableModel::refilter` — the
+shared model's first filtering consumer. Case-insensitive contains runs
+over all row cells; the field renders a localized placeholder +
+caret-state stroke (`ROSTER_SEARCH` in en/de catalogs), Backspace drops
+whole UTF-8 sequences, Escape blurs instead of closing, and
+`wants_text_input()` joins the client's text-routing aggregate.
+`display_order_` keeps its display-position→source-row contract so
+filtered opens hit the right colony; the filter survives live `set_view`
+refreshes exactly like the column sort does. `native_colony_roster`
+covers focus/needle narrowing/open identity/refresh persistence/
+Escape-blur/clear-restore; 3/3 roster+localization suites and the
+native client build green.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
