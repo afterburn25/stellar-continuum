@@ -238,7 +238,7 @@ void keyboard_focus_and_sliders(const fs::path& path) {
     return settings.handle(event, 1280, 720);
   };
   constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
-  constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u, kUp = 0x40000052u;
+  constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u;
   constexpr std::uint32_t kEnd = 0x4000004du;
   require(settings.focused() < 0, "voice settings opened with stale focus");
   require(press(kTab) && settings.focused() == 0, "Tab did not focus ENABLE VOICES");
