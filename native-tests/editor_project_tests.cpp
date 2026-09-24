@@ -53,6 +53,7 @@ int main() {
     project.body_edits[3].mass_earth = 0.83; // mass override
     project.body_edits[3].eccentricity = 0.21; // orbit eccentricity override
     project.body_edits[3].inclination_degrees = 97.5; // orbit inclination override
+    project.body_edits[3].satellite_orbit_km = 384400.0; // moon orbit override
     project.body_edits[9].note = "moon survey";
     project.name = "Survey Run \"Kestrel\"";
     const auto text = serialize_project(project);
@@ -147,6 +148,20 @@ int main() {
           R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"inclinationDeg":190.0}]})");
       require(!out_of_domain.body_edits.contains(3),
               "out-of-domain inclination must not serialize an override");
+    }
+    require(restored.body_edits.at(3).satellite_orbit_km &&
+                *restored.body_edits.at(3).satellite_orbit_km == 384400.0,
+            "satellite orbit override did not round-trip");
+    require(!restored.body_edits.at(9).satellite_orbit_km,
+            "unset satellite orbit override must stay unset (AUTO follows generated)");
+
+    // Satellite orbit radius is a positive distance — non-positive input
+    // must not deserialize an override.
+    {
+      const auto nonpositive = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"satelliteOrbitKm":0.0}]})");
+      require(!nonpositive.body_edits.contains(3),
+              "non-positive satellite orbit must not serialize an override");
     }
 
     // Documents without the additive bodyEdits array still parse.

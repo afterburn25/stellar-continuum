@@ -32,6 +32,8 @@ std::string serialize_project(const EditorProject &project) {
         row["inclinationDeg"] = *edit.inclination_degrees;
       if (edit.position_x) row["positionX"] = *edit.position_x;
       if (edit.position_y) row["positionY"] = *edit.position_y;
+      if (edit.satellite_orbit_km)
+        row["satelliteOrbitKm"] = *edit.satellite_orbit_km;
       rows.push_back(std::move(row));
     }
     return rows;
@@ -106,11 +108,15 @@ EditorProject parse_project(std::string_view text) {
         };
         edit.position_x = finite_number(row, "positionX");
         edit.position_y = finite_number(row, "positionY");
+        // Moon orbit radius is a positive distance in kilometres.
+        if (const auto it = row.find("satelliteOrbitKm");
+            it != row.end() && it->is_number() && it->get<double>() > 0.)
+          edit.satellite_orbit_km = it->get<double>();
         if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked ||
             edit.anomaly || edit.rare_resource || edit.pre_warp_civilization ||
             edit.radius_earth || edit.orbit_au || edit.mass_earth ||
             edit.eccentricity || edit.inclination_degrees ||
-            edit.position_x || edit.position_y)
+            edit.position_x || edit.position_y || edit.satellite_orbit_km)
           out[row.at("id").get<int>()] = std::move(edit);
       }
     };

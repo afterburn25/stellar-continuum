@@ -183,7 +183,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
 
 enum class WorkspaceView { Galaxy, System, Body };
 
-enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass, BodyEccentricity, BodyInclination, SystemPositionX, SystemPositionY };
+enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass, BodyEccentricity, BodyInclination, BodyMoonOrbit, SystemPositionX, SystemPositionY };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
@@ -252,7 +252,7 @@ struct Editor {
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
       hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{},
       hit_radius{}, hit_orbit{}, hit_mass{}, hit_eccentricity{},
-      hit_inclination{}, hit_position_x{}, hit_position_y{};
+      hit_inclination{}, hit_moon_orbit{}, hit_position_x{}, hit_position_y{};
   // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
   bool menu_open{};
   UiRect menu_rect{};
@@ -344,6 +344,28 @@ double body_effective_inclination_degrees(const Editor &ed,
       it != ed.body_edits.end() && it->second.inclination_degrees)
     return *it->second.inclination_degrees;
   return body.orbital_inclination_degrees;
+}
+// Moon orbit with the annotation-layer radius override applied: the
+// generated satellite elements stay; a set satellite_orbit_km wins for the
+// ring, the day-phased marker, picking and the camera fit.
+core::SatelliteOrbit moon_orbit(const Editor &ed,
+                                const core::PlanetaryBody &parent,
+                                const core::PlanetaryBody &moon) {
+  auto orbit = core::planetary_satellite_orbit(parent, moon);
+  if (const auto it = ed.body_edits.find(moon.id);
+      it != ed.body_edits.end() && it->second.satellite_orbit_km)
+    orbit.relative.radius = *it->second.satellite_orbit_km;
+  return orbit;
+}
+// Effective satellite orbit radius for display: the annotation wins, then
+// the generated orbit.
+double body_satellite_orbit_km(const Editor &ed,
+                               const core::PlanetaryBody &parent,
+                               const core::PlanetaryBody &moon) {
+  if (const auto it = ed.body_edits.find(moon.id);
+      it != ed.body_edits.end() && it->second.satellite_orbit_km)
+    return *it->second.satellite_orbit_km;
+  return core::planetary_satellite_orbit(parent, moon).relative.radius;
 }
 double body_radius_earth(const Editor &ed, const core::PlanetaryBody &body) {
   if (const auto it = ed.body_edits.find(body.id);
@@ -504,6 +526,7 @@ void commit_active_field(Editor &ed) {
              ed.editing == Field::BodyOrbit || ed.editing == Field::BodyMass ||
              ed.editing == Field::BodyEccentricity ||
              ed.editing == Field::BodyInclination ||
+             ed.editing == Field::BodyMoonOrbit ||
              ed.editing == Field::SystemPositionX ||
              ed.editing == Field::SystemPositionY) {
     // Numeric overrides: empty restores AUTO, otherwise a finite in-range
@@ -531,6 +554,8 @@ void commit_active_field(Editor &ed) {
         return {&edproj::SystemEdit::eccentricity, "eccentricity", 0., 0.95, true, false, true, true};
       case Field::BodyInclination:
         return {&edproj::SystemEdit::inclination_degrees, "inclination", 0., 180., true, true, true, true};
+      case Field::BodyMoonOrbit:
+        return {&edproj::SystemEdit::satellite_orbit_km, "moon orbit", 0., 0., false, false, true, true};
       case Field::SystemPositionX:
         return {&edproj::SystemEdit::position_x, "position x", 0., 0., false, false, false, false};
       case Field::SystemPositionY:
@@ -661,8 +686,21 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
   row("surface", body.environment.has_solid_surface ? "solid" : "none");
   if (body.environment.is_immersed_environment)
     row("environment", "immersed");
-  if (body.parent_body_id)
+  if (body.parent_body_id) {
     row("parent body", std::to_string(*body.parent_body_id));
+    if (const auto parent =
+            std::ranges::find_if(ed.bodies, [&](const auto &b) {
+              return b.id == *body.parent_body_id;
+            });
+        parent != ed.bodies.end()) {
+      try {
+        row("orbit", fspec("%.0f",
+                           body_satellite_orbit_km(ed, *parent, body)) +
+                         " km");
+      } catch (const std::exception &) {
+      }
+    }
+  }
   row("orbit index", std::to_string(body.orbit_index));
   row("eccentricity", fspec("%.3f", body_effective_eccentricity(ed, body)));
   row("inclination",
@@ -928,6 +966,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
     ed.hit_name = ed.hit_note = ed.hit_bookmark = {};
     ed.hit_anomaly = ed.hit_rare = ed.hit_prewarp = {};
     ed.hit_position_x = ed.hit_position_y = {};
+    ed.hit_moon_orbit = {};
     return;
   }
   const auto &sys = ed.systems[ed.selected];
@@ -1024,6 +1063,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
     y += ed.hit_mass.height + 8 * s;
     // Star-orbiting bodies only: moons ride their parent's satellite orbit.
     if (!body.parent_body_id) {
+      ed.hit_moon_orbit = {};
       out.overlay.push_back(
           Text{{x, y}, "orbit override (AU)", muted, font - 1});
       y += font + 4;
@@ -1071,9 +1111,39 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
                 "0 to 180 degrees, empty = auto...", font);
       y += ed.hit_inclination.height + 8 * s;
     } else {
+      // Moons ride their parent's satellite orbit — the stellar-orbit
+      // overrides don't apply; the satellite radius is theirs.
       ed.hit_orbit = {};
       ed.hit_eccentricity = {};
       ed.hit_inclination = {};
+      out.overlay.push_back(
+          Text{{x, y}, "moon orbit override (km)", muted, font - 1});
+      y += font + 4;
+      ed.hit_moon_orbit = {x, y, r.width - 28 * s, (font + 12) * s};
+      std::string moon_orbit_value;
+      if (ed.editing == Field::BodyMoonOrbit)
+        moon_orbit_value = ed.edit_buffer;
+      else if (stored.satellite_orbit_km)
+        moon_orbit_value = fspec("%.0f", *stored.satellite_orbit_km);
+      else {
+        if (const auto parent =
+                std::ranges::find_if(ed.bodies, [&](const auto &b) {
+                  return b.id == *body.parent_body_id;
+                });
+            parent != ed.bodies.end()) {
+          try {
+            moon_orbit_value =
+                fspec("%.0f", body_satellite_orbit_km(ed, *parent, body)) +
+                " (auto)";
+          } catch (const std::exception &) {
+            moon_orbit_value = "unknown";
+          }
+        }
+      }
+      field_box(out, ed.hit_moon_orbit, moon_orbit_value,
+                ed.editing == Field::BodyMoonOrbit,
+                "kilometres, empty = auto...", font);
+      y += ed.hit_moon_orbit.height + 8 * s;
     }
   } else {
     ed.hit_radius = {};
@@ -1081,6 +1151,7 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
     ed.hit_mass = {};
     ed.hit_eccentricity = {};
     ed.hit_inclination = {};
+    ed.hit_moon_orbit = {};
     // Galactic map position: system-level overrides move the star marker,
     // click picking, camera fit and the inspector row — every consumer reads
     // the effective axis.
@@ -1777,7 +1848,7 @@ void fit_body_camera(Editor &ed) {
   for (const auto mi : moon_indices(ed, ed.focus_body))
     try {
       const auto orbit =
-          core::planetary_satellite_orbit(body, ed.bodies[mi]);
+          moon_orbit(ed, body, ed.bodies[mi]);
       extent = std::max(extent,
                         orbit.relative.radius * (1.0 + orbit.relative.eccentricity) * 1.05);
     } catch (const std::exception &) {
@@ -1813,7 +1884,7 @@ void render_body_view(DrawList &out, Editor &ed, float s) {
   for (const auto mi : moons)
     try {
       orbit_ring_mapped(out,
-                        core::planetary_satellite_orbit(body, ed.bodies[mi])
+                        moon_orbit(ed, body, ed.bodies[mi])
                             .relative,
                         0, 0, {60, 100, 122, 120}, to_screen);
     } catch (const std::exception &) {
@@ -1842,7 +1913,7 @@ void render_body_view(DrawList &out, Editor &ed, float s) {
   for (const auto mi : moons) {
     const auto &moon = ed.bodies[mi];
     try {
-      const auto orbit = core::planetary_satellite_orbit(body, moon);
+      const auto orbit = moon_orbit(ed, body, moon);
       const auto rel =
           core::satellite_relative_position(orbit, ed.system_days);
       const auto p = to_screen(rel[0], rel[1]);
@@ -2332,6 +2403,17 @@ int main(int argc, char **argv) {
                       : std::string{};
               window.set_text_input(true);
             }
+          } else if (ed.hit_moon_orbit.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyMoonOrbit;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.satellite_orbit_km
+                      ? fspec("%.0f", *it->second.satellite_orbit_km)
+                      : std::string{};
+              window.set_text_input(true);
+            }
           } else if (ed.hit_position_x.contains(event.position) ||
                      ed.hit_position_y.contains(event.position)) {
             if (const auto target = annotation_target(ed);
@@ -2416,7 +2498,7 @@ int main(int argc, char **argv) {
               for (const auto mi : moon_indices(ed, ed.focus_body))
                 try {
                   const auto rel = core::satellite_relative_position(
-                      core::planetary_satellite_orbit(parent,
+                      moon_orbit(ed, parent,
                                                       ed.bodies[mi]),
                       ed.system_days);
                   const auto p = body_to_screen(ed, rel[0], rel[1]);

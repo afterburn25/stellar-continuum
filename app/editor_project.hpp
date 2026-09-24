@@ -49,6 +49,11 @@ struct SystemEdit {
   // value is legal — the galaxy is centered on the origin so negatives are
   // normal coordinates.
   std::optional<double> position_x, position_y;
+  // Satellite orbit radius override in kilometres (moon edits only): unset
+  // follows the generated SatelliteOrbit.relative.radius; a set value wins
+  // for the parent's moon ring, the marker position, click picking and the
+  // body-view camera fit.
+  std::optional<double> satellite_orbit_km;
 };
 
 struct EditorProject {
