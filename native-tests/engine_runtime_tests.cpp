@@ -359,6 +359,36 @@ int main() {
           "the faller rests on the tile top (128 - 32)");
   }
 
+  // The host steps VfxSystem in sim time — a spawned emitter produces
+  // particles deterministically.
+  {
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    VfxInstanceId instance = invalid_vfx_instance;
+    std::size_t particles = 0, particles_late = 0;
+    host.on_update = [&](World &, float) {
+      ++updates;
+      if (updates == 1) {
+        EmitterDefinition def;
+        def.id = "test-emitter";
+        def.spawn_rate_per_second = 120.f;
+        def.particle_lifetime_seconds = 1.0f;
+        host.vfx().define(std::move(def));
+        instance = host.spawn_emitter("test-emitter", 300.f, 300.f);
+      }
+      if (updates == 3)
+        particles = host.vfx().particles(instance).size();
+      if (updates == 4)
+        particles_late = host.vfx().particles(instance).size();
+    };
+    check(host.run() == 0, "vfx run exits cleanly");
+    check(instance != invalid_vfx_instance,
+          "spawn_emitter returns a live instance");
+    check(host.vfx().alive(instance), "the emitter stays alive");
+    check(particles > 0 && particles_late > particles,
+          "particles accumulate in sim time");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
