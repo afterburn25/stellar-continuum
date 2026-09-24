@@ -69,6 +69,8 @@ class NativeVoiceSettings final {
   // Normalized range of the ringed slider — null for non-slider controls.
   [[nodiscard]] std::optional<stellar::engine::AnnouncementRange>
   focused_range() const;
+  // Semantic role of the ringed control for platform control typing.
+  [[nodiscard]] stellar::engine::AnnouncementControl focused_control() const;
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
   void cancel();

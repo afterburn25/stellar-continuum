@@ -346,6 +346,15 @@ NativeVoiceSettings::focused_range() const {
   default: return std::nullopt;
   }
 }
+stellar::engine::AnnouncementControl NativeVoiceSettings::focused_control() const {
+  using stellar::engine::AnnouncementControl;
+  switch (focus_) {
+  case 1: case 4: case 6: return AnnouncementControl::Slider;
+  case 0: case 2: case 5: case 8: case 9: return AnnouncementControl::CheckBox;
+  case 10: case 11: case 12: case 13: case 14: return AnnouncementControl::Button;
+  default: return AnnouncementControl::Custom;
+  }
+}
 void NativeVoiceSettings::activate_at(const VoiceSettingsLayout& layout, stellar::native_map::Point position) {
   if (layout.volume_track.contains(position)) {
     dragging_ = Dragged::Volume; set_from_track(dragging_, position, layout); return;

@@ -1139,7 +1139,15 @@ Slider announcements additionally carry `AnnouncementRange`
 via `GetPatternProvider` (the raw-provider pattern entry point — not
 QueryInterface), so Narrator-class AT reports slider position in range;
 `SetValue` fails honestly since adjustment stays on the key/pointer
-contract. Audio and voice settings populate it.
+contract. Audio and voice settings populate it. Focus announcements also
+carry `AnnouncementControl` (Button/CheckBox/Edit/Slider/Group/Custom) —
+the fragment reports the matching UIA ControlType, with a valid range
+implying Slider for unclassified announcements. Audio/voice settings
+classify via `focused_control()`; the pause-menu ring and HUD chrome
+announce as Button. Remaining surfaces default to Custom until they
+classify their focusables. Note: client-side the fragment resolves with
+the host HWND runtime id `{42, hwnd}`, not our appended `{3, 1}` — the
+bridge test walks raw children matching that shape.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

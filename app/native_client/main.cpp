@@ -6041,7 +6041,7 @@ class NativeCampaign final {
       if(voice_settings_&&voice_settings_->visible()){
         const int focus_before=voice_settings_->focused();
         (void)voice_settings_->handle(event,width,height);
-        if(voice_settings_->focused()!=focus_before)announcer_.announce_focus(voice_settings_->focused_label(),announcement_bounds(voice_settings_->focused_bounds(width,height)),voice_settings_->focused_range());
+        if(voice_settings_->focused()!=focus_before)announcer_.announce_focus(voice_settings_->focused_label(),announcement_bounds(voice_settings_->focused_bounds(width,height)),voice_settings_->focused_range(),voice_settings_->focused_control());
         gesture_.capture_for_ui();continue;
       }
       if(settings_hub_){
@@ -6072,7 +6072,7 @@ class NativeCampaign final {
         notification_view_.close();chronicle_view_.close();
         const int focus_before=audio_settings_->focused();
         (void)audio_settings_->handle(event,width,height);
-        if(audio_settings_->focused()!=focus_before)announcer_.announce_focus(audio_settings_->focused_label(),announcement_bounds(audio_settings_->focused_bounds(width,height)),audio_settings_->focused_range());
+        if(audio_settings_->focused()!=focus_before)announcer_.announce_focus(audio_settings_->focused_label(),announcement_bounds(audio_settings_->focused_bounds(width,height)),audio_settings_->focused_range(),audio_settings_->focused_control());
         gesture_.capture_for_ui();
         continue;
       }
@@ -6152,7 +6152,7 @@ class NativeCampaign final {
               }
               else return false;
               menu_hover_feedback_.cue(static_cast<std::uint64_t>(hud_items[static_cast<std::size_t>(hud_focus_)].second));
-              announcer_.announce_focus(hud_action_label(hud_items[static_cast<std::size_t>(hud_focus_)].second),announcement_bounds(hud_items[static_cast<std::size_t>(hud_focus_)].first));
+              announcer_.announce_focus(hud_action_label(hud_items[static_cast<std::size_t>(hud_focus_)].second),announcement_bounds(hud_items[static_cast<std::size_t>(hud_focus_)].first),std::nullopt,stellar::engine::AnnouncementControl::Button);
               return true;
             };
             if(activate){
@@ -7232,6 +7232,7 @@ class NativeCampaign final {
     if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);
     if(notifications_available())chronicle_view_.render(out,width,height);
     stellar::native_audio::render_voice_caption(out,presentation_audio_,width,height,text_measurer_,
+        general_settings_?general_settings_->saved().effective():stellar::engine::AccessibilitySettings{},
         voice_playback_?&*voice_playback_:nullptr,announcement_caption());
     if(audio_settings_)audio_settings_->render(out,width,height);
     if(general_settings_)general_settings_->render(out,width,height);
@@ -8110,7 +8111,7 @@ class NativeCampaign final {
       default:return {};
     }
   }
-  void announce_menu_focus(int width,int height){if(menu_focus_>=0&&menu_focus_<menu_action_count){const auto layout=NativeUiLayout::for_viewport(width,height);const std::array<UiRect,7> rects{layout.continue_button,layout.save_button,layout.load_button,layout.settings_button,layout.support_button,layout.new_game_button,layout.exit_button};announcer_.announce_focus(menu_action_label(menu_actions_[menu_focus_]),announcement_bounds(rects[static_cast<std::size_t>(menu_focus_)]));}}
+  void announce_menu_focus(int width,int height){if(menu_focus_>=0&&menu_focus_<menu_action_count){const auto layout=NativeUiLayout::for_viewport(width,height);const std::array<UiRect,7> rects{layout.continue_button,layout.save_button,layout.load_button,layout.settings_button,layout.support_button,layout.new_game_button,layout.exit_button};announcer_.announce_focus(menu_action_label(menu_actions_[menu_focus_]),announcement_bounds(rects[static_cast<std::size_t>(menu_focus_)]),std::nullopt,stellar::engine::AnnouncementControl::Button);}}
   std::string hud_action_label(UiAction action)const{
     switch(action){
       case UiAction::Notifications:return tr("NAV_EVENTS","Events");
@@ -8138,7 +8139,7 @@ class NativeCampaign final {
       if(accessibility_bridge_){
         if(item->kind==stellar::engine::AnnouncementKind::Focus)
           accessibility_bridge_->focus_changed(item->text, item->bounds,
-                                               item->range);
+                                               item->range, item->control);
         else
           accessibility_bridge_->announce(item->text);
       }
@@ -8861,11 +8862,15 @@ int main(int argc,char **argv){
     window.set_screenshot_directory(general_settings.saved().screenshot_directory);
     stellar::native_map::NativeUiLayout::set_user_scale(
       stellar::native_general::interface_scale_multiplier(general_settings.saved().interface_scale));
+    stellar::native_map::NativeUiLayout::set_text_scale(
+      general_settings.saved().effective().text_scale);
     general_settings.set_text_measurer([&](const Text& text){return window.measure_text(text);});
     general_settings.set_apply([&](const auto& value){
       window.set_screenshot_directory(value.screenshot_directory);
       stellar::native_map::NativeUiLayout::set_user_scale(
         stellar::native_general::interface_scale_multiplier(value.interface_scale));
+      stellar::native_map::NativeUiLayout::set_text_scale(
+        value.effective().text_scale);
       if(value.locale!=locale_table.locale()){
         locale_table=stellar::engine::LocalizationTable{value.locale,"en"};
         load_locale(locale_table,value.locale);load_locale(locale_table,"en");
@@ -8946,7 +8951,7 @@ int main(int argc,char **argv){
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
       config.developer_access=&developer_access;config.locale=&locale_table;
-      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){if(item->kind==stellar::engine::AnnouncementKind::Focus)accessibility_bridge.focus_changed(item->text,item->bounds,item->range);else accessibility_bridge.announce(item->text);if(!item->text.empty())startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
+      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){if(item->kind==stellar::engine::AnnouncementKind::Focus)accessibility_bridge.focus_changed(item->text,item->bounds,item->range,item->control);else accessibility_bridge.announce(item->text);if(!item->text.empty())startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},general_settings.saved().effective(),nullptr,ui);};return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
     StartupEntryEvidence startup_evidence,restart_evidence;

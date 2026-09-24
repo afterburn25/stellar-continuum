@@ -198,7 +198,9 @@ int main() {
   announcer.announce("arrived");
   announcer.announce_focus("focused control",
                            stellar::engine::AnnouncementBounds{4.f, 8.f, 16.f,
-                                                               24.f});
+                                                               24.f},
+                           std::nullopt,
+                           stellar::engine::AnnouncementControl::Button);
   const auto status_item = announcer.take();
   const auto focus_item = announcer.take();
   check(status_item && status_item->kind == AnnouncementKind::Status &&
@@ -207,6 +209,10 @@ int main() {
   check(focus_item->bounds && focus_item->bounds->x == 4.f &&
             focus_item->bounds->width == 16.f && !status_item->bounds,
         "focus announcement did not retain its control bounds");
+  check(focus_item->control == stellar::engine::AnnouncementControl::Button &&
+            status_item->control ==
+                stellar::engine::AnnouncementControl::Custom,
+        "focus announcement did not retain its control kind");
   check(!announcer.take().has_value(), "announcer did not drain fully");
 
   if (failures == 0)

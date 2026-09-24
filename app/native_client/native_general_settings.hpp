@@ -62,6 +62,7 @@ struct GeneralSettingsLayout final {
   stellar::native_map::UiRect browse, defaults, cancel, save;
   stellar::native_map::UiRect nebula,eruptions;
   stellar::native_map::UiRect motion,iscale,flashing,contrast,colorblind,language;
+  stellar::native_map::UiRect subtitles,subtitle_scale,text_scale;
   [[nodiscard]] static GeneralSettingsLayout for_viewport(int width,int height) noexcept;
 };
 class NativeGeneralSettings final {

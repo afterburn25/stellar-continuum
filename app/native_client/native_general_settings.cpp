@@ -33,6 +33,17 @@ void button(DrawList& draw,UiRect rect,std::string text,int size,bool primary=fa
   draw.overlay.emplace_back(Text{{rect.x+rect.width*.5f,rect.y+(rect.height-static_cast<float>(size))*.5f},
     std::move(text),disabled?Color{123,147,162,255}:text_color,size,rect.width,rect,TextAlign::Center,FontFace::Interface});
 }
+// Text/subtitle scale presets cycle within the engine accessibility clamp
+// (0.75..2.0); a stored value off the grid snaps to the nearest preset.
+constexpr std::array<float,5> text_scale_presets{.75f,1.f,1.25f,1.5f,2.f};
+float next_text_scale(float current)noexcept{
+  const auto at=std::min_element(text_scale_presets.begin(),text_scale_presets.end(),
+    [&](float a,float b){return std::abs(a-current)<std::abs(b-current);});
+  return text_scale_presets[(static_cast<std::size_t>(at-text_scale_presets.begin())+1)%text_scale_presets.size()];
+}
+std::string scale_percent(float scale){
+  return std::to_string(static_cast<int>(std::lround(scale*100.f)))+"%";
+}
 }
 GeneralSettingsLayout GeneralSettingsLayout::for_viewport(int width,int height) noexcept {
   const float w=static_cast<float>(std::max(width,1)),h=static_cast<float>(std::max(height,1));
@@ -40,9 +51,10 @@ GeneralSettingsLayout GeneralSettingsLayout::for_viewport(int width,int height) 
   const UiRect panel{(w-680.f*s)*.5f,(h-500.f*s)*.5f,680.f*s,500.f*s};
   const auto r=[&](float x,float y,float rw,float rh){return UiRect{panel.x+x*s,panel.y+y*s,rw*s,rh*s};};
   return {s,std::max(12,static_cast<int>(std::lround(17*s))),std::max(16,static_cast<int>(std::lround(26*s))),panel,
-    r(30,65,150,32),r(192,65,150,32),r(30,286,620,67),r(30,355,620,48),
+    r(30,65,150,32),r(192,65,150,32),r(30,310,620,66),r(30,380,620,40),
     r(30,424,146,40),r(188,424,146,40),r(346,424,146,40),r(504,424,146,40),r(358,65,292,32),r(30,111,620,32),
-    r(30,153,199,32),r(240,153,199,32),r(450,153,200,32),r(30,195,199,32),r(240,195,199,32),r(450,195,200,32)};
+    r(30,153,199,32),r(240,153,199,32),r(450,153,200,32),r(30,195,199,32),r(240,195,199,32),r(450,195,200,32),
+    r(30,233,199,30),r(240,233,199,30),r(450,233,200,30)};
 }
 NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(std::move(path)) {
   try {
@@ -57,7 +69,7 @@ NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(s
     const auto json=nlohmann::json::parse(std::string(bytes.data(),static_cast<std::size_t>(input.gcount())),
       [&](int depth,nlohmann::json::parse_event_t event,nlohmann::json& value){
         if(depth==1&&event==nlohmann::json::parse_event_t::key){auto key=value.get<std::string>();if(std::find(keys.begin(),keys.end(),key)!=keys.end())duplicate=true;keys.push_back(std::move(key));}return true;});
-    if(duplicate||!json.is_object()||(json.size()!=2&&json.size()<4||json.size()>12)||!json.contains("schemaVersion")||!json.at("schemaVersion").is_number_integer()||
+    if(duplicate||!json.is_object()||(json.size()!=2&&json.size()<4||json.size()>15)||!json.contains("schemaVersion")||!json.at("schemaVersion").is_number_integer()||
        json.at("schemaVersion")!=1||!json.contains("screenshotDirectory")||!json.at("screenshotDirectory").is_string())throw std::runtime_error("unsupported settings schema");
     const auto encoded=json.at("screenshotDirectory").get<std::string>();
     const auto value=std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(encoded.data()),encoded.size()));
@@ -71,6 +83,9 @@ NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(s
     if(json.contains("reduceFlashing")){if(!json.at("reduceFlashing").is_boolean())throw std::runtime_error("Invalid reduced flashing flag");saved_.accessibility.reduce_flashing=json.at("reduceFlashing").get<bool>();}
     if(json.contains("highContrast")){if(!json.at("highContrast").is_boolean())throw std::runtime_error("Invalid high contrast flag");saved_.accessibility.high_contrast=json.at("highContrast").get<bool>();}
     if(json.contains("colorBlind")){if(!json.at("colorBlind").is_number_integer())throw std::runtime_error("Invalid color-blind mode");const auto mode=json.at("colorBlind").get<int>();if(mode<0||mode>3)throw std::runtime_error("Invalid color-blind mode");saved_.accessibility.color_blind=static_cast<stellar::engine::ColorBlindMode>(mode);}
+    if(json.contains("subtitlesEnabled")){if(!json.at("subtitlesEnabled").is_boolean())throw std::runtime_error("Invalid subtitles flag");saved_.accessibility.subtitles_enabled=json.at("subtitlesEnabled").get<bool>();}
+    if(json.contains("subtitleScale")){if(!json.at("subtitleScale").is_number())throw std::runtime_error("Invalid subtitle scale");const auto scale=json.at("subtitleScale").get<float>();if(scale<0.75f||scale>2.f)throw std::runtime_error("Invalid subtitle scale");saved_.accessibility.subtitle_scale=scale;}
+    if(json.contains("textScale")){if(!json.at("textScale").is_number())throw std::runtime_error("Invalid text scale");const auto scale=json.at("textScale").get<float>();if(scale<0.75f||scale>2.f)throw std::runtime_error("Invalid text scale");saved_.accessibility.text_scale=scale;}
     if(json.contains("locale")){if(!json.at("locale").is_string())throw std::runtime_error("Invalid locale id");const auto id=json.at("locale").get<std::string>();if(id.empty()||id.size()>16||id.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-")!=std::string::npos)throw std::runtime_error("Invalid locale id");saved_.locale=id;}
   } catch(const std::exception& error) {
     error_="Saved screenshot folder unavailable. The default location is active.";
@@ -85,7 +100,7 @@ bool NativeGeneralSettings::save(GeneralPreferences value) {
   if(value.nebula_density<0||value.nebula_density>2){error_="Choose Low, Medium or High nebula density.";return false;}
   if(!valid_directory(value.screenshot_directory)){error_="Choose an existing absolute folder.";return false;}
   try {
-    const auto text=nlohmann::json{{"schemaVersion",1},{"screenshotDirectory",utf8(value.screenshot_directory)},{"assetCategoriesCollapsed",value.asset_categories_collapsed},{"assetsHidden",value.assets_hidden},{"nebulaDensity",value.nebula_density},{"eruptionQuality",value.eruption_quality},{"reduceMotion",value.accessibility.reduce_motion},{"interfaceScale",value.interface_scale},{"reduceFlashing",value.accessibility.reduce_flashing},{"highContrast",value.accessibility.high_contrast},{"colorBlind",static_cast<int>(value.accessibility.color_blind)},{"locale",value.locale}}.dump();
+    const auto text=nlohmann::json{{"schemaVersion",1},{"screenshotDirectory",utf8(value.screenshot_directory)},{"assetCategoriesCollapsed",value.asset_categories_collapsed},{"assetsHidden",value.assets_hidden},{"nebulaDensity",value.nebula_density},{"eruptionQuality",value.eruption_quality},{"reduceMotion",value.accessibility.reduce_motion},{"interfaceScale",value.interface_scale},{"reduceFlashing",value.accessibility.reduce_flashing},{"highContrast",value.accessibility.high_contrast},{"colorBlind",static_cast<int>(value.accessibility.color_blind)},{"subtitlesEnabled",value.accessibility.subtitles_enabled},{"subtitleScale",value.accessibility.subtitle_scale},{"textScale",value.accessibility.text_scale},{"locale",value.locale}}.dump();
     if(text.size()>maximum_bytes)throw std::runtime_error("settings are oversized");
     stellar::engine::write_file_atomically(path_,std::span{reinterpret_cast<const std::byte*>(text.data()),text.size()});
   } catch(const std::exception& error) {
@@ -160,7 +175,7 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
   const auto layout=GeneralSettingsLayout::for_viewport(width,height);
   // Focusable order is the hover-target order; while a folder browser is
   // pending only Cancel is reachable.
-  const std::array<UiRect,14> focusables{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.motion,layout.iscale,layout.flashing,layout.contrast,layout.colorblind,layout.language,layout.browse,layout.defaults,layout.cancel,layout.save};
+  const std::array<UiRect,17> focusables{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.motion,layout.iscale,layout.flashing,layout.contrast,layout.colorblind,layout.language,layout.subtitles,layout.subtitle_scale,layout.text_scale,layout.browse,layout.defaults,layout.cancel,layout.save};
   hover_feedback_.update(event,stellar::native_menu_audio::hit(event.position,browsing()?std::span<const UiRect>{&layout.cancel,1}:std::span<const UiRect>{focusables}));
   if(event.type==InputEventType::Wheel&&layout.folder.contains(event.position)&&measure_){
     const auto text=path_text(layout);
@@ -206,6 +221,9 @@ void NativeGeneralSettings::activate_at(const GeneralSettingsLayout& layout,stel
     const auto at=std::find(locales_.begin(),locales_.end(),draft_.locale);
     const auto index=at==locales_.end()?std::size_t{0}:(static_cast<std::size_t>(at-locales_.begin())+1)%locales_.size();
     draft_.locale=locales_.at(index);return;}
+  if(layout.subtitles.contains(position)){draft_.accessibility.subtitles_enabled=!draft_.accessibility.subtitles_enabled;return;}
+  if(layout.subtitle_scale.contains(position)){draft_.accessibility.subtitle_scale=next_text_scale(draft_.accessibility.subtitle_scale);return;}
+  if(layout.text_scale.contains(position)){draft_.accessibility.text_scale=next_text_scale(draft_.accessibility.text_scale);return;}
   if(layout.audio.contains(position)&&audio_){cancel();audio_();}
   else if(layout.video.contains(position)&&video_){cancel();video_();}
   else if(layout.browse.contains(position)) {
@@ -242,10 +260,13 @@ std::string NativeGeneralSettings::focused_label()const{
   case 7:return trf("SETTINGS_HIGH_CONTRAST",{on_off(draft_.accessibility.high_contrast)},"High contrast: {0}");
   case 8:return trf("SETTINGS_COLOR_BLIND",{colorblind_names.at(static_cast<std::size_t>(draft_.accessibility.color_blind))},"Color-blind mode: {0}");
   case 9:return trf("SETTINGS_LANGUAGE",{locale_name(draft_.locale)},"Language: {0}");
-  case 10:return tr("SETTINGS_BROWSE","Browse");
-  case 11:return tr("SETTINGS_USE_DEFAULT","Use default");
-  case 12:return tr("SETTINGS_CANCEL","Cancel");
-  case 13:return tr("SETTINGS_SAVE","Save");
+  case 10:return trf("SETTINGS_SUBTITLES",{on_off(draft_.accessibility.subtitles_enabled)},"Subtitles: {0}");
+  case 11:return trf("SETTINGS_SUBTITLE_SCALE",{scale_percent(draft_.accessibility.subtitle_scale)},"Subtitle size: {0}");
+  case 12:return trf("SETTINGS_TEXT_SCALE",{scale_percent(draft_.accessibility.text_scale)},"Text size: {0}");
+  case 13:return tr("SETTINGS_BROWSE","Browse");
+  case 14:return tr("SETTINGS_USE_DEFAULT","Use default");
+  case 15:return tr("SETTINGS_CANCEL","Cancel");
+  case 16:return tr("SETTINGS_SAVE","Save");
   default:return{};
   }
 }
@@ -253,7 +274,7 @@ std::optional<UiRect> NativeGeneralSettings::focused_bounds(int width,int height
   if(focus_<0)return std::nullopt;
   const auto layout=GeneralSettingsLayout::for_viewport(width,height);
   if(browsing())return layout.cancel;
-  const std::array<UiRect,14> focusables{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.motion,layout.iscale,layout.flashing,layout.contrast,layout.colorblind,layout.language,layout.browse,layout.defaults,layout.cancel,layout.save};
+  const std::array<UiRect,17> focusables{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.motion,layout.iscale,layout.flashing,layout.contrast,layout.colorblind,layout.language,layout.subtitles,layout.subtitle_scale,layout.text_scale,layout.browse,layout.defaults,layout.cancel,layout.save};
   return focus_<static_cast<int>(focusables.size())?std::optional<UiRect>{focusables[static_cast<std::size_t>(focus_)]}:std::nullopt;
 }
 void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
@@ -280,8 +301,11 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   // Native-language names for shipped locale ids; unknown ids display raw.
   const auto locale_name=[&](std::string_view id){if(id=="en")return std::string("English");if(id=="de")return std::string("Deutsch");return std::string(id);};
   button(draw,l.language,trf("SETTINGS_LANGUAGE",{locale_name(draft_.locale)},"Language: {0}"),l.font_pixels,false,browsing());
-  label(draw,{l.folder.x,l.panel.y+231*s,l.folder.width,26*s},tr("SETTINGS_SCREENSHOT_FOLDER","SCREENSHOT FOLDER"),l.font_pixels);
-  label(draw,{l.folder.x,l.panel.y+259*s,l.folder.width,25*s},tr("SETTINGS_SCREENSHOT_HINT","Press F12 to save a PNG of the game."),l.font_pixels);
+  button(draw,l.subtitles,trf("SETTINGS_SUBTITLES",{tr(draft_.accessibility.subtitles_enabled?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.subtitles_enabled?"On":"Off")},"Subtitles: {0}"),l.font_pixels,false,browsing());
+  button(draw,l.subtitle_scale,trf("SETTINGS_SUBTITLE_SCALE",{scale_percent(draft_.accessibility.subtitle_scale)},"Subtitle size: {0}"),l.font_pixels,false,browsing());
+  button(draw,l.text_scale,trf("SETTINGS_TEXT_SCALE",{scale_percent(draft_.accessibility.text_scale)},"Text size: {0}"),l.font_pixels,false,browsing());
+  label(draw,{l.folder.x,l.panel.y+266*s,l.folder.width,20*s},tr("SETTINGS_SCREENSHOT_FOLDER","SCREENSHOT FOLDER"),l.font_pixels);
+  label(draw,{l.folder.x,l.panel.y+288*s,l.folder.width,18*s},tr("SETTINGS_SCREENSHOT_HINT","Press F12 to save a PNG of the game."),l.font_pixels);
   draw.overlay.emplace_back(FilledRectangle{l.folder,{5,16,30,255}});draw.overlay.emplace_back(StrokedRectangle{l.folder,{65,111,143,255}});
   auto path=path_text(l);
   const auto maximum=measure_?std::max(0.f,static_cast<float>(measure_(path).height)-path.clip->height):0.f;
@@ -292,8 +316,8 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   button(draw,l.defaults,tr("SETTINGS_USE_DEFAULT","USE DEFAULT"),l.font_pixels,false,browsing());button(draw,l.cancel,tr("SETTINGS_CANCEL","CANCEL"),l.font_pixels);
   button(draw,l.save,tr("SETTINGS_SAVE","SAVE"),l.font_pixels,true,browsing());
   if(focus_>=0){
-    const std::array<UiRect,14> focusables{l.audio,l.video,l.nebula,l.eruptions,l.motion,l.iscale,l.flashing,l.contrast,l.colorblind,l.language,l.browse,l.defaults,l.cancel,l.save};
-    const auto& rect=browsing()?l.cancel:focusables[static_cast<std::size_t>(std::min(focus_,13))];
+    const std::array<UiRect,17> focusables{l.audio,l.video,l.nebula,l.eruptions,l.motion,l.iscale,l.flashing,l.contrast,l.colorblind,l.language,l.subtitles,l.subtitle_scale,l.text_scale,l.browse,l.defaults,l.cancel,l.save};
+    const auto& rect=browsing()?l.cancel:focusables[static_cast<std::size_t>(std::min(focus_,16))];
     draw.overlay.emplace_back(StrokedRectangle{rect,{160,210,255,255}});
   }
   nebula_dropdown_.render(draw,l.nebula,width,height,l.font_pixels);

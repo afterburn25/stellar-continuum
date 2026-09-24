@@ -90,6 +90,15 @@ struct NativeUiLayout {
   }
   [[nodiscard]] static float user_scale() noexcept { return user_scale_factor; }
 
+  // Accessibility text multiplier (AccessibilitySettings::text_scale) —
+  // enlarges the shared font metrics without growing chrome geometry, so
+  // larger text does not shrink the world viewport.
+  static inline float text_scale_factor = 1.f;
+  static void set_text_scale(float factor) noexcept {
+    text_scale_factor = std::clamp(factor, .75f, 2.f);
+  }
+  [[nodiscard]] static float text_scale() noexcept { return text_scale_factor; }
+
   [[nodiscard]] static NativeUiLayout for_viewport(int width,
                                                     int height) noexcept {
     const auto screen_width = static_cast<float>(width);
@@ -118,11 +127,12 @@ struct NativeUiLayout {
         std::max(12.f, (screen_height - 2.f * inset - 60.f * scale - 13.f * rail_gap) / 14.f));
     const auto rail_y = inset + 60.f * scale;
 
+    const auto text = text_scale_factor;
     auto result = NativeUiLayout{
         scale,
-        static_cast<int>(std::lround(17.f * scale)),
-        static_cast<int>(std::lround(15.f * scale)),
-        static_cast<int>(std::lround(22.f * scale)),
+        static_cast<int>(std::lround(17.f * scale * text)),
+        static_cast<int>(std::lround(15.f * scale * text)),
+        static_cast<int>(std::lround(22.f * scale * text)),
         {inset, inset, 76.f * scale, 32.f * scale},
         {inset + 86.f * scale, inset, 104.f * scale, 32.f * scale},
         {inset, rail_y, rail_size, rail_size},

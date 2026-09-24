@@ -192,10 +192,35 @@ void verify_navigation_blockers() {
     require(!blocked, "A menu or modal exposed navigation underneath it.");
 }
 
+void verify_text_scale() {
+  const auto baseline = NativeUiLayout::for_viewport(1920, 1080);
+  NativeUiLayout::set_text_scale(1.5f);
+  const auto scaled = NativeUiLayout::for_viewport(1920, 1080);
+  require(scaled.scale == baseline.scale &&
+              scaled.pause.x == baseline.pause.x &&
+              scaled.menu_panel.width == baseline.menu_panel.width,
+          "Text scale changed layout geometry.");
+  require(scaled.control_font_pixels ==
+                  std::lround(17.f * baseline.scale * 1.5f) &&
+              scaled.metric_font_pixels ==
+                  std::lround(15.f * baseline.scale * 1.5f) &&
+              scaled.heading_font_pixels ==
+                  std::lround(22.f * baseline.scale * 1.5f),
+          "Text scale did not enlarge the shared font metrics.");
+  NativeUiLayout::set_text_scale(0.5f);
+  require(NativeUiLayout::text_scale() == .75f,
+          "Text scale did not clamp below the accessibility range.");
+  NativeUiLayout::set_text_scale(9.f);
+  require(NativeUiLayout::text_scale() == 2.f,
+          "Text scale did not clamp above the accessibility range.");
+  NativeUiLayout::set_text_scale(1.f);
+}
+
 } // namespace
 
 int main() try {
   verify_navigation_blockers();
+  verify_text_scale();
   verify(640, 360, 324.f/430.f);
   verify(1280, 720, 1.f);
   verify(1920, 1080, 1.f);

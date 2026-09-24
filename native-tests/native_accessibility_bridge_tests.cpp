@@ -99,36 +99,50 @@ int main() try {
   // UIA splices the host HWND's native children (title bar, etc.) into a
   // hostable provider — walk the raw children until the focus fragment shows
   // up with its appended runtime id.
-  IUIAutomationElement* child{};
-  require(SUCCEEDED(walker->GetFirstChildElement(element, &child)),
-          "raw child walk failed");
-  IUIAutomationElement* fragment{};
-  for (IUIAutomationElement* cursor = child; cursor;) {
-    CONTROLTYPEID ct{};
-    (void)cursor->get_CurrentControlType(&ct);
-    SAFEARRAY* rid{};
-    (void)cursor->GetRuntimeId(&rid);
-    long length = 0;
-    if (rid) {
-      long lb = 0, ub = -1;
-      SafeArrayGetLBound(rid, 1, &lb);
-      SafeArrayGetUBound(rid, 1, &ub);
-      length = ub - lb + 1;
-      SafeArrayDestroy(rid);
+  // The synthetic fragment resolves client-side with the host HWND runtime
+  // id ({42, hwnd}) — distinguishing it from the host's spliced native
+  // children regardless of the control type the focus announcement set.
+  const auto find_fragment = [&](IUIAutomationElement* root)
+      -> IUIAutomationElement* {
+    IUIAutomationElement* first{};
+    if (FAILED(walker->GetFirstChildElement(root, &first))) return nullptr;
+    IUIAutomationElement* found{};
+    for (IUIAutomationElement* cursor = first; cursor;) {
+      SAFEARRAY* rid{};
+      (void)cursor->GetRuntimeId(&rid);
+      bool match = false;
+      if (rid) {
+        long lb = 0, ub = -1;
+        SafeArrayGetLBound(rid, 1, &lb);
+        SafeArrayGetUBound(rid, 1, &ub);
+        int* data{};
+        if (SUCCEEDED(SafeArrayAccessData(
+                rid, reinterpret_cast<void**>(&data)))) {
+          // UIA substitutes the host HWND runtime id ({42, hwnd}) for our
+          // fragment client-side; spliced native children carry longer rids.
+          match = ub - lb + 1 == 2 &&
+                  data[1] ==
+                      static_cast<int>(
+                          reinterpret_cast<std::intptr_t>(host.hwnd));
+          SafeArrayUnaccessData(rid);
+        }
+        SafeArrayDestroy(rid);
+      }
+      if (match) {
+        found = cursor;
+        break;
+      }
+      IUIAutomationElement* next{};
+      (void)walker->GetNextSiblingElement(cursor, &next);
+      cursor->Release();
+      cursor = next;
     }
-    if (ct == UIA_CustomControlTypeId && length == 2) {
-      fragment = cursor;
-      break;
-    }
-    IUIAutomationElement* next{};
-    (void)walker->GetNextSiblingElement(cursor, &next);
-    cursor->Release();
-    cursor = next;
-  }
-  if (child && child != fragment) child->Release();
-  require(fragment != nullptr,
+    if (first && first != found) first->Release();
+    return found;
+  };
+  IUIAutomationElement* child = find_fragment(element);
+  require(child != nullptr,
           "focus fragment was not exposed among the root's children");
-  child = fragment;
   BSTR child_name{};
   const HRESULT name_hr = child->get_CurrentName(&child_name);
   if (!(SUCCEEDED(name_hr) && child_name &&
@@ -139,10 +153,12 @@ int main() try {
     throw std::runtime_error("focus fragment did not carry the focused label");
   }
   SysFreeString(child_name);
+  // The range-bearing announcement resolves to a real Slider control type —
+  // a valid range implies the slider role even unclassified.
   CONTROLTYPEID child_type{};
   require(SUCCEEDED(child->get_CurrentControlType(&child_type)) &&
-              child_type == UIA_CustomControlTypeId,
-          "focus fragment reported the wrong control type");
+              child_type == UIA_SliderControlTypeId,
+          "focus fragment did not report the slider control type");
   BOOL has_focus = FALSE;
   require(SUCCEEDED(child->get_CurrentHasKeyboardFocus(&has_focus)) &&
               has_focus == TRUE,
@@ -179,6 +195,25 @@ int main() try {
               read_only == TRUE,
           "range pattern did not report the slider's value/read-only flag");
   range_pattern->Release();
+  child->Release();
+  // An explicit control kind maps to the matching UIA control type, and
+  // dropping the range retires the pattern rather than leaving it stale.
+  (void)bridge.focus_changed(
+      "Save", stellar::engine::AnnouncementBounds{8.f, 9.f, 40.f, 16.f},
+      std::nullopt, stellar::engine::AnnouncementControl::Button);
+  IUIAutomationElement* button_fragment = find_fragment(element);
+  require(button_fragment != nullptr,
+          "focus fragment was not exposed for the button announcement");
+  require(SUCCEEDED(button_fragment->get_CurrentControlType(&child_type)) &&
+              child_type == UIA_ButtonControlTypeId,
+          "focus fragment did not report the button control type");
+  IUIAutomationRangeValuePattern* stale_range{};
+  require(SUCCEEDED(button_fragment->GetCurrentPattern(
+              UIA_RangeValuePatternId,
+              reinterpret_cast<IUnknown**>(&stale_range))) &&
+              stale_range == nullptr,
+          "focus fragment kept the range pattern on a non-slider control");
+  child = button_fragment;
   IUIAutomationElement* parent{};
   require(SUCCEEDED(walker->GetParentElement(child, &parent)) && parent,
           "focus fragment did not navigate to its root parent");
@@ -188,40 +223,16 @@ int main() try {
   (void)bridge.focus_changed("");
   // UIA may cache properties per resolved element — re-walk for a fresh
   // fragment instance and check the live flag there.
-  IUIAutomationElement* released_child{};
-  require(SUCCEEDED(walker->GetFirstChildElement(element, &released_child)),
-          "raw child walk failed after release");
-  IUIAutomationElement* released_fragment{};
-  for (IUIAutomationElement* cursor = released_child; cursor;) {
-    CONTROLTYPEID ct{};
-    (void)cursor->get_CurrentControlType(&ct);
-    SAFEARRAY* rid{};
-    (void)cursor->GetRuntimeId(&rid);
-    long length = 0;
-    if (rid) {
-      long lb = 0, ub = -1;
-      SafeArrayGetLBound(rid, 1, &lb);
-      SafeArrayGetUBound(rid, 1, &ub);
-      length = ub - lb + 1;
-      SafeArrayDestroy(rid);
-    }
-    if (ct == UIA_CustomControlTypeId && length == 2) {
-      released_fragment = cursor;
-      break;
-    }
-    IUIAutomationElement* next{};
-    (void)walker->GetNextSiblingElement(cursor, &next);
-    cursor->Release();
-    cursor = next;
-  }
-  if (released_child && released_child != released_fragment)
-    released_child->Release();
+  IUIAutomationElement* released_fragment = find_fragment(element);
   require(released_fragment != nullptr,
           "focus fragment disappeared after release");
   require(SUCCEEDED(
               released_fragment->get_CurrentHasKeyboardFocus(&has_focus)) &&
               has_focus == FALSE,
           "focus fragment still claimed keyboard focus after release");
+  require(SUCCEEDED(released_fragment->get_CurrentControlType(&child_type)) &&
+              child_type == UIA_CustomControlTypeId,
+          "focus fragment kept the button control type after release");
   released_fragment->Release();
   child->Release();
   walker->Release();

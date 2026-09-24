@@ -68,7 +68,7 @@ void empty_default_and_unicode_round_trip(const TempDirectory& temp) {
   require(json.find("\"schemaVersion\":1") != std::string::npos,
           "schema version was not persisted");
   require(reloaded.saved().nebula_density==1,"Nebula preference did not default to Medium");
-  auto navigator=reloaded.saved();navigator.asset_categories_collapsed={true,false,true,false,true};navigator.assets_hidden=true;navigator.nebula_density=2;navigator.accessibility.reduce_motion=true;
+  auto navigator=reloaded.saved();navigator.asset_categories_collapsed={true,false,true,false,true};navigator.assets_hidden=true;navigator.nebula_density=2;navigator.accessibility.reduce_motion=true;navigator.accessibility.subtitles_enabled=false;navigator.accessibility.subtitle_scale=1.5f;navigator.accessibility.text_scale=0.75f;
   require(reloaded.save(navigator),"Navigator preferences failed to save");
   NativeGeneralSettings navigator_reload(file);
   require(navigator_reload.saved()==navigator,"Category collapse/hide preferences did not round-trip with screenshot path");
@@ -199,8 +199,17 @@ void layouts_fit_and_keep_controls_separate() {
     };
     for (const auto rect : {layout.panel, layout.audio, layout.video, layout.folder,
                             layout.status, layout.browse, layout.defaults,
-                            layout.cancel, layout.save, layout.motion})
+                            layout.cancel, layout.save, layout.motion,
+                            layout.subtitles, layout.subtitle_scale,
+                            layout.text_scale})
       require(inside(rect), "General Settings layout escaped the viewport");
+    require(!overlaps(layout.subtitles, layout.folder) &&
+                !overlaps(layout.subtitle_scale, layout.folder) &&
+                !overlaps(layout.text_scale, layout.folder) &&
+                !overlaps(layout.subtitles, layout.language) &&
+                !overlaps(layout.subtitle_scale, layout.subtitles) &&
+                !overlaps(layout.text_scale, layout.subtitle_scale),
+            "subtitle/text scale rows overlap another General Settings region");
     require(!overlaps(layout.audio, layout.video), "audio and video navigation overlap");
     require(!overlaps(layout.folder, layout.status), "folder path and status areas overlap");
     require(!overlaps(layout.motion, layout.nebula) && !overlaps(layout.motion, layout.eruptions) &&
@@ -392,9 +401,34 @@ void keyboard_focus_traversal(const TempDirectory& temp) {
               std::string("Reduced motion (decorative animation): ") +
                   (!motion ? "On" : "Off"),
           "focused_label did not track the toggled state");
-  // Focus wraps past SAVE (index 13) back onto AUDIO.
-  for (int i = 0; i < 9; ++i) (void)press(kTab);
-  require(settings.focused() == 13 && settings.focused_label() == "Save",
+  // The subtitle/text rows announce their accessibility state and cycle
+  // their presets through the same dispatch.
+  for (int i = 0; i < 6; ++i) (void)press(kTab);
+  require(settings.focused() == 10 && settings.focused_label() ==
+              std::string("Subtitles: ") +
+                  (settings.draft().accessibility.subtitles_enabled ? "On" : "Off"),
+          "Tab chain did not reach SUBTITLES with its state");
+  require(press(kSpace) &&
+              settings.draft().accessibility.subtitles_enabled ==
+                  !settings.saved().accessibility.subtitles_enabled,
+          "Space did not toggle subtitles");
+  require(press(kTab) && settings.focused() == 11 &&
+              settings.focused_label() == "Subtitle size: 100%",
+          "Tab did not reach SUBTITLE SIZE at its default");
+  require(press(kSpace) && settings.draft().accessibility.subtitle_scale ==
+                                   1.25f &&
+              settings.focused_label() == "Subtitle size: 125%",
+          "Space did not cycle the subtitle scale preset");
+  require(press(kTab) && settings.focused() == 12 &&
+              settings.focused_label() == "Text size: 100%",
+          "Tab did not reach TEXT SIZE at its default");
+  require(press(kSpace) && settings.draft().accessibility.text_scale ==
+                                   1.25f &&
+              settings.focused_label() == "Text size: 125%",
+          "Space did not cycle the text scale preset");
+  // Focus wraps past SAVE (index 16) back onto AUDIO.
+  for (int i = 0; i < 4; ++i) (void)press(kTab);
+  require(settings.focused() == 16 && settings.focused_label() == "Save",
           "Tab chain did not reach SAVE");
   require(press(kTab) && settings.focused() == 0,
           "focus did not wrap to the first control");
@@ -408,8 +442,8 @@ void keyboard_focus_traversal(const TempDirectory& temp) {
   require(press(kReturn) && settings.visible() && settings.focused() < 0,
           "activation ran without focus");
   // A pending folder browser narrows the ring to Cancel.
-  for (int i = 0; i < 11; ++i) (void)press(kTab);
-  require(settings.focused() == 10, "Tab chain did not reach BROWSE");
+  for (int i = 0; i < 14; ++i) (void)press(kTab);
+  require(settings.focused() == 13, "Tab chain did not reach BROWSE");
   require(press(kReturn) && settings.browsing(),
           "Return on focused BROWSE did not open the picker");
   require(press(kTab) && settings.focused() == 0,

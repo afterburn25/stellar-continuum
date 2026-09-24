@@ -77,12 +77,26 @@ struct AnnouncementRange {
   double minimum{}, maximum{1.}, value{};
 };
 
+// Semantic role of the control a Focus announcement names — platform
+// bridges map it to the OS control type (UIA ControlType, AT-SPI role) so
+// AT announces "button" rather than a generic custom control. Custom is
+// the honest fallback for composite or unclassified widgets.
+enum class AnnouncementControl {
+  Custom,
+  Button,
+  CheckBox,
+  Edit,
+  Slider,
+  Group,
+};
+
 struct AccessibilityAnnouncement {
   std::string text;
   AnnouncementPriority priority{AnnouncementPriority::Polite};
   AnnouncementKind kind{AnnouncementKind::Status};
   std::optional<AnnouncementBounds> bounds;
   std::optional<AnnouncementRange> range;
+  AnnouncementControl control{AnnouncementControl::Custom};
   std::uint64_t sequence{};
 };
 
@@ -94,13 +108,15 @@ public:
   void announce(std::string text,
                 AnnouncementPriority priority = AnnouncementPriority::Polite);
   // A focused-control label — routed as a focus change by platform bridges.
-  // bounds carries the control's pixel rect when the surface can project it.
+  // bounds carries the control's pixel rect when the surface can project it;
+  // control names the widget's semantic role for platform control typing.
   void announce_focus(std::string text,
                       std::optional<AnnouncementBounds> bounds = std::nullopt,
                       std::optional<AnnouncementRange> range = std::nullopt,
+                      AnnouncementControl control = AnnouncementControl::Custom,
                       AnnouncementPriority priority = AnnouncementPriority::Polite) {
     announce(std::move(text), priority, AnnouncementKind::Focus,
-             std::move(bounds), std::move(range));
+             std::move(bounds), std::move(range), control);
   }
   // Oldest pending announcement, or nullopt when drained.
   [[nodiscard]] std::optional<AccessibilityAnnouncement> take();
@@ -114,7 +130,8 @@ private:
   void announce(std::string text, AnnouncementPriority priority,
                 AnnouncementKind kind,
                 std::optional<AnnouncementBounds> bounds,
-                std::optional<AnnouncementRange> range);
+                std::optional<AnnouncementRange> range,
+                AnnouncementControl control);
   std::deque<AccessibilityAnnouncement> pending_;
   std::size_t capacity_;
   std::uint64_t sequence_{};

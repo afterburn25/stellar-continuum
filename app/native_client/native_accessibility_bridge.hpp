@@ -32,11 +32,15 @@ class NativeAccessibilityBridge final {
   bool announce(std::string_view text);
   // Raises a UIA focus-changed event carrying the label on a synthetic
   // fragment so assistive clients see real focus tracking. Bounds (client
-  // pixels) project the control's real rect onto the fragment. Same gates.
+  // pixels) project the control's real rect onto the fragment; control maps
+  // to the UIA control type so AT announces "button"/"slider" rather than a
+  // generic custom control. Same gates.
   bool focus_changed(
       std::string_view label,
       std::optional<stellar::engine::AnnouncementBounds> bounds = std::nullopt,
-      std::optional<stellar::engine::AnnouncementRange> range = std::nullopt);
+      std::optional<stellar::engine::AnnouncementRange> range = std::nullopt,
+      stellar::engine::AnnouncementControl control =
+          stellar::engine::AnnouncementControl::Custom);
   // Subclassed window-procedure sink installed while attached — platform
   // plumbing for the WM_GETOBJECT answer, not a general event API.
   std::intptr_t handle_window_message(std::uintptr_t hwnd, unsigned message,

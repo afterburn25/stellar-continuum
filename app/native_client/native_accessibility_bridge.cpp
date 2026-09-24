@@ -105,6 +105,19 @@ class ProviderBase : public IRawElementProviderSimple {
 // geometry, so the bounding rectangle reports the window itself.
 struct FragmentRange { double minimum{}, maximum{1.}, value{}; };
 
+long uia_control_type(
+    stellar::engine::AnnouncementControl control) noexcept {
+  using stellar::engine::AnnouncementControl;
+  switch (control) {
+  case AnnouncementControl::Button: return UIA_ButtonControlTypeId;
+  case AnnouncementControl::CheckBox: return UIA_CheckBoxControlTypeId;
+  case AnnouncementControl::Edit: return UIA_EditControlTypeId;
+  case AnnouncementControl::Slider: return UIA_SliderControlTypeId;
+  case AnnouncementControl::Group: return UIA_GroupControlTypeId;
+  default: return UIA_CustomControlTypeId;
+  }
+}
+
 class FocusFragment final : public ProviderBase,
                             public IRangeValueProvider,
                             public IRawElementProviderFragment {
@@ -113,13 +126,18 @@ class FocusFragment final : public ProviderBase,
       : root_(root), host_(host) {}
 
   void set_label(std::wstring label, std::optional<RECT> rect,
-                 std::optional<FragmentRange> range) {
+                 std::optional<FragmentRange> range, long control_type) {
     label_ = std::move(label);
     rect_ = rect;
     range_ = range;
+    control_type_ = control_type;
     focused_ = true;
   }
-  void clear_focus() noexcept { focused_ = false; range_.reset(); }
+  void clear_focus() noexcept {
+    focused_ = false;
+    range_.reset();
+    control_type_ = UIA_CustomControlTypeId;
+  }
 
   // IUnknown is implemented once here so both interface bases resolve to the
   // same counter.
@@ -203,7 +221,7 @@ class FocusFragment final : public ProviderBase,
                                        static_cast<UINT>(label_.size()));
     } else if (id == UIA_ControlTypePropertyId) {
       out->vt = VT_I4;
-      out->lVal = UIA_CustomControlTypeId;
+      out->lVal = control_type_;
     } else if (id == UIA_HasKeyboardFocusPropertyId) {
       out->vt = VT_BOOL;
       out->boolVal = focused_ ? VARIANT_TRUE : VARIANT_FALSE;
@@ -268,6 +286,7 @@ class FocusFragment final : public ProviderBase,
   std::wstring label_;
   std::optional<RECT> rect_;
   std::optional<FragmentRange> range_;
+  long control_type_{UIA_CustomControlTypeId};
   bool focused_{};
 };
 
@@ -283,8 +302,9 @@ class WindowProvider final : public ProviderBase,
 
   FocusFragment *focus_fragment() noexcept { return focus_; }
   void set_focus_label(std::wstring label, std::optional<RECT> rect,
-                       std::optional<FragmentRange> range) {
-    focus_->set_label(std::move(label), std::move(rect), std::move(range));
+                       std::optional<FragmentRange> range, long control_type) {
+    focus_->set_label(std::move(label), std::move(rect), std::move(range),
+                      control_type);
     focused_ = true;
   }
   // The ring released — the fragment stops claiming focus and GetFocus
@@ -510,7 +530,8 @@ bool NativeAccessibilityBridge::announce(std::string_view text) {
 bool NativeAccessibilityBridge::focus_changed(
     std::string_view label,
     std::optional<stellar::engine::AnnouncementBounds> bounds,
-    std::optional<stellar::engine::AnnouncementRange> range) {
+    std::optional<stellar::engine::AnnouncementRange> range,
+    stellar::engine::AnnouncementControl control) {
   auto *provider = static_cast<WindowProvider *>(provider_);
   if (!provider) return false;
   std::wstring name = wide(label);
@@ -540,9 +561,15 @@ bool NativeAccessibilityBridge::focus_changed(
       std::isfinite(range->value) && range->maximum > range->minimum)
     fragment_range =
         FragmentRange{range->minimum, range->maximum, range->value};
+  // A valid range means the control is a slider even when the surface left
+  // the semantic kind unclassified.
+  if (fragment_range &&
+      control == stellar::engine::AnnouncementControl::Custom)
+    control = stellar::engine::AnnouncementControl::Slider;
   // The fragment reflects real focus state regardless of listeners; only the
   // event raise is gated on an assistive client being attached.
-  provider->set_focus_label(std::move(name), rect, fragment_range);
+  provider->set_focus_label(std::move(name), rect, fragment_range,
+                            uia_control_type(control));
   if (!UiaClientsAreListening()) return false;
   return SUCCEEDED(UiaRaiseAutomationEvent(
       static_cast<IRawElementProviderSimple *>(provider->focus_fragment()),
@@ -573,7 +600,8 @@ void NativeAccessibilityBridge::detach() {}
 bool NativeAccessibilityBridge::announce(std::string_view) { return false; }
 bool NativeAccessibilityBridge::focus_changed(
     std::string_view, std::optional<stellar::engine::AnnouncementBounds>,
-    std::optional<stellar::engine::AnnouncementRange>) {
+    std::optional<stellar::engine::AnnouncementRange>,
+    stellar::engine::AnnouncementControl) {
   return false;
 }
 std::intptr_t NativeAccessibilityBridge::handle_window_message(std::uintptr_t,

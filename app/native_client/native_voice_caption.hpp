@@ -1,6 +1,7 @@
 #pragma once
 #include "native_audio_director.hpp"
 #include "native_voice_playback.hpp"
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <algorithm>
 #include <cmath>
@@ -10,10 +11,11 @@ namespace stellar::native_audio {
 template<class Measure>
 void render_voice_caption(stellar::native_map::DrawList& out, NativeAudioDirector* audio,
                           int width,int height,Measure measure,
+                          const stellar::engine::AccessibilitySettings& accessibility={},
                           const stellar::native_voice::NativeVoicePlayback* playback=nullptr,
                           std::optional<VoiceCaption> ui_announcement=std::nullopt) {
   using namespace stellar::native_map;
-  if(!audio)return;
+  if(!audio||!accessibility.subtitles_enabled)return;
   std::optional<VoiceCaption> current;
   if(playback&&playback->has_active_subtitle())
     current=VoiceCaption{playback->active_speaker_name(),playback->active_subtitle(),
@@ -23,7 +25,7 @@ void render_voice_caption(stellar::native_map::DrawList& out, NativeAudioDirecto
   if(!current)return;
   const auto preferences=audio->voice_preferences();
   const float scale=std::clamp(height/1080.f,.8f,2.5f);
-  const int pixels=std::max(12,static_cast<int>(std::lround(preferences.subtitle_size*scale)));
+  const int pixels=std::max(12,static_cast<int>(std::lround(preferences.subtitle_size*scale*accessibility.subtitle_scale)));
   const float content_width=std::min(900.f*scale,width-80.f*scale);
   const auto value=(preferences.speaker_labels&&!current->speaker.empty()?current->speaker+"\n":"")+current->text;
   const auto measured=measure(Text{{0,0},value,{239,248,255,255},pixels,content_width});

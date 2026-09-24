@@ -286,6 +286,15 @@ NativeAudioSettings::focused_range() const {
   default: return std::nullopt;
   }
 }
+stellar::engine::AnnouncementControl NativeAudioSettings::focused_control() const {
+  using stellar::engine::AnnouncementControl;
+  switch (focus_) {
+  case 0: case 1: case 2: return AnnouncementControl::Slider;
+  case 3: return AnnouncementControl::CheckBox;
+  default: return focus_ >= 4 ? AnnouncementControl::Button
+                              : AnnouncementControl::Custom;
+  }
+}
 std::string NativeAudioSettings::tr(std::string_view key, std::string_view fallback) const {
   if (locale_ && locale_->contains(key)) return std::string(locale_->translate(key));
   return std::string(fallback);
