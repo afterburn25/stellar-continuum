@@ -558,6 +558,26 @@ re-verified at 106/106 green after a proper rebuild); and the in-flight
 `native_voice_settings_tests.cpp` fails /WX on an unused `kUp` local in
 another lane, which stops the default `all` build — targeted test-target
 builds work.
+A 319-test run at `57ab71dc` records 317/319 green after the workspace
+keyboard-focus lane completed: every remaining native surface adopted the
+focus contract — settlement (choice rows), logistics (refresh/close),
+colony freight-review modal, economy (refresh/close/industry priorities),
+shipyard (search edit-mode precedence, sort/filter dropdowns, dynamic
+design and queue-order cards, quantity/favorite/build controls,
+cancel-confirmation narrowing), construction (clipped project and
+status-order rows, two-stage PrepareCancel/Cancel), research (domain
+tabs, every render-registered interface hit, guided/tree cards, inspector
+action), fleet (outliner rows, release-gated military-order and Locate
+controls activated through a matched press+release pair, recovery rail
+with the disabled queued-return excluded, engage, preview confirm), and
+battle (chrome + two-column order grid; field formation selection stays
+pointer-spatial by design and the targeted pick state remains
+Escape-cancellable). The two failures (`native_developer_diagnostics`,
+`campaign_diagnostics`) are inside the other agent's actively-edited
+diagnostics lane — both binaries were built from their unstaged
+`inspect_diplomacy_invariants` mid-flight changes, not committed code;
+every accessibility suite passes. Remaining accessibility gaps:
+screen-reader contracts and per-surface text scaling.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
