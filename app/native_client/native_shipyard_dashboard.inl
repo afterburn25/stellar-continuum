@@ -58,30 +58,45 @@ std::optional<UiRect> NativeShipyardWorkspace::design_bounds(std::string_view id
 }
 std::vector<NativeShipyardWorkspace::FocusItem> NativeShipyardWorkspace::focusables(const ShipyardWorkspaceLayout& l)const{
   std::vector<FocusItem> items;const float s=l.scale;
-  const auto push=[&](UiRect r,std::uint64_t t){if(r.width>0&&r.height>0)items.push_back({r,t});};
-  push(l.close,1);
-  for(int i=0;i<static_cast<int>(ship_categories.size());++i)push({l.categories.x,l.categories.y+i*54*s,l.categories.width,48*s},10+i);
-  push(l.search,20);push(l.sort,21);push(l.filter,22);
+  const auto push=[&](UiRect r,std::uint64_t t,std::string label){if(r.width>0&&r.height>0)items.push_back({r,t,std::move(label)});};
+  push(l.close,1,tr("SHIPYARD_CLOSE","Close shipyard"));
+  for(int i=0;i<static_cast<int>(ship_categories.size());++i)push({l.categories.x,l.categories.y+i*54*s,l.categories.width,48*s},10+i,tr(ship_category_keys[i],ship_categories[i]));
+  push(l.search,20,tr("SHIPYARD_SEARCH","Search ships"));
+  push(l.sort,21,trf("SHIPYARD_SORT_LABEL",{tr(ship_sort_keys[sort_],ship_sorts[sort_])},"Sort: {0}"));
+  push(l.filter,22,trf("SHIPYARD_FILTER_LABEL",{tr(ship_filter_keys[filter_],ship_filters[filter_])},"Filter: {0}"));
   const auto designs=filtered_designs();
-  for(std::size_t i=0;i<designs.size();++i){const auto r=card(i,l);if(l.designs.contains({r.x+r.width*.5f,r.y+r.height*.5f}))push(r,100+i);}
+  for(std::size_t i=0;i<designs.size();++i){const auto r=card(i,l);if(l.designs.contains({r.x+r.width*.5f,r.y+r.height*.5f}))push(r,100+i,designs[i]->name);}
   if(view_){
     const UiRect clip{l.orders.x,l.orders.y+30*s,l.orders.width,l.orders.height-30*s};
     const UiRect queue{l.orders.x+5*s,l.orders.y+30*s,l.orders.width-10*s,l.orders.height-35*s};
     for(std::size_t i=0;i<view_->orders.size();++i){const auto&o=view_->orders[i];
       const UiRect r{clip.x,clip.y-order_scroll_.scroll_offset+i*64*s,clip.width,60*s};
       const auto hit=intersection(r,clip);if(!hit)continue;
-      push(*hit,200+i*10);
+      push(*hit,200+i*10,o.design_name);
       const float bx=r.x+r.width-110*s;
       if(queue.contains({bx,r.y+12*s})&&queue.contains({bx+102*s,r.y+42*s})){
-        if(!o.active){push({bx,r.y+12*s,30*s,30*s},200+i*10+1);push({bx+36*s,r.y+12*s,30*s,30*s},200+i*10+2);}
-        if(o.can_cancel)push({bx+72*s,r.y+12*s,30*s,30*s},200+i*10+3);
+        if(!o.active){push({bx,r.y+12*s,30*s,30*s},200+i*10+1,trf("SHIPYARD_ORDER_UP",{o.design_name},"Move {0} earlier"));push({bx+36*s,r.y+12*s,30*s,30*s},200+i*10+2,trf("SHIPYARD_ORDER_DOWN",{o.design_name},"Move {0} later"));}
+        if(o.can_cancel)push({bx+72*s,r.y+12*s,30*s,30*s},200+i*10+3,trf("SHIPYARD_ORDER_CANCEL",{o.design_name},"Cancel {0}"));
       }
     }
   }
-  if(selected_design()){push(l.minus,30);push(l.plus,31);push(l.favorite,32);}
-  if(selected_design()||selected_order())push(l.action,33);
+  if(const auto* d=selected_design()){
+    push(l.minus,30,tr("SHIPYARD_QTY_DOWN","Decrease quantity"));
+    push(l.plus,31,tr("SHIPYARD_QTY_UP","Increase quantity"));
+    push(l.favorite,32,has_ship(favorites_,d->id)?tr("SHIPYARD_UNFAVORITE","Remove from favorites"):tr("SHIPYARD_FAVORITE","Add to favorites"));
+  }
+  if(const auto* o=selected_order())push(l.action,33,cancel_confirmation_id_==o->order_id?tr("SHIPYARD_CONFIRM_REFUND","Confirm cancel and refund"):tr("SHIPYARD_CANCEL_ORDER","Cancel order"));
+  else if(const auto* d=selected_design()){
+    const bool enabled=batch_blocker().empty();
+    push(l.action,33,enabled?(d->will_queue?tr("SHIPYARD_QUEUE_BUILD","Queue build"):tr("SHIPYARD_START_BUILD","Start build")):tr("SHIPYARD_BUILD_UNAVAILABLE","Build unavailable"));
+  }
   std::stable_sort(items.begin(),items.end(),[](const auto&a,const auto&b){return a.rect.y!=b.rect.y?a.rect.y<b.rect.y:a.rect.x<b.rect.x;});
   return items;
+}
+std::string NativeShipyardWorkspace::focused_label(const ShipyardWorkspaceLayout& l)const{
+  if(focus_<0)return {};
+  const auto items=focusables(l);
+  return focus_<static_cast<int>(items.size())?items[static_cast<std::size_t>(focus_)].label:std::string{};
 }
 std::string NativeShipyardWorkspace::batch_blocker()const{
   const auto* d=selected_design();if(!d)return tr("SHIPYARD_SELECT_DESIGN","Select a ship design.");

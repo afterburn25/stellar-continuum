@@ -125,6 +125,10 @@ public:
   }
   [[nodiscard]] bool seed_focused() const noexcept { return seed_focused_; }
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height,
+                                          const TextMeasurer &) const;
   [[nodiscard]] float detail_scroll() const noexcept {
     return detail_scroll_.scroll_offset;
   }

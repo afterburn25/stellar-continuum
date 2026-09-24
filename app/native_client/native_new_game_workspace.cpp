@@ -1007,4 +1007,91 @@ void NativeNewGameWorkspace::render(
   if(dropdown_.visible())dropdown_.render(out,choice_bounds[dropdown_.id()],width,height,layout.body_font);
 }
 
+std::string NativeNewGameWorkspace::focused_label(
+    int width, int height, const TextMeasurer &measure) const {
+  if (focus_ < 0) return {};
+  const auto label_for = [&](std::uint64_t target) -> std::string {
+    if (target >= 200) {
+      const auto index = static_cast<std::size_t>(target - 200);
+      return view_ && index < view_->size_presets.size()
+                 ? view_->size_presets[index].label
+                 : std::string{};
+    }
+    if (target >= 100) {
+      const auto index = static_cast<std::size_t>(target - 100);
+      if (page_ == SandboxPage::GalaxyType)
+        return index < galaxy_card_names.size()
+                   ? tr(galaxy_card_name_keys[index], galaxy_card_names[index])
+                   : std::string{};
+      return view_ && index < view_->species.size()
+                 ? view_->species[index].display_name
+                 : std::string{};
+    }
+    const auto count_label = [&](const auto &choices, int count) {
+      const auto found =
+          std::ranges::find(choices, count, &NativeCivilizationCountOption::count);
+      return found == choices.end() ? tr("SETUP_UNAVAILABLE", "Unavailable")
+                                    : found->label;
+    };
+    switch (target) {
+    case 1:
+      return tr("STARTUP_BACK", "Back");
+    case 2:
+      return page_ == SandboxPage::GalaxyType
+                 ? trf("SETUP_SHAPE",
+                       {population_.morphology ==
+                                stellar::core::GalaxyMorphology::BarredSpiral
+                            ? std::string("Barred Spiral")
+                            : std::string(stellar::core::morphology_name(
+                                  population_.morphology))},
+                       "Shape: {0}")
+                 : tr("SETUP_NEXT", "Next");
+    case 3:
+      return trf("SETUP_POPULATION",
+                 {std::string(stellar::core::population_selection_label(
+                     requested_population_))},
+                 "Population: {0}");
+    case 4:
+      return view_ ? trf("SETUP_RIVALS_LABEL",
+                         {count_label(view_->pre_warp_civilization_presets,
+                                      selected_pre_warp_civilization_count_)},
+                         "Rival empires: {0}")
+                   : tr("SETUP_RIVAL_EMPIRES", "Rival empires");
+    case 5:
+      return view_ ? trf("SETUP_ANCIENTS_LABEL",
+                         {count_label(view_->ancient_civilization_presets,
+                                      selected_ancient_civilization_count_)},
+                         "Ancient empires: {0}")
+                   : tr("SETUP_ANCIENT_EMPIRES", "Ancient empires");
+    case 6:
+      return tr("SETUP_DEV_NORMAL_RESEARCH", "All normal research completed");
+    case 7:
+      return tr("SETUP_DEV_SPECIAL_RESEARCH", "Include special research");
+    case 8:
+      return tr("SETUP_DEV_COVERAGE", "Full celestial coverage");
+    case 9:
+      return tr("SETUP_DEV_EXPLORATION", "Entire galaxy explored and surveyed");
+    case 10:
+      return tr("SETUP_SEED_LABEL", "Galaxy seed");
+    case 11:
+      return tr("SETUP_RANDOMIZE", "Randomize");
+    case 12:
+      return tr("SETUP_RESTORE_DEFAULTS", "Restore defaults");
+    case 13:
+      return tr("SETUP_COPY", "Copy setup");
+    case 14:
+      return tr("SETUP_CREATE", "Create campaign");
+    default:
+      return {};
+    }
+  };
+  const auto items =
+      page_ == SandboxPage::Configuration
+          ? configuration_focusables(measure_layout(width, height, measure))
+          : galaxy_focusables(GalaxyChoiceLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(items.size())
+             ? label_for(items[static_cast<std::size_t>(focus_)].target)
+             : std::string{};
+}
+
 } // namespace stellar::native_setup_ui

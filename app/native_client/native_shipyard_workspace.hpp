@@ -54,6 +54,10 @@ public:
   void bind_preferences(std::filesystem::path);
   [[nodiscard]] bool wants_text_input()const{return visible_&&search_focused_;}
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string
+  focused_label(const ShipyardWorkspaceLayout &) const;
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
   [[nodiscard]] bool confirmation_open() const noexcept {
@@ -98,6 +102,7 @@ private:
   struct FocusItem {
     stellar::native_map::UiRect rect;
     std::uint64_t target;
+    std::string label;
   };
   [[nodiscard]] std::vector<FocusItem> focusables(
       const ShipyardWorkspaceLayout &) const;

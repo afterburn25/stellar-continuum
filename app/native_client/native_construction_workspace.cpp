@@ -332,10 +332,11 @@ void NativeConstructionWorkspace::rebuild_status_order() {
       status_order_.push_back(index);
 }
 
-std::vector<UiRect> NativeConstructionWorkspace::focusables(
+std::vector<NativeConstructionWorkspace::FocusRect>
+NativeConstructionWorkspace::focusables(
     const ConstructionWorkspaceLayout &layout) const {
-  std::vector<UiRect> out;
-  out.push_back(layout.close);
+  std::vector<FocusRect> out;
+  out.push_back({layout.close, tr("CONSTRUCTION_CLOSE", "Close construction")});
   const UiRect project_rows{layout.projects.x,
                             layout.projects.y + 27.f * layout.scale,
                             layout.projects.width,
@@ -355,7 +356,7 @@ std::vector<UiRect> NativeConstructionWorkspace::focusables(
                                   static_cast<float>(index) * 58.f * layout.scale,
                           project_rows.width, 54.f * layout.scale};
       if (const auto clipped = intersection(bounds, project_rows))
-        out.push_back(*clipped);
+        out.push_back({*clipped, view_->projects[index].name});
     }
     for (std::size_t order_index = 0; order_index < status_order_.size();
          ++order_index) {
@@ -365,22 +366,44 @@ std::vector<UiRect> NativeConstructionWorkspace::focusables(
               static_cast<float>(order_index) * 72.f * layout.scale,
           order_rows.width, 68.f * layout.scale};
       if (const auto clipped = intersection(bounds, order_rows))
-        out.push_back(*clipped);
+        out.push_back(
+            {*clipped, view_->projects[status_order_[order_index]].name});
     }
   }
   if (const auto *project = selected_project()) {
     if (project->active || project->queued) {
-      out.push_back(layout.secondary_action);
+      out.push_back({layout.secondary_action,
+                     tr(cancel_confirmation_id_ == project->id
+                            ? "CONSTRUCTION_CONFIRM_CANCEL"
+                            : "CONSTRUCTION_CANCEL_REFUND",
+                        cancel_confirmation_id_ == project->id
+                            ? "Confirm cancel"
+                            : "Cancel and refund")});
     } else if (!project->complete) {
-      out.push_back(layout.primary_action);
-      out.push_back(layout.secondary_action);
+      out.push_back({layout.primary_action,
+                     tr(project->start.will_queue
+                            ? "CONSTRUCTION_START_QUEUE_BTN"
+                            : "CONSTRUCTION_START_NOW",
+                        project->start.will_queue ? "Start or queue"
+                                                  : "Start now")});
+      out.push_back({layout.secondary_action,
+                     tr("CONSTRUCTION_QUEUE", "Queue")});
     }
   }
-  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
-    if (a.y != b.y) return a.y < b.y;
-    return a.x < b.x;
+  std::ranges::sort(out, [](const FocusRect &a, const FocusRect &b) {
+    if (a.bounds.y != b.bounds.y) return a.bounds.y < b.bounds.y;
+    return a.bounds.x < b.bounds.x;
   });
   return out;
+}
+
+std::string NativeConstructionWorkspace::focused_label(
+    const ConstructionWorkspaceLayout &layout) const {
+  if (focus_ < 0) return {};
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
 }
 
 ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
@@ -448,7 +471,7 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
     }
     if (focus_ >= 0 && focus_ < count &&
         (event.key == kReturn || event.key == kSpace)) {
-      const UiRect target = items[static_cast<std::size_t>(focus_)];
+      const UiRect target = items[static_cast<std::size_t>(focus_)].bounds;
       InputEvent press{InputEventType::LeftPressed};
       press.position = {target.x + target.width * .5f,
                         target.y + target.height * .5f};
@@ -759,7 +782,7 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
   if (focus_ >= 0) {
     const auto items = focusables(layout);
     if (focus_ < static_cast<int>(items.size()))
-      stroke(out, items[static_cast<std::size_t>(focus_)],
+      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
              {160, 210, 255, 255});
   }
 }

@@ -5988,7 +5988,14 @@ class NativeCampaign final {
       if(battle_workspace_.visible()&&!menu_){
         if(event.type==InputEventType::KeyPressed&&event.key==0x4000003fu&&
            input.focused&&input.renderable())session_->request_save();
-        else execute_battle(battle_workspace_.handle(event,width,height));
+        else{
+          const int focus_before=battle_workspace_.focus();
+          execute_battle(battle_workspace_.handle(event,width,height));
+          if(battle_workspace_.focus()!=focus_before)
+            announcer_.announce(battle_workspace_.focused_label(
+                stellar::native_battle_ui::BattleWorkspaceLayout::for_viewport(
+                    width,height)));
+        }
         gesture_.capture_for_ui();continue;
       }
       if(event.type==InputEventType::KeyPressed&&event.key==0x40000041u&&
@@ -6141,7 +6148,10 @@ class NativeCampaign final {
         const auto top_action=event.type==InputEventType::LeftPressed?layout.hit(event.position,false):UiAction::None;
         if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
           using stellar::native_economy::EconomyCommandKind;
+          const int focus_before=economy_workspace_.focus();
           const auto command=economy_workspace_.handle(event,economy_controller_.view(),width,height);
+          if(command.captured&&economy_workspace_.focus()!=focus_before)
+            announcer_.announce(economy_workspace_.focused_label(economy_controller_.view()));
           if(command.kind==EconomyCommandKind::Refresh){refresh_economy(true,true);if(audio_confirm_)audio_confirm_();}
           else if(command.kind==EconomyCommandKind::SetIndustryPriority){
             const auto outcome=economy_controller_.change_priority(session_->frame(),session_->cache().generation,command.view_revision,command.priority);
@@ -6275,19 +6285,31 @@ class NativeCampaign final {
         if(command.captured)continue;
       }
       if(construction_workspace_.visible()){
+        const int focus_before=construction_workspace_.focus();
         const auto command=construction_workspace_.handle(event,width,height);
+        if(command.captured&&construction_workspace_.focus()!=focus_before)
+          announcer_.announce(construction_workspace_.focused_label(
+              ConstructionWorkspaceLayout::for_viewport(width,height)));
         if(command.kind!=ConstructionWorkspaceCommandKind::None)
           execute_construction(command);
         if(command.captured)continue;
       }
       if(shipyard_workspace_.visible()){
+        const int focus_before=shipyard_workspace_.focus();
         const auto command=shipyard_workspace_.handle(event,width,height);
+        if(command.captured&&shipyard_workspace_.focus()!=focus_before)
+          announcer_.announce(shipyard_workspace_.focused_label(
+              ShipyardWorkspaceLayout::for_viewport(width,height)));
         if(command.kind!=ShipyardWorkspaceCommandKind::None)
           execute_shipyard(command);
         if(command.captured)continue;
       }
       if(research_workspace_.visible()){
+        const int focus_before=research_workspace_.focus();
         const auto command=research_workspace_.handle(event,width,height);
+        if(command.captured&&research_workspace_.focus()!=focus_before)
+          announcer_.announce(
+              research_workspace_.focused_label(width,height));
         if(command.kind==WorkspaceCommandKind::Select){
           research_controller_.select(command.node_id);
           refresh_research(true);
@@ -8562,10 +8584,12 @@ int main(int argc,char **argv){
       [&]{audio.service();service_general();audio_settings.set_device_status(audio.failure_message());if(!audio_menu_ready){++audio_boot_services;if(audio.stats().music_started)throw std::runtime_error("Music started before the startup menu was ready.");}},
       [&]{audio_menu_ready=true;audio.menu_ready();},
       [&]{audio.confirm();},[&]{return audio.assets_ready();},[&]{audio.hover();}};
+    stellar::engine::AccessibilityAnnouncer startup_announcer;
+    std::optional<stellar::native_audio::VoiceCaption> startup_announcement;
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
       config.developer_access=&developer_access;config.locale=&locale_table;
-      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.caption=[&](DrawList& draw,int w,int h){stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);});};return config;
+      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take())startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
     StartupEntryEvidence startup_evidence,restart_evidence;

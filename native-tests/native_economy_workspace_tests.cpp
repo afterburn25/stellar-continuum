@@ -37,9 +37,13 @@ void keyboard_focus() {
   NativeEconomyWorkspace workspace;workspace.open();const auto v=view();
   const auto key=[&](std::uint32_t k,bool shift=false){InputEvent e{InputEventType::KeyPressed};e.key=k;e.shift=shift;return workspace.handle(e,v,1280,720);};
   require(workspace.focus()<0,"economy panel opened with stale focus");
+  require(workspace.focused_label(v).empty(),"unfocused panel reported a label");
   require(key(kTab).captured&&workspace.focus()==0,"Tab did not focus the refresh control");
+  require(workspace.focused_label(v)=="Refresh","refresh control label mismatch");
   require(key(kTab).captured&&workspace.focus()==1,"Tab did not focus the close control");
+  require(workspace.focused_label(v)=="Close treasury","close control label mismatch");
   require(key(kEnd).captured&&workspace.focus()==4,"End did not select the last control");
+  require(workspace.focused_label(v)=="Shipbuilding","priority control label mismatch");
   require(key(kTab,true).captured&&workspace.focus()==3,"Shift+Tab did not retreat the ring");
   require(key(kHome).captured&&workspace.focus()==0,"Home did not select the first control");
   auto command=key(kReturn);require(command.captured&&command.kind==EconomyCommandKind::Refresh,"Return on refresh did not emit the command");

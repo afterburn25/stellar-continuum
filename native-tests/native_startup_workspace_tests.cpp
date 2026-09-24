@@ -95,9 +95,13 @@ void keyboard_focus_traversal(){
     return ui.handle(e,1280,720,measure);};
   constexpr std::uint32_t kTab=9u,kReturn=13u,kHome=0x4000004au,kEnd=0x4000004du;
   require(ui.focused()<0,"startup workspace began focused");
+  require(ui.focused_label(1280,720).empty(),"unfocused workspace reported a label");
   require(key(kTab).captured&&ui.focused()==0&&cues==1,"Tab did not focus New Game");
+  require(ui.focused_label(1280,720)=="New Game","New Game label mismatch");
   require(key(kTab).captured&&ui.focused()==1,"Tab did not reach Load");
+  require(ui.focused_label(1280,720)=="Load saved campaign","Load label mismatch");
   require(key(kEnd).captured&&ui.focused()==4,"End did not reach Exit");
+  require(ui.focused_label(1280,720)=="Exit to Windows","Exit label mismatch");
   require(key(kTab).captured&&ui.focused()==0,"focus did not wrap to New Game");
   require(key(kTab,true).captured&&ui.focused()==4,"Shift+Tab did not wrap to Exit");
   require(key(kHome).captured&&ui.focused()==0,"Home did not focus New Game");
@@ -119,6 +123,7 @@ void keyboard_focus_traversal(){
   require(key(kReturn).kind==StartupIntentKind::None&&ui.screen()==StartupScreen::Development,
           "Return on Development did not open the diagnostics screen");
   require(key(kTab).captured&&ui.focused()==0,"Development Tab did not focus the copy button");
+  require(ui.focused_label(1280,720)=="Copy system info","Development primary label mismatch");
   require(key(kReturn).kind==StartupIntentKind::CopyDiagnostics,
           "Return on the copy button did not route diagnostics");
   require(key(kTab).captured&&ui.focused()==1,"Development Tab did not reach Back");

@@ -4,6 +4,7 @@
 #include "native_startup_workspace.hpp"
 #include "native_developer_access.hpp"
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <chrono>
@@ -38,6 +39,9 @@ struct StartupEntryConfig {
   stellar::native_settings::NativeSettingsHub* settings_hub{};
   stellar::native_audio::NativeVoiceSettings* voice_settings{};
   std::function<void(stellar::native_map::DrawList&,int,int)> caption;
+  // Optional live-region sink — focus-ring changes announce localized labels
+  // here; the caption hook drains it into the voice-caption fallback.
+  stellar::engine::AccessibilityAnnouncer *announcer{};
   stellar::engine::DeveloperAccess *developer_access{};
   const stellar::engine::LocalizationTable *locale{};
 };

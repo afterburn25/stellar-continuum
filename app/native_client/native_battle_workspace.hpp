@@ -133,6 +133,10 @@ public:
     return selection_;
   }
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string
+  focused_label(const BattleWorkspaceLayout &) const;
 
 private:
   [[nodiscard]] stellar::native_map::Point
@@ -150,7 +154,11 @@ private:
                      BattleWorkspaceCommand &command) const;
   void adopt_viewport(int width, int height) noexcept;
   void invalidate_ship_targets() noexcept;
-  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+  };
+  [[nodiscard]] std::vector<FocusRect>
   focusables(const BattleWorkspaceLayout &) const;
   [[nodiscard]] bool ship_targets_current(int width, int height) const noexcept;
   [[nodiscard]] std::string tr(std::string_view key,

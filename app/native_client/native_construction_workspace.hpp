@@ -76,9 +76,17 @@ public:
   handle(const stellar::native_map::InputEvent &event, int width, int height);
   void render(stellar::native_map::DrawList &out, int width, int height) const;
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string
+  focused_label(const ConstructionWorkspaceLayout &layout) const;
 
 private:
-  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+  };
+  [[nodiscard]] std::vector<FocusRect>
   focusables(const ConstructionWorkspaceLayout &layout) const;
   [[nodiscard]] const stellar::native_construction::NativeConstructionProject *
   selected_project() const noexcept;

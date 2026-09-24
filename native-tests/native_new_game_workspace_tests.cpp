@@ -221,7 +221,9 @@ void keyboard_focus(){
   int cues=0;w.set_hover_callback([&]{++cues;});
   const auto key=[&](std::uint32_t k,bool shift=false){InputEvent e{InputEventType::KeyPressed};e.key=k;e.shift=shift;return w.handle(e,width,height,measure);};
   require(w.page()==SandboxPage::GalaxyType&&w.focus()<0,"sandbox did not open on the galaxy page without focus");
+  require(w.focused_label(width,height,measure).empty(),"unfocused workspace reported a label");
   (void)key(kTab);require(w.focus()==0,"Tab did not focus the first galaxy card");
+  require(w.focused_label(width,height,measure)=="Spiral Galaxy","galaxy card label mismatch");
   require(cues==1,"focus change did not play the hover cue");
   (void)key(kTab);(void)key(kTab);(void)key(kTab);
   (void)key(kTab,true);require(w.focus()==2,"Shift+Tab did not retreat the focus ring");
@@ -248,8 +250,10 @@ void keyboard_focus(){
   const int seed_index=index_of(l.seed_input),species_index=index_of(measured.species_rows[0]),create_index=index_of(l.create);
   require(seed_index>=0&&species_index>=0&&create_index>=0,"focus order replication missed a control");
   (void)key(kHome);require(w.focus()==0,"Home did not focus the first configuration control");
+  require(w.focused_label(width,height,measure)=="Back","configuration first control label mismatch");
   for(int i=0;i<seed_index;++i)(void)key(kTab);
   require(w.focus()==seed_index,"Tab did not reach the seed field");
+  require(w.focused_label(width,height,measure)=="Galaxy seed","seed field label mismatch");
   (void)key(kReturn);require(w.seed_focused(),"Return on the seed field did not enter edit mode");
   require(w.focus()==seed_index,"entering edit mode moved the focus ring");
   (void)w.handle({InputEventType::TextEntered,{},{},0,"42"},width,height,measure);

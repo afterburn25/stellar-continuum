@@ -669,17 +669,36 @@ void NativeBattleWorkspace::issue_context(const Point point, int width,
   if(!command.orders.empty())command.kind=BattleWorkspaceCommandKind::IssueOrder;
 }
 
-std::vector<UiRect> NativeBattleWorkspace::focusables(
+std::vector<NativeBattleWorkspace::FocusRect>
+NativeBattleWorkspace::focusables(
     const BattleWorkspaceLayout &layout) const {
-  std::vector<UiRect> out{layout.play, layout.speed, layout.fit, layout.menu};
-  out.insert(out.end(), layout.order_buttons.begin(),
-             layout.order_buttons.end());
-  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
-    if (a.y != b.y)
-      return a.y < b.y;
-    return a.x < b.x;
+  std::vector<FocusRect> out{
+      {layout.play, tr(tactical_speed_ > 0. ? "BATTLE_PAUSE" : "BATTLE_PLAY",
+                       tactical_speed_ > 0. ? "Pause" : "Play")},
+      {layout.speed,
+       trf("BATTLE_SPEED_LABEL", {std::to_string(tactical_resume_speed_)},
+           "Speed {0}x")},
+      {layout.fit, tr("BATTLE_FIT", "Fit view")},
+      {layout.menu, tr("BATTLE_MENU", "Menu")}};
+  for (std::size_t index = 0; index < layout.order_buttons.size(); ++index)
+    out.push_back({layout.order_buttons[index],
+                   tr(battle_order_buttons()[index].label_key,
+                      battle_order_buttons()[index].label)});
+  std::ranges::sort(out, [](const FocusRect &a, const FocusRect &b) {
+    if (a.bounds.y != b.bounds.y)
+      return a.bounds.y < b.bounds.y;
+    return a.bounds.x < b.bounds.x;
   });
   return out;
+}
+
+std::string NativeBattleWorkspace::focused_label(
+    const BattleWorkspaceLayout &layout) const {
+  if (focus_ < 0) return {};
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
 }
 
 BattleWorkspaceCommand
@@ -743,7 +762,7 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
         focus_ < count) {
-      const auto &r = items[static_cast<std::size_t>(focus_)];
+      const auto &r = items[static_cast<std::size_t>(focus_)].bounds;
       InputEvent press{InputEventType::LeftPressed};
       press.position = {r.x + r.width * .5f, r.y + r.height * .5f};
       const int keep = focus_;
@@ -1396,7 +1415,7 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
   if (focus_ >= 0) {
     const auto items = focusables(layout);
     if (focus_ < static_cast<int>(items.size()))
-      stroke(out, items[static_cast<std::size_t>(focus_)],
+      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
              {160, 210, 255, 255});
   }
 }

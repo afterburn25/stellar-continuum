@@ -97,27 +97,37 @@ bool NativeStartupWorkspace::wants_text_input()const noexcept{return screen_==St
 std::vector<NativeStartupWorkspace::Focusable> NativeStartupWorkspace::collect_focusables(
     const StartupLayout&l,int width,int height)const{
   std::vector<Focusable> out;
-  const auto push=[&](UiRect rect,std::uint64_t cue){if(rect.width>0&&rect.height>0)out.push_back({rect,cue});};
+  const auto push=[&](UiRect rect,std::uint64_t cue,std::string label){if(rect.width>0&&rect.height>0)out.push_back({rect,cue,std::move(label)});};
+  const auto back=[&]{return tr("STARTUP_BACK","Back");};
   switch(screen_){
     case StartupScreen::Entry:
       // Visual order: Continue first when present, then the menu links;
       // cue ids match the hit() target space.
-      if(return_to_campaign_available_||!continue_save_.empty())push(l.return_to_campaign,6);
-      push(l.new_campaign,1);push(l.load_campaign,2);push(l.settings,3);push(l.development,4);push(l.exit,5);
+      if(return_to_campaign_available_||!continue_save_.empty())push(l.return_to_campaign,6,tr("STARTUP_CONTINUE","Continue"));
+      push(l.new_campaign,1,tr("STARTUP_NEW_GAME","New Game"));push(l.load_campaign,2,tr("STARTUP_LOAD","Load saved campaign"));push(l.settings,3,tr("STARTUP_SETTINGS","Settings"));push(l.development,4,tr("STARTUP_DEVELOPMENT","Development"));push(l.exit,5,tr("STARTUP_EXIT","Exit to Windows"));
       break;
-    case StartupScreen::ModeSelection:push(l.sandbox_campaign,2);push(l.back,1);break;
-    case StartupScreen::Development:push(l.primary,2);push(l.back,1);break;
-    case StartupScreen::Failure:push(l.back,1);break;
-    case StartupScreen::Busy:push(busy_cancel(width,height,l.scale),1);break;
+    case StartupScreen::ModeSelection:push(l.sandbox_campaign,2,tr("STARTUP_SANDBOX_TITLE","Sandbox"));push(l.back,1,back());break;
+    case StartupScreen::Development:push(l.primary,2,tr("STARTUP_COPY_SYSINFO","Copy system info"));push(l.back,1,back());break;
+    case StartupScreen::Failure:push(l.back,1,back());break;
+    case StartupScreen::Busy:push(busy_cancel(width,height,l.scale),1,tr(operation_.worker_running?"SETTINGS_CANCEL":"STARTUP_BACK",operation_.worker_running?"Cancel":"Back"));break;
     case StartupScreen::LoadSlots:{
       const float pitch=46.f*l.scale;
       for(std::size_t i=0;i<slots_.slots.size();++i)
-        push(intersect({l.list.x,l.list.y+i*pitch-load_scroll_.scroll_offset,l.list.width,pitch-4*l.scale},l.list),100+i);
-      push(l.back,1);if(selected_slot_)push(l.primary,2);
+        push(intersect({l.list.x,l.list.y+i*pitch-load_scroll_.scroll_offset,l.list.width,pitch-4*l.scale},l.list),100+i,slots_.slots[i].filename);
+      push(l.back,1,back());if(selected_slot_)push(l.primary,2,tr("STARTUP_LOAD_SELECTED","Load selected"));
       break;}
     default:break;
   }
   return out;
+}
+
+std::string NativeStartupWorkspace::focused_label(int width,int height)const{
+  if(focus_<0)return {};
+  const auto items=collect_focusables(StartupLayout::for_viewport(width,height),width,height);
+  return focus_<static_cast<int>(items.size())?items[static_cast<std::size_t>(focus_)].label:std::string{};
+}
+std::string NativeStartupWorkspace::focused_label(int width,int height,const TextMeasurer&measure)const{
+  return screen_==StartupScreen::Setup?setup_.focused_label(width,height,measure):focused_label(width,height);
 }
 
 StartupIntent NativeStartupWorkspace::handle(const InputEvent&e,int width,int height,const TextMeasurer&measure){

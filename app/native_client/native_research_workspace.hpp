@@ -96,6 +96,9 @@ public:
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   first_actionable_card(int width, int height) const;
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
 
 private:
   struct NodePlacement {
@@ -110,12 +113,16 @@ private:
 
   void rebuild_topology();
   struct GuidedCard{std::string id;stellar::native_map::UiRect bounds;bool recommended{};};
-  struct InterfaceHit{stellar::native_map::UiRect bounds;int action{};std::string id;};
+  struct InterfaceHit{stellar::native_map::UiRect bounds;int action{};std::string id;std::string label;};
   [[nodiscard]] std::vector<GuidedCard> guided_cards(const ResearchWorkspaceLayout&)const;
   void render_dashboard(stellar::native_map::DrawList&,const ResearchWorkspaceLayout&);
   void render_controls(stellar::native_map::DrawList&,const ResearchWorkspaceLayout&);
   std::optional<WorkspaceCommand> handle_controls(const stellar::native_map::InputEvent&,const ResearchWorkspaceLayout&,int,int);
-  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+  };
+  [[nodiscard]] std::vector<FocusRect>
   focusables(const ResearchWorkspaceLayout&)const;
   stellar::core::AdaptiveResearchPlan plan_;
   ResearchViewMode mode_{ResearchViewMode::Guided};

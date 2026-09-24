@@ -109,6 +109,16 @@ void NativeEconomyWorkspace::clear() noexcept { close(); notice_.clear(); cache_
 void NativeEconomyWorkspace::set_text_measurer(TextMeasurer measure) { measure_=std::move(measure); ++measure_revision_; cache_.valid=false; }
 void NativeEconomyWorkspace::set_notice(std::string notice) { notice_=std::move(notice); cache_.valid=false; }
 
+std::string NativeEconomyWorkspace::focused_label(const NativeEconomyView& view) const {
+  if(focus_<0) return {};
+  if(focus_==0) return tr(view.state==EconomyState::Ready?"ECONOMY_REFRESH":"ECONOMY_RETRY",view.state==EconomyState::Ready?"Refresh":"Retry");
+  if(focus_==1) return tr("ECONOMY_CLOSE","Close treasury");
+  constexpr std::array<const char*,3> keys{"ECONOMY_POLICY_BALANCED","ECONOMY_POLICY_INFRASTRUCTURE","ECONOMY_POLICY_SHIPBUILDING"};
+  constexpr std::array<const char*,3> labels{"Balanced","Infrastructure","Shipbuilding"};
+  const auto index=static_cast<std::size_t>(focus_-2);
+  return index<3?tr(keys[index],labels[index]):std::string{};
+}
+
 const NativeEconomyWorkspace::Cache& NativeEconomyWorkspace::cache_for(const NativeEconomyView& view,const EconomyLayout& layout,int width,int height) const {
   const auto sig=signature(view,notice_);
   if(cache_.valid&&cache_.width==width&&cache_.height==height&&cache_.generation==view.campaign_generation&&cache_.revision==view.revision&&cache_.measure_revision==measure_revision_&&cache_.signature==sig) return cache_;

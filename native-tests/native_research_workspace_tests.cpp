@@ -218,9 +218,13 @@ void keyboard_focus_traversal() {
     return workspace.handle(event, width, height);
   };
   require(workspace.focus() < 0, "Focus should start unset.");
+  require(workspace.focused_label(width, height).empty(),
+          "Unfocused workspace reported a label.");
   // Ordered ring begins with the close control at the surface top.
   require(key(kTab).captured && workspace.focus() == 0,
           "Tab did not land on the first focusable.");
+  require(workspace.focused_label(width, height) == "Close research",
+          "Focused close control label mismatch.");
   require(key(kTab).captured && workspace.focus() == 1,
           "Tab did not advance focus.");
   require(key(kTab, true).captured && workspace.focus() == 0,
@@ -229,6 +233,8 @@ void keyboard_focus_traversal() {
   for (int i = 0; i < 5; ++i)
     (void)key(kTab);
   require(workspace.focus() == 5, "Search field is not the sixth focusable.");
+  require(workspace.focused_label(width, height) == "Search research",
+          "Focused search field label mismatch.");
   require(key(kReturn).captured && workspace.wants_text_input() &&
               workspace.focus() == 5,
           "Search activation did not enter edit mode.");

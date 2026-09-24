@@ -326,12 +326,18 @@ int run_tests() {
     NativeShipyardWorkspace w;w.open();w.set_view(view());
     const auto key=[&](std::uint32_t k,bool shift=false){InputEvent e{InputEventType::KeyPressed};e.key=k;e.shift=shift;return w.handle(e,width,height);};
     REQUIRE(w.focus()<0);
+    const auto ring_layout=ShipyardWorkspaceLayout::for_viewport(width,height);
+    REQUIRE(w.focused_label(ring_layout).empty());
     REQUIRE(key(kTab).captured&&w.focus()==0);
+    REQUIRE(w.focused_label(ring_layout)=="Close shipyard");
     REQUIRE(key(kTab).captured&&w.focus()==1);
+    REQUIRE(w.focused_label(ring_layout)=="All ships");
     REQUIRE(key(kTab,true).captured&&w.focus()==0);
     REQUIRE(key(kEnd).captured&&w.focus()>1);
+    REQUIRE(!w.focused_label(ring_layout).empty());
     REQUIRE(key(kHome).captured&&w.focus()==0);
     (void)key(kTab);(void)key(kTab);REQUIRE(w.focus()==2);
+    REQUIRE(w.focused_label(ring_layout)=="Search ships");
     REQUIRE(key(kReturn).captured&&w.wants_text_input()&&w.focus()==2);
     InputEvent edit{InputEventType::TextEntered};edit.text="zz";(void)w.handle(edit,width,height);
     REQUIRE(!w.design_bounds("scout",width,height));

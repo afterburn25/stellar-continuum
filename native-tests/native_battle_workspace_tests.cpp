@@ -810,9 +810,14 @@ void keyboard_focus() {
     return workspace.handle(e, width, height);
   };
   require(workspace.focus() < 0, "Battle focus should start unset.");
+  const auto ring_layout = BattleWorkspaceLayout::for_viewport(width, height);
+  require(workspace.focused_label(ring_layout).empty(),
+          "Unfocused battle workspace reported a label.");
   // Top row: play, speed, fit, menu; then the two-column order grid.
   require(key(kTab).captured && workspace.focus() == 0,
           "Tab did not land on the play control.");
+  require(workspace.focused_label(ring_layout) == "Pause",
+          "Focused play control label mismatch.");
   auto command = key(kReturn);
   require(command.kind == BattleWorkspaceCommandKind::TogglePause &&
               workspace.focus() == 0,
@@ -835,6 +840,8 @@ void keyboard_focus() {
     (void)key(kTab);
   require(workspace.focus() == hold,
           "Hold order is not the first order-grid focusable.");
+  require(workspace.focused_label(ring_layout) == "Hold",
+          "Focused order button label mismatch.");
   command = key(kReturn);
   require(command.captured && command.kind == BattleWorkspaceCommandKind::None,
           "Order issued without a selection.");

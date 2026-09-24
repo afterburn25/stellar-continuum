@@ -43,6 +43,9 @@ class NativeEconomyWorkspace final {
   void clear() noexcept;
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(const NativeEconomyView &) const;
   void set_text_measurer(TextMeasurer measure);
   void set_localization(const stellar::engine::LocalizationTable *table);
   void set_notice(std::string notice);

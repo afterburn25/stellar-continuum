@@ -420,11 +420,19 @@ StartupEntryResult run_native_startup_entry(Window &window,
       evidence.exit_requested = true;
       return {{}, true, std::move(evidence)};
     }
+    const auto announce_focus=[&]{
+      if(config.announcer)
+        config.announcer->announce(workspace.focused_label(
+            input.drawable_width,input.drawable_height,measure));
+    };
     if (!input.renderable()) {
       for (const auto &event : input.events)
-        if (!route_settings(event,input.drawable_width,input.drawable_height))
+        if (!route_settings(event,input.drawable_width,input.drawable_height)) {
+          const int focus_before=workspace.focused();
           (void)workspace.handle(event, input.drawable_width,
                                     input.drawable_height, measure);
+          if(workspace.focused()!=focus_before)announce_focus();
+        }
       window.set_text_input(workspace.wants_text_input()&&
           !(config.general_settings&&config.general_settings->visible())&&!(config.settings_hub&&config.settings_hub->visible()));
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
@@ -458,8 +466,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
         (void)config.audio_settings->handle(event, input.drawable_width, input.drawable_height);
         continue;
       }
+      const int focus_before=workspace.focused();
       const auto intent = workspace.handle(event, input.drawable_width,
                                            input.drawable_height, measure);
+      if(workspace.focused()!=focus_before)announce_focus();
       switch (intent.kind) {
       case StartupIntentKind::Exit:
         exit = true;

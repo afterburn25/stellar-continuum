@@ -306,11 +306,18 @@ void keyboard_focus_traversal() {
     return workspace.handle(event, width, height);
   };
   REQUIRE(workspace.focus() < 0);
+  const auto ring_layout =
+      ConstructionWorkspaceLayout::for_viewport(width, height);
+  REQUIRE(workspace.focused_label(ring_layout).empty());
   // Ordered ring: close, project row, primary action, secondary action.
   REQUIRE(key(kTab).captured && workspace.focus() == 0);
+  REQUIRE(workspace.focused_label(ring_layout) == "Close construction");
   REQUIRE(key(kTab).captured && workspace.focus() == 1);
+  REQUIRE(workspace.focused_label(ring_layout) ==
+          "Orbital Shipyard With A Long Source Name");
   REQUIRE(key(kTab, true).captured && workspace.focus() == 0);
   REQUIRE(key(kEnd).captured && workspace.focus() == 3);
+  REQUIRE(workspace.focused_label(ring_layout) == "Queue");
   REQUIRE(key(kHome).captured && workspace.focus() == 0);
   // Row activation keeps focus and selects without a command.
   (void)key(kTab);

@@ -74,7 +74,17 @@ public:
   void set_operation(stellar::native_startup::NativeStartupView);
   void show_failure(std::string message);
   [[nodiscard]] StartupScreen screen() const noexcept { return screen_; }
-  [[nodiscard]] int focused() const noexcept { return focus_; }
+  // On the Setup screen the delegated new-game workspace owns the ring.
+  [[nodiscard]] int focused() const noexcept {
+    return screen_ == StartupScreen::Setup ? setup_.focus() : focus_;
+  }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
+  // Delegating variant — on the Setup screen the new-game workspace owns the
+  // ring, so its label needs the text measurer.
+  [[nodiscard]] std::string focused_label(int width, int height,
+                                          const TextMeasurer &) const;
   [[nodiscard]] bool wants_text_input() const noexcept;
   [[nodiscard]] StartupIntent handle(const stellar::native_map::InputEvent &,
                                      int width, int height,
@@ -92,6 +102,7 @@ private:
   struct Focusable {
     stellar::native_map::UiRect rect;
     std::uint64_t cue{};
+    std::string label;
   };
   [[nodiscard]] std::vector<Focusable> collect_focusables(
       const StartupLayout &, int width, int height) const;
