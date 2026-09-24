@@ -278,8 +278,18 @@ struct Shell {
   std::unordered_map<std::string,
                      std::shared_ptr<const stellar::native_map::Mesh3D>>
       scene3_meshes;
-  std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
+  // Decoded scene3d textures arrive through a shared state so misses can
+  // decode on the JobSystem instead of stalling the draw thread; `done`
+  // is set release/acquire after `image`.
+  struct Scene3Tex {
+    std::shared_ptr<const RgbaImage> image;
+    std::string error;                 // job-written before done
+    std::atomic<bool> done{false};
+    bool reported{false};              // UI-thread: error surfaced once
+  };
+  std::unordered_map<std::string, std::shared_ptr<Scene3Tex>>
       scene3_textures;
+  engine::JobSystem *jobs{}; // main() wires the shell's JobSystem once
   std::unique_ptr<engine::ContentResolver> scene3_content;
   bool scene3_looking{};  // right-drag orbit is active in the preview
   bool scene3_dragging{}; // left-drag applies the transform mode below
@@ -1596,15 +1606,54 @@ std::shared_ptr<const Mesh3D> scene3_mesh(Shell &shell,
 std::shared_ptr<const RgbaImage> scene3_tex(Shell &shell,
                                             const std::string &path) {
   if (const auto it = shell.scene3_textures.find(path);
-      it != shell.scene3_textures.end())
-    return it->second;
-  std::shared_ptr<const RgbaImage> img;
-  if (shell.scene3_content)
-    if (const auto loose = shell.scene3_content->loose_path(path);
-        std::filesystem::is_regular_file(loose))
-      img = decode_rgba_image(loose, 4096);
-  shell.scene3_textures.emplace(path, img);
-  return img;
+      it != shell.scene3_textures.end()) {
+    auto &state = *it->second;
+    if (!state.done.load(std::memory_order_acquire)) return nullptr;
+    if (!state.error.empty() && !state.reported) {
+      state.reported = true;
+      shell.status = "texture decode failed: " + path;
+    }
+    return state.image;
+  }
+  auto state = std::make_shared<Shell::Scene3Tex>();
+  shell.scene3_textures.emplace(path, state);
+  const auto loose = shell.scene3_content
+                         ? shell.scene3_content->loose_path(path)
+                         : std::filesystem::path{};
+  if (!std::filesystem::is_regular_file(loose)) {
+    state->done.store(true, std::memory_order_release);
+    return nullptr;
+  }
+  if (shell.jobs) {
+    // Decode off the draw thread; the entity binds untextured until the
+    // job publishes the image.
+    (void)shell.jobs->submit("scene3d.texture",
+                             engine::JobPriority::Normal, {},
+                             [state, loose] {
+      try {
+        state->image = decode_rgba_image(loose, 4096);
+      } catch (const std::exception &error) {
+        state->error = error.what();
+      } catch (...) {
+        state->error = "unknown decode error";
+      }
+      state->done.store(true, std::memory_order_release);
+    });
+    return nullptr;
+  }
+  try {
+    state->image = decode_rgba_image(loose, 4096);
+  } catch (const std::exception &error) {
+    state->error = error.what();
+  } catch (...) {
+    state->error = "unknown decode error";
+  }
+  state->done.store(true, std::memory_order_release);
+  if (!state->error.empty()) {
+    state->reported = true;
+    shell.status = "texture decode failed: " + path;
+  }
+  return state->image;
 }
 
 // Parses "x,y,z" into three floats.
@@ -5071,6 +5120,7 @@ int main(int argc, char **argv) {
     }
 
     Shell shell;
+    shell.jobs = &jobs;
     shell.projects_root = find_path("projects");
     std::filesystem::create_directories(shell.projects_root);
     refresh_projects(shell);
