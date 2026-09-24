@@ -617,6 +617,51 @@ int main() {
           "has_audio reports no device in a headless run");
   }
 
+  // set_scene3d swaps the spawned 3D set mid-run — the level-switching
+  // counterpart of set_scene.
+  {
+    const auto sub = root / "scene3d-switch";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream a(sub / "editor" / "scene3d.json");
+      a << R"({"entities":[{"name":"first","pos":[0,0,0]}]})";
+      std::ofstream b(sub / "editor" / "scene3d-b.json");
+      b << R"({"entities":[{"name":"second","pos":[9,9,9]}]})";
+    }
+    auto opts = headless_options(sub);
+    opts.scene3d = true;
+    RuntimeHost host{opts};
+    int updates = 0;
+    bool had_first = false, had_second = false;
+    host.on_update = [&](World &, float) {
+      ++updates;
+      if (updates == 1) {
+        had_first = host.entities3d().size() == 1;
+        host.set_scene3d("editor/scene3d-b.json");
+      }
+      if (updates == 2)
+        had_second = host.entities3d().size() == 1;
+    };
+    check(host.run() == 0, "set_scene3d run exits cleanly");
+    check(had_first && had_second,
+          "set_scene3d respawns the tracked 3D set");
+    const auto box = host.entities3d_in_box(9.f, 9.f, 9.f, 1.f, 1.f, 1.f);
+    check(box.size() == 1, "the switched scene's entity is live");
+
+    // Called before run(), set_scene3d selects the initial document and
+    // enables the mode — no --scene3d flag needed.
+    RuntimeHost initial{headless_options(sub)};
+    initial.set_scene3d("editor/scene3d-b.json");
+    bool spawned_b = false;
+    initial.on_update = [&](World &, float) {
+      spawned_b = initial.entities3d_in_box(9.f, 9.f, 9.f, 1.f, 1.f, 1.f)
+                      .size() == 1;
+    };
+    check(initial.run() == 0, "pre-run set_scene3d exits cleanly");
+    check(initial.scene3d() && spawned_b,
+          "pre-run set_scene3d selects the initial document");
+  }
+
   // Scene-authored animations: a clip's "x" track owns the entity's
   // Transform2D.x while playing, and a named event marker fires exactly
   // once when the playhead crosses it.

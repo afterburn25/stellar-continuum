@@ -396,6 +396,17 @@ bool RuntimeHost::destroy_tilemap(EntityId id) {
   return impl_->destroy_tilemap_fn && impl_->destroy_tilemap_fn(id);
 }
 bool RuntimeHost::scene3d() const { return impl_->options.scene3d; }
+void RuntimeHost::set_scene3d(std::string file) {
+  // Outside run() (or before the scene3d wiring exists) the option just
+  // records the initial document — reload_scene3d picks it up.
+  if (impl_->switch_scene3d) {
+    impl_->options.scene3d = true;
+    impl_->switch_scene3d(file);
+  } else {
+    impl_->options.scene3d = true;
+    impl_->options.scene3d_file = std::move(file);
+  }
+}
 EntityId RuntimeHost::spawn_entity3d(const Scene3dEntity &entity) {
   return impl_->spawn3_fn ? impl_->spawn3_fn(entity) : EntityId{};
 }

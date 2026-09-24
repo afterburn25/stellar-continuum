@@ -276,6 +276,10 @@ public:
   // separate from the 2D gameplay list); entities3d_in_radius runs a
   // sphere query (aggro/AoE/pick volumes).
   [[nodiscard]] bool scene3d() const;
+  // 3D counterpart of set_scene — switches the active Scene3dDocument
+  // (project-relative path), respawning the 3D entity set. Before run()
+  // it sets the initial scene.
+  void set_scene3d(std::string file);
   EntityId spawn_entity3d(const Scene3dEntity &entity);
   [[nodiscard]] std::vector<EntityId> entities3d() const;
   [[nodiscard]] std::vector<EntityId>
