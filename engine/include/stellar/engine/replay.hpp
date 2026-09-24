@@ -54,6 +54,21 @@ public:
     return checkpoints_;
   }
 
+  // Container-storage footprint for MemoryTracker::report — command
+  // payloads grow unboundedly over a recording session, so occupancy is
+  // worth tracking.
+  [[nodiscard]] std::size_t estimated_memory_bytes() const noexcept {
+    std::size_t total = commands_.capacity() * sizeof(ReplayCommand) +
+                        checkpoints_.capacity() * sizeof(ReplayCheckpoint) +
+                        header_.build_id.capacity() +
+                        header_.game_version.capacity();
+    for (const auto &command : commands_)
+      total += command.name.capacity() + command.payload.capacity();
+    for (const auto &checkpoint : checkpoints_)
+      total += checkpoint.label.capacity();
+    return total;
+  }
+
   std::string serialize() const;
   static std::optional<ReplayRecorder> parse(std::string_view document,
                                              std::string *error = nullptr);

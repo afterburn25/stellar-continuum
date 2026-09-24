@@ -5566,6 +5566,13 @@ class NativeCampaign final {
     if(planet_material_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
       planet_material_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("planet-materials");
     stellar::engine::MemoryTracker::instance().report(planet_material_memory_,planet_material_cache_.resident_bytes(),stellar::native_planets::MaterialCache::budget);
+    // Recording sessions accumulate command payloads unboundedly — the
+    // recorder's occupancy joins the census while one is active.
+    if(replay_&&replay_->recorder){
+      if(replay_recorder_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+        replay_recorder_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("replay-recorder");
+      stellar::engine::MemoryTracker::instance().report(replay_recorder_memory_,replay_->recorder->estimated_memory_bytes());
+    }
     if(video_settings_)video_settings_->service(input.focused,input.renderable());
     resize_galaxy_camera(width,height);
     assets_refresh_elapsed_+=std::max(0.,elapsed);
@@ -8153,6 +8160,7 @@ class NativeCampaign final {
   // backend; attach a real backend here when one ships.
   stellar::engine::PlatformServices platform_services_;
   stellar::engine::MemoryTracker::SubsystemId planet_material_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
+  stellar::engine::MemoryTracker::SubsystemId replay_recorder_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
   SessionNoticeKind last_support_notice_kind_{};
   double support_notice_seconds_{};
   stellar::native_notifications::NativeNotificationView notification_view_;

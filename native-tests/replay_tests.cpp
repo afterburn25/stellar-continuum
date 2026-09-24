@@ -42,6 +42,20 @@ int main() {
           "player streams recorded entries");
   }
 
+  // Occupancy census tracks command payloads, not just entry counts.
+  {
+    ReplayRecorder recorder;
+    const auto empty = recorder.estimated_memory_bytes();
+    recorder.record(1, "order",
+                    std::string(2048, 'x')); // payload-heavy command
+    recorder.checkpoint(1, 99, "save:World");
+    check(recorder.estimated_memory_bytes() >= empty + 2048,
+          "recorder census counts command payloads");
+    check(ReplayRecorder::parse(recorder.serialize())
+              ->estimated_memory_bytes() > 0,
+          "parsed recorder reports a footprint");
+  }
+
   // Section checkpoints emit top-level members plus object members one
   // level deep, in document order, with per-section hashes.
   nlohmann::ordered_json document{

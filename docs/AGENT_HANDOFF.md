@@ -632,6 +632,11 @@ actor/visibility/tag vectors); the diagnostic monitor reports it as the
 the journal is capacity-bounded but payload-heavy, so this tracks
 chronicle growth over long campaigns. `engine_diagnostics` covers
 payload accounting; 4/4 diagnostics/report/QA green (qa_host 32 s).
+Replay-recorder census (follow-on): `ReplayRecorder::
+estimated_memory_bytes()` counts command payloads — unbounded during
+`--record` sessions — and the client reports it as `replay-recorder`
+while recording. `replay` covers the estimate + parsed round-trip;
+3/3 replay/session/persistence green.
 Caveat: `stellar_campaign_phase_profile_tests`/`campaign_phase_cadence`
 compile-fail on `set_phase_tier`/`wake_phase` — the coordinator API is
 mid-refactor in the other agent's lane, not a diagnostics regression.
