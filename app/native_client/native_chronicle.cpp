@@ -573,6 +573,21 @@ std::optional<UiRect> NativeChronicleView::focused_bounds(int width,
              : std::nullopt;
 }
 
+stellar::engine::AnnouncementControl
+NativeChronicleView::focused_control(int width, int height) const {
+  const auto bounds = focused_bounds(width, height);
+  const auto search = chronicle_layout_for(
+                          snapshot_, width, height, measure_,
+                          scroll_.scroll_offset, tag_filter_,
+                          recency_window_ > 0.0)
+                          .search_box;
+  return bounds && bounds->x == search.x && bounds->y == search.y &&
+                 bounds->width == search.width &&
+                 bounds->height == search.height
+             ? stellar::engine::AnnouncementControl::Edit
+             : stellar::engine::AnnouncementControl::Custom;
+}
+
 bool NativeChronicleView::handle(const native_map::InputEvent &event,
                                  int width, int height) {
   if (!visible_) return false;

@@ -4,6 +4,7 @@
 
 #include "native_new_campaign_setup.hpp"
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
 
@@ -132,6 +133,10 @@ public:
   // Client-pixel rect of the ringed control — null when nothing is focused.
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   focused_bounds(int width, int height, const TextMeasurer &) const;
+  // UIA control kind of the ringed control — Edit on the seed field,
+  // Custom elsewhere.
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(int width, int height, const TextMeasurer &) const;
   [[nodiscard]] float detail_scroll() const noexcept {
     return detail_scroll_.scroll_offset;
   }

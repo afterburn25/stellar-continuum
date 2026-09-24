@@ -5,6 +5,7 @@
 #include "native_dropdown.hpp"
 #include <filesystem>
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
@@ -61,6 +62,10 @@ public:
   // Client-pixel rect of the ringed control — null when nothing is focused.
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   focused_bounds(const ShipyardWorkspaceLayout &) const;
+  // UIA control kind of the ringed control — Edit on the search field,
+  // Custom elsewhere.
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(const ShipyardWorkspaceLayout &) const;
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
   [[nodiscard]] bool confirmation_open() const noexcept {

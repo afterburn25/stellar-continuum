@@ -351,6 +351,16 @@ RosterWorkspace::focused_bounds(int width, int height) const {
                    targets[static_cast<std::size_t>(focus_)].bounds}
              : std::nullopt;
 }
+stellar::engine::AnnouncementControl
+RosterWorkspace::focused_control(int width, int height) const {
+  const auto bounds = focused_bounds(width, height);
+  const auto search = RosterLayout::for_viewport(width, height).search;
+  return bounds && bounds->x == search.x && bounds->y == search.y &&
+                 bounds->width == search.width &&
+                 bounds->height == search.height
+             ? stellar::engine::AnnouncementControl::Edit
+             : stellar::engine::AnnouncementControl::Custom;
+}
 int RosterWorkspace::header_column(Point point,
                                    const RosterLayout &layout) const noexcept {
   const float s = layout.scale;

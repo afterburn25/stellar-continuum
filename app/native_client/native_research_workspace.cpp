@@ -661,6 +661,20 @@ NativeResearchWorkspace::focused_bounds(int width, int height) const {
              : std::nullopt;
 }
 
+stellar::engine::AnnouncementControl
+NativeResearchWorkspace::focused_control(int width, int height) const {
+  const auto bounds = focused_bounds(width, height);
+  const auto search = ResearchWorkspaceLayout::for_viewport(
+                          width, height,
+                          window_ ? window_->domain_tabs.size() : 0)
+                          .search;
+  return bounds && bounds->x == search.x && bounds->y == search.y &&
+                 bounds->width == search.width &&
+                 bounds->height == search.height
+             ? stellar::engine::AnnouncementControl::Edit
+             : stellar::engine::AnnouncementControl::Custom;
+}
+
 WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
                                                  int width, int height) {
   if (!visible_)

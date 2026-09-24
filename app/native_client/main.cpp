@@ -6293,7 +6293,7 @@ class NativeCampaign final {
             const auto send_map_key=[&](int g)->bool{
               if(g==0){
                 const auto command=assets_.handle(event,width,height);
-                if(command.captured&&nav&&!activate)announcer_.announce_focus(assets_.focused_label(width,height),announcement_bounds(assets_.focused_bounds(width,height)));
+                if(command.captured&&nav&&!activate)announcer_.announce_focus(assets_.focused_label(width,height),announcement_bounds(assets_.focused_bounds(width,height)),std::nullopt,assets_.focused_control(width,height));
                 return command.captured;
               }
               if(g==1){
@@ -6409,7 +6409,7 @@ class NativeCampaign final {
         const int focus_before=chronicle_view_.focus();
         if(chronicle_view_.handle(event,width,height)){
           if(chronicle_view_.focus()!=focus_before)
-            announcer_.announce_focus(chronicle_view_.focused_label(width,height),announcement_bounds(chronicle_view_.focused_bounds(width,height)));
+            announcer_.announce_focus(chronicle_view_.focused_label(width,height),announcement_bounds(chronicle_view_.focused_bounds(width,height)),std::nullopt,chronicle_view_.focused_control(width,height));
           if(const auto nav=chronicle_view_.navigation()){
             chronicle_view_.close();
             (void)enter_system(static_cast<int>(*nav),width,height);
@@ -6593,7 +6593,7 @@ class NativeCampaign final {
           const int focus_before=colony_roster_.focus();
           const auto command=colony_roster_.handle(event,width,height);
           if(command.captured&&colony_roster_.focus()!=focus_before)
-            announcer_.announce_focus(colony_roster_.focused_label(width,height),announcement_bounds(colony_roster_.focused_bounds(width,height)));
+            announcer_.announce_focus(colony_roster_.focused_label(width,height),announcement_bounds(colony_roster_.focused_bounds(width,height)),std::nullopt,colony_roster_.focused_control(width,height));
           if(command.refresh)refresh_roster(true);
           else if(command.open_colony_id)open_roster_colony(command,width,height);
           if(command.captured){gesture_.cancel();continue;}
@@ -6757,7 +6757,7 @@ class NativeCampaign final {
         const auto command=shipyard_workspace_.handle(event,width,height);
         if(command.captured&&shipyard_workspace_.focus()!=focus_before)
           {const auto sl=ShipyardWorkspaceLayout::for_viewport(width,height);
-          announcer_.announce_focus(shipyard_workspace_.focused_label(sl),announcement_bounds(shipyard_workspace_.focused_bounds(sl)));}
+          announcer_.announce_focus(shipyard_workspace_.focused_label(sl),announcement_bounds(shipyard_workspace_.focused_bounds(sl)),std::nullopt,shipyard_workspace_.focused_control(sl));}
         if(command.kind!=ShipyardWorkspaceCommandKind::None)
           execute_shipyard(command);
         if(command.captured)continue;
@@ -6767,7 +6767,7 @@ class NativeCampaign final {
         const auto command=research_workspace_.handle(event,width,height);
         if(command.captured&&research_workspace_.focus()!=focus_before)
           announcer_.announce_focus(
-              research_workspace_.focused_label(width,height),announcement_bounds(research_workspace_.focused_bounds(width,height)));
+              research_workspace_.focused_label(width,height),announcement_bounds(research_workspace_.focused_bounds(width,height)),std::nullopt,research_workspace_.focused_control(width,height));
         if(command.kind==WorkspaceCommandKind::Select){
           research_controller_.select(command.node_id);
           refresh_research(true);

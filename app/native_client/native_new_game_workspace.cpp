@@ -1108,4 +1108,17 @@ NativeNewGameWorkspace::focused_bounds(int width, int height,
              : std::nullopt;
 }
 
+stellar::engine::AnnouncementControl
+NativeNewGameWorkspace::focused_control(int width, int height,
+                                        const TextMeasurer &measure) const {
+  if (page_ != SandboxPage::Configuration)
+    return stellar::engine::AnnouncementControl::Custom;
+  const auto bounds = focused_bounds(width, height, measure);
+  const auto seed = measure_layout(width, height, measure).base.seed_input;
+  return bounds && bounds->x == seed.x && bounds->y == seed.y &&
+                 bounds->width == seed.width && bounds->height == seed.height
+             ? stellar::engine::AnnouncementControl::Edit
+             : stellar::engine::AnnouncementControl::Custom;
+}
+
 } // namespace stellar::native_setup_ui

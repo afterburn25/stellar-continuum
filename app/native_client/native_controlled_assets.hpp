@@ -1,4 +1,5 @@
 #pragma once
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
 #include "native_colony_roster.hpp"
@@ -70,6 +71,9 @@ public:
   // real focus geometry from it. Null when nothing is focused.
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   focused_bounds(int,int)const;
+  // UIA control kind of the ringed control — Edit on the search field,
+  // Custom elsewhere.
+  [[nodiscard]] stellar::engine::AnnouncementControl focused_control(int,int)const;
   [[nodiscard]] std::optional<stellar::native_map::UiRect> row_bounds(Key,int,int)const;
   [[nodiscard]] stellar::native_map::UiRect category_bounds(Category,int,int)const;
   [[nodiscard]] Command handle(const stellar::native_map::InputEvent&,int,int);

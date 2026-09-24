@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/fresh_campaign.hpp>
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
@@ -71,6 +72,10 @@ public:
   // Client-pixel rect of the ringed control — null when nothing is focused.
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   focused_bounds(int width, int height) const;
+  // UIA control kind of the ringed control — Edit on the search field,
+  // Custom elsewhere.
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(int width, int height) const;
   void set_notice(std::string value) { notice_ = std::move(value); }
   void set_localization(
       const stellar::engine::LocalizationTable *table) noexcept {

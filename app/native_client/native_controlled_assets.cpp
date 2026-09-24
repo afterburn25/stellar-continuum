@@ -154,6 +154,11 @@ std::optional<stellar::native_map::UiRect> Navigator::focused_bounds(int w,int h
   const auto targets=focusables(l);
   return focus_<static_cast<int>(targets.size())?std::optional<stellar::native_map::UiRect>{targets[static_cast<std::size_t>(focus_)].bounds}:std::nullopt;
 }
+stellar::engine::AnnouncementControl Navigator::focused_control(int w,int h)const{
+  const auto bounds=focused_bounds(w,h);
+  const auto search=Layout::make(w,h).search;
+  return bounds&&!preferences_.hidden&&bounds->x==search.x&&bounds->y==search.y&&bounds->width==search.width&&bounds->height==search.height?stellar::engine::AnnouncementControl::Edit:stellar::engine::AnnouncementControl::Custom;
+}
 void Navigator::commit_preferences(Preferences next){if(persist_&&!persist_(next)){error_=tr("ASSETS_PREFS_FAIL","Could not save navigator preferences.");return;}preferences_=next;error_.clear();pressed_.reset();rebuild();}
 Command Navigator::handle(const InputEvent& e,int w,int h){
   const auto l=Layout::make(w,h);pointer_=e.position;Command out;out.generation=view_.generation;out.observer=view_.observer;

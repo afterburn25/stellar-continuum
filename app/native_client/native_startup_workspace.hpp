@@ -5,6 +5,7 @@
 #include "native_startup_artwork.hpp"
 #include "native_startup_session.hpp"
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
 
@@ -91,6 +92,13 @@ public:
   focused_bounds(int width, int height) const;
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   focused_bounds(int width, int height, const TextMeasurer &) const;
+  // UIA control kind of the ringed control — the workspace's own ring has
+  // no text fields; the delegating variant forwards to the new-game
+  // workspace on Setup (its seed field announces Edit).
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(int width, int height) const;
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(int width, int height, const TextMeasurer &) const;
   [[nodiscard]] bool wants_text_input() const noexcept;
   [[nodiscard]] StartupIntent handle(const stellar::native_map::InputEvent &,
                                      int width, int height,

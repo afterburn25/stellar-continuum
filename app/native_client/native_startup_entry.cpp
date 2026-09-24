@@ -68,10 +68,17 @@ StartupEntryResult run_native_startup_entry(Window &window,
       const bool captured=settings->handle(e,w,h);
       if(config.announcer&&settings->focused()!=focus_before){
         const auto rect=settings->focused_bounds(w,h);
+        std::optional<stellar::engine::AnnouncementRange> range;
+        if constexpr(requires{settings->focused_range();})
+          range=settings->focused_range();
+        stellar::engine::AnnouncementControl control=
+            stellar::engine::AnnouncementControl::Custom;
+        if constexpr(requires{settings->focused_control();})
+          control=settings->focused_control();
         config.announcer->announce_focus(label(),
             rect?std::optional<stellar::engine::AnnouncementBounds>{
                      {rect->x,rect->y,rect->width,rect->height}}
-                :std::nullopt);
+                :std::nullopt,range,control);
       }
       return captured;
     };
@@ -447,7 +454,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
                                     measure),
             rect?std::optional<stellar::engine::AnnouncementBounds>{
                      {rect->x,rect->y,rect->width,rect->height}}
-                :std::nullopt);
+                :std::nullopt,
+            std::nullopt,
+            workspace.focused_control(input.drawable_width,
+                                      input.drawable_height,measure));
       }
     };
     if (!input.renderable()) {

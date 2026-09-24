@@ -1188,8 +1188,14 @@ carry `AnnouncementControl` (Button/CheckBox/Edit/Slider/Group/Custom) —
 the fragment reports the matching UIA ControlType, with a valid range
 implying Slider for unclassified announcements. Audio/voice settings
 classify via `focused_control()`; the pause-menu ring and HUD chrome
-announce as Button. Remaining surfaces default to Custom until they
-classify their focusables. Note: client-side the fragment resolves with
+announce as Button; the text-field surfaces classify their search/seed
+fields Edit — colony roster, chronicle, controlled-assets navigator,
+research and shipyard searches plus the new-campaign seed field (the
+startup workspace delegates to it on the Setup screen), each
+`focused_control` comparing the focused rect against the surface's
+known text-field layout rect. The startup settings route now forwards
+range and control too (previously label+bounds only). Remaining
+surfaces default to Custom until they classify their focusables. Note: client-side the fragment resolves with
 the host HWND runtime id `{42, hwnd}`, not our appended `{3, 1}` — the
 bridge test walks raw children matching that shape.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
