@@ -285,8 +285,10 @@ the client dumps the canonical document at the requested simulated tick
 to `replay-until-<tick>.json` beside the recording (same canonicalization
 — wall-clock provenance stripped), leaf-diffs it against the expected
 sidecar when one exists (`replay-until-<tick>.diff.txt`), prints the
-first leaf, then exits. The stop waits on simulated time, so a recording
-that pauses before the target tick never triggers it.
+first leaf, then exits. A stall guard covers the case where the tick can
+never reach the target: pending commands key off the simulated tick, so
+a frozen tick cannot unpause — 600 frames without progress prints a
+"tick stalled" diagnostic and exits instead of hanging.
 `--replay-info <file>` is the inventory companion: it parses the recording
 and prints a JSON `replay_info={...}` line — header seed/build/version,
 command count + tick span + per-kind counts, per-tick checkpoint section

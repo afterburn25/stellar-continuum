@@ -709,6 +709,11 @@ struct ReplayState {
   // sidecar — the bisect companion to checkpoint divergence.
   std::optional<std::uint64_t> stop_at_tick;
   std::filesystem::path stop_dump_path;
+  // Stall detection for --replay-until: frames since the simulated tick
+  // last advanced. A paused campaign or exhausted command stream can never
+  // reach the stop — the update loop reports it instead of hanging.
+  std::uint64_t last_tick{std::numeric_limits<std::uint64_t>::max()};
+  std::uint32_t stalled_frames{};
 };
 
 // Writes the recording on scope exit, including early returns and failures.
@@ -5999,8 +6004,19 @@ class NativeCampaign final {
     // <recording>.expected/<tick>.json names the diverging leaf — this is
     // the bisect companion to checkpoint divergence. Runs outside the input
     // gate so a modal that pauses command feeding cannot suppress the dump.
-    if(replay_&&replay_->recording&&session_&&replay_->stop_at_tick&&
-       replay_tick()>=*replay_->stop_at_tick){
+    if(replay_&&replay_->recording&&session_&&replay_->stop_at_tick){
+      if(const auto current_tick=replay_tick();current_tick<*replay_->stop_at_tick){
+        // Stall detection: a paused campaign or an exhausted command stream
+        // can never reach the stop — report it instead of hanging.
+        if(current_tick!=replay_->last_tick){replay_->last_tick=current_tick;replay_->stalled_frames=0;}
+        else if(++replay_->stalled_frames>600){
+          std::cout<<"replay-until: simulated tick stalled at "<<current_tick
+                   <<" below target "<<*replay_->stop_at_tick
+                   <<" for 600 frames — the recording cannot reach it\n";
+          replay_->stop_at_tick.reset();
+          session_->request_exit();
+        }
+      }else{
       const auto stop=*replay_->stop_at_tick;
       const PlayerCampaignCaptureOptions capture_options{
           session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,""};
@@ -6047,6 +6063,7 @@ class NativeCampaign final {
       std::cout<<message<<'\n';
       replay_->stop_at_tick.reset();
       session_->request_exit();
+      }
     }
     for(const auto &event:input.events){
       if(developer_session()&&stellar_activity_panel_.handle(event,width,height,session_->frame())){
