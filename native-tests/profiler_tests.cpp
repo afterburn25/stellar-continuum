@@ -1,7 +1,10 @@
 #include <stellar/engine/profiler.hpp>
 
+#include <algorithm>
 #include <iostream>
 #include <string>
+#include <thread>
+#include <vector>
 
 using namespace stellar::engine;
 
@@ -80,6 +83,31 @@ int main() {
   check(rows[2].name == "network" && rows[2].calls_a == 0 &&
             rows[2].mean_ns_a == 0.0,
         "b-only key reports zero on a");
+
+  // Multi-threaded recording: spans and call aggregates accumulate in
+  // per-thread buffers and merge at thread exit/frame boundaries — no
+  // global lock on the recording path.
+  profiler.reset_aggregates();
+  profiler.begin_frame();
+  {
+    std::vector<std::thread> workers;
+    for (int t = 0; t < 4; ++t)
+      workers.emplace_back([&profiler] {
+        for (int i = 0; i < 50; ++i) {
+          auto scope = profiler.span("worker", "job");
+          (void)scope;
+        }
+      });
+    for (auto &worker : workers) worker.join();
+  }
+  const auto worker_frame = profiler.end_frame();
+  check(worker_frame.spans.size() == 200, "threaded spans drained");
+  const auto merged = profiler.aggregates();
+  const auto worker_aggregate =
+      std::find_if(merged.begin(), merged.end(),
+                   [](const ProfileAggregate &a) { return a.name == "worker"; });
+  check(worker_aggregate != merged.end() && worker_aggregate->calls == 200,
+        "threaded aggregates merged");
 
   if (failures == 0)
     std::cout << "Profiler tests passed\n";

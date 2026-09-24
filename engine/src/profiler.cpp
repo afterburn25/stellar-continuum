@@ -90,6 +90,7 @@ struct Profiler::ThreadSpans {
     ~ThreadSpans();
     std::mutex mutex;
     std::vector<ProfileSpan> spans;
+    std::unordered_map<AggregateKey, AggregateState, AggregateHash> aggregates;
 };
 
 namespace {
@@ -123,6 +124,17 @@ void Profiler::unregister_thread_buffer(ThreadSpans* buffer) {
     std::lock_guard buffer_lock(buffer->mutex);
     for (auto& span : buffer->spans) pending_spans_.push_back(std::move(span));
     buffer->spans.clear();
+    merge_thread_aggregates_locked(*buffer);
+}
+
+void Profiler::merge_thread_aggregates_locked(ThreadSpans& buffer) {
+    for (const auto& [key, state] : buffer.aggregates) {
+        auto& aggregate = aggregates_[key];
+        aggregate.calls += state.calls;
+        aggregate.total_nanoseconds += state.total_nanoseconds;
+        aggregate.max_nanoseconds = std::max(aggregate.max_nanoseconds, state.max_nanoseconds);
+    }
+    buffer.aggregates.clear();
 }
 
 void Profiler::drain_thread_buffers_locked() {
@@ -130,6 +142,7 @@ void Profiler::drain_thread_buffers_locked() {
         std::lock_guard buffer_lock(buffer->mutex);
         for (auto& span : buffer->spans) pending_spans_.push_back(std::move(span));
         buffer->spans.clear();
+        merge_thread_aggregates_locked(*buffer);
     }
 }
 
@@ -181,18 +194,15 @@ Profiler::Scope Profiler::span(std::string_view name, std::string_view category)
 
 void Profiler::record_span(ProfileSpan span) {
     if (!enabled_) return;
-    {
-        std::lock_guard lock(mutex_);
-        auto& aggregate = aggregates_[{span.name, span.category}];
-        ++aggregate.calls;
-        aggregate.total_nanoseconds += span.duration_nanoseconds;
-        aggregate.max_nanoseconds = std::max(aggregate.max_nanoseconds, span.duration_nanoseconds);
-    }
     auto& storage = thread_spans();
     // First use on this thread registers the buffer so frame boundaries can
     // drain it; register before pushing so the drain cannot miss this span.
     register_once(storage);
     std::lock_guard buffer_lock(storage.mutex);
+    auto& aggregate = storage.aggregates[{span.name, span.category}];
+    ++aggregate.calls;
+    aggregate.total_nanoseconds += span.duration_nanoseconds;
+    aggregate.max_nanoseconds = std::max(aggregate.max_nanoseconds, span.duration_nanoseconds);
     storage.spans.push_back(std::move(span));
 }
 
@@ -249,14 +259,33 @@ std::deque<ProfileFrame> Profiler::recent_frames() const {
     return frames_;
 }
 
-std::vector<ProfileAggregate> Profiler::aggregates() const {
-    std::lock_guard lock(mutex_);
+std::vector<ProfileAggregate> Profiler::aggregates_merged_locked() const {
+    // Snapshot the shared aggregates, then merge per-thread buffers that
+    // have not drained since the last frame boundary so readers keep the
+    // real-time contract the recording path had before aggregation moved
+    // off the global lock.
+    std::unordered_map<AggregateKey, AggregateState, AggregateHash> merged = aggregates_;
+    for (auto* buffer : thread_buffers_) {
+        std::lock_guard buffer_lock(buffer->mutex);
+        for (const auto& [key, state] : buffer->aggregates) {
+            auto& aggregate = merged[key];
+            aggregate.calls += state.calls;
+            aggregate.total_nanoseconds += state.total_nanoseconds;
+            aggregate.max_nanoseconds = std::max(aggregate.max_nanoseconds, state.max_nanoseconds);
+        }
+    }
     std::vector<ProfileAggregate> out;
-    out.reserve(aggregates_.size());
-    for (const auto& [key, state] : aggregates_) {
+    out.reserve(merged.size());
+    for (const auto& [key, state] : merged) {
         out.push_back({key.name, key.category, state.calls,
                        state.total_nanoseconds, state.max_nanoseconds});
     }
+    return out;
+}
+
+std::vector<ProfileAggregate> Profiler::aggregates() const {
+    std::lock_guard lock(mutex_);
+    auto out = aggregates_merged_locked();
     std::sort(out.begin(), out.end(), [](const ProfileAggregate& a, const ProfileAggregate& b) {
         return a.total_nanoseconds > b.total_nanoseconds;
     });
@@ -265,18 +294,16 @@ std::vector<ProfileAggregate> Profiler::aggregates() const {
 
 void Profiler::reset_aggregates() {
     std::lock_guard lock(mutex_);
+    // Drain first so per-thread aggregates accumulated before the reset
+    // cannot resurface afterwards.
+    drain_thread_buffers_locked();
     aggregates_.clear();
 }
 
 std::string Profiler::export_json() const {
     std::lock_guard lock(mutex_);
     const std::vector<ProfileFrame> frames(frames_.begin(), frames_.end());
-    std::vector<ProfileAggregate> aggregate_list;
-    aggregate_list.reserve(aggregates_.size());
-    for (const auto& [key, state] : aggregates_)
-        aggregate_list.push_back({key.name, key.category, state.calls,
-                                  state.total_nanoseconds,
-                                  state.max_nanoseconds});
+    const auto aggregate_list = aggregates_merged_locked();
     return serialize_capture(
         std::span<const ProfileFrame>(frames),
         std::span<const ProfileAggregate>(aggregate_list));

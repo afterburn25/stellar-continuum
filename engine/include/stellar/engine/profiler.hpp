@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <deque>
@@ -62,10 +63,12 @@ struct ProfileComparisonRow {
 [[nodiscard]] std::vector<ProfileComparisonRow>
 compare_captures(const ProfileCapture &a, const ProfileCapture &b);
 
-// Process-wide CPU profiler. Span recording is per-thread and cheap (a mutex
-// is only touched when a thread-local buffer flushes at frame end); counters
-// and gauges are aggregated under the same lock. GPU pass timings are left to
-// the render layer, which records them as ordinary spans.
+// Process-wide CPU profiler. Span recording is per-thread and cheap: spans
+// and their call aggregates accumulate in a thread-local buffer under its own
+// lock, merged into the shared registries at frame boundaries and thread
+// exit — the global mutex is never taken on the recording path. Counters and
+// gauges remain under the global lock. GPU pass timings are left to the
+// render layer, which records them as ordinary spans.
 class Profiler {
 public:
     static Profiler& instance();
@@ -134,10 +137,14 @@ private:
     void register_thread_buffer(ThreadSpans* buffer);
     void unregister_thread_buffer(ThreadSpans* buffer);
     void register_once(ThreadSpans& storage);
+    void merge_thread_aggregates_locked(ThreadSpans& buffer);
     void drain_thread_buffers_locked();
+    // Callers hold mutex_: merged view of aggregates_ plus per-thread
+    // aggregates that have not reached a frame boundary yet.
+    std::vector<ProfileAggregate> aggregates_merged_locked() const;
     static std::uint64_t thread_key();
 
-    bool enabled_{true};
+    std::atomic<bool> enabled_{true};
     mutable std::mutex mutex_;
     std::deque<ProfileFrame> frames_;
     std::size_t retained_frames_{240};
