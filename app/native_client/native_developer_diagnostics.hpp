@@ -28,16 +28,16 @@ const char *campaign_domain_name(std::int64_t domain){
 class NativeDeveloperDiagnostics {
 public:
   void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;refresh(monitor);}
-  void close(){visible_=false;pressed_=-1;dropdown_.close();entity_search_focused_=false;}
+  void close(){visible_=false;pressed_=-1;dropdown_.close();entity_search_focused_=event_search_focused_=false;}
   bool visible()const{return visible_;}
-  bool wants_text_input()const{return visible_&&entity_search_focused_;}
+  bool wants_text_input()const{return visible_&&(entity_search_focused_||event_search_focused_);}
   bool handle(const InputEvent &e,int w,int h,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     if(!visible_)return false;const auto l=layout(w,h);pointer_=e.position;
     if(dropdown_.visible()){
       if(const auto choice=dropdown_.handle(e,l.detail,w,h))monitor.history().set_detail(static_cast<stellar::engine::DiagnosticDetail>(*choice));
       return true;
     }
-    if(e.type==InputEventType::EscapePressed){if(entity_search_focused_){entity_search_focused_=false;return true;}close();return true;}
+    if(e.type==InputEventType::EscapePressed){if(entity_search_focused_||event_search_focused_){entity_search_focused_=event_search_focused_=false;return true;}close();return true;}
     if(e.type==InputEventType::PointerCancelled){pressed_=-1;return true;}
     // Shared scroll model — row stride/count are view-dependent, so the
     // engine VirtualizedList is configured per event/render against the
@@ -49,7 +49,8 @@ public:
     if(e.type==InputEventType::LeftPressed){
       if(l.detail.contains(e.position)){dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));return true;}
       pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
-      entity_search_focused_=entities_&&entity_search_rect(l).contains(e.position);
+      entity_search_focused_=entities_&&header_search_rect(l).contains(e.position);
+      event_search_focused_=events_&&header_search_rect(l).contains(e.position);
       // Sortable phase-table headers (default view) — same click
       // convention as the colony roster: press cycles asc→desc and the
       // scroll returns to the top.
@@ -84,13 +85,15 @@ public:
         }
       }
     }
-    if(entity_search_focused_){
-      // Pointer-focused entity search — the roster/navigator contract:
-      // typed text edits, Backspace pops a UTF-8 code point, Tab or
-      // Return commit out, and the field owns the keyboard meanwhile.
-      if(e.type==InputEventType::TextEntered&&entity_search_.size()+e.text.size()<=120){entity_search_+=e.text;entities_dirty_=true;}
-      else if(e.type==InputEventType::BackspacePressed&&!entity_search_.empty()){auto n=entity_search_.size()-1;while(n>0&&(static_cast<unsigned char>(entity_search_[n])&0xc0)==0x80)--n;entity_search_.resize(n);entities_dirty_=true;}
-      else if(e.type==InputEventType::KeyPressed&&(e.key==9u||e.key==13u))entity_search_focused_=false;
+    if(entity_search_focused_||event_search_focused_){
+      // Pointer-focused search — the roster/navigator contract: typed
+      // text edits, Backspace pops a UTF-8 code point, Tab or Return
+      // commit out, and the field owns the keyboard meanwhile.
+      auto &search=entity_search_focused_?entity_search_:event_search_;
+      if(e.type==InputEventType::TextEntered&&search.size()+e.text.size()<=120)search+=e.text;
+      else if(e.type==InputEventType::BackspacePressed&&!search.empty()){auto n=search.size()-1;while(n>0&&(static_cast<unsigned char>(search[n])&0xc0)==0x80)--n;search.resize(n);}
+      else if(e.type==InputEventType::KeyPressed&&(e.key==9u||e.key==13u))entity_search_focused_=event_search_focused_=false;
+      if(entity_search_focused_&&(e.type==InputEventType::TextEntered||e.type==InputEventType::BackspacePressed))entities_dirty_=true;
       return true;
     }
     if(e.type==InputEventType::KeyPressed&&entities_&&!entities_dirty_){
@@ -257,10 +260,7 @@ public:
       label({l.list.x,l.list.y-31*s,l.list.width-262*s,27*s},std::to_string(entity_total_)+" projected entities · "+std::to_string(entity_parented_)+" parented · "+number(entity_bytes_/1024.)+" KiB estimated container footprint · "+
         (entity_sync_?"synced +"+std::to_string(entity_sync_->created)+" ~"+std::to_string(entity_sync_->updated)+" -"+std::to_string(entity_sync_->destroyed)+" ↻"+std::to_string(entity_sync_->reparented):"fresh projection")+
         (entity_search_.empty()?"":" · "+std::to_string(entity_shown_)+" shown")+" · read-only",native_menu_style::muted);
-      const UiRect search_rect=entity_search_rect(l);
-      out.overlay.emplace_back(FilledRectangle{search_rect,{3,13,22,245}});
-      out.overlay.emplace_back(StrokedRectangle{search_rect,entity_search_focused_?native_menu_style::cyan:Color{54,111,140,255}});
-      label({search_rect.x+8*s,search_rect.y+4*s,search_rect.width-16*s,22*s},entity_search_.empty()?"Search entities…":entity_search_,entity_search_.empty()?native_menu_style::muted:native_menu_style::ink);
+      render_search_field(out,header_search_rect(l),entity_search_,entity_search_focused_,"Search entities…",font);
       // The list splits into the row scroll view (left) and a read-only
       // field dump of the selected entity (right) — the same
       // list+details idiom as the celestial index.
@@ -329,10 +329,21 @@ public:
         label({l.list.x+810*s,y+4*s,190*s,25*s},cells[3].text);
       }
     }else{
-      label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(snapshot_.size())+" retained events · newest first · snapshot captured on refresh",native_menu_style::muted);
-      const auto range=scroll_window(l,57.f,snapshot_.size(),8);
+      // The filter maps onto a stable index list so hit-testing, scroll
+      // bounds and rendered rows all agree on the same visible set.
+      const auto event_query=fold_ascii(event_search_);
+      event_view_.clear();
+      for(std::size_t i=0;i<snapshot_.size();++i){
+        const auto &r=snapshot_[i];
+        if(event_query.empty()||fold_ascii(r.game_date+" tick "+std::to_string(r.tick)+(r.civilization_id?" empire "+std::to_string(*r.civilization_id):"")+" "+r.subsystem+"/"+r.event_type+" "+r.message).find(event_query)!=std::string::npos)
+          event_view_.push_back(i);
+      }
+      label({l.list.x,l.list.y-31*s,l.list.width-262*s,27*s},std::to_string(snapshot_.size())+" retained events · newest first · snapshot captured on refresh"+
+        (event_search_.empty()?"":" · "+std::to_string(event_view_.size())+" shown"),native_menu_style::muted);
+      render_search_field(out,header_search_rect(l),event_search_,event_search_focused_,"Search events…",font);
+      const auto range=scroll_window(l,57.f,event_view_.size(),8);
       for(auto i=range.first;i<range.last;++i){
-        const auto &r=snapshot_[i];const auto y=l.list.y+static_cast<float>(i)*57*s-list_view_.scroll_offset;
+        const auto &r=snapshot_[event_view_[i]];const auto y=l.list.y+static_cast<float>(i)*57*s-list_view_.scroll_offset;
         out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,54*s},{12,32,45,210}});
         const auto color=r.severity>=stellar::engine::DiagnosticSeverity::Error?Color{255,135,112,255}:
             r.severity==stellar::engine::DiagnosticSeverity::Warning?Color{245,199,113,255}:native_menu_style::cyan;
@@ -340,6 +351,7 @@ public:
         label({l.list.x+8*s,y+28*s,l.list.width-16*s,23*s},r.message);
       }
       if(snapshot_.empty())label(l.list,"No retained events at the chosen recording level. This does not certify a clean simulation.",native_menu_style::muted);
+      else if(event_view_.empty())label(l.list,"No retained events match the search.",native_menu_style::muted);
     }
     label({l.panel.x+20*s,l.panel.y+650*s,l.panel.width-40*s,26*s},
       "Checks: "+std::to_string(monitor.invariant_checks())+" · Retained: "+std::to_string(monitor.history().records().size())+
@@ -361,9 +373,16 @@ private:
   // In the entities view the list splits: rows left, selected-entity
   // detail right — row hit-testing bounds to the rows region.
   static UiRect entity_rows_rect(const Layout &l){return {l.list.x,l.list.y,l.list.width*.62f,l.list.height};}
-  // The entities search field shares the census header band (right
+  // The entities/events search fields share the header band (right
   // edge, above the list) — pointer-focused like the roster's.
-  static UiRect entity_search_rect(const Layout &l){return {l.list.x+l.list.width-250*l.scale,l.list.y-34*l.scale,250*l.scale,28*l.scale};}
+  static UiRect header_search_rect(const Layout &l){return {l.list.x+l.list.width-250*l.scale,l.list.y-34*l.scale,250*l.scale,28*l.scale};}
+  // Shared search-field chrome for the list views (entities/events).
+  template<typename Out> void render_search_field(Out &out,const UiRect &r,const std::string &text,bool focused,std::string_view placeholder,int font)const{
+    out.overlay.emplace_back(FilledRectangle{r,{3,13,22,245}});
+    out.overlay.emplace_back(StrokedRectangle{r,focused?native_menu_style::cyan:Color{54,111,140,255}});
+    const float s=r.height/28.f;
+    native_menu_style::text(out,{r.x+8*s,r.y+4*s,r.width-16*s,22*s},text.empty()?std::string(placeholder):text,font,text.empty()?native_menu_style::muted:native_menu_style::ink);
+  }
   // ASCII case fold for the entity search — projected labels are ASCII.
   static std::string fold_ascii(std::string_view v){std::string r;r.reserve(v.size());for(const char c:v)r+=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));return r;}
   // Phase-table column headers sit one row above the list (the rects
@@ -428,8 +447,9 @@ private:
   static std::string number(double value){std::ostringstream out;out<<std::fixed<<std::setprecision(3)<<value;return out.str();}
   std::vector<stellar::engine::DiagnosticRecord> snapshot_;stellar::native_ui::Dropdown dropdown_;
   bool visible_{},events_{};int pressed_{-1};Point pointer_{};
-  std::string entity_search_;bool entity_search_focused_{};
+  std::string entity_search_,event_search_;bool entity_search_focused_{},event_search_focused_{};
   mutable std::size_t entity_shown_{};
+  mutable std::vector<std::size_t> event_view_;
   mutable stellar::engine::VirtualizedList list_view_;mutable std::size_t list_rows_{};
   mutable stellar::engine::TableModel phase_table_;
 };

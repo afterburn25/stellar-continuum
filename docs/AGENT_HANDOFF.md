@@ -917,6 +917,15 @@ a row click still selects. The test covers focus, filtered leaves,
 expanded ancestors, the census count, Escape-blur, and the
 clear→restore round trip. `native_developer_diagnostics` green;
 client builds clean under /W4 /WX.
+Events search (row-24 diagnostics usability): the RECENT EVENTS view
+shares the same pointer-focused field contract (header-band search
+rect, shared chrome helper) over the 512-record retained ring — the
+filter compiles to a render-time index list (`event_view_`) so
+hit-testing, scroll bounds and rendered cards all agree on the same
+visible set, and the header appends the kept count. The test
+isolates the always-present session record by needle, asserts the
+filtered card count and census, and covers Escape-blur.
+`native_developer_diagnostics` green; client builds clean.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

@@ -246,6 +246,33 @@ int main(int argc,char **argv)try{
       }
     }
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Entities inspector modified world state.");
+    // Events search — the same pointer-focused field filters the
+    // retained ring down to cards carrying the needle.
+    click("RECENT EVENTS");
+    {
+      const auto count_cards=[](const DrawList &d){
+        std::size_t n=0;
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value.find(" · tick ")!=std::string::npos)++n;
+        return n;};
+      const auto all=count_cards(draw());
+      check(all>1,"Events view rendered no retained records.");
+      const auto anchor=control(draw(),"Search events…");
+      (void)window.handle({InputEventType::LeftPressed,anchor},w,h,monitor);
+      (void)window.handle({InputEventType::LeftReleased,anchor},w,h,monitor);
+      check(window.wants_text_input(),"Events search did not take focus.");
+      InputEvent typed{InputEventType::TextEntered};typed.text="isolated";
+      (void)window.handle(typed,w,h,monitor);
+      const auto filtered=draw();std::size_t shown_cards=0;bool message=false,shown_count=false;
+      for(const auto &c:filtered.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){
+        if(t->value.find(" · tick ")!=std::string::npos)++shown_cards;
+        if(t->value.find("Observing the isolated developer campaign")!=std::string::npos)message=true;
+        if(t->value.find(" shown")!=std::string::npos)shown_count=true;
+      }
+      check(shown_cards==1&&shown_cards<all&&message&&shown_count,"Events search did not isolate the matching record.");
+      (void)window.handle({InputEventType::EscapePressed},w,h,monitor);
+      check(!window.wants_text_input()&&window.visible(),"Escape in event search closed the panel.");
+    }
+    check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Events search modified world state.");
     click("CLOSE");check(!window.visible()&&!window.handle({InputEventType::LeftPressed},w,h,monitor),"Closed diagnostics captured gameplay.");
     panel.toggle();controls={};panel.render(controls,w,h,frame);point=control(controls,"EMPIRE MONITOR");
     (void)panel.handle({InputEventType::LeftPressed,point},w,h,frame);(void)panel.handle({InputEventType::LeftReleased,point},w,h,frame);
