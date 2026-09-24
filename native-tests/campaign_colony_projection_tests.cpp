@@ -424,6 +424,21 @@ int main() {
     // The ops pass skips the corrupt entities rather than throwing —
     // before the guards, any of these escaped the whole pass.
     (void)inspect_campaign_operations(world, 0, 100.0);
+
+    // Bounded passes surface truncation honestly instead of silently
+    // dropping findings: the invariant marker carries the drop count.
+    const auto capped_invariants = inspect_campaign_invariants(world, 0, 100.0, 3);
+    check(capped_invariants.size() == 4 &&
+              capped_invariants.back().event_type == "findings_truncated" &&
+              capped_invariants.back().severity ==
+                  stellar::engine::DiagnosticSeverity::Critical,
+          "invariant cap appends a Critical truncation marker");
+    const auto capped_ops = inspect_campaign_operations(world, 0, 100.0, 1);
+    check(capped_ops.size() == 2 &&
+              capped_ops.back().event_type == "findings_truncated" &&
+              capped_ops.back().severity ==
+                  stellar::engine::DiagnosticSeverity::Warning,
+          "operations cap appends a Warning truncation marker");
   }
 
   if (failures == 0)

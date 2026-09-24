@@ -29,6 +29,11 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
   using namespace stellar::engine;
   if(maximum<1||maximum>4096)throw std::invalid_argument("Invalid operational finding bound.");
   std::vector<DiagnosticRecord> records;
+  // Honest truncation: any candidate loop that stops at the bound, or
+  // any block skipped because it is already full, means findings may
+  // have been dropped — the pass appends a findings_truncated marker
+  // so callers can distinguish "128 findings" from "128 of N".
+  bool truncated=false;
   for(const auto &fleet:world.fleets){
     if(!fleet.is_active||!fleet.return_to_base_failure_reason||fleet.return_to_base_failure_reason->empty())continue;
     DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="fleet";
@@ -36,18 +41,18 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
     r.entity_id=fleet.id;r.civilization_id=fleet.civilization_id;r.system_id=fleet.current_system_id;
     r.message=*fleet.return_to_base_failure_reason;
     r.values["fuelLightYears"]=fleet.fuel_remaining_light_years;
-    records.push_back(std::move(r));if(records.size()==maximum)break;
+    records.push_back(std::move(r));if(records.size()==maximum){truncated=true;break;}
   }
   // Sustenance shortfalls: colonies whose food/water demand outruns
   // installed supply over a 30-day horizon. The engine economy-analysis
   // framework does the demand/bottleneck math; the projection adapter
   // reshapes authoritative sustenance state (same functions the economy
   // phase calls) — no rules are duplicated or re-derived here.
-  if(records.size()<maximum){
+  if(records.size()>=maximum)truncated=true;else{
     static const auto catalog=sustenance_economy_catalog();
     const SettlementBodyIndex sustenance_index(world.colonies,world.bodies);
     for(const auto &colony:world.colonies){
-      if(records.size()>=maximum)break;
+      if(records.size()>=maximum){truncated=true;break;}
       if(colony.kind!=SettlementKind::Colony)continue;
       // The authoritative queries refuse corrupt colonies (uncatalogued
       // building types, unresolved bodies, negative ids) — invariants
@@ -57,7 +62,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       catch(const std::exception&){continue;}
       for(const auto &d:demands){
         if(!d.bottleneck)continue;
-        if(records.size()>=maximum)break;
+        if(records.size()>=maximum){truncated=true;break;}
         DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="colony";
         r.event_type=d.resource=="res.power"?"power_shortfall":"sustenance_shortfall";
         r.severity=DiagnosticSeverity::Warning;
@@ -79,9 +84,9 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
   // output (they fail `operational()` before power/staffing allocation).
   // The engine settlement projection carries the authoritative
   // per-structure condition — no rules are re-derived here.
-  if(records.size()<maximum){
+  if(records.size()>=maximum)truncated=true;else{
     for(const auto &colony:world.colonies){
-      if(records.size()>=maximum)break;
+      if(records.size()>=maximum){truncated=true;break;}
       if(colony.surface_buildings.empty())continue;
       const auto settlement=project_colony_settlement(colony);
       std::size_t degraded=0;double worst=1.0;
@@ -108,7 +113,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
   // holds another civilization's colonies. Strength values come from
   // the warfare theater projection (WarfareModel reports over real
   // combat profiles), not a recomputed approximation.
-  if(records.size()<maximum){
+  if(records.size()>=maximum)truncated=true;else{
     std::unordered_map<int,std::unordered_set<int>> system_owners;
     for(const auto &colony:world.colonies){
       if(colony.kind!=SettlementKind::Colony)continue;
@@ -122,7 +127,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       try{theater.emplace(project_warfare_theater(world.fleets,world.systems));}
       catch(const std::exception&){}
       if(theater)for(const auto &fleet:world.fleets){
-        if(records.size()>=maximum)break;
+        if(records.size()>=maximum){truncated=true;break;}
         if(!fleet.is_active||!fleet.current_system_id||
            fleet.transit_phase!=FleetTransitPhase::None)continue;
         const auto owners=system_owners.find(*fleet.current_system_id);
@@ -149,7 +154,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
   // broken, destination gone). Reassessed with the same authoritative
   // reach calculator orders use — flagged only when the assessment is
   // authoritative, not provisional.
-  if(records.size()<maximum){
+  if(records.size()>=maximum)truncated=true;else{
     // Lane construction refuses duplicate system ids and reach
     // evaluation refuses non-finite metrics — invariants flag both;
     // skip rather than fail the whole pass.
@@ -167,7 +172,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       }
     };
     for(const auto &fleet:world.fleets){
-      if(records.size()>=maximum)break;
+      if(records.size()>=maximum){truncated=true;break;}
       if(!fleet.is_active||!fleet.destination_system_id)continue;
       if(!world.systems.empty()&&
          std::none_of(world.systems.begin(),world.systems.end(),
@@ -203,13 +208,13 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
   // coverage come from `economy_logistics`/`civilization_logistics_coverage`
   // — the same authoritative computations the logistics workspace and
   // voice bridge consume — not re-derived here.
-  if(records.size()<maximum){
+  if(records.size()>=maximum)truncated=true;else{
     const auto econ_construction=economic_construction_projection(world.construction);
     const auto econ_fleets=economic_fleet_projection(world.fleets);
     const EconomyWorldView econ{world.civilizations,world.bodies,econ_construction,econ_fleets};
     const SettlementBodyIndex population_index(world.colonies,world.bodies);
     for(const auto &civ:world.civilizations){
-      if(records.size()>=maximum)break;
+      if(records.size()>=maximum){truncated=true;break;}
       // The authoritative queries throw when a civ lacks economy or
       // construction rows — missing rows are an invariant finding, not
       // a logistics one; skip rather than fail the whole pass.
@@ -224,7 +229,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       try{snapshot=economy_logistics(econ,world.colonies,world.economies,civ.id);}
       catch(const std::exception&){continue;}
       for(const auto &colony:snapshot.colonies){
-        if(records.size()>=maximum)break;
+        if(records.size()>=maximum){truncated=true;break;}
         if(colony.condition==SupplyCondition::Healthy)continue;
         DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="logistics";
         r.event_type=colony.condition==SupplyCondition::Critical?"logistics_critical":"logistics_strained";
@@ -246,7 +251,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       // Treasury: Arrears/Depleted are the severe states the economy
       // workspace and voice bridge already classify via the same
       // authoritative assess_treasury; Surplus/Deficit are normal.
-      if(records.size()<maximum){
+      if(records.size()>=maximum)truncated=true;else{
         const auto eit=std::find_if(world.economies.begin(),world.economies.end(),
             [&](const auto &e){return e.civilization_id==civ.id;});
         // assess_treasury rejects non-finite/negative inputs — corrupt
@@ -287,7 +292,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       // homebound civilizations.
       const auto has_external=std::any_of(world.colonies.begin(),world.colonies.end(),
           [&](const auto &c){return c.civilization_id==civ.id&&c.system_id!=civ.home_system_id;});
-      if(records.size()<maximum&&has_external){
+      if(records.size()>=maximum)truncated=true;else if(has_external){
         CivilizationLogisticsCoverage coverage;
         try{coverage=civilization_logistics_coverage(econ,world.colonies,world.economies,civ.id);}
         catch(const std::exception&){coverage={};}
@@ -311,13 +316,13 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       // signal the colony-level snapshots cannot express. The network
       // is projected from the same authoritative home_system_logistics
       // the workspace consumes; nothing is re-derived here.
-      if(records.size()<maximum){
+      if(records.size()>=maximum)truncated=true;else{
         HomeSystemLogisticsNetwork home;
         try{home=home_system_logistics(econ,world.colonies,world.economies,civ.id);}
         catch(const std::exception&){home={};}
         const auto projected=project_home_logistics_network(home);
         for(const auto& [route_id,utilization]:projected.route_utilization()){
-          if(records.size()>=maximum)break;
+          if(records.size()>=maximum){truncated=true;break;}
           if(utilization<0.999)continue;
           const auto* route=projected.route(route_id);
           if(!route)continue;
@@ -344,14 +349,14 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       // crowding, sustenance ratios) — const query, no growth is
       // simulated. A colony whose cohort wants to leave at >=10%/year
       // is a loyalty risk no existing finding covers.
-      if(records.size()<maximum){
+      if(records.size()>=maximum)truncated=true;else{
         const auto cit=std::find_if(econ_construction.begin(),econ_construction.end(),
             [&](const auto &s){return s.civilization_id==civ.id;});
         const bool automation=cit!=econ_construction.end()&&
             std::find(cit->completed_project_ids.begin(),cit->completed_project_ids.end(),
                       "industrial_automation")!=cit->completed_project_ids.end();
         for(const auto &colony:world.colonies){
-          if(records.size()>=maximum)break;
+          if(records.size()>=maximum){truncated=true;break;}
           if(colony.civilization_id!=civ.id||colony.kind!=SettlementKind::Colony)continue;
           // The projection refuses corrupt colonies (uncatalogued
           // species/building types, unresolved bodies, negative ids) —
@@ -386,7 +391,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
       // temporal and do not apply to a one-shot ranking); the journal
       // still records utility and candidate count. The commit emits the
       // spotlight record — a real effect, not a shadow evaluation.
-      if(records.size()<maximum){
+      if(records.size()>=maximum)truncated=true;else{
         static const std::unordered_map<std::string,double> severity_weights{
             {"logistics_critical",.95},{"treasury_depleted",.95},
             {"treasury_arrears",.9},{"logistics_link_saturated",.85},
@@ -403,7 +408,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
           mind.add_action({action_id,"spotlight",
               [utility=weight->second]{return utility;},
               [&,finding=finding,utility=weight->second]{
-                if(records.size()>=maximum)return;
+                if(records.size()>=maximum){truncated=true;return;}
                 DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
                 r.subsystem="advisor";r.event_type="advisor_spotlight";
                 r.severity=DiagnosticSeverity::Warning;
@@ -418,6 +423,14 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
         (void)mind.decide("spotlight",day,0.0);
       }
     }
+  }
+  if(truncated){
+    DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
+    r.subsystem="diagnostics";r.event_type="findings_truncated";
+    r.severity=DiagnosticSeverity::Warning;
+    r.message="Operational finding bound reached; additional findings may have been dropped.";
+    r.values["maximumFindings"]=static_cast<std::int64_t>(maximum);
+    records.push_back(std::move(r));
   }
   return records;
 }
@@ -448,8 +461,11 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   using namespace stellar::engine;
   if(maximum<1||maximum>4096)throw std::invalid_argument("Invalid invariant finding bound.");
   std::vector<DiagnosticRecord> findings;
+  // Dropped findings are counted and surfaced as a findings_truncated
+  // marker so a capped pass cannot hide invariant corruption silently.
+  std::size_t dropped=0;
   const auto emit=[&](std::string subsystem,std::string type,int id,std::string message){
-    if(findings.size()>=maximum)return;
+    if(findings.size()>=maximum){++dropped;return;}
     DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem=std::move(subsystem);
     r.event_type=std::move(type);r.message=std::move(message);r.entity_id=id;r.severity=DiagnosticSeverity::Critical;
     findings.push_back(std::move(r));
@@ -617,6 +633,14 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     }
   }
   if(!civilizations.contains(w.player_civilization_id))emit("civilization","missing_player",w.player_civilization_id,"Player empire ID does not exist.");
+  if(dropped>0){
+    DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
+    r.subsystem="diagnostics";r.event_type="findings_truncated";
+    r.severity=DiagnosticSeverity::Critical;
+    r.message="Invariant finding bound reached; corrupt-state findings were dropped.";
+    r.values["droppedFindings"]=static_cast<std::int64_t>(dropped);
+    findings.push_back(std::move(r));
+  }
   return findings;
 }
 }

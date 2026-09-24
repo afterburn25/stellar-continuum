@@ -764,7 +764,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   entity degrades to "invariant finding + skipped entity" instead of
   discarding the entire pass's findings (the monitor collects
   invariants and operations in one batch, so an escape previously
-  lost both).
+  lost both). Both passes also surface truncation honestly: when the
+  `maximum_findings` bound is reached mid-scan a `findings_truncated`
+  marker is appended (Critical for invariants with the dropped count,
+  Warning for operations), so a capped pass cannot hide findings
+  silently — callers may see `maximum`+1 records.
   `campaign_colony_projection`
   tests — spec synthesis, flag fidelity, remaining-industry accounting,
   powered-set operating flags, unknown-type fallback, hub-less capacity

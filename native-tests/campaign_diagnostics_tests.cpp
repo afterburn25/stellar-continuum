@@ -118,7 +118,9 @@ int main(int argc,char **argv)try{
   const auto faults=inspect_campaign_invariants(corrupt,20,5);
   check(faults.size()==3,"Duplicate ID, orphaned colony and nonfinite credits were not detected.");
   check(faults.front().tick==20&&faults.front().severity==DiagnosticSeverity::Critical,"Invariant lost severity/tick.");
-  check(inspect_campaign_invariants(corrupt,20,5,2).size()==2,"Invariant limit ignored.");
+  const auto capped=inspect_campaign_invariants(corrupt,20,5,2);
+  check(capped.size()==3&&capped.back().event_type=="findings_truncated",
+        "Invariant limit ignored or truncation marker missing.");
   check(rejects([&]{(void)inspect_campaign_invariants(world,0,0,0);}),"Invalid finding bound accepted.");
   const auto root=fs::path(argv[2])/std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
   DiagnosticRecord r;r.tick=42;r.game_date="26 Mar 2050";r.real_timestamp=diagnostic_utc_now();
