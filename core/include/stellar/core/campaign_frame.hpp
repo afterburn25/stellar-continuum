@@ -7,6 +7,9 @@
 #include <stellar/engine/history.hpp>
 
 #include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace stellar::core {
@@ -28,6 +31,24 @@ struct CampaignFrameResult {
   // Opt-in wall-clock execution measurements, never serialized or used by
   // simulation decisions. One sample per completed authoritative tick.
   std::vector<std::uint64_t> tick_execution_nanoseconds;
+};
+
+// Attributes a retained advance trace to the first phase whose output is
+// absent. `expected_sensor_contacts` is the campaign civilization count
+// when the step advanced positive time (0 for zero-day steps, where the
+// sensor loop is skipped by design); a partially filled contact vector
+// means the sensor loop itself threw. All four phase outputs present means
+// the throw came from post-step chronicle recording.
+[[nodiscard]] std::string_view campaign_advance_failure_phase(
+    const IntegratedAdaptiveCampaignAdvanceTrace &trace,
+    std::size_t expected_sensor_contacts) noexcept;
+
+// Diagnosis for an authoritative step that threw inside advance(). The
+// phase names the strategic phase whose output is absent from the retained
+// trace, or the tactical route when the combat advance threw.
+struct CampaignAdvanceFailure {
+  std::string phase;
+  std::string message;
 };
 
 // Reconstructed headless adapter for Main's frame routing. Trusted bootstrap
@@ -67,6 +88,10 @@ class CampaignFrame final {
   issue_tactical_order(MassiveCombatOrder order);
   [[nodiscard]] MassiveCombatSnapshot tactical_snapshot();
   [[nodiscard]] CampaignFrameResult advance(double real_delta_seconds);
+  // Set when the previous advance attempt threw mid-step; cleared by the
+  // next attempt. Diagnostics read it after catching advance().
+  [[nodiscard]] const std::optional<CampaignAdvanceFailure> &
+  last_advance_failure() const noexcept;
   // The campaign chronicle: every completed advance's emitted events,
   // owned by the runtime and serialized with the save payload.
   [[nodiscard]] engine::EventHistory &history() noexcept;

@@ -822,7 +822,20 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   save-path `restore` validation so in-memory corruption surfaces before
   the next save/load cycle, plus `orphaned_civilization` for rows the
   codec maps to absent empires. The monitor,
-  developer report and QA host compose all three passes,
+  developer report and QA host compose all three passes.
+  `CampaignFrame::advance` also retains a `CampaignAdvanceFailure`
+  on the frame when an authoritative step throws mid-step: every
+  `runtime->advance` call passes the `IntegratedAdaptiveCampaignAdvanceTrace`,
+  and `campaign_advance_failure_phase` attributes the throw to the first
+  phase whose output is absent (`core`/`sensor`/`research`/`diplomacy`,
+  `chronicle` when all four completed but post-step recording threw, or
+  `tactical` for the combat route) plus the exception message —
+  `frame.last_advance_failure()` clears on the next attempt and the QA
+  host records it as a `simulation/step_failure` critical finding in the
+  failure path before attempting the critical checkpoint. `campaign_frame_parity`'s
+  StrategicFailure contract row asserts the record exists with an
+  attributed phase on a real throw, and the moved-owner row asserts a
+  successful advance leaves none,
   cross-system orbit bindings via `validate_stellar_orbit_catalog`
   (`invalid_orbit_binding`), `validate_central_black_hole` on the
   galactic-core metadata (`invalid_black_hole`), galactic-core
