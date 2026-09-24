@@ -305,6 +305,43 @@ int main(int argc,char **argv)try{
       check(empires.handle({InputEventType::EscapePressed},w,h,frame)&&empires.focus()<0&&empires.visible(),"Escape closed the empire monitor instead of releasing its ring.");
       check(empires.handle({InputEventType::EscapePressed},w,h,frame)&&!empires.visible(),"Second Escape did not close the empire monitor.");
     }
+    // Empire monitor edge scroll: with more empires than the twelve
+    // rendered slots, Down on the bottom row scrolls the content window so
+    // every empire is reachable — wrap only happens at the true last row.
+    {
+      auto many=seed_persistable_fresh_campaign(-9142051,load_nearby_catalog(argv[1]),
+          {"2050-03-21T00:00:00Z",250,13,3,"terran_baseline",StellarPopulationOptions{},true});
+      auto many_runtime=IntegratedAdaptiveCampaignRuntime::create_fresh(load_adaptive_research_strategic_runtime(argv[2]),std::move(many));
+      CampaignFrame many_frame(std::move(many_runtime),StrategicClock{},CampaignFramePolicy::Developer);
+      NativeDeveloperEmpireMonitor empires;empires.open(many_frame);
+      check(stellar::core::developer_empire_summaries(many_frame.runtime()).size()>12,"The many-empire fixture did not overflow the monitor's rendered window.");
+      const auto press=[&](std::uint32_t key){InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;return empires.handle(ev,w,h,many_frame);};
+      check(press(9),"Tab did not enter the many-empire ring.");
+      std::unordered_set<std::string> seen;
+      std::string top_row_label;
+      bool wrapped=false;
+      for(int i=0;i<64;++i){
+        check(press(0x40000051u),"Empire edge-scroll navigation leaked.");
+        const auto label=empires.focused_label(w,h);
+        if(label=="Close empire monitor"&&!seen.empty()){wrapped=true;break;}
+        if(top_row_label.empty()&&label!="Close empire monitor")
+          top_row_label=label;
+        seen.insert(label);
+      }
+      check(wrapped,"Down never wrapped back to the ring's top.");
+      // Twelve slots render at once — distinct row labels past that count
+      // prove Down edge-scrolled the content window.
+      seen.erase("Show home system");
+      seen.erase("Refresh empire monitor");
+      check(seen.size()>12,"Down did not edge-scroll the empire list past its rendered window.");
+      // Up walks back: the top row's label returns once the window is home.
+      bool returned=false;
+      for(int i=0;i<64;++i){
+        check(press(0x40000052u),"Empire edge-scroll Up navigation leaked.");
+        if(empires.focused_label(w,h)==top_row_label){returned=true;break;}
+      }
+      check(returned,"Up did not scroll the empire list back to its first row.");
+    }
     // Simulation panel: the sixteen rendered buttons ring in (y,x) order
     // and activation replays the same dispatch a matched press/release
     // takes — the 25× speed lands through set_developer_speed unchanged.

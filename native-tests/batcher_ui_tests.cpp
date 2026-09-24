@@ -93,6 +93,16 @@ int main() {
   fractional.configure(40, 24.0f, 480.0f);
   check(fractional.scroll_offset == 480.0f,
         "configure re-clamps when the viewport grows");
+  // Snap tolerance: a max scroll landing a hair under a row multiple must
+  // still expose the final row — otherwise fixed-slot lists keep the last
+  // row permanently out of the rendered window.
+  VirtualizedList tail;
+  tail.configure(16, 22.78f, 273.36f);
+  tail.scroll_to(tail.max_scroll());
+  check(tail.sync_rows(16, 22.78f, 273.36f) == 4,
+        "a boundary-adjacent max scroll must expose the final row");
+  check(tail.visible_range().last == 16,
+        "the final row must be inside the visible range");
 
   // --- Scroll view (variable-height content) ---
   ScrollView view;
@@ -111,6 +121,21 @@ int main() {
         "shrunk content clamps the offset and hides the thumb");
   view.scroll_to(std::numeric_limits<float>::quiet_NaN());
   check(view.scroll_offset == 0.0f, "non-finite offsets reset to the head");
+  // scroll_interval_into_view snaps a clipped interval fully into the
+  // viewport and no-ops on an already-visible one.
+  view.sync(1000.0f, 200.0f);
+  view.scroll_to(140.0f);
+  view.scroll_interval_into_view(300.0f, 340.0f, 0.0f, 200.0f);
+  check(view.scroll_offset == 280.0f,
+        "an interval clipped below scrolls fully into view");
+  view.scroll_interval_into_view(145.0f, 195.0f, 0.0f, 200.0f);
+  check(view.scroll_offset == 280.0f, "a visible interval does not scroll");
+  view.scroll_interval_into_view(-20.0f, 20.0f, 0.0f, 200.0f);
+  check(view.scroll_offset == 260.0f,
+        "an interval clipped above scrolls up");
+  view.scroll_interval_into_view(180.0f, 5000.0f, 0.0f, 200.0f);
+  check(view.scroll_offset == view.max_scroll(),
+        "oversized intervals clamp through scroll_to");
 
   // --- Table model ---
   TableModel table;

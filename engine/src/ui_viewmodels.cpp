@@ -12,8 +12,12 @@ VirtualizedList::Range VirtualizedList::visible_range() const {
   range.content_height = row_height * static_cast<float>(row_count);
   if (row_count == 0 || row_height <= 0.0f || viewport_height <= 0.0f)
     return range;
+  // Snap tolerance: a scroll offset within a thousandth of a row of a row
+  // boundary is treated as being on the boundary — without it, a clamped
+  // max scroll like 91.12/22.78 floors to 3.999998 and the final row can
+  // never occupy the first rendered slot.
   const auto first = static_cast<std::size_t>(
-      std::clamp(std::floor(scroll_offset / row_height), 0.0f,
+      std::clamp(std::floor(scroll_offset / row_height + 1e-3f), 0.0f,
                  static_cast<float>(row_count - 1)));
   const auto visible = static_cast<std::size_t>(
       std::ceil(viewport_height / row_height)) + 1; // one row of overscan
@@ -60,9 +64,9 @@ std::size_t VirtualizedList::sync_rows(std::size_t rows, float new_row_height,
   configure(rows, new_row_height, new_viewport_height);
   if (row_height > 0.0f)
     scroll_offset =
-        std::floor(scroll_offset / row_height) * row_height;
+        std::floor(scroll_offset / row_height + 1e-3f) * row_height;
   return row_height > 0.0f
-             ? static_cast<std::size_t>(scroll_offset / row_height)
+             ? static_cast<std::size_t>(scroll_offset / row_height + 1e-3f)
              : 0;
 }
 
