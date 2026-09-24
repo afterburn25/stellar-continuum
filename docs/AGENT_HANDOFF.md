@@ -637,9 +637,9 @@ estimated_memory_bytes()` counts command payloads — unbounded during
 `--record` sessions — and the client reports it as `replay-recorder`
 while recording. `replay` covers the estimate + parsed round-trip;
 3/3 replay/session/persistence green.
-Caveat: `stellar_campaign_phase_profile_tests`/`campaign_phase_cadence`
-compile-fail on `set_phase_tier`/`wake_phase` — the coordinator API is
-mid-refactor in the other agent's lane, not a diagnostics regression.
+Earlier caveat retired: `campaign_phase_cadence`/`phase_profile` now
+compile and pass at HEAD (verified 13.2 s / 0.1 s) — the coordinator
+refactor landed.
 A 319-test run at `57ab71dc` records 317/319 green after the workspace
 keyboard-focus lane completed: every remaining native surface adopted the
 focus contract — settlement (choice rows), logistics (refresh/close),
