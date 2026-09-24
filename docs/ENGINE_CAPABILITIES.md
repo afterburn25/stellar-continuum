@@ -1222,9 +1222,10 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   Covered by `input_actions` tests (context_names enumeration, pad button
   press/release edges, axis persistence/update across frames, plus the
   existing feed/axis/chord/rebind suite); verified `--input-map` loads and
-  degrades to defaults on missing/malformed files. Remaining gap: no
-  rebinding UI or pad-specific glyphs in the tools; only the first pad is
-  used.
+  degrades to defaults on missing/malformed files. The in-app Controls
+  view rebinds Button and Axis1D actions (see the Native input record);
+  remaining gap: no pad-specific glyphs in the tools and only the first
+  pad is used.
 - **Scene music:** `SceneDocument::music` names a content-relative track the
   host plays when the scene loads — per-level music for `set_scene()`
   switching and hot reload (a change to the field restarts the new track;
