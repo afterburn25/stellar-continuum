@@ -808,7 +808,15 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `validate_developer_simulation_state` (fixed-tick speed/backlog
   consistency → `invalid_simulation`) and `validate_developer_coverage`
   (coverage version, forced-system refs, required stellar types →
-  `invalid_coverage`),
+  `invalid_coverage`). Diplomatic state — which lives on the campaign
+  runtime, outside `FreshCampaignState` — is covered by the companion
+  `inspect_diplomacy_invariants(diplomacy, world, …)` pass: it mirrors
+  `DiplomacySnapshotInvariantValidator` as a guarded umbrella
+  (`invalid_state`) and adds the campaign-entity refs the snapshot
+  validator cannot see (`orphaned_observer`/`orphaned_civilization`/
+  `orphaned_system` across contacts, relationships, access grants,
+  claims/responses, agreements, proposals and history). The monitor,
+  developer report and QA host compose all three passes,
   cross-system orbit bindings via `validate_stellar_orbit_catalog`
   (`invalid_orbit_binding`), `validate_central_black_hole` on the
   galactic-core metadata (`invalid_black_hole`), galactic-core
@@ -2240,7 +2248,8 @@ callers. Remaining gaps below are work outstanding, not approved deferrals.
   `campaign_diagnostics`, opt-in `CampaignFrame` profiling; Application
   `developer_qa_host`. Research fingerprints delegate to the same byte digest.
 - **Interfaces:** `DiagnosticLog::append/flush`, `DiagnosticLogPolicy`, typed
-  `DiagnosticRecord`, `inspect_campaign_invariants`, `campaign_step_diagnostics`,
+  `DiagnosticRecord`, `inspect_campaign_invariants`,
+  `inspect_diplomacy_invariants`, `campaign_step_diagnostics`,
   `CampaignFrame::set_profiling_enabled`, `tick_execution_nanoseconds`.
 - **Purpose/users:** The developer headless host runs the authoritative campaign
   frame, AI and research implementation. It records real events and measurements

@@ -45,6 +45,8 @@ public:
     if(!last_inspected_day_||std::floor(day)!=std::floor(*last_inspected_day_)){
       ++checks_;auto findings=inspect_campaign_invariants(world,tick,day);
       auto warnings=inspect_campaign_operations(world,tick,day);findings.insert(findings.end(),warnings.begin(),warnings.end());
+      auto diplomatic=inspect_diplomacy_invariants(frame.runtime().diplomacy(),world,tick,day);
+      findings.insert(findings.end(),diplomatic.begin(),diplomatic.end());
       std::set<Key> current;
       for(auto &finding:findings){
         Key key{finding.subsystem,finding.event_type,finding.entity_id.value_or(-1),finding.message};current.insert(key);

@@ -12,6 +12,8 @@
 #include <stellar/core/construction_projects.hpp>
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/developer_campaign.hpp>
+#include <stellar/core/diplomacy_snapshot_invariants.hpp>
+#include <stellar/core/diplomacy_state.hpp>
 #include <stellar/core/exploration_advance.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/fleet_reach.hpp>
@@ -1101,6 +1103,92 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     try{validate_developer_coverage(w);}
     catch(const std::exception&){
       emit("developer","invalid_coverage",0,"Developer coverage provenance fails its authoritative validation.");}
+  }
+  if(dropped>0){
+    DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
+    r.subsystem="diagnostics";r.event_type="findings_truncated";
+    r.severity=DiagnosticSeverity::Critical;
+    r.message="Invariant finding bound reached; corrupt-state findings were dropped.";
+    r.values["droppedFindings"]=static_cast<std::int64_t>(dropped);
+    findings.push_back(std::move(r));
+  }
+  return findings;
+}
+std::vector<stellar::engine::DiagnosticRecord>
+inspect_diplomacy_invariants(
+    const DiplomacyState &diplomacy,const FreshCampaignState &w,
+    std::uint64_t tick,double day,std::size_t maximum){
+  using namespace stellar::engine;
+  if(maximum<1||maximum>4096)throw std::invalid_argument("Invalid invariant finding bound.");
+  std::vector<DiagnosticRecord> findings;
+  std::size_t dropped=0;
+  const auto emit=[&](std::string_view type,int id,std::string message){
+    if(findings.size()>=maximum){++dropped;return;}
+    DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
+    r.subsystem="diplomacy";r.event_type=std::string(type);
+    r.message=std::move(message);r.entity_id=id;r.severity=DiagnosticSeverity::Critical;
+    findings.push_back(std::move(r));
+  };
+  DiplomacyStateSnapshot snapshot;
+  try{snapshot=diplomacy.snapshot();}
+  catch(const std::exception&){
+    emit("invalid_snapshot",0,"Diplomatic state could not be captured.");}
+  if(findings.empty()){
+    // The authoritative snapshot validator owns intra-record rules (enum
+    // ranges, id ordering, capacity, cross-record linkage); mirror it as
+    // one guarded umbrella rather than re-deriving each rule.
+    try{(void)DiplomacySnapshotInvariantValidator::validate(snapshot);}
+    catch(const std::exception &error){
+      emit("invalid_state",0,
+           std::string("Diplomatic state fails its invariant validator: ")+error.what());}
+    // Campaign-entity references: the snapshot validator cannot see the
+    // campaign, so absent-civilization/system refs are this pass's layer.
+    std::unordered_set<int> civ_ids,system_ids;
+    for(const auto &c:w.civilizations)civ_ids.insert(c.id);
+    for(const auto &s:w.systems)system_ids.insert(s.id);
+    const auto absent_civ=[&](int id){return !civ_ids.contains(id);};
+    const auto absent_system=[&](int id){return !system_ids.contains(id);};
+    const auto scan_known_to=[&](const std::vector<int> &ids){
+      for(const auto id:ids)if(absent_civ(id))return id;return 0;};
+    for(const auto &c:snapshot.contacts){
+      if(absent_civ(c.observer_civilization_id)){
+        emit("orphaned_observer",c.observer_civilization_id,"Contact observer is an absent civilization.");break;}}
+    for(const auto &c:snapshot.contacts){
+      if(c.target_civilization_id&&absent_civ(*c.target_civilization_id)){
+        emit("orphaned_civilization",*c.target_civilization_id,"Contact target is an absent civilization.");break;}
+      if(c.last_observed_system_id&&absent_system(*c.last_observed_system_id)){
+        emit("orphaned_system",*c.last_observed_system_id,"Contact observation site is an absent system.");break;}}
+    for(const auto &r:snapshot.relationships){
+      if(absent_civ(r.civilization_a_id)||absent_civ(r.civilization_b_id)){
+        emit("orphaned_civilization",r.civilization_a_id,"Relationship references an absent civilization.");break;}}
+    for(const auto &a:snapshot.access_permissions){
+      if(absent_civ(a.grantor_civilization_id)||absent_civ(a.visitor_civilization_id)){
+        emit("orphaned_civilization",a.grantor_civilization_id,"Access permission references an absent civilization.");break;}}
+    for(const auto &c:snapshot.claims){
+      if(absent_civ(c.claimant_civilization_id)){
+        emit("orphaned_civilization",c.claimant_civilization_id,"Territorial claimant is an absent civilization.");break;}
+      if(absent_system(c.system_id)){
+        emit("orphaned_system",c.system_id,"Territorial claim targets an absent system.");break;}
+      if(const auto bad=scan_known_to(c.known_to_civilization_ids)){
+        emit("orphaned_observer",bad,"Claim knowledge references an absent civilization.");break;}}
+    for(const auto &r:snapshot.claim_responses){
+      if(absent_civ(r.responding_civilization_id)){
+        emit("orphaned_civilization",r.responding_civilization_id,"Claim response references an absent civilization.");break;}}
+    for(const auto &a:snapshot.agreements){
+      if(absent_civ(a.civilization_a_id)||absent_civ(a.civilization_b_id)){
+        emit("orphaned_civilization",a.civilization_a_id,"Agreement references an absent civilization.");break;}}
+    for(const auto &p:snapshot.proposals){
+      if(absent_civ(p.proposer_civilization_id)||absent_civ(p.recipient_civilization_id)){
+        emit("orphaned_civilization",p.proposer_civilization_id,"Proposal references an absent civilization.");break;}}
+    for(const auto &e:snapshot.recent_history){
+      if(absent_civ(e.primary_civilization_id)){
+        emit("orphaned_civilization",e.primary_civilization_id,"History event references an absent civilization.");break;}
+      if(e.secondary_civilization_id&&absent_civ(*e.secondary_civilization_id)){
+        emit("orphaned_civilization",*e.secondary_civilization_id,"History event references an absent civilization.");break;}
+      if(e.system_id&&absent_system(*e.system_id)){
+        emit("orphaned_system",*e.system_id,"History event references an absent system.");break;}
+      if(const auto bad=scan_known_to(e.known_to_civilization_ids)){
+        emit("orphaned_observer",bad,"History knowledge references an absent civilization.");break;}}
   }
   if(dropped>0){
     DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);

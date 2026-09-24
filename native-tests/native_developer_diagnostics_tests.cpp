@@ -77,7 +77,11 @@ int main(int argc,char **argv)try{
     }
     for(const auto &c:view.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){const auto &r=*t->clip;
       check(r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h,"Diagnostics text escaped viewport.");}
-    click("RECENT EVENTS");(void)control(draw(),"Observing the isolated");
+    click("RECENT EVENTS");
+    // The newest-first list renders eight rows; the session-start record
+    // is the oldest entry, so scroll to the tail before asserting it.
+    {const auto anchor=control(draw(),"Colony logistics");InputEvent scroll{InputEventType::Wheel,anchor,{},-1000.f};(void)window.handle(scroll,w,h,monitor);}
+    (void)control(draw(),"Observing the isolated");
     click("Record:");click("Errors only");check(monitor.history().detail()==stellar::engine::DiagnosticDetail::ErrorsOnly,"Recording dropdown did not commit.");
     click("Record:");click("Normal");
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Diagnostics UI modified world/discovery/time.");

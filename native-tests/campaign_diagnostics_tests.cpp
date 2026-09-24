@@ -1,5 +1,6 @@
 #include <stellar/core/campaign_diagnostics.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/developer_campaign.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -122,6 +123,38 @@ int main(int argc,char **argv)try{
   check(capped.size()==3&&capped.back().event_type=="findings_truncated",
         "Invariant limit ignored or truncation marker missing.");
   check(rejects([&]{(void)inspect_campaign_invariants(world,0,0,0);}),"Invalid finding bound accepted.");
+  {
+    // Diplomatic state lives on the runtime, outside FreshCampaignState —
+    // its own pass mirrors the snapshot invariant validator and flags
+    // campaign-entity refs the validator cannot see.
+    const auto clean_diplomacy=inspect_diplomacy_invariants(DiplomacyState{},world,0,0);
+    for(const auto &f:clean_diplomacy)std::cerr<<f.subsystem<<" "<<f.event_type<<" "<<f.message<<'\n';
+    check(clean_diplomacy.empty(),"Empty diplomatic state failed invariants.");
+    DiplomacyStateSnapshot planted;
+    DiplomaticContactSnapshot contact;contact.observer_civilization_id=999;
+    contact.contact_id="contact-1";contact.target_civilization_id=world.player_civilization_id;
+    contact.awareness=ContactAwareness::identified;contact.condition=ContactCondition::active;
+    contact.first_observed_tick=1;contact.last_observed_tick=1;
+    planted.contacts.push_back(contact);
+    TerritorialClaimSnapshot claim;claim.claim_id=1;
+    claim.claimant_civilization_id=world.player_civilization_id;claim.system_id=99999;
+    claim.asserted_at_tick=1;claim.active=true;planted.claims.push_back(claim);
+    DiplomaticHistoryEventSnapshot event;event.event_id=1;event.tick=1;
+    event.kind=DiplomaticEventKind::claim_asserted;
+    event.primary_civilization_id=world.player_civilization_id;event.system_id=99999;
+    event.summary="planted";event.known_to_civilization_ids={world.player_civilization_id};
+    planted.recent_history.push_back(event);
+    planted.next_claim_id=2;planted.next_agreement_id=1;
+    planted.next_proposal_id=1;planted.next_event_id=2;
+    auto diplomacy=DiplomacyState::restore(planted);
+    const auto dfindings=inspect_diplomacy_invariants(diplomacy,world,20,5);
+    for(const auto &f:dfindings)std::cerr<<f.subsystem<<" "<<f.event_type<<" "<<f.entity_id.value_or(-1)<<" "<<f.message<<'\n';
+    const auto observers=std::count_if(dfindings.begin(),dfindings.end(),[](const auto &f){return f.event_type=="orphaned_observer";});
+    const auto systems=std::count_if(dfindings.begin(),dfindings.end(),[](const auto &f){return f.event_type=="orphaned_system";});
+    check(observers==1&&systems==2,"Absent diplomatic observers and systems were not flagged.");
+    check(std::none_of(dfindings.begin(),dfindings.end(),[](const auto &f){return f.event_type=="invalid_state";}),
+        "Internally-valid diplomatic state failed its own validator.");
+  }
   const auto root=fs::path(argv[2])/std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
   DiagnosticRecord r;r.tick=42;r.game_date="26 Mar 2050";r.real_timestamp=diagnostic_utc_now();
   r.subsystem="research";r.event_type="completed";r.message="Science — completed ☀";r.entity_id=7;

@@ -14,6 +14,13 @@ namespace stellar::core {
 [[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
     const FreshCampaignState &,std::uint64_t tick,double simulation_day,
     std::size_t maximum_findings=128);
+// Inspects the persisted diplomatic state — which lives on the campaign
+// runtime, outside FreshCampaignState — against its own snapshot
+// invariant validator and the campaign's entity universe. Read-only.
+[[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> inspect_diplomacy_invariants(
+    const DiplomacyState &, const FreshCampaignState &,
+    std::uint64_t tick, double simulation_day,
+    std::size_t maximum_findings=128);
 // Observer adapter of returned canonical events; does not infer fake events
 // from UI state or advance any subsystem.
 [[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> campaign_step_diagnostics(
