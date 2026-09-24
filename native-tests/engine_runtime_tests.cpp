@@ -920,6 +920,48 @@ int main() {
     check(particles > 0, "the attached emitter produces particles");
   }
 
+  // Spin integrates into Rotation; wall bounce reflects movers but a
+  // "bounce":false entity stops dead at the level edge.
+  {
+    const auto sub = root / "spin-bounce";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[
+                   {"name":"spinner","x":100,"y":300,"spin":90},
+                   {"name":"bouncer","x":600,"y":50,"vx":300},
+                   {"name":"stopper","x":600,"y":150,"vx":300,
+                    "bounce":false}]})";
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 30;
+    RuntimeHost host{opts};
+    float spin_deg = 0.f, bouncer_dx = 0.f, stopper_x = -1.f,
+          stopper_dx = 999.f;
+    host.on_update = [&](World &world, float) {
+      if (const auto e = host.find_entity("spinner"))
+        if (const auto *r = world.get<Rotation>(*e))
+          spin_deg = r->value;
+      if (const auto e = host.find_entity("bouncer"))
+        if (const auto *v = world.get<Velocity2D>(*e))
+          bouncer_dx = v->dx;
+      if (const auto e = host.find_entity("stopper")) {
+        if (const auto *t = world.get<Transform2D>(*e))
+          stopper_x = t->x;
+        if (const auto *v = world.get<Velocity2D>(*e))
+          stopper_dx = v->dx;
+      }
+    };
+    check(host.run() == 0, "spin/bounce run exits cleanly");
+    // on_update runs before each step, so 30 updates observe 29
+    // integrations: ~43.5 degrees.
+    check(spin_deg > 40.f && spin_deg < 50.f,
+          "spin integrates ~90 deg/s into Rotation");
+    check(bouncer_dx < 0.f, "the wall bounce reflects the mover");
+    check(stopper_x == 608.f && stopper_dx == 0.f,
+          "bounce:false stops dead at the level edge");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
