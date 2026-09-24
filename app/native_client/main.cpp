@@ -9032,6 +9032,15 @@ int main(int argc,char **argv){
          <<",\"commands\":"<<recording->commands().size()
          <<",\"truncated\":"<<(recording->truncated()?"true":"false")
          <<",\"memory_bytes\":"<<recording->estimated_memory_bytes();
+      // Ordering integrity: the replay feed and the cursor-based checkpoint
+      // verifier both assume non-decreasing ticks — a hand-edited or
+      // corrupt recording would silently misbehave, so report it.
+      out<<",\"commands_ordered\":"
+         <<(std::ranges::is_sorted(recording->commands(),{},
+                &stellar::engine::ReplayCommand::tick)?"true":"false")
+         <<",\"checkpoints_ordered\":"
+         <<(std::ranges::is_sorted(recording->checkpoints(),{},
+                &stellar::engine::ReplayCheckpoint::tick)?"true":"false");
       if(!recording->commands().empty()){
         const auto [lo,hi]=std::ranges::minmax(recording->commands(),{},
             &stellar::engine::ReplayCommand::tick);
