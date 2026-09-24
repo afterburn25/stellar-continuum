@@ -740,6 +740,40 @@ int main() {
           "the faller rests on the platform top");
   }
 
+  // Oneway platforms: a falling entity lands on top, but a riser
+  // moving up through the platform's cells passes straight through.
+  {
+    const auto sub = root / "oneway";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"gravity":400.0,
+                  "entities":[
+                   {"name":"faller","x":50,"y":100,"w":32,"h":32},
+                   {"name":"riser","x":100,"y":300,"w":32,"h":32,
+                    "vy":-250,"gravityScale":0},
+                   {"name":"ledge","x":0,"y":200,"w":200,"h":16,
+                    "oneway":true,"gravityScale":0}]})";
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 60;
+    RuntimeHost host{opts};
+    float faller_y = -999.f, riser_y = 999.f;
+    host.on_update = [&](World &world, float) {
+      if (const auto f = host.find_entity("faller"))
+        if (const auto *t = world.get<Transform2D>(*f))
+          faller_y = t->y;
+      if (const auto r = host.find_entity("riser"))
+        if (const auto *t = world.get<Transform2D>(*r))
+          riser_y = t->y;
+    };
+    check(host.run() == 0, "oneway run exits cleanly");
+    check(std::abs(faller_y - 168.f) < 2.f,
+          "the faller lands on the oneway platform's top");
+    check(riser_y < 100.f,
+          "the riser passes through the oneway platform");
+  }
+
   // Injected input drives the "player" entity through the real
   // action-mapper path: a held 'd' (move_right) sets velocity while
   // held, release stops it — the same path live keyboard input takes.
