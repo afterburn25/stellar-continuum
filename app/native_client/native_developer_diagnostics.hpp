@@ -28,15 +28,16 @@ const char *campaign_domain_name(std::int64_t domain){
 class NativeDeveloperDiagnostics {
 public:
   void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;refresh(monitor);}
-  void close(){visible_=false;pressed_=-1;dropdown_.close();}
+  void close(){visible_=false;pressed_=-1;dropdown_.close();entity_search_focused_=false;}
   bool visible()const{return visible_;}
+  bool wants_text_input()const{return visible_&&entity_search_focused_;}
   bool handle(const InputEvent &e,int w,int h,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     if(!visible_)return false;const auto l=layout(w,h);pointer_=e.position;
     if(dropdown_.visible()){
       if(const auto choice=dropdown_.handle(e,l.detail,w,h))monitor.history().set_detail(static_cast<stellar::engine::DiagnosticDetail>(*choice));
       return true;
     }
-    if(e.type==InputEventType::EscapePressed){close();return true;}
+    if(e.type==InputEventType::EscapePressed){if(entity_search_focused_){entity_search_focused_=false;return true;}close();return true;}
     if(e.type==InputEventType::PointerCancelled){pressed_=-1;return true;}
     // Shared scroll model — row stride/count are view-dependent, so the
     // engine VirtualizedList is configured per event/render against the
@@ -48,6 +49,7 @@ public:
     if(e.type==InputEventType::LeftPressed){
       if(l.detail.contains(e.position)){dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));return true;}
       pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
+      entity_search_focused_=entities_&&entity_search_rect(l).contains(e.position);
       // Sortable phase-table headers (default view) — same click
       // convention as the colony roster: press cycles asc→desc and the
       // scroll returns to the top.
@@ -81,6 +83,15 @@ public:
           if(!node->children.empty())set_entity_expanded(*node,!node->expanded);
         }
       }
+    }
+    if(entity_search_focused_){
+      // Pointer-focused entity search — the roster/navigator contract:
+      // typed text edits, Backspace pops a UTF-8 code point, Tab or
+      // Return commit out, and the field owns the keyboard meanwhile.
+      if(e.type==InputEventType::TextEntered&&entity_search_.size()+e.text.size()<=120){entity_search_+=e.text;entities_dirty_=true;}
+      else if(e.type==InputEventType::BackspacePressed&&!entity_search_.empty()){auto n=entity_search_.size()-1;while(n>0&&(static_cast<unsigned char>(entity_search_[n])&0xc0)==0x80)--n;entity_search_.resize(n);entities_dirty_=true;}
+      else if(e.type==InputEventType::KeyPressed&&(e.key==9u||e.key==13u))entity_search_focused_=false;
+      return true;
     }
     if(e.type==InputEventType::KeyPressed&&entities_&&!entities_dirty_){
       // SDL_Keycode arrows/Home/End/Return/Space drive the tree's
@@ -198,24 +209,44 @@ public:
           if(const auto detail=tag_detail(e);!detail.empty())line+="   ·   "+detail;
           return line;};
         const auto all=projected.entities();
+        entity_parented_=0;
+        for(const auto e:all)if(projected.parent(e))++entity_parented_;
+        // Pointer-focused search keeps each match plus its ancestor
+        // chain (the navigator's reveal semantics), expanded so the
+        // context stays visible; clearing restores the user's toggles.
+        const auto query=fold_ascii(entity_search_);
+        std::unordered_set<std::uint64_t> keep;
+        if(!query.empty())
+          for(const auto e:all)
+            if(fold_ascii(entity_line(e)).find(query)!=std::string::npos)
+              for(auto cur=e;;){
+                if(!keep.insert(cur.value()).second)break;
+                const auto p=projected.parent(cur);
+                if(!p)break;
+                cur=*p;
+              }
+        entity_shown_=query.empty()?all.size():keep.size();
         std::unordered_set<std::uint64_t> placed;placed.reserve(all.size());
         for(bool progress=true;placed.size()<all.size()&&progress;){
           progress=false;
           for(const auto e:all){
             if(placed.contains(e.value()))continue;
+            if(!query.empty()&&!keep.contains(e.value())){placed.insert(e.value());continue;}
             const auto p=projected.parent(e);
             if(p&&!placed.contains(p->value()))continue;
             auto &node=entity_tree_.add(node_id(e),entity_line(e),p?node_id(*p):"");
             // Roots open by default; deeper levels follow the user's
-            // toggles, which persist across sync refreshes.
-            node.expanded=p?entity_expanded_.contains(node.id):!entity_collapsed_.contains(node.id);
-            if(p)++entity_parented_;
+            // toggles, which persist across sync refreshes. A search
+            // reveals its whole kept chain instead.
+            node.expanded=!query.empty()||(p?entity_expanded_.contains(node.id):!entity_collapsed_.contains(node.id));
             placed.insert(e.value());progress=true;
           }
         }
-        for(const auto e:all)
+        for(const auto e:all){
+          if(!query.empty()&&!keep.contains(e.value()))continue;
           if(placed.insert(e.value()).second)
-            entity_tree_.add(node_id(e),entity_line(e)).expanded=!entity_collapsed_.contains(node_id(e));
+            entity_tree_.add(node_id(e),entity_line(e)).expanded=!query.empty()||!entity_collapsed_.contains(node_id(e));
+        }
         entity_flat_=entity_tree_.flattened();
         // Selection is id-stable like the expansion sets — re-apply it;
         // a node the sync removed simply clears.
@@ -223,8 +254,13 @@ public:
         entity_selected_=entity_tree_.selected_id();
         entities_dirty_=false;
       }
-      label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(entity_total_)+" projected entities · "+std::to_string(entity_parented_)+" parented · "+number(entity_bytes_/1024.)+" KiB estimated container footprint · "+
-        (entity_sync_?"synced +"+std::to_string(entity_sync_->created)+" ~"+std::to_string(entity_sync_->updated)+" -"+std::to_string(entity_sync_->destroyed)+" ↻"+std::to_string(entity_sync_->reparented):"fresh projection")+" · read-only",native_menu_style::muted);
+      label({l.list.x,l.list.y-31*s,l.list.width-262*s,27*s},std::to_string(entity_total_)+" projected entities · "+std::to_string(entity_parented_)+" parented · "+number(entity_bytes_/1024.)+" KiB estimated container footprint · "+
+        (entity_sync_?"synced +"+std::to_string(entity_sync_->created)+" ~"+std::to_string(entity_sync_->updated)+" -"+std::to_string(entity_sync_->destroyed)+" ↻"+std::to_string(entity_sync_->reparented):"fresh projection")+
+        (entity_search_.empty()?"":" · "+std::to_string(entity_shown_)+" shown")+" · read-only",native_menu_style::muted);
+      const UiRect search_rect=entity_search_rect(l);
+      out.overlay.emplace_back(FilledRectangle{search_rect,{3,13,22,245}});
+      out.overlay.emplace_back(StrokedRectangle{search_rect,entity_search_focused_?native_menu_style::cyan:Color{54,111,140,255}});
+      label({search_rect.x+8*s,search_rect.y+4*s,search_rect.width-16*s,22*s},entity_search_.empty()?"Search entities…":entity_search_,entity_search_.empty()?native_menu_style::muted:native_menu_style::ink);
       // The list splits into the row scroll view (left) and a read-only
       // field dump of the selected entity (right) — the same
       // list+details idiom as the celestial index.
@@ -325,6 +361,11 @@ private:
   // In the entities view the list splits: rows left, selected-entity
   // detail right — row hit-testing bounds to the rows region.
   static UiRect entity_rows_rect(const Layout &l){return {l.list.x,l.list.y,l.list.width*.62f,l.list.height};}
+  // The entities search field shares the census header band (right
+  // edge, above the list) — pointer-focused like the roster's.
+  static UiRect entity_search_rect(const Layout &l){return {l.list.x+l.list.width-250*l.scale,l.list.y-34*l.scale,250*l.scale,28*l.scale};}
+  // ASCII case fold for the entity search — projected labels are ASCII.
+  static std::string fold_ascii(std::string_view v){std::string r;r.reserve(v.size());for(const char c:v)r+=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));return r;}
   // Phase-table column headers sit one row above the list (the rects
   // the header labels draw into).
   static UiRect phase_header_rect(const Layout &l,int col){
@@ -387,6 +428,8 @@ private:
   static std::string number(double value){std::ostringstream out;out<<std::fixed<<std::setprecision(3)<<value;return out.str();}
   std::vector<stellar::engine::DiagnosticRecord> snapshot_;stellar::native_ui::Dropdown dropdown_;
   bool visible_{},events_{};int pressed_{-1};Point pointer_{};
+  std::string entity_search_;bool entity_search_focused_{};
+  mutable std::size_t entity_shown_{};
   mutable stellar::engine::VirtualizedList list_view_;mutable std::size_t list_rows_{};
   mutable stellar::engine::TableModel phase_table_;
 };

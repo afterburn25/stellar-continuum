@@ -213,6 +213,37 @@ int main(int argc,char **argv)try{
         check(sel.substr(sel.find(' ')+1)==expanded_view[pi+1].first.substr(expanded_view[pi+1].first.find(' ')+1),"Clicking a row did not select it.");
         check(has_text(draw(),tag_line(expanded_view[pi+1].first)),"Clicked row did not surface its tag fields.");
       }
+      // Pointer-focused search keeps matching entities plus their
+      // ancestor chain (expanded, like the navigator's reveal) —
+      // Escape blurs instead of closing, and clearing the text
+      // restores the unfiltered tree.
+      {
+        const auto baseline=rows(draw());
+        const auto search_anchor=control(draw(),"Search entities…");
+        (void)window.handle({InputEventType::LeftPressed,search_anchor},w,h,monitor);
+        (void)window.handle({InputEventType::LeftReleased,search_anchor},w,h,monitor);
+        check(window.wants_text_input(),"Entities search did not take focus.");
+        InputEvent typed{InputEventType::TextEntered};typed.text="colony";
+        (void)window.handle(typed,w,h,monitor);
+        const auto filtered=rows(draw());
+        bool any_match=false,leaves_match=true,no_collapsed=true,shown_count=false;
+        for(const auto &[text,x]:filtered){
+          any_match|=text.find("colony")!=std::string::npos;
+          if(text.starts_with("· ")&&text.find("colony")==std::string::npos)leaves_match=false;
+          if(text.starts_with("› "))no_collapsed=false;
+        }
+        for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value.find(" shown")!=std::string::npos)shown_count=true;
+        check(!filtered.empty()&&any_match&&leaves_match&&no_collapsed&&shown_count,"Entities search did not filter to matches and ancestors.");
+        // Backspace edits while the field holds focus; Escape blurs
+        // (instead of closing) only after the text is gone.
+        for(int i=0;i<6;++i)(void)window.handle({InputEventType::BackspacePressed},w,h,monitor);
+        const auto unfiltered=rows(draw());
+        bool back=unfiltered.size()==baseline.size();
+        for(std::size_t k=0;back&&k<baseline.size();++k)back=unfiltered[k].first==baseline[k].first;
+        check(back,"Clearing the entity search did not restore the tree.");
+        (void)window.handle({InputEventType::EscapePressed},w,h,monitor);
+        check(!window.wants_text_input()&&window.visible(),"Escape in entity search closed the panel.");
+      }
     }
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Entities inspector modified world state.");
     click("CLOSE");check(!window.visible()&&!window.handle({InputEventType::LeftPressed},w,h,monitor),"Closed diagnostics captured gameplay.");

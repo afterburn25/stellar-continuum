@@ -886,6 +886,22 @@ buttons (pending mode clamps to index 0). Note: the pause menu lives
 in the windowed campaign class — no headless test drives its event
 loop, so this slice is verified by the client build + inspection
 rather than a unit test.
+Entities search (row-24 diagnostics tree usability): the ENTITIES
+inspector gained a pointer-focused search field in the census header
+band (navigator contract — StrokedRectangle chrome, cyan focus ring,
+muted placeholder). Typing rebuilds the tree to matching entities plus
+their expanded ancestor chain (reveal semantics — kept nodes force
+expanded, non-matches never place), and the census appends the kept
+count ("· N shown"); clearing the text restores the user's persisted
+expansion sets. The field owns the keyboard while focused (Tab/Return
+commit out, everything else captured), Escape blurs instead of
+closing, Backspace pops a UTF-8 code point, and the new
+`wants_text_input()` joins the client's text-input gate in main.cpp
+so SDL delivers text while it holds focus. Clicking elsewhere blurs;
+a row click still selects. The test covers focus, filtered leaves,
+expanded ancestors, the census count, Escape-blur, and the
+clear→restore round trip. `native_developer_diagnostics` green;
+client builds clean under /W4 /WX.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
