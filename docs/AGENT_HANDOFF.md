@@ -300,7 +300,13 @@ stale or mismatched sidecar (which would silently poison a later
 leaf-diff) is flagged instead of trusted. It is standalone
 (rejects `--replay`/`--record` pairing) and verified live against a
 synthesized recording including matching, stale, unparseable, missing-file
-and malformed-JSON paths.
+and malformed-JSON paths. The journal is bounded:
+`ReplayRecorder::set_memory_budget` (the client sets 128 MiB on `--record`)
+makes the recorder drop entries once the occupancy estimate would pass the
+bound — the recording stays an honest prefix (no later commands or
+checkpoints claim fidelity), `serialize` carries `truncated:true`, and
+`--replay-info`/the flush path report it. The bound is soft: a vector
+capacity growth on the last accepted entry may overshoot by one step.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

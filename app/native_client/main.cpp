@@ -723,6 +723,9 @@ struct ReplayFileFlush {
   ~ReplayFileFlush() {
     if (!state || !state->recorder || path.empty()) return;
     try {
+      if (state->recorder->truncated())
+        std::cerr << "Stellar Continuum native client: replay recording hit "
+                     "its memory budget — the file holds a truncated prefix.\n";
       const auto bytes = state->recorder->serialize();
       stellar::engine::write_file_atomically(
           path, std::as_bytes(std::span<const char>(bytes.data(), bytes.size())));
@@ -8963,7 +8966,8 @@ int main(int argc,char **argv){
          <<",\"seed\":"<<recording->header().seed
          <<",\"build_id\":"<<json_string(recording->header().build_id)
          <<",\"game_version\":"<<json_string(recording->header().game_version)
-         <<",\"commands\":"<<recording->commands().size();
+         <<",\"commands\":"<<recording->commands().size()
+         <<",\"truncated\":"<<(recording->truncated()?"true":"false");
       if(!recording->commands().empty()){
         const auto [lo,hi]=std::ranges::minmax(recording->commands(),{},
             &stellar::engine::ReplayCommand::tick);
@@ -9200,10 +9204,15 @@ int main(int argc,char **argv){
     std::optional<std::filesystem::path> generated_save_path,setup_screenshot,loading_screenshot,restart_save_path;
     bool new_game_restart{};
     ReplayState replay;
-    if(!options.record_path.empty())
+    if(!options.record_path.empty()){
       replay.recorder.emplace(stellar::engine::ReplayHeader{
           static_cast<std::uint64_t>(options.seed),STELLAR_SOURCE_COMMIT,
           STELLAR_GAME_VERSION});
+      // Bounded recording: past the budget the recorder keeps an honest
+      // prefix (no later commands or checkpoints claim fidelity) and
+      // serializes a truncated flag rather than growing without limit.
+      replay.recorder->set_memory_budget(128ull*1024*1024);
+    }
     if(!options.replay_path.empty()){
       std::ifstream replay_file(options.replay_path,std::ios::binary);
       if(!replay_file)throw std::invalid_argument("Replay file cannot be opened.");

@@ -54,9 +54,23 @@ public:
     return checkpoints_;
   }
 
+  // Optional memory bound (0 = unbounded, the default). Once retaining
+  // another entry would push the container-capacity estimate past the
+  // budget, record()/checkpoint() drop that entry and every later one:
+  // the recording stays an honest prefix (nothing claims fidelity beyond
+  // the last retained entry) and truncated() reports the cut. The bound
+  // is soft — a vector capacity growth on the last accepted entry may
+  // overshoot it by one growth step. Serializing preserves the flag so
+  // tooling can tell a complete recording from a truncated one.
+  void set_memory_budget(std::size_t bytes) noexcept { memory_budget_ = bytes; }
+  [[nodiscard]] std::size_t memory_budget() const noexcept {
+    return memory_budget_;
+  }
+  [[nodiscard]] bool truncated() const noexcept { return truncated_; }
+
   // Container-storage footprint for MemoryTracker::report — command
-  // payloads grow unboundedly over a recording session, so occupancy is
-  // worth tracking.
+  // payloads grow over a recording session (bounded only when a budget
+  // is set), so occupancy is worth tracking.
   [[nodiscard]] std::size_t estimated_memory_bytes() const noexcept {
     std::size_t total = commands_.capacity() * sizeof(ReplayCommand) +
                         checkpoints_.capacity() * sizeof(ReplayCheckpoint) +
@@ -77,6 +91,8 @@ private:
   ReplayHeader header_;
   std::vector<ReplayCommand> commands_;
   std::vector<ReplayCheckpoint> checkpoints_;
+  std::size_t memory_budget_{};
+  bool truncated_{};
 };
 
 // Divergence localization helpers. A single whole-document checkpoint

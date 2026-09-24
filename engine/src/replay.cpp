@@ -20,12 +20,27 @@ ReplayRecorder::ReplayRecorder(ReplayHeader header)
 
 void ReplayRecorder::record(std::uint64_t tick, std::string name,
                             std::string payload) {
+  if (truncated_) return;
+  if (memory_budget_ != 0 &&
+      estimated_memory_bytes() + sizeof(ReplayCommand) + name.size() +
+              payload.size() >
+          memory_budget_) {
+    truncated_ = true;
+    return;
+  }
   commands_.push_back(ReplayCommand{tick, std::move(name),
                                     std::move(payload)});
 }
 
 void ReplayRecorder::checkpoint(std::uint64_t tick, std::uint64_t hash,
                                 std::string label) {
+  if (truncated_) return;
+  if (memory_budget_ != 0 &&
+      estimated_memory_bytes() + sizeof(ReplayCheckpoint) + label.size() >
+          memory_budget_) {
+    truncated_ = true;
+    return;
+  }
   checkpoints_.push_back(ReplayCheckpoint{tick, hash, std::move(label)});
 }
 
@@ -44,6 +59,7 @@ std::string ReplayRecorder::serialize() const {
     doc["checkpoints"].push_back({{"tick", checkpoint.tick},
                                   {"hash", checkpoint.hash},
                                   {"label", checkpoint.label}});
+  if (truncated_) doc["truncated"] = true;
   return doc.dump();
 }
 
@@ -74,6 +90,7 @@ std::optional<ReplayRecorder> ReplayRecorder::parse(std::string_view document,
     recorder.checkpoint(entry.value("tick", std::uint64_t{}),
                         entry.value("hash", std::uint64_t{}),
                         entry.value("label", std::string{}));
+  recorder.truncated_ = doc.value("truncated", false);
   return recorder;
 }
 

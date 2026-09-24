@@ -56,6 +56,48 @@ int main() {
           "parsed recorder reports a footprint");
   }
 
+  // Memory budget: once an entry would push the occupancy estimate past
+  // the bound the recorder drops it and everything after — a truncated
+  // recording is an honest prefix and serializes the flag.
+  {
+    ReplayRecorder recorder;
+    recorder.set_memory_budget(4096);
+    std::size_t retained = 0;
+    for (std::size_t i = 0; i < 64; ++i) {
+      recorder.record(i, "order", std::string(256, 'x'));
+      if (recorder.truncated()) break;
+      ++retained;
+    }
+    check(recorder.truncated(), "budget truncation never engaged");
+    check(recorder.commands().size() == retained,
+          "truncated recorder kept a clean prefix");
+    check(recorder.estimated_memory_bytes() < 8192,
+          "truncated recorder overshot the budget by more than a growth step");
+    // Later small entries are dropped too — no gaps in the command stream.
+    recorder.record(9999, "order", "{}");
+    check(recorder.commands().size() == retained,
+          "post-truncation record was dropped");
+    recorder.checkpoint(9999, 7, "save:World");
+    check(recorder.checkpoints().empty(),
+          "post-truncation checkpoint was dropped");
+    const auto parsed = ReplayRecorder::parse(recorder.serialize());
+    check(parsed && parsed->truncated() &&
+              parsed->commands().size() == retained,
+          "truncation flag round-trips through the recording");
+    // A recording under budget does not claim truncation.
+    ReplayRecorder small;
+    small.set_memory_budget(1u << 20);
+    small.record(1, "order", "{}");
+    check(!small.truncated() &&
+              !ReplayRecorder::parse(small.serialize())->truncated(),
+          "untruncated recording does not carry the flag");
+    // Default stays unbounded.
+    ReplayRecorder unbounded;
+    for (int i = 0; i < 8; ++i)
+      unbounded.record(i, "order", std::string(1024, 'x'));
+    check(!unbounded.truncated(), "default recorder grew unbounded");
+  }
+
   // Section checkpoints emit top-level members plus object members one
   // level deep, in document order, with per-section hashes.
   nlohmann::ordered_json document{
