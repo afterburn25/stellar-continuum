@@ -1,5 +1,6 @@
 #include "native_controlled_assets.hpp"
 #include <chrono>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 using namespace stellar::native_assets;
@@ -64,4 +65,51 @@ void scale_and_virtualization(){
   }
 }
 }
-int main(){try{projection();interactions();scale_and_virtualization();std::cout<<"Controlled Assets ownership, live projection, preferences, input, search and virtualization passed.\n";return 0;}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
+void keyboard_focus(){
+  // Keyboard-focus contract: Tab/arrows ring the actionable rects in
+  // (y,x) order — hide, search, the conditional clear button, then every
+  // visible header/row clipped to the list viewport — Home/End jump to
+  // the ends, Return/Space replay the press/release pair through the
+  // same dispatch, and the ring scrolls entries into view. The search
+  // field owns its keys while editing; hidden mode narrows the ring to
+  // the restore control.
+  Navigator n;n.set_view(sample());auto p=n.preferences();p.collapsed.fill(false);n.set_preferences(p);
+  const auto key=[&](std::uint32_t code,bool shift=false){InputEvent e{};e.type=InputEventType::KeyPressed;e.key=code;e.shift=shift;return n.handle(e,1920,1080);};
+  constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kDown=0x40000051u;
+  constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du,kF5=0x4000003fu;
+  const auto l=Layout::make(1920,1080);
+  require(n.focus()<0,"ring present before any key");
+  require(key(kTab).captured&&n.focus()==0,"Tab did not focus the hide control");
+  require(key(kDown).captured&&n.focus()==1,"Down did not advance to search");
+  require(key(kTab,true).captured&&n.focus()==0,"Shift+Tab did not walk back");
+  require(key(kEnd).captured&&n.focus()==9,"End did not land on the last row");
+  require(key(kHome).captured&&n.focus()==0,"Home did not return to the head");
+  require(!key(kF5).captured,"unrelated key was captured");
+  // Search activation enters edit mode; the field owns keys until commit.
+  (void)key(kDown);require(n.focus()==1,"ring did not reach search");
+  require(key(kReturn).captured&&n.wants_text_input(),"Return on search did not enter edit mode");
+  require(key(kDown).captured&&n.focus()==1,"editing search leaked a key to the ring");
+  require(key(kTab).captured&&!n.wants_text_input(),"Tab did not commit out of search editing");
+  // A row selects through the replayed dispatch; headers toggle collapse.
+  (void)key(kEnd);
+  auto command=key(kSpace);
+  require(command.captured&&command.key==Key{Category::Shipyards,14}&&!command.manage&&n.selection()==Key{Category::Shipyards,14},"Space on a row did not select it");
+  (void)key(kHome);(void)key(kDown);(void)key(kDown);
+  require(n.focus()==2,"ring did not reach the Planets header");
+  Preferences persisted;n.set_persist([&](const Preferences& v){persisted=v;return true;});
+  command=key(kReturn);
+  require(command.captured&&n.preferences().collapsed[0]&&persisted.collapsed[0]&&n.focus()==2,"Return on a header did not toggle collapse or lost the ring");
+  // The ring renders over the focused rect.
+  DrawList draw;n.render(draw,1920,1080,{});
+  const auto* ring=std::get_if<StrokedRectangle>(&draw.overlay.back());
+  require(ring&&ring->color.r==94&&ring->color.g==212,"focused navigator control rendered no ring");
+  // A pointer press hands ownership back to the pointer.
+  (void)n.handle({InputEventType::LeftPressed,center(l.panel)},1920,1080);
+  require(n.focus()<0,"pointer press did not clear the ring");
+  // Hidden mode: the restore control rings and unhides on Return.
+  auto prefs=n.preferences();prefs.hidden=true;n.set_preferences(prefs);
+  require(key(kTab).captured&&n.focus()==0,"hidden mode did not ring the restore control");
+  command=key(kReturn);
+  require(command.captured&&!n.preferences().hidden,"Return on restore did not unhide");
+}
+int main(){try{projection();interactions();scale_and_virtualization();keyboard_focus();std::cout<<"Controlled Assets ownership, live projection, preferences, input, search and virtualization passed.\n";return 0;}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

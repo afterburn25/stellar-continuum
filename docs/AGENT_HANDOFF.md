@@ -829,6 +829,20 @@ Offsets snap to whole rows (`snap_list`) so the top row always renders
 fully — no row clipping needed. `native_developer_diagnostics` covers
 wheel-to-tail, scroll-follows-selection and click row math through the
 model; 11/11 diagnostics/projection/UI surface green.
+Controlled-assets keyboard contract (row-26 accessibility): the
+navigator joins the focus contract — `focusables()` walks hide,
+search, the conditional clear button and every clipped-visible tree
+entry (category headers and rows) in (y,x) order. Tab/arrows/Home/End
+ring the set with scroll-follow keeping the focused entry fully
+inside the viewport; Return/Space replay the press/release pair
+through the same dispatch, so headers toggle persisted collapse and
+rows select/manage with generation+observer guards unchanged. Hidden
+mode narrows the ring to the restore control (Return unhides); the
+search field owns its keys while editing (Tab/Return commit out);
+pointer presses and cancels reset the ring. `native_controlled_assets`
+covers cycling/wrap/Home/End, edit-mode ownership, header collapse
+via keyboard, row selection via Space, ring rendering, pointer reset
+and hidden-mode restore; suite green.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
