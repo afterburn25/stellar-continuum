@@ -803,6 +803,20 @@ covers cycling/wrap/Home/End, keyboard-driven negotiate→term→confirm
 issuing propose_non_aggression with the state quote intact,
 Space-select on a contact row, ring rendering and pointer reset;
 8/8 diplomacy suites green.
+Colony roster keyboard contract (row-26 accessibility): the OWNED
+COLONIES roster joins the focus contract — `focusables()` walks the
+search field, refresh/close, the sort-column headers (the same hit
+zones `header_column` answers, including the compact-mode collapse
+to the single population header) and every list row clipped to the
+viewport, in (y,x) order. Tab/arrows/Home/End ring the set;
+Return/Space replay the matched press+release pair through the same
+dispatch, so sort headers toggle, refresh fires and rows emit their
+generation/player-guarded open-colony command unchanged. The search
+field enters edit mode on activation and owns its keys until
+Tab/Return commit out; pointer presses, cancels, open/close reset
+the ring. `native_colony_roster` covers cycling/wrap/Home/End, row
+activation, sort-header toggling, edit-mode key ownership, ring
+rendering and pointer reset; suite green.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

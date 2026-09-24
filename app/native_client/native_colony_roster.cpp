@@ -284,6 +284,47 @@ void RosterWorkspace::apply_display_order() {
   for (const auto *row : table_.display_rows())
     display_order_.push_back(std::stoi(row->first));
 }
+// Focusables walk actionable rects in (y,x) order: the search field,
+// refresh and close controls, the sort-column headers (the same hit zones
+// header_column() answers), and each list row clipped to its viewport.
+std::vector<UiRect> RosterWorkspace::focusables(
+    const RosterLayout &layout) const {
+  std::vector<UiRect> out;
+  out.push_back(layout.search);
+  out.push_back(layout.refresh);
+  out.push_back(layout.close);
+  const float s = layout.scale;
+  const bool compact =
+      viewport_height_ <= 800 || layout.list.width < 650.f * s;
+  if (compact) {
+    out.push_back({layout.list.x + layout.list.width * .70f,
+                   layout.list.y - 20.f * s, layout.list.width * .28f,
+                   20.f * s});
+  } else {
+    out.push_back({layout.list.x + 8.f * s, layout.list.y - 26.f * s,
+                   layout.list.width * .37f, 24.f * s});
+    out.push_back({layout.list.x + layout.list.width * .39f,
+                   layout.list.y - 26.f * s, layout.list.width * .38f,
+                   24.f * s});
+    out.push_back({layout.list.x + layout.list.width * .79f,
+                   layout.list.y - 26.f * s, layout.list.width * .18f,
+                   24.f * s});
+  }
+  const float pitch = layout.row_height + 5.f * s;
+  for (std::size_t i = 0; i < display_order_.size(); ++i) {
+    const auto visible = clip_intersection(
+        {layout.list.x,
+         layout.list.y + static_cast<float>(i) * pitch - list_.scroll_offset,
+         layout.list.width, layout.row_height},
+        layout.list);
+    if (visible.height > 0.f)
+      out.push_back(visible);
+  }
+  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
+    return a.y == b.y ? a.x < b.x : a.y < b.y;
+  });
+  return out;
+}
 int RosterWorkspace::header_column(Point point,
                                    const RosterLayout &layout) const noexcept {
   const float s = layout.scale;
@@ -315,12 +356,14 @@ void RosterWorkspace::open() noexcept {
   list_.scroll_offset = 0;
   search_.clear();
   search_focused_ = false;
+  focus_ = -1;
   apply_filter();
   clear_press();
 }
 void RosterWorkspace::close() noexcept {
   visible_ = false;
   search_focused_ = false;
+  focus_ = -1;
   clear_press();
 }
 void RosterWorkspace::discard_campaign() noexcept {
@@ -368,6 +411,7 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
   sync_scroll(layout);
   list_.scroll_to(list_.scroll_offset);
   if (event.type == InputEventType::PointerCancelled) {
+    focus_ = -1;
     clear_press();
     return {true};
   }
@@ -396,6 +440,57 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
     }
     apply_filter();
     return {true};
+  }
+  if (search_focused_ && event.type == InputEventType::KeyPressed) {
+    // While editing, the search field owns the keyboard — Tab or Return
+    // commit out of it; every other key stays captured.
+    if (event.key == 9u || event.key == 13u)
+      search_focused_ = false;
+    return {true};
+  }
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    // SDL_Keycode: Tab/arrows walk the (y,x)-ordered focusables — search,
+    // refresh, close, the sort headers and each visible row — Home/End
+    // jump to the ends, and Return/Space replay the matched press/release
+    // pair through the same dispatch a click takes.
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const auto rects = focusables(layout);
+    const int count = static_cast<int>(rects.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      return {true};
+    }
+    if (count > 0 && (fwd || bwd)) {
+      focus_ = focus_ < 0 || focus_ >= count
+                   ? (bwd ? count - 1 : 0)
+                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      return {true};
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto &rect = rects[static_cast<std::size_t>(focus_)];
+      InputEvent press{InputEventType::LeftPressed};
+      press.position = {rect.x + rect.width * .5f,
+                        rect.y + rect.height * .5f};
+      InputEvent release = press;
+      release.type = InputEventType::LeftReleased;
+      const int keep = focus_;
+      (void)handle(press, width, height);
+      auto command = handle(release, width, height);
+      if (visible_)
+        focus_ = keep;
+      command.captured = true;
+      return command;
+    }
+    // Unhandled keys keep falling through to global shortcuts.
+    return {};
   }
   if (!pointer(event.type))
     return {};
@@ -451,6 +546,7 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
   }
   if (event.type == InputEventType::LeftPressed) {
     pointer_owned_ = true;
+    focus_ = -1;
     search_focused_ = layout.search.contains(event.position);
     if (search_focused_)
       return {true};
@@ -667,6 +763,12 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
         FilledRectangle{{layout.list.x + layout.list.width + 5.f * layout.scale,
                          y, 3.f * layout.scale, thumb},
                         cyan});
+  }
+  if (focus_ >= 0) {
+    const auto rects = focusables(layout);
+    if (focus_ < static_cast<int>(rects.size()))
+      out.overlay.emplace_back(StrokedRectangle{
+          rects[static_cast<std::size_t>(focus_)], cyan});
   }
 }
 } // namespace stellar::native_colony_roster

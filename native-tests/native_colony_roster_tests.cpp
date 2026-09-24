@@ -1,6 +1,7 @@
 #include "native_colony_roster.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <ranges>
@@ -394,6 +395,88 @@ void search_filters_rows() {
   require(workspace.row_button(39, width, height).height > 0,
           "clearing the search did not restore the full roster");
 }
+
+void keyboard_focus_rings_controls_and_activates_rows() {
+  // Keyboard-focus contract: Tab/arrows ring every actionable rect in
+  // (y,x) order — search, refresh, close, the sort headers and each
+  // visible row — Home/End jump to the ends, Return/Space replay the
+  // matched press/release pair through the same dispatch, and pointer
+  // presses reset the ring. The search field owns the keyboard while
+  // editing; Tab/Return commit out of it.
+  constexpr int width = 1280, height = 720;
+  RosterWorkspace workspace;
+  workspace.set_view(build(world(6), 4));
+  workspace.open();
+  const auto layout = RosterLayout::for_viewport(width, height);
+  const auto key = [&](std::uint32_t code, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = code;
+    event.shift = shift;
+    return workspace.handle(event, width, height);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kDown = 0x40000051u, kUp = 0x40000052u;
+  constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+  constexpr std::uint32_t kF5 = 0x4000003fu;
+  // Header row x-sorted: search, refresh, close — then the three sort
+  // headers, then visible rows.
+  require(workspace.focus() < 0, "focus ring present before any key");
+  require(key(kTab).captured && workspace.focus() == 0,
+          "Tab did not focus the search field");
+  require(key(kDown).captured && workspace.focus() == 1,
+          "Down did not advance the ring");
+  require(key(kUp).captured && workspace.focus() == 0,
+          "Up did not walk back");
+  require(key(kEnd).captured && workspace.focus() > 5,
+          "End did not land on a row");
+  const int last = workspace.focus();
+  require(key(kHome).captured && workspace.focus() == 0,
+          "Home did not return to the head");
+  require(key(kTab, true).captured && workspace.focus() == last,
+          "Shift+Tab did not wrap to the last control");
+  require(!key(kF5).captured, "unrelated key was captured");
+  // The ring renders over the focused control.
+  {
+    DrawList draw;
+    workspace.render(draw, width, height);
+    const auto *ring = std::get_if<StrokedRectangle>(&draw.overlay.back());
+    require(ring && ring->color.r == 108 && ring->color.g == 218,
+            "focused roster control rendered no ring");
+  }
+  // Return on a row replays the matched press/release and opens the colony.
+  // At 720p the roster is compact: one sort header, so the first visible
+  // row is focus index 4.
+  (void)key(kHome);
+  while (workspace.focus() < 4)
+    (void)key(kDown);
+  const auto opened = key(kReturn);
+  require(opened.open_colony_id && *opened.open_colony_id == 1 &&
+              opened.captured,
+          "Return on a roster row did not open the colony");
+  // The sort header sorts through the same dispatch.
+  while (workspace.focus() > 3)
+    (void)key(kUp);
+  require(workspace.focus() == 3, "ring did not reach the sort header");
+  auto command = key(kSpace);
+  require(command.captured && !command.open_colony_id,
+          "sort header activation issued a command");
+  require(workspace.focus() == 3,
+          "sort activation did not keep the ring");
+  // The search field enters edit mode on activation and owns its keys.
+  (void)key(kHome);
+  command = key(kReturn);
+  require(command.captured && workspace.wants_text_input(),
+          "Return on search did not enter edit mode");
+  require(key(kDown).captured && workspace.focus() == 0,
+          "editing search leaked a key to the ring");
+  require(key(kTab).captured && !workspace.wants_text_input(),
+          "Tab did not commit out of search editing");
+  // A pointer press hands ownership back to the pointer.
+  (void)workspace.handle(
+      {InputEventType::LeftPressed, center(layout.panel)}, width, height);
+  require(workspace.focus() < 0, "pointer press did not clear the ring");
+}
 } // namespace
 
 int main() {
@@ -406,6 +489,7 @@ int main() {
     cancellation_and_compact_hover_are_bounded();
     column_sort_orders_rows();
     search_filters_rows();
+    keyboard_focus_rings_controls_and_activates_rows();
     std::cout << "native colony roster tests passed\n";
     return 0;
   } catch (const std::exception &error) {

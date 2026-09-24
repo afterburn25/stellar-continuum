@@ -64,6 +64,7 @@ public:
     return visible_ && search_focused_;
   }
   [[nodiscard]] float scroll_offset() const noexcept { return list_.scroll_offset; }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
   void set_notice(std::string value) { notice_ = std::move(value); }
   void set_localization(
       const stellar::engine::LocalizationTable *table) noexcept {
@@ -88,6 +89,8 @@ private:
   // 0=colony,1=world,2=population; -1 when the point misses the headers.
   [[nodiscard]] int header_column(stellar::native_map::Point,
                                   const RosterLayout &) const noexcept;
+  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  focusables(const RosterLayout &) const;
   const stellar::engine::LocalizationTable *locale_{};
   View view_;
   bool visible_{};
@@ -99,6 +102,7 @@ private:
   std::optional<int> pressed_row_;
   PressTarget pressed_target_{PressTarget::none};
   bool pointer_owned_{};
+  int focus_{-1};
   stellar::native_map::Point pointer_{};
   int viewport_width_{}, viewport_height_{};
   std::uint64_t pressed_generation_{};
