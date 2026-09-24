@@ -1593,6 +1593,30 @@ class NativeCampaign final {
     for(std::size_t i=0;i<reloaded_bodies.size();++i)if(reloaded_bodies[i].appearance!=planet_world.bodies[i].appearance)throw std::runtime_error("Imported appearance rerolled during save/load.");
     std::cout<<"imported_planets=eight_classes_both_views_canonical_materials_developer_index_and_reload_passed\n";
     std::cout<<"planet_portraits=eight_classes_canonical_cached_portraits_submitted_passed\n";
+    // Broad material assertion: the coverage world forces one body per
+    // generation-enabled subclass, so sweeping bodies exercises every
+    // subclass's canonical material through the real cache — admitted art
+    // decodes or the procedural fallback synthesizes — not just the eight
+    // navigated examples above.
+    {
+      std::unordered_set<std::string> pending_subclasses;
+      for(const auto& def:planet_subclass_definitions())if(def.generation_enabled)pending_subclasses.insert(def.id);
+      std::size_t resolved=0;
+      for(const auto& body:planet_world.bodies){
+        if(!body.appearance||!pending_subclasses.erase(body.appearance->subclass))continue;
+        (void)planet_material_cache_.request(*body.appearance,128);
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);
+        while(!planet_material_cache_.ready()&&std::chrono::steady_clock::now()<deadline){
+          planet_material_cache_.poll();std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        const auto pack=planet_material_cache_.request(*body.appearance,128);
+        if(!pack||!pack->albedo)throw std::runtime_error("Canonical material did not resolve for subclass "+body.appearance->subclass);
+        ++resolved;
+      }
+      if(!pending_subclasses.empty())throw std::runtime_error("Coverage world is missing subclass "+*pending_subclasses.begin());
+      if(!planet_material_cache_.errors().empty())throw std::runtime_error("Broad planet material sweep reported a failure.");
+      std::cout<<"broad_planet_materials="<<resolved<<"_subclasses_canonical_albedo_resolved_passed\n";
+    }
     // Explicit smoke-only fault injection into this isolated developer world.
     // Runtime fault handling never repairs state; restore this fixture solely
     // so the rest of the smoke can finish without persisting test corruption.
