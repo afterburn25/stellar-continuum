@@ -9333,6 +9333,14 @@ int main(int argc,char **argv){
         std::cerr<<"Stellar Continuum native client: recording is truncated "
                    "(memory budget) — commands and checkpoints end "
                    "mid-session; nothing past the prefix is verified.\n";
+      // The feed loop and cursor verifier assume non-decreasing ticks —
+      // a hand-edited recording would silently drop commands.
+      if(!std::ranges::is_sorted(parsed->commands(),{},
+             &stellar::engine::ReplayCommand::tick)||
+         !std::ranges::is_sorted(parsed->checkpoints(),{},
+             &stellar::engine::ReplayCheckpoint::tick))
+        std::cerr<<"Stellar Continuum native client: recording streams are "
+                   "not in tick order — out-of-order entries never fire.\n";
       replay.recording=std::move(parsed);
     }
     // Expected-document sidecars live next to the recording: record writes
