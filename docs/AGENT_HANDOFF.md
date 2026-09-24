@@ -817,6 +817,18 @@ Tab/Return commit out; pointer presses, cancels, open/close reset
 the ring. `native_colony_roster` covers cycling/wrap/Home/End, row
 activation, sort-header toggling, edit-mode key ownership, ring
 rendering and pointer reset; suite green.
+Diagnostics VirtualizedList (row-24 scroll-model adoption): the
+panel's hand-rolled `first_` index is gone — all four scroll views
+share one engine `VirtualizedList` configured per frame (33·s phase
+rows and entity rows, 57·s event snapshots, 61·s asset records).
+`scroll_to` clamps wheel deltas and re-clamps every render, so a
+collapse or refresh that shrinks content can no longer leave a stale
+`first_` past the tail (the prior render-time-only clamp); keyboard
+selection follow is `ensure_visible` instead of the manual clamp.
+Offsets snap to whole rows (`snap_list`) so the top row always renders
+fully — no row clipping needed. `native_developer_diagnostics` covers
+wheel-to-tail, scroll-follows-selection and click row math through the
+model; 11/11 diagnostics/projection/UI surface green.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

@@ -27,7 +27,7 @@ const char *campaign_domain_name(std::int64_t domain){
 } // namespace
 class NativeDeveloperDiagnostics {
 public:
-  void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;first_=0;refresh(monitor);}
+  void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;refresh(monitor);}
   void close(){visible_=false;pressed_=-1;dropdown_.close();}
   bool visible()const{return visible_;}
   bool handle(const InputEvent &e,int w,int h,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
@@ -38,27 +38,33 @@ public:
     }
     if(e.type==InputEventType::EscapePressed){close();return true;}
     if(e.type==InputEventType::PointerCancelled){pressed_=-1;return true;}
-    if(e.type==InputEventType::Wheel&&l.list.contains(e.position))first_=std::max(0,first_-static_cast<int>(std::round(e.wheel_y)));
+    // Shared scroll model — row stride/count are view-dependent, so the
+    // engine VirtualizedList is configured per event/render against the
+    // last rendered row set (list_rows_ refreshes every frame).
+    list_view_.row_height=(assets_?61.f:events_?57.f:33.f)*l.scale;
+    list_view_.viewport_height=l.list.height;
+    list_view_.row_count=list_rows_;
+    if(e.type==InputEventType::Wheel&&l.list.contains(e.position))list_view_.scroll_to(list_view_.scroll_offset-std::round(e.wheel_y)*list_view_.row_height);
     if(e.type==InputEventType::LeftPressed){
       if(l.detail.contains(e.position)){dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));return true;}
       pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
       if(pressed_<0&&entities_&&!entities_dirty_&&entity_rows_rect(l).contains(e.position)){
-        const int row=first_+static_cast<int>((e.position.y-l.list.y)/(33*l.scale));
+        const int row=static_cast<int>((e.position.y-l.list.y+list_view_.scroll_offset)/list_view_.row_height);
         if(row>=0&&row<static_cast<int>(entity_flat_.size()))pressed_=100+row;
       }
     }
     if(e.type==InputEventType::LeftReleased){
       const int hit=std::exchange(pressed_,-1);
       if(hit==0&&l.close.contains(e.position))close();
-      if(hit==1&&l.performance.contains(e.position)){events_=false;generation_=false;assets_=false;entities_=false;first_=0;}
-      if(hit==2&&l.events.contains(e.position)){events_=true;generation_=false;assets_=false;entities_=false;first_=0;refresh(monitor);}
-      if(hit==3&&l.refresh.contains(e.position)){first_=0;refresh(monitor);entities_dirty_=true;}
-      if(hit==4&&l.generation.contains(e.position)){generation_=true;assets_=false;entities_=false;first_=0;}
-      if(hit==5&&l.assets.contains(e.position)){assets_=true;generation_=false;entities_=false;first_=0;}
-      if(hit==6&&l.entities.contains(e.position)){entities_=true;events_=false;generation_=false;assets_=false;first_=0;entities_dirty_=true;}
+      if(hit==1&&l.performance.contains(e.position)){events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;}
+      if(hit==2&&l.events.contains(e.position)){events_=true;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;refresh(monitor);}
+      if(hit==3&&l.refresh.contains(e.position)){list_view_.scroll_offset=0;refresh(monitor);entities_dirty_=true;}
+      if(hit==4&&l.generation.contains(e.position)){generation_=true;assets_=false;entities_=false;list_view_.scroll_offset=0;}
+      if(hit==5&&l.assets.contains(e.position)){assets_=true;generation_=false;entities_=false;list_view_.scroll_offset=0;}
+      if(hit==6&&l.entities.contains(e.position)){entities_=true;events_=false;generation_=false;assets_=false;list_view_.scroll_offset=0;entities_dirty_=true;}
       if(hit>=100){
         const int row=hit-100;
-        const int released=first_+static_cast<int>((e.position.y-l.list.y)/(33*l.scale));
+        const int released=static_cast<int>((e.position.y-l.list.y+list_view_.scroll_offset)/list_view_.row_height);
         if(released==row&&entity_rows_rect(l).contains(e.position)&&row<static_cast<int>(entity_flat_.size())){
           const auto *node=entity_flat_[row].first;
           entity_selected_=node->id;entity_tree_.select(node->id);
@@ -80,7 +86,7 @@ public:
         if(row<0||row>=static_cast<int>(entity_flat_.size()))return;
         entity_selected_=entity_flat_[row].first->id;
         entity_tree_.select(entity_selected_);
-        first_=std::clamp(first_,row-13,row);};
+        list_view_.ensure_visible(static_cast<std::size_t>(row));snap_list();};
       if(e.key==kHome||e.key==kEnd){
         select_row(e.key==kHome?0:static_cast<int>(entity_flat_.size())-1);
       }else if(e.key==kDown||e.key==kUp){
@@ -121,8 +127,8 @@ public:
       if(auto registry=stellar::engine::mounted_asset_registry()){
         const auto d=registry->diagnostics();const auto& records=registry->records();
         label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(d.assets)+" assets / "+std::to_string(d.packages)+" packages · Reads "+std::to_string(d.reads)+" · Errors "+std::to_string(d.failures)+" · Read "+number(d.bytes_read/1048576.)+" MiB",native_menu_style::muted);
-        const int begin=std::clamp(first_,0,std::max(0,static_cast<int>(records.size())-7));
-        for(int i=0;i<7&&begin+i<static_cast<int>(records.size());++i){const auto&r=records[begin+i];std::uint64_t size=0;for(const auto&c:r.chunks)size+=c.stored_bytes;const auto y=l.list.y+i*61*s;
+        const auto range=scroll_window(l,61.f,records.size(),7);
+        for(auto i=range.first;i<range.last;++i){const auto&r=records[i];std::uint64_t size=0;for(const auto&c:r.chunks)size+=c.stored_bytes;const auto y=l.list.y+static_cast<float>(i)*61*s-list_view_.scroll_offset;
           label({l.list.x,y,l.list.width,25*s},r.id);
           label({l.list.x,y+27*s,l.list.width,25*s},r.format+" · "+std::to_string(r.width)+" × "+std::to_string(r.height)+" · "+std::to_string(r.chunks.size())+" chunks · "+number(size/1048576.)+" MiB · "+r.chunks.front().package,native_menu_style::muted);
         }
@@ -214,13 +220,13 @@ public:
       // list+details idiom as the celestial index.
       const UiRect rows_rect=entity_rows_rect(l);
       const UiRect detail{l.list.x+rows_rect.width+14*s,l.list.y,l.list.width-rows_rect.width-14*s,l.list.height};
-      const auto begin=std::clamp(first_,0,std::max(0,static_cast<int>(entity_flat_.size())-14));
-      for(int i=0;i<14&&begin+i<static_cast<int>(entity_flat_.size());++i){
-        const auto &[node,depth]=entity_flat_[begin+i];
-        const auto y=l.list.y+i*33*s;
+      const auto range=scroll_window(l,33.f,entity_flat_.size(),14);
+      for(auto i=range.first;i<range.last;++i){
+        const auto &[node,depth]=entity_flat_[i];
+        const auto y=l.list.y+static_cast<float>(i)*33*s-list_view_.scroll_offset;
         const bool selected=node->id==entity_selected_;
         if(selected)out.overlay.emplace_back(FilledRectangle{{rows_rect.x,y,rows_rect.width,31*s},{24,64,88,230}});
-        else if(i%2==0)out.overlay.emplace_back(FilledRectangle{{rows_rect.x,y,rows_rect.width,31*s},{12,32,45,210}});
+        else if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{{rows_rect.x,y,rows_rect.width,31*s},{12,32,45,210}});
         const float indent=8*s+static_cast<float>(depth)*20*s;
         const std::string glyph=node->children.empty()?"· ":(node->expanded?"▾ ":"› ");
         label({rows_rect.x+indent,y+4*s,rows_rect.width-indent-8*s,25*s},glyph+node->label_key,selected?native_menu_style::cyan:native_menu_style::ink);
@@ -256,10 +262,10 @@ public:
       for(const auto&p:samples)rows.push_back({std::string(p.phase),p.timing.samples,p.timing.total_nanoseconds,p.timing.maximum_nanoseconds});
       for(const auto&a:stellar::engine::Profiler::instance().aggregates())
         rows.push_back({"client/"+a.name,a.calls,a.total_nanoseconds,a.max_nanoseconds});
-      const auto begin=std::clamp(first_,0,std::max(0,static_cast<int>(rows.size())-14));
-      for(int i=0;i<14&&begin+i<static_cast<int>(rows.size());++i){
-        const auto &p=rows[begin+i];const auto y=l.list.y+i*33*s;
-        if(i%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
+      const auto range=scroll_window(l,33.f,rows.size(),14);
+      for(auto i=range.first;i<range.last;++i){
+        const auto &p=rows[i];const auto y=l.list.y+static_cast<float>(i)*33*s-list_view_.scroll_offset;
+        if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
         label({l.list.x+8*s,y+4*s,400*s,25*s},p.phase);
         label({l.list.x+430*s,y+4*s,140*s,25*s},std::to_string(p.n));
         label({l.list.x+600*s,y+4*s,170*s,25*s},p.n?number(static_cast<double>(p.total)/p.n/1e6):"Unmeasured");
@@ -267,9 +273,9 @@ public:
       }
     }else{
       label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(snapshot_.size())+" retained events · newest first · snapshot captured on refresh",native_menu_style::muted);
-      const auto begin=std::clamp(first_,0,std::max(0,static_cast<int>(snapshot_.size())-8));
-      for(int i=0;i<8&&begin+i<static_cast<int>(snapshot_.size());++i){
-        const auto &r=snapshot_[begin+i];const auto y=l.list.y+i*57*s;
+      const auto range=scroll_window(l,57.f,snapshot_.size(),8);
+      for(auto i=range.first;i<range.last;++i){
+        const auto &r=snapshot_[i];const auto y=l.list.y+static_cast<float>(i)*57*s-list_view_.scroll_offset;
         out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,54*s},{12,32,45,210}});
         const auto color=r.severity>=stellar::engine::DiagnosticSeverity::Error?Color{255,135,112,255}:
             r.severity==stellar::engine::DiagnosticSeverity::Warning?Color{245,199,113,255}:native_menu_style::cyan;
@@ -298,6 +304,19 @@ private:
   // In the entities view the list splits: rows left, selected-entity
   // detail right — row hit-testing bounds to the rows region.
   static UiRect entity_rows_rect(const Layout &l){return {l.list.x,l.list.y,l.list.width*.62f,l.list.height};}
+  // Configures the shared VirtualizedList for the active view, re-clamps
+  // the offset (collapses/refreshes shrink content), publishes the row
+  // count for handle(), and returns the visible range capped at the
+  // view's historical row cap so overscan never paints past the list.
+  stellar::engine::VirtualizedList::Range scroll_window(const Layout &l,float stride,std::size_t rows,std::size_t cap)const{
+    list_view_.row_height=stride*l.scale;list_view_.viewport_height=l.list.height;list_view_.row_count=rows;
+    list_view_.scroll_to(list_view_.scroll_offset);snap_list();list_rows_=rows;
+    auto range=list_view_.visible_range();range.last=std::min(range.last,range.first+cap);
+    return range;
+  }
+  // This panel scrolls whole rows (rows always start fully visible at
+  // the list top) — quantize the pixel offset to the row stride.
+  void snap_list()const{if(list_view_.row_height>0)list_view_.scroll_offset=std::floor(list_view_.scroll_offset/list_view_.row_height)*list_view_.row_height;}
   // Node ids encode the EntityId ("e"+value()); decode back for the
   // detail pane.
   static std::optional<stellar::engine::EntityId> entity_for_node(std::string_view id){
@@ -340,6 +359,7 @@ private:
   }
   static std::string number(double value){std::ostringstream out;out<<std::fixed<<std::setprecision(3)<<value;return out.str();}
   std::vector<stellar::engine::DiagnosticRecord> snapshot_;stellar::native_ui::Dropdown dropdown_;
-  bool visible_{},events_{};int pressed_{-1},first_{};Point pointer_{};
+  bool visible_{},events_{};int pressed_{-1};Point pointer_{};
+  mutable stellar::engine::VirtualizedList list_view_;mutable std::size_t list_rows_{};
 };
 }
