@@ -143,7 +143,12 @@ Core/engine projections, never re-derived in UI.
 - Accessibility preferences — `interfaceScale` (Compact→Huge user
   multiplier through `NativeUiLayout`), `reduceMotion`, `reduceFlashing`,
   `highContrast` (global luminance pass), `colorBlind` (Machado
-  daltonization) — all persisted with draft/cancel semantics
+  daltonization), plus `subtitlesEnabled`/`subtitleScale`/`textScale` —
+  a third General Settings row whose consumers are real: the caption
+  renderer gates on subtitles and multiplies the voice-preferred pixel
+  size, and `NativeUiLayout::set_text_scale` enlarges shared font
+  metrics without growing chrome — all persisted with draft/cancel
+  semantics
 - Diagnostics tooling — ENTITIES inspector over the read-only campaign
   projection (incremental sync, tag drill-down, detail pane, search,
   full keyboard tree contract), phase-table sort, events-view search,

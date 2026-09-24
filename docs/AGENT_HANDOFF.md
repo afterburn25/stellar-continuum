@@ -1151,15 +1151,25 @@ bridge test walks raw children matching that shape.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast
-and the typed `ColorBlindMode`, plus text/subtitle scale fields reserved
-for per-surface text scaling) instead of shadowing the same concepts as
-loose fields. The persisted JSON shape is unchanged (same keys, same
+and the typed `ColorBlindMode`, plus text/subtitle scale) instead of
+shadowing the same concepts as loose fields. The persisted JSON shape is unchanged (same keys, same
 validation); `effective()` folds the interface-scale preset into
 `ui_scale` and sanitizes for consumers. `AccessibilitySettings` gains a
 defaulted `operator==` for draft/saved comparison. Client reads moved
 from `saved().reduce_motion`-style fields to `saved().accessibility.*`;
 the daltonization site no longer casts an int ordinal. `AccessibilitySettings`
 is no longer dead engine surface.
+Text/subtitle scale consumption (row 26 follow-up): General Settings
+gains a third accessibility row — SUBTITLES toggle, SUBTITLE SIZE and
+TEXT SIZE preset cyclers (0.75/1.0/1.25/1.5/2.0) — persisted as
+`subtitlesEnabled`/`subtitleScale`/`textScale`. Consumers:
+`render_voice_caption` takes the effective `AccessibilitySettings`
+(gates captions on `subtitles_enabled`, multiplies the voice-preferred
+pixel size by `subtitle_scale`; both the in-game and startup call sites
+pass `general_settings.saved().effective()`), and
+`NativeUiLayout::set_text_scale` multiplies only the shared font metrics
+in `for_viewport` — text enlarges without growing chrome geometry.
+`native_ui_layout` verifies fonts scale while rects stay identical.
 In-app rebind UI (row 16): the settings hub Controls view binds against the
 campaign's live `InputMapper` — `context("GALAXY")` enumerates Button actions
 into rows ("Toggle pause — Space, P"), activation captures the next
