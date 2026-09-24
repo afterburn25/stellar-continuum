@@ -709,6 +709,101 @@ int main() {
               "View Landing",
           "unbound panels must keep the literal fallbacks");
   }
+  {
+    // Colony-list scrolling: rows beyond the viewport stay reachable — the
+    // wheel scrolls the list, clipped row buttons keep a visible band in the
+    // ring, and focus snaps each row fully into view.
+    auto campaign = campaign_fixture();
+    const auto board = build_mission_board(campaign);
+    std::vector<NativeMissionColonyRow> colonies;
+    for (int i = 0; i < 9; ++i) {
+      NativeMissionColonyRow row;
+      row.colony_id = 100 + i;
+      row.name = "Colony " + std::to_string(i);
+      colonies.push_back(row);
+    }
+    const std::vector<native_colony::NativeSettlementMissionView> fleets{};
+    const auto selection = colony_site_selection(fleets, 0, 0);
+    const auto layout = mission_layout_for(board, selection, colonies.size(),
+                                           1600, 900, true);
+    check(layout.colony_rows.size() == 9,
+          "scrolled layout must expose every colony row");
+
+    NativeMissionView panel;
+    panel.open();
+    native_map::InputEvent tab;
+    tab.type = native_map::InputEventType::LeftReleased;
+    tab.position = {layout.sites_tab.x + 4.f, layout.sites_tab.y + 4.f};
+    (void)panel.handle(tab, board, fleets, colonies, 1600, 900);
+
+    // Only the rows intersecting the viewport join the ring: three chrome
+    // controls plus roughly three rows of View buttons — far fewer than
+    // three chrome + nine rows.
+    const auto ring = mission_focus_targets(layout, selection, true,
+                                            colonies, nullptr);
+    check(ring.size() < 3 + 9,
+          "rows clipped out of the viewport must stay out of the ring");
+
+    // The wheel scrolls the row list inside the panel.
+    native_map::InputEvent wheel{native_map::InputEventType::Wheel};
+    wheel.position = {layout.list_viewport.x + 10.f,
+                      layout.list_viewport.y + 10.f};
+    wheel.wheel_y = -1.f;
+    check(panel.handle(wheel, board, fleets, colonies, 1600, 900).captured &&
+              panel.scroll_offset() > 0.f,
+          "the wheel must scroll the colony list");
+    // Home scrolls the list back to the top.
+    const auto key = [&](std::uint32_t value) {
+      native_map::InputEvent event{native_map::InputEventType::KeyPressed};
+      event.key = value;
+      return panel.handle(event, board, fleets, colonies, 1600, 900);
+    };
+    (void)key(0x4000004au); // Home
+    check(panel.scroll_offset() == 0.f,
+          "Home must scroll the colony list back to the top");
+
+    // End jumps to the true list end: the last row's button lands fully
+    // inside the viewport.
+    (void)key(0x4000004du); // End
+    const auto snapped =
+        panel.focused_bounds(board, fleets, colonies, 1600, 900);
+    check(snapped && snapped->height > 20.f &&
+              snapped->y + snapped->height <=
+                  layout.list_viewport.y + layout.list_viewport.height +
+                      0.5f,
+          "End must scroll the last row's button fully into view");
+    check(panel.focused_label(board, fleets, colonies, 1600, 900)
+                  .find("Colony 8") != std::string::npos,
+          "End must ring the deepest colony's View button");
+
+    // Up from the list's top edge scrolls the window back up one row while
+    // the ring keeps the edge slot.
+    (void)key(0x4000004au); // Home → top chrome, list at top.
+    int hops = 0;
+    while (hops++ < 12 &&
+           panel.focused_label(board, fleets, colonies, 1600, 900)
+                   .find("Colony 0") == std::string::npos)
+      (void)key(9); // Tab down into the rows.
+    check(panel.focused_label(board, fleets, colonies, 1600, 900)
+                  .find("Colony 0") != std::string::npos,
+          "Tab must reach the first row's View button");
+
+    // Down past the last clipped row edge-scrolls until Colony 8 is reached.
+    int reached = -1;
+    for (int i = 0; i < 12 && reached < 0; ++i) {
+      const auto label =
+          panel.focused_label(board, fleets, colonies, 1600, 900);
+      if (label.find("Colony 8") != std::string::npos) {
+        const auto command = key(13);
+        if (command.kind == MissionViewCommandKind::OpenColony)
+          reached = command.colony_id;
+        continue;
+      }
+      (void)key(0x40000051u); // Down
+    }
+    check(reached == 108,
+          "Down must edge-scroll the ring to the last colony's View button");
+  }
   if (failures > 0) {
     std::cerr << failures << " mission panel checks failed\n";
     return 1;

@@ -705,10 +705,21 @@ std::string_view role_label(FleetRole role) noexcept {
 
 }  // namespace
 
+[[nodiscard]] std::optional<UiRect>
+clip_rect(UiRect rect, const UiRect &clip) {
+  const auto x1 = std::max(rect.x, clip.x);
+  const auto y1 = std::max(rect.y, clip.y);
+  const auto x2 = std::min(rect.x + rect.width, clip.x + clip.width);
+  const auto y2 = std::min(rect.y + rect.height, clip.y + clip.height);
+  if (x2 <= x1 || y2 <= y1) return std::nullopt;
+  return UiRect{x1, y1, x2 - x1, y2 - y1};
+}
+
 MissionLayout mission_layout_for(const NativeMissionBoard &board,
                                  const NativeColonySiteSelection &selection,
                                  std::size_t colony_rows, int width,
-                                 int height, bool show_sites) {
+                                 int height, bool show_sites,
+                                 float scroll_offset) {
   MissionLayout layout;
   const auto sw = static_cast<float>(width),
              sh = static_cast<float>(height);
@@ -736,18 +747,18 @@ MissionLayout mission_layout_for(const NativeMissionBoard &board,
   auto top = tab_top + tab_height + 10.f * scale;
 
   if (!show_sites) {
+    layout.list_viewport = {layout.panel.x + pad, top,
+                            layout.panel.width - pad * 2.f,
+                            layout.panel.y + layout.panel.height - pad - top};
     const auto card_height = 78.f * scale;
     const auto card_gap = 8.f * scale;
     for (std::size_t i = 0; i < board.missions.size(); ++i) {
-      UiRect card{layout.panel.x + pad, top,
-                  layout.panel.width - pad * 2.f, card_height};
-      if (card.y + card.height >
-          layout.panel.y + layout.panel.height - pad)
-        break;
-      layout.cards.push_back(card);
+      layout.cards.push_back(
+          {layout.panel.x + pad, top - scroll_offset,
+           layout.panel.width - pad * 2.f, card_height});
       top += card_height + card_gap;
     }
-    if (layout.cards.empty())
+    if (board.missions.empty())
       layout.empty_hint = {layout.panel.x + pad, top,
                            layout.panel.width - pad * 2.f, 60.f * scale};
     return layout;
@@ -776,13 +787,13 @@ MissionLayout mission_layout_for(const NativeMissionBoard &board,
   layout.action_status = {layout.panel.x + pad, top,
                           layout.panel.width - pad * 2.f, 30.f * scale};
   top += layout.action_status.height + 6.f * scale;
+  layout.list_viewport = {layout.panel.x + pad, top,
+                          layout.panel.width - pad * 2.f,
+                          layout.panel.y + layout.panel.height - pad - top};
   const auto row_height = 52.f * scale;
   for (std::size_t i = 0; i < colony_rows; ++i) {
-    UiRect row{layout.panel.x + pad, top,
+    UiRect row{layout.panel.x + pad, top - scroll_offset,
                layout.panel.width - pad * 2.f, row_height};
-    if (row.y + row.height >
-        layout.panel.y + layout.panel.height - pad)
-      break;
     layout.colony_rows.push_back(row);
     // Reference owned-colony card header actions: View, Land, Collect.
     const auto button_h = 26.f * scale, button_y = row.y + 13.f * scale,
@@ -834,20 +845,29 @@ std::vector<MissionFocusTarget> mission_focus_targets(
     targets.push_back({layout.select_ship,
                        mt(locale, "MISSIONS_FOCUS_SELECT_SHIP",
                           "Select ship on map")});
+  // Colony-row buttons live in the scroll viewport: a clipped button stays
+  // in the ring with its visible band so keyboard navigation can scroll it
+  // fully into view.
   for (std::size_t i = 0;
        i < layout.colony_rows.size() && i < colonies.size(); ++i) {
-    targets.push_back(
-        {layout.colony_view_buttons[i],
-         mtf(locale, "MISSIONS_FOCUS_VIEW", colonies[i].name, "View {0}")});
+    const auto push_row_button = [&](const native_map::UiRect &button,
+                                     std::string label) {
+      const auto clipped = clip_rect(button, layout.list_viewport);
+      if (clipped)
+        targets.push_back({*clipped, std::move(label), button});
+    };
+    push_row_button(
+        layout.colony_view_buttons[i],
+        mtf(locale, "MISSIONS_FOCUS_VIEW", colonies[i].name, "View {0}"));
     if (colonies[i].can_land)
-      targets.push_back(
-          {layout.colony_land_buttons[i],
-           mtf(locale, "MISSIONS_FOCUS_LAND", colonies[i].name, "Land {0}")});
+      push_row_button(
+          layout.colony_land_buttons[i],
+          mtf(locale, "MISSIONS_FOCUS_LAND", colonies[i].name, "Land {0}"));
     if (colonies[i].is_resource_outpost)
-      targets.push_back(
-          {layout.colony_collect_buttons[i],
-           mtf(locale, "MISSIONS_FOCUS_COLLECT", colonies[i].name,
-               "Collect {0}")});
+      push_row_button(
+          layout.colony_collect_buttons[i],
+          mtf(locale, "MISSIONS_FOCUS_COLLECT", colonies[i].name,
+              "Collect {0}"));
   }
   std::ranges::sort(targets, [](const MissionFocusTarget &a,
                                 const MissionFocusTarget &b) {
@@ -865,7 +885,8 @@ std::string NativeMissionView::focused_label(
   if (!visible_ || focus_ < 0) return {};
   const auto selection = colony_site_selection(fleets, fleet_index_, site_index_);
   const auto layout = mission_layout_for(board, selection, colonies.size(),
-                                         width, height, show_sites_);
+                                         width, height, show_sites_,
+                                         scroll_.scroll_offset);
   const auto targets = mission_focus_targets(layout, selection, show_sites_, colonies, locale_);
   return focus_ < static_cast<int>(targets.size())
              ? targets[static_cast<std::size_t>(focus_)].label
@@ -880,7 +901,8 @@ std::optional<native_map::UiRect> NativeMissionView::focused_bounds(
   if (!visible_ || focus_ < 0) return std::nullopt;
   const auto selection = colony_site_selection(fleets, fleet_index_, site_index_);
   const auto layout = mission_layout_for(board, selection, colonies.size(),
-                                         width, height, show_sites_);
+                                         width, height, show_sites_,
+                                         scroll_.scroll_offset);
   const auto targets = mission_focus_targets(layout, selection, show_sites_, colonies, locale_);
   return focus_ < static_cast<int>(targets.size())
              ? std::optional<native_map::UiRect>{
@@ -899,7 +921,7 @@ MissionViewCommand NativeMissionView::handle(
       colony_site_selection(fleets, fleet_index_, site_index_);
   const auto layout =
       mission_layout_for(board, selection, colonies.size(), width, height,
-                         show_sites_);
+                         show_sites_, scroll_.scroll_offset);
   // Keyboard focus contract: Tab/arrows walk the actionable controls in
   // (y,x) order, Home/End jump to the ends, Return/Space activate through
   // the same press/release dispatch a pointer click takes. Escape releases
@@ -929,15 +951,82 @@ MissionViewCommand NativeMissionView::handle(
                      event.key == kRight || event.key == kDown;
     const bool bwd = (event.key == kTab && event.shift) ||
                      event.key == kLeft || event.key == kUp;
+    // Focus-follow: snap a clipped row button fully into the scroll viewport.
+    const auto snap_focus_into_view = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto &target = targets[static_cast<std::size_t>(focus_)];
+      if (!target.unclipped) return;
+      const auto extent =
+          static_cast<float>(colonies.size()) * (52.f + 6.f) * layout.scale;
+      scroll_.sync(extent, layout.list_viewport.height);
+      scroll_.scroll_interval_into_view(target.unclipped->y,
+                                        target.unclipped->y +
+                                            target.unclipped->height,
+                                        layout.list_viewport.y,
+                                        layout.list_viewport.y +
+                                            layout.list_viewport.height);
+    };
+    // Edge scroll: the ring only covers rows whose buttons intersect the
+    // viewport, so a row showing <13px contributes nothing. When nav lands
+    // on the ring's list edge and the scroll has room, advance the content
+    // window by one row instead of wrapping — the recomputed edge target is
+    // the newly revealed row's button.
+    const auto row_pitch = 58.f * layout.scale;
+    const auto list_extent =
+        static_cast<float>(colonies.size()) * row_pitch;
+    const auto ring_at_scroll = [&] {
+      const auto next_layout = mission_layout_for(
+          board, selection, colonies.size(), width, height, show_sites_,
+          scroll_.scroll_offset);
+      return mission_focus_targets(next_layout, selection, show_sites_,
+                                   colonies, locale_);
+    };
+    const auto first_row_index = [&] {
+      for (int i = 0; i < count; ++i)
+        if (targets[static_cast<std::size_t>(i)].unclipped) return i;
+      return count;
+    };
     if (count > 0 && (event.key == kHome || event.key == kEnd)) {
-      focus_ = event.key == kHome ? 0 : count - 1;
+      // Jump to the true list ends, not just the clipped-visible rows.
+      scroll_.sync(list_extent, layout.list_viewport.height);
+      scroll_.scroll_to(event.key == kHome ? 0.f : scroll_.max_scroll());
+      const auto jumped = ring_at_scroll();
+      focus_ = event.key == kHome ? 0
+                                  : static_cast<int>(jumped.size()) - 1;
       command.captured = true;
       return command;
     }
     if (count > 0 && (fwd || bwd)) {
+      if (focus_ >= 0 && focus_ < count) {
+        scroll_.sync(list_extent, layout.list_viewport.height);
+        if (fwd && focus_ == count - 1 &&
+            targets.back().unclipped &&
+            scroll_.scroll_offset < scroll_.max_scroll()) {
+          scroll_.scroll_by(row_pitch);
+          const auto scrolled = ring_at_scroll();
+          focus_ = static_cast<int>(scrolled.size()) - 1;
+          command.captured = true;
+          return command;
+        }
+        const int first_row = first_row_index();
+        if (bwd && focus_ == first_row && first_row < count &&
+            scroll_.scroll_offset > 0.f) {
+          scroll_.scroll_by(-row_pitch);
+          const auto scrolled = ring_at_scroll();
+          focus_ = -1;
+          for (int i = 0; i < static_cast<int>(scrolled.size()); ++i)
+            if (scrolled[static_cast<std::size_t>(i)].unclipped &&
+                focus_ < 0)
+              focus_ = i;
+          if (focus_ < 0) focus_ = 0;
+          command.captured = true;
+          return command;
+        }
+      }
       focus_ = focus_ < 0 || focus_ >= count
                    ? (bwd ? count - 1 : 0)
                    : (focus_ + (bwd ? -1 : 1) + count) % count;
+      snap_focus_into_view();
       command.captured = true;
       return command;
     }
@@ -958,6 +1047,19 @@ MissionViewCommand NativeMissionView::handle(
       return activated;
     }
     // Unhandled keys keep falling through to global shortcuts.
+    return command;
+  }
+  if (event.type == native_map::InputEventType::Wheel &&
+      layout.panel.contains(event.position)) {
+    // Wheel scrolls the active tab's list (mission cards or colony rows).
+    const auto extent =
+        show_sites_
+            ? static_cast<float>(colonies.size()) * (52.f + 6.f) * layout.scale
+            : static_cast<float>(board.missions.size()) * (78.f + 8.f) *
+                  layout.scale;
+    scroll_.sync(extent, layout.list_viewport.height);
+    scroll_.scroll_by(-event.wheel_y * 42.f * layout.scale);
+    command.captured = true;
     return command;
   }
   if (event.type == native_map::InputEventType::LeftReleased &&
@@ -986,10 +1088,12 @@ MissionViewCommand NativeMissionView::handle(
   command.captured = true;
   if (layout.missions_tab.contains(event.position)) {
     show_sites_ = false;
+    scroll_ = {};
     return command;
   }
   if (layout.sites_tab.contains(event.position)) {
     show_sites_ = true;
+    scroll_ = {};
     return command;
   }
   if (show_sites_) {
@@ -1024,6 +1128,10 @@ MissionViewCommand NativeMissionView::handle(
     }
     for (std::size_t i = 0;
          i < layout.colony_view_buttons.size() && i < colonies.size(); ++i) {
+      // Row buttons are clipped to the scroll viewport: a click outside the
+      // visible band must not reach a scrolled-away control.
+      if (!layout.list_viewport.contains(event.position))
+        break;
       if (layout.colony_view_buttons[i].contains(event.position)) {
         command.kind = MissionViewCommandKind::OpenColony;
         command.colony_id = colonies[i].colony_id;
@@ -1059,7 +1167,7 @@ void NativeMissionView::render(
       colony_site_selection(fleets, fleet_index_, site_index_);
   const auto layout =
       mission_layout_for(board, selection, colonies.size(), width, height,
-                         show_sites_);
+                         show_sites_, scroll_.scroll_offset);
   const auto scale = layout.scale;
   const auto muted = Color{122, 154, 192, 255};
   const auto body = Color{190, 212, 236, 255};
@@ -1130,12 +1238,15 @@ void NativeMissionView::render(
          i < layout.cards.size() && i < board.missions.size(); ++i) {
       const auto &card = board.missions[i];
       const auto &rect = layout.cards[i];
-      out.overlay.emplace_back(FilledRectangle{rect, {17, 27, 47, 240}});
-      out.overlay.emplace_back(StrokedRectangle{rect, {59, 83, 118, 255}});
+      const auto visible = clip_rect(rect, layout.list_viewport);
+      if (!visible) continue;
+      out.overlay.emplace_back(FilledRectangle{*visible, {17, 27, 47, 240}});
+      out.overlay.emplace_back(StrokedRectangle{*visible, {59, 83, 118, 255}});
       const auto pad = 10.f * scale;
       auto line = rect.y + 8.f * scale;
       out.overlay.emplace_back(Text{{rect.x + pad, line}, card.fleet_name,
-                                    accent, layout.body_font_pixels});
+                                    accent, layout.body_font_pixels, 0.f,
+                                    layout.list_viewport});
       const auto role_key = [](FleetRole role) {
         switch (role) {
           case FleetRole::Scout: return "FLEET_ROLE_SCOUT";
@@ -1165,14 +1276,16 @@ void NativeMissionView::render(
                    " - " +
                    mt(locale_, phase_key(card.phase),
                       mission_phase_label(card.phase)),
-               mission_phase_color(card.phase), layout.small_font_pixels});
+               mission_phase_color(card.phase), layout.small_font_pixels, 0.f,
+               layout.list_viewport});
       line += 36.f * scale;
       out.overlay.emplace_back(
           Text{{rect.x + pad, line}, card.destination + " - " + card.eta, body,
-               layout.small_font_pixels});
+               layout.small_font_pixels, 0.f, layout.list_viewport});
       out.overlay.emplace_back(
           Text{{rect.x + pad, line + 15.f * scale}, card.summary, muted,
-               layout.small_font_pixels, rect.width - pad * 2.f});
+               layout.small_font_pixels, rect.width - pad * 2.f,
+               layout.list_viewport});
     }
     draw_focus_ring();
     return;
@@ -1181,14 +1294,18 @@ void NativeMissionView::render(
   // Colony Sites tab.
   const auto nav_fill = Color{13, 51, 52, 255};
   const auto nav = [&](const UiRect &rect, std::string_view label,
-                       bool enabled) {
-    out.overlay.emplace_back(FilledRectangle{rect, nav_fill});
+                       bool enabled,
+                       std::optional<UiRect> clip = std::nullopt) {
+    const auto band =
+        clip ? clip_rect(rect, *clip) : std::optional<UiRect>{rect};
+    if (!band) return;
+    out.overlay.emplace_back(FilledRectangle{*band, nav_fill});
     out.overlay.emplace_back(
-        StrokedRectangle{rect, enabled ? Color{96, 125, 168, 255}
-                                       : Color{45, 60, 82, 255}});
+        StrokedRectangle{*band, enabled ? Color{96, 125, 168, 255}
+                                        : Color{45, 60, 82, 255}});
     out.overlay.emplace_back(
         Text{{rect.x + 8.f * scale, rect.y + 5.f * scale}, std::string(label),
-             enabled ? body : muted, layout.small_font_pixels});
+             enabled ? body : muted, layout.small_font_pixels, 0.f, clip});
   };
   nav(layout.previous_fleet, mt(locale_, "MISSIONS_BTN_PREV_SHIP", "< Ship"),
       selection.fleet_index > 0);
@@ -1235,28 +1352,37 @@ void NativeMissionView::render(
        i < layout.colony_rows.size() && i < colonies.size(); ++i) {
     const auto &row = colonies[i];
     const auto &rect = layout.colony_rows[i];
-    out.overlay.emplace_back(FilledRectangle{rect, {17, 27, 47, 240}});
-    out.overlay.emplace_back(StrokedRectangle{rect, {59, 83, 118, 255}});
+    const auto visible = clip_rect(rect, layout.list_viewport);
+    if (!visible) continue;
+    out.overlay.emplace_back(FilledRectangle{*visible, {17, 27, 47, 240}});
+    out.overlay.emplace_back(StrokedRectangle{*visible, {59, 83, 118, 255}});
     out.overlay.emplace_back(
         Text{{rect.x + 10.f * scale, rect.y + 6.f * scale},
              row.name + "  /  " + row.planet_name + ", " + row.system_name,
-             Color{233, 242, 252, 255}, layout.body_font_pixels});
+             Color{233, 242, 252, 255}, layout.body_font_pixels, 0.f,
+             layout.list_viewport});
     out.overlay.emplace_back(
         Text{{rect.x + 10.f * scale, rect.y + 24.f * scale},
              fixed(row.population_millions, 0, 1) + "M population",
-             gold, layout.small_font_pixels});
+             gold, layout.small_font_pixels, 0.f, layout.list_viewport});
     const auto &button = layout.colony_view_buttons[i];
-    out.overlay.emplace_back(FilledRectangle{button, {13, 51, 52, 255}});
-    out.overlay.emplace_back(StrokedRectangle{button, {96, 125, 168, 255}});
-    out.overlay.emplace_back(
-        Text{{button.x + 10.f * scale, button.y + 6.f * scale},
-             mt(locale_, "MISSIONS_VIEW", "View"), body,
-             layout.small_font_pixels});
+    const auto button_visible = clip_rect(button, layout.list_viewport);
+    if (button_visible) {
+      out.overlay.emplace_back(
+          FilledRectangle{*button_visible, {13, 51, 52, 255}});
+      out.overlay.emplace_back(
+          StrokedRectangle{*button_visible, {96, 125, 168, 255}});
+      out.overlay.emplace_back(
+          Text{{button.x + 10.f * scale, button.y + 6.f * scale},
+               mt(locale_, "MISSIONS_VIEW", "View"), body,
+               layout.small_font_pixels, 0.f, layout.list_viewport});
+    }
     nav(layout.colony_land_buttons[i], mt(locale_, "MISSIONS_LAND", "Land"),
-        row.can_land);
+        row.can_land, layout.list_viewport);
     if (row.is_resource_outpost)
       nav(layout.colony_collect_buttons[i],
-          mt(locale_, "MISSIONS_COLLECT", "Collect"), row.can_request_freight);
+          mt(locale_, "MISSIONS_COLLECT", "Collect"), row.can_request_freight,
+          layout.list_viewport);
   }
   draw_focus_ring();
 }
