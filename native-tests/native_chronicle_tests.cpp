@@ -572,14 +572,20 @@ void keyboard_focus() {
   constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
 
   require(view.focus() < 0, "Focus ring present before any key");
+  require(view.focused_label(1280, 800).empty(),
+          "Unfocused view returned a label");
   // Focusables in (y,x) order: search/refresh/close, then the intro
   // cyclers time/actor/significance/domain, then card surfaces —
   // the newest card contributes its body, DIP action and tag chip,
   // the older located card its body.
   require(key(kTab) && view.focus() == 0, "Tab did not focus first control");
+  require(view.focused_label(1280, 800) == "Refresh",
+          "Focused label did not name the first control");
   require(key(kDown) && view.focus() == 1, "Down did not advance the ring");
   require(key(kLeft) && view.focus() == 0, "Left did not walk back");
   require(key(kEnd) && view.focus() == 10, "End did not land on the last row");
+  require(!view.focused_label(1280, 800).empty(),
+          "Card focus produced an empty label");
   // Activating a located card navigates to its system.
   require(key(kReturn), "Card activation not consumed");
   const auto nav = view.navigation();

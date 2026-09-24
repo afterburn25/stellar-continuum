@@ -192,8 +192,11 @@ void keyboard_focus() {
   quote.body_id=owned.body_id;quote.system_id=owned.system_id;quote.accepted=true;
   workspace.set_freight_preview(quote);
   REQUIRE(workspace.focus()<0);
+  REQUIRE(workspace.focused_label().empty());
   (void)key(kTab);REQUIRE(workspace.focus()==0);
+  REQUIRE(workspace.focused_label()=="Cancel");
   (void)key(kTab);REQUIRE(workspace.focus()==1);
+  REQUIRE(workspace.focused_label()=="Confirm dispatch");
   (void)key(kTab,true);REQUIRE(workspace.focus()==0);
   (void)key(kEnd);REQUIRE(workspace.focus()==1);
   const auto confirmed=key(kReturn);

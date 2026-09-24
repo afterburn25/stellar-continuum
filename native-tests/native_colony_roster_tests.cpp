@@ -422,14 +422,20 @@ void keyboard_focus_rings_controls_and_activates_rows() {
   // Header row x-sorted: search, refresh, close — then the three sort
   // headers, then visible rows.
   require(workspace.focus() < 0, "focus ring present before any key");
+  require(workspace.focused_label(width, height).empty(),
+          "unfocused roster returned a label");
   require(key(kTab).captured && workspace.focus() == 0,
           "Tab did not focus the search field");
+  require(workspace.focused_label(width, height) == "Search colonies",
+          "focused label did not name the search field");
   require(key(kDown).captured && workspace.focus() == 1,
           "Down did not advance the ring");
   require(key(kUp).captured && workspace.focus() == 0,
           "Up did not walk back");
   require(key(kEnd).captured && workspace.focus() > 5,
           "End did not land on a row");
+  require(workspace.focused_label(width, height).starts_with("Terra Colony"),
+          "focused label did not name the roster row");
   const int last = workspace.focus();
   require(key(kHome).captured && workspace.focus() == 0,
           "Home did not return to the head");

@@ -188,8 +188,14 @@ void keyboard_focus() {
   constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
   constexpr std::uint32_t kF5 = 0x4000003fu;
   require(view.focus() < 0, "focus ring present before any key");
+  require(view.focused_label(notifications.items(), 1280, 720).empty(),
+          "unfocused feed returned a label");
   require(key(kTab).captured && view.focus() == 0, "Tab did not focus the first control");
+  require(view.focused_label(notifications.items(), 1280, 720) == "Chronicle",
+          "focused label did not name the chronicle button");
   require(key(kDown).captured && view.focus() == 1, "Down did not advance the ring");
+  require(view.focused_label(notifications.items(), 1280, 720) == "Close feed",
+          "focused label did not name the close button");
   require(key(kLeft).captured && view.focus() == 0, "Left did not walk back");
   require(key(kEnd).captured && view.focus() == 3, "End did not land on the last action");
   require(key(kTab, true).captured && view.focus() == 2, "Shift+Tab did not step backwards");
