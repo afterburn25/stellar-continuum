@@ -1,3 +1,4 @@
+#include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/native_scene3d.hpp>
 #include <stellar/engine/native_geometry3d.hpp>
 #include <stellar/engine/surface_attachment.hpp>
@@ -41,6 +42,14 @@ int main(int argc,char** argv)try{
   check(channel(*first,80,160,0)>220&&channel(*first,240,160,1)>200,"Intersecting meshes failed the depth test");
   check(channel(*first,30,30,2)==240,"3D viewport covered a later 2D overlay");
   check(channel(*first,400,160,0)==5,"3D viewport escaped its rectangle");
+  { // Window::draw attributes the 3D backend's VRAM residency to MemoryTracker.
+    const auto snapshot=stellar::engine::MemoryTracker::instance().snapshot();
+    const auto find=[&](std::string_view name){return std::find_if(snapshot.subsystems.begin(),snapshot.subsystems.end(),[&](const auto& s){return s.name==name;});};
+    const auto residency=window.scene3d_statistics();
+    const auto tex=find("scene3d-textures"),meshes=find("scene3d-meshes"),targets=find("scene3d-targets");
+    check(tex!=snapshot.subsystems.end()&&meshes!=snapshot.subsystems.end()&&targets!=snapshot.subsystems.end(),"3D renderer VRAM is not attributed to MemoryTracker subsystems");
+    check(tex->current_bytes==residency.texture_cache_bytes&&meshes->current_bytes==residency.mesh_cache_bytes&&targets->current_bytes==residency.target_bytes,"Attributed VRAM bytes do not match renderer residency");
+  }
   {
     std::vector<std::uint8_t> pixels(64*64*4);
     for(int y=0;y<64;++y)for(int x=0;x<64;++x){const auto i=(y*64+x)*4;pixels[i]=x<32?255:0;pixels[i+1]=x>=32?255:0;pixels[i+3]=255;}

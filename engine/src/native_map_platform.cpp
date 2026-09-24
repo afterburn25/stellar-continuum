@@ -1,4 +1,5 @@
 #include <stellar/engine/asset_registry.hpp>
+#include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/native_triangle_mesh.hpp>
 #include "native_scene3d_gpu.hpp"
@@ -187,6 +188,11 @@ struct Window::Storage {
   SDL_Texture* scene_target{};
   SDL_Gamepad *gamepad{};SDL_JoystickID gamepad_id{};
   std::unique_ptr<Scene3DRenderer> scene3d;
+  // MemoryTracker VRAM attribution — the 3D backend reports its resident
+  // texture/mesh/render-target bytes once a scene3d view draws.
+  engine::MemoryTracker::SubsystemId gpu_texture_subsystem{engine::MemoryTracker::invalid_subsystem},
+      gpu_mesh_subsystem{engine::MemoryTracker::invalid_subsystem},
+      gpu_target_subsystem{engine::MemoryTracker::invalid_subsystem};
   int scene_width{},scene_height{},scene_percent{100},scene_samples{1};
   void prepare_scene_target(int percent,int samples) {
     if(percent==100&&samples==1){if(scene_target)SDL_DestroyTexture(scene_target);scene_target=nullptr;scene_width=scene_height=0;return;}
@@ -570,7 +576,22 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
   const auto submission_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;
   const auto has_3d=[](const auto& commands){return std::any_of(commands.begin(),commands.end(),[](const auto& c){return std::holds_alternative<Scene3DView>(c);});};
   if(!storage_->scene3d&&(has_3d(draw_list.world)||has_3d(draw_list.overlay)))storage_->scene3d=std::make_unique<Scene3DRenderer>(storage_->device,storage_->renderer);
-  if(storage_->scene3d)storage_->scene3d->prepare(draw_list);
+  if(storage_->scene3d){
+    storage_->scene3d->prepare(draw_list);
+    // VRAM attribution: report the backend's resident texture, mesh and
+    // render-target bytes into MemoryTracker subsystems once per draw so
+    // the memory overlay attributes GPU residency to the renderer.
+    auto& tracker=engine::MemoryTracker::instance();
+    if(storage_->gpu_texture_subsystem==engine::MemoryTracker::invalid_subsystem){
+      storage_->gpu_texture_subsystem=tracker.register_subsystem("scene3d-textures");
+      storage_->gpu_mesh_subsystem=tracker.register_subsystem("scene3d-meshes");
+      storage_->gpu_target_subsystem=tracker.register_subsystem("scene3d-targets");
+    }
+    const auto gpu_stats=storage_->scene3d->statistics();
+    tracker.report(storage_->gpu_texture_subsystem,gpu_stats.texture_cache_bytes,maximum_scene3d_texture_cache_bytes);
+    tracker.report(storage_->gpu_mesh_subsystem,gpu_stats.mesh_cache_bytes,maximum_mesh3d_cache_bytes);
+    tracker.report(storage_->gpu_target_subsystem,gpu_stats.target_bytes,0);
+  }
   const auto draw_line=[&](const Line &line){
     if(!valid_point(line.from)||!valid_point(line.to))throw std::invalid_argument("Line coordinates must be finite.");
     const float dx=line.to.x-line.from.x,dy=line.to.y-line.from.y,length=std::hypot(dx,dy);
