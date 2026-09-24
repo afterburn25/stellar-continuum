@@ -275,8 +275,8 @@ int main() {
     RuntimeHost host{headless_options(root)};
     int updates = 0;
     int read_back = -2;
-    bool wrote = false;
-    std::size_t map_count = 0;
+    bool wrote = false, carrier_ok = false, destroyed = false;
+    std::size_t map_count = 0, after_destroy = 1;
     host.on_update = [&](World &, float) {
       if (++updates != 1) return;
       SceneTilemap map{};
@@ -285,17 +285,25 @@ int main() {
       map.cells = {1, -1, 1, -1, -1, 1, -1, 1};
       const auto id = host.spawn_tilemap(map);
       map_count = host.tilemap_count();
+      carrier_ok =
+          host.tilemap_entity() == id && host.tilemap_entities().size() == 1;
       wrote = host.set_tile_at("runtime-ground", 5.f, 5.f, 7);
       read_back = host.tile_at("runtime-ground", 5.f, 5.f);
       check(host.tilemap_index("runtime-ground").has_value(),
             "tilemap_index resolves the runtime map by name");
       check(host.world().get<Tilemap>(id) != nullptr,
             "spawn_tilemap returns a carrier with a Tilemap");
+      destroyed = host.destroy_tilemap(id);
+      after_destroy = host.tilemap_count();
     };
     check(host.run() == 0, "tilemap run exits cleanly");
     check(map_count == 1, "spawn_tilemap joins the map list");
+    check(carrier_ok,
+          "tilemap_entity/tilemap_entities enumerate the carrier");
     check(wrote && read_back == 7,
           "set_tile_at/tile_at round-trip by name");
+    check(destroyed && after_destroy == 0,
+          "destroy_tilemap removes the map");
   }
 
   // Contact events: two spawned overlapping entities fire on_collision
@@ -574,6 +582,37 @@ int main() {
           "save_data rejects path escapes");
     check(!host.load_data("never-written").has_value(),
           "load_data reports a missing key");
+  }
+
+  // Accessor surface: viewport/world dimensions, the fly camera,
+  // time scale, and the player/3D getters on a 2D demo world.
+  {
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    host.on_update = [&](World &, float) {
+      if (++updates == 1) {
+        host.set_time_scale(2.5);
+        host.set_camera3d(1.0, 2.0, 3.0, 45.f, -10.f);
+      }
+    };
+    check(host.run() == 0, "accessor run exits cleanly");
+    check(host.viewport_width() == 640 && host.viewport_height() == 480,
+          "viewport getters report the configured drawable");
+    check(host.world_width() == 640.f && host.world_height() == 480.f,
+          "world bounds fall back to the viewport");
+    check(std::abs(host.time_scale() - 2.5) < 1e-9,
+          "set_time_scale round-trips");
+    check(std::abs(host.camera3d_x() - 1.0) < 1e-9 &&
+              std::abs(host.camera3d_y() - 2.0) < 1e-9 &&
+              std::abs(host.camera3d_z() - 3.0) < 1e-9 &&
+              std::abs(host.camera3d_yaw() - 45.f) < 1e-4f &&
+              std::abs(host.camera3d_pitch() + 10.f) < 1e-4f,
+          "set_camera3d getters round-trip");
+    check(!host.player().has_value(),
+          "no player entity in the demo world");
+    check(!host.scene3d() && host.gravity3d() == 0.f &&
+              host.ground_y() == 0.f,
+          "3D getters are inert in 2D mode");
   }
 
   // Scene-authored animations: a clip's "x" track owns the entity's
