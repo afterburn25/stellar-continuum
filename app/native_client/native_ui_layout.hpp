@@ -3,7 +3,9 @@
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <utility>
 
 namespace stellar::native_map {
 
@@ -207,6 +209,30 @@ struct NativeUiLayout {
     if (explore.contains(point)) return UiAction::Explore;
     if (menu.contains(point)) return UiAction::Menu;
     return UiAction::None;
+  }
+
+  // Always-on chrome in keyboard focus order — top strip left-to-right, then
+  // the navigation bar, then the left rail. `notifications` is only clickable
+  // when the feed is available; callers drop it from the ring in that case.
+  [[nodiscard]] std::array<std::pair<UiRect, UiAction>, 17> hud_actions()
+      const noexcept {
+    return {{{notifications, UiAction::Notifications},
+             {pause, UiAction::Pause},
+             {speed, UiAction::Speed},
+             {map, UiAction::Map},
+             {home, UiAction::Home},
+             {colonies, UiAction::Colonies},
+             {economy, UiAction::Economy},
+             {research, UiAction::Research},
+             {diplomacy, UiAction::Diplomacy},
+             {supply, UiAction::Supply},
+             {shipyard, UiAction::Shipyard},
+             {menu, UiAction::Menu},
+             {inspect, UiAction::Inspect},
+             {zoom_in, UiAction::ZoomIn},
+             {zoom_out, UiAction::ZoomOut},
+             {construction, UiAction::Construction},
+             {explore, UiAction::Explore}}};
   }
 };
 

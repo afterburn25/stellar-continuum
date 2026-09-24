@@ -535,6 +535,20 @@ int main() try {
             "Shift+Tab did not retreat focus.");
     require(key(outliner, kEnd).captured && outliner.focus() == 1,
             "End did not reach the last focusable row.");
+    // Boundary wrap-out releases the ring so the dispatcher can hand the
+    // same key to the next map focus group (HUD chrome, assets navigator).
+    require(!key(outliner, kTab).captured && outliner.focus() < 0,
+            "Tab past the tail did not release the ring.");
+    require(key(outliner, kTab, true).captured && outliner.focus() == 1,
+            "Shift+Tab did not re-enter at the tail.");
+    require(key(outliner, kTab, true).captured && outliner.focus() == 0,
+            "Shift+Tab did not walk to the head.");
+    require(!key(outliner, kTab, true).captured && outliner.focus() < 0,
+            "Shift+Tab at the head did not release the ring.");
+    require(key(outliner, kTab).captured && outliner.focus() == 0,
+            "Tab did not re-enter at the head.");
+    require(key(outliner, kEnd).captured && outliner.focus() == 1,
+            "End did not return to the last focusable row.");
     auto command = key(outliner, kReturn);
     require(command.kind == FleetWorkspaceCommandKind::Select &&
                 command.fleet_id == 12,

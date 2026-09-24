@@ -493,9 +493,18 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
       return {FleetWorkspaceCommandKind::None, true};
     }
     if (count > 0 && (fwd || bwd)) {
-      focus_ = focus_ < 0 || focus_ >= count
-                   ? (bwd ? count - 1 : 0)
-                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      if (focus_ < 0 || focus_ >= count) {
+        focus_ = bwd ? count - 1 : 0;
+      } else {
+        // Walking past a boundary releases the ring so the dispatcher can
+        // hand the same key to the next map focus group.
+        const int next = focus_ + (bwd ? -1 : 1);
+        if (next < 0 || next >= count) {
+          focus_ = -1;
+          return {};
+        }
+        focus_ = next;
+      }
       return {FleetWorkspaceCommandKind::None, true};
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&

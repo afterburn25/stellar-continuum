@@ -5569,6 +5569,7 @@ class NativeCampaign final {
            (notification_view_.visible()&&notification_view_.focus()>=0)||
            (colony_roster_.visible()&&colony_roster_.focus()>=0)||
            (map_hud_visible()&&assets_.focus()>=0)||
+           hud_focus_>=0||
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
   }
@@ -5897,8 +5898,71 @@ class NativeCampaign final {
           gesture_.capture_for_ui();continue;
         }
       }
-      if(!map_hud_visible()){hud_switch_pressed_=false;assets_.cancel_input();}
+      if(!map_hud_visible()){hud_switch_pressed_=false;assets_.cancel_input();map_focus_group_=-1;hud_focus_=-1;}
       if(map_hud_visible()){
+        if(event.type==InputEventType::LeftPressed||event.type==InputEventType::PointerCancelled){map_focus_group_=-1;hud_focus_=-1;}
+        if(event.type==InputEventType::KeyPressed&&event.key){
+          constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u,kHome=0x4000004au,kEnd=0x4000004du;
+          const bool bwd=event.key==kLeft||event.key==kUp||(event.key==kTab&&event.shift);
+          const bool nav=event.key==kTab||event.key==kRight||event.key==kDown||bwd||event.key==kHome||event.key==kEnd;
+          const bool activate=event.key==kReturn||event.key==kSpace;
+          if(nav||activate){
+            // Always-on map focus groups: assets navigator -> fleet workspace
+            // -> HUD chrome. A nav key that would wrap a group's boundary
+            // releases the ring so the same key can land in the next group;
+            // activation keys only reach the group currently holding focus.
+            if(map_focus_group_>=0&&(map_focus_group_==0?assets_.focus():map_focus_group_==1?fleet_workspace_.focus():hud_focus_)<0)map_focus_group_=-1;
+            const auto hud_items=[&]{
+              std::vector<std::pair<UiRect,UiAction>> items;
+              for(const auto &item:layout.hud_actions())
+                if(item.second!=UiAction::Notifications||notifications_available())items.push_back(item);
+              return items;}();
+            const auto send_map_key=[&](int g)->bool{
+              if(g==0)return assets_.handle(event,width,height).captured;
+              if(g==1){
+                const auto markers=fleet_markers(width,height);
+                const auto fleet_command=fleet_workspace_.handle(event,width,height,markers,std::nullopt);
+                if(fleet_command.kind==FleetWorkspaceCommandKind::OpenColony)open_overview_colony(fleet_command.colony_id,width,height);
+                else handle_fleet_command(fleet_command);
+                return fleet_command.captured;
+              }
+              const int count=static_cast<int>(hud_items.size());
+              if(event.key==kHome||event.key==kEnd)hud_focus_=event.key==kHome?0:count-1;
+              else if(nav&&!activate){
+                if(hud_focus_<0||hud_focus_>=count)hud_focus_=bwd?count-1:0;
+                else{const int next=hud_focus_+(bwd?-1:1);if(next<0||next>=count){hud_focus_=-1;return false;}hud_focus_=next;}
+              }
+              else if(activate&&hud_focus_>=0&&hud_focus_<count){
+                const auto action=hud_items[static_cast<std::size_t>(hud_focus_)].second;
+                if(audio_confirm_)audio_confirm_();
+                if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
+                else if(action==UiAction::Speed)cycle_speed();
+                else if(action==UiAction::Notifications){if(notifications_available())notification_view_.toggle(notifications_.latest_sequence());}
+                else if(action==UiAction::Menu)toggle_menu();
+                else route_navigation(action);
+                return true;
+              }
+              else return false;
+              menu_hover_feedback_.cue(static_cast<std::uint64_t>(hud_items[static_cast<std::size_t>(hud_focus_)].second));
+              announcer_.announce(hud_action_label(hud_items[static_cast<std::size_t>(hud_focus_)].second));
+              return true;
+            };
+            if(activate){
+              if(map_focus_group_>=0&&send_map_key(map_focus_group_)){gesture_.capture_for_ui();continue;}
+            }else{
+              int g=map_focus_group_>=0?map_focus_group_:(bwd?2:0);
+              bool claimed=false;
+              for(int tries=0;tries<3;++tries){
+                if(send_map_key(g)){map_focus_group_=g;claimed=true;break;}
+                g=(g+(bwd?2:1))%3;
+              }
+              if(!claimed)map_focus_group_=-1;
+              // Nav keys on the clean map belong to the rings — never fall
+              // through to the raw handlers, claimed or not.
+              gesture_.capture_for_ui();continue;
+            }
+          }
+        }
         const auto asset_command=assets_.handle(event,width,height);
         if(asset_command.captured){if(asset_command.key)execute_asset(asset_command,width,height);gesture_.capture_for_ui();continue;}
         const auto hud=CommandHudLayout::make(width,height);
@@ -6735,6 +6799,13 @@ class NativeCampaign final {
       draw_navigation(layout.supply,UiAction::Supply,supply_workspace_.visible(),tr("NAV_LOGISTICS","Logistics"));
       draw_navigation(layout.diplomacy,UiAction::Diplomacy,diplomacy_workspace_.visible(),tr("NAV_DIPLOMACY","Diplomacy"));
       draw_navigation(layout.menu,UiAction::Menu,false,tr("NAV_MENU","Menu"));
+      if(map_hud_visible()&&hud_focus_>=0){
+        std::vector<std::pair<UiRect,UiAction>> items;
+        for(const auto &item:layout.hud_actions())
+          if(item.second!=UiAction::Notifications||notifications_available())items.push_back(item);
+        if(hud_focus_<static_cast<int>(items.size()))
+          out.overlay.emplace_back(StrokedRectangle{items[static_cast<std::size_t>(hud_focus_)].first,{164,221,237,255}});
+      }
     }
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y},
@@ -7718,6 +7789,28 @@ class NativeCampaign final {
     }
   }
   void announce_menu_focus(){if(menu_focus_>=0&&menu_focus_<menu_action_count)announcer_.announce(menu_action_label(menu_actions_[menu_focus_]));}
+  std::string hud_action_label(UiAction action)const{
+    switch(action){
+      case UiAction::Notifications:return tr("NAV_EVENTS","Events");
+      case UiAction::Pause:return tr("NAV_PAUSE","Pause");
+      case UiAction::Speed:return tr("NAV_SPEED","Speed");
+      case UiAction::Map:return tr("NAV_GALAXY","Galaxy");
+      case UiAction::Home:return tr("NAV_SYSTEM","System");
+      case UiAction::Colonies:return tr("NAV_PLANETS","Planets");
+      case UiAction::Economy:return tr("NAV_ECONOMY","Economy");
+      case UiAction::Research:return tr("NAV_RESEARCH","Research");
+      case UiAction::Diplomacy:return tr("NAV_DIPLOMACY","Diplomacy");
+      case UiAction::Supply:return tr("NAV_LOGISTICS","Logistics");
+      case UiAction::Shipyard:return tr("NAV_SHIPYARD","Shipyard");
+      case UiAction::Menu:return tr("NAV_MENU","Menu");
+      case UiAction::Inspect:return tr("NAV_INSPECT","Inspect");
+      case UiAction::ZoomIn:return tr("NAV_ZOOM_IN","Zoom in");
+      case UiAction::ZoomOut:return tr("NAV_ZOOM_OUT","Zoom out");
+      case UiAction::Construction:return tr("NAV_CONSTRUCTION","Construction");
+      case UiAction::Explore:return tr("NAV_EXPLORE","Explore");
+      default:return {};
+    }
+  }
   std::optional<stellar::native_audio::VoiceCaption> announcement_caption(){
     while(auto item=announcer_.take())
       announcement_caption_=stellar::native_audio::VoiceCaption{"",std::move(item->text),
@@ -8274,7 +8367,7 @@ class NativeCampaign final {
   stellar::native_audio::NativeVoiceSettings* voice_settings_{};
   stellar::native_video_settings::NativeVideoController* video_settings_{};
   stellar::native_audio::NativeAudioSettings* audio_settings_{};
-  bool menu_{};int menu_focus_{-1};bool smoke_save_pending_{};bool smoke_shortcut_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  bool menu_{};int menu_focus_{-1};int map_focus_group_{-1};int hud_focus_{-1};bool smoke_save_pending_{};bool smoke_shortcut_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
   double smoke_galaxy_day_{},smoke_galaxy_fitted_scale_{},smoke_galaxy_regional_scale_{};
   GalaxyArtSceneEvidence smoke_galaxy_overview_{},smoke_galaxy_regional_{},smoke_galaxy_system_{};

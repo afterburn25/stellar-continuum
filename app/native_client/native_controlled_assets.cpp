@@ -147,7 +147,12 @@ Command Navigator::handle(const InputEvent& e,int w,int h){
       constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
       constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
       constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
-      if(e.key==kTab||e.key==kRight||e.key==kDown||e.key==kLeft||e.key==kUp||e.key==kHome||e.key==kEnd){focus_=0;out.captured=true;}
+      if(e.key==kHome||e.key==kEnd){focus_=0;out.captured=true;}
+      else if(e.key==kTab||e.key==kRight||e.key==kDown||e.key==kLeft||e.key==kUp){
+        // Single-item ring: the first nav key lands on restore, the next
+        // wraps out so the map focus chain can advance to the next group.
+        if(focus_<0){focus_=0;out.captured=true;}
+        else focus_=-1;}
       else if((e.key==kReturn||e.key==kSpace)&&focus_==0){InputEvent press{InputEventType::LeftPressed,{l.restore.x+l.restore.width*.5f,l.restore.y+l.restore.height*.5f}};(void)handle(press,w,h);focus_=-1;out.captured=true;}
       return out;
     }
@@ -180,7 +185,16 @@ Command Navigator::handle(const InputEvent& e,int w,int h){
     const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
     const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
     if(count>0&&(e.key==kHome||e.key==kEnd))focus_=e.key==kHome?0:count-1;
-    else if(count>0&&(fwd||bwd))focus_=focus_<0||focus_>=count?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;
+    else if(count>0&&(fwd||bwd)){
+      if(focus_<0||focus_>=count)focus_=bwd?count-1:0;
+      else{
+        // Walking past a boundary releases the ring so the dispatcher can
+        // hand the same key to the next map focus group.
+        const int next=focus_+(bwd?-1:1);
+        if(next<0||next>=count){focus_=-1;return out;}
+        focus_=next;
+      }
+    }
     else if((e.key==kReturn||e.key==kSpace)&&focus_>=0&&focus_<count){
       const auto& r=targets[static_cast<std::size_t>(focus_)].bounds;
       InputEvent press{InputEventType::LeftPressed,{r.x+r.width*.5f,r.y+r.height*.5f}};

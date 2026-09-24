@@ -83,10 +83,15 @@ void keyboard_focus(){
   require(key(kDown).captured&&n.focus()==1,"Down did not advance to search");
   require(key(kTab,true).captured&&n.focus()==0,"Shift+Tab did not walk back");
   require(key(kEnd).captured&&n.focus()==9,"End did not land on the last row");
+  // Boundary wrap-out releases the ring so the dispatcher can hand the same
+  // key to the next map focus group (fleet workspace, HUD chrome).
+  require(!key(kTab).captured&&n.focus()<0,"Tab past the last row did not release the ring");
+  require(key(kTab,true).captured&&n.focus()==9,"Shift+Tab did not re-enter at the tail");
   require(key(kHome).captured&&n.focus()==0,"Home did not return to the head");
+  require(!key(kTab,true).captured&&n.focus()<0,"Shift+Tab at the head did not release the ring");
   require(!key(kF5).captured,"unrelated key was captured");
   // Search activation enters edit mode; the field owns keys until commit.
-  (void)key(kDown);require(n.focus()==1,"ring did not reach search");
+  (void)key(kTab);(void)key(kDown);require(n.focus()==1,"ring did not reach search");
   require(key(kReturn).captured&&n.wants_text_input(),"Return on search did not enter edit mode");
   require(key(kDown).captured&&n.focus()==1,"editing search leaked a key to the ring");
   require(key(kTab).captured&&!n.wants_text_input(),"Tab did not commit out of search editing");
@@ -109,6 +114,8 @@ void keyboard_focus(){
   // Hidden mode: the restore control rings and unhides on Return.
   auto prefs=n.preferences();prefs.hidden=true;n.set_preferences(prefs);
   require(key(kTab).captured&&n.focus()==0,"hidden mode did not ring the restore control");
+  require(!key(kTab).captured&&n.focus()<0,"hidden-mode ring did not release on the next Tab");
+  require(key(kTab).captured&&n.focus()==0,"hidden mode did not re-ring the restore control");
   command=key(kReturn);
   require(command.captured&&!n.preferences().hidden,"Return on restore did not unhide");
 }
