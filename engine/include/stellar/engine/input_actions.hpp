@@ -84,6 +84,9 @@ public:
   // All registered context names (unordered) — needed to activate a
   // freshly loaded map file.
   std::vector<std::string> context_names() const;
+  // Registered context by name, or nullptr — rebind UIs enumerate
+  // context->actions for their row list.
+  const InputContext *context(std::string_view name) const;
 
   // Feeds one raw event. Returns true when a context consumed it.
   bool feed(const RawInputEvent &event);
@@ -123,5 +126,16 @@ private:
   // only emit axis events on change; begin_frame must not clear them.
   std::unordered_map<int, float> gamepad_axes_;
 };
+
+// SDL-style keycode → display name ("Space", "F5", "A"; unknown codes render
+// "Key <code>"). Deterministic and SDL-free so tests, tools and every
+// platform share it — this is what a rebind UI shows next to an action.
+std::string key_name(int code);
+// Human-readable binding summary ("Ctrl+S", "Mouse 3", "Wheel"); chord keys
+// render before the trigger in listed order.
+std::string describe_binding(const InputBinding &binding);
+// ", "-joined summaries of every binding — what a rebind UI displays next to
+// the action name. Empty lists render "Unbound".
+std::string describe_bindings(const std::vector<InputBinding> &bindings);
 
 } // namespace stellar::engine

@@ -363,4 +363,106 @@ std::string InputMapper::save_contexts() const {
   return nlohmann::json{{"contexts", std::move(contexts)}}.dump(2);
 }
 
+const InputContext *InputMapper::context(std::string_view name) const {
+  const auto it = contexts_.find(std::string(name));
+  return it == contexts_.end() ? nullptr : &it->second;
+}
+
+std::string key_name(int code) {
+  // Printable ASCII (SDL3 keycodes carry it verbatim); letters render
+  // uppercase like a physical keycap.
+  if (code == 32)
+    return "Space";
+  if (code >= 'a' && code <= 'z')
+    return std::string(1, static_cast<char>(code - 'a' + 'A'));
+  if (code > 32 && code < 127)
+    return std::string(1, static_cast<char>(code));
+  switch (code) {
+  case 8: return "Backspace";
+  case 9: return "Tab";
+  case 13: return "Return";
+  case 27: return "Escape";
+  case 0x40000039: return "Caps Lock";
+  case 0x40000046: return "Print Screen";
+  case 0x40000047: return "Scroll Lock";
+  case 0x40000048: return "Pause";
+  case 0x40000049: return "Insert";
+  case 0x4000004a: return "Home";
+  case 0x4000004b: return "Page Up";
+  case 0x4000004c: return "Delete";
+  case 0x4000004d: return "End";
+  case 0x4000004e: return "Page Down";
+  case 0x4000004f: return "Right";
+  case 0x40000050: return "Left";
+  case 0x40000051: return "Down";
+  case 0x40000052: return "Up";
+  case 0x40000053: return "Num Lock";
+  case 0x40000054: return "Keypad /";
+  case 0x40000055: return "Keypad *";
+  case 0x40000056: return "Keypad -";
+  case 0x40000057: return "Keypad +";
+  case 0x40000058: return "Keypad Enter";
+  case 0x40000063: return "Keypad .";
+  case 0x400000e0: return "Left Ctrl";
+  case 0x400000e1: return "Left Shift";
+  case 0x400000e2: return "Left Alt";
+  case 0x400000e3: return "Left Gui";
+  case 0x400000e4: return "Right Ctrl";
+  case 0x400000e5: return "Right Shift";
+  case 0x400000e6: return "Right Alt";
+  case 0x400000e7: return "Right Gui";
+  default: break;
+  }
+  if (code >= 0x40000059 && code <= 0x40000062)
+    return "Keypad " + std::to_string(code - 0x40000059 + 1);
+  if (code >= 0x4000003a && code <= 0x40000045)
+    return "F" + std::to_string(code - 0x4000003a + 1);
+  if (code >= 0x40000068 && code <= 0x40000073)
+    return "F" + std::to_string(code - 0x40000068 + 13);
+  return "Key " + std::to_string(code);
+}
+
+std::string describe_binding(const InputBinding &binding) {
+  std::string trigger;
+  switch (binding.kind) {
+  case RawInputEvent::Kind::KeyPress:
+  case RawInputEvent::Kind::KeyRelease:
+    trigger = key_name(binding.code);
+    break;
+  case RawInputEvent::Kind::MouseButton:
+    trigger = binding.code == 1   ? "Left Mouse"
+              : binding.code == 2 ? "Middle Mouse"
+              : binding.code == 3 ? "Right Mouse"
+                                  : "Mouse " + std::to_string(binding.code);
+    break;
+  case RawInputEvent::Kind::MouseWheel:
+    trigger = "Wheel";
+    break;
+  case RawInputEvent::Kind::GamepadButton:
+    trigger = "Pad " + std::to_string(binding.code);
+    break;
+  case RawInputEvent::Kind::GamepadAxis:
+    trigger = "Axis " + std::to_string(binding.code);
+    break;
+  case RawInputEvent::Kind::MouseMotion:
+    trigger = "Mouse Motion";
+    break;
+  }
+  for (const int chord : binding.chord_keys)
+    trigger = key_name(chord) + "+" + trigger;
+  return trigger;
+}
+
+std::string describe_bindings(const std::vector<InputBinding> &bindings) {
+  if (bindings.empty())
+    return "Unbound";
+  std::string result;
+  for (const auto &binding : bindings) {
+    if (!result.empty())
+      result += ", ";
+    result += describe_binding(binding);
+  }
+  return result;
+}
+
 } // namespace stellar::engine

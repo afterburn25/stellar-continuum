@@ -1107,6 +1107,21 @@ defaulted `operator==` for draft/saved comparison. Client reads moved
 from `saved().reduce_motion`-style fields to `saved().accessibility.*`;
 the daltonization site no longer casts an int ordinal. `AccessibilitySettings`
 is no longer dead engine surface.
+In-app rebind UI (row 16): the settings hub Controls view binds against the
+campaign's live `InputMapper` — `context("GALAXY")` enumerates Button actions
+into rows ("Toggle pause — Space, P"), activation captures the next
+non-modifier keypress as the primary binding (alternate bindings survive;
+Ctrl/Shift/Alt fold into `chord_keys`), Escape or a click cancels, and the
+client persists `save_contexts()` to `galaxy-controls.json` beside the other
+settings files — loaded over the built-in defaults at startup via
+`NativeCampaign::load_user_bindings` (a rejected file keeps defaults).
+Without a mapper the view falls back to the static help card. Engine-side:
+`InputMapper::context(name)` plus `key_name`/`describe_binding`/
+`describe_bindings` display helpers (SDL-free, deterministic). Coverage:
+`input_actions` (helpers + context accessor) and `native_startup_workspace`
+(ring, capture, rebind + alternate preservation, chord, cancels, persist).
+Open: conflict surfacing (two actions on one key both fire), mouse/gamepad
+capture, and multi-pad — all mapper-level follow-ups, not blockers.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

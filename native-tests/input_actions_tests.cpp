@@ -196,6 +196,29 @@ int main() {
   check(reloaded.context_names().size() == 2,
         "context set survives round-trip");
 
+  // context(name): rebind UIs enumerate a context's action list directly.
+  const auto *galaxy = mapper.context("GALAXY");
+  check(galaxy != nullptr && !galaxy->actions.empty(),
+        "context(GALAXY) returns the registered context");
+  check(mapper.context("MISSING") == nullptr, "missing context is nullptr");
+  check(mapper.context("GALAXY")->name == "GALAXY",
+        "context accessor returns the named context");
+
+  // key_name/describe_binding: display names a rebind UI renders.
+  check(key_name(32) == "Space" && key_name('a') == "A" && key_name('4') == "4",
+        "key_name covers space and printables");
+  check(key_name(0x4000003f) == "F6" && key_name(0x4000004f) == "Right" &&
+            key_name(0x400000e0) == "Left Ctrl",
+        "key_name covers function keys, arrows and modifiers");
+  check(key_name(999999) == "Key 999999", "unknown keycode falls back");
+  check(describe_binding({RawInputEvent::Kind::KeyPress, 32}) == "Space",
+        "describe_binding names a keypress");
+  check(describe_binding({RawInputEvent::Kind::MouseButton, 3}) == "Right Mouse",
+        "describe_binding names a mouse button");
+  check(describe_bindings(mapper.bindings("quit")) == "Key 17+Q",
+        "describe_bindings renders chord then trigger");
+  check(describe_bindings({}) == "Unbound", "empty bindings render Unbound");
+
   if (failures == 0)
     std::cout << "InputMapper tests passed\n";
   return failures == 0 ? 0 : 1;

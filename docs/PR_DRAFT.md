@@ -117,7 +117,12 @@ Core/engine projections, never re-derived in UI.
   chrome as ordered focus groups — a nav key that would wrap a group's
   boundary releases the ring so the same key lands in the next group —
   and `NativeUiLayout::hud_actions()` drives a HUD focus ring whose
-  activation replays the pointer dispatch paths
+  activation replays the pointer dispatch paths. The settings hub Controls
+  view is a real rebind UI on the live `InputMapper`: it lists every
+  bindable GALAXY action with `describe_bindings` labels, captures the next
+  keypress (modifiers fold into chords, alternates survive, Escape/click
+  cancels), and persists through `save_contexts` to galaxy-controls.json
+  loaded over the defaults at startup
 - Screen-reader substrate — `AccessibilityAnnouncer` is the bounded
   live-region queue (polite/assertive, dedup, capacity eviction,
   monotonic sequences) a platform AT bridge will drain; live consumers

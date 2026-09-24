@@ -836,6 +836,20 @@ class NativeCampaign final {
     else SDL_Log("GALAXY input context failed to load: %s",error.c_str());
   }
 
+  // User-customized bindings overlay: replaces the registered GALAXY context
+  // wholesale (the stack resolves by name, so no re-push needed). Returns
+  // true when a saved map loaded; a rejected file keeps the defaults.
+  bool load_user_bindings(const std::filesystem::path &path){
+    std::error_code ec;
+    if(!std::filesystem::exists(path,ec))return false;
+    std::ifstream in(path);std::ostringstream contents;contents<<in.rdbuf();
+    std::string error;
+    if(input_mapper_.load_contexts(contents.str(),&error))return true;
+    SDL_Log("Saved input bindings rejected: %s",error.c_str());return false;
+  }
+  // Live mapper — the settings hub's Controls view binds against it.
+  stellar::engine::InputMapper& input_mapper()noexcept{return input_mapper_;}
+
   // Maps the persisted UI voice preferences onto the playback controller's
   // settings record (stellar::native_voice::NativeVoiceSettings).
   [[nodiscard]] static stellar::native_voice::NativeVoiceSettings
@@ -8773,6 +8787,18 @@ int main(int argc,char **argv){
                              [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings,&settings_hub,&voice_settings,&accessibility_bridge);
     campaign.attach_replay(&replay);
     campaign.set_locale(locale_table);
+    // Rebindable galaxy controls: the hub's Controls view edits the live
+    // mapper and persists the rebound map beside the other settings files.
+    const auto controls_path=settings_path.parent_path()/"galaxy-controls.json";
+    campaign.load_user_bindings(controls_path);
+    settings_hub.set_input_mapper(&campaign.input_mapper());
+    settings_hub.set_bindings_persist([&campaign,&controls_path]{
+      const auto text=campaign.input_mapper().save_contexts();
+      try {
+        stellar::engine::write_file_atomically(controls_path,
+          std::span{reinterpret_cast<const std::byte*>(text.data()),text.size()});
+      } catch(const std::exception& error){std::cerr<<"Input bindings save failed: "<<error.what()<<'\n';}
+    });
     active_voice_playback=campaign.voice_playback();
     campaign.configure_support(window.gpu_driver(),window.presentation_mode());
     std::cout<<"renderer="<<window.gpu_driver()<<" presentation="<<window.presentation_mode()<<" drawable="<<window.drawable_width()<<'x'<<window.drawable_height()<<'\n';

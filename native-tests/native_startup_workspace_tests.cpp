@@ -202,6 +202,67 @@ void menu_hover_feedback(){
     (void)hub.handle({InputEventType::LeftPressed,{1,1}},w,h);
     require(hub.focused()<0&&key(kReturn)&&hub.focused()<0,"activation ran without focus");
   }
+  // Controls view with a live InputMapper: bindable rows ring, activation
+  // captures the next keypress as the primary binding (alternates survive),
+  // the persist callback fires, and Escape/click cancel capture.
+  {
+    const int w=1280,h=720;
+    stellar::engine::InputMapper mapper;
+    std::string mapper_error;
+    require(mapper.load_contexts(R"json({"contexts":[{"name":"GALAXY","exclusive":false,"actions":[
+      {"name":"toggle_pause","type":"Button","bindings":[{"kind":"KeyPress","code":32},{"kind":"KeyPress","code":112}]},
+      {"name":"quicksave","type":"Button","bindings":[{"kind":"KeyPress","code":1073741887}]},
+      {"name":"zoom","type":"Axis1D","bindings":[{"kind":"MouseWheel","scale":0.1}]}]}]})json",&mapper_error),mapper_error.c_str());
+    mapper.push_context("GALAXY");
+    stellar::native_settings::NativeSettingsHub hub;
+    hub.set_input_mapper(&mapper);
+    int persists=0;hub.set_bindings_persist([&]{++persists;});
+    hub.open();
+    const auto l=stellar::native_settings::HubLayout::for_viewport(w,h);
+    // Enter Controls: click the Controls category.
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    constexpr std::uint32_t kTab=9u,kReturn=13u;
+    auto key=[&](std::uint32_t k){
+      InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=k;return hub.handle(ev,w,h);};
+    // Ring: Button rows (Axis1D excluded) then Back — 2 actions + Back = 3.
+    require(key(kTab)&&hub.focused()==0,"Controls row 0 did not focus");
+    require(hub.focused_label()=="Toggle pause: Space, P","row label did not name action and bindings");
+    require(key(kTab)&&hub.focused_label()=="Quicksave: F6","row label did not describe the F6 binding");
+    require(key(kTab)&&hub.focused()==2&&hub.focused_label()=="Back","Controls Back did not focus last");
+    // Activate row 0 → capture; a keypress rebinds the primary binding.
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    (void)key(kTab);(void)key(kReturn); // capture row 0
+    require(hub.focused_label()=="Press a key for Toggle pause","capture label did not prompt");
+    InputEvent rebind{};rebind.type=InputEventType::KeyPressed;rebind.key='x';
+    require(hub.handle(rebind,w,h),"capture keypress not consumed");
+    const auto bound=mapper.bindings("toggle_pause");
+    require(bound.size()==2&&bound[0].code=='x'&&bound[1].code==112,
+            "rebind replaced the primary binding and kept the alternate");
+    require(persists==1,"persist callback did not fire after rebind");
+    require(hub.focused_label()=="Toggle pause: X, P","label did not reflect the rebound key");
+    // Chord capture: Ctrl+click-capture quicksave, then Ctrl+Q.
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    (void)key(kTab);(void)key(kTab);(void)key(kReturn); // capture row 1
+    InputEvent chord{};chord.type=InputEventType::KeyPressed;chord.key='q';chord.control=true;
+    (void)hub.handle(chord,w,h);
+    const auto save_keys=mapper.bindings("quicksave");
+    require(save_keys.size()==1&&save_keys[0].code=='q'&&save_keys[0].chord_keys.size()==1,
+            "Ctrl+key did not capture as a chorded binding");
+    // Escape during capture cancels without rebinding (focus stayed on row 1;
+    // Shift+Tab retreats to row 0, Return captures it).
+    InputEvent back_tab{};back_tab.type=InputEventType::KeyPressed;back_tab.key=kTab;back_tab.shift=true;
+    require(hub.handle(back_tab,w,h)&&hub.focused()==0&&key(kReturn),"capture restart failed");
+    InputEvent escape{};escape.type=InputEventType::EscapePressed;
+    require(hub.handle(escape,w,h)&&mapper.bindings("toggle_pause")[0].code=='x',
+            "Escape did not cancel capture cleanly");
+    // A pointer click during capture cancels without rebinding.
+    require(key(kReturn),"second capture did not start");
+    (void)hub.handle({InputEventType::LeftPressed,{1,1}},w,h);
+    require(mapper.bindings("toggle_pause")[0].code=='x',"click did not cancel capture");
+    DrawList draw;hub.render(draw,w,h);
+  }
 }
 }
 int main()try{menu_hover_feedback();keyboard_focus_traversal();responsive();entry_setup_create();load_and_failure();long_load_list_scrolls();live_campaign_return_lifecycle();continue_and_development();std::cout<<"native startup workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
