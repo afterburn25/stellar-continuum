@@ -159,6 +159,25 @@ void verify(int width, int height, float expected_scale) {
   require(layout.hit({static_cast<float>(width - 1),
                       static_cast<float>(height - 1)}, true) == UiAction::None,
           "Outside point activated the menu.");
+
+  // hud_actions() is the keyboard focus ring's source of truth — every item
+  // must hit-test back to its own action and arrive in (y,x) order.
+  const auto ring = layout.hud_actions();
+  require(ring.size() == 17, "HUD focus ring changed size.");
+  for (std::size_t index = 0; index < ring.size(); ++index) {
+    const auto &[bounds, action] = ring[index];
+    require(contains_rect(viewport, bounds),
+            "A HUD focusable escaped the drawable viewport.");
+    require(layout.hit({bounds.x + bounds.width * .5f,
+                        bounds.y + bounds.height * .5f},
+                       false) == action,
+            "A HUD focusable did not hit-test to its action.");
+    if (index)
+      require(ring[index - 1].first.y < bounds.y ||
+                  (ring[index - 1].first.y == bounds.y &&
+                   ring[index - 1].first.x <= bounds.x),
+              "HUD focusables are not in (y,x) order.");
+  }
 }
 
 void verify_navigation_blockers() {
