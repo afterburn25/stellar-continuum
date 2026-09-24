@@ -621,10 +621,6 @@ struct Options {
   }
   return GalaxyStarVisualClass::unknown;
 }
-[[nodiscard]] std::string spectral_name(std::optional<StellarClass> value){
-  if(!value)return "Unclassified";
-  switch(*value){case StellarClass::MRedDwarf:return "M red dwarf";case StellarClass::KOrangeDwarf:return "K orange dwarf";case StellarClass::GYellowDwarf:return "G yellow dwarf";case StellarClass::FYellowWhiteDwarf:return "F yellow-white dwarf";case StellarClass::AWhiteStar:return "A white star";case StellarClass::HotBlueStar:return "Hot blue star";case StellarClass::Giant:return "Giant";case StellarClass::WhiteDwarf:return "White dwarf";case StellarClass::NeutronStar:return "Neutron star";case StellarClass::BlackHole:return "Black hole";case StellarClass::Protostar:return "Protostar";case StellarClass::Pulsar:return "Pulsar";} return "Unclassified";
-}
 void fill(DrawList &out,UiRect bounds,Color color){out.overlay.emplace_back(FilledRectangle{bounds,color});}
 void stroke(DrawList &out,UiRect bounds,Color color){out.overlay.emplace_back(StrokedRectangle{bounds,color});}
 [[nodiscard]] Point center(UiRect bounds)noexcept{return {bounds.x+bounds.width*.5f,bounds.y+bounds.height*.5f};}
@@ -2576,7 +2572,7 @@ class NativeCampaign final {
       if(ship==world.fleets.end()||!ship->freight_home_colony_id)throw std::runtime_error("Freight reload lost its dispatch.");
       quote.fleet_id=ship->id;quote.home_colony_id=*ship->freight_home_colony_id;
       if(state()!=before)throw std::runtime_error("Freight reload changed paused state.");
-      colony_workspace_.set_freight_notice("Freight run restored. Unpause to continue travel, loading and delivery.");
+      colony_workspace_.set_freight_notice(tr("COLONY_FREIGHT_RESTORED","Freight run restored. Unpause to continue travel, loading and delivery."));
     }
     const auto ship=std::ranges::find(world.fleets,quote.fleet_id,&FleetState::id);
     const bool dispatched=ship!=world.fleets.end()&&ship->freight_target_outpost_id==initial.colony_id&&ship->freight_home_colony_id==quote.home_colony_id&&ship->cargo_materials==0.;
@@ -6999,7 +6995,7 @@ class NativeCampaign final {
         else if(command.kind==DiplomacyWorkspaceCommandKind::FocusSystem){
           if(!enter_system(command.focus_system_id,width,height))
             diplomacy_workspace_.set_notice(
-                "The last observation is outside surveyed space.",false);
+                tr("DIPLOMACY_NOTICE_UNSURVEYED","The last observation is outside surveyed space."),false);
         }
         if(command.captured&&event.type==InputEventType::KeyPressed&&
            diplomacy_workspace_.focus()>=0)
@@ -8017,10 +8013,10 @@ class NativeCampaign final {
     if(view.observer_only||view.foreign_settlement)return;
     if(command.action==PlanetaryAction::Cancel){
       std::visit([&](const auto& quote){using T=std::decay_t<decltype(quote)>;if constexpr(!std::is_same_v<T,std::monostate>)(void)surface_controller_.cancel_quote(generation,quote.quote_revision);},screen.pending());
-      screen.complete("Order cancelled. No resources spent.");return;
+      screen.complete(tr("PLANET_ORDER_CANCELLED","Order cancelled. No resources spent."));return;
     }
     if(command.action==PlanetaryAction::Confirm){
-      NativeSurfaceCommandOutcome outcome{false,"Review the order again."};
+      NativeSurfaceCommandOutcome outcome{false,tr("PLANET_ORDER_REVIEW","Review the order again.")};
       std::visit([&](const auto& quote){using T=std::decay_t<decltype(quote)>;
         if constexpr(std::is_same_v<T,NativeSurfacePlacementQuote>)outcome=surface_controller_.confirm_placement(session_->frame(),generation,quote);
         else if constexpr(std::is_same_v<T,NativeSurfaceManagementQuote>)outcome=surface_controller_.confirm_management(session_->frame(),generation,quote);
@@ -8204,7 +8200,7 @@ class NativeCampaign final {
     const auto &view=construction_workspace_.view();
     if(!view){
       construction_workspace_.set_notice(
-          "Construction details are still loading.",false);
+          tr("CONSTRUCTION_NOTICE_LOADING","Construction details are still loading."),false);
       return;
     }
     if(command.kind==ConstructionWorkspaceCommandKind::PrepareCancel){
@@ -8328,9 +8324,9 @@ class NativeCampaign final {
   }
 
   [[nodiscard]] std::string system_display_name(int system_id)const{
-    if(!known_.contains(system_id))return "Unknown system";
+    if(!known_.contains(system_id))return tr("SYSTEM_NAME_UNKNOWN","Unknown system");
     const auto found=session_->cache().systems_by_id.find(system_id);
-    return found==session_->cache().systems_by_id.end()?"Unknown system":found->second->name;
+    return found==session_->cache().systems_by_id.end()?tr("SYSTEM_NAME_UNKNOWN","Unknown system"):found->second->name;
   }
 
   [[nodiscard]] std::vector<ObservedSystemName> observed_system_names()const{
@@ -8969,7 +8965,7 @@ class NativeCampaign final {
     const auto& r=*std::ranges::find(phenomena_.field()->regions,*context.dominant,&GalaxyPhenomenon::id);
     const bool known=world.knowledge.system_survey_level(world.player_civilization_id,id)>=SystemSurveyLevel::partially_surveyed||developer_session();
     const float s=std::clamp(height/1080.f,.7f,1.7f);const auto layout=SystemWorkspaceLayout::for_viewport(width,height);const auto row=layout.controls_row;const UiRect box{row.x+row.width*.53f,row.y+4*s,row.width*.45f,row.height-8*s};
-    std::ostringstream label;label<<(known?phenomenon_definition(r.type).name:"Uncharted cloud environment");if(known)label<<" · Sensors "<<static_cast<int>(context.effects.sensor*100)<<"% · Survey effort "<<std::fixed<<std::setprecision(2)<<context.effects.scanning<<"x";
+    std::ostringstream label;label<<(known?std::string(phenomenon_definition(r.type).name):tr("PHENOMENA_UNKNOWN","Uncharted interstellar cloud"));if(known)label<<" · "<<tr("PHENOMENA_SENSOR","Sensor range")<<" "<<static_cast<int>(context.effects.sensor*100)<<"% · "<<tr("PHENOMENA_SURVEY","Survey effort")<<" "<<std::fixed<<std::setprecision(2)<<context.effects.scanning<<"x";
     stellar::native_menu_style::text(out,box,label.str(),std::max(12,static_cast<int>(13*s)),{150,215,235,255});
   }
   void refresh_inspection() {
