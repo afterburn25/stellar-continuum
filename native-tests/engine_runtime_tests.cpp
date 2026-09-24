@@ -700,6 +700,46 @@ int main() {
           "the x track owns Transform2D.x while playing");
   }
 
+  // 2D solid platform: a falling entity lands on the solid's top and
+  // on_land fires once with the platform as the ground entity.
+  {
+    const auto sub = root / "solid-land";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"gravity":400.0,
+                  "entities":[{"name":"faller","x":50,"y":100,"w":32,"h":32},
+                   {"name":"platform","x":0,"y":200,"w":200,"h":32,
+                    "solid":true,"gravityScale":0}]})";
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 60;
+    RuntimeHost host{opts};
+    int landings = 0;
+    EntityId landed{}, ground_arg{42u, 9u};
+    float rest_y = -999.f;
+    host.on_land = [&](EntityId e, EntityId ground) {
+      ++landings;
+      landed = e;
+      ground_arg = ground;
+    };
+    host.on_update = [&](World &world, float) {
+      const auto faller = host.find_entity("faller");
+      if (faller)
+        if (const auto *t = world.get<Transform2D>(*faller))
+          rest_y = t->y;
+    };
+    check(host.run() == 0, "solid-land run exits cleanly");
+    check(landings == 1, "on_land fires once on the platform touchdown");
+    check(landed == host.find_entity("faller"),
+          "on_land reports the falling entity");
+    check(ground_arg == host.find_entity("platform"),
+          "on_land passes the solid as the ground entity");
+    // Rests with its bottom edge on the platform's top (200 - 32).
+    check(std::abs(rest_y - 168.f) < 2.f,
+          "the faller rests on the platform top");
+  }
+
   // Injected input drives the "player" entity through the real
   // action-mapper path: a held 'd' (move_right) sets velocity while
   // held, release stops it — the same path live keyboard input takes.
