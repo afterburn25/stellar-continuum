@@ -173,9 +173,12 @@ Core/engine projections, never re-derived in UI.
   upstream event-pipeline change)
 - Accessibility stays PARTIAL: the announcement substrate +
   focus-label convention landed (announcer queue, notification/menu/HUD
-  consumers, `focused_label()` on every focus-bearing surface), but
-  platform AT bridging (UIA/AT-SPI) and speech playback of announcements
-  are still open
+  consumers, `focused_label()` on every focus-bearing surface) along
+  with opt-in speech playback (Voice & Subtitles "Speak interface
+  announcements") and a Windows UIA notification bridge
+  (`NativeAccessibilityBridge` — HWND subclass answers UiaRootObjectId
+  and raises NotificationKind events); AT-SPI/non-Windows backends and
+  semantic providers (focus traversal, control patterns) are still open
 - `NativeMissionView` (missions/settlement panel) is a tested component
   not yet instantiated by the client
 - Pause-menu/inspection-card focus rings are verified by client build +
