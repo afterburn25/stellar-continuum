@@ -122,9 +122,10 @@ Core/engine projections, never re-derived in UI.
   live-region queue (polite/assertive, dedup, capacity eviction,
   monotonic sequences) a platform AT bridge will drain; live consumers
   today: notification arrivals announce, pause-menu/HUD focus moves
-  announce localized labels, `focused_label()` on the navigator and
-  fleet outliner name the ringed control, and pending announcements
-  render through the voice-caption channel while subtitles are enabled
+  announce localized labels, every focus-bearing surface exposes
+  `focused_label()` so the dispatcher names the ringed control on every
+  focus move, and pending announcements render through the voice-caption
+  channel while subtitles are enabled
 - Accessibility preferences — `interfaceScale` (Compact→Huge user
   multiplier through `NativeUiLayout`), `reduceMotion`, `reduceFlashing`,
   `highContrast` (global luminance pass), `colorBlind` (Machado
@@ -169,9 +170,9 @@ Core/engine projections, never re-derived in UI.
   upstream event-pipeline change)
 - Accessibility stays PARTIAL: the announcement substrate +
   focus-label convention landed (announcer queue, notification/menu/HUD
-  consumers, `focused_label()` on the map groups), but platform AT
-  bridging (UIA/AT-SPI) is still open and `focused_label()` adoption on
-  the remaining workspaces is in progress
+  consumers, `focused_label()` on every focus-bearing surface), but
+  platform AT bridging (UIA/AT-SPI) and speech playback of announcements
+  are still open
 - `NativeMissionView` (missions/settlement panel) is a tested component
   not yet instantiated by the client
 - Pause-menu/inspection-card focus rings are verified by client build +
