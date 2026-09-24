@@ -48,6 +48,9 @@ public:
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_.scroll_offset; }
   [[nodiscard]] bool visible() const noexcept { return inspection_.has_value(); }
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label() const;
   [[nodiscard]] InspectionHandleResult handle(const stellar::native_map::InputEvent&,
                                               stellar::native_map::UiRect);
   void render(stellar::native_map::DrawList&, stellar::native_map::UiRect) const;

@@ -6146,14 +6146,20 @@ class NativeCampaign final {
       if(supply_workspace_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed?layout.hit(event.position,false):UiAction::None;
         if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
+          const int focus_before=supply_workspace_.focus();
           const auto command=supply_workspace_.handle(event,supply_controller_.view(),width,height);
+          if(command.captured&&supply_workspace_.focus()!=focus_before)
+            announcer_.announce(supply_workspace_.focused_label(supply_controller_.view()));
           if(command.refresh){refresh_supply(true,true);if(audio_confirm_)audio_confirm_();}
           if(command.captured){gesture_.cancel();continue;}
         }
       }
 
       if(settlement_workspace_.visible()&&!menu_){
+        const int focus_before=settlement_workspace_.focus();
         const auto command=settlement_workspace_.handle(event,width,height);
+        if(command.captured&&settlement_workspace_.focus()!=focus_before)
+          announcer_.announce(settlement_workspace_.focused_label());
         if(command.kind==SettlementWorkspaceCommandKind::Confirm)
           execute_settlement();
         if(command.captured)continue;
@@ -6251,6 +6257,9 @@ class NativeCampaign final {
             diplomacy_workspace_.set_notice(
                 "The last observation is outside surveyed space.",false);
         }
+        if(command.captured&&event.type==InputEventType::KeyPressed&&
+           diplomacy_workspace_.focus()>=0)
+          announcer_.announce(diplomacy_workspace_.focused_label(width,height));
         if(command.captured)continue;
       }
       if(construction_workspace_.visible()){
@@ -6277,7 +6286,10 @@ class NativeCampaign final {
            event.type==InputEventType::BackspacePressed)continue;
       }
       if(inspection_visible()){
+        const int focus_before=inspection_card_.focus();
         const auto result=inspection_card_.handle(event,inspection_bounds(width,height));
+        if(result.captured&&inspection_card_.focus()!=focus_before)
+          announcer_.announce(inspection_card_.focused_label());
         if(result.closed)selected_id_.reset();
         if(result.captured){gesture_.cancel();continue;}
       }

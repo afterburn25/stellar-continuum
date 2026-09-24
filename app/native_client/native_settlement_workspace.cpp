@@ -71,6 +71,11 @@ std::string NativeSettlementWorkspace::trf(
 void NativeSettlementWorkspace::reset_gesture() noexcept { pointer_owned_=false; pressed_=PressTarget::None; press_width_=press_height_=0; }
 void NativeSettlementWorkspace::set_preview(NativeSettlementTargetPreview value){reset_gesture();focus_=-1;preview_=std::move(value);}
 void NativeSettlementWorkspace::clear()noexcept{preview_.reset();pointer_={};focus_=-1;reset_gesture();}
+std::string NativeSettlementWorkspace::focused_label() const {
+  if (focus_ < 0) return {};
+  return focus_ == 0 ? tr("SETTLE_CANCEL", "Cancel")
+                     : tr("SETTLE_CONFIRM", "Confirm mission");
+}
 
 SettlementWorkspaceCommand NativeSettlementWorkspace::handle(const InputEvent&event,int width,int height){
   if(!preview_)return {};

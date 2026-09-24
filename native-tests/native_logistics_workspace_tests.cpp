@@ -250,6 +250,12 @@ void keyboard_focus() {
           "End did not select the last control");
   require(key(kHome).captured && workspace.focus() == 0,
           "Home did not select the first control");
+  require(workspace.focused_label(view) == "Refresh",
+          "focused refresh control reported the wrong label");
+  (void)key(kEnd);
+  require(workspace.focused_label(view) == "Close supply network",
+          "focused close control reported the wrong label");
+  (void)key(kHome);
   const auto refreshed = key(kReturn);
   require(refreshed.captured && refreshed.refresh,
           "Return on the focused refresh control did not emit the command");

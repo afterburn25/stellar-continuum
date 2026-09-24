@@ -70,6 +70,13 @@ std::string SupplyWorkspace::trf(
 void SupplyWorkspace::clear_rows() noexcept { rows_={}; }
 void SupplyWorkspace::open() noexcept { visible_=true;scroll_={};owned_=false;focus_=-1;clear_rows(); }
 void SupplyWorkspace::close() noexcept { visible_=false;owned_=false;focus_=-1;clear_rows(); }
+std::string SupplyWorkspace::focused_label(const View &view) const {
+  if (focus_ < 0) return {};
+  if (focus_ == 0)
+    return tr(view.state == LoadState::Failed ? "SUPPLY_RETRY" : "SUPPLY_REFRESH",
+              view.state == LoadState::Failed ? "Retry" : "Refresh");
+  return tr("SUPPLY_CLOSE", "Close supply network");
+}
 void SupplyWorkspace::set_text_measurer(std::function<TextExtent(const Text&)> value) {
   measure_=std::move(value);++measurer_revision_;clear_rows();
 }

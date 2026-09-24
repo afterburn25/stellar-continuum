@@ -369,6 +369,8 @@ void card_keyboard_focus() {
   require(card.focus()<0,"card started with a focused control");
   require(key(kTab).captured&&card.focus()==0,
           "Tab did not focus the card close control");
+  require(card.focused_label()=="Close inspection",
+          "focused card close control reported the wrong label");
   DrawList draw;
   card.render(draw,bounds);
   require(std::ranges::any_of(draw.overlay,[&](const UiOverlayCommand&item){

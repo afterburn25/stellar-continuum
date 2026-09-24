@@ -35,7 +35,9 @@ void keyboard_focus(){
   NativeSettlementWorkspace ui;ui.set_preview(preview());
   REQUIRE(ui.focus()<0);
   (void)key(ui,kTab);REQUIRE(ui.focus()==0);
+  REQUIRE(ui.focused_label()=="Cancel");
   (void)key(ui,kTab);REQUIRE(ui.focus()==1);
+  REQUIRE(ui.focused_label()=="Confirm mission");
   (void)key(ui,kTab,true);REQUIRE(ui.focus()==0);
   (void)key(ui,kEnd);REQUIRE(ui.focus()==1);
   (void)key(ui,kHome);REQUIRE(ui.focus()==0);

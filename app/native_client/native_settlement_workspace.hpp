@@ -41,6 +41,9 @@ public:
   [[nodiscard]] SettlementWorkspaceCommand handle(
       const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label() const;
 private:
   enum class PressTarget { None, Confirm, Cancel };
   void reset_gesture() noexcept;

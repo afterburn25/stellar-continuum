@@ -253,6 +253,11 @@ void SystemInspectionCard::set_inspection(SystemInspection value) {
   if (last_bounds_) sync_scroll(scroll_, *inspection_, *last_bounds_,text_measurer_,locale_);
 }
 void SystemInspectionCard::clear() noexcept { inspection_.reset(); scroll_ = {}; last_bounds_.reset(); pointer_owned_ = false; focus_ = -1; }
+std::string SystemInspectionCard::focused_label() const {
+  return focus_ >= 0 ? tr_at(locale_, "INSPECTION_CLOSE", "Close inspection")
+                     : std::string{};
+}
+
 UiRect SystemInspectionCard::close_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+bounds.width-30.f*s,bounds.y+7.f*s,24.f*s,24.f*s}; }
 UiRect SystemInspectionCard::body_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+10.f*s,bounds.y+62.f*s,std::max(0.f,bounds.width-20.f*s),std::max(0.f,bounds.height-70.f*s)}; }
 InspectionHandleResult SystemInspectionCard::handle(const InputEvent& event, UiRect bounds) {
