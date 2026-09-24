@@ -1112,7 +1112,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   — solid movers push out along the least-penetrated axis and zero
   inward velocity; `on_collision`/`on_collision_exit`/`on_land` fire for
   the 3D set. Public API: `scene3d()`, `entities3d()`,
-  `entities3d_in_radius`, `spawn_entity3d`, `on_spawn3d`,
+  `entities3d_in_radius`, `entities3d_in_box`, `spawn_entity3d`,
+  `on_spawn3d`,
   `set_camera3d` + getters, `gravity3d()`, `ground_y()`, `raycast3d`,
   `entity3d_at`. F5/F9 snapshots capture the 3D set —
   including a `Camera3DState` carrier that restores the fly camera — and

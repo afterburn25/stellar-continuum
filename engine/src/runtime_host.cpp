@@ -326,6 +326,19 @@ RuntimeHost::entities3d_in_radius(float x, float y, float z,
   }
   return out;
 }
+std::vector<EntityId>
+RuntimeHost::entities3d_in_box(float x, float y, float z, float half_w,
+                               float half_h, float half_d) const {
+  std::vector<EntityId> out;
+  for (const auto e : impl_->entities3d) {
+    const auto *t = impl_->world.get<Transform3D>(e);
+    if (!t) continue;
+    if (std::fabs(t->x - x) <= half_w && std::fabs(t->y - y) <= half_h &&
+        std::fabs(t->z - z) <= half_d)
+      out.push_back(e);
+  }
+  return out;
+}
 void RuntimeHost::set_camera3d(double x, double y, double z,
                                float yaw_deg, float pitch_deg) {
   impl_->cam3_x = x;

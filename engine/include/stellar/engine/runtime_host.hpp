@@ -250,6 +250,12 @@ public:
   [[nodiscard]] std::vector<EntityId> entities3d() const;
   [[nodiscard]] std::vector<EntityId>
   entities3d_in_radius(float x, float y, float z, float radius) const;
+  // Axis-aligned box query on center points — half-extents around
+  // (x,y,z); the box counterpart of entities3d_in_radius for trigger
+  // volumes and zone tests.
+  [[nodiscard]] std::vector<EntityId>
+  entities3d_in_box(float x, float y, float z, float half_w,
+                    float half_h, float half_d) const;
   // Fly camera: world position + yaw/pitch degrees (0,0 looks down -Z).
   void set_camera3d(double x, double y, double z, float yaw_deg,
                     float pitch_deg);
