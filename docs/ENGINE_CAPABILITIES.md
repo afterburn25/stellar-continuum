@@ -752,7 +752,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   order refs, plus local-transit vector finiteness, `sensor_range`,
   `mission_order_revision`, `orphaned_route_hop` for planned-route
   systems that no longer exist, and `route_overflow` past the 132-entry
-  persisted path bound. Semantic bounds are flagged as `out_of_range`:
+  persisted path bound. Persisted observer/intelligence state is
+  covered too: knowledge snapshot entries flag `orphaned_observer`/
+  `orphaned_known_system`/`orphaned_known_civilization`, combat
+  intelligence flags `orphaned_observer`/`orphaned_observed_fleet`
+  plus `observation_overflow` past the 2048 per-observer bound and
+  non-negative power/day, and an active massive encounter flags
+  `orphaned_encounter`/`orphaned_encounter_vessel` for absent
+  systems and vessel-bound fleets. Semantic bounds are flagged as `out_of_range`:
   `transit_progress` beyond 1 (the loader enforces [0,1]),
   `fuel_remaining_light_years` beyond `fuel_capacity_light_years`
   (refuel caps at capacity×service), `cargo_materials` beyond
