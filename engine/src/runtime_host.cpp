@@ -667,6 +667,9 @@ int RuntimeHost::run() {
     header.window_width = static_cast<std::uint32_t>(options.width);
     header.window_height = static_cast<std::uint32_t>(options.height);
     impl.recorder.emplace(header);
+    // Same bound the game client uses — a long session truncates to an
+    // honest prefix rather than growing without limit.
+    impl.recorder->set_memory_budget(128ull * 1024 * 1024);
   }
   // Writes the finished journal; false on failure.
   const auto flush_recorder = [&]() -> bool {
@@ -676,6 +679,10 @@ int RuntimeHost::run() {
       write_file_atomically(
           options.record_file,
           std::as_bytes(std::span{text.data(), text.size()}));
+      if (impl.recorder->truncated())
+        std::fprintf(stderr,
+                     "record: journal hit the memory budget — the file is "
+                     "an honest prefix, later input is absent\n");
       return true;
     } catch (const std::exception &) {
       std::fprintf(stderr, "record: cannot write %s\n",
