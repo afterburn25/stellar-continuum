@@ -570,6 +570,27 @@ newest-first view, hiding the oldest session-start record — the test now
 scrolls to the tail before asserting it (stale assumption, not a
 behavior regression). Fresh campaigns produce zero false-positive
 research/diplomacy findings (`developer_qa_host` 41 s soak passes).
+Follow-ups since: `a5bd5f97` reordered `inspect_research_invariants` so
+precise `orphaned_civilization` findings precede the codec-restore
+umbrella (restore rejects absent-civ rows itself, so the precise check
+was unreachable). `453d540c`/`23d8df65`/`6878510b` landed
+advance-failure attribution: every `CampaignFrame::advance` call retains
+the `IntegratedAdaptiveCampaignAdvanceTrace`, and a mid-step throw
+records `CampaignAdvanceFailure{phase,message}` on the frame
+(`last_advance_failure()`, cleared by the next attempt) — phases
+`core`/`sensor`/`research`/`diplomacy`/`chronicle` via
+`campaign_advance_failure_phase`, `tactical` for the combat route,
+`stellar_activity` for the weather-clock advance. Consumers: the QA host
+logs `simulation/step_failure` before its critical checkpoint, and the
+native client catches developer-session step throws into
+`CampaignDiagnosticMonitor::observe_advance_failure` → the fault
+capture's pause+bundle path instead of crashing (player sessions still
+throw). Verified: `campaign_frame_parity` asserts the record on its real
+StrategicFailure throw and its absence after the moved-owner advance;
+8/8 across diagnostics/fault/session/QA surface green (qa_host 29 s).
+Caveat: `stellar_campaign_phase_profile_tests`/`campaign_phase_cadence`
+compile-fail on `set_phase_tier`/`wake_phase` — the coordinator API is
+mid-refactor in the other agent's lane, not a diagnostics regression.
 A 319-test run at `57ab71dc` records 317/319 green after the workspace
 keyboard-focus lane completed: every remaining native surface adopted the
 focus contract — settlement (choice rows), logistics (refresh/close),
