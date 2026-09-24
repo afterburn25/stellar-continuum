@@ -5,7 +5,9 @@
 #include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
+#include <charconv>
 #include <iomanip>
+#include <optional>
 #include <sstream>
 #include <unordered_set>
 
@@ -40,7 +42,7 @@ public:
     if(e.type==InputEventType::LeftPressed){
       if(l.detail.contains(e.position)){dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));return true;}
       pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
-      if(pressed_<0&&entities_&&!entities_dirty_&&l.list.contains(e.position)){
+      if(pressed_<0&&entities_&&!entities_dirty_&&entity_rows_rect(l).contains(e.position)){
         const int row=first_+static_cast<int>((e.position.y-l.list.y)/(33*l.scale));
         if(row>=0&&row<static_cast<int>(entity_flat_.size()))pressed_=100+row;
       }
@@ -57,7 +59,7 @@ public:
       if(hit>=100){
         const int row=hit-100;
         const int released=first_+static_cast<int>((e.position.y-l.list.y)/(33*l.scale));
-        if(released==row&&l.list.contains(e.position)&&row<static_cast<int>(entity_flat_.size())){
+        if(released==row&&entity_rows_rect(l).contains(e.position)&&row<static_cast<int>(entity_flat_.size())){
           const auto *node=entity_flat_[row].first;
           entity_selected_=node->id;entity_tree_.select(node->id);
           if(!node->children.empty())set_entity_expanded(*node,!node->expanded);
@@ -137,36 +139,36 @@ public:
       // it through sync_campaign_world on open/refresh, so surviving rows
       // hold stable EntityIds between refreshes (the incremental path's
       // first live consumer).
+      const auto &projected=entity_world_;
+      const auto legacy_name=[&](stellar::engine::EntityId e){
+        if(const auto legacy=projected.legacy_for(e))
+          return std::string(campaign_domain_name(*legacy>>32))+" "+std::to_string(static_cast<int>(static_cast<std::uint32_t>(*legacy)));
+        return std::string("entity");
+      };
+      // Tag fields are the component payload — the drill-down surface
+      // shows the authoritative refs each tag carries.
+      const auto tag_detail=[&](stellar::engine::EntityId e){
+        using namespace stellar::core;
+        std::string detail;
+        if(const auto*tag=projected.get<CampaignSystemTag>(e))detail="x "+number(tag->x)+", y "+number(tag->y);
+        else if(const auto*body=projected.get<CampaignBodyTag>(e))detail="system "+std::to_string(body->system_id);
+        else if(const auto*civ=projected.get<CampaignCivilizationTag>(e))detail="home system "+std::to_string(civ->home_system_id);
+        else if(const auto*colony=projected.get<CampaignColonyTag>(e))detail="civ "+std::to_string(colony->civilization_id)+" · system "+std::to_string(colony->system_id);
+        else if(const auto*fleet=projected.get<CampaignFleetTag>(e))detail="civ "+std::to_string(fleet->civilization_id);
+        else if(const auto*economy=projected.get<CampaignEconomyTag>(e))detail="civ "+std::to_string(economy->civilization_id);
+        else if(const auto*tech=projected.get<CampaignTechnologyTag>(e))detail="civ "+std::to_string(tech->civilization_id);
+        else if(const auto*construction=projected.get<CampaignConstructionTag>(e))detail="civ "+std::to_string(construction->civilization_id);
+        else if(const auto*shipyard=projected.get<CampaignShipyardTag>(e))detail="civ "+std::to_string(shipyard->civilization_id);
+        return detail;
+      };
       if(entities_dirty_){
         entity_parented_=0;
         if(!entities_world_built_){
           entity_world_=stellar::core::project_campaign_world(frame.runtime().world().campaign());
           entities_world_built_=true;entity_sync_.reset();
         }else entity_sync_=stellar::core::sync_campaign_world(entity_world_,frame.runtime().world().campaign());
-        const auto &projected=entity_world_;
         entity_bytes_=projected.estimated_memory_bytes();
         entity_total_=projected.size();
-        const auto legacy_name=[&](stellar::engine::EntityId e){
-          if(const auto legacy=projected.legacy_for(e))
-            return std::string(campaign_domain_name(*legacy>>32))+" "+std::to_string(static_cast<int>(static_cast<std::uint32_t>(*legacy)));
-          return std::string("entity");
-        };
-        // Tag fields are the component payload — the drill-down surface
-        // shows the authoritative refs each tag carries.
-        const auto tag_detail=[&](stellar::engine::EntityId e){
-          using namespace stellar::core;
-          std::string detail;
-          if(const auto*tag=projected.get<CampaignSystemTag>(e))detail="x "+number(tag->x)+", y "+number(tag->y);
-          else if(const auto*body=projected.get<CampaignBodyTag>(e))detail="system "+std::to_string(body->system_id);
-          else if(const auto*civ=projected.get<CampaignCivilizationTag>(e))detail="home system "+std::to_string(civ->home_system_id);
-          else if(const auto*colony=projected.get<CampaignColonyTag>(e))detail="civ "+std::to_string(colony->civilization_id)+" · system "+std::to_string(colony->system_id);
-          else if(const auto*fleet=projected.get<CampaignFleetTag>(e))detail="civ "+std::to_string(fleet->civilization_id);
-          else if(const auto*economy=projected.get<CampaignEconomyTag>(e))detail="civ "+std::to_string(economy->civilization_id);
-          else if(const auto*tech=projected.get<CampaignTechnologyTag>(e))detail="civ "+std::to_string(tech->civilization_id);
-          else if(const auto*construction=projected.get<CampaignConstructionTag>(e))detail="civ "+std::to_string(construction->civilization_id);
-          else if(const auto*shipyard=projected.get<CampaignShipyardTag>(e))detail="civ "+std::to_string(shipyard->civilization_id);
-          return detail;
-        };
         // The projected hierarchy becomes a collapsible TreeModel —
         // the client's first tree consumer. Parents must precede
         // children (add resolves the link eagerly), so entities are
@@ -207,18 +209,42 @@ public:
       }
       label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(entity_total_)+" projected entities · "+std::to_string(entity_parented_)+" parented · "+number(entity_bytes_/1024.)+" KiB estimated container footprint · "+
         (entity_sync_?"synced +"+std::to_string(entity_sync_->created)+" ~"+std::to_string(entity_sync_->updated)+" -"+std::to_string(entity_sync_->destroyed)+" ↻"+std::to_string(entity_sync_->reparented):"fresh projection")+" · read-only",native_menu_style::muted);
+      // The list splits into the row scroll view (left) and a read-only
+      // field dump of the selected entity (right) — the same
+      // list+details idiom as the celestial index.
+      const UiRect rows_rect=entity_rows_rect(l);
+      const UiRect detail{l.list.x+rows_rect.width+14*s,l.list.y,l.list.width-rows_rect.width-14*s,l.list.height};
       const auto begin=std::clamp(first_,0,std::max(0,static_cast<int>(entity_flat_.size())-14));
       for(int i=0;i<14&&begin+i<static_cast<int>(entity_flat_.size());++i){
         const auto &[node,depth]=entity_flat_[begin+i];
         const auto y=l.list.y+i*33*s;
         const bool selected=node->id==entity_selected_;
-        if(selected)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{24,64,88,230}});
-        else if(i%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
+        if(selected)out.overlay.emplace_back(FilledRectangle{{rows_rect.x,y,rows_rect.width,31*s},{24,64,88,230}});
+        else if(i%2==0)out.overlay.emplace_back(FilledRectangle{{rows_rect.x,y,rows_rect.width,31*s},{12,32,45,210}});
         const float indent=8*s+static_cast<float>(depth)*20*s;
         const std::string glyph=node->children.empty()?"· ":(node->expanded?"▾ ":"› ");
-        label({l.list.x+indent,y+4*s,l.list.width-indent-8*s,25*s},glyph+node->label_key,selected?native_menu_style::cyan:native_menu_style::ink);
+        label({rows_rect.x+indent,y+4*s,rows_rect.width-indent-8*s,25*s},glyph+node->label_key,selected?native_menu_style::cyan:native_menu_style::ink);
       }
-      if(entity_flat_.empty())label(l.list,"The campaign projected no entities.");
+      if(entity_flat_.empty())label(rows_rect,"The campaign projected no entities.");
+      if(const auto sel=entity_for_node(entity_selected_);sel&&projected.alive(*sel)){
+        const auto e=*sel;float y=detail.y;
+        const auto line=[&](std::string value,Color color=native_menu_style::muted){label({detail.x,y,detail.width,24*s},std::move(value),color);y+=26*s;};
+        line("SELECTED ENTITY",native_menu_style::cyan);
+        line(legacy_name(e),native_menu_style::ink);
+        line("entity index "+std::to_string(e.index)+" · generation "+std::to_string(e.generation));
+        if(const auto p=projected.parent(e))line("parent · "+legacy_name(*p));
+        line("children "+std::to_string(projected.children(e).size()));
+        using namespace stellar::core;
+        if(const auto*system_tag=projected.get<CampaignSystemTag>(e)){line("tag campaign.system",native_menu_style::cyan);line("id "+std::to_string(system_tag->id));line("x "+number(system_tag->x));line("y "+number(system_tag->y));}
+        else if(const auto*body_tag=projected.get<CampaignBodyTag>(e)){line("tag campaign.body",native_menu_style::cyan);line("id "+std::to_string(body_tag->id));line("system "+std::to_string(body_tag->system_id));}
+        else if(const auto*civ_tag=projected.get<CampaignCivilizationTag>(e)){line("tag campaign.civilization",native_menu_style::cyan);line("id "+std::to_string(civ_tag->id));line("home system "+std::to_string(civ_tag->home_system_id));}
+        else if(const auto*colony_tag=projected.get<CampaignColonyTag>(e)){line("tag campaign.colony",native_menu_style::cyan);line("id "+std::to_string(colony_tag->id));line("civ "+std::to_string(colony_tag->civilization_id));line("system "+std::to_string(colony_tag->system_id));}
+        else if(const auto*fleet_tag=projected.get<CampaignFleetTag>(e)){line("tag campaign.fleet",native_menu_style::cyan);line("id "+std::to_string(fleet_tag->id));line("civ "+std::to_string(fleet_tag->civilization_id));}
+        else if(const auto*economy_tag=projected.get<CampaignEconomyTag>(e)){line("tag campaign.economy",native_menu_style::cyan);line("civ "+std::to_string(economy_tag->civilization_id));}
+        else if(const auto*tech_tag=projected.get<CampaignTechnologyTag>(e)){line("tag campaign.technology",native_menu_style::cyan);line("civ "+std::to_string(tech_tag->civilization_id));}
+        else if(const auto*construction_tag=projected.get<CampaignConstructionTag>(e)){line("tag campaign.construction",native_menu_style::cyan);line("civ "+std::to_string(construction_tag->civilization_id));}
+        else if(const auto*shipyard_tag=projected.get<CampaignShipyardTag>(e)){line("tag campaign.shipyard",native_menu_style::cyan);line("civ "+std::to_string(shipyard_tag->civilization_id));}
+      }else label(detail,"Select a row — the projected entity's index, refs and tag fields list here.",native_menu_style::muted);
     }else if(!events_){
       label({l.list.x+8*s,l.list.y-31*s,400*s,27*s},"Phase",native_menu_style::muted);
       label({l.list.x+430*s,l.list.y-31*s,140*s,27*s},"Samples",native_menu_style::muted);
@@ -268,6 +294,18 @@ private:
       {p.x+276*s,p.y+64*s,242*s,38*s},{p.x+532*s,p.y+64*s,242*s,38*s},{p.x+788*s,p.y+64*s,292*s,38*s},
       {p.x+20*s,p.y+186*s,1060*s,445*s},{p.x+20*s,p.y+110*s,242*s,34*s},{p.x+276*s,p.y+110*s,242*s,34*s},
       {p.x+532*s,p.y+110*s,242*s,34*s}};
+  }
+  // In the entities view the list splits: rows left, selected-entity
+  // detail right — row hit-testing bounds to the rows region.
+  static UiRect entity_rows_rect(const Layout &l){return {l.list.x,l.list.y,l.list.width*.62f,l.list.height};}
+  // Node ids encode the EntityId ("e"+value()); decode back for the
+  // detail pane.
+  static std::optional<stellar::engine::EntityId> entity_for_node(std::string_view id){
+    if(id.size()<2||id.front()!='e')return std::nullopt;
+    std::uint64_t value{};
+    const auto r=std::from_chars(id.data()+1,id.data()+id.size(),value);
+    if(r.ec!=std::errc{}||r.ptr!=id.data()+id.size())return std::nullopt;
+    return stellar::engine::EntityId{static_cast<std::uint32_t>(value&0xffffffffu),static_cast<std::uint32_t>(value>>32)};
   }
   bool generation_{},assets_{},entities_{};
   mutable bool entities_dirty_{true},entities_world_built_{};

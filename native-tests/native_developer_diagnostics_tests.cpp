@@ -116,6 +116,9 @@ int main(int argc,char **argv)try{
           if(t->value.starts_with("▾ ")||t->value.starts_with("› ")||t->value.starts_with("· "))out.emplace_back(t->value,t->clip->x);
         return out;};
       const auto expanded_view=rows(draw());
+      bool pane_hint=false;
+      for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value.starts_with("Select a row"))pane_hint=true;
+      check(pane_hint,"Entities inspector rendered no selection hint.");
       std::size_t pi=expanded_view.size();
       for(std::size_t i=0;i<expanded_view.size();++i)if(expanded_view[i].first.starts_with("▾ ")){pi=i;break;}
       check(pi<expanded_view.size(),"Entities tree rendered no expanded parent rows.");
@@ -168,6 +171,23 @@ int main(int argc,char **argv)try{
         key(kLeft);check(selected(draw())==expanded_view[pi].first,"Left on a child row did not jump to its parent.");
         key(kSpace);check(selected(draw())==collapsed_text,"Space did not toggle the selected parent row.");
         key(kReturn);check(selected(draw())==expanded_view[pi].first,"Return did not re-expand the selected row.");
+        // The selection feeds a detail pane — the projected entity's
+        // tag fields list beside the rows.
+        const auto tag_line=[&](std::string_view row_text){
+          const auto label_part=std::string(row_text.substr(row_text.find(' ')+1));
+          return "tag campaign."+label_part.substr(0,label_part.find(' '));};
+        const auto has_text=[](const DrawList &d,const std::string &v){
+          for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value==v)return true;
+          return false;};
+        check(has_text(draw(),tag_line(expanded_view[pi].first)),"Selected entity did not surface its tag fields.");
+        // A plain row click selects without toggling — a leaf's tag
+        // fields list too (the glyph may flip if the child is a parent).
+        const auto child_point=control(draw(),expanded_view[pi+1].first);
+        (void)window.handle({InputEventType::LeftPressed,child_point},w,h,monitor);
+        (void)window.handle({InputEventType::LeftReleased,child_point},w,h,monitor);
+        const auto sel=selected(draw());
+        check(sel.substr(sel.find(' ')+1)==expanded_view[pi+1].first.substr(expanded_view[pi+1].first.find(' ')+1),"Clicking a row did not select it.");
+        check(has_text(draw(),tag_line(expanded_view[pi+1].first)),"Clicked row did not surface its tag fields.");
       }
     }
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Entities inspector modified world state.");

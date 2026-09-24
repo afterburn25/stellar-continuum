@@ -747,6 +747,33 @@ owns its keys while editing (Tab/Return commit out); pointer presses,
 cancels, open and close reset the ring. `native_chronicle` covers
 traversal/activation/edit-mode capture/pointer reset/Escape-close;
 3/3 chronicle+notification suites green.
+Notification feed keyboard contract (row-26 accessibility): the
+RECENT EVENTS panel joins the same focus contract — Tab/arrows ring
+the actionable rects in (y,x) order (CHRONICLE/close header buttons,
+then each card's explicit action buttons), Home/End jump to the ends,
+and Return/Space replay the press/release pair through the same
+dispatch a click takes, so Contact activates OPEN RELATIONS and
+located cards emit OpenSystem unchanged. Card bodies stay inert and
+only action buttons fully inside the list viewport focus — the same
+`contains_rect` gate pointer activation applies. Pointer presses,
+cancels, open and close reset the ring; unhandled keys still fall
+through to global shortcuts. `native_notifications` covers
+cycling/Home/End/shift-Tab, keyboard dispatch of Contact/System/
+Chronicle commands, the rendered ring over the focused rect (empty
+feed included) and pointer reset; 2/2 notification suites green.
+Entities tree detail pane (row-24 follow-on): the ENTITIES inspector
+splits its list region into the row scroll view (left ~62%) and a
+read-only detail pane (right) for the selected row — the same
+list+details idiom as the celestial index. The pane decodes the node
+id back to its `EntityId` (`e<index|generation<<32>`), guards with
+`World::alive`, and dumps the projected record: legacy ref, parent
+name, child count and every field of whichever campaign tag the
+entity carries (all nine `Campaign*Tag` domains). Row hit-testing
+bounds to the rows region so clicks in the pane never toggle;
+`native_developer_diagnostics` covers the pre-selection hint, the
+keyboard-selected entity's tag dump and click-select feeding the pane.
+`native_developer_diagnostics` green; the panel stays read-only (the
+byte-identical campaign JSON assertion stands).
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
