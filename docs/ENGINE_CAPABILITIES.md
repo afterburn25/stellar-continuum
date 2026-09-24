@@ -775,7 +775,18 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   radiation hazard in [0,1]) and `validate_stellar_planet` exposure
   fields (finite-positive orbit AU, non-negative flux/approach);
   top-level state adds `stellar_activity_day`, galactic-core
-  position/exclusion radius and `engulfed_planets`. Semantic bounds are flagged as `out_of_range`:
+  position/exclusion radius and `engulfed_planets`. The stellar
+  catalog checks mirror the persistence validators too: stellar
+  class range, companion ordering and the Sol singleton
+  (`invalid_kind`/`invalid_companion`), region index bounds,
+  guarded `validate_stellar_physics`/`validate_stellar_orbits`/
+  `validate_stellar_activity` per system (`invalid_stellar`),
+  cross-system orbit bindings via `validate_stellar_orbit_catalog`
+  (`invalid_orbit_binding`), `validate_central_black_hole` on the
+  galactic-core metadata (`invalid_black_hole`) and the persisted
+  activity-clock bound (`invalid_activity_clock`). Loader-enforced
+  enum bounds flag `invalid_kind` for fleet `transit_phase` and
+  economy `industry_priority`. Semantic bounds are flagged as `out_of_range`:
   `transit_progress` beyond 1 (the loader enforces [0,1]),
   `fuel_remaining_light_years` beyond `fuel_capacity_light_years`
   (refuel caps at capacity×service), `cargo_materials` beyond

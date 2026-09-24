@@ -20,6 +20,9 @@
 #include <stellar/core/massive_combat_persistence.hpp>
 #include <stellar/core/settlement_body_index.hpp>
 #include <stellar/core/ship_designs.hpp>
+#include <stellar/core/stellar_activity.hpp>
+#include <stellar/core/stellar_object.hpp>
+#include <stellar/core/stellar_orbits.hpp>
 #include <stellar/core/surface_construction.hpp>
 #include <stellar/core/surface_economy.hpp>
 #include <stellar/engine/strategic_ai.hpp>
@@ -541,8 +544,41 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
         (s.position.depth_light_years&&!std::isfinite(*s.position.depth_light_years)))
       emit("galaxy","invalid_position",s.id,"System position is not finite.");
     if(s.engulfed_planets<0)emit("galaxy","invalid_nonnegative_value",s.id,"Engulfed planet count is negative.");
+    // The stellar-catalog validator: class range, companion ordering
+    // (B requires A, C requires B) and the canonical Sol singleton.
+    const auto valid_class=[](const std::optional<StellarClass> value){
+      return !value||(static_cast<int>(*value)>=0&&
+                      static_cast<int>(*value)<=static_cast<int>(StellarClass::Pulsar));};
+    if(!valid_class(s.primary)||!valid_class(s.secondary)||!valid_class(s.tertiary))
+      emit("galaxy","invalid_kind",s.id,"Stellar class is outside the catalog.");
+    if((s.secondary&&!s.primary)||(s.tertiary&&!s.secondary)||
+        (s.catalog_preset_id&&*s.catalog_preset_id==sol_catalog_preset_id&&(s.secondary||s.tertiary)))
+      emit("galaxy","invalid_companion",s.id,"Companion stars lack their required primaries.");
+    // The loader rejects region indices outside the 12-band catalog.
+    if(s.stellar_region&&static_cast<unsigned>(*s.stellar_region)>=12)
+      emit("galaxy","invalid_kind",s.id,"Stellar region is outside the catalog.");
+    // Deep physics/orbit/activity validators throw on any violation.
+    try{
+      if(s.stellar_object)validate_stellar_physics(*s.stellar_object);
+      validate_stellar_orbits(s);
+      validate_stellar_activity(s);
+    }catch(const std::exception&){
+      emit("galaxy","invalid_stellar",s.id,"Stellar physics, orbits or activity fail their authoritative validation.");}
   }
-  if(w.stellar_activity_day)positive(*w.stellar_activity_day,"Stellar activity day",0,"galaxy");
+  // Cross-system orbit bindings: planets must bind in-system and
+  // moons must share their parent's stellar host.
+  try{validate_stellar_orbit_catalog(w.systems,w.bodies);}
+  catch(const std::exception&){
+    emit("galaxy","invalid_orbit_binding",0,"Stellar orbit bindings refer outside their system or host.");}
+  if(w.galactic_core&&w.galactic_core->black_hole)
+    try{validate_central_black_hole(*w.galactic_core->black_hole);}
+    catch(const std::exception&){
+      emit("galaxy","invalid_black_hole",0,"Central black hole fails its authoritative validation.");}
+  if(w.stellar_activity_day){positive(*w.stellar_activity_day,"Stellar activity day",0,"galaxy");
+    if(std::isfinite(*w.stellar_activity_day)&&*w.stellar_activity_day>=0.0)
+      try{validate_stellar_activity_clock(w.stellar_activity_day);}
+      catch(const std::exception&){
+        emit("galaxy","invalid_activity_clock",0,"Stellar activity clock exceeds the persisted bound.");}}
   if(w.core){
     if(!std::isfinite(w.core->position.x)||!std::isfinite(w.core->position.y))
       emit("galaxy","invalid_position",0,"Galactic core position is not finite.");
