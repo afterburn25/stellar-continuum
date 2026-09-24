@@ -9282,6 +9282,20 @@ int main(int argc,char **argv){
         }
         out<<",\"pointer_out_of_bounds\":"<<out_of_bounds;
       }
+      // Verification coverage: commands past the last recorded checkpoint
+      // replay but prove nothing — no capture remains to compare them
+      // against. Report the tail so a script can judge how much of the
+      // recording is actually verified.
+      if(!recording->commands().empty()){
+        const auto last_checkpoint=recording->checkpoints().empty()
+            ? std::uint64_t{}
+            : std::ranges::max(recording->checkpoints(),{},
+                  &stellar::engine::ReplayCheckpoint::tick).tick;
+        std::size_t tail=0;
+        for(const auto &command:recording->commands())
+          if(command.tick>last_checkpoint)++tail;
+        out<<",\"unverified_tail_commands\":"<<tail;
+      }
       // Checkpoints emit one entry per section per capture — group by tick
       // and report whether the canonical expected document is on disk.
       std::map<std::uint64_t,std::size_t> checkpoint_ticks;
