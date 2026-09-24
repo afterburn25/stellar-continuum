@@ -110,8 +110,8 @@ std::string NativeGeneralSettings::trf(std::string_view key,std::initializer_lis
   }
   return out;
 }
-void NativeGeneralSettings::open(){nebula_dropdown_.close();eruption_dropdown_.close();hover_feedback_.reset();draft_=saved_;pending_request_.reset();path_scroll_=0;visible_=true;}
-void NativeGeneralSettings::cancel(){nebula_dropdown_.close();eruption_dropdown_.close();draft_=saved_;pending_request_.reset();visible_=false;}
+void NativeGeneralSettings::open(){nebula_dropdown_.close();eruption_dropdown_.close();hover_feedback_.reset();draft_=saved_;pending_request_.reset();path_scroll_=0;focus_=-1;visible_=true;}
+void NativeGeneralSettings::cancel(){nebula_dropdown_.close();eruption_dropdown_.close();draft_=saved_;pending_request_.reset();focus_=-1;visible_=false;}
 Text NativeGeneralSettings::path_text(const GeneralSettingsLayout& l) const {
   const UiRect clip{l.folder.x+12*l.scale,l.folder.y+12*l.scale,l.folder.width-24*l.scale,l.folder.height-24*l.scale};
   const auto& path=draft_.screenshot_directory.empty()?default_directory_:draft_.screenshot_directory;
@@ -158,39 +158,67 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
   if(nebula_dropdown_.visible()){if(const auto choice=nebula_dropdown_.handle(event,GeneralSettingsLayout::for_viewport(width,height).nebula,width,height))draft_.nebula_density=*choice;return true;}
   if(event.type==InputEventType::EscapePressed){cancel();return true;}
   const auto layout=GeneralSettingsLayout::for_viewport(width,height);
-  hover_feedback_.update(event,browsing()?stellar::native_menu_audio::hit(event.position,{layout.cancel}):stellar::native_menu_audio::hit(event.position,{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.motion,layout.iscale,layout.flashing,layout.contrast,layout.colorblind,layout.language,layout.browse,layout.defaults,layout.cancel,layout.save}));
+  // Focusable order is the hover-target order; while a folder browser is
+  // pending only Cancel is reachable.
+  const std::array<UiRect,14> focusables{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.motion,layout.iscale,layout.flashing,layout.contrast,layout.colorblind,layout.language,layout.browse,layout.defaults,layout.cancel,layout.save};
+  hover_feedback_.update(event,stellar::native_menu_audio::hit(event.position,browsing()?std::span<const UiRect>{&layout.cancel,1}:std::span<const UiRect>{focusables}));
   if(event.type==InputEventType::Wheel&&layout.folder.contains(event.position)&&measure_){
     const auto text=path_text(layout);
     const auto max_scroll=std::max(0.f,static_cast<float>(measure_(text).height)-text.clip->height);
     path_scroll_=std::clamp(path_scroll_-event.wheel_y*40*layout.scale,0.f,max_scroll);return true;
   }
+  if(event.type==InputEventType::KeyPressed){
+    // SDL_Keycode: Tab/arrows move the focus ring, Return/Space activate.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const int count=browsing()?1:static_cast<int>(focusables.size());
+    if(event.key==kHome||event.key==kEnd){
+      focus_=event.key==kHome?0:count-1;
+      hover_feedback_.cue(static_cast<std::uint64_t>(focus_)+1);return true;
+    }
+    const bool fwd=(event.key==kTab&&!event.shift)||event.key==kRight||event.key==kDown;
+    const bool bwd=(event.key==kTab&&event.shift)||event.key==kLeft||event.key==kUp;
+    if(fwd||bwd){
+      if(focus_<0)focus_=bwd?count-1:0;else focus_=(focus_+(bwd?-1:1)+count)%count;
+      hover_feedback_.cue(static_cast<std::uint64_t>(focus_)+1);return true;
+    }
+    if((event.key==kReturn||event.key==kSpace)&&focus_>=0){
+      const auto& rect=browsing()?layout.cancel:focusables[static_cast<std::size_t>(focus_)];
+      focus_=-1;
+      activate_at(layout,{rect.x+rect.width*.5f,rect.y+rect.height*.5f});return true;
+    }
+  }
   if(event.type!=InputEventType::LeftPressed)return true;
-  if(layout.cancel.contains(event.position)){cancel();return true;}
-  if(browsing())return true;
-  if(layout.eruptions.contains(event.position)){eruption_dropdown_.open(0,{"Low","Medium","High","Ultra"},draft_.eruption_quality);return true;}
-  if(layout.nebula.contains(event.position)){nebula_dropdown_.open(0,{"Low","Medium","High"},draft_.nebula_density);return true;}
-  if(layout.motion.contains(event.position)){draft_.reduce_motion=!draft_.reduce_motion;return true;}
-  if(layout.iscale.contains(event.position)){draft_.interface_scale=(draft_.interface_scale+1)%4;return true;}
-  if(layout.flashing.contains(event.position)){draft_.reduce_flashing=!draft_.reduce_flashing;return true;}
-  if(layout.contrast.contains(event.position)){draft_.high_contrast=!draft_.high_contrast;return true;}
-  if(layout.colorblind.contains(event.position)){draft_.color_blind=(draft_.color_blind+1)%4;return true;}
-  if(layout.language.contains(event.position)&&!locales_.empty()){
+  focus_=-1;
+  activate_at(layout,event.position);return true;
+}
+void NativeGeneralSettings::activate_at(const GeneralSettingsLayout& layout,stellar::native_map::Point position) {
+  if(layout.cancel.contains(position)){cancel();return;}
+  if(browsing())return;
+  if(layout.eruptions.contains(position)){eruption_dropdown_.open(0,{"Low","Medium","High","Ultra"},draft_.eruption_quality);return;}
+  if(layout.nebula.contains(position)){nebula_dropdown_.open(0,{"Low","Medium","High"},draft_.nebula_density);return;}
+  if(layout.motion.contains(position)){draft_.reduce_motion=!draft_.reduce_motion;return;}
+  if(layout.iscale.contains(position)){draft_.interface_scale=(draft_.interface_scale+1)%4;return;}
+  if(layout.flashing.contains(position)){draft_.reduce_flashing=!draft_.reduce_flashing;return;}
+  if(layout.contrast.contains(position)){draft_.high_contrast=!draft_.high_contrast;return;}
+  if(layout.colorblind.contains(position)){draft_.color_blind=(draft_.color_blind+1)%4;return;}
+  if(layout.language.contains(position)&&!locales_.empty()){
     const auto at=std::find(locales_.begin(),locales_.end(),draft_.locale);
     const auto index=at==locales_.end()?std::size_t{0}:(static_cast<std::size_t>(at-locales_.begin())+1)%locales_.size();
-    draft_.locale=locales_.at(index);return true;}
-  if(layout.audio.contains(event.position)&&audio_){cancel();audio_();}
-  else if(layout.video.contains(event.position)&&video_){cancel();video_();}
-  else if(layout.browse.contains(event.position)) {
-    if(!browse_){error_="Folder browser is unavailable.";return true;}
+    draft_.locale=locales_.at(index);return;}
+  if(layout.audio.contains(position)&&audio_){cancel();audio_();}
+  else if(layout.video.contains(position)&&video_){cancel();video_();}
+  else if(layout.browse.contains(position)) {
+    if(!browse_){error_="Folder browser is unavailable.";return;}
     const auto id=++next_request_;pending_request_=id;
     try {
       if(!browse_(id,draft_.screenshot_directory.empty()?default_directory_:draft_.screenshot_directory)){
         pending_request_.reset();error_="Finish the open folder browser before trying again.";
       } else error_.clear();
     } catch(const std::exception& error){pending_request_.reset();error_="Folder browser could not open. Please try again.";std::cerr<<error.what()<<'\n';}
-  } else if(layout.defaults.contains(event.position)){draft_.screenshot_directory.clear();path_scroll_=0;error_.clear();}
-  else if(layout.save.contains(event.position)&&save(draft_))visible_=false;
-  return true;
+  } else if(layout.defaults.contains(position)){draft_.screenshot_directory.clear();path_scroll_=0;error_.clear();}
+  else if(layout.save.contains(position)&&save(draft_))visible_=false;
 }
 void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   if(!visible_)return;
@@ -227,6 +255,11 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   button(draw,l.browse,browsing()?tr("SETTINGS_BROWSING","BROWSING..."):tr("SETTINGS_BROWSE","BROWSE"),l.font_pixels,false,browsing());
   button(draw,l.defaults,tr("SETTINGS_USE_DEFAULT","USE DEFAULT"),l.font_pixels,false,browsing());button(draw,l.cancel,tr("SETTINGS_CANCEL","CANCEL"),l.font_pixels);
   button(draw,l.save,tr("SETTINGS_SAVE","SAVE"),l.font_pixels,true,browsing());
+  if(focus_>=0){
+    const std::array<UiRect,14> focusables{l.audio,l.video,l.nebula,l.eruptions,l.motion,l.iscale,l.flashing,l.contrast,l.colorblind,l.language,l.browse,l.defaults,l.cancel,l.save};
+    const auto& rect=browsing()?l.cancel:focusables[static_cast<std::size_t>(std::min(focus_,13))];
+    draw.overlay.emplace_back(StrokedRectangle{rect,{160,210,255,255}});
+  }
   nebula_dropdown_.render(draw,l.nebula,width,height,l.font_pixels);
   eruption_dropdown_.render(draw,l.eruptions,width,height,l.font_pixels);
 }

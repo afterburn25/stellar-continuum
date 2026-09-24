@@ -345,6 +345,67 @@ void navigation_cancels_and_closed_view_ignores_events(const TempDirectory& temp
   }
 }
 
+void keyboard_focus_traversal(const TempDirectory& temp) {
+  NativeGeneralSettings settings(temp.path / "focus.json");
+  require(settings.save({}), "could not seed focus preference");
+  int cues{}, audio_calls{};
+  settings.set_hover_callback([&] { ++cues; });
+  settings.set_navigation([&] { ++audio_calls; }, [] {});
+  settings.set_browse([](std::uint64_t, const auto&) { return true; });
+  settings.open();
+  const auto press = [&](std::uint32_t k, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = k;
+    event.shift = shift;
+    return settings.handle(event, 1280, 720);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kRight = 0x4000004fu, kUp = 0x40000052u;
+  require(settings.focused() < 0, "General Settings opened with stale focus");
+  require(press(kTab) && settings.focused() == 0 && cues == 1,
+          "Tab did not focus AUDIO");
+  require(press(kTab) && settings.focused() == 1, "second Tab did not reach VIDEO");
+  require(press(kTab, true) && settings.focused() == 0,
+          "Shift+Tab did not retreat focus");
+  require(press(kRight) && settings.focused() == 1 && press(kUp) &&
+              settings.focused() == 0,
+          "arrow keys did not move focus");
+  require(press(kReturn), "Return on focused AUDIO was not consumed");
+  require(!settings.visible() && audio_calls == 1,
+          "Return on focused AUDIO did not navigate");
+  settings.open();
+  // Space activates the focused toggle through the same dispatch as a click.
+  for (int i = 0; i < 5; ++i) (void)press(kTab);
+  require(settings.focused() == 4, "Tab chain did not reach REDUCE MOTION");
+  const bool motion = settings.draft().reduce_motion;
+  require(press(kSpace) && settings.draft().reduce_motion == !motion,
+          "Space did not toggle the focused preference");
+  // Focus wraps past SAVE (index 13) back onto AUDIO.
+  for (int i = 0; i < 14; ++i) (void)press(kTab);
+  require(settings.focused() == 13, "Tab chain did not reach SAVE");
+  require(press(kTab) && settings.focused() == 0,
+          "focus did not wrap to the first control");
+  // Pointer presses take focus back; Return without focus activates nothing.
+  require(settings.focused() == 0, "refocus failed");
+  InputEvent click{};
+  click.type = InputEventType::LeftPressed;
+  click.position = {-20.f, -20.f};
+  require(settings.handle(click, 1280, 720) && settings.focused() < 0,
+          "pointer press did not clear keyboard focus");
+  require(press(kReturn) && settings.visible() && settings.focused() < 0,
+          "activation ran without focus");
+  // A pending folder browser narrows the ring to Cancel.
+  for (int i = 0; i < 11; ++i) (void)press(kTab);
+  require(settings.focused() == 10, "Tab chain did not reach BROWSE");
+  require(press(kReturn) && settings.browsing(),
+          "Return on focused BROWSE did not open the picker");
+  require(press(kTab) && settings.focused() == 0,
+          "browsing focus was not limited to Cancel");
+  require(press(kReturn) && !settings.visible() && !settings.browsing(),
+          "focused Cancel did not dismiss the pending browser");
+}
+
 void failed_save_keeps_draft_and_does_not_apply(const TempDirectory& temp) {
   const auto file = temp.path / "failed-ui-save.json";
   const auto first = temp.path / "failed-ui-first";
@@ -597,6 +658,7 @@ int main() {
     picker_save_cancel_and_default_flow(temp);
     layouts_fit_and_keep_controls_separate();
     navigation_cancels_and_closed_view_ignores_events(temp);
+    keyboard_focus_traversal(temp);
     failed_save_keeps_draft_and_does_not_apply(temp);
     long_unicode_path_wrap_cache_and_scroll(temp);
   } catch (const std::exception& error) {

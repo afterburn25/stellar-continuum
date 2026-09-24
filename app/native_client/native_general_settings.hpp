@@ -84,6 +84,7 @@ class NativeGeneralSettings final {
   void open();
   void cancel();
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] int focused() const noexcept { return focus_; }
   [[nodiscard]] bool browsing() const noexcept { return pending_request_.has_value(); }
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&,int,int);
   void render(stellar::native_map::DrawList&,int,int) const;
@@ -92,6 +93,7 @@ class NativeGeneralSettings final {
  private:
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
   stellar::native_ui::Dropdown nebula_dropdown_,eruption_dropdown_;
+  void activate_at(const GeneralSettingsLayout&,stellar::native_map::Point);
   [[nodiscard]] stellar::native_map::Text path_text(const GeneralSettingsLayout&) const;
   [[nodiscard]] std::string tr(std::string_view key,std::string_view fallback)const;
   [[nodiscard]] std::string trf(std::string_view key,std::initializer_list<std::string> args,std::string_view fallback)const;
@@ -111,5 +113,6 @@ class NativeGeneralSettings final {
   std::uint64_t next_request_{};
   std::optional<std::uint64_t> pending_request_;
   bool visible_{};
+  int focus_{-1};
 };
 } // namespace stellar::native_general

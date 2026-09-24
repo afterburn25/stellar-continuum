@@ -48,7 +48,11 @@ public:
       // SDL_Keycode: Tab/arrows move the focus ring, Return/Space activate.
       constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
       constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+      constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
       const int count=controls_?1:6;
+      if(e.key==kHome||e.key==kEnd){
+        focus_=e.key==kHome?0:count-1;hover_feedback_.cue(focus_target());return true;
+      }
       const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
       const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
       if(fwd||bwd){
