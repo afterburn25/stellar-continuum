@@ -326,7 +326,6 @@ struct Shell {
     engine::SimulationStepReport last{};
     std::size_t selected{0};
   } sim;
-  engine::VirtualizedList sim_list;
   UiRect hit_sim_step{}, hit_sim_run{}, hit_sim_wake{}, hit_sim_tier{},
       hit_sim_list{};
 
