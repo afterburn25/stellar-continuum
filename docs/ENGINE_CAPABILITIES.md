@@ -828,8 +828,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `runtime->advance` call passes the `IntegratedAdaptiveCampaignAdvanceTrace`,
   and `campaign_advance_failure_phase` attributes the throw to the first
   phase whose output is absent (`core`/`sensor`/`research`/`diplomacy`,
-  `chronicle` when all four completed but post-step recording threw, or
-  `tactical` for the combat route) plus the exception message —
+  `chronicle` when all four completed but post-step recording threw;
+  `tactical` for the combat route and `stellar_activity` for the
+  weather-clock advance) plus the exception message —
   `frame.last_advance_failure()` clears on the next attempt and the QA
   host records it as a `simulation/step_failure` critical finding in the
   failure path before attempting the critical checkpoint. `campaign_frame_parity`'s

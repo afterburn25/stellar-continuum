@@ -263,8 +263,12 @@ CampaignFrameResult CampaignFrame::advance(double real_delta_seconds) {
     }
     saved.completed_ticks=snapshot.tick;saved.backlog_nanoseconds=snapshot.backlog.count();
     if(!count)s.clock.record_fixed_advance(0,0,static_cast<double>(snapshot.backlog.count())/1e9*s.clock.days_per_second());
-    result.stellar_weather_launches=s.runtime->advance_stellar_activity(
-        std::max(0.,s.clock.simulation_days()-start)*24.);
+    try{
+      result.stellar_weather_launches=s.runtime->advance_stellar_activity(
+          std::max(0.,s.clock.simulation_days()-start)*24.);
+    }catch(...){
+      s.last_advance_failure={"stellar_activity",campaign_advance_exception_message(std::current_exception())};throw;
+    }
     result.ready_for_save_capture=true;return result;
   }
   result.completed_substeps = s.policy == CampaignFramePolicy::Developer
@@ -282,8 +286,12 @@ CampaignFrameResult CampaignFrame::advance(double real_delta_seconds) {
                               campaign_advance_exception_message(std::current_exception())};throw;
     }
   }
-  result.stellar_weather_launches=s.runtime->advance_stellar_activity(
-      std::max(0.,s.clock.simulation_days()-start)*24.);
+  try{
+    result.stellar_weather_launches=s.runtime->advance_stellar_activity(
+        std::max(0.,s.clock.simulation_days()-start)*24.);
+  }catch(...){
+    s.last_advance_failure={"stellar_activity",campaign_advance_exception_message(std::current_exception())};throw;
+  }
   result.ready_for_save_capture = true;
   return result;
 }
