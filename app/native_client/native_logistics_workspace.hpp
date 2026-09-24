@@ -24,6 +24,7 @@ public:
   void open() noexcept;
   void close() noexcept;
   bool visible() const noexcept { return visible_; }
+  int focus() const noexcept { return focus_; }
   float scroll_offset() const noexcept { return scroll_; }
   SupplyCommand handle(const stellar::native_map::InputEvent&, const View&, int width, int height);
   void render(stellar::native_map::DrawList&, const View&, int width, int height) const;
@@ -46,6 +47,7 @@ private:
   const stellar::engine::LocalizationTable *locale_{};
   std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure_;
   bool visible_{}, owned_{};
+  int focus_{-1};
   mutable float scroll_{};
   std::uint64_t measurer_revision_{};
   mutable CachedRows rows_;

@@ -68,8 +68,8 @@ std::string SupplyWorkspace::trf(
 }
 
 void SupplyWorkspace::clear_rows() noexcept { rows_={}; }
-void SupplyWorkspace::open() noexcept { visible_=true;scroll_=0.f;owned_=false;clear_rows(); }
-void SupplyWorkspace::close() noexcept { visible_=false;owned_=false;clear_rows(); }
+void SupplyWorkspace::open() noexcept { visible_=true;scroll_=0.f;owned_=false;focus_=-1;clear_rows(); }
+void SupplyWorkspace::close() noexcept { visible_=false;owned_=false;focus_=-1;clear_rows(); }
 void SupplyWorkspace::set_text_measurer(std::function<TextExtent(const Text&)> value) {
   measure_=std::move(value);++measurer_revision_;clear_rows();
 }
@@ -97,6 +97,26 @@ SupplyCommand SupplyWorkspace::handle(const InputEvent& event,const View& view,i
   const auto layout=SupplyLayout::for_viewport(width,height);
   if(event.type==InputEventType::PointerCancelled){owned_=false;return {true,false};}
   if(event.type==InputEventType::EscapePressed){close();return {true,false};}
+  if(event.type==InputEventType::KeyPressed&&event.key){
+    // SDL_Keycode: Tab/arrows move the ring over [refresh, close];
+    // Return/Space replay the click gesture through the same dispatch.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const bool fwd=(event.key==kTab&&!event.shift)||event.key==kRight||event.key==kDown;
+    const bool bwd=(event.key==kTab&&event.shift)||event.key==kLeft||event.key==kUp;
+    if(event.key==kHome||event.key==kEnd){focus_=event.key==kHome?0:1;return {true,false};}
+    if(fwd||bwd){focus_=focus_<0?(bwd?1:0):(focus_+(bwd?-1:1)+2)%2;return {true,false};}
+    if((event.key==kReturn||event.key==kSpace)&&focus_>=0){
+      const auto&rect=focus_==0?layout.refresh:layout.close;
+      InputEvent press{InputEventType::LeftPressed},release{InputEventType::LeftReleased};
+      press.position=release.position={rect.x+rect.width*.5f,rect.y+rect.height*.5f};
+      const int keep=focus_;auto command=handle(press,view,width,height);
+      static_cast<void>(handle(release,view,width,height));
+      if(visible_)focus_=keep;return command;
+    }
+    return {}; // Non-modal: unhandled keys pass through to global shortcuts.
+  }
   if(!pointer_event(event.type))return {};
   if(event.type==InputEventType::LeftReleased||event.type==InputEventType::RightReleased){
     const bool captured=owned_||layout.panel.contains(event.position);owned_=false;return {captured,false};
@@ -105,6 +125,7 @@ SupplyCommand SupplyWorkspace::handle(const InputEvent& event,const View& view,i
   if(!layout.panel.contains(event.position))return {};
   if(event.type==InputEventType::LeftPressed){
     if(layout.close.contains(event.position)){close();return {true,false};}
+    focus_=-1;
     owned_=true;
     return {true,layout.refresh.contains(event.position)};
   }
@@ -134,6 +155,7 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
                 "{0}  /  HOME SYSTEM  /  {1} TRANSPORT LINKS")
            :tr("SUPPLY_UNAVAILABLE","HOME SYSTEM SUPPLY UNAVAILABLE"),font,cyan,p);
   label(out,{p.x+18.f*s,p.y+85.f*s,p.width-36.f*s,45.f*s},view.message,font,ready?muted:amber,p);
+  if(focus_>=0)out.overlay.emplace_back(StrokedRectangle{focus_==0?layout.refresh:layout.close,{160,210,255,255}});
   if(!ready)return; // Never render stale totals or healthy zeroes after a failure.
   const std::array<const char*,4> metric_keys{"SUPPLY_METRIC_AVAILABLE","SUPPLY_METRIC_DEMAND","SUPPLY_METRIC_DELIVERED","SUPPLY_METRIC_SHORTFALL"};
   const std::array<std::string,4> metric_fallbacks{"AVAILABLE","DEMAND","DELIVERED","SHORTFALL"};
