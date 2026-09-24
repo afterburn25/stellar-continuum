@@ -195,6 +195,14 @@ int main() {
   check(announcer.take()->text == "alert" && announcer.take()->text == "next" &&
             !announcer.take().has_value(),
         "take drains in publish order");
+  announcer.announce("arrived");
+  announcer.announce_focus("focused control");
+  const auto status_item = announcer.take();
+  const auto focus_item = announcer.take();
+  check(status_item && status_item->kind == AnnouncementKind::Status &&
+            focus_item && focus_item->kind == AnnouncementKind::Focus,
+        "announcement kind did not distinguish focus from status");
+  check(!announcer.take().has_value(), "announcer did not drain fully");
 
   if (failures == 0)
     std::cout << "Economy, replay, animation and accessibility tests passed\n";

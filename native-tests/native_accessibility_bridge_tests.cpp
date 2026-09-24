@@ -87,6 +87,70 @@ int main() try {
   require(SUCCEEDED(element->get_CurrentIsControlElement(&is_control)) &&
               is_control == FALSE,
           "notification provider leaked into the control tree");
+  // focus_changed() projects a synthetic fragment: the root's tree-walk
+  // child reports the label, and GetFocus resolves it.
+  (void)bridge.focus_changed("Fleet Atlas");
+  IUIAutomationTreeWalker* walker{};
+  require(SUCCEEDED(automation->get_RawViewWalker(&walker)) && walker,
+          "UIA raw view walker was not available");
+  // UIA splices the host HWND's native children (title bar, etc.) into a
+  // hostable provider — walk the raw children until the focus fragment shows
+  // up with its appended runtime id.
+  IUIAutomationElement* child{};
+  require(SUCCEEDED(walker->GetFirstChildElement(element, &child)),
+          "raw child walk failed");
+  IUIAutomationElement* fragment{};
+  for (IUIAutomationElement* cursor = child; cursor;) {
+    CONTROLTYPEID ct{};
+    (void)cursor->get_CurrentControlType(&ct);
+    SAFEARRAY* rid{};
+    (void)cursor->GetRuntimeId(&rid);
+    long length = 0;
+    if (rid) {
+      long lb = 0, ub = -1;
+      SafeArrayGetLBound(rid, 1, &lb);
+      SafeArrayGetUBound(rid, 1, &ub);
+      length = ub - lb + 1;
+      SafeArrayDestroy(rid);
+    }
+    if (ct == UIA_CustomControlTypeId && length == 2) {
+      fragment = cursor;
+      break;
+    }
+    IUIAutomationElement* next{};
+    (void)walker->GetNextSiblingElement(cursor, &next);
+    cursor->Release();
+    cursor = next;
+  }
+  if (child && child != fragment) child->Release();
+  require(fragment != nullptr,
+          "focus fragment was not exposed among the root's children");
+  child = fragment;
+  BSTR child_name{};
+  const HRESULT name_hr = child->get_CurrentName(&child_name);
+  if (!(SUCCEEDED(name_hr) && child_name &&
+        std::wstring(child_name) == L"Fleet Atlas")) {
+    std::fprintf(stderr, "child name hr=%lx value='%ls'\n",
+                 static_cast<unsigned long>(name_hr),
+                 child_name ? child_name : L"<null>");
+    throw std::runtime_error("focus fragment did not carry the focused label");
+  }
+  SysFreeString(child_name);
+  CONTROLTYPEID child_type{};
+  require(SUCCEEDED(child->get_CurrentControlType(&child_type)) &&
+              child_type == UIA_CustomControlTypeId,
+          "focus fragment reported the wrong control type");
+  BOOL has_focus = FALSE;
+  require(SUCCEEDED(child->get_CurrentHasKeyboardFocus(&has_focus)) &&
+              has_focus == TRUE,
+          "focus fragment did not report keyboard focus");
+  IUIAutomationElement* parent{};
+  require(SUCCEEDED(walker->GetParentElement(child, &parent)) && parent,
+          "focus fragment did not navigate to its root parent");
+  parent->Release();
+  child->Release();
+  walker->Release();
+
   element->Release();
   automation->Release();
 

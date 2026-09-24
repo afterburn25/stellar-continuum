@@ -27,6 +27,9 @@ class NativeAccessibilityBridge final {
   // Raises a notification for a live-region announcement. Returns false when
   // unattached, the text is empty, or no assistive client is listening.
   bool announce(std::string_view text);
+  // Raises a UIA focus-changed event carrying the label on a synthetic
+  // fragment so assistive clients see real focus tracking. Same gates.
+  bool focus_changed(std::string_view label);
   // Subclassed window-procedure sink installed while attached — platform
   // plumbing for the WM_GETOBJECT answer, not a general event API.
   std::intptr_t handle_window_message(std::uintptr_t hwnd, unsigned message,

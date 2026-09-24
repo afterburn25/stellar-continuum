@@ -82,10 +82,16 @@ AccessibilitySettings::from_json(std::string_view document) {
 
 void AccessibilityAnnouncer::announce(std::string text,
                                       AnnouncementPriority priority) {
+  announce(std::move(text), priority, AnnouncementKind::Status);
+}
+
+void AccessibilityAnnouncer::announce(std::string text,
+                                      AnnouncementPriority priority,
+                                      AnnouncementKind kind) {
   if (text.empty())
     return;
   if (!pending_.empty() && pending_.back().text == text &&
-      pending_.back().priority == priority)
+      pending_.back().priority == priority && pending_.back().kind == kind)
     return;
   if (priority == AnnouncementPriority::Assertive) {
     std::erase_if(pending_, [](const AccessibilityAnnouncement &item) {
@@ -100,7 +106,7 @@ void AccessibilityAnnouncer::announce(std::string text,
     pending_.erase(polite != pending_.end() ? polite : pending_.begin());
   }
   pending_.push_back(
-      AccessibilityAnnouncement{std::move(text), priority, sequence_++});
+      AccessibilityAnnouncement{std::move(text), priority, kind, sequence_++});
 }
 
 std::optional<AccessibilityAnnouncement> AccessibilityAnnouncer::take() {

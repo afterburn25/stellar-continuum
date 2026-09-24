@@ -66,7 +66,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     const auto route=[&](auto*settings,const auto&label){
       const int focus_before=settings->focused();
       const bool captured=settings->handle(e,w,h);
-      if(config.announcer&&settings->focused()!=focus_before)config.announcer->announce(label());
+      if(config.announcer&&settings->focused()!=focus_before)config.announcer->announce_focus(label());
       return captured;
     };
     if(config.voice_settings&&config.voice_settings->visible())
@@ -434,7 +434,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     }
     const auto announce_focus=[&]{
       if(config.announcer)
-        config.announcer->announce(workspace.focused_label(
+        config.announcer->announce_focus(workspace.focused_label(
             input.drawable_width,input.drawable_height,measure));
     };
     if (!input.renderable()) {

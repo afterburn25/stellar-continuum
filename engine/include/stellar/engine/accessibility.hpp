@@ -56,9 +56,17 @@ enum class AnnouncementPriority {
   Assertive,
 };
 
+// Focus marks labels raised because the keyboard/AT focus moved — platform
+// bridges map it to a real focus-change event rather than a live-region note.
+enum class AnnouncementKind {
+  Status,
+  Focus,
+};
+
 struct AccessibilityAnnouncement {
   std::string text;
   AnnouncementPriority priority{AnnouncementPriority::Polite};
+  AnnouncementKind kind{AnnouncementKind::Status};
   std::uint64_t sequence{};
 };
 
@@ -69,6 +77,11 @@ public:
 
   void announce(std::string text,
                 AnnouncementPriority priority = AnnouncementPriority::Polite);
+  // A focused-control label — routed as a focus change by platform bridges.
+  void announce_focus(std::string text,
+                      AnnouncementPriority priority = AnnouncementPriority::Polite) {
+    announce(std::move(text), priority, AnnouncementKind::Focus);
+  }
   // Oldest pending announcement, or nullopt when drained.
   [[nodiscard]] std::optional<AccessibilityAnnouncement> take();
   // Newest pending announcement without consuming it.
@@ -78,6 +91,8 @@ public:
   void clear() noexcept { pending_.clear(); }
 
 private:
+  void announce(std::string text, AnnouncementPriority priority,
+                AnnouncementKind kind);
   std::deque<AccessibilityAnnouncement> pending_;
   std::size_t capacity_;
   std::uint64_t sequence_{};

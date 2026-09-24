@@ -5914,13 +5914,13 @@ class NativeCampaign final {
       if(voice_settings_&&voice_settings_->visible()){
         const int focus_before=voice_settings_->focused();
         (void)voice_settings_->handle(event,width,height);
-        if(voice_settings_->focused()!=focus_before)announcer_.announce(voice_settings_->focused_label());
+        if(voice_settings_->focused()!=focus_before)announcer_.announce_focus(voice_settings_->focused_label());
         gesture_.capture_for_ui();continue;
       }
       if(settings_hub_){
         const int focus_before=settings_hub_->focused();
         if(settings_hub_->handle(event,width,height)){
-          if(settings_hub_->focused()!=focus_before)announcer_.announce(settings_hub_->focused_label());
+          if(settings_hub_->focused()!=focus_before)announcer_.announce_focus(settings_hub_->focused_label());
           gesture_.capture_for_ui();continue;
         }
       }
@@ -5928,7 +5928,7 @@ class NativeCampaign final {
         notification_view_.close();chronicle_view_.close();
         const int focus_before=general_settings_->focused();
         (void)general_settings_->handle(event,width,height);
-        if(general_settings_->focused()!=focus_before)announcer_.announce(general_settings_->focused_label());
+        if(general_settings_->focused()!=focus_before)announcer_.announce_focus(general_settings_->focused_label());
         gesture_.capture_for_ui();
         continue;
       }
@@ -5936,7 +5936,7 @@ class NativeCampaign final {
         notification_view_.close();chronicle_view_.close();
         const int focus_before=video_settings_->focused();
         (void)video_settings_->handle(event,width,height);
-        if(video_settings_->focused()!=focus_before)announcer_.announce(video_settings_->focused_label(width,height));
+        if(video_settings_->focused()!=focus_before)announcer_.announce_focus(video_settings_->focused_label(width,height));
         gesture_.capture_for_ui();
         continue;
       }
@@ -5944,7 +5944,7 @@ class NativeCampaign final {
         notification_view_.close();chronicle_view_.close();
         const int focus_before=audio_settings_->focused();
         (void)audio_settings_->handle(event,width,height);
-        if(audio_settings_->focused()!=focus_before)announcer_.announce(audio_settings_->focused_label());
+        if(audio_settings_->focused()!=focus_before)announcer_.announce_focus(audio_settings_->focused_label());
         gesture_.capture_for_ui();
         continue;
       }
@@ -5995,7 +5995,7 @@ class NativeCampaign final {
             const auto send_map_key=[&](int g)->bool{
               if(g==0){
                 const auto command=assets_.handle(event,width,height);
-                if(command.captured&&nav&&!activate)announcer_.announce(assets_.focused_label(width,height));
+                if(command.captured&&nav&&!activate)announcer_.announce_focus(assets_.focused_label(width,height));
                 return command.captured;
               }
               if(g==1){
@@ -6003,7 +6003,7 @@ class NativeCampaign final {
                 const auto fleet_command=fleet_workspace_.handle(event,width,height,markers,std::nullopt);
                 if(fleet_command.kind==FleetWorkspaceCommandKind::OpenColony)open_overview_colony(fleet_command.colony_id,width,height);
                 else handle_fleet_command(fleet_command);
-                if(fleet_command.captured&&nav&&!activate)announcer_.announce(fleet_workspace_.focused_label(fleet_workspace_.layout(width,height)));
+                if(fleet_command.captured&&nav&&!activate)announcer_.announce_focus(fleet_workspace_.focused_label(fleet_workspace_.layout(width,height)));
                 return fleet_command.captured;
               }
               const int count=static_cast<int>(hud_items.size());
@@ -6024,7 +6024,7 @@ class NativeCampaign final {
               }
               else return false;
               menu_hover_feedback_.cue(static_cast<std::uint64_t>(hud_items[static_cast<std::size_t>(hud_focus_)].second));
-              announcer_.announce(hud_action_label(hud_items[static_cast<std::size_t>(hud_focus_)].second));
+              announcer_.announce_focus(hud_action_label(hud_items[static_cast<std::size_t>(hud_focus_)].second));
               return true;
             };
             if(activate){
@@ -6067,7 +6067,7 @@ class NativeCampaign final {
           const int focus_before=battle_workspace_.focus();
           execute_battle(battle_workspace_.handle(event,width,height));
           if(battle_workspace_.focus()!=focus_before)
-            announcer_.announce(battle_workspace_.focused_label(
+            announcer_.announce_focus(battle_workspace_.focused_label(
                 stellar::native_battle_ui::BattleWorkspaceLayout::for_viewport(
                     width,height)));
         }
@@ -6087,7 +6087,7 @@ class NativeCampaign final {
         const int focus_before=notification_view_.focus();
         const auto command=notification_view_.handle(event,notifications_.items(),width,height);
         if(command.captured&&notification_view_.focus()!=focus_before)
-          announcer_.announce(notification_view_.focused_label(notifications_.items(),width,height));
+          announcer_.announce_focus(notification_view_.focused_label(notifications_.items(),width,height));
         if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenDiplomaticContact){
           system_workspace_.close();colony_workspace_.close();
           research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
@@ -6112,7 +6112,7 @@ class NativeCampaign final {
         const int focus_before=chronicle_view_.focus();
         if(chronicle_view_.handle(event,width,height)){
           if(chronicle_view_.focus()!=focus_before)
-            announcer_.announce(chronicle_view_.focused_label(width,height));
+            announcer_.announce_focus(chronicle_view_.focused_label(width,height));
           if(const auto nav=chronicle_view_.navigation()){
             chronicle_view_.close();
             (void)enter_system(static_cast<int>(*nav),width,height);
@@ -6213,7 +6213,7 @@ class NativeCampaign final {
           const int focus_before=colony_roster_.focus();
           const auto command=colony_roster_.handle(event,width,height);
           if(command.captured&&colony_roster_.focus()!=focus_before)
-            announcer_.announce(colony_roster_.focused_label(width,height));
+            announcer_.announce_focus(colony_roster_.focused_label(width,height));
           if(command.refresh)refresh_roster(true);
           else if(command.open_colony_id)open_roster_colony(command,width,height);
           if(command.captured){gesture_.cancel();continue;}
@@ -6226,7 +6226,7 @@ class NativeCampaign final {
           const int focus_before=economy_workspace_.focus();
           const auto command=economy_workspace_.handle(event,economy_controller_.view(),width,height);
           if(command.captured&&economy_workspace_.focus()!=focus_before)
-            announcer_.announce(economy_workspace_.focused_label(economy_controller_.view()));
+            announcer_.announce_focus(economy_workspace_.focused_label(economy_controller_.view()));
           if(command.kind==EconomyCommandKind::Refresh){refresh_economy(true,true);if(audio_confirm_)audio_confirm_();}
           else if(command.kind==EconomyCommandKind::SetIndustryPriority){
             const auto outcome=economy_controller_.change_priority(session_->frame(),session_->cache().generation,command.view_revision,command.priority);
@@ -6243,7 +6243,7 @@ class NativeCampaign final {
           const int focus_before=supply_workspace_.focus();
           const auto command=supply_workspace_.handle(event,supply_controller_.view(),width,height);
           if(command.captured&&supply_workspace_.focus()!=focus_before)
-            announcer_.announce(supply_workspace_.focused_label(supply_controller_.view()));
+            announcer_.announce_focus(supply_workspace_.focused_label(supply_controller_.view()));
           if(command.refresh){refresh_supply(true,true);if(audio_confirm_)audio_confirm_();}
           if(command.captured){gesture_.cancel();continue;}
         }
@@ -6253,7 +6253,7 @@ class NativeCampaign final {
         const int focus_before=settlement_workspace_.focus();
         const auto command=settlement_workspace_.handle(event,width,height);
         if(command.captured&&settlement_workspace_.focus()!=focus_before)
-          announcer_.announce(settlement_workspace_.focused_label());
+          announcer_.announce_focus(settlement_workspace_.focused_label());
         if(command.kind==SettlementWorkspaceCommandKind::Confirm)
           execute_settlement();
         if(command.captured)continue;
@@ -6265,7 +6265,7 @@ class NativeCampaign final {
           const int focus_before=colony_workspace_.focus();
           const auto command=colony_workspace_.handle(event,width,height);
           if(command.captured&&colony_workspace_.focus()!=focus_before)
-            announcer_.announce(colony_workspace_.focused_label());
+            announcer_.announce_focus(colony_workspace_.focused_label());
           if(command.kind==ColonyWorkspaceCommandKind::Close)gesture_.cancel();
           else if(command.kind==ColonyWorkspaceCommandKind::Planetary)execute_planetary(command.planetary);
           else if(command.kind==ColonyWorkspaceCommandKind::ReviewFreight || command.kind==ColonyWorkspaceCommandKind::ConfirmFreight || command.kind==ColonyWorkspaceCommandKind::CancelFreight)
@@ -6280,7 +6280,7 @@ class NativeCampaign final {
           const int focus_before=system_workspace_.focused();
           const auto command=system_workspace_.handle(event,width,height);
           if(command.captured&&system_workspace_.focused()!=focus_before)
-            announcer_.announce(system_workspace_.focused_label(width,height));
+            announcer_.announce_focus(system_workspace_.focused_label(width,height));
           if(command.kind==SystemWorkspaceCommandKind::close){system_workspace_.close();gesture_.cancel();}
           else if(command.kind==SystemWorkspaceCommandKind::toggle_motion){
             auto& clock=session_->frame().clock();if(clock.speed()==StrategicSpeed::Paused)clock.resume();else clock.set_speed(StrategicSpeed::Paused);
@@ -6359,14 +6359,14 @@ class NativeCampaign final {
         }
         if(command.captured&&event.type==InputEventType::KeyPressed&&
            diplomacy_workspace_.focus()>=0)
-          announcer_.announce(diplomacy_workspace_.focused_label(width,height));
+          announcer_.announce_focus(diplomacy_workspace_.focused_label(width,height));
         if(command.captured)continue;
       }
       if(construction_workspace_.visible()){
         const int focus_before=construction_workspace_.focus();
         const auto command=construction_workspace_.handle(event,width,height);
         if(command.captured&&construction_workspace_.focus()!=focus_before)
-          announcer_.announce(construction_workspace_.focused_label(
+          announcer_.announce_focus(construction_workspace_.focused_label(
               ConstructionWorkspaceLayout::for_viewport(width,height)));
         if(command.kind!=ConstructionWorkspaceCommandKind::None)
           execute_construction(command);
@@ -6376,7 +6376,7 @@ class NativeCampaign final {
         const int focus_before=shipyard_workspace_.focus();
         const auto command=shipyard_workspace_.handle(event,width,height);
         if(command.captured&&shipyard_workspace_.focus()!=focus_before)
-          announcer_.announce(shipyard_workspace_.focused_label(
+          announcer_.announce_focus(shipyard_workspace_.focused_label(
               ShipyardWorkspaceLayout::for_viewport(width,height)));
         if(command.kind!=ShipyardWorkspaceCommandKind::None)
           execute_shipyard(command);
@@ -6386,7 +6386,7 @@ class NativeCampaign final {
         const int focus_before=research_workspace_.focus();
         const auto command=research_workspace_.handle(event,width,height);
         if(command.captured&&research_workspace_.focus()!=focus_before)
-          announcer_.announce(
+          announcer_.announce_focus(
               research_workspace_.focused_label(width,height));
         if(command.kind==WorkspaceCommandKind::Select){
           research_controller_.select(command.node_id);
@@ -6401,7 +6401,7 @@ class NativeCampaign final {
         const int focus_before=inspection_card_.focus();
         const auto result=inspection_card_.handle(event,inspection_bounds(width,height));
         if(result.captured&&inspection_card_.focus()!=focus_before)
-          announcer_.announce(inspection_card_.focused_label());
+          announcer_.announce_focus(inspection_card_.focused_label());
         if(result.closed)selected_id_.reset();
         if(result.captured){gesture_.cancel();continue;}
       }
@@ -7920,7 +7920,7 @@ class NativeCampaign final {
       default:return {};
     }
   }
-  void announce_menu_focus(){if(menu_focus_>=0&&menu_focus_<menu_action_count)announcer_.announce(menu_action_label(menu_actions_[menu_focus_]));}
+  void announce_menu_focus(){if(menu_focus_>=0&&menu_focus_<menu_action_count)announcer_.announce_focus(menu_action_label(menu_actions_[menu_focus_]));}
   std::string hud_action_label(UiAction action)const{
     switch(action){
       case UiAction::Notifications:return tr("NAV_EVENTS","Events");
@@ -7945,7 +7945,12 @@ class NativeCampaign final {
   }
   std::optional<stellar::native_audio::VoiceCaption> announcement_caption(){
     while(auto item=announcer_.take()){
-      if(accessibility_bridge_)accessibility_bridge_->announce(item->text);
+      if(accessibility_bridge_){
+        if(item->kind==stellar::engine::AnnouncementKind::Focus)
+          accessibility_bridge_->focus_changed(item->text);
+        else
+          accessibility_bridge_->announce(item->text);
+      }
       if(voice_playback_&&presentation_audio_&&
          presentation_audio_->voice_preferences().interface_announcements){
         stellar::native_voice::NativeSpeechRequest request;
@@ -8686,7 +8691,7 @@ int main(int argc,char **argv){
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
       config.developer_access=&developer_access;config.locale=&locale_table;
-      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){accessibility_bridge.announce(item->text);startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
+      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){if(item->kind==stellar::engine::AnnouncementKind::Focus)accessibility_bridge.focus_changed(item->text);else accessibility_bridge.announce(item->text);startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
     StartupEntryEvidence startup_evidence,restart_evidence;

@@ -1092,9 +1092,18 @@ when `UiaClientsAreListening()`. `Window::native_window_handle()`
 exposes the HWND read-only; both announcer drains feed the bridge.
 `native_accessibility_bridge` verifies the contract end-to-end through
 the real UIA client (`ElementFromHandle` resolves the provider's name
-and control type) plus WM_GETOBJECT fallthrough and detach. Open:
-AT-SPI/non-Windows backends, and the provider stays notification-only —
-focus traversal and control patterns need real semantic projection.
+and control type) plus WM_GETOBJECT fallthrough and detach. Same
+session: `AccessibilityAnnouncement` gains a `Kind` (Status/Focus) —
+every `focused_label` announce site routes through `announce_focus`,
+and Focus items raise `UIA_AutomationFocusChangedEventId` on a
+synthetic focus fragment (custom control, HasKeyboardFocus, label as
+name, Parent/FragmentRoot navigation, `GetFocus` on the window root)
+instead of a live-region notification; the UIA test walks the raw tree
+to the fragment and checks its name/type/focus (UIA splices the host
+HWND's native children into hostable providers — the test iterates
+siblings to find ours). Open: AT-SPI/non-Windows backends, per-control
+fragment geometry (window rect until surfaces project focus bounds),
+and UIA control patterns.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast
