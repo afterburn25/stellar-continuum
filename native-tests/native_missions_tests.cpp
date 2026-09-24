@@ -687,6 +687,27 @@ int main() {
     // An unbound key still falls through to global shortcuts.
     check(!key(120).captured,
           "unhandled keys must not be captured by the ring");
+
+    // A bound catalog localizes the focus labels; absent keys fall back to
+    // the literals.
+    stellar::engine::LocalizationTable locale{"en", "en"};
+    check(locale.load_json(
+              R"({"locale":"en","strings":{"MISSIONS_TAB_SITES":"ZIELE","MISSIONS_FOCUS_VIEW":"Open {0}"}})"),
+          "the test catalog must parse");
+    panel.set_localization(&locale);
+    (void)key(0x4000004au); // Home → first focusable.
+    (void)key(9);
+    (void)key(9);
+    check(panel.focused_label(board, fleets, colonies, 1600, 900) == "ZIELE",
+          "the sites tab label must resolve through the bound catalog");
+    (void)key(0x4000004du); // End → last focusable (the colony View button).
+    check(panel.focused_label(board, fleets, colonies, 1600, 900) ==
+              "Open Landing",
+          "row action labels must format through the bound catalog");
+    panel.set_localization(nullptr);
+    check(panel.focused_label(board, fleets, colonies, 1600, 900) ==
+              "View Landing",
+          "unbound panels must keep the literal fallbacks");
   }
   if (failures > 0) {
     std::cerr << failures << " mission panel checks failed\n";

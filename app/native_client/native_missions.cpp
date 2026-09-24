@@ -19,6 +19,29 @@
 namespace stellar::native_missions {
 namespace {
 
+// Chrome strings resolve through the shared catalog when bound; the literal
+// stays the fallback for missing keys (and for unlocalized consumers like
+// the mission tests).
+std::string mt(const stellar::engine::LocalizationTable *locale,
+               std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+std::string mtf(const stellar::engine::LocalizationTable *locale,
+                std::string_view key, std::string_view arg,
+                std::string_view fallback) {
+  if (locale && locale->contains(key)) {
+    const std::string args[]{std::string(arg)};
+    return locale->format(key, args);
+  }
+  std::string text(fallback);
+  const auto at = text.find("{0}");
+  if (at != std::string::npos) text.replace(at, 3, arg);
+  return text;
+}
+
+
 using namespace stellar::core;
 using native_map::Color;
 using native_map::FilledRectangle;
@@ -779,11 +802,14 @@ MissionLayout mission_layout_for(const NativeMissionBoard &board,
 
 std::vector<MissionFocusTarget> mission_focus_targets(
     const MissionLayout &layout, const NativeColonySiteSelection &selection,
-    bool show_sites, std::span<const NativeMissionColonyRow> colonies) {
+    bool show_sites, std::span<const NativeMissionColonyRow> colonies,
+    const stellar::engine::LocalizationTable *locale) {
   std::vector<MissionFocusTarget> targets;
-  targets.push_back({layout.missions_tab, "Missions"});
-  targets.push_back({layout.sites_tab, "Colony sites"});
-  targets.push_back({layout.close_button, "Close"});
+  targets.push_back(
+      {layout.missions_tab, mt(locale, "MISSIONS_TAB_MISSIONS", "Missions")});
+  targets.push_back(
+      {layout.sites_tab, mt(locale, "MISSIONS_TAB_SITES", "Colony sites")});
+  targets.push_back({layout.close_button, mt(locale, "MISSIONS_CLOSE", "Close")});
   if (!show_sites) {
     std::ranges::sort(targets, [](const MissionFocusTarget &a,
                                   const MissionFocusTarget &b) {
@@ -793,25 +819,35 @@ std::vector<MissionFocusTarget> mission_focus_targets(
     return targets;
   }
   if (selection.fleet_index > 0)
-    targets.push_back({layout.previous_fleet, "Previous ship"});
+    targets.push_back({layout.previous_fleet,
+                       mt(locale, "MISSIONS_PREV_SHIP", "Previous ship")});
   if (selection.fleet_index < selection.fleet_count - 1)
-    targets.push_back({layout.next_fleet, "Next ship"});
+    targets.push_back({layout.next_fleet,
+                       mt(locale, "MISSIONS_NEXT_SHIP", "Next ship")});
   if (selection.site_index > 0)
-    targets.push_back({layout.previous_site, "Previous site"});
+    targets.push_back({layout.previous_site,
+                       mt(locale, "MISSIONS_PREV_SITE", "Previous site")});
   if (selection.site_index < selection.site_count - 1)
-    targets.push_back({layout.next_site, "Next site"});
+    targets.push_back({layout.next_site,
+                       mt(locale, "MISSIONS_NEXT_SITE", "Next site")});
   if (selection.fleet_id)
-    targets.push_back({layout.select_ship, "Select ship on map"});
+    targets.push_back({layout.select_ship,
+                       mt(locale, "MISSIONS_FOCUS_SELECT_SHIP",
+                          "Select ship on map")});
   for (std::size_t i = 0;
        i < layout.colony_rows.size() && i < colonies.size(); ++i) {
     targets.push_back(
-        {layout.colony_view_buttons[i], "View " + colonies[i].name});
+        {layout.colony_view_buttons[i],
+         mtf(locale, "MISSIONS_FOCUS_VIEW", colonies[i].name, "View {0}")});
     if (colonies[i].can_land)
       targets.push_back(
-          {layout.colony_land_buttons[i], "Land " + colonies[i].name});
+          {layout.colony_land_buttons[i],
+           mtf(locale, "MISSIONS_FOCUS_LAND", colonies[i].name, "Land {0}")});
     if (colonies[i].is_resource_outpost)
       targets.push_back(
-          {layout.colony_collect_buttons[i], "Collect " + colonies[i].name});
+          {layout.colony_collect_buttons[i],
+           mtf(locale, "MISSIONS_FOCUS_COLLECT", colonies[i].name,
+               "Collect {0}")});
   }
   std::ranges::sort(targets, [](const MissionFocusTarget &a,
                                 const MissionFocusTarget &b) {
@@ -830,7 +866,7 @@ std::string NativeMissionView::focused_label(
   const auto selection = colony_site_selection(fleets, fleet_index_, site_index_);
   const auto layout = mission_layout_for(board, selection, colonies.size(),
                                          width, height, show_sites_);
-  const auto targets = mission_focus_targets(layout, selection, show_sites_, colonies);
+  const auto targets = mission_focus_targets(layout, selection, show_sites_, colonies, locale_);
   return focus_ < static_cast<int>(targets.size())
              ? targets[static_cast<std::size_t>(focus_)].label
              : std::string{};
@@ -845,7 +881,7 @@ std::optional<native_map::UiRect> NativeMissionView::focused_bounds(
   const auto selection = colony_site_selection(fleets, fleet_index_, site_index_);
   const auto layout = mission_layout_for(board, selection, colonies.size(),
                                          width, height, show_sites_);
-  const auto targets = mission_focus_targets(layout, selection, show_sites_, colonies);
+  const auto targets = mission_focus_targets(layout, selection, show_sites_, colonies, locale_);
   return focus_ < static_cast<int>(targets.size())
              ? std::optional<native_map::UiRect>{
                    targets[static_cast<std::size_t>(focus_)].bounds}
@@ -887,7 +923,7 @@ MissionViewCommand NativeMissionView::handle(
                             kDown = 0x40000051u, kUp = 0x40000052u;
     constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
     const auto targets =
-        mission_focus_targets(layout, selection, show_sites_, colonies);
+        mission_focus_targets(layout, selection, show_sites_, colonies, locale_);
     const int count = static_cast<int>(targets.size());
     const bool fwd = (event.key == kTab && !event.shift) ||
                      event.key == kRight || event.key == kDown;
@@ -1033,7 +1069,8 @@ void NativeMissionView::render(
   out.overlay.emplace_back(
       StrokedRectangle{layout.panel, {72, 101, 145, 255}});
   out.overlay.emplace_back(Text{{layout.header.x, layout.header.y},
-                                "MISSIONS & SETTLEMENT",
+                                mt(locale_, "MISSIONS_TITLE",
+                                   "MISSIONS & SETTLEMENT"),
                                 Color{233, 242, 252, 255},
                                 layout.heading_font_pixels});
   out.overlay.emplace_back(FilledRectangle{layout.close_button,
@@ -1053,18 +1090,22 @@ void NativeMissionView::render(
       StrokedRectangle{layout.missions_tab, {96, 125, 168, 255}});
   out.overlay.emplace_back(Text{{layout.missions_tab.x + 8.f * scale,
                                  layout.missions_tab.y + 5.f * scale},
-                                "Missions", body, layout.body_font_pixels});
+                                mt(locale_, "MISSIONS_TAB_MISSIONS",
+                                   "Missions"),
+                                body, layout.body_font_pixels});
   out.overlay.emplace_back(
       FilledRectangle{layout.sites_tab, tab_fill(show_sites_)});
   out.overlay.emplace_back(
       StrokedRectangle{layout.sites_tab, {96, 125, 168, 255}});
   out.overlay.emplace_back(Text{{layout.sites_tab.x + 8.f * scale,
                                  layout.sites_tab.y + 5.f * scale},
-                                "Colony Sites", body, layout.body_font_pixels});
+                                mt(locale_, "MISSIONS_TAB_SITES",
+                                   "Colony Sites"),
+                                body, layout.body_font_pixels});
   const auto draw_focus_ring = [&] {
     if (focus_ < 0) return;
     const auto targets =
-        mission_focus_targets(layout, selection, show_sites_, colonies);
+        mission_focus_targets(layout, selection, show_sites_, colonies, locale_);
     if (focus_ < static_cast<int>(targets.size()))
       out.overlay.emplace_back(
           StrokedRectangle{targets[static_cast<std::size_t>(focus_)].bounds,
@@ -1074,12 +1115,14 @@ void NativeMissionView::render(
   if (!show_sites_) {
     if (board.missions.empty()) {
       out.overlay.emplace_back(Text{{layout.empty_hint.x, layout.empty_hint.y},
-                                    "No active mission fleets.", body,
-                                    layout.body_font_pixels});
+                                    mt(locale_, "MISSIONS_EMPTY",
+                                       "No active mission fleets."),
+                                    body, layout.body_font_pixels});
       out.overlay.emplace_back(Text{
           {layout.empty_hint.x, layout.empty_hint.y + 18.f * scale},
-          "Commission scout, science, or colony ships to begin.", muted,
-          layout.small_font_pixels});
+          mt(locale_, "MISSIONS_EMPTY_HINT",
+             "Commission scout, science, or colony ships to begin."),
+          muted, layout.small_font_pixels});
       draw_focus_ring();
       return;
     }
@@ -1093,10 +1136,35 @@ void NativeMissionView::render(
       auto line = rect.y + 8.f * scale;
       out.overlay.emplace_back(Text{{rect.x + pad, line}, card.fleet_name,
                                     accent, layout.body_font_pixels});
+      const auto role_key = [](FleetRole role) {
+        switch (role) {
+          case FleetRole::Scout: return "FLEET_ROLE_SCOUT";
+          case FleetRole::Science: return "FLEET_ROLE_SCIENCE";
+          case FleetRole::Colony: return "FLEET_ROLE_COLONY";
+          default: return "FLEET_ROLE_FLEET";
+        }
+      };
+      const auto phase_key = [](NativeMissionPhase phase) {
+        switch (phase) {
+          case NativeMissionPhase::awaiting_order:
+            return "MISSION_PHASE_AWAITING";
+          case NativeMissionPhase::traveling:
+            return "MISSION_PHASE_TRAVELING";
+          case NativeMissionPhase::scouting:
+            return "MISSION_PHASE_SCOUTING";
+          case NativeMissionPhase::science_survey:
+            return "MISSION_PHASE_SURVEY";
+          case NativeMissionPhase::establishing_colony:
+            return "MISSION_PHASE_COLONIZING";
+        }
+        return "MISSION_PHASE_AWAITING";
+      };
       out.overlay.emplace_back(
           Text{{rect.x + pad, line + 17.f * scale},
-               std::string(role_label(card.role)) + " - " +
-                   std::string(mission_phase_label(card.phase)),
+               mt(locale_, role_key(card.role), role_label(card.role)) +
+                   " - " +
+                   mt(locale_, phase_key(card.phase),
+                      mission_phase_label(card.phase)),
                mission_phase_color(card.phase), layout.small_font_pixels});
       line += 36.f * scale;
       out.overlay.emplace_back(
@@ -1122,11 +1190,13 @@ void NativeMissionView::render(
         Text{{rect.x + 8.f * scale, rect.y + 5.f * scale}, std::string(label),
              enabled ? body : muted, layout.small_font_pixels});
   };
-  nav(layout.previous_fleet, "< Ship", selection.fleet_index > 0);
-  nav(layout.next_fleet, "Ship >",
+  nav(layout.previous_fleet, mt(locale_, "MISSIONS_BTN_PREV_SHIP", "< Ship"),
+      selection.fleet_index > 0);
+  nav(layout.next_fleet, mt(locale_, "MISSIONS_BTN_NEXT_SHIP", "Ship >"),
       selection.fleet_index < selection.fleet_count - 1);
-  nav(layout.previous_site, "< Site", selection.site_index > 0);
-  nav(layout.next_site, "Site >",
+  nav(layout.previous_site, mt(locale_, "MISSIONS_BTN_PREV_SITE", "< Site"),
+      selection.site_index > 0);
+  nav(layout.next_site, mt(locale_, "MISSIONS_BTN_NEXT_SITE", "Site >"),
       selection.site_index < selection.site_count - 1);
   out.overlay.emplace_back(Text{{layout.details.x, layout.details.y},
                                 selection.details, body,
@@ -1143,7 +1213,9 @@ void NativeMissionView::render(
   out.overlay.emplace_back(
       Text{{layout.select_ship.x + 10.f * scale,
             layout.select_ship.y + 8.f * scale},
-           selection.fleet_id ? "SELECT SHIP ON MAP" : "NO COLONY SHIP",
+           selection.fleet_id
+               ? mt(locale_, "MISSIONS_SELECT_SHIP", "SELECT SHIP ON MAP")
+               : mt(locale_, "MISSIONS_NO_SHIP", "NO COLONY SHIP"),
            selection.fleet_id ? Color{233, 242, 252, 255} : muted,
            layout.body_font_pixels});
   if (!selection.status.empty() && selection.site_count > 0)
@@ -1156,8 +1228,9 @@ void NativeMissionView::render(
                                    layout.action_status.y +
                                        layout.action_status.height +
                                        4.f * scale},
-                                  "OWNED WORLDS", accent,
-                                  layout.small_font_pixels});
+                                  mt(locale_, "MISSIONS_OWNED_WORLDS",
+                                     "OWNED WORLDS"),
+                                  accent, layout.small_font_pixels});
   for (std::size_t i = 0;
        i < layout.colony_rows.size() && i < colonies.size(); ++i) {
     const auto &row = colonies[i];
@@ -1176,12 +1249,14 @@ void NativeMissionView::render(
     out.overlay.emplace_back(FilledRectangle{button, {13, 51, 52, 255}});
     out.overlay.emplace_back(StrokedRectangle{button, {96, 125, 168, 255}});
     out.overlay.emplace_back(
-        Text{{button.x + 10.f * scale, button.y + 6.f * scale}, "View",
-             body, layout.small_font_pixels});
-    nav(layout.colony_land_buttons[i], "Land", row.can_land);
+        Text{{button.x + 10.f * scale, button.y + 6.f * scale},
+             mt(locale_, "MISSIONS_VIEW", "View"), body,
+             layout.small_font_pixels});
+    nav(layout.colony_land_buttons[i], mt(locale_, "MISSIONS_LAND", "Land"),
+        row.can_land);
     if (row.is_resource_outpost)
-      nav(layout.colony_collect_buttons[i], "Collect",
-          row.can_request_freight);
+      nav(layout.colony_collect_buttons[i],
+          mt(locale_, "MISSIONS_COLLECT", "Collect"), row.can_request_freight);
   }
   draw_focus_ring();
 }

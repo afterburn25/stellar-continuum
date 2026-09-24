@@ -8,6 +8,7 @@
 #include "stellar/core/fleet_state.hpp"
 #include "stellar/core/fresh_campaign.hpp"
 #include "stellar/engine/native_map_platform.hpp"
+#include "stellar/engine/localization.hpp"
 #include "native_settlement_mission_controller.hpp"
 
 namespace stellar::native_missions {
@@ -116,7 +117,8 @@ struct MissionFocusTarget {
 
 [[nodiscard]] std::vector<MissionFocusTarget> mission_focus_targets(
     const MissionLayout &layout, const NativeColonySiteSelection &selection,
-    bool show_sites, std::span<const NativeMissionColonyRow> colonies);
+    bool show_sites, std::span<const NativeMissionColonyRow> colonies,
+    const stellar::engine::LocalizationTable *locale);
 
 // Toggleable MISSIONS & SETTLEMENT panel (reference ExplorationMissionPanel's
 // missions tab). Mission cards are display-only, matching the reference.
@@ -126,6 +128,10 @@ class NativeMissionView final {
   void open() noexcept { visible_ = true; focus_ = -1; }
   void close() noexcept { visible_ = false; focus_ = -1; }
   void toggle() noexcept { visible_ = !visible_; focus_ = -1; }
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
 
   // Keyboard focus contract: -1 until a nav key arms the ring; the label and
   // bounds of the ringed control feed the accessibility announcer.
@@ -155,6 +161,7 @@ class NativeMissionView final {
   bool visible_{}, show_sites_{};
   int fleet_index_{}, site_index_{};
   int focus_{-1};
+  const stellar::engine::LocalizationTable *locale_{};
 };
 
 }  // namespace stellar::native_missions

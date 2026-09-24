@@ -993,6 +993,7 @@ class NativeCampaign final {
     economy_controller_.set_localization(&table);
     research_controller_.set_localization(&table);
     phenomena_.set_localization(&table);
+    mission_view_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
