@@ -378,6 +378,7 @@ int main() {
     broken.civilization_id = 1;
     broken.operating_arrears = -3.0;
     broken.last_research_funding_fraction = 2.0; // clamped [0,1] upstream
+    broken.industry_priority = static_cast<IndustryPriority>(7); // outside the enum
     world.economies.push_back(broken);
     ConstructionState con;
     con.civilization_id = 1;
@@ -393,6 +394,7 @@ int main() {
     dead_stick.strategic_speed = 0.0;
     dead_stick.freight_home_colony_id = 999; // absent colony
     dead_stick.transit_progress = 1.5;       // loader enforces [0,1]
+    dead_stick.transit_phase = static_cast<FleetTransitPhase>(9); // loader bound is 3
     dead_stick.fuel_capacity_light_years = 100.0;
     dead_stick.fuel_remaining_light_years = 2000.0; // refuel caps at capacity
     dead_stick.cargo_material_capacity = 10.0;
@@ -538,7 +540,7 @@ int main() {
     check(ranged == 8,
           "transit, fuel, cargo, fractions, orbit, radiation and hub "
           "level bounds flag over-range values");
-    check(freight == 3 && design == 1 && consistency == 22,
+    check(freight == 3 && design == 1 && consistency == 24,
           "freight role/site, design, order, site, surface, placement, "
           "progress, slot, economy and evidence violations are flagged");
     check(knowledge_refs == 2 && intel_refs == 2,

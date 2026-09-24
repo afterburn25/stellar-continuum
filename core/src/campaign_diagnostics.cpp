@@ -728,6 +728,10 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     if(!civilizations.contains(e.civilization_id))emit("economy","orphaned_economy",e.civilization_id,"Economy references an absent civilization.");
     positive(e.credits,"Credits",e.civilization_id,"economy");positive(e.industry,"Industry",e.civilization_id,"economy");positive(e.science,"Science",e.civilization_id,"economy");
     positive(e.operating_arrears,"Operating arrears",e.civilization_id,"economy");
+    if(e.industry_priority&&*e.industry_priority!=IndustryPriority::Balanced&&
+        *e.industry_priority!=IndustryPriority::InfrastructureFirst&&
+        *e.industry_priority!=IndustryPriority::ShipbuildingFirst)
+      emit("economy","invalid_kind",e.civilization_id,"Industry priority is outside the catalog.");
     bounded(e.last_research_funding_fraction,1.0,"Research funding fraction",e.civilization_id,"economy");
     bounded(e.last_base_operations_funding_fraction,1.0,"Operations funding fraction",e.civilization_id,"economy");
   }
@@ -765,6 +769,9 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     // simulation dereferences every tick.
     positive(f.transit_progress,"Transit progress",f.id,"fleet");
     bounded(f.transit_progress,1.0,"Transit progress",f.id,"fleet");
+    // The loader rejects transit phases outside [None,LocalArrival].
+    if(static_cast<int>(f.transit_phase)<0||static_cast<int>(f.transit_phase)>3)
+      emit("fleet","invalid_kind",f.id,"Transit phase is outside the catalog.");
     // The reference validator rejects non-finite and non-positive
     // endurance bounds outright.
     if(!std::isfinite(f.maximum_leg_range_light_years)||f.maximum_leg_range_light_years<=0.0)
