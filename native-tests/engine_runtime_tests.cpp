@@ -186,7 +186,15 @@ int main() {
     int updates = 0;
     EntityId spawned{};
     bool destroyed_ok = false, found_spawned = false;
+    bool spawn_cb = false;
+    EntityId spawn_cb_id{};
     double time_at_two = -1.0;
+    host.on_spawn = [&](World &, EntityId id, const SceneEntity &src) {
+      if (src.name == "runtime-spawned") {
+        spawn_cb = true;
+        spawn_cb_id = id;
+      }
+    };
     host.on_update = [&](World &, float) {
       ++updates;
       if (updates == 1) {
@@ -207,6 +215,8 @@ int main() {
     };
     check(host.run() == 0, "control-surface run exits cleanly");
     check(found_spawned, "spawn_entity + find_entity resolve by name");
+    check(spawn_cb && spawn_cb_id == spawned,
+          "on_spawn fires with the new id");
     check(destroyed_ok, "destroy_entity removes the runtime entity");
     check(std::abs(host.camera_x() - 100.f) < 1e-4f &&
               std::abs(host.camera_y() - 50.f) < 1e-4f &&
@@ -485,6 +495,49 @@ int main() {
                 positions[6].y == positions[2].y,
             "F9 restores the F5 snapshot exactly");
     }
+  }
+
+  // 3D gravity + ground plane: a spawned box falls, lands on ground_y
+  // once (on_land touchdown transition), and rests with its AABB bottom
+  // on the plane. on_spawn3d fires for the document entity.
+  {
+    const auto sub = root / "scene3d-land";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene3d.json");
+      out << R"({"entities":[{"name":"ball","mesh":"box","pos":[0,4,0]}],
+                  "gravity":40.0,"groundY":0.0})";
+    }
+    auto opts = headless_options(sub);
+    opts.scene3d = true;
+    opts.frame_limit = 90;
+    RuntimeHost host{opts};
+    int landings = 0;
+    EntityId landed{}, ground_arg{42u, 7u};
+    bool spawn3d_cb = false;
+    float rest_y = -999.f;
+    host.on_spawn3d = [&](World &, EntityId id, const Scene3dEntity &s) {
+      if (s.name == "ball") spawn3d_cb = id != EntityId{};
+    };
+    host.on_land = [&](EntityId e, EntityId ground) {
+      ++landings;
+      landed = e;
+      ground_arg = ground;
+    };
+    host.on_update = [&](World &world, float) {
+      if (!host.entities3d().empty())
+        if (const auto *t =
+                world.get<Transform3D>(host.entities3d().front()))
+          rest_y = t->y;
+    };
+    check(host.run() == 0, "3D land run exits cleanly");
+    check(spawn3d_cb, "on_spawn3d fires for the document entity");
+    check(landings == 1 && landed == host.entities3d().front(),
+          "on_land fires once on touchdown");
+    check(ground_arg == EntityId{},
+          "the ground plane passes an empty entity");
+    check(std::abs(rest_y - 0.5f) < 0.05f,
+          "the box rests with its AABB bottom on ground_y");
   }
 
   // save_data/load_data round-trip named blobs under saves/data/ —
