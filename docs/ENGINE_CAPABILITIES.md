@@ -764,9 +764,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   radius/mass (`invalid_positive_value` — `nonnegative` accepted 0),
   `orbit_index`, `invalid_body_parent` for parentless Moons and
   parented primaries, eccentricity outside [0,1) and inclination
-  outside [0,180] as `out_of_range`; top-level state adds
-  `stellar_activity_day`, galactic-core position/exclusion radius
-  and `engulfed_planets`. Semantic bounds are flagged as `out_of_range`:
+  outside [0,180] as `out_of_range`; `validate_environment` bounds
+  (gravity/pressure non-negative, temperature above absolute zero,
+  radiation hazard in [0,1]) and `validate_stellar_planet` exposure
+  fields (finite-positive orbit AU, non-negative flux/approach);
+  top-level state adds `stellar_activity_day`, galactic-core
+  position/exclusion radius and `engulfed_planets`. Semantic bounds are flagged as `out_of_range`:
   `transit_progress` beyond 1 (the loader enforces [0,1]),
   `fuel_remaining_light_years` beyond `fuel_capacity_light_years`
   (refuel caps at capacity×service), `cargo_materials` beyond

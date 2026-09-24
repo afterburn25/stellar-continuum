@@ -346,6 +346,13 @@ int main() {
     broken_body.orbit_index = -1;
     broken_body.orbital_eccentricity = 1.5;
     broken_body.orbital_inclination_degrees = 200.0;
+    broken_body.environment.gravity_g = -1.0;
+    broken_body.environment.pressure_kpa = -5.0;
+    broken_body.environment.radiation_hazard = 1.5;
+    broken_body.stellar_exposure = StellarPlanetProperties{};
+    broken_body.stellar_exposure->orbit_au = 0.0;
+    broken_body.stellar_exposure->incident_flux = -2.0;
+    broken_body.stellar_exposure->safe_approach_au = -3.0;
     world.bodies.push_back(broken_body);
     CivilizationEconomy broken;
     broken.civilization_id = 1;
@@ -452,14 +459,16 @@ int main() {
       else if (finding.event_type == "orphaned_freight" ||
                finding.event_type == "orphaned_target") ++fleet_refs;
     }
-    check(invalid == 9,
+    check(invalid == 13,
           "stability, condition, arrears, hull, sensor, revision, "
-          "orbit index and observation magnitudes flag invalid values");
-    check(positive == 2 && body_parent == 1,
-          "zero speed/radius and the parentless Moon are flagged");
-    check(ranged == 6,
-          "transit, fuel, cargo, fractions and orbit bounds flag "
-          "over-range values");
+          "orbit index, gravity/pressure/flux/approach and observation "
+          "magnitudes flag invalid values");
+    check(positive == 5 && body_parent == 1,
+          "zero speed/radius/temperature/orbit and the parentless "
+          "Moon are flagged");
+    check(ranged == 7,
+          "transit, fuel, cargo, fractions, orbit and radiation "
+          "bounds flag over-range values");
     check(knowledge_refs == 2 && intel_refs == 2,
           "absent knowledge/intel observers and targets are flagged");
     check(positions == 1 && route_refs == 2,

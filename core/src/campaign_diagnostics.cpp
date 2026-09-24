@@ -549,6 +549,22 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       emit("planet","invalid_body_parent",b.id,"Moon has no parent body.");
     if(b.kind!=PlanetaryBodyKind::Moon&&b.parent_body_id)
       emit("planet","invalid_body_parent",b.id,"Primary body cannot have a parent body.");
+    // validate_environment bounds: temperature must be above absolute
+    // zero, radiation hazard is a [0,1] fraction.
+    positive(b.environment.gravity_g,"Gravity",b.id,"planet");
+    if(!std::isfinite(b.environment.temperature_kelvin)||b.environment.temperature_kelvin<=0.0)
+      emit("planet","invalid_positive_value",b.id,"Body temperature is non-finite or below absolute zero.");
+    positive(b.environment.pressure_kpa,"Pressure",b.id,"planet");
+    if(!std::isfinite(b.environment.radiation_hazard)||b.environment.radiation_hazard<0.0||b.environment.radiation_hazard>1.0)
+      emit("planet","out_of_range",b.id,"Radiation hazard is outside [0, 1].");
+    // validate_stellar_planet: exposure orbit must be finite positive.
+    if(b.stellar_exposure){
+      const auto &x=*b.stellar_exposure;
+      positive(x.incident_flux,"Incident flux",b.id,"planet");
+      positive(x.safe_approach_au,"Safe approach",b.id,"planet");
+      if(!std::isfinite(x.orbit_au)||x.orbit_au<=0.0)
+        emit("planet","invalid_positive_value",b.id,"Exposure orbit AU is non-finite or non-positive.");
+    }
   }
   for(const auto &c:w.colonies){
     if(!systems.contains(c.system_id)||!civilizations.contains(c.civilization_id)||
