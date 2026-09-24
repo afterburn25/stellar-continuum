@@ -558,6 +558,18 @@ re-verified at 106/106 green after a proper rebuild); and the in-flight
 `native_voice_settings_tests.cpp` fails /WX on an unused `kUp` local in
 another lane, which stops the default `all` build — targeted test-target
 builds work.
+Runtime-held state outside `FreshCampaignState` is now covered through
+`8875715c`: `inspect_diplomacy_invariants` (guarded
+`DiplomacySnapshotInvariantValidator` umbrella + campaign-entity refs)
+and `inspect_research_invariants` (codec capture + save-path `restore`
+replay + orphaned-civ rows) are wired into the monitor, developer report
+and QA host. A pre-existing failure was also repaired:
+`native_developer_diagnostics` broke when the day's ops-findings lane
+(`0c5d7f20`/`e75cd431`) pushed the monitor past the eight-row
+newest-first view, hiding the oldest session-start record — the test now
+scrolls to the tail before asserting it (stale assumption, not a
+behavior regression). Fresh campaigns produce zero false-positive
+research/diplomacy findings (`developer_qa_host` 41 s soak passes).
 A 319-test run at `57ab71dc` records 317/319 green after the workspace
 keyboard-focus lane completed: every remaining native surface adopted the
 focus contract — settlement (choice rows), logistics (refresh/close),
