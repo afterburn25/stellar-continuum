@@ -57,7 +57,7 @@ public:
   [[nodiscard]] std::string focused_label()const{
     const auto rows=control_actions();
     if(capture_>=0&&capture_<static_cast<int>(rows.size()))
-      return tr("SETTINGS_CONTROLS_CAPTURE","Press a key for")+" "+action_label(rows[static_cast<std::size_t>(capture_)]->name);
+      return tr("SETTINGS_CONTROLS_CAPTURE","Press a key or button for")+" "+action_label(rows[static_cast<std::size_t>(capture_)]->name);
     if(focus_<0)return {};
     if(controls_){
       if(focus_==static_cast<int>(rows.size()))return tr("SETTINGS_BACK","Back");
@@ -84,48 +84,34 @@ public:
       if(capture_>=0){capture_=-1;return true;}
       if(controls_){controls_=false;focus_=4;}else close();return true;
     }
-    if(e.type==InputEventType::KeyPressed){
-      // Capture mode: the next non-modifier keypress becomes the focused
-      // action's primary binding; alternate bindings survive.
-      if(capture_>=0){
+    // Capture mode: the next trigger input — non-modifier keypress, gamepad
+    // button or right-click — becomes the focused action's primary binding.
+    // Left-click and pointer loss cancel; everything else is swallowed.
+    if(capture_>=0){
+      stellar::engine::InputBinding primary;
+      if(e.type==InputEventType::KeyPressed){
         switch(e.key){
           case 0x400000e0u:case 0x400000e1u:case 0x400000e2u:case 0x400000e3u:
           case 0x400000e4u:case 0x400000e5u:case 0x400000e6u:case 0x400000e7u:
             return true; // modifier alone — keep waiting for the trigger key
           default:break;
         }
-        const auto rows=control_actions();
-        if(capture_<static_cast<int>(rows.size())&&mapper_){
-          stellar::engine::InputBinding primary{stellar::engine::RawInputEvent::Kind::KeyPress,
-                                                static_cast<int>(e.key)};
-          if(e.control)primary.chord_keys.push_back(0x400000e0);
-          if(e.shift)primary.chord_keys.push_back(0x400000e1);
-          if(e.alt)primary.chord_keys.push_back(0x400000e2);
-          // Steal: the same trigger+chord is removed from any sibling action
-          // so two commands never silently share one key.
-          notice_.clear();
-          for(const auto* other:rows){
-            const auto& target_action=*rows[static_cast<std::size_t>(capture_)];
-            if(other==&target_action)continue;
-            auto others=mapper_->bindings(other->name);
-            const auto clash=std::find_if(others.begin(),others.end(),[&](const stellar::engine::InputBinding& b){
-              return b.kind==primary.kind&&b.code==primary.code&&b.chord_keys==primary.chord_keys;});
-            if(clash!=others.end()){
-              others.erase(clash);
-              mapper_->rebind(other->name,std::move(others));
-              if(!notice_.empty())notice_+=", ";
-              notice_+=action_label(other->name);
-            }
-          }
-          if(!notice_.empty())
-            notice_=tr("SETTINGS_CONTROLS_STOLEN","Rebound — removed from")+" "+notice_;
-          auto bound=mapper_->bindings(rows[static_cast<std::size_t>(capture_)]->name);
-          if(bound.empty())bound.push_back(primary);else bound.front()=primary;
-          mapper_->rebind(rows[static_cast<std::size_t>(capture_)]->name,std::move(bound));
-          if(persist_)persist_();
-        }
-        capture_=-1;hover_feedback_.cue(focus_target());return true;
+        primary={stellar::engine::RawInputEvent::Kind::KeyPress,static_cast<int>(e.key)};
+        if(e.control)primary.chord_keys.push_back(0x400000e0);
+        if(e.shift)primary.chord_keys.push_back(0x400000e1);
+        if(e.alt)primary.chord_keys.push_back(0x400000e2);
+      }else if(e.type==InputEventType::GamepadPressed){
+        primary={stellar::engine::RawInputEvent::Kind::GamepadButton,e.gamepad_button};
+      }else if(e.type==InputEventType::RightPressed){
+        primary={stellar::engine::RawInputEvent::Kind::MouseButton,3};
+      }else{
+        if(e.type==InputEventType::LeftPressed)capture_=-1;
+        return true;
       }
+      apply_capture(primary);
+      capture_=-1;hover_feedback_.cue(focus_target());return true;
+    }
+    if(e.type==InputEventType::KeyPressed){
       // SDL_Keycode: Tab/arrows move the focus ring, Return/Space activate.
       constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
       constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
@@ -143,7 +129,6 @@ public:
       if((e.key==kReturn||e.key==kSpace)&&focus_>=0){activate_focus();return true;}
     }
     if(e.type==InputEventType::LeftPressed){
-      if(capture_>=0){capture_=-1;return true;}
       focus_=-1;
       if(l.back.contains(e.position)){if(controls_)controls_=false;else close();}
       else if(controls_){
@@ -160,7 +145,7 @@ public:
     using namespace stellar::native_menu_style;
     const auto l=HubLayout::for_viewport(width,height);const float s=l.scale;
     panel(out,l.panel,s);text(out,l.title,tr(controls_?"SETTINGS_HUB_CONTROLS_TITLE":"SETTINGS_HUB_TITLE",controls_?"CONTROLS":"SETTINGS"),static_cast<int>(29*s));
-    text(out,l.description,tr(controls_?(control_actions().empty()?"SETTINGS_HUB_CONTROLS_DESC":"SETTINGS_HUB_CONTROLS_REBIND_DESC"):"SETTINGS_HUB_DESC",controls_?(control_actions().empty()?"Explore and manage your campaign with the mouse.":"Activate a command, then press the key to bind. Escape cancels."):"Choose a category. Your campaign stays paused while settings are open."),static_cast<int>(15*s),muted);
+    text(out,l.description,tr(controls_?(control_actions().empty()?"SETTINGS_HUB_CONTROLS_DESC":"SETTINGS_HUB_CONTROLS_REBIND_DESC"):"SETTINGS_HUB_DESC",controls_?(control_actions().empty()?"Explore and manage your campaign with the mouse.":"Activate a command, then press a key, right-click or a pad button to bind. Escape or left-click cancels."):"Choose a category. Your campaign stays paused while settings are open."),static_cast<int>(15*s),muted);
     if(controls_){
       const auto rows=control_actions();
       if(rows.empty()){
@@ -174,7 +159,7 @@ public:
           const bool hot=rects[i].contains(pointer_)||focus_==static_cast<int>(i);
           const auto bindings=mapper_->bindings(rows[i]->name);
           const std::string value=capture_==static_cast<int>(i)
-              ?tr("SETTINGS_CONTROLS_PRESS_KEY","press a key…")
+              ?tr("SETTINGS_CONTROLS_PRESS_KEY","press a key or button…")
               :stellar::engine::describe_bindings(bindings);
           button(out,rects[i],action_label(rows[i]->name)+" — "+value,static_cast<int>(16*s),hot||capture_==static_cast<int>(i),true,s);
         }
@@ -227,6 +212,34 @@ private:
   std::uint64_t focus_target()const noexcept{
     if(focus_<0)return 0;const int last=controls_?control_count()-1:5;
     return focus_==last?1u:(controls_?20u:10u)+static_cast<std::uint64_t>(focus_);
+  }
+  // Installs the captured trigger as the focused action's primary binding,
+  // stealing the identical trigger+chord from any sibling action so two
+  // commands never silently share one input. Alternates survive; the
+  // stolen-from names become a one-shot announcer notice.
+  void apply_capture(const stellar::engine::InputBinding& primary){
+    const auto rows=control_actions();
+    if(!mapper_||capture_>=static_cast<int>(rows.size()))return;
+    notice_.clear();
+    for(const auto* other:rows){
+      const auto& target_action=*rows[static_cast<std::size_t>(capture_)];
+      if(other==&target_action)continue;
+      auto others=mapper_->bindings(other->name);
+      const auto clash=std::find_if(others.begin(),others.end(),[&](const stellar::engine::InputBinding& b){
+        return b.kind==primary.kind&&b.code==primary.code&&b.chord_keys==primary.chord_keys;});
+      if(clash!=others.end()){
+        others.erase(clash);
+        mapper_->rebind(other->name,std::move(others));
+        if(!notice_.empty())notice_+=", ";
+        notice_+=action_label(other->name);
+      }
+    }
+    if(!notice_.empty())
+      notice_=tr("SETTINGS_CONTROLS_STOLEN","Rebound — removed from")+" "+notice_;
+    auto bound=mapper_->bindings(rows[static_cast<std::size_t>(capture_)]->name);
+    if(bound.empty())bound.push_back(primary);else bound.front()=primary;
+    mapper_->rebind(rows[static_cast<std::size_t>(capture_)]->name,std::move(bound));
+    if(persist_)persist_();
   }
   void activate_focus(){
     if(controls_){

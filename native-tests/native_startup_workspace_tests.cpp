@@ -233,7 +233,7 @@ void menu_hover_feedback(){
     hub.close();hub.open();
     (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
     (void)key(kTab);(void)key(kReturn); // capture row 0
-    require(hub.focused_label()=="Press a key for Toggle pause","capture label did not prompt");
+    require(hub.focused_label()=="Press a key or button for Toggle pause","capture label did not prompt");
     InputEvent rebind{};rebind.type=InputEventType::KeyPressed;rebind.key='x';
     require(hub.handle(rebind,w,h),"capture keypress not consumed");
     const auto bound=mapper.bindings("toggle_pause");
@@ -272,6 +272,18 @@ void menu_hover_feedback(){
     require(mapper.bindings("quicksave")[0].code=='x',"steal did not bind the captured key");
     require(hub.take_notice()=="Rebound — removed from Toggle pause","steal notice missing");
     require(hub.take_notice().empty(),"notice did not drain once");
+    // Right-click and gamepad buttons are capturable triggers too.
+    (void)key(kReturn); // capture quicksave (still focused)
+    InputEvent right{};right.type=InputEventType::RightPressed;
+    (void)hub.handle(right,w,h);
+    require(mapper.bindings("quicksave")[0].kind==stellar::engine::RawInputEvent::Kind::MouseButton&&
+            mapper.bindings("quicksave")[0].code==3,"right-click did not capture as Mouse 3");
+    (void)key(kReturn);
+    InputEvent pad{};pad.type=InputEventType::GamepadPressed;pad.gamepad_button=7;
+    (void)hub.handle(pad,w,h);
+    require(mapper.bindings("quicksave")[0].kind==stellar::engine::RawInputEvent::Kind::GamepadButton&&
+            mapper.bindings("quicksave")[0].code==7,"pad button did not capture");
+    require(hub.focused_label()=="Quicksave: Pad 7","label did not describe the pad binding");
     DrawList draw;hub.render(draw,w,h);
   }
 }
