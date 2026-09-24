@@ -650,6 +650,15 @@ int RuntimeHost::run() {
     }
     impl.replay = std::move(*parsed);
     impl.replaying = true;
+    // Provenance advisory matching the client: a recording from another
+    // build cannot reproduce this session — flag it so a divergence is
+    // read as provenance mismatch rather than a simulation defect.
+    if (const auto &h = impl.replay.header();
+        !h.build_id.empty() && h.build_id != STELLAR_SOURCE_COMMIT)
+      std::fprintf(stderr,
+                   "replay: recorded build %s differs from this build "
+                   "(%s) — divergence may reflect the mismatch\n",
+                   h.build_id.c_str(), STELLAR_SOURCE_COMMIT);
     // The recorded seed is part of the run's identity — the RNG stream
     // lives on a world entity, so a different seed changes checkpoint
     // hashes even when the game never draws from it. Apply the recorded
