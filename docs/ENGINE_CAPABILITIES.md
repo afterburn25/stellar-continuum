@@ -804,7 +804,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   plus a guarded `capture_galaxy_persistence_metadata` umbrella that
   flags `invalid_generation_metadata` when the generation record
   disagrees with the galaxy (seed, system count, configuration,
-  phenomena or core-landmark agreement),
+  phenomena or core-landmark agreement). Developer provenance mirrors
+  `validate_developer_simulation_state` (fixed-tick speed/backlog
+  consistency → `invalid_simulation`) and `validate_developer_coverage`
+  (coverage version, forced-system refs, required stellar types →
+  `invalid_coverage`),
   cross-system orbit bindings via `validate_stellar_orbit_catalog`
   (`invalid_orbit_binding`), `validate_central_black_hole` on the
   galactic-core metadata (`invalid_black_hole`), galactic-core

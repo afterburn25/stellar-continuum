@@ -11,6 +11,7 @@
 #include <stellar/core/colony_operations.hpp>
 #include <stellar/core/construction_projects.hpp>
 #include <stellar/core/construction_state.hpp>
+#include <stellar/core/developer_campaign.hpp>
 #include <stellar/core/exploration_advance.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/fleet_reach.hpp>
@@ -1093,6 +1094,14 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       emit("combat","invalid_encounter",e.system_id,"Active encounter fails its authoritative validation.");}
   }
   if(!civilizations.contains(w.player_civilization_id))emit("civilization","missing_player",w.player_civilization_id,"Player empire ID does not exist.");
+  if(w.developer_provenance){
+    try{validate_developer_simulation_state(w.developer_provenance->simulation);}
+    catch(const std::exception&){
+      emit("developer","invalid_simulation",0,"Developer simulation provenance fails its authoritative validation.");}
+    try{validate_developer_coverage(w);}
+    catch(const std::exception&){
+      emit("developer","invalid_coverage",0,"Developer coverage provenance fails its authoritative validation.");}
+  }
   if(dropped>0){
     DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
     r.subsystem="diagnostics";r.event_type="findings_truncated";

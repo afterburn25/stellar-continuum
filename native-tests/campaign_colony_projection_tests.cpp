@@ -473,6 +473,14 @@ int main() {
     ghost.power = -5.0;
     ghost.observed_day = -1.0;
     world.combat_intelligence.push_back(ghost);
+    // Developer provenance: an invalid fixed-tick speed and a coverage
+    // record forcing an absent system.
+    world.developer_provenance=CampaignDeveloperProvenance{};
+    world.developer_provenance->simulation.fixed_ticks=true;
+    world.developer_provenance->simulation.speed=3;
+    world.developer_provenance->tools_used=true;
+    world.developer_provenance->full_celestial_coverage=true;
+    world.developer_provenance->coverage_forced_system_ids={99999};
     // Knowledge state: absent observer civ knowing an absent system,
     // a survey row bound to an absent system, and an absent
     // galactic-core observer.
@@ -485,7 +493,7 @@ int main() {
         duplicate = 0, orphans = 0, tech = 0, overflow_n = 0,
         fleet_refs = 0, ranged = 0, route_refs = 0, positions = 0,
         knowledge_refs = 0, intel_refs = 0, body_parent = 0,
-        consistency = 0, freight = 0, design = 0;
+        consistency = 0, freight = 0, design = 0, developer = 0;
     for (const auto &finding : findings) {
       if (finding.event_type == "invalid_body_parent") ++body_parent;
       else if (finding.event_type == "out_of_range") ++ranged;
@@ -527,11 +535,13 @@ int main() {
                 finding.event_type == "orphaned_known_system" ||
                 finding.event_type == "orphaned_known_civilization"))
         ++knowledge_refs;
+      else if (finding.subsystem == "developer") ++developer;
       else if (finding.subsystem == "combat" &&
                (finding.event_type == "orphaned_observer" ||
                 finding.event_type == "orphaned_observed_fleet" ||
                 finding.event_type == "observation_overflow"))
         ++intel_refs;
+      else if (finding.subsystem == "developer") ++developer;
       else if (finding.event_type == "invalid_positive_value") ++positive;
       else if (finding.event_type == "unknown_species") ++species;
       else if (finding.event_type == "unknown_building_type") ++type;
@@ -559,9 +569,9 @@ int main() {
     check(freight == 3 && design == 1 && consistency == 30,
           "freight role/site, design, order, site, surface, placement, "
           "progress, slot, economy and evidence violations are flagged");
-    check(knowledge_refs == 5 && intel_refs == 2,
-          "absent knowledge/intel observers, survey systems and core "
-          "observers are flagged");
+    check(knowledge_refs == 5 && intel_refs == 2 && developer == 2,
+          "absent knowledge/intel observers, survey systems, core "
+          "observers and developer provenance violations are flagged");
     check(positions == 1 && route_refs == 3,
           "non-finite transit vector, absent route hops and path "
           "overflow are flagged");
