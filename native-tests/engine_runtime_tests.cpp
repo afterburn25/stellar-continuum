@@ -468,8 +468,12 @@ int main() {
     opts.replay_file = journal_path;
     RuntimeHost host{opts};
     int updates = 0;
+    int events_seen = 0;
     bool demo_found = false;
     std::vector<Transform2D> positions;
+    host.on_event = [&](const stellar::native_map::InputEvent &) {
+      ++events_seen;
+    };
     host.on_update = [&](World &world, float) {
       ++updates;
       const auto demo = host.find_entity("demo");
@@ -482,6 +486,7 @@ int main() {
     check(host.run() == 0, "save/load replay exits cleanly");
     check(updates == 8 && demo_found,
           "the demo entity resolves every frame");
+    check(events_seen == 2, "on_event receives injected input");
     check(positions.size() == 8, "every frame reports a position");
     if (positions.size() == 8) {
       // F5 at tick 2 saves the state update 2 observed; stepping from
