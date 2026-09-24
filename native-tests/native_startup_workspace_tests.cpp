@@ -120,6 +120,38 @@ void menu_hover_feedback(){
     child=false;hub.close();hub.open();
     (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[4])},w,h);
     (void)hub.handle({InputEventType::PointerMove,hp},w,h);require(cues==7,"Controls help text played hover audio");
+    // Keyboard focus: Tab/arrows ring the buttons, Return/Space activate.
+    auto key=[&](std::uint32_t k,bool shift=false){
+      InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=k;ev.shift=shift;
+      return hub.handle(ev,w,h);};
+    hub.close();hub.open();require(hub.focused()<0,"hub opened with stale focus");
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    require(key(kTab),"Tab was not consumed by the settings hub");
+    require(hub.focused()==0,"Tab did not focus the first category");
+    require(cues==8,"focus change did not play the hover cue");
+    require(key(kTab)&&hub.focused()==1&&cues==9,"second Tab did not advance focus");
+    require(key(kTab,true)&&hub.focused()==0,"Shift+Tab did not move focus back");
+    require(key(kDown)&&hub.focused()==1&&key(kRight)&&hub.focused()==2,"arrow keys did not advance focus");
+    require(key(kUp)&&hub.focused()==1&&key(kLeft)&&hub.focused()==0,"arrow keys did not retreat focus");
+    require(key(kTab,true)&&hub.focused()==5,"Shift+Tab did not wrap focus to Back");
+    require(key(kReturn),"Return on focused Back was not consumed");
+    require(!hub.visible(),"Return on focused Back did not close the hub");
+    hub.open();require(key(kTab)&&key(kSpace),"keyboard activation sequence failed");
+    require(child,"Space on a focused category did not open it");child=false;
+    require(hub.focused()<0,"opening a child kept a stale focus index");
+    // The Controls help view exposes Back as its only focusable.
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[4])},w,h);
+    require(key(kTab)&&hub.focused()==0,"Controls view did not focus Back");
+    require(key(kReturn),"Return on Controls Back was not consumed");
+    require(key(kTab)&&hub.focused()==0,"focus did not return to the category list");
+    // Pointer clicks take over from the focus ring.
+    (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[0])},w,h);child=false;
+    require(hub.focused()<0,"pointer activation did not clear keyboard focus");
+    hub.close();hub.open();require(key(kTab)&&hub.focused()==0,"focus restart failed");
+    (void)hub.handle({InputEventType::LeftPressed,{1,1}},w,h);
+    require(hub.focused()<0&&key(kReturn)&&hub.focused()<0,"activation ran without focus");
   }
 }
 }

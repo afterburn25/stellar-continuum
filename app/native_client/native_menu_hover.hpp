@@ -25,6 +25,9 @@ public:
     const auto previous=std::exchange(target_,target);
     if(target&&target!=previous&&callback_)callback_();
   }
+  // Keyboard/focus navigation: play the cue for the focused control without
+  // replacing the pointer's hover target.
+  void cue(std::uint64_t target){if(target&&target!=target_&&callback_)callback_();}
 private:
   std::function<void()> callback_;
   std::uint64_t target_{};
