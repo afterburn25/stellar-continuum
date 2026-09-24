@@ -123,8 +123,24 @@ class NativePlanetaryScreen {
         constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
         const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
         const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
-        if(e.key==kHome||e.key==kEnd){focus_=e.key==kHome?0:count-1;return {};}
-        if(fwd||bwd){focus_=focus_<0?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;return {};}
+        // Controls clipped by a scroll region stay in the ring; when focus
+        // lands on one, snap its lane so the control is fully visible —
+        // which exposes the next row and keeps the region reachable.
+        const auto snap_focused=[&]{
+          if(focus_<0||focus_>=count)return;
+          const auto&h=hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])];
+          if(!h.unclipped)return;
+          const auto&r=*h.unclipped;
+          if(h.scroll_lane==2){
+            const UiRect area{l.slots.x+10*l.s,l.slots.y+45*l.s,l.slots.width-20*l.s,l.slots.height-55*l.s};
+            slot_scroll_.sync(slot_height_+55*l.s,area.height);
+            slot_scroll_.scroll_interval_into_view(r.y,r.y+r.height,area.y,area.y+area.height);
+          }else if(h.scroll_lane==3){
+            detail_scroll_.sync(detail_height_,l.details.height);
+            detail_scroll_.scroll_interval_into_view(r.y,r.y+r.height,l.details.y,l.details.y+l.details.height);
+          }};
+        if(e.key==kHome||e.key==kEnd){focus_=e.key==kHome?0:count-1;snap_focused();return {};}
+        if(fwd||bwd){focus_=focus_<0?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;snap_focused();return {};}
         if((e.key==kReturn||e.key==kSpace)&&focus_>=0)
           return activate(hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])]);
       }
@@ -186,7 +202,11 @@ class NativePlanetaryScreen {
   }
 
  private:
-  struct Hit{UiRect rect;int id{};PlanetaryCommand command;bool enabled{true};int select{-1},tab{-1},control{-1};std::string label;};
+  struct Hit{UiRect rect;int id{};PlanetaryCommand command;bool enabled{true};int select{-1},tab{-1},control{-1};std::string label;
+    // Set when `rect` was clipped to a scroll region: the control's
+    // translated, unclipped bounds plus which lane scrolls it —
+    // 2 building slots, 3 details — so keyboard focus snaps the region.
+    std::optional<UiRect> unclipped;int scroll_lane{0};};
   // Indices into hits_ of the enabled, currently-rendered controls in
   // deterministic (y,x) order — the keyboard ring's target list.
   std::vector<int> ring()const{
@@ -249,7 +269,7 @@ class NativePlanetaryScreen {
     else {int lines=1;float count=0,cols=std::max(1.f,r.width/(font*.55f));for(char c:t.value){if(c=='\n'){++lines;count=0;}else if(++count>cols){++lines;count=0;}}h=lines*(font+5.f);}
     out.overlay.emplace_back(std::move(t));return std::max(h,font+5.f);
   }
-  void button(DrawList& out,UiRect r,std::string title,PlanetaryCommand command,const PlanetaryLayout& l,bool enabled=true,std::optional<UiRect> clip={},Picture icon={},std::string subtitle={})const{
+  void button(DrawList& out,UiRect r,std::string title,PlanetaryCommand command,const PlanetaryLayout& l,bool enabled=true,std::optional<UiRect> clip={},Picture icon={},std::string subtitle={},int scroll_lane=0)const{
     const UiRect visible=clip?intersection(r,*clip):r;if(visible.height<=0||visible.width<=0)return;
     std::string title_copy=title;
     stellar::engine::ui_skin::control(out,r,visible.contains(pointer_),false,enabled,l.s,visible);
@@ -257,7 +277,7 @@ class NativePlanetaryScreen {
     if(icon)out.overlay.emplace_back(Image{icon,{r.x+8*l.s,r.y+(r.height-icon_size)*.5f,icon_size,icon_size},{},{255,255,255,static_cast<std::uint8_t>(enabled?255:110)},visible});
     label(out,{r.x+pad,r.y+(subtitle.empty()?(r.height-font)*.5f:16*l.s),r.width-pad-8*l.s,r.height},std::move(title),font,enabled?stellar::native_menu_style::ink:stellar::native_menu_style::muted,visible);
     if(!subtitle.empty())label(out,{r.x+pad,r.y+40*l.s,r.width-pad-8*l.s,24*l.s},std::move(subtitle),l.small,stellar::native_menu_style::muted,visible);
-    hits_.push_back({visible,static_cast<int>(hits_.size()),std::move(command),enabled,-1,-1,-1,std::move(title_copy)});
+    hits_.push_back({visible,static_cast<int>(hits_.size()),std::move(command),enabled,-1,-1,-1,std::move(title_copy),scroll_lane>0?std::optional<UiRect>{r}:std::nullopt,scroll_lane});
   }
   static void scrollbar(DrawList& out,UiRect r,const stellar::engine::ScrollView& scroll){const auto thumb=scroll.thumb(r.height,14.f);if(thumb.size<=0)return;out.overlay.emplace_back(FilledRectangle{{r.x+r.width-3,r.y+thumb.offset,3,thumb.size},{105,157,178,210}});}
   static int art_index(std::string_view type){const auto family=stellar::core::surface_functional_family(type);if(family=="power_generator")return 0;if(family=="science_lab")return 1;if(family=="fabricator")return 2;if(family=="trade_hub")return 3;if(family=="habitat_complex")return 4;if(family=="controlled_agriculture")return 5;if(family=="water_reclamation")return 6;if(family=="grid_battery")return 7;return 8;}
@@ -279,7 +299,7 @@ class NativePlanetaryScreen {
       label(out,{r.x+8*s,r.y+97*s,r.width-16*s,29*s},b?b->name:unlocked?tr("PLANET_SLOT_AVAILABLE","Available slot"):tr("PLANET_SLOT_LOCKED","Locked slot"),l.small,ink,clip);
       label(out,{r.x+8*s,r.y+133*s,r.width-16*s,30*s},b?state(*b):unlocked?tr("PLANET_CONSTRUCT","Construct"):tr("PLANET_LOCKED","Locked"),l.small,b&&(!b->powered||!b->staffed)?bad:cyan,clip);
       if(b&&!b->complete){UiRect bar{r.x+5*s,r.y+r.height-4*s,static_cast<float>((r.width-10*s)*b->progress_fraction),3*s};out.overlay.emplace_back(FilledRectangle{intersection(bar,area),gold});}
-      hits_.push_back({clip,static_cast<int>(hits_.size()),{},unlocked,i,-1,-1,b?b->name:unlocked?tr("PLANET_SLOT_AVAILABLE","Available slot"):tr("PLANET_SLOT_LOCKED","Locked slot")});
+      hits_.push_back({clip,static_cast<int>(hits_.size()),{},unlocked,i,-1,-1,b?b->name:unlocked?tr("PLANET_SLOT_AVAILABLE","Available slot"):tr("PLANET_SLOT_LOCKED","Locked slot"),r,2});
     }
     slot_scroll_.sync(slot_height_+55*s,area.height);scrollbar(out,area,slot_scroll_);
   }
@@ -312,7 +332,7 @@ class NativePlanetaryScreen {
     for(int i=0;i<4;++i){UiRect r{l.tabs.x+i*l.tabs.width*.25f,l.tabs.y,l.tabs.width*.25f,l.tabs.height};button(out,r,captions[i],{},l,!v.observer_only||i>=2);hits_.back().tab=i;if(tab_==i)out.overlay.emplace_back(FilledRectangle{{r.x,r.y+r.height-2*s,r.width,2*s},cyan});}
     if(tab_==1&&selected_<0&&!v.observer_only){render_slots(out,v,l);return;}
     float y=l.details.y-detail_scroll_.scroll_offset;const auto write=[&](std::string value,Color color=ink,int size=0){y+=wrapped(out,{l.details.x,y,l.details.width-7*s,0},l.details,std::move(value),size?size:l.small,color)+7*s;};
-    const auto action=[&](std::string title,PlanetaryCommand cmd,bool enabled=true){button(out,{l.details.x,y,l.details.width-7*s,36*s},std::move(title),cmd,l,enabled&&(!v.foreign_settlement||cmd.action==PlanetaryAction::None),l.details);y+=44*s;};
+    const auto action=[&](std::string title,PlanetaryCommand cmd,bool enabled=true){button(out,{l.details.x,y,l.details.width-7*s,36*s},std::move(title),cmd,l,enabled&&(!v.foreign_settlement||cmd.action==PlanetaryAction::None),l.details,{},std::string{},3);y+=44*s;};
     if(tab_==2){
       write(region?tr("PLANET_OVERVIEW_REGION","REGION OVERVIEW"):tr("PLANET_OVERVIEW_WORLD","WORLD OVERVIEW"),cyan,l.font);
       if(region){write(region->terrain);write(tr("PLANET_REGION_DESC","Geographic survey province. Population and deposits are currently recorded at planetary level."),muted);}

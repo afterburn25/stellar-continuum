@@ -292,6 +292,9 @@ std::optional<UiRect> clipped(UiRect a, const UiRect &b) {
 struct FocusTarget {
   UiRect bounds;
   std::string label;
+  // Set when `bounds` was clipped to the list viewport: the row's
+  // translated, unclipped rect so keyboard focus can snap it into view.
+  std::optional<UiRect> unclipped;
 };
 
 std::vector<FocusTarget> focusables(
@@ -331,16 +334,18 @@ std::vector<FocusTarget> focusables(
             : std::string{};
     if (card.navigable)
       if (const auto clip = clipped(card.bounds, layout.list_viewport))
-        out.push_back({*clip, card_label});
+        out.push_back({*clip, card_label, card.bounds});
     if (card.contact_button)
       if (const auto clip =
               clipped(*card.contact_button, layout.list_viewport))
         out.push_back(
-            {*clip, resolve(locale, "CHRONICLE_CONTACT", "Contact")});
+            {*clip, resolve(locale, "CHRONICLE_CONTACT", "Contact"),
+             *card.contact_button});
     for (const auto &chip : card.tag_chips)
       if (const auto clip = clipped(chip.bounds, layout.list_viewport))
         out.push_back(
-            {*clip, resolve(locale, "CHRONICLE_TAG", "Tag") + " " + chip.tag});
+            {*clip, resolve(locale, "CHRONICLE_TAG", "Tag") + " " + chip.tag,
+             chip.bounds});
   }
   std::ranges::sort(out, [](const FocusTarget &a, const FocusTarget &b) {
     return a.bounds.y != b.bounds.y ? a.bounds.y < b.bounds.y
@@ -645,14 +650,28 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
                      event.key == kRight || event.key == kDown;
     const bool bwd = (event.key == kTab && event.shift) ||
                      event.key == kLeft || event.key == kUp;
+    // Cards clipped by the list viewport stay in the ring; when focus
+    // lands on one, snap the list so it is fully visible — which exposes
+    // the next card and keeps the whole feed keyboard-reachable.
+    const auto snap_focused = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto &target = items[static_cast<std::size_t>(focus_)];
+      if (!target.unclipped) return;
+      scroll_.scroll_interval_into_view(
+          target.unclipped->y, target.unclipped->y + target.unclipped->height,
+          layout.list_viewport.y,
+          layout.list_viewport.y + layout.list_viewport.height);
+    };
     if (count > 0 && (event.key == kHome || event.key == kEnd)) {
       focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused();
       return true;
     }
     if (count > 0 && (fwd || bwd)) {
       focus_ = focus_ < 0 || focus_ >= count
                    ? (bwd ? count - 1 : 0)
                    : (focus_ + (bwd ? -1 : 1) + count) % count;
+      snap_focused();
       return true;
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&

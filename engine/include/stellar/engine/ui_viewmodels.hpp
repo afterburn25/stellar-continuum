@@ -67,6 +67,13 @@ struct ScrollView {
   // shrinking content set or a growing viewport cannot strand it past
   // the tail. Returns the clamped offset.
   float sync(float new_content_height, float new_viewport_height);
+  // Focus-follow counterpart of VirtualizedList::ensure_visible for
+  // pixel-scrolled content: scrolls so the interval
+  // [interval_top, interval_bottom] — the focused row's translated,
+  // unclipped bounds — lies fully inside [viewport_top, viewport_bottom].
+  // No-op when it already fits.
+  void scroll_interval_into_view(float interval_top, float interval_bottom,
+                                 float viewport_top, float viewport_bottom);
 
   struct Thumb {
     float offset{}, size{};

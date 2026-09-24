@@ -88,6 +88,10 @@ private:
   struct FocusRect {
     stellar::native_map::UiRect bounds;
     std::string label;
+    // Row position in its list plus which lane scrolls it — 1 projects,
+    // 2 build orders — so keyboard focus can snap the row into view.
+    int scroll_row{-1};
+    int scroll_lane{0};
   };
   [[nodiscard]] std::vector<FocusRect>
   focusables(const ConstructionWorkspaceLayout &layout) const;

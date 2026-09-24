@@ -451,8 +451,8 @@ NativeNewGameWorkspace::configuration_focusables(
   }
   for (std::size_t index = 0; index < measured.species_rows.size(); ++index) {
     const auto &row = measured.species_rows[index];
-    const Point center{row.x + row.width * .5f, row.y + row.height * .5f};
-    if (layout.species_rows.contains(center)) items.push_back({row, 100 + index});
+    if (const auto clip = intersection(row, layout.species_rows))
+      items.push_back({*clip, 100 + index, row});
   }
   const auto sizes =
       std::min(view_->size_presets.size(), layout.size_buttons.size());
@@ -488,15 +488,31 @@ NativeNewGameWorkspace::galaxy_focusables(const GalaxyChoiceLayout &layout) cons
 
 NativeNewGameIntent NativeNewGameWorkspace::handle_focus_key(
     const InputEvent &event, std::span<const FocusItem> items, int width,
-    int height, const TextMeasurer &measure) {
+    int height, const TextMeasurer &measure,
+    const NativeNewGameMeasuredLayout *measured) {
   constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
   constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
                           kDown = 0x40000051u, kUp = 0x40000052u;
   constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
   const int count = static_cast<int>(items.size());
   if (count == 0 || !event.key) return {NativeNewGameIntentKind::None, true};
+  // Species rows clipped by the list viewport stay in the ring; when
+  // focus lands on one, snap the list so the row is fully visible — which
+  // exposes the next row and keeps the whole list keyboard-reachable.
+  const auto snap_focused = [&] {
+    if (!measured || focus_ < 0 || focus_ >= count) return;
+    const auto &target = items[static_cast<std::size_t>(focus_)];
+    if (!target.unclipped) return;
+    species_scroll_.sync(measured->species_content_height,
+                         measured->base.species_rows.height);
+    species_scroll_.scroll_interval_into_view(
+        target.unclipped->y, target.unclipped->y + target.unclipped->height,
+        measured->base.species_rows.y,
+        measured->base.species_rows.y + measured->base.species_rows.height);
+  };
   if (event.key == kHome || event.key == kEnd) {
     focus_ = event.key == kHome ? 0 : count - 1;
+    snap_focused();
     hover_feedback_.cue(items[static_cast<std::size_t>(focus_)].target);
     return {NativeNewGameIntentKind::None, true};
   }
@@ -507,6 +523,7 @@ NativeNewGameIntent NativeNewGameWorkspace::handle_focus_key(
   if (fwd || bwd) {
     if (focus_ < 0 || focus_ >= count) focus_ = bwd ? count - 1 : 0;
     else focus_ = (focus_ + (bwd ? -1 : 1) + count) % count;
+    snap_focused();
     hover_feedback_.cue(items[static_cast<std::size_t>(focus_)].target);
     return {NativeNewGameIntentKind::None, true};
   }
@@ -606,7 +623,7 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
       }
     }
     return handle_focus_key(event, configuration_focusables(measured), width,
-                            height, measure);
+                            height, measure, &measured);
   }
   if (event.type == InputEventType::LeftReleased) {
     pressed_ = false;

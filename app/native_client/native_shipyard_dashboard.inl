@@ -58,26 +58,28 @@ std::optional<UiRect> NativeShipyardWorkspace::design_bounds(std::string_view id
 }
 std::vector<NativeShipyardWorkspace::FocusItem> NativeShipyardWorkspace::focusables(const ShipyardWorkspaceLayout& l)const{
   std::vector<FocusItem> items;const float s=l.scale;
-  const auto push=[&](UiRect r,std::uint64_t t,std::string label){if(r.width>0&&r.height>0)items.push_back({r,t,std::move(label)});};
+  const auto push=[&](UiRect r,std::uint64_t t,std::string label,
+                      std::optional<UiRect> unclipped=std::nullopt,int lane=0){
+    if(r.width>0&&r.height>0)items.push_back({r,t,std::move(label),unclipped,lane});};
   push(l.close,1,tr("SHIPYARD_CLOSE","Close shipyard"));
   for(int i=0;i<static_cast<int>(ship_categories.size());++i)push({l.categories.x,l.categories.y+i*54*s,l.categories.width,48*s},10+i,tr(ship_category_keys[i],ship_categories[i]));
   push(l.search,20,tr("SHIPYARD_SEARCH","Search ships"));
   push(l.sort,21,trf("SHIPYARD_SORT_LABEL",{tr(ship_sort_keys[sort_],ship_sorts[sort_])},"Sort: {0}"));
   push(l.filter,22,trf("SHIPYARD_FILTER_LABEL",{tr(ship_filter_keys[filter_],ship_filters[filter_])},"Filter: {0}"));
   const auto designs=filtered_designs();
-  for(std::size_t i=0;i<designs.size();++i){const auto r=card(i,l);if(l.designs.contains({r.x+r.width*.5f,r.y+r.height*.5f}))push(r,100+i,designs[i]->name);}
+  for(std::size_t i=0;i<designs.size();++i){const auto r=card(i,l);if(const auto clip=intersection(r,l.designs))push(*clip,100+i,designs[i]->name,r,1);}
   if(view_){
     const UiRect clip{l.orders.x,l.orders.y+30*s,l.orders.width,l.orders.height-30*s};
     const UiRect queue{l.orders.x+5*s,l.orders.y+30*s,l.orders.width-10*s,l.orders.height-35*s};
     for(std::size_t i=0;i<view_->orders.size();++i){const auto&o=view_->orders[i];
       const UiRect r{clip.x,clip.y-order_scroll_.scroll_offset+i*64*s,clip.width,60*s};
       const auto hit=intersection(r,clip);if(!hit)continue;
-      push(*hit,200+i*10,o.design_name);
+      push(*hit,200+i*10,o.design_name,r,2);
       const float bx=r.x+r.width-110*s;
-      if(queue.contains({bx,r.y+12*s})&&queue.contains({bx+102*s,r.y+42*s})){
-        if(!o.active){push({bx,r.y+12*s,30*s,30*s},200+i*10+1,trf("SHIPYARD_ORDER_UP",{o.design_name},"Move {0} earlier"));push({bx+36*s,r.y+12*s,30*s,30*s},200+i*10+2,trf("SHIPYARD_ORDER_DOWN",{o.design_name},"Move {0} later"));}
-        if(o.can_cancel)push({bx+72*s,r.y+12*s,30*s,30*s},200+i*10+3,trf("SHIPYARD_ORDER_CANCEL",{o.design_name},"Cancel {0}"));
-      }
+      const auto push_order_button=[&](UiRect b,std::uint64_t t,std::string label){
+        if(const auto c=intersection(b,clip))push(*c,t,std::move(label),b,2);};
+      if(!o.active){push_order_button({bx,r.y+12*s,30*s,30*s},200+i*10+1,trf("SHIPYARD_ORDER_UP",{o.design_name},"Move {0} earlier"));push_order_button({bx+36*s,r.y+12*s,30*s,30*s},200+i*10+2,trf("SHIPYARD_ORDER_DOWN",{o.design_name},"Move {0} later"));}
+      if(o.can_cancel)push_order_button({bx+72*s,r.y+12*s,30*s,30*s},200+i*10+3,trf("SHIPYARD_ORDER_CANCEL",{o.design_name},"Cancel {0}"));
     }
   }
   if(const auto* d=selected_design()){
@@ -153,8 +155,25 @@ ShipyardWorkspaceCommand NativeShipyardWorkspace::handle(const InputEvent& e,int
     const auto items=focusables(l);const int count=static_cast<int>(items.size());
     const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
     const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
-    if(count>0&&(e.key==kHome||e.key==kEnd)){focus_=e.key==kHome?0:count-1;return {ShipyardWorkspaceCommandKind::None,true};}
-    if(count>0&&(fwd||bwd)){focus_=focus_<0||focus_>=count?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;return {ShipyardWorkspaceCommandKind::None,true};}
+    // Rows/cards clipped by a scroll viewport stay in the ring; when focus
+    // lands on one, snap its lane so it is fully visible — which exposes
+    // the next entry and keeps the whole list keyboard-reachable.
+    const auto snap_focused=[&]{
+      if(focus_<0||focus_>=count)return;
+      const auto&t=items[static_cast<std::size_t>(focus_)];
+      if(!t.unclipped)return;
+      const auto&full=*t.unclipped;
+      if(t.scroll_lane==1){
+        const int columns=std::clamp(static_cast<int>(l.designs.width/(214*s)),2,4);
+        const float rows=static_cast<float>((filtered_designs().size()+columns-1)/columns);
+        design_scroll_.sync(rows*268*s,l.designs.height);
+        design_scroll_.scroll_interval_into_view(full.y,full.y+full.height,l.designs.y,l.designs.y+l.designs.height);
+      }else if(t.scroll_lane==2){
+        order_scroll_.sync(30*s+(view_?view_->orders.size():0)*64*s,l.orders.height);
+        order_scroll_.scroll_interval_into_view(full.y,full.y+full.height,l.orders.y+30*s,l.orders.y+l.orders.height);
+      }};
+    if(count>0&&(e.key==kHome||e.key==kEnd)){focus_=e.key==kHome?0:count-1;snap_focused();return {ShipyardWorkspaceCommandKind::None,true};}
+    if(count>0&&(fwd||bwd)){focus_=focus_<0||focus_>=count?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;snap_focused();return {ShipyardWorkspaceCommandKind::None,true};}
     if((e.key==kReturn||e.key==kSpace)&&focus_>=0&&focus_<count){
       const auto&r=items[static_cast<std::size_t>(focus_)].rect;
       InputEvent press{InputEventType::LeftPressed};press.position={r.x+r.width*.5f,r.y+r.height*.5f};

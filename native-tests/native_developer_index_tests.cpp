@@ -224,6 +224,48 @@ int main(int argc,char **argv)try{
         "Escape closed the planet index instead of releasing its ring.");
       check(planet_index.handle({InputEventType::EscapePressed},w,h,frame)&&!planet_index.visible(),"Second Escape did not close the planet index.");
     }
+    // Arrow scroll-follow: the ring covers the rendered slots only, so Down
+    // on the last rendered row scrolls the list to reveal the next logical
+    // row and Up on the first rendered row scrolls back — every row stays
+    // keyboard-reachable without the pointer.
+    {
+      planet_index.open(frame.runtime().world().campaign());
+      constexpr std::uint32_t kDown=0x40000051u,kUp=0x40000052u;
+      const auto planet_key=[&](std::uint32_t key,bool shift=false){
+        InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;ev.shift=shift;
+        return planet_index.handle(ev,w,h,frame);};
+      const auto planet_texts2=[&]{DrawList d;planet_index.render(d,w,h);std::vector<std::string> v;
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)v.push_back(t->value);
+        std::ranges::sort(v);return v;};
+      const auto is_row=[&](const std::string &label){
+        return !label.empty()&&label!="Giant and ring test panel"&&label!="Close planet type index"
+          &&label.find("Planet class filter")!=0&&label.find("Generate")!=0&&label.find("Go to example")!=0
+          &&label!="View rules"&&label!="View example";};
+      check(planet_key(9u)&&planet_index.focus()>=0,"Tab did not enter the planet index ring for scrolling.");
+      int scroll_guard=0;
+      while(!is_row(planet_index.focused_label(w,h))&&scroll_guard++<16)
+        check(planet_key(kDown),"Planet-index header navigation leaked.");
+      check(is_row(planet_index.focused_label(w,h)),"Planet-index ring never reached a rendered row.");
+      const auto initial_texts=planet_texts2();
+      scroll_guard=0;std::string scrolled_label;
+      while(scroll_guard++<64){
+        check(planet_key(kDown),"Planet-index scroll-follow leaked.");
+        const auto label=planet_index.focused_label(w,h);
+        if(!is_row(label))break;
+        if(!std::ranges::contains(initial_texts,label)){scrolled_label=label;break;}
+      }
+      check(!scrolled_label.empty(),"Down on the last rendered planet row left the list instead of scrolling.");
+      const auto scrolled_texts=planet_texts2();
+      scroll_guard=0;bool scrolled_back=false;
+      while(scroll_guard++<128){
+        check(planet_key(kUp),"Planet-index upward navigation leaked.");
+        if(planet_texts2()!=scrolled_texts){scrolled_back=true;break;}
+        if(!is_row(planet_index.focused_label(w,h)))break;
+      }
+      check(scrolled_back,"Up on the first rendered planet row did not scroll the list back.");
+      check(planet_index.handle({InputEventType::EscapePressed},w,h,frame)&&planet_index.focus()<0,"Planet index ring did not release.");
+      planet_index.close();
+    }
     // Stellar activity panel: the twenty-four command buttons ring in
     // (y,x) order and activation replays the same dispatch a pointer
     // press takes — CLOSE ends the panel through the shared path.

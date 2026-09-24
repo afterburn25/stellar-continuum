@@ -111,6 +111,11 @@ private:
     stellar::native_map::UiRect rect;
     std::uint64_t target;
     std::string label;
+    // Set when `rect` was clipped to a scroll viewport: the control's
+    // translated, unclipped bounds plus which lane scrolls it —
+    // 1 design cards, 2 build orders — so keyboard focus snaps the list.
+    std::optional<stellar::native_map::UiRect> unclipped;
+    int scroll_lane{0};
   };
   [[nodiscard]] std::vector<FocusItem> focusables(
       const ShipyardWorkspaceLayout &) const;

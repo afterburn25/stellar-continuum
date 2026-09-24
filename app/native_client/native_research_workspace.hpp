@@ -129,6 +129,11 @@ private:
   struct FocusRect {
     stellar::native_map::UiRect bounds;
     std::string label;
+    // Set when `bounds` was clipped to a panned/scrolled region: the
+    // translated, unclipped rect plus which lane moves it — 1 guided list,
+    // 2 tree graph — so keyboard focus can snap the row into view.
+    std::optional<stellar::native_map::UiRect> unclipped;
+    int scroll_lane{0};
   };
   [[nodiscard]] std::vector<FocusRect>
   focusables(const ResearchWorkspaceLayout&)const;

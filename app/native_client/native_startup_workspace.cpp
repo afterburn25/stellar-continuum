@@ -188,7 +188,15 @@ StartupIntent NativeStartupWorkspace::handle(const InputEvent&e,int width,int he
       else if(focus_<0)focus_=bwd?count-1:0;
       else focus_=(focus_+(bwd?-1:1)+count)%count;
       if(focus_>=count)focus_=0;
-      hover_feedback_.cue(focusables[static_cast<std::size_t>(focus_)].cue);
+      const auto &focused=focusables[static_cast<std::size_t>(focus_)];
+      // Save-slot rows clipped by the list viewport stay in the ring; snap
+      // the list so the focused row is fully visible and the next row
+      // stays reachable.
+      if(screen_==StartupScreen::LoadSlots&&focused.cue>=100){
+        load_scroll_.sync_rows(slots_.slots.size(),46.f*l.scale,l.list.height);
+        load_scroll_.ensure_visible(static_cast<std::size_t>(focused.cue-100));
+      }
+      hover_feedback_.cue(focused.cue);
       return {StartupIntentKind::None,true};
     }
     if((e.key==kReturn||e.key==kSpace)&&focus_>=0&&focus_<count){

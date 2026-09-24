@@ -57,6 +57,24 @@ public:
         const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
         const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
         const bool home=e.key==kHome,end=e.key==kEnd;
+        // Arrow scroll-follow: the ring covers the rendered rows, so Up on
+        // the first row scrolls one row up and Down on the last scrolls
+        // one row down — the slot stays focused and re-resolves to the
+        // newly revealed row. Only Up/Down scroll; Tab/arrows off the
+        // edge move to the next control.
+        if(ring_>=0&&ring_<count&&(e.key==kDown||e.key==kUp)){
+          const auto&t=targets[static_cast<std::size_t>(ring_)];
+          if(t.hit>=10){
+            const int first=first_row(l);
+            const int last=std::min(first+12,static_cast<int>(rows_.size()))-1;
+            if(e.key==kDown&&t.row==last&&last+1<static_cast<int>(rows_.size())){
+              empire_view_.scroll_to(empire_view_.scroll_offset+empire_view_.row_height);return true;
+            }
+            if(e.key==kUp&&t.row==first&&first>0){
+              empire_view_.scroll_to(empire_view_.scroll_offset-empire_view_.row_height);return true;
+            }
+          }
+        }
         if(fwd||bwd||home||end){
           if(ring_<0)ring_=bwd||end?count-1:0;
           else if(fwd)ring_=(ring_+1)%count;

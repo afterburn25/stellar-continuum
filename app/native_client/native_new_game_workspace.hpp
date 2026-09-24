@@ -173,6 +173,9 @@ private:
   struct FocusItem {
     stellar::native_map::UiRect rect;
     std::uint64_t target;
+    // Set when `rect` was clipped to the species list viewport: the row's
+    // translated, unclipped bounds so keyboard focus can snap the list.
+    std::optional<stellar::native_map::UiRect> unclipped;
   };
   [[nodiscard]] std::vector<FocusItem> configuration_focusables(
       const NativeNewGameMeasuredLayout &) const;
@@ -180,7 +183,8 @@ private:
       const GalaxyChoiceLayout &) const;
   [[nodiscard]] NativeNewGameIntent handle_focus_key(
       const stellar::native_map::InputEvent &, std::span<const FocusItem>,
-      int, int, const TextMeasurer &);
+      int, int, const TextMeasurer &,
+      const NativeNewGameMeasuredLayout *measured = nullptr);
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
   [[nodiscard]] std::string trf(std::string_view key,

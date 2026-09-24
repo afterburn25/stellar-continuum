@@ -617,12 +617,14 @@ NativeResearchWorkspace::focusables(
                            l.graph.width, l.graph.height - 80.f * l.scale};
       for (const auto &card : guided_cards(l))
         if (const auto clip = intersection(card.bounds, content))
-          out.push_back({*clip, node_label(card.id)});
+          out.push_back({*clip, node_label(card.id), card.bounds,
+                         /*scroll_lane=*/1});
     } else {
       for (const auto &placement : placements_)
         if (const auto clip =
                 intersection(l.graph, transformed_card(placement, l)))
-          out.push_back({*clip, node_label(placement.id)});
+          out.push_back({*clip, node_label(placement.id),
+                         transformed_card(placement, l), /*scroll_lane=*/2});
     }
     if (const auto *node = selected_node()) {
       const auto intent = node->primary_action.intent;
@@ -753,14 +755,47 @@ WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
                      event.key == kRight || event.key == kDown;
     const bool bwd = (event.key == kTab && event.shift) ||
                      event.key == kLeft || event.key == kUp;
+    // Cards clipped by their viewport stay in the ring; when focus lands
+    // on one, snap its lane — guided list scroll or tree-graph pan — so
+    // the card is fully visible and the next card stays reachable.
+    const auto snap_focused = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto &target = items[static_cast<std::size_t>(focus_)];
+      if (!target.unclipped) return;
+      const auto &full = *target.unclipped;
+      if (target.scroll_lane == 1) {
+        const UiRect content{layout.graph.x, layout.graph.y + 80.f * layout.scale,
+                             layout.graph.width,
+                             layout.graph.height - 80.f * layout.scale};
+        float extent = 0.f;
+        for (const auto &card : guided_cards(layout))
+          extent = std::max(extent, card.bounds.y + card.bounds.height +
+                                        guided_scroll_.scroll_offset - content.y);
+        guided_scroll_.sync(extent, content.height);
+        guided_scroll_.scroll_interval_into_view(
+            full.y, full.y + full.height, content.y, content.y + content.height);
+      } else if (target.scroll_lane == 2) {
+        float dx = 0.f, dy = 0.f;
+        if (full.x < layout.graph.x) dx = layout.graph.x - full.x;
+        else if (full.x + full.width > layout.graph.x + layout.graph.width)
+          dx = layout.graph.x + layout.graph.width - full.x - full.width;
+        if (full.y < layout.graph.y) dy = layout.graph.y - full.y;
+        else if (full.y + full.height > layout.graph.y + layout.graph.height)
+          dy = layout.graph.y + layout.graph.height - full.y - full.height;
+        pan_.x += dx / layout.scale;
+        pan_.y += dy / layout.scale;
+      }
+    };
     if (count > 0 && (event.key == kHome || event.key == kEnd)) {
       focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused();
       return {WorkspaceCommandKind::None, true};
     }
     if (count > 0 && (fwd || bwd)) {
       focus_ = focus_ < 0 || focus_ >= count
                    ? (bwd ? count - 1 : 0)
                    : (focus_ + (bwd ? -1 : 1) + count) % count;
+      snap_focused();
       return {WorkspaceCommandKind::None, true};
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&

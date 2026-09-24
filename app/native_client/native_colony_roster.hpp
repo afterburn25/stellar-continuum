@@ -103,6 +103,7 @@ private:
   struct FocusTarget {
     stellar::native_map::UiRect bounds;
     std::string label;
+    int display_row{-1};
   };
   [[nodiscard]] std::vector<FocusTarget> focusables(const RosterLayout &) const;
   const stellar::engine::LocalizationTable *locale_{};

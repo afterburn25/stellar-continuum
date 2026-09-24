@@ -78,6 +78,16 @@ void ScrollView::scroll_to(float offset) {
 
 void ScrollView::scroll_by(float delta) { scroll_to(scroll_offset + delta); }
 
+void ScrollView::scroll_interval_into_view(float interval_top,
+                                           float interval_bottom,
+                                           float viewport_top,
+                                           float viewport_bottom) {
+  if (interval_top < viewport_top)
+    scroll_to(scroll_offset + interval_top - viewport_top);
+  else if (interval_bottom > viewport_bottom)
+    scroll_to(scroll_offset + interval_bottom - viewport_bottom);
+}
+
 float ScrollView::sync(float new_content_height, float new_viewport_height) {
   content_height = new_content_height;
   viewport_height = new_viewport_height;

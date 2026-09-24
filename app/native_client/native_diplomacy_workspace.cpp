@@ -495,11 +495,13 @@ NativeDiplomacyWorkspace::focusables(
       out.push_back({filter_button(layout, index),
                      tr(filter_keys[index], filter_labels[index].second)});
     const auto rows = filtered_contacts();
-    for (std::size_t index = 0; index < rows.size(); ++index)
-      if (const auto clipped =
-              intersection(contact_row(layout, index, contact_scroll_.scroll_offset),
-                           layout.contact_rows))
-        out.push_back({*clipped, rows[index]->display_name});
+    for (std::size_t index = 0; index < rows.size(); ++index) {
+      const auto row_rect =
+          contact_row(layout, index, contact_scroll_.scroll_offset);
+      if (const auto clipped = intersection(row_rect, layout.contact_rows))
+        out.push_back(
+            {*clipped, rows[index]->display_name, row_rect, /*scroll_lane=*/1});
+    }
     const auto &sel = view_->selected;
     if (sel.present) {
       // Same enumeration order as the click dispatch and renderer.
@@ -537,14 +539,16 @@ NativeDiplomacyWorkspace::focusables(
         const bool legal[] = {proposal.can_accept, proposal.can_reject,
                               proposal.can_withdraw};
         for (int which = 0; which < 3; ++which)
-          if (legal[which])
+          if (legal[which]) {
+            const auto button = proposal_button(layout, card, which,
+                                                detail_scroll_.scroll_offset);
             if (const auto clipped =
-                    intersection(proposal_button(layout, card, which,
-                                                 detail_scroll_.scroll_offset),
-                                 layout.detail_rows))
+                    intersection(button, layout.detail_rows))
               out.push_back(
-                  {*clipped, tr(proposal_names[which],
-                                proposal_fallbacks[which])});
+                  {*clipped,
+                   tr(proposal_names[which], proposal_fallbacks[which]),
+                   button, /*scroll_lane=*/2});
+          }
       }
     }
     if (tab_ == DiplomacyWorkspaceTab::intelligence && sel.present) {
@@ -559,7 +563,8 @@ NativeDiplomacyWorkspace::focusables(
               {*clipped,
                trf("DIPLOMACY_LAST_OBSERVATION",
                    {contact.last_observed_system_name},
-                   "Last observation · {0}")});
+                   "Last observation · {0}"),
+               link, /*scroll_lane=*/2});
       }
     }
   }
@@ -614,14 +619,41 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
                      event.key == kRight || event.key == kDown;
     const bool bwd = (event.key == kTab && event.shift) ||
                      event.key == kLeft || event.key == kUp;
+    // Rows clipped by a scroll viewport stay in the ring; when focus lands
+    // on a clipped row, snap its lane so the row is fully visible — which
+    // exposes the next row and keeps the whole list keyboard-reachable.
+    const auto snap_focused = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto &target = rects[static_cast<std::size_t>(focus_)];
+      if (!target.unclipped) return;
+      if (target.scroll_lane == 1) {
+        contact_scroll_.sync(filtered_contacts().size() * 62.f *
+                                     layout.scale +
+                                 12.f * layout.scale,
+                             layout.contact_rows.height);
+        contact_scroll_.scroll_interval_into_view(
+            target.unclipped->y, target.unclipped->y + target.unclipped->height,
+            layout.contact_rows.y,
+            layout.contact_rows.y + layout.contact_rows.height);
+      } else if (target.scroll_lane == 2) {
+        detail_scroll_.sync(detail_content_height(layout),
+                            layout.detail_rows.height);
+        detail_scroll_.scroll_interval_into_view(
+            target.unclipped->y, target.unclipped->y + target.unclipped->height,
+            layout.detail_rows.y,
+            layout.detail_rows.y + layout.detail_rows.height);
+      }
+    };
     if (count > 0 && (event.key == kHome || event.key == kEnd)) {
       focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused();
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
     if (count > 0 && (fwd || bwd)) {
       focus_ = focus_ < 0 || focus_ >= count
                    ? (bwd ? count - 1 : 0)
                    : (focus_ + (bwd ? -1 : 1) + count) % count;
+      snap_focused();
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&

@@ -67,6 +67,23 @@ public:
         const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
         const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
         const bool home=e.key==kHome,end=e.key==kEnd;
+        // Arrow scroll-follow: the ring covers rendered rows only, so Up on
+        // the first row scrolls one row up and Down on the last scrolls one
+        // row down — the slot stays focused and re-resolves to the newly
+        // revealed row. Other nav keys leave the list to the next control.
+        if(ring_>=0&&ring_<count&&(e.key==kDown||e.key==kUp)){
+          const auto&t=targets[static_cast<std::size_t>(ring_)];
+          if(t.kind==FocusTarget::Kind::Row&&t.row>=0){
+            const int first=first_row(l);
+            const int last=std::min(first+8,static_cast<int>(rows_.size()))-1;
+            if(e.key==kDown&&t.row==last&&last+1<static_cast<int>(rows_.size())){
+              list_view_.scroll_to(list_view_.scroll_offset+list_view_.row_height);return true;
+            }
+            if(e.key==kUp&&t.row==first&&first>0){
+              list_view_.scroll_to(list_view_.scroll_offset-list_view_.row_height);return true;
+            }
+          }
+        }
         if(fwd||bwd||home||end){
           if(ring_<0)ring_=bwd||end?count-1:0;
           else if(fwd)ring_=(ring_+1)%count;

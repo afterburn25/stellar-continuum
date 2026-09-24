@@ -145,6 +145,9 @@ private:
   struct FocusRect {
     stellar::native_map::UiRect bounds;
     std::string label;
+    // Set when `bounds` was clipped to the outliner list viewport: the
+    // row's translated, unclipped rect so keyboard focus can snap the list.
+    std::optional<stellar::native_map::UiRect> unclipped;
   };
   [[nodiscard]] std::vector<FocusRect>
   focusables(const FleetWorkspaceLayout &) const;

@@ -132,6 +132,11 @@ private:
   struct FocusRect {
     stellar::native_map::UiRect bounds;
     std::string label;
+    // Set when `bounds` was clipped to a scroll viewport: the row's
+    // translated, unclipped rect plus which lane scrolls it — 1 contacts,
+    // 2 detail — so keyboard focus can snap the row fully into view.
+    std::optional<stellar::native_map::UiRect> unclipped;
+    int scroll_lane{0};
   };
   [[nodiscard]] std::vector<FocusRect>
   focusables(const DiplomacyWorkspaceLayout &layout) const;

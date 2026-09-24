@@ -325,7 +325,8 @@ std::vector<RosterWorkspace::FocusTarget> RosterWorkspace::focusables(
       const auto row = static_cast<std::size_t>(display_order_[i]);
       out.push_back({visible, row < view_.rows.size()
                                   ? view_.rows[row].name
-                                  : std::string{}});
+                                  : std::string{},
+                     static_cast<int>(i)});
     }
   }
   std::ranges::sort(out, [](const FocusTarget &a, const FocusTarget &b) {
@@ -498,14 +499,28 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
                      event.key == kRight || event.key == kDown;
     const bool bwd = (event.key == kTab && event.shift) ||
                      event.key == kLeft || event.key == kUp;
+    // Rows clipped by the viewport stay in the ring; when focus lands on a
+    // partially-clipped row, snap the list so the row is fully visible —
+    // which exposes the next row and makes the whole list reachable.
+    const auto snap_focused_row = [&] {
+      if (focus_ >= 0 && focus_ < count) {
+        const auto &target = rects[static_cast<std::size_t>(focus_)];
+        if (target.display_row >= 0) {
+          sync_scroll(layout);
+          list_.ensure_visible(static_cast<std::size_t>(target.display_row));
+        }
+      }
+    };
     if (count > 0 && (event.key == kHome || event.key == kEnd)) {
       focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused_row();
       return {true};
     }
     if (count > 0 && (fwd || bwd)) {
       focus_ = focus_ < 0 || focus_ >= count
                    ? (bwd ? count - 1 : 0)
                    : (focus_ + (bwd ? -1 : 1) + count) % count;
+      snap_focused_row();
       return {true};
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&

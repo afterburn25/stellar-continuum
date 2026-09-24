@@ -375,7 +375,7 @@ std::vector<NativeFleetWorkspace::FocusRect> NativeFleetWorkspace::focusables(
                            static_cast<float>(index) * 45.f * layout.scale,
                        layout.list.width, 41.f * layout.scale};
       if (const auto clipped = intersection(row, layout.list))
-        out.push_back({*clipped, view_->own_fleets[index].name});
+        out.push_back({*clipped, view_->own_fleets[index].name, row});
     }
   if (overview_ && !selected_fleet_id()) {
     const UiRect content{layout.details.x, layout.details.y,
@@ -519,8 +519,23 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
                      event.key == kRight || event.key == kDown;
     const bool bwd = (event.key == kTab && event.shift) ||
                      event.key == kLeft || event.key == kUp;
+    // Rows clipped by the outliner viewport stay in the ring; when focus
+    // lands on one, snap the list so the row is fully visible — which
+    // exposes the next row and keeps the whole list keyboard-reachable.
+    const auto snap_focused = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto &target = items[static_cast<std::size_t>(focus_)];
+      if (!target.unclipped) return;
+      const auto rows = view_ ? view_->own_fleets.size() : 0;
+      list_scroll_.sync(static_cast<float>(rows) * 45.f * layout.scale,
+                        layout.list.height);
+      list_scroll_.scroll_interval_into_view(
+          target.unclipped->y, target.unclipped->y + target.unclipped->height,
+          layout.list.y, layout.list.y + layout.list.height);
+    };
     if (count > 0 && (event.key == kHome || event.key == kEnd)) {
       focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused();
       return {FleetWorkspaceCommandKind::None, true};
     }
     if (count > 0 && (fwd || bwd)) {
@@ -536,6 +551,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
         }
         focus_ = next;
       }
+      snap_focused();
       return {FleetWorkspaceCommandKind::None, true};
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&

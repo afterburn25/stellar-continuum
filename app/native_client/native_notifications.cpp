@@ -87,7 +87,13 @@ bool same_rect(UiRect left, UiRect right) noexcept {
 // each card's action buttons. Card bodies are inert — only the explicit
 // action buttons respond, and only while fully inside the viewport (the
 // same gate the pointer activation path applies).
-struct FocusTarget { UiRect bounds; std::string label; };
+struct FocusTarget {
+  UiRect bounds;
+  std::string label;
+  // Set when `bounds` was clipped to the feed viewport: the button's
+  // translated, unclipped rect so keyboard focus can snap it into view.
+  std::optional<UiRect> unclipped;
+};
 
 void collect_focusables(const NotificationLayout& layout,
                         const stellar::engine::LocalizationTable* locale,
@@ -97,12 +103,18 @@ void collect_focusables(const NotificationLayout& layout,
   out.push_back({layout.close_button,
                  resolve(locale, "NOTIFY_CLOSE", "Close feed")});
   for (const auto& entry : layout.entries) {
-    if (entry.contact_button && contains_rect(layout.list_viewport, *entry.contact_button))
-      out.push_back({*entry.contact_button,
-                     resolve(locale, "NOTIFY_OPEN_RELATIONS", "Open relations")});
-    if (entry.system_button && contains_rect(layout.list_viewport, *entry.system_button))
-      out.push_back({*entry.system_button,
-                     resolve(locale, "NOTIFY_VIEW_SYSTEM", "View system")});
+    if (entry.contact_button)
+      if (const auto clip = intersection(*entry.contact_button, layout.list_viewport);
+          clip.width > 0.f && clip.height > 0.f)
+        out.push_back({clip,
+                       resolve(locale, "NOTIFY_OPEN_RELATIONS", "Open relations"),
+                       *entry.contact_button});
+    if (entry.system_button)
+      if (const auto clip = intersection(*entry.system_button, layout.list_viewport);
+          clip.width > 0.f && clip.height > 0.f)
+        out.push_back({clip,
+                       resolve(locale, "NOTIFY_VIEW_SYSTEM", "View system"),
+                       *entry.system_button});
   }
   std::sort(out.begin(), out.end(), [](const FocusTarget& a, const FocusTarget& b) {
     return a.bounds.y == b.bounds.y ? a.bounds.x < b.bounds.x : a.bounds.y < b.bounds.y;
@@ -308,8 +320,21 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
                      event.key == kRight || event.key == kDown;
     const bool bwd = (event.key == kTab && event.shift) ||
                      event.key == kLeft || event.key == kUp;
+    // Buttons clipped by the feed viewport stay in the ring; when focus
+    // lands on one, snap the feed so the button is fully visible — which
+    // exposes the next card and keeps the whole feed keyboard-reachable.
+    const auto snap_focused = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto& target = rects[static_cast<std::size_t>(focus_)];
+      if (!target.unclipped) return;
+      scroll_.scroll_interval_into_view(
+          target.unclipped->y, target.unclipped->y + target.unclipped->height,
+          layout.list_viewport.y,
+          layout.list_viewport.y + layout.list_viewport.height);
+    };
     if (count > 0 && (event.key == kHome || event.key == kEnd)) {
       focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused();
       command.captured = true;
       return command;
     }
@@ -317,6 +342,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
       focus_ = focus_ < 0 || focus_ >= count
                    ? (bwd ? count - 1 : 0)
                    : (focus_ + (bwd ? -1 : 1) + count) % count;
+      snap_focused();
       command.captured = true;
       return command;
     }

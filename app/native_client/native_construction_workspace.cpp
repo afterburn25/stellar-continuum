@@ -356,7 +356,8 @@ NativeConstructionWorkspace::focusables(
                                   static_cast<float>(index) * 58.f * layout.scale,
                           project_rows.width, 54.f * layout.scale};
       if (const auto clipped = intersection(bounds, project_rows))
-        out.push_back({*clipped, view_->projects[index].name});
+        out.push_back({*clipped, view_->projects[index].name,
+                       static_cast<int>(index), /*scroll_lane=*/1});
     }
     for (std::size_t order_index = 0; order_index < status_order_.size();
          ++order_index) {
@@ -367,7 +368,8 @@ NativeConstructionWorkspace::focusables(
           order_rows.width, 68.f * layout.scale};
       if (const auto clipped = intersection(bounds, order_rows))
         out.push_back(
-            {*clipped, view_->projects[status_order_[order_index]].name});
+            {*clipped, view_->projects[status_order_[order_index]].name,
+             static_cast<int>(order_index), /*scroll_lane=*/2});
     }
   }
   if (const auto *project = selected_project()) {
@@ -470,13 +472,25 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
                          event.key == kRight || event.key == kDown;
     const bool backward = (event.key == kTab && event.shift) ||
                           event.key == kLeft || event.key == kUp;
+    // Rows clipped by a list viewport stay in the ring; when focus lands
+    // on one, snap its list so the row is fully visible — which exposes
+    // the next row and keeps the whole list keyboard-reachable.
+    const auto snap_focused = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto &target = items[static_cast<std::size_t>(focus_)];
+      if (target.scroll_row < 0) return;
+      (target.scroll_lane == 1 ? project_scroll_ : order_scroll_)
+          .ensure_visible(static_cast<std::size_t>(target.scroll_row));
+    };
     if (count > 0 && (forward || backward)) {
       focus_ = focus_ < 0 ? (forward ? 0 : count - 1)
                           : (focus_ + (forward ? 1 : -1) + count) % count;
+      snap_focused();
       return {ConstructionWorkspaceCommandKind::None, true};
     }
     if (count > 0 && (event.key == kHome || event.key == kEnd)) {
       focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused();
       return {ConstructionWorkspaceCommandKind::None, true};
     }
     if (focus_ >= 0 && focus_ < count &&
