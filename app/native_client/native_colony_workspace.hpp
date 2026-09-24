@@ -50,6 +50,7 @@ public:
   [[nodiscard]] const auto& freight_preview() const noexcept { return freight_preview_; }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeColonyView> &
   view() const noexcept {
     return view_;
@@ -73,6 +74,7 @@ private:
   std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure_;
   mutable float freight_scroll_{};
   ColonyWorkspaceCommandKind freight_pressed_{ColonyWorkspaceCommandKind::None};
+  int focus_{-1};
   [[nodiscard]] float freight_content_height(const ColonyWorkspaceLayout&) const;
 };
 

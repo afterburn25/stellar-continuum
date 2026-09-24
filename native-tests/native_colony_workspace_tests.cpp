@@ -181,7 +181,36 @@ void freight_review_input_and_layout() {
   }
 }
 
+void keyboard_focus() {
+  constexpr std::uint32_t kTab=9u,kReturn=13u,kHome=0x4000004au,kEnd=0x4000004du;
+  const int width=1280,height=720;
+  NativeColonyWorkspace workspace;auto owned=view();owned.resource_outpost=true;
+  workspace.open(owned);
+  const auto key=[&](std::uint32_t k,bool shift=false){InputEvent e{InputEventType::KeyPressed};e.key=k;e.shift=shift;return workspace.handle(e,width,height);};
+  NativeOutpostFreightPreview quote;quote.campaign_generation=owned.campaign_generation;quote.revision=19;
+  quote.player_civilization_id=owned.player_civilization_id;quote.colony_id=owned.colony_id;
+  quote.body_id=owned.body_id;quote.system_id=owned.system_id;quote.accepted=true;
+  workspace.set_freight_preview(quote);
+  REQUIRE(workspace.focus()<0);
+  (void)key(kTab);REQUIRE(workspace.focus()==0);
+  (void)key(kTab);REQUIRE(workspace.focus()==1);
+  (void)key(kTab,true);REQUIRE(workspace.focus()==0);
+  (void)key(kEnd);REQUIRE(workspace.focus()==1);
+  const auto confirmed=key(kReturn);
+  REQUIRE(confirmed.kind==ColonyWorkspaceCommandKind::ConfirmFreight&&confirmed.quote_revision==19);
+  REQUIRE(workspace.freight_preview().has_value()&&workspace.focus()==1);
+  (void)key(kHome);const auto cancelled=key(kReturn);
+  REQUIRE(cancelled.kind==ColonyWorkspaceCommandKind::CancelFreight&&!workspace.freight_preview()&&workspace.focus()<0);
+  quote.accepted=false;quote.message="No idle freighter available.";workspace.set_freight_preview(quote);
+  (void)key(kEnd);REQUIRE(workspace.focus()==0);
+  REQUIRE(key(kReturn).kind==ColonyWorkspaceCommandKind::CancelFreight);
+  workspace.set_freight_preview(quote);
+  (void)workspace.handle({InputEventType::LeftPressed,center(ColonyWorkspaceLayout::for_viewport(width,height).freight_cancel)},width,height);
+  REQUIRE(workspace.focus()<0);
+  (void)workspace.handle({InputEventType::PointerCancelled},width,height);
+}
+
 } // namespace
-int main(){try{only_planetary_screen_is_rendered();freight_review_input_and_layout();
+int main(){try{only_planetary_screen_is_rendered();freight_review_input_and_layout();keyboard_focus();
   std::cout<<"Planetary workspace and freight checks passed\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
