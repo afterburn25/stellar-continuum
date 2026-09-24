@@ -576,6 +576,44 @@ int main() {
           "load_data reports a missing key");
   }
 
+  // Scene-authored animations: a clip's "x" track owns the entity's
+  // Transform2D.x while playing, and a named event marker fires exactly
+  // once when the playhead crosses it.
+  {
+    const auto sub = root / "anim";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[{"name":"door","x":10,"y":20,"anim":"slide"}],
+                  "animations":[{"id":"slide","loop":"once",
+                    "tracks":{"x":[[0,10],[0.2,110]]},
+                    "events":[[0.1,"halfway"]]}]})";
+    }
+    auto opts = headless_options(sub);
+    // 12 frames at 60 Hz reaches the clip's 0.2s end; the marker at
+    // 0.1s crosses around frame 7.
+    opts.frame_limit = 12;
+    RuntimeHost host{opts};
+    int updates = 0;
+    int halfway_events = 0;
+    float door_x = -1.f;
+    host.on_anim_event = [&](const std::string &event, EntityId) {
+      if (event == "halfway") ++halfway_events;
+    };
+    host.on_update = [&](World &world, float) {
+      ++updates;
+      const auto door = host.find_entity("door");
+      if (door)
+        if (const auto *t = world.get<Transform2D>(*door))
+          door_x = t->x;
+    };
+    check(host.run() == 0, "anim run exits cleanly");
+    check(halfway_events == 1,
+          "on_anim_event fires once per marker crossing");
+    check(door_x > 10.f && door_x <= 110.f,
+          "the x track owns Transform2D.x while playing");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
