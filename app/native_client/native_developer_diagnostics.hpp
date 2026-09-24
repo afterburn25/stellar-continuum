@@ -79,10 +79,17 @@ public:
       }else label(l.list,"This legacy save predates canonical generation fingerprints. Its saved galaxy remains authoritative.");
     }else if(entities_){
       // Read-only projection of the authoritative campaign into the typed
-      // World store — rebuilt on open/refresh, never on every frame.
+      // World store — the panel keeps one projected world and reconciles
+      // it through sync_campaign_world on open/refresh, so surviving rows
+      // hold stable EntityIds between refreshes (the incremental path's
+      // first live consumer).
       if(entities_dirty_){
         entity_lines_.clear();entity_parented_=0;
-        const auto projected=stellar::core::project_campaign_world(frame.runtime().world().campaign());
+        if(!entities_world_built_){
+          entity_world_=stellar::core::project_campaign_world(frame.runtime().world().campaign());
+          entities_world_built_=true;entity_sync_.reset();
+        }else entity_sync_=stellar::core::sync_campaign_world(entity_world_,frame.runtime().world().campaign());
+        const auto &projected=entity_world_;
         entity_bytes_=projected.estimated_memory_bytes();
         entity_lines_.reserve(projected.size());
         const auto legacy_name=[&](stellar::engine::EntityId e){
@@ -114,7 +121,8 @@ public:
         }
         entities_dirty_=false;
       }
-      label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(entity_lines_.size())+" projected entities · "+std::to_string(entity_parented_)+" parented · "+number(entity_bytes_/1024.)+" KiB estimated container footprint · read-only projection",native_menu_style::muted);
+      label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(entity_lines_.size())+" projected entities · "+std::to_string(entity_parented_)+" parented · "+number(entity_bytes_/1024.)+" KiB estimated container footprint · "+
+        (entity_sync_?"synced +"+std::to_string(entity_sync_->created)+" ~"+std::to_string(entity_sync_->updated)+" -"+std::to_string(entity_sync_->destroyed)+" ↻"+std::to_string(entity_sync_->reparented):"fresh projection")+" · read-only",native_menu_style::muted);
       const auto begin=std::clamp(first_,0,std::max(0,static_cast<int>(entity_lines_.size())-14));
       for(int i=0;i<14&&begin+i<static_cast<int>(entity_lines_.size());++i){
         const auto y=l.list.y+i*33*s;
@@ -173,7 +181,9 @@ private:
       {p.x+532*s,p.y+110*s,242*s,34*s}};
   }
   bool generation_{},assets_{},entities_{};
-  mutable bool entities_dirty_{true};
+  mutable bool entities_dirty_{true},entities_world_built_{};
+  mutable stellar::engine::World entity_world_;
+  mutable std::optional<stellar::core::CampaignWorldProjectionSync> entity_sync_;
   mutable std::vector<std::string> entity_lines_;
   mutable int entity_parented_{};
   mutable std::size_t entity_bytes_{};

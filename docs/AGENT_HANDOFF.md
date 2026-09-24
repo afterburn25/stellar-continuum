@@ -623,8 +623,12 @@ diagnostics panel's ENTITIES view runs a read-only
 `project_campaign_world` over the authoritative campaign on
 open/refresh, listing every entity as `domain id · tag fields ← parent`
 with census counts and `estimated_memory_bytes` in the header.
-`native_developer_diagnostics` clicks through the view and verifies the
-campaign stays byte-identical.
+The panel keeps one projected world and reconciles it via
+`sync_campaign_world` on refresh — the incremental path's first live
+consumer; the header shows `synced +c ~u -d ↻r` drift counts.
+`native_developer_diagnostics` clicks through the view (fresh
+projection + synced refresh) and verifies the campaign stays
+byte-identical.
 Event-history memory census: `EventHistory::estimated_memory_bytes()`
 counts inline deque storage plus per-event payload heap (strings,
 actor/visibility/tag vectors); the diagnostic monitor reports it as the

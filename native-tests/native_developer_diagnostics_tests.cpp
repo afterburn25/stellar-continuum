@@ -94,6 +94,15 @@ int main(int argc,char **argv)try{
       }
       check(census&&domain_row,"Entities inspector did not project the campaign world.");
     }
+    // A second refresh reconciles through sync_campaign_world — the
+    // header reports drift counts instead of a fresh projection.
+    click("ENTITIES");
+    {
+      const auto synced=draw();bool sync_counts=false;
+      for(const auto &c:synced.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)
+        if(t->value.find("synced +")!=std::string::npos)sync_counts=true;
+      check(sync_counts,"Entities inspector did not reuse the projected world.");
+    }
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Entities inspector modified world state.");
     click("CLOSE");check(!window.visible()&&!window.handle({InputEventType::LeftPressed},w,h,monitor),"Closed diagnostics captured gameplay.");
     panel.toggle();controls={};panel.render(controls,w,h,frame);point=control(controls,"EMPIRE MONITOR");
