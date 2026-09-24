@@ -93,6 +93,10 @@ struct RuntimeHostOptions {
   // boundaries nondeterministic.
   std::filesystem::path record_file;
   std::filesystem::path replay_file;
+  // --replay-exit: quit once the recorded stream is fully consumed —
+  // exit 0 after replay_verified, exit 1 as soon as a checkpoint
+  // diverges. Without it a replay keeps running like a normal session.
+  bool replay_exit{false};
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content

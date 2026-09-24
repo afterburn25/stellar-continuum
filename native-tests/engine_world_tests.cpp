@@ -375,6 +375,17 @@ int main() {
         check(world.get<Oneway>(spawned[0]) != nullptr &&
                   world.get<Oneway>(spawned[1]) == nullptr,
               "spawn_scene oneway flag");
+        // Marker codecs emit a fixed byte — an empty struct memcpy'd
+        // into the snapshot would leak uninitialized memory and make
+        // replay checkpoint hashes nondeterministic.
+        {
+          const auto snap = world.snapshot();
+          World restored;
+          register_scene_components(restored);
+          restored.restore(snap);
+          check(restored.snapshot() == snap,
+                "marker components snapshot byte-deterministically");
+        }
         check(world.get<UserData>(spawned[0]) &&
                   world.get<UserData>(spawned[0])->value == "checkpoint-7" &&
                   world.get<UserData>(spawned[1]) == nullptr,

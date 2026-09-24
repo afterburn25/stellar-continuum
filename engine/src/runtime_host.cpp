@@ -652,6 +652,10 @@ int RuntimeHost::run() {
       std::fprintf(stderr,
                    "replay: recording truncated — entries past the "
                    "retained prefix are absent\n");
+    if (options.fixed_timestep_hz <= 0.)
+      std::fprintf(stderr,
+                   "replay: no --fixed-hz — wall-clock stepping is not "
+                   "deterministic, checkpoints will diverge\n");
     if (const auto &h = impl.replay.header();
         h.window_width != 0 &&
         (h.window_width != static_cast<std::uint32_t>(options.width) ||
@@ -1104,9 +1108,9 @@ int RuntimeHost::run() {
         impl.cam3_x = cam->x;
         impl.cam3_y = cam->y;
         impl.cam3_z = cam->z;
-        impl.cam3_yaw = cam->yaw_deg;
-        impl.cam3_pitch = cam->pitch_deg;
-        impl.cam3_fov = cam->fov_deg;
+        impl.cam3_yaw = static_cast<float>(cam->yaw_deg);
+        impl.cam3_pitch = static_cast<float>(cam->pitch_deg);
+        impl.cam3_fov = static_cast<float>(cam->fov_deg);
         break;
       }
     // Tilemap entities restore with the snapshot — pull them out of the
@@ -2142,7 +2146,11 @@ int RuntimeHost::run() {
       // Frame-limited runs step once per rendered frame so --frames N
       // always produces exactly N simulation steps — byte-identical
       // snapshots across runs for determinism checks.
-      if (options.frame_limit > 0) {
+      // Journaled runs (record or replay) step once per frame like
+      // frame-limited runs — journal ticks are frame indices, and a
+      // wall-clock accumulator would run a variable number of steps per
+      // frame, making recorded checkpoints unverifiable.
+      if (options.frame_limit > 0 || impl.replaying || impl.recorder) {
         simulate(step);
       } else {
         accumulator += dt;
@@ -2184,6 +2192,7 @@ int RuntimeHost::run() {
                        static_cast<unsigned long long>(cp.tick),
                        cp.label.c_str());
           impl.replay_diverged = true;
+          if (options.replay_exit) impl.quit_requested = true;
         }
       }
       // The recording is fully verified once its command stream and every
@@ -2198,6 +2207,7 @@ int RuntimeHost::run() {
                         impl.replay.commands().size()),
                     static_cast<unsigned long long>(cps.size()));
         std::fflush(stdout);
+        if (options.replay_exit) impl.quit_requested = true;
       }
     }
 
@@ -2455,7 +2465,11 @@ int RuntimeHost::run() {
     }
     if (on_draw) on_draw(draw, w, h);
     window.draw(draw);
-    if (options.frame_limit > 0 && ++rendered >= options.frame_limit)
+    // The frame counter is the journal tick — it must advance on every
+    // rendered frame, not only while a --frames budget is active, or
+    // replayed commands and checkpoints stay pinned at tick 0.
+    ++rendered;
+    if (options.frame_limit > 0 && rendered >= options.frame_limit)
       break;
   }
   RuntimeDiagnostics::context("runtime:teardown");
@@ -2477,6 +2491,11 @@ int RuntimeHost::run(int argc, char **argv) {
   // exits without creating a window, so scripts can inspect a journal on
   // headless machines.
   std::filesystem::path replay_info;
+  // Valueless flags are scanned separately — the value-taking loop below
+  // stops at i+1 < argc and would ignore a trailing flag.
+  for (int i = 1; i < argc; ++i)
+    if (std::string_view{argv[i]} == "--replay-exit")
+      impl_->options.replay_exit = true;
   for (int i = 1; i + 1 < argc; ++i) {
     const std::string_view arg{argv[i]};
     if (arg == "--frames")

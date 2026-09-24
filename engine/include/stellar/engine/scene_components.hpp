@@ -165,8 +165,11 @@ struct DoubleSided {
 // resolved world entity so F5/F9 snapshots restore the camera too (the
 // document seeds it only on scene load).
 struct Camera3DState {
+  // All-double members keep the layout padding-free — the snapshot codec
+  // memcpy's the object representation and padding bytes would leak
+  // uninitialized memory into byte-compared snapshots.
   double x{}, y{}, z{3.0};
-  float yaw_deg{}, pitch_deg{}, fov_deg{60.f};
+  double yaw_deg{}, pitch_deg{}, fov_deg{60.0};
 };
 // 3D positional attachment — same contract as Parent, with a z offset.
 struct Parent3D {

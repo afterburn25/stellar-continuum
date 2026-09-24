@@ -16,7 +16,15 @@
 namespace stellar::engine {
 namespace {
 
+// Snapshots must be byte-deterministic — memcpy'ing an object with
+// padding (or an empty marker struct) leaks uninitialized bytes into
+// snapshots and replay checkpoint hashes. Empty markers must use the
+// fixed-byte codecs below; member order in registered structs keeps
+// layouts padding-free (std::is_empty catches the empty case).
 template <class T> std::vector<std::uint8_t> encode_pod(const T &v) {
+  static_assert(!std::is_empty_v<T>,
+                "encode_pod cannot serialize empty markers — use a "
+                "fixed-byte codec");
   std::vector<std::uint8_t> bytes(sizeof(T));
   std::memcpy(bytes.data(), &v, sizeof(T));
   return bytes;
@@ -221,12 +229,23 @@ void register_scene_components(World &world) {
                                      decode_pod<Lifetime>);
   world.register_component<Flip>("flip", encode_pod<Flip>,
                                  decode_pod<Flip>);
-  world.register_component<Hidden>("hidden", encode_pod<Hidden>,
-                                   decode_pod<Hidden>);
-  world.register_component<Oneway>("oneway", encode_pod<Oneway>,
-                                   decode_pod<Oneway>);
-  world.register_component<NoBounce>("nobounce", encode_pod<NoBounce>,
-                                     decode_pod<NoBounce>);
+  // Marker components carry no data — encode_pod would memcpy the single
+  // padding byte of an empty struct, leaking uninitialized memory into
+  // snapshots and checkpoint hashes (nondeterministic replays). Emit a
+  // fixed byte like Solid/DoubleSided; decode ignores the payload so
+  // existing saves still load.
+  const auto encode_marker = [](const auto &) {
+    return std::vector<std::uint8_t>{1};
+  };
+  world.register_component<Hidden>(
+      "hidden", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return Hidden{}; });
+  world.register_component<Oneway>(
+      "oneway", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return Oneway{}; });
+  world.register_component<NoBounce>(
+      "nobounce", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return NoBounce{}; });
   world.register_component<UserData>("userdata", encode_user_data,
                                      decode_user_data);
   world.register_component<Opacity>("opacity", encode_pod<Opacity>,

@@ -46,8 +46,11 @@ enum class CampaignDomain : std::int64_t {
 // Query tags — one per projected domain, carrying the authoritative
 // refs a consumer needs to correlate entities back to Core rows.
 struct CampaignSystemTag {
-  int id{};
+  // Member order keeps the layout padding-free — the snapshot codec
+  // memcpy's the object representation and padding bytes would leak
+  // uninitialized memory into byte-compared snapshots.
   double x{}, y{};
+  int id{};
 };
 struct CampaignBodyTag {
   int id{}, system_id{};

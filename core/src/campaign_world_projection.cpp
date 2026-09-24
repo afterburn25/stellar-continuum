@@ -9,9 +9,15 @@ namespace stellar::core {
 namespace {
 
 // POD tag serialization for snapshot codecs: same-build snapshots
-// only — campaign authority persists through the Player17 path.
+// only — campaign authority persists through the Player17 path. The
+// assert rejects types with padding bits: memcpy'ing them would leak
+// uninitialized bytes into snapshots and make byte comparisons
+// nondeterministic.
 template <class T>
 std::vector<std::uint8_t> encode_tag(const T &component) {
+  static_assert(!std::is_empty_v<T>,
+                "encode_tag cannot serialize empty markers — use a "
+                "fixed-byte codec");
   std::vector<std::uint8_t> bytes(sizeof(T));
   std::memcpy(bytes.data(), &component, sizeof(T));
   return bytes;
@@ -99,8 +105,8 @@ engine::World project_campaign_world(const FreshCampaignState &state) {
   for (const auto &system : state.systems) {
     const auto entity = world.create();
     world.bind_legacy(entity, legacy(CampaignDomain::System, system.id));
-    world.add(entity, CampaignSystemTag{system.id, system.position.x,
-                                        system.position.y});
+    world.add(entity, CampaignSystemTag{system.position.x,
+                                        system.position.y, system.id});
   }
   for (const auto &body : state.bodies) {
     const auto entity = world.create();
@@ -208,7 +214,7 @@ sync_campaign_world(engine::World &world, const FreshCampaignState &state) {
     seen.insert(key);
     const auto entity = upsert(
         world, key,
-        CampaignSystemTag{system.id, system.position.x, system.position.y},
+        CampaignSystemTag{system.position.x, system.position.y, system.id},
         created);
     created ? ++result.created : ++result.updated;
     reparent(world, entity, std::nullopt);
