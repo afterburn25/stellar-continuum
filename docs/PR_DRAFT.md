@@ -13,7 +13,7 @@ Space strategy engine specialization: M1–M15 frameworks, Core adoption, chroni
 ## Summary
 
 Specializes the Stellar Engine into a reusable, deterministic C++23
-space-strategy/simulation engine (246 commits, ~37.7k insertions, 278
+space-strategy/simulation engine (256 commits, ~38.5k insertions, 290
 files). Not an Unreal clone — the goal is a strategy/simulation
 substrate: scheduling, economy, population, colonies, infrastructure,
 logistics, planetary development, terraforming, strategic AI, warfare,
@@ -112,7 +112,19 @@ Core/engine projections, never re-derived in UI.
   Tab/arrows/Home/End rings, Return/Space activation through the same
   dispatch pointers take, edit-mode text-field ownership, modal
   narrowing, `wants_keyboard_focus()` suppressing bound galaxy actions
-  (Space→pause) while a ring is live
+  (Space→pause) while a ring is live. Always-on chrome is reachable too:
+  `map_focus_group_` chains the assets navigator, fleet outliner and HUD
+  chrome as ordered focus groups — a nav key that would wrap a group's
+  boundary releases the ring so the same key lands in the next group —
+  and `NativeUiLayout::hud_actions()` drives a HUD focus ring whose
+  activation replays the pointer dispatch paths
+- Screen-reader substrate — `AccessibilityAnnouncer` is the bounded
+  live-region queue (polite/assertive, dedup, capacity eviction,
+  monotonic sequences) a platform AT bridge will drain; live consumers
+  today: notification arrivals announce, pause-menu/HUD focus moves
+  announce localized labels, `focused_label()` on the navigator and
+  fleet outliner name the ringed control, and pending announcements
+  render through the voice-caption channel while subtitles are enabled
 - Accessibility preferences — `interfaceScale` (Compact→Huge user
   multiplier through `NativeUiLayout`), `reduceMotion`, `reduceFlashing`,
   `highContrast` (global luminance pass), `colorBlind` (Machado
@@ -155,11 +167,11 @@ Core/engine projections, never re-derived in UI.
 - Chronicle browser: multi-select filter composition unexposed;
   `HistoryEvent::summary` is opaque text (structured localization is an
   upstream event-pipeline change)
-- Accessibility stays PARTIAL: screen-reader/announcement contracts are
-  still open; the global HUD chrome (top bar + rail) intentionally has
-  no focus ring yet — the always-on map surfaces (assets navigator,
-  fleet outliner) already claim Tab, so HUD ordering needs a deliberate
-  focus-group policy
+- Accessibility stays PARTIAL: the announcement substrate +
+  focus-label convention landed (announcer queue, notification/menu/HUD
+  consumers, `focused_label()` on the map groups), but platform AT
+  bridging (UIA/AT-SPI) is still open and `focused_label()` adoption on
+  the remaining workspaces is in progress
 - `NativeMissionView` (missions/settlement panel) is a tested component
   not yet instantiated by the client
 - Pause-menu/inspection-card focus rings are verified by client build +
