@@ -1194,6 +1194,7 @@
     "HUD_INDUSTRY": "INDUSTRY",
     "HUD_SCIENCE": "SCIENCE",
     "HUD_SYSTEM_VIEW": "SYSTEM VIEW",
+    "HUD_SWITCH_VIEW": "SWITCH VIEW",
     "HUD_EMPIRE": "Empire",
     "HUD_PAUSED": "PAUSED",
     "HUD_TIP_RETURN": "Return to star map",

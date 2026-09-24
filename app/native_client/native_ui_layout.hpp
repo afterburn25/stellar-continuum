@@ -44,7 +44,8 @@ enum class UiAction {
   Colonies,
   Explore,
   Menu,
-  Missions
+  Missions,
+  SwitchView
 };
 
 struct NativeUiLayout {

@@ -1981,6 +1981,23 @@ class NativeCampaign final {
     if(system_workspace_.visible()||selected_id_!=home->id)throw std::runtime_error("Galaxy button lost the focused system");
     click(hud.switch_view);
     if(system_workspace_.system_id()!=home->id)throw std::runtime_error("System button did not reopen the focused system");
+    // The view-switch button joins the HUD keyboard ring only while it is
+    // actionable — Return replays the same activate_hud_switch dispatch.
+    {
+      const auto ring_items=[&]{return hud_ring_items(NativeUiLayout::for_viewport(width,height),width,height);};
+      const auto items=ring_items();
+      if(items.empty()||items.back().second!=UiAction::SwitchView)throw std::runtime_error("Switch view missing from the HUD focus ring");
+      map_focus_group_=2;hud_focus_=static_cast<int>(items.size())-1;
+      const auto key=[&](std::uint32_t k){InputEvent e{InputEventType::KeyPressed};e.key=k;route({e});};
+      key(13u);
+      if(system_workspace_.visible()||selected_id_!=home->id)throw std::runtime_error("Keyboard switch view did not return to the galaxy");
+      const auto galaxy_items=ring_items();
+      if(galaxy_items.empty()||galaxy_items.back().second!=UiAction::SwitchView)throw std::runtime_error("Switch view dropped out of the ring with a live selection");
+      hud_focus_=static_cast<int>(galaxy_items.size())-1;
+      key(13u);
+      if(system_workspace_.system_id()!=home->id)throw std::runtime_error("Keyboard switch view did not reopen the focused system");
+      map_focus_group_=-1;hud_focus_=-1;
+    }
     if(!colony_roster_.view().rows.empty()){
       const auto row=colony_roster_.view().rows.front();
       const auto asset=std::ranges::find_if(assets_.view().rows,[&](const auto& r){return r.body_id==row.body_id;});
@@ -6438,11 +6455,7 @@ class NativeCampaign final {
             // releases the ring so the same key can land in the next group;
             // activation keys only reach the group currently holding focus.
             if(map_focus_group_>=0&&(map_focus_group_==0?assets_.focus():map_focus_group_==1?fleet_workspace_.focus():hud_focus_)<0)map_focus_group_=-1;
-            const auto hud_items=[&]{
-              std::vector<std::pair<UiRect,UiAction>> items;
-              for(const auto &item:layout.hud_actions())
-                if(item.second!=UiAction::Notifications||notifications_available())items.push_back(item);
-              return items;}();
+            const auto hud_items=hud_ring_items(layout,width,height);
             const auto send_map_key=[&](int g)->bool{
               if(g==0){
                 const auto command=assets_.handle(event,width,height);
@@ -6470,6 +6483,7 @@ class NativeCampaign final {
                 else if(action==UiAction::Speed)cycle_speed();
                 else if(action==UiAction::Notifications){if(notifications_available())notification_view_.toggle(notifications_.latest_sequence());}
                 else if(action==UiAction::Menu)toggle_menu();
+                else if(action==UiAction::SwitchView)activate_hud_switch(width,height);
                 else route_navigation(action);
                 return true;
               }
@@ -6501,8 +6515,7 @@ class NativeCampaign final {
         if(event.type==InputEventType::LeftReleased&&hud_switch_pressed_){
           hud_switch_pressed_=false;
           if(hud.switch_view.contains(event.position)){
-            if(system_workspace_.visible()){selected_id_=system_workspace_.system_id();system_workspace_.close();refresh_inspection();}
-            else if(selected_id_&&!enter_system(*selected_id_,width,height))scientist_voice(stellar::native_audio::VoiceCue::ReconnaissanceRequired);
+            activate_hud_switch(width,height);
             if(audio_confirm_)audio_confirm_();
           }gesture_.cancel();continue;
         }
@@ -7507,9 +7520,7 @@ class NativeCampaign final {
       draw_navigation(layout.diplomacy,UiAction::Diplomacy,diplomacy_workspace_.visible(),tr("NAV_DIPLOMACY","Diplomacy"));
       draw_navigation(layout.menu,UiAction::Menu,false,tr("NAV_MENU","Menu"));
       if(map_hud_visible()&&hud_focus_>=0){
-        std::vector<std::pair<UiRect,UiAction>> items;
-        for(const auto &item:layout.hud_actions())
-          if(item.second!=UiAction::Notifications||notifications_available())items.push_back(item);
+        const auto items=hud_ring_items(layout,width,height);
         if(hud_focus_<static_cast<int>(items.size()))
           out.overlay.emplace_back(StrokedRectangle{items[static_cast<std::size_t>(hud_focus_)].first,{164,221,237,255}});
       }
@@ -8546,6 +8557,22 @@ class NativeCampaign final {
     }
   }
   void announce_menu_focus(int width,int height){if(menu_focus_>=0&&menu_focus_<menu_action_count){const auto layout=NativeUiLayout::for_viewport(width,height);const std::array<UiRect,7> rects{layout.continue_button,layout.save_button,layout.load_button,layout.settings_button,layout.support_button,layout.new_game_button,layout.exit_button};announcer_.announce_focus(menu_action_label(menu_actions_[menu_focus_]),announcement_bounds(rects[static_cast<std::size_t>(menu_focus_)]),std::nullopt,stellar::engine::AnnouncementControl::Button);}}
+  // HUD focus-ring items: the layout's chrome actions plus the command
+  // plate's view-switch button — the latter only while it is actionable
+  // (a system is open or one is selected), matching the pointer path's
+  // dimmed-when-inert rendering.
+  [[nodiscard]] std::vector<std::pair<UiRect,UiAction>> hud_ring_items(const NativeUiLayout &layout,int width,int height)const{
+    std::vector<std::pair<UiRect,UiAction>> items;
+    for(const auto &item:layout.hud_actions())
+      if(item.second!=UiAction::Notifications||notifications_available())items.push_back(item);
+    if(system_workspace_.visible()||selected_id_)
+      items.emplace_back(CommandHudLayout::make(width,height).switch_view,UiAction::SwitchView);
+    return items;
+  }
+  void activate_hud_switch(int width,int height){
+    if(system_workspace_.visible()){selected_id_=system_workspace_.system_id();system_workspace_.close();refresh_inspection();}
+    else if(selected_id_&&!enter_system(*selected_id_,width,height))scientist_voice(stellar::native_audio::VoiceCue::ReconnaissanceRequired);
+  }
   std::string hud_action_label(UiAction action)const{
     switch(action){
       case UiAction::Notifications:return tr("NAV_EVENTS","Events");
@@ -8566,6 +8593,7 @@ class NativeCampaign final {
       case UiAction::Construction:return tr("NAV_CONSTRUCTION","Construction");
       case UiAction::Explore:return tr("NAV_EXPLORE","Explore");
       case UiAction::Missions:return tr("NAV_MISSIONS","Missions");
+      case UiAction::SwitchView:return tr("HUD_SWITCH_VIEW","Switch view");
       default:return {};
     }
   }

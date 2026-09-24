@@ -1029,9 +1029,12 @@ keys only reach the group holding focus, pointer presses/cancels and
 fall through to raw handlers (claimed or not, they are consumed by the
 chain). `NativeUiLayout::hud_actions()` exposes the 17 HUD actions in
 (y,x) order — top strip, nav bar, rail; the EVENTS item drops out when
-the feed is unavailable — and `hud_focus_` rings the focused control
-while activation replays the pointer dispatch paths (pause/resume,
-speed cycle, feed toggle, menu, `route_navigation`); focus changes cue
+the feed is unavailable — and `hud_ring_items` appends the command
+plate's view-switch button while it is actionable (a system is open or
+one is selected; it renders dimmed and is pointer-inert otherwise), so
+`hud_focus_` rings every live chrome control while activation replays
+the pointer dispatch paths (pause/resume, speed cycle, feed toggle,
+menu, `activate_hud_switch`, `route_navigation`); focus changes cue
 the hover sound and announce the localized label. This also repaired a
 latent gap: the fleet outliner's keyboard block was unreachable
 because the navigator claimed every nav key first. Navigator and fleet
