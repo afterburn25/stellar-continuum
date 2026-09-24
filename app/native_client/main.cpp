@@ -2790,6 +2790,41 @@ class NativeCampaign final {
     const auto canonical_before=encode_player_campaign_v17_json(
         capture_player_campaign_v17(session_->frame().runtime(),capture_options));
     smoke_keyboard_commands_=0;
+    // Pointer replay injection: a recorded pointer_button command must
+    // dequeue into a real InputEvent and dispatch through the same click
+    // path as live input — drive a recorded click on the HUD menu button,
+    // verify the menu opened, then a recorded click on Continue closes it.
+    {
+      ReplayState pointer_replay;
+      auto *const outer_replay=replay_;
+      const auto journal_click=[&](const UiRect &cell){
+        pointer_replay.recording.emplace();
+        const auto point=center(cell);
+        char payload[96];
+        std::snprintf(payload,sizeof payload,"1,%.9g,%.9g,0,0",
+            static_cast<double>(point.x),static_cast<double>(point.y));
+        pointer_replay.recording->record(0,"pointer_button",payload);
+        payload[0]='2';
+        pointer_replay.recording->record(0,"pointer_button",payload);
+      };
+      InputSnapshot idle;idle.drawable_width=width;idle.drawable_height=height;
+      journal_click(layout.menu);
+      replay_=&pointer_replay;
+      const auto opened=update(idle,width,height,0.,false)&&menu_&&
+                        pointer_replay.command_cursor==2;
+      pointer_replay=ReplayState{};
+      if(opened){
+        journal_click(layout.continue_button);
+        const auto closed=update(idle,width,height,0.,false)&&!menu_&&
+                          pointer_replay.command_cursor==2;
+        replay_=outer_replay;
+        if(!closed)
+          throw std::runtime_error("Replayed menu click did not close the menu.");
+      }else{
+        replay_=outer_replay;
+        throw std::runtime_error("Replayed pointer click did not open the menu.");
+      }
+    }
     const auto send=[&](InputEvent event){
       InputSnapshot input;
       input.drawable_width=width;input.drawable_height=height;
@@ -7008,6 +7043,7 @@ class NativeCampaign final {
         if(action!=UiAction::None&&audio_confirm_)audio_confirm_();
         if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
         else if(action==UiAction::Speed)cycle_speed();
+        else if(action==UiAction::Menu)toggle_menu();
         else activate_menu_action(action,width,height);
         if(colony_roster_.visible()||economy_workspace_.visible()||supply_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible())captured=true;
         gesture_.begin(captured);continue;
