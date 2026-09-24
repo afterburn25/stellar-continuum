@@ -43,7 +43,8 @@ enum class UiAction {
   Economy,
   Colonies,
   Explore,
-  Menu
+  Menu,
+  Missions
 };
 
 struct NativeUiLayout {
@@ -81,6 +82,9 @@ struct NativeUiLayout {
   UiRect menu;
   UiRect zoom_text;
   UiRect navigation_bar,brand;
+  // Rail utility slot below Explore — assigned via secondary(5), not the
+  // positional initializer, so it must trail every listed member.
+  UiRect missions;
 
   // Accessibility user multiplier (interface-scale preference). Main-thread
   // presentation only — applied on top of the viewport-derived scale.
@@ -186,6 +190,7 @@ struct NativeUiLayout {
     result.menu={screen_width-52.f*scale,49.f*scale,34.f*scale,34.f*scale};
     const auto secondary=[&](int i){return UiRect{inset,120.f*scale+i*(rail_size+rail_gap),rail_size,rail_size};};
     result.inspect=secondary(0);result.zoom_in=secondary(1);result.zoom_out=secondary(2);result.construction=secondary(3);result.explore=secondary(4);
+    result.missions=secondary(5);
     result.zoom_text={80.f*scale,110.f*scale,210.f*scale,20.f*scale};
     return result;
   }
@@ -217,6 +222,7 @@ struct NativeUiLayout {
     if (economy.contains(point)) return UiAction::Economy;
     if (colonies.contains(point)) return UiAction::Colonies;
     if (explore.contains(point)) return UiAction::Explore;
+    if (missions.contains(point)) return UiAction::Missions;
     if (menu.contains(point)) return UiAction::Menu;
     return UiAction::None;
   }
@@ -224,7 +230,7 @@ struct NativeUiLayout {
   // Always-on chrome in keyboard focus order — top strip left-to-right, then
   // the navigation bar, then the left rail. `notifications` is only clickable
   // when the feed is available; callers drop it from the ring in that case.
-  [[nodiscard]] std::array<std::pair<UiRect, UiAction>, 17> hud_actions()
+  [[nodiscard]] std::array<std::pair<UiRect, UiAction>, 18> hud_actions()
       const noexcept {
     return {{{notifications, UiAction::Notifications},
              {pause, UiAction::Pause},
@@ -242,7 +248,8 @@ struct NativeUiLayout {
              {zoom_in, UiAction::ZoomIn},
              {zoom_out, UiAction::ZoomOut},
              {construction, UiAction::Construction},
-             {explore, UiAction::Explore}}};
+             {explore, UiAction::Explore},
+             {missions, UiAction::Missions}}};
   }
 };
 

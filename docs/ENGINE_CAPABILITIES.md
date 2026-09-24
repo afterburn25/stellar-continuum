@@ -62,6 +62,37 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Native missions panel integration (2026-09-24)
+
+- **Purpose:** wire the previously tested-but-uninstantiated
+  `NativeMissionView` (missions/settlement board over authoritative
+  campaign state) into the native client behind a rail affordance.
+- **Modules:** `app/native_client/native_ui_layout.hpp` (new
+  `UiAction::Missions` + rail rect via `secondary(5)`, hit test and
+  `hud_actions()` ring entry), `app/native_client/main.cpp`
+  (routing/event/render/refresh + command dispatch),
+  `app/native_client/native_missions.*` (view — unchanged),
+  `data/locale/{en,de}.json` (`NAV_MISSIONS`).
+- **Public interfaces:** the MISSIONS rail button toggles the panel
+  through the same `route_navigation` dispatch as the other workspaces
+  (mutually exclusive, closes on Map/Home/system entry/menu). The view's
+  commands route to authoritative paths: FocusFleet →
+  `fleet_controller_.select` + camera center, OpenColony → the existing
+  overview entry (`enter_system` + body select), LandColony → planetary
+  surface entry via `open_colony_from_system`, CollectOutpostFreight →
+  surface entry plus the outpost freight preview through
+  `outpost_freight_controller_.preview` (pause + UI gesture capture).
+- **Data feed:** `refresh_missions` rebuilds the mission board, active
+  settlement fleet views and owned-colony rows each frame the panel is
+  open, gated on the session cache generation.
+- **Tests:** `native_missions` (view behavior — pre-existing),
+  `native_ui_layout` (18-item HUD ring incl. the new rect's hit-test
+  round-trip and (y,x) ordering), `localization`.
+- **Limitations:** the panel is pointer-driven (no keyboard focus ring —
+  Escape closes it); the rail affordance renders a text glyph because no
+  missions navigation art asset exists; panel strings are literals —
+  `native_missions` is not a `LocalizationTable` consumer.
+
 ## Galaxy map framework + engine-shell Galaxy tool (2026-09-24)
 
 - **Purpose:** the pending engine-level galaxy model for space-strategy

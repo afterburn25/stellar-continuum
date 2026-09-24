@@ -2926,6 +2926,19 @@ class NativeCampaign final {
     click(layout.diplomacy);
     verify_only(diplomacy_workspace_.visible(),"Relations");
     blocked_keys();
+    // Missions rail affordance: opens exclusively over the workspace class,
+    // re-click toggles closed, and Escape releases the panel without
+    // reaching the pause menu.
+    click(layout.missions);
+    if(!mission_view_.visible()||diplomacy_workspace_.visible())
+      throw std::runtime_error("Missions rail button did not open exclusively.");
+    click(layout.missions);
+    if(mission_view_.visible())
+      throw std::runtime_error("Missions rail button did not close the board.");
+    click(layout.missions);
+    send({InputEventType::EscapePressed});
+    if(mission_view_.visible()||menu_)
+      throw std::runtime_error("Escape did not close the missions board before the menu.");
     const auto& after=session_->frame().runtime().world().campaign();
     const auto after_economy=std::ranges::find(after.economies,
         after.player_civilization_id,&CivilizationEconomy::civilization_id);
@@ -5850,13 +5863,14 @@ class NativeCampaign final {
     refresh_inspection();
     refresh_economy(false,false);
     refresh_roster(false);
+    refresh_missions(false);
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
       const auto close_navigation_workspaces=[&]{
         research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
         diplomacy_workspace_.close();colony_roster_.close();economy_workspace_.close();
         supply_workspace_.close();system_workspace_.close();colony_workspace_.close();
-        notification_view_.close();chronicle_view_.close();
+        notification_view_.close();chronicle_view_.close();mission_view_.close();
       };
       if(action==UiAction::Map){
         close_navigation_workspaces();selected_id_.reset();refresh_inspection();return;
@@ -5898,6 +5912,7 @@ class NativeCampaign final {
       if(action!=UiAction::Supply)supply_workspace_.close();
       if(action!=UiAction::Colonies)colony_roster_.close();
       if(action!=UiAction::Economy)economy_workspace_.close();
+      if(action!=UiAction::Missions)mission_view_.close();
       fleet_workspace_.cancel_recovery();
       notification_view_.close();chronicle_view_.close();
       system_workspace_.close();
@@ -5924,6 +5939,9 @@ class NativeCampaign final {
       }else if(action==UiAction::Diplomacy){
         if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
         else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.open();refresh_diplomacy(true);}
+      }else if(action==UiAction::Missions){
+        if(mission_view_.visible())mission_view_.close();
+        else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();mission_view_.open();refresh_missions(true);}
       }
     };
     if(!input.focused||!input.renderable())menu_hover_feedback_.reset();
@@ -6370,13 +6388,13 @@ class NativeCampaign final {
       if(event.type==InputEventType::GamepadReleased){
         stellar::engine::RawInputEvent raw;
         raw.kind=stellar::engine::RawInputEvent::Kind::GamepadButton;
-        raw.code=event.gamepad_button;raw.pressed=false;
+        raw.code=event.gamepad_button;raw.device=event.gamepad_device;raw.pressed=false;
         (void)input_mapper_.feed(raw);continue;
       }
       if(event.type==InputEventType::GamepadAxis){
         stellar::engine::RawInputEvent raw;
         raw.kind=stellar::engine::RawInputEvent::Kind::GamepadAxis;
-        raw.code=event.gamepad_axis;raw.value=event.gamepad_axis_value;
+        raw.code=event.gamepad_axis;raw.device=event.gamepad_device;raw.value=event.gamepad_axis_value;
         (void)input_mapper_.feed(raw);continue;
       }
       if(event.type==InputEventType::RightReleased){
@@ -6404,7 +6422,7 @@ class NativeCampaign final {
         const char *record_name="mouse_button";
         if(event.type==InputEventType::GamepadPressed){
           raw.kind=stellar::engine::RawInputEvent::Kind::GamepadButton;
-          raw.code=event.gamepad_button;
+          raw.code=event.gamepad_button;raw.device=event.gamepad_device;
           record_name="gamepad_button";
         }else{
           raw.kind=stellar::engine::RawInputEvent::Kind::MouseButton;
@@ -6427,6 +6445,21 @@ class NativeCampaign final {
           continue;
         }
       }
+      // The missions board is a floating panel — it owns its pointer input
+      // and routes its commands to the authoritative paths (fleet focus,
+      // colony open, planetary surface entry, outpost freight review).
+      if(mission_view_.visible()&&!menu_){
+        if(event.type==InputEventType::EscapePressed||event.type==InputEventType::PointerCancelled){mission_view_.close();continue;}
+        const auto command=mission_view_.handle(event,mission_board_,mission_fleets_,mission_colonies_,width,height);
+        if(command.captured){
+          if(command.kind==native_missions::MissionViewCommandKind::Close)mission_view_.close();
+          else if(command.kind==native_missions::MissionViewCommandKind::FocusFleet)focus_mission_fleet(command.fleet_id);
+          else if(command.kind==native_missions::MissionViewCommandKind::OpenColony){mission_view_.close();open_overview_colony(command.colony_id,width,height);}
+          else if(command.kind==native_missions::MissionViewCommandKind::LandColony){mission_view_.close();open_mission_colony(command.colony_id,width,height,false);}
+          else if(command.kind==native_missions::MissionViewCommandKind::CollectOutpostFreight){mission_view_.close();open_mission_colony(command.colony_id,width,height,true);}
+          continue;
+        }
+      }
       const auto modal_blocks_navigation=!native_navigation_available(
           menu_,settlement_workspace_.visible(),diplomacy_workspace_.modal_open(),
           (colony_workspace_.planetary_modal()),
@@ -6436,7 +6469,7 @@ class NativeCampaign final {
         const auto navigation=action==UiAction::Map||action==UiAction::Home||action==UiAction::Inspect||action==UiAction::ZoomIn||action==UiAction::ZoomOut||action==UiAction::Explore||action==UiAction::Menu||action==UiAction::Research||
                               action==UiAction::Shipyard||
                               action==UiAction::Construction||
-                              action==UiAction::Diplomacy||action==UiAction::Supply||action==UiAction::Economy||action==UiAction::Colonies;
+                              action==UiAction::Diplomacy||action==UiAction::Supply||action==UiAction::Economy||action==UiAction::Colonies||action==UiAction::Missions;
         if(navigation){
           if(audio_confirm_)audio_confirm_();
           route_navigation(action);
@@ -7105,6 +7138,7 @@ class NativeCampaign final {
     colony_workspace_.render(out, width, height);
     settlement_workspace_.render(out,width,height);
     if(!menu_)colony_roster_.render(out,width,height);
+    if(!menu_)mission_view_.render(out,mission_board_,mission_fleets_,mission_colonies_,width,height);
     if(!menu_)supply_workspace_.render(out,supply_controller_.view(),width,height);
     if(!menu_)economy_workspace_.render(out,economy_controller_.view(),width,height);
     if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&
@@ -7186,6 +7220,8 @@ class NativeCampaign final {
       draw_navigation(layout.construction,UiAction::Construction,construction_workspace_.visible(),"Construction");
       draw_navigation(layout.shipyard,UiAction::Shipyard,shipyard_workspace_.visible(),"Shipyard");
       draw_navigation(layout.explore,UiAction::Explore,fleet_controller_.selection().has_value(),tr("NAV_EXPLORE","Explore"));
+      draw_navigation(layout.missions,UiAction::Missions,mission_view_.visible(),tr("NAV_MISSIONS","Missions"));
+      {const UiRect icon_rect{layout.missions.x+6.f*layout.scale,layout.missions.y+4.f*layout.scale,layout.missions.width-12.f*layout.scale,layout.missions.height-8.f*layout.scale};out.overlay.emplace_back(Text{{icon_rect.x+icon_rect.width*.5f,icon_rect.y+icon_rect.height*.5f-8.f*layout.scale},"M",{245,250,255,255},static_cast<int>(16.f*layout.scale),0,icon_rect,TextAlign::Center,FontFace::Heading});}
       draw_navigation(layout.colonies,UiAction::Colonies,colony_roster_.visible()||colony_workspace_.visible(),tr("NAV_PLANETS","Planets"));
       draw_navigation(layout.supply,UiAction::Supply,supply_workspace_.visible(),tr("NAV_LOGISTICS","Logistics"));
       draw_navigation(layout.diplomacy,UiAction::Diplomacy,diplomacy_workspace_.visible(),tr("NAV_DIPLOMACY","Diplomacy"));
@@ -7510,7 +7546,7 @@ class NativeCampaign final {
     auto built=system_controller_.build(session_->frame(),session_->cache().generation,system_id);
     if(!built.snapshot)return false;
     auto travel=system_travel_controller_.build(session_->frame(),session_->cache().generation,*built.snapshot);
-    colony_roster_.close();economy_workspace_.close();supply_workspace_.close();gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();colony_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();
+    colony_roster_.close();economy_workspace_.close();supply_workspace_.close();gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();colony_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();mission_view_.close();
     system_workspace_.open(std::move(*built.snapshot),width,height);selected_id_=system_id;
     system_background_.preload(system_id,starfield_quality(),starfield_density());
     {const auto& world=session_->frame().runtime().world().campaign();const auto star=std::ranges::find(world.systems,system_id,&StellarSystem::id);if(star!=world.systems.end()){DrawList preload;phenomena_.append_system(preload,system_id,star->position.x,star->position.y,width,height,1,phenomena_options(system_id));}}
@@ -7936,6 +7972,55 @@ class NativeCampaign final {
     return result;
   }
 
+  // Missions board feed: mission cards, active settlement fleets and the
+  // owned-colony rows are rebuilt when the campaign generation turns over
+  // while the panel is open.
+  void refresh_missions(bool force){
+    if(!mission_view_.visible()){mission_generation_.reset();return;}
+    const auto generation=session_->cache().generation;
+    if(!force&&mission_generation_==generation)return;
+    mission_generation_=generation;
+    auto&frame=session_->frame();
+    const auto&campaign=frame.runtime().world().campaign();
+    mission_board_=native_missions::build_mission_board(campaign);
+    mission_fleets_.clear();
+    for(auto&view:settlement_controller_.build(frame,generation))
+      if(has_active_settlement_target(view))mission_fleets_.push_back(std::move(view));
+    mission_colonies_=native_missions::build_owned_colony_rows(campaign);
+  }
+  // "Select ship on map": select the colony ship and center the galaxy map
+  // on it — the settle order itself is issued from the destination system.
+  void focus_mission_fleet(int fleet_id){
+    const auto outcome=fleet_controller_.select(session_->frame(),session_->cache().generation,fleet_id);
+    if(!outcome.accepted){publish_notification("Fleet",observer_safe_fleet_message(outcome.message,observed_system_names()));return;}
+    refresh_fleets(true);
+    if(fleet_workspace_.view()){
+      const auto fleet=std::ranges::find(fleet_workspace_.view()->own_fleets,fleet_id,&NativeOwnFleet::id);
+      if(fleet!=fleet_workspace_.view()->own_fleets.end()){
+        mission_view_.close();
+        camera_.center={fleet->position.x,fleet->position.y};
+        if(audio_confirm_)audio_confirm_();
+      }
+    }else mission_view_.close();
+  }
+  // Owned-colony card actions: enter the colony's planetary management
+  // screen (surface entry is the reference "Land"), optionally opening the
+  // freight review for a resource outpost (the reference "Collect").
+  void open_mission_colony(int colony_id,int width,int height,bool review_freight){
+    const auto&world=session_->frame().runtime().world().campaign();
+    const auto colony=std::ranges::find(world.colonies,colony_id,&Colony::id);
+    if(colony==world.colonies.end()||!colony->planetary_body_id)return;
+    if(!enter_system(colony->system_id,width,height)||
+       !system_workspace_.select_body(*colony->planetary_body_id))return;
+    open_colony_from_system(*colony->planetary_body_id);
+    if(!review_freight||!colony_workspace_.visible()||!colony_workspace_.view())return;
+    const auto&view=*colony_workspace_.view();
+    if(view.observer_only||view.foreign_settlement)return;
+    session_->frame().clock().set_speed(StrategicSpeed::Paused);
+    colony_workspace_.set_freight_preview(outpost_freight_controller_.preview(
+        session_->frame(),session_->cache().generation,view));
+    gesture_.capture_for_ui();
+  }
   // Reference UiOpenOwnedColony(colonyId, land:false): enter the owning
   // system's orbital view already focused on the colony world.
   void open_overview_colony(int colony_id,int width,int height){
@@ -8200,6 +8285,7 @@ class NativeCampaign final {
       case UiAction::ZoomOut:return tr("NAV_ZOOM_OUT","Zoom out");
       case UiAction::Construction:return tr("NAV_CONSTRUCTION","Construction");
       case UiAction::Explore:return tr("NAV_EXPLORE","Explore");
+      case UiAction::Missions:return tr("NAV_MISSIONS","Missions");
       default:return {};
     }
   }
@@ -8234,7 +8320,7 @@ class NativeCampaign final {
     if(!presentation_audio_||!presentation_audio_->voice_preferences().subtitles)return std::nullopt;
     return announcement_caption_;
   }
-  void toggle_menu(){menu_focus_=-1;settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();chronicle_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){menu_focus_=-1;settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();chronicle_view_.close();mission_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());
     if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));
     std::unordered_set<int> owned;
@@ -8542,6 +8628,11 @@ class NativeCampaign final {
   stellar::native_logistics::HomeLogisticsController supply_controller_;
   stellar::native_logistics::SupplyWorkspace supply_workspace_;
   stellar::native_colony_roster::RosterWorkspace colony_roster_;
+  native_missions::NativeMissionView mission_view_;
+  native_missions::NativeMissionBoard mission_board_;
+  std::vector<NativeSettlementMissionView> mission_fleets_;
+  std::vector<native_missions::NativeMissionColonyRow> mission_colonies_;
+  std::optional<std::uint64_t> mission_generation_;
   stellar::native_assets::Navigator assets_;
   NativeDeveloperSimulationPanel developer_panel_;
   stellar::app_diagnostics::CampaignDiagnosticMonitor developer_monitor_;

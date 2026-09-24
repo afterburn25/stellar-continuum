@@ -919,10 +919,19 @@ feeds `wants_keyboard_focus()`. `native_inspection` covers Tab focus,
 ring rendering, single-target cycling, pointer reset, and Return
 dismissal; the pre-existing "card does not swallow unmapped keys"
 assertion still passes (zero-key events stay uncaptured).
-Remaining unwired surface: `NativeMissionView` (missions/settlement
-panel) is a tested component never instantiated by the client — it
-has no dispatch context, so a focus ring would be speculative until
-it is integrated.
+`NativeMissionView` (missions/settlement panel) is now wired into the
+client behind a secondary-rail MISSIONS button (`UiAction::Missions`,
+rect via `secondary(5)`, localized `NAV_MISSIONS` label, HUD ring entry,
+text-glyph affordance — no nav art asset exists). `refresh_missions`
+rebuilds the board/settlement-fleets/colony-rows feed on generation
+change while open, and its commands route to real paths: FocusFleet →
+`fleet_controller_.select` + camera center, OpenColony → the overview
+entry, LandColony → planetary surface entry, CollectOutpostFreight →
+surface entry + freight preview (paused, gesture-captured). It is a
+non-modal floating panel: Escape/pointer-cancel close it, sibling
+navigation workspaces close mutually, `toggle_menu` and `enter_system`
+close it. The panel stays pointer-only — a keyboard focus ring over its
+tabs/pagers/cards remains open follow-up.
 Entities search (row-24 diagnostics tree usability): the ENTITIES
 inspector gained a pointer-focused search field in the census header
 band (navigator contract — StrokedRectangle chrome, cyan focus ring,

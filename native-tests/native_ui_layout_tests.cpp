@@ -163,7 +163,7 @@ void verify(int width, int height, float expected_scale) {
   // hud_actions() is the keyboard focus ring's source of truth — every item
   // must hit-test back to its own action and arrive in (y,x) order.
   const auto ring = layout.hud_actions();
-  require(ring.size() == 17, "HUD focus ring changed size.");
+  require(ring.size() == 18, "HUD focus ring changed size.");
   for (std::size_t index = 0; index < ring.size(); ++index) {
     const auto &[bounds, action] = ring[index];
     require(contains_rect(viewport, bounds),
