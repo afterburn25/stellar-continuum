@@ -1,6 +1,7 @@
 #include "stellar/engine/runtime_host.hpp"
 
 #include "stellar/engine/atomic_file_write.hpp"
+#include "stellar/engine/broadphase.hpp"
 #include "stellar/engine/mesh3d_loader.hpp"
 #include "stellar/engine/native_audio.hpp"
 #include "stellar/engine/native_geometry3d.hpp"
@@ -1740,16 +1741,33 @@ int RuntimeHost::run() {
         // not just world axes). The scan always runs — solid resolution
         // is needed even when no callbacks are registered.
         {
+          // Broad-phase: a uniform grid over the world AABBs emits
+          // candidate pairs in sorted order — O(n + cells) instead of the
+          // pairwise scan, deterministic, and no true overlap is missed.
+          Broadphase3D grid;
+          std::unordered_map<std::uint64_t, EntityBox3D> boxes;
+          std::unordered_map<std::uint64_t, EntityId> by_key;
+          float cell = 1.f;
+          boxes.reserve(impl.entities3d.size());
+          for (const auto e : impl.entities3d) {
+            if (!world.get<Transform3D>(e)) continue;
+            auto box = entity_box3d(e);
+            cell = std::max({cell, box.hx, box.hy, box.hz});
+            const auto key = e.value();
+            by_key.emplace(key, e);
+            boxes.emplace(key, std::move(box));
+          }
+          grid.reset(cell * 2.f);
+          for (const auto &[key, box] : boxes)
+            grid.insert(key,
+                        {box.cx - box.hx, box.cy - box.hy, box.cz - box.hz},
+                        {box.cx + box.hx, box.cy + box.hy, box.cz + box.hz});
           std::set<std::pair<std::uint64_t, std::uint64_t>> now;
           std::vector<std::pair<EntityId, EntityId>> entered;
-          for (std::size_t i = 0; i < impl.entities3d.size(); ++i) {
-            auto *ta = world.get<Transform3D>(impl.entities3d[i]);
-            if (!ta) continue;
-            const auto abox = entity_box3d(impl.entities3d[i]);
-            for (std::size_t j = i + 1; j < impl.entities3d.size(); ++j) {
-              const auto *tb = world.get<Transform3D>(impl.entities3d[j]);
-              if (!tb) continue;
-              const auto bbox = entity_box3d(impl.entities3d[j]);
+          for (const auto &[ka, kb] : grid.pairs()) {
+            const auto &abox = boxes.at(ka), &bbox = boxes.at(kb);
+            const auto ea = by_key.at(ka), eb = by_key.at(kb);
+            {
               // Broad-phase: world-AABB reject before the SAT scan.
               if (abox.hx + bbox.hx - std::abs(abox.cx - bbox.cx) <= 0.f ||
                   abox.hy + bbox.hy - std::abs(abox.cy - bbox.cy) <= 0.f ||
@@ -1760,22 +1778,17 @@ int RuntimeHost::run() {
               const auto mtv_ab =
                   obb_separation(abox.obb, bbox.obb);
               if (!mtv_ab) continue;
-              const auto a = impl.entities3d[i].value(),
-                         b = impl.entities3d[j].value();
+              const auto a = ka, b = kb;
               now.insert(std::minmax(a, b));
               if (!impl.overlapping3d.count(std::minmax(a, b)))
-                entered.emplace_back(impl.entities3d[i],
-                                     impl.entities3d[j]);
+                entered.emplace_back(ea, eb);
               // Solid blocker resolution: the non-solid entity is pushed
               // out along the MTV and loses inward velocity along it. A
               // dominantly-upward push counts as a landing surface.
-              const bool sa =
-                  world.get<Solid>(impl.entities3d[i]) != nullptr;
-              const bool sb =
-                  world.get<Solid>(impl.entities3d[j]) != nullptr;
+              const bool sa = world.get<Solid>(ea) != nullptr;
+              const bool sb = world.get<Solid>(eb) != nullptr;
               if (sa != sb) {
-                const auto mover = sa ? impl.entities3d[j]
-                                      : impl.entities3d[i];
+                const auto mover = sa ? eb : ea;
                 auto *tm = world.get<Transform3D>(mover);
                 auto *vm = world.get<Velocity3D>(mover);
                 // obb_separation(a,b) returns the vector that pushes b
@@ -1808,8 +1821,7 @@ int RuntimeHost::run() {
                   impl.grounded3d.insert(mover.value());
                   if (on_land &&
                       !impl.prev_grounded3d.count(mover.value()))
-                    on_land(mover, sa ? impl.entities3d[i]
-                                      : impl.entities3d[j]);
+                    on_land(mover, sa ? ea : eb);
                 }
               }
             }
@@ -1831,25 +1843,40 @@ int RuntimeHost::run() {
       // AABB contact events: collect overlaps during the scan, then fire
       // callbacks afterwards so handlers may spawn/destroy entities safely.
       if (on_collision || on_collision_exit) {
+        // Uniform-grid broad-phase: candidate pairs in sorted order —
+        // O(n + cells) instead of the pairwise scan, deterministic.
+        Broadphase2D grid;
+        std::unordered_map<std::uint64_t, EntityId> by_key;
+        float cell = 1.f;
+        by_key.reserve(impl.entities.size());
+        for (const auto e : impl.entities) {
+          const auto *ta = world.get<Transform2D>(e);
+          const auto *ea = world.get<Extent2D>(e);
+          if (!ta || !ea) continue;
+          cell = std::max({cell, ea->w, ea->h});
+          by_key.emplace(e.value(), e);
+        }
+        grid.reset(cell);
+        for (const auto &[key, e] : by_key) {
+          const auto *ta = world.get<Transform2D>(e);
+          const auto *ea = world.get<Extent2D>(e);
+          grid.insert(key, {ta->x, ta->y},
+                      {ta->x + ea->w, ta->y + ea->h});
+        }
         std::set<std::pair<std::uint64_t, std::uint64_t>> now;
         std::vector<std::pair<EntityId, EntityId>> entered;
-        for (std::size_t i = 0; i < impl.entities.size(); ++i) {
-          const auto *ta = world.get<Transform2D>(impl.entities[i]);
-          const auto *ea = world.get<Extent2D>(impl.entities[i]);
-          if (!ta || !ea) continue;
-          for (std::size_t j = i + 1; j < impl.entities.size(); ++j) {
-            const auto *tb = world.get<Transform2D>(impl.entities[j]);
-            const auto *eb = world.get<Extent2D>(impl.entities[j]);
-            if (!tb || !eb) continue;
-            if (ta->x < tb->x + eb->w && tb->x < ta->x + ea->w &&
-                ta->y < tb->y + eb->h && tb->y < ta->y + ea->h) {
-              const auto a = impl.entities[i].value();
-              const auto b = impl.entities[j].value();
-              const auto key = std::minmax(a, b);
-              now.insert(key);
-              if (!impl.overlapping.count(key))
-                entered.emplace_back(impl.entities[i], impl.entities[j]);
-            }
+        for (const auto &[ka, kb] : grid.pairs()) {
+          const auto ea_e = by_key.at(ka), eb_e = by_key.at(kb);
+          const auto *ta = world.get<Transform2D>(ea_e);
+          const auto *ea = world.get<Extent2D>(ea_e);
+          const auto *tb = world.get<Transform2D>(eb_e);
+          const auto *eb = world.get<Extent2D>(eb_e);
+          if (ta->x < tb->x + eb->w && tb->x < ta->x + ea->w &&
+              ta->y < tb->y + eb->h && tb->y < ta->y + ea->h) {
+            const auto key = std::minmax(ka, kb);
+            now.insert(key);
+            if (!impl.overlapping.count(key))
+              entered.emplace_back(ea_e, eb_e);
           }
         }
         if (on_collision_exit) {

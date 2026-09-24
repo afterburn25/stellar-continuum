@@ -1,10 +1,13 @@
+#include <stellar/engine/broadphase.hpp>
 #include <stellar/engine/render_graph.hpp>
 #include <stellar/engine/shader_library.hpp>
 #include <stellar/engine/texture_streaming.hpp>
 #include <stellar/engine/vfx.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -241,6 +244,47 @@ int main() {
         "unlimited system was incorrectly budget-scaled");
   check(vfx_unlimited.stats().budget_scale == 1.0f,
         "unlimited system reported budget pressure");
+
+  // Broadphase: candidates are a sorted, deduplicated superset of the
+  // true AABB overlaps — never a miss, false positives allowed.
+  {
+    Broadphase2D grid;
+    struct Box { float x, y, w, h; };
+    const std::vector<Box> boxes{
+        {0, 0, 10, 10},   {5, 5, 10, 10}, {50, 50, 4, 4},
+        {52, 52, 4, 4},   {-40, -40, 6, 6}, {1000, 0, 2, 2}};
+    grid.reset(8.f);
+    for (std::size_t i = 0; i < boxes.size(); ++i)
+      grid.insert(i, {boxes[i].x, boxes[i].y},
+                  {boxes[i].x + boxes[i].w, boxes[i].y + boxes[i].h});
+    const auto candidates = grid.pairs();
+    check(std::is_sorted(candidates.begin(), candidates.end()) &&
+              std::adjacent_find(candidates.begin(), candidates.end()) ==
+                  candidates.end(),
+          "broadphase pairs unsorted or duplicated");
+    std::set<std::pair<std::uint64_t, std::uint64_t>> candidate_set(
+        candidates.begin(), candidates.end());
+    for (std::size_t i = 0; i < boxes.size(); ++i)
+      for (std::size_t j = i + 1; j < boxes.size(); ++j) {
+        const auto &ba = boxes[i], &bb = boxes[j];
+        const bool overlap = ba.x < bb.x + bb.w && bb.x < ba.x + ba.w &&
+                             ba.y < bb.y + bb.h && bb.y < ba.y + ba.h;
+        check(!overlap || candidate_set.count({i, j}) == 1,
+              "broadphase missed a true AABB overlap");
+      }
+    check(candidate_set.count({0, 1}) == 1 &&
+              candidate_set.count({2, 3}) == 1,
+          "expected overlapping pairs absent from candidates");
+    Broadphase3D grid3;
+    grid3.reset(4.f);
+    grid3.insert(7, {0, 0, 0}, {2, 2, 2});
+    grid3.insert(9, {1, 1, 1}, {3, 3, 3});
+    grid3.insert(11, {50, 50, 50}, {51, 51, 51});
+    const auto pairs3 = grid3.pairs();
+    check(pairs3.size() == 1 && pairs3.front() ==
+                                     std::pair<std::uint64_t, std::uint64_t>{7, 9},
+          "3D broadphase emitted wrong candidate set");
+  }
 
   if (failures == 0)
     std::cout << "Render graph, streaming, shader and VFX tests passed\n";
