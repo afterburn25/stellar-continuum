@@ -69,8 +69,8 @@ std::string NativeSettlementWorkspace::trf(
 }
 
 void NativeSettlementWorkspace::reset_gesture() noexcept { pointer_owned_=false; pressed_=PressTarget::None; press_width_=press_height_=0; }
-void NativeSettlementWorkspace::set_preview(NativeSettlementTargetPreview value){reset_gesture();preview_=std::move(value);}
-void NativeSettlementWorkspace::clear()noexcept{preview_.reset();pointer_={};reset_gesture();}
+void NativeSettlementWorkspace::set_preview(NativeSettlementTargetPreview value){reset_gesture();focus_=-1;preview_=std::move(value);}
+void NativeSettlementWorkspace::clear()noexcept{preview_.reset();pointer_={};focus_=-1;reset_gesture();}
 
 SettlementWorkspaceCommand NativeSettlementWorkspace::handle(const InputEvent&event,int width,int height){
   if(!preview_)return {};
@@ -79,8 +79,30 @@ SettlementWorkspaceCommand NativeSettlementWorkspace::handle(const InputEvent&ev
   const auto layout=SettlementWorkspaceLayout::for_viewport(width,height);
   if(event.type==InputEventType::PointerCancelled){reset_gesture();return {SettlementWorkspaceCommandKind::None,true};}
   if(pointer_owned_&&(width!=press_width_||height!=press_height_)){reset_gesture();}
+  if(event.type==InputEventType::KeyPressed&&event.key){
+    // SDL_Keycode: Tab/arrows move the ring, Return/Space replay the click
+    // gesture. Confirm is unreachable while the preview rejects the target.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const int count=preview_->accepted?2:1;
+    const bool fwd=(event.key==kTab&&!event.shift)||event.key==kRight||event.key==kDown;
+    const bool bwd=(event.key==kTab&&event.shift)||event.key==kLeft||event.key==kUp;
+    if(event.key==kHome||event.key==kEnd)focus_=event.key==kHome?0:count-1;
+    else if(fwd||bwd)focus_=focus_<0?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;
+    else if((event.key==kReturn||event.key==kSpace)&&focus_>=0){
+      const auto&rect=focus_==0?layout.cancel:layout.confirm;
+      InputEvent press{InputEventType::LeftPressed},release{InputEventType::LeftReleased};
+      press.position=release.position={rect.x+rect.width*.5f,rect.y+rect.height*.5f};
+      const int keep=focus_;static_cast<void>(handle(press,width,height));
+      auto command=handle(release,width,height);
+      if(preview_)focus_=keep;return command;
+    }
+    return {SettlementWorkspaceCommandKind::None,true};
+  }
   if(event.type==InputEventType::LeftPressed){
     if(!layout.panel.contains(event.position))return {SettlementWorkspaceCommandKind::None,true};
+    focus_=-1;
     pointer_owned_=true;press_width_=width;press_height_=height;
     pressed_=layout.cancel.contains(event.position)?PressTarget::Cancel:
              (layout.confirm.contains(event.position)&&preview_->accepted?PressTarget::Confirm:PressTarget::None);
@@ -133,5 +155,6 @@ void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
   label(out,{x,y,content_w,55.f*layout.scale},p.message,p.accepted?good:bad,layout.small_font);
   stellar::engine::ui_skin::control(out,layout.cancel,layout.cancel.contains(pointer_),false,true,layout.scale);label(out,layout.cancel,tr("SETTLE_CANCEL","CANCEL"),text_color,layout.body_font,TextAlign::Center);
   const auto can_confirm=p.accepted;stellar::engine::ui_skin::control(out,layout.confirm,layout.confirm.contains(pointer_),true,can_confirm,layout.scale);label(out,layout.confirm,tr("SETTLE_CONFIRM","CONFIRM MISSION"),can_confirm?text_color:muted,layout.body_font,TextAlign::Center);
+  if(focus_>=0)stroke(out,focus_==0?layout.cancel:layout.confirm,{160,210,255,255});
 }
 } // namespace stellar::native_colony_ui

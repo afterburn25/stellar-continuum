@@ -36,6 +36,7 @@ public:
     locale_ = table;
   }
   [[nodiscard]] bool visible() const noexcept { return preview_.has_value(); }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeSettlementTargetPreview>& preview() const noexcept { return preview_; }
   [[nodiscard]] SettlementWorkspaceCommand handle(
       const stellar::native_map::InputEvent&, int width, int height);
@@ -53,7 +54,7 @@ private:
   stellar::native_map::Point pointer_{};
   bool pointer_owned_{};
   PressTarget pressed_{PressTarget::None};
-  int press_width_{}, press_height_{};
+  int press_width_{}, press_height_{}, focus_{-1};
 };
 
 } // namespace stellar::native_colony_ui
