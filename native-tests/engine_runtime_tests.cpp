@@ -740,6 +740,49 @@ int main() {
     }
   }
 
+  // --input-map stacks a project context over the built-in "game" one:
+  // an exclusive rebind of move_right to 'e' disables the default 'd'.
+  {
+    const auto sub = root / "input-map";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[{"name":"player","x":100,"y":200}]})";
+      std::ofstream map(sub / "input-map.json");
+      map << R"({"contexts":[{"name":"custom","exclusive":true,
+                  "actions":[{"name":"move_right","type":"Button",
+                    "bindings":[{"kind":"KeyPress","code":101}]}]}]})";
+    }
+    ReplayRecorder journal;
+    journal.record(1, "input", "8,100,0,0,0,0,0,0,0,0,0,0,0,0,0,");  // 'd'
+    journal.record(3, "input", "8,101,0,0,0,0,0,0,0,0,0,0,0,0,0,");  // 'e'
+    const auto journal_path = sub / "input_journal.json";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 6;
+    opts.input_map = "input-map.json";
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    std::vector<float> xs;
+    host.on_update = [&](World &world, float) {
+      const auto player = host.player();
+      if (player)
+        if (const auto *t = world.get<Transform2D>(*player))
+          xs.push_back(t->x);
+    };
+    check(host.run() == 0, "input-map replay exits cleanly");
+    check(xs.size() == 6, "the player resolves every frame");
+    if (xs.size() == 6) {
+      check(xs[2] == 100.f,
+            "the exclusive context shadows the default 'd' binding");
+      check(xs[5] > 100.f,
+            "the project binding 'e' drives move_right");
+    }
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
