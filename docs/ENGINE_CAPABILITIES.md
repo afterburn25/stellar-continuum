@@ -85,11 +85,21 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Data feed:** `refresh_missions` rebuilds the mission board, active
   settlement fleet views and owned-colony rows each frame the panel is
   open, gated on the session cache generation.
-- **Tests:** `native_missions` (view behavior — pre-existing),
-  `native_ui_layout` (18-item HUD ring incl. the new rect's hit-test
-  round-trip and (y,x) ordering), `localization`.
-- **Limitations:** the panel is pointer-driven (no keyboard focus ring —
-  Escape closes it); the rail affordance renders a text glyph because no
+- **Keyboard contract:** the panel rings its actionable controls in
+  (y,x) order (close, tabs, enabled site pagers, select-ship, colony
+  View/Land/Collect — display-only mission cards and disabled controls
+  stay out); Return/Space replay the matched press/release dispatch so
+  the emitted commands are identical to pointer clicks, Escape releases
+  a live ring before the host closes the panel, `map_hud_visible()`
+  excludes it so the map focus groups cannot preempt its keys, and
+  `focused_label`/`focused_bounds` feed `announce_focus` as Button
+  announcements.
+- **Tests:** `native_missions` (view behavior + ring order/activation/
+  release/reset), `native_ui_layout` (18-item HUD ring incl. the new
+  rect's hit-test round-trip and (y,x) ordering), `localization`, and
+  the `--navigation-smoke` end-to-end pass (exclusive open, rail toggle,
+  ring arming, Escape layering).
+- **Limitations:** the rail affordance renders a text glyph because no
   missions navigation art asset exists; panel strings are literals —
   `native_missions` is not a `LocalizationTable` consumer.
 

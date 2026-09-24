@@ -563,6 +563,131 @@ int main() {
     panel.render(out, board, fleets, colonies, 1600, 900);
     check(!out.overlay.empty(), "the sites tab must render");
   }
+  {
+    // Keyboard focus ring: nav keys arm and walk the actionable controls in
+    // (y,x) order, activation replays the pointer dispatch, Escape releases
+    // the ring before the host closes, and a pointer press clears it.
+    auto campaign = campaign_fixture();
+    const auto board = build_mission_board(campaign);
+    NativeMissionView panel;
+    panel.open();
+    const auto key = [&](std::uint32_t value) {
+      native_map::InputEvent event{native_map::InputEventType::KeyPressed};
+      event.key = value;
+      return panel.handle(event, board, {}, {}, 1600, 900);
+    };
+    check(panel.focus() < 0 &&
+              panel.focused_label(board, {}, {}, 1600, 900).empty() &&
+              !panel.focused_bounds(board, {}, {}, 1600, 900),
+          "an unfocused panel must report no focus");
+    // (y,x) order in missions mode: Close (header band) → Missions →
+    // Colony sites.
+    check(key(9).captured && panel.focus() == 0,
+          "Tab must arm the ring on the first control");
+    check(panel.focused_label(board, {}, {}, 1600, 900) == "Close" &&
+              panel.focused_bounds(board, {}, {}, 1600, 900).has_value(),
+          "the ringed close control must carry an honest label and bounds");
+    const auto close_command = key(13);
+    check(close_command.kind == MissionViewCommandKind::Close &&
+              close_command.captured,
+          "Return on the ringed close control must replay its dispatch");
+    check(panel.focus() == 0, "activation must retain the ring position");
+    check(key(9).captured &&
+              panel.focused_label(board, {}, {}, 1600, 900) == "Missions",
+          "Tab must advance to the missions tab");
+    check(key(9).captured &&
+              panel.focused_label(board, {}, {}, 1600, 900) ==
+                  "Colony sites",
+          "Tab must advance to the sites tab");
+    (void)key(13); // Activate the sites tab — no fleets/colonies ring below.
+    native_map::InputEvent escape{native_map::InputEventType::EscapePressed};
+    const auto release = panel.handle(escape, board, {}, {}, 1600, 900);
+    check(release.captured && panel.focus() < 0,
+          "Escape must release the ring while the panel stays open");
+    check(!panel.handle(escape, board, {}, {}, 1600, 900).captured,
+          "Escape without a ring must fall through for the host to close");
+    // Rearm, then a pointer press inside the panel clears the ring.
+    (void)key(9);
+    native_map::InputEvent press{native_map::InputEventType::LeftPressed};
+    press.position = {1400.f, 500.f};
+    (void)panel.handle(press, board, {}, {}, 1600, 900);
+    check(panel.focus() < 0, "a pointer press must release the ring");
+    panel.close();
+    check(panel.focus() < 0 &&
+              panel.focused_label(board, {}, {}, 1600, 900).empty(),
+          "closing the panel must retire the ring");
+  }
+  {
+    // Sites-mode ring: the select-ship and colony row buttons join the ring
+    // and emit their real commands through keyboard activation.
+    auto campaign = campaign_fixture();
+    const auto board = build_mission_board(campaign);
+    native_colony::NativeSettlementMissionView view;
+    view.fleet_id = 21;
+    view.fleet_name = "CSV Horizon";
+    view.can_receive_orders = true;
+    native_colony::NativeSettlementCandidate site;
+    site.system_id = 2;
+    site.body_id = 7;
+    site.can_order = true;
+    view.candidates = {site};
+    const std::vector<native_colony::NativeSettlementMissionView> fleets{
+        view};
+    Colony own;
+    own.id = 30;
+    own.civilization_id = 1;
+    own.system_id = 1;
+    own.name = "Landing";
+    campaign.colonies = {own};
+    const auto colonies = build_owned_colony_rows(campaign);
+
+    NativeMissionView panel;
+    panel.open();
+    const auto key = [&](std::uint32_t value) {
+      native_map::InputEvent event{native_map::InputEventType::KeyPressed};
+      event.key = value;
+      return panel.handle(event, board, fleets, colonies, 1600, 900);
+    };
+    // Arm the ring and activate the Colony sites tab (index 2).
+    (void)key(9);
+    (void)key(9);
+    (void)key(9);
+    check(panel.focus() == 2 &&
+              panel.focused_label(board, fleets, colonies, 1600, 900) ==
+                  "Colony sites",
+          "the ring must reach the sites tab");
+    (void)key(13);
+    // Sites-mode ring: Close, Missions, Colony sites, Select ship on map,
+    // View Landing — the single fleet/site pagers stay out of the ring.
+    const auto first = key(9);
+    check(first.captured,
+          "nav keys must stay captured on the sites tab");
+    // End jumps to the last focusable — the colony View button.
+    const auto jump = key(0x4000004du);
+    check(jump.captured &&
+              panel.focused_label(board, fleets, colonies, 1600, 900) ==
+                  "View Landing",
+          "End must ring the colony's View button");
+    const auto open_command = key(13);
+    check(open_command.kind == MissionViewCommandKind::OpenColony &&
+              open_command.colony_id == 30,
+          "Return on a colony View button must issue OpenColony");
+    // Shift+Tab back to Select ship on map, activate → FocusFleet.
+    native_map::InputEvent back{native_map::InputEventType::KeyPressed};
+    back.key = 9;
+    back.shift = true;
+    (void)panel.handle(back, board, fleets, colonies, 1600, 900);
+    check(panel.focused_label(board, fleets, colonies, 1600, 900) ==
+              "Select ship on map",
+          "Shift+Tab must ring the select-ship control");
+    const auto focus_command = key(13);
+    check(focus_command.kind == MissionViewCommandKind::FocusFleet &&
+              focus_command.fleet_id == 21,
+          "Return on select-ship must issue FocusFleet");
+    // An unbound key still falls through to global shortcuts.
+    check(!key(120).captured,
+          "unhandled keys must not be captured by the ring");
+  }
   if (failures > 0) {
     std::cerr << failures << " mission panel checks failed\n";
     return 1;

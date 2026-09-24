@@ -932,8 +932,17 @@ entry, LandColony → planetary surface entry, CollectOutpostFreight →
 surface entry + freight preview (paused, gesture-captured). It is a
 non-modal floating panel: Escape/pointer-cancel close it, sibling
 navigation workspaces close mutually, `toggle_menu` and `enter_system`
-close it. The panel stays pointer-only — a keyboard focus ring over its
-tabs/pagers/cards remains open follow-up.
+close it. The panel adopts the keyboard focus contract — Tab/arrows ring
+the actionable controls in (y,x) order (close, tabs, enabled site
+pagers, select-ship, colony View/Land/Collect), Return/Space replay the
+matched press/release dispatch so FocusFleet/OpenColony/LandColony/
+CollectOutpostFreight emit unchanged, Escape releases the ring before
+the host closes the panel, and `map_hud_visible()` excludes it so the
+map focus groups cannot preempt its keys. `focused_label`/
+`focused_bounds` feed `announce_focus` with Button control kind;
+`native_missions` pins the ring order, activation dispatch, Escape
+layering and pointer reset, and the navigation smoke exercises the
+affordance, ring arming and Escape layering end-to-end.
 Entities search (row-24 diagnostics tree usability): the ENTITIES
 inspector gained a pointer-focused search field in the census header
 band (navigator contract — StrokedRectangle chrome, cyan focus ring,

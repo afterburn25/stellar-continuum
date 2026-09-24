@@ -107,14 +107,39 @@ struct MissionViewCommand {
   int fleet_id{-1}, colony_id{-1};
 };
 
+// A focusable control inside the panel — actionable buttons only (disabled
+// pagers and display-only mission cards never join the ring), (y,x) ordered.
+struct MissionFocusTarget {
+  native_map::UiRect bounds;
+  std::string label;
+};
+
+[[nodiscard]] std::vector<MissionFocusTarget> mission_focus_targets(
+    const MissionLayout &layout, const NativeColonySiteSelection &selection,
+    bool show_sites, std::span<const NativeMissionColonyRow> colonies);
+
 // Toggleable MISSIONS & SETTLEMENT panel (reference ExplorationMissionPanel's
 // missions tab). Mission cards are display-only, matching the reference.
 class NativeMissionView final {
  public:
   [[nodiscard]] bool visible() const noexcept { return visible_; }
-  void open() noexcept { visible_ = true; }
-  void close() noexcept { visible_ = false; }
-  void toggle() noexcept { visible_ = !visible_; }
+  void open() noexcept { visible_ = true; focus_ = -1; }
+  void close() noexcept { visible_ = false; focus_ = -1; }
+  void toggle() noexcept { visible_ = !visible_; focus_ = -1; }
+
+  // Keyboard focus contract: -1 until a nav key arms the ring; the label and
+  // bounds of the ringed control feed the accessibility announcer.
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  [[nodiscard]] std::string focused_label(
+      const NativeMissionBoard &board,
+      std::span<const native_colony::NativeSettlementMissionView> fleets,
+      std::span<const NativeMissionColonyRow> colonies, int width,
+      int height) const;
+  [[nodiscard]] std::optional<native_map::UiRect> focused_bounds(
+      const NativeMissionBoard &board,
+      std::span<const native_colony::NativeSettlementMissionView> fleets,
+      std::span<const NativeMissionColonyRow> colonies, int width,
+      int height) const;
 
   [[nodiscard]] MissionViewCommand handle(
       const native_map::InputEvent &event, const NativeMissionBoard &board,
@@ -129,6 +154,7 @@ class NativeMissionView final {
  private:
   bool visible_{}, show_sites_{};
   int fleet_index_{}, site_index_{};
+  int focus_{-1};
 };
 
 }  // namespace stellar::native_missions

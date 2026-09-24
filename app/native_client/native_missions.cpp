@@ -777,6 +777,81 @@ MissionLayout mission_layout_for(const NativeMissionBoard &board,
   return layout;
 }
 
+std::vector<MissionFocusTarget> mission_focus_targets(
+    const MissionLayout &layout, const NativeColonySiteSelection &selection,
+    bool show_sites, std::span<const NativeMissionColonyRow> colonies) {
+  std::vector<MissionFocusTarget> targets;
+  targets.push_back({layout.missions_tab, "Missions"});
+  targets.push_back({layout.sites_tab, "Colony sites"});
+  targets.push_back({layout.close_button, "Close"});
+  if (!show_sites) {
+    std::ranges::sort(targets, [](const MissionFocusTarget &a,
+                                  const MissionFocusTarget &b) {
+      return a.bounds.y == b.bounds.y ? a.bounds.x < b.bounds.x
+                                      : a.bounds.y < b.bounds.y;
+    });
+    return targets;
+  }
+  if (selection.fleet_index > 0)
+    targets.push_back({layout.previous_fleet, "Previous ship"});
+  if (selection.fleet_index < selection.fleet_count - 1)
+    targets.push_back({layout.next_fleet, "Next ship"});
+  if (selection.site_index > 0)
+    targets.push_back({layout.previous_site, "Previous site"});
+  if (selection.site_index < selection.site_count - 1)
+    targets.push_back({layout.next_site, "Next site"});
+  if (selection.fleet_id)
+    targets.push_back({layout.select_ship, "Select ship on map"});
+  for (std::size_t i = 0;
+       i < layout.colony_rows.size() && i < colonies.size(); ++i) {
+    targets.push_back(
+        {layout.colony_view_buttons[i], "View " + colonies[i].name});
+    if (colonies[i].can_land)
+      targets.push_back(
+          {layout.colony_land_buttons[i], "Land " + colonies[i].name});
+    if (colonies[i].is_resource_outpost)
+      targets.push_back(
+          {layout.colony_collect_buttons[i], "Collect " + colonies[i].name});
+  }
+  std::ranges::sort(targets, [](const MissionFocusTarget &a,
+                                const MissionFocusTarget &b) {
+    return a.bounds.y == b.bounds.y ? a.bounds.x < b.bounds.x
+                                    : a.bounds.y < b.bounds.y;
+  });
+  return targets;
+}
+
+std::string NativeMissionView::focused_label(
+    const NativeMissionBoard &board,
+    std::span<const native_colony::NativeSettlementMissionView> fleets,
+    std::span<const NativeMissionColonyRow> colonies, int width,
+    int height) const {
+  if (!visible_ || focus_ < 0) return {};
+  const auto selection = colony_site_selection(fleets, fleet_index_, site_index_);
+  const auto layout = mission_layout_for(board, selection, colonies.size(),
+                                         width, height, show_sites_);
+  const auto targets = mission_focus_targets(layout, selection, show_sites_, colonies);
+  return focus_ < static_cast<int>(targets.size())
+             ? targets[static_cast<std::size_t>(focus_)].label
+             : std::string{};
+}
+
+std::optional<native_map::UiRect> NativeMissionView::focused_bounds(
+    const NativeMissionBoard &board,
+    std::span<const native_colony::NativeSettlementMissionView> fleets,
+    std::span<const NativeMissionColonyRow> colonies, int width,
+    int height) const {
+  if (!visible_ || focus_ < 0) return std::nullopt;
+  const auto selection = colony_site_selection(fleets, fleet_index_, site_index_);
+  const auto layout = mission_layout_for(board, selection, colonies.size(),
+                                         width, height, show_sites_);
+  const auto targets = mission_focus_targets(layout, selection, show_sites_, colonies);
+  return focus_ < static_cast<int>(targets.size())
+             ? std::optional<native_map::UiRect>{
+                   targets[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
+
 MissionViewCommand NativeMissionView::handle(
     const native_map::InputEvent &event, const NativeMissionBoard &board,
     std::span<const native_colony::NativeSettlementMissionView> fleets,
@@ -789,6 +864,66 @@ MissionViewCommand NativeMissionView::handle(
   const auto layout =
       mission_layout_for(board, selection, colonies.size(), width, height,
                          show_sites_);
+  // Keyboard focus contract: Tab/arrows walk the actionable controls in
+  // (y,x) order, Home/End jump to the ends, Return/Space activate through
+  // the same press/release dispatch a pointer click takes. Escape releases
+  // a live ring (the host closes the panel on a second press); pointer
+  // presses and cancels reset the ring.
+  if (event.type == native_map::InputEventType::PointerCancelled) {
+    focus_ = -1;
+    command.captured = true;
+    return command;
+  }
+  if (event.type == native_map::InputEventType::EscapePressed) {
+    if (focus_ >= 0) {
+      focus_ = -1;
+      command.captured = true;
+    }
+    return command;
+  }
+  if (event.type == native_map::InputEventType::KeyPressed && event.key) {
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const auto targets =
+        mission_focus_targets(layout, selection, show_sites_, colonies);
+    const int count = static_cast<int>(targets.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      command.captured = true;
+      return command;
+    }
+    if (count > 0 && (fwd || bwd)) {
+      focus_ = focus_ < 0 || focus_ >= count
+                   ? (bwd ? count - 1 : 0)
+                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      command.captured = true;
+      return command;
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto &rect = targets[static_cast<std::size_t>(focus_)].bounds;
+      native_map::InputEvent press{native_map::InputEventType::LeftPressed};
+      press.position = {rect.x + rect.width * .5f,
+                        rect.y + rect.height * .5f};
+      auto release = press;
+      release.type = native_map::InputEventType::LeftReleased;
+      const int keep = focus_;
+      (void)handle(press, board, fleets, colonies, width, height);
+      auto activated = handle(release, board, fleets, colonies, width, height);
+      if (visible_)
+        focus_ = keep;
+      activated.captured = true;
+      return activated;
+    }
+    // Unhandled keys keep falling through to global shortcuts.
+    return command;
+  }
   if (event.type == native_map::InputEventType::LeftReleased &&
       layout.close_button.contains(event.position)) {
     command.kind = MissionViewCommandKind::Close;
@@ -798,14 +933,18 @@ MissionViewCommand NativeMissionView::handle(
   if (event.type != native_map::InputEventType::LeftReleased ||
       !layout.panel.contains(event.position)) {
     // ContainPointerInput: pointer input inside the panel never reaches the
-    // map.
+    // map. A press also releases the keyboard ring.
     if ((event.type == native_map::InputEventType::LeftPressed ||
          event.type == native_map::InputEventType::RightPressed ||
          event.type == native_map::InputEventType::RightReleased ||
          event.type == native_map::InputEventType::Wheel ||
          event.type == native_map::InputEventType::PointerMove) &&
-        layout.panel.contains(event.position))
+        layout.panel.contains(event.position)) {
+      if (event.type == native_map::InputEventType::LeftPressed ||
+          event.type == native_map::InputEventType::RightPressed)
+        focus_ = -1;
       command.captured = true;
+    }
     return command;
   }
   command.captured = true;
@@ -922,6 +1061,15 @@ void NativeMissionView::render(
   out.overlay.emplace_back(Text{{layout.sites_tab.x + 8.f * scale,
                                  layout.sites_tab.y + 5.f * scale},
                                 "Colony Sites", body, layout.body_font_pixels});
+  const auto draw_focus_ring = [&] {
+    if (focus_ < 0) return;
+    const auto targets =
+        mission_focus_targets(layout, selection, show_sites_, colonies);
+    if (focus_ < static_cast<int>(targets.size()))
+      out.overlay.emplace_back(
+          StrokedRectangle{targets[static_cast<std::size_t>(focus_)].bounds,
+                           {160, 210, 255, 255}});
+  };
 
   if (!show_sites_) {
     if (board.missions.empty()) {
@@ -932,6 +1080,7 @@ void NativeMissionView::render(
           {layout.empty_hint.x, layout.empty_hint.y + 18.f * scale},
           "Commission scout, science, or colony ships to begin.", muted,
           layout.small_font_pixels});
+      draw_focus_ring();
       return;
     }
     for (std::size_t i = 0;
@@ -957,6 +1106,7 @@ void NativeMissionView::render(
           Text{{rect.x + pad, line + 15.f * scale}, card.summary, muted,
                layout.small_font_pixels, rect.width - pad * 2.f});
     }
+    draw_focus_ring();
     return;
   }
 
@@ -1033,6 +1183,7 @@ void NativeMissionView::render(
       nav(layout.colony_collect_buttons[i], "Collect",
           row.can_request_freight);
   }
+  draw_focus_ring();
 }
 
 }  // namespace stellar::native_missions

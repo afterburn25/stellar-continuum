@@ -2944,6 +2944,20 @@ class NativeCampaign final {
     send({InputEventType::EscapePressed});
     if(mission_view_.visible()||menu_)
       throw std::runtime_error("Escape did not close the missions board before the menu.");
+    // Focus ring: Tab arms the first control, Escape releases the ring
+    // while the panel stays open, and a second Escape closes it.
+    click(layout.missions);
+    key(9);
+    if(mission_view_.focus()<0)
+      throw std::runtime_error("Tab did not arm the missions focus ring.");
+    if(!wants_keyboard_focus())
+      throw std::runtime_error("The armed missions ring did not claim keyboard focus.");
+    send({InputEventType::EscapePressed});
+    if(!mission_view_.visible()||mission_view_.focus()>=0)
+      throw std::runtime_error("Escape did not release the missions ring first.");
+    send({InputEventType::EscapePressed});
+    if(mission_view_.visible()||menu_)
+      throw std::runtime_error("Escape did not close the missions board after ring release.");
     const auto& after=session_->frame().runtime().world().campaign();
     const auto after_economy=std::ranges::find(after.economies,
         after.player_civilization_id,&CivilizationEconomy::civilization_id);
@@ -5762,6 +5776,7 @@ class NativeCampaign final {
            (chronicle_view_.visible()&&chronicle_view_.focus()>=0)||
            (notification_view_.visible()&&notification_view_.focus()>=0)||
            (colony_roster_.visible()&&colony_roster_.focus()>=0)||
+           (mission_view_.visible()&&mission_view_.focus()>=0)||
            (map_hud_visible()&&assets_.focus()>=0)||
            hud_focus_>=0||
            system_workspace_.small_body_keyboard_focus()||
@@ -6465,17 +6480,22 @@ class NativeCampaign final {
       // The missions board is a floating panel — it owns its pointer input
       // and routes its commands to the authoritative paths (fleet focus,
       // colony open, planetary surface entry, outpost freight review).
+      // Keyboard events reach the view first: a live focus ring consumes
+      // Escape to release itself; otherwise the panel closes.
       if(mission_view_.visible()&&!menu_){
-        if(event.type==InputEventType::EscapePressed||event.type==InputEventType::PointerCancelled){mission_view_.close();continue;}
+        const int focus_before=mission_view_.focus();
         const auto command=mission_view_.handle(event,mission_board_,mission_fleets_,mission_colonies_,width,height);
         if(command.captured){
+          if(mission_view_.focus()!=focus_before)
+            announcer_.announce_focus(mission_view_.focused_label(mission_board_,mission_fleets_,mission_colonies_,width,height),announcement_bounds(mission_view_.focused_bounds(mission_board_,mission_fleets_,mission_colonies_,width,height)),std::nullopt,stellar::engine::AnnouncementControl::Button);
           if(command.kind==native_missions::MissionViewCommandKind::Close)mission_view_.close();
           else if(command.kind==native_missions::MissionViewCommandKind::FocusFleet)focus_mission_fleet(command.fleet_id);
           else if(command.kind==native_missions::MissionViewCommandKind::OpenColony){mission_view_.close();open_overview_colony(command.colony_id,width,height);}
           else if(command.kind==native_missions::MissionViewCommandKind::LandColony){mission_view_.close();open_mission_colony(command.colony_id,width,height,false);}
           else if(command.kind==native_missions::MissionViewCommandKind::CollectOutpostFreight){mission_view_.close();open_mission_colony(command.colony_id,width,height,true);}
-          continue;
+          gesture_.cancel();continue;
         }
+        if(event.type==InputEventType::EscapePressed||event.type==InputEventType::PointerCancelled){mission_view_.close();continue;}
       }
       const auto modal_blocks_navigation=!native_navigation_available(
           menu_,settlement_workspace_.visible(),diplomacy_workspace_.modal_open(),
@@ -7160,7 +7180,7 @@ class NativeCampaign final {
     if(!menu_)economy_workspace_.render(out,economy_controller_.view(),width,height);
     if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&
        !construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&
-       !colony_workspace_.visible()&&!settlement_workspace_.visible())
+       !colony_workspace_.visible()&&!settlement_workspace_.visible()&&!mission_view_.visible())
       feedback_.render(out,width,height);
     const auto layout = NativeUiLayout::for_viewport(width, height);
     using stellar::native_ui_style::panel;
@@ -8388,7 +8408,7 @@ class NativeCampaign final {
         !research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
         !diplomacy_workspace_.visible()&&!colony_workspace_.visible()&&
         !notification_view_.visible()&&!chronicle_view_.visible()&&
-        !fleet_workspace_.preview();
+        !mission_view_.visible()&&!fleet_workspace_.preview();
   }
   void render_command_hud(DrawList& out,int width,int height){
     const auto l=CommandHudLayout::make(width,height);const float s=l.scale;
