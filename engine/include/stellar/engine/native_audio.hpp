@@ -120,9 +120,10 @@ class AudioOutput final {
   void stop_music();
   void play_effect(std::shared_ptr<const AudioClip> clip);
   // Positional variant: pan in [-1, 1] scales the stereo channels with
-  // an equal-power curve (0 = center). Games map a world/screen position
-  // onto pan; distance attenuation belongs to the caller's gain choice.
+  // an equal-power curve (0 = center); gain in [0, 1] attenuates the
+  // whole effect — games map world/screen distance onto it.
   void play_effect(std::shared_ptr<const AudioClip> clip, float pan);
+  void play_effect(std::shared_ptr<const AudioClip> clip, float pan, float gain);
   void play_voice(std::shared_ptr<const AudioClip> clip);
   void stop_voice();
   void set_volumes(float master, float music, float effects);

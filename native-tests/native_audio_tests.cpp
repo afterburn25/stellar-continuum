@@ -295,6 +295,15 @@ int main(int argc, char** argv) {
     output.play_effect(short_loop, -1.f);
     output.play_effect(short_loop, 1.f);
     check(output.diagnostics().effect_play_count == before_pan + 2, "panned effects did not occupy voices");
+    // Distance attenuation: gain is validated on the same contract and a
+    // gained play occupies a voice exactly like a full-volume one.
+    check(rejects([&] { output.play_effect(short_loop, 0.f, -0.5f); }), "negative gain was accepted");
+    check(rejects([&] { output.play_effect(short_loop, 0.f, 1.5f); }), "over-unity gain was accepted");
+    check(rejects([&] { output.play_effect(short_loop, 0.f, std::numeric_limits<float>::quiet_NaN()); }), "NaN gain was accepted");
+    const auto before_gain = output.diagnostics().effect_play_count;
+    output.play_effect(short_loop, 0.5f, 0.4f);
+    output.play_effect(short_loop, 0.f, 0.f);
+    check(output.diagnostics().effect_play_count == before_gain + 2, "gained effects did not occupy voices");
     std::atomic_bool wrong_thread_rejected{};
     std::thread wrong_thread([&] {
       try { (void)output.diagnostics(); } catch (const std::logic_error&) { wrong_thread_rejected = true; }

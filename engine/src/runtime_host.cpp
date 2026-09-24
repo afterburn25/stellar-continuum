@@ -1505,16 +1505,30 @@ int RuntimeHost::run() {
             }
         }
         if (bounced && impl.player && entity == *impl.player && bounce_clip) {
-          // Pan the impact cue by the entity's screen position — the
-          // first engine-side consumer of positional effects.
+          // Pan the impact cue by the entity's screen position and
+          // attenuate by normalized distance from the view center — the
+          // first engine-side consumers of positional effects.
           const float view = impl.view_w > 0 ? static_cast<float>(impl.view_w)
                                              : world_w * impl.cam_zoom;
+          const float view_h = impl.view_h > 0 ? static_cast<float>(impl.view_h)
+                                               : world_h * impl.cam_zoom;
           const float screen_x =
               (t->x + ext->w * .5f - impl.cam_x) * impl.cam_zoom;
+          const float screen_y =
+              (t->y + ext->h * .5f - impl.cam_y) * impl.cam_zoom;
           const float pan =
               view > 0.f ? std::clamp(screen_x / (view * .5f) - 1.f, -1.f, 1.f)
                          : 0.f;
-          audio.play_effect(bounce_clip, pan);
+          // Corner of the view reads as distance 1 — the bounce still
+          // plays at half gain so off-center impacts stay audible.
+          const float norm_x = view > 0.f ? screen_x / (view * .5f) - 1.f : 0.f;
+          const float norm_y = view_h > 0.f ? screen_y / (view_h * .5f) - 1.f : 0.f;
+          const float distance =
+              std::clamp(std::hypot(std::clamp(norm_x, -1.f, 1.f),
+                                    std::clamp(norm_y, -1.f, 1.f)) /
+                             1.4142135623730951f,
+                         0.f, 1.f);
+          audio.play_effect(bounce_clip, pan, 1.f - 0.5f * distance);
         }
       }
       // Lifetimes tick down in sim time; expired entities self-destruct
