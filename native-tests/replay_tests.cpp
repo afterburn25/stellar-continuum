@@ -26,7 +26,7 @@ using namespace stellar::engine;
 int main() {
   // Recorder/player round-trip preserves commands, checkpoints, labels.
   {
-    ReplayRecorder recorder{ReplayHeader{42, "build", "1.0"}};
+    ReplayRecorder recorder{ReplayHeader{42, "build", "1.0", 1600, 900}};
     recorder.record(10, "order", "{\"fleet\":7}");
     recorder.checkpoint(10, 1234, "save:World");
     const auto parsed = ReplayRecorder::parse(recorder.serialize());
@@ -34,8 +34,14 @@ int main() {
     check(parsed && parsed->commands().size() == 1 &&
               parsed->checkpoints().size() == 1 &&
               parsed->checkpoints()[0].label == "save:World" &&
-              parsed->header().seed == 42,
+              parsed->header().seed == 42 &&
+              parsed->header().window_width == 1600 &&
+              parsed->header().window_height == 900,
           "round-trip keeps labels and header");
+    check(ReplayRecorder::parse(
+              ReplayRecorder{ReplayHeader{42, "build", "1.0"}}.serialize())
+              ->header().window_width == 0,
+          "older recordings carry no window size");
     ReplayPlayer player{&*parsed};
     check(player.commands_for(10).size() == 1 &&
               player.expected_checkpoint(10).value_or(0) == 1234,

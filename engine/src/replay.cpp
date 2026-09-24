@@ -49,6 +49,10 @@ std::string ReplayRecorder::serialize() const {
   doc["seed"] = header_.seed;
   doc["build_id"] = header_.build_id;
   doc["game_version"] = header_.game_version;
+  if (header_.window_width != 0 || header_.window_height != 0) {
+    doc["window_width"] = header_.window_width;
+    doc["window_height"] = header_.window_height;
+  }
   doc["commands"] = nlohmann::json::array();
   for (const auto &command : commands_)
     doc["commands"].push_back({{"tick", command.tick},
@@ -80,7 +84,9 @@ std::optional<ReplayRecorder> ReplayRecorder::parse(std::string_view document,
   }
   ReplayRecorder recorder(ReplayHeader{
       doc.value("seed", std::uint64_t{}), doc.value("build_id", std::string{}),
-      doc.value("game_version", std::string{})});
+      doc.value("game_version", std::string{}),
+      doc.value("window_width", std::uint32_t{}),
+      doc.value("window_height", std::uint32_t{})});
   for (const auto &entry : doc.value("commands", nlohmann::json::array()))
     recorder.record(entry.value("tick", std::uint64_t{}),
                     entry.value("name", std::string{}),

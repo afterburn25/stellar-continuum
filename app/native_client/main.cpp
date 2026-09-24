@@ -543,6 +543,11 @@ struct Options {
   if(!result.record_path.empty()&&!result.replay_path.empty())throw std::invalid_argument("--record and --replay are mutually exclusive.");
   if(result.replay_until_tick&&result.replay_path.empty())throw std::invalid_argument("--replay-until requires --replay.");
   if(result.replay_exit&&result.replay_path.empty())throw std::invalid_argument("--replay-exit requires --replay.");
+  // Replay feeds commands only once a campaign session exists; without a
+  // session source the run lands on the interactive startup screen and the
+  // recorded stream can never consume — fail fast instead of idling.
+  if(!result.replay_path.empty()&&!result.load&&!result.smoke_screenshot)
+    throw std::invalid_argument("--replay requires --load or a smoke session; the interactive startup screen cannot host a deterministic replay.");
   if(!result.replay_info_path.empty()&&(!result.replay_path.empty()||!result.record_path.empty()))throw std::invalid_argument("--replay-info is a standalone inspection flag.");
   return result;
 }
@@ -733,6 +738,13 @@ struct ReplayState {
   std::uint64_t verification_last_tick{std::numeric_limits<std::uint64_t>::max()};
   std::size_t verification_last_command{}, verification_last_checkpoint{};
   std::uint32_t verification_stalled_frames{};
+  // pointer_button commands dequeue into real InputEvents merged into the
+  // next update's event stream (ahead of live events) so hit-testing and
+  // dispatch see exactly what the recorded session saw — not a synthetic
+  // binding. pointer_held bounds move journaling on the record side to
+  // drags, where accumulated motion decides drag-vs-click.
+  std::vector<InputEvent> injected_events;
+  std::uint32_t pointer_held{};
 };
 
 // Writes the recording on scope exit, including early returns and failures.
@@ -5998,16 +6010,46 @@ class NativeCampaign final {
       }
     };
     if(!input.focused||!input.renderable())menu_hover_feedback_.reset();
-    // Replay: feed recorded keypresses whose ticks have arrived through the
-    // same GALAXY context and dispatch path as live input. The same input
-    // gates apply — a suppressed tick replays when the gate opens.
-    if(replay_&&replay_->recording&&session_&&!menu_&&
-       !diplomacy_workspace_.visible()&&!wants_text_input()){
+    // Replay: feed recorded commands whose ticks have arrived through the
+    // same dispatch paths as live input. pointer_button commands dequeue
+    // into real InputEvents merged into the event stream below — pointer
+    // dispatch doesn't need the menu/text gate because the handlers gate on
+    // UI state exactly as they did during recording. Key/pad/binding
+    // commands resolve through GALAXY under the same input gates — a
+    // suppressed tick replays when the gate opens, and in-order replay
+    // holds later pointer commands behind a gated binding command.
+    if(replay_&&replay_->recording&&session_){
       const auto tick=replay_tick();
       const auto &commands=replay_->recording->commands();
+      const bool input_gate_open=
+          !menu_&&!diplomacy_workspace_.visible()&&!wants_text_input();
       while(replay_->command_cursor<commands.size()&&
             commands[replay_->command_cursor].tick<=tick){
-        const auto &command=commands[replay_->command_cursor++];
+        const auto &command=commands[replay_->command_cursor];
+        if(command.name=="pointer_button"){
+          ++replay_->command_cursor;
+          // "type,x,y[,dx,dy]" — replayed through the real event stream so
+          // hit-testing and dispatch see live-shaped input.
+          int type=0;float x=0.f,y=0.f,dx=0.f,dy=0.f;
+          const char *const begin=command.payload.data();
+          const char *const end=begin+command.payload.size();
+          const auto parsed_type=std::from_chars(begin,end,type);
+          if(parsed_type.ec!=std::errc{}||parsed_type.ptr>=end||*parsed_type.ptr!=',')continue;
+          const auto parsed_x=std::from_chars(parsed_type.ptr+1,end,x);
+          if(parsed_x.ec!=std::errc{}||parsed_x.ptr>=end||*parsed_x.ptr!=',')continue;
+          const auto parsed_y=std::from_chars(parsed_x.ptr+1,end,y);
+          if(parsed_y.ec!=std::errc{})continue;
+          if(parsed_y.ptr<end&&*parsed_y.ptr==','){
+            const auto parsed_dx=std::from_chars(parsed_y.ptr+1,end,dx);
+            if(parsed_dx.ec==std::errc{}&&parsed_dx.ptr<end&&*parsed_dx.ptr==',')
+              (void)std::from_chars(parsed_dx.ptr+1,end,dy);
+          }
+          replay_->injected_events.push_back(
+              InputEvent{static_cast<InputEventType>(type),{x,y},{dx,dy}});
+          continue;
+        }
+        if(!input_gate_open)break;
+        ++replay_->command_cursor;
         stellar::engine::RawInputEvent raw;
         if(command.name=="key_press")
           raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
@@ -6031,9 +6073,11 @@ class NativeCampaign final {
         else raw.pressed=false;
         (void)input_mapper_.feed(raw);
       }
-      // Completeness: once every recorded command is consumed, a recorded
-      // checkpoint whose tick has passed without the capture firing means the
-      // replay skipped a save the original session produced.
+      // Completeness and completion are cursor bookkeeping, not dispatch —
+      // they must run even while the input gate is closed: a pointer command
+      // consumed behind the gate (e.g. a menu click) can finish the stream
+      // with the gate held shut, and gating these checks would hang a
+      // scripted --replay-exit run with nothing left pending.
       if(replay_->divergence.empty()&&
          replay_->command_cursor>=commands.size()){
         const auto &expected=replay_->recording->checkpoints();
@@ -6052,8 +6096,11 @@ class NativeCampaign final {
          replay_->command_cursor>=commands.size()&&
          replay_->checkpoint_cursor>=replay_->recording->checkpoints().size()){
         replay_->completion_reported=true;
+        // Flush: scripted --replay watchers poll for this line — a buffered
+        // stream would hold it hostage until the process exits.
         std::cout<<"replay_verified={\"commands\":"<<commands.size()
-                 <<",\"checkpoints\":"<<replay_->verified_checkpoints<<"}\n";
+                 <<",\"checkpoints\":"<<replay_->verified_checkpoints<<"}\n"
+                 <<std::flush;
         // --replay-exit: a scripted verification run ends here — exit 0
         // with the verified line, rather than continuing the session.
         if(replay_->exit_on_completion)return false;
@@ -6656,7 +6703,12 @@ class NativeCampaign final {
           const auto action=first_galaxy_action_pressed();
           if(action.empty())handled=false;
           else{
-            if(replay_&&replay_->recorder)
+            // Right-clicks already journal as pointer_button events at the
+            // top of the loop — recording mouse_button too would dispatch
+            // the binding twice on replay (the injected event reaches this
+            // same feed). Pad buttons carry no position, so they keep the
+            // binding-level record.
+            if(replay_&&replay_->recorder&&event.type==InputEventType::GamepadPressed)
               replay_->recorder->record(replay_tick(),record_name,
                                         std::to_string(raw.code));
             dispatch_galaxy_action(action,width,height);
@@ -9152,8 +9204,11 @@ int main(int argc,char **argv){
       out<<"replay_info={\"file\":"<<json_string(utf8_path(options.replay_info_path))
          <<",\"seed\":"<<recording->header().seed
          <<",\"build_id\":"<<json_string(recording->header().build_id)
-         <<",\"game_version\":"<<json_string(recording->header().game_version)
-         <<",\"commands\":"<<recording->commands().size()
+         <<",\"game_version\":"<<json_string(recording->header().game_version);
+      if(recording->header().window_width!=0||recording->header().window_height!=0)
+        out<<",\"window_width\":"<<recording->header().window_width
+           <<",\"window_height\":"<<recording->header().window_height;
+      out<<",\"commands\":"<<recording->commands().size()
          <<",\"truncated\":"<<(recording->truncated()?"true":"false")
          <<",\"memory_bytes\":"<<recording->estimated_memory_bytes();
       // Ordering integrity: the replay feed and the cursor-based checkpoint
@@ -9420,7 +9475,9 @@ int main(int argc,char **argv){
     if(!options.record_path.empty()){
       replay.recorder.emplace(stellar::engine::ReplayHeader{
           static_cast<std::uint64_t>(options.seed),STELLAR_SOURCE_COMMIT,
-          STELLAR_GAME_VERSION});
+          STELLAR_GAME_VERSION,
+          static_cast<std::uint32_t>(window.drawable_width()),
+          static_cast<std::uint32_t>(window.drawable_height())});
       // Bounded recording: past the budget the recorder keeps an honest
       // prefix (no later commands or checkpoints claim fidelity) and
       // serializes a truncated flag rather than growing without limit.
@@ -9451,6 +9508,18 @@ int main(int argc,char **argv){
                  <<", recorded version "<<parsed->header().game_version
                  <<" vs "<<STELLAR_GAME_VERSION
                  <<") — divergence may reflect the mismatch.\n";
+      // Pointer commands carry drawable-pixel positions — a replay under a
+      // different drawable size (windowed vs scaled fullscreen) lands them
+      // on different UI cells, so flag the mismatch like a provenance
+      // difference.
+      if(parsed->header().window_width!=0&&parsed->header().window_height!=0&&
+         (parsed->header().window_width!=static_cast<std::uint32_t>(window.drawable_width())||
+          parsed->header().window_height!=static_cast<std::uint32_t>(window.drawable_height())))
+        std::cerr<<"Stellar Continuum native client: recording was made on a "
+                 <<parsed->header().window_width<<"x"<<parsed->header().window_height
+                 <<" drawable — replaying at "<<window.drawable_width()<<"x"
+                 <<window.drawable_height()
+                 <<" moves pointer hit-testing; divergence may reflect the mismatch.\n";
       // A truncated recording is an honest prefix: its command stream and
       // checkpoints end mid-session, so nothing past them is verified.
       if(parsed->truncated())

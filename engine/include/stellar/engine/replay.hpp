@@ -36,6 +36,12 @@ struct ReplayHeader {
   std::uint64_t seed{};
   std::string build_id;
   std::string game_version;
+  // Drawable-pixel surface size at record time — pointer commands carry
+  // positions consumed in drawable coordinates, so a replay under a
+  // different surface size cannot land them identically. Zero on recordings
+  // that predate the field.
+  std::uint32_t window_width{};
+  std::uint32_t window_height{};
 };
 
 std::uint64_t fnv1a64(std::string_view bytes) noexcept;
