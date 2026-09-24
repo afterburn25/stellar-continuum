@@ -735,6 +735,18 @@ node id, same as the expansion sets. `batcher_ui` covers the model
 semantics (walk/clamp/hidden-clear/absent-clear);
 `native_developer_diagnostics` drives the key contract end-to-end;
 10/10 diagnostics/projection/UI surface green (qa_host 44 s).
+Chronicle keyboard contract (row-26 accessibility): the chronicle
+browser joins the workspace focus contract — Tab/arrows ring every
+actionable control in (y,x) order (header controls, intro-row cyclers
+plus the conditional page/focus buttons, located cards, DIP actions
+and tag chips — each clipped to the list viewport), Home/End jump to
+the ends, and Return/Space replay the press/release pair through the
+same dispatch pointer input takes, so located cards navigate, chips
+toggle their entity focus and cyclers run unchanged. The search field
+owns its keys while editing (Tab/Return commit out); pointer presses,
+cancels, open and close reset the ring. `native_chronicle` covers
+traversal/activation/edit-mode capture/pointer reset/Escape-close;
+3/3 chronicle+notification suites green.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

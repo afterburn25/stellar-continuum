@@ -537,6 +537,98 @@ void search_filtering() {
   require(!view.visible(), "Second Escape did not close the view");
 }
 
+void keyboard_focus() {
+  // Keyboard-focus contract: Tab/arrows ring every actionable control
+  // in visual order, Home/End jump, and Return/Space replay the
+  // press/release pair through the same dispatch pointer input takes.
+  engine::EventHistory history;
+  const auto add = [&](double day, std::string category,
+                       std::uint64_t location,
+                       std::vector<std::uint64_t> actors,
+                       std::vector<std::string> tags) {
+    engine::HistoryEvent event;
+    event.at_day = day;
+    event.category = std::move(category);
+    event.summary = category;
+    event.location = location;
+    event.actors = std::move(actors);
+    event.tags = std::move(tags);
+    event.visible_to = {1};
+    history.record(std::move(event));
+  };
+  add(400., "exploration.system_surveyed", 9, {}, {});
+  add(410., "war.fleet_destroyed", 4, {7}, {"fleet:12"}); // newest
+
+  NativeChronicleView view;
+  view.open(history, 1);
+  const auto key = [&](std::uint32_t code) {
+    native_map::InputEvent event;
+    event.type = native_map::InputEventType::KeyPressed;
+    event.key = code;
+    return view.handle(event, 1280, 800);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u;
+  constexpr std::uint32_t kLeft = 0x40000050u, kDown = 0x40000051u;
+  constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+
+  require(view.focus() < 0, "Focus ring present before any key");
+  // Focusables in (y,x) order: search/refresh/close, then the intro
+  // cyclers time/actor/significance/domain, then card surfaces —
+  // the newest card contributes its body, DIP action and tag chip,
+  // the older located card its body.
+  require(key(kTab) && view.focus() == 0, "Tab did not focus first control");
+  require(key(kDown) && view.focus() == 1, "Down did not advance the ring");
+  require(key(kLeft) && view.focus() == 0, "Left did not walk back");
+  require(key(kEnd) && view.focus() == 10, "End did not land on the last row");
+  // Activating a located card navigates to its system.
+  require(key(kReturn), "Card activation not consumed");
+  const auto nav = view.navigation();
+  require(nav && *nav == 9, "Card activation did not navigate");
+  // Back to the domain cycler — activation cycles the filter.
+  require(key(kHome) && view.focus() == 0, "Home did not return to the head");
+  for (int i = 0; i < 6; ++i) (void)key(kDown);
+  require(view.focus() == 6, "Ring did not reach the domain cycler");
+  require(key(kReturn) && view.domain_filter() == "construction.",
+          "Domain activation did not cycle the filter");
+  require(view.focus() == 6, "Activation did not keep the ring");
+  // The ring renders as a drawn stroke over the focused control.
+  {
+    native_map::DrawList out;
+    view.render(out, 1280, 800);
+    bool ring = false;
+    for (const auto &command : out.overlay)
+      if (const auto *stroke =
+              std::get_if<native_map::StrokedRectangle>(&command))
+        if (stroke->color.r == 160 && stroke->color.g == 210)
+          ring = true;
+    require(ring, "Focused control rendered no ring");
+  }
+  // Pointer presses reset the ring; open starts clean.
+  native_map::InputEvent press;
+  press.type = native_map::InputEventType::LeftPressed;
+  press.position = {640.f, 400.f};
+  require(view.handle(press, 1280, 800) && view.focus() < 0,
+          "Pointer press did not reset the ring");
+  // The search field owns the keyboard while editing — arrows do not
+  // move the ring, and Tab commits out of edit mode.
+  press.position = {600.f, 83.f};
+  native_map::InputEvent release = press;
+  release.type = native_map::InputEventType::LeftReleased;
+  require(view.handle(press, 1280, 800) && view.handle(release, 1280, 800),
+          "Search field did not focus");
+  require(view.wants_text_input(), "Search activation did not edit");
+  require(key(kDown) && view.focus() < 0,
+          "Editing search leaked a key to the ring");
+  require(key(kTab) && !view.wants_text_input(),
+          "Tab did not commit out of the search field");
+  // Escape closes regardless of the ring.
+  require(key(kTab) && view.focus() == 0, "Ring did not restart");
+  native_map::InputEvent escape;
+  escape.type = native_map::InputEventType::EscapePressed;
+  require(view.handle(escape, 1280, 800) && !view.visible(),
+          "Escape did not close with the ring active");
+}
+
 void render_smoke() {
   auto history = make_history();
   NativeChronicleView view;
@@ -557,6 +649,7 @@ int main() {
     tag_focus();
     recency_filtering();
     search_filtering();
+    keyboard_focus();
     view_lifecycle();
     render_smoke();
   } catch (const std::exception &error) {

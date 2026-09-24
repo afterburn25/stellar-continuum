@@ -168,6 +168,9 @@ public:
   [[nodiscard]] bool wants_text_input() const noexcept {
     return visible_ && search_focused_;
   }
+  // Keyboard-focus ring index into the (y,x)-ordered focusable list;
+  // -1 when no control is focused. Exposed for the test surface.
+  [[nodiscard]] int focus() const noexcept { return focus_; }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
   [[nodiscard]] const ChronicleSnapshot &current() const noexcept {
@@ -215,6 +218,7 @@ private:
   std::string search_;
   bool search_focused_{};
   std::size_t press_entry_{}, press_tag_{};
+  int focus_{-1};
   std::optional<std::uint64_t> navigation_{}, contact_navigation_{};
   std::function<std::string(std::uint64_t)> actor_name_resolver_;
   std::function<double()> campaign_day_source_;

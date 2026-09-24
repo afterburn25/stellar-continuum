@@ -106,6 +106,7 @@ struct TagChip {
 
 struct CardLayout {
   UiRect bounds, metadata_bounds, message_bounds;
+  bool navigable{}; // the card body activates only when it navigates
   std::optional<UiRect> contact_button;
   std::vector<TagChip> tag_chips;
 };
@@ -225,6 +226,7 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
                            card.metadata_bounds.y + metadata_height + 3.f * s,
                            card.bounds.width - card_pad * 2.f,
                            message_height};
+    card.navigable = entry.system_id != 0;
     if (entry.contact_id != 0) {
       const float bw = 44.f * s, bh = 20.f * s;
       card.contact_button = UiRect{
@@ -270,6 +272,51 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
     for (auto &chip : card.tag_chips) chip.bounds.y -= layout.scroll;
   }
   return layout;
+}
+
+std::optional<UiRect> clipped(UiRect a, const UiRect &b) {
+  const float x1 = std::min(a.x + a.width, b.x + b.width),
+              y1 = std::min(a.y + a.height, b.y + b.height);
+  a.x = std::max(a.x, b.x);
+  a.y = std::max(a.y, b.y);
+  a.width = x1 - a.x;
+  a.height = y1 - a.y;
+  if (a.width <= 0.f || a.height <= 0.f) return std::nullopt;
+  return a;
+}
+
+// Keyboard-focus contract: every actionable control in visual (y,x)
+// order — the header row, the intro-row cyclers, then each visible
+// card's body (located entries only — an unlocated card activates to
+// nothing), DIP action and tag chips.
+std::vector<UiRect> focusables(const ChronicleLayout &layout) {
+  std::vector<UiRect> out;
+  out.push_back(layout.search_box);
+  out.push_back(layout.refresh_button);
+  out.push_back(layout.close_button);
+  if (layout.focus_button) out.push_back(*layout.focus_button);
+  if (layout.page_older_button) out.push_back(*layout.page_older_button);
+  if (layout.page_newer_button) out.push_back(*layout.page_newer_button);
+  out.push_back(layout.time_button);
+  out.push_back(layout.actor_button);
+  out.push_back(layout.significance_button);
+  out.push_back(layout.domain_button);
+  for (const auto &card : layout.entries) {
+    if (card.navigable)
+      if (const auto clip = clipped(card.bounds, layout.list_viewport))
+        out.push_back(*clip);
+    if (card.contact_button)
+      if (const auto clip =
+              clipped(*card.contact_button, layout.list_viewport))
+        out.push_back(*clip);
+    for (const auto &chip : card.tag_chips)
+      if (const auto clip = clipped(chip.bounds, layout.list_viewport))
+        out.push_back(*clip);
+  }
+  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
+    return a.y != b.y ? a.y < b.y : a.x < b.x;
+  });
+  return out;
 }
 
 } // namespace
@@ -362,6 +409,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   window_page_ = 0;
   search_.clear();
   search_focused_ = false;
+  focus_ = -1;
   snapshot_ = snapshot(history, observer_civilization_id);
   cancel_press();
 }
@@ -370,6 +418,7 @@ void NativeChronicleView::close() noexcept {
   visible_ = false;
   scroll_ = 0.f;
   search_focused_ = false;
+  focus_ = -1;
   cancel_press();
 }
 
@@ -505,8 +554,56 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
     refresh();
     return true;
   }
+  if (event.type == native_map::InputEventType::KeyPressed &&
+      event.key) {
+    if (search_focused_) {
+      // While editing, the search field owns the keyboard — Tab or
+      // Return commit out of it; every other key stays captured.
+      if (event.key == 9u || event.key == 13u) search_focused_ = false;
+      return true;
+    }
+    // SDL_Keycode: Tab/arrows walk the (y,x)-ordered focusables,
+    // Home/End jump to the ends, and Return/Space replay the
+    // press/release pair through the same dispatch a click takes.
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const auto items = focusables(layout);
+    const int count = static_cast<int>(items.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      return true;
+    }
+    if (count > 0 && (fwd || bwd)) {
+      focus_ = focus_ < 0 || focus_ >= count
+                   ? (bwd ? count - 1 : 0)
+                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      return true;
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto &rect = items[static_cast<std::size_t>(focus_)];
+      native_map::InputEvent press{native_map::InputEventType::LeftPressed};
+      press.position = {rect.x + rect.width * .5f,
+                        rect.y + rect.height * .5f};
+      native_map::InputEvent release = press;
+      release.type = native_map::InputEventType::LeftReleased;
+      const int keep = focus_;
+      (void)handle(press, width, height);
+      (void)handle(release, width, height);
+      if (visible_) focus_ = keep;
+      return true;
+    }
+    // Unhandled keys keep falling through to global shortcuts.
+  }
   if (event.type == native_map::InputEventType::PointerCancelled) {
     const bool captured = pointer_captured_;
+    focus_ = -1;
     cancel_press();
     return captured;
   }
@@ -522,6 +619,7 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
       search_focused_ = false;
       return false;
     }
+    focus_ = -1;
     pointer_captured_ = true;
     press_origin_ = event.position;
     press_target_ = PressTarget::None;
@@ -898,7 +996,6 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                          "No recorded events yet."),
                  muted_color, std::max(11, static_cast<int>(std::lround(13.f * s))),
                  layout.empty_hint.width, layout.empty_hint);
-    return;
   }
   for (std::size_t i = 0; i < layout.entries.size(); ++i) {
     const auto &card = layout.entries[i];
@@ -982,6 +1079,12 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
          {layout.list_viewport.x + layout.list_viewport.width - 3.f * s, y,
           2.f * s, thumb_h},
          muted_color);
+  }
+  if (focus_ >= 0) {
+    const auto items = focusables(layout);
+    if (focus_ < static_cast<int>(items.size()))
+      out.overlay.emplace_back(StrokedRectangle{
+          items[static_cast<std::size_t>(focus_)], {160, 210, 255, 255}});
   }
 }
 
