@@ -21,6 +21,7 @@
 #include <exception>
 #include <iostream>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -208,6 +209,30 @@ int main(int argc, char **argv) {
       require(mismatches.empty(),
               "activity matrix mismatch in the minimal world: " +
                   mismatches);
+    }
+
+    // The same matrix over the full seeded world. Discovery: the fresh
+    // campaign gives the same seven domains no observable inputs over
+    // 12 steps — the inert set is identical to the minimal world. That
+    // is the honest adoption data: those phases are dormant-by-default
+    // candidates in fresh campaigns and need event-driven wake once
+    // their domains gain inputs; a seeded world with active fleets,
+    // contested space or colonization orders would discriminate them.
+    {
+      const std::set<std::string_view> expected_inert{
+          "strategic_ai", "shipbuilding", "exploration", "freight",
+          "combat", "colonization", "economy_storage"};
+      std::set<std::string_view> inert;
+      for (const auto phase :
+           GalaxySimulationStepCoordinator::phase_names) {
+        TracePlan probe{};
+        probe.tiers = {{std::string(phase), SimulationTier::Dormant}};
+        const auto probe_trace = run_trace(catalog, kSeed, kSteps, probe);
+        if (probe_trace == baseline) inert.insert(phase);
+      }
+      require(inert == expected_inert,
+              "live-world activity matrix drifted — a phase silently "
+              "changed class");
     }
 
     // Divergence honesty: demoting a phase that actually integrates
