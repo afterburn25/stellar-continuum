@@ -542,6 +542,22 @@ parity suites green). The 15 `engine_shell_tool_*` frame-render smokes
 block on window creation in this agent session and were not exercised;
 all other ~285 tests pass including every campaign/projection/parity
 suite.
+The `FreshCampaignState` surface is now fully mirrored through `7dd543c7`:
+per-civ survey rows (orphaned system, level range, progress bounds,
+level/progress consistency — defensive since writers and restore
+normalize), `galactic_core_observers` refs, a guarded
+`capture_galaxy_persistence_metadata` umbrella (`invalid_generation_metadata`
+on seed/system-count/configuration/phenomena/core-landmark disagreement),
+and developer provenance (`validate_developer_simulation_state` →
+`invalid_simulation`, `validate_developer_coverage` → `invalid_coverage`).
+Two build caveats in this agent session: `cmake --build` requires the
+vcvars64 environment (a bare-shell invocation fails at dependency
+scanning and any subsequent ctest run executes stale binaries — the
+first verification pass of `f45f91ed` ran stale binaries and was
+re-verified at 106/106 green after a proper rebuild); and the in-flight
+`native_voice_settings_tests.cpp` fails /WX on an unused `kUp` local in
+another lane, which stops the default `all` build — targeted test-target
+builds work.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
