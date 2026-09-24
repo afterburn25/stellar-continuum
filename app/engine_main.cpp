@@ -305,7 +305,8 @@ struct Shell {
       hit3_ttl{}, hit3_data{}, hit3_parent{}, hit3_cam{},
       hit3_camrot{}, hit3_fov{}, hit3_lightdir{}, hit3_lightint{},
       hit3_grav{}, hit3_ground{}, hit3_bounds{}, hit3_bg{},
-      hit3_music{};
+      hit3_music{}, hit3_filla_dir{}, hit3_filla_tint{},
+      hit3_fillb_dir{}, hit3_fillb_tint{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -1246,6 +1247,31 @@ bool parse_pair(std::string_view text, float &a, float &b) {
   return true;
 }
 
+// Parses "a,b,c,d" into four floats.
+bool parse_quad(std::string_view text, float &a, float &b, float &c,
+                float &d) {
+  const auto c1 = text.find(',');
+  const auto c2 = c1 == std::string_view::npos
+                      ? c1
+                      : text.find(',', c1 + 1);
+  const auto c3 = c2 == std::string_view::npos
+                      ? c2
+                      : text.find(',', c2 + 1);
+  if (c1 == std::string_view::npos || c2 == std::string_view::npos ||
+      c3 == std::string_view::npos)
+    return false;
+  try {
+    a = std::stof(std::string(text.substr(0, c1)));
+    b = std::stof(std::string(text.substr(c1 + 1, c2 - c1 - 1)));
+    c = std::stof(std::string(text.substr(c2 + 1, c3 - c2 - 1)));
+    d = std::stof(std::string(text.substr(c3 + 1)));
+    return std::isfinite(a) && std::isfinite(b) && std::isfinite(c) &&
+           std::isfinite(d);
+  } catch (const std::exception &) {
+    return false;
+  }
+}
+
 // Parses "r,g,b" into clamped 0-255 channels.
 bool parse_color(std::string_view text, std::uint8_t &r, std::uint8_t &g,
                  std::uint8_t &b) {
@@ -1805,6 +1831,46 @@ void commit_scene3_field(Shell &shell) {
     doc.music = shell.scene3_buffer;
     return ok(shell.scene3_buffer.empty() ? "scene music cleared"
                                           : "scene music set");
+  // Fill lights: fields 30/32 set a slot's direction, 31/33 set its
+  // "r,g,b,intensity" tint (0..1 channels); an empty direction removes
+  // the slot — the material pipeline evaluates at most two.
+  case 30:
+  case 32: {
+    const std::size_t slot = shell.scene3_field == 30 ? 0 : 1;
+    if (shell.scene3_buffer.empty()) {
+      if (slot >= doc.lights.size()) {
+        shell.scene3_buffer.clear();
+        return;
+      }
+      commit();
+      doc.lights.erase(doc.lights.begin() + slot);
+      return ok("fill light removed");
+    }
+    if (!parse_triple(shell.scene3_buffer, a, b, c))
+      return fail("use \"x,y,z\" direction, empty removes");
+    commit();
+    while (doc.lights.size() <= slot)
+      doc.lights.push_back(engine::Scene3dLight{});
+    doc.lights[slot].dir_x = a;
+    doc.lights[slot].dir_y = b;
+    doc.lights[slot].dir_z = c;
+    return ok("fill light direction updated");
+  }
+  case 31:
+  case 33: {
+    const std::size_t slot = shell.scene3_field == 31 ? 0 : 1;
+    float intensity;
+    if (!parse_quad(shell.scene3_buffer, a, b, c, intensity))
+      return fail("use \"r,g,b,intensity\" like 0.4,0.6,1,0.5");
+    commit();
+    while (doc.lights.size() <= slot)
+      doc.lights.push_back(engine::Scene3dLight{});
+    doc.lights[slot].r = a;
+    doc.lights[slot].g = b;
+    doc.lights[slot].b = c;
+    doc.lights[slot].intensity = std::max(0.f, intensity);
+    return ok("fill light tint updated");
+  }
   default:
     break;
   }
@@ -1891,6 +1957,10 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                         shell.hit3_bounds =
                                                             shell.hit3_bg =
                                                                 shell.hit3_music =
+                                                                    shell.hit3_filla_dir =
+                                                                        shell.hit3_filla_tint =
+                                                                            shell.hit3_fillb_dir =
+                                                                                shell.hit3_fillb_tint =
                                                                     {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
@@ -2124,6 +2194,26 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         ed(28), "clear color r,g,b");
   field(shell.hit3_music, "music", doc.music, ed(29),
         "content-relative track");
+  const auto fill_dir = [&doc, &fmt3](std::size_t slot) {
+    return slot < doc.lights.size()
+               ? fmt3(doc.lights[slot].dir_x, doc.lights[slot].dir_y,
+                      doc.lights[slot].dir_z)
+               : std::string{};
+  };
+  const auto fill_tint = [&doc](std::size_t slot) {
+    if (slot >= doc.lights.size()) return std::string{};
+    const auto &l = doc.lights[slot];
+    return std::to_string(l.r) + "," + std::to_string(l.g) + "," +
+           std::to_string(l.b) + "," + std::to_string(l.intensity);
+  };
+  field(shell.hit3_filla_dir, "fillA dir", fill_dir(0), ed(30),
+        "x,y,z - empty removes slot");
+  field(shell.hit3_filla_tint, "fillA tint", fill_tint(0), ed(31),
+        "r,g,b,intensity 0..1");
+  field(shell.hit3_fillb_dir, "fillB dir", fill_dir(1), ed(32),
+        "x,y,z - empty removes slot");
+  field(shell.hit3_fillb_tint, "fillB tint", fill_tint(1), ed(33),
+        "r,g,b,intensity 0..1");
 }
 
 std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
@@ -5943,6 +6033,36 @@ int main(int argc, char **argv) {
                             std::to_string((int)doc.bg_b));
             else if (shell.hit3_music.contains(event.position))
               edit3(29, doc.music);
+            else if (shell.hit3_filla_dir.contains(event.position))
+              edit3(30,
+                    doc.lights.empty()
+                        ? ""
+                        : std::to_string(doc.lights[0].dir_x) + "," +
+                              std::to_string(doc.lights[0].dir_y) + "," +
+                              std::to_string(doc.lights[0].dir_z));
+            else if (shell.hit3_filla_tint.contains(event.position))
+              edit3(31,
+                    doc.lights.empty()
+                        ? ""
+                        : std::to_string(doc.lights[0].r) + "," +
+                              std::to_string(doc.lights[0].g) + "," +
+                              std::to_string(doc.lights[0].b) + "," +
+                              std::to_string(doc.lights[0].intensity));
+            else if (shell.hit3_fillb_dir.contains(event.position))
+              edit3(32,
+                    doc.lights.size() < 2
+                        ? ""
+                        : std::to_string(doc.lights[1].dir_x) + "," +
+                              std::to_string(doc.lights[1].dir_y) + "," +
+                              std::to_string(doc.lights[1].dir_z));
+            else if (shell.hit3_fillb_tint.contains(event.position))
+              edit3(33,
+                    doc.lights.size() < 2
+                        ? ""
+                        : std::to_string(doc.lights[1].r) + "," +
+                              std::to_string(doc.lights[1].g) + "," +
+                              std::to_string(doc.lights[1].b) + "," +
+                              std::to_string(doc.lights[1].intensity));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -
