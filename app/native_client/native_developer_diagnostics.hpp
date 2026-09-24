@@ -4,8 +4,10 @@
 #include <stellar/core/campaign_world_projection.hpp>
 #include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/profiler.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 #include <iomanip>
 #include <sstream>
+#include <unordered_set>
 
 namespace stellar::native_map {
 namespace {
@@ -38,6 +40,10 @@ public:
     if(e.type==InputEventType::LeftPressed){
       if(l.detail.contains(e.position)){dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));return true;}
       pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
+      if(pressed_<0&&entities_&&!entities_dirty_&&l.list.contains(e.position)){
+        const int row=first_+static_cast<int>((e.position.y-l.list.y)/(33*l.scale));
+        if(row>=0&&row<static_cast<int>(entity_flat_.size()))pressed_=100+row;
+      }
     }
     if(e.type==InputEventType::LeftReleased){
       const int hit=std::exchange(pressed_,-1);
@@ -48,6 +54,25 @@ public:
       if(hit==4&&l.generation.contains(e.position)){generation_=true;assets_=false;entities_=false;first_=0;}
       if(hit==5&&l.assets.contains(e.position)){assets_=true;generation_=false;entities_=false;first_=0;}
       if(hit==6&&l.entities.contains(e.position)){entities_=true;events_=false;generation_=false;assets_=false;first_=0;entities_dirty_=true;}
+      if(hit>=100){
+        const int row=hit-100;
+        const int released=first_+static_cast<int>((e.position.y-l.list.y)/(33*l.scale));
+        if(released==row&&l.list.contains(e.position)&&row<static_cast<int>(entity_flat_.size())){
+          const auto *node=entity_flat_[row].first;
+          if(!node->children.empty()){
+            const bool expand=!node->expanded;
+            entity_tree_.set_expanded(node->id,expand);
+            // Roots persist collapses; deeper nodes persist expansions
+            // (roots default open, deeper levels default closed).
+            if(node->parent_id.empty()){
+              if(expand)entity_collapsed_.erase(node->id);else entity_collapsed_.insert(node->id);
+            }else{
+              if(expand)entity_expanded_.insert(node->id);else entity_expanded_.erase(node->id);
+            }
+            entity_flat_=entity_tree_.flattened();
+          }
+        }
+      }
     }
     return true;
   }
@@ -84,14 +109,14 @@ public:
       // hold stable EntityIds between refreshes (the incremental path's
       // first live consumer).
       if(entities_dirty_){
-        entity_lines_.clear();entity_parented_=0;
+        entity_parented_=0;
         if(!entities_world_built_){
           entity_world_=stellar::core::project_campaign_world(frame.runtime().world().campaign());
           entities_world_built_=true;entity_sync_.reset();
         }else entity_sync_=stellar::core::sync_campaign_world(entity_world_,frame.runtime().world().campaign());
         const auto &projected=entity_world_;
         entity_bytes_=projected.estimated_memory_bytes();
-        entity_lines_.reserve(projected.size());
+        entity_total_=projected.size();
         const auto legacy_name=[&](stellar::engine::EntityId e){
           if(const auto legacy=projected.legacy_for(e))
             return std::string(campaign_domain_name(*legacy>>32))+" "+std::to_string(static_cast<int>(static_cast<std::uint32_t>(*legacy)));
@@ -113,23 +138,52 @@ public:
           else if(const auto*shipyard=projected.get<CampaignShipyardTag>(e))detail="civ "+std::to_string(shipyard->civilization_id);
           return detail;
         };
-        for(const auto e:projected.entities()){
+        // The projected hierarchy becomes a collapsible TreeModel —
+        // the client's first tree consumer. Parents must precede
+        // children (add resolves the link eagerly), so entities are
+        // placed in passes; anything left over (a defensive case — the
+        // projection never emits cycles) lands as a root.
+        entity_tree_=stellar::engine::TreeModel{};
+        const auto node_id=[](stellar::engine::EntityId e){
+          return "e"+std::to_string(e.value());};
+        const auto entity_line=[&](stellar::engine::EntityId e){
           std::string line=legacy_name(e);
           if(const auto detail=tag_detail(e);!detail.empty())line+="   ·   "+detail;
-          if(const auto p=projected.parent(e)){++entity_parented_;line+="   ←   "+legacy_name(*p);}
-          entity_lines_.push_back(std::move(line));
+          return line;};
+        const auto all=projected.entities();
+        std::unordered_set<std::uint64_t> placed;placed.reserve(all.size());
+        for(bool progress=true;placed.size()<all.size()&&progress;){
+          progress=false;
+          for(const auto e:all){
+            if(placed.contains(e.value()))continue;
+            const auto p=projected.parent(e);
+            if(p&&!placed.contains(p->value()))continue;
+            auto &node=entity_tree_.add(node_id(e),entity_line(e),p?node_id(*p):"");
+            // Roots open by default; deeper levels follow the user's
+            // toggles, which persist across sync refreshes.
+            node.expanded=p?entity_expanded_.contains(node.id):!entity_collapsed_.contains(node.id);
+            if(p)++entity_parented_;
+            placed.insert(e.value());progress=true;
+          }
         }
+        for(const auto e:all)
+          if(placed.insert(e.value()).second)
+            entity_tree_.add(node_id(e),entity_line(e)).expanded=!entity_collapsed_.contains(node_id(e));
+        entity_flat_=entity_tree_.flattened();
         entities_dirty_=false;
       }
-      label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(entity_lines_.size())+" projected entities · "+std::to_string(entity_parented_)+" parented · "+number(entity_bytes_/1024.)+" KiB estimated container footprint · "+
+      label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(entity_total_)+" projected entities · "+std::to_string(entity_parented_)+" parented · "+number(entity_bytes_/1024.)+" KiB estimated container footprint · "+
         (entity_sync_?"synced +"+std::to_string(entity_sync_->created)+" ~"+std::to_string(entity_sync_->updated)+" -"+std::to_string(entity_sync_->destroyed)+" ↻"+std::to_string(entity_sync_->reparented):"fresh projection")+" · read-only",native_menu_style::muted);
-      const auto begin=std::clamp(first_,0,std::max(0,static_cast<int>(entity_lines_.size())-14));
-      for(int i=0;i<14&&begin+i<static_cast<int>(entity_lines_.size());++i){
+      const auto begin=std::clamp(first_,0,std::max(0,static_cast<int>(entity_flat_.size())-14));
+      for(int i=0;i<14&&begin+i<static_cast<int>(entity_flat_.size());++i){
+        const auto &[node,depth]=entity_flat_[begin+i];
         const auto y=l.list.y+i*33*s;
         if(i%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
-        label({l.list.x+8*s,y+4*s,l.list.width-16*s,25*s},entity_lines_[begin+i]);
+        const float indent=8*s+static_cast<float>(depth)*20*s;
+        const std::string glyph=node->children.empty()?"· ":(node->expanded?"▾ ":"› ");
+        label({l.list.x+indent,y+4*s,l.list.width-indent-8*s,25*s},glyph+node->label_key);
       }
-      if(entity_lines_.empty())label(l.list,"The campaign projected no entities.");
+      if(entity_flat_.empty())label(l.list,"The campaign projected no entities.");
     }else if(!events_){
       label({l.list.x+8*s,l.list.y-31*s,400*s,27*s},"Phase",native_menu_style::muted);
       label({l.list.x+430*s,l.list.y-31*s,140*s,27*s},"Samples",native_menu_style::muted);
@@ -184,9 +238,11 @@ private:
   mutable bool entities_dirty_{true},entities_world_built_{};
   mutable stellar::engine::World entity_world_;
   mutable std::optional<stellar::core::CampaignWorldProjectionSync> entity_sync_;
-  mutable std::vector<std::string> entity_lines_;
+  mutable stellar::engine::TreeModel entity_tree_;
+  mutable std::vector<std::pair<const stellar::engine::TreeModel::Node *,int>> entity_flat_;
+  mutable std::unordered_set<std::string> entity_expanded_,entity_collapsed_;
   mutable int entity_parented_{};
-  mutable std::size_t entity_bytes_{};
+  mutable std::size_t entity_bytes_{},entity_total_{};
   void refresh(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     snapshot_.clear();for(auto i=monitor.history().records().rbegin();i!=monitor.history().records().rend();++i)snapshot_.push_back(i->record);
   }

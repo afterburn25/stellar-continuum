@@ -90,7 +90,7 @@ int main(int argc,char **argv)try{
       const auto entity_view=draw();bool census=false,domain_row=false;
       for(const auto &c:entity_view.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){
         if(t->value.find("projected entities")!=std::string::npos&&t->value.find("KiB")!=std::string::npos)census=true;
-        if((t->value.starts_with("system ")||t->value.starts_with("civilization "))&&t->value.find("·")!=std::string::npos)domain_row=true;
+        if(t->value.find("system ")!=std::string::npos&&t->value.find("·")!=std::string::npos)domain_row=true;
       }
       check(census&&domain_row,"Entities inspector did not project the campaign world.");
     }
@@ -102,6 +102,46 @@ int main(int argc,char **argv)try{
       for(const auto &c:synced.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)
         if(t->value.find("synced +")!=std::string::npos)sync_counts=true;
       check(sync_counts,"Entities inspector did not reuse the projected world.");
+    }
+    // Entity rows form the projected hierarchy — clicking a parent row
+    // collapses its subtree, and the collapse survives sync refreshes.
+    // The list clamps to 14 rendered rows and the projection is larger,
+    // so row identity — not row count — is the oracle: clip.x encodes
+    // the depth indent, making a parent's rendered children the
+    // contiguous deeper-indented run below it.
+    {
+      const auto rows=[](const DrawList &d){
+        std::vector<std::pair<std::string,float>> out;
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)
+          if(t->value.starts_with("▾ ")||t->value.starts_with("› ")||t->value.starts_with("· "))out.emplace_back(t->value,t->clip->x);
+        return out;};
+      const auto expanded_view=rows(draw());
+      std::size_t pi=expanded_view.size();
+      for(std::size_t i=0;i<expanded_view.size();++i)if(expanded_view[i].first.starts_with("▾ ")){pi=i;break;}
+      check(pi<expanded_view.size(),"Entities tree rendered no expanded parent rows.");
+      const std::string collapsed_text="› "+expanded_view[pi].first.substr(std::string_view("▾ ").size());
+      std::size_t children=0;
+      for(std::size_t k=pi+1;k<expanded_view.size()&&expanded_view[k].second>expanded_view[pi].second;++k)++children;
+      check(children>0,"Expanded parent row rendered no children.");
+      const auto parent_point=control(draw(),expanded_view[pi].first);
+      (void)window.handle({InputEventType::LeftPressed,parent_point},w,h,monitor);
+      (void)window.handle({InputEventType::LeftReleased,parent_point},w,h,monitor);
+      const auto collapsed_view=rows(draw());
+      check(collapsed_view.size()>pi&&collapsed_view[pi].first==collapsed_text,"Collapsing a parent row did not collapse its glyph.");
+      bool hidden=std::ranges::none_of(collapsed_view,[&](const auto &r){return r.first==expanded_view[pi+1].first;});
+      for(std::size_t k=pi+1;hidden&&k<collapsed_view.size()&&k+children<expanded_view.size();++k)
+        hidden=collapsed_view[k].first==expanded_view[k+children].first;
+      check(hidden,"Collapsing a parent row did not hide its subtree.");
+      // Sync rebuild keeps the user's collapse.
+      click("ENTITIES");
+      (void)control(draw(),collapsed_text);
+      const auto collapsed_point=control(draw(),collapsed_text);
+      (void)window.handle({InputEventType::LeftPressed,collapsed_point},w,h,monitor);
+      (void)window.handle({InputEventType::LeftReleased,collapsed_point},w,h,monitor);
+      const auto restored=rows(draw());
+      bool same=restored.size()==expanded_view.size();
+      for(std::size_t k=0;same&&k<expanded_view.size();++k)same=restored[k].first==expanded_view[k].first;
+      check(same,"Re-expanding a parent row did not restore its subtree.");
     }
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Entities inspector modified world state.");
     click("CLOSE");check(!window.visible()&&!window.handle({InputEventType::LeftPressed},w,h,monitor),"Closed diagnostics captured gameplay.");

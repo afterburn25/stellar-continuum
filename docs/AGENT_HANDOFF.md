@@ -704,6 +704,22 @@ refreshes exactly like the column sort does. `native_colony_roster`
 covers focus/needle narrowing/open identity/refresh persistence/
 Escape-blur/clear-restore; 3/3 roster+localization suites and the
 native client build green.
+Entities tree (row-24 tree adoption in the client): the diagnostics
+panel's ENTITIES inspector now renders the read-only campaign-world
+projection through `TreeModel` — the native client's first tree
+consumer. Entities are placed parent-before-child (`add` resolves
+links eagerly; leftovers land as roots defensively) and rows render
+depth-indented with ·/›/▾ glyphs over `label_key`. A matched
+press+release on a list row toggles the node's subtree (entity rows
+encode `pressed_=100+row` on the existing button-press path);
+expansion state persists across `sync_campaign_world` rebuilds by
+node id — roots default open and remember collapses, deeper levels
+default closed and remember expansions. `native_developer_diagnostics`
+covers collapse/expand/persist-across-sync against rendered row
+identity — the 14-row viewport clamps while the projection is larger,
+so the oracle compares ordered row labels and depth indents
+(`clip.x`), not row counts; 10/10 diagnostics/projection/UI surface
+green (qa_host 42 s).
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
