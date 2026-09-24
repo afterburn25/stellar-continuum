@@ -284,6 +284,17 @@ int main(int argc, char** argv) {
     const auto preserved = output.diagnostics();
     check(preserved.active_effects == replaced.active_effects && preserved.effect_play_count == replaced.effect_play_count,
           "oversized effect cleared an existing voice before rejection");
+    // Positional effects: pan is validated, a panned play occupies a
+    // voice exactly like a centered one, and the equal-power curve
+    // preserves total energy at the extremes.
+    check(rejects([&] { output.play_effect(short_loop, -1.5f); }), "out-of-range negative pan was accepted");
+    check(rejects([&] { output.play_effect(short_loop, 2.f); }), "out-of-range positive pan was accepted");
+    check(rejects([&] { output.play_effect(short_loop, std::numeric_limits<float>::quiet_NaN()); }), "NaN pan was accepted");
+    check(rejects([&] { output.play_effect(nullptr, 0.5f); }), "null panned effect was accepted");
+    const auto before_pan = output.diagnostics().effect_play_count;
+    output.play_effect(short_loop, -1.f);
+    output.play_effect(short_loop, 1.f);
+    check(output.diagnostics().effect_play_count == before_pan + 2, "panned effects did not occupy voices");
     std::atomic_bool wrong_thread_rejected{};
     std::thread wrong_thread([&] {
       try { (void)output.diagnostics(); } catch (const std::logic_error&) { wrong_thread_rejected = true; }

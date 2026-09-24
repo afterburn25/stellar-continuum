@@ -1502,8 +1502,18 @@ int RuntimeHost::run() {
               if (impl.grounded.count(entity.value())) break;
             }
         }
-        if (bounced && impl.player && entity == *impl.player && bounce_clip)
-          audio.play_effect(bounce_clip);
+        if (bounced && impl.player && entity == *impl.player && bounce_clip) {
+          // Pan the impact cue by the entity's screen position — the
+          // first engine-side consumer of positional effects.
+          const float view = impl.view_w > 0 ? static_cast<float>(impl.view_w)
+                                             : world_w * impl.cam_zoom;
+          const float screen_x =
+              (t->x + ext->w * .5f - impl.cam_x) * impl.cam_zoom;
+          const float pan =
+              view > 0.f ? std::clamp(screen_x / (view * .5f) - 1.f, -1.f, 1.f)
+                         : 0.f;
+          audio.play_effect(bounce_clip, pan);
+        }
       }
       // Lifetimes tick down in sim time; expired entities self-destruct
       // (collected first so destruction doesn't disturb the scan).

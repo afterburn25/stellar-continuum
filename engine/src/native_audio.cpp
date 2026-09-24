@@ -396,6 +396,7 @@ struct AudioOutput::Storage {
   std::uint64_t effect_play_count{};
   std::uint64_t voice_play_count{};
   std::array<std::byte, music_chunk_bytes> music_scratch{};
+  std::vector<float> pan_scratch;
   float master{0.78f};
   float music{0.64f};
   float effects_gain{0.82f};
@@ -502,8 +503,14 @@ void AudioOutput::stop_music() {
 }
 
 void AudioOutput::play_effect(std::shared_ptr<const AudioClip> clip) {
+  play_effect(std::move(clip), 0.0f);
+}
+
+void AudioOutput::play_effect(std::shared_ptr<const AudioClip> clip, float pan) {
   require_owner();
   if (!clip) throw std::invalid_argument("Effect playback requires an audio clip.");
+  if (!std::isfinite(pan) || pan < -1.0f || pan > 1.0f)
+    throw std::invalid_argument("Effect pan must be a finite value in [-1, 1].");
   if (clip->byte_size() > maximum_effect_audio_bytes) {
     throw std::length_error("Audio effect exceeds the 1 MiB per-voice limit.");
   }
@@ -511,7 +518,22 @@ void AudioOutput::play_effect(std::shared_ptr<const AudioClip> clip) {
   for (auto& voice : storage_->effects) if (!voice.clip) { selected = &voice; break; }
   if (selected->clip) for (auto& voice : storage_->effects) if (voice.age < selected->age) selected = &voice;
   require_sdl(SDL_ClearAudioStream(selected->stream), "SDL effect queue clear failed");
-  require_sdl(SDL_PutAudioStreamData(selected->stream, clip->samples().data(), static_cast<int>(clip->byte_size())), "SDL effect queue failed");
+  if (pan == 0.0f) {
+    require_sdl(SDL_PutAudioStreamData(selected->stream, clip->samples().data(), static_cast<int>(clip->byte_size())), "SDL effect queue failed");
+  } else {
+    // Equal-power stereo pan applied at queue time — the SDL stream
+    // gain is scalar, so per-channel weighting happens on the PCM.
+    const float angle = (pan + 1.0f) * 0.7853981633974483f; // (pan+1) * pi/4
+    const float left_gain = std::cos(angle), right_gain = std::sin(angle);
+    storage_->pan_scratch.resize(clip->samples().size());
+    const auto source = clip->samples();
+    for (std::size_t i = 0; i + 1 < source.size(); i += 2) {
+      storage_->pan_scratch[i] = source[i] * left_gain;
+      storage_->pan_scratch[i + 1] = source[i + 1] * right_gain;
+    }
+    require_sdl(SDL_PutAudioStreamData(selected->stream, storage_->pan_scratch.data(),
+                                       static_cast<int>(clip->byte_size())), "SDL effect queue failed");
+  }
   // Effects are finite inputs. Flushing exposes a converter/resampler tail before this voice goes idle.
   require_sdl(SDL_FlushAudioStream(selected->stream), "SDL effect queue flush failed");
   selected->clip = std::move(clip); selected->age = ++storage_->next_age; ++storage_->effect_play_count;
