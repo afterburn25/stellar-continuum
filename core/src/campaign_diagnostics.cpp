@@ -22,6 +22,7 @@
 #include <stellar/core/settlement_body_index.hpp>
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/shipyard_state.hpp>
+#include <stellar/core/small_body_fields.hpp>
 #include <stellar/core/stellar_activity.hpp>
 #include <stellar/core/stellar_object.hpp>
 #include <stellar/core/stellar_orbits.hpp>
@@ -572,6 +573,17 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   try{validate_stellar_orbit_catalog(w.systems,w.bodies);}
   catch(const std::exception&){
     emit("galaxy","invalid_orbit_binding",0,"Stellar orbit bindings refer outside their system or host.");}
+  // Small-body fields: region/profile bounds, composition sums,
+  // field ids, parent refs and cycle checks — one guarded pass.
+  try{validate_small_body_catalog(w.systems,w.bodies);}
+  catch(const std::exception&){
+    emit("galaxy","invalid_small_body",0,"Small-body fields fail their authoritative validation.");}
+  if(w.galactic_core){
+    if(!std::isfinite(w.galactic_core->x)||!std::isfinite(w.galactic_core->y))
+      emit("galaxy","invalid_position",0,"Galactic core metadata position is not finite.");
+    if(!std::isfinite(w.galactic_core->exclusion_radius)||w.galactic_core->exclusion_radius<0.0f)
+      emit("galaxy","invalid_nonnegative_value",0,"Core metadata exclusion radius is invalid.");
+  }
   if(w.galactic_core&&w.galactic_core->black_hole)
     try{validate_central_black_hole(*w.galactic_core->black_hole);}
     catch(const std::exception&){

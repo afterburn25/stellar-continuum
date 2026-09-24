@@ -798,8 +798,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `validate_stellar_activity` per system (`invalid_stellar`),
   cross-system orbit bindings via `validate_stellar_orbit_catalog`
   (`invalid_orbit_binding`), `validate_central_black_hole` on the
-  galactic-core metadata (`invalid_black_hole`) and the persisted
-  activity-clock bound (`invalid_activity_clock`). Loader-enforced
+  galactic-core metadata (`invalid_black_hole`), galactic-core
+  metadata position/exclusion-radius magnitudes, the persisted
+  activity-clock bound (`invalid_activity_clock`), and the whole
+  small-body catalog (`invalid_small_body` via
+  `validate_small_body_catalog` — region/profile bounds,
+  composition sums, ids, parent refs and cycles). Loader-enforced
   enum bounds flag `invalid_kind` for fleet `transit_phase` and
   economy `industry_priority`. Semantic bounds are flagged as `out_of_range`:
   `transit_progress` beyond 1 (the loader enforces [0,1]),
