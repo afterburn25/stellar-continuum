@@ -748,7 +748,16 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   non-negative progress/authorization/reserved-population fields,
   `unknown_technology` for uncatalogued completed or active research,
   `queue_overflow` past `maximum_queued_construction_projects`,
-  shipyard `unknown_species` and `orphaned_colony` reservation refs).
+  shipyard `unknown_species` and `orphaned_colony` reservation refs,
+  plus the capture-time shipyard accounting checks: positive
+  `next_order_sequence`, `inconsistent_build` for active accounting
+  without a design, `unknown_ship_design` when an unknown design
+  carries refund metadata, build progress bounded by the design's
+  industry cost, `invalid_order_id`/`inconsistent_sequence` for
+  malformed or non-monotonic order identities, and
+  `invalid_reservation` via the guarded population-safety
+  validator). Economy DTO bounds also flag non-negative
+  `last_research_spending_per_day` and both funding fractions.
   Construction project collections mirror `validate_construction`:
   `unknown_project` for uncatalogued active/completed/queued ids,
   `inconsistent_project` for active-without-project state and

@@ -461,6 +461,7 @@ int main() {
     world.construction.push_back(overflow);
     ShipyardState yard;
     yard.civilization_id = 99;
+    yard.reserved_population_millions = 2.0; // reserved with no active design
     yard.reserved_population_species_id = "voidborn";
     yard.reserved_population_source_colony_id = 999;
     world.shipyards.push_back(yard);
@@ -510,6 +511,10 @@ int main() {
                finding.event_type == "invalid_character" ||
                finding.event_type == "unknown_project" ||
                finding.event_type == "inconsistent_project" ||
+               finding.event_type == "inconsistent_build" ||
+               finding.event_type == "inconsistent_sequence" ||
+               finding.event_type == "invalid_order_id" ||
+               finding.event_type == "invalid_reservation" ||
                finding.event_type == "invalid_kind") ++consistency;
       else if (finding.event_type == "orphaned_route_hop" ||
                finding.event_type == "route_overflow") ++route_refs;
@@ -547,7 +552,7 @@ int main() {
     check(ranged == 9,
           "transit, fuel, cargo, fractions, orbit, radiation, hub "
           "level and project-cost bounds flag over-range values");
-    check(freight == 3 && design == 1 && consistency == 28,
+    check(freight == 3 && design == 1 && consistency == 30,
           "freight role/site, design, order, site, surface, placement, "
           "progress, slot, economy and evidence violations are flagged");
     check(knowledge_refs == 2 && intel_refs == 2,
