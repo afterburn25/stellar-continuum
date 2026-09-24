@@ -1106,7 +1106,9 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   tracked set), hot-reloads it with the 2D scene poll, flies the camera
   with the rebindable "game" context (WASD move, Space/C up/down,
   right-drag look, wheel fov), integrates gravity + velocity at the
-  fixed timestep, rests entities on `groundY` by their mesh's scaled
+  fixed timestep (solids are kinematic — gravity-exempt, matching the
+  2D scene mode — while authored velocity still integrates for moving
+  platforms), rests entities on `groundY` by their mesh's scaled
   world-AABB bottom, clamps/bounces at `bounds` (`NoBounce` opts out),
   ticks `Lifetime`, resolves `Parent3D` follow, and runs contact events
   — solid movers push out along the least-penetrated axis and zero

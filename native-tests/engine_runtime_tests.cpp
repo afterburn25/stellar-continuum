@@ -566,6 +566,52 @@ int main() {
           "the box rests with its AABB bottom on ground_y");
   }
 
+  // 3D solid collision: a box falling onto a solid entity separates
+  // along the MTV, grounds, and fires on_land with the solid as the
+  // ground entity — the non-empty counterpart of the ground-plane case.
+  {
+    const auto sub = root / "scene3d-solid";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene3d.json");
+      out << R"({"entities":[
+                   {"name":"crate","mesh":"box","pos":[0,3,0]},
+                   {"name":"slab","mesh":"box","pos":[0,0,0],
+                    "scale":3.0,"solid":true}],
+                  "gravity":40.0,"groundY":-100.0})";
+    }
+    auto opts = headless_options(sub);
+    opts.scene3d = true;
+    opts.frame_limit = 90;
+    RuntimeHost host{opts};
+    int landings = 0, contacts = 0;
+    EntityId landed{}, ground_arg{};
+    float rest_y = -999.f;
+    host.on_collision = [&](EntityId, EntityId) { ++contacts; };
+    host.on_land = [&](EntityId e, EntityId ground) {
+      ++landings;
+      landed = e;
+      ground_arg = ground;
+    };
+    host.on_update = [&](World &world, float) {
+      if (!host.entities3d().empty())
+        if (const auto *t =
+                world.get<Transform3D>(host.entities3d().front()))
+          rest_y = t->y;
+    };
+    check(host.run() == 0, "3D solid-land run exits cleanly");
+    check(contacts == 1, "on_collision fires once for the solid pair");
+    check(landings == 1, "on_land fires once on the solid touchdown");
+    check(landed == host.entities3d().front(),
+          "on_land reports the falling crate");
+    check(ground_arg != EntityId{},
+          "on_land passes the solid as the ground entity");
+    // A 3x box's top is y=1.5; the unit crate's AABB bottom rests there
+    // → center y = 2.0.
+    check(std::abs(rest_y - 2.0f) < 0.1f,
+          "the crate rests on the solid's top face");
+  }
+
   // save_data/load_data round-trip named blobs under saves/data/ —
   // no run() needed, and key validation rejects path escapes.
   {

@@ -2006,7 +2006,11 @@ int RuntimeHost::run() {
           const float rest_y =
               impl.ground_y3 + box.hy - (box.cy - t->y);
           const float cx_off = box.cx - t->x, cz_off = box.cz - t->z;
-          if (v && gscale != 0.f) v->dy -= impl.gravity3 * gscale * dt_step;
+          // Solids are kinematic like their 2D counterparts — authored
+          // velocity still integrates (moving platforms), gravity does
+          // not pull them.
+          if (v && gscale != 0.f && !world.get<Solid>(e))
+            v->dy -= impl.gravity3 * gscale * dt_step;
           if (v && (v->dx != 0.f || v->dy != 0.f || v->dz != 0.f)) {
             t->x += v->dx * dt_step;
             t->y += v->dy * dt_step;
