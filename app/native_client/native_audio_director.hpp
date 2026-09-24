@@ -35,6 +35,7 @@ struct NativeAudioStats final {
   // whole-file decoded clip.
   bool music_streaming{};
   std::size_t queued_music_bytes{};
+  std::size_t music_queue_limit_bytes{};
   bool failed{};
   bool enabled{};
   bool stopped{};
@@ -43,6 +44,7 @@ struct NativeAudioStats final {
   std::uint64_t voice_play_count{};
   std::uint64_t voice_event_count{};
   std::size_t queued_voice_bytes{};
+  std::size_t voice_queue_limit_bytes{};
   // Successful output-device rebuilds after a device-level failure.
   std::uint64_t device_recoveries{};
 };

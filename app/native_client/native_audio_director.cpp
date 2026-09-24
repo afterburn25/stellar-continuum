@@ -269,6 +269,8 @@ void NativeAudioDirector::service() {
     stats_.queued_music_bytes = diagnostics.queued_music_bytes;
     stats_.voice_active = diagnostics.voice_active;
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
+    stats_.music_queue_limit_bytes = diagnostics.music_queue_limit_bytes;
+    stats_.voice_queue_limit_bytes = diagnostics.voice_queue_limit_bytes;
     service_voice();
   } catch (const stellar::engine::audio::AudioStreamError& error) {
     fail(std::string{"audio stream failure: "} + error.what());
@@ -326,6 +328,8 @@ void NativeAudioDirector::service_voice() {
     stats_.voice_active = diagnostics.voice_active;
     stats_.voice_play_count = diagnostics.voice_play_count;
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
+    stats_.music_queue_limit_bytes = diagnostics.music_queue_limit_bytes;
+    stats_.voice_queue_limit_bytes = diagnostics.voice_queue_limit_bytes;
   } catch (const std::exception& error) {
     fail(std::string{"audio voice playback failed: "} + error.what(), true);
   }
@@ -426,6 +430,8 @@ void NativeAudioDirector::play_dialogue_pcm(
     stats_.voice_active = diagnostics.voice_active;
     stats_.voice_play_count = diagnostics.voice_play_count;
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
+    stats_.music_queue_limit_bytes = diagnostics.music_queue_limit_bytes;
+    stats_.voice_queue_limit_bytes = diagnostics.voice_queue_limit_bytes;
   } catch (const std::exception& error) {
     fail(std::string{"audio voice playback failed: "} + error.what(), true);
   }

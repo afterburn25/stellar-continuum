@@ -9202,6 +9202,10 @@ int main(int argc,char **argv){
     const auto service_general=[&]{if(auto result=window.take_folder_dialog_result())general_settings.accept_browse_result(std::move(*result));};
     // Declared after Window: audio closes its streams/device before SDL teardown.
     stellar::native_audio::NativeAudioDirector audio(asset_root,!options.smoke_screenshot||options.audio_check);
+    // Audio queue occupancy joins the memory census — the bounded music and
+    // voice queues report their current fill against their combined limit.
+    stellar::engine::MemoryTracker::SubsystemId audio_queue_memory_{
+        stellar::engine::MemoryTracker::invalid_subsystem};
     stellar::native_audio::NativeAudioSettings audio_settings(settings_path,
       [&audio](const stellar::native_audio::AudioPreferences& value){audio.set_volumes(value.muted?0.f:value.master,value.music,value.effects);},
       [&audio]{audio.confirm();});
@@ -9533,6 +9537,12 @@ int main(int argc,char **argv){
       }
 
       audio.service();
+      if(audio_queue_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+        audio_queue_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("audio-queues");
+      if(const auto audio_stats=audio.stats();audio_stats.music_queue_limit_bytes!=0)
+        stellar::engine::MemoryTracker::instance().report(audio_queue_memory_,
+            audio_stats.queued_music_bytes+audio_stats.queued_voice_bytes,
+            audio_stats.music_queue_limit_bytes+audio_stats.voice_queue_limit_bytes);
       service_general();
       audio_settings.set_device_status(audio.failure_message());
       if(options.voice_check){
