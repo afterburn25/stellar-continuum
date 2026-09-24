@@ -184,6 +184,44 @@ int main(int argc,char **argv)try{
     check(planet_appearance_contradictions(created).empty(),"Developer control bypassed physical eligibility");
     planet_click(control(planet_render(),"GO TO EXAMPLE"));const auto planet_target=planet_index.take_focus_request();
     check(planet_target&&planet_target->second==created.id&&!planet_index.visible(),"Planet navigation did not target the newly created body");
+    // Keyboard ring: the panel's rendered controls walk in (y,x) order —
+    // header actions, class filter, rendered rows, then the
+    // example/generate footer — and activation replays the same dispatch
+    // pointer press+release takes, including the canonical
+    // force_developer_planet_type command and the map focus request.
+    {
+      planet_index.open(frame.runtime().world().campaign());
+      const auto planet_press=[&](std::uint32_t key,bool shift=false){
+        InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;ev.shift=shift;
+        return planet_index.handle(ev,w,h,frame);};
+      constexpr std::uint32_t kTab=9u,kReturn=13u,kDown=0x40000051u;
+      check(planet_index.focus()<0,"Reopened planet index retained keyboard focus.");
+      check(planet_press(kTab)&&planet_index.focus()>=0,"Tab did not enter the planet index ring.");
+      check(planet_index.focused_label(w,h)=="Giant and ring test panel","First planet-index target is not the giant panel.");
+      check(planet_index.focused_bounds(w,h).has_value(),"Focused planet-index control lacks bounds.");
+      int planet_guard=0;
+      while(planet_index.focused_label(w,h).find("Ancient Grey Crater")!=0&&planet_guard++<64)
+        check(planet_press(kDown),"Planet-index row navigation leaked.");
+      check(planet_press(kReturn),"Planet row activation leaked.");
+      while(planet_index.focused_label(w,h).find("Generate subclass")!=0&&planet_guard++<128)
+        check(planet_press(kDown),"Planet-index footer navigation leaked.");
+      const auto bodies_before=frame.runtime().world().campaign().bodies.size();
+      check(planet_press(kReturn),"Subclass activation leaked.");
+      check(frame.runtime().world().campaign().bodies.size()==bodies_before+1,"Keyboard subclass generation did not run the canonical command.");
+      while(planet_index.focused_label(w,h).find("Go to example")!=0&&planet_guard++<192)
+        check(planet_press(kDown),"Planet-index example navigation leaked.");
+      check(planet_press(kReturn),"Example activation leaked.");
+      const auto keyed_target=planet_index.take_focus_request();
+      check(keyed_target&&!planet_index.visible(),"Keyboard GO TO EXAMPLE produced the wrong target.");
+      planet_index.open(frame.runtime().world().campaign());
+      check(planet_press(kTab)&&planet_index.focus()>=0,"Tab did not re-enter the planet index ring.");
+      (void)planet_index.handle({InputEventType::LeftPressed,{w*.5f,h*.5f}},w,h,frame);
+      check(planet_index.focus()<0,"Pointer press did not clear the planet index ring.");
+      check(planet_press(kTab),"Planet-index Tab press leaked.");
+      check(planet_index.handle({InputEventType::EscapePressed},w,h,frame)&&planet_index.focus()<0&&planet_index.visible(),
+        "Escape closed the planet index instead of releasing its ring.");
+      check(planet_index.handle({InputEventType::EscapePressed},w,h,frame)&&!planet_index.visible(),"Second Escape did not close the planet index.");
+    }
     // Running the authoritative campaign after appending a planet exercises
     // borrowed simulation views and ensures no stale vector pointers survive.
     (void)frame.runtime().advance(.25,.25);

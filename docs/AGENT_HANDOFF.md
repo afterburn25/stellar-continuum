@@ -1229,10 +1229,15 @@ pointer press/cancel clear the ring. The dispatcher announces focus
 moves through `focused_label`/`focused_bounds`/`focused_control` and the
 panel joins `wants_keyboard_focus()`. `native_developer_index` pins the
 ring, Edit classification, edit commit, activation replay, pointer
-reset and Escape layering. The remaining developer panels (diagnostics,
-planet index, empire monitor, simulation panel, phenomena/background
-debug, giant test, stellar activity) stay pointer-only — they predate
-the contract and adopt it incrementally from here.
+reset and Escape layering. `NativeDeveloperPlanetIndex` follows the same
+contract: header actions, class filter, rendered rows and the
+conditional rules/go/generate footer ring in (y,x) order; keyboard
+activation replays the press/release dispatch so the canonical
+`force_developer_planet_type` command and the GO TO EXAMPLE focus
+request emit unchanged. The remaining developer panels (diagnostics,
+empire monitor, simulation panel, phenomena/background debug, giant
+test, stellar activity) stay pointer-only — they predate the contract
+and adopt it incrementally from here.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

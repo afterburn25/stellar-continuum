@@ -5803,6 +5803,7 @@ class NativeCampaign final {
            (mission_view_.visible()&&mission_view_.focus()>=0)||
            (map_hud_visible()&&assets_.focus()>=0)||
            (developer_index_.visible()&&developer_index_.focus()>=0)||
+           (developer_planet_index_.visible()&&developer_planet_index_.focus()>=0)||
            hud_focus_>=0||
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
@@ -6167,15 +6168,22 @@ class NativeCampaign final {
       }
       if(developer_session()&&developer_diagnostics_.handle(event,width,height,developer_monitor_)){gesture_.capture_for_ui();continue;}
       if(developer_session()&&giant_test_panel_.handle(event,width,height,session_->frame())){gesture_.capture_for_ui();continue;}
-      if(developer_session()&&developer_planet_index_.handle(event,width,height,session_->frame())){
-        if(developer_planet_index_.take_giant_request()){giant_test_panel_.open(session_->frame());refresh_knowledge();}
-        if(const auto target=developer_planet_index_.take_focus_request()){
-          if(menu_)toggle_menu();
-          if(enter_system(target->first,width,height)&&system_workspace_.select_body(target->second)){
-            system_workspace_.focus_selected_body(width,height);refresh_colony_entry(true);open_colony_from_system(target->second);
+      if(developer_session()){
+        const int developer_planet_index_focus_before=developer_planet_index_.focus();
+        if(developer_planet_index_.handle(event,width,height,session_->frame())){
+          if(developer_planet_index_.take_giant_request()){giant_test_panel_.open(session_->frame());refresh_knowledge();}
+          if(const auto target=developer_planet_index_.take_focus_request()){
+            if(menu_)toggle_menu();
+            if(enter_system(target->first,width,height)&&system_workspace_.select_body(target->second)){
+              system_workspace_.focus_selected_body(width,height);refresh_colony_entry(true);open_colony_from_system(target->second);
+            }
           }
+          if(developer_planet_index_.focus()!=developer_planet_index_focus_before)
+            announcer_.announce_focus(developer_planet_index_.focused_label(width,height),
+              announcement_bounds(developer_planet_index_.focused_bounds(width,height)),
+              std::nullopt,developer_planet_index_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
         }
-        gesture_.capture_for_ui();continue;
       }
       if(developer_session()){
         const int developer_index_focus_before=developer_index_.focus();
