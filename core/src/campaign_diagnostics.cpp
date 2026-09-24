@@ -19,6 +19,7 @@
 #include <stellar/core/massive_combat_persistence.hpp>
 #include <stellar/core/settlement_body_index.hpp>
 #include <stellar/core/ship_designs.hpp>
+#include <stellar/core/surface_construction.hpp>
 #include <stellar/core/surface_economy.hpp>
 #include <stellar/engine/strategic_ai.hpp>
 #include <algorithm>
@@ -591,6 +592,15 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     positive(c.stored_extracted_materials,"Extracted material reserve",c.id,"colony");
     if(c.remaining_extractable_materials)positive(*c.remaining_extractable_materials,"Remaining extractable materials",c.id,"colony");
     positive(c.surface_hub_upgrade_days_remaining,"Hub upgrade remaining",c.id,"colony");
+    if(c.surface_hub_upgrade_days_remaining>0.0&&
+        (c.surface_hub_level>=3||
+         (c.kind==SettlementKind::ResourceOutpost&&c.surface_hub_level>0)))
+      emit("colony","inconsistent_upgrade",c.id,"Hub expansion is in progress past its level cap.");
+    // Slot indices must be in range and unique; the canonical
+    // allocator throws on violations.
+    try{(void)planetary_building_slots(c);}
+    catch(const std::exception&){
+      emit("colony","invalid_slot",c.id,"Surface building slots are invalid or duplicated.");}
     if(c.kind!=SettlementKind::Colony&&c.kind!=SettlementKind::ResourceOutpost)
       emit("colony","invalid_kind",c.id,"Settlement kind is outside the catalog.");
     if(c.surface_hub_level<0||c.surface_hub_level>3)
@@ -606,11 +616,38 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
         emit("colony","invalid_surface_site",c.id,"Surface buildings sit on a body without solid ground.");
     }
     (void)ids(c.surface_buildings,&SurfaceBuilding::id,"construction");
-    for(const auto &b:c.surface_buildings){positive(b.industry_progress,"Building progress",b.id,"construction");
+    // Per-building checks mirror validate_surface_construction:
+    // overlap queries only see buildings that passed every check.
+    std::vector<SurfaceBuilding> placed;
+    for(const auto &b:c.surface_buildings){
+      bool clean=true;
+      if(b.id<=0){emit("construction","invalid_positive_value",b.id,"Surface building ID is missing.");clean=false;}
+      const auto *def=find_surface_building(b.type_id);
+      if(auto error=surface_placement_error(placed,b.type_id,b.x,b.z,b.rotation_degrees)){
+        emit("construction","invalid_placement",b.id,*error);clean=false;}
+      positive(b.industry_progress,"Building progress",b.id,"construction");
       positive(b.condition,"Building condition",b.id,"construction");
       positive(b.stored_power_days,"Building power reserve",b.id,"construction");
-      if(!known_types.contains(b.type_id))emit("construction","unknown_building_type",b.id,"Surface building has an uncatalogued type.");
-      if(!std::isfinite(b.x)||!std::isfinite(b.z))emit("construction","invalid_position",b.id,"Surface building position is not finite.");}
+      positive(b.upgrade_days_remaining,"Upgrade remaining",b.id,"construction");
+      if(def){
+        if(std::isfinite(b.industry_progress)&&b.industry_progress>def->industry_cost)
+          emit("construction","out_of_range",b.id,"Industry progress exceeds the build cost.");
+        if(b.is_complete!=(b.industry_progress>=def->industry_cost)){
+          emit("construction","inconsistent_progress",b.id,"Completion flag does not match industry progress.");clean=false;}
+        if(std::isfinite(b.stored_power_days)&&b.stored_power_days>def->power_storage_days+.0000001)
+          emit("construction","out_of_range",b.id,"Stored grid energy exceeds the catalog capacity.");
+      }
+      if(b.operating_priority<0||b.operating_priority>1){
+        emit("construction","out_of_range",b.id,"Operating priority is outside [0,1].");clean=false;}
+      if(std::isfinite(b.condition)&&b.condition>1.0)
+        emit("construction","out_of_range",b.id,"Building condition is above 1.");
+      if(static_cast<bool>(b.pending_upgrade_type_id)!=(b.upgrade_days_remaining>0.0)||
+          (b.pending_upgrade_type_id&&def&&
+           (!b.is_complete||def->upgrade_type_id!=b.pending_upgrade_type_id))){
+        emit("construction","inconsistent_upgrade",b.id,"Pending upgrade does not match upgrade progress.");clean=false;}
+      if(!known_types.contains(b.type_id)){emit("construction","unknown_building_type",b.id,"Surface building has an uncatalogued type.");clean=false;}
+      if(!std::isfinite(b.x)||!std::isfinite(b.z)){emit("construction","invalid_position",b.id,"Surface building position is not finite.");clean=false;}
+      if(clean)placed.push_back(b);}
   }
   for(const auto &c:w.civilizations){
     if(!systems.contains(c.home_system_id))

@@ -494,6 +494,10 @@ int main() {
                finding.event_type == "missing_economy" ||
                finding.event_type == "capacity_overflow" ||
                finding.event_type == "invalid_evidence" ||
+               finding.event_type == "invalid_placement" ||
+               finding.event_type == "inconsistent_progress" ||
+               finding.event_type == "inconsistent_upgrade" ||
+               finding.event_type == "invalid_slot" ||
                finding.event_type == "invalid_kind") ++consistency;
       else if (finding.event_type == "orphaned_route_hop" ||
                finding.event_type == "route_overflow") ++route_refs;
@@ -531,9 +535,9 @@ int main() {
     check(ranged == 8,
           "transit, fuel, cargo, fractions, orbit, radiation and hub "
           "level bounds flag over-range values");
-    check(freight == 3 && design == 1 && consistency == 13,
-          "freight role/site, design, order, site, surface, economy "
-          "and evidence consistency violations are flagged");
+    check(freight == 3 && design == 1 && consistency == 21,
+          "freight role/site, design, order, site, surface, placement, "
+          "progress, slot, economy and evidence violations are flagged");
     check(knowledge_refs == 2 && intel_refs == 2,
           "absent knowledge/intel observers and targets are flagged");
     check(positions == 1 && route_refs == 3,

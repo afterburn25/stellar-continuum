@@ -802,7 +802,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `invalid_destination` for role- or system-mismatched work sites.
   Combat intelligence additionally flags `duplicate_id` observation
   pairs, `invalid_evidence` for blank evidence, and the 4096-entry
-  persisted total bound via `observation_overflow`. Every
+  persisted total bound via `observation_overflow`. Per-building
+  checks mirror `validate_surface_construction`: `invalid_slot` for
+  out-of-range or duplicate slot indices (the canonical allocator
+  throws), `invalid_placement` via the authoritative
+  `surface_placement_error` (boundary, hub clearance, slope,
+  overlap — only fully-valid buildings join the overlap set),
+  `invalid_positive_value` for missing building ids,
+  `inconsistent_progress` when `is_complete` disagrees with
+  `industry_progress` versus the catalog cost, `inconsistent_upgrade`
+  for pending-upgrade/progress mismatches or hub expansion past the
+  level cap, and `out_of_range` for `operating_priority` outside
+  [0,1], `condition` above 1, `industry_progress` above the build
+  cost, and `stored_power_days` above the catalog storage. Every
   throwing call in the operations pass is now wrapped — sustenance
   analysis, the warfare theater projection, lane-network construction
   and reach assessment, the logistics snapshot/coverage/home-network
