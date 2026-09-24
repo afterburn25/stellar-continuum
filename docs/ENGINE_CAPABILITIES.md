@@ -1292,7 +1292,9 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   tilemap layers (edit `layer` for draw order);
   collision is cell-level solid only (no per-tile slopes/one-way flags);
   paint strokes stamp an NxN brush (1..8, `brushsz` field — the footprint
-  outlines in the preview, one undo step per stroke) with no fill tool. Other
+  outlines in the preview, one undo step per stroke) or, with the FILL
+  toggle, flood the 4-connected same-value region under the click
+  (bounded to existing cells, one undo step). Other
   RuntimeHost consumers (2D platformers, top-down maps, puzzle boards)
   reuse the same path.
 

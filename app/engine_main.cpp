@@ -245,7 +245,7 @@ struct Shell {
       hit_scene_tilepar{}, hit_scene_tilecells{},
       hit_scene_tileorigin{}, hit_scene_tilename{},
       hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_brushsz{},
-      hit_scene_music{},
+      hit_scene_fill{}, hit_scene_music{},
       hit_scene_spin{}, hit_scene_worldsize{}, hit_scene_bounce{},
       scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
@@ -260,6 +260,7 @@ struct Shell {
   bool scene_painting{}; // pointer is mid paint stroke
   int scene_paint_cell{}; // brush value written into tilemap cells
   int scene_paint_brush{1}; // NxN cells per stamp, centered on the click
+  bool scene_paint_fill{}; // FILL mode: clicks flood a connected region
   // Which document tilemap the tile fields/paint mode edit — scenes can
   // stack several grids (decor, collision, foreground) on own layers.
   std::size_t scene_tile_index{};
@@ -2269,6 +2270,47 @@ void paint_tile_at(Shell &shell, float wx, float wy) {
     }
 }
 
+// Flood-fills the 4-connected region of same-valued cells under the click
+// with the brush value — the FILL toggle in paint mode. Bounded to the
+// map's existing cells (fills never extend the grid).
+void fill_tile_at(Shell &shell, float wx, float wy) {
+  auto *tmap = scene_tile(shell);
+  if (tmap == nullptr) return;
+  auto &tm = *tmap;
+  if (tm.tile_w <= 0 || tm.tile_h <= 0 || tm.columns <= 0 ||
+      tm.cells.empty())
+    return;
+  const int cx =
+      static_cast<int>(std::floor((wx - tm.x) / tm.tile_w));
+  const int cy =
+      static_cast<int>(std::floor((wy - tm.y) / tm.tile_h));
+  const int rows = static_cast<int>(tm.cells.size()) / tm.columns;
+  if (cx < 0 || cy < 0 || cx >= tm.columns || cy >= rows) return;
+  const int target = tm.cells[static_cast<std::size_t>(cy) * tm.columns +
+                              cx];
+  if (target == shell.scene_paint_cell) return;
+  std::vector<char> seen(tm.cells.size(), 0);
+  std::vector<int> stack{cy * tm.columns + cx};
+  while (!stack.empty()) {
+    const int flat = stack.back();
+    stack.pop_back();
+    if (seen[static_cast<std::size_t>(flat)]) continue;
+    seen[static_cast<std::size_t>(flat)] = 1;
+    if (tm.cells[static_cast<std::size_t>(flat)] != target) continue;
+    tm.cells[static_cast<std::size_t>(flat)] = shell.scene_paint_cell;
+    shell.scene_modified = true;
+    const int px = flat % tm.columns, py = flat / tm.columns;
+    for (const auto [ox, oy] : {std::pair{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+      const int nx = px + ox, ny = py + oy;
+      if (nx < 0 || ny < 0 || nx >= tm.columns || ny >= rows) continue;
+      const int nflat = ny * tm.columns + nx;
+      if (static_cast<std::size_t>(nflat) < tm.cells.size() &&
+          !seen[static_cast<std::size_t>(nflat)])
+        stack.push_back(nflat);
+    }
+  }
+}
+
 void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   float x = body.x + 22 * s;
   float y = body.y + 18 * s;
@@ -2302,7 +2344,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                 shell.hit_scene_tilepar = shell.hit_scene_tilecells =
                 shell.hit_scene_tileorigin = shell.hit_scene_tilename =
                     shell.hit_scene_paint = shell.hit_scene_paintcell =
-                        shell.hit_scene_brushsz =
+                        shell.hit_scene_brushsz = shell.hit_scene_fill =
                         shell.hit_scene_music = shell.hit_scene_spin =
                             shell.hit_scene_worldsize =
                                 shell.hit_scene_bounce =
@@ -2374,6 +2416,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   shell_button(out, shell.hit_scene_paint,
                shell.scene_paint ? "PAINT *" : "PAINT", ntiles == 0, font,
                s);
+  shell.hit_scene_fill = {x + 1284 * s, y, 70 * s, bh};
+  shell_button(out, shell.hit_scene_fill,
+               shell.scene_paint_fill ? "FILL *" : "FILL",
+               ntiles == 0 || !shell.scene_paint, font, s);
   y += bh + 14 * s;
 
   // Entity list (left) + scene preview (right).
@@ -2627,8 +2673,11 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   }
   out.overlay.push_back(Text{
       {pv.x + 6 * s, pv.y + pv.height - 16 * s},
-      shell.scene_paint ? "paint mode - click/drag writes cells"
-                        : "click selects - drag moves entities",
+      shell.scene_paint
+          ? (shell.scene_paint_fill
+                 ? "fill mode - click floods a same-value region"
+                 : "paint mode - click/drag writes cells")
+          : "click selects - drag moves entities",
       muted, static_cast<int>(11 * s), 0, pv});
 
   // Property fields for the selected entity. Column count adapts to the
@@ -5450,7 +5499,7 @@ int main(int argc, char **argv) {
                 }
               }
             }
-          } else if (shell.scene_painting &&
+          } else if (shell.scene_painting && !shell.scene_paint_fill &&
               scene_tile(shell) != nullptr &&
               shell.scene_preview.contains(event.position)) {
             const auto &pv = shell.scene_preview;
@@ -5557,10 +5606,13 @@ int main(int argc, char **argv) {
                     "paint brush " + std::to_string(shell.scene_paint_cell);
                 break;
               }
-              // One undo step per stroke.
+              // One undo step per stroke — a fill is a single stroke.
               shell.scene_history.commit(shell.scene_doc);
               shell.scene_painting = true;
-              paint_tile_at(shell, wx, wy);
+              if (shell.scene_paint_fill)
+                fill_tile_at(shell, wx, wy);
+              else
+                paint_tile_at(shell, wx, wy);
               break;
             }
             const auto order = scene_draw_order(shell.scene_doc);
@@ -5941,6 +5993,10 @@ int main(int argc, char **argv) {
               }
             } else if (shell.hit_scene_paint.contains(event.position)) {
               shell.scene_paint = !shell.scene_paint;
+              if (!shell.scene_paint) shell.scene_paint_fill = false;
+            } else if (shell.hit_scene_fill.contains(event.position) &&
+                       shell.scene_paint) {
+              shell.scene_paint_fill = !shell.scene_paint_fill;
             } else if (shell.scene_preview.contains(event.position)) {
               // Press already selected/placed; release ends the drag.
               shell.scene_dragging = false;
