@@ -1291,7 +1291,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   the existing indexed tile calls; the editor selects but cannot reorder
   tilemap layers (edit `layer` for draw order);
   collision is cell-level solid only (no per-tile slopes/one-way flags);
-  paint strokes fill single cells (no brush size or fill tool). Other
+  paint strokes stamp an NxN brush (1..8, `brushsz` field — the footprint
+  outlines in the preview, one undo step per stroke) with no fill tool. Other
   RuntimeHost consumers (2D platformers, top-down maps, puzzle boards)
   reuse the same path.
 

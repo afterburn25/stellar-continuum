@@ -244,7 +244,8 @@ struct Shell {
       hit_scene_tilecollide{}, hit_scene_tilelayer{},
       hit_scene_tilepar{}, hit_scene_tilecells{},
       hit_scene_tileorigin{}, hit_scene_tilename{},
-      hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_music{},
+      hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_brushsz{},
+      hit_scene_music{},
       hit_scene_spin{}, hit_scene_worldsize{}, hit_scene_bounce{},
       scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
@@ -258,6 +259,7 @@ struct Shell {
   bool scene_paint{};    // PAINT mode: clicks write cells, not select
   bool scene_painting{}; // pointer is mid paint stroke
   int scene_paint_cell{}; // brush value written into tilemap cells
+  int scene_paint_brush{1}; // NxN cells per stamp, centered on the click
   // Which document tilemap the tile fields/paint mode edit — scenes can
   // stack several grids (decor, collision, foreground) on own layers.
   std::size_t scene_tile_index{};
@@ -1423,6 +1425,19 @@ void commit_scene_field(Shell &shell) {
       shell.scene_buffer.clear();
       return;
     }
+    if (shell.scene_field == 42) {
+      try {
+        shell.scene_paint_brush =
+            std::clamp(std::stoi(shell.scene_buffer), 1, 8);
+        shell.status = "brush size " +
+                       std::to_string(shell.scene_paint_brush) + "x" +
+                       std::to_string(shell.scene_paint_brush);
+      } catch (const std::exception &) {
+        shell.status = "invalid value - use 1..8";
+      }
+      shell.scene_buffer.clear();
+      return;
+    }
     if (ok) {
       shell.scene_history.commit(shell.scene_doc);
       if (auto *sel = scene_tile(shell)) {
@@ -2236,13 +2251,22 @@ void paint_tile_at(Shell &shell, float wx, float wy) {
       static_cast<int>(std::floor((wx - tm.x) / tm.tile_w));
   const int cy =
       static_cast<int>(std::floor((wy - tm.y) / tm.tile_h));
-  if (cx < 0 || cy < 0 || cx >= tm.columns) return;
-  const std::size_t idx = static_cast<std::size_t>(cy) * tm.columns + cx;
-  if (idx >= tm.cells.size())
-    tm.cells.resize(static_cast<std::size_t>(cy + 1) * tm.columns, -1);
-  if (tm.cells[idx] == shell.scene_paint_cell) return;
-  tm.cells[idx] = shell.scene_paint_cell;
-  shell.scene_modified = true;
+  // Brush footprint: an NxN block centered on the clicked cell (1 = the
+  // single-cell stamp). The same one-undo-step-per-stroke rule applies.
+  const int brush = std::clamp(shell.scene_paint_brush, 1, 8);
+  const int lo = -(brush / 2), hi = brush - brush / 2;
+  for (int dy = lo; dy < hi; ++dy)
+    for (int dx = lo; dx < hi; ++dx) {
+      const int px = cx + dx, py = cy + dy;
+      if (px < 0 || py < 0 || px >= tm.columns) continue;
+      const std::size_t idx =
+          static_cast<std::size_t>(py) * tm.columns + px;
+      if (idx >= tm.cells.size())
+        tm.cells.resize(static_cast<std::size_t>(py + 1) * tm.columns, -1);
+      if (tm.cells[idx] == shell.scene_paint_cell) continue;
+      tm.cells[idx] = shell.scene_paint_cell;
+      shell.scene_modified = true;
+    }
 }
 
 void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
@@ -2278,6 +2302,7 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
                 shell.hit_scene_tilepar = shell.hit_scene_tilecells =
                 shell.hit_scene_tileorigin = shell.hit_scene_tilename =
                     shell.hit_scene_paint = shell.hit_scene_paintcell =
+                        shell.hit_scene_brushsz =
                         shell.hit_scene_music = shell.hit_scene_spin =
                             shell.hit_scene_worldsize =
                                 shell.hit_scene_bounce =
@@ -2561,12 +2586,16 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
           ((shell.pointer_x - pv.x) / sx - tm.x) / tm.tile_w));
       const int hy = static_cast<int>(std::floor(
           ((shell.pointer_y - pv.y) / sy - tm.y) / tm.tile_h));
-      if (hx >= 0 && hx < tm.columns && hy >= 0)
+      if (hx >= 0 && hx < tm.columns && hy >= 0) {
+        // Outline the whole brush footprint, not just the hovered cell.
+        const int brush = std::clamp(shell.scene_paint_brush, 1, 8);
+        const int lo = -(brush / 2);
         out.overlay.push_back(StrokedRectangle{
-            {pv.x + (tm.x + hx * tm.tile_w) * sx,
-             pv.y + (tm.y + hy * tm.tile_h) * sy, tm.tile_w * sx,
-             tm.tile_h * sy},
+            {pv.x + (tm.x + (hx + lo) * tm.tile_w) * sx,
+             pv.y + (tm.y + (hy + lo) * tm.tile_h) * sy,
+             brush * tm.tile_w * sx, brush * tm.tile_h * sy},
             accent});
+      }
     }
     // Tile picker: the decoded sheet as a strip along the preview's top —
     // clicking a cell selects it as the brush instead of painting.
@@ -2792,6 +2821,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         std::to_string(shell.scene_paint_cell),
         shell.editing_scene && shell.scene_field == 37,
         "brush tile id, -1 erases");
+  field(shell.hit_scene_brushsz, "brushsz",
+        std::to_string(shell.scene_paint_brush),
+        shell.editing_scene && shell.scene_field == 42,
+        "NxN stamp per click, 1..8");
   field(shell.hit_scene_music, "music", shell.scene_doc.music,
         shell.editing_scene && shell.scene_field == 38,
         "content-relative track played on scene load");
@@ -5791,6 +5824,8 @@ int main(int argc, char **argv) {
               edit_field(36);
             else if (shell.hit_scene_paintcell.contains(event.position))
               edit_field(37);
+            else if (shell.hit_scene_brushsz.contains(event.position))
+              edit_field(42);
             else if (shell.hit_scene_music.contains(event.position))
               edit_field(38);
             else if (shell.hit_scene_spin.contains(event.position))
