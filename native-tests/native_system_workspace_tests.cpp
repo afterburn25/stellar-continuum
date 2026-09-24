@@ -83,13 +83,18 @@ int main(int argc,char**argv)try{
     const UiRect launcher{field_rect.x+12*s,field_rect.y+field_rect.height-35*s,180*s,29*s};
     const auto ring_at=[&](const DrawList&scene,UiRect r){return std::ranges::any_of(scene.overlay,[&](const UiOverlayCommand&item){const auto*stroke=std::get_if<StrokedRectangle>(&item);return stroke&&stroke->bounds.x==r.x&&stroke->bounds.y==r.y&&stroke->bounds.width==r.width&&stroke->color.r==164;});};
     require(!keys.small_body_keyboard_focus(),"small-body ring started focused");
+    require(keys.focused()<0&&keys.focused_label(1920,1080).empty(),"unfocused workspace reported a label");
     require(key(kTab).captured&&keys.small_body_keyboard_focus(),"Tab did not focus the small-body ring");
+    require(keys.focused()==0&&keys.focused_label(1920,1080)=="Paused / Resume","focused_label did not name the motion toggle");
     DrawList closed_draw;keys.render(closed_draw,1920,1080);
     require(ring_at(closed_draw,motion),"focus ring did not land on the motion toggle first");
     require(key(kReturn).kind==SystemWorkspaceCommandKind::toggle_motion,"Return did not activate the focused motion toggle");
+    require(keys.focused()==0&&keys.focused_label(1920,1080)=="Paused / Resume","activation lost the motion toggle's focus label");
     require(key(kEnd).captured,"End did not reach the launcher");
+    require(keys.focused_label(1920,1080)=="BELTS & DEBRIS  "+std::to_string(reference.small_body_fields.size()),"focused_label did not name the launcher");
     (void)key(kReturn);
     require(key(kHome).captured,"Home did not reach the close control");
+    require(keys.focused_label(1920,1080)=="Close","focused_label did not name the panel close control");
     DrawList open_draw;keys.render(open_draw,1920,1080);
     require(has_overlay_text(open_draw,"SMALL-BODY SURVEY"),"Return on the launcher did not open the survey panel");
     const UiRect close_rect{field_rect.x+12*s+std::min(450*s,field_rect.width-24*s)-65*s,field_rect.y+8*s+9*s,55*s,25*s};

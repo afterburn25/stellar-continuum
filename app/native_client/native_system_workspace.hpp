@@ -108,6 +108,11 @@ public:
   [[nodiscard]] std::optional<int> system_id()const noexcept;
   [[nodiscard]] std::optional<int> selected_body_id()const noexcept{return selected_body_id_;}
   [[nodiscard]] bool small_body_keyboard_focus()const noexcept{return small_body_ring_>=0;}
+  // Keyboard ring index over the small-body controls (-1 when unfocused).
+  [[nodiscard]] int focused()const noexcept{return small_body_ring_;}
+  // Localized label of the ringed small-body control for
+  // screen-reader/live-region consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width,int height)const;
   [[nodiscard]] std::optional<stellar::core::SmallBodyInstance> focused_small_body()const{
     if(!snapshot_||!small_body_focus_||snapshot_->small_body_fields.empty())return std::nullopt;
     const auto& f=snapshot_->small_body_fields[small_body_field_%snapshot_->small_body_fields.size()];
@@ -143,6 +148,10 @@ private:
   void sync_body_inspection();
   std::optional<SystemWorkspaceCommand> handle_small_bodies(const stellar::native_map::InputEvent&,int,int);
   void render_small_body_panel(stellar::native_map::DrawList&,int,int);
+  // Ordered (y,x) focus ring for the small-body chrome; each entry carries
+  // the localized label it renders so announcements match the screen.
+  [[nodiscard]] std::vector<std::pair<stellar::native_map::UiRect,std::string>>
+      small_body_ring_targets(int width,int height)const;
   [[nodiscard]] const stellar::native_system::NativeSystemBody *selected_body()const noexcept;
   [[nodiscard]] const stellar::native_system_travel::NativeLocalFleetMarker *selected_fleet()const noexcept;
   [[nodiscard]] std::vector<int> fleet_hits(stellar::native_map::Point)const;

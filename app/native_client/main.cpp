@@ -6219,7 +6219,10 @@ class NativeCampaign final {
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
         if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
+          const int focus_before=system_workspace_.focused();
           const auto command=system_workspace_.handle(event,width,height);
+          if(command.captured&&system_workspace_.focused()!=focus_before)
+            announcer_.announce(system_workspace_.focused_label(width,height));
           if(command.kind==SystemWorkspaceCommandKind::close){system_workspace_.close();gesture_.cancel();}
           else if(command.kind==SystemWorkspaceCommandKind::toggle_motion){
             auto& clock=session_->frame().clock();if(clock.speed()==StrategicSpeed::Paused)clock.resume();else clock.set_speed(StrategicSpeed::Paused);
