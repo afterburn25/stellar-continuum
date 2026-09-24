@@ -720,6 +720,21 @@ identity — the 14-row viewport clamps while the projection is larger,
 so the oracle compares ordered row labels and depth indents
 (`clip.x`), not row counts; 10/10 diagnostics/projection/UI surface
 green (qa_host 42 s).
+Entities tree keyboard contract (row-24 follow-on): `TreeModel` owns
+an id-stable selection — `select`/`selected`/`move_selection` over the
+flattened view; the selection clears when its id is absent (a
+`select` after rebuild) or hidden inside a collapsed subtree (the next
+`move_selection` drains it). The ENTITIES inspector consumes it:
+arrows/Home/End move the selection with the scroll window following
+(`first_` clamps so the row stays visible), Left collapses an
+expanded parent or jumps to the parent row, Right expands or descends
+to the first child, Return/Space toggles, a row click selects as well
+as toggles, and the selected row renders with an accent fill + cyan
+label. Selection persists across `sync_campaign_world` rebuilds by
+node id, same as the expansion sets. `batcher_ui` covers the model
+semantics (walk/clamp/hidden-clear/absent-clear);
+`native_developer_diagnostics` drives the key contract end-to-end;
+10/10 diagnostics/projection/UI surface green (qa_host 44 s).
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

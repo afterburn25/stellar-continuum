@@ -59,20 +59,49 @@ public:
         const int released=first_+static_cast<int>((e.position.y-l.list.y)/(33*l.scale));
         if(released==row&&l.list.contains(e.position)&&row<static_cast<int>(entity_flat_.size())){
           const auto *node=entity_flat_[row].first;
-          if(!node->children.empty()){
-            const bool expand=!node->expanded;
-            entity_tree_.set_expanded(node->id,expand);
-            // Roots persist collapses; deeper nodes persist expansions
-            // (roots default open, deeper levels default closed).
-            if(node->parent_id.empty()){
-              if(expand)entity_collapsed_.erase(node->id);else entity_collapsed_.insert(node->id);
-            }else{
-              if(expand)entity_expanded_.insert(node->id);else entity_expanded_.erase(node->id);
-            }
-            entity_flat_=entity_tree_.flattened();
-          }
+          entity_selected_=node->id;entity_tree_.select(node->id);
+          if(!node->children.empty())set_entity_expanded(*node,!node->expanded);
         }
       }
+    }
+    if(e.type==InputEventType::KeyPressed&&entities_&&!entities_dirty_){
+      // SDL_Keycode arrows/Home/End/Return/Space drive the tree's
+      // selection contract — the same semantics the editor's list gets.
+      constexpr std::uint32_t kReturn=13u,kSpace=32u;
+      constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+      constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+      const auto row_of=[&](std::string_view id){
+        for(std::size_t i=0;i<entity_flat_.size();++i)
+          if(entity_flat_[i].first->id==id)return static_cast<int>(i);
+        return -1;};
+      const auto select_row=[&](int row){
+        if(row<0||row>=static_cast<int>(entity_flat_.size()))return;
+        entity_selected_=entity_flat_[row].first->id;
+        entity_tree_.select(entity_selected_);
+        first_=std::clamp(first_,row-13,row);};
+      if(e.key==kHome||e.key==kEnd){
+        select_row(e.key==kHome?0:static_cast<int>(entity_flat_.size())-1);
+      }else if(e.key==kDown||e.key==kUp){
+        if(entity_tree_.selected()==nullptr)
+          select_row(e.key==kDown?0:static_cast<int>(entity_flat_.size())-1);
+        else{
+          entity_tree_.move_selection(e.key==kDown?1:-1);
+          entity_selected_=entity_tree_.selected_id();
+          select_row(row_of(entity_selected_));
+        }
+      }else if(const int row=row_of(entity_selected_);row>=0){
+        const auto *node=entity_flat_[row].first;
+        if(e.key==kRight){
+          if(!node->children.empty()){
+            if(node->expanded)select_row(row+1);else set_entity_expanded(*node,true);
+          }
+        }else if(e.key==kLeft){
+          if(!node->children.empty()&&node->expanded)set_entity_expanded(*node,false);
+          else if(!node->parent_id.empty())select_row(row_of(node->parent_id));
+        }else if((e.key==kReturn||e.key==kSpace)&&!node->children.empty())
+          set_entity_expanded(*node,!node->expanded);
+      }
+      return true;
     }
     return true;
   }
@@ -170,6 +199,10 @@ public:
           if(placed.insert(e.value()).second)
             entity_tree_.add(node_id(e),entity_line(e)).expanded=!entity_collapsed_.contains(node_id(e));
         entity_flat_=entity_tree_.flattened();
+        // Selection is id-stable like the expansion sets — re-apply it;
+        // a node the sync removed simply clears.
+        entity_tree_.select(entity_selected_);
+        entity_selected_=entity_tree_.selected_id();
         entities_dirty_=false;
       }
       label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(entity_total_)+" projected entities · "+std::to_string(entity_parented_)+" parented · "+number(entity_bytes_/1024.)+" KiB estimated container footprint · "+
@@ -178,10 +211,12 @@ public:
       for(int i=0;i<14&&begin+i<static_cast<int>(entity_flat_.size());++i){
         const auto &[node,depth]=entity_flat_[begin+i];
         const auto y=l.list.y+i*33*s;
-        if(i%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
+        const bool selected=node->id==entity_selected_;
+        if(selected)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{24,64,88,230}});
+        else if(i%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
         const float indent=8*s+static_cast<float>(depth)*20*s;
         const std::string glyph=node->children.empty()?"· ":(node->expanded?"▾ ":"› ");
-        label({l.list.x+indent,y+4*s,l.list.width-indent-8*s,25*s},glyph+node->label_key);
+        label({l.list.x+indent,y+4*s,l.list.width-indent-8*s,25*s},glyph+node->label_key,selected?native_menu_style::cyan:native_menu_style::ink);
       }
       if(entity_flat_.empty())label(l.list,"The campaign projected no entities.");
     }else if(!events_){
@@ -241,8 +276,27 @@ private:
   mutable stellar::engine::TreeModel entity_tree_;
   mutable std::vector<std::pair<const stellar::engine::TreeModel::Node *,int>> entity_flat_;
   mutable std::unordered_set<std::string> entity_expanded_,entity_collapsed_;
+  mutable std::string entity_selected_;
   mutable int entity_parented_{};
   mutable std::size_t entity_bytes_{},entity_total_{};
+  void set_entity_expanded(const stellar::engine::TreeModel::Node &node,bool expand){
+    entity_tree_.set_expanded(node.id,expand);
+    // Roots persist collapses; deeper nodes persist expansions
+    // (roots default open, deeper levels default closed).
+    if(node.parent_id.empty()){
+      if(expand)entity_collapsed_.erase(node.id);else entity_collapsed_.insert(node.id);
+    }else{
+      if(expand)entity_expanded_.insert(node.id);else entity_expanded_.erase(node.id);
+    }
+    entity_flat_=entity_tree_.flattened();
+    // Collapsing an ancestor hides a selected descendant — fall back to
+    // the toggled row so the selection stays on a visible node.
+    if(!entity_selected_.empty()){
+      bool visible=false;
+      for(const auto &r:entity_flat_)if(r.first->id==entity_selected_){visible=true;break;}
+      if(!visible){entity_selected_=node.id;entity_tree_.select(node.id);}
+    }
+  }
   void refresh(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     snapshot_.clear();for(auto i=monitor.history().records().rbegin();i!=monitor.history().records().rend();++i)snapshot_.push_back(i->record);
   }

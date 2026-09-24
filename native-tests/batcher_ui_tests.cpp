@@ -102,6 +102,26 @@ int main() {
   check(flat.size() == 5, "nested expansion");
   check(flat[3].second == 3, "luna depth 3");
 
+  // Selection is stable by id and navigates the flattened view.
+  tree.select("earth");
+  check(tree.selected() && tree.selected_id() == "earth",
+        "select finds node");
+  check(tree.move_selection(1) && tree.selected_id() == "luna",
+        "selection walks the flat view");
+  check(tree.move_selection(-2) && tree.selected_id() == "sol",
+        "selection climbs across depths");
+  check(tree.move_selection(-1) && tree.selected_id() == "galaxy",
+        "selection reaches the root");
+  check(!tree.move_selection(-1), "selection clamps at the head");
+  tree.select("alpha");
+  check(!tree.move_selection(1), "selection clamps at the tail");
+  tree.select("earth");
+  tree.set_expanded("sol", false); // earth hides inside the collapse
+  check(!tree.move_selection(1) && tree.selected_id().empty(),
+        "a selection hidden by collapse clears on navigation");
+  tree.select("absent");
+  check(tree.selected() == nullptr, "selecting an absent id clears");
+
   if (failures == 0)
     std::cout << "Draw batcher and UI view-model tests passed\n";
   return failures == 0 ? 0 : 1;

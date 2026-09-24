@@ -142,6 +142,33 @@ int main(int argc,char **argv)try{
       bool same=restored.size()==expanded_view.size();
       for(std::size_t k=0;same&&k<expanded_view.size();++k)same=restored[k].first==expanded_view[k].first;
       check(same,"Re-expanding a parent row did not restore its subtree.");
+      // Keyboard contract: arrows move a cyan-marked selection over the
+      // flattened rows, Left collapses an expanded parent or jumps to
+      // the parent row, Right expands or descends, Home/End jump the
+      // ends and the scroll window follows the selection.
+      {
+        const auto selected=[](const DrawList &d){
+          for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&
+              t->color.g==221&&t->color.b==240&&
+              (t->value.starts_with("▾ ")||t->value.starts_with("› ")||t->value.starts_with("· ")))return t->value;
+          return std::string{};};
+        const auto key=[&](std::uint32_t k){InputEvent e{InputEventType::KeyPressed};e.key=k;(void)window.handle(e,w,h,monitor);};
+        constexpr std::uint32_t kReturn=13u,kSpace=32u;
+        constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+        constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+        key(kEnd);check(selected(draw())==rows(draw()).back().first,"End did not select the last entity row.");
+        key(kHome);check(selected(draw())==expanded_view[0].first,"Home did not select the first entity row.");
+        key(kDown);check(selected(draw())==expanded_view[1].first,"Down did not advance the entity selection.");
+        key(kUp);check(selected(draw())==expanded_view[0].first,"Up did not move the entity selection back.");
+        for(std::size_t i=0;i<pi;++i)key(kDown);
+        check(selected(draw())==expanded_view[pi].first,"Arrows did not reach the parent row.");
+        key(kLeft);check(selected(draw())==collapsed_text,"Left did not collapse the selected parent row.");
+        key(kRight);check(selected(draw())==expanded_view[pi].first,"Right did not re-expand the selected row.");
+        key(kDown);check(selected(draw())==expanded_view[pi+1].first,"Down did not descend to the first child row.");
+        key(kLeft);check(selected(draw())==expanded_view[pi].first,"Left on a child row did not jump to its parent.");
+        key(kSpace);check(selected(draw())==collapsed_text,"Space did not toggle the selected parent row.");
+        key(kReturn);check(selected(draw())==expanded_view[pi].first,"Return did not re-expand the selected row.");
+      }
     }
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Entities inspector modified world state.");
     click("CLOSE");check(!window.visible()&&!window.handle({InputEventType::LeftPressed},w,h,monitor),"Closed diagnostics captured gameplay.");

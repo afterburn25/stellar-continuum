@@ -93,6 +93,17 @@ public:
   void set_expanded(std::string_view id, bool expanded);
   bool is_expanded(std::string_view id) const;
 
+  // Selection, stable by node id. select() clears when the id is absent,
+  // so a consumer can re-apply a persisted id after a rebuild.
+  void select(std::string_view id);
+  void clear_selection() { selected_.clear(); }
+  const Node *selected() const;
+  std::string_view selected_id() const { return selected_; }
+  // Moves the selection delta rows through the flattened (visible) view;
+  // clears a selection that is not currently visible. Returns true when
+  // the selection changed.
+  bool move_selection(int delta);
+
   // Depth-first flattened view: visible rows (a node appears only when all
   // ancestors are expanded). Pair = (node, depth).
   std::vector<std::pair<const Node *, int>> flattened() const;
@@ -100,6 +111,7 @@ public:
 private:
   std::vector<Node> nodes_;                       // stable by pointer? no —
   std::vector<std::string> roots_;                // ids only
+  std::string selected_;
   Node *find_node(std::string_view id);
 };
 

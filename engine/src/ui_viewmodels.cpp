@@ -149,6 +149,29 @@ bool TreeModel::is_expanded(std::string_view id) const {
   return node != nullptr && node->expanded;
 }
 
+void TreeModel::select(std::string_view id) {
+  selected_ = find(id) != nullptr ? std::string(id) : std::string{};
+}
+const TreeModel::Node *TreeModel::selected() const {
+  return selected_.empty() ? nullptr : find(selected_);
+}
+bool TreeModel::move_selection(int delta) {
+  if (delta == 0)
+    return false;
+  const auto flat = flattened();
+  for (std::size_t i = 0; i < flat.size(); ++i) {
+    if (flat[i].first->id != selected_)
+      continue;
+    const auto next = static_cast<std::ptrdiff_t>(i) + delta;
+    if (next < 0 || next >= static_cast<std::ptrdiff_t>(flat.size()))
+      return false;
+    selected_ = flat[static_cast<std::size_t>(next)].first->id;
+    return true;
+  }
+  selected_.clear();
+  return false;
+}
+
 std::vector<std::pair<const TreeModel::Node *, int>>
 TreeModel::flattened() const {
   std::vector<std::pair<const Node *, int>> result;
