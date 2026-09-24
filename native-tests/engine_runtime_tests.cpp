@@ -395,6 +395,7 @@ int main() {
     int updates = 0;
     EntityId spawned{};
     std::size_t in_box = 0, in_radius = 0, out_of_radius = 0;
+    std::optional<RuntimeHost::RaycastHit3D> hit, miss;
     host.on_update = [&](World &, float) {
       ++updates;
       if (updates == 1) {
@@ -411,6 +412,10 @@ int main() {
             host.entities3d_in_radius(50.f, 0.f, -30.f, 10.f).size();
         out_of_radius =
             host.entities3d_in_radius(-500.f, 0.f, 0.f, 10.f).size();
+        // Raycast straight at the crate's center from the -X side, and
+        // a parallel ray that misses it entirely.
+        hit = host.raycast3d(0.0, 0.0, -30.0, 1.f, 0.f, 0.f, 200.f);
+        miss = host.raycast3d(0.0, 0.0, 200.0, 1.f, 0.f, 0.f, 200.f);
       }
     };
     check(host.run() == 0, "3D spawn run exits cleanly");
@@ -420,6 +425,11 @@ int main() {
     check(in_box == 1, "entities3d_in_box finds the crate");
     check(in_radius == 1, "entities3d_in_radius finds the crate");
     check(out_of_radius == 0, "entities3d_in_radius excludes far entities");
+    check(hit.has_value() && hit->entity == spawned,
+          "raycast3d hits the crate");
+    check(hit.has_value() && hit->distance > 40.f && hit->distance < 50.f,
+          "raycast3d reports a sane hit distance");
+    check(!miss.has_value(), "raycast3d misses off-axis");
   }
 
   // set_scene swaps the spawned set mid-run — level switching.
