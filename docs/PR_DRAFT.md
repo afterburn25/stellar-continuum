@@ -95,8 +95,10 @@ Core/engine projections, never re-derived in UI.
 - `IntegratedAdaptiveCampaignRuntime` records chronicle entries every
   advance; `DiplomacyState` read-only journal accessors
 - Engine view-model framework adoption — `VirtualizedList` (colony
-  roster, editor systems list, all four diagnostics views with
-  selection-follow + tail clamping), `TableModel` (roster sort/filter +
+  roster, editor systems list, all four diagnostics views, both
+  developer indexes, empire monitor, phenomena dump — `sync_rows` owns
+  the shared configure/clamp/snap contract, with selection-follow +
+  tail clamping), `TableModel` (roster sort/filter +
   diagnostics phase-table sort, `refilter` keeps state across live
   `set_rows`), `TreeModel` (editor system list, diagnostics ENTITIES
   inspector with id-stable selection + detail pane + search reveal,

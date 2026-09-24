@@ -375,9 +375,9 @@ void RosterWorkspace::discard_campaign() noexcept {
   display_order_.clear();
 }
 void RosterWorkspace::sync_scroll(const RosterLayout &layout) const noexcept {
-  list_.row_count = display_order_.size();
-  list_.row_height = layout.row_height + 5.f * layout.scale;
-  list_.viewport_height = layout.list.height;
+  list_.configure(display_order_.size(),
+                  layout.row_height + 5.f * layout.scale,
+                  layout.list.height);
 }
 float RosterWorkspace::maximum_scroll(
     const RosterLayout &layout) const noexcept {
@@ -409,7 +409,6 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
   }
   const auto layout = RosterLayout::for_viewport(width, height);
   sync_scroll(layout);
-  list_.scroll_to(list_.scroll_offset);
   if (event.type == InputEventType::PointerCancelled) {
     focus_ = -1;
     clear_press();
@@ -672,7 +671,6 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
          font - 2, muted, p);
   }
   const float maximum = maximum_scroll(layout);
-  list_.scroll_to(list_.scroll_offset);
   for (std::size_t i = 0; i < display_order_.size(); ++i) {
     const auto box = row_button(static_cast<int>(i), width, height);
     const auto visible = clip_intersection(box, layout.list);

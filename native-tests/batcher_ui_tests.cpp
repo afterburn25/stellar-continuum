@@ -73,6 +73,25 @@ int main() {
   check(snapped.scroll_offset == snapped.max_scroll(), "clamp lands on max_scroll");
   check(snapped.sync_rows(0, 24.0f, 240.0f) == 0 && snapped.scroll_offset == 0.0f,
         "sync_rows empties to row zero");
+  // configure/set_row_count re-clamp without snapping — fractional
+  // (partially-scrolled) offsets stay fractional.
+  VirtualizedList fractional;
+  fractional.configure(1000, 24.0f, 240.0f);
+  fractional.scroll_offset = 100.5f;
+  fractional.set_row_count(1000);
+  check(fractional.scroll_offset == 100.5f,
+        "set_row_count preserves a fractional offset");
+  fractional.scroll_offset = 1000.5f;
+  fractional.set_row_count(40);
+  check(fractional.scroll_offset == 40.0f * 24.0f - 240.0f,
+        "set_row_count clamps a stale offset on shrink");
+  fractional.scroll_offset = 1000.5f;
+  fractional.configure(40, 24.0f, 240.0f);
+  check(fractional.scroll_offset == 720.0f,
+        "configure clamps a stale offset without snapping");
+  fractional.configure(40, 24.0f, 480.0f);
+  check(fractional.scroll_offset == 480.0f,
+        "configure re-clamps when the viewport grows");
 
   // --- Table model ---
   TableModel table;

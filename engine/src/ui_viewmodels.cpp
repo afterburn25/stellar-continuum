@@ -42,12 +42,22 @@ void VirtualizedList::scroll_to(float offset) {
   scroll_offset = std::clamp(offset, 0.0f, max_scroll());
 }
 
-std::size_t VirtualizedList::sync_rows(std::size_t rows, float new_row_height,
-                                       float new_viewport_height) {
+void VirtualizedList::configure(std::size_t rows, float new_row_height,
+                                float new_viewport_height) {
   row_count = rows;
   row_height = new_row_height;
   viewport_height = new_viewport_height;
   scroll_to(scroll_offset);
+}
+
+void VirtualizedList::set_row_count(std::size_t rows) {
+  row_count = rows;
+  scroll_to(scroll_offset);
+}
+
+std::size_t VirtualizedList::sync_rows(std::size_t rows, float new_row_height,
+                                       float new_viewport_height) {
+  configure(rows, new_row_height, new_viewport_height);
   if (row_height > 0.0f)
     scroll_offset =
         std::floor(scroll_offset / row_height) * row_height;

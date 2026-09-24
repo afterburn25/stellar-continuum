@@ -951,10 +951,28 @@ Pending announcements surface through the existing voice-caption
 channel — `render_voice_caption` gained a UI-announcement fallback
 shown only while subtitles are enabled (4s expiry). `economy_animation`
 covers dedup/preemption/eviction/drain order; the client links clean.
-Still open: platform AT bridging (UIA/AT-SPI), per-surface
-focused-label announcements beyond the menu, and the always-on HUD
-chrome ring (needs a focus-group policy — `assets_`/`fleet_workspace_`
-already claim keys on the clean map).
+Still open: platform AT bridging (UIA/AT-SPI) and per-surface
+focused-label announcements beyond the menu and HUD chrome.
+Map focus groups + HUD chrome ring (row-26 accessibility): the clean
+map now chains its always-on focus groups — `map_focus_group_` orders
+assets navigator -> fleet outliner -> HUD chrome. A nav key that would
+wrap a group's boundary releases the ring uncaptured (`focus_` resets)
+so the dispatcher hands the same key to the next group; activation
+keys only reach the group holding focus, pointer presses/cancels and
+`map_hud_visible()` transitions reset the chain, and nav keys never
+fall through to raw handlers (claimed or not, they are consumed by the
+chain). `NativeUiLayout::hud_actions()` exposes the 17 HUD actions in
+(y,x) order — top strip, nav bar, rail; the EVENTS item drops out when
+the feed is unavailable — and `hud_focus_` rings the focused control
+while activation replays the pointer dispatch paths (pause/resume,
+speed cycle, feed toggle, menu, `route_navigation`); focus changes cue
+the hover sound and announce the localized label. This also repaired a
+latent gap: the fleet outliner's keyboard block was unreachable
+because the navigator claimed every nav key first. Navigator and fleet
+tests gained wrap-out coverage; the client links clean. The windowed
+campaign class still has no headless event-loop harness, so the chain
+itself is verified by unit coverage of the wrap-out contract plus
+build/inspection.
 VirtualizedList::sync_rows (row 24): the configure+clamp+snap step
 every VirtualizedList consumer hand-rolled (assign row count/height/
 viewport, re-bound a stale offset, quantize to a whole row, derive the
@@ -965,11 +983,24 @@ returns the first visible row. The diagnostics panel's `scroll_window`
 helper, both developer indexes, the empire monitor's two lists, and
 the phenomena dump all delegate to it, deleting five copies of the
 same arithmetic. `batcher_ui` covers snap-to-edge, stale-offset
-tail clamp, and empty-list reset. `batcher_ui`,
+tail clamp, and empty-list reset.
+VirtualizedList configure/set_row_count (row 24): the fractional-scroll
+consumers (colony roster, editor system/detail/picker lists,
+engine-shell asset/key/project/entity/scene lists) cannot snap to row
+edges — their first row renders partially by design — but their direct
+`row_count`/`viewport_height` field assignments never re-clamped
+`scroll_offset`, so a filtered or shrunk row set could strand it past
+`max_scroll` and render blank space. `configure(rows, row_height,
+viewport_height)` applies geometry + re-clamps without snapping;
+`set_row_count(rows)` does the same for row-only mutations; every
+assignment site now routes through one of them (a shrink while scrolled
+deep lands on the tail instead of blank space). `batcher_ui` covers
+fractional preservation, shrink clamp, and viewport-growth re-clamp.
+`batcher_ui`,
 `native_developer_diagnostics`, `native_developer_index`,
 `galaxy_phenomena`, `native_colony_roster`, `native_controlled_assets`,
-`campaign_world_projection`, `engine_diagnostics` green; client builds
-clean.
+`campaign_world_projection`, `engine_diagnostics` green; client, editor
+and engine-shell targets build clean.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

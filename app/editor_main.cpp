@@ -400,7 +400,7 @@ void rebuild_tree(Editor &ed) {
                            node.id);
   }
   ed.flat_rows = ed.system_tree.flattened();
-  ed.system_list.row_count = ed.flat_rows.size();
+  ed.system_list.set_row_count(ed.flat_rows.size());
 }
 
 std::size_t flat_pos_of_system(const Editor &ed, std::size_t sys_index) {
@@ -652,11 +652,11 @@ void rebuild_detail_rows(Editor &ed) {
   if (ed.view != WorkspaceView::Galaxy &&
       ed.selected_body < ed.bodies.size()) {
     rebuild_body_rows(ed, ed.bodies[ed.selected_body]);
-    ed.detail_list.row_count = ed.detail_rows.size();
+    ed.detail_list.set_row_count(ed.detail_rows.size());
     return;
   }
   if (ed.selected >= ed.systems.size()) {
-    ed.detail_list.row_count = 0;
+    ed.detail_list.set_row_count(0);
     return;
   }
   const auto &sys = ed.systems[ed.selected];
@@ -766,7 +766,7 @@ void rebuild_detail_rows(Editor &ed) {
     }
   }
 
-  ed.detail_list.row_count = ed.detail_rows.size();
+  ed.detail_list.set_row_count(ed.detail_rows.size());
 }
 
 Point world_to_screen(const Editor &ed, float x, float y) {
@@ -992,8 +992,8 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   ed.detail_rect = detail;
   out.overlay.push_back(FilledRectangle{detail, {5, 13, 22, 255}});
   out.overlay.push_back(StrokedRectangle{detail, panel_edge});
-  ed.detail_list.viewport_height = detail.height;
-  ed.detail_list.row_height = font + 8.f;
+  ed.detail_list.configure(ed.detail_rows.size(), font + 8.f,
+                           detail.height);
   const auto range = ed.detail_list.visible_range();
   float ry = detail.y + 4 * s - ed.detail_list.scroll_offset +
              range.first * ed.detail_list.row_height;
@@ -1051,8 +1051,7 @@ void render_system_list(DrawList &out, Editor &ed, float s) {
   ed.rows_rect = list;
   out.overlay.push_back(FilledRectangle{list, {5, 13, 22, 255}});
   out.overlay.push_back(StrokedRectangle{list, panel_edge});
-  ed.system_list.viewport_height = list.height;
-  ed.system_list.row_height = 20.f;
+  ed.system_list.configure(ed.flat_rows.size(), 20.f, list.height);
   const auto range = ed.system_list.visible_range();
   float ry = list.y - ed.system_list.scroll_offset +
              range.first * ed.system_list.row_height;
@@ -1135,8 +1134,8 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
                     r.height - 30 * s - font * 2};
   out.overlay.push_back(FilledRectangle{rows, {5, 13, 22, 255}});
   out.overlay.push_back(StrokedRectangle{rows, panel_edge});
-  ed.picker_list.viewport_height = rows.height;
-  ed.picker_list.row_height = font + 10.f;
+  ed.picker_list.configure(ed.project_files.size(), font + 10.f,
+                           rows.height);
   // Hit geometry starts at the first row top (below the 4*s inset).
   ed.picker_rows = {rows.x, rows.y + 4 * s, rows.width, rows.height - 4 * s};
   const auto range = ed.picker_list.visible_range();
@@ -1289,7 +1288,7 @@ void open_picker(Editor &ed) {
         ed.project_files.push_back(entry.path());
     }
   std::sort(ed.project_files.begin(), ed.project_files.end());
-  ed.picker_list.row_count = ed.project_files.size();
+  ed.picker_list.set_row_count(ed.project_files.size());
   ed.picker_list.scroll_to(0);
   ed.picker_open = true;
   if (ed.project_files.empty())

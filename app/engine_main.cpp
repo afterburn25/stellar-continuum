@@ -550,8 +550,8 @@ void scan_assets(Shell &shell, std::filesystem::path root) {
     if (shell.asset_files.size() >= 20000) break;
   }
   std::ranges::sort(shell.asset_files);
-  shell.asset_list.row_count = shell.asset_files.size();
   shell.asset_list.row_height = 22.f;
+  shell.asset_list.set_row_count(shell.asset_files.size());
 }
 
 // Projects tool -----------------------------------------------------------
@@ -564,8 +564,8 @@ void scan_assets(Shell &shell, std::filesystem::path root) {
 
 void refresh_projects(Shell &shell) {
   shell.projects = engine::find_projects(shell.projects_root);
-  shell.project_list.row_count = shell.projects.size();
   shell.project_list.row_height = 24.f;
+  shell.project_list.set_row_count(shell.projects.size());
   if (shell.selected_project >= shell.projects.size())
     shell.selected_project = shell.projects.empty()
                                  ? static_cast<std::size_t>(-1)
@@ -1940,9 +1940,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
   shell.scene3_rows = list_rect;
-  shell.scene3_list.viewport_height = list_rect.height;
-  shell.scene3_list.row_height = 22 * s;
-  shell.scene3_list.row_count = doc.entities.size();
+  shell.scene3_list.configure(doc.entities.size(), 22 * s,
+                              list_rect.height);
   const auto range = shell.scene3_list.visible_range();
   float ry = list_rect.y - shell.scene3_list.scroll_offset +
              range.first * shell.scene3_list.row_height;
@@ -2263,9 +2262,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
   shell.scene_rows = list_rect;
-  shell.entity_list.viewport_height = list_rect.height;
-  shell.entity_list.row_height = 22 * s;
-  shell.entity_list.row_count = shell.scene_doc.entities.size();
+  shell.entity_list.configure(shell.scene_doc.entities.size(), 22 * s,
+                              list_rect.height);
   const auto range = shell.entity_list.visible_range();
   float ry = list_rect.y - shell.entity_list.scroll_offset +
              range.first * shell.entity_list.row_height;
@@ -2804,13 +2802,12 @@ void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
   }
   if (shell.show_cooked && shell.cooked_dirty.exchange(false))
     load_cooked(shell);
-  shell.asset_list.row_count = row_count;
-
   const UiRect list_rect = tool_list_rect(body, s, 0.48f);
   out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
 
-  shell.asset_list.viewport_height = list_rect.height;
+  shell.asset_list.configure(row_count, shell.asset_list.row_height,
+                             list_rect.height);
   const auto range = shell.asset_list.visible_range();
   const float row_h = shell.asset_list.row_height;
   float ry = list_rect.y - shell.asset_list.scroll_offset +
@@ -2952,9 +2949,8 @@ void render_localization(DrawList &out, Shell &shell, UiRect body, float s,
   const UiRect list_rect = tool_list_rect(body, s, 1.0f);
   out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
-  shell.key_list.row_count = shell.sample_keys.size();
-  shell.key_list.row_height = 22.f;
-  shell.key_list.viewport_height = list_rect.height;
+  shell.key_list.configure(shell.sample_keys.size(), 22.f,
+                           list_rect.height);
   const auto range = shell.key_list.visible_range();
   float ry = list_rect.y - shell.key_list.scroll_offset +
              range.first * shell.key_list.row_height;
@@ -4983,7 +4979,9 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
                         body.y + body.height - y - 16 * s};
   out.overlay.push_back(FilledRectangle{shell.project_rows, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{shell.project_rows, panel_edge});
-  shell.project_list.viewport_height = shell.project_rows.height;
+  shell.project_list.configure(shell.projects.size(),
+                               shell.project_list.row_height,
+                               shell.project_rows.height);
   const auto range = shell.project_list.visible_range();
   float ry = shell.project_rows.y - shell.project_list.scroll_offset +
              range.first * shell.project_list.row_height;

@@ -31,6 +31,15 @@ struct VirtualizedList {
   void ensure_visible(std::size_t row);
   float max_scroll() const;
   void scroll_to(float offset);
+  // Applies the row count and viewport geometry then re-clamps
+  // scroll_offset against the new maximum — call whenever the row source
+  // or viewport changes so a shrink cannot strand the scroll past the
+  // tail. Fractional offsets are preserved.
+  void configure(std::size_t rows, float row_height,
+                 float viewport_height);
+  // Sets the row count and re-clamps scroll_offset — for row-source
+  // shrinks (filters, rebuilds) where the geometry is unchanged.
+  void set_row_count(std::size_t rows);
   // Frame sync for row-snapped consumers: reconfigures the model,
   // re-clamps the offset against the new content (a shrinking row set
   // can never strand it past the tail), snaps down to a whole-row
