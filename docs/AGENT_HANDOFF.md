@@ -1196,8 +1196,15 @@ navigation smoke's pad/right-click rebind exercise. Note: commit
 inspection card without resetting `selected_id_`, so the unconditional
 `refresh_inspection()` reopened it the same frame; the chain now clears
 the selection with the card, matching the card's own close path.
-Open: multi-pad disambiguation and axis bindings in the UI — mapper-level
-follow-ups, not blockers.
+Pad camera axes landed in the same lane: `GALAXY_PAD` (Axis1D over SDL
+axes 0/1/3 — left stick pans, right stick zooms, 0.18 dead zone,
+dt-scaled) is a separate non-rebindable context that `load_user_bindings`
+re-registers after a user-map load so older saved maps cannot clobber it.
+The navigation smoke verifies stick pan + zoom end-to-end and that the
+system view does not leak a galaxy-camera pan. The Controls view lists
+the axes as a hint line.
+Open: multi-pad disambiguation and axis capture in the rebind UI —
+mapper-level follow-ups, not blockers.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

@@ -180,6 +180,12 @@ public:
               :stellar::engine::describe_bindings(bindings);
           button(out,rects[i],action_label(rows[i]->name)+" — "+value,static_cast<int>(16*s),hot||capture_==static_cast<int>(i),true,s);
         }
+        // Gamepad axes bind in the non-rebindable GALAXY_PAD context — the
+        // hint keeps stick camera control discoverable beside the rows.
+        const float hint_y=l.categories[0].y+static_cast<float>(rects.size())*26.f*s;
+        if(hint_y+22.f*s<l.back.y-26.f*s)
+          text(out,{l.categories[0].x,hint_y,l.categories[0].width,22.f*s},
+               tr("SETTINGS_CONTROLS_PAD","Left stick — pan the map · right stick — zoom"),static_cast<int>(13*s),muted);
         if(!notice_.empty())
           text(out,{l.categories[0].x,l.back.y-26.f*s,l.categories[0].width,22.f*s},notice_,static_cast<int>(14*s),muted);
       }

@@ -49,6 +49,7 @@
     "SETTINGS_CONTROLS_PRESS_KEY": "press a key\u2026",
     "SETTINGS_CONTROLS_CAPTURE": "Press a key or button for",
     "SETTINGS_CONTROLS_STOLEN": "Rebound — removed from",
+    "SETTINGS_CONTROLS_PAD": "Left stick — pan the map · right stick — zoom",
     "SETTINGS_ACTION_TOGGLE_PAUSE": "Pause / resume",
     "SETTINGS_ACTION_SPEED_NORMAL": "Speed: normal",
     "SETTINGS_ACTION_SPEED_FAST": "Speed: fast",

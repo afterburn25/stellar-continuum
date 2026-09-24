@@ -127,11 +127,15 @@ Core/engine projections, never re-derived in UI.
   startup. Non-keyboard bindings actually fire: the client feeds
   `GamepadButton`/`MouseButton` through the same gameplay gate as keys
   and records them for replay as `gamepad_button`/`mouse_button`
-  commands. The navigation smoke exercises pad and right-click rebinding
-  end-to-end — and caught a real defect: Escape cleared the inspection
-  card without resetting `selected_id_`, so `refresh_inspection()`
-  reopened it the same frame; the card now deselects on Escape like its
-  own close path does
+  commands. Gamepad camera axes land through a non-rebindable
+  `GALAXY_PAD` context — left stick pans, right stick zooms (Axis1D,
+  dead-zone + dt-scaled, same surface gate as wheel input) — restored
+  after user-map loads so older binding files cannot clobber it. The
+  navigation smoke exercises pad/right-click rebinding and stick
+  pan/zoom end-to-end — and caught a real defect: Escape cleared the
+  inspection card without resetting `selected_id_`, so
+  `refresh_inspection()` reopened it the same frame; the card now
+  deselects on Escape like its own close path does
 - Screen-reader substrate — `AccessibilityAnnouncer` is the bounded
   live-region queue (polite/assertive, dedup, capacity eviction,
   monotonic sequences) a platform AT bridge will drain; live consumers

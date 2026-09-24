@@ -832,6 +832,18 @@ class NativeCampaign final {
     configure_voice_pipeline();
   }
 
+  // Gamepad camera axes are Axis1D actions in a separate context — the
+  // Controls view only rebinds Button actions, so these never enter a
+  // saved user map and older saves cannot clobber them (load_user_bindings
+  // re-registers the context after a successful load). SDL axis ids:
+  // 0=left X, 1=left Y, 3=right Y.
+  static constexpr std::string_view kGalaxyPadContext=R"json({
+    "contexts":[{"name":"GALAXY_PAD","exclusive":false,"actions":[
+      {"name":"map_pan_x","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":0}]},
+      {"name":"map_pan_y","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":1}]},
+      {"name":"map_zoom","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":3}]}
+    ]}]}
+  )json";
   // Reference Main.cs keyboard shortcuts, expressed as a data-driven GALAXY
   // input context (engine InputActions): Space pauses, 1-5 select strategic
   // speeds (5 is the Developer-only Demo rate), T/R/C/B cycle and start the
@@ -854,8 +866,11 @@ class NativeCampaign final {
       ]}]}
     )json";
     std::string error;
-    if(input_mapper_.load_contexts(kGalaxyContext,&error))
+    if(input_mapper_.load_contexts(kGalaxyContext,&error)
+        &&input_mapper_.load_contexts(kGalaxyPadContext,&error)){
+      input_mapper_.push_context("GALAXY_PAD");
       input_mapper_.push_context("GALAXY");
+    }
     else SDL_Log("GALAXY input context failed to load: %s",error.c_str());
   }
 
@@ -867,7 +882,13 @@ class NativeCampaign final {
     if(!std::filesystem::exists(path,ec))return false;
     std::ifstream in(path);std::ostringstream contents;contents<<in.rdbuf();
     std::string error;
-    if(input_mapper_.load_contexts(contents.str(),&error))return true;
+    if(input_mapper_.load_contexts(contents.str(),&error)){
+      // Re-register the non-rebindable pad axes — saved maps written before
+      // they existed carry no GALAXY_PAD context to restore.
+      std::string pad_error;
+      (void)input_mapper_.load_contexts(kGalaxyPadContext,&pad_error);
+      return true;
+    }
     SDL_Log("Saved input bindings rejected: %s",error.c_str());return false;
   }
   // Live mapper — the settings hub's Controls view binds against it.
@@ -2753,6 +2774,35 @@ class NativeCampaign final {
       if(input_mapper_.rebind("speed_normal",
              {{stellar::engine::RawInputEvent::Kind::KeyPress,49}})!=1)
         throw std::runtime_error("Speed keyboard binding restore failed.");
+      // Axis bindings (GALAXY_PAD) — the mapper holds the last axis value,
+      // so a deflection persists until a centered event clears it. Zoom in
+      // first so the overview clamp leaves room for the camera to move.
+      const auto send_axis=[&](std::uint32_t axis,float value){
+        InputEvent stick{InputEventType::GamepadAxis};stick.gamepad_axis=static_cast<std::uint8_t>(axis);stick.gamepad_axis_value=value;
+        InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+        input.events.push_back(stick);
+        if(!update(input,width,height,.1,false))
+          throw std::runtime_error("Pad-axis replay closed the campaign.");
+      };
+      camera_.pixels_per_world=std::clamp(
+          fitted_pixels_per_world_>0.?fitted_pixels_per_world_*4.:400.,.01,16000.);
+      camera_.center=galaxy_overview_camera(width,height).center;
+      const auto pan_before=camera_.center;
+      send_axis(0,1.f);
+      if(!system_workspace_.visible()){
+        if(camera_.center.x==pan_before.x)
+          throw std::runtime_error("Left stick did not pan the galaxy camera.");
+        const auto zoom_before=camera_.pixels_per_world;
+        send_axis(3,1.f);
+        if(camera_.pixels_per_world==zoom_before)
+          throw std::runtime_error("Right stick did not zoom the galaxy camera.");
+        send_axis(3,0.f);
+      }else if(camera_.center.x!=pan_before.x)
+        throw std::runtime_error("System view leaked a galaxy-camera pan.");
+      send_axis(0,0.f);
+      camera_.center=galaxy_overview_camera(width,height).center;
+      if(fitted_pixels_per_world_>0.)
+        camera_.pixels_per_world=fitted_pixels_per_world_;
       key(' '); // Return to the paused state the caller sequence expects.
       if(clock.speed()!=StrategicSpeed::Paused)
         throw std::runtime_error("Could not restore paused state after pad/mouse check.");
@@ -6710,6 +6760,22 @@ class NativeCampaign final {
           territory_world.player_civilization_id,territory_claims,
           session_->cache().generation);
       territory_refresh_elapsed_=0.;
+    }
+    // Gamepad camera input — Axis1D bindings in the GALAXY_PAD context read
+    // the held stick values the mapper keeps live between axis events. Pan
+    // moves the view in the stick direction (opposite the drag gesture's
+    // sign); zoom acts on the viewport center like a centered wheel.
+    if(!system_workspace_.visible()&&map_hud_visible()){
+      const auto dead=[](float v){return std::abs(v)<.18f?0.f:v;};
+      const float dt=static_cast<float>(std::max(0.,elapsed));
+      const float pan_x=dead(input_mapper_.axis("map_pan_x"));
+      const float pan_y=dead(input_mapper_.axis("map_pan_y"));
+      if(pan_x!=0.f||pan_y!=0.f)
+        pan_galaxy_camera({-pan_x*1000.f*dt,-pan_y*1000.f*dt},width,height);
+      if(const float zoom=dead(input_mapper_.axis("map_zoom"));zoom!=0.f)
+        zoom_galaxy_camera(-zoom*3.f*dt,
+            {static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},
+            width,height);
     }
     return true;
   }
