@@ -297,7 +297,9 @@ exits before window creation (headless, no GPU). Each present sidecar is
 also verified: `expected_verified` recomputes the section checkpoints from
 the retained document and compares them against the recorded hashes, so a
 stale or mismatched sidecar (which would silently poison a later
-leaf-diff) is flagged instead of trusted. It is standalone
+leaf-diff) is flagged instead of trusted — `expected_mismatch` names the
+first diverging section label (or `<unparseable>`/`<section count>` for
+structural failures). It is standalone
 (rejects `--replay`/`--record` pairing) and verified live against a
 synthesized recording including matching, stale, unparseable, missing-file
 and malformed-JSON paths. The journal is bounded:

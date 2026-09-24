@@ -9006,6 +9006,7 @@ int main(int argc,char **argv){
           // checkpoints — a stale or mismatched sidecar would silently
           // poison a later leaf-diff.
           bool verified=false;
+          std::string mismatch;
           if(std::ifstream expected_in{
                  expected_dir/(std::to_string(tick)+".json"),
                  std::ios::binary};expected_in){
@@ -9019,16 +9020,27 @@ int main(int argc,char **argv){
               for(const auto&checkpoint:recording->checkpoints())
                 if(checkpoint.tick==tick)recorded[checkpoint.label]=checkpoint.hash;
               verified=recorded.size()==recomputed.size();
+              // A section-count asymmetry can't name a single label; a
+              // hash mismatch names the first diverging section.
+              if(!verified&&recorded.size()==recomputed.size())
+                mismatch="<section count>";
               for(const auto&section:recomputed){
-                if(!verified)break;
                 const auto found=recorded.find(section.label);
-                if(found==recorded.end()||found->second!=section.hash)verified=false;
+                if(found==recorded.end()||found->second!=section.hash){
+                  verified=false;
+                  mismatch=found==recorded.end()?"<unrecorded: "+section.label+">":
+                          section.label;
+                  break;
+                }
               }
             }catch(const std::exception&){
               // An unparseable sidecar stays unverified.
+              mismatch="<unparseable>";
             }
           }
           out<<",\"expected_verified\":"<<(verified?"true":"false");
+          if(!verified&&!mismatch.empty())
+            out<<",\"expected_mismatch\":"<<json_string(mismatch);
         }
         out<<"}";
       }
