@@ -1343,6 +1343,7 @@ live stick values key on (device, axis); unpinned axis bindings sum
 every pad. Captured bindings stay unpinned so either pad drives.
 Open: an accessibility input layer and device-policy/focus-capture
 tests — no pad-picker UI yet, so pinning is a JSON-level feature.
+Memory census broadening (row 55): the client's per-update MemoryTracker reports now also cover the two remaining bounded app caches — `territory-overlay` reports `NativeTerritoryOverlay::cached_image_bytes()` against its 16 MiB bound, and `image-preparation` reports `ImagePreparationQueue::reserved_bytes()` against the 32 MiB reservation bound — beside the existing planet-materials/replay-recorder/audio-queues reporters. Both land in support-bundle memory.json automatically through the tracker registry; the shared map-smoke tail asserts all three client cache subsystems register, so a lost report fails every smoke.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

@@ -5855,6 +5855,12 @@ class NativeCampaign final {
     if(planet_material_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
       planet_material_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("planet-materials");
     stellar::engine::MemoryTracker::instance().report(planet_material_memory_,planet_material_cache_.resident_bytes(),stellar::native_planets::MaterialCache::budget);
+    if(territory_overlay_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+      territory_overlay_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("territory-overlay");
+    stellar::engine::MemoryTracker::instance().report(territory_overlay_memory_,territory_overlay_.cached_image_bytes(),NativeTerritoryOverlay::maximum_cached_image_bytes);
+    if(image_preparation_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+      image_preparation_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("image-preparation");
+    stellar::engine::MemoryTracker::instance().report(image_preparation_memory_,image_preparation_->reserved_bytes(),ImagePreparationQueue::default_max_reserved_output_bytes);
     // Recording sessions accumulate command payloads unboundedly — the
     // recorder's occupancy joins the census while one is active.
     if(replay_&&replay_->recorder){
@@ -9147,6 +9153,8 @@ class NativeCampaign final {
   // backend; attach a real backend here when one ships.
   stellar::engine::PlatformServices platform_services_;
   stellar::engine::MemoryTracker::SubsystemId planet_material_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
+  stellar::engine::MemoryTracker::SubsystemId territory_overlay_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
+  stellar::engine::MemoryTracker::SubsystemId image_preparation_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
   stellar::engine::MemoryTracker::SubsystemId replay_recorder_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
   SessionNoticeKind last_support_notice_kind_{};
   double support_notice_seconds_{};
@@ -10138,6 +10146,14 @@ int main(int argc,char **argv){
                  <<",\"scene_texture_bytes\":"<<gpu_residency.texture_cache_bytes
                  <<",\"scene_mesh_bytes\":"<<gpu_residency.mesh_cache_bytes
                  <<",\"scene_render_target_bytes\":"<<gpu_residency.target_bytes<<"}\n";
+        { // The client's bounded caches must be registered in the memory census.
+          const auto census=stellar::engine::MemoryTracker::instance().snapshot();
+          const auto tracked=[&](std::string_view name){
+            return std::find_if(census.subsystems.begin(),census.subsystems.end(),
+                [&](const auto& s){return s.name==name;})!=census.subsystems.end();};
+          if(!tracked("planet-materials")||!tracked("territory-overlay")||!tracked("image-preparation"))
+            throw std::runtime_error("Memory census is missing the client's bounded cache subsystems.");
+        }
         std::cout<<std::fixed<<std::setprecision(3)
                  <<"native-map smoke ok: gpu_driver="<<window.gpu_driver()
                  <<" presentation="<<window.presentation_mode()
