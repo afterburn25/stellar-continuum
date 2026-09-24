@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
@@ -424,6 +425,103 @@ int main() try {
       640, 360);
   require(hidden_focus.kind != DiplomacyWorkspaceCommandKind::FocusSystem,
           "A clipped intelligence control accepted an off-region click.");
+
+  // Keyboard-focus contract: Tab/arrows ring every actionable rect in (y,x)
+  // order, Home/End jump to the ends, Return/Space replay the click dispatch
+  // at the focused rect, and the modal narrows the ring to its own controls.
+  {
+    NativeDiplomacyWorkspace keys;
+    keys.open();
+    keys.set_view(sample_view());
+    const auto key = [&](std::uint32_t code, bool shift = false) {
+      InputEvent event{};
+      event.type = InputEventType::KeyPressed;
+      event.key = code;
+      event.shift = shift;
+      return keys.handle(event, 1280, 720);
+    };
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kDown = 0x40000051u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    constexpr std::uint32_t kF5 = 0x4000003fu;
+    const auto focused_rect = [&] {
+      DrawList ring_draw;
+      keys.render(ring_draw, 1280, 720, nullptr);
+      const auto *ring =
+          std::get_if<StrokedRectangle>(&ring_draw.overlay.back());
+      require(ring && ring->color.r == 120 && ring->color.g == 197,
+              "Focused diplomacy control rendered no accent ring.");
+      return ring->bounds;
+    };
+    require(keys.focus() < 0, "Diplomacy focus ring present before any key.");
+    require(key(kTab).captured && keys.focus() == 0 &&
+                overlaps(focused_rect(), layout.close),
+            "First Tab did not ring the close control.");
+    require(key(kTab, true).captured && keys.focus() > 0,
+            "Shift+Tab did not wrap to the last control.");
+    const int last = keys.focus();
+    require(key(kHome).captured && keys.focus() == 0 &&
+                key(kEnd).captured && keys.focus() == last,
+            "Home/End did not jump between the ring ends.");
+    require(key(kDown).captured && keys.focus() == 0,
+            "Down did not wrap from the last control to the first.");
+    require(!key(kF5).captured, "An unrelated key was captured.");
+
+    // Activate the negotiate action: walk the ring until it lands on the
+    // negotiate button, then Return replays the click dispatch.
+    const UiRect negotiate_rect{layout.actions.x + 8.f * s,
+                                layout.actions.y + 8.f * s + 36.f * s,
+                                layout.actions.width - 16.f * s, 30.f * s};
+    bool found = false;
+    for (int step = 0; step < 60 && !found; ++step) {
+      if (overlaps(focused_rect(), negotiate_rect)) found = true;
+      else (void)key(kDown);
+    }
+    require(found, "Ring never reached the negotiate action.");
+    auto command = key(kReturn);
+    require(command.captured && keys.modal_open() && keys.focus() < 0,
+            "Return on the negotiate action did not open the term modal.");
+    // The modal narrows the ring to its terms plus cancel.
+    require(key(kTab).captured && keys.focus() == 0,
+            "Modal ring did not restart on the first term.");
+    command = key(kReturn); // first term reaches the confirmation modal
+    require(command.captured && keys.modal_open(),
+            "Term activation did not reach the confirmation modal.");
+    require(key(kTab).captured && keys.focus() == 0,
+            "Confirmation modal ring did not restart.");
+    command = key(kReturn); // confirm button
+    require(command.kind == DiplomacyWorkspaceCommandKind::Action &&
+                command.action ==
+                    DiplomacyWorkspaceAction::propose_non_aggression &&
+                command.target_civilization_id == 7 &&
+                command.campaign_generation == 4 &&
+                command.diplomacy_revision == 3 && command.captured,
+            "Keyboard-confirmed negotiation did not emit the action.");
+
+    // A contact row selects by keyboard through the same dispatch.
+    const UiRect second_contact{layout.contact_rows.x + 4.f * s,
+                                layout.contact_rows.y + 4.f * s + 62.f * s,
+                                layout.contact_rows.width - 8.f * s,
+                                58.f * s};
+    (void)key(kHome);
+    found = false;
+    for (int step = 0; step < 60 && !found; ++step) {
+      if (overlaps(focused_rect(), second_contact)) found = true;
+      else (void)key(kDown);
+    }
+    require(found, "Ring never reached a contact row.");
+    command = key(kSpace);
+    require(command.kind == DiplomacyWorkspaceCommandKind::SelectContact &&
+                command.contact_index == 1 && command.captured,
+            "Space on a contact row did not select it.");
+
+    // A pointer press hands ownership back to the pointer.
+    require(keys.handle({InputEventType::LeftPressed, center(layout.surface)},
+                        1280, 720)
+                    .captured &&
+                keys.focus() < 0,
+            "Pointer press did not clear the diplomacy ring.");
+  }
 
   // The close control emits Close.
   const auto closed = workspace.handle(

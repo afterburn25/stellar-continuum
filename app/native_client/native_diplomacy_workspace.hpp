@@ -97,6 +97,7 @@ public:
   [[nodiscard]] std::size_t selected_contact_index() const noexcept;
   [[nodiscard]] bool select_contact_civilization(int civilization_id);
   [[nodiscard]] const std::string &notice() const noexcept;
+  [[nodiscard]] int focus() const noexcept { return focus_; }
 
   [[nodiscard]] DiplomacyWorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);
@@ -121,6 +122,8 @@ private:
   };
 
   void reconcile_selection();
+  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  focusables(const DiplomacyWorkspaceLayout &layout) const;
   [[nodiscard]] float
   detail_scroll_limit(const DiplomacyWorkspaceLayout &layout) const noexcept;
   [[nodiscard]] std::vector<const stellar::native_diplomacy::
@@ -146,6 +149,7 @@ private:
   bool notice_accepted_{};
   float contact_scroll_{};
   float detail_scroll_{};
+  int focus_{-1};
 };
 
 } // namespace stellar::native_diplomacy_ui

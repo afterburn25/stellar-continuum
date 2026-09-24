@@ -787,6 +787,22 @@ each header's `expanded` flag at rebuild. `native_controlled_assets`
 covers the collapse→expand→collapse round-trip on top of the existing
 search-reveal/temporary-reveal/generation-guard/virtualization suite;
 suite green and the client TU compiles under /W4 /WX.
+Diplomacy keyboard contract (row-26 accessibility): the RELATIONS
+workspace joins the focus contract — `focusables()` walks actionable
+rects in (y,x) order (close, the nine-button filter grid, contact
+rows clipped to their viewport, the conditional
+transmission/negotiate/war action stack, the tab strip, and the
+detail region's proposal buttons or intelligence FOCUS link) and an
+open modal narrows the ring to its terms or confirm/cancel pair.
+Tab/arrows/Home/End ring the set; Return/Space replay the click at
+the focused rect through the same dispatch, so SelectContact, Action,
+ProposalAction and FocusSystem commands emit unchanged. Pointer
+presses, cancels, open/close and discard reset the ring; unhandled
+keys fall through to global shortcuts. `native_diplomacy_workspace`
+covers cycling/wrap/Home/End, keyboard-driven negotiate→term→confirm
+issuing propose_non_aggression with the state quote intact,
+Space-select on a contact row, ring rendering and pointer reset;
+8/8 diplomacy suites green.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
