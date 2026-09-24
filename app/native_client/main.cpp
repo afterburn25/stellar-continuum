@@ -714,6 +714,10 @@ struct ReplayState {
   // reach the stop — the update loop reports it instead of hanging.
   std::uint64_t last_tick{std::numeric_limits<std::uint64_t>::max()};
   std::uint32_t stalled_frames{};
+  // One-shot "recording fully consumed and verified" report — a scripted
+  // --replay run greps replay_verified={...} instead of watching for the
+  // absence of a divergence over a timeout.
+  bool completion_reported{};
 };
 
 // Writes the recording on scope exit, including early returns and failures.
@@ -6015,6 +6019,16 @@ class NativeCampaign final {
               std::to_string(expected[replay_->checkpoint_cursor].tick)+
               (expected[replay_->checkpoint_cursor].label.empty()?"":
                " ("+expected[replay_->checkpoint_cursor].label+")");
+      }
+      // Completion: the whole recorded stream consumed, every recorded
+      // checkpoint verified, no divergence — report it once so a scripted
+      // run has a success signal instead of only an absence of failure.
+      if(replay_->divergence.empty()&&!replay_->completion_reported&&
+         replay_->command_cursor>=commands.size()&&
+         replay_->checkpoint_cursor>=replay_->recording->checkpoints().size()){
+        replay_->completion_reported=true;
+        std::cout<<"replay_verified={\"commands\":"<<commands.size()
+                 <<",\"checkpoints\":"<<replay_->verified_checkpoints<<"}\n";
       }
     }
     // --replay-until: once the simulated tick reaches the requested stop,

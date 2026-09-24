@@ -309,6 +309,10 @@ bound — the recording stays an honest prefix (no later commands or
 checkpoints claim fidelity), `serialize` carries `truncated:true`, and
 `--replay-info`/the flush path report it. The bound is soft: a vector
 capacity growth on the last accepted entry may overshoot by one step.
+`--replay` emits a one-shot `replay_verified={"commands":N,
+"checkpoints":M}` line once the recorded stream is fully consumed and
+every recorded checkpoint verified without divergence — a scripted run
+can grep it instead of timing out on the absence of failure.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
