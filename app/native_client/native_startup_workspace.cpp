@@ -85,7 +85,7 @@ StartupLayout StartupLayout::for_viewport(int width,int height) noexcept{
 void NativeStartupWorkspace::set_setup(stellar::native_setup::NativeNewCampaignSetupView view){developer_mode_=view.developer_mode;setup_.set_view(std::move(view));}
 void NativeStartupWorkspace::set_return_to_campaign_available(bool available)noexcept{return_to_campaign_available_=available;}
 void NativeStartupWorkspace::show_setup()noexcept{screen_=StartupScreen::Setup;setup_.begin_sandbox();selected_slot_.reset();load_scroll_=0;failure_.clear();reset_pointer();}
-void NativeStartupWorkspace::reset_pointer() noexcept{pointer_={};hover_feedback_.reset();}
+void NativeStartupWorkspace::reset_pointer() noexcept{pointer_={};hover_feedback_.reset();focus_=-1;}
 void NativeStartupWorkspace::show_entry() noexcept{screen_=StartupScreen::Entry;selected_slot_.reset();load_scroll_=0;failure_.clear();reset_pointer();}
 void NativeStartupWorkspace::set_slots(stellar::native_startup::NativeStartupSaveSlots slots){slots_=std::move(slots);selected_slot_=slots_.slots.empty()?std::nullopt:std::optional<std::size_t>{0};load_scroll_=0;screen_=StartupScreen::LoadSlots;reset_pointer();}
 void NativeStartupWorkspace::set_setup_message(std::string message,bool accepted){setup_.set_assessment_message(std::move(message),accepted);}
@@ -93,6 +93,32 @@ void NativeStartupWorkspace::begin_operation(stellar::native_startup::NativeStar
 void NativeStartupWorkspace::set_operation(stellar::native_startup::NativeStartupView view){if(screen_!=StartupScreen::Busy||operation_.request_id==0||view.request_id!=operation_.request_id)throw std::logic_error("Startup operation update has no matching explicit origin.");operation_=std::move(view);reset_pointer();}
 void NativeStartupWorkspace::show_failure(std::string value){failure_=std::move(value);screen_=StartupScreen::Failure;reset_pointer();}
 bool NativeStartupWorkspace::wants_text_input()const noexcept{return screen_==StartupScreen::Setup&&setup_.seed_focused();}
+
+std::vector<NativeStartupWorkspace::Focusable> NativeStartupWorkspace::collect_focusables(
+    const StartupLayout&l,int width,int height)const{
+  std::vector<Focusable> out;
+  const auto push=[&](UiRect rect,std::uint64_t cue){if(rect.width>0&&rect.height>0)out.push_back({rect,cue});};
+  switch(screen_){
+    case StartupScreen::Entry:
+      // Visual order: Continue first when present, then the menu links;
+      // cue ids match the hit() target space.
+      if(return_to_campaign_available_||!continue_save_.empty())push(l.return_to_campaign,6);
+      push(l.new_campaign,1);push(l.load_campaign,2);push(l.settings,3);push(l.development,4);push(l.exit,5);
+      break;
+    case StartupScreen::ModeSelection:push(l.sandbox_campaign,2);push(l.back,1);break;
+    case StartupScreen::Development:push(l.primary,2);push(l.back,1);break;
+    case StartupScreen::Failure:push(l.back,1);break;
+    case StartupScreen::Busy:push(busy_cancel(width,height,l.scale),1);break;
+    case StartupScreen::LoadSlots:{
+      const float pitch=46.f*l.scale;
+      for(std::size_t i=0;i<slots_.slots.size();++i)
+        push(intersect({l.list.x,l.list.y+i*pitch-load_scroll_,l.list.width,pitch-4*l.scale},l.list),100+i);
+      push(l.back,1);if(selected_slot_)push(l.primary,2);
+      break;}
+    default:break;
+  }
+  return out;
+}
 
 StartupIntent NativeStartupWorkspace::handle(const InputEvent&e,int width,int height,const TextMeasurer&measure){
   if(e.type==InputEventType::PointerMove)pointer_=e.position;
@@ -122,7 +148,43 @@ StartupIntent NativeStartupWorkspace::handle(const InputEvent&e,int width,int he
     load_scroll_=std::clamp(load_scroll_-e.wheel_y*pitch*3.f,0.f,maximum);
     return {StartupIntentKind::None,true};
   }
+  if(e.type==InputEventType::KeyPressed){
+    // SDL_Keycode: Tab/arrows ring the screen's controls, Home/End jump to
+    // the ends, Return/Space re-enter pointer dispatch at the rect center.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const auto focusables=collect_focusables(l,width,height);
+    const int count=static_cast<int>(focusables.size());
+    const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
+    const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
+    if(count>0&&(e.key==kHome||e.key==kEnd||fwd||bwd)){
+      if(e.key==kHome)focus_=0;
+      else if(e.key==kEnd)focus_=count-1;
+      else if(focus_<0)focus_=bwd?count-1:0;
+      else focus_=(focus_+(bwd?-1:1)+count)%count;
+      if(focus_>=count)focus_=0;
+      hover_feedback_.cue(focusables[static_cast<std::size_t>(focus_)].cue);
+      return {StartupIntentKind::None,true};
+    }
+    if((e.key==kReturn||e.key==kSpace)&&focus_>=0&&focus_<count){
+      const auto r=focusables[static_cast<std::size_t>(focus_)].rect;
+      const int keep=focus_;
+      InputEvent click{};click.type=InputEventType::LeftPressed;
+      click.position={r.x+r.width*.5f,r.y+r.height*.5f};
+      const auto before=screen_;
+      auto intent=handle(click,width,height,measure);
+      // Keep focus for non-navigating results so an action can repeat;
+      // screen changes and navigation intents take it back.
+      const bool non_navigating=intent.kind==StartupIntentKind::None||
+                                intent.kind==StartupIntentKind::CopyDiagnostics;
+      focus_=non_navigating&&screen_==before?keep:-1;
+      return intent;
+    }
+    return {StartupIntentKind::None,true};
+  }
   if(e.type!=InputEventType::LeftPressed)return {StartupIntentKind::None,l.panel.contains(e.position)};
+  focus_=-1;
   if(screen_==StartupScreen::Entry&&l.development.contains(e.position)){screen_=StartupScreen::Development;reset_pointer();return {StartupIntentKind::None,true};}
   if(screen_==StartupScreen::Development){
     if(l.back.contains(e.position)){show_entry();return {StartupIntentKind::Back,true};}
@@ -146,6 +208,12 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
   if(artwork){const auto kind=screen_==StartupScreen::Busy?busy_artwork_:StartupArtworkKind::MainMenu;backdrop=(*artwork)(kind);}
   if(screen_==StartupScreen::Setup){setup_.render(out,width,height,measure,portraits,std::move(backdrop));return;}
   const auto l=StartupLayout::for_viewport(width,height);const float s=l.scale;
+  const auto focus_ring=[&]{
+    if(focus_<0)return;
+    const auto fs=collect_focusables(l,width,height);
+    if(focus_<static_cast<int>(fs.size()))
+      out.overlay.emplace_back(StrokedRectangle{fs[static_cast<std::size_t>(focus_)].rect,{160,210,255,255}});
+  };
   if(backdrop){const auto destination=startup_artwork_destination(backdrop->width(),backdrop->height(),width,height);out.overlay.emplace_back(Image{std::move(backdrop),destination,std::nullopt,{255,255,255,255},UiRect{0,0,static_cast<float>(width),static_cast<float>(height)}});}else fill(out,{0,0,static_cast<float>(width),static_cast<float>(height)},background);
   if(backdrop_only)return;
   if(screen_!=StartupScreen::Busy&&screen_!=StartupScreen::Entry){
@@ -172,7 +240,7 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
     const UiRect footer{l.title.x,std::max(l.exit.y+l.exit.height+30*s,static_cast<float>(height)-74*s),l.title.width,16*s};
     text(out,footer,tr(developer_mode_?"STARTUP_DEV_MODE":"STARTUP_PLAYER_MODE",developer_mode_?"DEV MODE · ISOLATED SAVES":"PLAYER MODE"),accent,l.small_font,TextAlign::Left);
     if(!build_label_.empty()) text(out,{footer.x,footer.y+17*s,footer.width,16*s},build_label_,muted,l.small_font,TextAlign::Left);
-    return;
+    focus_ring();return;
   }
   if(screen_==StartupScreen::Development){
     text(out,{l.panel.x+22*s,l.panel.y+70*s,l.panel.width-44*s,30*s},tr("STARTUP_DEV_TITLE","DEVELOPMENT & DIAGNOSTICS"),gold,l.body_font);
@@ -181,7 +249,7 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
       tr("STARTUP_DEV_HELP","F12 captures the screen. Export diagnostics from the pause menu.\n\nOpen the Developer Game launcher, then choose New Game > Sandbox. The footer shows DEV MODE. Saves stay separate.\n\nManual launch: --dev-game enters developer mode directly. Ctrl+Shift+F12 toggles mode only in a --devtools launch."),muted,l.small_font);
     native_menu_style::button(out,l.primary,tr("STARTUP_COPY_SYSINFO","Copy system info"),l.small_font,l.primary.contains(pointer_),true,s);
     native_menu_style::button(out,l.back,tr("SETTINGS_BACK","Back"),l.body_font,l.back.contains(pointer_),true,s);
-    return;
+    focus_ring();return;
   }
   if(screen_==StartupScreen::ModeSelection){
     text(out,{l.panel.x+22*s,l.panel.y+22*s,l.panel.width-170*s,34*s},tr("STARTUP_CHOOSE_GAME","CHOOSE YOUR GAME"),bright,l.heading_font,TextAlign::Left,FontFace::Heading);
@@ -217,10 +285,11 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
     render_card(l.sandbox_campaign,tr("STARTUP_SANDBOX_TITLE","SANDBOX"),tr("STARTUP_SANDBOX_DESC","Set the galaxy scale, rivals, ancient empires, and your people."),true,sandbox_art);
     fill(out,l.back,raised);stroke(out,l.back,border);
     text(out,l.back,tr("STARTUP_BACK","BACK"),bright,l.body_font,TextAlign::Center);
-    return;
+    focus_ring();return;
   }
-  if(screen_==StartupScreen::LoadSlots){text(out,{l.panel.x+22*s,l.panel.y+70*s,l.panel.width-44*s,28*s},tr("STARTUP_SELECT_SAVE","SELECT A SAVED CAMPAIGN"),bright,l.body_font);if(!slots_.error.empty())text(out,l.list,slots_.error,warning,l.body_font);else if(slots_.slots.empty())text(out,l.list,tr("STARTUP_NO_SAVES","No saved campaigns are available."),muted,l.body_font);else{const float pitch=46.f*s;for(std::size_t i=0;i<slots_.slots.size();++i){UiRect row{l.list.x,l.list.y+i*pitch-load_scroll_,l.list.width,pitch-4*s};const auto visible=intersect(row,l.list);if(visible.width<=0||visible.height<=0)continue;fill(out,visible,selected_slot_==i?selected:raised);stroke(out,visible,selected_slot_==i?accent:border);UiRect label{row.x+10*s,row.y+11*s,row.width-20*s,row.height-12*s};const auto clip=intersect(label,l.list);if(clip.width>0&&clip.height>0)out.overlay.emplace_back(Text{{label.x,label.y},slots_.slots[i].filename,bright,l.body_font,label.width,clip,TextAlign::Left,FontFace::Interface});}}fill(out,l.back,raised);stroke(out,l.back,border);text(out,l.back,tr("STARTUP_BACK","BACK"),bright,l.body_font,TextAlign::Center);fill(out,l.primary,selected_slot_?selected:raised);stroke(out,l.primary,selected_slot_?accent:muted);text(out,l.primary,tr("STARTUP_LOAD_SELECTED","LOAD SELECTED"),selected_slot_?bright:muted,l.body_font,TextAlign::Center);return;}
-  if(screen_==StartupScreen::Busy){const auto status=busy_status(width,height,s),cancel=busy_cancel(width,height,s);fill(out,status,{5,14,27,210});stroke(out,status,border);text(out,{status.x+18*s,status.y+12*s,status.width-36*s,26*s},operation_.status,bright,l.body_font,TextAlign::Center);if(operation_.determinate_progress){UiRect track{status.x+50*s,status.y+50*s,status.width-100*s,12*s};fill(out,track,raised);fill(out,{track.x,track.y,track.width*static_cast<float>(std::clamp(*operation_.determinate_progress,0.,1.)),track.height},accent);}else {const UiRect track{status.x+50*s,status.y+50*s,status.width-100*s,12*s};fill(out,track,raised);const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();const float cycle=static_cast<float>(std::fmod(seconds,2.4)/2.4);const float travel=cycle<.5f?cycle*2.f:2.f-cycle*2.f;const float segment=track.width*.22f;fill(out,{track.x+(track.width-segment)*travel,track.y,segment,track.height},accent);}text(out,{status.x+20*s,status.y+82*s,status.width-40*s,34*s},loading_tip_,muted,l.small_font,TextAlign::Center);fill(out,cancel,{8,20,36,220});stroke(out,cancel,border);text(out,cancel,tr(operation_.worker_running?"SETTINGS_CANCEL":"STARTUP_BACK",operation_.worker_running?"CANCEL":"BACK"),bright,l.body_font,TextAlign::Center);return;}
+  if(screen_==StartupScreen::LoadSlots){text(out,{l.panel.x+22*s,l.panel.y+70*s,l.panel.width-44*s,28*s},tr("STARTUP_SELECT_SAVE","SELECT A SAVED CAMPAIGN"),bright,l.body_font);if(!slots_.error.empty())text(out,l.list,slots_.error,warning,l.body_font);else if(slots_.slots.empty())text(out,l.list,tr("STARTUP_NO_SAVES","No saved campaigns are available."),muted,l.body_font);else{const float pitch=46.f*s;for(std::size_t i=0;i<slots_.slots.size();++i){UiRect row{l.list.x,l.list.y+i*pitch-load_scroll_,l.list.width,pitch-4*s};const auto visible=intersect(row,l.list);if(visible.width<=0||visible.height<=0)continue;fill(out,visible,selected_slot_==i?selected:raised);stroke(out,visible,selected_slot_==i?accent:border);UiRect label{row.x+10*s,row.y+11*s,row.width-20*s,row.height-12*s};const auto clip=intersect(label,l.list);if(clip.width>0&&clip.height>0)out.overlay.emplace_back(Text{{label.x,label.y},slots_.slots[i].filename,bright,l.body_font,label.width,clip,TextAlign::Left,FontFace::Interface});}}fill(out,l.back,raised);stroke(out,l.back,border);text(out,l.back,tr("STARTUP_BACK","BACK"),bright,l.body_font,TextAlign::Center);fill(out,l.primary,selected_slot_?selected:raised);stroke(out,l.primary,selected_slot_?accent:muted);text(out,l.primary,tr("STARTUP_LOAD_SELECTED","LOAD SELECTED"),selected_slot_?bright:muted,l.body_font,TextAlign::Center);focus_ring();return;}
+  if(screen_==StartupScreen::Busy){const auto status=busy_status(width,height,s),cancel=busy_cancel(width,height,s);fill(out,status,{5,14,27,210});stroke(out,status,border);text(out,{status.x+18*s,status.y+12*s,status.width-36*s,26*s},operation_.status,bright,l.body_font,TextAlign::Center);if(operation_.determinate_progress){UiRect track{status.x+50*s,status.y+50*s,status.width-100*s,12*s};fill(out,track,raised);fill(out,{track.x,track.y,track.width*static_cast<float>(std::clamp(*operation_.determinate_progress,0.,1.)),track.height},accent);}else {const UiRect track{status.x+50*s,status.y+50*s,status.width-100*s,12*s};fill(out,track,raised);const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();const float cycle=static_cast<float>(std::fmod(seconds,2.4)/2.4);const float travel=cycle<.5f?cycle*2.f:2.f-cycle*2.f;const float segment=track.width*.22f;fill(out,{track.x+(track.width-segment)*travel,track.y,segment,track.height},accent);}text(out,{status.x+20*s,status.y+82*s,status.width-40*s,34*s},loading_tip_,muted,l.small_font,TextAlign::Center);fill(out,cancel,{8,20,36,220});stroke(out,cancel,border);text(out,cancel,tr(operation_.worker_running?"SETTINGS_CANCEL":"STARTUP_BACK",operation_.worker_running?"CANCEL":"BACK"),bright,l.body_font,TextAlign::Center);focus_ring();return;}
   text(out,{l.panel.x+22*s,l.panel.y+70*s,l.panel.width-44*s,28*s},tr("STARTUP_FAILED","STARTUP COULD NOT COMPLETE"),warning,l.body_font,TextAlign::Center);text(out,l.status,failure_,warning,l.body_font,TextAlign::Center);fill(out,l.back,raised);stroke(out,l.back,border);text(out,l.back,tr("STARTUP_BACK","BACK"),bright,l.body_font,TextAlign::Center);
+  focus_ring();
 }
 } // namespace stellar::native_startup_ui

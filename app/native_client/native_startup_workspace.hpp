@@ -73,6 +73,7 @@ public:
   void set_operation(stellar::native_startup::NativeStartupView);
   void show_failure(std::string message);
   [[nodiscard]] StartupScreen screen() const noexcept { return screen_; }
+  [[nodiscard]] int focused() const noexcept { return focus_; }
   [[nodiscard]] bool wants_text_input() const noexcept;
   [[nodiscard]] StartupIntent handle(const stellar::native_map::InputEvent &,
                                      int width, int height,
@@ -84,6 +85,15 @@ public:
               const StartupArtworkProvider *, bool backdrop_only = false) const;
 
 private:
+  // Keyboard focus contract: Tab/arrow ring over each screen's live
+  // controls (LoadSlots rows included), Return/Space activate through the
+  // same dispatch as a pointer press at the control's center.
+  struct Focusable {
+    stellar::native_map::UiRect rect;
+    std::uint64_t cue{};
+  };
+  [[nodiscard]] std::vector<Focusable> collect_focusables(
+      const StartupLayout &, int width, int height) const;
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
@@ -103,6 +113,7 @@ private:
   std::string diagnostics_;
   std::filesystem::path continue_save_;
   stellar::native_map::Point pointer_{};
+  int focus_{-1};
   bool return_to_campaign_available_{};
   const stellar::engine::LocalizationTable *locale_{};
 };

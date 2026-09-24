@@ -87,6 +87,44 @@ void continue_and_development(){
 }
 }
 namespace {
+void keyboard_focus_traversal(){
+  NativeStartupWorkspace ui;ui.set_setup(setup());int cues=0;
+  ui.set_hover_callback([&]{++cues;});
+  const auto key=[&](std::uint32_t k,bool shift=false){
+    InputEvent e{};e.type=InputEventType::KeyPressed;e.key=k;e.shift=shift;
+    return ui.handle(e,1280,720,measure);};
+  constexpr std::uint32_t kTab=9u,kReturn=13u,kHome=0x4000004au,kEnd=0x4000004du;
+  require(ui.focused()<0,"startup workspace began focused");
+  require(key(kTab).captured&&ui.focused()==0&&cues==1,"Tab did not focus New Game");
+  require(key(kTab).captured&&ui.focused()==1,"Tab did not reach Load");
+  require(key(kEnd).captured&&ui.focused()==4,"End did not reach Exit");
+  require(key(kTab).captured&&ui.focused()==0,"focus did not wrap to New Game");
+  require(key(kTab,true).captured&&ui.focused()==4,"Shift+Tab did not wrap to Exit");
+  require(key(kHome).captured&&ui.focused()==0,"Home did not focus New Game");
+  require(key(kReturn).kind==StartupIntentKind::OpenModeSelection&&ui.screen()==StartupScreen::ModeSelection,
+          "Return on New Game did not open mode selection");
+  require(ui.focused()<0,"mode transition kept a stale focus index");
+  require(key(kTab).captured&&ui.focused()==0,"Mode Selection Tab did not focus Sandbox");
+  require(key(kReturn).kind==StartupIntentKind::OpenSetup&&ui.screen()==StartupScreen::Setup,
+          "Return on Sandbox did not open setup");
+  (void)ui.handle({InputEventType::EscapePressed},1280,720,measure);
+  require(ui.screen()==StartupScreen::ModeSelection,"setup cancel did not return to mode selection");
+  require(key(kTab).captured&&key(kTab).captured&&ui.focused()==1,
+          "Mode Selection Tab did not reach Back");
+  require(key(kReturn).kind==StartupIntentKind::Back&&ui.screen()==StartupScreen::Entry,
+          "Return on Back did not restore the entry screen");
+  // Development screen: focused primary routes the diagnostics copy.
+  for(int i=0;i<4;++i)(void)key(kTab);
+  require(ui.focused()==3,"Tab chain did not reach Development");
+  require(key(kReturn).kind==StartupIntentKind::None&&ui.screen()==StartupScreen::Development,
+          "Return on Development did not open the diagnostics screen");
+  require(key(kTab).captured&&ui.focused()==0,"Development Tab did not focus the copy button");
+  require(key(kReturn).kind==StartupIntentKind::CopyDiagnostics,
+          "Return on the copy button did not route diagnostics");
+  require(key(kTab).captured&&ui.focused()==1,"Development Tab did not reach Back");
+  require(key(kReturn).kind==StartupIntentKind::Back&&ui.screen()==StartupScreen::Entry,
+          "Development Back did not restore the entry screen");
+}
 void menu_hover_feedback(){
   for(const auto [w,h]:{std::pair{1280,720},std::pair{1920,1080}}){
     NativeStartupWorkspace ui;ui.set_setup(setup());int cues=0;
@@ -156,4 +194,4 @@ void menu_hover_feedback(){
   }
 }
 }
-int main()try{menu_hover_feedback();responsive();entry_setup_create();load_and_failure();long_load_list_scrolls();live_campaign_return_lifecycle();continue_and_development();std::cout<<"native startup workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
+int main()try{menu_hover_feedback();keyboard_focus_traversal();responsive();entry_setup_create();load_and_failure();long_load_list_scrolls();live_campaign_return_lifecycle();continue_and_development();std::cout<<"native startup workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
