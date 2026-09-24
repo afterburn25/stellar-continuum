@@ -3,6 +3,7 @@
 #include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/fleet_state.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <iostream>
 #include <stdexcept>
@@ -133,6 +134,43 @@ void malformed_projector_identity_fails_without_foreign_totals() {
           "malformed projection exposed foreign home totals");
 }
 
+void locale_resolves_node_labels_and_unavailable_message() {
+  stellar::engine::LocalizationTable locale{"en", "en"};
+  require(locale.load_json(
+              R"({"locale":"en","strings":{
+                "SUPPLY_MESSAGE_LEGEND":"LEGENDE",
+                "SUPPLY_KIND_HOMEWORLD":"KIND-A","SUPPLY_KIND_ORBITAL_HUB":"KIND-B",
+                "SUPPLY_KIND_LUNAR":"KIND-C","SUPPLY_KIND_PLANETARY":"KIND-D",
+                "SUPPLY_KIND_RESOURCE":"KIND-E","SUPPLY_KIND_DEPOT":"KIND-F",
+                "SUPPLY_KIND_SHIPYARD":"KIND-G","SUPPLY_KIND_NODE":"KIND-H",
+                "SUPPLY_STATUS_SELF":"STATUS-A","SUPPLY_STATUS_NODE":"STATUS-B",
+                "SUPPLY_STATUS_FULL":"STATUS-C","SUPPLY_STATUS_SHORTFALL":"STATUS-D",
+                "SUPPLY_ERR_ECONOMY":"WIRTSCHAFT FEHLT"}})"),
+          "locale fixture did not parse");
+  const auto ready = build_home_logistics(world(2), 1, &locale);
+  require(ready.state == LoadState::Ready && ready.message == "LEGENDE" &&
+              !ready.nodes.empty(),
+          "locale did not resolve the ready-state legend");
+  const auto localized = [](const std::string &value, const char *prefix) {
+    return value.starts_with(prefix);
+  };
+  for (const auto &node : ready.nodes) {
+    require(localized(node.kind_label, "KIND-"),
+            "locale did not resolve a node kind label");
+    require(localized(node.status, "STATUS-"),
+            "locale did not resolve a node status label");
+  }
+  auto missing = world();
+  missing.economies.clear();
+  require(build_home_logistics(missing, 1, &locale).message == "WIRTSCHAFT FEHLT",
+          "locale did not resolve the unavailable message");
+  HomeLogisticsController controller;
+  controller.set_localization(&locale);
+  require(controller.refresh(missing, 1, 7) == false &&
+              controller.view().message == "WIRTSCHAFT FEHLT",
+          "controller locale did not resolve the unavailable message");
+}
+
 void identity_generation_and_clear_do_not_keep_stale_view() {
   auto state = world();
   HomeLogisticsController controller;
@@ -156,6 +194,7 @@ int main() {
     all_nodes_are_preserved();
     failure_latches_until_explicit_retry();
     malformed_projector_identity_fails_without_foreign_totals();
+    locale_resolves_node_labels_and_unavailable_message();
     identity_generation_and_clear_do_not_keep_stale_view();
     std::cout << "native logistics tests passed\n";
     return 0;

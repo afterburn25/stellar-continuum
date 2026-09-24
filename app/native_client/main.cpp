@@ -1024,6 +1024,9 @@ class NativeCampaign final {
     research_controller_.set_localization(&table);
     phenomena_.set_localization(&table);
     mission_view_.set_localization(&table);
+    feedback_.set_localization(&table);
+    supply_controller_.set_localization(&table);
+    system_travel_controller_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 

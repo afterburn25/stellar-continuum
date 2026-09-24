@@ -1,5 +1,7 @@
 #include "native_campaign_feedback.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <atomic>
 #include <iostream>
 #include <stdexcept>
@@ -126,6 +128,29 @@ void rendering_is_compact_clipped_and_owner_bound() {
             "feedback rendered more than the compact three-panel maximum");
     require(research_report_label,
             "research feedback promised a completion instead of a report");
+  }
+  // A bound catalog localizes notice labels; unbound keys keep literals.
+  {
+    stellar::engine::LocalizationTable locale{"en", "en"};
+    require(locale.load_json(
+                R"({"locale":"en","strings":{"FEEDBACK_RESEARCH":"FORSCHUNG BEREIT"}})"),
+            "the test catalog must parse");
+    feedback.set_localization(&locale);
+    DrawList draw;
+    feedback.render(draw, 1280, 720);
+    bool translated{}, fallback_kept{};
+    for (const auto& command : draw.overlay) {
+      if (const auto* label = std::get_if<Text>(&command)) {
+        translated = translated || label->value.find("FORSCHUNG BEREIT") !=
+                                       std::string::npos;
+        fallback_kept = fallback_kept ||
+                        label->value.find("Ship complete") !=
+                            std::string::npos;
+      }
+    }
+    feedback.set_localization(nullptr);
+    require(translated && fallback_kept,
+            "feedback notices did not resolve through the bound catalog");
   }
   std::atomic<bool> rejected{};
   std::thread foreign([&] {

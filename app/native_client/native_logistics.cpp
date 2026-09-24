@@ -3,6 +3,7 @@
 #include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/fleet_state.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <exception>
@@ -14,17 +15,32 @@ namespace stellar::native_logistics {
 namespace {
 using namespace stellar::core;
 
-std::string kind_label(const LogisticsNodeKind kind) {
+std::string resolve(const engine::LocalizationTable *locale,
+                    std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+
+std::string kind_label(const LogisticsNodeKind kind,
+                       const engine::LocalizationTable *locale) {
   switch (kind) {
-    case LogisticsNodeKind::Homeworld: return "Homeworld";
-    case LogisticsNodeKind::OrbitalHub: return "Orbital hub";
-    case LogisticsNodeKind::LunarSettlement: return "Lunar settlement";
-    case LogisticsNodeKind::PlanetarySettlement: return "Planetary settlement";
-    case LogisticsNodeKind::ResourceSite: return "Resource site";
-    case LogisticsNodeKind::Depot: return "Depot";
-    case LogisticsNodeKind::Shipyard: return "Shipyard";
+    case LogisticsNodeKind::Homeworld:
+      return resolve(locale, "SUPPLY_KIND_HOMEWORLD", "Homeworld");
+    case LogisticsNodeKind::OrbitalHub:
+      return resolve(locale, "SUPPLY_KIND_ORBITAL_HUB", "Orbital hub");
+    case LogisticsNodeKind::LunarSettlement:
+      return resolve(locale, "SUPPLY_KIND_LUNAR", "Lunar settlement");
+    case LogisticsNodeKind::PlanetarySettlement:
+      return resolve(locale, "SUPPLY_KIND_PLANETARY", "Planetary settlement");
+    case LogisticsNodeKind::ResourceSite:
+      return resolve(locale, "SUPPLY_KIND_RESOURCE", "Resource site");
+    case LogisticsNodeKind::Depot:
+      return resolve(locale, "SUPPLY_KIND_DEPOT", "Depot");
+    case LogisticsNodeKind::Shipyard:
+      return resolve(locale, "SUPPLY_KIND_SHIPYARD", "Shipyard");
   }
-  return "Node";
+  return resolve(locale, "SUPPLY_KIND_NODE", "Node");
 }
 
 View unavailable(std::string message) {
@@ -58,17 +74,22 @@ bool has_construction(const FreshCampaignState &campaign, const int id) {
 }
 
 std::optional<View> unavailable_for(const FreshCampaignState &campaign,
-                                    const int civilization_id) {
+                                    const int civilization_id,
+                                    const engine::LocalizationTable *locale) {
   const auto *observer = valid_observer(campaign, civilization_id);
   if (!observer)
-    return unavailable("Supply network unavailable: player observer is missing or invalid.");
+    return unavailable(resolve(locale, "SUPPLY_ERR_OBSERVER",
+                               "Supply network unavailable: player observer is missing or invalid."));
   if (std::ranges::find(campaign.systems, observer->home_system_id,
                         &StellarSystem::id) == campaign.systems.end())
-    return unavailable("Supply network unavailable: the observer home system is missing.");
+    return unavailable(resolve(locale, "SUPPLY_ERR_HOME",
+                               "Supply network unavailable: the observer home system is missing."));
   if (!has_economy(campaign, civilization_id))
-    return unavailable("Supply network unavailable: economy state is missing. Reload the campaign or refresh when ready.");
+    return unavailable(resolve(locale, "SUPPLY_ERR_ECONOMY",
+                               "Supply network unavailable: economy state is missing. Reload the campaign or refresh when ready."));
   if (!has_construction(campaign, civilization_id))
-    return unavailable("Supply network unavailable: construction state is missing. Reload the campaign or refresh when ready.");
+    return unavailable(resolve(locale, "SUPPLY_ERR_CONSTRUCTION",
+                               "Supply network unavailable: construction state is missing. Reload the campaign or refresh when ready."));
   return std::nullopt;
 }
 
@@ -83,7 +104,8 @@ HomeSystemLogisticsNetwork canonical_project(const FreshCampaignState &campaign,
 }
 
 View make_view(const FreshCampaignState &campaign, const int civilization_id,
-               const HomeSystemLogisticsNetwork &network) {
+               const HomeSystemLogisticsNetwork &network,
+               const engine::LocalizationTable *locale) {
   const auto observer = std::ranges::find(campaign.civilizations,
                                           civilization_id, &Civilization::id);
   if (network.civilization_id != civilization_id ||
@@ -95,9 +117,10 @@ View make_view(const FreshCampaignState &campaign, const int civilization_id,
   const auto system = std::ranges::find(campaign.systems, network.home_system_id,
                                         &StellarSystem::id);
   view.system_name = system == campaign.systems.end()
-                         ? "HOME SYSTEM"
+                         ? resolve(locale, "SUPPLY_HOME_SYSTEM", "HOME SYSTEM")
                          : system->name;
-  view.message = "Available is exportable surplus; demand is required imports. Values are supply units per day.";
+  view.message = resolve(locale, "SUPPLY_MESSAGE_LEGEND",
+                         "Available is exportable surplus; demand is required imports. Values are supply units per day.");
   view.corridor_count = static_cast<int>(network.links.size());
   view.supply_per_day = network.total_supply_offered_per_day;
   view.demand_per_day = network.total_demand_per_day;
@@ -117,35 +140,42 @@ View make_view(const FreshCampaignState &campaign, const int civilization_id,
       continue;
     const double node_demand = demand[node.id];
     const double node_delivered = delivered[node.id];
-    const std::string status = node_demand <= 0.0
-                                   ? supply[node.id] <= 0.0 ? "Self-sufficient"
-                                                           : "Supply node"
-                                   : node_delivered + .0001 >= node_demand
-                                         ? "Fully supplied"
-                                         : "Shortfall";
-    view.nodes.push_back({node.id, node.name, kind_label(node.kind), status,
-                          supply[node.id], node_demand, node_delivered});
+    const std::string status =
+        node_demand <= 0.0
+            ? supply[node.id] <= 0.0
+                  ? resolve(locale, "SUPPLY_STATUS_SELF", "Self-sufficient")
+                  : resolve(locale, "SUPPLY_STATUS_NODE", "Supply node")
+            : node_delivered + .0001 >= node_demand
+                  ? resolve(locale, "SUPPLY_STATUS_FULL", "Fully supplied")
+                  : resolve(locale, "SUPPLY_STATUS_SHORTFALL", "Shortfall");
+    view.nodes.push_back({node.id, node.name, kind_label(node.kind, locale),
+                          status, supply[node.id], node_demand,
+                          node_delivered});
   }
   return view;
 }
 
-View failed(const std::exception &error) {
+View failed(const std::exception &error,
+            const engine::LocalizationTable *locale) {
   View view;
   view.state = LoadState::Failed;
-  view.message = "Supply network failed to load. Retry; if it persists, export diagnostics from the pause menu.";
+  view.message = resolve(locale, "SUPPLY_ERR_FAILED",
+                         "Supply network failed to load. Retry; if it persists, export diagnostics from the pause menu.");
   view.diagnostic = error.what();
   return view;
 }
 }  // namespace
 
 View build_home_logistics(const FreshCampaignState &campaign,
-                          const int civilization_id) {
-  if (const auto absent = unavailable_for(campaign, civilization_id)) return *absent;
+                          const int civilization_id,
+                          const engine::LocalizationTable *locale) {
+  if (const auto absent = unavailable_for(campaign, civilization_id, locale))
+    return *absent;
   try {
     return make_view(campaign, civilization_id,
-                     canonical_project(campaign, civilization_id));
+                     canonical_project(campaign, civilization_id), locale);
   } catch (const std::exception &error) {
-    return failed(error);
+    return failed(error, locale);
   }
 }
 
@@ -165,18 +195,19 @@ bool HomeLogisticsController::refresh(const FreshCampaignState &campaign,
   if (same_identity && failure_latched_ && !explicit_retry) return false;
   civilization_id_ = civilization_id;
   generation_ = generation;
-  if (const auto absent = unavailable_for(campaign, civilization_id)) {
+  if (const auto absent = unavailable_for(campaign, civilization_id, locale_)) {
     view_ = *absent;
     failure_latched_ = false;
     return false;
   }
   ++attempted_refresh_count_;
   try {
-    view_ = make_view(campaign, civilization_id, projector_(campaign, civilization_id));
+    view_ = make_view(campaign, civilization_id,
+                      projector_(campaign, civilization_id), locale_);
     ++successful_refresh_count_;
     failure_latched_ = false;
   } catch (const std::exception &error) {
-    view_ = failed(error);
+    view_ = failed(error, locale_);
     failure_latched_ = true;
   }
   return true;

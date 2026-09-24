@@ -8,8 +8,11 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
+
+namespace stellar::engine { class LocalizationTable; }
 
 namespace stellar::native_system_travel {
 
@@ -52,8 +55,12 @@ public:
       stellar::core::CampaignFrame&,std::uint64_t campaign_generation,
       const stellar::native_system::NativeSystemSnapshot&);
   [[nodiscard]] bool is_current_generation(std::uint64_t)const noexcept;
+  void set_localization(
+      const stellar::engine::LocalizationTable* table)noexcept{locale_=table;}
 private:
   void require_owner()const;
+  [[nodiscard]] std::string tr(std::string_view,std::string_view)const;
+  const stellar::engine::LocalizationTable* locale_{};
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
 };

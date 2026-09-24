@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+namespace stellar::engine { class LocalizationTable; }
+
 namespace stellar::native_logistics {
 
 enum class LoadState { Unavailable, Ready, Failed };
@@ -40,7 +42,8 @@ struct View {
 };
 
 [[nodiscard]] View build_home_logistics(
-    const stellar::core::FreshCampaignState &campaign, int civilization_id);
+    const stellar::core::FreshCampaignState &campaign, int civilization_id,
+    const stellar::engine::LocalizationTable *locale = nullptr);
 
 class HomeLogisticsController final {
  public:
@@ -57,6 +60,10 @@ class HomeLogisticsController final {
                              int civilization_id, std::uint64_t generation,
                              bool explicit_retry = false);
   void clear() noexcept;
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
 
   [[nodiscard]] const View &view() const noexcept { return view_; }
   [[nodiscard]] std::uint64_t attempted_refresh_count() const noexcept {
@@ -68,6 +75,7 @@ class HomeLogisticsController final {
 
  private:
   Projector projector_;
+  const stellar::engine::LocalizationTable *locale_{};
   View view_;
   std::optional<int> civilization_id_;
   std::optional<std::uint64_t> generation_;
