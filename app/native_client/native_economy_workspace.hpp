@@ -41,6 +41,7 @@ class NativeEconomyWorkspace final {
   void close() noexcept;
   void clear() noexcept;
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
   void set_text_measurer(TextMeasurer measure);
   void set_localization(const stellar::engine::LocalizationTable *table);
   void set_notice(std::string notice);
@@ -74,6 +75,7 @@ class NativeEconomyWorkspace final {
 
   const stellar::engine::LocalizationTable *locale_{};
   bool visible_{}, pointer_owned_{}, dragging_{};
+  int focus_{-1};
   PressTarget pressed_{PressTarget::None};
   native_map::Point press_point_{};
   float press_scroll_{};

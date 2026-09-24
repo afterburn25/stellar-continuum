@@ -32,4 +32,24 @@ void controls_are_pinned_and_cache_is_bounded() { int calls{};NativeEconomyWorks
 void gestures_do_not_leak_or_activate_stale_buttons() { NativeEconomyWorkspace workspace;workspace.open();auto v=view();const auto l=EconomyLayout::for_viewport(1280,720);auto command=workspace.handle({InputEventType::LeftReleased,center(l.priority_buttons[2])},v,1280,720);require(command.kind==EconomyCommandKind::None,"release-only activated priority");command=workspace.handle({InputEventType::LeftPressed,center(l.priority_buttons[2])},v,1280,720);require(command.captured,"panel press leaked");++v.revision;command=workspace.handle({InputEventType::LeftReleased,center(l.priority_buttons[2])},v,1280,720);require(command.kind==EconomyCommandKind::None,"stale priority press activated");(void)workspace.handle({InputEventType::LeftPressed,center(l.priority_buttons[2])},v,1280,720);++v.player_civilization_id;command=workspace.handle({InputEventType::LeftReleased,center(l.priority_buttons[2])},v,1280,720);require(command.kind==EconomyCommandKind::None,"observer change activated a stale priority press");(void)workspace.handle({InputEventType::LeftPressed,center(l.body)},v,1280,720);require(workspace.handle({InputEventType::PointerCancelled},v,1280,720).captured,"cancel not captured");require(!workspace.handle({InputEventType::LeftReleased,{0,0}},v,1280,720).captured,"cancel retained pointer ownership");command=workspace.handle({InputEventType::LeftPressed,center(l.refresh)},v,1280,720);command=workspace.handle({InputEventType::LeftReleased,center(l.refresh)},v,1280,720);require(command.kind==EconomyCommandKind::Refresh,"refresh hit zone did not command refresh"); }
 void failure_is_actionable_without_stale_data() { NativeEconomyWorkspace workspace;workspace.open();auto failed=view();failed.state=EconomyState::Failed;failed.message="Treasury snapshot failed.";failed.diagnostic="player={serialized campaign}";DrawList draw;workspace.render(draw,failed,1280,720);bool retry{}, stale{}, dump{};for(const auto& item:draw.overlay)if(const auto*t=std::get_if<Text>(&item)){retry=retry||t->value=="RETRY";stale=stale||t->value=="¤ 145,000";dump=dump||t->value.find("serialized campaign")!=std::string::npos;}require(retry&&!stale&&!dump,"failed economy state did not expose retry safely");auto unavailable=failed;unavailable.state=EconomyState::Unavailable;DrawList unavailable_draw;workspace.render(unavailable_draw,unavailable,1280,720);bool unavailable_retry{};for(const auto& item:unavailable_draw.overlay)if(const auto*t=std::get_if<Text>(&item))unavailable_retry=unavailable_retry||t->value=="RETRY";require(unavailable_retry,"unavailable economy state omitted retry"); }
 }
-int main() { try { layout_is_responsive();every_flow_row_is_drawn();rows_scroll_and_are_clipped();controls_are_pinned_and_cache_is_bounded();gestures_do_not_leak_or_activate_stale_buttons();failure_is_actionable_without_stale_data(); } catch(const std::exception& error) { std::cerr<<error.what()<<'\n';return 1;} }
+void keyboard_focus() {
+  constexpr std::uint32_t kTab=9u,kReturn=13u,kHome=0x4000004au,kEnd=0x4000004du,kDigit5='5';
+  NativeEconomyWorkspace workspace;workspace.open();const auto v=view();
+  const auto key=[&](std::uint32_t k,bool shift=false){InputEvent e{InputEventType::KeyPressed};e.key=k;e.shift=shift;return workspace.handle(e,v,1280,720);};
+  require(workspace.focus()<0,"economy panel opened with stale focus");
+  require(key(kTab).captured&&workspace.focus()==0,"Tab did not focus the refresh control");
+  require(key(kTab).captured&&workspace.focus()==1,"Tab did not focus the close control");
+  require(key(kEnd).captured&&workspace.focus()==4,"End did not select the last control");
+  require(key(kTab,true).captured&&workspace.focus()==3,"Shift+Tab did not retreat the ring");
+  require(key(kHome).captured&&workspace.focus()==0,"Home did not select the first control");
+  auto command=key(kReturn);require(command.captured&&command.kind==EconomyCommandKind::Refresh,"Return on refresh did not emit the command");
+  require(workspace.focus()==0&&workspace.visible(),"refresh activation moved focus or closed the panel");
+  (void)key(kEnd);command=key(kReturn);
+  require(command.kind==EconomyCommandKind::SetIndustryPriority,"Return on a priority button did not dispatch the priority change");
+  require(workspace.focus()==4,"priority activation moved the ring");
+  require(!key(kDigit5).captured,"unrelated key was swallowed by the non-modal panel");
+  (void)key(kHome);(void)key(kTab);command=key(kReturn);
+  require(command.kind==EconomyCommandKind::Close&&!workspace.visible(),"Return on close did not dismiss the panel");
+  workspace.open();require(workspace.focus()<0,"reopened panel kept a stale focus index");
+}
+int main() { try { layout_is_responsive();every_flow_row_is_drawn();rows_scroll_and_are_clipped();controls_are_pinned_and_cache_is_bounded();gestures_do_not_leak_or_activate_stale_buttons();failure_is_actionable_without_stale_data();keyboard_focus(); } catch(const std::exception& error) { std::cerr<<error.what()<<'\n';return 1;} }

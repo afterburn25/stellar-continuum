@@ -103,8 +103,8 @@ void NativeEconomyWorkspace::set_localization(
   cache_.valid = false;
 }
 
-void NativeEconomyWorkspace::open() noexcept { visible_=true; scroll_=0; reset_gesture(); }
-void NativeEconomyWorkspace::close() noexcept { visible_=false; reset_gesture(); }
+void NativeEconomyWorkspace::open() noexcept { visible_=true; scroll_=0; focus_=-1; reset_gesture(); }
+void NativeEconomyWorkspace::close() noexcept { visible_=false; focus_=-1; reset_gesture(); }
 void NativeEconomyWorkspace::clear() noexcept { close(); notice_.clear(); cache_={}; observed_generation_=observed_revision_=0; observed_observer_=0; }
 void NativeEconomyWorkspace::set_text_measurer(TextMeasurer measure) { measure_=std::move(measure); ++measure_revision_; cache_.valid=false; }
 void NativeEconomyWorkspace::set_notice(std::string notice) { notice_=std::move(notice); cache_.valid=false; }
@@ -172,6 +172,29 @@ EconomyCommand NativeEconomyWorkspace::handle(const InputEvent& event,const Nati
   command.view_revision=view.revision;
   if(event.type==InputEventType::EscapePressed) { close(); command.kind=EconomyCommandKind::Close;command.captured=true; return command; }
   if(event.type==InputEventType::PointerCancelled) { const bool captured=pointer_owned_; reset_gesture(); command.captured=captured; return command; }
+  if(event.type==InputEventType::KeyPressed&&event.key) {
+    // SDL_Keycode: Tab/arrows move the ring over [refresh, close, priorities];
+    // Return/Space replay the press+release gesture. Unrelated keys pass
+    // through — the panel is non-modal.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    constexpr int count=5;
+    const bool fwd=(event.key==kTab&&!event.shift)||event.key==kRight||event.key==kDown;
+    const bool bwd=(event.key==kTab&&event.shift)||event.key==kLeft||event.key==kUp;
+    if(event.key==kHome||event.key==kEnd){focus_=event.key==kHome?0:count-1;command.captured=true;return command;}
+    if(fwd||bwd){focus_=focus_<0?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;command.captured=true;return command;}
+    if((event.key==kReturn||event.key==kSpace)&&focus_>=0){
+      const std::array<UiRect,count> focusables{layout.refresh,layout.close,layout.priority_buttons[0],layout.priority_buttons[1],layout.priority_buttons[2]};
+      const auto&rect=focusables[static_cast<std::size_t>(focus_)];
+      InputEvent press{InputEventType::LeftPressed},release{InputEventType::LeftReleased};
+      press.position=release.position={rect.x+rect.width*.5f,rect.y+rect.height*.5f};
+      const int keep=focus_;static_cast<void>(handle(press,view,width,height));
+      auto activated=handle(release,view,width,height);
+      if(visible_)focus_=keep;return activated;
+    }
+    return command;
+  }
   if(!pointer_event(event.type)) return command;
   const auto& cached=cache_for(view,layout,width,height);
   const auto maximum=std::max(0.f,cached.content_height-layout.body.height);
@@ -179,6 +202,7 @@ EconomyCommand NativeEconomyWorkspace::handle(const InputEvent& event,const Nati
   if(event.type==InputEventType::Wheel) { if(layout.panel.contains(event.position)) { if(layout.body.contains(event.position)) scroll_=std::clamp(scroll_-event.wheel_y*52.f*layout.scale,0.f,maximum); command.captured=true; } return command; }
   if(event.type==InputEventType::LeftPressed||event.type==InputEventType::RightPressed) {
     if(!layout.panel.contains(event.position)) return command;
+    focus_=-1;
     pointer_owned_=true; press_point_=event.position; press_scroll_=scroll_; pressed_=event.type==InputEventType::LeftPressed?hit(event.position,layout):PressTarget::Body; command.captured=true; return command;
   }
   if(event.type==InputEventType::PointerMove) {
@@ -226,5 +250,6 @@ void NativeEconomyWorkspace::render(DrawList& out,const NativeEconomyView& view,
     }
   }
   if(maximum>0) { const float thumb=std::max(20.f*layout.scale,layout.body.height*layout.body.height/rows.content_height); const float y=layout.body.y+(layout.body.height-thumb)*scroll_/maximum; fill(out,{layout.body.x+layout.body.width-3*layout.scale,layout.body.y,2*layout.scale,layout.body.height},muted); fill(out,{layout.body.x+layout.body.width-3*layout.scale,y,2*layout.scale,thumb},accent); }
+  if(focus_>=0) { const std::array<UiRect,5> focusables{layout.refresh,layout.close,layout.priority_buttons[0],layout.priority_buttons[1],layout.priority_buttons[2]}; out.overlay.emplace_back(StrokedRectangle{focusables[static_cast<std::size_t>(focus_)],{160,210,255,255}}); }
 }
 } // namespace stellar::native_economy
