@@ -13,12 +13,13 @@ Space strategy engine specialization: M1–M15 frameworks, Core adoption, chroni
 ## Summary
 
 Specializes the Stellar Engine into a reusable, deterministic C++23
-space-strategy/simulation engine (78 commits, ~19.6k insertions, 121
+space-strategy/simulation engine (246 commits, ~37.7k insertions, 278
 files). Not an Unreal clone — the goal is a strategy/simulation
 substrate: scheduling, economy, population, colonies, infrastructure,
 logistics, planetary development, terraforming, strategic AI, warfare,
-event history, and editor tooling — all deterministic, persistable,
-tested, and consumed by real Core/App surfaces.
+event history, rendering frontier, accessibility, and editor tooling —
+all deterministic, persistable, tested, and consumed by real Core/App
+surfaces.
 
 **Architecture discipline throughout:** engine supplies mechanics and
 frameworks; Core keeps gameplay authority. Core consumption happens
@@ -40,7 +41,7 @@ Core/engine projections, never re-derived in UI.
 | 7–8 | Planetary + terraforming | IMPLEMENTED (engine) — `HabitabilityProfile`/`evaluate_habitability`; `to_engine_environment` Core projection feeds it |
 | 9 | Strategic AI | IMPLEMENTED (engine) — `StrategicMind` utility machinery |
 | 10 | Strategic warfare | IMPLEMENTED (engine) — `WarfareModel` cohorts/interdiction/Lanchester; Core consumption via theater projection + `foreign_armed_presence` diagnostics |
-| 11 | Space rendering | **PARTIAL** — scene3d GPU path with planet/ring/star materials; **HDR/tonemap resolve landed** (RGBA16F scene targets + fullscreen resolve, capability-checked UNORM fallback); instancing (needs texture-array/bindless redesign), render-graph backend consumption, TextureStreamer residency pending |
+| 11 | Space rendering | IMPLEMENTED — scene3d GPU path with planet/ring/star materials; HDR/tonemap resolve (RGBA16F + fullscreen resolve, UNORM fallback); SSBO instanced rendering with `DrawBatcher`-owned ordering/batching; `RenderGraph` pass scheduling (scene→tonemap); `TextureStreamer` byte-budget residency with runtime-tunable limit, pinned-fallback pop-in, screen-footprint LOD demand and partial mip-tail residency. Remaining: no indirect draw |
 | 12 | Editor tools | **PARTIAL** — 16 shell tools (Projects…Galaxy incl. Simulation/Colony/Economy/Planet/AI/Warfare/Missions/Physics genre inspectors + the `GalaxyMap` debugger) + per-tool `--frames` ctest smoke; generated projects scaffold executor + persistence |
 | 13 | Scale benchmarks | IMPLEMENTED — `simulation_scale_250…5000`, `combined_scale` (400 settlements, ~870µs/tick, bit-identical) |
 | 14 | Event history | IMPLEMENTED — `EventHistory` observer-private chronicle; runtime records every advance incl. diplomatic journal entries; v17 save payload; retention policy |
@@ -53,8 +54,12 @@ Core/engine projections, never re-derived in UI.
   at `d68c98af` (15 `engine_shell_tool_*` tests need a display)
 - User desktop run (`ba7fbf05`): **310/310** including shell smoke tests
 - User desktop run (`d5c7e0d3`): **314/314** after GalaxyMap + replay chain
+- Handoff receipt (`550a50d3`): **315/315** after app/editor lanes
+- Handoff receipt (`4b82ca7a`): **321/321** full suite over the merged
+  state incl. the cadence-oracle tests
 - New this branch: `replay` unit tests for per-section checkpoint
-  divergence localization
+  divergence localization; `campaign_phase_cadence_oracle` pins the
+  per-phase activity matrix
 - `stellar-continuum-native` builds `/W4 /WX` clean throughout
 
 ## Notable capabilities added
@@ -89,14 +94,51 @@ Core/engine projections, never re-derived in UI.
   contract)
 - `IntegratedAdaptiveCampaignRuntime` records chronicle entries every
   advance; `DiplomacyState` read-only journal accessors
+- Engine view-model framework adoption — `VirtualizedList` (colony
+  roster, editor systems list, all four diagnostics views with
+  selection-follow + tail clamping), `TableModel` (roster sort/filter +
+  diagnostics phase-table sort, `refilter` keeps state across live
+  `set_rows`), `TreeModel` (editor system list, diagnostics ENTITIES
+  inspector with id-stable selection + detail pane + search reveal,
+  controlled-assets navigator with persisted collapse), `UndoHistory`
+  (editor annotation layer)
+- Keyboard-focus contract across the native client — settings
+  hub/panels, startup + new-game flow, settlement/logistics/economy/
+  shipyard/construction/research/fleet/battle workspaces, chronicle,
+  notification feed, diplomacy, colony roster, controlled-assets
+  navigator, small-body survey panel, pause menu, inspection card:
+  Tab/arrows/Home/End rings, Return/Space activation through the same
+  dispatch pointers take, edit-mode text-field ownership, modal
+  narrowing, `wants_keyboard_focus()` suppressing bound galaxy actions
+  (Space→pause) while a ring is live
+- Accessibility preferences — `interfaceScale` (Compact→Huge user
+  multiplier through `NativeUiLayout`), `reduceMotion`, `reduceFlashing`,
+  `highContrast` (global luminance pass), `colorBlind` (Machado
+  daltonization) — all persisted with draft/cancel semantics
+- Diagnostics tooling — ENTITIES inspector over the read-only campaign
+  projection (incremental sync, tag drill-down, detail pane, search,
+  full keyboard tree contract), phase-table sort, events-view search,
+  continuation inspection, fault capture for developer step throws,
+  authoritative logistics/treasury findings
+- Engine hardening — profiler recording off the global mutex, replay
+  document checkpointing (no re-parse), occupancy censuses
+  (MemoryTracker world/event-history/replay-recorder), pull-based audio
+  stream decoder + equal-power panning, phase-cadence oracle pinning
+  the per-phase activity matrix for minimal + seeded worlds
+- Editor annotation layer — trait overrides (anomaly/rare/pre-warp),
+  numeric `radiusEarth`/`orbitAu` overrides, multi-file projects
+  (`project.json` + `assets/` with embedded png discovery)
+- `campaign_colony_projection` — Core projects authoritative colony
+  state into the engine `Colony` settlement model (first projection-
+  beyond-diagnostics consumption)
 
 ## Limitations (honest)
 
-- M11 space rendering is PARTIAL: HDR/tonemap landed (RGBA16F +
-  resolve, UNORM fallback); remaining are render-graph backend
-  consumption, instancing (texture-array/bindless redesign), and
-  TextureStreamer residency — offscreen Vulkan captures verify in CI,
-  windowed shell smoke still needs a desktop display
+- M11 space rendering is now IMPLEMENTED: instancing (SSBO arrays),
+  RenderGraph scheduling, TextureStreamer byte-budget residency +
+  mip-tail streaming all landed; remaining is indirect draw.
+  Offscreen Vulkan captures verify in CI, windowed shell smoke still
+  needs a desktop display
 - Authoritative Core adoption of economy-catalog/colony/logistics/
   population/strategic-AI frameworks pending — current consumption is
   intentionally read-only projection to avoid dual authority
@@ -111,6 +153,16 @@ Core/engine projections, never re-derived in UI.
 - Chronicle browser: multi-select filter composition unexposed;
   `HistoryEvent::summary` is opaque text (structured localization is an
   upstream event-pipeline change)
+- Accessibility stays PARTIAL: screen-reader/announcement contracts are
+  still open; the global HUD chrome (top bar + rail) intentionally has
+  no focus ring yet — the always-on map surfaces (assets navigator,
+  fleet outliner) already claim Tab, so HUD ordering needs a deliberate
+  focus-group policy
+- `NativeMissionView` (missions/settlement panel) is a tested component
+  not yet instantiated by the client
+- Pause-menu/inspection-card focus rings are verified by client build +
+  code inspection; the windowed campaign class has no headless
+  event-loop harness
 - `engine_shell_tool_*` smoke tests require a desktop display
 
 ## Conventions preserved
