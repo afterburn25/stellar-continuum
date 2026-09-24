@@ -1080,9 +1080,21 @@ category request with `ReplaceCategory` queueing (rapid Tab/arrow runs
 collapse to the latest label), per-announcement dedupe keys (re-focused
 identical labels still speak), 10s expiry and `interruptible` honoring
 `no_interruptions`; captions remain independent under the subtitles
-preference. Startup-flow announcements stay caption-only because the
-voice pipeline starts with the campaign session. Platform AT bridging
-(UIA/AT-SPI) remains the open slice.
+preference. Startup-flow announcements stay caption-only for speech
+because the voice pipeline starts with the campaign session.
+UIA bridging (row 26): `NativeAccessibilityBridge` is the platform AT
+slice — it subclasses the game HWND (`GWLP_WNDPROC`; SDL's message hook
+cannot answer WM_GETOBJECT because the hook cannot supply a return
+value), answers `UiaRootObjectId` with a minimal server-side
+`IRawElementProviderSimple` (pane, "Stellar Continuum", outside the
+control tree) and raises `UiaRaiseNotificationEvent` per announcement
+when `UiaClientsAreListening()`. `Window::native_window_handle()`
+exposes the HWND read-only; both announcer drains feed the bridge.
+`native_accessibility_bridge` verifies the contract end-to-end through
+the real UIA client (`ElementFromHandle` resolves the provider's name
+and control type) plus WM_GETOBJECT fallthrough and detach. Open:
+AT-SPI/non-Windows backends, and the provider stays notification-only —
+focus traversal and control patterns need real semantic projection.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

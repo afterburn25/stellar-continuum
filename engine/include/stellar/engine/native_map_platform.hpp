@@ -156,6 +156,9 @@ class Window final {
   [[nodiscard]] std::vector<DisplayMode> windowed_display_modes() const;
   [[nodiscard]] DisplayMode desktop_display_mode() const;
   [[nodiscard]] float display_refresh_hz() const;
+  // Opaque OS handle (HWND on Windows, nullptr elsewhere) for platform
+  // accessibility bridging. Read-only; the window retains ownership.
+  [[nodiscard]] void *native_window_handle() const noexcept;
   // Owner-thread operations. Driver rejection is reported to the host's
   // transactional preview controller; no requested setting is reported saved.
   void set_display_mode(WindowDisplayMode mode,int width=0,int height=0,float refresh_hz=0);

@@ -8553,7 +8553,8 @@ int main(int argc,char **argv){
                   options.window_height,!options.windowed&&initial_video.display!=stellar::native_video_settings::VideoDisplayMode::Windowed,
                   asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
     stellar::native_client::NativeAccessibilityBridge accessibility_bridge;
-    accessibility_bridge.attach(window.native_window_handle());
+    if(!accessibility_bridge.attach(window.native_window_handle()))
+      SDL_Log("Accessibility bridge unavailable on this platform.");
     // English is the built-in baseline; a shipped Data/locale/<locale>.json
     // table overrides panel text through the engine localization service and
     // falls back to English for any key it does not cover.

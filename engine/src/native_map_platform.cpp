@@ -434,6 +434,14 @@ float Window::display_refresh_hz()const{
   const auto *mode=SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(storage_->window));
   return mode&&std::isfinite(mode->refresh_rate)&&mode->refresh_rate>1.f?mode->refresh_rate:60.f;
 }
+void *Window::native_window_handle()const noexcept{
+#ifdef _WIN32
+  return SDL_GetPointerProperty(SDL_GetWindowProperties(storage_->window),
+                                SDL_PROP_WINDOW_WIN32_HWND_POINTER,nullptr);
+#else
+  return nullptr;
+#endif
+}
 void Window::set_display_mode(WindowDisplayMode requested,int width,int height,float refresh_hz){
   if(width<0||height<0||!std::isfinite(refresh_hz)||refresh_hz<0.f)
     throw std::invalid_argument("Invalid display resolution or refresh rate.");
