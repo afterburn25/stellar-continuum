@@ -34,7 +34,7 @@ std::vector<NativeResearchWorkspace::GuidedCard> NativeResearchWorkspace::guided
     if(sort_==0&&a->recommendation_score!=b->recommendation_score)return a->recommendation_score>b->recommendation_score;
     return a->display_name<b->display_name;
   });
-  const float s=l.scale,gap=10*s,x=l.graph.x+12*s,available=l.graph.width-24*s;float y=l.graph.y+82*s-guided_scroll_;
+  const float s=l.scale,gap=10*s,x=l.graph.x+12*s,available=l.graph.width-24*s;float y=l.graph.y+82*s-guided_scroll_.scroll_offset;
   const bool rows=list_view_||mode_==ResearchViewMode::Queue;
   const int columns=rows?1:std::clamp(static_cast<int>(available/std::max(220*s,220.f)),2,4);
   const float cw=(available-gap*(columns-1))/columns;
@@ -54,7 +54,7 @@ void NativeResearchWorkspace::render_dashboard(DrawList& out,const ResearchWorks
   const auto title=tr(mode_==ResearchViewMode::Recent?"RESEARCH_VIEW_RECENT":mode_==ResearchViewMode::Favorites?"RESEARCH_VIEW_FAVORITES":mode_==ResearchViewMode::Completed?"RESEARCH_VIEW_COMPLETED":mode_==ResearchViewMode::Queue?"RESEARCH_VIEW_QUEUE":plan_.suggestions?"RESEARCH_VIEW_RECOMMENDED":"RESEARCH_VIEW_AVAILABLE",mode_==ResearchViewMode::Recent?"RECENTLY COMPLETED":mode_==ResearchViewMode::Favorites?"FAVORITE TECHNOLOGIES":mode_==ResearchViewMode::Completed?"COMPLETED RESEARCH":mode_==ResearchViewMode::Queue?"RESEARCH QUEUE":plan_.suggestions?"RECOMMENDED & AVAILABLE":"AVAILABLE TECHNOLOGIES");
   text(out,{l.graph.x+12*s,l.graph.y+49*s,l.graph.width-24*s,26*s},title,bright,l.body_font_pixels);
   const UiRect content{l.graph.x,l.graph.y+80*s,l.graph.width,l.graph.height-80*s};float extent=0;bool section=false;
-  for(const auto& card:cards){const auto clip=intersection(card.bounds,content);extent=std::max(extent,card.bounds.y+card.bounds.height+guided_scroll_-content.y);if(!clip)continue;
+  for(const auto& card:cards){const auto clip=intersection(card.bounds,content);extent=std::max(extent,card.bounds.y+card.bounds.height+guided_scroll_.scroll_offset-content.y);if(!clip)continue;
     const auto n=std::ranges::find(window_->nodes,card.id,&NativeResearchNode::id);if(n==window_->nodes.end())continue;
     if(!card.recommended&&!section&&std::ranges::any_of(cards,[](const auto& c){return c.recommended;})){clipped_text(out,{card.bounds.x,card.bounds.y-30*s,l.graph.width-24*s,25*s},content,tr("RESEARCH_OTHER_AVAILABLE","OTHER AVAILABLE TECHNOLOGIES"),muted,l.small_font_pixels);section=true;}
     const auto r=card.bounds;stellar::engine::ui_skin::surface(out,r,s,selected_node_id_==n->id,content);
@@ -86,7 +86,8 @@ void NativeResearchWorkspace::render_dashboard(DrawList& out,const ResearchWorks
     }
   }
   if(cards.empty())text(out,{content.x+18*s,content.y+18*s,content.width-36*s,96*s},tr(mode_==ResearchViewMode::Queue?"RESEARCH_EMPTY_QUEUE":mode_==ResearchViewMode::Recent?"RESEARCH_EMPTY_RECENT":"RESEARCH_EMPTY_VIEW",mode_==ResearchViewMode::Queue?"No technologies queued. Add a known program from the inspector. Queued programs wait for their requirements and funding; blocked entries are never skipped.":mode_==ResearchViewMode::Recent?"No completion records in the saved research history yet. Established starting knowledge is listed under Completed Research.":"No technologies match this view. Change the category, search or filter."),muted,l.body_font_pixels);
-  if(extent>content.height){const float thumb=std::max(20*s,content.height*content.height/extent),y=content.y+(content.height-thumb)*std::clamp(guided_scroll_/(extent-content.height),0.f,1.f);fill(out,{content.x+content.width-4*s,y,2*s,thumb},border);}
+  guided_scroll_.sync(extent,content.height);
+  if(const auto thumb=guided_scroll_.thumb(content.height,20*s);thumb.size>0)fill(out,{content.x+content.width-4*s,content.y+thumb.offset,2*s,thumb.size},border);
 }
 void NativeResearchWorkspace::render_controls(DrawList& out,const ResearchWorkspaceLayout& l){
   const float s=l.scale;
@@ -113,7 +114,8 @@ void NativeResearchWorkspace::render_controls(DrawList& out,const ResearchWorksp
   }
   native_menu_style::panel(out,l.active,s);
   text(out,{l.active.x+12*s,l.active.y+8*s,l.active.width-24*s,24*s},trf("RESEARCH_ACTIVE_PROGRAMS",{std::to_string(window_->active_program_count),window_->lab_capacity_only?tr("RESEARCH_ACTIVE_LIMITED"," programs · laboratory capacity limited"):trf("RESEARCH_ACTIVE_SLOTS",{std::to_string(window_->maximum_programs.value_or(0))}," / {0} slots")},"ACTIVE RESEARCH  ·  {0}{1}"),bright,l.body_font_pixels);
-  float x=l.active.x+10*s-active_scroll_;const UiRect area{l.active.x+8*s,l.active.y+38*s,l.active.width-16*s,l.active.height-44*s};
+  active_scroll_.sync((window_?window_->active_program_count+1:1)*264*s+16*s,l.active.width);
+  float x=l.active.x+10*s-active_scroll_.scroll_offset;const UiRect area{l.active.x+8*s,l.active.y+38*s,l.active.width-16*s,l.active.height-44*s};
   for(const auto& n:window_->nodes)if(n.active){const UiRect r{x,area.y,255*s,area.height};x+=264*s;if(const auto clip=intersection(r,area)){
     stellar::engine::ui_skin::surface(out,r,s,false,area);clipped_text(out,{r.x+8*s,r.y+7*s,r.width-52*s,28*s},*clip,concise(n.display_name,26),bright,l.small_font_pixels);
     const float progress=static_cast<float>(std::clamp(n.total_progress,0.,1.));const UiRect bar{r.x+8*s,r.y+38*s,r.width-16*s,6*s};stellar::engine::ui_skin::progress(out,bar,progress,s,area);
@@ -133,16 +135,16 @@ void NativeResearchWorkspace::render_controls(DrawList& out,const ResearchWorksp
 }
 std::optional<WorkspaceCommand> NativeResearchWorkspace::handle_controls(const InputEvent& e,const ResearchWorkspaceLayout& l,int width,int height){
   const WorkspaceCommand consumed{WorkspaceCommandKind::None,true};
-  if(dropdown_.visible()){const int id=dropdown_.id();if(auto value=dropdown_.handle(e,id==1?l.filter:id==2?l.sort:l.toolbar,width,height)){if(id==1)filter_=*value;else if(id==2)sort_=*value;else return WorkspaceCommand{WorkspaceCommandKind::Execute,true,{},*value==1?NativeResearchIntent::SuggestionsOn:NativeResearchIntent::SuggestionsOff};guided_scroll_=0;}return consumed;}
+  if(dropdown_.visible()){const int id=dropdown_.id();if(auto value=dropdown_.handle(e,id==1?l.filter:id==2?l.sort:l.toolbar,width,height)){if(id==1)filter_=*value;else if(id==2)sort_=*value;else return WorkspaceCommand{WorkspaceCommandKind::Execute,true,{},*value==1?NativeResearchIntent::SuggestionsOn:NativeResearchIntent::SuggestionsOff};guided_scroll_={};}return consumed;}
   if(e.type==InputEventType::EscapePressed&&why_open_){why_open_=false;return consumed;}
-  if(e.type==InputEventType::Wheel&&l.active.contains(e.position)){active_scroll_=std::clamp(active_scroll_-e.wheel_y*120*l.scale,0.f,std::max(0.f,(window_?window_->active_program_count+1:1)*264*l.scale-l.active.width+16*l.scale));return consumed;}
+  if(e.type==InputEventType::Wheel&&l.active.contains(e.position)){active_scroll_.sync((window_?window_->active_program_count+1:1)*264*l.scale+16*l.scale,l.active.width);active_scroll_.scroll_by(-e.wheel_y*120*l.scale);return consumed;}
   if(e.type!=InputEventType::LeftPressed)return {};
   if(why_open_){why_open_=false;return consumed;}
   for(auto hit=interface_hits_.rbegin();hit!=interface_hits_.rend();++hit)if(hit->bounds.contains(e.position)){
     const auto action=hit->action;const auto id=hit->id;
-    if(action>=100){mode_=static_cast<ResearchViewMode>(action-100);guided_scroll_=0;search_focused_=false;return consumed;}
+    if(action>=100){mode_=static_cast<ResearchViewMode>(action-100);guided_scroll_={};search_focused_=false;return consumed;}
     if(action==1)why_open_=!why_open_;
-    else if(action==2){list_view_=!list_view_;guided_scroll_=0;}
+    else if(action==2){list_view_=!list_view_;guided_scroll_={};}
     else if(action==3)dropdown_.open(3,{tr("RESEARCH_ASSIST_OFF","Off"),tr("RESEARCH_ASSIST_SUGGESTIONS","Suggestions only")},plan_.suggestions?1:0);
     else if(action==4)dropdown_.open(1,{tr("RESEARCH_DD_AVAILABLE","Available"),tr("RESEARCH_DD_ALL_KNOWN","All known"),tr("RESEARCH_DD_RECOMMENDED","Recommended"),tr("RESEARCH_DD_RESEARCHING","Researching"),tr("RESEARCH_DD_QUEUED","Queued"),tr("RESEARCH_DD_LOCKED","Locked"),tr("RESEARCH_DD_COMPLETED","Completed"),tr("RESEARCH_DD_FAVORITES","Favorites")},filter_);
     else if(action==5)dropdown_.open(2,{tr("RESEARCH_DD_RELEVANCE","Relevance"),tr("RESEARCH_DD_TIME","Research time"),tr("RESEARCH_DD_TIER","Tier"),tr("RESEARCH_DD_CATEGORY","Category"),tr("RESEARCH_DD_NAME","Name")},sort_);

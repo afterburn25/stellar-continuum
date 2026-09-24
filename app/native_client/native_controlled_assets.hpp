@@ -61,7 +61,7 @@ public:
   [[nodiscard]] const std::string& search()const{return search_;}
   [[nodiscard]] bool wants_text_input()const{return search_focused_&&!preferences_.hidden;}
   [[nodiscard]] std::optional<Key> selection()const{return selected_;}
-  [[nodiscard]] float scroll_offset()const{return scroll_;}
+  [[nodiscard]] float scroll_offset()const{return scroll_.scroll_offset;}
   [[nodiscard]] int focus()const noexcept{return focus_;}
   // Localized label of the ringed control — the announcement surface for
   // screen-reader/live-region consumers. Empty when nothing is focused.
@@ -101,7 +101,7 @@ private:
   int pressed_observer_{},click_count_{};
   bool search_focused_{},reveal_selection_{};
   int focus_{-1};
-  mutable float scroll_{};
+  mutable stellar::engine::ScrollView scroll_{};
   stellar::native_map::Point pointer_{};
   const stellar::engine::LocalizationTable* locale_{};
 };

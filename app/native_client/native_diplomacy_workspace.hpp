@@ -4,6 +4,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -125,7 +126,7 @@ private:
   [[nodiscard]] std::vector<stellar::native_map::UiRect>
   focusables(const DiplomacyWorkspaceLayout &layout) const;
   [[nodiscard]] float
-  detail_scroll_limit(const DiplomacyWorkspaceLayout &layout) const noexcept;
+  detail_content_height(const DiplomacyWorkspaceLayout &layout) const noexcept;
   [[nodiscard]] std::vector<const stellar::native_diplomacy::
                                 NativeDiplomacyContact *>
   filtered_contacts() const;
@@ -147,8 +148,8 @@ private:
   std::optional<ModalState> modal_;
   std::string notice_;
   bool notice_accepted_{};
-  float contact_scroll_{};
-  float detail_scroll_{};
+  stellar::engine::ScrollView contact_scroll_{};
+  stellar::engine::ScrollView detail_scroll_{};
   int focus_{-1};
 };
 

@@ -50,7 +50,7 @@ std::vector<const NativeShipDesign*> NativeShipyardWorkspace::filtered_designs()
 UiRect NativeShipyardWorkspace::card(std::size_t i,const ShipyardWorkspaceLayout& l)const{
   const int columns=std::clamp(static_cast<int>(l.designs.width/(214*l.scale)),2,4);
   const float gap=8*l.scale,w=(l.designs.width-gap*(columns-1))/columns;
-  return {l.designs.x+(i%columns)*(w+gap),l.designs.y+design_scroll_+(i/columns)*268*l.scale,w,260*l.scale};
+  return {l.designs.x+(i%columns)*(w+gap),l.designs.y-design_scroll_.scroll_offset+(i/columns)*268*l.scale,w,260*l.scale};
 }
 std::optional<UiRect> NativeShipyardWorkspace::design_bounds(std::string_view id,int w,int h)const{
   const auto l=ShipyardWorkspaceLayout::for_viewport(w,h);const auto designs=filtered_designs();
@@ -68,7 +68,7 @@ std::vector<NativeShipyardWorkspace::FocusItem> NativeShipyardWorkspace::focusab
     const UiRect clip{l.orders.x,l.orders.y+30*s,l.orders.width,l.orders.height-30*s};
     const UiRect queue{l.orders.x+5*s,l.orders.y+30*s,l.orders.width-10*s,l.orders.height-35*s};
     for(std::size_t i=0;i<view_->orders.size();++i){const auto&o=view_->orders[i];
-      const UiRect r{clip.x,clip.y+order_scroll_+i*64*s,clip.width,60*s};
+      const UiRect r{clip.x,clip.y-order_scroll_.scroll_offset+i*64*s,clip.width,60*s};
       const auto hit=intersection(r,clip);if(!hit)continue;
       push(*hit,200+i*10);
       const float bx=r.x+r.width-110*s;
@@ -107,13 +107,13 @@ bool NativeShipyardWorkspace::save_preferences(){
 
 ShipyardWorkspaceCommand NativeShipyardWorkspace::handle(const InputEvent& e,int w,int h){
   if(!visible_)return {};pointer_=e.position;const auto l=ShipyardWorkspaceLayout::for_viewport(w,h);const float s=l.scale;
-  if(dropdown_.visible()){const int id=dropdown_.id();if(auto choice=dropdown_.handle(e,id==1?l.sort:l.filter,w,h)){if(id==1)sort_=*choice;else filter_=*choice;design_scroll_=0;}return {ShipyardWorkspaceCommandKind::None,true};}
+  if(dropdown_.visible()){const int id=dropdown_.id();if(auto choice=dropdown_.handle(e,id==1?l.sort:l.filter,w,h)){if(id==1)sort_=*choice;else filter_=*choice;design_scroll_={};}return {ShipyardWorkspaceCommandKind::None,true};}
   if(e.type==InputEventType::PointerCancelled){cancel_confirmation_id_.reset();search_focused_=false;return {ShipyardWorkspaceCommandKind::None,true};}
   if(e.type==InputEventType::EscapePressed){close();return {ShipyardWorkspaceCommandKind::None,true};}
   if(search_focused_&&(e.type==InputEventType::TextEntered||e.type==InputEventType::BackspacePressed)){
     if(e.type==InputEventType::BackspacePressed&&!search_.empty()){auto end=search_.size()-1;while(end>0&&(static_cast<unsigned char>(search_[end])&0xc0u)==0x80u)--end;search_.resize(end);}
     else if(e.type==InputEventType::TextEntered&&search_.size()+e.text.size()<=128)search_+=e.text;
-    design_scroll_=0;return {ShipyardWorkspaceCommandKind::None,true};
+    design_scroll_={};return {ShipyardWorkspaceCommandKind::None,true};
   }
   if(e.type==InputEventType::KeyPressed&&e.key){
     if(search_focused_){
@@ -140,9 +140,9 @@ ShipyardWorkspaceCommand NativeShipyardWorkspace::handle(const InputEvent& e,int
     return {};
   }
   if(e.type==InputEventType::Wheel){
-    if(l.designs.contains(e.position)){const auto designs=filtered_designs();const float content=designs.empty()?0:card(designs.size()-1,l).y-design_scroll_-l.designs.y+268*s;design_scroll_=std::clamp(design_scroll_+e.wheel_y*66*s,std::min(0.f,l.designs.height-content),0.f);}
-    else if(l.orders.contains(e.position))order_scroll_=std::clamp(order_scroll_+e.wheel_y*50*s,std::min(0.f,l.orders.height-30*s-(view_?view_->orders.size():0)*64*s),0.f);
-    else if(l.design_details.contains(e.position))detail_scroll_=std::clamp(detail_scroll_-e.wheel_y*48*s,0.f,detail_limit_);
+    if(l.designs.contains(e.position)){const auto designs=filtered_designs();const float content=designs.empty()?0:card(designs.size()-1,l).y-design_scroll_.scroll_offset-l.designs.y+268*s;design_scroll_.sync(content,l.designs.height);design_scroll_.scroll_by(-e.wheel_y*66*s);}
+    else if(l.orders.contains(e.position)){order_scroll_.sync(30*s+(view_?view_->orders.size():0)*64*s,l.orders.height);order_scroll_.scroll_by(-e.wheel_y*50*s);}
+    else if(l.design_details.contains(e.position))detail_scroll_.scroll_by(-e.wheel_y*48*s);
     return {ShipyardWorkspaceCommandKind::None,l.surface.contains(e.position)};
   }
   if(e.type!=InputEventType::LeftPressed)return {ShipyardWorkspaceCommandKind::None,l.surface.contains(e.position)};
@@ -151,11 +151,11 @@ ShipyardWorkspaceCommand NativeShipyardWorkspace::handle(const InputEvent& e,int
   focus_=-1;
   search_focused_=l.search.contains(e.position);if(search_focused_)return {ShipyardWorkspaceCommandKind::None,true};
   if(l.sort.contains(e.position)||l.filter.contains(e.position)){const bool sort=l.sort.contains(e.position);std::vector<std::string> options;if(sort)for(std::size_t i=0;i<ship_sorts.size();++i)options.emplace_back(tr(ship_sort_keys[i],ship_sorts[i]));else for(std::size_t i=0;i<ship_filters.size();++i)options.emplace_back(tr(ship_filter_keys[i],ship_filters[i]));dropdown_.open(sort?1:2,std::move(options),sort?sort_:filter_);return {ShipyardWorkspaceCommandKind::None,true};}
-  for(int i=0;i<static_cast<int>(ship_categories.size());++i){UiRect r{l.categories.x,l.categories.y+i*54*s,l.categories.width,48*s};if(r.contains(e.position)){category_=i;design_scroll_=0;return {ShipyardWorkspaceCommandKind::None,true};}}
-  const auto designs=filtered_designs();for(std::size_t i=0;i<designs.size();++i){const auto r=intersection(card(i,l),l.designs);if(r&&r->contains(e.position)){selected_design_id_=designs[i]->id;selected_order_id_.reset();cancel_confirmation_id_.reset();notice_.clear();detail_scroll_=0;quantity_=1;return {ShipyardWorkspaceCommandKind::None,true};}}
+  for(int i=0;i<static_cast<int>(ship_categories.size());++i){UiRect r{l.categories.x,l.categories.y+i*54*s,l.categories.width,48*s};if(r.contains(e.position)){category_=i;design_scroll_={};return {ShipyardWorkspaceCommandKind::None,true};}}
+  const auto designs=filtered_designs();for(std::size_t i=0;i<designs.size();++i){const auto r=intersection(card(i,l),l.designs);if(r&&r->contains(e.position)){selected_design_id_=designs[i]->id;selected_order_id_.reset();cancel_confirmation_id_.reset();notice_.clear();detail_scroll_={};quantity_=1;return {ShipyardWorkspaceCommandKind::None,true};}}
   if(view_){const UiRect clip{l.orders.x,l.orders.y+30*s,l.orders.width,l.orders.height-30*s};
-    for(std::size_t i=0;i<view_->orders.size();++i){const auto& o=view_->orders[i];const UiRect r{clip.x,clip.y+order_scroll_+i*64*s,clip.width,60*s};const auto hit=intersection(r,clip);if(!hit||!hit->contains(e.position))continue;
-      selected_order_id_=o.order_id;selected_design_id_.reset();cancel_confirmation_id_.reset();notice_.clear();detail_scroll_=0;
+    for(std::size_t i=0;i<view_->orders.size();++i){const auto& o=view_->orders[i];const UiRect r{clip.x,clip.y-order_scroll_.scroll_offset+i*64*s,clip.width,60*s};const auto hit=intersection(r,clip);if(!hit||!hit->contains(e.position))continue;
+      selected_order_id_=o.order_id;selected_design_id_.reset();cancel_confirmation_id_.reset();notice_.clear();detail_scroll_={};
       const float bx=r.x+r.width-110*s;
       if(!o.active&&UiRect{bx,r.y+12*s,30*s,30*s}.contains(e.position))return {ShipyardWorkspaceCommandKind::MoveUp,true,o.order_id};
       if(!o.active&&UiRect{bx+36*s,r.y+12*s,30*s,30*s}.contains(e.position))return {ShipyardWorkspaceCommandKind::MoveDown,true,o.order_id};
@@ -195,7 +195,7 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
   stellar::native_ui_style::menu_panel(out,l.orders);text(out,{l.orders.x+10*s,l.orders.y+6*s,l.orders.width-20*s,22*s},trf("SHIPYARD_ORDERS_HEADING",{std::to_string(view_?view_->orders.size():0)},"BUILD ORDERS  /  {0}"),bright,l.small_font_pixels,FontFace::Heading);
   const UiRect queue{l.orders.x+5*s,l.orders.y+30*s,l.orders.width-10*s,l.orders.height-35*s};
   if(!view_||view_->orders.empty())text(out,queue,tr("SHIPYARD_NO_ORDERS","No ships are under construction."),muted,l.body_font_pixels);
-  if(view_)for(std::size_t i=0;i<view_->orders.size();++i){const auto& o=view_->orders[i];const UiRect r{l.orders.x,queue.y+order_scroll_+i*64*s,l.orders.width,60*s};const auto clip=intersection(r,queue);if(!clip)continue;
+  if(view_)for(std::size_t i=0;i<view_->orders.size();++i){const auto& o=view_->orders[i];const UiRect r{l.orders.x,queue.y-order_scroll_.scroll_offset+i*64*s,l.orders.width,60*s};const auto clip=intersection(r,queue);if(!clip)continue;
     fill(out,*clip,selected_order_id_==o.order_id?selected:inset);float x=r.x+12*s;
     if(art){if(auto image=art->image_for(o.design_id,stellar::core::FleetRole::Military)){const UiRect p{x,r.y+5*s,70*s,49*s};out.overlay.emplace_back(Image{image,p,cover_source(*image,p),{255,255,255,255},queue});}x+=80*s;}
     clipped_text({x,r.y+4*s,r.width-(x-r.x)-122*s,22*s},queue,o.design_name,bright,l.body_font_pixels);
@@ -208,7 +208,7 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
     }
   }
   stellar::native_ui_style::menu_panel(out,l.design_details);const auto* d=selected_design();const auto* o=selected_order();
-  const UiRect details{l.design_details.x+10*s,l.design_details.y+8*s,l.design_details.width-20*s,l.design_details.height-16*s};float y=details.y-detail_scroll_;
+  const UiRect details{l.design_details.x+10*s,l.design_details.y+8*s,l.design_details.width-20*s,l.design_details.height-16*s};float y=details.y-detail_scroll_.scroll_offset;
   const auto write=[&](std::string value,Color color=bright,int pixels=0){if(!pixels)pixels=l.small_font_pixels;Text item{{details.x,y},std::move(value),color,pixels,details.width,details};const auto extent=measure_?measure_(item):TextExtent{0,static_cast<int>((1+item.value.size()/std::max(1,static_cast<int>(details.width/(pixels*.53f))))*(pixels+4))};out.overlay.emplace_back(std::move(item));y+=std::max(pixels+3,extent.height)+6*s;};
   if(d){write(d->name,bright,l.body_font_pixels);if(art){if(auto image=art->image_for(d->id,d->role)){const UiRect p{details.x,y,details.width,152*s};out.overlay.emplace_back(Image{image,p,cover_source(*image,p),{255,255,255,255},details});y+=160*s;}}
     write(d->description);write(tr("SHIPYARD_COMBAT","COMBAT"),good);write(trf("SHIPYARD_STATS_DEFENSE",{number(d->hull,0),number(d->armor,0),number(d->shields,0)},"Hull  {0}     Armor  {1}     Shields  {2}"));
@@ -217,7 +217,7 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
     if(art){const auto design=std::ranges::find(view_->available_designs,o->design_id,&NativeShipDesign::id);const auto role=design==view_->available_designs.end()?stellar::core::FleetRole::Military:design->role;if(auto image=art->image_for(o->design_id,role)){const UiRect p{details.x,y,details.width,152*s};out.overlay.emplace_back(Image{image,p,cover_source(*image,p),{255,255,255,255},details});y+=160*s;}}
     write(o->active?tr("SHIPYARD_STATE_ACTIVE","Active construction"):tr("SHIPYARD_STATE_WAITING","Waiting for the production line"),good);write(trf("SHIPYARD_INDUSTRY_REMAINING",{number(o->industry_remaining,1)},"Industry remaining  {0}"));write(trf("SHIPYARD_POPULATION_RESERVED",{number(o->reserved_population_millions,3)},"Population reserved  {0} million"));write(tr("SHIPYARD_CANCEL_NOTE","Cancelling releases the unused authorization and reserved population under the normal construction rules."));}
   else write(tr("SHIPYARD_SELECT_HINT","Select an available design to review its requirements."),muted);
-  detail_limit_=std::max(0.f,y+detail_scroll_-details.y-details.height);
+  detail_scroll_.sync(y+detail_scroll_.scroll_offset-details.y,details.height);
   std::string readiness;
   if(d&&view_){const auto q=std::ranges::find(d->batch_quotes,quantity_,&stellar::core::ShipbuildingBatchAssessment::quantity);
     const auto credit=q==d->batch_quotes.end()?d->formatted_credit_cost:view_->currency.format(q->credit_cost);

@@ -4,6 +4,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <initializer_list>
 #include <optional>
@@ -101,8 +102,8 @@ private:
   std::optional<std::string> cancel_confirmation_id_;
   std::string notice_;
   bool notice_accepted_{};
-  float project_scroll_{};
-  float order_scroll_{};
+  mutable stellar::engine::VirtualizedList project_scroll_{};
+  mutable stellar::engine::VirtualizedList order_scroll_{};
   std::vector<std::size_t> status_order_;
   int focus_{-1};
 };

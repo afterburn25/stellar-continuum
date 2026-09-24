@@ -6,6 +6,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <optional>
 #include <functional>
@@ -72,7 +73,7 @@ private:
   std::optional<stellar::native_colony::NativeOutpostFreightPreview> freight_preview_;
   std::string freight_text_;
   std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure_;
-  mutable float freight_scroll_{};
+  mutable stellar::engine::ScrollView freight_scroll_{};
   ColonyWorkspaceCommandKind freight_pressed_{ColonyWorkspaceCommandKind::None};
   int focus_{-1};
   [[nodiscard]] float freight_content_height(const ColonyWorkspaceLayout&) const;

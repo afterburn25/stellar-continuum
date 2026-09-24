@@ -5,6 +5,7 @@
 #include "native_new_campaign_setup.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <array>
 #include <cstdint>
@@ -124,7 +125,9 @@ public:
   }
   [[nodiscard]] bool seed_focused() const noexcept { return seed_focused_; }
   [[nodiscard]] int focus() const noexcept { return focus_; }
-  [[nodiscard]] float detail_scroll() const noexcept { return detail_scroll_; }
+  [[nodiscard]] float detail_scroll() const noexcept {
+    return detail_scroll_.scroll_offset;
+  }
 
   [[nodiscard]] NativeNewGameMeasuredLayout measure_layout(
       int width, int height, const TextMeasurer &) const;
@@ -180,7 +183,7 @@ private:
   bool developer_exploration_{};
   int selected_system_count_{}, selected_pre_warp_civilization_count_{},
       selected_ancient_civilization_count_{};
-  float species_scroll_{}, detail_scroll_{};
+  mutable stellar::engine::ScrollView species_scroll_{}, detail_scroll_{};
   bool seed_focused_{}, seed_replace_pending_{}, assessment_accepted_{}, pressed_{};
   int focus_{-1};
   stellar::native_map::Point pointer_{};

@@ -3,6 +3,7 @@
 #include "native_dropdown.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 #include <stellar/engine/localization.hpp>
 #include <filesystem>
 #include <array>
@@ -109,7 +110,7 @@ class NativeGeneralSettings final {
   mutable std::string cached_path_source_,cached_path_lines_;
   mutable float cached_path_width_{};
   mutable int cached_path_font_{};
-  float path_scroll_{};
+  stellar::engine::ScrollView path_scroll_{};
   std::uint64_t next_request_{};
   std::optional<std::uint64_t> pending_request_;
   bool visible_{};

@@ -257,7 +257,7 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
     preview_.reset();
     target_display_name_.clear();
     notice_.clear();
-    list_scroll_ = 0.f;
+    list_scroll_.scroll_offset = 0.f;
     focus_ = -1;
   }
   const auto selected_changed = [&] {
@@ -302,7 +302,7 @@ void NativeFleetWorkspace::discard_campaign() {
   preview_.reset();
   target_display_name_.clear();
   notice_.clear();
-  list_scroll_ = 0.f;
+  list_scroll_.scroll_offset = 0.f;
   clear_pressed_action();
   focus_ = -1;
 }
@@ -371,7 +371,7 @@ std::vector<NativeFleetWorkspace::FocusRect> NativeFleetWorkspace::focusables(
   if (view_ && presentation_ == FleetWorkspacePresentation::Outliner)
     for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
       const UiRect row{layout.list.x,
-                       layout.list.y + list_scroll_ +
+                       layout.list.y - list_scroll_.scroll_offset +
                            static_cast<float>(index) * 45.f * layout.scale,
                        layout.list.width, 41.f * layout.scale};
       if (const auto clipped = intersection(row, layout.list))
@@ -486,9 +486,8 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
       presentation_ == FleetWorkspacePresentation::Outliner && layout.list.contains(event.position)) {
     const auto count = view_ ? view_->own_fleets.size() : 0;
     const auto content = static_cast<float>(count) * 45.f * layout.scale;
-    const auto minimum = std::min(0.f, layout.list.height - content);
-    list_scroll_ = std::clamp(list_scroll_ + event.wheel_y * 36.f * layout.scale,
-                              minimum, 0.f);
+    list_scroll_.sync(content, layout.list.height);
+    list_scroll_.scroll_by(-event.wheel_y * 36.f * layout.scale);
     return {FleetWorkspaceCommandKind::None, true};
   }
   if (event.type == InputEventType::RightPressed) {
@@ -612,7 +611,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     if (view_ && presentation_ == FleetWorkspacePresentation::Outliner) {
       for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
         const UiRect row{layout.list.x,
-                         layout.list.y + list_scroll_ +
+                         layout.list.y - list_scroll_.scroll_offset +
                              static_cast<float>(index) * 45.f * layout.scale,
                          layout.list.width, 41.f * layout.scale};
         const auto clipped = intersection(row, layout.list);
@@ -698,7 +697,7 @@ void NativeFleetWorkspace::render(
     for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
       const auto &fleet = view_->own_fleets[index];
       const UiRect row{layout.list.x,
-                       layout.list.y + list_scroll_ +
+                       layout.list.y - list_scroll_.scroll_offset +
                            static_cast<float>(index) * 45.f * layout.scale,
                        layout.list.width, 41.f * layout.scale};
       const auto clipped = intersection(row, layout.list);
@@ -1009,7 +1008,7 @@ void NativeFleetWorkspace::render(
     for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
       const auto &candidate = view_->own_fleets[index];
       const UiRect row{layout.list.x,
-                       layout.list.y + list_scroll_ +
+                       layout.list.y - list_scroll_.scroll_offset +
                            static_cast<float>(index) * 45.f * layout.scale,
                        layout.list.width, 41.f * layout.scale};
       if (!layout.list.contains(pointer_) || !row.contains(pointer_)) continue;

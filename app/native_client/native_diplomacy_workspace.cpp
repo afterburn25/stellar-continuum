@@ -362,7 +362,7 @@ void NativeDiplomacyWorkspace::discard_campaign() {
   tab_ = DiplomacyWorkspaceTab::agreements;
   modal_.reset();
   notice_.clear();
-  contact_scroll_ = detail_scroll_ = 0;
+  contact_scroll_ = {}; detail_scroll_ = {};
   focus_ = -1;
 }
 void NativeDiplomacyWorkspace::set_notice(std::string message, bool accepted) {
@@ -413,7 +413,7 @@ void NativeDiplomacyWorkspace::reconcile_selection() {
   selected_contact_index_ = fallback.source_index;
   selected_contact_id_ = fallback.contact_id;
 }
-float NativeDiplomacyWorkspace::detail_scroll_limit(
+float NativeDiplomacyWorkspace::detail_content_height(
     const DiplomacyWorkspaceLayout &layout) const noexcept {
   if (!view_) return 0.f;
   const auto s = layout.scale;
@@ -463,7 +463,7 @@ float NativeDiplomacyWorkspace::detail_scroll_limit(
                           view_->contacts.empty() ? 64.f * s : 44.f * s);
     break;
   }
-  return std::max(0.f, content - layout.detail_rows.height + 8.f * s);
+  return content + 8.f * s;
 }
 std::vector<const NativeDiplomacyContact *>
 NativeDiplomacyWorkspace::filtered_contacts() const {
@@ -493,7 +493,7 @@ std::vector<UiRect> NativeDiplomacyWorkspace::focusables(
     const auto rows = filtered_contacts();
     for (std::size_t index = 0; index < rows.size(); ++index)
       if (const auto clipped =
-              intersection(contact_row(layout, index, contact_scroll_),
+              intersection(contact_row(layout, index, contact_scroll_.scroll_offset),
                            layout.contact_rows))
         out.push_back(*clipped);
     const auto &sel = view_->selected;
@@ -521,7 +521,7 @@ std::vector<UiRect> NativeDiplomacyWorkspace::focusables(
           if (legal[which])
             if (const auto clipped =
                     intersection(proposal_button(layout, card, which,
-                                                 detail_scroll_),
+                                                 detail_scroll_.scroll_offset),
                                  layout.detail_rows))
               out.push_back(*clipped);
       }
@@ -531,7 +531,7 @@ std::vector<UiRect> NativeDiplomacyWorkspace::focusables(
       if (contact.last_observed_system_id) {
         const auto s = layout.scale;
         const UiRect link{layout.detail_rows.x + 16.f * s,
-                          layout.detail_rows.y + 78.f * s - detail_scroll_,
+                          layout.detail_rows.y + 78.f * s - detail_scroll_.scroll_offset,
                           layout.detail_rows.width - 32.f * s, 34.f * s};
         if (const auto clipped = intersection(link, layout.detail_rows))
           out.push_back(*clipped);
@@ -597,16 +597,16 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
   if (event.type == InputEventType::Wheel) {
     if (layout.contact_rows.contains(event.position)) {
       const auto rows = filtered_contacts();
-      const auto content = rows.size() * 62.f * layout.scale;
-      const auto limit = std::max(
-          0.f, content - layout.contact_rows.height + 12.f * layout.scale);
-      contact_scroll_ = std::clamp(contact_scroll_ - event.wheel_y * 26.f,
-                                   0.f, limit);
+      contact_scroll_.sync(
+          rows.size() * 62.f * layout.scale + 12.f * layout.scale,
+          layout.contact_rows.height);
+      contact_scroll_.scroll_by(-event.wheel_y * 26.f);
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
     if (layout.detail_rows.contains(event.position)) {
-      detail_scroll_ = std::clamp(detail_scroll_ - event.wheel_y * 26.f, 0.f,
-                                  detail_scroll_limit(layout));
+      detail_scroll_.sync(detail_content_height(layout),
+                          layout.detail_rows.height);
+      detail_scroll_.scroll_by(-event.wheel_y * 26.f);
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
     if (layout.surface.contains(event.position))
@@ -674,21 +674,21 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
   for (std::size_t index = 0; index < std::size(filter_labels); ++index) {
     if (filter_button(layout, index).contains(event.position)) {
       filter_ = filter_labels[index].first;
-      contact_scroll_ = 0;
+      contact_scroll_ = {};
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
   }
   for (std::size_t index = 0; index < std::size(tab_labels); ++index) {
     if (tab_button(layout, index).contains(event.position)) {
       tab_ = tab_labels[index].first;
-      detail_scroll_ = 0;
+      detail_scroll_ = {};
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
   }
 
   const auto rows = filtered_contacts();
   for (std::size_t index = 0; index < rows.size(); ++index) {
-    const auto bounds = contact_row(layout, index, contact_scroll_);
+    const auto bounds = contact_row(layout, index, contact_scroll_.scroll_offset);
     const auto clipped = intersection(bounds, layout.contact_rows);
     if (clipped && clipped->contains(event.position)) {
       selected_contact_index_ = rows[index]->source_index;
@@ -793,7 +793,7 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
       for (int which = 0; which < 3; ++which) {
         if (!buttons[which].first) continue;
         const auto clipped = intersection(
-            proposal_button(layout, card, which, detail_scroll_),
+            proposal_button(layout, card, which, detail_scroll_.scroll_offset),
             layout.detail_rows);
         if (clipped && clipped->contains(event.position)) {
           DiplomacyWorkspaceCommand command{
@@ -812,7 +812,7 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
     if (contact.last_observed_system_id) {
       const auto s2 = layout.scale;
       const UiRect focus{layout.detail_rows.x + 16.f * s2,
-                         layout.detail_rows.y + 78.f * s2 - detail_scroll_,
+                         layout.detail_rows.y + 78.f * s2 - detail_scroll_.scroll_offset,
                          layout.detail_rows.width - 32.f * s2, 34.f * s2};
       if (const auto clipped = intersection(focus, layout.detail_rows);
           clipped && clipped->contains(event.position))
@@ -870,7 +870,7 @@ void NativeDiplomacyWorkspace::render(
          muted, layout.body_font_pixels);
   }
   for (std::size_t index = 0; index < rows.size(); ++index) {
-    const auto bounds = contact_row(layout, index, contact_scroll_);
+    const auto bounds = contact_row(layout, index, contact_scroll_.scroll_offset);
     if (bounds.y >= layout.contact_rows.y + layout.contact_rows.height ||
         bounds.y + bounds.height <= layout.contact_rows.y)
       continue;
@@ -1074,7 +1074,7 @@ void NativeDiplomacyWorkspace::render(
   const auto card = [&](std::size_t index, float card_h) {
     const auto top = layout.detail_rows.y + 8.f * s +
                      static_cast<float>(index) * (card_h + 8.f * s) -
-                     detail_scroll_;
+                     detail_scroll_.scroll_offset;
     return UiRect{layout.detail_rows.x + 8.f * s, top,
                   layout.detail_rows.width - 16.f * s, card_h};
   };
@@ -1173,7 +1173,7 @@ void NativeDiplomacyWorkspace::render(
           {proposal.can_withdraw, tr("DIPLOMACY_WITHDRAW", "Withdraw")}};
       for (int which = 0; which < 3; ++which) {
         if (!buttons[which].first) continue;
-        const auto button = proposal_button(layout, index, which, detail_scroll_);
+        const auto button = proposal_button(layout, index, which, detail_scroll_.scroll_offset);
         const auto clipped = detail_clip(button);
         if (!clipped) continue;
         detail_fill(button, button.contains(pointer_) ? hover : inset);
@@ -1244,7 +1244,7 @@ void NativeDiplomacyWorkspace::render(
                 bright, layout.body_font_pixels);
       if (contact.last_observed_system_id) {
         const UiRect focus{layout.detail_rows.x + 16.f * s,
-                           layout.detail_rows.y + 78.f * s - detail_scroll_,
+                           layout.detail_rows.y + 78.f * s - detail_scroll_.scroll_offset,
                            layout.detail_rows.width - 32.f * s, 34.f * s};
         if (const auto clipped = detail_clip(focus)) {
           detail_fill(focus, focus.contains(pointer_) ? hover : row);

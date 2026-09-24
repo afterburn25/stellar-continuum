@@ -68,7 +68,7 @@ std::string SupplyWorkspace::trf(
 }
 
 void SupplyWorkspace::clear_rows() noexcept { rows_={}; }
-void SupplyWorkspace::open() noexcept { visible_=true;scroll_=0.f;owned_=false;focus_=-1;clear_rows(); }
+void SupplyWorkspace::open() noexcept { visible_=true;scroll_={};owned_=false;focus_=-1;clear_rows(); }
 void SupplyWorkspace::close() noexcept { visible_=false;owned_=false;focus_=-1;clear_rows(); }
 void SupplyWorkspace::set_text_measurer(std::function<TextExtent(const Text&)> value) {
   measure_=std::move(value);++measurer_revision_;clear_rows();
@@ -132,8 +132,8 @@ SupplyCommand SupplyWorkspace::handle(const InputEvent& event,const View& view,i
   if(event.type==InputEventType::RightPressed)owned_=true;
   if(event.type==InputEventType::Wheel&&layout.body.contains(event.position)) {
     const auto& rows=rows_for(view,layout,width,height);
-    const auto maximum=std::max(0.f,rows.height-layout.body.height);
-    scroll_=std::clamp(scroll_-event.wheel_y*55.f*layout.scale,0.f,maximum);
+    scroll_.sync(rows.height,layout.body.height);
+    scroll_.scroll_by(-event.wheel_y*55.f*layout.scale);
   }
   return {true,false};
 }
@@ -177,10 +177,9 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
   for(std::size_t i=0;i<columns.size();++i)
     label(out,{b.x+b.width*columns[i]+8.f*s,p.y+215.f*s,b.width*spans[i]-16.f*s,23.f*s},tr(heading_keys[i],heading_fallbacks[i]),font-2,muted,p);
   const auto& rows=rows_for(view,layout,width,height);
-  const auto maximum=std::max(0.f,rows.height-b.height);
-  scroll_=std::clamp(scroll_,0.f,maximum);
+  scroll_.sync(rows.height,b.height);
   for(const auto& row:rows.rows){
-    const UiRect box{b.x,b.y+row.y-scroll_,b.width,row.height};
+    const UiRect box{b.x,b.y+row.y-scroll_.scroll_offset,b.width,row.height};
     const auto visible=intersect(box,b);if(visible.height<=0.f)continue;
     out.overlay.emplace_back(FilledRectangle{visible,{11,29,46,246}});
     const auto& n=view.nodes[row.index];
@@ -192,11 +191,9 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
             i==1&&n.delivered_per_day+.00001<n.demand_per_day?amber:ink,b);
   }
   if(view.nodes.empty())label(out,{b.x+8.f*s,b.y+12.f*s,b.width-16.f*s,50.f*s},tr("SUPPLY_EMPTY","No owned supply locations in the home system."),font,muted,b);
-  if(maximum>0.f){
-    const float thumb=std::max(24.f*s,b.height*b.height/rows.height);
-    const float y=b.y+(b.height-thumb)*scroll_/maximum;
+  if(const auto thumb=scroll_.thumb(b.height,24.f*s);thumb.size>0){
     out.overlay.emplace_back(FilledRectangle{{b.x+b.width+7.f*s,b.y,3.f*s,b.height},{29,61,78,255}});
-    out.overlay.emplace_back(FilledRectangle{{b.x+b.width+7.f*s,y,3.f*s,thumb},cyan});
+    out.overlay.emplace_back(FilledRectangle{{b.x+b.width+7.f*s,b.y+thumb.offset,3.f*s,thumb.size},cyan});
   }
 }
 } // namespace stellar::native_logistics

@@ -116,7 +116,7 @@ void NativeColonyWorkspace::discard_campaign() noexcept {
 }
 
 void NativeColonyWorkspace::cancel_freight() noexcept {
-  freight_preview_.reset(); freight_text_.clear(); freight_scroll_ = 0;
+  freight_preview_.reset(); freight_text_.clear(); freight_scroll_ = {};
   freight_pressed_ = ColonyWorkspaceCommandKind::None;
   focus_ = -1;
 }
@@ -205,8 +205,9 @@ ColonyWorkspaceCommand NativeColonyWorkspace::handle(const InputEvent &event,
       }
     }
     if (event.type == InputEventType::Wheel && layout.freight_text.contains(event.position)) {
-      freight_scroll_ = std::clamp(freight_scroll_ + event.wheel_y * 44.f * layout.scale,
-          std::min(0.f, layout.freight_text.height - freight_content_height(layout)), 0.f);
+      freight_scroll_.sync(freight_content_height(layout),
+                           layout.freight_text.height);
+      freight_scroll_.scroll_by(-event.wheel_y * 44.f * layout.scale);
     }
     return {ColonyWorkspaceCommandKind::None, true};
   }
@@ -219,7 +220,7 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
     if(freight_preview_){
       const auto l=ColonyWorkspaceLayout::for_viewport(width,height);
       fill(out,l.surface,{0,4,10,185});stellar::native_menu_style::panel(out,l.freight_review,l.scale);
-      const auto clip=l.freight_text;clipped_text(out,{clip.x,clip.y+freight_scroll_,clip.width,freight_content_height(l)},clip,freight_text_,bright,l.body_font_pixels);
+      const auto clip=l.freight_text;clipped_text(out,{clip.x,clip.y-freight_scroll_.scroll_offset,clip.width,freight_content_height(l)},clip,freight_text_,bright,l.body_font_pixels);
       stellar::native_menu_style::button(out,l.freight_cancel,tr("COLONY_FREIGHT_CANCEL","Cancel"),l.body_font_pixels,l.freight_cancel.contains(pointer_));
       stellar::native_menu_style::button(out,l.freight_confirm,tr("COLONY_FREIGHT_CONFIRM","Confirm dispatch"),l.body_font_pixels,l.freight_confirm.contains(pointer_),freight_preview_->accepted);
       if(focus_>=0)out.overlay.emplace_back(stellar::native_map::StrokedRectangle{focus_==0?l.freight_cancel:l.freight_confirm,{160,210,255,255}});

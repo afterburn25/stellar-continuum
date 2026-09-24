@@ -110,7 +110,7 @@ std::string NativeGeneralSettings::trf(std::string_view key,std::initializer_lis
   }
   return out;
 }
-void NativeGeneralSettings::open(){nebula_dropdown_.close();eruption_dropdown_.close();hover_feedback_.reset();draft_=saved_;pending_request_.reset();path_scroll_=0;focus_=-1;visible_=true;}
+void NativeGeneralSettings::open(){nebula_dropdown_.close();eruption_dropdown_.close();hover_feedback_.reset();draft_=saved_;pending_request_.reset();path_scroll_={};focus_=-1;visible_=true;}
 void NativeGeneralSettings::cancel(){nebula_dropdown_.close();eruption_dropdown_.close();draft_=saved_;pending_request_.reset();focus_=-1;visible_=false;}
 Text NativeGeneralSettings::path_text(const GeneralSettingsLayout& l) const {
   const UiRect clip{l.folder.x+12*l.scale,l.folder.y+12*l.scale,l.folder.width-24*l.scale,l.folder.height-24*l.scale};
@@ -150,7 +150,7 @@ void NativeGeneralSettings::accept_browse_result(FolderDialogResult result) {
   if(!result.error.empty()){error_="Folder browser could not open. Please try again.";std::cerr<<result.error<<'\n';return;}
   if(!result.directory)return;
   if(result.directory->empty()||!valid_directory(*result.directory)){error_="Choose an existing absolute folder.";return;}
-  draft_.screenshot_directory=std::move(*result.directory);path_scroll_=0;error_.clear();
+  draft_.screenshot_directory=std::move(*result.directory);path_scroll_={};error_.clear();
 }
 bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height) {
   if(!visible_)return false;
@@ -164,8 +164,8 @@ bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height)
   hover_feedback_.update(event,stellar::native_menu_audio::hit(event.position,browsing()?std::span<const UiRect>{&layout.cancel,1}:std::span<const UiRect>{focusables}));
   if(event.type==InputEventType::Wheel&&layout.folder.contains(event.position)&&measure_){
     const auto text=path_text(layout);
-    const auto max_scroll=std::max(0.f,static_cast<float>(measure_(text).height)-text.clip->height);
-    path_scroll_=std::clamp(path_scroll_-event.wheel_y*40*layout.scale,0.f,max_scroll);return true;
+    path_scroll_.sync(static_cast<float>(measure_(text).height),text.clip->height);
+    path_scroll_.scroll_by(-event.wheel_y*40*layout.scale);return true;
   }
   if(event.type==InputEventType::KeyPressed){
     // SDL_Keycode: Tab/arrows move the focus ring, Return/Space activate.
@@ -216,7 +216,7 @@ void NativeGeneralSettings::activate_at(const GeneralSettingsLayout& layout,stel
         pending_request_.reset();error_="Finish the open folder browser before trying again.";
       } else error_.clear();
     } catch(const std::exception& error){pending_request_.reset();error_="Folder browser could not open. Please try again.";std::cerr<<error.what()<<'\n';}
-  } else if(layout.defaults.contains(position)){draft_.screenshot_directory.clear();path_scroll_=0;error_.clear();}
+  } else if(layout.defaults.contains(position)){draft_.screenshot_directory.clear();path_scroll_={};error_.clear();}
   else if(layout.save.contains(position)&&save(draft_))visible_=false;
 }
 void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
@@ -248,7 +248,7 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   draw.overlay.emplace_back(FilledRectangle{l.folder,{5,16,30,255}});draw.overlay.emplace_back(StrokedRectangle{l.folder,{65,111,143,255}});
   auto path=path_text(l);
   const auto maximum=measure_?std::max(0.f,static_cast<float>(measure_(path).height)-path.clip->height):0.f;
-  path.at.y-=std::min(path_scroll_,maximum);draw.overlay.emplace_back(std::move(path));
+  path.at.y-=std::min(path_scroll_.scroll_offset,maximum);draw.overlay.emplace_back(std::move(path));
   label(draw,l.status,browsing()?"Choose a folder in the Windows browser...":!error_.empty()?error_:
     maximum>0?"Scroll over the path to see the full folder. Save to keep your choice.":draft_.screenshot_directory.empty()?"Using the default Pictures folder. Save to keep this choice.":"Save to use this folder. Cancel keeps your current location.",l.font_pixels);
   button(draw,l.browse,browsing()?tr("SETTINGS_BROWSING","BROWSING..."):tr("SETTINGS_BROWSE","BROWSE"),l.font_pixels,false,browsing());

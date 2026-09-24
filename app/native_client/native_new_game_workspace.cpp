@@ -217,8 +217,8 @@ void NativeNewGameWorkspace::set_view(NativeNewCampaignSetupView value) {
     selected_ancient_civilization_count_ =
         view_->default_ancient_civilization_count;
   }
-  species_scroll_ = 0;
-  detail_scroll_ = 0;
+  species_scroll_ = {};
+  detail_scroll_ = {};
   message_.clear();
   reset_interaction();
   reconcile();
@@ -258,7 +258,7 @@ void NativeNewGameWorkspace::restore_defaults() {
       view_->default_ancient_civilization_count;
   reconcile();
   randomize_seed();
-  detail_scroll_ = 0;
+  detail_scroll_ = {};
   message_.clear();
 }
 void NativeNewGameWorkspace::reconcile() {
@@ -306,7 +306,7 @@ NativeNewGameMeasuredLayout NativeNewGameWorkspace::measure_layout(
                                      wrap_width});
     return static_cast<float>(std::max(extent.height, pixels));
   };
-  float y = layout.species_rows.y - species_scroll_;
+  float y = layout.species_rows.y - species_scroll_.scroll_offset;
   for (const auto &option : view_->species) {
     const float label_height = measured_height(
         option.display_name, layout.body_font,
@@ -318,6 +318,8 @@ NativeNewGameMeasuredLayout NativeNewGameWorkspace::measure_layout(
     y += row_height + 4.f * layout.scale;
     result.species_content_height += row_height + 4.f * layout.scale;
   }
+  species_scroll_.sync(result.species_content_height,
+                       layout.species_rows.height);
   if (const auto *option = selected_species(*view_, selected_species_id_)) {
     const float identity_width = layout.details_content.width -
                                  layout.portrait.width - 12.f * layout.scale;
@@ -574,19 +576,17 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
   }
   if (event.type == InputEventType::Wheel) {
     if (layout.species.contains(event.position)) {
-      const float maximum = std::max(
-          0.f, measured.species_content_height - layout.species_rows.height);
-      species_scroll_ = std::clamp(species_scroll_ - event.wheel_y * 42.f *
-                                   layout.scale, 0.f, maximum);
+      species_scroll_.sync(measured.species_content_height,
+                           layout.species_rows.height);
+      species_scroll_.scroll_by(-event.wheel_y * 42.f * layout.scale);
       return {NativeNewGameIntentKind::None, true};
     }
     if (layout.details.contains(event.position)) {
-      const float maximum = std::max(
-          0.f, measured.details_content_height -
-                   std::max(1.f, layout.details_content.height -
-                                     measured.details_header_height));
-      detail_scroll_ = std::clamp(detail_scroll_ - event.wheel_y * 42.f *
-                                  layout.scale, 0.f, maximum);
+      detail_scroll_.sync(
+          measured.details_content_height,
+          std::max(1.f, layout.details_content.height -
+                            measured.details_header_height));
+      detail_scroll_.scroll_by(-event.wheel_y * 42.f * layout.scale);
       return {NativeNewGameIntentKind::None, true};
     }
   }
@@ -641,7 +641,7 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
   }
   if (const auto index = species_hit(event.position, measured)) {
     selected_species_id_ = view_->species[*index].id;
-    detail_scroll_ = 0;
+    detail_scroll_ = {};
     message_.clear();
     return {NativeNewGameIntentKind::SelectSpecies, true,
             selected_species_id_};
@@ -834,7 +834,8 @@ void NativeNewGameWorkspace::render(
                             clip.width,
                             std::max(1.f, clip.height -
                                              measured.details_header_height)};
-    float y = facts_clip.y - detail_scroll_;
+    detail_scroll_.sync(measured.details_content_height, facts_clip.height);
+    float y = facts_clip.y - detail_scroll_.scroll_offset;
     auto line = [&](std::string value, Color color = bright,
                     int font = 0, float gap = 4.f) {
       const int pixels = font == 0 ? layout.body_font : font;
@@ -899,20 +900,15 @@ void NativeNewGameWorkspace::render(
              {number(species->lifespan_years, 0),
               number(species->metabolic_demand, 2)},
              "Lifespan  {0} years · Metabolic demand  {1}x Terran baseline"));
-    const float maximum_scroll =
-        std::max(0.f, measured.details_content_height - facts_clip.height);
-    if (maximum_scroll > 0.f) {
+    const float maximum_scroll = detail_scroll_.max_scroll();
+    if (const auto thumb = detail_scroll_.thumb(facts_clip.height, 22.f * s);
+        thumb.size > 0.f) {
       const UiRect track{facts_clip.x + facts_clip.width - 3.f * s,
                          facts_clip.y, 2.f * s, facts_clip.height};
       fill(out, track, {91, 151, 205, 80});
-      const float handle_height =
-          std::max(22.f * s, facts_clip.height * facts_clip.height /
-                                   measured.details_content_height);
-      const float handle_y =
-          track.y + (track.height - handle_height) *
-                        (detail_scroll_ / maximum_scroll);
-      fill(out, {track.x, handle_y, track.width, handle_height}, accent);
-      if (detail_scroll_ + .5f < maximum_scroll) {
+      fill(out, {track.x, track.y + thumb.offset, track.width, thumb.size},
+           accent);
+      if (detail_scroll_.scroll_offset + .5f < maximum_scroll) {
         const UiRect fade{facts_clip.x, facts_clip.y + facts_clip.height - 24.f * s,
                           facts_clip.width - 6.f * s, 24.f * s};
         fill(out, fade, {8, 20, 36, 235});

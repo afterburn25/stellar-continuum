@@ -6,6 +6,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <initializer_list>
 #include <optional>
@@ -132,6 +133,7 @@ public:
   preview() const noexcept;
   [[nodiscard]] std::optional<int> selected_fleet_id() const noexcept;
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  void reset_focus() noexcept { focus_ = -1; }
   // Localized label of the ringed control — the announcement surface for
   // screen-reader/live-region consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label(const FleetWorkspaceLayout &) const;
@@ -166,7 +168,7 @@ private:
   std::string return_warning_;
   bool notice_accepted_{};
   stellar::native_map::Point pointer_{};
-  float list_scroll_{};
+  stellar::engine::ScrollView list_scroll_{};
   PressTarget pressed_action_{PressTarget::None};
   stellar::native_map::UiRect pressed_bounds_{};
   std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> pressed_military_quote_;

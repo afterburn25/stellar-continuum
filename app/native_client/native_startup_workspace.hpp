@@ -6,6 +6,7 @@
 #include "native_startup_session.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <filesystem>
 #include <optional>
@@ -102,7 +103,7 @@ private:
   stellar::native_setup_ui::NativeNewGameWorkspace setup_;
   stellar::native_startup::NativeStartupSaveSlots slots_;
   std::optional<std::size_t> selected_slot_;
-  float load_scroll_{};
+  mutable stellar::engine::VirtualizedList load_scroll_{};
   stellar::native_startup::NativeStartupView operation_;
   StartupArtworkKind busy_artwork_{StartupArtworkKind::NewGalaxyGeneration};
   std::string loading_tip_;

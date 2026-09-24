@@ -84,7 +84,7 @@ std::string Navigator::tr(std::string_view key,std::string_view fallback)const{r
 std::string Navigator::trf(std::string_view key,std::initializer_list<std::string> args,std::string_view fallback)const{return resolved(locale_,key,args,fallback);}
 
 void Navigator::set_view(View value){
-  if(value.generation!=view_.generation||value.observer!=view_.observer){selected_.reset();temporary_reveal_.reset();search_.clear();scroll_=0;cancel_input();}
+  if(value.generation!=view_.generation||value.observer!=view_.observer){selected_.reset();temporary_reveal_.reset();search_.clear();scroll_={};cancel_input();}
   const bool changed=value.generation!=view_.generation||value.observer!=view_.observer||value.rows!=view_.rows;
   if(!changed)return;
   const auto targets=[&]{std::vector<std::pair<Category,std::optional<Key>>> keys;for(const auto& e:entries_)keys.emplace_back(e.category,e.row?std::optional(view_.rows[*e.row].key):std::nullopt);return keys;};
@@ -119,7 +119,7 @@ void Navigator::rebuild(){
   }
 }
 float Navigator::extent(const Layout& l)const{float h=0;for(const auto& e:entries_)h+=e.row?l.row_height:l.category_height;return h;}
-UiRect Navigator::entry_bounds(std::size_t index,const Layout& l)const{float y=l.list.y-scroll_;for(std::size_t i=0;i<index;++i)y+=entries_[i].row?l.row_height:l.category_height;return {l.list.x,y,l.list.width-5*l.scale,entries_[index].row?l.row_height:l.category_height};}
+UiRect Navigator::entry_bounds(std::size_t index,const Layout& l)const{float y=l.list.y-scroll_.scroll_offset;for(std::size_t i=0;i<index;++i)y+=entries_[i].row?l.row_height:l.category_height;return {l.list.x,y,l.list.width-5*l.scale,entries_[index].row?l.row_height:l.category_height};}
 std::optional<UiRect> Navigator::row_bounds(Key key,int w,int h)const{const auto l=Layout::make(w,h);for(std::size_t i=0;i<entries_.size();++i)if(entries_[i].row&&view_.rows[*entries_[i].row].key==key){const auto r=entry_bounds(i,l);if(intersect(r,l.list).height>0)return r;}return {};}
 UiRect Navigator::category_bounds(Category c,int w,int h)const{const auto l=Layout::make(w,h);for(std::size_t i=0;i<entries_.size();++i)if(!entries_[i].row&&entries_[i].category==c)return entry_bounds(i,l);return {};}
 // Focusables walk actionable rects in (y,x) order: the hide control, the
@@ -173,7 +173,7 @@ Command Navigator::handle(const InputEvent& e,int w,int h){
   if(search_focused_&&(e.type==InputEventType::TextEntered||e.type==InputEventType::BackspacePressed)){
     if(e.type==InputEventType::TextEntered&&search_.size()+e.text.size()<=120)search_+=e.text;
     else if(e.type==InputEventType::BackspacePressed&&!search_.empty()){auto n=search_.size()-1;while(n>0&&(static_cast<unsigned char>(search_[n])&0xc0)==0x80)--n;search_.resize(n);}
-    scroll_=0;pressed_.reset();rebuild();out.captured=true;return out;
+    scroll_={};pressed_.reset();rebuild();out.captured=true;return out;
   }
   if(search_focused_&&e.type==InputEventType::KeyPressed){
     // While editing, the search field owns the keyboard — Tab or Return
@@ -219,9 +219,9 @@ Command Navigator::handle(const InputEvent& e,int w,int h){
     // Scroll-follow: keep the focused entry fully inside the viewport.
     if(const auto entry=targets[static_cast<std::size_t>(focus_)].entry){
       const auto bounds=entry_bounds(*entry,l);
-      if(bounds.y<l.list.y)scroll_=std::max(0.f,scroll_+bounds.y-l.list.y);
-      else if(bounds.y+bounds.height>l.list.y+l.list.height)scroll_+=bounds.y+bounds.height-l.list.y-l.list.height;
-      scroll_=std::clamp(scroll_,0.f,std::max(0.f,extent(l)-l.list.height));
+      if(bounds.y<l.list.y)scroll_.scroll_offset=std::max(0.f,scroll_.scroll_offset+bounds.y-l.list.y);
+      else if(bounds.y+bounds.height>l.list.y+l.list.height)scroll_.scroll_offset+=bounds.y+bounds.height-l.list.y-l.list.height;
+      scroll_.sync(extent(l),l.list.height);
     }
     return out;
   }
@@ -234,11 +234,11 @@ Command Navigator::handle(const InputEvent& e,int w,int h){
   if(!l.panel.contains(e.position))return out;
   out.captured=true;
   if(e.type==InputEventType::LeftPressed)focus_=-1;
-  if(e.type==InputEventType::Wheel){scroll_=std::clamp(scroll_-e.wheel_y*52*l.scale,0.f,std::max(0.f,extent(l)-l.list.height));pressed_.reset();}
+  if(e.type==InputEventType::Wheel){scroll_.sync(extent(l),l.list.height);scroll_.scroll_by(-e.wheel_y*52*l.scale);pressed_.reset();}
   if(e.type==InputEventType::LeftPressed){
     if(l.hide.contains(e.position)){auto p=preferences_;p.hidden=true;search_focused_=false;commit_preferences(p);return out;}
     search_focused_=l.search.contains(e.position);
-    if(l.clear.contains(e.position)){search_.clear();scroll_=0;rebuild();return out;}
+    if(l.clear.contains(e.position)){search_.clear();scroll_={};rebuild();return out;}
     if(l.list.contains(e.position))for(std::size_t i=0;i<entries_.size();++i)if(entry_bounds(i,l).contains(e.position)){pressed_=i;pressed_generation_=view_.generation;pressed_observer_=view_.observer;click_count_=e.click_count;break;}
   }
   return out;
@@ -246,14 +246,14 @@ Command Navigator::handle(const InputEvent& e,int w,int h){
 void Navigator::render(DrawList& out,int w,int h,const Art& art){
   const auto l=Layout::make(w,h);const auto s=l.scale;const int normal=std::max(11,static_cast<int>(15*s)),small=std::max(10,static_cast<int>(12*s));
   if(preferences_.hidden){native_menu_style::button(out,l.restore,tr("ASSETS_RESTORE","Assets ›"),normal,l.restore.contains(pointer_),true,s);if(focus_>=0)out.overlay.emplace_back(StrokedRectangle{l.restore,cyan});return;}
-  scroll_=std::clamp(scroll_,0.f,std::max(0.f,extent(l)-l.list.height));
-  if(reveal_selection_&&selected_){for(std::size_t i=0;i<entries_.size();++i)if(entries_[i].row&&view_.rows[*entries_[i].row].key==selected_){const auto r=entry_bounds(i,l);if(r.y<l.list.y)scroll_=std::max(0.f,scroll_+r.y-l.list.y);else if(r.y+r.height>l.list.y+l.list.height)scroll_+=r.y+r.height-l.list.y-l.list.height;break;}reveal_selection_=false;}
+  scroll_.sync(extent(l),l.list.height);
+  if(reveal_selection_&&selected_){for(std::size_t i=0;i<entries_.size();++i)if(entries_[i].row&&view_.rows[*entries_[i].row].key==selected_){const auto r=entry_bounds(i,l);if(r.y<l.list.y)scroll_.scroll_offset=std::max(0.f,scroll_.scroll_offset+r.y-l.list.y);else if(r.y+r.height>l.list.y+l.list.height)scroll_.scroll_offset+=r.y+r.height-l.list.y-l.list.height;scroll_.sync(extent(l),l.list.height);break;}reveal_selection_=false;}
   native_menu_style::panel(out,l.panel,s);label(out,l.header,trf("ASSETS_TITLE",{std::to_string(view_.rows.size())},"CONTROLLED ASSETS · {0}"),cyan,normal,l.panel);
   native_menu_style::button(out,l.hide,"›",normal,l.hide.contains(pointer_),true,s);
   out.overlay.emplace_back(FilledRectangle{l.search,{3,13,22,245}});out.overlay.emplace_back(StrokedRectangle{l.search,search_focused_?cyan:Color{54,111,140,255}});
   label(out,{l.search.x+8*s,l.search.y+6*s,l.search.width-40*s,24*s},search_.empty()?tr("ASSETS_SEARCH","Search assets…"):search_,search_.empty()?muted:ink,small,l.search);
   if(!search_.empty())label(out,l.clear,"×",ink,normal,l.search);
-  float y=l.list.y-scroll_;std::optional<std::pair<const Row*,UiRect>> tooltip;
+  float y=l.list.y-scroll_.scroll_offset;std::optional<std::pair<const Row*,UiRect>> tooltip;
   for(const auto& e:entries_){const float height=e.row?l.row_height:l.category_height;const UiRect r{l.list.x,y,l.list.width-5*s,height};y+=height;
     const auto clip=intersect(r,l.list);if(clip.height<=0)continue;
     if(!e.row){const int c=static_cast<int>(e.category);const bool expanded=!preferences_.collapsed[c]||!search_.empty()||(temporary_reveal_&&temporary_reveal_->category==e.category);
@@ -273,7 +273,7 @@ void Navigator::render(DrawList& out,int w,int h,const Art& art){
     if(hovered)tooltip=std::pair{&row,r};
   }
   if(entries_.empty())label(out,{l.list.x+10*s,l.list.y+18*s,l.list.width-20*s,150*s},view_.rows.empty()?tr("ASSETS_EMPTY","No controlled assets.\n\nExplore the galaxy or establish a colony to begin expanding your civilization."):tr("ASSETS_EMPTY_SEARCH","No assets match your search."),muted,normal,l.list);
-  const auto content=extent(l);if(content>l.list.height){const float thumb=std::max(24*s,l.list.height*l.list.height/content);out.overlay.emplace_back(FilledRectangle{{l.list.x+l.list.width-2*s,l.list.y+(l.list.height-thumb)*scroll_/(content-l.list.height),2*s,thumb},{72,158,192,255}});}
+  if(const auto thumb=scroll_.thumb(l.list.height,24*s);thumb.size>0){out.overlay.emplace_back(FilledRectangle{{l.list.x+l.list.width-2*s,l.list.y+thumb.offset,2*s,thumb.size},{72,158,192,255}});}
   if(tooltip){const UiRect box{l.panel.x-300*s-8*s,std::clamp(tooltip->second.y,80*s,h-174*s),300*s,158*s};native_menu_style::panel(out,box,s);label(out,{box.x+12*s,box.y+12*s,box.width-24*s,box.height-24*s},tooltip->first->tooltip,ink,small,box);}
   if(!error_.empty())label(out,{l.panel.x+10*s,l.panel.y+l.panel.height-22*s,l.panel.width-20*s,22*s},error_,amber,small,l.panel);
   if(focus_>=0){const auto targets=focusables(l);if(focus_<static_cast<int>(targets.size()))out.overlay.emplace_back(StrokedRectangle{targets[static_cast<std::size_t>(focus_)].bounds,cyan});}

@@ -7,6 +7,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <initializer_list>
 #include <optional>
@@ -115,8 +116,8 @@ private:
   std::optional<std::string> cancel_confirmation_id_;
   std::string notice_;
   bool notice_accepted_{};
-  float design_scroll_{};
-  float order_scroll_{};
+  mutable stellar::engine::ScrollView design_scroll_{};
+  mutable stellar::engine::ScrollView order_scroll_{};
   mutable int last_ship_art_rows_{};
   std::filesystem::path preferences_path_;
   std::vector<std::string> favorites_;
@@ -124,8 +125,7 @@ private:
   int category_{},sort_{},filter_{},quantity_{1};
   bool search_focused_{};
   int focus_{-1};
-  float detail_scroll_{};
-  mutable float detail_limit_{};
+  mutable stellar::engine::ScrollView detail_scroll_{};
   stellar::native_ui::Dropdown dropdown_;
   TextMeasurer measure_;
 };

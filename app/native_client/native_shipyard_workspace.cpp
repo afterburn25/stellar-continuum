@@ -173,8 +173,8 @@ void NativeShipyardWorkspace::set_view(NativeShipyardView view) {
     selected_order_id_.reset();
     cancel_confirmation_id_.reset();
     notice_.clear();
-    design_scroll_ = 0.f;detail_scroll_=0;quantity_=1;search_.clear();category_=0;filter_=0;dropdown_.close();focus_=-1;
-    order_scroll_ = 0.f;
+    design_scroll_ = {};detail_scroll_={};quantity_=1;search_.clear();category_=0;filter_=0;dropdown_.close();focus_=-1;
+    order_scroll_ = {};
   }
   if (revision_changed) {
     cancel_confirmation_id_.reset();
@@ -193,9 +193,9 @@ void NativeShipyardWorkspace::discard_campaign() {
   selected_order_id_.reset();
   cancel_confirmation_id_.reset();
   notice_.clear();
-  design_scroll_ = 0.f;
-  order_scroll_ = 0.f;
-  detail_scroll_=0;detail_limit_=0;quantity_=1;search_.clear();search_focused_=false;
+  design_scroll_ = {};
+  order_scroll_ = {};
+  detail_scroll_={};quantity_=1;search_.clear();search_focused_=false;
   category_=0;sort_=0;filter_=0;dropdown_.close();focus_=-1;
 }
 

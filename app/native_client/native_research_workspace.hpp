@@ -4,6 +4,7 @@
 #include "native_dropdown.hpp"
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <cstddef>
 #include <functional>
@@ -66,7 +67,7 @@ public:
     locale_ = table;
   }
   [[nodiscard]] const stellar::core::AdaptiveResearchPlan& plan()const{return plan_;}
-  void set_view_mode(ResearchViewMode mode){mode_=mode;guided_scroll_=0;}
+  void set_view_mode(ResearchViewMode mode){mode_=mode;guided_scroll_={};}
   [[nodiscard]] ResearchViewMode view_mode()const{return mode_;}
   void set_artwork_resolver(ArtworkResolver resolve);
   void open();
@@ -119,7 +120,7 @@ private:
   stellar::core::AdaptiveResearchPlan plan_;
   ResearchViewMode mode_{ResearchViewMode::Guided};
   int filter_{},sort_{};bool list_view_{},why_open_{};
-  float guided_scroll_{},active_scroll_{};
+  stellar::engine::ScrollView guided_scroll_{},active_scroll_{};
   std::vector<InterfaceHit> interface_hits_;
   stellar::native_ui::Dropdown dropdown_;
   std::optional<stellar::native_map::UiRect> inspector_content_clip_;
@@ -154,8 +155,7 @@ private:
   std::string topology_signature_;
   std::string notice_;
   bool notice_accepted_{};
-  float inspector_scroll_{};
-  float inspector_scroll_limit_{};
+  stellar::engine::ScrollView inspector_scroll_{};
   int focus_{-1};
   int inspector_viewport_width_{}, inspector_viewport_height_{};
   TextMeasurer text_measurer_;

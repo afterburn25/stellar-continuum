@@ -1013,10 +1013,31 @@ structs carry `ScrollView` members instead of raw
 content_height/max_scroll/scroll triples. `batcher_ui` covers bounds,
 non-finite reset, proportional thumb math, and fit-content hiding;
 `native_notifications`, `native_chronicle`, `native_economy_workspace`,
-`native_system_workspace` green; client builds clean. Remaining
-raw-scroll surfaces (diplomacy contact/detail, colony freight, research
-inspector, settings path, new-game species/detail, fleet list) follow
-the same contract and can adopt incrementally.
+`native_system_workspace` green; client builds clean.
+
+ScrollView sweep (row 24): the remaining raw-scroll surfaces adopted the
+same model — diplomacy contact/detail panes, colony freight review,
+research inspector plus the guided-card grid and horizontal
+active-program strip, fleet outliner, new-game species/detail panes,
+settings screenshot-path field, system-inspection card, supply-network
+workspace, controlled-assets navigator, planetary screen
+(facts/slots/details/queue) and shipyard designs/orders/details.
+Negative-offset conventions (fleet, colony, construction, planetary,
+shipyard designs/orders) were inverted to positive `scroll_offset`
+subtracted from row geometry; the shipyard `detail_limit_` cache folded
+into the model's `content_height`. Two fixed-stride lists went to
+`VirtualizedList` instead: the startup save-slot list (`sync_rows`) and
+the construction project/order lists (fractional `configure`, since
+their wheel delta is not a row multiple). `native_diplomacy_workspace`,
+`native_colony_workspace`, `native_research_workspace`,
+`native_fleet_workspace`, `native_new_game_workspace`,
+`native_logistics_workspace`, `native_inspection`,
+`native_construction_workspace`, `native_startup_workspace`,
+`native_shipyard_workspace`, `native_planetary_screen` and
+`native_controlled_assets` all green. The only remaining hand-rolled
+scroll is the general-settings screenshot-path field (file was
+write-locked by a concurrent editor session during the sweep — migrate
+`path_scroll_` to `ScrollView` when free).
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

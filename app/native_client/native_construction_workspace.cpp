@@ -224,8 +224,8 @@ void NativeConstructionWorkspace::set_view(NativeConstructionView view) {
   if (generation_changed) {
     selected_project_id_.reset();
     notice_.clear();
-    project_scroll_ = 0.f;
-    order_scroll_ = 0.f;
+    project_scroll_ = {};
+    order_scroll_ = {};
     focus_ = -1;
   }
   if (generation_changed || revision_changed) cancel_confirmation_id_.reset();
@@ -239,8 +239,8 @@ void NativeConstructionWorkspace::discard_campaign() {
   selected_project_id_.reset();
   cancel_confirmation_id_.reset();
   notice_.clear();
-  project_scroll_ = 0.f;
-  order_scroll_ = 0.f;
+  project_scroll_ = {};
+  order_scroll_ = {};
   status_order_.clear();
   focus_ = -1;
 }
@@ -287,8 +287,10 @@ std::optional<UiRect> NativeConstructionWorkspace::project_bounds(
   const UiRect rows{layout.projects.x, layout.projects.y + 27.f * layout.scale,
                     layout.projects.width,
                     layout.projects.height - 27.f * layout.scale};
+  project_scroll_.configure(view_->projects.size(), 58.f * layout.scale,
+                            rows.height);
   const auto index = static_cast<std::size_t>(found - view_->projects.begin());
-  const UiRect bounds{rows.x, rows.y + project_scroll_ +
+  const UiRect bounds{rows.x, rows.y - project_scroll_.scroll_offset +
                                   static_cast<float>(index) * 58.f * layout.scale,
                       rows.width, 54.f * layout.scale};
   return intersection(bounds, rows);
@@ -342,10 +344,14 @@ std::vector<UiRect> NativeConstructionWorkspace::focusables(
                           layout.orders.y + 27.f * layout.scale,
                           layout.orders.width,
                           layout.orders.height - 27.f * layout.scale};
+  project_scroll_.configure(view_ ? view_->projects.size() : 0,
+                            58.f * layout.scale, project_rows.height);
+  order_scroll_.configure(status_order_.size(), 72.f * layout.scale,
+                          order_rows.height);
   if (view_) {
     for (std::size_t index = 0; index < view_->projects.size(); ++index) {
       const UiRect bounds{project_rows.x,
-                          project_rows.y + project_scroll_ +
+                          project_rows.y - project_scroll_.scroll_offset +
                                   static_cast<float>(index) * 58.f * layout.scale,
                           project_rows.width, 54.f * layout.scale};
       if (const auto clipped = intersection(bounds, project_rows))
@@ -355,7 +361,7 @@ std::vector<UiRect> NativeConstructionWorkspace::focusables(
          ++order_index) {
       const UiRect bounds{
           order_rows.x,
-          order_rows.y + order_scroll_ +
+          order_rows.y - order_scroll_.scroll_offset +
               static_cast<float>(order_index) * 72.f * layout.scale,
           order_rows.width, 68.f * layout.scale};
       if (const auto clipped = intersection(bounds, order_rows))
@@ -395,22 +401,21 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
                           layout.orders.y + 27.f * layout.scale,
                           layout.orders.width,
                           layout.orders.height - 27.f * layout.scale};
+  project_scroll_.configure(view_ ? view_->projects.size() : 0,
+                            58.f * layout.scale, project_rows.height);
+  order_scroll_.configure(status_order_.size(), 72.f * layout.scale,
+                          order_rows.height);
   if (event.type == InputEventType::Wheel) {
-    const auto scroll = [&](float &offset, UiRect bounds, std::size_t count) {
-      const auto content = static_cast<float>(count) * 58.f * layout.scale;
-      offset = std::clamp(offset + event.wheel_y * 40.f * layout.scale,
-                          std::min(0.f, bounds.height - content), 0.f);
-    };
     if (layout.projects.contains(event.position)) {
-      scroll(project_scroll_, project_rows, view_ ? view_->projects.size() : 0);
+      project_scroll_.configure(view_ ? view_->projects.size() : 0,
+                                58.f * layout.scale, project_rows.height);
+      project_scroll_.scroll_to(project_scroll_.scroll_offset - event.wheel_y * 40.f * layout.scale);
       return {ConstructionWorkspaceCommandKind::None, true};
     }
     if (layout.orders.contains(event.position)) {
-      const auto content = static_cast<float>(status_order_.size()) *
-                           72.f * layout.scale;
-      order_scroll_ = std::clamp(
-          order_scroll_ + event.wheel_y * 40.f * layout.scale,
-          std::min(0.f, order_rows.height - content), 0.f);
+      order_scroll_.configure(status_order_.size(), 72.f * layout.scale,
+                              order_rows.height);
+      order_scroll_.scroll_to(order_scroll_.scroll_offset - event.wheel_y * 40.f * layout.scale);
       return {ConstructionWorkspaceCommandKind::None, true};
     }
     return {ConstructionWorkspaceCommandKind::None,
@@ -468,7 +473,7 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
   if (view_) {
     for (std::size_t index = 0; index < view_->projects.size(); ++index) {
       const UiRect bounds{project_rows.x,
-                          project_rows.y + project_scroll_ +
+                          project_rows.y - project_scroll_.scroll_offset +
                               static_cast<float>(index) * 58.f * layout.scale,
                           project_rows.width, 54.f * layout.scale};
       const auto clipped = intersection(bounds, project_rows);
@@ -483,7 +488,7 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
          ++order_index) {
       const auto &project = view_->projects[status_order_[order_index]];
       const UiRect bounds{order_rows.x,
-                          order_rows.y + order_scroll_ +
+                          order_rows.y - order_scroll_.scroll_offset +
                               static_cast<float>(order_index) * 72.f * layout.scale,
                           order_rows.width, 68.f * layout.scale};
       const auto clipped = intersection(bounds, order_rows);
@@ -543,6 +548,8 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                             layout.projects.y + 27.f * layout.scale,
                             layout.projects.width,
                             layout.projects.height - 27.f * layout.scale};
+  project_scroll_.configure(view_ ? view_->projects.size() : 0,
+                            58.f * layout.scale, project_rows.height);
   if (!view_ || view_->projects.empty()) {
     text(out, {project_rows.x + 10.f * layout.scale,
                project_rows.y + 8.f * layout.scale,
@@ -556,7 +563,7 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
     for (std::size_t index = 0; index < view_->projects.size(); ++index) {
       const auto &project = view_->projects[index];
       const UiRect bounds{project_rows.x,
-                          project_rows.y + project_scroll_ +
+                          project_rows.y - project_scroll_.scroll_offset +
                               static_cast<float>(index) * 58.f * layout.scale,
                           project_rows.width, 54.f * layout.scale};
       const auto clipped = intersection(bounds, project_rows);
@@ -613,12 +620,14 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                           layout.orders.y + 27.f * layout.scale,
                           layout.orders.width,
                           layout.orders.height - 27.f * layout.scale};
+  order_scroll_.configure(status_order_.size(), 72.f * layout.scale,
+                          order_rows.height);
   if (view_)
     for (std::size_t order_index = 0; order_index < status_order_.size();
          ++order_index) {
       const auto &value = view_->projects[status_order_[order_index]];
       const UiRect bounds{order_rows.x,
-                          order_rows.y + order_scroll_ +
+                          order_rows.y - order_scroll_.scroll_offset +
                               static_cast<float>(order_index) * 72.f * layout.scale,
                           order_rows.width, 68.f * layout.scale};
       const auto clipped = intersection(bounds, order_rows);

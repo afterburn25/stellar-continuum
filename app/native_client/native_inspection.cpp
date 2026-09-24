@@ -160,17 +160,11 @@ std::optional<UiRect> intersection(UiRect first,UiRect second){
   return UiRect{left,top,right-left,bottom-top};
 }
 
-float maximum_scroll(const SystemInspection& value, UiRect bounds,
-    const std::function<TextExtent(const Text&)>& measurer,
+void sync_scroll(stellar::engine::ScrollView& scroll, const SystemInspection& value,
+    UiRect bounds, const std::function<TextExtent(const Text&)>& measurer,
     const stellar::engine::LocalizationTable *locale = nullptr) {
   const auto layout = content_layout(value, bounds,measurer,locale);
-  return std::max(0.f, layout.height - layout.clip.height);
-}
-
-void clamp_scroll(float& scroll, const SystemInspection& value, UiRect bounds,
-    const std::function<TextExtent(const Text&)>& measurer,
-    const stellar::engine::LocalizationTable *locale = nullptr) {
-  scroll = std::clamp(scroll,0.f,maximum_scroll(value,bounds,measurer,locale));
+  scroll.sync(layout.height, layout.clip.height);
 }
 }
 
@@ -248,23 +242,23 @@ void SystemInspectionCard::set_text_measurer(
     std::function<TextExtent(const Text&)> value){
   text_measurer_=std::move(value);
   if(inspection_&&last_bounds_)
-    clamp_scroll(scroll_,*inspection_,*last_bounds_,text_measurer_,locale_);
+    sync_scroll(scroll_,*inspection_,*last_bounds_,text_measurer_,locale_);
 }
 void SystemInspectionCard::set_inspection(SystemInspection value) {
   if (!inspection_ || inspection_->selected_system_id != value.selected_system_id || inspection_->observer_id != value.observer_id) {
-    scroll_ = 0.f;
+    scroll_ = {};
     pointer_owned_ = false;
   }
   inspection_ = std::move(value);
-  if (last_bounds_) clamp_scroll(scroll_, *inspection_, *last_bounds_,text_measurer_,locale_);
+  if (last_bounds_) sync_scroll(scroll_, *inspection_, *last_bounds_,text_measurer_,locale_);
 }
-void SystemInspectionCard::clear() noexcept { inspection_.reset(); scroll_ = 0.f; last_bounds_.reset(); pointer_owned_ = false; focus_ = -1; }
+void SystemInspectionCard::clear() noexcept { inspection_.reset(); scroll_ = {}; last_bounds_.reset(); pointer_owned_ = false; focus_ = -1; }
 UiRect SystemInspectionCard::close_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+bounds.width-30.f*s,bounds.y+7.f*s,24.f*s,24.f*s}; }
 UiRect SystemInspectionCard::body_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+10.f*s,bounds.y+62.f*s,std::max(0.f,bounds.width-20.f*s),std::max(0.f,bounds.height-70.f*s)}; }
 InspectionHandleResult SystemInspectionCard::handle(const InputEvent& event, UiRect bounds) {
   if (!inspection_) { focus_ = -1; return {}; }
   last_bounds_ = bounds;
-  clamp_scroll(scroll_, *inspection_, bounds,text_measurer_,locale_);
+  sync_scroll(scroll_, *inspection_, bounds,text_measurer_,locale_);
   const auto close=close_bounds(bounds);
   if (event.type == InputEventType::LeftPressed || event.type == InputEventType::PointerCancelled) focus_ = -1;
   if (event.type == InputEventType::KeyPressed && event.key) {
@@ -290,7 +284,7 @@ InspectionHandleResult SystemInspectionCard::handle(const InputEvent& event, UiR
   }
   if (!bounds.contains(event.position)) return {};
   if (event.type == InputEventType::LeftPressed || event.type == InputEventType::RightPressed) { pointer_owned_=true; return {true,false}; }
-  if (event.type == InputEventType::Wheel) { scroll_ = std::clamp(scroll_ - event.wheel_y * 32.f*scale_for(bounds),0.f,maximum_scroll(*inspection_,bounds,text_measurer_,locale_)); return {true, false}; }
+  if (event.type == InputEventType::Wheel) { sync_scroll(scroll_,*inspection_,bounds,text_measurer_,locale_); scroll_.scroll_by(-event.wheel_y * 32.f*scale_for(bounds)); return {true, false}; }
   const bool pointer_event = event.type == InputEventType::PointerMove ||
       event.type == InputEventType::LeftReleased ||
       event.type == InputEventType::RightReleased;
@@ -299,7 +293,7 @@ InspectionHandleResult SystemInspectionCard::handle(const InputEvent& event, UiR
 void SystemInspectionCard::render(DrawList& out, UiRect bounds) const {
   if (!inspection_) return;
   const auto& value = *inspection_; const auto layout=content_layout(value,bounds,text_measurer_,locale_); const float scale=layout.scale; const int body=layout.body_font; const int small=layout.small_font;
-  last_bounds_=bounds; clamp_scroll(scroll_,value,bounds,text_measurer_,locale_);
+  last_bounds_=bounds; sync_scroll(scroll_,value,bounds,text_measurer_,locale_);
   out.overlay.emplace_back(FilledRectangle{bounds, {7, 20, 35, 246}}); out.overlay.emplace_back(StrokedRectangle{bounds, {78, 168, 209, 255}});
   const UiRect header{bounds.x+10.f*scale,bounds.y+7.f*scale,std::max(0.f,bounds.width-20.f*scale),48.f*scale};
   text(out,{header.x,header.y,std::max(0.f,header.width-34.f*scale),21.f*scale},value.name,{235,244,255,255},body+4);
@@ -309,24 +303,19 @@ void SystemInspectionCard::render(DrawList& out, UiRect bounds) const {
   out.overlay.emplace_back(FilledRectangle{{header.x,header.y+40.f*scale,header.width*static_cast<float>(std::clamp(value.survey_progress,0.,1.)),5.f*scale},{94,210,183,255}});
   for(const auto& item:layout.items){
     const UiRect row{layout.clip.x+item.x,
-                     layout.clip.y+item.y-scroll_,item.width,item.height};
+                     layout.clip.y+item.y-scroll_.scroll_offset,item.width,item.height};
     const auto clipped=intersection(row,layout.clip);
     if(!clipped)continue;
     out.overlay.emplace_back(Text{{row.x,row.y},item.value,item.color,item.font,
                                   row.width,*clipped});
   }
-  if(layout.height>layout.clip.height&&layout.clip.height>0.f){
-    const float maximum=layout.height-layout.clip.height;
-    const float thumb_height=std::min(layout.clip.height,std::max(18.f*scale,
-        layout.clip.height*layout.clip.height/layout.height));
-    const float travel=layout.clip.height-thumb_height;
-    const float thumb_y=layout.clip.y+(maximum>0.f?travel*scroll_/maximum:0.f);
+  if(const auto thumb=scroll_.thumb(layout.clip.height,18.f*scale);thumb.size>0.f){
     const float indicator_width=3.f*scale;
     const float indicator_x=layout.clip.x+layout.clip.width-indicator_width;
     out.overlay.emplace_back(FilledRectangle{{indicator_x,layout.clip.y,
         indicator_width,layout.clip.height},{25,49,64,210}});
-    out.overlay.emplace_back(FilledRectangle{{indicator_x,thumb_y,
-        indicator_width,thumb_height},{105,213,244,230}});
+    out.overlay.emplace_back(FilledRectangle{{indicator_x,layout.clip.y+thumb.offset,
+        indicator_width,thumb.size},{105,213,244,230}});
   }
   const auto close=close_bounds(bounds);
   text(out,close,"X",{235,244,255,255},small);
