@@ -156,6 +156,14 @@ std::string NativeColonyWorkspace::focused_label() const {
                      : tr("COLONY_FREIGHT_CONFIRM", "Confirm dispatch");
 }
 
+std::optional<UiRect>
+NativeColonyWorkspace::focused_bounds(int width, int height) const {
+  if (focus_ < 0 || !freight_preview_) return std::nullopt;
+  const auto layout = ColonyWorkspaceLayout::for_viewport(width, height);
+  return focus_ == 0 ? std::optional<UiRect>{layout.freight_cancel}
+                     : std::optional<UiRect>{layout.freight_confirm};
+}
+
 ColonyWorkspaceCommand NativeColonyWorkspace::handle(const InputEvent &event,
                                                        int width, int height) {
   if (!visible_) return {};

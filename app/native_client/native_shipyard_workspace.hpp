@@ -58,6 +58,9 @@ public:
   // consumers. Empty when nothing is focused.
   [[nodiscard]] std::string
   focused_label(const ShipyardWorkspaceLayout &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(const ShipyardWorkspaceLayout &) const;
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
   [[nodiscard]] bool confirmation_open() const noexcept {

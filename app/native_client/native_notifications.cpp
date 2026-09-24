@@ -258,6 +258,19 @@ std::string NativeNotificationView::focused_label(
              ? targets[static_cast<std::size_t>(focus_)].label
              : std::string{};
 }
+std::optional<native_map::UiRect> NativeNotificationView::focused_bounds(
+    const std::deque<NativePlayerNotification>& items, int width,
+    int height) const {
+  if (focus_ < 0 || !visible_) return std::nullopt;
+  const auto layout = notification_layout_for(items, width, height, measure_,
+                                              scroll_.scroll_offset, locale_);
+  std::vector<FocusTarget> targets;
+  collect_focusables(layout, locale_, targets);
+  return focus_ < static_cast<int>(targets.size())
+             ? std::optional<native_map::UiRect>{
+                   targets[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
 void NativeNotificationView::toggle(std::int64_t latest_sequence) noexcept { if (visible_) close(); else open(latest_sequence); }
 
 NotificationViewCommand NativeNotificationView::handle(const native_map::InputEvent& event,

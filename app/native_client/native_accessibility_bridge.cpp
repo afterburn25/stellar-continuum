@@ -12,6 +12,7 @@
 #include <ole2.h>
 #include <UIAutomation.h>
 #include <atomic>
+#include <cmath>
 #include <string>
 
 namespace {
@@ -108,7 +109,10 @@ class FocusFragment final : public ProviderBase,
   FocusFragment(WindowProvider *root, HWND host) noexcept
       : root_(root), host_(host) {}
 
-  void set_label(std::wstring label) { label_ = std::move(label); }
+  void set_label(std::wstring label, std::optional<RECT> rect) {
+    label_ = std::move(label);
+    rect_ = rect;
+  }
 
   // IUnknown is implemented once here so both interface bases resolve to the
   // same counter.
@@ -165,8 +169,16 @@ class FocusFragment final : public ProviderBase,
   HRESULT STDMETHODCALLTYPE get_BoundingRectangle(
       UiaRect *out) noexcept override {
     if (!out) return E_POINTER;
+    // Screen coordinates — the stored rect is client-space until projected.
     RECT rect{};
-    GetWindowRect(host_, &rect);
+    if (rect_) {
+      rect = *rect_;
+      POINT corner{rect.left, rect.top};
+      ClientToScreen(host_, &corner);
+      OffsetRect(&rect, corner.x - rect.left, corner.y - rect.top);
+    } else {
+      GetWindowRect(host_, &rect);
+    }
     out->left = rect.left;
     out->top = rect.top;
     out->width = static_cast<double>(rect.right - rect.left);
@@ -191,6 +203,7 @@ class FocusFragment final : public ProviderBase,
   WindowProvider *root_;
   HWND host_;
   std::wstring label_;
+  std::optional<RECT> rect_;
 };
 
 // Fragment root answered for UiaRootObjectId: sources live-region
@@ -204,8 +217,8 @@ class WindowProvider final : public ProviderBase,
   }
 
   FocusFragment *focus_fragment() noexcept { return focus_; }
-  void set_focus_label(std::wstring label) {
-    focus_->set_label(std::move(label));
+  void set_focus_label(std::wstring label, std::optional<RECT> rect) {
+    focus_->set_label(std::move(label), std::move(rect));
     focused_ = true;
   }
   [[nodiscard]] bool has_focus() const noexcept { return focused_; }
@@ -419,14 +432,26 @@ bool NativeAccessibilityBridge::announce(std::string_view text) {
   return SUCCEEDED(result);
 }
 
-bool NativeAccessibilityBridge::focus_changed(std::string_view label) {
+bool NativeAccessibilityBridge::focus_changed(
+    std::string_view label,
+    std::optional<stellar::engine::AnnouncementBounds> bounds) {
   auto *provider = static_cast<WindowProvider *>(provider_);
   if (!provider || label.empty()) return false;
   std::wstring name = wide(label);
   if (name.empty()) return false;
+  std::optional<RECT> rect;
+  if (bounds) {
+    const auto finite = [](float v) { return std::isfinite(v); };
+    if (finite(bounds->x) && finite(bounds->y) && finite(bounds->width) &&
+        finite(bounds->height) && bounds->width > 0.f && bounds->height > 0.f)
+      rect = RECT{static_cast<LONG>(std::lround(bounds->x)),
+                  static_cast<LONG>(std::lround(bounds->y)),
+                  static_cast<LONG>(std::lround(bounds->x + bounds->width)),
+                  static_cast<LONG>(std::lround(bounds->y + bounds->height))};
+  }
   // The fragment reflects real focus state regardless of listeners; only the
   // event raise is gated on an assistive client being attached.
-  provider->set_focus_label(std::move(name));
+  provider->set_focus_label(std::move(name), rect);
   if (!UiaClientsAreListening()) return false;
   return SUCCEEDED(UiaRaiseAutomationEvent(
       static_cast<IRawElementProviderSimple *>(provider->focus_fragment()),
@@ -455,7 +480,10 @@ NativeAccessibilityBridge::~NativeAccessibilityBridge() = default;
 bool NativeAccessibilityBridge::attach(void *) { return false; }
 void NativeAccessibilityBridge::detach() {}
 bool NativeAccessibilityBridge::announce(std::string_view) { return false; }
-bool NativeAccessibilityBridge::focus_changed(std::string_view) { return false; }
+bool NativeAccessibilityBridge::focus_changed(
+    std::string_view, std::optional<stellar::engine::AnnouncementBounds>) {
+  return false;
+}
 std::intptr_t NativeAccessibilityBridge::handle_window_message(std::uintptr_t,
                                                                unsigned,
                                                                std::uintptr_t,

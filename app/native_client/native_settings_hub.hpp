@@ -71,6 +71,23 @@ public:
     constexpr std::array names{"General","Audio","Video","Voice & subtitles","Controls"};
     return focus_<5?tr(keys[static_cast<std::size_t>(focus_)],names[static_cast<std::size_t>(focus_)]):std::string{};
   }
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<UiRect> focused_bounds(int width,int height)const{
+    const auto l=HubLayout::for_viewport(width,height);
+    const auto rows=control_actions();
+    if(capture_>=0&&capture_<static_cast<int>(rows.size())){
+      const auto rects=control_row_rects(l);
+      return capture_<static_cast<int>(rects.size())?std::optional<UiRect>{rects[static_cast<std::size_t>(capture_)]}:std::nullopt;
+    }
+    if(focus_<0)return std::nullopt;
+    if(controls_){
+      if(focus_==static_cast<int>(rows.size()))return l.back;
+      const auto rects=control_row_rects(l);
+      return focus_<static_cast<int>(rects.size())?std::optional<UiRect>{rects[static_cast<std::size_t>(focus_)]}:std::nullopt;
+    }
+    if(focus_==5)return l.back;
+    return focus_<5?std::optional<UiRect>{l.categories[static_cast<std::size_t>(focus_)]}:std::nullopt;
+  }
   bool handle(const InputEvent&e,int width,int height){
     if(!showing_categories())return false;
     if(e.type==InputEventType::PointerMove)pointer_=e.position;

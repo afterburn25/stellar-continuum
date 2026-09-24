@@ -342,6 +342,15 @@ std::string RosterWorkspace::focused_label(int width, int height) const {
              ? targets[static_cast<std::size_t>(focus_)].label
              : std::string{};
 }
+std::optional<stellar::native_map::UiRect>
+RosterWorkspace::focused_bounds(int width, int height) const {
+  if (focus_ < 0 || !visible_) return std::nullopt;
+  const auto targets = focusables(RosterLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(targets.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   targets[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
 int RosterWorkspace::header_column(Point point,
                                    const RosterLayout &layout) const noexcept {
   const float s = layout.scale;

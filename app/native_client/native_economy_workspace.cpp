@@ -118,6 +118,14 @@ std::string NativeEconomyWorkspace::focused_label(const NativeEconomyView& view)
   const auto index=static_cast<std::size_t>(focus_-2);
   return index<3?tr(keys[index],labels[index]):std::string{};
 }
+std::optional<native_map::UiRect> NativeEconomyWorkspace::focused_bounds(int width,int height) const {
+  if(focus_<0) return std::nullopt;
+  const auto l=EconomyLayout::for_viewport(width,height);
+  if(focus_==0) return l.refresh;
+  if(focus_==1) return l.close;
+  const auto index=static_cast<std::size_t>(focus_-2);
+  return index<3?std::optional<native_map::UiRect>{l.priority_buttons[index]}:std::nullopt;
+}
 
 const NativeEconomyWorkspace::Cache& NativeEconomyWorkspace::cache_for(const NativeEconomyView& view,const EconomyLayout& layout,int width,int height) const {
   const auto sig=signature(view,notice_);

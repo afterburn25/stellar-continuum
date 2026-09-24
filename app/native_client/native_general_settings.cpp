@@ -249,6 +249,13 @@ std::string NativeGeneralSettings::focused_label()const{
   default:return{};
   }
 }
+std::optional<UiRect> NativeGeneralSettings::focused_bounds(int width,int height)const{
+  if(focus_<0)return std::nullopt;
+  const auto layout=GeneralSettingsLayout::for_viewport(width,height);
+  if(browsing())return layout.cancel;
+  const std::array<UiRect,14> focusables{layout.audio,layout.video,layout.nebula,layout.eruptions,layout.motion,layout.iscale,layout.flashing,layout.contrast,layout.colorblind,layout.language,layout.browse,layout.defaults,layout.cancel,layout.save};
+  return focus_<static_cast<int>(focusables.size())?std::optional<UiRect>{focusables[static_cast<std::size_t>(focus_)]}:std::nullopt;
+}
 void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   if(!visible_)return;
   const auto l=GeneralSettingsLayout::for_viewport(width,height);const auto s=l.scale;

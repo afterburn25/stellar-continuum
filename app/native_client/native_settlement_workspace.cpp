@@ -77,6 +77,14 @@ std::string NativeSettlementWorkspace::focused_label() const {
                      : tr("SETTLE_CONFIRM", "Confirm mission");
 }
 
+std::optional<UiRect>
+NativeSettlementWorkspace::focused_bounds(int width, int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto layout = SettlementWorkspaceLayout::for_viewport(width, height);
+  return focus_ == 0 ? std::optional<UiRect>{layout.cancel}
+                     : std::optional<UiRect>{layout.confirm};
+}
+
 SettlementWorkspaceCommand NativeSettlementWorkspace::handle(const InputEvent&event,int width,int height){
   if(!preview_)return {};
   pointer_=event.position;

@@ -94,6 +94,9 @@ class NativeGeneralSettings final {
   // Localized label of the ringed control for screen-reader/live-region
   // consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label() const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
   [[nodiscard]] bool browsing() const noexcept { return pending_request_.has_value(); }
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&,int,int);
   void render(stellar::native_map::DrawList&,int,int) const;

@@ -55,6 +55,10 @@ public:
   // Localized label of the ringed control for screen-reader/live-region
   // consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label() const;
+  // Client-pixel rect of the ringed freight-modal control — null when
+  // nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
   [[nodiscard]] const std::optional<stellar::native_colony::NativeColonyView> &
   view() const noexcept {
     return view_;

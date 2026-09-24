@@ -66,6 +66,10 @@ public:
   // Localized label of the ringed control — the announcement surface for
   // screen-reader/live-region consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label(int,int)const;
+  // Client-pixel rect of the ringed control — platform AT consumers project
+  // real focus geometry from it. Null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int,int)const;
   [[nodiscard]] std::optional<stellar::native_map::UiRect> row_bounds(Key,int,int)const;
   [[nodiscard]] stellar::native_map::UiRect category_bounds(Category,int,int)const;
   [[nodiscard]] Command handle(const stellar::native_map::InputEvent&,int,int);

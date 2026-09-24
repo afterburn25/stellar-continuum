@@ -261,6 +261,22 @@ std::string NativeAudioSettings::focused_label() const {
   if (general_navigation_ && extra-- == 0) return tr("SETTINGS_NAV_GENERAL", "General");
   return {};
 }
+std::optional<stellar::native_map::UiRect>
+NativeAudioSettings::focused_bounds(int width, int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto layout = AudioSettingsLayout::for_viewport(width, height);
+  std::array<stellar::native_map::UiRect, 9> focusables{
+      layout.master_track, layout.music_track, layout.effects_track,
+      layout.mute,         layout.defaults,    layout.cancel,
+      layout.save};
+  int count = 7;
+  if (video_navigation_) focusables[static_cast<std::size_t>(count++)] = layout.video;
+  if (general_navigation_) focusables[static_cast<std::size_t>(count++)] = layout.general;
+  return focus_ < count
+             ? std::optional<stellar::native_map::UiRect>{
+                   focusables[static_cast<std::size_t>(focus_)]}
+             : std::nullopt;
+}
 std::string NativeAudioSettings::tr(std::string_view key, std::string_view fallback) const {
   if (locale_ && locale_->contains(key)) return std::string(locale_->translate(key));
   return std::string(fallback);

@@ -321,6 +321,22 @@ std::string NativeVoiceSettings::focused_label() const {
   default: return {};
   }
 }
+std::optional<stellar::native_map::UiRect>
+NativeVoiceSettings::focused_bounds(int width, int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto layout = VoiceSettingsLayout::for_viewport(width, height);
+  const std::array<stellar::native_map::UiRect, 15> focusables{
+      layout.enable_voices,  layout.volume_track,   layout.subtitles,
+      layout.subtitle_size,  layout.background_track, layout.speaker_labels,
+      layout.filter_track,   layout.frequency,      layout.no_interruptions,
+      layout.interface_announcements,
+      layout.replay,         layout.stop,           layout.defaults,
+      layout.cancel,         layout.save};
+  return focus_ < static_cast<int>(focusables.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   focusables[static_cast<std::size_t>(focus_)]}
+             : std::nullopt;
+}
 void NativeVoiceSettings::activate_at(const VoiceSettingsLayout& layout, stellar::native_map::Point position) {
   if (layout.volume_track.contains(position)) {
     dragging_ = Dragged::Volume; set_from_track(dragging_, position, layout); return;

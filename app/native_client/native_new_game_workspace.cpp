@@ -1094,4 +1094,18 @@ std::string NativeNewGameWorkspace::focused_label(
              : std::string{};
 }
 
+std::optional<stellar::native_map::UiRect>
+NativeNewGameWorkspace::focused_bounds(int width, int height,
+                                       const TextMeasurer &measure) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto items =
+      page_ == SandboxPage::Configuration
+          ? configuration_focusables(measure_layout(width, height, measure))
+          : galaxy_focusables(GalaxyChoiceLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].rect}
+             : std::nullopt;
+}
+
 } // namespace stellar::native_setup_ui

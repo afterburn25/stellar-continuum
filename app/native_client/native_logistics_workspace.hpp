@@ -29,6 +29,9 @@ public:
   // Localized label of the ringed control for screen-reader/live-region
   // consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label(const View &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
   float scroll_offset() const noexcept { return scroll_.scroll_offset; }
   SupplyCommand handle(const stellar::native_map::InputEvent&, const View&, int width, int height);
   void render(stellar::native_map::DrawList&, const View&, int width, int height) const;

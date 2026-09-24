@@ -46,6 +46,9 @@ class NativeEconomyWorkspace final {
   // Localized label of the ringed control for screen-reader/live-region
   // consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label(const NativeEconomyView &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<native_map::UiRect>
+  focused_bounds(int width, int height) const;
   void set_text_measurer(TextMeasurer measure);
   void set_localization(const stellar::engine::LocalizationTable *table);
   void set_notice(std::string notice);

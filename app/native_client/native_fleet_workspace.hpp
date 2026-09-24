@@ -137,6 +137,9 @@ public:
   // Localized label of the ringed control — the announcement surface for
   // screen-reader/live-region consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label(const FleetWorkspaceLayout &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(const FleetWorkspaceLayout &) const;
 
 private:
   struct FocusRect {

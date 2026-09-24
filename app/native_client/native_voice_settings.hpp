@@ -62,6 +62,9 @@ class NativeVoiceSettings final {
   // consumers; toggles/choices/sliders include their current value.
   // Empty when nothing is focused.
   [[nodiscard]] std::string focused_label() const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
   void cancel();

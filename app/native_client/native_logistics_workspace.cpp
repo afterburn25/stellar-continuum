@@ -77,6 +77,13 @@ std::string SupplyWorkspace::focused_label(const View &view) const {
               view.state == LoadState::Failed ? "Retry" : "Refresh");
   return tr("SUPPLY_CLOSE", "Close supply network");
 }
+std::optional<UiRect> SupplyWorkspace::focused_bounds(int width,
+                                                      int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto layout = SupplyLayout::for_viewport(width, height);
+  return focus_ == 0 ? std::optional<UiRect>{layout.refresh}
+                     : std::optional<UiRect>{layout.close};
+}
 void SupplyWorkspace::set_text_measurer(std::function<TextExtent(const Text&)> value) {
   measure_=std::move(value);++measurer_revision_;clear_rows();
 }

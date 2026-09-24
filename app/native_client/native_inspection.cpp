@@ -257,6 +257,12 @@ std::string SystemInspectionCard::focused_label() const {
   return focus_ >= 0 ? tr_at(locale_, "INSPECTION_CLOSE", "Close inspection")
                      : std::string{};
 }
+std::optional<stellar::native_map::UiRect>
+SystemInspectionCard::focused_bounds(stellar::native_map::UiRect bounds) const {
+  return focus_ >= 0 ? std::optional<stellar::native_map::UiRect>{
+                           close_bounds(bounds)}
+                     : std::nullopt;
+}
 
 UiRect SystemInspectionCard::close_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+bounds.width-30.f*s,bounds.y+7.f*s,24.f*s,24.f*s}; }
 UiRect SystemInspectionCard::body_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+10.f*s,bounds.y+62.f*s,std::max(0.f,bounds.width-20.f*s),std::max(0.f,bounds.height-70.f*s)}; }

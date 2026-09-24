@@ -89,7 +89,8 @@ int main() try {
           "notification provider leaked into the control tree");
   // focus_changed() projects a synthetic fragment: the root's tree-walk
   // child reports the label, and GetFocus resolves it.
-  (void)bridge.focus_changed("Fleet Atlas");
+  (void)bridge.focus_changed("Fleet Atlas",
+                             stellar::engine::AnnouncementBounds{5.f, 6.f, 30.f, 20.f});
   IUIAutomationTreeWalker* walker{};
   require(SUCCEEDED(automation->get_RawViewWalker(&walker)) && walker,
           "UIA raw view walker was not available");
@@ -144,6 +145,18 @@ int main() try {
   require(SUCCEEDED(child->get_CurrentHasKeyboardFocus(&has_focus)) &&
               has_focus == TRUE,
           "focus fragment did not report keyboard focus");
+  // The passed client-space bounds must surface as the fragment's
+  // screen-space bounding rectangle.
+  RECT bounds{};
+  require(SUCCEEDED(child->get_CurrentBoundingRectangle(&bounds)),
+          "focus fragment did not report a bounding rectangle");
+  POINT corner{5, 6};
+  require(ClientToScreen(host.hwnd, &corner) == TRUE,
+          "ClientToScreen failed on the host window");
+  require(bounds.left == corner.x && bounds.top == corner.y &&
+              bounds.right - bounds.left == 30 &&
+              bounds.bottom - bounds.top == 20,
+          "focus fragment did not project the focused control's bounds");
   IUIAutomationElement* parent{};
   require(SUCCEEDED(walker->GetParentElement(child, &parent)) && parent,
           "focus fragment did not navigate to its root parent");

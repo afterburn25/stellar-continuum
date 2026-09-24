@@ -102,6 +102,10 @@ class NativeNotificationView final {
   [[nodiscard]] std::string focused_label(
       const std::deque<NativePlayerNotification>& items, int width,
       int height) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<native_map::UiRect> focused_bounds(
+      const std::deque<NativePlayerNotification>& items, int width,
+      int height) const;
 
   [[nodiscard]] NotificationViewCommand handle(
       const native_map::InputEvent& event,

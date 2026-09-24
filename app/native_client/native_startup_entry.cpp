@@ -66,7 +66,13 @@ StartupEntryResult run_native_startup_entry(Window &window,
     const auto route=[&](auto*settings,const auto&label){
       const int focus_before=settings->focused();
       const bool captured=settings->handle(e,w,h);
-      if(config.announcer&&settings->focused()!=focus_before)config.announcer->announce_focus(label());
+      if(config.announcer&&settings->focused()!=focus_before){
+        const auto rect=settings->focused_bounds(w,h);
+        config.announcer->announce_focus(label(),
+            rect?std::optional<stellar::engine::AnnouncementBounds>{
+                     {rect->x,rect->y,rect->width,rect->height}}
+                :std::nullopt);
+      }
       return captured;
     };
     if(config.voice_settings&&config.voice_settings->visible())
@@ -433,9 +439,16 @@ StartupEntryResult run_native_startup_entry(Window &window,
       return {{}, true, std::move(evidence)};
     }
     const auto announce_focus=[&]{
-      if(config.announcer)
-        config.announcer->announce_focus(workspace.focused_label(
-            input.drawable_width,input.drawable_height,measure));
+      if(config.announcer){
+        const auto rect=workspace.focused_bounds(input.drawable_width,
+                                                 input.drawable_height,measure);
+        config.announcer->announce_focus(
+            workspace.focused_label(input.drawable_width,input.drawable_height,
+                                    measure),
+            rect?std::optional<stellar::engine::AnnouncementBounds>{
+                     {rect->x,rect->y,rect->width,rect->height}}
+                :std::nullopt);
+      }
     };
     if (!input.renderable()) {
       for (const auto &event : input.events)

@@ -560,6 +560,19 @@ std::string NativeChronicleView::focused_label(int width,
              : std::string{};
 }
 
+std::optional<UiRect> NativeChronicleView::focused_bounds(int width,
+                                                        int height) const {
+  if (focus_ < 0 || !visible_) return std::nullopt;
+  const auto layout = chronicle_layout_for(
+      snapshot_, width, height, measure_, scroll_.scroll_offset, tag_filter_,
+      recency_window_ > 0.0);
+  const auto items = focusables(layout, snapshot_, locale_);
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<UiRect>{
+                   items[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
+
 bool NativeChronicleView::handle(const native_map::InputEvent &event,
                                  int width, int height) {
   if (!visible_) return false;

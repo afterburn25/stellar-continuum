@@ -650,6 +650,17 @@ std::string NativeResearchWorkspace::focused_label(int width,
              : std::string{};
 }
 
+std::optional<stellar::native_map::UiRect>
+NativeResearchWorkspace::focused_bounds(int width, int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto items = focusables(ResearchWorkspaceLayout::for_viewport(
+      width, height, window_ ? window_->domain_tabs.size() : 0));
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
+
 WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
                                                  int width, int height) {
   if (!visible_)

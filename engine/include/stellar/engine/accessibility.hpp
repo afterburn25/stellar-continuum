@@ -63,10 +63,18 @@ enum class AnnouncementKind {
   Focus,
 };
 
+// Pixel-space bounds of the focused control a Focus announcement names —
+// lets a platform bridge project real fragment geometry (magnifier tracking,
+// highlight rectangles). Absent when a surface cannot project bounds.
+struct AnnouncementBounds {
+  float x{}, y{}, width{}, height{};
+};
+
 struct AccessibilityAnnouncement {
   std::string text;
   AnnouncementPriority priority{AnnouncementPriority::Polite};
   AnnouncementKind kind{AnnouncementKind::Status};
+  std::optional<AnnouncementBounds> bounds;
   std::uint64_t sequence{};
 };
 
@@ -78,9 +86,12 @@ public:
   void announce(std::string text,
                 AnnouncementPriority priority = AnnouncementPriority::Polite);
   // A focused-control label — routed as a focus change by platform bridges.
+  // bounds carries the control's pixel rect when the surface can project it.
   void announce_focus(std::string text,
+                      std::optional<AnnouncementBounds> bounds = std::nullopt,
                       AnnouncementPriority priority = AnnouncementPriority::Polite) {
-    announce(std::move(text), priority, AnnouncementKind::Focus);
+    announce(std::move(text), priority, AnnouncementKind::Focus,
+             std::move(bounds));
   }
   // Oldest pending announcement, or nullopt when drained.
   [[nodiscard]] std::optional<AccessibilityAnnouncement> take();
@@ -92,7 +103,8 @@ public:
 
 private:
   void announce(std::string text, AnnouncementPriority priority,
-                AnnouncementKind kind);
+                AnnouncementKind kind,
+                std::optional<AnnouncementBounds> bounds);
   std::deque<AccessibilityAnnouncement> pending_;
   std::size_t capacity_;
   std::uint64_t sequence_{};

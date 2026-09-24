@@ -113,6 +113,10 @@ public:
   // Localized label of the ringed small-body control for
   // screen-reader/live-region consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label(int width,int height)const;
+  // Client-pixel rect of the ringed small-body control — null when nothing
+  // is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width,int height)const;
   [[nodiscard]] std::optional<stellar::core::SmallBodyInstance> focused_small_body()const{
     if(!snapshot_||!small_body_focus_||snapshot_->small_body_fields.empty())return std::nullopt;
     const auto& f=snapshot_->small_body_fields[small_body_field_%snapshot_->small_body_fields.size()];

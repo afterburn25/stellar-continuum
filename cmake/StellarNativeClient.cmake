@@ -228,7 +228,7 @@ if(BUILD_TESTING)
     add_executable(stellar_native_accessibility_bridge_tests
       native-tests/native_accessibility_bridge_tests.cpp
       app/native_client/native_accessibility_bridge.cpp)
-    target_include_directories(stellar_native_accessibility_bridge_tests PRIVATE app/native_client)
+    target_include_directories(stellar_native_accessibility_bridge_tests PRIVATE app/native_client engine/include)
     target_link_libraries(stellar_native_accessibility_bridge_tests PRIVATE
       Uiautomationcore Ole32 OleAut32 User32)
     add_test(NAME native_accessibility_bridge COMMAND stellar_native_accessibility_bridge_tests)

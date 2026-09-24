@@ -1107,9 +1107,20 @@ name, Parent/FragmentRoot navigation, `GetFocus` on the window root)
 instead of a live-region notification; the UIA test walks the raw tree
 to the fragment and checks its name/type/focus (UIA splices the host
 HWND's native children into hostable providers — the test iterates
-siblings to find ours). Open: AT-SPI/non-Windows backends, per-control
-fragment geometry (window rect until surfaces project focus bounds),
-and UIA control patterns.
+siblings to find ours). Open: AT-SPI/non-Windows backends and UIA
+control patterns.
+Per-control focus geometry (row 26): `AccessibilityAnnouncement` now
+carries optional `AnnouncementBounds` and every focus-bearing surface
+exposes `focused_bounds(...)` mirroring its `focused_label` — settings
+panels, workspaces, modals, the assets navigator/fleet/HUD/map group
+chain, the pause-menu ring and the startup screens included. The
+dispatcher passes the ringed control's client-pixel rect through
+`announce_focus`, the drains forward it, and the focus fragment reports
+it as `BoundingRectangle` (client→screen projected) — magnifier and
+tracking AT get the real control rect instead of the whole window. The
+bridge test asserts the fragment's reported bounds against a
+`ClientToScreen` expectation; `economy_animation` pins the bounds
+round-trip on the announcer.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

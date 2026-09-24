@@ -579,6 +579,16 @@ std::string NativeDiplomacyWorkspace::focused_label(int width,
              ? items[static_cast<std::size_t>(focus_)].label
              : std::string{};
 }
+std::optional<stellar::native_map::UiRect>
+NativeDiplomacyWorkspace::focused_bounds(int width, int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto items =
+      focusables(DiplomacyWorkspaceLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
 
 DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
     const InputEvent &event, int width, int height) {

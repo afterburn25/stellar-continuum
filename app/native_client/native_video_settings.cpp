@@ -337,6 +337,17 @@ int NativeVideoSettingsView::collect_focusables(
   out[count++] = {layout.cancel, -3, 2};
   return count;
 }
+std::optional<stellar::native_map::UiRect>
+NativeVideoSettingsView::focused_bounds(int width, int height) const {
+  if (!visible_ || focus_ < 0) return std::nullopt;
+  const auto layout = VideoSettingsLayout::for_viewport(width, height);
+  std::array<Focusable, 11> focusables{};
+  const int count = collect_focusables(layout, focusables);
+  return focus_ < count
+             ? std::optional<stellar::native_map::UiRect>{
+                   focusables[static_cast<std::size_t>(focus_)].rect}
+             : std::nullopt;
+}
 std::string NativeVideoSettingsView::focused_label(int width, int height) const {
   if (!visible_ || focus_ < 0) return {};
   const auto layout = VideoSettingsLayout::for_viewport(width, height);

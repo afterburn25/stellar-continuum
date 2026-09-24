@@ -85,6 +85,12 @@ public:
   // ring, so its label needs the text measurer.
   [[nodiscard]] std::string focused_label(int width, int height,
                                           const TextMeasurer &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  // The delegating variant forwards to the new-game workspace on Setup.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height, const TextMeasurer &) const;
   [[nodiscard]] bool wants_text_input() const noexcept;
   [[nodiscard]] StartupIntent handle(const stellar::native_map::InputEvent &,
                                      int width, int height,

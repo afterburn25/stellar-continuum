@@ -98,6 +98,11 @@ std::string NativeShipyardWorkspace::focused_label(const ShipyardWorkspaceLayout
   const auto items=focusables(l);
   return focus_<static_cast<int>(items.size())?items[static_cast<std::size_t>(focus_)].label:std::string{};
 }
+std::optional<stellar::native_map::UiRect> NativeShipyardWorkspace::focused_bounds(const ShipyardWorkspaceLayout& l)const{
+  if(focus_<0)return std::nullopt;
+  const auto items=focusables(l);
+  return focus_<static_cast<int>(items.size())?std::optional<stellar::native_map::UiRect>{items[static_cast<std::size_t>(focus_)].rect}:std::nullopt;
+}
 std::string NativeShipyardWorkspace::batch_blocker()const{
   const auto* d=selected_design();if(!d)return tr("SHIPYARD_SELECT_DESIGN","Select a ship design.");
   const auto q=std::ranges::find(d->batch_quotes,quantity_,&stellar::core::ShipbuildingBatchAssessment::quantity);

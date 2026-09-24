@@ -104,6 +104,9 @@ public:
   // consumers. Choice rows announce "LABEL: value" like they render.
   // Empty when nothing is focused.
   [[nodiscard]] std::string focused_label(int width, int height) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
   [[nodiscard]] const NativeVideoSettings &values() const noexcept {
     return values_;
   }

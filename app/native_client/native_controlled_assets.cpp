@@ -147,6 +147,13 @@ std::string Navigator::focused_label(int w,int h)const{
   const auto targets=focusables(Layout::make(w,h));
   return focus_<static_cast<int>(targets.size())?targets[static_cast<std::size_t>(focus_)].label:std::string{};
 }
+std::optional<stellar::native_map::UiRect> Navigator::focused_bounds(int w,int h)const{
+  if(focus_<0)return std::nullopt;
+  const Layout l=Layout::make(w,h);
+  if(preferences_.hidden)return focus_==0?std::optional<stellar::native_map::UiRect>{l.restore}:std::nullopt;
+  const auto targets=focusables(l);
+  return focus_<static_cast<int>(targets.size())?std::optional<stellar::native_map::UiRect>{targets[static_cast<std::size_t>(focus_)].bounds}:std::nullopt;
+}
 void Navigator::commit_preferences(Preferences next){if(persist_&&!persist_(next)){error_=tr("ASSETS_PREFS_FAIL","Could not save navigator preferences.");return;}preferences_=next;error_.clear();pressed_.reset();rebuild();}
 Command Navigator::handle(const InputEvent& e,int w,int h){
   const auto l=Layout::make(w,h);pointer_=e.position;Command out;out.generation=view_.generation;out.observer=view_.observer;

@@ -405,6 +405,16 @@ std::string NativeConstructionWorkspace::focused_label(
              ? items[static_cast<std::size_t>(focus_)].label
              : std::string{};
 }
+std::optional<stellar::native_map::UiRect>
+NativeConstructionWorkspace::focused_bounds(
+    const ConstructionWorkspaceLayout &layout) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
 
 ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
     const InputEvent &event, int width, int height) {

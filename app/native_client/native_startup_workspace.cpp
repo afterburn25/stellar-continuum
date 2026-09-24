@@ -126,8 +126,16 @@ std::string NativeStartupWorkspace::focused_label(int width,int height)const{
   const auto items=collect_focusables(StartupLayout::for_viewport(width,height),width,height);
   return focus_<static_cast<int>(items.size())?items[static_cast<std::size_t>(focus_)].label:std::string{};
 }
+std::optional<stellar::native_map::UiRect> NativeStartupWorkspace::focused_bounds(int width,int height)const{
+  if(focus_<0)return std::nullopt;
+  const auto items=collect_focusables(StartupLayout::for_viewport(width,height),width,height);
+  return focus_<static_cast<int>(items.size())?std::optional<stellar::native_map::UiRect>{items[static_cast<std::size_t>(focus_)].rect}:std::nullopt;
+}
 std::string NativeStartupWorkspace::focused_label(int width,int height,const TextMeasurer&measure)const{
   return screen_==StartupScreen::Setup?setup_.focused_label(width,height,measure):focused_label(width,height);
+}
+std::optional<stellar::native_map::UiRect> NativeStartupWorkspace::focused_bounds(int width,int height,const TextMeasurer&measure)const{
+  return screen_==StartupScreen::Setup?setup_.focused_bounds(width,height,measure):focused_bounds(width,height);
 }
 
 StartupIntent NativeStartupWorkspace::handle(const InputEvent&e,int width,int height,const TextMeasurer&measure){

@@ -32,6 +32,8 @@ public:
   [[nodiscard]] bool visible()const noexcept{return view_.visible();}
   [[nodiscard]] int focused()const noexcept{return view_.focused();}
   [[nodiscard]] std::string focused_label(int width,int height)const{return view_.focused_label(width,height);}
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect> focused_bounds(int width,int height)const{return view_.focused_bounds(width,height);}
   [[nodiscard]] bool previewing()const noexcept{return previous_.has_value();}
   [[nodiscard]] bool backend_state_known() const noexcept{return !faulted_;}
   [[nodiscard]] const NativeVideoSettings& active()const noexcept{return active_;}

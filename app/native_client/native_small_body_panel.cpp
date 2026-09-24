@@ -77,6 +77,12 @@ std::string NativeSystemWorkspace::focused_label(int width,int height)const{
   if(small_body_ring_>=static_cast<int>(ring.size()))return{};
   return ring[static_cast<std::size_t>(small_body_ring_)].second;
 }
+std::optional<UiRect> NativeSystemWorkspace::focused_bounds(int width,int height)const{
+  if(small_body_ring_<0||!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return std::nullopt;
+  const auto ring=small_body_ring_targets(width,height);
+  if(small_body_ring_>=static_cast<int>(ring.size()))return std::nullopt;
+  return ring[static_cast<std::size_t>(small_body_ring_)].first;
+}
 std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies(const InputEvent& e,int width,int height){
   if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed){small_body_ring_=-1;return std::nullopt;}
   const auto l=layout_for(width,height);const SystemWorkspaceCommand handled{SystemWorkspaceCommandKind::none,true};

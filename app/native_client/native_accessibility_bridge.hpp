@@ -1,7 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
+
+#include <stellar/engine/accessibility.hpp>
 
 namespace stellar::native_client {
 
@@ -28,8 +31,11 @@ class NativeAccessibilityBridge final {
   // unattached, the text is empty, or no assistive client is listening.
   bool announce(std::string_view text);
   // Raises a UIA focus-changed event carrying the label on a synthetic
-  // fragment so assistive clients see real focus tracking. Same gates.
-  bool focus_changed(std::string_view label);
+  // fragment so assistive clients see real focus tracking. Bounds (client
+  // pixels) project the control's real rect onto the fragment. Same gates.
+  bool focus_changed(
+      std::string_view label,
+      std::optional<stellar::engine::AnnouncementBounds> bounds = std::nullopt);
   // Subclassed window-procedure sink installed while attached — platform
   // plumbing for the WM_GETOBJECT answer, not a general event API.
   std::intptr_t handle_window_message(std::uintptr_t hwnd, unsigned message,
