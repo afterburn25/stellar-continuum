@@ -860,6 +860,32 @@ int main() {
           "the ttl entity self-destructs in sim time");
   }
 
+  // A scene `vfx` field auto-attaches a document-declared emitter on
+  // spawn — particles flow with no game code.
+  {
+    const auto sub = root / "vfx-attach";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[{"name":"torch","x":100,"y":100,
+                   "vfx":"embers"}],
+                  "emitters":[{"id":"embers","rate":120,
+                   "lifetime":0.5}]})";
+    }
+    RuntimeHost host{headless_options(sub)};
+    int updates = 0;
+    std::size_t live = 0, particles = 0;
+    host.on_update = [&](World &, float) {
+      ++updates;
+      live = host.vfx().live_instance_count();
+      if (updates == 4 && live == 1)
+        particles = host.vfx().particles(1).size();
+    };
+    check(host.run() == 0, "vfx-attach run exits cleanly");
+    check(live == 1, "the scene vfx field spawns an attached emitter");
+    check(particles > 0, "the attached emitter produces particles");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
