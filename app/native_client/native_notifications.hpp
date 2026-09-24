@@ -95,6 +95,7 @@ class NativeNotificationView final {
   void toggle(std::int64_t latest_sequence) noexcept;
   [[nodiscard]] std::int64_t last_read() const noexcept { return last_read_; }
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
 
   [[nodiscard]] NotificationViewCommand handle(
       const native_map::InputEvent& event,
@@ -110,6 +111,7 @@ class NativeNotificationView final {
   bool visible_{};
   std::int64_t last_read_{};
   float scroll_{};
+  int focus_{-1};
   native_map::Point pointer_{};
   native_map::Point press_origin_{};
   bool pointer_captured_{};

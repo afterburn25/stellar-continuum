@@ -83,6 +83,25 @@ bool same_rect(UiRect left, UiRect right) noexcept {
          std::abs(left.height - right.height) < .01f;
 }
 
+// Focusables walk actionable rects in (y,x) order: header controls, then
+// each card's action buttons. Card bodies are inert — only the explicit
+// action buttons respond, and only while fully inside the viewport (the
+// same gate the pointer activation path applies).
+void collect_focusables(const NotificationLayout& layout,
+                        std::vector<UiRect>& out) {
+  out.push_back(layout.chronicle_button);
+  out.push_back(layout.close_button);
+  for (const auto& entry : layout.entries) {
+    if (entry.contact_button && contains_rect(layout.list_viewport, *entry.contact_button))
+      out.push_back(*entry.contact_button);
+    if (entry.system_button && contains_rect(layout.list_viewport, *entry.system_button))
+      out.push_back(*entry.system_button);
+  }
+  std::sort(out.begin(), out.end(), [](const UiRect& a, const UiRect& b) {
+    return a.y == b.y ? a.x < b.x : a.y < b.y;
+  });
+}
+
 TextExtent fallback_measure(const Text& text) {
   const auto chars = static_cast<int>(text.value.size());
   const auto line_width = text.wrap_width > 0.f
@@ -216,9 +235,9 @@ void NativeNotificationView::cancel_press() noexcept {
   pressed_bounds_.reset();
 }
 void NativeNotificationView::open(std::int64_t latest_sequence) noexcept {
-  visible_ = true; scroll_ = 0.f; last_read_ = latest_sequence; cancel_press();
+  visible_ = true; scroll_ = 0.f; last_read_ = latest_sequence; focus_ = -1; cancel_press();
 }
-void NativeNotificationView::close() noexcept { visible_ = false; scroll_ = 0.f; cancel_press(); }
+void NativeNotificationView::close() noexcept { visible_ = false; scroll_ = 0.f; focus_ = -1; cancel_press(); }
 void NativeNotificationView::toggle(std::int64_t latest_sequence) noexcept { if (visible_) close(); else open(latest_sequence); }
 
 NotificationViewCommand NativeNotificationView::handle(const native_map::InputEvent& event,
@@ -229,7 +248,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
   auto layout = notification_layout_for(items, width, height, measure_, scroll_, locale_);
   scroll_ = layout.scroll;
   if (event.type == native_map::InputEventType::EscapePressed) { close(); command.kind = NotificationViewCommandKind::Close; command.captured = true; return command; }
-  if (event.type == native_map::InputEventType::PointerCancelled) { const bool captured = pointer_captured_; cancel_press(); command.captured = captured; return command; }
+  if (event.type == native_map::InputEventType::PointerCancelled) { const bool captured = pointer_captured_; focus_ = -1; cancel_press(); command.captured = captured; return command; }
   if (event.type == native_map::InputEventType::Wheel) {
     if (!layout.panel.contains(event.position)) return command;
     // Scrolling cancels an activation but a preceding panel press remains
@@ -241,8 +260,52 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
     scroll_ = std::clamp(scroll_ - event.wheel_y * 42.f * layout.scale, 0.f, layout.max_scroll);
     command.captured = true; return command;
   }
+  if (event.type == native_map::InputEventType::KeyPressed && event.key) {
+    // SDL_Keycode: Tab/arrows walk the (y,x)-ordered focusables, Home/End
+    // jump to the ends, and Return/Space replay the press/release pair
+    // through the same dispatch a click takes.
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    std::vector<UiRect> rects;
+    collect_focusables(layout, rects);
+    const int count = static_cast<int>(rects.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      command.captured = true;
+      return command;
+    }
+    if (count > 0 && (fwd || bwd)) {
+      focus_ = focus_ < 0 || focus_ >= count
+                   ? (bwd ? count - 1 : 0)
+                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      command.captured = true;
+      return command;
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto& rect = rects[static_cast<std::size_t>(focus_)];
+      native_map::InputEvent press{native_map::InputEventType::LeftPressed};
+      press.position = {rect.x + rect.width * .5f, rect.y + rect.height * .5f};
+      native_map::InputEvent release = press;
+      release.type = native_map::InputEventType::LeftReleased;
+      const int keep = focus_;
+      (void)handle(press, items, width, height);
+      command = handle(release, items, width, height);
+      if (visible_) focus_ = keep;
+      command.captured = true;
+      return command;
+    }
+    // Unhandled keys keep falling through to global shortcuts.
+  }
   if (event.type == native_map::InputEventType::LeftPressed) {
     if (!layout.panel.contains(event.position)) return command;
+    focus_ = -1;
     pointer_captured_ = true; press_origin_ = event.position; press_target_ = PressTarget::None; pressed_contact_id_.reset(); pressed_system_id_.reset(); pressed_bounds_.reset();
     if (layout.close_button.contains(event.position)) press_target_ = PressTarget::Close;
     else if (layout.chronicle_button.contains(event.position)) press_target_ = PressTarget::Chronicle;
@@ -354,7 +417,8 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
                resolve(locale_, "NOTIFY_SUBTITLE", "Recent reports from your empire."), muted_color,
                std::max(9, static_cast<int>(std::lround(11.f * s))), layout.list_viewport.width, layout.panel);
   if (items.empty()) { clipped_text(out, {layout.empty_hint.x, layout.empty_hint.y}, resolve(locale_, "NOTIFY_EMPTY", "No major events yet."), muted_color,
-      std::max(11, static_cast<int>(std::lround(13.f * s))), layout.empty_hint.width, layout.empty_hint); return; }
+      std::max(11, static_cast<int>(std::lround(13.f * s))), layout.empty_hint.width, layout.empty_hint); }
+  else {
   for (std::size_t i = 0; i < layout.entries.size(); ++i) {
     const auto& entry = layout.entries[i]; if (!intersects(entry.bounds, layout.list_viewport)) continue;
     const auto& item = items[entry.item_index];
@@ -389,6 +453,13 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
   if (layout.max_scroll > 0.f) { const float thumb_h = std::max(16.f * s, layout.list_viewport.height * layout.list_viewport.height / layout.content_height);
     const float y = layout.list_viewport.y + (layout.list_viewport.height - thumb_h) * (layout.scroll / layout.max_scroll);
     fill(out, {layout.list_viewport.x + layout.list_viewport.width - 3.f * s, y, 2.f * s, thumb_h}, muted_color); }
+  }
+  if (focus_ >= 0) {
+    std::vector<UiRect> focusables;
+    collect_focusables(layout, focusables);
+    if (focus_ < static_cast<int>(focusables.size()))
+      stroke(out, focusables[static_cast<std::size_t>(focus_)], title_color);
+  }
 }
 
 } // namespace stellar::native_notifications
