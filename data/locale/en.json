@@ -1170,6 +1170,7 @@
     "HUD_TIP_RETURN": "Return to star map",
     "HUD_TIP_OPEN": "Open focused system",
     "HUD_TIP_SELECT": "Select an explored star",
+    "HUD_EVENTS": "EVENTS {0}",
     "HUD_TIME_RATE": "  |  1x = 1 hour/sec",
     "FLEET_NOTICE_NO_SCOUT": "No scout or science vessel is available. Select a fleet on the map to plan exploration.",
     "DIPLOMACY_NOTICE_UNIDENTIFIED": "This contact is no longer identified. Review the contact list.",

@@ -7223,7 +7223,7 @@ class NativeCampaign final {
     if(notifications_available()){
       panel(out,layout.notifications,layout.notifications.contains(pointer_),notification_view_.visible());
       const auto unread=notifications_.unread_count(notification_view_.last_read());
-      control_label(out,layout.notifications,"EVENTS "+std::to_string(unread),
+      control_label(out,layout.notifications,trf("HUD_EVENTS",{std::to_string(unread)},"EVENTS {0}"),
           unread?Color{240,197,106,255}:Color{225,238,250,255},
           layout.control_font_pixels,layout.scale,text_measurer_);
     }
@@ -8901,6 +8901,20 @@ class NativeCampaign final {
   [[nodiscard]] std::string tr(std::string_view key,std::string_view fallback)const{
     if(locale_&&locale_->contains(key))return std::string(locale_->translate(key));
     return std::string(fallback);
+  }
+  [[nodiscard]] std::string trf(std::string_view key,std::initializer_list<std::string> args,
+                                std::string_view fallback)const{
+    if(locale_&&locale_->contains(key)){
+      const std::vector<std::string> values(args.begin(),args.end());
+      return locale_->format(key,std::span<const std::string>(values));
+    }
+    std::string out{fallback};
+    std::size_t index=0;
+    for(const auto& arg:args){
+      const std::string marker="{"+std::to_string(index++)+"}";
+      if(const auto at=out.find(marker);at!=std::string::npos)out.replace(at,marker.size(),arg);
+    }
+    return out;
   }
   int voice_ui_sequence_{};
   stellar::native_menu_audio::HoverFeedback menu_hover_feedback_;

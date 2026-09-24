@@ -1330,6 +1330,7 @@
     "HUD_TIP_RETURN": "Zurück zur Sternkarte",
     "HUD_TIP_OPEN": "Fokussiertes System öffnen",
     "HUD_TIP_SELECT": "Einen erkundeten Stern wählen",
+    "HUD_EVENTS": "EREIGNISSE {0}",
     "HUD_TIME_RATE": "  |  1x = 1 Stunde/Sek",
     "GLOBE_TERRAIN_GAS": "Atmosphärisches Band",
     "GLOBE_TERRAIN_FROZEN": "Eisprovinz",
