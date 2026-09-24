@@ -30,6 +30,16 @@ int main(int argc,char **argv)try{
   check(monitor.invariant_checks()==1&&!monitor.history().records().empty()&&
         monitor.history().records().front().record.event_type=="native_monitor_started",
         "Native monitor did not initialize with current-state inspection.");
+  // The research pass replays the codec's save-path validation on live
+  // state — a fresh campaign must produce no false-positive findings.
+  const auto research_findings=inspect_research_invariants(
+      frame.runtime().research(),frame.runtime().research_runtime(),
+      frame.runtime().world().campaign(),0,0);
+  for(const auto &f:research_findings)std::cerr<<f.subsystem<<" "<<f.event_type<<" "<<f.message<<'\n';
+  check(research_findings.empty(),"Fresh research state failed invariants.");
+  check(std::none_of(monitor.history().records().begin(),monitor.history().records().end(),
+        [](const auto &r){return r.record.subsystem=="research"||r.record.subsystem=="diplomacy";}),
+        "Monitor reported false-positive research/diplomacy findings.");
   const auto initialized_records=monitor.history().records().size();
   monitor.observe(frame,{},stamp);check(monitor.invariant_checks()==1&&monitor.history().records().size()==initialized_records,"Paused rendering spammed diagnostics.");
   const auto memory_id=stellar::engine::MemoryTracker::instance().register_subsystem("test-subsystem");

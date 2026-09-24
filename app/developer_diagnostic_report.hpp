@@ -85,6 +85,8 @@ inline std::vector<Entry> capture_developer_report(stellar::core::CampaignFrame 
   const auto warnings=operations.size();findings.insert(findings.end(),operations.begin(),operations.end());
   auto diplomatic=inspect_diplomacy_invariants(frame.runtime().diplomacy(),world,tick,day);
   findings.insert(findings.end(),diplomatic.begin(),diplomatic.end());
+  auto research=inspect_research_invariants(frame.runtime().research(),frame.runtime().research_runtime(),world,tick,day);
+  findings.insert(findings.end(),research.begin(),research.end());
   std::string errors,warning_log,diagnostics;
   for(auto &f:findings){f.real_timestamp=timestamp;const auto line=stellar::engine::diagnostic_record_json(f);diagnostics+=line;
     if(f.severity==stellar::engine::DiagnosticSeverity::Warning)warning_log+=line;else errors+=line;}

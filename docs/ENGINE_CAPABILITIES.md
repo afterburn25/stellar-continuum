@@ -815,7 +815,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   (`invalid_state`) and adds the campaign-entity refs the snapshot
   validator cannot see (`orphaned_observer`/`orphaned_civilization`/
   `orphaned_system` across contacts, relationships, access grants,
-  claims/responses, agreements, proposals and history). The monitor,
+  claims/responses, agreements, proposals and history). Adaptive
+  research state is covered by `inspect_research_invariants(research,
+  runtime, world, …)`: captures through
+  `AdaptiveResearchCampaignSnapshotCodec` and replays the codec's
+  save-path `restore` validation so in-memory corruption surfaces before
+  the next save/load cycle, plus `orphaned_civilization` for rows the
+  codec maps to absent empires. The monitor,
   developer report and QA host compose all three passes,
   cross-system orbit bindings via `validate_stellar_orbit_catalog`
   (`invalid_orbit_binding`), `validate_central_black_hole` on the
@@ -2249,7 +2255,8 @@ callers. Remaining gaps below are work outstanding, not approved deferrals.
   `developer_qa_host`. Research fingerprints delegate to the same byte digest.
 - **Interfaces:** `DiagnosticLog::append/flush`, `DiagnosticLogPolicy`, typed
   `DiagnosticRecord`, `inspect_campaign_invariants`,
-  `inspect_diplomacy_invariants`, `campaign_step_diagnostics`,
+  `inspect_diplomacy_invariants`, `inspect_research_invariants`,
+  `campaign_step_diagnostics`,
   `CampaignFrame::set_profiling_enabled`, `tick_execution_nanoseconds`.
 - **Purpose/users:** The developer headless host runs the authoritative campaign
   frame, AI and research implementation. It records real events and measurements

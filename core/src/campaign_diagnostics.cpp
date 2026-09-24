@@ -1,4 +1,5 @@
 #include <stellar/core/campaign_diagnostics.hpp>
+#include <stellar/core/adaptive_research_campaign.hpp>
 #include <stellar/core/campaign_calendar.hpp>
 #include <stellar/core/campaign_colony_projection.hpp>
 #include <stellar/core/colony_biology.hpp>
@@ -1189,6 +1190,52 @@ inspect_diplomacy_invariants(
         emit("orphaned_system",*e.system_id,"History event references an absent system.");break;}
       if(const auto bad=scan_known_to(e.known_to_civilization_ids)){
         emit("orphaned_observer",bad,"History knowledge references an absent civilization.");break;}}
+  }
+  if(dropped>0){
+    DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
+    r.subsystem="diagnostics";r.event_type="findings_truncated";
+    r.severity=DiagnosticSeverity::Critical;
+    r.message="Invariant finding bound reached; corrupt-state findings were dropped.";
+    r.values["droppedFindings"]=static_cast<std::int64_t>(dropped);
+    findings.push_back(std::move(r));
+  }
+  return findings;
+}
+std::vector<stellar::engine::DiagnosticRecord>
+inspect_research_invariants(
+    const AdaptiveResearchCampaignState &research,
+    const AdaptiveResearchStrategicRuntime &runtime,
+    const FreshCampaignState &w,
+    std::uint64_t tick,double day,std::size_t maximum){
+  using namespace stellar::engine;
+  if(maximum<1||maximum>4096)throw std::invalid_argument("Invalid invariant finding bound.");
+  std::vector<DiagnosticRecord> findings;
+  std::size_t dropped=0;
+  const auto emit=[&](std::string_view type,int id,std::string message){
+    if(findings.size()>=maximum){++dropped;return;}
+    DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
+    r.subsystem="research";r.event_type=std::string(type);
+    r.message=std::move(message);r.entity_id=id;r.severity=DiagnosticSeverity::Critical;
+    findings.push_back(std::move(r));
+  };
+  AdaptiveResearchCampaignSnapshot snapshot;
+  bool captured=false;
+  try{
+    AdaptiveResearchCampaignSnapshotCodec codec(runtime);
+    snapshot=codec.capture(research);captured=true;
+    // The codec's restore is the authoritative save-path validation —
+    // replay it on the capture so corrupt in-memory state surfaces
+    // instead of waiting for the next save/load cycle.
+    (void)codec.restore(w,snapshot);
+  }catch(const std::exception &error){
+    emit("invalid_research",0,
+         std::string("Research state fails its snapshot validation: ")+error.what());}
+  if(captured&&findings.empty()){
+    std::unordered_set<int> civ_ids;
+    for(const auto &c:w.civilizations)civ_ids.insert(c.id);
+    for(const auto &row:snapshot.civilizations)
+      if(!civ_ids.contains(row.civilization_id)){
+        emit("orphaned_civilization",row.civilization_id,"Research row references an absent civilization.");break;}
   }
   if(dropped>0){
     DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);

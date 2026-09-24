@@ -21,6 +21,14 @@ namespace stellar::core {
     const DiplomacyState &, const FreshCampaignState &,
     std::uint64_t tick, double simulation_day,
     std::size_t maximum_findings=128);
+// Inspects the adaptive research campaign state — also runtime-held —
+// by capturing its authoritative snapshot codec and replaying the
+// save-path restore validation, plus the campaign-entity refs the
+// codec cannot check alone. Read-only.
+[[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> inspect_research_invariants(
+    const AdaptiveResearchCampaignState &, const AdaptiveResearchStrategicRuntime &,
+    const FreshCampaignState &, std::uint64_t tick, double simulation_day,
+    std::size_t maximum_findings=128);
 // Observer adapter of returned canonical events; does not infer fake events
 // from UI state or advance any subsystem.
 [[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> campaign_step_diagnostics(

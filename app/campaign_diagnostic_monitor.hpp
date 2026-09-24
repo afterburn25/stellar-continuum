@@ -47,6 +47,8 @@ public:
       auto warnings=inspect_campaign_operations(world,tick,day);findings.insert(findings.end(),warnings.begin(),warnings.end());
       auto diplomatic=inspect_diplomacy_invariants(frame.runtime().diplomacy(),world,tick,day);
       findings.insert(findings.end(),diplomatic.begin(),diplomatic.end());
+      auto research=inspect_research_invariants(frame.runtime().research(),frame.runtime().research_runtime(),world,tick,day);
+      findings.insert(findings.end(),research.begin(),research.end());
       std::set<Key> current;
       for(auto &finding:findings){
         Key key{finding.subsystem,finding.event_type,finding.entity_id.value_or(-1),finding.message};current.insert(key);
