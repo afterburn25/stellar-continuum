@@ -2,6 +2,7 @@
 #include "native_menu_hover.hpp"
 #include "native_dropdown.hpp"
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -65,6 +66,9 @@ class NativeVoiceSettings final {
   // Client-pixel rect of the ringed control — null when nothing is focused.
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   focused_bounds(int width, int height) const;
+  // Normalized range of the ringed slider — null for non-slider controls.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementRange>
+  focused_range() const;
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
   void cancel();

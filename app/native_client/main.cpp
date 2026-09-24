@@ -2807,13 +2807,8 @@ class NativeCampaign final {
     // Escape unwinds the topmost layer: an open inspection card consumes the
     // first press, the pause menu takes the second.
     if(inspection_card_.visible()){
-      const bool stayed_open=update(escape,width,height,0.,false);
-      if(!stayed_open||inspection_card_.visible()){
-        SDL_Log("nav-smoke card escape: update=%d insp=%d pending=%d exit=%d",
-                stayed_open?1:0,inspection_card_.visible()?1:0,
-                session_->new_campaign_pending()?1:0,session_->exit_ready()?1:0);
+      if(!update(escape,width,height,0.,false)||inspection_card_.visible())
         throw std::runtime_error("Navigation smoke could not close the inspection card.");
-      }
     }
     if(!update(escape,width,height,0.,false)||!menu_)
       throw std::runtime_error("Navigation smoke could not open the pause menu.");
@@ -6041,7 +6036,7 @@ class NativeCampaign final {
       if(voice_settings_&&voice_settings_->visible()){
         const int focus_before=voice_settings_->focused();
         (void)voice_settings_->handle(event,width,height);
-        if(voice_settings_->focused()!=focus_before)announcer_.announce_focus(voice_settings_->focused_label(),announcement_bounds(voice_settings_->focused_bounds(width,height)));
+        if(voice_settings_->focused()!=focus_before)announcer_.announce_focus(voice_settings_->focused_label(),announcement_bounds(voice_settings_->focused_bounds(width,height)),voice_settings_->focused_range());
         gesture_.capture_for_ui();continue;
       }
       if(settings_hub_){
@@ -6072,7 +6067,7 @@ class NativeCampaign final {
         notification_view_.close();chronicle_view_.close();
         const int focus_before=audio_settings_->focused();
         (void)audio_settings_->handle(event,width,height);
-        if(audio_settings_->focused()!=focus_before)announcer_.announce_focus(audio_settings_->focused_label(),announcement_bounds(audio_settings_->focused_bounds(width,height)));
+        if(audio_settings_->focused()!=focus_before)announcer_.announce_focus(audio_settings_->focused_label(),announcement_bounds(audio_settings_->focused_bounds(width,height)),audio_settings_->focused_range());
         gesture_.capture_for_ui();
         continue;
       }
@@ -6515,7 +6510,7 @@ class NativeCampaign final {
         else if(construction_workspace_.visible())construction_workspace_.close();
         else if(shipyard_workspace_.visible()){if(shipyard_workspace_.popover_open())(void)shipyard_workspace_.handle(event,width,height);else shipyard_workspace_.close();}
         else if(research_workspace_.visible()){if(research_workspace_.popover_open())(void)research_workspace_.handle(event,width,height);else research_workspace_.close();}
-        else if(inspection_card_.visible())inspection_card_.clear();
+        else if(inspection_card_.visible()){inspection_card_.clear();selected_id_.reset();}
         else toggle_menu();
         gesture_.cancel();
         continue;
@@ -8137,7 +8132,8 @@ class NativeCampaign final {
     while(auto item=announcer_.take()){
       if(accessibility_bridge_){
         if(item->kind==stellar::engine::AnnouncementKind::Focus)
-          accessibility_bridge_->focus_changed(item->text, item->bounds);
+          accessibility_bridge_->focus_changed(item->text, item->bounds,
+                                               item->range);
         else
           accessibility_bridge_->announce(item->text);
       }
@@ -8884,7 +8880,7 @@ int main(int argc,char **argv){
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
       config.developer_access=&developer_access;config.locale=&locale_table;
-      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){if(item->kind==stellar::engine::AnnouncementKind::Focus)accessibility_bridge.focus_changed(item->text,item->bounds);else accessibility_bridge.announce(item->text);if(!item->text.empty())startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
+      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){if(item->kind==stellar::engine::AnnouncementKind::Focus)accessibility_bridge.focus_changed(item->text,item->bounds,item->range);else accessibility_bridge.announce(item->text);if(!item->text.empty())startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
     StartupEntryEvidence startup_evidence,restart_evidence;

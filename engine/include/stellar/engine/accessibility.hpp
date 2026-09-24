@@ -70,11 +70,19 @@ struct AnnouncementBounds {
   float x{}, y{}, width{}, height{};
 };
 
+// Normalized range for focused sliders — platform bridges expose it as a
+// value pattern so AT reports position within the control's range, not
+// just the label text.
+struct AnnouncementRange {
+  double minimum{}, maximum{1.}, value{};
+};
+
 struct AccessibilityAnnouncement {
   std::string text;
   AnnouncementPriority priority{AnnouncementPriority::Polite};
   AnnouncementKind kind{AnnouncementKind::Status};
   std::optional<AnnouncementBounds> bounds;
+  std::optional<AnnouncementRange> range;
   std::uint64_t sequence{};
 };
 
@@ -89,9 +97,10 @@ public:
   // bounds carries the control's pixel rect when the surface can project it.
   void announce_focus(std::string text,
                       std::optional<AnnouncementBounds> bounds = std::nullopt,
+                      std::optional<AnnouncementRange> range = std::nullopt,
                       AnnouncementPriority priority = AnnouncementPriority::Polite) {
     announce(std::move(text), priority, AnnouncementKind::Focus,
-             std::move(bounds));
+             std::move(bounds), std::move(range));
   }
   // Oldest pending announcement, or nullopt when drained.
   [[nodiscard]] std::optional<AccessibilityAnnouncement> take();
@@ -104,7 +113,8 @@ public:
 private:
   void announce(std::string text, AnnouncementPriority priority,
                 AnnouncementKind kind,
-                std::optional<AnnouncementBounds> bounds);
+                std::optional<AnnouncementBounds> bounds,
+                std::optional<AnnouncementRange> range);
   std::deque<AccessibilityAnnouncement> pending_;
   std::size_t capacity_;
   std::uint64_t sequence_{};

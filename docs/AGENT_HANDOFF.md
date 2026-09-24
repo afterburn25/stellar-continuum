@@ -1126,6 +1126,12 @@ fragment stops claiming `HasKeyboardFocus`, `GetFocus` falls back to the
 window root, and a focus-changed event fires on the root — so a ring
 releasing at a group boundary or on Escape no longer leaves a stale
 control claiming focus. Empty items are skipped for speech/captions.
+Slider announcements additionally carry `AnnouncementRange`
+(min/max/value): the fragment exposes a read-only `IRangeValueProvider`
+via `GetPatternProvider` (the raw-provider pattern entry point — not
+QueryInterface), so Narrator-class AT reports slider position in range;
+`SetValue` fails honestly since adjustment stays on the key/pointer
+contract. Audio and voice settings populate it.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

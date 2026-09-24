@@ -82,13 +82,15 @@ AccessibilitySettings::from_json(std::string_view document) {
 
 void AccessibilityAnnouncer::announce(std::string text,
                                       AnnouncementPriority priority) {
-  announce(std::move(text), priority, AnnouncementKind::Status, std::nullopt);
+  announce(std::move(text), priority, AnnouncementKind::Status, std::nullopt,
+           std::nullopt);
 }
 
 void AccessibilityAnnouncer::announce(std::string text,
                                       AnnouncementPriority priority,
                                       AnnouncementKind kind,
-                                      std::optional<AnnouncementBounds> bounds) {
+                                      std::optional<AnnouncementBounds> bounds,
+                                      std::optional<AnnouncementRange> range) {
   // Empty status text is dropped, but an empty Focus item is meaningful:
   // it marks the ring releasing, so platform bridges can retire the stale
   // focused fragment instead of leaving the last label claiming focus.
@@ -109,8 +111,9 @@ void AccessibilityAnnouncer::announce(std::string text,
         });
     pending_.erase(polite != pending_.end() ? polite : pending_.begin());
   }
-  pending_.push_back(AccessibilityAnnouncement{std::move(text), priority, kind,
-                                             std::move(bounds), sequence_++});
+  pending_.push_back(AccessibilityAnnouncement{
+      std::move(text), priority, kind, std::move(bounds), std::move(range),
+      sequence_++});
 }
 
 std::optional<AccessibilityAnnouncement> AccessibilityAnnouncer::take() {

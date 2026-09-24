@@ -103,18 +103,23 @@ class ProviderBase : public IRawElementProviderSimple {
 // Synthetic fragment for the control that currently owns keyboard focus. The
 // dispatcher supplies its label per focus move; surfaces do not yet project
 // geometry, so the bounding rectangle reports the window itself.
+struct FragmentRange { double minimum{}, maximum{1.}, value{}; };
+
 class FocusFragment final : public ProviderBase,
+                            public IRangeValueProvider,
                             public IRawElementProviderFragment {
  public:
   FocusFragment(WindowProvider *root, HWND host) noexcept
       : root_(root), host_(host) {}
 
-  void set_label(std::wstring label, std::optional<RECT> rect) {
+  void set_label(std::wstring label, std::optional<RECT> rect,
+                 std::optional<FragmentRange> range) {
     label_ = std::move(label);
     rect_ = rect;
+    range_ = range;
     focused_ = true;
   }
-  void clear_focus() noexcept { focused_ = false; }
+  void clear_focus() noexcept { focused_ = false; range_.reset(); }
 
   // IUnknown is implemented once here so both interface bases resolve to the
   // same counter.
@@ -132,7 +137,60 @@ class FocusFragment final : public ProviderBase,
       AddRef();
       return S_OK;
     }
+    if (iid == IID_IRangeValueProvider && range_) {
+      if (!out) return E_POINTER;
+      *out = static_cast<IRangeValueProvider *>(this);
+      AddRef();
+      return S_OK;
+    }
     return ProviderBase::QueryInterface(iid, out);
+  }
+
+  HRESULT STDMETHODCALLTYPE GetPatternProvider(PATTERNID pattern,
+                                               IUnknown **out) noexcept override {
+    if (!out) return E_POINTER;
+    *out = nullptr;
+    if (pattern == UIA_RangeValuePatternId && range_) {
+      *out = static_cast<IRangeValueProvider *>(this);
+      AddRef();
+    }
+    return S_OK;
+  }
+
+  // Read-only range pattern: AT learns the slider's position; adjustment
+  // stays on the app's own key/pointer contract (SetValue fails honestly).
+  HRESULT STDMETHODCALLTYPE SetValue(double) noexcept override {
+    return E_FAIL;
+  }
+  HRESULT STDMETHODCALLTYPE get_Value(double *out) noexcept override {
+    if (!out) return E_POINTER;
+    *out = range_ ? range_->value : 0.;
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE get_IsReadOnly(BOOL *out) noexcept override {
+    if (!out) return E_POINTER;
+    *out = TRUE;
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE get_Maximum(double *out) noexcept override {
+    if (!out) return E_POINTER;
+    *out = range_ ? range_->maximum : 1.;
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE get_Minimum(double *out) noexcept override {
+    if (!out) return E_POINTER;
+    *out = range_ ? range_->minimum : 0.;
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE get_LargeChange(double *out) noexcept override {
+    if (!out) return E_POINTER;
+    *out = .1;
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE get_SmallChange(double *out) noexcept override {
+    if (!out) return E_POINTER;
+    *out = .01;
+    return S_OK;
   }
 
   HRESULT STDMETHODCALLTYPE GetPropertyValue(PROPERTYID id,
@@ -152,6 +210,9 @@ class FocusFragment final : public ProviderBase,
     } else if (id == UIA_IsKeyboardFocusablePropertyId) {
       out->vt = VT_BOOL;
       out->boolVal = VARIANT_TRUE;
+    } else if (id == UIA_IsRangeValuePatternAvailablePropertyId) {
+      out->vt = VT_BOOL;
+      out->boolVal = range_ ? VARIANT_TRUE : VARIANT_FALSE;
     } else if (id == UIA_IsControlElementPropertyId ||
                id == UIA_IsContentElementPropertyId) {
       out->vt = VT_BOOL;
@@ -206,6 +267,7 @@ class FocusFragment final : public ProviderBase,
   HWND host_;
   std::wstring label_;
   std::optional<RECT> rect_;
+  std::optional<FragmentRange> range_;
   bool focused_{};
 };
 
@@ -220,8 +282,9 @@ class WindowProvider final : public ProviderBase,
   }
 
   FocusFragment *focus_fragment() noexcept { return focus_; }
-  void set_focus_label(std::wstring label, std::optional<RECT> rect) {
-    focus_->set_label(std::move(label), std::move(rect));
+  void set_focus_label(std::wstring label, std::optional<RECT> rect,
+                       std::optional<FragmentRange> range) {
+    focus_->set_label(std::move(label), std::move(rect), std::move(range));
     focused_ = true;
   }
   // The ring released — the fragment stops claiming focus and GetFocus
@@ -446,7 +509,8 @@ bool NativeAccessibilityBridge::announce(std::string_view text) {
 
 bool NativeAccessibilityBridge::focus_changed(
     std::string_view label,
-    std::optional<stellar::engine::AnnouncementBounds> bounds) {
+    std::optional<stellar::engine::AnnouncementBounds> bounds,
+    std::optional<stellar::engine::AnnouncementRange> range) {
   auto *provider = static_cast<WindowProvider *>(provider_);
   if (!provider) return false;
   std::wstring name = wide(label);
@@ -471,9 +535,14 @@ bool NativeAccessibilityBridge::focus_changed(
                   static_cast<LONG>(std::lround(bounds->x + bounds->width)),
                   static_cast<LONG>(std::lround(bounds->y + bounds->height))};
   }
+  std::optional<FragmentRange> fragment_range;
+  if (range && std::isfinite(range->minimum) && std::isfinite(range->maximum) &&
+      std::isfinite(range->value) && range->maximum > range->minimum)
+    fragment_range =
+        FragmentRange{range->minimum, range->maximum, range->value};
   // The fragment reflects real focus state regardless of listeners; only the
   // event raise is gated on an assistive client being attached.
-  provider->set_focus_label(std::move(name), rect);
+  provider->set_focus_label(std::move(name), rect, fragment_range);
   if (!UiaClientsAreListening()) return false;
   return SUCCEEDED(UiaRaiseAutomationEvent(
       static_cast<IRawElementProviderSimple *>(provider->focus_fragment()),
@@ -503,7 +572,8 @@ bool NativeAccessibilityBridge::attach(void *) { return false; }
 void NativeAccessibilityBridge::detach() {}
 bool NativeAccessibilityBridge::announce(std::string_view) { return false; }
 bool NativeAccessibilityBridge::focus_changed(
-    std::string_view, std::optional<stellar::engine::AnnouncementBounds>) {
+    std::string_view, std::optional<stellar::engine::AnnouncementBounds>,
+    std::optional<stellar::engine::AnnouncementRange>) {
   return false;
 }
 std::intptr_t NativeAccessibilityBridge::handle_window_message(std::uintptr_t,

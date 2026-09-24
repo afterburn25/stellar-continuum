@@ -35,7 +35,8 @@ class NativeAccessibilityBridge final {
   // pixels) project the control's real rect onto the fragment. Same gates.
   bool focus_changed(
       std::string_view label,
-      std::optional<stellar::engine::AnnouncementBounds> bounds = std::nullopt);
+      std::optional<stellar::engine::AnnouncementBounds> bounds = std::nullopt,
+      std::optional<stellar::engine::AnnouncementRange> range = std::nullopt);
   // Subclassed window-procedure sink installed while attached — platform
   // plumbing for the WM_GETOBJECT answer, not a general event API.
   std::intptr_t handle_window_message(std::uintptr_t hwnd, unsigned message,

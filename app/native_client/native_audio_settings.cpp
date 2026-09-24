@@ -277,6 +277,15 @@ NativeAudioSettings::focused_bounds(int width, int height) const {
                    focusables[static_cast<std::size_t>(focus_)]}
              : std::nullopt;
 }
+std::optional<stellar::engine::AnnouncementRange>
+NativeAudioSettings::focused_range() const {
+  switch (focus_) {
+  case 0: return stellar::engine::AnnouncementRange{0., 1., values_.master};
+  case 1: return stellar::engine::AnnouncementRange{0., 1., values_.music};
+  case 2: return stellar::engine::AnnouncementRange{0., 1., values_.effects};
+  default: return std::nullopt;
+  }
+}
 std::string NativeAudioSettings::tr(std::string_view key, std::string_view fallback) const {
   if (locale_ && locale_->contains(key)) return std::string(locale_->translate(key));
   return std::string(fallback);

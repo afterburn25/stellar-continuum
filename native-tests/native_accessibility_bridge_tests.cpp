@@ -1,5 +1,6 @@
 #include "native_accessibility_bridge.hpp"
 
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -90,7 +91,8 @@ int main() try {
   // focus_changed() projects a synthetic fragment: the root's tree-walk
   // child reports the label, and GetFocus resolves it.
   (void)bridge.focus_changed("Fleet Atlas",
-                             stellar::engine::AnnouncementBounds{5.f, 6.f, 30.f, 20.f});
+                             stellar::engine::AnnouncementBounds{5.f, 6.f, 30.f, 20.f},
+                             stellar::engine::AnnouncementRange{0., 1., .64});
   IUIAutomationTreeWalker* walker{};
   require(SUCCEEDED(automation->get_RawViewWalker(&walker)) && walker,
           "UIA raw view walker was not available");
@@ -157,6 +159,26 @@ int main() try {
               bounds.right - bounds.left == 30 &&
               bounds.bottom - bounds.top == 20,
           "focus fragment did not project the focused control's bounds");
+  // A slider focus announcement exposes the range pattern with the live
+  // value — AT reports position, not just label text.
+  IUIAutomationRangeValuePattern* range_pattern{};
+  const HRESULT pattern_hr = child->GetCurrentPattern(
+      UIA_RangeValuePatternId,
+      reinterpret_cast<IUnknown**>(&range_pattern));
+  if (!(SUCCEEDED(pattern_hr) && range_pattern))
+    std::fprintf(stderr, "range pattern hr=%lx pattern=%p\n",
+                 static_cast<unsigned long>(pattern_hr),
+                 static_cast<void*>(range_pattern));
+  require(SUCCEEDED(pattern_hr) && range_pattern,
+          "focus fragment did not expose the range pattern for a slider");
+  double range_value{};
+  BOOL read_only = FALSE;
+  require(SUCCEEDED(range_pattern->get_CurrentValue(&range_value)) &&
+              std::abs(range_value - .64) < 1e-9 &&
+              SUCCEEDED(range_pattern->get_CurrentIsReadOnly(&read_only)) &&
+              read_only == TRUE,
+          "range pattern did not report the slider's value/read-only flag");
+  range_pattern->Release();
   IUIAutomationElement* parent{};
   require(SUCCEEDED(walker->GetParentElement(child, &parent)) && parent,
           "focus fragment did not navigate to its root parent");

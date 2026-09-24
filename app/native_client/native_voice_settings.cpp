@@ -337,6 +337,15 @@ NativeVoiceSettings::focused_bounds(int width, int height) const {
                    focusables[static_cast<std::size_t>(focus_)]}
              : std::nullopt;
 }
+std::optional<stellar::engine::AnnouncementRange>
+NativeVoiceSettings::focused_range() const {
+  switch (focus_) {
+  case 1: return stellar::engine::AnnouncementRange{0., 1., values_.volume};
+  case 4: return stellar::engine::AnnouncementRange{0., 1., values_.subtitle_background_opacity};
+  case 6: return stellar::engine::AnnouncementRange{0., 1., values_.communication_filter};
+  default: return std::nullopt;
+  }
+}
 void NativeVoiceSettings::activate_at(const VoiceSettingsLayout& layout, stellar::native_map::Point position) {
   if (layout.volume_track.contains(position)) {
     dragging_ = Dragged::Volume; set_from_track(dragging_, position, layout); return;
