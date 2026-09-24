@@ -151,6 +151,34 @@ int main() {
     check(host.run() == 1, "forged checkpoint diverges and exits nonzero");
   }
 
+  // set_scene swaps the spawned set mid-run — level switching.
+  {
+    std::filesystem::create_directories(root / "editor", ec);
+    {
+      std::ofstream out(root / "editor" / "scene.json");
+      out << R"({"entities":[{"name":"alpha","x":10,"y":20}]})";
+    }
+    {
+      std::ofstream out(root / "editor" / "scene-b.json");
+      out << R"({"entities":[{"name":"beta","x":50,"y":60}]})";
+    }
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    bool saw_alpha = false, saw_beta = false;
+    host.on_update = [&](World &world, float) {
+      ++updates;
+      for (const auto e : world.entities())
+        if (const auto *n = world.get<EntityName>(e)) {
+          if (n->value == "alpha") saw_alpha = true;
+          if (n->value == "beta") saw_beta = true;
+        }
+      if (updates == 2) host.set_scene("editor/scene-b.json");
+    };
+    check(host.run() == 0, "set_scene run exits cleanly");
+    check(saw_alpha && saw_beta,
+          "set_scene swaps the spawned entity set");
+  }
+
   // --dump-bindings prints the resolved action map and exits before the
   // loop — the sim never ticks.
   {
