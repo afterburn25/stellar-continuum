@@ -505,6 +505,15 @@ textures/meshes/targets and ui-image/ui-text caches per frame), mip-tail
 promotion verification, and `NativeAudioDirector` device-fault recovery
 (bounded 5 s retry rebuilds the output and resumes music; decode
 failures stay permanent).
+A 319-test run at `9cc4256e` records 319/319 green after the
+broadphase/budget/LOD lane: `UniformBroadphase<2|3>` uniform-grid
+candidate pairs now drive both RuntimeHost contact scans (O(n+cells)
+replacing O(n²), narrow-phase semantics unchanged), `VfxSystem` gained a
+global particle budget (demand-proportional rate taper + hard headroom,
+RuntimeHost defaults to 64k), the shell's scene3d preview decodes
+textures on the JobSystem, and dielectric environment maps keep
+full-chain residency (view-independent texel demand). The other agent's
+`campaign_world_projection` test built and passes in this tree.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
