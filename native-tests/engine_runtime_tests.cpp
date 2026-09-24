@@ -487,6 +487,24 @@ int main() {
     }
   }
 
+  // save_data/load_data round-trip named blobs under saves/data/ —
+  // no run() needed, and key validation rejects path escapes.
+  {
+    RuntimeHost host{headless_options(root)};
+    const std::byte payload[] = {std::byte{0xde}, std::byte{0xad},
+                                 std::byte{0xbe}, std::byte{0xef}};
+    check(host.save_data("quest.flags", payload),
+          "save_data accepts a valid key");
+    const auto loaded = host.load_data("quest.flags");
+    check(loaded.has_value() && loaded->size() == 4 &&
+              (*loaded)[0] == 0xde && (*loaded)[3] == 0xef,
+          "load_data returns the saved bytes");
+    check(!host.save_data("../escape", payload),
+          "save_data rejects path escapes");
+    check(!host.load_data("never-written").has_value(),
+          "load_data reports a missing key");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
