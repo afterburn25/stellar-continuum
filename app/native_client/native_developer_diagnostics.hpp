@@ -90,8 +90,25 @@ public:
             return std::string(campaign_domain_name(*legacy>>32))+" "+std::to_string(static_cast<int>(static_cast<std::uint32_t>(*legacy)));
           return std::string("entity");
         };
+        // Tag fields are the component payload — the drill-down surface
+        // shows the authoritative refs each tag carries.
+        const auto tag_detail=[&](stellar::engine::EntityId e){
+          using namespace stellar::core;
+          std::string detail;
+          if(const auto*tag=projected.get<CampaignSystemTag>(e))detail="x "+number(tag->x)+", y "+number(tag->y);
+          else if(const auto*body=projected.get<CampaignBodyTag>(e))detail="system "+std::to_string(body->system_id);
+          else if(const auto*civ=projected.get<CampaignCivilizationTag>(e))detail="home system "+std::to_string(civ->home_system_id);
+          else if(const auto*colony=projected.get<CampaignColonyTag>(e))detail="civ "+std::to_string(colony->civilization_id)+" · system "+std::to_string(colony->system_id);
+          else if(const auto*fleet=projected.get<CampaignFleetTag>(e))detail="civ "+std::to_string(fleet->civilization_id);
+          else if(const auto*economy=projected.get<CampaignEconomyTag>(e))detail="civ "+std::to_string(economy->civilization_id);
+          else if(const auto*tech=projected.get<CampaignTechnologyTag>(e))detail="civ "+std::to_string(tech->civilization_id);
+          else if(const auto*construction=projected.get<CampaignConstructionTag>(e))detail="civ "+std::to_string(construction->civilization_id);
+          else if(const auto*shipyard=projected.get<CampaignShipyardTag>(e))detail="civ "+std::to_string(shipyard->civilization_id);
+          return detail;
+        };
         for(const auto e:projected.entities()){
           std::string line=legacy_name(e);
+          if(const auto detail=tag_detail(e);!detail.empty())line+="   ·   "+detail;
           if(const auto p=projected.parent(e)){++entity_parented_;line+="   ←   "+legacy_name(*p);}
           entity_lines_.push_back(std::move(line));
         }

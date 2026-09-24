@@ -90,7 +90,7 @@ int main(int argc,char **argv)try{
       const auto entity_view=draw();bool census=false,domain_row=false;
       for(const auto &c:entity_view.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){
         if(t->value.find("projected entities")!=std::string::npos&&t->value.find("KiB")!=std::string::npos)census=true;
-        if(t->value.starts_with("system ")||t->value.starts_with("civilization "))domain_row=true;
+        if((t->value.starts_with("system ")||t->value.starts_with("civilization "))&&t->value.find("·")!=std::string::npos)domain_row=true;
       }
       check(census&&domain_row,"Entities inspector did not project the campaign world.");
     }
