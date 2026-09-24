@@ -774,6 +774,19 @@ bounds to the rows region so clicks in the pane never toggle;
 keyboard-selected entity's tag dump and click-select feeding the pane.
 `native_developer_diagnostics` green; the panel stays read-only (the
 byte-identical campaign JSON assertion stands).
+Controlled Assets TreeModel (row-24 player-surface adoption): the
+navigator's hand-rolled collapse/flatten bookkeeping now runs through
+`TreeModel` — the first player-facing consumer. Category headers are
+`"c:<n>"` parent nodes over `"r:<index>"` row children; `flattened()`
+produces `entries_` (row index rides the node id, the category
+ordinal rides the header `label_key`), so hit-testing, rendering,
+tooltips and virtualization are unchanged. Collapse truth stays in
+`Preferences::collapsed` (the persisted contract); search and
+external selection force-expand via the same reveal policy applied to
+each header's `expanded` flag at rebuild. `native_controlled_assets`
+covers the collapse→expand→collapse round-trip on top of the existing
+search-reveal/temporary-reveal/generation-guard/virtualization suite;
+suite green and the client TU compiles under /W4 /WX.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

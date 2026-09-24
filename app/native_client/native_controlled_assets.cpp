@@ -98,12 +98,24 @@ void Navigator::set_view(View value){
 }
 void Navigator::set_selection(std::optional<Key> key,bool external){if(key==selected_)return;selected_=key;temporary_reveal_=external?key:std::nullopt;reveal_selection_=external&&key.has_value();rebuild();}
 void Navigator::rebuild(){
-  counts_.fill(0);matches_.fill(0);entries_.clear();const auto query=folded(search_);
+  counts_.fill(0);matches_.fill(0);const auto query=folded(search_);
   for(const auto& r:view_.rows){const auto c=static_cast<std::size_t>(r.key.category);++counts_[c];if(query.empty()||r.search.find(query)!=std::string::npos)++matches_[c];}
-  for(int c=0;c<5;++c){if(!matches_[c])continue;const auto category=static_cast<Category>(c);entries_.push_back({{},category});
+  // TreeModel owns the expand/flatten bookkeeping — "c:<category>"
+  // header nodes parent "r:<row index>" children, and entries_ is the
+  // flattened projection (row index rides the node id, the category
+  // ordinal rides the header label_key).
+  tree_=stellar::engine::TreeModel{};
+  for(int c=0;c<5;++c){if(!matches_[c])continue;const auto category=static_cast<Category>(c);
+    const auto header_id="c:"+std::to_string(c);
+    auto&header=tree_.add(header_id,std::to_string(c));
     const bool reveal=!query.empty()||(temporary_reveal_&&temporary_reveal_->category==category);
-    if(preferences_.collapsed[c]&&!reveal)continue;
-    for(std::size_t i=0;i<view_.rows.size();++i)if(view_.rows[i].key.category==category&&(query.empty()||view_.rows[i].search.find(query)!=std::string::npos))entries_.push_back({i,category});
+    header.expanded=!preferences_.collapsed[c]||reveal;
+    for(std::size_t i=0;i<view_.rows.size();++i)if(view_.rows[i].key.category==category&&(query.empty()||view_.rows[i].search.find(query)!=std::string::npos))tree_.add("r:"+std::to_string(i),{},header_id);
+  }
+  entries_.clear();
+  for(const auto &[node,depth]:tree_.flattened()){
+    if(node->id.front()=='c')entries_.push_back({std::nullopt,static_cast<Category>(std::stoi(node->label_key))});
+    else{const auto i=static_cast<std::size_t>(std::stoul(node->id.substr(2)));entries_.push_back({i,view_.rows[i].key.category});}
   }
 }
 float Navigator::extent(const Layout& l)const{float h=0;for(const auto& e:entries_)h+=e.row?l.row_height:l.category_height;return h;}

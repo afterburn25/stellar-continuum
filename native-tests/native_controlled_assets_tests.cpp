@@ -34,6 +34,8 @@ void interactions(){
   n.set_persist([&](const Preferences& value){persisted=value;return true;});
   require(n.category_bounds(Category::Stations,1920,1080).width==0,"Empty category visible");
   (void)click(n,n.category_bounds(Category::Planets,1920,1080));require(n.preferences().collapsed[0]&&!n.preferences().collapsed[2]&&persisted.collapsed[0],"Independent collapse persistence failed");
+  (void)click(n,n.category_bounds(Category::Planets,1920,1080));require(n.row_bounds({Category::Planets,10},1920,1080).has_value()&&!n.preferences().collapsed[0],"Tree re-expand lost its rows");
+  (void)click(n,n.category_bounds(Category::Planets,1920,1080));require(n.preferences().collapsed[0]&&!n.row_bounds({Category::Planets,10},1920,1080),"Tree re-collapse kept its rows");
   const auto l=Layout::make(1920,1080);(void)n.handle({InputEventType::LeftPressed,center(l.search)},1920,1080);
   InputEvent typing{InputEventType::TextEntered};typing.text="sol";(void)n.handle(typing,1920,1080);
   require(n.row_bounds({Category::Planets,10},1920,1080).has_value(),"Search hid collapsed result");

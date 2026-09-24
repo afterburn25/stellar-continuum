@@ -1,5 +1,6 @@
 #pragma once
 #include <stellar/engine/localization.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 #include "native_colony_roster.hpp"
 #include "native_fleet_controller.hpp"
 #include "native_shipyard_controller.hpp"
@@ -78,6 +79,11 @@ private:
   Preferences preferences_;
   std::function<bool(const Preferences&)> persist_;
   std::vector<Entry> entries_;
+  // Category headers own the row children — the first player-facing
+  // TreeModel consumer. entries_ is the flattened projection; collapse
+  // truth stays in preferences_ (persisted), search/temporary reveal
+  // force-expand per rebuild.
+  stellar::engine::TreeModel tree_;
   std::array<int,5> counts_{},matches_{};
   std::string search_,error_;
   std::optional<Key> selected_,temporary_reveal_;
