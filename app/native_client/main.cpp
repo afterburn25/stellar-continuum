@@ -6210,7 +6210,10 @@ class NativeCampaign final {
       }
 
       if(event.type==InputEventType::EscapePressed){
-        if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
+        if(map_focus_group_==0){assets_.cancel_input();map_focus_group_=-1;}
+        else if(map_focus_group_==1){fleet_workspace_.reset_focus();map_focus_group_=-1;}
+        else if(map_focus_group_==2){hud_focus_=-1;map_focus_group_=-1;}
+        else if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
         else if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
         else if(colony_workspace_.visible())colony_workspace_.close();
         else if(construction_workspace_.visible())construction_workspace_.close();
