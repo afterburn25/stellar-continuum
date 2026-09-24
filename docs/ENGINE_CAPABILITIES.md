@@ -775,7 +775,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   systems that no longer exist, and `route_overflow` past the 132-entry
   persisted path bound. Persisted observer/intelligence state is
   covered too: knowledge snapshot entries flag `orphaned_observer`/
-  `orphaned_known_system`/`orphaned_known_civilization`, combat
+  `orphaned_known_system`/`orphaned_known_civilization`, per-civ survey
+  rows flag `orphaned_known_system` plus defensive level-range/
+  progress-bound/`inconsistent_survey` checks (the writers and restore
+  path clamp and normalize, so violations are memory/hand-built
+  corruption), and `galactic_core_observers` flag `orphaned_observer`,
+  combat
   intelligence flags `orphaned_observer`/`orphaned_observed_fleet`
   plus `observation_overflow` past the 2048 per-observer bound and
   non-negative power/day, and an active massive encounter flags

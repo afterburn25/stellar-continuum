@@ -1019,6 +1019,26 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       for(const auto id:entry.values)
         if(!civilizations.contains(id)){emit("knowledge","orphaned_known_civilization",entry.observer_id,"Knowledge references an absent civilization.");break;}
     }
+    // Survey detail rows: ids must resolve and level/progress must
+    // hold the writers' bounds and consistency (fully iff progress
+    // reaches 1). The public API and restore path clamp/normalize,
+    // so violations indicate memory or hand-built corruption.
+    for(const auto &c:w.civilizations)
+      for(const auto &v:w.knowledge.system_survey_knowledge(c.id)){
+        if(!systems.contains(v.system_id)){
+          emit("knowledge","orphaned_known_system",c.id,"Survey knowledge references an absent system.");break;}
+        if(static_cast<int>(v.level)<0||static_cast<int>(v.level)>3)
+          emit("knowledge","invalid_kind",c.id,"Survey level is outside the catalog.");
+        if(!std::isfinite(v.progress)||v.progress<0.0)
+          emit("knowledge","invalid_nonnegative_value",c.id,"Survey progress is non-finite or negative.");
+        else if(v.progress>1.0)
+          emit("knowledge","out_of_range",c.id,"Survey progress exceeds the authoritative bound.");
+        if((v.level==SystemSurveyLevel::fully_surveyed)!=(v.progress>=1.0))
+          emit("knowledge","inconsistent_survey",c.id,"Survey level does not match its progress.");
+      }
+    for(const auto observer:w.knowledge.galactic_core_observers())
+      if(!civilizations.contains(observer))
+        emit("knowledge","orphaned_observer",observer,"Galactic-core observer is an absent civilization.");
   }
   // Combat intelligence is persisted: observers must be
   // civilizations, observed ids must be fleets, magnitudes bounded.

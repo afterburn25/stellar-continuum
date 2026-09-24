@@ -473,8 +473,12 @@ int main() {
     ghost.power = -5.0;
     ghost.observed_day = -1.0;
     world.combat_intelligence.push_back(ghost);
-    // Knowledge state: absent observer civ knowing an absent system.
+    // Knowledge state: absent observer civ knowing an absent system,
+    // a survey row bound to an absent system, and an absent
+    // galactic-core observer.
     (void)world.knowledge.reveal_system(99, 999);
+    (void)world.knowledge.advance_system_survey(1, 999, 0.5);
+    world.knowledge.unlock_galactic_core_access(99);
 
     const auto findings = inspect_campaign_invariants(world, 0, 100.0);
     int invalid = 0, species = 0, type = 0, orphan = 0, positive = 0,
@@ -555,8 +559,9 @@ int main() {
     check(freight == 3 && design == 1 && consistency == 30,
           "freight role/site, design, order, site, surface, placement, "
           "progress, slot, economy and evidence violations are flagged");
-    check(knowledge_refs == 2 && intel_refs == 2,
-          "absent knowledge/intel observers and targets are flagged");
+    check(knowledge_refs == 5 && intel_refs == 2,
+          "absent knowledge/intel observers, survey systems and core "
+          "observers are flagged");
     check(positions == 1 && route_refs == 3,
           "non-finite transit vector, absent route hops and path "
           "overflow are flagged");
