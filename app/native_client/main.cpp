@@ -352,6 +352,7 @@ struct Options {
   // under a fixed 60 Hz step and verifies the checkpoint hashes in order.
   std::filesystem::path record_path;
   std::filesystem::path replay_path;
+  std::optional<std::uint64_t> replay_until_tick;
 };
 
 [[nodiscard]] Options parse_options(int argc,
@@ -421,6 +422,7 @@ struct Options {
     else if((arg==L"--first-survey-smoke"||arg==L"--first-survey-paused-smoke"||arg==L"--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.first_survey_mode=arg==L"--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg==L"--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
     else if(arg==L"--record"&&i+1<argc) result.record_path=argv[++i];
     else if(arg==L"--replay"&&i+1<argc) result.replay_path=argv[++i];
+    else if(arg==L"--replay-until"&&i+1<argc) result.replay_until_tick=std::stoull(argv[++i]);
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -479,6 +481,7 @@ struct Options {
     else if((arg=="--first-survey-smoke"||arg=="--first-survey-paused-smoke"||arg=="--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=argv[++i];result.first_survey_mode=arg=="--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg=="--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
     else if(arg=="--record"&&i+1<argc) result.record_path=argv[++i];
     else if(arg=="--replay"&&i+1<argc) result.replay_path=argv[++i];
+    else if(arg=="--replay-until"&&i+1<argc) result.replay_until_tick=std::stoull(argv[++i]);
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
@@ -520,6 +523,7 @@ struct Options {
   if(result.dev_game&&!result.save_path_overridden)
     result.save_path=default_native_campaign_save_path().parent_path()/"developer"/"campaign.dev17.json";
   if(!result.record_path.empty()&&!result.replay_path.empty())throw std::invalid_argument("--record and --replay are mutually exclusive.");
+  if(result.replay_until_tick&&result.replay_path.empty())throw std::invalid_argument("--replay-until requires --replay.");
   return result;
 }
 
@@ -686,6 +690,11 @@ struct ReplayState {
   // canonical capture per checkpoint so a replay divergence can leaf-diff
   // the expected document instead of stopping at the section hash.
   std::filesystem::path expected_directory;
+  // --replay-until: once the simulated tick reaches the stop, dump the
+  // canonical document so it can be leaf-diffed against an expected
+  // sidecar — the bisect companion to checkpoint divergence.
+  std::optional<std::uint64_t> stop_at_tick;
+  std::filesystem::path stop_dump_path;
 };
 
 // Writes the recording on scope exit, including early returns and failures.
@@ -5850,6 +5859,61 @@ class NativeCampaign final {
                " ("+expected[replay_->checkpoint_cursor].label+")");
       }
     }
+    // --replay-until: once the simulated tick reaches the requested stop,
+    // dump the canonical document next to the recording. The dump is
+    // canonicalized exactly like checkpoint captures so a leaf-diff against
+    // <recording>.expected/<tick>.json names the diverging leaf — this is
+    // the bisect companion to checkpoint divergence. Runs outside the input
+    // gate so a modal that pauses command feeding cannot suppress the dump.
+    if(replay_&&replay_->recording&&session_&&replay_->stop_at_tick&&
+       replay_tick()>=*replay_->stop_at_tick){
+      const auto stop=*replay_->stop_at_tick;
+      const PlayerCampaignCaptureOptions capture_options{
+          session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,""};
+      auto document=encode_player_campaign_v17_document(
+          capture_player_campaign_v17(session_->frame().runtime(),
+                                      capture_options));
+      document.erase("SavedAtUtc");
+      if(const auto galaxy=document.find("Galaxy");galaxy!=document.end())
+        if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end())
+          meta->erase("CreatedAtUtc");
+      std::string message="replay-until: canonical state at tick "+
+          std::to_string(stop)+" dumped to ";
+      if(std::ofstream out{replay_->stop_dump_path,
+                           std::ios::binary|std::ios::trunc};out){
+        out<<document.dump(2);
+        message+=replay_->stop_dump_path.generic_string();
+      }else
+        message+="(write failed: "+replay_->stop_dump_path.generic_string()+")";
+      // Bisect aid: when an expected sidecar exists for the stop tick, leaf-diff
+      // immediately so the dump arrives with its first divergence named.
+      const auto expected_path=replay_->expected_directory/
+          (std::to_string(stop)+".json");
+      if(std::ifstream in{expected_path,std::ios::binary};in){
+        std::ostringstream contents;contents<<in.rdbuf();
+        try{
+          const auto leaves=stellar::engine::document_leaf_diff(
+              nlohmann::ordered_json::parse(contents.str()),document);
+          if(!leaves.empty()){
+            const auto diff_path=replay_->expected_directory.parent_path()/
+                ("replay-until-"+std::to_string(stop)+".diff.txt");
+            std::ostringstream report;
+            for(const auto&leaf:leaves)
+              report<<leaf.path<<"\n  expected: "<<leaf.expected
+                    <<"\n  actual:   "<<leaf.actual<<'\n';
+            if(std::ofstream out{diff_path,std::ios::binary|std::ios::trunc};out)
+              message+=" (first leaf: "+leaves.front().path+
+                  "; full diff in "+diff_path.generic_string()+")";
+          }else
+            message+=" (matches expected sidecar)";
+        }catch(const std::exception&){
+          // A corrupt expected sidecar still leaves the plain dump.
+        }
+      }
+      std::cout<<message<<'\n';
+      replay_->stop_at_tick.reset();
+      session_->request_exit();
+    }
     for(const auto &event:input.events){
       if(developer_session()&&stellar_activity_panel_.handle(event,width,height,session_->frame())){
         focus_stellar_activity(width,height);gesture_.capture_for_ui();continue;
@@ -8736,6 +8800,11 @@ int main(int argc,char **argv){
       replay.expected_directory=options.record_path.generic_string()+".expected";
     else if(!options.replay_path.empty())
       replay.expected_directory=options.replay_path.generic_string()+".expected";
+    if(options.replay_until_tick){
+      replay.stop_at_tick=options.replay_until_tick;
+      replay.stop_dump_path=options.replay_path.parent_path()/
+          ("replay-until-"+std::to_string(*options.replay_until_tick)+".json");
+    }
     // Fixed-step: record/replay share one deterministic advance quantum so
     // command ticks and checkpoint days reproduce exactly.
     constexpr double kReplayStepSeconds=1./60.;

@@ -280,7 +280,13 @@ canonical document to `<recording>.expected/<tick>.json`; on divergence
 (`path` + expected/actual values, first 32 leaves) — the divergence
 message names the first leaf path. Sidecars are dev artifacts alongside
 the recording; their absence degrades to the previous section-only
-report.
+report. `--replay <file> --replay-until <tick>` adds the bisect half:
+the client dumps the canonical document at the requested simulated tick
+to `replay-until-<tick>.json` beside the recording (same canonicalization
+— wall-clock provenance stripped), leaf-diffs it against the expected
+sidecar when one exists (`replay-until-<tick>.diff.txt`), prints the
+first leaf, then exits. The stop waits on simulated time, so a recording
+that pauses before the target tick never triggers it.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:
@@ -1129,8 +1135,11 @@ Without a mapper the view falls back to the static help card. Engine-side:
 `describe_bindings` display helpers (SDL-free, deterministic). Coverage:
 `input_actions` (helpers + context accessor) and `native_startup_workspace`
 (ring, capture, rebind + alternate preservation, chord, cancels, persist).
-Open: conflict surfacing (two actions on one key both fire), mouse/gamepad
-capture, and multi-pad — all mapper-level follow-ups, not blockers.
+Capture now also accepts right mouse and gamepad buttons, and a captured
+binding that conflicts with a sibling action's primary steals it — the
+hub surfaces a "reassigned from X" notice the client announces. Open:
+multi-pad disambiguation and axis bindings in the UI — mapper-level
+follow-ups, not blockers.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

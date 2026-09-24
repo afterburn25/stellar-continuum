@@ -143,7 +143,9 @@ Core/engine projections, never re-derived in UI.
 - Engine hardening — profiler recording off the global mutex, replay
   document checkpointing (no re-parse) with expected-document sidecars
   (`<recording>.expected/<tick>.json`) and `document_leaf_diff` leaf-level
-  divergence reports (`replay-divergence-<tick>.diff.txt`), occupancy
+  divergence reports (`replay-divergence-<tick>.diff.txt`), and a
+  `--replay-until <tick>` bisect dump that canonicalizes state at a chosen
+  tick and leaf-diffs it against the expected sidecar, occupancy
   censuses (MemoryTracker world/event-history/replay-recorder),
   pull-based audio stream decoder + equal-power panning, phase-cadence
   oracle pinning the per-phase activity matrix for minimal + seeded
