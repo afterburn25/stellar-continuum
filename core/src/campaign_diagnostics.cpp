@@ -588,9 +588,13 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       if(!known_types.contains(b.type_id))emit("construction","unknown_building_type",b.id,"Surface building has an uncatalogued type.");
       if(!std::isfinite(b.x)||!std::isfinite(b.z))emit("construction","invalid_position",b.id,"Surface building position is not finite.");}
   }
-  for(const auto &c:w.civilizations)
+  for(const auto &c:w.civilizations){
     if(!systems.contains(c.home_system_id))
       emit("civilization","orphaned_home",c.id,"Civilization references an absent home system.");
+    // The loader's require_species rejects blank and uncatalogued ids.
+    if(!known_species.contains(c.species_id))
+      emit("civilization","unknown_species",c.id,"Civilization references an uncatalogued species.");
+  }
   for(const auto &t:w.technologies){
     if(!civilizations.contains(t.civilization_id))emit("research","orphaned_research",t.civilization_id,"Research state references an absent civilization.");
     positive(t.active_research_progress,"Research progress",t.civilization_id,"research");

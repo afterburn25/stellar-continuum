@@ -474,7 +474,7 @@ int main() {
     check(positions == 1 && route_refs == 2,
           "non-finite transit vector, absent route hop and path "
           "overflow are flagged");
-    check(species == 2 && type == 1 && orphan == 2,
+    check(species == 4 && type == 1 && orphan == 2,
           "uncatalogued species/types and absent refs are flagged");
     check(duplicate == 1, "duplicate system is flagged");
     check(orphans == 4 && tech == 1 && overflow_n == 1,

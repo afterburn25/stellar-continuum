@@ -737,6 +737,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   remaining state surfaces are covered too: civilization
   `home_system_id` (`orphaned_home` — the loader already enforces it,
   the invariant catches hand-built/corrupt in-memory state),
+  and civilization `species_id` must resolve in the species
+  catalog (`unknown_species` — the loader's `require_species`
+  rejects blank and uncatalogued ids),
   research/construction/shipyard rows (duplicate civilization ids,
   `orphaned_research`/`orphaned_construction`/`orphaned_shipyard`,
   non-negative progress/authorization/reserved-population fields,
