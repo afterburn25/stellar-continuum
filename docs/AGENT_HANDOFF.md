@@ -1068,6 +1068,21 @@ change (the client's settings block and the startup entry's
 `route_settings`). `native_audio_settings`, `native_general_settings`,
 `native_video_settings`, `native_voice_settings`,
 `native_startup_workspace` all green.
+Announcement speech playback (row 26): announcements can now reach
+actual speech output — `VoicePreferences` gains an opt-in
+`interface_announcements` flag exposed as "Speak interface
+announcements" in the Voice & Subtitles panel (15th focusable; panel
+grew 680→725px). The strict settings schema accepts the optional
+`interfaceAnnouncements` key so pre-existing 10-key files load with it
+defaulting off. The campaign's announcer drain submits each item to
+`NativeVoicePlayback::speak` as an Important-priority `interface`-
+category request with `ReplaceCategory` queueing (rapid Tab/arrow runs
+collapse to the latest label), per-announcement dedupe keys (re-focused
+identical labels still speak), 10s expiry and `interruptible` honoring
+`no_interruptions`; captions remain independent under the subtitles
+preference. Startup-flow announcements stay caption-only because the
+voice pipeline starts with the campaign session. Platform AT bridging
+(UIA/AT-SPI) remains the open slice.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

@@ -25,6 +25,7 @@ struct VoicePreferences final {
   float communication_filter{};
   VoiceFrequency frequency{VoiceFrequency::Normal};
   bool no_interruptions{true};
+  bool interface_announcements{};
   bool operator==(const VoicePreferences&) const = default;
 };
 
@@ -35,6 +36,7 @@ struct VoiceSettingsLayout final {
   stellar::native_map::UiRect panel, title, introduction;
   stellar::native_map::UiRect enable_voices, volume_track, subtitles, subtitle_size;
   stellar::native_map::UiRect background_track, speaker_labels, filter_track, frequency, no_interruptions;
+  stellar::native_map::UiRect interface_announcements;
   stellar::native_map::UiRect replay, stop, defaults, cancel, save, status;
 
   [[nodiscard]] static VoiceSettingsLayout for_viewport(int width, int height) noexcept;

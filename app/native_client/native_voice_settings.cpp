@@ -95,9 +95,9 @@ VoiceSettingsLayout VoiceSettingsLayout::for_viewport(int width, int height) noe
   const float available_w = std::max(1.f, screen_w - 24.f);
   const float available_h = std::max(1.f, screen_h - 24.f);
   const float requested = std::clamp(std::min(screen_w / 1180.f, screen_h / 800.f), .72f, 1.75f);
-  const float scale = std::max(.001f, std::min({requested, available_w / 680.f, available_h / 680.f}));
+  const float scale = std::max(.001f, std::min({requested, available_w / 680.f, available_h / 725.f}));
   const float panel_w = std::max(1.f, std::min(available_w, 680.f * scale));
-  const float panel_h = std::max(1.f, std::min(available_h, 680.f * scale));
+  const float panel_h = std::max(1.f, std::min(available_h, 725.f * scale));
   const UiRect panel{(screen_w - panel_w) * .5f, (screen_h - panel_h) * .5f, panel_w, panel_h};
   const float x = panel.x + 28.f * scale;
   const float content_w = std::max(1.f, panel.width - 56.f * scale);
@@ -120,12 +120,13 @@ VoiceSettingsLayout VoiceSettingsLayout::for_viewport(int width, int height) noe
           {x, y + 401.f * scale, content_w, track_h},
           {x, y + 428.f * scale, content_w, row_h},
           {x, y + 470.f * scale, content_w, row_h},
-          {x, y + 515.f * scale, action_w, row_h},
-          {x + action_w + gap, y + 515.f * scale, action_w, row_h},
-          {x, y + 560.f * scale, footer_w, row_h},
-          {x + footer_w + gap, y + 560.f * scale, footer_w, row_h},
-          {x + (footer_w + gap) * 2.f, y + 560.f * scale, footer_w, row_h},
-          {x, y + 609.f * scale, content_w, 43.f * scale}};
+          {x, y + 515.f * scale, content_w, row_h},
+          {x, y + 560.f * scale, action_w, row_h},
+          {x + action_w + gap, y + 560.f * scale, action_w, row_h},
+          {x, y + 605.f * scale, footer_w, row_h},
+          {x + footer_w + gap, y + 605.f * scale, footer_w, row_h},
+          {x + (footer_w + gap) * 2.f, y + 605.f * scale, footer_w, row_h},
+          {x, y + 654.f * scale, content_w, 43.f * scale}};
 }
 
 NativeVoiceSettings::NativeVoiceSettings(std::filesystem::path path, Apply apply, Action replay, Action stop)
@@ -161,7 +162,10 @@ void NativeVoiceSettings::load() {
     constexpr std::array required{"schemaVersion", "enabled", "volume", "subtitles", "subtitleSize",
                                   "backgroundOpacity", "speakerLabels", "communicationFilter", "frequency",
                                   "noInterruptions"};
-    if (!json.is_object() || json.size() != required.size() || duplicate_key)
+    if (!json.is_object() || json.size() < required.size() ||
+        json.size() > required.size() + 1 || duplicate_key)
+      throw std::runtime_error("settings schema is unsupported");
+    if (json.size() > required.size() && !json.contains("interfaceAnnouncements"))
       throw std::runtime_error("settings schema is unsupported");
     for (const char* key : required) if (!json.contains(key)) throw std::runtime_error("settings member is missing");
     if (!json.at("schemaVersion").is_number_integer() || json.at("schemaVersion").get<std::int64_t>() != 1 ||
@@ -169,7 +173,9 @@ void NativeVoiceSettings::load() {
         !json.at("subtitles").is_boolean() || !json.at("subtitleSize").is_number_integer() ||
         !json.at("backgroundOpacity").is_number() || !json.at("speakerLabels").is_boolean() ||
         !json.at("communicationFilter").is_number() || !json.at("frequency").is_number_integer() ||
-        !json.at("noInterruptions").is_boolean())
+        !json.at("noInterruptions").is_boolean() ||
+        (json.contains("interfaceAnnouncements") &&
+         !json.at("interfaceAnnouncements").is_boolean()))
       throw std::runtime_error("settings member type is invalid");
     const auto unit = [&](const char* name) {
       const double value = json.at(name).get<double>();
@@ -182,7 +188,8 @@ void NativeVoiceSettings::load() {
     VoicePreferences loaded{json.at("enabled").get<bool>(), unit("volume"), json.at("subtitles").get<bool>(), size,
                             unit("backgroundOpacity"), json.at("speakerLabels").get<bool>(),
                             unit("communicationFilter"), static_cast<VoiceFrequency>(frequency),
-                            json.at("noInterruptions").get<bool>()};
+                            json.at("noInterruptions").get<bool>(),
+                            json.value("interfaceAnnouncements", false)};
     if (!valid_unit(loaded.volume) || !valid_unit(loaded.subtitle_background_opacity) ||
         !valid_unit(loaded.communication_filter)) throw std::runtime_error("setting is outside its range");
     values_ = saved_ = loaded;
@@ -230,7 +237,7 @@ bool NativeVoiceSettings::handle(const InputEvent& event, int width, int height)
     }
     return true;
   }
-  hover_feedback_.update(event,dragging_==Dragged::None?stellar::native_menu_audio::hit(event.position,{layout.enable_voices,layout.volume_track,layout.subtitles,layout.subtitle_size,layout.background_track,layout.speaker_labels,layout.filter_track,layout.frequency,layout.no_interruptions,layout.replay,layout.stop,layout.defaults,layout.cancel,layout.save}):0);
+  hover_feedback_.update(event,dragging_==Dragged::None?stellar::native_menu_audio::hit(event.position,{layout.enable_voices,layout.volume_track,layout.subtitles,layout.subtitle_size,layout.background_track,layout.speaker_labels,layout.filter_track,layout.frequency,layout.no_interruptions,layout.interface_announcements,layout.replay,layout.stop,layout.defaults,layout.cancel,layout.save}):0);
   if (event.type == InputEventType::PointerCancelled) { dragging_ = Dragged::None; return true; }
   if (event.type == InputEventType::EscapePressed) { cancel(); return true; }
   if (event.type == InputEventType::PointerMove && dragging_ != Dragged::None) {
@@ -243,7 +250,7 @@ bool NativeVoiceSettings::handle(const InputEvent& event, int width, int height)
     constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
     constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u, kDown = 0x40000051u, kUp = 0x40000052u;
     constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
-    constexpr int count = 14;
+    constexpr int count = 15;
     const bool slider = focus_ == 1 || focus_ == 4 || focus_ == 6;
     if (slider && (event.key == kLeft || event.key == kRight || event.key == kHome || event.key == kEnd)) {
       constexpr float step = .05f;
@@ -269,8 +276,8 @@ bool NativeVoiceSettings::handle(const InputEvent& event, int width, int height)
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 && !slider) {
       const std::array<UiRect, count> focusables{layout.enable_voices, layout.volume_track, layout.subtitles,
         layout.subtitle_size, layout.background_track, layout.speaker_labels, layout.filter_track,
-        layout.frequency, layout.no_interruptions, layout.replay, layout.stop, layout.defaults,
-        layout.cancel, layout.save};
+        layout.frequency, layout.no_interruptions, layout.interface_announcements, layout.replay,
+        layout.stop, layout.defaults, layout.cancel, layout.save};
       const auto& rect = focusables[static_cast<std::size_t>(focus_)];
       activate_at(layout, {rect.x + rect.width * .5f, rect.y + rect.height * .5f}); return true;
     }
@@ -304,11 +311,13 @@ std::string NativeVoiceSettings::focused_label() const {
                        frequency_name(values_.frequency));
   case 8: return named("SETTINGS_VOICE_NO_INTERRUPTIONS", "Do not interrupt dialogue",
                        state(values_.no_interruptions));
-  case 9: return tr("SETTINGS_VOICE_REPLAY", "Replay last announcement");
-  case 10: return tr("SETTINGS_VOICE_STOP", "Stop");
-  case 11: return tr("SETTINGS_DEFAULTS", "Defaults");
-  case 12: return tr("SETTINGS_CANCEL", "Cancel");
-  case 13: return tr("SETTINGS_SAVE", "Save");
+  case 9: return named("SETTINGS_VOICE_INTERFACE_ANNOUNCEMENTS", "Speak interface announcements",
+                       state(values_.interface_announcements));
+  case 10: return tr("SETTINGS_VOICE_REPLAY", "Replay last announcement");
+  case 11: return tr("SETTINGS_VOICE_STOP", "Stop");
+  case 12: return tr("SETTINGS_DEFAULTS", "Defaults");
+  case 13: return tr("SETTINGS_CANCEL", "Cancel");
+  case 14: return tr("SETTINGS_SAVE", "Save");
   default: return {};
   }
 }
@@ -332,6 +341,7 @@ void NativeVoiceSettings::activate_at(const VoiceSettingsLayout& layout, stellar
   else if (layout.speaker_labels.contains(position)) values_.speaker_labels = !values_.speaker_labels;
   else if (layout.frequency.contains(position)) {dropdown_.open(1,{"Minimal","Normal","Frequent"},static_cast<int>(values_.frequency));return;}
   else if (layout.no_interruptions.contains(position)) values_.no_interruptions = !values_.no_interruptions;
+  else if (layout.interface_announcements.contains(position)) values_.interface_announcements = !values_.interface_announcements;
   else if (layout.replay.contains(position)) { if (replay_) replay_(); return; }
   else if (layout.stop.contains(position)) { if (stop_) stop_(); return; }
   else if (layout.defaults.contains(position)) {
@@ -348,7 +358,8 @@ void NativeVoiceSettings::save() {
                     {"subtitles", values_.subtitles}, {"subtitleSize", values_.subtitle_size},
                     {"backgroundOpacity", values_.subtitle_background_opacity},
                     {"speakerLabels", values_.speaker_labels}, {"communicationFilter", values_.communication_filter},
-                    {"frequency", static_cast<int>(values_.frequency)}, {"noInterruptions", values_.no_interruptions}};
+                    {"frequency", static_cast<int>(values_.frequency)}, {"noInterruptions", values_.no_interruptions},
+                    {"interfaceAnnouncements", values_.interface_announcements}};
     const auto text = json.dump();
     if (text.size() > maximum_settings_bytes) throw std::runtime_error("settings payload exceeds 4 KiB");
     stellar::engine::write_file_atomically(path_,
@@ -406,6 +417,9 @@ void NativeVoiceSettings::render(DrawList& draw, int width, int height) const {
   toggle(draw, layout.no_interruptions,
          tr("SETTINGS_VOICE_NO_INTERRUPTIONS", "Do not interrupt dialogue"),
          values_.no_interruptions, layout.body_font_pixels, scale);
+  toggle(draw, layout.interface_announcements,
+         tr("SETTINGS_VOICE_INTERFACE_ANNOUNCEMENTS", "Speak interface announcements"),
+         values_.interface_announcements, layout.body_font_pixels, scale);
   native_menu_style::button(draw, layout.replay,
                             tr("SETTINGS_VOICE_REPLAY", "Replay last announcement"),
                             layout.body_font_pixels, false, static_cast<bool>(replay_), scale);
@@ -422,10 +436,10 @@ void NativeVoiceSettings::render(DrawList& draw, int width, int height) const {
         std::max(11, layout.body_font_pixels - 2), native_menu_style::muted);
   if(dropdown_.visible())dropdown_.render(draw,dropdown_.id()==0?layout.subtitle_size:layout.frequency,width,height,layout.body_font_pixels);
   if (focus_ >= 0) {
-    const std::array<UiRect, 14> focusables{layout.enable_voices, layout.volume_track, layout.subtitles,
+    const std::array<UiRect, 15> focusables{layout.enable_voices, layout.volume_track, layout.subtitles,
       layout.subtitle_size, layout.background_track, layout.speaker_labels, layout.filter_track,
-      layout.frequency, layout.no_interruptions, layout.replay, layout.stop, layout.defaults,
-      layout.cancel, layout.save};
+      layout.frequency, layout.no_interruptions, layout.interface_announcements, layout.replay,
+      layout.stop, layout.defaults, layout.cancel, layout.save};
     draw.overlay.emplace_back(StrokedRectangle{focusables[static_cast<std::size_t>(focus_)], {160, 210, 255, 255}});
   }
 }

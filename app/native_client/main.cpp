@@ -7927,9 +7927,22 @@ class NativeCampaign final {
     }
   }
   std::optional<stellar::native_audio::VoiceCaption> announcement_caption(){
-    while(auto item=announcer_.take())
+    while(auto item=announcer_.take()){
+      if(voice_playback_&&presentation_audio_&&
+         presentation_audio_->voice_preferences().interface_announcements){
+        stellar::native_voice::NativeSpeechRequest request;
+        request.text=item->text;
+        request.category="interface";
+        request.priority=static_cast<int>(stellar::native_voice::VoicePriority::Important);
+        request.queue_behavior=stellar::native_voice::SpeechQueueBehavior::ReplaceCategory;
+        request.interruptible=true;
+        request.dedupe_key="interface|"+std::to_string(++announcement_seq_);
+        request.expires_at=std::chrono::system_clock::now()+std::chrono::seconds(10);
+        voice_playback_->speak(std::move(request));
+      }
       announcement_caption_=stellar::native_audio::VoiceCaption{"",std::move(item->text),
           std::chrono::steady_clock::now()+std::chrono::seconds(4)};
+    }
     if(!announcement_caption_||std::chrono::steady_clock::now()>=announcement_caption_->expires_at)return std::nullopt;
     if(!presentation_audio_||!presentation_audio_->voice_preferences().subtitles)return std::nullopt;
     return announcement_caption_;
@@ -8434,6 +8447,7 @@ class NativeCampaign final {
   stellar::native_notifications::NativeNotificationFeed notifications_;
   stellar::engine::AccessibilityAnnouncer announcer_;
   std::optional<stellar::native_audio::VoiceCaption> announcement_caption_;
+  std::uint64_t announcement_seq_{};
   stellar::native_support::NativeSupportService support_;
   native_battle_ui::NativeBattleWorkspace battle_workspace_;
   double battle_refresh_elapsed_{};
