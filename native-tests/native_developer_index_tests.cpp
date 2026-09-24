@@ -1,4 +1,5 @@
 #include "native_developer_celestial_index.hpp"
+#include "native_developer_empire_monitor.hpp"
 #include "native_developer_planet_index.hpp"
 #include "native_developer_simulation_panel.hpp"
 #include "native_stellar_activity_panel.hpp"
@@ -241,6 +242,26 @@ int main(int argc,char **argv)try{
       check(activity_press(9)&&activity.focus()>=0,"Tab did not re-enter the activity ring.");
       check(activity.handle({InputEventType::EscapePressed},w,h,frame)&&activity.focus()<0&&activity.visible(),"Escape closed the activity panel instead of releasing its ring.");
       check(activity.handle({InputEventType::EscapePressed},w,h,frame)&&!activity.visible(),"Second Escape did not close the activity panel.");
+    }
+    // Empire monitor: close, rendered rows, refresh and show-home ring in
+    // (y,x) order; activation replays the press/release hit dispatch, so
+    // keyboard SHOW HOME issues the same focus request the pointer takes.
+    {
+      NativeDeveloperEmpireMonitor empires;empires.open(frame);
+      check(empires.visible()&&empires.focus()<0,"Empire monitor opened with stale focus.");
+      const auto empires_press=[&](std::uint32_t key){InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;return empires.handle(ev,w,h,frame);};
+      check(empires_press(9)&&empires.focus()>=0,"Tab did not enter the empire ring.");
+      check(empires.focused_label(w,h)=="Close empire monitor","First empire target is not the close control.");
+      check(empires.focused_bounds(w,h).has_value(),"Focused empire control lacks bounds.");
+      check(empires.focused_control(w,h)==stellar::engine::AnnouncementControl::Button,"Empire monitor control misclassified.");
+      int empires_guard=0;
+      while(empires.focused_label(w,h)!="Show home system"&&empires_guard++<32)check(empires_press(9),"Empire navigation leaked.");
+      check(empires.focused_label(w,h)=="Show home system","SHOW HOME SYSTEM never joined the empire ring.");
+      check(empires_press(13)&&!empires.visible()&&empires.take_focus_request().has_value(),"Keyboard SHOW HOME did not issue a focus request.");
+      empires.open(frame);
+      check(empires_press(9)&&empires.focus()>=0,"Tab did not re-enter the empire ring.");
+      check(empires.handle({InputEventType::EscapePressed},w,h,frame)&&empires.focus()<0&&empires.visible(),"Escape closed the empire monitor instead of releasing its ring.");
+      check(empires.handle({InputEventType::EscapePressed},w,h,frame)&&!empires.visible(),"Second Escape did not close the empire monitor.");
     }
     // Running the authoritative campaign after appending a planet exercises
     // borrowed simulation views and ensures no stale vector pointers survive.

@@ -1247,10 +1247,16 @@ unchanged, the ring/planet shadow toggles classify CheckBox, and the
 stellar activity panel follows: all twenty-four command buttons ring in
 (y,x) order and activation replays the shared `activate_button` switch,
 so force/cycle/scrub/move commands run `apply_developer_stellar_activity`
-unchanged; `native_developer_index` pins it. The remaining developer
-panels (diagnostics, empire monitor, simulation panel) stay
-pointer-only — they predate the contract and adopt it incrementally
-from here.
+unchanged; `native_developer_index` pins it. The developer empire
+monitor follows: close, refresh, show-home and the rendered empire
+rows ring in (y,x) order through a shared `activate_hit` switch —
+row selection and the home-system focus request replay the exact
+press/release dispatch pointer input takes, scroll-follow via
+`VirtualizedList::ensure_visible` keeps the focused row visible, and
+the read-only Core snapshots stay inspection-only;
+`native_developer_index` pins it. The remaining developer panels
+(diagnostics, simulation panel) stay pointer-only — they predate the
+contract and adopt it incrementally from here.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast
