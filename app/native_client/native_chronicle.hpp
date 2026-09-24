@@ -14,6 +14,7 @@
 #include <stellar/engine/history.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -172,7 +173,9 @@ public:
   // -1 when no control is focused. Exposed for the test surface.
   [[nodiscard]] int focus() const noexcept { return focus_; }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
-  [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
+  [[nodiscard]] float scroll_offset() const noexcept {
+    return scroll_.scroll_offset;
+  }
   [[nodiscard]] const ChronicleSnapshot &current() const noexcept {
     return snapshot_;
   }
@@ -206,7 +209,7 @@ private:
   void cancel_press() noexcept;
 
   bool visible_{};
-  float scroll_{};
+  stellar::engine::ScrollView scroll_{};
   const engine::EventHistory *history_{};
   int observer_{-1};
   std::string domain_filter_;

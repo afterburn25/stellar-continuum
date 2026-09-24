@@ -199,15 +199,15 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
     layout.entries.push_back(entry);
     cursor += card_height + 7.f * s;
   }
-  layout.content_height = std::max(0.f, cursor - (items.empty() ? 0.f : 7.f * s));
-  layout.max_scroll = std::max(0.f, layout.content_height - layout.list_viewport.height);
-  layout.scroll = std::clamp(std::isfinite(requested_scroll) ? requested_scroll : 0.f, 0.f, layout.max_scroll);
+  layout.scroll.sync(std::max(0.f, cursor - (items.empty() ? 0.f : 7.f * s)),
+                     layout.list_viewport.height);
+  layout.scroll.scroll_to(requested_scroll);
   for (auto& entry : layout.entries) {
-    entry.bounds.y -= layout.scroll;
-    entry.metadata_bounds.y -= layout.scroll;
-    entry.message_bounds.y -= layout.scroll;
-    if (entry.contact_button) entry.contact_button->y -= layout.scroll;
-    if (entry.system_button) entry.system_button->y -= layout.scroll;
+    entry.bounds.y -= layout.scroll.scroll_offset;
+    entry.metadata_bounds.y -= layout.scroll.scroll_offset;
+    entry.message_bounds.y -= layout.scroll.scroll_offset;
+    if (entry.contact_button) entry.contact_button->y -= layout.scroll.scroll_offset;
+    if (entry.system_button) entry.system_button->y -= layout.scroll.scroll_offset;
     layout.cards.push_back(entry.bounds);
     layout.contact_buttons.push_back(entry.contact_button);
   }
@@ -235,9 +235,9 @@ void NativeNotificationView::cancel_press() noexcept {
   pressed_bounds_.reset();
 }
 void NativeNotificationView::open(std::int64_t latest_sequence) noexcept {
-  visible_ = true; scroll_ = 0.f; last_read_ = latest_sequence; focus_ = -1; cancel_press();
+  visible_ = true; scroll_ = {}; last_read_ = latest_sequence; focus_ = -1; cancel_press();
 }
-void NativeNotificationView::close() noexcept { visible_ = false; scroll_ = 0.f; focus_ = -1; cancel_press(); }
+void NativeNotificationView::close() noexcept { visible_ = false; scroll_ = {}; focus_ = -1; cancel_press(); }
 void NativeNotificationView::toggle(std::int64_t latest_sequence) noexcept { if (visible_) close(); else open(latest_sequence); }
 
 NotificationViewCommand NativeNotificationView::handle(const native_map::InputEvent& event,
@@ -245,7 +245,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
   NotificationViewCommand command{};
   if (!visible_) return command;
   pointer_ = event.position;
-  auto layout = notification_layout_for(items, width, height, measure_, scroll_, locale_);
+  auto layout = notification_layout_for(items, width, height, measure_, scroll_.scroll_offset, locale_);
   scroll_ = layout.scroll;
   if (event.type == native_map::InputEventType::EscapePressed) { close(); command.kind = NotificationViewCommandKind::Close; command.captured = true; return command; }
   if (event.type == native_map::InputEventType::PointerCancelled) { const bool captured = pointer_captured_; focus_ = -1; cancel_press(); command.captured = captured; return command; }
@@ -257,7 +257,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
     pressed_contact_id_.reset();
     pressed_system_id_.reset();
     pressed_bounds_.reset();
-    scroll_ = std::clamp(scroll_ - event.wheel_y * 42.f * layout.scale, 0.f, layout.max_scroll);
+    scroll_.scroll_by(-event.wheel_y * 42.f * layout.scale);
     command.captured = true; return command;
   }
   if (event.type == native_map::InputEventType::KeyPressed && event.key) {
@@ -384,7 +384,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
 void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayerNotification>& items,
                                     int width, int height) const {
   if (!visible_) return;
-  const auto layout = notification_layout_for(items, width, height, measure_, scroll_, locale_);
+  const auto layout = notification_layout_for(items, width, height, measure_, scroll_.scroll_offset, locale_);
   const float s = layout.scale;
   stellar::engine::ui_skin::surface(out,layout.panel,s);
   const int title_pixels = std::max(13, static_cast<int>(std::lround(18.f * s)));
@@ -450,9 +450,9 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
         action_text, title_color, action_pixels, entry.system_button->width - 4.f * s,
         *entry.system_button, TextAlign::Center); }
   }
-  if (layout.max_scroll > 0.f) { const float thumb_h = std::max(16.f * s, layout.list_viewport.height * layout.list_viewport.height / layout.content_height);
-    const float y = layout.list_viewport.y + (layout.list_viewport.height - thumb_h) * (layout.scroll / layout.max_scroll);
-    fill(out, {layout.list_viewport.x + layout.list_viewport.width - 3.f * s, y, 2.f * s, thumb_h}, muted_color); }
+  if (const auto thumb = layout.scroll.thumb(layout.list_viewport.height, 16.f * s); thumb.size > 0.f) {
+    fill(out, {layout.list_viewport.x + layout.list_viewport.width - 3.f * s,
+               layout.list_viewport.y + thumb.offset, 2.f * s, thumb.size}, muted_color); }
   }
   if (focus_ >= 0) {
     std::vector<UiRect> focusables;

@@ -122,7 +122,8 @@ struct ChronicleLayout {
   // active (paging "all history" is meaningless).
   std::optional<UiRect> page_older_button, page_newer_button;
   std::vector<CardLayout> entries;
-  float scale{}, content_height{}, max_scroll{}, scroll{};
+  float scale{};
+  stellar::engine::ScrollView scroll{};
 };
 
 ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
@@ -257,19 +258,18 @@ ChronicleLayout chronicle_layout_for(const ChronicleSnapshot &snap,
     layout.entries.push_back(card);
     cursor += card_height + 7.f * s;
   }
-  layout.content_height =
-      std::max(0.f, cursor - (snap.entries.empty() ? 0.f : 7.f * s));
-  layout.max_scroll =
-      std::max(0.f, layout.content_height - layout.list_viewport.height);
-  layout.scroll = std::clamp(
-      std::isfinite(requested_scroll) ? requested_scroll : 0.f, 0.f,
-      layout.max_scroll);
+  layout.scroll.sync(
+      std::max(0.f, cursor - (snap.entries.empty() ? 0.f : 7.f * s)),
+      layout.list_viewport.height);
+  layout.scroll.scroll_to(requested_scroll);
   for (auto &card : layout.entries) {
-    card.bounds.y -= layout.scroll;
-    card.metadata_bounds.y -= layout.scroll;
-    card.message_bounds.y -= layout.scroll;
-    if (card.contact_button) card.contact_button->y -= layout.scroll;
-    for (auto &chip : card.tag_chips) chip.bounds.y -= layout.scroll;
+    card.bounds.y -= layout.scroll.scroll_offset;
+    card.metadata_bounds.y -= layout.scroll.scroll_offset;
+    card.message_bounds.y -= layout.scroll.scroll_offset;
+    if (card.contact_button)
+      card.contact_button->y -= layout.scroll.scroll_offset;
+    for (auto &chip : card.tag_chips)
+      chip.bounds.y -= layout.scroll.scroll_offset;
   }
   return layout;
 }
@@ -398,7 +398,7 @@ void NativeChronicleView::cancel_press() noexcept {
 void NativeChronicleView::open(const engine::EventHistory &history,
                                int observer_civilization_id) {
   visible_ = true;
-  scroll_ = 0.f;
+  scroll_ = {};
   history_ = &history;
   observer_ = observer_civilization_id;
   domain_filter_.clear();
@@ -416,7 +416,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
 
 void NativeChronicleView::close() noexcept {
   visible_ = false;
-  scroll_ = 0.f;
+  scroll_ = {};
   search_focused_ = false;
   focus_ = -1;
   cancel_press();
@@ -448,7 +448,7 @@ void NativeChronicleView::refresh() {
   }
   filter.search = search_;
   snapshot_ = snapshot(*history_, observer_, filter);
-  scroll_ = 0.f;
+  scroll_ = {};
 }
 
 void NativeChronicleView::cycle_recency() {
@@ -523,8 +523,8 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
   if (!visible_) return false;
   pointer_ = event.position;
   const auto layout = chronicle_layout_for(
-      snapshot_, width, height, measure_, scroll_, tag_filter_,
-      recency_window_ > 0.0);
+      snapshot_, width, height, measure_, scroll_.scroll_offset,
+      tag_filter_, recency_window_ > 0.0);
   scroll_ = layout.scroll;
   if (event.type == native_map::InputEventType::EscapePressed) {
     // Escape unfocuses the search field first, then closes the view.
@@ -610,8 +610,7 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
   if (event.type == native_map::InputEventType::Wheel) {
     if (!layout.panel.contains(event.position)) return false;
     press_target_ = PressTarget::None;
-    scroll_ = std::clamp(scroll_ - event.wheel_y * 42.f * layout.scale, 0.f,
-                         layout.max_scroll);
+    scroll_.scroll_by(-event.wheel_y * 42.f * layout.scale);
     return true;
   }
   if (event.type == native_map::InputEventType::LeftPressed) {
@@ -745,8 +744,8 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
 void NativeChronicleView::render(DrawList &out, int width, int height) const {
   if (!visible_) return;
   const auto layout = chronicle_layout_for(
-      snapshot_, width, height, measure_, scroll_, tag_filter_,
-      recency_window_ > 0.0);
+      snapshot_, width, height, measure_, scroll_.scroll_offset,
+      tag_filter_, recency_window_ > 0.0);
   const float s = layout.scale;
   stellar::engine::ui_skin::surface(out, layout.panel, s);
   const int title_pixels = std::max(13, static_cast<int>(std::lround(18.f * s)));
@@ -1067,17 +1066,12 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                  std::max(11, static_cast<int>(std::lround(13.f * s))),
                  card.message_bounds.width, layout.list_viewport);
   }
-  if (layout.max_scroll > 0.f) {
-    const float thumb_h =
-        std::max(16.f * s, layout.list_viewport.height *
-                              layout.list_viewport.height /
-                              layout.content_height);
-    const float y = layout.list_viewport.y +
-                    (layout.list_viewport.height - thumb_h) *
-                        (layout.scroll / layout.max_scroll);
+  if (const auto thumb = layout.scroll.thumb(layout.list_viewport.height,
+                                             16.f * s);
+      thumb.size > 0.f) {
     fill(out,
-         {layout.list_viewport.x + layout.list_viewport.width - 3.f * s, y,
-          2.f * s, thumb_h},
+         {layout.list_viewport.x + layout.list_viewport.width - 3.f * s,
+          layout.list_viewport.y + thumb.offset, 2.f * s, thumb.size},
          muted_color);
   }
   if (focus_ >= 0) {

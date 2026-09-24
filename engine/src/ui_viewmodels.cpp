@@ -66,6 +66,33 @@ std::size_t VirtualizedList::sync_rows(std::size_t rows, float new_row_height,
              : 0;
 }
 
+float ScrollView::max_scroll() const {
+  return std::max(0.0f, content_height - viewport_height);
+}
+
+void ScrollView::scroll_to(float offset) {
+  scroll_offset = std::isfinite(offset)
+                      ? std::clamp(offset, 0.0f, max_scroll())
+                      : 0.0f;
+}
+
+void ScrollView::scroll_by(float delta) { scroll_to(scroll_offset + delta); }
+
+float ScrollView::sync(float new_content_height, float new_viewport_height) {
+  content_height = new_content_height;
+  viewport_height = new_viewport_height;
+  scroll_to(scroll_offset);
+  return scroll_offset;
+}
+
+ScrollView::Thumb ScrollView::thumb(float track, float min_size) const {
+  const float maximum = max_scroll();
+  if (maximum <= 0.0f || track <= 0.0f || content_height <= 0.0f) return {};
+  const float size = std::min(
+      track, std::max(min_size, track * viewport_height / content_height));
+  return {(track - size) * scroll_offset / maximum, size};
+}
+
 void TableModel::set_columns(std::vector<TableColumn> columns) {
   columns_ = std::move(columns);
 }

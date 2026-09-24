@@ -1001,6 +1001,22 @@ fractional preservation, shrink clamp, and viewport-growth re-clamp.
 `galaxy_phenomena`, `native_colony_roster`, `native_controlled_assets`,
 `campaign_world_projection`, `engine_diagnostics` green; client, editor
 and engine-shell targets build clean.
+ScrollView (row 24): variable-height surfaces duplicated the same
+pixel-scroll contract — `max(0, content - viewport)` clamps, wheel/drag
+deltas, non-finite guards, and proportional scrollbar thumbs. Engine
+`ScrollView` (ui_viewmodels.hpp) owns it now: `sync(content, viewport)`
+re-clamps on reflow, `scroll_by`/`scroll_to` bound deltas, and
+`thumb(track, min_size)` returns proportional thumb geometry ({0,0}
+when content fits). The chronicle browser, notification feed, body
+inspection panel, and economy workspace adopted it; their layout
+structs carry `ScrollView` members instead of raw
+content_height/max_scroll/scroll triples. `batcher_ui` covers bounds,
+non-finite reset, proportional thumb math, and fit-content hiding;
+`native_notifications`, `native_chronicle`, `native_economy_workspace`,
+`native_system_workspace` green; client builds clean. Remaining
+raw-scroll surfaces (diplomacy contact/detail, colony freight, research
+inspector, settings path, new-game species/detail, fleet list) follow
+the same contract and can adopt incrementally.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

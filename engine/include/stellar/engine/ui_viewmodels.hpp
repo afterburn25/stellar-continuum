@@ -48,6 +48,35 @@ struct VirtualizedList {
                       float viewport_height);
 };
 
+// Pixel-offset scroll model for variable-height content (wrapped text,
+// card lists, mixed blocks). The consumer reports the laid-out content
+// height and viewport each frame; the model clamps the offset into
+// [0, max_scroll] and provides scrollbar thumb geometry. Fixed-stride
+// row lists should use VirtualizedList instead.
+struct ScrollView {
+  float content_height{};
+  float viewport_height{};
+  float scroll_offset{};
+
+  [[nodiscard]] float max_scroll() const;
+  // Clamps `offset` into [0, max_scroll]; a non-finite offset resets to 0.
+  void scroll_to(float offset);
+  // Applies a signed delta (wheel ticks, drag distance) via scroll_to.
+  void scroll_by(float delta);
+  // Applies freshly laid-out geometry and re-clamps the offset so a
+  // shrinking content set or a growing viewport cannot strand it past
+  // the tail. Returns the clamped offset.
+  float sync(float new_content_height, float new_viewport_height);
+
+  struct Thumb {
+    float offset{}, size{};
+  };
+  // Scrollbar thumb over a `track`-pixel rail: size is proportional
+  // (track * viewport / content), floored at `min_size`, capped at the
+  // track; {0,0} when the content fits the viewport.
+  [[nodiscard]] Thumb thumb(float track, float min_size) const;
+};
+
 struct TableColumn {
   std::string id;
   std::string title_key; // localization key

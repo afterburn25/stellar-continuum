@@ -41,11 +41,11 @@ void bounded_feed_and_reachable_scroll() {
   view.open(notifications.latest_sequence());
   require(view.last_read() == notifications.latest_sequence(), "opening did not acknowledge browseable retained list");
   auto layout = notification_layout_for(notifications.items(), 720, 720, measured, 0.f);
-  require(layout.max_scroll > 0.f && layout.entries.size() == 32, "all retained events were not represented in scroll layout");
+  require(layout.scroll.max_scroll() > 0.f && layout.entries.size() == 32, "all retained events were not represented in scroll layout");
   const auto last_before = layout.cards.back();
   require(!intersects(last_before, layout.list_viewport), "long list unexpectedly fits without scrolling");
   for (int i = 0; i < 200; ++i) (void)view.handle({InputEventType::Wheel, center(layout.panel), {}, -1.f}, notifications.items(), 720, 720);
-  require(std::abs(view.scroll_offset() - layout.max_scroll) < .1f, "scroll did not clamp at lower bound");
+  require(std::abs(view.scroll_offset() - layout.scroll.max_scroll()) < .1f, "scroll did not clamp at lower bound");
   auto end = notification_layout_for(notifications.items(), 720, 720, measured, view.scroll_offset());
   require(intersects(end.cards.back(), end.list_viewport), "oldest retained event is inaccessible at end scroll");
   for (int i = 0; i < 200; ++i) (void)view.handle({InputEventType::Wheel, center(layout.panel), {}, 1.f}, notifications.items(), 720, 720);

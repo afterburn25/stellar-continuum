@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -92,6 +93,24 @@ int main() {
   fractional.configure(40, 24.0f, 480.0f);
   check(fractional.scroll_offset == 480.0f,
         "configure re-clamps when the viewport grows");
+
+  // --- Scroll view (variable-height content) ---
+  ScrollView view;
+  view.sync(1000.0f, 240.0f);
+  check(view.max_scroll() == 760.0f, "scroll view bounds content minus viewport");
+  view.scroll_to(800.0f);
+  check(view.scroll_offset == 760.0f, "scroll_to clamps at the tail");
+  view.scroll_by(-1000.0f);
+  check(view.scroll_offset == 0.0f, "scroll_by clamps at the head");
+  view.scroll_to(380.0f);
+  const auto thumb = view.thumb(240.0f, 16.0f);
+  check(thumb.size == 240.0f * 240.0f / 1000.0f && thumb.offset == (240.0f - thumb.size) * 0.5f,
+        "thumb geometry is proportional and centered at mid-scroll");
+  view.sync(200.0f, 240.0f);
+  check(view.scroll_offset == 0.0f && view.thumb(240.0f, 16.0f).size == 0.0f,
+        "shrunk content clamps the offset and hides the thumb");
+  view.scroll_to(std::numeric_limits<float>::quiet_NaN());
+  check(view.scroll_offset == 0.0f, "non-finite offsets reset to the head");
 
   // --- Table model ---
   TableModel table;

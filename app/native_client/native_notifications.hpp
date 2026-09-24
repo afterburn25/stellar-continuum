@@ -5,6 +5,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <deque>
 #include <cstddef>
@@ -54,9 +55,7 @@ struct NotificationLayout {
   std::vector<std::optional<native_map::UiRect>> contact_buttons;
   std::vector<NotificationCardLayout> entries;
   float scale{};
-  float content_height{};
-  float max_scroll{};
-  float scroll{};
+  stellar::engine::ScrollView scroll{};
 };
 
 using TextMeasurer = std::function<native_map::TextExtent(const native_map::Text&)>;
@@ -94,7 +93,9 @@ class NativeNotificationView final {
   void close() noexcept;
   void toggle(std::int64_t latest_sequence) noexcept;
   [[nodiscard]] std::int64_t last_read() const noexcept { return last_read_; }
-  [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
+  [[nodiscard]] float scroll_offset() const noexcept {
+    return scroll_.scroll_offset;
+  }
   [[nodiscard]] int focus() const noexcept { return focus_; }
 
   [[nodiscard]] NotificationViewCommand handle(
@@ -110,7 +111,7 @@ class NativeNotificationView final {
 
   bool visible_{};
   std::int64_t last_read_{};
-  float scroll_{};
+  stellar::engine::ScrollView scroll_{};
   int focus_{-1};
   native_map::Point pointer_{};
   native_map::Point press_origin_{};

@@ -1,6 +1,7 @@
 #pragma once
 #include "native_body_inspection.hpp"
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 #include <functional>
 
 namespace stellar::native_system_ui {
@@ -11,7 +12,7 @@ public:
   void set_localization(const stellar::engine::LocalizationTable *table) noexcept { locale_ = table; }
   void clear();
   bool visible() const noexcept { return value_.has_value(); }
-  float scroll_offset() const noexcept { return scroll_; }
+  float scroll_offset() const noexcept { return scroll_.scroll_offset; }
   void scroll(float wheel,stellar::native_map::UiRect panel,float footer_top);
   void render(stellar::native_map::DrawList&,stellar::native_map::UiRect panel,float footer_top) const;
 private:
@@ -22,7 +23,8 @@ private:
   std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure_;
   mutable std::vector<Item> items_;
   mutable stellar::native_map::UiRect panel_{},body_{};
-  mutable float footer_top_{},name_height_{},content_height_{},scroll_{};
+  mutable float footer_top_{},name_height_{};
+  mutable stellar::engine::ScrollView scroll_{};
   mutable bool valid_{};
 };
 }
