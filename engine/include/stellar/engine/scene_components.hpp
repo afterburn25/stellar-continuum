@@ -1,5 +1,6 @@
 #pragma once
 
+#include "stellar/engine/animation.hpp"
 #include "stellar/engine/scene_document.hpp"
 #include "stellar/engine/world.hpp"
 
@@ -126,6 +127,16 @@ struct VfxRef {
   // Named VfxSystem emitter to attach while the entity lives — the host
   // spawns it on scene load/runtime spawn and stops it on destroy.
   std::string name;
+};
+struct AnimTimeline {
+  // Document animation clip driving this entity's channels each sim step.
+  // `player` owns the live playhead; saved_* are restore scratch written by
+  // the snapshot codec because the Timeline resolves by id only after the
+  // world restores — the host re-attaches and seeks on load.
+  std::string id;
+  AnimationPlayer player;
+  float saved_time{0.f};
+  bool saved_playing{true};
 };
 // 3D scene components — the spatial counterparts spawned from a
 // Scene3dDocument. Transforms carry a normalized quaternion orientation

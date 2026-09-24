@@ -232,6 +232,7 @@ int main() {
         hero.oneway = true;
         hero.data = "checkpoint-7";
         hero.opacity = 0.5f;
+        hero.anim = "patrol";
         // A child attached to the player at a (+64,+16) authored offset.
         SceneEntity turret{"turret", 74.f, 36.f};
         turret.parent = "player";
@@ -258,10 +259,34 @@ int main() {
         deco.layer = -3;
         deco.parallax = 0.5f;
         deco.cells.assign(16, 1);
+        SceneAnimationDef patrol;
+        patrol.id = "patrol";
+        patrol.loop = "pingpong";
+        patrol.tracks.push_back(
+            {"x", {{0.f, 10.f}, {2.f, 200.f}}});
+        patrol.tracks.push_back(
+            {"opacity", {{0.f, 1.f}, {2.f, 0.25f}}});
+        patrol.events.push_back({1.f, "midpoint"});
+        doc.animations.push_back(patrol);
+        // Document codec: animations + the entity anim field round-trip.
+        const auto reparsed =
+            SceneDocument::from_json(doc.to_json());
+        check(reparsed.has_value(), "scene doc reparses");
+        check(reparsed->animations.size() == 1 &&
+                  reparsed->animations[0].id == "patrol" &&
+                  reparsed->animations[0].loop == "pingpong" &&
+                  reparsed->animations[0].tracks.size() == 2 &&
+                  reparsed->animations[0].events.size() == 1,
+              "animation def survives codec");
+        check(reparsed->entities[0].anim == "patrol",
+              "entity anim field survives codec");
         World world;
         register_scene_components(world);
         const auto spawned = spawn_scene(world, doc);
         check(spawned.size() == 3, "spawn_scene creates all entities");
+        check(world.get<AnimTimeline>(spawned[0]) != nullptr &&
+                  world.get<AnimTimeline>(spawned[0])->id == "patrol",
+              "anim field spawns AnimTimeline component");
         const auto tile_es = tilemap_entities(world);
         check(tile_es.size() == 2, "each tilemap spawns its own entity");
         check(std::find(spawned.begin(), spawned.end(), tile_es[0]) ==
@@ -375,6 +400,10 @@ int main() {
         check(world.get<Transform2D>(spawned[2])->x == 74.f,
               "hierarchy reset restores authored offset");
 
+        // Mid-clip playhead state snapshots via the saved_* scratch —
+        // a detached player's time/pause survives save/load verbatim.
+        world.get<AnimTimeline>(spawned[0])->saved_time = 1.25f;
+        world.get<AnimTimeline>(spawned[0])->saved_playing = false;
         const auto path = std::filesystem::temp_directory_path() /
                           "stellar_scene_roundtrip.stw";
         save_world_to_file(world, path);
@@ -398,6 +427,11 @@ int main() {
                   world.get<Parent>(*rep_tur) != nullptr &&
                   world.get<Parent>(*rep_tur)->name == "player",
               "parent attachment survives restore");
+        const auto *rep_anim = world.get<AnimTimeline>(*rep);
+        check(rep_anim != nullptr && rep_anim->id == "patrol" &&
+                  std::abs(rep_anim->saved_time - 1.25f) < 1e-5 &&
+                  !rep_anim->saved_playing,
+              "anim playhead survives restore");
         world.get<Transform2D>(*rep)->x = 60.f;
         resolve_hierarchy(world);
         check(world.get<Transform2D>(*rep_tur)->x == 124.f,

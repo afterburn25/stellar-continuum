@@ -121,6 +121,39 @@ int main() {
   check(std::abs(wrap_time(6.0f, 4.0f, LoopMode::PingPong) - 2.0f) < 1e-5,
         "pingpong mirror");
 
+  // --- AnimationPlayer lifecycle ---
+  AnimationPlayer clip;
+  check(clip.advance(1.0f).values.empty(),
+        "timeline-less player steps empty");
+  clip.play(&timeline, LoopMode::Once);
+  check(clip.playing() && !clip.finished(), "play starts");
+  auto step = clip.advance(1.2f);
+  check(step.events.size() == 1 && step.events[0].name == "beat",
+        "player emits crossed event");
+  check(std::abs(step.values.at("pulse") - 0.3f) < 1e-5,
+        "player evaluates track at wrapped time");
+  clip.set_speed(2.0f);
+  step = clip.advance(0.4f); // playhead 2.0 — no event
+  check(step.events.empty(), "no event before crest");
+  step = clip.advance(1.0f); // playhead 4.0 — crest at 3.0 crossed, clamps
+  check(step.events.size() == 1 && step.events[0].name == "crest",
+        "speed-scaled advance crosses crest");
+  check(clip.finished() && std::abs(clip.time() - 4.0f) < 1e-5,
+        "once-mode clamps at duration");
+  clip.set_paused(true);
+  check(clip.advance(1.0f).values.empty(), "paused steps empty");
+  clip.set_paused(false);
+  clip.play(&timeline, LoopMode::Loop);
+  step = clip.advance(5.0f); // wraps once: crest(3) + beat(1, next cycle)
+  check(step.events.size() == 2, "player wrap emits both cycle events");
+  check(std::abs(clip.time() - 5.0f) < 1e-5,
+        "loop keeps unwrapped playhead");
+  clip.seek(2.5f);
+  check(std::abs(clip.time() - 2.5f) < 1e-5, "seek restores playhead");
+  clip.stop();
+  check(clip.timeline() == nullptr && clip.time() == 0.f,
+        "stop detaches and resets");
+
   // --- Accessibility ---
   AccessibilitySettings settings;
   settings.ui_scale = 5.0f;     // out of range

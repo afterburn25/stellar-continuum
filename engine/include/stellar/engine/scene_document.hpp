@@ -80,6 +80,10 @@ struct SceneEntity {
   // so children can also drift relative to their parent. Cycles and
   // missing parents are ignored (child keeps its last world position).
   std::string parent;
+  // Id of a document `animations` clip driving this entity's channels each
+  // sim step — keyframed patrols, door slides, opacity pulses. A track
+  // owns its channel while the clip plays.
+  std::string anim;
 };
 
 // Grid terrain layer: a tileset image sliced into tile_w/tile_h cells
@@ -97,6 +101,22 @@ struct SceneTilemap {
   bool collide{false};
   // One tileset cell index per grid cell, row-major; <0 = empty.
   std::vector<int> cells;
+};
+
+// Named scalar-track animation shared by entities — keyframed motion,
+// sizing, opacity and tint authored once and referenced by `anim` on any
+// number of entities. Track keys use the same (time,value) list shape as
+// emitter curves; `events` are (time,name) markers the host forwards to
+// the game as the playhead crosses them.
+struct SceneAnimationDef {
+  std::string id;
+  std::string loop{"loop"}; // "once" | "loop" | "pingpong"
+  // channel -> (time,value) keys. Channels: x y w h vx vy opacity
+  // rotation spin tintR tintG tintB — each owned by the track while the
+  // entity plays the clip (a track sets the field every sim step).
+  std::vector<std::pair<std::string, std::vector<std::pair<float, float>>>>
+      tracks;
+  std::vector<std::pair<float, std::string>> events;
 };
 
 // Declarative particle emitter definition — registers into the runtime's
@@ -218,6 +238,10 @@ struct SceneDocument {
   // load — entity `vfx` fields reference these by id (game-registered
   // definitions via host.vfx().define() still work).
   std::vector<SceneEmitterDef> emitters;
+  // Keyframed entity animations resolved by `anim` fields on load —
+  // the host builds one shared Timeline per def and steps a playhead
+  // per referencing entity.
+  std::vector<SceneAnimationDef> animations;
 
   static constexpr std::string_view filename{"scene.json"};
 

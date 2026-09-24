@@ -102,6 +102,70 @@ bool parse_emitters(const nlohmann::json &list,
   return true;
 }
 
+nlohmann::json animations_to_json(
+    const std::vector<SceneAnimationDef> &animations) {
+  nlohmann::json list = nlohmann::json::array();
+  for (const auto &def : animations) {
+    nlohmann::json a;
+    a["id"] = def.id;
+    if (def.loop != "loop") a["loop"] = def.loop;
+    nlohmann::json tracks = nlohmann::json::object();
+    for (const auto &[channel, keys] : def.tracks)
+      tracks[channel] = keys_json(keys);
+    a["tracks"] = std::move(tracks);
+    if (!def.events.empty()) {
+      nlohmann::json events = nlohmann::json::array();
+      for (const auto &[t, name] : def.events)
+        events.push_back({t, name});
+      a["events"] = std::move(events);
+    }
+    list.push_back(std::move(a));
+  }
+  return list;
+}
+
+bool parse_animations(const nlohmann::json &list,
+                      std::vector<SceneAnimationDef> &out,
+                      std::string *error) {
+  auto fail = [&](const std::string &message) {
+    if (error != nullptr) *error = message;
+    return false;
+  };
+  if (!list.is_array()) return fail("animations must be an array");
+  for (const auto &item : list) {
+    if (!item.is_object()) return fail("animation entry is not an object");
+    SceneAnimationDef def;
+    def.id = item.value("id", std::string{});
+    if (def.id.empty()) return fail("animation requires an id");
+    def.loop = item.value("loop", std::string{"loop"});
+    if (def.loop != "once" && def.loop != "loop" && def.loop != "pingpong")
+      return fail("animation loop must be once|loop|pingpong");
+    const auto &tracks = item.value("tracks", nlohmann::json::object());
+    if (!tracks.is_object())
+      return fail("animation tracks must be an object");
+    for (const auto &[channel, keys] : tracks.items()) {
+      if (!keys.is_array())
+        return fail("animation track " + channel + " must be an array");
+      std::vector<std::pair<float, float>> parsed;
+      for (const auto &k : keys) {
+        if (!k.is_array() || k.size() != 2)
+          return fail("animation track " + channel +
+                      " keys must be [time,value] pairs");
+        parsed.emplace_back(k[0].get<float>(), k[1].get<float>());
+      }
+      def.tracks.emplace_back(channel, std::move(parsed));
+    }
+    for (const auto &e :
+         item.value("events", nlohmann::json::array())) {
+      if (!e.is_array() || e.size() != 2)
+        return fail("animation events must be [time,name] pairs");
+      def.events.emplace_back(e[0].get<float>(), e[1].get<std::string>());
+    }
+    out.push_back(std::move(def));
+  }
+  return true;
+}
+
 } // namespace
 
 std::string SceneDocument::to_json() const {
@@ -140,6 +204,7 @@ std::string SceneDocument::to_json() const {
     if (!e.bounce) item["bounce"] = false;
     if (!e.parent.empty()) item["parent"] = e.parent;
     if (!e.vfx.empty()) item["vfx"] = e.vfx;
+    if (!e.anim.empty()) item["anim"] = e.anim;
     items.push_back(std::move(item));
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
@@ -166,6 +231,8 @@ std::string SceneDocument::to_json() const {
     doc["tilemaps"] = std::move(list);
   }
   if (!emitters.empty()) doc["emitters"] = emitters_to_json(emitters);
+  if (!animations.empty())
+    doc["animations"] = animations_to_json(animations);
   return doc.dump(2) + "\n";
 }
 
@@ -228,6 +295,7 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       entity.bounce = item.value("bounce", true);
       entity.parent = item.value("parent", std::string{});
       entity.vfx = item.value("vfx", std::string{});
+      entity.anim = item.value("anim", std::string{});
       scene.entities.push_back(std::move(entity));
     }
     if (doc.contains("background")) {
@@ -299,6 +367,12 @@ std::optional<SceneDocument> SceneDocument::from_json(std::string_view text,
       if (!parse_emitters(doc.at("emitters"), scene.emitters,
                           &emitter_error))
         return fail(emitter_error);
+    }
+    if (doc.contains("animations")) {
+      std::string anim_error;
+      if (!parse_animations(doc.at("animations"), scene.animations,
+                            &anim_error))
+        return fail(anim_error);
     }
   } catch (const std::exception &e) {
     return fail(std::string("malformed entity: ") + e.what());

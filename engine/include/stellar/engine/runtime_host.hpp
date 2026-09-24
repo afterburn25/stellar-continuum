@@ -314,6 +314,11 @@ public:
   std::function<void(World &, EntityId, const SceneEntity &)> on_spawn;
   // 3D counterpart — fires per spawned Scene3dEntity (scene3d mode).
   std::function<void(World &, EntityId, const Scene3dEntity &)> on_spawn3d;
+  // Named Timeline events crossed while a scene-authored `anim` clip
+  // advances — door-opened markers, patrol turnarounds. Fires once per
+  // crossing inside the sim step.
+  std::function<void(const std::string &event, EntityId entity)>
+      on_anim_event;
 
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /

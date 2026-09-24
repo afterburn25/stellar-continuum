@@ -242,6 +242,36 @@ void register_scene_components(World &world) {
       [](const std::vector<std::uint8_t> &b) {
         return VfxRef{{b.begin(), b.end()}};
       });
+  // AnimTimeline codec: NUL-terminated clip id, then the playhead time and
+  // playing flag into saved_* scratch — the timeline re-attaches by id on
+  // restore. A still-detached component re-encodes its scratch verbatim.
+  world.register_component<AnimTimeline>(
+      "animtimeline",
+      [](const AnimTimeline &a) {
+        std::vector<std::uint8_t> out{a.id.begin(), a.id.end()};
+        out.push_back(0);
+        const float time =
+            a.player.timeline() != nullptr ? a.player.time() : a.saved_time;
+        const bool playing = a.player.timeline() != nullptr
+                                 ? !a.player.paused()
+                                 : a.saved_playing;
+        put_f32(out, time);
+        out.push_back(playing ? 1 : 0);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        AnimTimeline a;
+        const auto nul = std::find(b.begin(), b.end(), std::uint8_t{0});
+        a.id.assign(b.begin(), nul);
+        std::size_t at = static_cast<std::size_t>(nul - b.begin()) + 1;
+        if (at + 4 <= b.size()) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&a.saved_time, &bits, 4);
+        }
+        if (at < b.size())
+          a.saved_playing = b[at] != 0;
+        return a;
+      });
   world.register_component<Camera3DState>("camera3d",
                                           encode_pod<Camera3DState>,
                                           decode_pod<Camera3DState>);
@@ -360,6 +390,7 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
                 Parent{s.parent, s.x - px, s.y - py, px, py, true});
     }
     if (!s.vfx.empty()) world.add(entity, VfxRef{s.vfx});
+    if (!s.anim.empty()) world.add(entity, AnimTimeline{s.anim});
     spawned.push_back(entity);
   }
   // Each tilemap lives on its own entity (not returned) so runtime cell
@@ -445,6 +476,7 @@ SceneDocument scene_from_world(const World &world) {
     if (const auto *o = world.get<Opacity>(entity)) s.opacity = o->value;
     if (const auto *par = world.get<Parent>(entity)) s.parent = par->name;
     if (const auto *vr = world.get<VfxRef>(entity)) s.vfx = vr->name;
+    if (const auto *at = world.get<AnimTimeline>(entity)) s.anim = at->id;
     doc.entities.push_back(std::move(s));
   }
   return doc;

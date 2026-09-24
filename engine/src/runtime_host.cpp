@@ -112,6 +112,15 @@ struct RuntimeHost::Impl {
   };
   std::vector<VfxTrack> vfx_tracks;
 
+  // Scene-declared entity animations (document `animations` array):
+  // shared Timelines keyed by clip id — each referencing entity steps
+  // its own AnimTimeline player against these.
+  struct AnimRuntime {
+    Timeline timeline;
+    LoopMode mode{LoopMode::Loop};
+  };
+  std::unordered_map<std::string, AnimRuntime> anims;
+
   // --- 3D scene mode (--scene3d) ---
   // The 3D tracked set lives beside the 2D one: scene-spawned and
   // runtime-spawned mesh entities. Meshes/textures cache by spec/path.
@@ -621,11 +630,49 @@ int RuntimeHost::run() {
     }
   };
 
+  // Scene-declared entity animations: one shared Timeline per def;
+  // channels feed the AnimTimeline players stepped inside simulate().
+  const auto register_animations =
+      [&](const std::vector<SceneAnimationDef> &defs) {
+        impl.anims.clear();
+        for (const auto &def : defs) {
+          Impl::AnimRuntime runtime;
+          float duration = 0.f;
+          for (const auto &[channel, keys] : def.tracks) {
+            auto &curve = runtime.timeline.track(channel);
+            for (const auto &[t, v] : keys) {
+              curve.add_key(t, v);
+              duration = std::max(duration, t);
+            }
+          }
+          runtime.timeline.duration = duration;
+          for (const auto &[t, name] : def.events)
+            runtime.timeline.add_event(t, name);
+          runtime.mode = def.loop == "once"    ? LoopMode::Once
+                         : def.loop == "pingpong" ? LoopMode::PingPong
+                                                  : LoopMode::Loop;
+          impl.anims.emplace(def.id, std::move(runtime));
+        }
+      };
+
+  // Attaches a spawned or restored entity's AnimTimeline to its shared
+  // Timeline — restores seek the saved playhead (codec wrote saved_*).
+  const auto attach_anim = [&](EntityId e) {
+    auto *at = world.get<AnimTimeline>(e);
+    if (!at || at->id.empty()) return;
+    const auto it = impl.anims.find(at->id);
+    if (it == impl.anims.end()) return;
+    at->player.play(&it->second.timeline, it->second.mode);
+    at->player.seek(at->saved_time);
+    at->player.set_paused(!at->saved_playing);
+  };
+
   // (Re)spawns World entities from a scene document; sprite decode stays
   // host-side since it depends on this project's content roots.
   std::string scene_music;
   auto spawn_entities = [&](const SceneDocument &doc) {
     register_emitters(doc.emitters);
+    register_animations(doc.animations);
     impl.bg_r = doc.bg_r;
     impl.bg_g = doc.bg_g;
     impl.bg_b = doc.bg_b;
@@ -661,6 +708,7 @@ int RuntimeHost::run() {
           sp != nullptr && !sp->value.empty())
         impl.sprites[i] = decode_sprite(sp->value);
       attach_vfx(impl.entities[i]);
+      attach_anim(impl.entities[i]);
       // Game-defined component attach: zip the spawned id with its
       // authored record (spawn order matches document order).
       if (on_spawn && i < doc.entities.size())
@@ -697,6 +745,7 @@ int RuntimeHost::run() {
     impl.sprites.push_back(
         entity.sprite.empty() ? nullptr : decode_sprite(entity.sprite));
     attach_vfx(ids.front());
+    attach_anim(ids.front());
     if (on_spawn) on_spawn(world, ids.front(), entity);
     return ids.front();
   };
@@ -912,6 +961,7 @@ int RuntimeHost::run() {
           sp != nullptr && !sp->value.empty())
         impl.sprites[i] = decode_sprite(sp->value);
       attach_vfx(impl.entities[i]);
+      attach_anim(impl.entities[i]);
     }
   };
 
@@ -1470,6 +1520,51 @@ int RuntimeHost::run() {
           }
         }
         for (const auto id : expired) impl.destroy_fn(id);
+      }
+      // Keyframed entity animations: each AnimTimeline steps its playhead
+      // in sim time and the evaluated tracks own their channels — a clip
+      // writing "x" sets Transform2D.x every step (velocity/collisions
+      // still resolve around it). Events fire per crossing.
+      for (const auto entity : impl.entities) {
+        auto *at = world.get<AnimTimeline>(entity);
+        if (!at || at->player.timeline() == nullptr) continue;
+        const auto step = at->player.advance(dt_step);
+        at->saved_time = at->player.time();
+        at->saved_playing = !at->player.paused();
+        if (on_anim_event)
+          for (const auto &event : step.events)
+            on_anim_event(event.name, entity);
+        const auto channel = [&step](const char *name) -> const float * {
+          const auto it = step.values.find(name);
+          return it == step.values.end() ? nullptr : &it->second;
+        };
+        if (auto *t = world.get<Transform2D>(entity)) {
+          if (const float *v = channel("x")) t->x = *v;
+          if (const float *v = channel("y")) t->y = *v;
+        }
+        if (auto *x = world.get<Extent2D>(entity)) {
+          if (const float *v = channel("w")) x->w = *v;
+          if (const float *v = channel("h")) x->h = *v;
+        }
+        if (auto *vel = world.get<Velocity2D>(entity)) {
+          if (const float *v = channel("vx")) vel->dx = *v;
+          if (const float *v = channel("vy")) vel->dy = *v;
+        }
+        if (const float *v = channel("opacity"))
+          if (auto *o = world.get<Opacity>(entity)) o->value = *v;
+        if (const float *v = channel("rotation"))
+          if (auto *r = world.get<Rotation>(entity)) r->value = *v;
+        if (const float *v = channel("spin"))
+          if (auto *sp = world.get<Spin>(entity)) sp->value = *v;
+        if (auto *tint = world.get<Tint>(entity)) {
+          const auto byte_of = [](float v) {
+            return static_cast<std::uint8_t>(
+                std::clamp(std::lround(v * 255.f), 0l, 255l));
+          };
+          if (const float *v = channel("tintR")) tint->r = byte_of(*v);
+          if (const float *v = channel("tintG")) tint->g = byte_of(*v);
+          if (const float *v = channel("tintB")) tint->b = byte_of(*v);
+        }
       }
       // Hierarchy: parented entities snap to parent+offset, folding their
       // own world-space drift into the offset — runs before contacts so
