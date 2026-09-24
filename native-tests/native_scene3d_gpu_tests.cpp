@@ -49,6 +49,7 @@ int main(int argc,char** argv)try{
     const auto tex=find("scene3d-textures"),meshes=find("scene3d-meshes"),targets=find("scene3d-targets");
     check(tex!=snapshot.subsystems.end()&&meshes!=snapshot.subsystems.end()&&targets!=snapshot.subsystems.end(),"3D renderer VRAM is not attributed to MemoryTracker subsystems");
     check(tex->current_bytes==residency.texture_cache_bytes&&meshes->current_bytes==residency.mesh_cache_bytes&&targets->current_bytes==residency.target_bytes,"Attributed VRAM bytes do not match renderer residency");
+    check(find("ui-image-cache")!=snapshot.subsystems.end()&&find("ui-text-cache")!=snapshot.subsystems.end(),"2D image/text caches are not attributed to MemoryTracker subsystems");
   }
   {
     std::vector<std::uint8_t> pixels(64*64*4);

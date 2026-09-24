@@ -192,7 +192,9 @@ struct Window::Storage {
   // texture/mesh/render-target bytes once a scene3d view draws.
   engine::MemoryTracker::SubsystemId gpu_texture_subsystem{engine::MemoryTracker::invalid_subsystem},
       gpu_mesh_subsystem{engine::MemoryTracker::invalid_subsystem},
-      gpu_target_subsystem{engine::MemoryTracker::invalid_subsystem};
+      gpu_target_subsystem{engine::MemoryTracker::invalid_subsystem},
+      image_cache_subsystem{engine::MemoryTracker::invalid_subsystem},
+      text_cache_subsystem{engine::MemoryTracker::invalid_subsystem};
   int scene_width{},scene_height{},scene_percent{100},scene_samples{1};
   void prepare_scene_target(int percent,int samples) {
     if(percent==100&&samples==1){if(scene_target)SDL_DestroyTexture(scene_target);scene_target=nullptr;scene_width=scene_height=0;return;}
@@ -591,6 +593,15 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
     tracker.report(storage_->gpu_texture_subsystem,gpu_stats.texture_cache_bytes,maximum_scene3d_texture_cache_bytes);
     tracker.report(storage_->gpu_mesh_subsystem,gpu_stats.mesh_cache_bytes,maximum_mesh3d_cache_bytes);
     tracker.report(storage_->gpu_target_subsystem,gpu_stats.target_bytes,0);
+  }
+  { // The 2D caches are equally bounded ledgers; attribute them every draw.
+    auto& tracker=engine::MemoryTracker::instance();
+    if(storage_->image_cache_subsystem==engine::MemoryTracker::invalid_subsystem){
+      storage_->image_cache_subsystem=tracker.register_subsystem("ui-image-cache");
+      storage_->text_cache_subsystem=tracker.register_subsystem("ui-text-cache");
+    }
+    tracker.report(storage_->image_cache_subsystem,storage_->image_cache_resident_bytes,0);
+    tracker.report(storage_->text_cache_subsystem,storage_->text_cache_bytes,Storage::text_cache_byte_capacity);
   }
   const auto draw_line=[&](const Line &line){
     if(!valid_point(line.from)||!valid_point(line.to))throw std::invalid_argument("Line coordinates must be finite.");
