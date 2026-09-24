@@ -1,6 +1,7 @@
 #include "native_developer_celestial_index.hpp"
 #include "native_developer_planet_index.hpp"
 #include "native_developer_simulation_panel.hpp"
+#include "native_stellar_activity_panel.hpp"
 #include "native_stellar_observation.hpp"
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <algorithm>
@@ -221,6 +222,25 @@ int main(int argc,char **argv)try{
       check(planet_index.handle({InputEventType::EscapePressed},w,h,frame)&&planet_index.focus()<0&&planet_index.visible(),
         "Escape closed the planet index instead of releasing its ring.");
       check(planet_index.handle({InputEventType::EscapePressed},w,h,frame)&&!planet_index.visible(),"Second Escape did not close the planet index.");
+    }
+    // Stellar activity panel: the twenty-four command buttons ring in
+    // (y,x) order and activation replays the same dispatch a pointer
+    // press takes — CLOSE ends the panel through the shared path.
+    {
+      StellarActivityPanel activity;activity.open(frame,std::nullopt);
+      check(activity.visible()&&activity.focus()<0,"Activity panel opened with stale focus.");
+      const auto activity_press=[&](std::uint32_t key){InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;return activity.handle(ev,w,h,frame);};
+      check(activity_press(9)&&activity.focus()>=0,"Tab did not enter the activity ring.");
+      check(activity.focused_label(w,h)=="PROMINENCE","First activity target is not PROMINENCE.");
+      check(activity.focused_bounds(w,h).has_value(),"Focused activity control lacks bounds.");
+      check(activity.focused_control(w,h)==stellar::engine::AnnouncementControl::Button,"Activity button misclassified.");
+      int activity_guard=0;
+      while(activity.focused_label(w,h)!="CLOSE"&&activity_guard++<48)check(activity_press(9),"Activity navigation leaked.");
+      check(activity_press(13)&&!activity.visible(),"Keyboard CLOSE did not close the activity panel.");
+      activity.open(frame,std::nullopt);
+      check(activity_press(9)&&activity.focus()>=0,"Tab did not re-enter the activity ring.");
+      check(activity.handle({InputEventType::EscapePressed},w,h,frame)&&activity.focus()<0&&activity.visible(),"Escape closed the activity panel instead of releasing its ring.");
+      check(activity.handle({InputEventType::EscapePressed},w,h,frame)&&!activity.visible(),"Second Escape did not close the activity panel.");
     }
     // Running the authoritative campaign after appending a planet exercises
     // borrowed simulation views and ensures no stale vector pointers survive.

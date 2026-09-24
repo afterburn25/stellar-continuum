@@ -5807,6 +5807,7 @@ class NativeCampaign final {
            (phenomena_debug_.visible&&phenomena_debug_.focus()>=0)||
            (background_debug_.visible()&&background_debug_.focus()>=0)||
            (giant_test_panel_.visible()&&giant_test_panel_.focus()>=0)||
+           (stellar_activity_panel_.visible()&&stellar_activity_panel_.focus()>=0)||
            hud_focus_>=0||
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
@@ -6153,9 +6154,59 @@ class NativeCampaign final {
       session_->request_exit();
       }
     }
-    for(const auto &event:input.events){
-      if(developer_session()&&stellar_activity_panel_.handle(event,width,height,session_->frame())){
-        focus_stellar_activity(width,height);gesture_.capture_for_ui();continue;
+    // Replayed pointer commands merge ahead of this frame's live events —
+    // they dispatch through the identical handlers in recorded order.
+    std::vector<InputEvent> frame_events;
+    const std::vector<InputEvent> *frame_event_stream=&input.events;
+    if(replay_&&!replay_->injected_events.empty()){
+      frame_events.reserve(replay_->injected_events.size()+input.events.size());
+      frame_events.insert(frame_events.end(),replay_->injected_events.begin(),
+                          replay_->injected_events.end());
+      replay_->injected_events.clear();
+      frame_events.insert(frame_events.end(),input.events.begin(),input.events.end());
+      frame_event_stream=&frame_events;
+    }
+    for(const auto &event:*frame_event_stream){
+      // Journal pointer input: positions (and drag deltas) are what dispatch
+      // consumes, so the recording stores the raw event and replay re-runs
+      // hit-testing against reproduced state instead of trusting a resolved
+      // action name. Moves record only while a button is held — accumulated
+      // drag motion decides drag-vs-click at release; hovers are cosmetic.
+      if(replay_&&replay_->recorder){
+        bool journal=false;
+        switch(event.type){
+        case InputEventType::LeftPressed:case InputEventType::RightPressed:
+          ++replay_->pointer_held;journal=true;break;
+        case InputEventType::LeftReleased:case InputEventType::RightReleased:
+          if(replay_->pointer_held>0)--replay_->pointer_held;
+          journal=true;break;
+        case InputEventType::PointerCancelled:
+          replay_->pointer_held=0;journal=true;break;
+        case InputEventType::PointerMove:
+          journal=replay_->pointer_held>0;break;
+        default:break;
+        }
+        if(journal){
+          char payload[96];
+          const auto written=std::snprintf(payload,sizeof payload,
+              "%d,%.9g,%.9g,%.9g,%.9g",static_cast<int>(event.type),
+              static_cast<double>(event.position.x),static_cast<double>(event.position.y),
+              static_cast<double>(event.delta.x),static_cast<double>(event.delta.y));
+          if(written>0)
+            replay_->recorder->record(replay_tick(),"pointer_button",
+                std::string(payload,static_cast<std::size_t>(written)));
+        }
+      }
+      if(developer_session()){
+        const int stellar_activity_focus_before=stellar_activity_panel_.focus();
+        if(stellar_activity_panel_.handle(event,width,height,session_->frame())){
+          focus_stellar_activity(width,height);
+          if(stellar_activity_panel_.focus()!=stellar_activity_focus_before)
+            announcer_.announce_focus(stellar_activity_panel_.focused_label(width,height),
+              announcement_bounds(stellar_activity_panel_.focused_bounds(width,height)),
+              std::nullopt,stellar_activity_panel_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
+        }
       }
       if(developer_session()&&developer_empires_.handle(event,width,height,session_->frame())){
         if(const auto id=developer_empires_.take_focus_request()){

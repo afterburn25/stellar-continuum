@@ -1244,9 +1244,13 @@ activation replays the shared `activate_button` switch so spectrum,
 distance, tilt and subclass changes run `apply_developer_giant_test`
 unchanged, the ring/planet shadow toggles classify CheckBox, and the
 3D preview stays pointer-spatial; `native_giant_visual` pins it. The
-remaining developer panels (diagnostics, empire monitor, simulation
-panel, stellar activity) stay pointer-only — they predate the contract
-and adopt it incrementally from here.
+stellar activity panel follows: all twenty-four command buttons ring in
+(y,x) order and activation replays the shared `activate_button` switch,
+so force/cycle/scrub/move commands run `apply_developer_stellar_activity`
+unchanged; `native_developer_index` pins it. The remaining developer
+panels (diagnostics, empire monitor, simulation panel) stay
+pointer-only — they predate the contract and adopt it incrementally
+from here.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast
