@@ -585,9 +585,19 @@ logs `simulation/step_failure` before its critical checkpoint, and the
 native client catches developer-session step throws into
 `CampaignDiagnosticMonitor::observe_advance_failure` → the fault
 capture's pause+bundle path instead of crashing (player sessions still
-throw). Verified: `campaign_frame_parity` asserts the record on its real
-StrategicFailure throw and its absence after the moved-owner advance;
-8/8 across diagnostics/fault/session/QA surface green (qa_host 29 s).
+throw). `3f0a8fb0` added `inspect_continuation_invariants(runtime,…)` —
+the last unvalidated runtime surface: it captures
+`runtime.continuation()` (strategic coordinator cached plans + diplomacy
+schedule) and replays `validate_campaign_runtime_continuation`, emitting
+`invalid_continuation`/`orphaned_plan`; wired into monitor/report/QA
+host, zero findings on seeded campaigns (4/4 diagnostics surface green,
+qa_host 31 s). Runtime-held state coverage is now complete:
+`FreshCampaignState`, diplomacy, adaptive research, continuation/schedules
+— event history excluded as legitimately historical, lane caches as
+derived/ephemeral. Verified: `campaign_frame_parity` asserts the record
+on its real StrategicFailure throw and its absence after the moved-owner
+advance; 8/8 across diagnostics/fault/session/QA surface green
+(qa_host 29 s).
 Caveat: `stellar_campaign_phase_profile_tests`/`campaign_phase_cadence`
 compile-fail on `set_phase_tier`/`wake_phase` — the coordinator API is
 mid-refactor in the other agent's lane, not a diagnostics regression.
