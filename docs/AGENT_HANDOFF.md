@@ -491,6 +491,20 @@ key/placeholder parity asserted in `localization`. Earlier commits in
 the lane added the `advisor_spotlight` diagnostic (StrategicMind picks
 the civ's top operational finding) and the editor `massEarth` override
 with derived effective gravity.
+A 319-test run at `5035cfa3` records 319/319 green: the suite gained the
+other agent's `campaign_world_projection` (Core container →
+`engine::World` bridge with `sync_campaign_world` reconciliation) plus
+this lane's profiler captures (`ProfileCapture` save/load + A/B
+`compare_captures` in the shell Profiler tool), generic animation
+(`AnimationPlayer` lifecycle + scene-authored entity `anim` tracks +
+`AnimTimeline` component + `on_anim_event` + snapshot restore), package
+save attestation (`<save>.packages.json` sidecar verified on load),
+input rebinding persistence (`save_contexts`/`bindings()`), MemoryTracker
+VRAM + 2D-cache attribution (`Window::draw` reports scene3d
+textures/meshes/targets and ui-image/ui-text caches per frame), mip-tail
+promotion verification, and `NativeAudioDirector` device-fault recovery
+(bounded 5 s retry rebuilds the output and resumes music; decode
+failures stay permanent).
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
