@@ -183,7 +183,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
 
 enum class WorkspaceView { Galaxy, System, Body };
 
-enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass };
+enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass, BodyEccentricity };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
@@ -251,7 +251,7 @@ struct Editor {
       hit_anomaly{}, hit_rare{}, hit_prewarp{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
       hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{},
-      hit_radius{}, hit_orbit{}, hit_mass{};
+      hit_radius{}, hit_orbit{}, hit_mass{}, hit_eccentricity{};
   // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
   bool menu_open{};
   UiRect menu_rect{};
@@ -298,9 +298,10 @@ engine::AnalyticOrbit body_orbit(const Editor &ed,
                                  const core::StellarSystem &sys,
                                  const core::PlanetaryBody &body) {
   auto orbit = core::planetary_stellar_orbit(sys, body);
-  if (const auto it = ed.body_edits.find(body.id);
-      it != ed.body_edits.end() && it->second.orbit_au)
-    orbit.radius = *it->second.orbit_au;
+  if (const auto it = ed.body_edits.find(body.id); it != ed.body_edits.end()) {
+    if (it->second.orbit_au) orbit.radius = *it->second.orbit_au;
+    if (it->second.eccentricity) orbit.eccentricity = *it->second.eccentricity;
+  }
   return orbit;
 }
 core::StellarPosition body_position(const Editor &ed,
@@ -322,6 +323,15 @@ std::optional<double> body_orbit_au(const Editor &ed,
     return it->second.orbit_au;
   if (body.stellar_exposure) return body.stellar_exposure->orbit_au;
   return std::nullopt;
+}
+// Effective stellar orbit eccentricity for display: the annotation wins,
+// then the generated record.
+double body_effective_eccentricity(const Editor &ed,
+                                   const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.eccentricity)
+    return *it->second.eccentricity;
+  return body.orbital_eccentricity;
 }
 double body_radius_earth(const Editor &ed, const core::PlanetaryBody &body) {
   if (const auto it = ed.body_edits.find(body.id);
@@ -463,16 +473,26 @@ void commit_active_field(Editor &ed) {
       ed.project_name = ed.edit_buffer;
     }
   } else if (ed.editing == Field::BodyRadius ||
-             ed.editing == Field::BodyOrbit || ed.editing == Field::BodyMass) {
-    // Body-only numeric overrides: empty restores AUTO, otherwise a positive
-    // finite number wins over the generated property.
+             ed.editing == Field::BodyOrbit || ed.editing == Field::BodyMass ||
+             ed.editing == Field::BodyEccentricity) {
+    // Body-only numeric overrides: empty restores AUTO, otherwise a finite
+    // in-range number wins over the generated property. Eccentricity accepts
+    // zero (circular) but is bounded below AnalyticOrbit's 0.95 rejection.
     const auto member =
         ed.editing == Field::BodyRadius ? &edproj::SystemEdit::radius_earth
         : ed.editing == Field::BodyOrbit ? &edproj::SystemEdit::orbit_au
+        : ed.editing == Field::BodyEccentricity
+            ? &edproj::SystemEdit::eccentricity
                                         : &edproj::SystemEdit::mass_earth;
     const auto label = ed.editing == Field::BodyRadius ? "radius"
                        : ed.editing == Field::BodyOrbit ? "orbit"
+                       : ed.editing == Field::BodyEccentricity
+                           ? "eccentricity"
                                                       : "mass";
+    const auto valid =
+        ed.editing == Field::BodyEccentricity
+            ? [](double v) { return v >= 0. && v < 0.95; }
+            : [](double v) { return v > 0.; };
     if (const auto target = annotation_target(ed); target && target->second) {
       const auto it = ed.body_edits.find(target->first);
       const auto current = it != ed.body_edits.end()
@@ -488,8 +508,8 @@ void commit_active_field(Editor &ed) {
       } else {
         try {
           const auto value = std::stod(ed.edit_buffer);
-          if (!std::isfinite(value) || value <= 0.)
-            throw std::runtime_error("not positive");
+          if (!std::isfinite(value) || !valid(value))
+            throw std::runtime_error("out of range");
           if (!current || *current != value) {
             ed.history.commit({ed.seed, ed.system_count, ed.edits,
                                ed.body_edits, ed.project_name});
@@ -497,7 +517,10 @@ void commit_active_field(Editor &ed) {
             rebuild_detail_rows(ed);
           }
         } catch (const std::exception &) {
-          ed.status = std::string(label) + " must be a positive number";
+          ed.status = std::string(label) +
+                      (ed.editing == Field::BodyEccentricity
+                           ? " must be between 0 and 0.95"
+                           : " must be a positive number");
           return; // keep the field open so the input is not silently dropped
         }
       }
@@ -581,7 +604,7 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
   if (body.parent_body_id)
     row("parent body", std::to_string(*body.parent_body_id));
   row("orbit index", std::to_string(body.orbit_index));
-  row("eccentricity", fspec("%.3f", body.orbital_eccentricity));
+  row("eccentricity", fspec("%.3f", body_effective_eccentricity(ed, body)));
   row("inclination",
       fspec("%.1f", body.orbital_inclination_degrees) + " deg");
   if (body.stellar_exposure) {
@@ -956,12 +979,29 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
                 ed.editing == Field::BodyOrbit, "orbit radius AU, empty = auto...",
                 font);
       y += ed.hit_orbit.height + 8 * s;
-    } else
+      out.overlay.push_back(
+          Text{{x, y}, "eccentricity override", muted, font - 1});
+      y += font + 4;
+      ed.hit_eccentricity = {x, y, r.width - 28 * s, (font + 12) * s};
+      const auto eccentricity_value =
+          ed.editing == Field::BodyEccentricity
+              ? ed.edit_buffer
+              : (stored.eccentricity
+                     ? fspec("%.3f", *stored.eccentricity)
+                     : fspec("%.3f", body.orbital_eccentricity) + " (auto)");
+      field_box(out, ed.hit_eccentricity, eccentricity_value,
+                ed.editing == Field::BodyEccentricity,
+                "0 to 0.95, empty = auto...", font);
+      y += ed.hit_eccentricity.height + 8 * s;
+    } else {
       ed.hit_orbit = {};
+      ed.hit_eccentricity = {};
+    }
   } else {
     ed.hit_radius = {};
     ed.hit_orbit = {};
     ed.hit_mass = {};
+    ed.hit_eccentricity = {};
   }
 
   // Embedded assets: files dropped under <project>/assets/ ride with the
@@ -2157,6 +2197,17 @@ int main(int argc, char **argv) {
               ed.edit_buffer =
                   it != ed.body_edits.end() && it->second.mass_earth
                       ? fspec("%.3f", *it->second.mass_earth)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_eccentricity.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyEccentricity;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.eccentricity
+                      ? fspec("%.3f", *it->second.eccentricity)
                       : std::string{};
               window.set_text_input(true);
             }

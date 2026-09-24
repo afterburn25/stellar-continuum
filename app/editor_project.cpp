@@ -26,6 +26,7 @@ std::string serialize_project(const EditorProject &project) {
       if (edit.radius_earth) row["radiusEarth"] = *edit.radius_earth;
       if (edit.orbit_au) row["orbitAu"] = *edit.orbit_au;
       if (edit.mass_earth) row["massEarth"] = *edit.mass_earth;
+      if (edit.eccentricity) row["eccentricity"] = *edit.eccentricity;
       rows.push_back(std::move(row));
     }
     return rows;
@@ -77,9 +78,16 @@ EditorProject parse_project(std::string_view text) {
         if (const auto it = row.find("massEarth");
             it != row.end() && it->is_number() && it->get<double>() > 0.)
           edit.mass_earth = it->get<double>();
+        // Eccentricity is the one override where zero is meaningful
+        // (circular orbit); AnalyticOrbit rejects >= 0.95.
+        if (const auto it = row.find("eccentricity");
+            it != row.end() && it->is_number() && it->get<double>() >= 0. &&
+            it->get<double>() < 0.95)
+          edit.eccentricity = it->get<double>();
         if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked ||
             edit.anomaly || edit.rare_resource || edit.pre_warp_civilization ||
-            edit.radius_earth || edit.orbit_au || edit.mass_earth)
+            edit.radius_earth || edit.orbit_au || edit.mass_earth ||
+            edit.eccentricity)
           out[row.at("id").get<int>()] = std::move(edit);
       }
     };

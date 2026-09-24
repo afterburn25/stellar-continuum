@@ -49,6 +49,7 @@ int main() {
     project.body_edits[3].radius_earth = 1.25; // numeric override
     project.body_edits[3].orbit_au = 1.524; // stellar orbit override
     project.body_edits[3].mass_earth = 0.83; // mass override
+    project.body_edits[3].eccentricity = 0.21; // orbit eccentricity override
     project.body_edits[9].note = "moon survey";
     project.name = "Survey Run \"Kestrel\"";
     const auto text = serialize_project(project);
@@ -99,6 +100,25 @@ int main() {
             "mass override did not round-trip");
     require(!restored.body_edits.at(9).mass_earth,
             "unset mass override must stay unset (AUTO follows generated)");
+    require(restored.body_edits.at(3).eccentricity &&
+                *restored.body_edits.at(3).eccentricity == 0.21,
+            "eccentricity override did not round-trip");
+    require(!restored.body_edits.at(9).eccentricity,
+            "unset eccentricity override must stay unset (AUTO follows generated)");
+
+    // Eccentricity is the one override where zero is meaningful (circular)
+    // and AnalyticOrbit rejects >= 0.95 — the codec enforces the same range.
+    {
+      const auto circular = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"eccentricity":0.0}]})");
+      require(circular.body_edits.at(3).eccentricity &&
+                  *circular.body_edits.at(3).eccentricity == 0.0,
+              "zero eccentricity must round-trip as a real override");
+      const auto hyperbolic = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"eccentricity":1.2}]})");
+      require(!hyperbolic.body_edits.contains(3),
+              "out-of-range eccentricity must not serialize an override");
+    }
 
     // Documents without the additive bodyEdits array still parse.
     const auto legacy = parse_project(

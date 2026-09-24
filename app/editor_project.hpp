@@ -33,6 +33,11 @@ struct SystemEdit {
   // same relationship generation applies — an overridden radius or mass
   // never leaves a stale gravity reading.
   std::optional<double> mass_earth;
+  // Stellar orbit eccentricity override (star-orbiting bodies only): unset
+  // follows the generated orbital_eccentricity; a set value wins for the
+  // Kepler ring and the day-phased position. Zero is meaningful (circular);
+  // values are bounded below AnalyticOrbit's 0.95 rejection.
+  std::optional<double> eccentricity;
 };
 
 struct EditorProject {
