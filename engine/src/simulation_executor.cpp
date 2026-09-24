@@ -189,6 +189,15 @@ void SimulationExecutor::finish_item(const WorkItem& item, std::uint64_t task_ns
     if (item.event_wake) ++total_wakeups_;
 }
 
+void SimulationExecutor::consume_tick() {
+    for (const auto& [key, task] : tasks_) {
+        if (task.tier == SimulationTier::Dormant)
+            scheduler_.dormant_consumed(key);
+        else
+            scheduler_.mark_ran(key);
+    }
+}
+
 SimulationStepReport SimulationExecutor::advance(SimulationBudget budget) {
     SimulationStepReport report;
     report.tick = scheduler_.tick();

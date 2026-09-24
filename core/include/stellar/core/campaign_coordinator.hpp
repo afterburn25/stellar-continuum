@@ -244,6 +244,31 @@ issue_civilian_return_to_base_order(
   [[nodiscard]] const stellar::engine::SimulationExecutor &
   executor() const noexcept { return executor_; }
 
+  // --- Phase cadence policy (simulation LOD) ------------------------
+  // Phase tasks default to the Active tier. Demotion is the executor's
+  // coarse-integration contract: a demoted phase runs once per policy
+  // period and receives the accumulated span scaled into its
+  // day-integration parameter (phase_days = simulation_days *
+  // elapsed_ticks), conserving total simulated time. Tick-count-driven
+  // phases (automatic_orders, legacy_research, economy_storage take no
+  // day parameter) accrue at their run cadence instead. Dormant is the
+  // event-driven tier — a dormant phase runs only when woken, with its
+  // full accumulated elapsed span. Byte-exact parity under demotion is
+  // a per-phase property proven by the seeded parity oracle, not by the
+  // plumbing: interactions with other phases between coarse runs are
+  // the general divergence source, so demotion stays an explicit
+  // opt-in policy decision.
+  [[nodiscard]] static std::optional<std::size_t>
+  phase_index(std::string_view phase) noexcept;
+  void set_phase_tier(std::string_view phase,
+                      stellar::engine::SimulationTier tier);
+  [[nodiscard]] stellar::engine::SimulationTier
+  phase_tier(std::string_view phase) const;
+  // Schedules a single out-of-cadence run on the next advance — the
+  // path commands take when a demoted/dormant phase must react to
+  // fresh orders or events before its cadence arrives.
+  void wake_phase(std::string_view phase);
+
   [[nodiscard]] bool has_matched_combat_runtime() const noexcept;
   [[nodiscard]] CivilizationStrategicRuntimeCoordinator &strategic_runtime()
       noexcept;

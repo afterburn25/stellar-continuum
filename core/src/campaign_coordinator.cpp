@@ -530,29 +530,34 @@ GalaxySimulationStepCoordinator::operator=(
 
 void GalaxySimulationStepCoordinator::configure_phase_tasks() {
   namespace eng = stellar::engine;
-  // One task per phase, chained in the historical phase order. All
-  // phases are Active tier today — the executor is the host so cadence
-  // can be demoted per phase later without restructuring advance().
+  // One task per phase, chained in the historical phase order. Phases
+  // start at the Active tier; set_phase_tier() demotes without
+  // restructuring advance(). Each day-integrating body scales its span
+  // by ctx.elapsed_ticks so a coarse run conserves simulated time.
   const std::array<eng::SimulationTask, phase_names.size()> phases{{
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
          advance_colony_economies(
              economy_world(campaign, step_.economic_construction,
                            step_.economic_fleets),
-             campaign.colonies, campaign.economies, step_.simulation_days,
+             campaign.colonies, campaign.economies, phase_days,
              advance_legacy_research_);
          timing.finish(performance_[0]);
        },
        .domain = "economy"},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
          (void)strategic_.advance(
              {campaign.seed,
               strategic_input_world(campaign, step_.state->lanes()),
               campaign_civilization_control(campaign)},
-             step_.simulation_days);
+             phase_days);
          timing.finish(performance_[1]);
        },
        .domain = "strategic_ai"},
@@ -567,9 +572,11 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          timing.finish(performance_[2]);
        },
        .domain = "automatic_orders"},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
          for (const auto &civilization : campaign.civilizations) {
            if (civilization.is_seeded_ancient)
              continue;
@@ -590,10 +597,10 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
                std::max(economy->industry, 0.0),
                construction_industry_demand(construction.read(),
                                             civilization.id,
-                                            step_.simulation_days),
+                                            phase_days),
                shipbuilding_industry_demand(shipbuilding.read(),
                                             civilization.id,
-                                            step_.simulation_days)};
+                                            phase_days)};
            validate_allocation_value(context.available_industry,
                                      "AvailableIndustry");
            validate_allocation_value(context.construction_demand,
@@ -614,27 +621,31 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          timing.finish(performance_[3]);
        },
        .domain = "industry_allocation", .depends_on = {2}},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
          step_.result->construction_events = advance_construction(
              construction_world(campaign, construction_capability_),
              std::span<const ConstructionIndustryBudget>{
                  step_.construction_budgets},
-             step_.simulation_days);
+             phase_days);
          timing.finish(performance_[4]);
        },
        .domain = "construction", .depends_on = {3}},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
          step_.result->shipbuilding_events = advance_shipbuilding(
              shipbuilding_world(campaign, shipbuilding_capability_,
                                 strategic_,
                                 use_strategic_shipbuilding_preferences_),
              std::span<const ConstructionIndustryBudget>{
                  step_.shipbuilding_budgets},
-             step_.simulation_days);
+             phase_days);
          timing.finish(performance_[5]);
        },
        .domain = "shipbuilding", .depends_on = {3}},
@@ -649,9 +660,11 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          timing.finish(performance_[6]);
        },
        .domain = "legacy_research", .depends_on = {5}},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
          step_.result->exploration_events = subsystems_.exploration.advance(
              {campaign.systems, campaign.bodies, campaign.civilizations,
               campaign.fleets, campaign.colonies, campaign.economies,
@@ -661,38 +674,44 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
                       campaign.generation_metadata->phenomena
                   ? &*campaign.generation_metadata->phenomena
                   : nullptr},
-             step_.simulation_days);
+             phase_days);
          timing.finish(performance_[7]);
        },
        .domain = "exploration", .depends_on = {6}},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
          subsystems_.freight.advance(
              {campaign.systems, campaign.civilizations, campaign.bodies,
               campaign.construction, campaign.fleets, campaign.colonies,
               campaign.economies, step_.state->lanes()},
-             step_.simulation_days);
+             phase_days);
          timing.finish(performance_[8]);
        },
        .domain = "freight", .depends_on = {7}},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
          step_.result->combat_events = simulation(combat_).advance(
-             {campaign.systems, campaign.fleets}, step_.simulation_days);
+             {campaign.systems, campaign.fleets}, phase_days);
          timing.finish(performance_[9]);
        },
        .domain = "combat", .depends_on = {8}},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
          step_.result->colonization_events = subsystems_.colonization.advance(
              {campaign.systems, campaign.bodies, campaign.civilizations,
               campaign.colonies, campaign.fleets, campaign.economies,
               campaign.knowledge, step_.state->lanes(),
               campaign_civilization_control(campaign)},
-             step_.simulation_days);
+             phase_days);
          timing.finish(performance_[10]);
        },
        .domain = "colonization", .depends_on = {9}},
@@ -720,6 +739,42 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
     executor_.add(static_cast<eng::SimulationExecutor::Key>(i),
                   std::move(task));
   }
+}
+
+std::optional<std::size_t>
+GalaxySimulationStepCoordinator::phase_index(std::string_view phase) noexcept {
+  for (std::size_t i = 0; i < phase_names.size(); ++i)
+    if (phase_names[i] == phase) return i;
+  return std::nullopt;
+}
+
+void GalaxySimulationStepCoordinator::set_phase_tier(
+    std::string_view phase, stellar::engine::SimulationTier tier) {
+  const auto index = phase_index(phase);
+  if (!index)
+    throw std::invalid_argument("Unknown coordinator phase: " +
+                                std::string(phase));
+  executor_.set_tier(
+      static_cast<stellar::engine::SimulationExecutor::Key>(*index), tier);
+}
+
+stellar::engine::SimulationTier
+GalaxySimulationStepCoordinator::phase_tier(std::string_view phase) const {
+  const auto index = phase_index(phase);
+  if (!index)
+    throw std::invalid_argument("Unknown coordinator phase: " +
+                                std::string(phase));
+  return executor_.tier(
+      static_cast<stellar::engine::SimulationExecutor::Key>(*index));
+}
+
+void GalaxySimulationStepCoordinator::wake_phase(std::string_view phase) {
+  const auto index = phase_index(phase);
+  if (!index)
+    throw std::invalid_argument("Unknown coordinator phase: " +
+                                std::string(phase));
+  executor_.wake(
+      static_cast<stellar::engine::SimulationExecutor::Key>(*index));
 }
 
 SimulationStepResult GalaxySimulationStepCoordinator::advance(
@@ -763,7 +818,15 @@ SimulationStepResult GalaxySimulationStepCoordinator::advance(
   SimulationStepResult result;
   result.simulation_days = simulation_days;
   step_.result = &result;
-  executor_.advance();
+  try {
+    executor_.advance();
+  } catch (...) {
+    // An aborted step consumed this tick: phases that ran integrated
+    // their span, and the retry is a new logical step — un-run phases
+    // must not double-integrate the aborted span on top of it.
+    executor_.consume_tick();
+    throw;
+  }
   return result;
 }
 

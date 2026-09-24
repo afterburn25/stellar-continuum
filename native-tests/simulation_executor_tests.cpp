@@ -101,6 +101,58 @@ int main() {
         check(runs == 1, "dormant stays dormant after event run");
     }
 
+    // consume_tick: an aborted step consumes its span for every task —
+    // a retried logical step sees elapsed 1, not the aborted tick's
+    // carry-over. Pending wake/dirty flags survive consumption.
+    {
+        SimulationExecutor exec;
+        int first_runs = 0, second_runs = 0;
+        std::uint64_t retry_elapsed = 0;
+        bool threw = true;
+        exec.add(1, task(SimulationTier::Active, "sys",
+                         [&](const SimulationTickContext&) {
+                             ++first_runs;
+                             if (threw) throw std::runtime_error("abort");
+                         }));
+        exec.add(2, task(SimulationTier::Active, "sys",
+                         [&](const SimulationTickContext& c) {
+                             ++second_runs;
+                             retry_elapsed = c.elapsed_ticks;
+                         }));
+        try {
+            exec.advance();
+        } catch (const std::runtime_error&) {
+        }
+        check(first_runs == 1 && second_runs == 0,
+              "aborted tick leaves later tasks un-run");
+        exec.consume_tick();
+        threw = false;
+        exec.advance();
+        check(second_runs == 1 && retry_elapsed == 1,
+              "retry integrates only its own span after consume_tick");
+
+        // Without consume_tick the retry would see the aborted tick's
+        // elapsed carry-over.
+        SimulationExecutor exec2;
+        std::uint64_t carried = 0;
+        bool threw2 = true;
+        exec2.add(1, task(SimulationTier::Active, "sys",
+                          [&](const SimulationTickContext&) {
+                              if (threw2) throw std::runtime_error("abort");
+                          }));
+        exec2.add(2, task(SimulationTier::Active, "sys",
+                          [&](const SimulationTickContext& c) {
+                              carried = c.elapsed_ticks;
+                          }));
+        try {
+            exec2.advance();
+        } catch (const std::runtime_error&) {
+        }
+        threw2 = false;
+        exec2.advance();
+        check(carried == 2, "un-consumed abort carries elapsed forward");
+    }
+
     // Dependency ordering: dependent runs after dependency when both due;
     // ordering-only when the dependency is not due.
     {

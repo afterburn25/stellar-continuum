@@ -132,6 +132,14 @@ public:
     void set_paused(bool paused) noexcept { paused_ = paused; }
     [[nodiscard]] bool paused() const noexcept { return paused_; }
 
+    // Marks every registered task as having consumed the current tick —
+    // for owners that treat an aborted step as consuming its elapsed
+    // span: a mid-pipeline exception followed by a retry of the same
+    // logical step must not let un-run tasks double-integrate the
+    // aborted span on top of the retry's own. Wake/dirty flags are
+    // left intact so pending event wakeups still fire.
+    void consume_tick();
+
     [[nodiscard]] Tick tick() const noexcept { return scheduler_.tick(); }
     [[nodiscard]] std::uint64_t dormant_elapsed(Key key) const;
     void dormant_consumed(Key key);

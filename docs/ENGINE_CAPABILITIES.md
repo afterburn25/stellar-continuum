@@ -31,7 +31,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Stellar activity scheduler | IMPLEMENTED | Core `stellar_activity.cpp`, `CampaignFrame` independent clock | `stellar_activity`, persistence tests | Scoped event timeline/history and CME hooks; damage/space-weather game effects remain unfinished |
 | Stellar VFX rendering | IMPLEMENTED BUT NEEDS POLISH | App eruption art/effects; Engine surface attachments/curved mesh; engine `VfxSystem` general framework — shared `EmitterDefinition`s, deterministic fixed-capacity pools, per-instance LOD rate fade, entity attachments, global particle budget (demand-proportional rate taper + hard headroom; `RuntimeHost` defaults to 64k) | `native_stellar_eruptions`, scene GPU tests, `render_pipeline` (budget/LOD/determinism) | Image-derived curved surfaces; client eruption art still bespoke rather than authored on `VfxSystem` |
 | Entity identity | PARTIALLY IMPLEMENTED | Engine `EntityRegistry` in `foundation.hpp`; Core domain IDs | `foundation`, persistence tests | No unified World/component store or full entity lifecycle across game domains |
-| Clocks/scheduling | IMPLEMENTED BUT NEEDS POLISH | Engine `FixedClock`; `SimulationScheduler`/`SimulationExecutor` tiered LOD with dependency-chained tasks, dirty/event wakeups, capture/restore; Core strategic/tactical/developer clocks; `GalaxySimulationStepCoordinator` routes all 12 phases through the executor preserving order | `foundation`, `strategic_clock_parity`, `campaign_frame_parity`, `simulation_executor`, `simulation_persistence`, `simulation_scale_*`, `campaign_coordinator*` | Phases remain sequential (one dependency chain); all phases Active tier — per-phase cadence tuning and intra-step parallelism unexercised |
+| Clocks/scheduling | IMPLEMENTED BUT NEEDS POLISH | Engine `FixedClock`; `SimulationScheduler`/`SimulationExecutor` tiered LOD with dependency-chained tasks, dirty/event wakeups, `consume_tick` abort semantics, capture/restore; Core strategic/tactical/developer clocks; `GalaxySimulationStepCoordinator` routes all 12 phases through the executor preserving order — phase cadence policy (`set_phase_tier`/`wake_phase`, elapsed-span scaling) gated by the seeded `campaign_phase_cadence_oracle` | `foundation`, `strategic_clock_parity`, `campaign_frame_parity`, `simulation_executor`, `simulation_persistence`, `simulation_scale_*`, `campaign_coordinator*`, `campaign_phase_cadence_oracle` | Phases remain sequential (one dependency chain); all phases still Active in production — demotion policies must clear the parity oracle per phase before adoption; intra-step parallelism unexercised |
 | Jobs/threading | PARTIALLY IMPLEMENTED | Engine `JobSystem` (priorities, cancel tokens, `submit_graph` dependency graphs, per-tag stats); save writer, image preparation, audio director, territory overlay, campaign session, planet-material decode queue | `job_system`, `foundation`, image preparation, campaign session, planet-material tests | Bounded specialized consumers; no work-stealing or affinity policy |
 | Events | PARTIALLY IMPLEMENTED | Engine owner-thread `EventQueue<T>` + `event_bus.cpp` typed subscriptions; Core domain events | `foundation`, `event_bus`, `mission_graph`, notification/activity tests | Event bus library unconsumed by the game; no cross-thread dispatch policy |
 | Physics utilities | PARTIALLY IMPLEMENTED | Engine `physics3d.hpp`, `analytic_orbit.hpp`, `broadphase.hpp` (`UniformBroadphase<2|3>` uniform-grid candidate pairs — sorted/deduplicated, never misses a true AABB overlap; `RuntimeHost` 2D+3D contact scans consume it, replacing O(n²) pairwise enumeration) | scene/triangle/orbit/scale tests; `render_pipeline` broadphase correctness; `engine_world` collision/landing | Kinematics, continuous primitive queries and AABB broadphase; no general rigid-body/constraint/N-body world |
@@ -966,9 +966,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   matching `galaxy_phenomena_json.hpp`) for all of those State
   structs so campaign save codecs can embed framework state without
   hand-written field lists.
+  `SimulationExecutor::consume_tick()` marks every task as having
+  consumed the current tick — the aborted-step contract: a mid-pipeline
+  exception followed by a retry of the same logical step must not let
+  un-run tasks double-integrate the aborted span.
 - **Consumers/tests:** `simulation_executor` functional tests (cadence,
   elapsed catch-up, dirty/event/dormant wakes, ordering, budgets,
-  pause, promotion, parallel≡serial state),
+  pause, promotion, parallel≡serial state, consume_tick abort/retry
+  semantics),
   `stellar_simulation_persistence_tests` (struct round-trip),
   `stellar_framework_persistence_tests` (all frameworks),
   `stellar_framework_state_codec_tests` (JSON round-trip through
@@ -977,10 +982,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   ctest `simulation_scale_250/500/1000/2500/5000` — serial and parallel
   checksums verified identical. **Core consumer:** the 12
   `GalaxySimulationStepCoordinator` phases (economy → economy_storage)
-  run as Active-tier executor tasks dependency-chained in the historical
+  run as executor tasks dependency-chained in the historical
   order; `campaign_coordinator_parity` (28 step + 8 combat cases)
-  verifies identical behavior. Phase tier demotion is now a data change,
-  not a restructure.
+  verifies identical behavior. **Phase cadence policy** is now
+  coordinator-owned data: `set_phase_tier`/`phase_tier`/`wake_phase`
+  demote any phase (Dormant = event-driven), day-integrating phases
+  scale their span by `elapsed_ticks` so coarse runs conserve simulated
+  time, and `coordinator.advance()` consumes the tick on exception so a
+  retried step cannot double-integrate. The **seeded parity oracle**
+  (`campaign_phase_cadence_oracle` ctest) captures a GalaxyPayloadV16
+  digest after every step and proves all-active determinism,
+  byte-exact parity for phases inert across the trace, honest
+  divergence when a live phase is demoted, and dormant→wake accounting
+  — the gate any real demotion policy must pass before adoption.
 - **Save/performance impact:** tasks are code — re-registered on load,
   never serialized; cadence bookkeeping is derivable. 5000-task
   registration ≈ 320 KB task-state in the benchmark model; serial
@@ -988,9 +1002,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Limitations:** ordering-only dependencies (no cross-tick dataflow);
   wall budget checked between tasks/waves (a single oversized task is
   never preempted); parallel waves wait fully between levels; cadence is
-  owner policy, not adaptive. The coordinator runs serial at Active
-  tier — parallel waves and tier demotion of Core phases are future
-  tuning, not yet enabled.
+  owner policy, not adaptive. The coordinator runs serial with all
+  phases Active — tick-count-driven phases (automatic_orders,
+  legacy_research, economy_storage) have no day parameter to scale, so
+  their demotion accrues at run cadence only; no production phase is
+  demoted yet — each adoption must clear the parity oracle.
 - **Future reuse:** the executor is the intended host for economy,
   population, colony, logistics and civilization-AI cadences in
   milestones 2–9 of the space-strategy specialization.
