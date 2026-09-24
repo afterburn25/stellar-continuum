@@ -1221,6 +1221,26 @@ int RuntimeHost::run() {
       }
     }
   }
+  // --dump-bindings prints the resolved action map (defaults plus any
+  // --input-map contexts) and exits before the loop — a scriptable way
+  // to inspect what a generated game's controls resolved to.
+  if (options.dump_bindings) {
+    for (const auto &name : impl.input.context_names()) {
+      const auto *ctx = impl.input.context(name);
+      if (!ctx) continue;
+      std::printf("context %s%s\n", ctx->name.c_str(),
+                  ctx->exclusive ? " (exclusive)" : "");
+      for (const auto &action : ctx->actions) {
+        const char *type =
+            action.type == InputAction::Type::Axis1D  ? "Axis1D"
+            : action.type == InputAction::Type::Axis2D ? "Axis2D"
+                                                       : "Button";
+        std::printf("  %s [%s] %s\n", action.name.c_str(), type,
+                    describe_bindings(action.bindings).c_str());
+      }
+    }
+    return 0;
+  }
   float accumulator = 0.f;
   int rendered = 0;
   auto last = std::chrono::steady_clock::now();
@@ -2527,6 +2547,8 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.replay_exit = true;
     else if (std::string_view{argv[i]} == "--headless")
       impl_->options.headless = true;
+    else if (std::string_view{argv[i]} == "--dump-bindings")
+      impl_->options.dump_bindings = true;
   }
   for (int i = 1; i + 1 < argc; ++i) {
     const std::string_view arg{argv[i]};

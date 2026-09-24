@@ -105,6 +105,11 @@ struct RuntimeHostOptions {
   // --replay-exit or recorded Escape the loop never exits on its own.
   // audio() must not be called in a headless run — there is no device.
   bool headless{false};
+  // --dump-bindings: print the resolved input map (built-in "game"
+  // context plus any --input-map contexts) as
+  // "context <name> / <action> [<type>] <bindings>" lines and exit 0
+  // before the loop. Pair with --headless to skip window creation.
+  bool dump_bindings{false};
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content

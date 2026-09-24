@@ -151,6 +151,18 @@ int main() {
     check(host.run() == 1, "forged checkpoint diverges and exits nonzero");
   }
 
+  // --dump-bindings prints the resolved action map and exits before the
+  // loop — the sim never ticks.
+  {
+    auto options = headless_options(root);
+    options.dump_bindings = true;
+    RuntimeHost host{options};
+    bool updated = false;
+    host.on_update = [&](World &, float) { updated = true; };
+    check(host.run() == 0, "dump-bindings exits cleanly");
+    check(!updated, "dump-bindings exits before the sim loop");
+  }
+
   std::filesystem::remove_all(root, ec);
   if (failures == 0)
     std::cout << "engine runtime host tests passed\n";
