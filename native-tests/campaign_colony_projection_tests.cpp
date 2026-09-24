@@ -334,6 +334,19 @@ int main() {
     foreign.radius_earth = 1.0;
     foreign.mass_earth = 1.0;
     world.bodies.push_back(foreign);
+    // Body violating the authoritative validator's bounds: zero
+    // radius, negative orbit index, unbound eccentricity, over-range
+    // inclination, and a Moon kind with no parent.
+    PlanetaryBody broken_body;
+    broken_body.id = 21;
+    broken_body.system_id = 7;
+    broken_body.kind = PlanetaryBodyKind::Moon;
+    broken_body.radius_earth = 0.0;
+    broken_body.mass_earth = 1.0;
+    broken_body.orbit_index = -1;
+    broken_body.orbital_eccentricity = 1.5;
+    broken_body.orbital_inclination_degrees = 200.0;
+    world.bodies.push_back(broken_body);
     CivilizationEconomy broken;
     broken.civilization_id = 1;
     broken.operating_arrears = -3.0;
@@ -407,9 +420,10 @@ int main() {
     int invalid = 0, species = 0, type = 0, orphan = 0, positive = 0,
         duplicate = 0, orphans = 0, tech = 0, overflow_n = 0,
         fleet_refs = 0, ranged = 0, route_refs = 0, positions = 0,
-        knowledge_refs = 0, intel_refs = 0;
+        knowledge_refs = 0, intel_refs = 0, body_parent = 0;
     for (const auto &finding : findings) {
-      if (finding.event_type == "out_of_range") ++ranged;
+      if (finding.event_type == "invalid_body_parent") ++body_parent;
+      else if (finding.event_type == "out_of_range") ++ranged;
       else if (finding.event_type == "invalid_nonnegative_value") ++invalid;
       else if (finding.event_type == "invalid_position") ++positions;
       else if (finding.event_type == "orphaned_route_hop" ||
@@ -438,9 +452,14 @@ int main() {
       else if (finding.event_type == "orphaned_freight" ||
                finding.event_type == "orphaned_target") ++fleet_refs;
     }
-    check(invalid == 8,
-          "stability, condition, arrears, hull, sensor, revision and "
-          "observation magnitudes flag invalid values");
+    check(invalid == 9,
+          "stability, condition, arrears, hull, sensor, revision, "
+          "orbit index and observation magnitudes flag invalid values");
+    check(positive == 2 && body_parent == 1,
+          "zero speed/radius and the parentless Moon are flagged");
+    check(ranged == 6,
+          "transit, fuel, cargo, fractions and orbit bounds flag "
+          "over-range values");
     check(knowledge_refs == 2 && intel_refs == 2,
           "absent knowledge/intel observers and targets are flagged");
     check(positions == 1 && route_refs == 2,
@@ -448,16 +467,12 @@ int main() {
           "overflow are flagged");
     check(species == 2 && type == 1 && orphan == 2,
           "uncatalogued species/types and absent refs are flagged");
-    check(positive == 1 && duplicate == 1,
-          "zero strategic speed and duplicate system are flagged");
+    check(duplicate == 1, "duplicate system is flagged");
     check(orphans == 4 && tech == 1 && overflow_n == 1,
           "home/research/construction/shipyard orphans, unknown tech "
           "and queue overflow are flagged");
     check(fleet_refs == 2,
           "freight and attack orders flag absent colony/fleet refs");
-    check(ranged == 4,
-          "transit progress, fuel, cargo and funding fraction flag "
-          "over-bound values");
     // The ops pass skips the corrupt entities rather than throwing —
     // before the guards, any of these escaped the whole pass.
     (void)inspect_campaign_operations(world, 0, 100.0);

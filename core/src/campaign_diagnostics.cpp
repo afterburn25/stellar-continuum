@@ -510,9 +510,18 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   for(const auto &d:surface_building_catalog())known_types.insert(d.id);
   for(const auto &p:species_biology_profiles())known_species.insert(p.id);
   for(const auto &t:legacy_technology_catalog())known_techs.insert(t.id);
-  for(const auto &s:w.systems)if(!std::isfinite(s.position.x)||!std::isfinite(s.position.y)||
-      (s.position.depth_light_years&&!std::isfinite(*s.position.depth_light_years)))
-    emit("galaxy","invalid_position",s.id,"System position is not finite.");
+  for(const auto &s:w.systems){
+    if(!std::isfinite(s.position.x)||!std::isfinite(s.position.y)||
+        (s.position.depth_light_years&&!std::isfinite(*s.position.depth_light_years)))
+      emit("galaxy","invalid_position",s.id,"System position is not finite.");
+    if(s.engulfed_planets<0)emit("galaxy","invalid_nonnegative_value",s.id,"Engulfed planet count is negative.");
+  }
+  if(w.stellar_activity_day)positive(*w.stellar_activity_day,"Stellar activity day",0,"galaxy");
+  if(w.core){
+    if(!std::isfinite(w.core->position.x)||!std::isfinite(w.core->position.y))
+      emit("galaxy","invalid_position",0,"Galactic core position is not finite.");
+    positive(w.core->exclusion_radius,"Core exclusion radius",0,"galaxy");
+  }
   for(const auto &b:w.bodies){
     if(!systems.contains(b.system_id))emit("planet","orphaned_body",b.id,"Planetary body references an absent system.");
     if(b.parent_body_id&&!bodies.contains(*b.parent_body_id))emit("planet","orphaned_parent",b.id,"Moon references an absent parent body.");
@@ -525,7 +534,21 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       }
       if(cur)emit("planet","cyclic_parent",b.id,"Body parent chain revisits a body.");
     }
-    positive(b.radius_earth,"Body radius",b.id,"planet");positive(b.mass_earth,"Body mass",b.id,"planet");
+    // Mirrors validate_planetary_body's authoritative bounds — the
+    // loader enforces these, so violations are post-load corruption.
+    if(!std::isfinite(b.radius_earth)||b.radius_earth<=0.0)
+      emit("planet","invalid_positive_value",b.id,"Body radius is non-finite or non-positive.");
+    if(!std::isfinite(b.mass_earth)||b.mass_earth<=0.0)
+      emit("planet","invalid_positive_value",b.id,"Body mass is non-finite or non-positive.");
+    if(b.orbit_index<0)emit("planet","invalid_nonnegative_value",b.id,"Orbit index is negative.");
+    if(!std::isfinite(b.orbital_eccentricity)||b.orbital_eccentricity<0.0||b.orbital_eccentricity>=1.0)
+      emit("planet","out_of_range",b.id,"Orbital eccentricity is outside [0, 1).");
+    if(!std::isfinite(b.orbital_inclination_degrees)||b.orbital_inclination_degrees<0.0||b.orbital_inclination_degrees>180.0)
+      emit("planet","out_of_range",b.id,"Orbital inclination is outside [0, 180] degrees.");
+    if(b.kind==PlanetaryBodyKind::Moon&&!b.parent_body_id)
+      emit("planet","invalid_body_parent",b.id,"Moon has no parent body.");
+    if(b.kind!=PlanetaryBodyKind::Moon&&b.parent_body_id)
+      emit("planet","invalid_body_parent",b.id,"Primary body cannot have a parent body.");
   }
   for(const auto &c:w.colonies){
     if(!systems.contains(c.system_id)||!civilizations.contains(c.civilization_id)||
