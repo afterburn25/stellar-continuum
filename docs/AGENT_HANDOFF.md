@@ -1239,9 +1239,14 @@ dropdown, region navigation, six CheckBox-classified option toggles)
 and the system-background debug overlay (eight option/region buttons
 through a shared `activate_button` dispatch) adopted the same contract;
 `galaxy_phenomena` and `system_background` pin their rings. The
+giant/ring test panel follows: all twenty buttons ring in (y,x) order,
+activation replays the shared `activate_button` switch so spectrum,
+distance, tilt and subclass changes run `apply_developer_giant_test`
+unchanged, the ring/planet shadow toggles classify CheckBox, and the
+3D preview stays pointer-spatial; `native_giant_visual` pins it. The
 remaining developer panels (diagnostics, empire monitor, simulation
-panel, giant test, stellar activity) stay pointer-only — they predate
-the contract and adopt it incrementally from here.
+panel, stellar activity) stay pointer-only — they predate the contract
+and adopt it incrementally from here.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

@@ -5806,6 +5806,7 @@ class NativeCampaign final {
            (developer_planet_index_.visible()&&developer_planet_index_.focus()>=0)||
            (phenomena_debug_.visible&&phenomena_debug_.focus()>=0)||
            (background_debug_.visible()&&background_debug_.focus()>=0)||
+           (giant_test_panel_.visible()&&giant_test_panel_.focus()>=0)||
            hud_focus_>=0||
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
@@ -6169,7 +6170,16 @@ class NativeCampaign final {
         gesture_.capture_for_ui();continue;
       }
       if(developer_session()&&developer_diagnostics_.handle(event,width,height,developer_monitor_)){gesture_.capture_for_ui();continue;}
-      if(developer_session()&&giant_test_panel_.handle(event,width,height,session_->frame())){gesture_.capture_for_ui();continue;}
+      if(developer_session()){
+        const int giant_test_focus_before=giant_test_panel_.focus();
+        if(giant_test_panel_.handle(event,width,height,session_->frame())){
+          if(giant_test_panel_.focus()!=giant_test_focus_before)
+            announcer_.announce_focus(giant_test_panel_.focused_label(width,height),
+              announcement_bounds(giant_test_panel_.focused_bounds(width,height)),
+              std::nullopt,giant_test_panel_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
+        }
+      }
       if(developer_session()){
         const int developer_planet_index_focus_before=developer_planet_index_.focus();
         if(developer_planet_index_.handle(event,width,height,session_->frame())){
