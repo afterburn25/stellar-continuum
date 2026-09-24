@@ -9030,7 +9030,8 @@ int main(int argc,char **argv){
          <<",\"build_id\":"<<json_string(recording->header().build_id)
          <<",\"game_version\":"<<json_string(recording->header().game_version)
          <<",\"commands\":"<<recording->commands().size()
-         <<",\"truncated\":"<<(recording->truncated()?"true":"false");
+         <<",\"truncated\":"<<(recording->truncated()?"true":"false")
+         <<",\"memory_bytes\":"<<recording->estimated_memory_bytes();
       if(!recording->commands().empty()){
         const auto [lo,hi]=std::ranges::minmax(recording->commands(),{},
             &stellar::engine::ReplayCommand::tick);
