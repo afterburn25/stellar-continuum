@@ -337,6 +337,7 @@ campaign_world_projection_census(const FreshCampaignState &state) {
   auto world = project_campaign_world(state);
   CampaignWorldProjectionCensus census;
   census.entities = static_cast<int>(world.size());
+  census.estimated_memory_bytes = world.estimated_memory_bytes();
   census.systems = static_cast<int>(world.view<CampaignSystemTag>().size());
   census.bodies = static_cast<int>(world.view<CampaignBodyTag>().size());
   census.civilizations =

@@ -128,6 +128,9 @@ struct CampaignWorldProjectionCensus {
   int economies{}, technologies{}, construction{}, shipyards{};
   int entities{}, legacy_bound{};
   int parented{}, unparented{};
+  // Projected store's container-storage footprint — the projection scales
+  // with galaxy size, so its occupancy is worth measuring.
+  std::size_t estimated_memory_bytes{};
 };
 
 [[nodiscard]] CampaignWorldProjectionCensus

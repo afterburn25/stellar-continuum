@@ -191,6 +191,31 @@ void World::clear() {
     membership_.clear();
 }
 
+namespace {
+template <class Map>
+std::size_t map_storage_estimate(const Map &map) noexcept {
+    // Node-based unordered_map: one allocation per node (value + link) plus
+    // the bucket array.
+    return map.size()*(sizeof(typename Map::value_type)+2*sizeof(void*))
+         + map.bucket_count()*sizeof(void*);
+}
+} // namespace
+
+std::size_t World::estimated_memory_bytes() const {
+    std::size_t total = registry_.memory_bytes();
+    for (const auto &[key, store] : stores_) total += store->memory_bytes();
+    total += map_storage_estimate(stores_);
+    total += map_storage_estimate(parents_);
+    total += map_storage_estimate(legacy_to_entity_);
+    total += map_storage_estimate(entity_to_legacy_);
+    total += map_storage_estimate(codecs_);
+    for (const auto &[key, children] : children_)
+        total += children.capacity()*sizeof(EntityId);
+    total += map_storage_estimate(children_);
+    total += membership_.capacity()*sizeof(EntityId);
+    return total;
+}
+
 std::vector<std::uint8_t> World::snapshot() const {
     Writer writer;
     writer.u32(snapshot_magic);

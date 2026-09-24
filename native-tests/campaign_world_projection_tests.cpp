@@ -365,6 +365,17 @@ int main() {
     check(census.legacy_bound == 13, "every entity is legacy-bound");
     check(census.parented == 9 && census.unparented == 4,
           "census counts resolved parents (civs+systems+orphan unparented)");
+    check(census.estimated_memory_bytes > 0,
+          "census reports the projected store's container footprint");
+    // A larger projection reports a larger footprint — the estimate
+    // tracks occupancy, not a fixed constant.
+    auto bigger = state;
+    bigger.systems.push_back(state.systems.front());
+    bigger.systems.back().id = 90001;
+    const auto bigger_census = campaign_world_projection_census(bigger);
+    check(bigger_census.estimated_memory_bytes >
+              census.estimated_memory_bytes,
+          "footprint estimate does not track entity growth");
   }
 
   if (failures == 0)

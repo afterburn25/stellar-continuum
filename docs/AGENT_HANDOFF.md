@@ -606,6 +606,18 @@ session tests green. Verified: `campaign_frame_parity` asserts the record
 on its real StrategicFailure throw and its absence after the moved-owner
 advance; 8/8 across diagnostics/fault/session/QA surface green
 (qa_host 29 s).
+World memory census (row 20): `World::estimated_memory_bytes()` plus
+`EntityRegistry::memory_bytes()` and component-store `memory_bytes()`
+measure container capacities (registry slots/free, sparse/dense vectors,
+hierarchy + legacy maps, codecs, membership) — occupancy reporting for
+`MemoryTracker::report`, not allocator truth; `TrackedAllocator` stays
+opt-in rather than retrofitting the World speculatively. The developer
+report registers the projected campaign world as the
+`campaign-world-projection` subsystem and carries
+`worldProjection.estimatedMemoryBytes` in session metadata.
+`engine_diagnostics` covers census growth; `campaign_world_projection`
+covers the census footprint field; 6/6 across the diagnostics/projection/
+report/QA surface green (qa_host 50 s).
 Caveat: `stellar_campaign_phase_profile_tests`/`campaign_phase_cadence`
 compile-fail on `set_phase_tier`/`wake_phase` — the coordinator API is
 mid-refactor in the other agent's lane, not a diagnostics regression.

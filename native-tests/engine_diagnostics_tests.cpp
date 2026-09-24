@@ -1,6 +1,7 @@
 #include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/foundation.hpp>
+#include <stellar/engine/world.hpp>
 
 #include <atomic>
 #include <iostream>
@@ -130,6 +131,25 @@ int main() {
         check(json.find("\"gpu.textures\"") != std::string::npos,
               "memory JSON export contains subsystems");
         check(!tracker.overlay_lines().empty(), "memory overlay lines produced");
+    }
+
+    // World occupancy census — container capacities, observational only.
+    {
+        World world;
+        const auto empty_bytes = world.estimated_memory_bytes();
+        const auto a = world.create();
+        world.add<int>(a, 7);
+        const auto grown_bytes = world.estimated_memory_bytes();
+        check(grown_bytes > empty_bytes,
+              "world census grows with entities and components");
+        for (int i = 0; i < 64; ++i) {
+            const auto e = world.create();
+            world.add<int>(e, i);
+        }
+        check(world.estimated_memory_bytes() > grown_bytes,
+              "world census tracks container growth");
+        check(MemoryTracker::instance().snapshot().subsystems.size() >= 3,
+              "subsystems persist across census calls");
     }
 
     if (failures != 0) {

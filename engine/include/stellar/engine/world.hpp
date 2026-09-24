@@ -116,6 +116,11 @@ public:
     void restore(const std::vector<std::uint8_t>& bytes);
     void clear();
 
+    // Approximate container-storage footprint: vector capacities plus
+    // node/bucket estimates for the index maps. Intended for
+    // MemoryTracker::report — measures occupancy, not allocator truth.
+    [[nodiscard]] std::size_t estimated_memory_bytes() const;
+
     static constexpr std::uint32_t snapshot_magic = 0x31575453; // "STW1"
     static constexpr std::uint32_t snapshot_version = 1;
 
@@ -132,6 +137,7 @@ private:
     public:
         virtual ~ComponentStoreBase() = default;
         virtual void erase(EntityId id) = 0;
+        [[nodiscard]] virtual std::size_t memory_bytes() const noexcept = 0;
     };
 
     template <class T>
@@ -173,6 +179,11 @@ private:
         }
         void erase(EntityId id) override { remove(id); }
         [[nodiscard]] const std::vector<EntityId>& entities() const { return dense_ids_; }
+        std::size_t memory_bytes() const noexcept override {
+            return sparse_.capacity()*sizeof(std::uint32_t)
+                 + dense_ids_.capacity()*sizeof(EntityId)
+                 + dense_.capacity()*sizeof(T);
+        }
 
         static constexpr std::uint32_t sentinel = std::numeric_limits<std::uint32_t>::max();
         std::vector<std::uint32_t> sparse_;

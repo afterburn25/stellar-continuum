@@ -64,12 +64,17 @@ inline std::vector<Entry> capture_developer_report(stellar::core::CampaignFrame 
   // legacy/parent resolution make the bridge measurable over real
   // state rather than a mock fixture.
   const auto projected=campaign_world_projection_census(world);
+  // The projection's container footprint joins the tracked-subsystem
+  // census — memory.json carries it beside the cache reporters.
+  static const auto world_subsystem=stellar::engine::MemoryTracker::instance().register_subsystem("campaign-world-projection");
+  stellar::engine::MemoryTracker::instance().report(world_subsystem,projected.estimated_memory_bytes);
   metadata["worldProjection"]={{"entities",projected.entities},{"systems",projected.systems},
     {"bodies",projected.bodies},{"civilizations",projected.civilizations},{"colonies",projected.colonies},
     {"fleets",projected.fleets},{"economies",projected.economies},{"technologies",projected.technologies},
     {"construction",projected.construction},{"shipyards",projected.shipyards},
     {"legacyBound",projected.legacy_bound},
-    {"parented",projected.parented},{"unparented",projected.unparented}};
+    {"parented",projected.parented},{"unparented",projected.unparented},
+    {"estimatedMemoryBytes",projected.estimated_memory_bytes}};
   if(world.generation_metadata){const auto &g=*world.generation_metadata;metadata["generatorVersion"]=g.generator_version;
     metadata["galaxyShape"]=g.galaxy_shape;metadata["stellarProfileVersion"]=g.stellar_profile_version.value_or("legacy");}
   if(world.generation_metadata&&world.generation_metadata->configuration){
