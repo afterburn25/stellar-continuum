@@ -154,7 +154,10 @@ Core/engine projections, never re-derived in UI.
   (`<recording>.expected/<tick>.json`) and `document_leaf_diff` leaf-level
   divergence reports (`replay-divergence-<tick>.diff.txt`), and a
   `--replay-until <tick>` bisect dump that canonicalizes state at a chosen
-  tick and leaf-diffs it against the expected sidecar, occupancy
+  tick and leaf-diffs it against the expected sidecar, plus a headless
+  `--replay-info <file>` JSON inventory (header, command ticks/kinds,
+  per-tick checkpoints + expected-sidecar presence) for picking bisect
+  ticks, occupancy
   censuses (MemoryTracker world/event-history/replay-recorder),
   pull-based audio stream decoder + equal-power panning, phase-cadence
   oracle pinning the per-phase activity matrix for minimal + seeded

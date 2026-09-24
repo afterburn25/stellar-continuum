@@ -287,6 +287,14 @@ to `replay-until-<tick>.json` beside the recording (same canonicalization
 sidecar when one exists (`replay-until-<tick>.diff.txt`), prints the
 first leaf, then exits. The stop waits on simulated time, so a recording
 that pauses before the target tick never triggers it.
+`--replay-info <file>` is the inventory companion: it parses the recording
+and prints a JSON `replay_info={...}` line — header seed/build/version,
+command count + tick span + per-kind counts, per-tick checkpoint section
+counts, and which `<recording>.expected/<tick>.json` sidecars exist — then
+exits before window creation (headless, no GPU). It is standalone
+(rejects `--replay`/`--record` pairing) and verified live against a
+synthesized recording including missing-file and malformed-JSON error
+paths.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

@@ -137,6 +137,7 @@
 #include <iostream>
 #include <iomanip>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <optional>
 #include <ranges>
@@ -361,6 +362,7 @@ struct Options {
   // under a fixed 60 Hz step and verifies the checkpoint hashes in order.
   std::filesystem::path record_path;
   std::filesystem::path replay_path;
+  std::filesystem::path replay_info_path;
   std::optional<std::uint64_t> replay_until_tick;
 };
 
@@ -432,6 +434,7 @@ struct Options {
     else if(arg==L"--record"&&i+1<argc) result.record_path=argv[++i];
     else if(arg==L"--replay"&&i+1<argc) result.replay_path=argv[++i];
     else if(arg==L"--replay-until"&&i+1<argc) result.replay_until_tick=std::stoull(argv[++i]);
+    else if(arg==L"--replay-info"&&i+1<argc) result.replay_info_path=argv[++i];
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -491,6 +494,7 @@ struct Options {
     else if(arg=="--record"&&i+1<argc) result.record_path=argv[++i];
     else if(arg=="--replay"&&i+1<argc) result.replay_path=argv[++i];
     else if(arg=="--replay-until"&&i+1<argc) result.replay_until_tick=std::stoull(argv[++i]);
+    else if(arg=="--replay-info"&&i+1<argc) result.replay_info_path=argv[++i];
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
@@ -533,6 +537,7 @@ struct Options {
     result.save_path=default_native_campaign_save_path().parent_path()/"developer"/"campaign.dev17.json";
   if(!result.record_path.empty()&&!result.replay_path.empty())throw std::invalid_argument("--record and --replay are mutually exclusive.");
   if(result.replay_until_tick&&result.replay_path.empty())throw std::invalid_argument("--replay-until requires --replay.");
+  if(!result.replay_info_path.empty()&&(!result.replay_path.empty()||!result.record_path.empty()))throw std::invalid_argument("--replay-info is a standalone inspection flag.");
   return result;
 }
 
@@ -8724,6 +8729,67 @@ int main(int argc,char **argv){
   stellar::engine::RuntimeDiagnostics diagnostics(STELLAR_GAME_VERSION,STELLAR_ENGINE_VERSION);
   try{
     const auto options=parse_options(argc,argv);
+    // --replay-info: headless recording inventory — header, command-stream
+    // summary, and per-tick checkpoint counts with expected-sidecar presence
+    // (the ticks --replay-until bisects on). Exits before window/session
+    // creation so it runs in scripts without a GPU or a valid install.
+    if(!options.replay_info_path.empty()){
+      std::ifstream in(options.replay_info_path,std::ios::binary);
+      if(!in)
+        throw std::invalid_argument("Cannot open replay recording: "+
+            utf8_path(options.replay_info_path));
+      std::ostringstream contents;contents<<in.rdbuf();
+      std::string parse_error;
+      const auto recording=stellar::engine::ReplayRecorder::parse(
+          contents.str(),&parse_error);
+      if(!recording)
+        throw std::invalid_argument("Replay file is not a valid recording: "+
+            parse_error);
+      std::ostringstream out;
+      out<<"replay_info={\"file\":"<<json_string(utf8_path(options.replay_info_path))
+         <<",\"seed\":"<<recording->header().seed
+         <<",\"build_id\":"<<json_string(recording->header().build_id)
+         <<",\"game_version\":"<<json_string(recording->header().game_version)
+         <<",\"commands\":"<<recording->commands().size();
+      if(!recording->commands().empty()){
+        const auto [lo,hi]=std::ranges::minmax(recording->commands(),{},
+            &stellar::engine::ReplayCommand::tick);
+        out<<",\"command_ticks\":["<<lo.tick<<","<<hi.tick<<"],\"kinds\":{";
+        std::unordered_map<std::string,std::size_t> kinds;
+        for(const auto &command:recording->commands())++kinds[command.name];
+        bool first_kind=true;
+        for(const auto &[name,count]:kinds){
+          if(!first_kind)out<<",";
+          first_kind=false;
+          out<<json_string(name)<<":"<<count;
+        }
+        out<<"}";
+      }
+      // Checkpoints emit one entry per section per capture — group by tick
+      // and report whether the canonical expected document is on disk.
+      std::map<std::uint64_t,std::size_t> checkpoint_ticks;
+      for(const auto &checkpoint:recording->checkpoints())
+        ++checkpoint_ticks[checkpoint.tick];
+      const auto expected_dir=std::filesystem::path(
+          utf8_path(options.replay_info_path)+".expected");
+      std::size_t expected_present=0;
+      out<<",\"checkpoints\":[";
+      bool first_tick=true;
+      for(const auto &[tick,sections]:checkpoint_ticks){
+        if(!first_tick)out<<",";
+        first_tick=false;
+        std::error_code ec;
+        const bool present=std::filesystem::is_regular_file(
+            expected_dir/(std::to_string(tick)+".json"),ec);
+        if(present)++expected_present;
+        out<<"{\"tick\":"<<tick<<",\"sections\":"<<sections
+           <<",\"expected_document\":"<<(present?"true":"false")<<"}";
+      }
+      out<<"],\"expected_dir\":"<<json_string(utf8_path(expected_dir))
+         <<"}";
+      std::cout<<out.str()<<'\n';
+      return 0;
+    }
     stellar::engine::RuntimeDiagnostics::context(options.dev_game?"startup developer game":"startup player game");
     const auto installation_root=stellar::engine::executable_directory();
     stellar::engine::RuntimeDirectoryLease maintenance_lease(installation_root);
