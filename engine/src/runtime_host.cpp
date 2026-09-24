@@ -276,6 +276,7 @@ RuntimeHost &RuntimeHost::operator=(RuntimeHost &&) noexcept = default;
 World &RuntimeHost::world() { return impl_->world; }
 const ContentResolver &RuntimeHost::content() const { return *impl_->content; }
 audio::AudioOutput &RuntimeHost::audio() { return *impl_->audio; }
+bool RuntimeHost::has_audio() const { return impl_->audio != nullptr; }
 DeterministicRandom &RuntimeHost::rng() {
   // Resolved lazily each call — restore regenerates entity ids, so the
   // carrier is found by component rather than a cached handle.
@@ -755,6 +756,13 @@ int RuntimeHost::run() {
   if (!options.headless) audio_output.emplace();
   impl.audio = audio_output ? &*audio_output : nullptr;
   auto *audio = impl.audio;
+  // impl.audio points into audio_output — clear it on every exit path
+  // (there are several returns) so has_audio() can't observe a dangling
+  // pointer after run() returns.
+  struct AudioScope {
+    Impl &impl;
+    ~AudioScope() { impl.audio = nullptr; }
+  } audio_scope{impl};
 
   auto load_clip = [&](const std::string &name)
       -> std::shared_ptr<const audio::AudioClip> {

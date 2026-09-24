@@ -103,7 +103,8 @@ struct RuntimeHostOptions {
   // frame (fixed-hz when configured, 1/60 otherwise) so --frames N runs
   // are deterministic regardless of host speed. With no --frames,
   // --replay-exit or recorded Escape the loop never exits on its own.
-  // audio() must not be called in a headless run — there is no device.
+  // audio() must not be called in a headless run — there is no device;
+  // has_audio() reports whether the accessor is valid.
   bool headless{false};
   // --dump-bindings: print the resolved input map (built-in "game"
   // context plus any --input-map contexts) as
@@ -134,8 +135,11 @@ public:
   [[nodiscard]] const ContentResolver &content() const;
   // Valid only while run() is on the stack (i.e. inside callbacks) — the
   // output device is scoped to the SDL loop so it tears down before the
-  // window does.
+  // window does. Null in a headless run — check has_audio() first.
   [[nodiscard]] audio::AudioOutput &audio();
+  // False in a headless run (no SDL audio device) — games that play
+  // sounds from callbacks guard audio() calls with this.
+  [[nodiscard]] bool has_audio() const;
   // The entity named "player" in the active scene, if any.
   [[nodiscard]] std::optional<EntityId> player() const;
   // A tracked entity by its authored scene name — doors, waypoints,

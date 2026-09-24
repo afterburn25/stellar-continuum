@@ -613,6 +613,8 @@ int main() {
     check(!host.scene3d() && host.gravity3d() == 0.f &&
               host.ground_y() == 0.f,
           "3D getters are inert in 2D mode");
+    check(!host.has_audio(),
+          "has_audio reports no device in a headless run");
   }
 
   // Scene-authored animations: a clip's "x" track owns the entity's
