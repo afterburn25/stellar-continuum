@@ -9,6 +9,7 @@
 #include <stellar/core/campaign_warfare_projection.hpp>
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/colony_operations.hpp>
+#include <stellar/core/construction_projects.hpp>
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/exploration_advance.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
@@ -749,6 +750,35 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     positive(c.active_project_authorization_credits,"Authorized credits",c.civilization_id,"construction");
     if(c.queued_projects.size()>maximum_queued_construction_projects)
       emit("construction","queue_overflow",c.civilization_id,"Construction queue exceeds the canonical bound.");
+    // Project catalog consistency mirrors validate_construction: the
+    // active id must resolve, progress may not exceed the build
+    // cost, and the three collections may not overlap.
+    const auto *active=c.active_project_id?find_construction_project(*c.active_project_id):nullptr;
+    if(c.active_project_id&&!active)
+      emit("construction","unknown_project",c.civilization_id,"Active construction project is not in the catalog.");
+    if(!c.active_project_id&&(c.active_project_progress!=0.0||c.active_project_authorization_credits!=0.0))
+      emit("construction","inconsistent_project",c.civilization_id,"Active construction state exists without a project.");
+    if(active&&std::isfinite(c.active_project_progress)&&c.active_project_progress>active->industry_cost+.0001)
+      emit("construction","out_of_range",c.civilization_id,"Active progress exceeds the project build cost.");
+    bool unknown_completed=false,duplicate_completed=false;
+    std::unordered_set<std::string_view> completed;
+    for(const auto &id:c.completed_project_ids){
+      if(!find_construction_project(id))unknown_completed=true;
+      if(!completed.insert(id).second)duplicate_completed=true;}
+    if(unknown_completed)emit("construction","unknown_project",c.civilization_id,"Completed project is not in the catalog.");
+    if(duplicate_completed)emit("construction","duplicate_id",c.civilization_id,"Duplicate completed project.");
+    if(c.active_project_id&&completed.contains(*c.active_project_id))
+      emit("construction","inconsistent_project",c.civilization_id,"Active project is also recorded as completed.");
+    bool unknown_queued=false,duplicate_queued=false,overlap_queued=false;
+    std::unordered_set<std::string_view> queued;
+    for(const auto &order:c.queued_projects){
+      if(!find_construction_project(order.project_id))unknown_queued=true;
+      positive(order.authorization_credits,"Queued authorization",c.civilization_id,"construction");
+      if(!queued.insert(order.project_id).second)duplicate_queued=true;
+      if(completed.contains(order.project_id)||(c.active_project_id&&order.project_id==*c.active_project_id))overlap_queued=true;}
+    if(unknown_queued)emit("construction","unknown_project",c.civilization_id,"Queued project is not in the catalog.");
+    if(duplicate_queued)emit("construction","duplicate_id",c.civilization_id,"Duplicate queued project.");
+    if(overlap_queued)emit("construction","inconsistent_project",c.civilization_id,"Queued project overlaps active or completed state.");
   }
   for(const auto &y:w.shipyards){
     if(!civilizations.contains(y.civilization_id))emit("shipyard","orphaned_shipyard",y.civilization_id,"Shipyard state references an absent civilization.");

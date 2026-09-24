@@ -382,6 +382,11 @@ int main() {
     world.economies.push_back(broken);
     ConstructionState con;
     con.civilization_id = 1;
+    con.active_project_id = "research_network"; // real catalog id
+    con.active_project_progress = 1.0e9;        // beyond the build cost
+    con.completed_project_ids = {"research_network"}; // active is also completed
+    con.queued_projects = {{"ghost_project", 5.0},   // uncatalogued
+                           {"research_network", -2.0}}; // overlaps + bad credits
     world.construction.push_back(con);
     // Zero strategic speed makes the warfare projection's class
     // definition throw; a duplicate system id makes lane construction
@@ -503,6 +508,8 @@ int main() {
                finding.event_type == "inconsistent_upgrade" ||
                finding.event_type == "invalid_slot" ||
                finding.event_type == "invalid_character" ||
+               finding.event_type == "unknown_project" ||
+               finding.event_type == "inconsistent_project" ||
                finding.event_type == "invalid_kind") ++consistency;
       else if (finding.event_type == "orphaned_route_hop" ||
                finding.event_type == "route_overflow") ++route_refs;
@@ -530,17 +537,17 @@ int main() {
       else if (finding.event_type == "orphaned_freight" ||
                finding.event_type == "orphaned_target") ++fleet_refs;
     }
-    check(invalid == 13,
+    check(invalid == 14,
           "stability, condition, arrears, hull, sensor, revision, "
-          "orbit index, gravity/pressure/flux/approach and observation "
-          "magnitudes flag invalid values");
+          "orbit index, gravity/pressure/flux/approach, queued credits "
+          "and observation magnitudes flag invalid values");
     check(positive == 7 && body_parent == 1,
           "zero speed/radius/temperature/orbit, non-positive leg "
           "range/fuel capacity and the parentless Moon are flagged");
-    check(ranged == 8,
-          "transit, fuel, cargo, fractions, orbit, radiation and hub "
-          "level bounds flag over-range values");
-    check(freight == 3 && design == 1 && consistency == 24,
+    check(ranged == 9,
+          "transit, fuel, cargo, fractions, orbit, radiation, hub "
+          "level and project-cost bounds flag over-range values");
+    check(freight == 3 && design == 1 && consistency == 28,
           "freight role/site, design, order, site, surface, placement, "
           "progress, slot, economy and evidence violations are flagged");
     check(knowledge_refs == 2 && intel_refs == 2,
@@ -550,7 +557,7 @@ int main() {
           "overflow are flagged");
     check(species == 4 && type == 1 && orphan == 2,
           "uncatalogued species/types and absent refs are flagged");
-    check(duplicate == 1, "duplicate system is flagged");
+    check(duplicate == 2, "duplicate system and queued projects are flagged");
     check(orphans == 4 && tech == 1 && overflow_n == 1,
           "home/research/construction/shipyard orphans, unknown tech "
           "and queue overflow are flagged");

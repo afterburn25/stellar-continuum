@@ -749,6 +749,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `unknown_technology` for uncatalogued completed or active research,
   `queue_overflow` past `maximum_queued_construction_projects`,
   shipyard `unknown_species` and `orphaned_colony` reservation refs).
+  Construction project collections mirror `validate_construction`:
+  `unknown_project` for uncatalogued active/completed/queued ids,
+  `inconsistent_project` for active-without-project state and
+  active/queued/completed overlap, `duplicate_id` per collection,
+  `out_of_range` for progress beyond the catalog build cost, and
+  non-negative queued authorization credits.
   Fleet state is covered end-to-end: transit/settlement/reconnaissance
   progress, leg range, fuel and cargo capacities, embarked-species
   catalog refs, destination/settlement body refs, reconnaissance
