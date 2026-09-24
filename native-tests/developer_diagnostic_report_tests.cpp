@@ -37,9 +37,14 @@ int main(int argc,char **argv)try{
       frame.runtime().world().campaign(),0,0);
   for(const auto &f:research_findings)std::cerr<<f.subsystem<<" "<<f.event_type<<" "<<f.message<<'\n';
   check(research_findings.empty(),"Fresh research state failed invariants.");
+  // The continuation pass replays the save-path schedule validation on a
+  // live capture — a fresh runtime must produce no findings.
+  const auto continuation_findings=inspect_continuation_invariants(frame.runtime(),0,0);
+  for(const auto &f:continuation_findings)std::cerr<<f.subsystem<<" "<<f.event_type<<" "<<f.message<<'\n';
+  check(continuation_findings.empty(),"Fresh runtime continuation failed invariants.");
   check(std::none_of(monitor.history().records().begin(),monitor.history().records().end(),
-        [](const auto &r){return r.record.subsystem=="research"||r.record.subsystem=="diplomacy";}),
-        "Monitor reported false-positive research/diplomacy findings.");
+        [](const auto &r){return r.record.subsystem=="research"||r.record.subsystem=="diplomacy"||r.record.subsystem=="continuation";}),
+        "Monitor reported false-positive research/diplomacy/continuation findings.");
   const auto initialized_records=monitor.history().records().size();
   monitor.observe(frame,{},stamp);check(monitor.invariant_checks()==1&&monitor.history().records().size()==initialized_records,"Paused rendering spammed diagnostics.");
   const auto memory_id=stellar::engine::MemoryTracker::instance().register_subsystem("test-subsystem");

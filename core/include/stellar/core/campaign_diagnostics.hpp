@@ -29,6 +29,14 @@ namespace stellar::core {
     const AdaptiveResearchCampaignState &, const AdaptiveResearchStrategicRuntime &,
     const FreshCampaignState &, std::uint64_t tick, double simulation_day,
     std::size_t maximum_findings=128);
+// Inspects the runtime's persisted continuation — the strategic
+// coordinator's cached plans and the diplomacy schedule — by capturing
+// `continuation()` and replaying `validate_campaign_runtime_continuation`,
+// the same validator the save/restore path applies. Read-only; the
+// capture is validated, never restored into the runtime.
+[[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> inspect_continuation_invariants(
+    const IntegratedAdaptiveCampaignRuntime &, std::uint64_t tick,
+    double simulation_day, std::size_t maximum_findings=128);
 // Observer adapter of returned canonical events; does not infer fake events
 // from UI state or advance any subsystem.
 [[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> campaign_step_diagnostics(

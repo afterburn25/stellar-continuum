@@ -184,6 +184,8 @@ int run_developer_qa(int argc,char **argv){
     findings.insert(findings.end(),diplomatic.begin(),diplomatic.end());
     auto research=inspect_research_invariants(frame.runtime().research(),frame.runtime().research_runtime(),world,initial_ticks+completed,frame.clock().simulation_days());
     findings.insert(findings.end(),research.begin(),research.end());
+    auto continuation=inspect_continuation_invariants(frame.runtime(),initial_ticks+completed,frame.clock().simulation_days());
+    findings.insert(findings.end(),continuation.begin(),continuation.end());
     for(auto &finding:findings){finding.real_timestamp=diagnostic_utc_now();log.append(std::move(finding));++critical;}
     if(critical)throw std::runtime_error("Campaign invariant violation; inspect structured logs.");
   };

@@ -821,8 +821,15 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `AdaptiveResearchCampaignSnapshotCodec` and replays the codec's
   save-path `restore` validation so in-memory corruption surfaces before
   the next save/load cycle, plus `orphaned_civilization` for rows the
-  codec maps to absent empires. The monitor,
-  developer report and QA host compose all three passes.
+  codec maps to absent empires. A fourth pass,
+  `inspect_continuation_invariants(runtime, …)`, captures
+  `runtime.continuation()` — the strategic coordinator's cached plans
+  and the diplomacy schedule — and replays
+  `validate_campaign_runtime_continuation`, the same validator the
+  save/restore path applies, emitting `invalid_continuation` plus a
+  precise `orphaned_plan` when a cached plan references an absent or
+  non-planning civilization. The monitor,
+  developer report and QA host compose all four passes.
   `CampaignFrame::advance` also retains a `CampaignAdvanceFailure`
   on the frame when an authoritative step throws mid-step: every
   `runtime->advance` call passes the `IntegratedAdaptiveCampaignAdvanceTrace`,

@@ -43,6 +43,8 @@ public:
       findings.insert(findings.end(),diplomatic.begin(),diplomatic.end());
       auto research=inspect_research_invariants(frame.runtime().research(),frame.runtime().research_runtime(),world,tick,day);
       findings.insert(findings.end(),research.begin(),research.end());
+      auto continuation=inspect_continuation_invariants(frame.runtime(),tick,day);
+      findings.insert(findings.end(),continuation.begin(),continuation.end());
       std::set<Key> current;
       for(auto &finding:findings){
         Key key{finding.subsystem,finding.event_type,finding.entity_id.value_or(-1),finding.message};current.insert(key);

@@ -1249,4 +1249,48 @@ inspect_research_invariants(
   }
   return findings;
 }
+std::vector<stellar::engine::DiagnosticRecord> inspect_continuation_invariants(
+    const IntegratedAdaptiveCampaignRuntime &runtime,std::uint64_t tick,double day,
+    std::size_t maximum){
+  using namespace stellar::engine;
+  if(maximum<1||maximum>4096)throw std::invalid_argument("Invalid invariant finding bound.");
+  std::vector<DiagnosticRecord> findings;
+  std::size_t dropped=0;
+  const auto emit=[&](std::string_view type,int id,std::string message){
+    if(findings.size()>=maximum){++dropped;return;}
+    DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
+    r.subsystem="continuation";r.event_type=std::string(type);
+    r.message=std::move(message);r.entity_id=id;r.severity=DiagnosticSeverity::Critical;
+    findings.push_back(std::move(r));
+  };
+  // The continuation capture replays the strategic coordinator's cached
+  // plans and the diplomacy schedule into snapshot records; the validator
+  // is the same one the save/restore path applies
+  // (player_campaign_json/player_campaign_persistence), so corrupt
+  // runtime-held scheduling surfaces before the next checkpoint.
+  CampaignRuntimeContinuation continuation;
+  try{
+    continuation=runtime.continuation();
+    validate_campaign_runtime_continuation(continuation,runtime.world().campaign(),day);
+  }catch(const std::exception &error){
+    emit("invalid_continuation",0,
+         std::string("Runtime continuation fails its persistence validation: ")+error.what());}
+  // Precise refs the validator reports only as one umbrella error: name
+  // the absent civilization so the finding is actionable on its own.
+  if(findings.empty()){
+    for(const auto &plan:continuation.strategic.plans)
+      if(std::ranges::none_of(runtime.world().campaign().civilizations,
+          [&](const auto &c){return c.id==plan.civilization_id&&!c.is_seeded_ancient;})){
+        emit("orphaned_plan",plan.civilization_id,"Strategic plan references an absent civilization.");break;}
+  }
+  if(dropped>0){
+    DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);
+    r.subsystem="diagnostics";r.event_type="findings_truncated";
+    r.severity=DiagnosticSeverity::Critical;
+    r.message="Invariant finding bound reached; corrupt-state findings were dropped.";
+    r.values["droppedFindings"]=static_cast<std::int64_t>(dropped);
+    findings.push_back(std::move(r));
+  }
+  return findings;
+}
 }
