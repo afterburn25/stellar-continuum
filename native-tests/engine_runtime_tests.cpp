@@ -292,6 +292,46 @@ int main() {
     check(exits >= 1, "on_collision_exit fires on separation");
   }
 
+  // Tilemap collision: a gravity-affected entity falls onto a colliding
+  // row of cells — on_tile_land reports the exact cell once and the
+  // entity rests on the tile top.
+  {
+    std::filesystem::create_directories(root / "editor", ec);
+    {
+      std::ofstream out(root / "editor" / "scene.json");
+      out << R"({"gravity":900,
+"entities":[{"name":"faller","x":40,"y":0,"w":32,"h":32}],
+"tilemaps":[{"name":"ground","y":128,"tileW":32,"tileH":32,
+"columns":8,"collide":true,"cells":[1,1,1,1,1,1,1,1]}]})";
+    }
+    auto options = headless_options(root);
+    options.frame_limit = 90;
+    RuntimeHost host{options};
+    int landings = 0;
+    int land_cx = -1, land_tile = -1;
+    float rest_y = -1.f;
+    host.on_tile_land = [&](EntityId, std::size_t, int cx, int cy,
+                            int tile) {
+      ++landings;
+      land_cx = cx;
+      land_tile = tile;
+      check(cy == 0, "tile_land reports the landed row");
+    };
+    host.on_update = [&](World &world, float) {
+      for (const auto e : world.entities())
+        if (const auto *n = world.get<EntityName>(e);
+            n && n->value == "faller")
+          if (const auto *t = world.get<Transform2D>(e))
+            rest_y = t->y;
+    };
+    check(host.run() == 0, "tilemap-landing run exits cleanly");
+    check(landings == 1, "on_tile_land fires once per touchdown");
+    check(land_cx == 1 && land_tile == 1,
+          "on_tile_land reports the cell and tile value");
+    check(std::abs(rest_y - 96.f) < 1.f,
+          "the faller rests on the tile top (128 - 32)");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
