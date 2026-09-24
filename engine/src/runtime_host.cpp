@@ -22,6 +22,7 @@
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string_view>
@@ -695,20 +696,33 @@ int RuntimeHost::run() {
     }
   };
 
+  if (options.headless && options.frame_limit <= 0 &&
+      !options.replay_exit)
+    std::fprintf(stderr,
+                 "headless: no --frames or --replay-exit — the run ends "
+                 "only on a recorded Escape or external stop\n");
+
   RuntimeDiagnostics::context("runtime:window-ctor");
-  Window window(options.window_title, options.width, options.height,
-                options.fullscreen, exe_dir / "engine-default-font.ttf");
-  RuntimeDiagnostics::context("runtime:window-init");
-  window.set_auto_frame_cap();
-  // F12/PrintScreen captures land in the project's screenshots/ dir.
-  window.set_screenshot_directory(
-      std::filesystem::absolute(options.project_root / "screenshots"));
+  // Headless runs skip the Window (and its Vulkan device) plus the audio
+  // device so generated games tick on CI machines without a display.
+  std::optional<Window> window;
+  if (!options.headless) {
+    window.emplace(options.window_title, options.width, options.height,
+                   options.fullscreen,
+                   exe_dir / "engine-default-font.ttf");
+    RuntimeDiagnostics::context("runtime:window-init");
+    window->set_auto_frame_cap();
+    // F12/PrintScreen captures land in the project's screenshots/ dir.
+    window->set_screenshot_directory(
+        std::filesystem::absolute(options.project_root / "screenshots"));
+  }
 
   RuntimeDiagnostics::context("runtime:audio-init");
   // Scoped to run() so its SDL audio teardown precedes ~Window's SDL_Quit.
-  audio::AudioOutput audio_output;
-  impl.audio = &audio_output;
-  auto &audio = audio_output;
+  std::optional<audio::AudioOutput> audio_output;
+  if (!options.headless) audio_output.emplace();
+  impl.audio = audio_output ? &*audio_output : nullptr;
+  auto *audio = impl.audio;
 
   auto load_clip = [&](const std::string &name)
       -> std::shared_ptr<const audio::AudioClip> {
@@ -726,11 +740,12 @@ int RuntimeHost::run() {
   if (!bounce_clip && !options.bounce_clip_alt.empty())
     bounce_clip = load_clip(options.bounce_clip_alt);
   if (!options.music_clip.empty()) {
-    if (const auto music = load_clip(options.music_clip))
-      audio.play_music(music);
-    else if (!options.music_clip_alt.empty())
+    if (const auto music = load_clip(options.music_clip)) {
+      if (audio) audio->play_music(music);
+    } else if (!options.music_clip_alt.empty()) {
       if (const auto mp3 = load_clip(options.music_clip_alt))
-        audio.play_music(mp3);
+        if (audio) audio->play_music(mp3);
+    }
   }
 
   // Decodes a content-relative sprite. Prefers the cooked package (BC7 mip
@@ -862,7 +877,7 @@ int RuntimeHost::run() {
     // already playing so levels can share the options/default track.
     if (!doc.music.empty() && doc.music != scene_music)
       if (const auto clip = load_clip(doc.music)) {
-        audio.play_music(clip);
+        if (audio) audio->play_music(clip);
         scene_music = doc.music;
       }
     for (const auto e : impl.entities) world.destroy(e);
@@ -1221,7 +1236,14 @@ int RuntimeHost::run() {
                                              : static_cast<float>(options.height);
   RuntimeDiagnostics::context("runtime:loop");
   for (;;) {
-    const auto snapshot = window.poll();
+    // Headless polls a synthetic snapshot: no events, always renderable,
+    // drawable fixed at the configured size. The run ends via --frames,
+    // a recorded/injected Escape or quit_requested (e.g. --replay-exit).
+    const auto snapshot =
+        window ? window->poll()
+               : InputSnapshot{.drawable_width = options.width,
+                               .drawable_height = options.height,
+                               .focused = true};
     if (snapshot.quit_requested || impl.quit_requested) break;
     impl.input.begin_frame();
     // The frame index is the journal tick — a replayed command lands in
@@ -1726,7 +1748,8 @@ int RuntimeHost::run() {
                                     std::clamp(norm_y, -1.f, 1.f)) /
                              1.4142135623730951f,
                          0.f, 1.f);
-          audio.play_effect(bounce_clip, pan, 1.f - 0.5f * distance);
+          if (audio)
+            audio->play_effect(bounce_clip, pan, 1.f - 0.5f * distance);
         }
       }
       // Lifetimes tick down in sim time; expired entities self-destruct
@@ -2150,7 +2173,11 @@ int RuntimeHost::run() {
       // frame-limited runs — journal ticks are frame indices, and a
       // wall-clock accumulator would run a variable number of steps per
       // frame, making recorded checkpoints unverifiable.
-      if (options.frame_limit > 0 || impl.replaying || impl.recorder) {
+      // Headless steps once per frame too — with no wall-clock pacing a
+      // real-time accumulator would starve on a fast CI machine, and a
+      // fixed step per frame keeps headless runs deterministic.
+      if (options.frame_limit > 0 || impl.replaying || impl.recorder ||
+          options.headless) {
         simulate(step);
       } else {
         accumulator += dt;
@@ -2162,9 +2189,11 @@ int RuntimeHost::run() {
         if (accumulator >= step) accumulator = 0.f;
       }
     } else {
-      simulate(dt);
+      // Wall-clock mode: windowed uses real dt; headless synthesizes a
+      // nominal 60 Hz step so frame counts stay deterministic.
+      simulate(options.headless ? 1.f / 60.f : dt);
     }
-    audio.service();
+    if (audio) audio->service();
 
     // World checkpoints: --record hashes the post-step world snapshot
     // every 30 frames; --replay consumes each recorded checkpoint once
@@ -2464,7 +2493,7 @@ int RuntimeHost::run() {
                                     TextAlign::Center});
     }
     if (on_draw) on_draw(draw, w, h);
-    window.draw(draw);
+    if (window) window->draw(draw);
     // The frame counter is the journal tick — it must advance on every
     // rendered frame, not only while a --frames budget is active, or
     // replayed commands and checkpoints stay pinned at tick 0.
@@ -2493,9 +2522,12 @@ int RuntimeHost::run(int argc, char **argv) {
   std::filesystem::path replay_info;
   // Valueless flags are scanned separately — the value-taking loop below
   // stops at i+1 < argc and would ignore a trailing flag.
-  for (int i = 1; i < argc; ++i)
+  for (int i = 1; i < argc; ++i) {
     if (std::string_view{argv[i]} == "--replay-exit")
       impl_->options.replay_exit = true;
+    else if (std::string_view{argv[i]} == "--headless")
+      impl_->options.headless = true;
+  }
   for (int i = 1; i + 1 < argc; ++i) {
     const std::string_view arg{argv[i]};
     if (arg == "--frames")

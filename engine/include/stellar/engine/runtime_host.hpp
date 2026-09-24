@@ -97,6 +97,14 @@ struct RuntimeHostOptions {
   // exit 0 after replay_verified, exit 1 as soon as a checkpoint
   // diverges. Without it a replay keeps running like a normal session.
   bool replay_exit{false};
+  // --headless: run without a Window or audio device — for CI machines
+  // with no display/GPU. The loop polls a synthetic input snapshot sized
+  // to width/height, skips drawing, and steps the simulation once per
+  // frame (fixed-hz when configured, 1/60 otherwise) so --frames N runs
+  // are deterministic regardless of host speed. With no --frames,
+  // --replay-exit or recorded Escape the loop never exits on its own.
+  // audio() must not be called in a headless run — there is no device.
+  bool headless{false};
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content

@@ -166,6 +166,16 @@ add_custom_command(TARGET stellar-continuum-native POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-continuum-native>/SDL3.dll")
 if(BUILD_TESTING)
+  add_executable(stellar_engine_runtime_tests native-tests/engine_runtime_tests.cpp)
+  target_link_libraries(stellar_engine_runtime_tests PRIVATE stellar_engine_runtime)
+  add_custom_command(TARGET stellar_engine_runtime_tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STELLAR_SDL_runtime}"
+      "$<TARGET_FILE_DIR:stellar_engine_runtime_tests>/SDL3.dll")
+  add_test(NAME engine_runtime COMMAND stellar_engine_runtime_tests)
+  set_tests_properties(engine_runtime PROPERTIES TIMEOUT 60)
+  if(MSVC)
+    target_compile_options(stellar_engine_runtime_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_moon_tests native-tests/native_moon_tests.cpp
     app/native_client/native_system_view.cpp app/native_client/native_system_workspace.cpp
     app/native_client/native_system_travel.cpp app/native_client/native_fleet_controller.cpp
