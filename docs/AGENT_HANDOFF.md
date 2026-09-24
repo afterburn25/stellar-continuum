@@ -293,10 +293,14 @@ a frozen tick cannot unpause — 600 frames without progress prints a
 and prints a JSON `replay_info={...}` line — header seed/build/version,
 command count + tick span + per-kind counts, per-tick checkpoint section
 counts, and which `<recording>.expected/<tick>.json` sidecars exist — then
-exits before window creation (headless, no GPU). It is standalone
+exits before window creation (headless, no GPU). Each present sidecar is
+also verified: `expected_verified` recomputes the section checkpoints from
+the retained document and compares them against the recorded hashes, so a
+stale or mismatched sidecar (which would silently poison a later
+leaf-diff) is flagged instead of trusted. It is standalone
 (rejects `--replay`/`--record` pairing) and verified live against a
-synthesized recording including missing-file and malformed-JSON error
-paths.
+synthesized recording including matching, stale, unparseable, missing-file
+and malformed-JSON paths.
 
 **Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
 host (no game module). Its Projects tool drives the full game-project loop:

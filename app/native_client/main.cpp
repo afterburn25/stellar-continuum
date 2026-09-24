@@ -8996,7 +8996,37 @@ int main(int argc,char **argv){
             expected_dir/(std::to_string(tick)+".json"),ec);
         if(present)++expected_present;
         out<<"{\"tick\":"<<tick<<",\"sections\":"<<sections
-           <<",\"expected_document\":"<<(present?"true":"false")<<"}";
+           <<",\"expected_document\":"<<(present?"true":"false");
+        if(present){
+          // Verify the retained document hashes to the recorded section
+          // checkpoints — a stale or mismatched sidecar would silently
+          // poison a later leaf-diff.
+          bool verified=false;
+          if(std::ifstream expected_in{
+                 expected_dir/(std::to_string(tick)+".json"),
+                 std::ios::binary};expected_in){
+            std::ostringstream doc_contents;doc_contents<<expected_in.rdbuf();
+            try{
+              const auto expected_doc=
+                  nlohmann::ordered_json::parse(doc_contents.str());
+              const auto recomputed=stellar::engine::document_section_checkpoints(
+                  tick,expected_doc,"save");
+              std::unordered_map<std::string,std::uint64_t> recorded;
+              for(const auto&checkpoint:recording->checkpoints())
+                if(checkpoint.tick==tick)recorded[checkpoint.label]=checkpoint.hash;
+              verified=recorded.size()==recomputed.size();
+              for(const auto&section:recomputed){
+                if(!verified)break;
+                const auto found=recorded.find(section.label);
+                if(found==recorded.end()||found->second!=section.hash)verified=false;
+              }
+            }catch(const std::exception&){
+              // An unparseable sidecar stays unverified.
+            }
+          }
+          out<<",\"expected_verified\":"<<(verified?"true":"false");
+        }
+        out<<"}";
       }
       out<<"],\"expected_dir\":"<<json_string(utf8_path(expected_dir))
          <<"}";
