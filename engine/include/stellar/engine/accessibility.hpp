@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+#include <deque>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -39,5 +41,44 @@ struct AccessibilitySettings {
 inline float effective_text_scale(const AccessibilitySettings &s) noexcept {
   return s.ui_scale * s.text_scale;
 }
+
+// Screen-reader live-region substrate. Surfaces announce semantic text
+// (focused-control labels, arriving events, mode changes); a platform
+// bridge — or the client's caption channel — drains the queue. The queue
+// is bounded and deterministic: assertive announcements preempt queued
+// polite ones, consecutive duplicate text is dropped, and overflow
+// evicts the oldest polite entries first.
+
+enum class AnnouncementPriority {
+  Polite,
+  Assertive,
+};
+
+struct AccessibilityAnnouncement {
+  std::string text;
+  AnnouncementPriority priority{AnnouncementPriority::Polite};
+  std::uint64_t sequence{};
+};
+
+class AccessibilityAnnouncer {
+public:
+  explicit AccessibilityAnnouncer(std::size_t capacity = 16) noexcept
+      : capacity_(capacity ? capacity : 1) {}
+
+  void announce(std::string text,
+                AnnouncementPriority priority = AnnouncementPriority::Polite);
+  // Oldest pending announcement, or nullopt when drained.
+  [[nodiscard]] std::optional<AccessibilityAnnouncement> take();
+  // Newest pending announcement without consuming it.
+  [[nodiscard]] const AccessibilityAnnouncement *latest() const noexcept;
+  [[nodiscard]] bool empty() const noexcept { return pending_.empty(); }
+  [[nodiscard]] std::size_t size() const noexcept { return pending_.size(); }
+  void clear() noexcept { pending_.clear(); }
+
+private:
+  std::deque<AccessibilityAnnouncement> pending_;
+  std::size_t capacity_;
+  std::uint64_t sequence_{};
+};
 
 } // namespace stellar::engine

@@ -170,6 +170,32 @@ int main() {
   check(AccessibilitySettings::from_json("not json").ui_scale == 1.0f,
         "malformed settings fall back to defaults");
 
+  // --- Accessibility announcer ---
+  AccessibilityAnnouncer announcer{3};
+  check(announcer.empty() && !announcer.take().has_value(),
+        "announcer starts drained");
+  announcer.announce("first");
+  announcer.announce("first");
+  check(announcer.size() == 1, "consecutive duplicates collapse");
+  announcer.announce("second");
+  announcer.announce("");
+  check(announcer.size() == 2, "empty text dropped");
+  check(announcer.latest()->text == "second", "latest tracks newest");
+  announcer.announce("third");
+  announcer.announce("fourth");  // capacity 3 -> oldest polite evicted
+  check(announcer.size() == 3 && announcer.take()->text == "second",
+        "capacity evicts oldest polite first");
+  announcer.announce("alert", AnnouncementPriority::Assertive);
+  check(announcer.size() == 1 && announcer.latest()->text == "alert",
+        "assertive preempts queued polite");
+  const auto seq_a = announcer.latest()->sequence;
+  announcer.announce("next", AnnouncementPriority::Assertive);
+  check(announcer.size() == 2 && announcer.latest()->sequence > seq_a,
+        "assertive does not preempt assertive; sequence increments");
+  check(announcer.take()->text == "alert" && announcer.take()->text == "next" &&
+            !announcer.take().has_value(),
+        "take drains in publish order");
+
   if (failures == 0)
     std::cout << "Economy, replay, animation and accessibility tests passed\n";
   return failures == 0 ? 0 : 1;

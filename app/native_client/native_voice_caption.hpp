@@ -10,7 +10,8 @@ namespace stellar::native_audio {
 template<class Measure>
 void render_voice_caption(stellar::native_map::DrawList& out, NativeAudioDirector* audio,
                           int width,int height,Measure measure,
-                          const stellar::native_voice::NativeVoicePlayback* playback=nullptr) {
+                          const stellar::native_voice::NativeVoicePlayback* playback=nullptr,
+                          std::optional<VoiceCaption> ui_announcement=std::nullopt) {
   using namespace stellar::native_map;
   if(!audio)return;
   std::optional<VoiceCaption> current;
@@ -18,12 +19,13 @@ void render_voice_caption(stellar::native_map::DrawList& out, NativeAudioDirecto
     current=VoiceCaption{playback->active_speaker_name(),playback->active_subtitle(),
                          std::chrono::steady_clock::now()+std::chrono::seconds(1)};
   if(!current)current=audio->caption();
+  if(!current)current=ui_announcement;
   if(!current)return;
   const auto preferences=audio->voice_preferences();
   const float scale=std::clamp(height/1080.f,.8f,2.5f);
   const int pixels=std::max(12,static_cast<int>(std::lround(preferences.subtitle_size*scale)));
   const float content_width=std::min(900.f*scale,width-80.f*scale);
-  const auto value=(preferences.speaker_labels?current->speaker+"\n":"")+current->text;
+  const auto value=(preferences.speaker_labels&&!current->speaker.empty()?current->speaker+"\n":"")+current->text;
   const auto measured=measure(Text{{0,0},value,{239,248,255,255},pixels,content_width});
   const float panel_height=static_cast<float>(measured.height)+24.f*scale;
   const UiRect panel{(width-content_width)*.5f-16*scale,height-panel_height-64*scale,content_width+32*scale,panel_height};

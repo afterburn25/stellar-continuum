@@ -938,6 +938,23 @@ oracles asserting rows shift on scroll and the view returns to the
 head / clamps at the tail. `native_developer_index`,
 `native_developer_diagnostics`, `galaxy_phenomena` green; client
 builds clean.
+Screen-reader substrate, first slice (row-26 accessibility):
+`AccessibilityAnnouncer` (engine/accessibility.hpp) is the bounded
+live-region queue a platform AT bridge will eventually drain —
+polite/assertive priorities (assertive preempts queued polite),
+consecutive-duplicate collapse, capacity evicts oldest polite first,
+monotonic sequence numbers. The client consumes it immediately two
+ways: `publish_notification` announces every feed item, and the pause
+menu announces each focused action's localized label on navigation
+(`announce_menu_focus` shares `menu_action_label` with the renderer).
+Pending announcements surface through the existing voice-caption
+channel — `render_voice_caption` gained a UI-announcement fallback
+shown only while subtitles are enabled (4s expiry). `economy_animation`
+covers dedup/preemption/eviction/drain order; the client links clean.
+Still open: platform AT bridging (UIA/AT-SPI), per-surface
+focused-label announcements beyond the menu, and the always-on HUD
+chrome ring (needs a focus-group policy — `assets_`/`fleet_workspace_`
+already claim keys on the clean map).
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

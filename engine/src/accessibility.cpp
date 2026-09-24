@@ -80,4 +80,39 @@ AccessibilitySettings::from_json(std::string_view document) {
   return result;
 }
 
+void AccessibilityAnnouncer::announce(std::string text,
+                                      AnnouncementPriority priority) {
+  if (text.empty())
+    return;
+  if (!pending_.empty() && pending_.back().text == text &&
+      pending_.back().priority == priority)
+    return;
+  if (priority == AnnouncementPriority::Assertive) {
+    std::erase_if(pending_, [](const AccessibilityAnnouncement &item) {
+      return item.priority == AnnouncementPriority::Polite;
+    });
+  }
+  while (pending_.size() >= capacity_) {
+    const auto polite = std::find_if(
+        pending_.begin(), pending_.end(), [](const AccessibilityAnnouncement &i) {
+          return i.priority == AnnouncementPriority::Polite;
+        });
+    pending_.erase(polite != pending_.end() ? polite : pending_.begin());
+  }
+  pending_.push_back(
+      AccessibilityAnnouncement{std::move(text), priority, sequence_++});
+}
+
+std::optional<AccessibilityAnnouncement> AccessibilityAnnouncer::take() {
+  if (pending_.empty())
+    return std::nullopt;
+  auto item = std::move(pending_.front());
+  pending_.pop_front();
+  return item;
+}
+
+const AccessibilityAnnouncement *AccessibilityAnnouncer::latest() const noexcept {
+  return pending_.empty() ? nullptr : &pending_.back();
+}
+
 } // namespace stellar::engine

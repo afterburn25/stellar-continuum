@@ -1,3 +1,4 @@
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/spatial_index.hpp>
@@ -5879,11 +5880,13 @@ class NativeCampaign final {
           if(event.key==kTab||event.key==kRight||event.key==kDown||backward){
             menu_focus_=menu_focus_<0?0:(backward?menu_focus_+menu_action_count-1:menu_focus_+1)%menu_action_count;
             menu_hover_feedback_.cue(static_cast<std::uint64_t>(menu_actions_[menu_focus_]));
+            announce_menu_focus();
             gesture_.capture_for_ui();continue;
           }
           if(event.key==kHome||event.key==kEnd){
             menu_focus_=event.key==kHome?0:menu_action_count-1;
             menu_hover_feedback_.cue(static_cast<std::uint64_t>(menu_actions_[menu_focus_]));
+            announce_menu_focus();
             gesture_.capture_for_ui();continue;
           }
           if((event.key==kReturn||event.key==kSpace)&&menu_focus_>=0&&menu_focus_<menu_action_count){
@@ -6836,7 +6839,7 @@ class NativeCampaign final {
     if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);
     if(notifications_available())chronicle_view_.render(out,width,height);
     stellar::native_audio::render_voice_caption(out,presentation_audio_,width,height,text_measurer_,
-        voice_playback_?&*voice_playback_:nullptr);
+        voice_playback_?&*voice_playback_:nullptr,announcement_caption());
     if(audio_settings_)audio_settings_->render(out,width,height);
     if(general_settings_)general_settings_->render(out,width,height);
     if(video_settings_)video_settings_->render(out,width,height);
@@ -6983,6 +6986,7 @@ class NativeCampaign final {
   }
   void publish_notification(std::string category,std::string message){
     support_.record(category,utc_timestamp()+" "+message);
+    announcer_.announce(message);
     notifications_.publish(std::move(category),stellar::native_campaign::format_campaign_date(
         session_->frame().clock().simulation_days()),std::move(message));
   }
@@ -7700,6 +7704,28 @@ class NativeCampaign final {
     else if(action==UiAction::Support)request_support(width,height);
     else if(action==UiAction::Exit)session_->request_exit();
   }
+  std::string menu_action_label(UiAction action)const{
+    const bool pending=session_->new_campaign_pending();
+    switch(action){
+      case UiAction::Continue:return tr(pending?"MENU_CANCEL_NEW_GAME":"MENU_CONTINUE",pending?"CANCEL NEW GAME":"CONTINUE");
+      case UiAction::Save:return tr("MENU_SAVE","SAVE");
+      case UiAction::Load:return tr("MENU_LOAD","LOAD");
+      case UiAction::Settings:return tr("MENU_SETTINGS","SETTINGS");
+      case UiAction::Support:return tr(support_.busy()?"MENU_EXPORTING":"MENU_EXPORT",support_.busy()?"EXPORTING...":"EXPORT DIAGNOSTICS");
+      case UiAction::NewGame:return tr("MENU_NEW_GAME","NEW GAME");
+      case UiAction::Exit:return tr("MENU_EXIT","EXIT TO WINDOWS");
+      default:return {};
+    }
+  }
+  void announce_menu_focus(){if(menu_focus_>=0&&menu_focus_<menu_action_count)announcer_.announce(menu_action_label(menu_actions_[menu_focus_]));}
+  std::optional<stellar::native_audio::VoiceCaption> announcement_caption(){
+    while(auto item=announcer_.take())
+      announcement_caption_=stellar::native_audio::VoiceCaption{"",std::move(item->text),
+          std::chrono::steady_clock::now()+std::chrono::seconds(4)};
+    if(!announcement_caption_||std::chrono::steady_clock::now()>=announcement_caption_->expires_at)return std::nullopt;
+    if(!presentation_audio_||!presentation_audio_->voice_preferences().subtitles)return std::nullopt;
+    return announcement_caption_;
+  }
   void toggle_menu(){menu_focus_=-1;settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();chronicle_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());
     if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));
@@ -8198,6 +8224,8 @@ class NativeCampaign final {
   std::function<void()> audio_confirm_;
   stellar::native_campaign_feedback::NativeCampaignFeedback feedback_;
   stellar::native_notifications::NativeNotificationFeed notifications_;
+  stellar::engine::AccessibilityAnnouncer announcer_;
+  std::optional<stellar::native_audio::VoiceCaption> announcement_caption_;
   stellar::native_support::NativeSupportService support_;
   native_battle_ui::NativeBattleWorkspace battle_workspace_;
   double battle_refresh_elapsed_{};
