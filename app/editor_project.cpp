@@ -27,6 +27,8 @@ std::string serialize_project(const EditorProject &project) {
       if (edit.orbit_au) row["orbitAu"] = *edit.orbit_au;
       if (edit.mass_earth) row["massEarth"] = *edit.mass_earth;
       if (edit.eccentricity) row["eccentricity"] = *edit.eccentricity;
+      if (edit.inclination_degrees)
+        row["inclinationDeg"] = *edit.inclination_degrees;
       rows.push_back(std::move(row));
     }
     return rows;
@@ -84,10 +86,15 @@ EditorProject parse_project(std::string_view text) {
             it != row.end() && it->is_number() && it->get<double>() >= 0. &&
             it->get<double>() < 0.95)
           edit.eccentricity = it->get<double>();
+        // Inclination is bounded to the generated domain 0-180 degrees.
+        if (const auto it = row.find("inclinationDeg");
+            it != row.end() && it->is_number() && it->get<double>() >= 0. &&
+            it->get<double>() <= 180.)
+          edit.inclination_degrees = it->get<double>();
         if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked ||
             edit.anomaly || edit.rare_resource || edit.pre_warp_civilization ||
             edit.radius_earth || edit.orbit_au || edit.mass_earth ||
-            edit.eccentricity)
+            edit.eccentricity || edit.inclination_degrees)
           out[row.at("id").get<int>()] = std::move(edit);
       }
     };

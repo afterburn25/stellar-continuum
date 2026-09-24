@@ -183,7 +183,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
 
 enum class WorkspaceView { Galaxy, System, Body };
 
-enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass, BodyEccentricity };
+enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass, BodyEccentricity, BodyInclination };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
@@ -251,7 +251,8 @@ struct Editor {
       hit_anomaly{}, hit_rare{}, hit_prewarp{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
       hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{},
-      hit_radius{}, hit_orbit{}, hit_mass{}, hit_eccentricity{};
+      hit_radius{}, hit_orbit{}, hit_mass{}, hit_eccentricity{},
+      hit_inclination{};
   // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
   bool menu_open{};
   UiRect menu_rect{};
@@ -301,6 +302,8 @@ engine::AnalyticOrbit body_orbit(const Editor &ed,
   if (const auto it = ed.body_edits.find(body.id); it != ed.body_edits.end()) {
     if (it->second.orbit_au) orbit.radius = *it->second.orbit_au;
     if (it->second.eccentricity) orbit.eccentricity = *it->second.eccentricity;
+    if (it->second.inclination_degrees)
+      orbit.inclination = *it->second.inclination_degrees * std::numbers::pi / 180.;
   }
   return orbit;
 }
@@ -332,6 +335,15 @@ double body_effective_eccentricity(const Editor &ed,
       it != ed.body_edits.end() && it->second.eccentricity)
     return *it->second.eccentricity;
   return body.orbital_eccentricity;
+}
+// Effective stellar orbit inclination for display: the annotation wins,
+// then the generated record.
+double body_effective_inclination_degrees(const Editor &ed,
+                                        const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.inclination_degrees)
+    return *it->second.inclination_degrees;
+  return body.orbital_inclination_degrees;
 }
 double body_radius_earth(const Editor &ed, const core::PlanetaryBody &body) {
   if (const auto it = ed.body_edits.find(body.id);
@@ -474,25 +486,39 @@ void commit_active_field(Editor &ed) {
     }
   } else if (ed.editing == Field::BodyRadius ||
              ed.editing == Field::BodyOrbit || ed.editing == Field::BodyMass ||
-             ed.editing == Field::BodyEccentricity) {
+             ed.editing == Field::BodyEccentricity ||
+             ed.editing == Field::BodyInclination) {
     // Body-only numeric overrides: empty restores AUTO, otherwise a finite
     // in-range number wins over the generated property. Eccentricity accepts
-    // zero (circular) but is bounded below AnalyticOrbit's 0.95 rejection.
-    const auto member =
-        ed.editing == Field::BodyRadius ? &edproj::SystemEdit::radius_earth
-        : ed.editing == Field::BodyOrbit ? &edproj::SystemEdit::orbit_au
-        : ed.editing == Field::BodyEccentricity
-            ? &edproj::SystemEdit::eccentricity
-                                        : &edproj::SystemEdit::mass_earth;
-    const auto label = ed.editing == Field::BodyRadius ? "radius"
-                       : ed.editing == Field::BodyOrbit ? "orbit"
-                       : ed.editing == Field::BodyEccentricity
-                           ? "eccentricity"
-                                                      : "mass";
-    const auto valid =
-        ed.editing == Field::BodyEccentricity
-            ? [](double v) { return v >= 0. && v < 0.95; }
-            : [](double v) { return v > 0.; };
+    // zero (circular) but is bounded below AnalyticOrbit's 0.95 rejection;
+    // inclination is bounded to the generated 0-180 degree domain.
+    struct OverrideSpec {
+      std::optional<double> edproj::SystemEdit::*member;
+      const char *label;
+      double lo, hi;
+      bool lo_inclusive, hi_inclusive;
+    };
+    const auto spec = [&]() -> OverrideSpec {
+      switch (ed.editing) {
+      case Field::BodyRadius:
+        return {&edproj::SystemEdit::radius_earth, "radius", 0., 0., false, false};
+      case Field::BodyOrbit:
+        return {&edproj::SystemEdit::orbit_au, "orbit", 0., 0., false, false};
+      case Field::BodyEccentricity:
+        return {&edproj::SystemEdit::eccentricity, "eccentricity", 0., 0.95, true, false};
+      case Field::BodyInclination:
+        return {&edproj::SystemEdit::inclination_degrees, "inclination", 0., 180., true, true};
+      default:
+        return {&edproj::SystemEdit::mass_earth, "mass", 0., 0., false, false};
+      }
+    }();
+    const auto member = spec.member;
+    const auto label = spec.label;
+    const auto valid = [&spec](double v) {
+      return (spec.lo_inclusive ? v >= spec.lo : v > spec.lo) &&
+             (spec.hi == 0. ||
+              (spec.hi_inclusive ? v <= spec.hi : v < spec.hi));
+    };
     if (const auto target = annotation_target(ed); target && target->second) {
       const auto it = ed.body_edits.find(target->first);
       const auto current = it != ed.body_edits.end()
@@ -520,6 +546,8 @@ void commit_active_field(Editor &ed) {
           ed.status = std::string(label) +
                       (ed.editing == Field::BodyEccentricity
                            ? " must be between 0 and 0.95"
+                       : ed.editing == Field::BodyInclination
+                           ? " must be between 0 and 180"
                            : " must be a positive number");
           return; // keep the field open so the input is not silently dropped
         }
@@ -606,7 +634,7 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
   row("orbit index", std::to_string(body.orbit_index));
   row("eccentricity", fspec("%.3f", body_effective_eccentricity(ed, body)));
   row("inclination",
-      fspec("%.1f", body.orbital_inclination_degrees) + " deg");
+      fspec("%.1f", body_effective_inclination_degrees(ed, body)) + " deg");
   if (body.stellar_exposure) {
     row("orbit", fspec("%.3f", *body_orbit_au(ed, body)) + " AU");
     row("incident flux", fspec("%.3f", body.stellar_exposure->incident_flux));
@@ -993,15 +1021,32 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
                 ed.editing == Field::BodyEccentricity,
                 "0 to 0.95, empty = auto...", font);
       y += ed.hit_eccentricity.height + 8 * s;
+      out.overlay.push_back(
+          Text{{x, y}, "inclination override (deg)", muted, font - 1});
+      y += font + 4;
+      ed.hit_inclination = {x, y, r.width - 28 * s, (font + 12) * s};
+      const auto inclination_value =
+          ed.editing == Field::BodyInclination
+              ? ed.edit_buffer
+              : (stored.inclination_degrees
+                     ? fspec("%.1f", *stored.inclination_degrees)
+                     : fspec("%.1f", body.orbital_inclination_degrees) +
+                           " (auto)");
+      field_box(out, ed.hit_inclination, inclination_value,
+                ed.editing == Field::BodyInclination,
+                "0 to 180 degrees, empty = auto...", font);
+      y += ed.hit_inclination.height + 8 * s;
     } else {
       ed.hit_orbit = {};
       ed.hit_eccentricity = {};
+      ed.hit_inclination = {};
     }
   } else {
     ed.hit_radius = {};
     ed.hit_orbit = {};
     ed.hit_mass = {};
     ed.hit_eccentricity = {};
+    ed.hit_inclination = {};
   }
 
   // Embedded assets: files dropped under <project>/assets/ ride with the
@@ -2208,6 +2253,17 @@ int main(int argc, char **argv) {
               ed.edit_buffer =
                   it != ed.body_edits.end() && it->second.eccentricity
                       ? fspec("%.3f", *it->second.eccentricity)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_inclination.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyInclination;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.inclination_degrees
+                      ? fspec("%.1f", *it->second.inclination_degrees)
                       : std::string{};
               window.set_text_input(true);
             }

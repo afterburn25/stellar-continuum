@@ -50,6 +50,7 @@ int main() {
     project.body_edits[3].orbit_au = 1.524; // stellar orbit override
     project.body_edits[3].mass_earth = 0.83; // mass override
     project.body_edits[3].eccentricity = 0.21; // orbit eccentricity override
+    project.body_edits[3].inclination_degrees = 97.5; // orbit inclination override
     project.body_edits[9].note = "moon survey";
     project.name = "Survey Run \"Kestrel\"";
     const auto text = serialize_project(project);
@@ -118,6 +119,24 @@ int main() {
           R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"eccentricity":1.2}]})");
       require(!hyperbolic.body_edits.contains(3),
               "out-of-range eccentricity must not serialize an override");
+    }
+    require(restored.body_edits.at(3).inclination_degrees &&
+                *restored.body_edits.at(3).inclination_degrees == 97.5,
+            "inclination override did not round-trip");
+    require(!restored.body_edits.at(9).inclination_degrees,
+            "unset inclination override must stay unset (AUTO follows generated)");
+
+    // Inclination is bounded to the generated 0-180 degree domain.
+    {
+      const auto retrograde = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"inclinationDeg":140.0}]})");
+      require(retrograde.body_edits.at(3).inclination_degrees &&
+                  *retrograde.body_edits.at(3).inclination_degrees == 140.0,
+              "retrograde inclination must round-trip as a real override");
+      const auto out_of_domain = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"inclinationDeg":190.0}]})");
+      require(!out_of_domain.body_edits.contains(3),
+              "out-of-domain inclination must not serialize an override");
     }
 
     // Documents without the additive bodyEdits array still parse.

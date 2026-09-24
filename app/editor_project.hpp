@@ -38,6 +38,11 @@ struct SystemEdit {
   // Kepler ring and the day-phased position. Zero is meaningful (circular);
   // values are bounded below AnalyticOrbit's 0.95 rejection.
   std::optional<double> eccentricity;
+  // Stellar orbit inclination override in degrees (star-orbiting bodies
+  // only): unset follows the generated orbital_inclination_degrees; a set
+  // value wins for the ring tilt and day-phased position. Bounded to the
+  // generated domain 0-180 (values past 90 are retrograde).
+  std::optional<double> inclination_degrees;
 };
 
 struct EditorProject {
