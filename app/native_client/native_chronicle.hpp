@@ -172,6 +172,9 @@ public:
   // Keyboard-focus ring index into the (y,x)-ordered focusable list;
   // -1 when no control is focused. Exposed for the test surface.
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] float scroll_offset() const noexcept {
     return scroll_.scroll_offset;

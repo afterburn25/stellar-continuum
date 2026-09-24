@@ -287,28 +287,32 @@ void RosterWorkspace::apply_display_order() {
 // Focusables walk actionable rects in (y,x) order: the search field,
 // refresh and close controls, the sort-column headers (the same hit zones
 // header_column() answers), and each list row clipped to its viewport.
-std::vector<UiRect> RosterWorkspace::focusables(
+std::vector<RosterWorkspace::FocusTarget> RosterWorkspace::focusables(
     const RosterLayout &layout) const {
-  std::vector<UiRect> out;
-  out.push_back(layout.search);
-  out.push_back(layout.refresh);
-  out.push_back(layout.close);
+  std::vector<FocusTarget> out;
+  out.push_back({layout.search, tr("ROSTER_SEARCH", "Search colonies")});
+  out.push_back({layout.refresh, tr("ROSTER_REFRESH", "Refresh")});
+  out.push_back({layout.close, tr("ROSTER_CLOSE", "Close roster")});
   const float s = layout.scale;
   const bool compact =
       viewport_height_ <= 800 || layout.list.width < 650.f * s;
   if (compact) {
-    out.push_back({layout.list.x + layout.list.width * .70f,
-                   layout.list.y - 20.f * s, layout.list.width * .28f,
-                   20.f * s});
+    out.push_back({{layout.list.x + layout.list.width * .70f,
+                    layout.list.y - 20.f * s, layout.list.width * .28f,
+                    20.f * s},
+                   tr("ROSTER_SORT_POPULATION", "Sort by population")});
   } else {
-    out.push_back({layout.list.x + 8.f * s, layout.list.y - 26.f * s,
-                   layout.list.width * .37f, 24.f * s});
-    out.push_back({layout.list.x + layout.list.width * .39f,
-                   layout.list.y - 26.f * s, layout.list.width * .38f,
-                   24.f * s});
-    out.push_back({layout.list.x + layout.list.width * .79f,
-                   layout.list.y - 26.f * s, layout.list.width * .18f,
-                   24.f * s});
+    out.push_back({{layout.list.x + 8.f * s, layout.list.y - 26.f * s,
+                    layout.list.width * .37f, 24.f * s},
+                   tr("ROSTER_SORT_COLONY", "Sort by colony")});
+    out.push_back({{layout.list.x + layout.list.width * .39f,
+                    layout.list.y - 26.f * s, layout.list.width * .38f,
+                    24.f * s},
+                   tr("ROSTER_SORT_WORLD", "Sort by world")});
+    out.push_back({{layout.list.x + layout.list.width * .79f,
+                    layout.list.y - 26.f * s, layout.list.width * .18f,
+                    24.f * s},
+                   tr("ROSTER_SORT_POPULATION", "Sort by population")});
   }
   const float pitch = layout.row_height + 5.f * s;
   for (std::size_t i = 0; i < display_order_.size(); ++i) {
@@ -317,13 +321,26 @@ std::vector<UiRect> RosterWorkspace::focusables(
          layout.list.y + static_cast<float>(i) * pitch - list_.scroll_offset,
          layout.list.width, layout.row_height},
         layout.list);
-    if (visible.height > 0.f)
-      out.push_back(visible);
+    if (visible.height > 0.f) {
+      const auto row = static_cast<std::size_t>(display_order_[i]);
+      out.push_back({visible, row < view_.rows.size()
+                                  ? view_.rows[row].name
+                                  : std::string{}});
+    }
   }
-  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
-    return a.y == b.y ? a.x < b.x : a.y < b.y;
+  std::ranges::sort(out, [](const FocusTarget &a, const FocusTarget &b) {
+    return a.bounds.y == b.bounds.y ? a.bounds.x < b.bounds.x
+                                    : a.bounds.y < b.bounds.y;
   });
   return out;
+}
+
+std::string RosterWorkspace::focused_label(int width, int height) const {
+  if (focus_ < 0 || !visible_) return {};
+  const auto targets = focusables(RosterLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(targets.size())
+             ? targets[static_cast<std::size_t>(focus_)].label
+             : std::string{};
 }
 int RosterWorkspace::header_column(Point point,
                                    const RosterLayout &layout) const noexcept {
@@ -474,7 +491,7 @@ RosterCommand RosterWorkspace::handle(const InputEvent &event, int width,
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
         focus_ < count) {
-      const auto &rect = rects[static_cast<std::size_t>(focus_)];
+      const auto &rect = rects[static_cast<std::size_t>(focus_)].bounds;
       InputEvent press{InputEventType::LeftPressed};
       press.position = {rect.x + rect.width * .5f,
                         rect.y + rect.height * .5f};
@@ -766,7 +783,7 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
     const auto rects = focusables(layout);
     if (focus_ < static_cast<int>(rects.size()))
       out.overlay.emplace_back(StrokedRectangle{
-          rects[static_cast<std::size_t>(focus_)], cyan});
+          rects[static_cast<std::size_t>(focus_)].bounds, cyan});
   }
 }
 } // namespace stellar::native_colony_roster

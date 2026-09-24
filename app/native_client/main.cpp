@@ -6002,7 +6002,10 @@ class NativeCampaign final {
       const bool can_notify=notifications_available();
       if(!can_notify){notification_view_.close();chronicle_view_.close();}
       if(can_notify&&notification_view_.visible()){
+        const int focus_before=notification_view_.focus();
         const auto command=notification_view_.handle(event,notifications_.items(),width,height);
+        if(command.captured&&notification_view_.focus()!=focus_before)
+          announcer_.announce(notification_view_.focused_label(notifications_.items(),width,height));
         if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenDiplomaticContact){
           system_workspace_.close();colony_workspace_.close();
           research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
@@ -6024,7 +6027,10 @@ class NativeCampaign final {
         if(command.captured){gesture_.capture_for_ui();continue;}
       }
       if(can_notify&&chronicle_view_.visible()){
+        const int focus_before=chronicle_view_.focus();
         if(chronicle_view_.handle(event,width,height)){
+          if(chronicle_view_.focus()!=focus_before)
+            announcer_.announce(chronicle_view_.focused_label(width,height));
           if(const auto nav=chronicle_view_.navigation()){
             chronicle_view_.close();
             (void)enter_system(static_cast<int>(*nav),width,height);
@@ -6122,7 +6128,10 @@ class NativeCampaign final {
       if(colony_roster_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed?layout.hit(event.position,false):UiAction::None;
         if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
+          const int focus_before=colony_roster_.focus();
           const auto command=colony_roster_.handle(event,width,height);
+          if(command.captured&&colony_roster_.focus()!=focus_before)
+            announcer_.announce(colony_roster_.focused_label(width,height));
           if(command.refresh)refresh_roster(true);
           else if(command.open_colony_id)open_roster_colony(command,width,height);
           if(command.captured){gesture_.cancel();continue;}
@@ -6168,7 +6177,10 @@ class NativeCampaign final {
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
         if(colony_workspace_.freight_preview()||(top_action!=UiAction::Pause&&top_action!=UiAction::Speed)){
+          const int focus_before=colony_workspace_.focus();
           const auto command=colony_workspace_.handle(event,width,height);
+          if(command.captured&&colony_workspace_.focus()!=focus_before)
+            announcer_.announce(colony_workspace_.focused_label());
           if(command.kind==ColonyWorkspaceCommandKind::Close)gesture_.cancel();
           else if(command.kind==ColonyWorkspaceCommandKind::Planetary)execute_planetary(command.planetary);
           else if(command.kind==ColonyWorkspaceCommandKind::ReviewFreight || command.kind==ColonyWorkspaceCommandKind::ConfirmFreight || command.kind==ColonyWorkspaceCommandKind::CancelFreight)

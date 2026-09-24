@@ -150,6 +150,12 @@ float NativeColonyWorkspace::freight_content_height(const ColonyWorkspaceLayout&
   return lines * (layout.body_font_pixels + 4.f * layout.scale);
 }
 
+std::string NativeColonyWorkspace::focused_label() const {
+  if (focus_ < 0 || !freight_preview_) return {};
+  return focus_ == 0 ? tr("COLONY_FREIGHT_CANCEL", "Cancel")
+                     : tr("COLONY_FREIGHT_CONFIRM", "Confirm dispatch");
+}
+
 ColonyWorkspaceCommand NativeColonyWorkspace::handle(const InputEvent &event,
                                                        int width, int height) {
   if (!visible_) return {};

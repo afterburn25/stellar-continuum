@@ -52,6 +52,9 @@ public:
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label() const;
   [[nodiscard]] const std::optional<stellar::native_colony::NativeColonyView> &
   view() const noexcept {
     return view_;

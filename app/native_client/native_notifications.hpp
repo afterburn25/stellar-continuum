@@ -97,6 +97,11 @@ class NativeNotificationView final {
     return scroll_.scroll_offset;
   }
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(
+      const std::deque<NativePlayerNotification>& items, int width,
+      int height) const;
 
   [[nodiscard]] NotificationViewCommand handle(
       const native_map::InputEvent& event,

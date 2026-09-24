@@ -87,18 +87,25 @@ bool same_rect(UiRect left, UiRect right) noexcept {
 // each card's action buttons. Card bodies are inert — only the explicit
 // action buttons respond, and only while fully inside the viewport (the
 // same gate the pointer activation path applies).
+struct FocusTarget { UiRect bounds; std::string label; };
+
 void collect_focusables(const NotificationLayout& layout,
-                        std::vector<UiRect>& out) {
-  out.push_back(layout.chronicle_button);
-  out.push_back(layout.close_button);
+                        const stellar::engine::LocalizationTable* locale,
+                        std::vector<FocusTarget>& out) {
+  out.push_back({layout.chronicle_button,
+                 resolve(locale, "NOTIFY_OPEN_CHRONICLE", "Chronicle")});
+  out.push_back({layout.close_button,
+                 resolve(locale, "NOTIFY_CLOSE", "Close feed")});
   for (const auto& entry : layout.entries) {
     if (entry.contact_button && contains_rect(layout.list_viewport, *entry.contact_button))
-      out.push_back(*entry.contact_button);
+      out.push_back({*entry.contact_button,
+                     resolve(locale, "NOTIFY_OPEN_RELATIONS", "Open relations")});
     if (entry.system_button && contains_rect(layout.list_viewport, *entry.system_button))
-      out.push_back(*entry.system_button);
+      out.push_back({*entry.system_button,
+                     resolve(locale, "NOTIFY_VIEW_SYSTEM", "View system")});
   }
-  std::sort(out.begin(), out.end(), [](const UiRect& a, const UiRect& b) {
-    return a.y == b.y ? a.x < b.x : a.y < b.y;
+  std::sort(out.begin(), out.end(), [](const FocusTarget& a, const FocusTarget& b) {
+    return a.bounds.y == b.bounds.y ? a.bounds.x < b.bounds.x : a.bounds.y < b.bounds.y;
   });
 }
 
@@ -238,6 +245,19 @@ void NativeNotificationView::open(std::int64_t latest_sequence) noexcept {
   visible_ = true; scroll_ = {}; last_read_ = latest_sequence; focus_ = -1; cancel_press();
 }
 void NativeNotificationView::close() noexcept { visible_ = false; scroll_ = {}; focus_ = -1; cancel_press(); }
+
+std::string NativeNotificationView::focused_label(
+    const std::deque<NativePlayerNotification>& items, int width,
+    int height) const {
+  if (focus_ < 0 || !visible_) return {};
+  const auto layout = notification_layout_for(items, width, height, measure_,
+                                              scroll_.scroll_offset, locale_);
+  std::vector<FocusTarget> targets;
+  collect_focusables(layout, locale_, targets);
+  return focus_ < static_cast<int>(targets.size())
+             ? targets[static_cast<std::size_t>(focus_)].label
+             : std::string{};
+}
 void NativeNotificationView::toggle(std::int64_t latest_sequence) noexcept { if (visible_) close(); else open(latest_sequence); }
 
 NotificationViewCommand NativeNotificationView::handle(const native_map::InputEvent& event,
@@ -268,8 +288,8 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
     constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
                             kDown = 0x40000051u, kUp = 0x40000052u;
     constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
-    std::vector<UiRect> rects;
-    collect_focusables(layout, rects);
+    std::vector<FocusTarget> rects;
+    collect_focusables(layout, locale_, rects);
     const int count = static_cast<int>(rects.size());
     const bool fwd = (event.key == kTab && !event.shift) ||
                      event.key == kRight || event.key == kDown;
@@ -289,7 +309,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
         focus_ < count) {
-      const auto& rect = rects[static_cast<std::size_t>(focus_)];
+      const auto& rect = rects[static_cast<std::size_t>(focus_)].bounds;
       native_map::InputEvent press{native_map::InputEventType::LeftPressed};
       press.position = {rect.x + rect.width * .5f, rect.y + rect.height * .5f};
       native_map::InputEvent release = press;
@@ -455,10 +475,10 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
                layout.list_viewport.y + thumb.offset, 2.f * s, thumb.size}, muted_color); }
   }
   if (focus_ >= 0) {
-    std::vector<UiRect> focusables;
-    collect_focusables(layout, focusables);
+    std::vector<FocusTarget> focusables;
+    collect_focusables(layout, locale_, focusables);
     if (focus_ < static_cast<int>(focusables.size()))
-      stroke(out, focusables[static_cast<std::size_t>(focus_)], title_color);
+      stroke(out, focusables[static_cast<std::size_t>(focus_)].bounds, title_color);
   }
 }
 

@@ -289,32 +289,62 @@ std::optional<UiRect> clipped(UiRect a, const UiRect &b) {
 // order — the header row, the intro-row cyclers, then each visible
 // card's body (located entries only — an unlocated card activates to
 // nothing), DIP action and tag chips.
-std::vector<UiRect> focusables(const ChronicleLayout &layout) {
-  std::vector<UiRect> out;
-  out.push_back(layout.search_box);
-  out.push_back(layout.refresh_button);
-  out.push_back(layout.close_button);
-  if (layout.focus_button) out.push_back(*layout.focus_button);
-  if (layout.page_older_button) out.push_back(*layout.page_older_button);
-  if (layout.page_newer_button) out.push_back(*layout.page_newer_button);
-  out.push_back(layout.time_button);
-  out.push_back(layout.actor_button);
-  out.push_back(layout.significance_button);
-  out.push_back(layout.domain_button);
-  for (const auto &card : layout.entries) {
+struct FocusTarget {
+  UiRect bounds;
+  std::string label;
+};
+
+std::vector<FocusTarget> focusables(
+    const ChronicleLayout &layout, const ChronicleSnapshot &snap,
+    const stellar::engine::LocalizationTable *locale) {
+  std::vector<FocusTarget> out;
+  out.push_back({layout.search_box,
+                 resolve(locale, "CHRONICLE_SEARCH", "Search chronicle")});
+  out.push_back({layout.refresh_button,
+                 resolve(locale, "CHRONICLE_REFRESH", "Refresh")});
+  out.push_back({layout.close_button,
+                 resolve(locale, "CHRONICLE_CLOSE", "Close chronicle")});
+  if (layout.focus_button)
+    out.push_back({*layout.focus_button,
+                   resolve(locale, "CHRONICLE_CLEAR_TAG", "Clear tag focus")});
+  if (layout.page_older_button)
+    out.push_back({*layout.page_older_button,
+                   resolve(locale, "CHRONICLE_PAGE_OLDER", "Older page")});
+  if (layout.page_newer_button)
+    out.push_back({*layout.page_newer_button,
+                   resolve(locale, "CHRONICLE_PAGE_NEWER", "Newer page")});
+  out.push_back({layout.time_button,
+                 resolve(locale, "CHRONICLE_TIME_FILTER", "Time filter")});
+  out.push_back({layout.actor_button,
+                 resolve(locale, "CHRONICLE_ACTOR_FILTER", "Actor filter")});
+  out.push_back({layout.significance_button,
+                 resolve(locale, "CHRONICLE_SIGNIFICANCE_FILTER",
+                         "Significance filter")});
+  out.push_back({layout.domain_button,
+                 resolve(locale, "CHRONICLE_DOMAIN_FILTER", "Domain filter")});
+  for (std::size_t i = 0; i < layout.entries.size(); ++i) {
+    const auto &card = layout.entries[i];
+    const std::string card_label =
+        i < snap.entries.size()
+            ? entry_label(snap.entries[i].category, locale) + "  " +
+                  snap.entries[i].date
+            : std::string{};
     if (card.navigable)
       if (const auto clip = clipped(card.bounds, layout.list_viewport))
-        out.push_back(*clip);
+        out.push_back({*clip, card_label});
     if (card.contact_button)
       if (const auto clip =
               clipped(*card.contact_button, layout.list_viewport))
-        out.push_back(*clip);
+        out.push_back(
+            {*clip, resolve(locale, "CHRONICLE_CONTACT", "Contact")});
     for (const auto &chip : card.tag_chips)
       if (const auto clip = clipped(chip.bounds, layout.list_viewport))
-        out.push_back(*clip);
+        out.push_back(
+            {*clip, resolve(locale, "CHRONICLE_TAG", "Tag") + " " + chip.tag});
   }
-  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
-    return a.y != b.y ? a.y < b.y : a.x < b.x;
+  std::ranges::sort(out, [](const FocusTarget &a, const FocusTarget &b) {
+    return a.bounds.y != b.bounds.y ? a.bounds.y < b.bounds.y
+                                    : a.bounds.x < b.bounds.x;
   });
   return out;
 }
@@ -518,6 +548,18 @@ void NativeChronicleView::cycle_domain() {
   refresh();
 }
 
+std::string NativeChronicleView::focused_label(int width,
+                                               int height) const {
+  if (focus_ < 0 || !visible_) return {};
+  const auto layout = chronicle_layout_for(
+      snapshot_, width, height, measure_, scroll_.scroll_offset, tag_filter_,
+      recency_window_ > 0.0);
+  const auto items = focusables(layout, snapshot_, locale_);
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
+}
+
 bool NativeChronicleView::handle(const native_map::InputEvent &event,
                                  int width, int height) {
   if (!visible_) return false;
@@ -569,7 +611,7 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
     constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
                             kDown = 0x40000051u, kUp = 0x40000052u;
     constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
-    const auto items = focusables(layout);
+    const auto items = focusables(layout, snapshot_, locale_);
     const int count = static_cast<int>(items.size());
     const bool fwd = (event.key == kTab && !event.shift) ||
                      event.key == kRight || event.key == kDown;
@@ -587,7 +629,7 @@ bool NativeChronicleView::handle(const native_map::InputEvent &event,
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
         focus_ < count) {
-      const auto &rect = items[static_cast<std::size_t>(focus_)];
+      const auto &rect = items[static_cast<std::size_t>(focus_)].bounds;
       native_map::InputEvent press{native_map::InputEventType::LeftPressed};
       press.position = {rect.x + rect.width * .5f,
                         rect.y + rect.height * .5f};
@@ -1075,10 +1117,11 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
          muted_color);
   }
   if (focus_ >= 0) {
-    const auto items = focusables(layout);
+    const auto items = focusables(layout, snapshot_, locale_);
     if (focus_ < static_cast<int>(items.size()))
       out.overlay.emplace_back(StrokedRectangle{
-          items[static_cast<std::size_t>(focus_)], {160, 210, 255, 255}});
+          items[static_cast<std::size_t>(focus_)].bounds,
+          {160, 210, 255, 255}});
   }
 }
 

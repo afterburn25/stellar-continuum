@@ -65,6 +65,9 @@ public:
   }
   [[nodiscard]] float scroll_offset() const noexcept { return list_.scroll_offset; }
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
   void set_notice(std::string value) { notice_ = std::move(value); }
   void set_localization(
       const stellar::engine::LocalizationTable *table) noexcept {
@@ -89,8 +92,11 @@ private:
   // 0=colony,1=world,2=population; -1 when the point misses the headers.
   [[nodiscard]] int header_column(stellar::native_map::Point,
                                   const RosterLayout &) const noexcept;
-  [[nodiscard]] std::vector<stellar::native_map::UiRect>
-  focusables(const RosterLayout &) const;
+  struct FocusTarget {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+  };
+  [[nodiscard]] std::vector<FocusTarget> focusables(const RosterLayout &) const;
   const stellar::engine::LocalizationTable *locale_{};
   View view_;
   bool visible_{};
