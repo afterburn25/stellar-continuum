@@ -814,7 +814,15 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   for pending-upgrade/progress mismatches or hub expansion past the
   level cap, and `out_of_range` for `operating_priority` outside
   [0,1], `condition` above 1, `industry_progress` above the build
-  cost, and `stored_power_days` above the catalog storage. Every
+  cost, and `stored_power_days` above the catalog storage.
+  Resource outposts bound `stored_extracted_materials` against the
+  represented capacity and `remaining + stored` against the
+  represented deposit via `resource_outpost_snapshot` (guarded —
+  unresolved inputs already carry their own findings). The active
+  massive encounter is validated on a clone through
+  `validate_campaign_massive_encounter` (`invalid_encounter`) — the
+  canonical validator mutates, so diagnostics stay read-only while
+  still surfacing deep battle-state corruption. Every
   throwing call in the operations pass is now wrapped — sustenance
   analysis, the warfare theater projection, lane-network construction
   and reach assessment, the logistics snapshot/coverage/home-network

@@ -8,6 +8,7 @@
 #include <stellar/core/campaign_population_projection.hpp>
 #include <stellar/core/campaign_warfare_projection.hpp>
 #include <stellar/core/colonization_runtime.hpp>
+#include <stellar/core/colony_operations.hpp>
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/exploration_advance.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
@@ -615,6 +616,24 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
           !site->second->environment.has_solid_surface)
         emit("colony","invalid_surface_site",c.id,"Surface buildings sit on a body without solid ground.");
     }
+    // Resource-outpost capacity/deposit bounds — the snapshot throws
+    // on unresolved bodies or corrupt funding; those inputs already
+    // carry their own invariant findings.
+    if(c.planetary_body_id)
+      try{
+        const auto ops=resource_outpost_snapshot(w.bodies,w.economies,c);
+        if(ops.is_resource_outpost){
+          if(std::isfinite(c.stored_extracted_materials)&&
+              c.stored_extracted_materials>ops.storage_capacity+.000001)
+            emit("colony","out_of_range",c.id,"Stored extracted material exceeds the represented capacity.");
+          if(c.remaining_extractable_materials&&
+              std::isfinite(*c.remaining_extractable_materials)&&
+              std::isfinite(c.stored_extracted_materials)&&
+              *c.remaining_extractable_materials+c.stored_extracted_materials>
+                  ops.initial_deposit_materials+.000001)
+            emit("colony","out_of_range",c.id,"Remaining plus stored material exceeds the represented deposit.");
+        }
+      }catch(const std::exception&){}
     (void)ids(c.surface_buildings,&SurfaceBuilding::id,"construction");
     // Per-building checks mirror validate_surface_construction:
     // overlap queries only see buildings that passed every check.
@@ -880,6 +899,15 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     for(const auto &v:e.vessels)
       if(!fleet_ids.contains(v.fleet_id))
         emit("combat","orphaned_encounter_vessel",v.fleet_id,"Encounter vessel binds an absent fleet.");
+    // Deep battle validation mirrors validate_galaxy_references; the
+    // canonical validator mutates (legacy InitialShipCount
+    // materialization), so it runs on a clone — diagnostics stay
+    // read-only.
+    try{
+      auto copy=clone_campaign_massive_encounter(e);
+      validate_campaign_massive_encounter(copy,{w.systems,w.fleets});
+    }catch(const std::exception&){
+      emit("combat","invalid_encounter",e.system_id,"Active encounter fails its authoritative validation.");}
   }
   if(!civilizations.contains(w.player_civilization_id))emit("civilization","missing_player",w.player_civilization_id,"Player empire ID does not exist.");
   if(dropped>0){
