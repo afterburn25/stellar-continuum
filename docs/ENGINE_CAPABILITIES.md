@@ -831,9 +831,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `chronicle` when all four completed but post-step recording threw;
   `tactical` for the combat route and `stellar_activity` for the
   weather-clock advance) plus the exception message —
-  `frame.last_advance_failure()` clears on the next attempt and the QA
-  host records it as a `simulation/step_failure` critical finding in the
-  failure path before attempting the critical checkpoint. `campaign_frame_parity`'s
+  `frame.last_advance_failure()` clears on the next attempt; the QA
+  host records it as a `simulation/step_failure` critical finding before
+  attempting the critical checkpoint, and the native client routes a
+  developer-session step throw through
+  `CampaignDiagnosticMonitor::observe_advance_failure` (critical record
+  under the same first-critical capture as `observe`) into the fault
+  capture's pause + diagnostic-bundle path instead of crashing — player
+  sessions still throw. `campaign_frame_parity`'s
   StrategicFailure contract row asserts the record exists with an
   attributed phase on a real throw, and the moved-owner row asserts a
   successful advance leaves none,

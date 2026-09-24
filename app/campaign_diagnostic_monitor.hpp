@@ -23,13 +23,7 @@ public:
     const auto &sim=world.developer_provenance->simulation;
     const auto tick=sim.completed_ticks+sim.tactical_completed_ticks;
     const auto day=frame.clock().simulation_days();
-    const auto add=[&](DiagnosticRecord record){
-      record.real_timestamp=timestamp;
-      // Capture before bounded history filtering/rotation. The host must not
-      // miss a critical fault because the viewer changed its recording level.
-      if(record.severity==DiagnosticSeverity::Critical&&!first_critical_)first_critical_=record;
-      history_.append(std::move(record));
-    };
+    const auto add=[&](DiagnosticRecord record){add_(std::move(record),timestamp);};
     if(!last_inspected_day_){
       DiagnosticRecord start;start.tick=tick;start.game_date=format_campaign_date(day);start.subsystem="session";
       start.event_type="native_monitor_started";start.message="Observing the isolated developer campaign; prior history is not reconstructed.";add(std::move(start));
@@ -57,7 +51,32 @@ public:
       active_findings_=std::move(current);last_inspected_day_=day;
     }
   }
+  // Records an advance() throw reported by CampaignFrame::last_advance_failure —
+  // the throwing frame has no CampaignFrameResult to observe. The record is
+  // critical so the developer fault response can pause and capture.
+  void observe_advance_failure(stellar::core::CampaignFrame &frame,std::string_view timestamp){
+    const auto &failure=frame.last_advance_failure();
+    if(!failure)return;
+    const auto &world=frame.runtime().world().campaign();
+    if(!world.developer_provenance)return;
+    const auto &sim=world.developer_provenance->simulation;
+    stellar::engine::DiagnosticRecord record;
+    record.tick=sim.completed_ticks+sim.tactical_completed_ticks;
+    record.game_date=stellar::core::format_campaign_date(frame.clock().simulation_days());
+    record.subsystem="simulation";record.event_type="step_failure";
+    record.severity=stellar::engine::DiagnosticSeverity::Critical;
+    record.message="Authoritative step failed in the "+failure->phase+" phase: "+failure->message;
+    record.values["phase"]=failure->phase;
+    add_(std::move(record),timestamp);
+  }
 private:
+  void add_(stellar::engine::DiagnosticRecord record,std::string_view timestamp){
+    record.real_timestamp=timestamp;
+    // Capture before bounded history filtering/rotation. The host must not
+    // miss a critical fault because the viewer changed its recording level.
+    if(record.severity==stellar::engine::DiagnosticSeverity::Critical&&!first_critical_)first_critical_=record;
+    history_.append(std::move(record));
+  }
   using Key=std::tuple<std::string,std::string,std::int64_t,std::string>;
   stellar::engine::DiagnosticBuffer history_;
   std::optional<double> last_inspected_day_;

@@ -6207,7 +6207,19 @@ class NativeCampaign final {
           (!general_settings_||!general_settings_->saved().reduce_motion)&&
           (!tumble_world.active_combat_encounter||tumble_world.active_combat_encounter->reconciled));
       const bool single_step=developer_panel_.take_step_request()&&session_->frame().can_step_developer();
-      const auto frame_result=[&]{const auto advance_scope=stellar::engine::Profiler::instance().span("simulation","client");return session_->advance(menu_?0.:elapsed,timestamp,single_step);}();
+      const auto frame_result=[&]{
+        const auto advance_scope=stellar::engine::Profiler::instance().span("simulation","client");
+        try{return session_->advance(menu_?0.:elapsed,timestamp,single_step);}
+        catch(...){
+          // A step that throws mid-frame in a developer session latches the
+          // fault path (pause + diagnostic capture) instead of crashing; the
+          // failure record lives on the frame. Player sessions still throw.
+          if(!developer_session()||!session_->frame().last_advance_failure())throw;
+          developer_monitor_.observe_advance_failure(session_->frame(),timestamp);
+          respond_to_developer_fault(width,height);
+          return stellar::core::CampaignFrameResult{};
+        }
+      }();
       if(developer_session()){
         developer_monitor_.observe(session_->frame(),frame_result,timestamp);
         respond_to_developer_fault(width,height);
