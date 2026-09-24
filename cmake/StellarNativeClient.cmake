@@ -22,7 +22,8 @@ target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
 # documents, content resolution, audio and quicksave so game projects get a
 # running loop from the engine instead of generated glue code.
 add_library(stellar_engine_runtime STATIC engine/src/runtime_host.cpp)
-target_include_directories(stellar_engine_runtime PUBLIC engine/include)
+target_include_directories(stellar_engine_runtime PUBLIC engine/include
+  PRIVATE "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(stellar_engine_runtime PUBLIC stellar_engine
   stellar_native_platform stellar_native_audio)
 if(MSVC)

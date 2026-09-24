@@ -13,6 +13,7 @@
 #include "stellar/engine/runtime_paths.hpp"
 #include "stellar/engine/save_history.hpp"
 #include "stellar/engine/texture_cook.hpp"
+#include "stellar/build_version.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -667,18 +668,30 @@ int RuntimeHost::run() {
       std::fprintf(stderr,
                    "replay: no --fixed-hz — wall-clock stepping is not "
                    "deterministic, checkpoints will diverge\n");
-    if (const auto &h = impl.replay.header();
-        h.window_width != 0 &&
+    if (const auto &h = impl.replay.header(); h.window_width != 0 &&
         (h.window_width != static_cast<std::uint32_t>(options.width) ||
-         h.window_height != static_cast<std::uint32_t>(options.height)))
-      std::fprintf(stderr,
-                   "replay: recorded drawable %ux%u differs from this "
-                   "window — pointer positions may not land identically\n",
-                   h.window_width, h.window_height);
+         h.window_height != static_cast<std::uint32_t>(options.height))) {
+      if (options.headless) {
+        // No real window constrains the drawable — adopt the recorded
+        // size so pointer positions land exactly as recorded.
+        impl.options.width = static_cast<int>(h.window_width);
+        impl.options.height = static_cast<int>(h.window_height);
+      } else {
+        std::fprintf(
+            stderr,
+            "replay: recorded drawable %ux%u differs from this "
+            "window — pointer positions may not land identically\n",
+            h.window_width, h.window_height);
+      }
+    }
   }
   if (!options.record_file.empty()) {
     ReplayHeader header;
     header.seed = options.seed;
+    // Provenance matches the client's convention: build_id is the source
+    // commit, game_version the engine version that built the host.
+    header.build_id = STELLAR_SOURCE_COMMIT;
+    header.game_version = STELLAR_ENGINE_VERSION;
     header.window_width = static_cast<std::uint32_t>(options.width);
     header.window_height = static_cast<std::uint32_t>(options.height);
     impl.recorder.emplace(header);
