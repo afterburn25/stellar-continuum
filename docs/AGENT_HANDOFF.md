@@ -1254,9 +1254,16 @@ row selection and the home-system focus request replay the exact
 press/release dispatch pointer input takes, scroll-follow via
 `VirtualizedList::ensure_visible` keeps the focused row visible, and
 the read-only Core snapshots stay inspection-only;
-`native_developer_index` pins it. The remaining developer panels
-(diagnostics, simulation panel) stay pointer-only — they predate the
-contract and adopt it incrementally from here.
+`native_developer_index` pins it. The developer simulation panel
+follows: all sixteen rendered buttons ring in (y,x) order through a
+shared `activate` switch — speed presets run `set_developer_speed`,
+pause/resume runs the tactical/strategic clock toggle, AI control runs
+`set_developer_ai_control`, and the index/diagnostics/empire/stellar
+requests emit unchanged — while disabled controls (ADVANCE ONE TICK
+without a pending step, EXPORT while busy) skip the ring exactly like
+pointer input; `native_developer_index` pins it. The remaining
+developer panel (diagnostics) stays pointer-only — it predates the
+contract and adopts it incrementally from here.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast

@@ -263,6 +263,27 @@ int main(int argc,char **argv)try{
       check(empires.handle({InputEventType::EscapePressed},w,h,frame)&&empires.focus()<0&&empires.visible(),"Escape closed the empire monitor instead of releasing its ring.");
       check(empires.handle({InputEventType::EscapePressed},w,h,frame)&&!empires.visible(),"Second Escape did not close the empire monitor.");
     }
+    // Simulation panel: the sixteen rendered buttons ring in (y,x) order
+    // and activation replays the same dispatch a matched press/release
+    // takes — the 25× speed lands through set_developer_speed unchanged.
+    {
+      NativeDeveloperSimulationPanel simulation;simulation.toggle();
+      check(simulation.visible()&&simulation.focus()<0,"Simulation simulation opened with stale focus.");
+      const auto sim_press=[&](std::uint32_t key){InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;return simulation.handle(ev,w,h,frame);};
+      check(sim_press(9)&&simulation.focus()>=0,"Tab did not enter the simulation panel ring.");
+      check(simulation.focused_label(w,h,frame)=="1×","First simulation target is not the 1× speed.");
+      check(simulation.focused_bounds(w,h,frame).has_value(),"Focused simulation control lacks bounds.");
+      check(simulation.focused_control(w,h,frame)==stellar::engine::AnnouncementControl::Button,"Simulation control misclassified.");
+      while(simulation.focused_label(w,h,frame)!="25×")check(sim_press(9),"Simulation navigation leaked.");
+      check(sim_press(13)&&frame.runtime().world().campaign().developer_provenance->simulation.speed==25,"Keyboard speed activation did not reach set_developer_speed.");
+      int sim_guard=0;
+      while(simulation.focused_label(w,h,frame)!="CLOSE"&&sim_guard++<20)check(sim_press(9),"Simulation navigation leaked.");
+      check(sim_press(13)&&!simulation.visible(),"Keyboard CLOSE did not close the simulation panel.");
+      simulation.toggle();
+      check(sim_press(9)&&simulation.focus()>=0,"Tab did not re-enter the simulation ring.");
+      check(simulation.handle({InputEventType::EscapePressed},w,h,frame)&&simulation.focus()<0&&simulation.visible(),"Escape closed the simulation panel instead of releasing its ring.");
+      check(simulation.handle({InputEventType::EscapePressed},w,h,frame)&&!simulation.visible(),"Second Escape did not close the simulation panel.");
+    }
     // Running the authoritative campaign after appending a planet exercises
     // borrowed simulation views and ensures no stale vector pointers survive.
     (void)frame.runtime().advance(.25,.25);

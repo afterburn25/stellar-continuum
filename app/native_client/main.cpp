@@ -5809,6 +5809,7 @@ class NativeCampaign final {
            (giant_test_panel_.visible()&&giant_test_panel_.focus()>=0)||
            (stellar_activity_panel_.visible()&&stellar_activity_panel_.focus()>=0)||
            (developer_empires_.visible()&&developer_empires_.focus()>=0)||
+           (developer_panel_.visible()&&developer_panel_.focus()>=0)||
            hud_focus_>=0||
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
@@ -6276,20 +6277,27 @@ class NativeCampaign final {
           gesture_.capture_for_ui();continue;
         }
       }
-      if(developer_session()&&developer_panel_.handle(event,width,height,session_->frame())){
-        if(developer_panel_.take_stellar_request()){
-          stellar_activity_panel_.open(session_->frame(),selected_id_);focus_stellar_activity(width,height);
+      if(developer_session()){
+        const int developer_panel_focus_before=developer_panel_.focus();
+        if(developer_panel_.handle(event,width,height,session_->frame())){
+          if(developer_panel_.take_stellar_request()){
+            stellar_activity_panel_.open(session_->frame(),selected_id_);focus_stellar_activity(width,height);
+          }
+          if(developer_panel_.take_empires_request())developer_empires_.open(session_->frame());
+          if(developer_panel_.take_reveal_request()){
+            fully_explore_developer_galaxy(session_->frame().runtime().world().campaign());
+            refresh_knowledge();territory_refresh_elapsed_=.5;refresh_diplomacy(true);
+          }
+          if(developer_panel_.take_diagnostics_request())developer_diagnostics_.open(developer_monitor_);
+          if(developer_panel_.take_export_request())request_support(width,height);
+          if(developer_panel_.take_planet_index_request())developer_planet_index_.open(session_->frame().runtime().world().campaign());
+          if(developer_panel_.take_index_request())developer_index_.open(session_->frame().runtime().world().campaign());
+          if(developer_panel_.focus()!=developer_panel_focus_before)
+            announcer_.announce_focus(developer_panel_.focused_label(width,height,session_->frame()),
+              announcement_bounds(developer_panel_.focused_bounds(width,height,session_->frame())),
+              std::nullopt,developer_panel_.focused_control(width,height,session_->frame()));
+          gesture_.capture_for_ui();continue;
         }
-        if(developer_panel_.take_empires_request())developer_empires_.open(session_->frame());
-        if(developer_panel_.take_reveal_request()){
-          fully_explore_developer_galaxy(session_->frame().runtime().world().campaign());
-          refresh_knowledge();territory_refresh_elapsed_=.5;refresh_diplomacy(true);
-        }
-        if(developer_panel_.take_diagnostics_request())developer_diagnostics_.open(developer_monitor_);
-        if(developer_panel_.take_export_request())request_support(width,height);
-        if(developer_panel_.take_planet_index_request())developer_planet_index_.open(session_->frame().runtime().world().campaign());
-        if(developer_panel_.take_index_request())developer_index_.open(session_->frame().runtime().world().campaign());
-        gesture_.capture_for_ui();continue;
       }
       const bool hover_blocked=settings_visible()||(!menu_&&(battle_workspace_.visible()||settlement_workspace_.visible()||colony_workspace_.planetary_modal()||diplomacy_workspace_.modal_open()||shipyard_workspace_.confirmation_open()||construction_workspace_.confirmation_open()||fleet_workspace_.preview()));
       const auto hover_action=(!hover_blocked&&input.focused&&input.renderable())?layout.hit(event.position,menu_):UiAction::None;
