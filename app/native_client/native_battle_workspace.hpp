@@ -132,6 +132,7 @@ public:
   [[nodiscard]] const std::set<std::int64_t> &selection() const noexcept {
     return selection_;
   }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
 
 private:
   [[nodiscard]] stellar::native_map::Point
@@ -149,6 +150,8 @@ private:
                      BattleWorkspaceCommand &command) const;
   void adopt_viewport(int width, int height) noexcept;
   void invalidate_ship_targets() noexcept;
+  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  focusables(const BattleWorkspaceLayout &) const;
   [[nodiscard]] bool ship_targets_current(int width, int height) const noexcept;
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
@@ -195,6 +198,7 @@ private:
   };
   std::vector<VisualEvent> visual_events_;
   mutable int last_rendered_tokens_{};
+  int focus_{-1};
 };
 
 } // namespace stellar::native_battle_ui

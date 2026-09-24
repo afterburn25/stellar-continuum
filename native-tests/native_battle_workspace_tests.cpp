@@ -796,6 +796,76 @@ void fit_keeps_formations_clear_of_controls() {
   }
 }
 
+void keyboard_focus() {
+  constexpr std::uint32_t kTab = 9u;
+  constexpr std::uint32_t kReturn = 13u;
+  constexpr std::uint32_t kHome = 0x4000004au;
+  constexpr int width = 1280, height = 720;
+  NativeBattleWorkspace workspace;
+  workspace.open(snapshot(), 1, width, height);
+  const auto key = [&](std::uint32_t k, bool shift = false) {
+    InputEvent e{InputEventType::KeyPressed};
+    e.key = k;
+    e.shift = shift;
+    return workspace.handle(e, width, height);
+  };
+  require(workspace.focus() < 0, "Battle focus should start unset.");
+  // Top row: play, speed, fit, menu; then the two-column order grid.
+  require(key(kTab).captured && workspace.focus() == 0,
+          "Tab did not land on the play control.");
+  auto command = key(kReturn);
+  require(command.kind == BattleWorkspaceCommandKind::TogglePause &&
+              workspace.focus() == 0,
+          "Play activation did not toggle pause.");
+  (void)key(kTab);
+  command = key(kReturn);
+  require(command.kind == BattleWorkspaceCommandKind::CycleSpeed &&
+              workspace.focus() == 1,
+          "Speed activation did not cycle speed.");
+  (void)key(kTab);
+  (void)key(kTab);
+  command = key(kReturn);
+  require(command.kind == BattleWorkspaceCommandKind::Menu,
+          "Menu activation did not issue the menu command.");
+  require(workspace.visible(), "Menu command closed the battle surface.");
+  // Order buttons activate through the same press dispatch.
+  const int hold = 4; // first order-grid entry
+  (void)key(kHome);
+  for (int i = 0; i < hold; ++i)
+    (void)key(kTab);
+  require(workspace.focus() == hold,
+          "Hold order is not the first order-grid focusable.");
+  command = key(kReturn);
+  require(command.captured && command.kind == BattleWorkspaceCommandKind::None,
+          "Order issued without a selection.");
+  // Select an owned formation, then keyboard-activate Hold.
+  const auto own = workspace.project({-60.f, 0.f}, width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, own), width,
+                       height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, own), width,
+                         height);
+  require(workspace.selection().contains(11), "selection failed");
+  require(workspace.focus() < 0,
+          "Pointer selection did not clear keyboard focus.");
+  for (int i = 0; i <= hold; ++i)
+    (void)key(kTab);
+  require(workspace.focus() == hold,
+          "Refocus did not reach the Hold order.");
+  command = key(kReturn);
+  require(command.kind == BattleWorkspaceCommandKind::IssueOrder &&
+              command.orders.size() == 1 &&
+              command.orders.front().formation_id == 11 &&
+              command.orders.front().type == MassiveCombatOrderType::Hold,
+          "Keyboard activation did not issue the Hold order.");
+  require(workspace.focus() == hold,
+          "Order activation lost keyboard focus.");
+  // Pointer cancellation clears focus.
+  (void)workspace.handle(press(InputEventType::PointerCancelled, {}), width,
+                         height);
+  require(workspace.focus() < 0,
+          "Pointer cancellation did not clear keyboard focus.");
+}
+
 } // namespace
 
 int main() {
@@ -805,6 +875,7 @@ int main() {
     selection_rules();
     gesture_ownership();
     order_commands();
+    keyboard_focus();
     speed_and_chrome();
     ship_art_hit_targets();
     camera_roundtrip_and_resize();
