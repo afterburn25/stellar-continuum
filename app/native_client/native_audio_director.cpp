@@ -48,7 +48,10 @@ constexpr std::array voice_paths{
 }
 
 struct NativeAudioDirector::Clips final {
-  Clip hover, confirm, discovery, construction, ship, alert, music;
+  Clip hover, confirm, discovery, construction, ship, alert;
+  // Music pulls decoded PCM on demand — the only long program in the
+  // set, so it never occupies a whole-file decode in memory.
+  std::shared_ptr<stellar::engine::audio::AudioStreamDecoder> music_stream;
   Clip reconnaissance_required, research_report, survey_complete;
   std::array<Clip,3> filtered;
   std::array<int,3> filter_steps{-1,-1,-1};
@@ -111,7 +114,11 @@ void NativeAudioDirector::start_decode_job() {
         loaded->construction = decode(sfx_paths[3].relative);
         loaded->ship = decode(sfx_paths[4].relative);
         loaded->alert = decode(sfx_paths[5].relative);
-        loaded->music = decode(music_path.relative);
+        // Streamed, not decoded: bounds memory and skips the 16 MiB
+        // source cap. The Media Foundation reader binds lazily on the
+        // first read, which happens on the output owner thread.
+        loaded->music_stream =
+            stellar::engine::audio::open_audio_stream(root / music_path.relative);
         std::string voice_failure;
         try {
           std::size_t voice_total{};
@@ -168,6 +175,7 @@ void NativeAudioDirector::fail(std::string message, bool device_fault) {
   stats_.failed = true;
   stats_.enabled = false;
   stats_.music_started = false;
+  stats_.music_streaming = false;
   stats_.queued_music_bytes = 0;
   stats_.voice_active = false;
   stats_.queued_voice_bytes = 0;
@@ -257,10 +265,13 @@ void NativeAudioDirector::service() {
     output_->service();
     const auto diagnostics = output_->diagnostics();
     stats_.music_started = diagnostics.music_started;
+    stats_.music_streaming = diagnostics.music_streaming;
     stats_.queued_music_bytes = diagnostics.queued_music_bytes;
     stats_.voice_active = diagnostics.voice_active;
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
     service_voice();
+  } catch (const stellar::engine::audio::AudioStreamError& error) {
+    fail(std::string{"audio stream failure: "} + error.what());
   } catch (const std::exception& error) {
     fail(std::string{"audio device failure: "} + error.what(), true);
   }
@@ -329,12 +340,18 @@ void NativeAudioDirector::menu_ready() {
   // Guard on music_started, not the start count: after a device recovery the
   // count is already nonzero but the queue is empty and must be refilled.
   if (!may_play_effect() || stats_.music_started) return;
+  if (!clips_->music_stream) { fail("audio music stream was not loaded"); return; }
   try {
-    output_->play_music(clips_->music);
+    output_->play_music(clips_->music_stream);
     ++stats_.music_start_count;
     const auto diagnostics = output_->diagnostics();
     stats_.music_started = diagnostics.music_started;
+    stats_.music_streaming = diagnostics.music_streaming;
     stats_.queued_music_bytes = diagnostics.queued_music_bytes;
+  } catch (const stellar::engine::audio::AudioStreamError& error) {
+    // Corrupt/unreadable media is a permanent asset failure, not a
+    // device fault — recovery retries cannot fix it.
+    fail(std::string{"audio music stream failed: "} + error.what());
   } catch (const std::exception& error) {
     fail(std::string{"audio music playback failed: "} + error.what(), true);
   }
@@ -462,6 +479,7 @@ void NativeAudioDirector::stop() {
   }
   voice_queue_.clear();
   stats_.music_started = false;
+  stats_.music_streaming = false;
   stats_.queued_music_bytes = 0;
   stats_.voice_active = false;
   stats_.queued_voice_bytes = 0;

@@ -15,7 +15,7 @@
 
 namespace stellar::engine {
 class JobSystem;
-namespace audio { class AudioOutput; }
+namespace audio { class AudioOutput; class AudioStreamDecoder; }
 }
 namespace stellar::native_audio { struct PcmData; }
 
@@ -31,6 +31,9 @@ struct NativeAudioStats final {
   std::uint64_t hover_count{};
   std::uint64_t event_count{};
   bool music_started{};
+  // Music is fed from the incremental pull decoder rather than a
+  // whole-file decoded clip.
+  bool music_streaming{};
   std::size_t queued_music_bytes{};
   bool failed{};
   bool enabled{};
