@@ -478,8 +478,18 @@ void Scene3DRenderer::prepare(const DrawList& list){
       // anisotropic_texture declares high-frequency content (polar/ring
       // maps): isotropic LOD erases it, so it keeps full-chain residency.
       stream_request(image,priority,instance.material.anisotropic_texture?0u:mip_for(image));
-      if(instance.material.dielectric)for(const auto& optical:{instance.material.dielectric->environment,instance.material.dielectric->surface})
-        {if(textures.insert(optical.get()).second)texture_bytes+=texture_mip_layout3d(optical.get()).resident_bytes;stream_request(optical,priority,mip_for(optical));}
+      if(instance.material.dielectric){
+        // The environment map is a view-independent equirect sampled at
+        // reflected/refracted directions — surface footprint does not bound
+        // its texel demand, so it keeps full-chain residency like aniso
+        // content. The roughness/relief surface map IS surface content.
+        const auto& env=instance.material.dielectric->environment;
+        if(textures.insert(env.get()).second)texture_bytes+=texture_mip_layout3d(env.get()).resident_bytes;
+        stream_request(env,priority,0u);
+        const auto& optical=instance.material.dielectric->surface;
+        if(textures.insert(optical.get()).second)texture_bytes+=texture_mip_layout3d(optical.get()).resident_bytes;
+        stream_request(optical,priority,mip_for(optical));
+      }
       if(instance.material.surface_response)for(const auto& response_image:{instance.material.surface_response->normal,instance.material.surface_response->properties,instance.material.surface_response->cloud_shadow})
         {if(textures.insert(response_image.get()).second)texture_bytes+=texture_mip_layout3d(response_image.get()).resident_bytes;stream_request(response_image,priority,mip_for(response_image));}
       if(instance.material.surface_effect){const auto& image_next=instance.material.surface_effect->next_texture;
