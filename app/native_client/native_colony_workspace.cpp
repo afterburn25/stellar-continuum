@@ -123,6 +123,7 @@ void NativeColonyWorkspace::cancel_freight() noexcept {
 
 void NativeColonyWorkspace::set_freight_preview(NativeOutpostFreightPreview preview) {
   cancel_freight();
+  planetary_.release_focus();
   if (!visible_ || !view_ || !view_->resource_outpost ||
       preview.campaign_generation != view_->campaign_generation ||
       preview.player_civilization_id != view_->player_civilization_id ||
@@ -151,14 +152,16 @@ float NativeColonyWorkspace::freight_content_height(const ColonyWorkspaceLayout&
 }
 
 std::string NativeColonyWorkspace::focused_label() const {
-  if (focus_ < 0 || !freight_preview_) return {};
+  if (!freight_preview_) return planetary_.focused_label();
+  if (focus_ < 0) return {};
   return focus_ == 0 ? tr("COLONY_FREIGHT_CANCEL", "Cancel")
                      : tr("COLONY_FREIGHT_CONFIRM", "Confirm dispatch");
 }
 
 std::optional<UiRect>
 NativeColonyWorkspace::focused_bounds(int width, int height) const {
-  if (focus_ < 0 || !freight_preview_) return std::nullopt;
+  if (!freight_preview_) return planetary_.focused_bounds();
+  if (focus_ < 0) return std::nullopt;
   const auto layout = ColonyWorkspaceLayout::for_viewport(width, height);
   return focus_ == 0 ? std::optional<UiRect>{layout.freight_cancel}
                      : std::optional<UiRect>{layout.freight_confirm};

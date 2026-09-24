@@ -51,14 +51,26 @@ public:
   [[nodiscard]] const auto& freight_preview() const noexcept { return freight_preview_; }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
-  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Effective focus index: the freight modal's own ring while it is open,
+  // the planetary screen's hit-registry ring otherwise.
+  [[nodiscard]] int focus() const noexcept {
+    return freight_preview_ ? focus_ : planetary_.focus();
+  }
   // Localized label of the ringed control for screen-reader/live-region
-  // consumers. Empty when nothing is focused.
+  // consumers. Empty when nothing is focused. Outside the freight modal the
+  // planetary screen's focused control reports.
   [[nodiscard]] std::string focused_label() const;
-  // Client-pixel rect of the ringed freight-modal control — null when
-  // nothing is focused.
+  // Client-pixel rect of the ringed control — the freight modal's rect
+  // while it is open, the planetary hit rect otherwise. Null when nothing
+  // is focused.
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   focused_bounds(int width, int height) const;
+  // UIA control kind of the ringed control — all planetary/freight
+  // controls are buttons.
+  [[nodiscard]] stellar::engine::AnnouncementControl focused_control() const {
+    return focus() >= 0 ? stellar::engine::AnnouncementControl::Button
+                        : stellar::engine::AnnouncementControl::Custom;
+  }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeColonyView> &
   view() const noexcept {
     return view_;

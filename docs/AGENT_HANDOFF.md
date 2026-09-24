@@ -1195,7 +1195,25 @@ startup workspace delegates to it on the Setup screen), each
 `focused_control` comparing the focused rect against the surface's
 known text-field layout rect. The startup settings route now forwards
 range and control too (previously label+bounds only). Remaining
-surfaces default to Custom until they classify their focusables. Note: client-side the fragment resolves with
+surfaces default to Custom until they classify their focusables.
+Planetary ring (row 26): `NativePlanetaryScreen` — the last
+player-facing surface without a keyboard ring — now walks its
+render-registered hit registry: every enabled button, layer/view-mode
+control, tab, action row and clipped-visible slot cell sorts into a
+(y,x) ring; Return/Space run a shared `activate(hit)` extracted from
+the pointer release path so keyboard and pointer dispatch are
+identical by construction; the confirmation modal narrows the ring
+automatically (it clears `hits_` before registering Cancel/Confirm);
+Escape releases the ring before the modal-cancel/deselect/Back chain;
+pointer press/cancel reset it; globe region picking stays
+pointer-spatial. `NativeColonyWorkspace` delegates
+`focus()`/`focused_label`/`focused_bounds`/`focused_control` to the
+screen outside the freight modal (`set_freight_preview` releases the
+planetary ring so it cannot freeze under the overlay). Hits gained a
+`label` field captured from the rendered title/slot name so
+announcements carry real text. `native_planetary_screen` pins the
+ring, Escape layering, activation replay and modal narrowing;
+`native_colony_workspace` pins the delegation. Note: client-side the fragment resolves with
 the host HWND runtime id `{42, hwnd}`, not our appended `{3, 1}` — the
 bridge test walks raw children matching that shape.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds

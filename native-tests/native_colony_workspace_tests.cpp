@@ -213,7 +213,34 @@ void keyboard_focus() {
   (void)workspace.handle({InputEventType::PointerCancelled},width,height);
 }
 
+void planetary_ring_delegates() {
+  constexpr std::uint32_t kTab=9u;
+  const int width=1280,height=720;
+  NativeColonyWorkspace workspace;workspace.open(view());
+  DrawList draw;workspace.render(draw,width,height);
+  const auto key=[&](std::uint32_t k){InputEvent e{InputEventType::KeyPressed};e.key=k;return workspace.handle(e,width,height);};
+  // Outside the freight modal the workspace exposes the planetary screen's
+  // hit-registry ring.
+  REQUIRE(workspace.focus()<0);
+  REQUIRE(workspace.focused_label().empty());
+  REQUIRE(!workspace.focused_bounds(width,height).has_value());
+  (void)key(kTab);REQUIRE(workspace.focus()==0);
+  REQUIRE(!workspace.focused_label().empty());
+  REQUIRE(workspace.focused_bounds(width,height).has_value());
+  REQUIRE(workspace.focused_control()==stellar::engine::AnnouncementControl::Button);
+  // Opening the freight modal releases the planetary ring; the modal's own
+  // ring then reports.
+  auto owned=view();owned.resource_outpost=true;
+  NativeOutpostFreightPreview quote;quote.campaign_generation=owned.campaign_generation;
+  quote.player_civilization_id=owned.player_civilization_id;quote.colony_id=owned.colony_id;
+  quote.body_id=owned.body_id;quote.system_id=owned.system_id;quote.accepted=true;
+  workspace.set_view(owned);workspace.set_freight_preview(quote);
+  REQUIRE(workspace.focus()<0);
+  (void)key(kTab);REQUIRE(workspace.focus()==0);
+  REQUIRE(workspace.focused_label()=="Cancel");
+}
+
 } // namespace
-int main(){try{only_planetary_screen_is_rendered();freight_review_input_and_layout();keyboard_focus();
+int main(){try{only_planetary_screen_is_rendered();freight_review_input_and_layout();keyboard_focus();planetary_ring_delegates();
   std::cout<<"Planetary workspace and freight checks passed\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

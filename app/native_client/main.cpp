@@ -5799,6 +5799,7 @@ class NativeCampaign final {
            (chronicle_view_.visible()&&chronicle_view_.focus()>=0)||
            (notification_view_.visible()&&notification_view_.focus()>=0)||
            (colony_roster_.visible()&&colony_roster_.focus()>=0)||
+           (colony_workspace_.visible()&&colony_workspace_.focus()>=0)||
            (mission_view_.visible()&&mission_view_.focus()>=0)||
            (map_hud_visible()&&assets_.focus()>=0)||
            hud_focus_>=0||
@@ -6645,7 +6646,7 @@ class NativeCampaign final {
           const int focus_before=colony_workspace_.focus();
           const auto command=colony_workspace_.handle(event,width,height);
           if(command.captured&&colony_workspace_.focus()!=focus_before)
-            announcer_.announce_focus(colony_workspace_.focused_label(),announcement_bounds(colony_workspace_.focused_bounds(width,height)));
+            announcer_.announce_focus(colony_workspace_.focused_label(),announcement_bounds(colony_workspace_.focused_bounds(width,height)),std::nullopt,colony_workspace_.focused_control());
           if(command.kind==ColonyWorkspaceCommandKind::Close)gesture_.cancel();
           else if(command.kind==ColonyWorkspaceCommandKind::Planetary)execute_planetary(command.planetary);
           else if(command.kind==ColonyWorkspaceCommandKind::ReviewFreight || command.kind==ColonyWorkspaceCommandKind::ConfirmFreight || command.kind==ColonyWorkspaceCommandKind::CancelFreight)

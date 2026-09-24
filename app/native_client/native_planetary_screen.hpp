@@ -5,6 +5,7 @@
 #include "native_menu_style.hpp"
 #include "native_ui_layout.hpp"
 #include "native_planet_globe.hpp"
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
 #include <algorithm>
@@ -64,17 +65,42 @@ class NativePlanetaryScreen {
   void set_portrait(Picture p){portrait_=std::move(p);}
   void set_measurer(std::function<TextExtent(const Text&)> value){measure_=std::move(value);}
   void set_localization(const stellar::engine::LocalizationTable *table)noexcept{locale_=table;globe_.set_localization(table);}
-  void reset(){selected_=-1;tab_=2;globe_.reset();fact_scroll_=detail_scroll_=slot_scroll_=queue_scroll_={};pending_={};notice_.clear();pressed_.reset();hits_.clear();portrait_.reset();}
+  void reset(){selected_=-1;tab_=2;focus_=-1;globe_.reset();fact_scroll_=detail_scroll_=slot_scroll_=queue_scroll_={};pending_={};notice_.clear();pressed_.reset();hits_.clear();portrait_.reset();}
   void set_view(const NativeColonyView& v){if(identity_!=std::pair{v.campaign_generation,v.body_id}){reset();identity_={v.campaign_generation,v.body_id};}globe_.bind(v);}
   void set_confirmation(std::variant<std::monostate,NativeSurfacePlacementQuote,NativeSurfaceManagementQuote,NativeSurfaceRemovalQuote> value){pending_=std::move(value);pressed_.reset();}
   const auto& pending() const{return pending_;}
   bool modal() const{return pending_.index()!=0;}
   void complete(std::string notice){pending_={};notice_=std::move(notice);pressed_.reset();}
   int selected_slot()const{return selected_;}
+  // Keyboard-focus contract: the ring walks the render-registered hits in
+  // (y,x) order — every enabled button, layer/mode control, tab, action row
+  // and clipped-visible slot cell; activation replays the same hit dispatch
+  // a matched pointer press+release takes. The confirmation modal narrows
+  // the ring automatically since it clears the registry before registering
+  // Cancel/Confirm.
+  [[nodiscard]] int focus()const noexcept{return focus_;}
+  [[nodiscard]] bool wants_keyboard_focus()const noexcept{return focus_>=0;}
+  void release_focus()noexcept{focus_=-1;}
+  [[nodiscard]] std::string focused_label()const{
+    const auto items=ring();
+    return focus_>=0&&focus_<static_cast<int>(items.size())
+               ?hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])].label
+               :std::string{};
+  }
+  [[nodiscard]] std::optional<UiRect> focused_bounds()const{
+    const auto items=ring();
+    return focus_>=0&&focus_<static_cast<int>(items.size())
+               ?std::optional<UiRect>{hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])].rect}
+               :std::nullopt;
+  }
+  [[nodiscard]] stellar::engine::AnnouncementControl focused_control()const{
+    return focus_>=0?stellar::engine::AnnouncementControl::Button
+                    :stellar::engine::AnnouncementControl::Custom;
+  }
   PlanetaryCommand handle(const InputEvent& e,int width,int height){
     pointer_=e.position;const auto l=PlanetaryLayout::make(width,height);
-    if(e.type==InputEventType::PointerCancelled){pressed_.reset();globe_.handle(e,l.globe);return {};}
-    if(e.type==InputEventType::EscapePressed||e.type==InputEventType::RightPressed){if(modal())return {PlanetaryAction::Cancel};if(selected_>=0){selected_=-1;return {};}if(globe_.selected()>=0||globe_.zoom()!=1.f){globe_.whole();tab_=2;return {};}return {PlanetaryAction::Back};}
+    if(e.type==InputEventType::PointerCancelled){pressed_.reset();focus_=-1;globe_.handle(e,l.globe);return {};}
+    if(e.type==InputEventType::EscapePressed||e.type==InputEventType::RightPressed){if(focus_>=0){focus_=-1;return {};}if(modal())return {PlanetaryAction::Cancel};if(selected_>=0){selected_=-1;return {};}if(globe_.selected()>=0||globe_.zoom()!=1.f){globe_.whole();tab_=2;return {};}return {PlanetaryAction::Back};}
     if(!modal()&&globe_.handle(e,l.globe)){if(e.type==InputEventType::LeftReleased){tab_=2;selected_=-1;detail_scroll_={};}return {};}
     if(e.type==InputEventType::Wheel&&!modal()){
       pressed_.reset();
@@ -86,23 +112,29 @@ class NativePlanetaryScreen {
       else if(l.slots.contains(e.position)){slot_scroll_.sync(slot_height_+55*l.s,l.slots.height);slot_scroll_.scroll_by(-change);}
       return {};
     }
+    if(e.type==InputEventType::KeyPressed&&e.key){
+      // SDL_Keycode: Tab/arrows/Home/End walk the rendered hit registry in
+      // (y,x) order; Return/Space run the same dispatch a matched pointer
+      // press+release takes.
+      const auto items=ring();const int count=static_cast<int>(items.size());
+      if(count){
+        constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+        constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+        constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+        const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
+        const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
+        if(e.key==kHome||e.key==kEnd){focus_=e.key==kHome?0:count-1;return {};}
+        if(fwd||bwd){focus_=focus_<0?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;return {};}
+        if((e.key==kReturn||e.key==kSpace)&&focus_>=0)
+          return activate(hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])]);
+      }
+    }
     const auto hit=[&]()->std::optional<Hit>{for(auto it=hits_.rbegin();it!=hits_.rend();++it)if(it->rect.contains(e.position)&&it->enabled)return *it;return {};};
-    if(e.type==InputEventType::LeftPressed){pressed_=hit();return {};}
+    if(e.type==InputEventType::LeftPressed){focus_=-1;pressed_=hit();return {};}
     if(e.type!=InputEventType::LeftReleased)return {};
     const auto prior=std::exchange(pressed_,std::nullopt),current=hit();
     if(!prior||!current||prior->id!=current->id||prior->select!=current->select||prior->tab!=current->tab||prior->command.action!=current->command.action||prior->command.slot!=current->command.slot||prior->command.building_id!=current->command.building_id||prior->command.type!=current->command.type||prior->command.value!=current->command.value)return {};
-    if(current->control>=0){
-      if(current->control==0){globe_.whole();tab_=2;}
-      else if(current->control==1)globe_.focus();
-      else if(current->control==2)globe_.set_night(!globe_.night());
-      else if(current->control==3)globe_.zoom_by(1.2f);
-      else if(current->control==4)globe_.zoom_by(1/1.2f);
-      else if(current->control>=10)layer_=layer_==current->control-10?-1:current->control-10;
-      return {};
-    }
-    if(current->tab>=0){tab_=current->tab;selected_=-1;detail_scroll_=slot_scroll_={};return {};}
-    if(current->select>=0){selected_=current->select;tab_=1;detail_scroll_={};return {};}
-    return current->command;
+    return activate(*current);
   }
   void render(DrawList& out,const NativeColonyView& v,int width,int height)const{
     using namespace stellar::native_menu_style;
@@ -150,10 +182,35 @@ class NativePlanetaryScreen {
     label(out,l.notice,notice_.empty()?(v.foreign_settlement?trf("PLANET_NOTICE_FOREIGN",{v.owner_name},"Developer inspection · {0} · Live statistics"):v.observer_only?(v.developer_inspection?tr("PLANET_NOTICE_UNSETTLED","Unsettled world · No colony population or structures."):tr("PLANET_NOTICE_SURVEY","Survey information only. Colony actions require an owned settlement.")):alerts(v)):notice_,l.small,notice_.empty()?muted:cyan);
     if(!modal())if(const auto hovered=globe_.hit(pointer_,l.globe)){const auto& region=globe_.regions()[*hovered];const float tw=std::min(235*s,l.globe.width),th=68*s;UiRect tip{std::clamp(pointer_.x+14*s,l.globe.x,l.globe.x+l.globe.width-tw),std::clamp(pointer_.y+18*s,l.globe.y,l.globe.y+l.globe.height-th),tw,th};panel(out,tip,s);label(out,{tip.x+10*s,tip.y+8*s,tw-20*s,24*s},region.name,l.small,cyan);label(out,{tip.x+10*s,tip.y+34*s,tw-20*s,25*s},region.terrain,l.small,ink);}
     if(modal())render_confirmation(out,l);
+    if(focus_>=0){const auto items=ring();if(focus_<static_cast<int>(items.size()))out.overlay.emplace_back(StrokedRectangle{hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])].rect,{160,210,255,255}});}
   }
 
  private:
-  struct Hit{UiRect rect;int id{};PlanetaryCommand command;bool enabled{true};int select{-1},tab{-1},control{-1};};
+  struct Hit{UiRect rect;int id{};PlanetaryCommand command;bool enabled{true};int select{-1},tab{-1},control{-1};std::string label;};
+  // Indices into hits_ of the enabled, currently-rendered controls in
+  // deterministic (y,x) order — the keyboard ring's target list.
+  std::vector<int> ring()const{
+    std::vector<int> out;
+    for(int i=0;i<static_cast<int>(hits_.size());++i)if(hits_[static_cast<std::size_t>(i)].enabled)out.push_back(i);
+    std::ranges::sort(out,[&](int a,int b){const auto&ra=hits_[static_cast<std::size_t>(a)].rect,&rb=hits_[static_cast<std::size_t>(b)].rect;return ra.y==rb.y?ra.x<rb.x:ra.y<rb.y;});
+    return out;
+  }
+  // Shared dispatch: keyboard activation and a matched pointer
+  // press+release run the same control/tab/select/command semantics.
+  PlanetaryCommand activate(const Hit &h){
+    if(h.control>=0){
+      if(h.control==0){globe_.whole();tab_=2;}
+      else if(h.control==1)globe_.focus();
+      else if(h.control==2)globe_.set_night(!globe_.night());
+      else if(h.control==3)globe_.zoom_by(1.2f);
+      else if(h.control==4)globe_.zoom_by(1/1.2f);
+      else if(h.control>=10)layer_=layer_==h.control-10?-1:h.control-10;
+      return {};
+    }
+    if(h.tab>=0){tab_=h.tab;selected_=-1;detail_scroll_=slot_scroll_={};return {};}
+    if(h.select>=0){selected_=h.select;tab_=1;detail_scroll_={};return {};}
+    return h.command;
+  }
   [[nodiscard]] std::string tr(std::string_view key,std::string_view fallback)const{
     if(locale_&&locale_->contains(key))return std::string(locale_->translate(key));
     return std::string(fallback);
@@ -171,7 +228,7 @@ class NativePlanetaryScreen {
   static constexpr Color bad{255,156,137,255};
   mutable NativePlanetGlobe globe_;int layer_{0};
   Art art_;std::function<Picture(int)> action_art_;Picture portrait_;std::function<TextExtent(const Text&)> measure_;
-  std::pair<std::uint64_t,int> identity_{};int selected_{-1},tab_{2};mutable stellar::engine::ScrollView fact_scroll_{},detail_scroll_{},slot_scroll_{},queue_scroll_{};
+  std::pair<std::uint64_t,int> identity_{};int selected_{-1},tab_{2},focus_{-1};mutable stellar::engine::ScrollView fact_scroll_{},detail_scroll_{},slot_scroll_{},queue_scroll_{};
   mutable float fact_height_{},detail_height_{},slot_height_{},queue_height_{};mutable std::vector<Hit> hits_;std::optional<Hit> pressed_;Point pointer_{};std::string notice_;
   std::variant<std::monostate,NativeSurfacePlacementQuote,NativeSurfaceManagementQuote,NativeSurfaceRemovalQuote> pending_;
   static std::string number(double n,int precision=1){std::ostringstream o;o<<std::fixed<<std::setprecision(precision)<<n;return o.str();}
@@ -194,12 +251,13 @@ class NativePlanetaryScreen {
   }
   void button(DrawList& out,UiRect r,std::string title,PlanetaryCommand command,const PlanetaryLayout& l,bool enabled=true,std::optional<UiRect> clip={},Picture icon={},std::string subtitle={})const{
     const UiRect visible=clip?intersection(r,*clip):r;if(visible.height<=0||visible.width<=0)return;
+    std::string title_copy=title;
     stellar::engine::ui_skin::control(out,r,visible.contains(pointer_),false,enabled,l.s,visible);
     const int font=r.width<110*l.s||r.height<30*l.s?l.small:l.font;const float icon_size=subtitle.empty()?28*l.s:42*l.s,pad=icon?icon_size+18*l.s:8*l.s;
     if(icon)out.overlay.emplace_back(Image{icon,{r.x+8*l.s,r.y+(r.height-icon_size)*.5f,icon_size,icon_size},{},{255,255,255,static_cast<std::uint8_t>(enabled?255:110)},visible});
     label(out,{r.x+pad,r.y+(subtitle.empty()?(r.height-font)*.5f:16*l.s),r.width-pad-8*l.s,r.height},std::move(title),font,enabled?stellar::native_menu_style::ink:stellar::native_menu_style::muted,visible);
     if(!subtitle.empty())label(out,{r.x+pad,r.y+40*l.s,r.width-pad-8*l.s,24*l.s},std::move(subtitle),l.small,stellar::native_menu_style::muted,visible);
-    hits_.push_back({visible,static_cast<int>(hits_.size()),std::move(command),enabled});
+    hits_.push_back({visible,static_cast<int>(hits_.size()),std::move(command),enabled,-1,-1,-1,std::move(title_copy)});
   }
   static void scrollbar(DrawList& out,UiRect r,const stellar::engine::ScrollView& scroll){const auto thumb=scroll.thumb(r.height,14.f);if(thumb.size<=0)return;out.overlay.emplace_back(FilledRectangle{{r.x+r.width-3,r.y+thumb.offset,3,thumb.size},{105,157,178,210}});}
   static int art_index(std::string_view type){const auto family=stellar::core::surface_functional_family(type);if(family=="power_generator")return 0;if(family=="science_lab")return 1;if(family=="fabricator")return 2;if(family=="trade_hub")return 3;if(family=="habitat_complex")return 4;if(family=="controlled_agriculture")return 5;if(family=="water_reclamation")return 6;if(family=="grid_battery")return 7;return 8;}
@@ -221,7 +279,7 @@ class NativePlanetaryScreen {
       label(out,{r.x+8*s,r.y+97*s,r.width-16*s,29*s},b?b->name:unlocked?tr("PLANET_SLOT_AVAILABLE","Available slot"):tr("PLANET_SLOT_LOCKED","Locked slot"),l.small,ink,clip);
       label(out,{r.x+8*s,r.y+133*s,r.width-16*s,30*s},b?state(*b):unlocked?tr("PLANET_CONSTRUCT","Construct"):tr("PLANET_LOCKED","Locked"),l.small,b&&(!b->powered||!b->staffed)?bad:cyan,clip);
       if(b&&!b->complete){UiRect bar{r.x+5*s,r.y+r.height-4*s,static_cast<float>((r.width-10*s)*b->progress_fraction),3*s};out.overlay.emplace_back(FilledRectangle{intersection(bar,area),gold});}
-      hits_.push_back({clip,static_cast<int>(hits_.size()),{},unlocked,i,-1});
+      hits_.push_back({clip,static_cast<int>(hits_.size()),{},unlocked,i,-1,-1,b?b->name:unlocked?tr("PLANET_SLOT_AVAILABLE","Available slot"):tr("PLANET_SLOT_LOCKED","Locked slot")});
     }
     slot_scroll_.sync(slot_height_+55*s,area.height);scrollbar(out,area,slot_scroll_);
   }
