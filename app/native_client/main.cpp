@@ -2804,6 +2804,17 @@ class NativeCampaign final {
     escape.drawable_width=width;
     escape.drawable_height=height;
     escape.events={{InputEventType::EscapePressed}};
+    // Escape unwinds the topmost layer: an open inspection card consumes the
+    // first press, the pause menu takes the second.
+    if(inspection_card_.visible()){
+      const bool stayed_open=update(escape,width,height,0.,false);
+      if(!stayed_open||inspection_card_.visible()){
+        SDL_Log("nav-smoke card escape: update=%d insp=%d pending=%d exit=%d",
+                stayed_open?1:0,inspection_card_.visible()?1:0,
+                session_->new_campaign_pending()?1:0,session_->exit_ready()?1:0);
+        throw std::runtime_error("Navigation smoke could not close the inspection card.");
+      }
+    }
     if(!update(escape,width,height,0.,false)||!menu_)
       throw std::runtime_error("Navigation smoke could not open the pause menu.");
     blocked_keys();
@@ -8130,6 +8141,9 @@ class NativeCampaign final {
         else
           accessibility_bridge_->announce(item->text);
       }
+      // Empty focus items only signal the ring releasing to the bridge —
+      // nothing to speak or caption.
+      if(item->text.empty())continue;
       if(voice_playback_&&presentation_audio_&&
          presentation_audio_->voice_preferences().interface_announcements){
         stellar::native_voice::NativeSpeechRequest request;
@@ -8870,7 +8884,7 @@ int main(int argc,char **argv){
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
       config.developer_access=&developer_access;config.locale=&locale_table;
-      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){if(item->kind==stellar::engine::AnnouncementKind::Focus)accessibility_bridge.focus_changed(item->text,item->bounds);else accessibility_bridge.announce(item->text);startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
+      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){if(item->kind==stellar::engine::AnnouncementKind::Focus)accessibility_bridge.focus_changed(item->text,item->bounds);else accessibility_bridge.announce(item->text);if(!item->text.empty())startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},nullptr,ui);};return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
     StartupEntryEvidence startup_evidence,restart_evidence;

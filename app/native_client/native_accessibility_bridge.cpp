@@ -112,7 +112,9 @@ class FocusFragment final : public ProviderBase,
   void set_label(std::wstring label, std::optional<RECT> rect) {
     label_ = std::move(label);
     rect_ = rect;
+    focused_ = true;
   }
+  void clear_focus() noexcept { focused_ = false; }
 
   // IUnknown is implemented once here so both interface bases resolve to the
   // same counter.
@@ -146,7 +148,7 @@ class FocusFragment final : public ProviderBase,
       out->lVal = UIA_CustomControlTypeId;
     } else if (id == UIA_HasKeyboardFocusPropertyId) {
       out->vt = VT_BOOL;
-      out->boolVal = VARIANT_TRUE;
+      out->boolVal = focused_ ? VARIANT_TRUE : VARIANT_FALSE;
     } else if (id == UIA_IsKeyboardFocusablePropertyId) {
       out->vt = VT_BOOL;
       out->boolVal = VARIANT_TRUE;
@@ -204,6 +206,7 @@ class FocusFragment final : public ProviderBase,
   HWND host_;
   std::wstring label_;
   std::optional<RECT> rect_;
+  bool focused_{};
 };
 
 // Fragment root answered for UiaRootObjectId: sources live-region
@@ -220,6 +223,12 @@ class WindowProvider final : public ProviderBase,
   void set_focus_label(std::wstring label, std::optional<RECT> rect) {
     focus_->set_label(std::move(label), std::move(rect));
     focused_ = true;
+  }
+  // The ring released — the fragment stops claiming focus and GetFocus
+  // reports the window itself until the next focus announcement.
+  void clear_focus() noexcept {
+    focused_ = false;
+    if (focus_) focus_->clear_focus();
   }
   [[nodiscard]] bool has_focus() const noexcept { return focused_; }
 
@@ -320,6 +329,9 @@ class WindowProvider final : public ProviderBase,
     *out = nullptr;
     if (focused_ && focus_) {
       *out = static_cast<IRawElementProviderFragment *>(focus_);
+      (*out)->AddRef();
+    } else {
+      *out = static_cast<IRawElementProviderFragment *>(this);
       (*out)->AddRef();
     }
     return S_OK;
@@ -436,9 +448,19 @@ bool NativeAccessibilityBridge::focus_changed(
     std::string_view label,
     std::optional<stellar::engine::AnnouncementBounds> bounds) {
   auto *provider = static_cast<WindowProvider *>(provider_);
-  if (!provider || label.empty()) return false;
+  if (!provider) return false;
   std::wstring name = wide(label);
-  if (name.empty()) return false;
+  if (name.empty()) {
+    // Empty focus text = the ring released: retire the stale fragment and
+    // report focus back on the window root so AT stops tracking a control
+    // that no longer has it.
+    provider->clear_focus();
+    if (UiaClientsAreListening())
+      UiaRaiseAutomationEvent(
+          static_cast<IRawElementProviderSimple *>(provider),
+          UIA_AutomationFocusChangedEventId);
+    return true;
+  }
   std::optional<RECT> rect;
   if (bounds) {
     const auto finite = [](float v) { return std::isfinite(v); };

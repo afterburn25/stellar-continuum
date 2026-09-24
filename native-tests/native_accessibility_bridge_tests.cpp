@@ -161,6 +161,46 @@ int main() try {
   require(SUCCEEDED(walker->GetParentElement(child, &parent)) && parent,
           "focus fragment did not navigate to its root parent");
   parent->Release();
+  // An empty focus label is the ring-release signal — the fragment must
+  // stop claiming keyboard focus so AT stops tracking a stale control.
+  (void)bridge.focus_changed("");
+  // UIA may cache properties per resolved element — re-walk for a fresh
+  // fragment instance and check the live flag there.
+  IUIAutomationElement* released_child{};
+  require(SUCCEEDED(walker->GetFirstChildElement(element, &released_child)),
+          "raw child walk failed after release");
+  IUIAutomationElement* released_fragment{};
+  for (IUIAutomationElement* cursor = released_child; cursor;) {
+    CONTROLTYPEID ct{};
+    (void)cursor->get_CurrentControlType(&ct);
+    SAFEARRAY* rid{};
+    (void)cursor->GetRuntimeId(&rid);
+    long length = 0;
+    if (rid) {
+      long lb = 0, ub = -1;
+      SafeArrayGetLBound(rid, 1, &lb);
+      SafeArrayGetUBound(rid, 1, &ub);
+      length = ub - lb + 1;
+      SafeArrayDestroy(rid);
+    }
+    if (ct == UIA_CustomControlTypeId && length == 2) {
+      released_fragment = cursor;
+      break;
+    }
+    IUIAutomationElement* next{};
+    (void)walker->GetNextSiblingElement(cursor, &next);
+    cursor->Release();
+    cursor = next;
+  }
+  if (released_child && released_child != released_fragment)
+    released_child->Release();
+  require(released_fragment != nullptr,
+          "focus fragment disappeared after release");
+  require(SUCCEEDED(
+              released_fragment->get_CurrentHasKeyboardFocus(&has_focus)) &&
+              has_focus == FALSE,
+          "focus fragment still claimed keyboard focus after release");
+  released_fragment->Release();
   child->Release();
   walker->Release();
 

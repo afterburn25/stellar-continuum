@@ -89,7 +89,10 @@ void AccessibilityAnnouncer::announce(std::string text,
                                       AnnouncementPriority priority,
                                       AnnouncementKind kind,
                                       std::optional<AnnouncementBounds> bounds) {
-  if (text.empty())
+  // Empty status text is dropped, but an empty Focus item is meaningful:
+  // it marks the ring releasing, so platform bridges can retire the stale
+  // focused fragment instead of leaving the last label claiming focus.
+  if (text.empty() && kind != AnnouncementKind::Focus)
     return;
   if (!pending_.empty() && pending_.back().text == text &&
       pending_.back().priority == priority && pending_.back().kind == kind)

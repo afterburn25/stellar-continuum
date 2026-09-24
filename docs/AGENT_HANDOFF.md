@@ -1120,7 +1120,12 @@ it as `BoundingRectangle` (client→screen projected) — magnifier and
 tracking AT get the real control rect instead of the whole window. The
 bridge test asserts the fragment's reported bounds against a
 `ClientToScreen` expectation; `economy_animation` pins the bounds
-round-trip on the announcer.
+round-trip on the announcer. Focus release is also honest now: an empty
+`announce_focus` text is a release signal (still dropped for Status), the
+fragment stops claiming `HasKeyboardFocus`, `GetFocus` falls back to the
+window root, and a focus-changed event fires on the root — so a ring
+releasing at a group boundary or on Escape no longer leaves a stale
+control claiming focus. Empty items are skipped for speech/captions.
 Accessibility substrate adoption (row 26): `GeneralPreferences` now embeds
 the engine `AccessibilitySettings` struct as the canonical accessibility
 carrier (`accessibility` member — reduce-motion/flashing, high-contrast
