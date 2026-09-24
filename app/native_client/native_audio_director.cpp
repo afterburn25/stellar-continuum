@@ -24,6 +24,9 @@ constexpr std::size_t maximum_total_decoded_bytes = 104u * 1024u * 1024u;
 constexpr std::size_t maximum_voice_clip_bytes = 8u * 1024u * 1024u;
 constexpr std::size_t maximum_total_voice_bytes = 16u * 1024u * 1024u;
 constexpr auto debounce_interval = std::chrono::milliseconds{60};
+// Device-level failures (unplugged/default device errors) retry at this
+// cadence instead of permanently disabling audio for the session.
+constexpr auto recovery_interval = std::chrono::seconds{5};
 constexpr std::array<std::string_view, 3> voice_text{
     "Long-range telemetry is incomplete. Dispatch a scout vessel to chart this system before approach.",
     "Our research team has a new report. Review the findings before selecting our next objective.",
@@ -63,13 +66,29 @@ NativeAudioDirector::NativeAudioDirector(std::filesystem::path asset_root, bool 
   stats_.enabled = enabled;
   if (!enabled) return;
   try {
-    output_ = std::make_unique<stellar::engine::audio::AudioOutput>();
-    output_->set_volumes(.78f, .64f, .82f);
-    jobs_ = std::make_unique<stellar::engine::JobSystem>(1);
-    load_state_ = std::make_shared<LoadState>();
-    const auto state = load_state_;
-    const auto root = asset_root_;
-    decode_job_ = jobs_->submit([state, root] {
+    open_output();
+    start_decode_job();
+  } catch (const std::exception& error) {
+    fail(std::string{"audio output initialization failed: "} + error.what(), true);
+    output_.reset();
+    jobs_.reset();
+    load_state_.reset();
+  }
+}
+
+void NativeAudioDirector::open_output() {
+  output_ = std::make_unique<stellar::engine::audio::AudioOutput>();
+  output_->set_volumes(master_volume_, music_volume_, effects_volume_);
+  output_->set_voice_gain(voice_preferences_.enabled ? voice_preferences_.volume : 0.f);
+}
+
+void NativeAudioDirector::start_decode_job() {
+  if (decode_collected_) return;
+  jobs_ = std::make_unique<stellar::engine::JobSystem>(1);
+  load_state_ = std::make_shared<LoadState>();
+  const auto state = load_state_;
+  const auto root = asset_root_;
+  decode_job_ = jobs_->submit([state, root] {
       try {
         auto loaded = std::make_unique<Clips>();
         std::size_t total{};
@@ -126,12 +145,6 @@ NativeAudioDirector::NativeAudioDirector(std::filesystem::path asset_root, bool 
         state->failure = "unknown audio decoding failure";
       }
     });
-  } catch (const std::exception& error) {
-    fail(std::string{"audio output initialization failed: "} + error.what());
-    output_.reset();
-    jobs_.reset();
-    load_state_.reset();
-  }
 }
 
 NativeAudioDirector::~NativeAudioDirector() noexcept {
@@ -150,7 +163,7 @@ void NativeAudioDirector::require_owner() const {
     throw std::logic_error("Native audio director must be used on its owner thread.");
 }
 
-void NativeAudioDirector::fail(std::string message) {
+void NativeAudioDirector::fail(std::string message, bool device_fault) {
   if (stats_.failed) return;
   stats_.failed = true;
   stats_.enabled = false;
@@ -159,6 +172,12 @@ void NativeAudioDirector::fail(std::string message) {
   stats_.voice_active = false;
   stats_.queued_voice_bytes = 0;
   voice_queue_.clear();
+  // Device-level faults (unplugged/default device errors, SDL stream failures)
+  // are transient: arm the recovery cadence so service() retries the output.
+  // Decode/asset failures stay permanent — reopening a device cannot fix them.
+  failure_was_device_ = device_fault;
+  device_recoverable_ = device_fault;
+  next_recovery_attempt_ = std::chrono::steady_clock::now() + recovery_interval;
   failure_message_ = std::move(message);
   if (output_) {
     try { output_->stop_all(); } catch (...) {}
@@ -198,12 +217,41 @@ void NativeAudioDirector::collect_loaded_assets() {
   else stats_.voice_available = true;
 }
 
+// Attempts to reopen the output device after a device-level failure. On
+// success the normal pipeline resumes: collect_loaded_assets() picks up any
+// pending decode job and menu_ready() restarts music (music_started was
+// cleared by fail()). Bounded by recovery_interval; never throws.
+void NativeAudioDirector::try_recover() {
+  if (!device_recoverable_ || stats_.stopped) return;
+  const auto now = std::chrono::steady_clock::now();
+  if (now < next_recovery_attempt_) return;
+  next_recovery_attempt_ = now + recovery_interval;
+  try {
+    open_output();
+    start_decode_job();
+  } catch (const std::exception& error) {
+    failure_message_ = std::string{"audio device recovery pending: "} + error.what();
+    output_.reset();
+    jobs_.reset();
+    load_state_.reset();
+    return;
+  }
+  device_recoverable_ = false;
+  ++stats_.device_recoveries;
+  if (failure_was_device_) {
+    stats_.failed = false;
+    stats_.enabled = true;
+    failure_message_.clear();
+  }
+}
+
 void NativeAudioDirector::service() {
   require_owner();
-  if (stats_.stopped || !stats_.enabled) return;
+  if (stats_.stopped) return;
+  if (!stats_.enabled) { try_recover(); return; }
   collect_loaded_assets();
   if (!stats_.enabled || !output_) return;
-  if (menu_ready_ && stats_.music_start_count == 0) menu_ready();
+  if (menu_ready_ && !stats_.music_started) menu_ready();
   if (!stats_.enabled || !output_) return;
   try {
     output_->service();
@@ -214,7 +262,7 @@ void NativeAudioDirector::service() {
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
     service_voice();
   } catch (const std::exception& error) {
-    fail(std::string{"audio device failure: "} + error.what());
+    fail(std::string{"audio device failure: "} + error.what(), true);
   }
 }
 
@@ -268,7 +316,7 @@ void NativeAudioDirector::service_voice() {
     stats_.voice_play_count = diagnostics.voice_play_count;
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
   } catch (const std::exception& error) {
-    fail(std::string{"audio voice playback failed: "} + error.what());
+    fail(std::string{"audio voice playback failed: "} + error.what(), true);
   }
 }
 
@@ -278,7 +326,9 @@ void NativeAudioDirector::menu_ready() {
   if (stats_.stopped || !stats_.enabled) return;
   menu_ready_ = true;
   collect_loaded_assets();
-  if (!may_play_effect() || stats_.music_start_count != 0) return;
+  // Guard on music_started, not the start count: after a device recovery the
+  // count is already nonzero but the queue is empty and must be refilled.
+  if (!may_play_effect() || stats_.music_started) return;
   try {
     output_->play_music(clips_->music);
     ++stats_.music_start_count;
@@ -286,7 +336,7 @@ void NativeAudioDirector::menu_ready() {
     stats_.music_started = diagnostics.music_started;
     stats_.queued_music_bytes = diagnostics.queued_music_bytes;
   } catch (const std::exception& error) {
-    fail(std::string{"audio music playback failed: "} + error.what());
+    fail(std::string{"audio music playback failed: "} + error.what(), true);
   }
 }
 
@@ -297,7 +347,7 @@ void NativeAudioDirector::confirm() {
   last_confirm_ = now;
   if (!may_play_effect()) return;
   try { output_->play_effect(clips_->confirm); ++stats_.confirm_count; }
-  catch (const std::exception& error) { fail(std::string{"audio effect playback failed: "} + error.what()); }
+  catch (const std::exception& error) { fail(std::string{"audio effect playback failed: "} + error.what(), true); }
 }
 
 void NativeAudioDirector::hover() {
@@ -307,7 +357,7 @@ void NativeAudioDirector::hover() {
   last_hover_ = now;
   if (!may_play_effect()) return;
   try { output_->play_effect(clips_->hover); ++stats_.hover_count; }
-  catch (const std::exception& error) { fail(std::string{"audio effect playback failed: "} + error.what()); }
+  catch (const std::exception& error) { fail(std::string{"audio effect playback failed: "} + error.what(), true); }
 }
 
 void NativeAudioDirector::play_event(Cue cue) {
@@ -321,7 +371,7 @@ void NativeAudioDirector::play_event(Cue cue) {
     case Cue::Alert: clip = clips_->alert; break;
   }
   try { output_->play_effect(std::move(clip)); ++stats_.event_count; }
-  catch (const std::exception& error) { fail(std::string{"audio effect playback failed: "} + error.what()); }
+  catch (const std::exception& error) { fail(std::string{"audio effect playback failed: "} + error.what(), true); }
 }
 
 void NativeAudioDirector::speak(VoiceCue cue) { require_owner(); admit_voice(cue,false); }
@@ -360,7 +410,7 @@ void NativeAudioDirector::play_dialogue_pcm(
     stats_.voice_play_count = diagnostics.voice_play_count;
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
   } catch (const std::exception& error) {
-    fail(std::string{"audio voice playback failed: "} + error.what());
+    fail(std::string{"audio voice playback failed: "} + error.what(), true);
   }
 }
 
@@ -372,7 +422,7 @@ void NativeAudioDirector::stop_voice() {
   stats_.queued_voice_bytes = 0;
   if (!output_) return;
   try { output_->stop_voice(); }
-  catch (const std::exception& error) { fail(std::string{"audio voice shutdown failed: "} + error.what()); }
+  catch (const std::exception& error) { fail(std::string{"audio voice shutdown failed: "} + error.what(), true); }
 }
 
 void NativeAudioDirector::set_volumes(float master, float music, float effects) {
@@ -380,9 +430,10 @@ void NativeAudioDirector::set_volumes(float master, float music, float effects) 
   if (!std::isfinite(master) || !std::isfinite(music) || !std::isfinite(effects) ||
       master < 0.f || master > 1.f || music < 0.f || music > 1.f || effects < 0.f || effects > 1.f)
     throw std::invalid_argument("Audio volumes must be finite values from zero through one.");
+  master_volume_ = master; music_volume_ = music; effects_volume_ = effects;
   if (!stats_.enabled || stats_.stopped || !output_) return;
   try { output_->set_volumes(master, music, effects); }
-  catch (const std::exception& error) { fail(std::string{"audio volume update failed: "} + error.what()); }
+  catch (const std::exception& error) { fail(std::string{"audio volume update failed: "} + error.what(), true); }
 }
 void NativeAudioDirector::set_voice_preferences(const VoicePreferences& value) {
   require_owner();
@@ -393,7 +444,7 @@ void NativeAudioDirector::set_voice_preferences(const VoicePreferences& value) {
   if (!value.enabled && voice_preferences_.enabled) stop_voice();
   voice_preferences_=value;
   if(output_)try{output_->set_voice_gain(value.enabled?value.volume:0.f);}
-  catch(const std::exception& error){fail(std::string{"voice gain update failed: "}+error.what());}
+  catch(const std::exception& error){fail(std::string{"voice gain update failed: "}+error.what(), true);}
 }
 VoicePreferences NativeAudioDirector::voice_preferences() const { require_owner(); return voice_preferences_; }
 std::optional<VoiceCaption> NativeAudioDirector::caption() const { require_owner(); if(!caption_ || !voice_preferences_.subtitles || std::chrono::steady_clock::now()>=caption_->expires_at) return {}; return caption_; }
@@ -406,7 +457,7 @@ void NativeAudioDirector::stop() {
   caption_.reset();
   if (output_) {
     try { output_->stop_all(); }
-    catch (const std::exception& error) { fail(std::string{"audio shutdown failed: "} + error.what()); }
+    catch (const std::exception& error) { fail(std::string{"audio shutdown failed: "} + error.what(), true); }
     output_.reset();
   }
   voice_queue_.clear();
@@ -418,6 +469,7 @@ void NativeAudioDirector::stop() {
 
 std::string NativeAudioDirector::failure_message() const { require_owner(); return failure_message_; }
 NativeAudioStats NativeAudioDirector::stats() const { require_owner(); return stats_; }
+void NativeAudioDirector::force_device_fault_for_test() { require_owner(); fail("injected device fault", true); }
 
 } // namespace stellar::native_audio
 

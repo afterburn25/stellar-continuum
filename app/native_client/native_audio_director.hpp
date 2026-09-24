@@ -40,6 +40,8 @@ struct NativeAudioStats final {
   std::uint64_t voice_play_count{};
   std::uint64_t voice_event_count{};
   std::size_t queued_voice_bytes{};
+  // Successful output-device rebuilds after a device-level failure.
+  std::uint64_t device_recoveries{};
 };
 struct VoiceCaption final { std::string speaker, text; std::chrono::steady_clock::time_point expires_at{}; };
 
@@ -73,13 +75,19 @@ class NativeAudioDirector final {
   void stop();
   [[nodiscard]] std::string failure_message() const;
   [[nodiscard]] NativeAudioStats stats() const;
+  // Test seam: routes a synthetic fault through the real device-failure path
+  // so recovery can be verified without unplugging hardware.
+  void force_device_fault_for_test();
 
  private:
   struct LoadState;
   struct Clips;
   void require_owner() const;
   void collect_loaded_assets();
-  void fail(std::string message);
+  void open_output();
+  void start_decode_job();
+  void try_recover();
+  void fail(std::string message, bool device_fault = false);
   [[nodiscard]] bool may_play_effect() const;
   [[nodiscard]] bool may_play_voice() const;
   [[nodiscard]] static std::size_t voice_index(VoiceCue cue);
@@ -100,6 +108,10 @@ class NativeAudioDirector final {
   std::array<std::chrono::steady_clock::time_point, 3> last_voice_{};
   std::deque<VoiceCue> voice_queue_;
   NativeAudioStats stats_{};
+  float master_volume_{.78f}, music_volume_{.64f}, effects_volume_{.82f};
+  bool device_recoverable_{};
+  bool failure_was_device_{};
+  std::chrono::steady_clock::time_point next_recovery_attempt_{};
   bool menu_ready_{};
   bool decode_collected_{};
   bool diagnostic_emitted_{};
