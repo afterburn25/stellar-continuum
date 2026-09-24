@@ -5918,12 +5918,17 @@ class NativeCampaign final {
                 if(item.second!=UiAction::Notifications||notifications_available())items.push_back(item);
               return items;}();
             const auto send_map_key=[&](int g)->bool{
-              if(g==0)return assets_.handle(event,width,height).captured;
+              if(g==0){
+                const auto command=assets_.handle(event,width,height);
+                if(command.captured&&nav&&!activate)announcer_.announce(assets_.focused_label(width,height));
+                return command.captured;
+              }
               if(g==1){
                 const auto markers=fleet_markers(width,height);
                 const auto fleet_command=fleet_workspace_.handle(event,width,height,markers,std::nullopt);
                 if(fleet_command.kind==FleetWorkspaceCommandKind::OpenColony)open_overview_colony(fleet_command.colony_id,width,height);
                 else handle_fleet_command(fleet_command);
+                if(fleet_command.captured&&nav&&!activate)announcer_.announce(fleet_workspace_.focused_label(fleet_workspace_.layout(width,height)));
                 return fleet_command.captured;
               }
               const int count=static_cast<int>(hud_items.size());

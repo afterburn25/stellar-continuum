@@ -129,14 +129,23 @@ UiRect Navigator::category_bounds(Category c,int w,int h)const{const auto l=Layo
 // unclipped bounds.
 std::vector<Navigator::FocusTarget> Navigator::focusables(const Layout& l) const{
   std::vector<FocusTarget> out;
-  out.push_back({l.hide,std::nullopt});
-  out.push_back({l.search,std::nullopt});
-  if(!search_.empty())out.push_back({l.clear,std::nullopt});
+  out.push_back({l.hide,std::nullopt,tr("ASSETS_HIDE","Hide assets panel")});
+  out.push_back({l.search,std::nullopt,tr("ASSETS_SEARCH","Search assets")});
+  if(!search_.empty())out.push_back({l.clear,std::nullopt,tr("ASSETS_CLEAR","Clear search")});
   for(std::size_t i=0;i<entries_.size();++i)
-    if(const auto clip=intersect(entry_bounds(i,l),l.list);clip.height>0.f)
-      out.push_back({clip,i});
+    if(const auto clip=intersect(entry_bounds(i,l),l.list);clip.height>0.f){
+      const auto&e=entries_[i];
+      out.push_back({clip,i,e.row?view_.rows[*e.row].name
+                                :tr(name_keys[static_cast<int>(e.category)],names[static_cast<int>(e.category)])});
+    }
   std::ranges::sort(out,[](const FocusTarget& a,const FocusTarget& b){return a.bounds.y==b.bounds.y?a.bounds.x<b.bounds.x:a.bounds.y<b.bounds.y;});
   return out;
+}
+std::string Navigator::focused_label(int w,int h)const{
+  if(focus_<0)return {};
+  if(preferences_.hidden)return focus_==0?tr("ASSETS_RESTORE","Restore assets panel"):std::string{};
+  const auto targets=focusables(Layout::make(w,h));
+  return focus_<static_cast<int>(targets.size())?targets[static_cast<std::size_t>(focus_)].label:std::string{};
 }
 void Navigator::commit_preferences(Preferences next){if(persist_&&!persist_(next)){error_=tr("ASSETS_PREFS_FAIL","Could not save navigator preferences.");return;}preferences_=next;error_.clear();pressed_.reset();rebuild();}
 Command Navigator::handle(const InputEvent& e,int w,int h){

@@ -79,10 +79,13 @@ void keyboard_focus(){
   constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du,kF5=0x4000003fu;
   const auto l=Layout::make(1920,1080);
   require(n.focus()<0,"ring present before any key");
+  require(n.focused_label(1920,1080).empty(),"unfocused ring reported a label");
   require(key(kTab).captured&&n.focus()==0,"Tab did not focus the hide control");
+  require(n.focused_label(1920,1080)=="Hide assets panel","focused control label mismatch");
   require(key(kDown).captured&&n.focus()==1,"Down did not advance to search");
   require(key(kTab,true).captured&&n.focus()==0,"Shift+Tab did not walk back");
   require(key(kEnd).captured&&n.focus()==9,"End did not land on the last row");
+  require(n.focused_label(1920,1080)=="Owned 4","focused row label mismatch");
   // Boundary wrap-out releases the ring so the dispatcher can hand the same
   // key to the next map focus group (fleet workspace, HUD chrome).
   require(!key(kTab).captured&&n.focus()<0,"Tab past the last row did not release the ring");

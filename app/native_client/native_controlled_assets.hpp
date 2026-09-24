@@ -63,6 +63,9 @@ public:
   [[nodiscard]] std::optional<Key> selection()const{return selected_;}
   [[nodiscard]] float scroll_offset()const{return scroll_;}
   [[nodiscard]] int focus()const noexcept{return focus_;}
+  // Localized label of the ringed control — the announcement surface for
+  // screen-reader/live-region consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int,int)const;
   [[nodiscard]] std::optional<stellar::native_map::UiRect> row_bounds(Key,int,int)const;
   [[nodiscard]] stellar::native_map::UiRect category_bounds(Category,int,int)const;
   [[nodiscard]] Command handle(const stellar::native_map::InputEvent&,int,int);
@@ -73,7 +76,7 @@ private:
   // Ring rect plus the entries_ index it came from (headers and rows
   // alike); plain controls carry no entry. Scroll-follow uses the entry's
   // unclipped bounds.
-  struct FocusTarget { stellar::native_map::UiRect bounds; std::optional<std::size_t> entry{}; };
+  struct FocusTarget { stellar::native_map::UiRect bounds; std::optional<std::size_t> entry{}; std::string label; };
   [[nodiscard]] std::vector<FocusTarget> focusables(const Layout&) const;
   void rebuild();
   void commit_preferences(Preferences);

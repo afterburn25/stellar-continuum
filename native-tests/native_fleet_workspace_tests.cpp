@@ -529,6 +529,9 @@ int main() try {
     require(outliner.focus() < 0, "Fleet focus should start unset.");
     require(key(outliner, kTab).captured && outliner.focus() == 0,
             "Tab did not land on the first fleet row.");
+    require(outliner.focused_label(outliner.layout(width, height)) ==
+                "ISS Wayfinder Long Range Expeditionary Vessel",
+            "Focused row label mismatch.");
     require(key(outliner, kTab).captured && outliner.focus() == 1,
             "Tab did not advance to the second fleet row.");
     require(key(outliner, kTab, true).captured && outliner.focus() == 0,

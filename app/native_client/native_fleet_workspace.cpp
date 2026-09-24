@@ -364,9 +364,9 @@ void NativeFleetWorkspace::set_recovery_result(
   set_notice(outcome.message, outcome.accepted || outcome.requires_confirmation);
 }
 
-std::vector<UiRect> NativeFleetWorkspace::focusables(
+std::vector<NativeFleetWorkspace::FocusRect> NativeFleetWorkspace::focusables(
     const FleetWorkspaceLayout &layout) const {
-  std::vector<UiRect> out;
+  std::vector<FocusRect> out;
   const auto *fleet = selected_fleet();
   if (view_ && presentation_ == FleetWorkspacePresentation::Outliner)
     for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
@@ -375,7 +375,7 @@ std::vector<UiRect> NativeFleetWorkspace::focusables(
                            static_cast<float>(index) * 45.f * layout.scale,
                        layout.list.width, 41.f * layout.scale};
       if (const auto clipped = intersection(row, layout.list))
-        out.push_back(*clipped);
+        out.push_back({*clipped, view_->own_fleets[index].name});
     }
   if (overview_ && !selected_fleet_id()) {
     const UiRect content{layout.details.x, layout.details.y,
@@ -384,41 +384,63 @@ std::vector<UiRect> NativeFleetWorkspace::focusables(
                              layout.details.y};
     for (const auto &row :
          native_overview::overview_layout_for(*overview_, content).colony_rows)
-      out.push_back(row);
+      out.push_back({row, tr("FLEET_COLONY", "Colony")});
   }
   if (fleet) {
     if (!preview_ && !pending_return_) {
       if (fleet->military_order_quote) {
-        out.push_back(layout.order_hold);
-        out.push_back(layout.order_defend);
-        out.push_back(layout.order_retreat);
+        out.push_back({layout.order_hold, tr("FLEET_ORDER_HOLD_BTN", "HOLD")});
+        out.push_back({layout.order_defend, tr("FLEET_ORDER_DEFEND_BTN", "DEFEND")});
+        out.push_back({layout.order_retreat, tr("FLEET_ORDER_RETREAT_BTN", "RETREAT")});
         if (fleet->locate)
-          out.push_back(layout.military_locate);
+          out.push_back({layout.military_locate, tr("FLEET_LOCATE", "LOCATE")});
       } else if (fleet->recovery && fleet->locate) {
-        out.push_back(layout.civilian_locate);
+        out.push_back({layout.civilian_locate, tr("FLEET_LOCATE", "LOCATE")});
       } else if (fleet->locate) {
-        out.push_back(layout.locate);
+        out.push_back({layout.locate, tr("FLEET_LOCATE", "LOCATE")});
       }
     }
     if (!preview_ && fleet->recovery) {
-      out.push_back(layout.recovery_left);
-      if (pending_return_ || !fleet->recovery->return_requested)
-        out.push_back(layout.recovery_right);
+      const auto queued = fleet->recovery->return_requested;
+      out.push_back({layout.recovery_left,
+                     pending_return_
+                         ? tr("FLEET_CONFIRM_RETURN", "CONFIRM RETURN")
+                         : tr(fleet->recovery->hold_requested ? "FLEET_RESUME"
+                                                              : "FLEET_HOLD",
+                              fleet->recovery->hold_requested ? "RESUME"
+                                                              : "HOLD")});
+      if (pending_return_ || !queued)
+        out.push_back({layout.recovery_right,
+                       pending_return_
+                           ? tr("SETTINGS_CANCEL", "CANCEL")
+                           : tr(queued ? "FLEET_RETURN_QUEUED"
+                                       : "FLEET_RETURN_BASE",
+                                queued ? "RETURN QUEUED" : "RETURN TO BASE")});
     }
     if (!preview_ && !pending_return_ && !fleet->foreign_inspection &&
         fleet->role == stellar::core::FleetRole::Military &&
         fleet->current_system_id && !fleet->destination_system_id &&
         fleet->combat_status && fleet->combat_status->is_armed)
-      out.push_back(layout.engage);
+      out.push_back({layout.engage, tr("FLEET_ENGAGE", "ENGAGE HOSTILES")});
   }
   if (preview_ && preview_->command_available)
-    out.push_back(layout.confirm);
-  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
-    if (a.y != b.y)
-      return a.y < b.y;
-    return a.x < b.x;
+    out.push_back({layout.confirm, tr("FLEET_CONFIRM_TRAVEL", "CONFIRM TRAVEL")});
+  std::ranges::sort(out, [](const FocusRect &a, const FocusRect &b) {
+    if (a.bounds.y != b.bounds.y)
+      return a.bounds.y < b.bounds.y;
+    return a.bounds.x < b.bounds.x;
   });
   return out;
+}
+
+std::string NativeFleetWorkspace::focused_label(
+    const FleetWorkspaceLayout &layout) const {
+  if (focus_ < 0)
+    return {};
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
 }
 
 FleetWorkspaceCommand NativeFleetWorkspace::handle(
@@ -509,7 +531,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     }
     if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
         focus_ < count) {
-      const auto &r = items[static_cast<std::size_t>(focus_)];
+      const auto &r = items[static_cast<std::size_t>(focus_)].bounds;
       const Point at{r.x + r.width * .5f, r.y + r.height * .5f};
       InputEvent press{InputEventType::LeftPressed};
       press.position = at;
@@ -1004,7 +1026,7 @@ void NativeFleetWorkspace::render(
   if (focus_ >= 0) {
     const auto items = focusables(layout);
     if (focus_ < static_cast<int>(items.size()))
-      stroke(out, items[static_cast<std::size_t>(focus_)],
+      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
              {160, 210, 255, 255});
   }
 }

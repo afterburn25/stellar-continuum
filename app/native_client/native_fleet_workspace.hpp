@@ -132,9 +132,16 @@ public:
   preview() const noexcept;
   [[nodiscard]] std::optional<int> selected_fleet_id() const noexcept;
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control — the announcement surface for
+  // screen-reader/live-region consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(const FleetWorkspaceLayout &) const;
 
 private:
-  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+  };
+  [[nodiscard]] std::vector<FocusRect>
   focusables(const FleetWorkspaceLayout &) const;
   FleetWorkspacePresentation presentation_;
   enum class PressTarget { None, Hold, Defend, Retreat, Locate };
