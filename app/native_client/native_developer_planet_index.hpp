@@ -20,15 +20,10 @@ class NativeDeveloperPlanetIndex {
  static UiRect row(const Layout& l,int i){return {l.list.x,l.list.y+i*49*l.scale,l.list.width,45*l.scale};}
  stellar::core::DeveloperPlanetFilter mode()const{return filter_==16?stellar::core::DeveloperPlanetFilter::ImportedArtwork:filter_==17?stellar::core::DeveloperPlanetFilter::Habitable:stellar::core::DeveloperPlanetFilter::All;}
  void rebuild(){rows_.clear();for(std::size_t i=0;i<entries_.size();++i)if(filter_<0||(filter_>=16&&entries_[i].count>0)||static_cast<int>(entries_[i].type)==filter_)rows_.push_back(static_cast<int>(i));}
- // The engine VirtualizedList owns the scroll offset — configured per
+ // The engine VirtualizedList owns the scroll offset — synced per
  // call so a rebuild that shrinks rows can never leave a stale offset
  // past the tail; the panel scrolls whole rows.
- int first_row(const Layout& l)const{
-  list_view_.row_height=49*l.scale;list_view_.viewport_height=l.list.height;list_view_.row_count=rows_.size();
-  list_view_.scroll_to(list_view_.scroll_offset);
-  if(list_view_.row_height>0)list_view_.scroll_offset=std::floor(list_view_.scroll_offset/list_view_.row_height)*list_view_.row_height;
-  return list_view_.row_height>0?static_cast<int>(list_view_.scroll_offset/list_view_.row_height):0;
- }
+ int first_row(const Layout& l)const{return static_cast<int>(list_view_.sync_rows(rows_.size(),49*l.scale,l.list.height));}
  static std::string number(double v,int precision=2){std::ostringstream o;o<<std::fixed<<std::setprecision(precision)<<v;return o.str();}
  public:
  void open(const stellar::core::FreshCampaignState& w){entries_=stellar::core::build_developer_planet_index(w);visible_=true;rules_=false;selected_=-1;filter_=-1;list_view_.scroll_offset=0;notice_.clear();focus_.reset();rebuild();}

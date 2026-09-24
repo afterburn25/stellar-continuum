@@ -44,11 +44,7 @@ private:
   // call so a shorter dump can never leave a stale offset (the old
   // int scroll_ had no upper clamp at all).
   int first_line(const Layout& l)const{
-    list_view_.row_height=23*l.s;list_view_.viewport_height=18*23*l.s;
-    list_view_.row_count=data_.empty()?0:static_cast<std::size_t>(std::ranges::count(data_,'\n'))+1;
-    list_view_.scroll_to(list_view_.scroll_offset);
-    if(list_view_.row_height>0)list_view_.scroll_offset=std::floor(list_view_.scroll_offset/list_view_.row_height)*list_view_.row_height;
-    return list_view_.row_height>0?static_cast<int>(list_view_.scroll_offset/list_view_.row_height):0;
+    return static_cast<int>(list_view_.sync_rows(data_.empty()?0:static_cast<std::size_t>(std::ranges::count(data_,'\n'))+1,23*l.s,18*23*l.s));
   }
   stellar::native_ui::Dropdown dropdown_;std::string data_;mutable stellar::engine::VirtualizedList list_view_{};int selected_{};bool navigate_{};
 };

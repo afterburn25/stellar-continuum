@@ -31,6 +31,12 @@ struct VirtualizedList {
   void ensure_visible(std::size_t row);
   float max_scroll() const;
   void scroll_to(float offset);
+  // Frame sync for row-snapped consumers: reconfigures the model,
+  // re-clamps the offset against the new content (a shrinking row set
+  // can never strand it past the tail), snaps down to a whole-row
+  // boundary, and returns the first visible row index.
+  std::size_t sync_rows(std::size_t rows, float row_height,
+                      float viewport_height);
 };
 
 struct TableColumn {

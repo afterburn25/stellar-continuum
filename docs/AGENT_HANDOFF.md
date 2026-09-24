@@ -955,6 +955,21 @@ Still open: platform AT bridging (UIA/AT-SPI), per-surface
 focused-label announcements beyond the menu, and the always-on HUD
 chrome ring (needs a focus-group policy — `assets_`/`fleet_workspace_`
 already claim keys on the clean map).
+VirtualizedList::sync_rows (row 24): the configure+clamp+snap step
+every VirtualizedList consumer hand-rolled (assign row count/height/
+viewport, re-bound a stale offset, quantize to a whole row, derive the
+first visible row) is now one engine call —
+`size_t sync_rows(rows, row_height, viewport_height)` clamps the old
+offset against the new `max_scroll`, snaps it to a row edge, and
+returns the first visible row. The diagnostics panel's `scroll_window`
+helper, both developer indexes, the empire monitor's two lists, and
+the phenomena dump all delegate to it, deleting five copies of the
+same arithmetic. `batcher_ui` covers snap-to-edge, stale-offset
+tail clamp, and empty-list reset. `batcher_ui`,
+`native_developer_diagnostics`, `native_developer_index`,
+`galaxy_phenomena`, `native_colony_roster`, `native_controlled_assets`,
+`campaign_world_projection`, `engine_diagnostics` green; client builds
+clean.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

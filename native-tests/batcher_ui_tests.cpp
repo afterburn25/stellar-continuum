@@ -60,6 +60,19 @@ int main() {
   list.ensure_visible(999);
   check(list.scroll_offset > 0.0f, "ensure_visible scrolls down");
   check(list.scroll_offset <= list.max_scroll(), "scroll clamped");
+  // sync_rows reconfigures, re-clamps a stale offset and snaps to a
+  // whole-row boundary, returning the first visible row.
+  VirtualizedList snapped;
+  snapped.scroll_offset = 24.0f * 100.0f + 7.0f;
+  check(snapped.sync_rows(1000, 24.0f, 240.0f) == 100,
+        "sync_rows returns the snapped first row");
+  check(snapped.scroll_offset == 2400.0f, "sync_rows snaps to a row edge");
+  snapped.scroll_offset = 24.0f * 999.0f;
+  check(snapped.sync_rows(40, 24.0f, 240.0f) == 30,
+        "sync_rows clamps a stale offset to the tail");
+  check(snapped.scroll_offset == snapped.max_scroll(), "clamp lands on max_scroll");
+  check(snapped.sync_rows(0, 24.0f, 240.0f) == 0 && snapped.scroll_offset == 0.0f,
+        "sync_rows empties to row zero");
 
   // --- Table model ---
   TableModel table;

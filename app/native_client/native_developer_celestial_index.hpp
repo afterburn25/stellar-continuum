@@ -99,15 +99,10 @@ private:
       {p.x+550*s,p.y+600*s,540*s,40*s},{p.x+550*s,p.y+505*s,540*s,40*s}};
   }
   static UiRect row(const Layout &l,int i){return {l.list.x,l.list.y+i*55*l.scale,l.list.width,52*l.scale};}
-  // The engine VirtualizedList owns the scroll offset — configured per
+  // The engine VirtualizedList owns the scroll offset — synced per
   // call so a rebuild that shrinks rows can never leave a stale offset
   // past the tail; the panel scrolls whole rows.
-  int first_row(const Layout &l)const{
-    list_view_.row_height=55*l.scale;list_view_.viewport_height=l.list.height;list_view_.row_count=rows_.size();
-    list_view_.scroll_to(list_view_.scroll_offset);
-    if(list_view_.row_height>0)list_view_.scroll_offset=std::floor(list_view_.scroll_offset/list_view_.row_height)*list_view_.row_height;
-    return list_view_.row_height>0?static_cast<int>(list_view_.scroll_offset/list_view_.row_height):0;
-  }
+  int first_row(const Layout &l)const{return static_cast<int>(list_view_.sync_rows(rows_.size(),55*l.scale,l.list.height));}
   static std::string number(double value){std::ostringstream out;out<<std::setprecision(3)<<std::scientific<<value;return out.str();}
   static std::string lower(std::string value){for(auto &c:value)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));return value;}
   const stellar::core::DeveloperCelestialEntry *selected()const{return selected_>=0&&selected_<static_cast<int>(index_.entries.size())?&index_.entries[selected_]:nullptr;}

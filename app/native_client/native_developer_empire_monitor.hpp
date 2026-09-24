@@ -102,10 +102,7 @@ private:
   int first_row(const Layout &l)const{return first_of(empire_view_,l,34.f,l.list.height,rows_.size());}
   int project_row(const Layout &l)const{return first_of(project_view_,l,56.f,l.projects.height,research_.active_projects.size());}
   static int first_of(stellar::engine::VirtualizedList &v,const Layout &l,float stride,float viewport,std::size_t rows){
-    v.row_height=stride*l.s;v.viewport_height=viewport;v.row_count=rows;
-    v.scroll_to(v.scroll_offset);
-    if(v.row_height>0)v.scroll_offset=std::floor(v.scroll_offset/v.row_height)*v.row_height;
-    return v.row_height>0?static_cast<int>(v.scroll_offset/v.row_height):0;
+    return static_cast<int>(v.sync_rows(rows,stride*l.s,viewport));
   }
   static std::string number(double v){std::ostringstream o;o<<std::fixed<<std::setprecision(2)<<v;return o.str();}
   static std::string delta(double v){return (v>=0?"+":"")+number(v);}

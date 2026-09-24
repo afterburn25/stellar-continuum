@@ -396,14 +396,13 @@ private:
   // count for handle(), and returns the visible range capped at the
   // view's historical row cap so overscan never paints past the list.
   stellar::engine::VirtualizedList::Range scroll_window(const Layout &l,float stride,std::size_t rows,std::size_t cap)const{
-    list_view_.row_height=stride*l.scale;list_view_.viewport_height=l.list.height;list_view_.row_count=rows;
-    list_view_.scroll_to(list_view_.scroll_offset);snap_list();list_rows_=rows;
+    (void)list_view_.sync_rows(rows,stride*l.scale,l.list.height);list_rows_=rows;
     auto range=list_view_.visible_range();range.last=std::min(range.last,range.first+cap);
     return range;
   }
   // This panel scrolls whole rows (rows always start fully visible at
   // the list top) — quantize the pixel offset to the row stride.
-  void snap_list()const{if(list_view_.row_height>0)list_view_.scroll_offset=std::floor(list_view_.scroll_offset/list_view_.row_height)*list_view_.row_height;}
+  void snap_list()const{(void)list_view_.sync_rows(list_rows_,list_view_.row_height,list_view_.viewport_height);}
   // Node ids encode the EntityId ("e"+value()); decode back for the
   // detail pane.
   static std::optional<stellar::engine::EntityId> entity_for_node(std::string_view id){
