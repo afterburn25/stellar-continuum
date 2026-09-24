@@ -682,6 +682,15 @@ missing-source rejection, streamed-music queue/diagnostics, plus the
 existing recovery/queue-bound tests; 3/3 audio suites and the full
 native client build green. The phase-cadence caveat above is stale —
 `campaign_phase_cadence`/`phase_profile` compile and pass at HEAD.
+Positional effects (`4b82ca7a`): `play_effect(clip, pan)` applies an
+equal-power stereo pan at queue time (SDL stream gain is scalar, so
+per-channel weighting happens on the PCM; centered stays zero-copy);
+RuntimeHost pans the player bounce cue by the entity's camera-relative
+screen x — the first engine-side consumer of positional effects.
+321/321 full suite green at `4b82ca7a` over the merged state including
+the other agent's diagnostics/replay lane — the earlier
+`campaign_diagnostics`/`native_developer_diagnostics` failures resolved
+once that lane committed.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
