@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <variant>
 #include <vector>
@@ -356,6 +357,12 @@ int main() {
     dead_stick.fuel_remaining_light_years = 2000.0; // refuel caps at capacity
     dead_stick.cargo_material_capacity = 10.0;
     dead_stick.cargo_materials = 50.0; // freight clamps at capacity
+    dead_stick.sensor_range = -1.0f;
+    dead_stick.mission_order_revision = -2;
+    dead_stick.local_transit_target = {
+        std::numeric_limits<float>::quiet_NaN(), 0.0f};
+    dead_stick.planned_route_system_ids = {999}; // absent system
+    dead_stick.stellar_transit_path.resize(133); // loader bound is 132
     dead_stick.combat = FleetCombatState{};
     dead_stick.combat->hull = -5.0;
     dead_stick.combat->target_fleet_id = 999; // absent fleet
@@ -389,10 +396,13 @@ int main() {
     const auto findings = inspect_campaign_invariants(world, 0, 100.0);
     int invalid = 0, species = 0, type = 0, orphan = 0, positive = 0,
         duplicate = 0, orphans = 0, tech = 0, overflow_n = 0,
-        fleet_refs = 0, ranged = 0;
+        fleet_refs = 0, ranged = 0, route_refs = 0, positions = 0;
     for (const auto &finding : findings) {
       if (finding.event_type == "out_of_range") ++ranged;
       else if (finding.event_type == "invalid_nonnegative_value") ++invalid;
+      else if (finding.event_type == "invalid_position") ++positions;
+      else if (finding.event_type == "orphaned_route_hop" ||
+               finding.event_type == "route_overflow") ++route_refs;
       else if (finding.event_type == "invalid_positive_value") ++positive;
       else if (finding.event_type == "unknown_species") ++species;
       else if (finding.event_type == "unknown_building_type") ++type;
@@ -407,8 +417,12 @@ int main() {
       else if (finding.event_type == "orphaned_freight" ||
                finding.event_type == "orphaned_target") ++fleet_refs;
     }
-    check(invalid == 4,
-          "stability, condition, arrears and hull flag invalid values");
+    check(invalid == 6,
+          "stability, condition, arrears, hull, sensor and revision "
+          "flag invalid values");
+    check(positions == 1 && route_refs == 2,
+          "non-finite transit vector, absent route hop and path "
+          "overflow are flagged");
     check(species == 2 && type == 1 && orphan == 2,
           "uncatalogued species/types and absent refs are flagged");
     check(positive == 1 && duplicate == 1,

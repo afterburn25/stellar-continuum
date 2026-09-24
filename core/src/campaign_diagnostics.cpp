@@ -588,6 +588,16 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     for(const auto system:{f.current_system_id,f.destination_system_id,f.transit_origin_system_id,f.transit_target_system_id})
       if(system&&!systems.contains(*system))emit("fleet","orphaned_location",f.id,"Fleet references an absent system.");
     if(!std::isfinite(f.position.x)||!std::isfinite(f.position.y))emit("fleet","invalid_position",f.id,"Fleet position is not finite.");
+    if(!std::isfinite(f.local_transit_start.x)||!std::isfinite(f.local_transit_start.y)||
+        !std::isfinite(f.local_transit_position.x)||!std::isfinite(f.local_transit_position.y)||
+        !std::isfinite(f.local_transit_target.x)||!std::isfinite(f.local_transit_target.y))
+      emit("fleet","invalid_position",f.id,"Local transit vectors are not finite.");
+    positive(f.sensor_range,"Sensor range",f.id,"fleet");
+    if(f.mission_order_revision<0)emit("fleet","invalid_nonnegative_value",f.id,"Mission order revision is negative.");
+    for(const auto hop:f.planned_route_system_ids)
+      if(!systems.contains(hop)){emit("fleet","orphaned_route_hop",f.id,"Planned route references an absent system.");break;}
+    if(f.stellar_transit_path.size()>132)
+      emit("fleet","route_overflow",f.id,"Stellar transit path exceeds the persisted route limit.");
     positive(f.fuel_remaining_light_years,"Fuel",f.id,"fleet");positive(f.embarked_population_millions,"Embarked population",f.id,"fleet");
     // Strictly positive: the warfare projection refuses speed <= 0.
     if(!std::isfinite(f.strategic_speed)||f.strategic_speed<=0.0)
