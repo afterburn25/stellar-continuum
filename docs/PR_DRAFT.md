@@ -127,11 +127,12 @@ Core/engine projections, never re-derived in UI.
   startup. Non-keyboard bindings actually fire: the client feeds
   `GamepadButton`/`MouseButton` through the same gameplay gate as keys
   and records them for replay as `gamepad_button`/`mouse_button`
-  commands. Gamepad camera axes land through a non-rebindable
-  `GALAXY_PAD` context — left stick pans, right stick zooms (Axis1D,
-  dead-zone + dt-scaled, same surface gate as wheel input) — restored
-  after user-map loads so older binding files cannot clobber it. The
-  navigation smoke exercises pad/right-click rebinding and stick
+  commands. Gamepad camera axes land through a `GALAXY_PAD` context —
+  left stick pans, right stick zooms (Axis1D, dead-zone + dt-scaled,
+  same surface gate as wheel input) — injected on user-map load only
+  when the saved map lacks it. The axis rows are rebindable in the
+  Controls view: capture accepts a stick deflection or wheel scroll.
+  The navigation smoke exercises pad/right-click rebinding and stick
   pan/zoom end-to-end — and caught a real defect: Escape cleared the
   inspection card without resetting `selected_id_`, so
   `refresh_inspection()` reopened it the same frame; the card now

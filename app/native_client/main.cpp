@@ -833,10 +833,10 @@ class NativeCampaign final {
   }
 
   // Gamepad camera axes are Axis1D actions in a separate context — the
-  // Controls view only rebinds Button actions, so these never enter a
-  // saved user map and older saves cannot clobber them (load_user_bindings
-  // re-registers the context after a successful load). SDL axis ids:
-  // 0=left X, 1=left Y, 3=right Y.
+  // Controls view lists them as rebindable axis rows (stick deflection or
+  // wheel capture). Saves written before the context existed lack it, so
+  // load_user_bindings re-registers the defaults when the loaded map does
+  // not define it. SDL axis ids: 0=left X, 1=left Y, 3=right Y.
   static constexpr std::string_view kGalaxyPadContext=R"json({
     "contexts":[{"name":"GALAXY_PAD","exclusive":false,"actions":[
       {"name":"map_pan_x","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":0}]},
@@ -883,10 +883,13 @@ class NativeCampaign final {
     std::ifstream in(path);std::ostringstream contents;contents<<in.rdbuf();
     std::string error;
     if(input_mapper_.load_contexts(contents.str(),&error)){
-      // Re-register the non-rebindable pad axes — saved maps written before
-      // they existed carry no GALAXY_PAD context to restore.
-      std::string pad_error;
-      (void)input_mapper_.load_contexts(kGalaxyPadContext,&pad_error);
+      // Saved maps written before pad camera axes existed carry no
+      // GALAXY_PAD context — inject the defaults; a saved map that defines
+      // it already holds the user's own axis bindings.
+      if(!input_mapper_.context("GALAXY_PAD")){
+        std::string pad_error;
+        (void)input_mapper_.load_contexts(kGalaxyPadContext,&pad_error);
+      }
       return true;
     }
     SDL_Log("Saved input bindings rejected: %s",error.c_str());return false;
@@ -9127,7 +9130,7 @@ int main(int argc,char **argv){
     // mapper and persists the rebound map beside the other settings files.
     const auto controls_path=settings_path.parent_path()/"galaxy-controls.json";
     campaign.load_user_bindings(controls_path);
-    settings_hub.set_input_mapper(&campaign.input_mapper());
+    settings_hub.set_input_mapper(&campaign.input_mapper(),"GALAXY","GALAXY_PAD");
     settings_hub.set_bindings_persist([&campaign,&controls_path]{
       const auto text=campaign.input_mapper().save_contexts();
       try {

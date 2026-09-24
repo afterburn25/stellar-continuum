@@ -1198,13 +1198,17 @@ inspection card without resetting `selected_id_`, so the unconditional
 the selection with the card, matching the card's own close path.
 Pad camera axes landed in the same lane: `GALAXY_PAD` (Axis1D over SDL
 axes 0/1/3 — left stick pans, right stick zooms, 0.18 dead zone,
-dt-scaled) is a separate non-rebindable context that `load_user_bindings`
-re-registers after a user-map load so older saved maps cannot clobber it.
-The navigation smoke verifies stick pan + zoom end-to-end and that the
-system view does not leak a galaxy-camera pan. The Controls view lists
-the axes as a hint line.
-Open: multi-pad disambiguation and axis capture in the rebind UI —
-mapper-level follow-ups, not blockers.
+dt-scaled) is a separate context `load_user_bindings` injects only when a
+saved map lacks it, so user axis rebinds persist through
+galaxy-controls.json. The navigation smoke verifies stick pan + zoom
+end-to-end and that the system view does not leak a galaxy-camera pan.
+Axis rebinding is live in the Controls view: `set_input_mapper` takes a
+second context name, its Axis1D actions list after the GALAXY buttons,
+and capturing an axis row accepts a stick deflection past a 0.5 dead
+zone or a wheel scroll (discrete keys are swallowed — they cannot drive
+an axis). Startup workspace tests cover the axis ring, deflection
+capture, cross-context steal and wheel binding.
+Open: multi-pad disambiguation — mapper-level follow-up, not a blocker.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

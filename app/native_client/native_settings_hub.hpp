@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -34,11 +35,13 @@ public:
   void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
   void set_callbacks(Open open,std::function<bool()> child_visible){open_=std::move(open);child_visible_=std::move(child_visible);}
   void set_localization(const stellar::engine::LocalizationTable* table)noexcept{locale_=table;}
-  // Borrowed mapper — the Controls view lists this context's Button actions
-  // and rebinds them through rebind()/bindings(). Null keeps the static
-  // control-reference help view.
-  void set_input_mapper(stellar::engine::InputMapper* mapper,std::string context_name="GALAXY"){
-    mapper_=mapper;context_name_=std::move(context_name);
+  // Borrowed mapper — the Controls view lists the context's Button actions
+  // plus the optional axis context's Axis1D actions, and rebinds them
+  // through rebind()/bindings(). Null keeps the static control-reference
+  // help view.
+  void set_input_mapper(stellar::engine::InputMapper* mapper,std::string context_name="GALAXY",
+                        std::string axis_context_name={}){
+    mapper_=mapper;context_name_=std::move(context_name);axis_context_name_=std::move(axis_context_name);
   }
   // Invoked after every successful rebind so the owner persists
   // save_contexts() wherever it keeps settings files.
@@ -56,8 +59,12 @@ public:
   // consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label()const{
     const auto rows=control_actions();
-    if(capture_>=0&&capture_<static_cast<int>(rows.size()))
-      return tr("SETTINGS_CONTROLS_CAPTURE","Press a key or button for")+" "+action_label(rows[static_cast<std::size_t>(capture_)]->name);
+    if(capture_>=0&&capture_<static_cast<int>(rows.size())){
+      const bool axis_row=rows[static_cast<std::size_t>(capture_)]->type==stellar::engine::InputAction::Type::Axis1D;
+      return tr(axis_row?"SETTINGS_CONTROLS_CAPTURE_AXIS":"SETTINGS_CONTROLS_CAPTURE",
+                axis_row?"Move a stick or scroll for":"Press a key or button for")
+             +" "+action_label(rows[static_cast<std::size_t>(capture_)]->name);
+    }
     if(focus_<0)return {};
     if(controls_){
       if(focus_==static_cast<int>(rows.size()))return tr("SETTINGS_BACK","Back");
@@ -103,10 +110,27 @@ public:
     }
     // Capture mode: the next trigger input — non-modifier keypress, gamepad
     // button or right-click — becomes the focused action's primary binding.
-    // Left-click and pointer loss cancel; everything else is swallowed.
+    // Axis rows accept only continuous triggers (a bound key would produce
+    // no axis output): a stick deflection past the dead zone or a wheel
+    // scroll. Left-click and pointer loss cancel; everything else is
+    // swallowed.
     if(capture_>=0){
+      const auto rows=control_actions();
+      if(capture_>=static_cast<int>(rows.size())){capture_=-1;return true;}
+      const bool axis_row=rows[static_cast<std::size_t>(capture_)]->type==
+                          stellar::engine::InputAction::Type::Axis1D;
       stellar::engine::InputBinding primary;
-      if(e.type==InputEventType::KeyPressed){
+      if(axis_row){
+        if(e.type==InputEventType::GamepadAxis){
+          if(std::fabs(e.gamepad_axis_value)<0.5f)return true; // dead zone — keep waiting
+          primary={stellar::engine::RawInputEvent::Kind::GamepadAxis,e.gamepad_axis};
+        }else if(e.type==InputEventType::Wheel){
+          primary={stellar::engine::RawInputEvent::Kind::MouseWheel,0};
+        }else{
+          if(e.type==InputEventType::LeftPressed)capture_=-1;
+          return true;
+        }
+      }else if(e.type==InputEventType::KeyPressed){
         switch(e.key){
           case 0x400000e0u:case 0x400000e1u:case 0x400000e2u:case 0x400000e3u:
           case 0x400000e4u:case 0x400000e5u:case 0x400000e6u:case 0x400000e7u:
@@ -176,12 +200,15 @@ public:
           const bool hot=rects[i].contains(pointer_)||focus_==static_cast<int>(i);
           const auto bindings=mapper_->bindings(rows[i]->name);
           const std::string value=capture_==static_cast<int>(i)
-              ?tr("SETTINGS_CONTROLS_PRESS_KEY","press a key or button…")
+              ?tr(rows[i]->type==stellar::engine::InputAction::Type::Axis1D
+                  ?"SETTINGS_CONTROLS_PRESS_AXIS":"SETTINGS_CONTROLS_PRESS_KEY",
+                  rows[i]->type==stellar::engine::InputAction::Type::Axis1D
+                  ?"move a stick or scroll…":"press a key or button…")
               :stellar::engine::describe_bindings(bindings);
           button(out,rects[i],action_label(rows[i]->name)+" — "+value,static_cast<int>(16*s),hot||capture_==static_cast<int>(i),true,s);
         }
-        // Gamepad axes bind in the non-rebindable GALAXY_PAD context — the
-        // hint keeps stick camera control discoverable beside the rows.
+        // Stick-camera defaults, kept discoverable beside the rebind rows
+        // (the pad axis rows themselves are listed above).
         const float hint_y=l.categories[0].y+static_cast<float>(rects.size())*26.f*s;
         if(hint_y+22.f*s<l.back.y-26.f*s)
           text(out,{l.categories[0].x,hint_y,l.categories[0].width,22.f*s},
@@ -201,13 +228,20 @@ private:
     if(locale_&&locale_->contains(key))return std::string(locale_->translate(key));
     return std::string(fallback);
   }
-  // Button actions of the configured context — the rebindable rows. Empty
-  // without a mapper (the controls view then shows the static help card).
+  // Button actions of the configured context plus Axis1D actions of the
+  // axis context — the rebindable rows. Empty without a mapper (the
+  // controls view then shows the static help card).
   [[nodiscard]] std::vector<const stellar::engine::InputAction*> control_actions()const{
     std::vector<const stellar::engine::InputAction*> rows;
-    if(mapper_)if(const auto* context=mapper_->context(context_name_))
-      for(const auto& action:context->actions)
-        if(action.type==stellar::engine::InputAction::Type::Button)rows.push_back(&action);
+    if(mapper_){
+      if(const auto* context=mapper_->context(context_name_))
+        for(const auto& action:context->actions)
+          if(action.type==stellar::engine::InputAction::Type::Button)rows.push_back(&action);
+      if(!axis_context_name_.empty())
+        if(const auto* context=mapper_->context(axis_context_name_))
+          for(const auto& action:context->actions)
+            if(action.type==stellar::engine::InputAction::Type::Axis1D)rows.push_back(&action);
+    }
     return rows;
   }
   [[nodiscard]] int control_count()const{return static_cast<int>(control_actions().size())+1;}
@@ -278,7 +312,7 @@ private:
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
   bool visible_{},controls_{};Point pointer_{};int focus_{-1};Open open_;std::function<bool()> child_visible_;
   const stellar::engine::LocalizationTable* locale_{};
-  stellar::engine::InputMapper* mapper_{};std::string context_name_{"GALAXY"};
+  stellar::engine::InputMapper* mapper_{};std::string context_name_{"GALAXY"},axis_context_name_;
   std::function<void()> persist_{};int capture_{-1};std::string notice_;
 };
 }

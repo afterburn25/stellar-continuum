@@ -284,6 +284,38 @@ void menu_hover_feedback(){
     require(mapper.bindings("quicksave")[0].kind==stellar::engine::RawInputEvent::Kind::GamepadButton&&
             mapper.bindings("quicksave")[0].code==7,"pad button did not capture");
     require(hub.focused_label()=="Quicksave: Pad 7","label did not describe the pad binding");
+    // Axis rows: an axis context contributes Axis1D rows that capture a
+    // stick deflection or wheel scroll — discrete keys are swallowed.
+    require(mapper.load_contexts(R"json({"contexts":[{"name":"GALAXY_PAD","exclusive":false,"actions":[
+      {"name":"map_pan_x","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":0}]},
+      {"name":"map_zoom","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":3}]}]}]})json",&mapper_error),mapper_error.c_str());
+    mapper.push_context("GALAXY_PAD");
+    hub.set_input_mapper(&mapper,"GALAXY","GALAXY_PAD");
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    // Ring: 2 Button rows + 2 Axis1D rows + Back.
+    (void)key(kTab);(void)key(kTab);(void)key(kTab);
+    require(hub.focused_label()=="Map pan x: Axis 0","axis row label did not name the stick binding");
+    require(key(kTab)&&hub.focused()==3&&hub.focused_label()=="Map zoom: Axis 3","zoom axis row did not focus");
+    require(key(kReturn),"axis row activation did not start capture");
+    require(hub.focused_label()=="Move a stick or scroll for Map zoom","axis capture label did not prompt");
+    // A below-dead-zone deflection and a keypress keep waiting.
+    InputEvent jitter{};jitter.type=InputEventType::GamepadAxis;jitter.gamepad_axis=0;jitter.gamepad_axis_value=0.2f;
+    require(hub.handle(jitter,w,h)&&mapper.bindings("map_zoom")[0].code==3,"jitter deflection rebound the axis");
+    InputEvent stray{};stray.type=InputEventType::KeyPressed;stray.key='z';
+    require(hub.handle(stray,w,h)&&mapper.bindings("map_zoom")[0].code==3,"keypress bound a discrete trigger to an axis row");
+    // A real deflection captures — stealing axis 0 from map_pan_x.
+    InputEvent deflect{};deflect.type=InputEventType::GamepadAxis;deflect.gamepad_axis=0;deflect.gamepad_axis_value=0.9f;
+    require(hub.handle(deflect,w,h),"axis capture was not consumed");
+    require(mapper.bindings("map_zoom")[0].kind==stellar::engine::RawInputEvent::Kind::GamepadAxis&&
+            mapper.bindings("map_zoom")[0].code==0,"stick deflection did not capture as an axis binding");
+    require(mapper.bindings("map_pan_x").empty(),"stolen axis was not stripped from the sibling");
+    require(hub.take_notice()=="Rebound — removed from Map pan x","axis steal notice missing");
+    // Wheel capture on the same row binds MouseWheel.
+    require(key(kReturn),"axis recapture did not start");
+    InputEvent scroll{};scroll.type=InputEventType::Wheel;scroll.wheel_y=1.f;
+    require(hub.handle(scroll,w,h)&&mapper.bindings("map_zoom")[0].kind==stellar::engine::RawInputEvent::Kind::MouseWheel,
+            "wheel scroll did not capture on an axis row");
     DrawList draw;hub.render(draw,w,h);
   }
 }

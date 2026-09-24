@@ -93,6 +93,8 @@
     "SETTINGS_CONTROLS_PRESS_KEY": "Taste drücken…",
     "SETTINGS_CONTROLS_CAPTURE": "Taste oder Button drücken für",
     "SETTINGS_CONTROLS_STOLEN": "Neu belegt — entfernt von",
+    "SETTINGS_CONTROLS_PRESS_AXIS": "Stick bewegen oder scrollen…",
+    "SETTINGS_CONTROLS_CAPTURE_AXIS": "Stick bewegen oder scrollen für",
     "MENU_PAUSED": "PAUSIERT",
     "MENU_SAVING": "KAMPAGNE WIRD GESPEICHERT",
     "MENU_CONTINUE": "FORTSETZEN",
