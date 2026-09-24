@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <span>
 #include <string>
@@ -140,6 +141,16 @@ struct CheckpointVerification {
 [[nodiscard]] CheckpointVerification verify_checkpoint_sequence(
     std::span<const ReplayCheckpoint> expected, std::size_t &cursor,
     std::span<const ReplayCheckpoint> actual);
+
+// Headless recording inventory ("replay_info={...}") — shared by the
+// game client's and RuntimeHost's --replay-info flags. Reports the
+// header, command-stream summary (kind counts, tick range, ordering
+// integrity, out-of-bounds pointer positions, unverified tail past the
+// last checkpoint) and per-tick checkpoint counts with expected-sidecar
+// presence/verification under "<path>.expected". Reads the sidecar
+// directory; the recording itself is already parsed.
+[[nodiscard]] std::string replay_info_json(const ReplayRecorder &recording,
+                                           const std::filesystem::path &path);
 
 // Streams a recorded command stream back in tick order. Callers pull
 // commands_for(tick) inside their fixed-step loop and verify checkpoints.

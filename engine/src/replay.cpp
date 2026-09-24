@@ -2,6 +2,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <charconv>
+#include <fstream>
+#include <map>
+#include <sstream>
+#include <unordered_map>
 #include <utility>
 
 namespace stellar::engine {
@@ -250,6 +256,190 @@ ReplayPlayer::expected_checkpoint(std::uint64_t tick) const {
 const ReplayHeader &ReplayPlayer::header() const {
   static const ReplayHeader empty{};
   return recording_ == nullptr ? empty : recording_->header();
+}
+
+namespace {
+
+[[nodiscard]] std::string replay_utf8_path(const std::filesystem::path &path) {
+  const auto value = path.u8string();
+  return {reinterpret_cast<const char *>(value.data()), value.size()};
+}
+
+[[nodiscard]] std::string replay_json_string(std::string_view value) {
+  std::ostringstream out;
+  out << '"';
+  constexpr char hex[] = "0123456789abcdef";
+  for (const unsigned char c : value) {
+    switch (c) {
+    case '"': out << "\\\""; break;
+    case '\\': out << "\\\\"; break;
+    case '\b': out << "\\b"; break;
+    case '\f': out << "\\f"; break;
+    case '\n': out << "\\n"; break;
+    case '\r': out << "\\r"; break;
+    case '\t': out << "\\t"; break;
+    default:
+      if (c < 0x20) out << "\\u00" << hex[c >> 4] << hex[c & 15];
+      else out << static_cast<char>(c);
+    }
+  }
+  out << '"';
+  return out.str();
+}
+
+} // namespace
+
+std::string replay_info_json(const ReplayRecorder &recording,
+                             const std::filesystem::path &path) {
+  std::ostringstream out;
+  out << "replay_info={\"file\":" << replay_json_string(replay_utf8_path(path))
+      << ",\"seed\":" << recording.header().seed
+      << ",\"build_id\":" << replay_json_string(recording.header().build_id)
+      << ",\"game_version\":"
+      << replay_json_string(recording.header().game_version);
+  if (recording.header().window_width != 0 ||
+      recording.header().window_height != 0)
+    out << ",\"window_width\":" << recording.header().window_width
+        << ",\"window_height\":" << recording.header().window_height;
+  out << ",\"commands\":" << recording.commands().size()
+      << ",\"truncated\":" << (recording.truncated() ? "true" : "false")
+      << ",\"memory_bytes\":" << recording.estimated_memory_bytes();
+  // Ordering integrity: the replay feed and the cursor-based checkpoint
+  // verifier both assume non-decreasing ticks — a hand-edited or
+  // corrupt recording would silently misbehave, so report it.
+  out << ",\"commands_ordered\":"
+      << (std::ranges::is_sorted(recording.commands(), {},
+                                 &ReplayCommand::tick)
+              ? "true"
+              : "false")
+      << ",\"checkpoints_ordered\":"
+      << (std::ranges::is_sorted(recording.checkpoints(), {},
+                                 &ReplayCheckpoint::tick)
+              ? "true"
+              : "false");
+  if (!recording.commands().empty()) {
+    const auto [lo, hi] =
+        std::ranges::minmax(recording.commands(), {}, &ReplayCommand::tick);
+    out << ",\"command_ticks\":[" << lo.tick << "," << hi.tick
+        << "],\"kinds\":{";
+    std::unordered_map<std::string, std::size_t> kinds;
+    for (const auto &command : recording.commands()) ++kinds[command.name];
+    bool first_kind = true;
+    for (const auto &[name, count] : kinds) {
+      if (!first_kind) out << ",";
+      first_kind = false;
+      out << replay_json_string(name) << ":" << count;
+    }
+    out << "}";
+  }
+  // Pointer commands carry drawable-pixel positions — any landing
+  // outside the recorded drawable can never hit the same UI cell on
+  // replay (hand-edited or corrupt fixture), so count them.
+  if (recording.header().window_width != 0 ||
+      recording.header().window_height != 0) {
+    std::size_t out_of_bounds = 0;
+    for (const auto &command : recording.commands()) {
+      if (command.name != "pointer_button") continue;
+      int type = 0;
+      float x = 0.f, y = 0.f;
+      const char *const begin = command.payload.data();
+      const char *const end = begin + command.payload.size();
+      const auto pt = std::from_chars(begin, end, type);
+      if (pt.ec != std::errc{} || pt.ptr >= end || *pt.ptr != ',') continue;
+      const auto px = std::from_chars(pt.ptr + 1, end, x);
+      if (px.ec != std::errc{} || px.ptr >= end || *px.ptr != ',') continue;
+      if (std::from_chars(px.ptr + 1, end, y).ec != std::errc{}) continue;
+      if (x < 0.f || y < 0.f || x >= recording.header().window_width ||
+          y >= recording.header().window_height)
+        ++out_of_bounds;
+    }
+    out << ",\"pointer_out_of_bounds\":" << out_of_bounds;
+  }
+  // Verification coverage: commands past the last recorded checkpoint
+  // replay but prove nothing — no capture remains to compare them
+  // against. Report the tail so a script can judge how much of the
+  // recording is actually verified.
+  if (!recording.commands().empty()) {
+    const auto last_checkpoint =
+        recording.checkpoints().empty()
+            ? std::uint64_t{}
+            : std::ranges::max(recording.checkpoints(), {},
+                               &ReplayCheckpoint::tick)
+                  .tick;
+    std::size_t tail = 0;
+    for (const auto &command : recording.commands())
+      if (command.tick > last_checkpoint) ++tail;
+    out << ",\"unverified_tail_commands\":" << tail;
+  }
+  // Checkpoints emit one entry per section per capture — group by tick
+  // and report whether the canonical expected document is on disk.
+  std::map<std::uint64_t, std::size_t> checkpoint_ticks;
+  for (const auto &checkpoint : recording.checkpoints())
+    ++checkpoint_ticks[checkpoint.tick];
+  const auto expected_dir =
+      std::filesystem::path(replay_utf8_path(path) + ".expected");
+  std::size_t expected_present = 0;
+  out << ",\"checkpoints\":[";
+  bool first_tick = true;
+  for (const auto &[tick, sections] : checkpoint_ticks) {
+    if (!first_tick) out << ",";
+    first_tick = false;
+    std::error_code ec;
+    const bool present = std::filesystem::is_regular_file(
+        expected_dir / (std::to_string(tick) + ".json"), ec);
+    if (present) ++expected_present;
+    out << "{\"tick\":" << tick << ",\"sections\":" << sections
+        << ",\"expected_document\":" << (present ? "true" : "false");
+    if (present) {
+      // Verify the retained document hashes to the recorded section
+      // checkpoints — a stale or mismatched sidecar would silently
+      // poison a later leaf-diff.
+      bool verified = false;
+      std::string mismatch;
+      if (std::ifstream expected_in{
+              expected_dir / (std::to_string(tick) + ".json"),
+              std::ios::binary};
+          expected_in) {
+        std::ostringstream doc_contents;
+        doc_contents << expected_in.rdbuf();
+        try {
+          const auto expected_doc =
+              nlohmann::ordered_json::parse(doc_contents.str());
+          const auto recomputed =
+              document_section_checkpoints(tick, expected_doc, "save");
+          std::unordered_map<std::string, std::uint64_t> recorded;
+          for (const auto &checkpoint : recording.checkpoints())
+            if (checkpoint.tick == tick)
+              recorded[checkpoint.label] = checkpoint.hash;
+          verified = recorded.size() == recomputed.size();
+          // A section-count asymmetry can't name a single label; a
+          // hash mismatch names the first diverging section.
+          if (!verified && recorded.size() == recomputed.size())
+            mismatch = "<section count>";
+          for (const auto &section : recomputed) {
+            const auto found = recorded.find(section.label);
+            if (found == recorded.end() || found->second != section.hash) {
+              verified = false;
+              mismatch = found == recorded.end()
+                             ? "<unrecorded: " + section.label + ">"
+                             : section.label;
+              break;
+            }
+          }
+        } catch (const std::exception &) {
+          // An unparseable sidecar stays unverified.
+          mismatch = "<unparseable>";
+        }
+      }
+      out << ",\"expected_verified\":" << (verified ? "true" : "false");
+      if (!verified && !mismatch.empty())
+        out << ",\"expected_mismatch\":" << replay_json_string(mismatch);
+    }
+    out << "}";
+  }
+  out << "],\"expected_dir\":"
+      << replay_json_string(replay_utf8_path(expected_dir)) << "}";
+  return out.str();
 }
 
 } // namespace stellar::engine

@@ -2473,6 +2473,10 @@ int RuntimeHost::run() {
 }
 
 int RuntimeHost::run(int argc, char **argv) {
+  // --replay-info is standalone: it prints the recording inventory and
+  // exits without creating a window, so scripts can inspect a journal on
+  // headless machines.
+  std::filesystem::path replay_info;
   for (int i = 1; i + 1 < argc; ++i) {
     const std::string_view arg{argv[i]};
     if (arg == "--frames")
@@ -2513,6 +2517,8 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.record_file = argv[++i];
     else if (arg == "--replay")
       impl_->options.replay_file = argv[++i];
+    else if (arg == "--replay-info")
+      replay_info = argv[++i];
     else if (arg == "--scene3d")
       impl_->options.scene3d = true;
     else if (arg == "--scene3d-file")
@@ -2520,6 +2526,26 @@ int RuntimeHost::run(int argc, char **argv) {
     else if (arg == "--fly-speed")
       impl_->options.fly_speed =
           static_cast<float>(std::atof(argv[++i]));
+  }
+  if (!replay_info.empty()) {
+    std::ifstream in(replay_info, std::ios::binary);
+    if (!in) {
+      std::fprintf(stderr, "Cannot open replay recording: %s\n",
+                   replay_info.generic_string().c_str());
+      return 1;
+    }
+    std::ostringstream contents;
+    contents << in.rdbuf();
+    std::string parse_error;
+    const auto recording =
+        ReplayRecorder::parse(contents.str(), &parse_error);
+    if (!recording) {
+      std::fprintf(stderr, "Replay file is not a valid recording: %s\n",
+                   parse_error.c_str());
+      return 1;
+    }
+    std::printf("%s\n", replay_info_json(*recording, replay_info).c_str());
+    return 0;
   }
   return run();
 }

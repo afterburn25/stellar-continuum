@@ -218,6 +218,38 @@ int main() {
           "array shrink and scalar type change localized");
   }
 
+  // replay_info_json renders the shared --replay-info inventory:
+  // header, kind counts, ordering integrity, pointer bounds against the
+  // recorded drawable, the unverified command tail past the last
+  // checkpoint, and per-tick sidecar presence.
+  {
+    ReplayRecorder recorder{ReplayHeader{7, "b", "1.0", 1280, 720}};
+    recorder.record(0, "pointer_button", "1,640,360,0,0");
+    recorder.record(0, "pointer_button", "1,2000,10,0,0");
+    recorder.record(50, "order", "{}");
+    recorder.checkpoint(10, 5, "save:World");
+    const auto parsed = ReplayRecorder::parse(recorder.serialize());
+    check(parsed.has_value(), "info fixture parses");
+    const auto info = replay_info_json(*parsed, "recording.json");
+    const auto has = [&](std::string_view needle) {
+      return info.find(needle) != std::string::npos;
+    };
+    check(has("\"seed\":7") && has("\"window_width\":1280"),
+          "info reports header fields");
+    check(has("\"commands_ordered\":true") &&
+              has("\"checkpoints_ordered\":true"),
+          "info reports ordering integrity");
+    check(has("\"pointer_button\":2") && has("\"order\":1"),
+          "info counts command kinds");
+    check(has("\"pointer_out_of_bounds\":1"),
+          "info flags the out-of-drawable pointer command");
+    check(has("\"unverified_tail_commands\":1"),
+          "info counts commands past the last checkpoint");
+    check(has("\"tick\":10") && has("\"sections\":1") &&
+              has("\"expected_document\":false"),
+          "info reports checkpoint ticks and missing sidecar");
+  }
+
   if (failures != 0) {
     std::cerr << failures << " replay checks failed\n";
     return 1;
