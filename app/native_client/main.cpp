@@ -946,8 +946,7 @@ class NativeCampaign final {
           // The canonical payload carries two wall-clock provenance fields —
           // SavedAtUtc and the campaign's CreatedAtUtc generation stamp. Strip
           // both so checkpoint hashes compare simulation state only.
-          auto document=nlohmann::ordered_json::parse(
-              encode_player_campaign_v17_json(payload));
+          auto document=encode_player_campaign_v17_document(payload);
           document.erase("SavedAtUtc");
           if(const auto galaxy=document.find("Galaxy");galaxy!=document.end())
             if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end())

@@ -1086,7 +1086,9 @@ Json encode_player_campaign_tail(const PlayerCampaignPayloadV17Dto& payload){
     json_detail::validate_encoded_text(tail["EventHistory"]);
     return tail;
 }
-Json encode_player_campaign_document(const PlayerCampaignPayloadV17Dto &payload) {
+} // namespace
+
+Json encode_player_campaign_v17_document(const PlayerCampaignPayloadV17Dto &payload) {
   if (payload.format_version != 17)
     fail(PlayerCampaignJsonStage::Representability,
          "NativeRepresentabilityException",
@@ -1109,11 +1111,10 @@ Json encode_player_campaign_document(const PlayerCampaignPayloadV17Dto &payload)
     fail(PlayerCampaignJsonStage::Encode, "JsonException", error.what());
   }
 }
-} // namespace
 
 std::string encode_player_campaign_v17_json(const PlayerCampaignPayloadV17Dto &payload) {
   try {
-    return encode_player_campaign_document(payload).dump(2);
+    return encode_player_campaign_v17_document(payload).dump(2);
   } catch (const nlohmann::json::exception &error) {
     fail(PlayerCampaignJsonStage::Encode, "JsonException", error.what());
   }
@@ -1269,7 +1270,7 @@ Json developer_envelope(const DeveloperCampaignPayload &snapshot,Json payload){
 }
 
 std::string encode_developer_campaign_json(const DeveloperCampaignPayload& snapshot){
-  return developer_envelope(snapshot,encode_player_campaign_document(snapshot.campaign)).dump(2);
+  return developer_envelope(snapshot,encode_player_campaign_v17_document(snapshot.campaign)).dump(2);
 }
 namespace {
 void stream_player(detail::JsonStreamWriter& out,const PlayerCampaignPayloadV17Dto& payload,bool developer){
