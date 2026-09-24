@@ -52,20 +52,47 @@ int main() {
     RuntimeHost host{headless_options(root)};
     int updates = 0;
     std::size_t rect_hits = 0, radius_hits = 0, far_hits = 0;
+    bool picked = false, picked_miss = false, picked_hidden = false;
+    EntityId ghost_id{};
     host.on_update = [&](World &, float) {
       ++updates;
-      rect_hits = host.entities_in_rect(0.f, 0.f, 2000.f, 2000.f).size();
-      // The demo entity starts at (120,160) 96x96 — center near (168,208)
-      // before it integrates far (240,150 u/s at 60 Hz).
-      radius_hits =
-          host.entities_in_radius(175.f, 215.f, 20.f).size();
-      far_hits = host.entities_in_radius(-500.f, -500.f, 10.f).size();
+      // Capture on update 1 — the ghost spawned below would join later
+      // queries otherwise.
+      if (updates == 1) {
+        rect_hits =
+            host.entities_in_rect(0.f, 0.f, 2000.f, 2000.f).size();
+        // The demo entity starts at (120,160) 96x96 — center near
+        // (168,208) before it integrates far (240,150 u/s at 60 Hz).
+        radius_hits =
+            host.entities_in_radius(175.f, 215.f, 20.f).size();
+        far_hits = host.entities_in_radius(-500.f, -500.f, 10.f).size();
+      }
+      // Screen-space picking: the demo rect sits at ~(120,160)-(216,256)
+      // under the identity camera on update 1; empty space misses and a
+      // hidden entity never picks.
+      if (updates == 1) {
+        picked = host.entity_at(150.f, 180.f).has_value();
+        picked_miss = !host.entity_at(5.f, 5.f).has_value();
+        SceneEntity ghost{};
+        ghost.name = "ghost";
+        ghost.x = 700.f;
+        ghost.y = 700.f;
+        ghost.w = 60.f;
+        ghost.h = 60.f;
+        ghost.visible = false;
+        ghost_id = host.spawn_entity(ghost);
+      }
+      if (updates == 2)
+        picked_hidden = !host.entity_at(710.f, 710.f).has_value();
     };
     check(host.run() == 0, "headless run exits cleanly");
     check(updates == 4, "headless steps once per frame under --frames");
     check(rect_hits == 1, "entities_in_rect finds the demo entity");
     check(radius_hits == 1, "entities_in_radius finds the demo entity");
     check(far_hits == 0, "entities_in_radius excludes far entities");
+    check(picked, "entity_at hits the demo rect");
+    check(picked_miss, "entity_at misses empty space");
+    check(picked_hidden, "entity_at skips Hidden entities");
   }
 
   // Headless runs are deterministic: identical options produce
