@@ -131,8 +131,11 @@ public:
   [[nodiscard]] const std::optional<stellar::native_fleet::NativeFleetRoutePreview> &
   preview() const noexcept;
   [[nodiscard]] std::optional<int> selected_fleet_id() const noexcept;
+  [[nodiscard]] int focus() const noexcept { return focus_; }
 
 private:
+  [[nodiscard]] std::vector<stellar::native_map::UiRect>
+  focusables(const FleetWorkspaceLayout &) const;
   FleetWorkspacePresentation presentation_;
   enum class PressTarget { None, Hold, Defend, Retreat, Locate };
   [[nodiscard]] const stellar::native_fleet::NativeOwnFleet *
@@ -162,6 +165,7 @@ private:
   std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> pressed_military_quote_;
   std::optional<stellar::native_fleet::NativeFleetLocateQuote> pressed_locate_quote_;
   mutable int last_ship_art_rows_{};
+  int focus_{-1};
 };
 
 } // namespace stellar::native_fleet_ui

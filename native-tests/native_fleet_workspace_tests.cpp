@@ -510,6 +510,87 @@ int main() try {
               !has_text(replacement_draw, "Alpha Centauri"),
           "Fleet preview, notice, or selection survived campaign replacement.");
 
+  {
+    // Keyboard focus traversal: rows then release-gated orders and Locate.
+    constexpr std::uint32_t kTab = 9u;
+    constexpr std::uint32_t kReturn = 13u;
+    constexpr std::uint32_t kEnd = 0x4000004du;
+    constexpr std::uint32_t kDigit5 = '5';
+    const int width = 1280, height = 720;
+    const auto key = [&](NativeFleetWorkspace &w, std::uint32_t k,
+                         bool shift = false) {
+      InputEvent e{InputEventType::KeyPressed};
+      e.key = k;
+      e.shift = shift;
+      return w.handle(e, width, height, {}, std::nullopt);
+    };
+    NativeFleetWorkspace outliner;
+    outliner.set_view(player_view(true));
+    require(outliner.focus() < 0, "Fleet focus should start unset.");
+    require(key(outliner, kTab).captured && outliner.focus() == 0,
+            "Tab did not land on the first fleet row.");
+    require(key(outliner, kTab).captured && outliner.focus() == 1,
+            "Tab did not advance to the second fleet row.");
+    require(key(outliner, kTab, true).captured && outliner.focus() == 0,
+            "Shift+Tab did not retreat focus.");
+    require(key(outliner, kEnd).captured && outliner.focus() == 1,
+            "End did not reach the last focusable row.");
+    auto command = key(outliner, kReturn);
+    require(command.kind == FleetWorkspaceCommandKind::Select &&
+                command.fleet_id == 12,
+            "Row activation did not select its fleet.");
+    require(outliner.focus() == 1, "Row activation lost keyboard focus.");
+    require(!key(outliner, kDigit5).captured,
+            "Unhandled key was captured by the focus handler.");
+    (void)outliner.handle(
+        {InputEventType::LeftPressed, center(outliner.layout(width, height).panel)},
+        width, height, {}, std::nullopt);
+    require(outliner.focus() < 0,
+            "Pointer press did not clear keyboard focus.");
+  }
+  {
+    // Release-gated strategic orders fire through the press+release pair.
+    constexpr std::uint32_t kTab = 9u;
+    constexpr std::uint32_t kReturn = 13u;
+    constexpr std::uint32_t kEnd = 0x4000004du;
+    NativeFleetWorkspace strategic;
+    auto tactical = player_view(true);
+    auto &fleet = tactical.own_fleets.front();
+    fleet.military_order_quote = NativeMilitaryOrderQuote{
+        .campaign_generation = 4, .token = 9, .observer_id = 0, .fleet_id = 10,
+        .mission_order_revision = fleet.mission_order_revision,
+        .role = stellar::core::FleetRole::Military, .current_system_id = 0,
+        .armed = true, .combat_effective = true};
+    fleet.locate = NativeFleetLocateQuote{
+        .campaign_generation = 4, .observer_id = 0, .fleet_id = 10,
+        .mission_order_revision = fleet.mission_order_revision};
+    const auto order_quote = *fleet.military_order_quote;
+    const auto locate_quote = *fleet.locate;
+    strategic.set_view(tactical);
+    const auto key = [&](std::uint32_t k) {
+      InputEvent e{InputEventType::KeyPressed};
+      e.key = k;
+      return strategic.handle(e, 1280, 720, {}, std::nullopt);
+    };
+    (void)key(kTab);
+    (void)key(kTab);
+    (void)key(kTab);
+    require(strategic.focus() == 2,
+            "Order buttons did not follow the fleet rows in the ring.");
+    auto command = key(kReturn);
+    require(command.kind == FleetWorkspaceCommandKind::MilitaryOrder &&
+                command.military_order == stellar::core::MilitaryOrderType::Hold &&
+                command.military_order_quote == order_quote,
+            "Keyboard activation did not fire the release-gated Hold order.");
+    require(strategic.focus() == 2,
+            "Order activation lost keyboard focus.");
+    require(key(kEnd).captured, "End did not reach the Locate control.");
+    command = key(kReturn);
+    require(command.kind == FleetWorkspaceCommandKind::Locate &&
+                command.locate_quote == locate_quote,
+            "Keyboard activation did not fire release-gated Locate.");
+  }
+
   std::cout << "Native owned-fleet outliner, map hit, route preview, confirmation, "
                "empty-state and secrecy tests passed\n";
   return 0;

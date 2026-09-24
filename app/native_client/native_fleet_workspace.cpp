@@ -258,6 +258,7 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
     target_display_name_.clear();
     notice_.clear();
     list_scroll_ = 0.f;
+    focus_ = -1;
   }
   const auto selected_changed = [&] {
     if (!view_ || view_->selected_fleet_id != view.selected_fleet_id ||
@@ -303,6 +304,7 @@ void NativeFleetWorkspace::discard_campaign() {
   notice_.clear();
   list_scroll_ = 0.f;
   clear_pressed_action();
+  focus_ = -1;
 }
 
 void NativeFleetWorkspace::set_preview(NativeFleetRoutePreview preview,
@@ -362,6 +364,63 @@ void NativeFleetWorkspace::set_recovery_result(
   set_notice(outcome.message, outcome.accepted || outcome.requires_confirmation);
 }
 
+std::vector<UiRect> NativeFleetWorkspace::focusables(
+    const FleetWorkspaceLayout &layout) const {
+  std::vector<UiRect> out;
+  const auto *fleet = selected_fleet();
+  if (view_ && presentation_ == FleetWorkspacePresentation::Outliner)
+    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
+      const UiRect row{layout.list.x,
+                       layout.list.y + list_scroll_ +
+                           static_cast<float>(index) * 45.f * layout.scale,
+                       layout.list.width, 41.f * layout.scale};
+      if (const auto clipped = intersection(row, layout.list))
+        out.push_back(*clipped);
+    }
+  if (overview_ && !selected_fleet_id()) {
+    const UiRect content{layout.details.x, layout.details.y,
+                         layout.details.width,
+                         layout.route.y + layout.route.height -
+                             layout.details.y};
+    for (const auto &row :
+         native_overview::overview_layout_for(*overview_, content).colony_rows)
+      out.push_back(row);
+  }
+  if (fleet) {
+    if (!preview_ && !pending_return_) {
+      if (fleet->military_order_quote) {
+        out.push_back(layout.order_hold);
+        out.push_back(layout.order_defend);
+        out.push_back(layout.order_retreat);
+        if (fleet->locate)
+          out.push_back(layout.military_locate);
+      } else if (fleet->recovery && fleet->locate) {
+        out.push_back(layout.civilian_locate);
+      } else if (fleet->locate) {
+        out.push_back(layout.locate);
+      }
+    }
+    if (!preview_ && fleet->recovery) {
+      out.push_back(layout.recovery_left);
+      if (pending_return_ || !fleet->recovery->return_requested)
+        out.push_back(layout.recovery_right);
+    }
+    if (!preview_ && !pending_return_ && !fleet->foreign_inspection &&
+        fleet->role == stellar::core::FleetRole::Military &&
+        fleet->current_system_id && !fleet->destination_system_id &&
+        fleet->combat_status && fleet->combat_status->is_armed)
+      out.push_back(layout.engage);
+  }
+  if (preview_ && preview_->command_available)
+    out.push_back(layout.confirm);
+  std::ranges::sort(out, [](const UiRect &a, const UiRect &b) {
+    if (a.y != b.y)
+      return a.y < b.y;
+    return a.x < b.x;
+  });
+  return out;
+}
+
 FleetWorkspaceCommand NativeFleetWorkspace::handle(
     const InputEvent &event, int width, int height,
     std::span<const FleetScreenMarker> markers,
@@ -374,6 +433,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
   if (event.type == InputEventType::PointerCancelled) {
     clear_pressed_action();
     cancel_recovery();
+    focus_ = -1;
     return {FleetWorkspaceCommandKind::None, true};
   }
   if (event.type == InputEventType::LeftReleased &&
@@ -417,7 +477,49 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
               *target_system_id};
     return {};
   }
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const auto items = focusables(layout);
+    const int count = static_cast<int>(items.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      return {FleetWorkspaceCommandKind::None, true};
+    }
+    if (count > 0 && (fwd || bwd)) {
+      focus_ = focus_ < 0 || focus_ >= count
+                   ? (bwd ? count - 1 : 0)
+                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      return {FleetWorkspaceCommandKind::None, true};
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto &r = items[static_cast<std::size_t>(focus_)];
+      const Point at{r.x + r.width * .5f, r.y + r.height * .5f};
+      InputEvent press{InputEventType::LeftPressed};
+      press.position = at;
+      const int keep = focus_;
+      auto command = handle(press, width, height, markers, target_system_id);
+      if (command.kind == FleetWorkspaceCommandKind::None) {
+        // Release-gated controls (orders, locate) fire on the matched release.
+        InputEvent release{InputEventType::LeftReleased};
+        release.position = at;
+        command = handle(release, width, height, markers, target_system_id);
+      }
+      focus_ = keep;
+      command.captured = true;
+      return command;
+    }
+    return {};
+  }
   if (event.type != InputEventType::LeftPressed) return {};
+  focus_ = -1;
   if (visible_panel && layout.panel.contains(event.position)) {
     // New strategic and Locate controls require an exact matched release and
     // retain the displayed quote, never a later selection's authority.
@@ -890,6 +992,12 @@ void NativeFleetWorkspace::render(
           width, height, layout.scale, native_ui::Tone::Military);
       break;
     }
+  if (focus_ >= 0) {
+    const auto items = focusables(layout);
+    if (focus_ < static_cast<int>(items.size()))
+      stroke(out, items[static_cast<std::size_t>(focus_)],
+             {160, 210, 255, 255});
+  }
 }
 
 const std::optional<NativeFleetMapView> &NativeFleetWorkspace::view() const noexcept {
