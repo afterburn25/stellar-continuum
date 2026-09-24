@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <exception>
 #include <iostream>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -172,6 +173,42 @@ int main(int argc, char **argv) {
     const auto demoted = run_trace(catalog, kSeed, kSteps, minimal);
     require_same_trace(demoted, minimal_baseline,
                        "inert-phase demotion parity");
+
+    // Per-phase activity matrix: a phase set to Dormant contributes
+    // zero runs, so byte parity against the minimal baseline proves the
+    // phase is inert for this scenario class — an adoption candidate —
+    // while divergence proves it is live. The classification is pinned
+    // so a later change that silently activates (or deactivates) a
+    // phase flips its class and fails the oracle.
+    {
+      const std::map<std::string_view, bool> expected_inert{
+          {"economy", false},          {"strategic_ai", true},
+          {"automatic_orders", false}, {"industry_allocation", false},
+          {"construction", false},     {"shipbuilding", true},
+          {"legacy_research", false},  {"exploration", true},
+          {"freight", true},           {"combat", true},
+          {"colonization", true},      {"economy_storage", true}};
+      std::string mismatches;
+      for (const auto phase :
+           GalaxySimulationStepCoordinator::phase_names) {
+        TracePlan probe{};
+        probe.minimal_world = true;
+        probe.tiers = {{std::string(phase), SimulationTier::Dormant}};
+        const auto probe_trace = run_trace(catalog, kSeed, kSteps, probe);
+        const bool inert = probe_trace == minimal_baseline;
+        const auto expected = expected_inert.find(phase);
+        require(expected != expected_inert.end(),
+                "activity matrix is missing an expectation for " +
+                    std::string(phase));
+        if (inert != expected->second) {
+          mismatches += std::string(phase) +
+                        (inert ? " inert" : " live") + ";";
+        }
+      }
+      require(mismatches.empty(),
+              "activity matrix mismatch in the minimal world: " +
+                  mismatches);
+    }
 
     // Divergence honesty: demoting a phase that actually integrates
     // (economy, Background period 16 over 24 steps -> 1 coarse run at
