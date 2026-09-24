@@ -823,6 +823,43 @@ int main() {
     }
   }
 
+  // Lifetime ttl self-destructs in sim time, and a name-keyed parent
+  // attachment keeps the child at its authored offset as the parent
+  // moves.
+  {
+    const auto sub = root / "ttl-parent";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[
+                   {"name":"mover","x":0,"y":100,"vx":100},
+                   {"name":"rider","x":50,"y":140,"parent":"mover"},
+                   {"name":"spark","x":500,"y":500,"ttl":0.05}]})";
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 20;
+    RuntimeHost host{opts};
+    float offset = 0.f;
+    int rider_frames = 0;
+    host.on_update = [&](World &world, float) {
+      const auto mover = host.find_entity("mover");
+      const auto rider = host.find_entity("rider");
+      if (mover && rider) {
+        const auto *mt = world.get<Transform2D>(*mover);
+        const auto *rt = world.get<Transform2D>(*rider);
+        if (mt && rt) {
+          offset = rt->x - mt->x;
+          ++rider_frames;
+        }
+      }
+    };
+    check(host.run() == 0, "ttl/parent run exits cleanly");
+    check(rider_frames > 0 && std::abs(offset - 50.f) < 1.f,
+          "the rider keeps its authored offset as the parent moves");
+    check(!host.find_entity("spark").has_value(),
+          "the ttl entity self-destructs in sim time");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
