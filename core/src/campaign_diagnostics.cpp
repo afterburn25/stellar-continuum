@@ -7,16 +7,21 @@
 #include <stellar/core/campaign_logistics_projection.hpp>
 #include <stellar/core/campaign_population_projection.hpp>
 #include <stellar/core/campaign_warfare_projection.hpp>
+#include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/construction_state.hpp>
+#include <stellar/core/exploration_advance.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/fleet_state.hpp>
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/legacy_technology.hpp>
 #include <stellar/core/logistics.hpp>
+#include <stellar/core/massive_combat_persistence.hpp>
 #include <stellar/core/settlement_body_index.hpp>
+#include <stellar/core/ship_designs.hpp>
 #include <stellar/core/surface_economy.hpp>
 #include <stellar/engine/strategic_ai.hpp>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <exception>
@@ -503,9 +508,14 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   // unresolvable for the colony — plus catalogued building types and
   // species so the checks below flag what the ops pass must skip.
   std::unordered_set<std::uint64_t> body_keys;body_keys.reserve(w.bodies.size());
-  for(const auto &b:w.bodies)
+  std::unordered_map<int,const PlanetaryBody*> body_by_id;body_by_id.reserve(w.bodies.size());
+  std::unordered_map<int,const Colony*> colony_by_id;colony_by_id.reserve(w.colonies.size());
+  for(const auto &b:w.bodies){
     body_keys.insert((std::uint64_t{static_cast<std::uint32_t>(b.system_id)}<<32)|
                      static_cast<std::uint32_t>(b.id));
+    body_by_id.emplace(b.id,&b);
+  }
+  for(const auto &c:w.colonies)colony_by_id.emplace(c.id,&c);
   std::unordered_set<std::string_view> known_types,known_species,known_techs;
   for(const auto &d:surface_building_catalog())known_types.insert(d.id);
   for(const auto &p:species_biology_profiles())known_species.insert(p.id);
@@ -581,6 +591,20 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     positive(c.stored_extracted_materials,"Extracted material reserve",c.id,"colony");
     if(c.remaining_extractable_materials)positive(*c.remaining_extractable_materials,"Remaining extractable materials",c.id,"colony");
     positive(c.surface_hub_upgrade_days_remaining,"Hub upgrade remaining",c.id,"colony");
+    if(c.kind!=SettlementKind::Colony&&c.kind!=SettlementKind::ResourceOutpost)
+      emit("colony","invalid_kind",c.id,"Settlement kind is outside the catalog.");
+    if(c.surface_hub_level<0||c.surface_hub_level>3)
+      emit("colony","out_of_range",c.id,"Surface hub level is outside the authoritative [0,3] bound.");
+    if(static_cast<int>(c.surface_buildings.size())>surface_building_capacity(c))
+      emit("colony","capacity_overflow",c.id,"Surface buildings exceed the represented hub capacity.");
+    if(!c.planetary_body_id&&!c.surface_buildings.empty())
+      emit("colony","missing_surface_body",c.id,"Surface buildings exist without an exact planetary body.");
+    if(c.planetary_body_id&&!c.surface_buildings.empty()){
+      const auto site=body_by_id.find(*c.planetary_body_id);
+      if(site!=body_by_id.end()&&site->second->system_id==c.system_id&&
+          !site->second->environment.has_solid_surface)
+        emit("colony","invalid_surface_site",c.id,"Surface buildings sit on a body without solid ground.");
+    }
     (void)ids(c.surface_buildings,&SurfaceBuilding::id,"construction");
     for(const auto &b:c.surface_buildings){positive(b.industry_progress,"Building progress",b.id,"construction");
       positive(b.condition,"Building condition",b.id,"construction");
@@ -627,6 +651,15 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     bounded(e.last_research_funding_fraction,1.0,"Research funding fraction",e.civilization_id,"economy");
     bounded(e.last_base_operations_funding_fraction,1.0,"Operations funding fraction",e.civilization_id,"economy");
   }
+  // The reference validator requires exactly one authoritative
+  // economy per civilization once any settlement runs surface
+  // construction; duplicates already flag as duplicate_id.
+  if(std::ranges::any_of(w.colonies,
+                         [](const Colony &c){return !c.surface_buildings.empty();}))
+    for(const auto &c:w.civilizations)
+      if(std::ranges::none_of(w.economies,
+                              [&](const CivilizationEconomy &e){return e.civilization_id==c.id;}))
+        emit("economy","missing_economy",c.id,"Civilization has surface construction but no authoritative economy.");
   for(const auto &f:w.fleets){
     if(!civilizations.contains(f.civilization_id))emit("fleet","orphaned_fleet",f.id,"Fleet references an absent civilization.");
     for(const auto system:{f.current_system_id,f.destination_system_id,f.transit_origin_system_id,f.transit_target_system_id})
@@ -652,24 +685,98 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     // simulation dereferences every tick.
     positive(f.transit_progress,"Transit progress",f.id,"fleet");
     bounded(f.transit_progress,1.0,"Transit progress",f.id,"fleet");
-    positive(f.maximum_leg_range_light_years,"Maximum leg range",f.id,"fleet");
-    positive(f.fuel_capacity_light_years,"Fuel capacity",f.id,"fleet");
+    // The reference validator rejects non-finite and non-positive
+    // endurance bounds outright.
+    if(!std::isfinite(f.maximum_leg_range_light_years)||f.maximum_leg_range_light_years<=0.0)
+      emit("fleet","invalid_positive_value",f.id,"Maximum leg range is non-finite or non-positive.");
+    if(!std::isfinite(f.fuel_capacity_light_years)||f.fuel_capacity_light_years<=0.0)
+      emit("fleet","invalid_positive_value",f.id,"Fuel capacity is non-finite or non-positive.");
     bounded(f.fuel_remaining_light_years,f.fuel_capacity_light_years,"Fuel",f.id,"fleet");
     positive(f.cargo_material_capacity,"Cargo capacity",f.id,"fleet");
     positive(f.cargo_materials,"Cargo load",f.id,"fleet");
     bounded(f.cargo_materials,f.cargo_material_capacity,"Cargo load",f.id,"fleet");
     positive(f.settlement_days_completed,"Settlement progress",f.id,"fleet");
+    bounded(f.settlement_days_completed,ColonizationSimulation::establishment_days(f),
+            "Settlement progress",f.id,"fleet");
     positive(f.reconnaissance_days_completed,"Reconnaissance progress",f.id,"fleet");
+    bounded(f.reconnaissance_days_completed,ExplorationSimulation::scout_reconnaissance_days,
+            "Reconnaissance progress",f.id,"fleet");
+    if(f.design_id){
+      const auto *design=find_ship_design(*f.design_id);
+      if(!design)emit("fleet","unknown_ship_design",f.id,"Fleet references an unknown ship design.");
+      else if(design->role!=f.role)
+        emit("fleet","incompatible_design",f.id,"Fleet role does not match its ship design.");
+    }
+    if(f.tactical_loadout)
+      try{f.tactical_loadout->validate();}
+      catch(const std::exception&){
+        emit("fleet","invalid_loadout",f.id,"Tactical loadout fails its authoritative validation.");}
+    if(f.tactical_vessel){
+      try{f.tactical_vessel->validate();}
+      catch(const std::exception&){
+        emit("fleet","invalid_vessel",f.id,"Tactical vessel fails its authoritative validation.");}
+      if(f.tactical_vessel->id!=campaign_vessel_id_for_fleet(f.id))
+        emit("fleet","inconsistent_vessel",f.id,"Tactical state belongs to a different vessel identity.");
+    }
+    // Order consistency: the validator requires freight state only on
+    // logistics fleets, waypoints to terminate at the destination, and
+    // civilian hold/return orders only on civilian fleets.
+    const bool civilian=f.role==FleetRole::Scout||f.role==FleetRole::Science||f.role==FleetRole::Colony;
+    if((f.freight_target_outpost_id||f.freight_home_colony_id||f.cargo_materials>0.0)&&
+        f.role!=FleetRole::Logistics)
+      emit("fleet","invalid_freight",f.id,"Fleet carries freight mission state without a logistics role.");
+    if(!f.destination_system_id&&!f.planned_route_system_ids.empty())
+      emit("fleet","inconsistent_route",f.id,"Route waypoints exist without an active destination.");
+    if(!f.planned_route_system_ids.empty()&&f.destination_system_id&&
+        f.planned_route_system_ids.back()!=*f.destination_system_id)
+      emit("fleet","inconsistent_route",f.id,"Route does not end at the mission destination.");
+    if(f.is_active&&!civilian&&
+        (f.hold_requested||f.return_to_base_requested||f.return_to_base_failure_reason))
+      emit("fleet","invalid_order",f.id,"Civilian hold or return order on a non-civilian fleet.");
+    if((!f.settlement_body_id&&f.settlement_days_completed>0.0)||
+        (!f.reconnaissance_system_id&&f.reconnaissance_days_completed>0.0)||
+        (f.prevent_automatic_settlement&&(f.role!=FleetRole::Colony||f.settlement_body_id)))
+      emit("fleet","inconsistent_order",f.id,"Local work progress or the settlement lock lacks a matching order.");
     if(f.destination_planetary_body_id&&!bodies.contains(*f.destination_planetary_body_id))
       emit("fleet","orphaned_destination_body",f.id,"Fleet destination references an absent body.");
     if(f.settlement_body_id&&!bodies.contains(*f.settlement_body_id))
       emit("fleet","orphaned_settlement_body",f.id,"Settlement order references an absent body.");
     if(f.reconnaissance_system_id&&!systems.contains(*f.reconnaissance_system_id))
       emit("fleet","orphaned_reconnaissance",f.id,"Reconnaissance order references an absent system.");
+    if(f.reconnaissance_system_id&&f.role!=FleetRole::Scout)
+      emit("fleet","invalid_reconnaissance",f.id,"Reconnaissance work site on a non-scout fleet.");
     if(f.freight_target_outpost_id&&!colony_ids.contains(*f.freight_target_outpost_id))
       emit("fleet","orphaned_freight",f.id,"Freight order references an absent outpost.");
     if(f.freight_home_colony_id&&!colony_ids.contains(*f.freight_home_colony_id))
       emit("fleet","orphaned_freight",f.id,"Freight order references an absent home colony.");
+    if(f.freight_target_outpost_id){
+      const auto outpost=colony_by_id.find(*f.freight_target_outpost_id);
+      if(outpost!=colony_by_id.end()&&
+          (outpost->second->civilization_id!=f.civilization_id||
+           outpost->second->kind!=SettlementKind::ResourceOutpost))
+        emit("fleet","invalid_freight",f.id,"Freight outpost is not a same-owner resource outpost.");
+    }
+    if(f.freight_home_colony_id){
+      const auto home=colony_by_id.find(*f.freight_home_colony_id);
+      if(home!=colony_by_id.end()&&
+          (home->second->civilization_id!=f.civilization_id||
+           home->second->kind!=SettlementKind::Colony))
+        emit("fleet","invalid_freight",f.id,"Freight home is not a same-owner colony.");
+    }
+    if(f.settlement_body_id){
+      const auto site=body_by_id.find(*f.settlement_body_id);
+      if(f.role!=FleetRole::Colony||f.destination_system_id||
+          (site!=body_by_id.end()&&f.current_system_id!=site->second->system_id))
+        emit("fleet","invalid_settlement",f.id,"Settlement work site is not a body in the current system.");
+    }
+    if(f.destination_planetary_body_id){
+      const auto target_system=f.destination_system_id?f.destination_system_id
+          :(f.settlement_body_id==f.destination_planetary_body_id?f.current_system_id:std::nullopt);
+      const auto body=body_by_id.find(*f.destination_planetary_body_id);
+      if(f.role!=FleetRole::Colony||!target_system||
+          (body!=body_by_id.end()&&body->second->system_id!=*target_system))
+        emit("fleet","invalid_destination",f.id,"Planetary-body target lacks a colony destination in its system.");
+    }
     if(f.embarked_population_species_id&&!known_species.contains(*f.embarked_population_species_id))
       emit("fleet","unknown_species",f.id,"Fleet embarks an uncatalogued species.");
     if(f.combat){
@@ -705,12 +812,20 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
   }
   // Combat intelligence is persisted: observers must be
   // civilizations, observed ids must be fleets, magnitudes bounded.
+  if(w.combat_intelligence.size()>static_cast<std::size_t>(maximum_fleet_power_observations))
+    emit("combat","observation_overflow",0,"Power observations exceed the persisted total bound.");
   std::unordered_map<int,int> observation_counts;
+  std::unordered_set<std::uint64_t> observation_pairs;
   for(const auto &o:w.combat_intelligence){
     if(!civilizations.contains(o.observer_id))
       emit("combat","orphaned_observer",o.fleet_id,"Power observation observer is an absent civilization.");
     if(!fleet_ids.contains(o.fleet_id))
       emit("combat","orphaned_observed_fleet",o.fleet_id,"Power observation references an absent fleet.");
+    if(!observation_pairs.insert((std::uint64_t{static_cast<std::uint32_t>(o.observer_id)}<<32)|
+                                 static_cast<std::uint32_t>(o.fleet_id)).second)
+      emit("combat","duplicate_id",o.fleet_id,"Duplicate power observation for an observer/fleet pair.");
+    if(o.evidence.find_first_not_of(" \t\n\r\f\v")==std::string::npos)
+      emit("combat","invalid_evidence",o.fleet_id,"Power observation carries no evidence.");
     positive(o.power,"Observed power",o.fleet_id,"combat");
     positive(o.observed_day,"Observed day",o.fleet_id,"combat");
     if(++observation_counts[o.observer_id]==maximum_fleet_power_observations_per_observer+1)

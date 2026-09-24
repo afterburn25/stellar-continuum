@@ -779,7 +779,30 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `cargo_material_capacity` (freight loads clamp at capacity), and
   the economy `last_research_funding_fraction`/
   `last_base_operations_funding_fraction` beyond 1 (authoritative
-  writes clamp to [0,1]). Every
+  writes clamp to [0,1]). The pass now mirrors the remaining
+  `validate_galaxy_references` surface: settlement `kind` validity
+  (`invalid_kind`), `surface_hub_level` outside [0,3]
+  (`out_of_range`), buildings past `surface_building_capacity`
+  (`capacity_overflow`), buildings without an exact body
+  (`missing_surface_body`) or on a body without solid ground
+  (`invalid_surface_site`), and `missing_economy` when a civilization
+  runs surface construction with no authoritative economy. Fleets
+  mirror the same validator: strictly-positive leg range and fuel
+  capacity, `settlement_days_completed`/`reconnaissance_days_completed`
+  bounded by `establishment_days`/`scout_reconnaissance_days`,
+  `unknown_ship_design`/`incompatible_design` catalog checks,
+  `invalid_loadout`/`invalid_vessel`/`inconsistent_vessel` for
+  tactical state, `invalid_freight` for freight state on
+  non-logistics fleets or wrong-kind/foreign-owner targets,
+  `inconsistent_route` for waypoints without a destination or
+  routes not ending at the mission destination, `invalid_order` for
+  civilian hold/return orders on military fleets,
+  `inconsistent_order` for work progress without a matching order,
+  and `invalid_settlement`/`invalid_reconnaissance`/
+  `invalid_destination` for role- or system-mismatched work sites.
+  Combat intelligence additionally flags `duplicate_id` observation
+  pairs, `invalid_evidence` for blank evidence, and the 4096-entry
+  persisted total bound via `observation_overflow`. Every
   throwing call in the operations pass is now wrapped — sustenance
   analysis, the warfare theater projection, lane-network construction
   and reach assessment, the logistics snapshot/coverage/home-network

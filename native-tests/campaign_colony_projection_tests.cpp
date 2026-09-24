@@ -328,6 +328,26 @@ int main() {
         building(1, "power_generator", true, true, /*condition=*/-0.5),
         building(2, "xeno_relic")}; // uncatalogued type
     world.colonies.push_back(bad);
+    // Hub level outside [0,3], buildings over a level-0 hub's zero
+    // capacity, and buildings with no exact body — three separate
+    // validator classes.
+    auto floating = make_colony(31, 1, /*hub=*/-1);
+    floating.kind = static_cast<SettlementKind>(9); // outside the enum
+    floating.surface_buildings = {building(3, "power_generator")};
+    world.colonies.push_back(floating);
+    // Buildings on a body without solid ground.
+    PlanetaryBody gas;
+    gas.id = 30;
+    gas.system_id = 7;
+    gas.kind = PlanetaryBodyKind::Planet;
+    gas.radius_earth = 1.0;
+    gas.mass_earth = 1.0;
+    gas.environment.has_solid_surface = false;
+    world.bodies.push_back(gas);
+    auto gassy = make_colony(32, 1);
+    gassy.planetary_body_id = 30;
+    gassy.surface_buildings = {building(4, "power_generator")};
+    world.colonies.push_back(gassy);
     PlanetaryBody foreign;
     foreign.id = 9;
     foreign.system_id = 8;
@@ -387,6 +407,29 @@ int main() {
     dead_stick.combat->hull = -5.0;
     dead_stick.combat->target_fleet_id = 999; // absent fleet
     world.fleets.push_back(dead_stick);
+    // Order-consistency violations the reference validator rejects:
+    // civilian orders on a military fleet, work/site mismatches, an
+    // uncatalogued design, and a route that cannot reach its mission.
+    FleetState orderless;
+    orderless.id = 2;
+    orderless.civilization_id = 1;
+    orderless.role = FleetRole::Military;
+    orderless.is_active = true;
+    orderless.current_system_id = 7;
+    orderless.strategic_speed = 5.0;
+    orderless.maximum_leg_range_light_years = 10.0;
+    orderless.fuel_capacity_light_years = -1.0; // strictly-positive bound
+    orderless.design_id = "unknown_hull";
+    orderless.hold_requested = true;
+    orderless.return_to_base_requested = true;
+    orderless.prevent_automatic_settlement = true;
+    orderless.settlement_body_id = 9;      // exists but role is Military
+    orderless.reconnaissance_system_id = 7; // exists but role is not Scout
+    orderless.destination_system_id = 7;
+    orderless.destination_planetary_body_id = 9; // body 9 lives in system 8
+    orderless.planned_route_system_ids = {7, 8}; // 8 absent; ends at wrong system
+    orderless.freight_target_outpost_id = 30;    // a Colony, not an outpost
+    world.fleets.push_back(orderless);
     StellarSystem dup;
     dup.id = 7;
     dup.name = "Duplicate";
@@ -427,12 +470,31 @@ int main() {
     int invalid = 0, species = 0, type = 0, orphan = 0, positive = 0,
         duplicate = 0, orphans = 0, tech = 0, overflow_n = 0,
         fleet_refs = 0, ranged = 0, route_refs = 0, positions = 0,
-        knowledge_refs = 0, intel_refs = 0, body_parent = 0;
+        knowledge_refs = 0, intel_refs = 0, body_parent = 0,
+        consistency = 0, freight = 0, design = 0;
     for (const auto &finding : findings) {
       if (finding.event_type == "invalid_body_parent") ++body_parent;
       else if (finding.event_type == "out_of_range") ++ranged;
       else if (finding.event_type == "invalid_nonnegative_value") ++invalid;
       else if (finding.event_type == "invalid_position") ++positions;
+      else if (finding.event_type == "invalid_freight") ++freight;
+      else if (finding.event_type == "unknown_ship_design" ||
+               finding.event_type == "incompatible_design") ++design;
+      else if (finding.event_type == "inconsistent_route" ||
+               finding.event_type == "invalid_order" ||
+               finding.event_type == "inconsistent_order" ||
+               finding.event_type == "inconsistent_vessel" ||
+               finding.event_type == "invalid_loadout" ||
+               finding.event_type == "invalid_vessel" ||
+               finding.event_type == "invalid_reconnaissance" ||
+               finding.event_type == "invalid_settlement" ||
+               finding.event_type == "invalid_destination" ||
+               finding.event_type == "invalid_surface_site" ||
+               finding.event_type == "missing_surface_body" ||
+               finding.event_type == "missing_economy" ||
+               finding.event_type == "capacity_overflow" ||
+               finding.event_type == "invalid_evidence" ||
+               finding.event_type == "invalid_kind") ++consistency;
       else if (finding.event_type == "orphaned_route_hop" ||
                finding.event_type == "route_overflow") ++route_refs;
       else if (finding.subsystem == "knowledge" &&
@@ -463,16 +525,19 @@ int main() {
           "stability, condition, arrears, hull, sensor, revision, "
           "orbit index, gravity/pressure/flux/approach and observation "
           "magnitudes flag invalid values");
-    check(positive == 5 && body_parent == 1,
-          "zero speed/radius/temperature/orbit and the parentless "
-          "Moon are flagged");
-    check(ranged == 7,
-          "transit, fuel, cargo, fractions, orbit and radiation "
-          "bounds flag over-range values");
+    check(positive == 7 && body_parent == 1,
+          "zero speed/radius/temperature/orbit, non-positive leg "
+          "range/fuel capacity and the parentless Moon are flagged");
+    check(ranged == 8,
+          "transit, fuel, cargo, fractions, orbit, radiation and hub "
+          "level bounds flag over-range values");
+    check(freight == 3 && design == 1 && consistency == 13,
+          "freight role/site, design, order, site, surface, economy "
+          "and evidence consistency violations are flagged");
     check(knowledge_refs == 2 && intel_refs == 2,
           "absent knowledge/intel observers and targets are flagged");
-    check(positions == 1 && route_refs == 2,
-          "non-finite transit vector, absent route hop and path "
+    check(positions == 1 && route_refs == 3,
+          "non-finite transit vector, absent route hops and path "
           "overflow are flagged");
     check(species == 4 && type == 1 && orphan == 2,
           "uncatalogued species/types and absent refs are flagged");
