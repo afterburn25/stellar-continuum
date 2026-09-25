@@ -612,6 +612,40 @@ int main() {
           "the crate rests on the solid's top face");
   }
 
+  // 3D enter/exit: two overlapping non-solid boxes fire on_collision on
+  // the first overlapping step, then on_collision_exit once the mover's
+  // velocity carries it clear — no push-out without a solid.
+  {
+    const auto sub = root / "scene3d-exit";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene3d.json");
+      out << R"({"entities":[
+                   {"name":"anchor","mesh":"box","pos":[0,0,0]},
+                   {"name":"drifter","mesh":"box","pos":[0.5,0,0],
+                    "vel":[2,0,0]}]})";
+    }
+    auto opts = headless_options(sub);
+    opts.scene3d = true;
+    opts.frame_limit = 30;
+    RuntimeHost host{opts};
+    int enters = 0, exits = 0;
+    EntityId entered_a{}, exited_a{};
+    host.on_collision = [&](EntityId a, EntityId) {
+      ++enters;
+      entered_a = a;
+    };
+    host.on_collision_exit = [&](EntityId a, EntityId) {
+      ++exits;
+      exited_a = a;
+    };
+    check(host.run() == 0, "3D enter/exit run exits cleanly");
+    check(enters == 1, "on_collision fires once while the boxes overlap");
+    check(exits == 1, "on_collision_exit fires once they separate");
+    check(entered_a == exited_a,
+          "the exit pair matches the enter pair");
+  }
+
   // save_data/load_data round-trip named blobs under saves/data/ —
   // no run() needed, and key validation rejects path escapes.
   {
