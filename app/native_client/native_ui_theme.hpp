@@ -194,6 +194,101 @@ inline void progress(DrawList &out, UiRect bounds, double ratio,
   stroke(out, bounds, color::keyline);
 }
 
+// One keyboard/pad focus indicator — replaces the per-workspace hardcoded
+// {160,210,255,255} stroked rects so the ring is identical on every surface.
+inline void focus_ring(DrawList &out, UiRect bounds) {
+  stroke(out, bounds, color::focus);
+}
+
+// Scannable statistic: muted micro-label over a larger tone-colored value.
+// The primary Phase-3 hierarchy element for headline numbers.
+inline void metric_tile(DrawList &out, UiRect bounds, std::string label,
+                        std::string value, int label_pixels, int value_pixels,
+                        Tone tone = Tone::Neutral, bool filled = true) {
+  if (filled) {
+    fill(out, bounds, color::surface_secondary);
+    stroke(out, bounds, color::keyline);
+  }
+  const float pad = std::max(4.f, bounds.width * .06f);
+  text(out, {bounds.x + pad, bounds.y + 5.f}, std::move(label),
+       color::text_muted, label_pixels, bounds.width - 2.f * pad,
+       TextAlign::Left, FontFace::Heading, bounds);
+  text(out, {bounds.x + pad, bounds.y + bounds.height * .5f - 1.f},
+       std::move(value),
+       tone == Tone::Neutral ? color::text_primary : accent(tone),
+       value_pixels, bounds.width - 2.f * pad, TextAlign::Left,
+       FontFace::Heading, bounds);
+}
+
+// Compact status pill: tone-colored keyline + centered caps label.
+inline void badge(DrawList &out, UiRect bounds, std::string label, int pixels,
+                  Tone tone = Tone::Neutral) {
+  fill(out, bounds, color::surface_secondary);
+  stroke(out, bounds, accent(tone));
+  text(out, {bounds.x, bounds.y + (bounds.height - pixels) * .5f - 1.f},
+       std::move(label), accent(tone), pixels, bounds.width, TextAlign::Center,
+       FontFace::Heading, bounds);
+}
+
+// Rectangle intersection shared by the clipped helpers below.
+[[nodiscard]] inline std::optional<UiRect> clipped(UiRect a, UiRect b) {
+  const float x = std::max(a.x, b.x), y = std::max(a.y, b.y);
+  const float r = std::min(a.x + a.width, b.x + b.width),
+              bottom = std::min(a.y + a.height, b.y + b.height);
+  if (r <= x || bottom <= y) return std::nullopt;
+  return UiRect{x, y, r - x, bottom - y};
+}
+
+// Label left / value right row — the standard fact line.
+inline void key_value(DrawList &out, UiRect bounds, std::string label,
+                      std::string value, int pixels,
+                      Tone tone = Tone::Neutral,
+                      std::optional<UiRect> clip = std::nullopt) {
+  const auto visible =
+      clip ? clipped(bounds, *clip) : std::optional<UiRect>{bounds};
+  if (!visible || visible->width <= 0.f || visible->height <= 0.f) return;
+  text(out, {bounds.x, bounds.y}, std::move(label), color::text_secondary,
+       pixels, bounds.width * .48f, TextAlign::Left, FontFace::Interface,
+       visible);
+  text(out, {bounds.x, bounds.y}, std::move(value),
+       tone == Tone::Neutral ? color::text_primary : accent(tone), pixels,
+       bounds.width * .52f, TextAlign::Right, FontFace::Interface, visible);
+}
+
+// Empty/error surface: centered muted message with an optional accent hint
+// line underneath for the player's next action.
+inline void empty_state(DrawList &out, UiRect bounds, std::string title,
+                        std::string hint, int pixels) {
+  text(out, {bounds.x + bounds.width * .5f, bounds.y + bounds.height * .38f},
+       std::move(title), color::text_secondary, pixels, bounds.width - 16.f,
+       TextAlign::Center, FontFace::Heading, bounds);
+  if (!hint.empty())
+    text(out, {bounds.x + bounds.width * .5f, bounds.y + bounds.height * .38f +
+                                               pixels * 1.6f},
+         std::move(hint), color::text_muted, std::max(9, pixels - 3),
+         bounds.width - 16.f, TextAlign::Center, FontFace::Interface, bounds);
+}
+
+// Single tab inside a strip — caller owns the strip frame; active tabs get a
+// tone underbar and primary text, inactive tabs stay muted.
+inline void tab(DrawList &out, UiRect bounds, std::string caption,
+                Point pointer, int pixels, bool active,
+                bool enabled = true) {
+  const bool hovered = enabled && bounds.contains(pointer);
+  if (active || hovered)
+    fill(out, bounds, active ? color::surface_raised : color::surface_hover);
+  if (active)
+    fill(out, {bounds.x, bounds.y + bounds.height - 2.f, bounds.width, 2.f},
+         color::selected);
+  text(out, {bounds.x + bounds.width * .5f,
+             bounds.y + (bounds.height - pixels) * .5f - 1.f},
+       std::move(caption),
+       !enabled ? color::disabled
+                : active ? color::text_primary
+                         : hovered ? color::text_primary : color::text_secondary,
+       pixels, bounds.width, TextAlign::Center, FontFace::Heading, bounds);
+}
+
 inline void tooltip(DrawList &out, Point anchor, std::string title,
                     std::string body, int viewport_width, int viewport_height,
                     float scale = 1.f, Tone tone = Tone::Neutral) {

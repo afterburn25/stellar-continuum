@@ -35,24 +35,24 @@ convention and lower priority — classify during the audit):
 
 | # | Screen / surface | Status | Severity found | Notes |
 |---|---|---|---|---|
-| 1 | Startup / main menu / new game / galaxy selection | ☐ | | |
-| 2 | Galaxy map (all zoom bands) | ☐ | | highest-priority visual screen |
-| 3 | System view | ☐ | | |
-| 4 | Planet view / colony command center | ☐ | | |
-| 5 | Economy workspace | ☐ | | |
-| 6 | Logistics workspace | ☐ | | |
-| 7 | Research workspace (adaptive research) | ☐ | | |
-| 8 | Diplomacy | ☐ | | observer-safe data only |
-| 9 | Fleets / battle groups | ☐ | | |
-| 10 | Battle presentation | ☐ | | |
-| 11 | Shipyard / construction queues | ☐ | | |
-| 12 | Missions | ☐ | | newly live; keep scrolling/focus |
-| 13 | Notifications | ☐ | | |
-| 14 | Chronicle | ☐ | | privacy filtering preserved |
-| 15 | Controlled assets navigator | ☐ | | reference surface — search/collapse/reveal already polished |
-| 16 | Settings (hub, general, audio, video, voice, controls) | ☐ | | |
-| 17 | Pause menu / session chrome | ☐ | | |
-| 18 | Developer surfaces (diagnostics, indices, giant panel) | ☐ | | classify; dev-only by convention |
+| 1 | Startup / main menu / new game / galaxy selection | ☑ | LOW | `native_startup_workspace`, `native_new_game_workspace`, `native_startup_session`, `native_startup_entry`. Own palette + helpers; loading tips localized; seeded-art cover. Consistent enough to defer. |
+| 2 | Galaxy map (all zoom bands) | ☑ | HIGH | Zoom-gated labels (>2× relative zoom), collision-aware label layout with HUD obstacles, compact markers >10k systems, territory labels at overview blend, fleet route effects + preview, phenomena inspect — all already present. Gaps: **no map legend** (star-class palette, fleet marker, lane, territory color, route-preview green/amber are unexplained), no zoom-band indicator, no strategic overlay toggles. Highest-priority visual screen. |
+| 3 | System view | ☑ | MEDIUM | `native_system_workspace` + `native_system_view`: bodies, orbits, small bodies, lanes with metrics, travel snapshot, shipyard marker, settlement prep, body inspection panel, small-body AT ring. Rich; mainly needs visual polish review via captures. |
+| 4 | Planet view / colony command center | ☑ | HIGH | `NativePlanetaryScreen` inside `native_colony_workspace`: globe + layers, facts column, alert strip, 5 action buttons, 4 tabs, slots grid, per-site management, queue, confirmation modals, full hit-registry AT ring. Gaps: no at-a-glance vitals (population/stability/power/food/employment scattered across a scrollable fact list + two tabs); alert strip is bare text tokens ("POWER DEFICIT.") with no magnitudes or per-facility impact; economy tab is dense wrapped text. Phase 8 "major problems obvious" unmet. |
+| 5 | Economy workspace | ☑ | HIGH | `native_economy_workspace`: flat scrollable row list — 2×3 card tiles, treasury health, 3 industry-priority buttons, income/cost rows, guidance. Own palette/helpers; section headings render as plain rows; no grouping chrome, no "what changed/why/where" affordance, no shortage/stockpile breakdown beyond rows the view emits. |
+| 6 | Logistics workspace | ☑ | HIGH | `native_logistics_workspace` (`SupplyWorkspace`): home-system scope only — 4 metric tiles (available/demand/delivered/shortfall) + per-node table (location/status/offered/demand/delivered). `corridor_count` is a subtitle number; no route list, no origin→destination, no congestion/transit, no navigation to affected colony/system. Needs a view-model extension before richer presentation is possible (authoritative scope is `HomeSystemLogisticsNetwork`). |
+| 7 | Research workspace (adaptive research) | ☑ | MEDIUM | `native_research_workspace`: 6 modes (Guided/Tree/Recent/Favorites/Completed/Queue), search, filter, sort, inspector, bookmarks, dropdowns, why-explanations, per-mode AT focus. Deep; Phase 11 largely satisfied by Guided mode. Audit residual: card density/readability at small scales. |
+| 8 | Diplomacy | ☑ | MEDIUM | `native_diplomacy_workspace`: contact list + stage + meters + action row + 5 tabs (agreements/proposals/history/intelligence/overview), negotiation modal, FocusSystem navigation, contact filter. Strong; verify discoverability of the contact-filter control and tab labels via captures. |
+| 9 | Fleets / battle groups | ☑ | HIGH | `native_fleet_workspace` outliner + detail + orders (hold/defend/retreat), locate, engage, route preview, recovery confirm, ship-art rows, empire-overview detail when nothing selected. No battle-group layer in `NativeOwnFleet` — fleets are flat rows; per-fleet ships/strength breakdown not surfaced. Flat list will not scale to many fleets; no grouping by role/location. |
+| 10 | Battle presentation | ☑ | MEDIUM | `native_battle_workspace` + `native_battle_art`/`native_battle_sprites`: tactical field, ship targets, environment backdrop. Needs visual capture review for hierarchy (forces summary vs field). |
+| 11 | Shipyard / construction queues | ☑ | MEDIUM | `native_shipyard_workspace`, `native_construction_workspace` + controllers: queues exist with progress; verify blocked-reason surfacing and unavailable-item treatment in captures. |
+| 12 | Missions | ☑ | LOW | `native_missions` (`NativeMissionView`): missions/sites tabs, cards, fleet pagers, land/collect, FocusFleet/OpenColony routing, focus ring over actionable controls only. Newly live — polish pass, keep scroll/focus contract. |
+| 13 | Notifications | ☑ | MEDIUM | `native_notifications`: bounded feed (32), category/date/message, VIEW SYSTEM + diplomatic-contact actions, unread badge, chronicle hand-off, scroll. Gaps: no severity iconography or grouping; transient feed vs retained feed is subtle. |
+| 14 | Chronicle | ☑ | LOW | `native_chronicle`: observer-safe `HistoryQuery` projection, domain filter, significance floor, actor filter, time-window paging, tag chips, header search, system/DIP navigation. Reference-quality surface. |
+| 15 | Controlled assets navigator | ☑ | LOW | `native_controlled_assets`: TreeModel categories, search, persisted collapse prefs, manage actions, tooltips, full UIA incl. `focused_expanded`. Reference surface — reuse its patterns. |
+| 16 | Settings (hub, general, audio, video, voice, controls) | ☑ | LOW | `native_settings_hub` + per-domain settings: controls view has full rebind UI (capture/conflict-steal/chords/persist). Audit residual: visual consistency with workspace chrome. |
+| 17 | Pause menu / session chrome | ☑ | LOW | `NativeUiLayout` menu panel + brand/nav bar + context plate (`native_command_hud`). Consistent; context plate is a strong "where am I" anchor. |
+| 18 | Developer surfaces (diagnostics, indices, giant panel) | ☑ | LOW | Dev-only by convention; English-only allowed. No player-facing requirements. |
 
 ## Design system inventory (Phase 2)
 
@@ -68,19 +68,39 @@ tabs · action/icon buttons · toggles · inputs/search · list/table rows · se
 hovered / disabled / warning / critical / positive states · tooltips · dialogs /
 confirmations · status badges · progress meters.
 
-## Known starting hypotheses (verify with live captures — Phase 30)
+## Audit findings (verified against source — 2026-09-24)
 
-- No global quick-find exists; search is per-surface only (chronicle, roster, assets,
-  research, shipyard, diagnostics, celestial index, seed). Phase 5 designs the shared
-  overlay and must respect knowledge/FoW filtering.
-- Contextual navigation exists in places (notification feed action buttons, assets
-  manage actions, missions OpenColony) but is inconsistent across surfaces — Phase 24
-  inventory: which notices know their target but don't link it.
-- Galaxy map label/marker density at each zoom band needs measurement; no evidence yet
-  that labels cull by zoom.
-- Tooltip coverage is uneven (assets rows carry tooltips; many chrome controls do not).
-- Several surfaces predate the `focused_expanded`/`focused_value` AT metadata — any
-  layout change must keep the focus-accessor family honest.
+Hypotheses verified/refuted during the audit:
+
+- **Confirmed:** no global quick-find exists; search is per-surface only
+  (chronicle, colony roster, controlled assets, research, shipyard, diagnostics,
+  celestial index, seed). Phase 5's shared overlay must respect knowledge/FoW and
+  reuse the existing focused_value Edit contract.
+- **Confirmed:** contextual navigation exists in places (notification feed VIEW
+  SYSTEM / contact actions, controlled-assets manage actions, missions
+  FocusFleet/OpenColony, chronicle system/DIP entries) but is inconsistent —
+  supply rows, fleet route failures and economy notices know their targets but
+  do not link them.
+- **Refuted:** galaxy map labels *do* cull by zoom — `relative_zoom > 2` gates
+  system names, compact markers engage above 10k systems below zoom 16, and
+  `layout_native_galaxy_labels` resolves collisions against star + HUD
+  obstacles with priority ordering. The real gap is a **legend** and
+  zoom-band signalling, not label spam.
+- **Confirmed:** tooltip coverage is uneven (assets rows and HUD buttons carry
+  tooltips; most workspace controls do not explain themselves or their
+  disabled state).
+- **Confirmed:** per-workspace style drift is the dominant consistency issue —
+  `native_ui_theme` (palette + panel/section_header/button/progress/tooltip)
+  is nearly unused; every workspace redefines `ink`/`muted`/`accent` with
+  slightly different values and re-implements `fill`/`label`/`scrollbar`/
+  focus-ring drawing (the focus color `{160,210,255,255}` is hand-duplicated
+  in ≥5 surfaces).
+- **Confirmed:** several surfaces predate or partially implement the
+  `focused_expanded`/`focused_value`/`focused_range` AT family — any layout
+  change must keep the focus-accessor contract honest (verified list in the
+  session prompt's Row-26 note: `native_accessibility_bridge`,
+  `native_controlled_assets`, `native_developer_diagnostics`,
+  `economy_animation`, `stellar_startup_ui`, per-surface tests).
 
 ## Execution order
 
@@ -90,26 +110,90 @@ confirmations · status badges · progress meters.
 4. Colony/planetary command center summary.
 5. Remaining phases per the mission spec, smallest-blast-radius first.
 
-## Ranked issues (fill during audit)
+## Ranked issues
 
 ### CRITICAL
 
-(none yet)
+(none found — no screen blocks task completion, hides required information,
+breaks navigation/AT flow, or presents wrong state)
 
 ### HIGH
 
-(none yet)
+1. **No adopted shared design language.** `native_ui_theme.hpp` ships a full
+   semantic palette + components but workspaces hand-roll palettes and helpers
+   (economy, logistics, fleet, missions, startup, planetary each define their
+   own `ink`/`muted`/`accent` constants and `fill`/`label`/`scrollbar`
+   utilities). → IN PROGRESS: the theme now provides `metric_tile`, `badge`,
+   `key_value`, `focus_ring`, `empty_state`, `tab` and `clipped`; the
+   planetary screen consumes them. Workspace migrations remain open —
+   economy, logistics, fleet, missions, startup next.
+2. **No global quick-find / command palette** (Phase 5). Known/accessible
+   systems, colonies, fleets, contacts, shipyards and missions are only
+   findable through per-surface searches or manual map hunting. Design must
+   reuse the existing Edit-focused AT contract and FoW-filtered name sources.
+3. ~~**Galaxy map has no legend or overlay vocabulary.**~~ → PARTIALLY DONE.
+   A collapsible legend panel now explains charted/uncharted stars, lanes,
+   territory, fleet markers and selection using the live glyph colors.
+   Still open: zoom-band readout label, route-preview green/amber entry,
+   phenomena iconography, strategic overlay toggles.
+4. ~~**Colony screen lacks an at-a-glance vitals summary.**~~ → PARTIALLY
+   DONE. Vitals strip + numeric alert chips now render for owned colonies
+   (observer-safe). Still open: "affected facilities" detail on chips,
+   per-issue navigation targets beyond the economy tab.
+5. **Logistics workspace is home-system-scoped only.** No route/corridor
+   list, no origin→destination freight view, no congestion or transit
+   information, no navigation to the affected node. Requires extending the
+   `native_logistics` projection over authoritative
+   `LogisticsNetwork`/`HomeSystemLogisticsNetwork` state before presentation
+   can improve — do not fake corridors.
+6. **Economy workspace is a flat undifferentiated list.** Six KPI tiles +
+   interleaved section rows in one scroll; headings are visually identical
+   to data rows; no grouping chrome or change attribution. Re-skin onto the
+   shared theme: metric tiles, section headers, warning/danger tones.
+7. **Fleet list is flat.** `NativeOwnFleet` has no battle-group layer; large
+   fleets late-game will produce one long undifferentiated list with no
+   grouping by role, location or readiness.
 
 ### MEDIUM
 
-(none yet)
+1. Tooltip coverage is uneven — workspace controls mostly lack
+   what/why-disabled/what-happens explanations (HUD buttons and asset rows
+   are the exception).
+2. Notifications feed has no severity iconography or grouping — a
+   32-cap flat list where combat alerts and trivia look identical.
+3. Empty/error states are inconsistent: some surfaces give next-action
+   guidance ("No scout or science vessel…"), others show bare "No X" text.
+4. Typography hierarchy varies per workspace (heading/body/small pixel
+   triples differ slightly everywhere); unify through theme tokens.
+5. System view + battle workspace need live visual review — cannot be
+   verified from source alone (Phase 30 captures).
 
 ### LOW
 
-(none yet)
+1. Scrollbar width/track styling differs per workspace.
+2. `zoom_text` shows a bare number; a zoom-band label ("OVERVIEW /
+   SECTOR / LOCAL") would orient players.
+3. Selected-system card (bottom-left) is a fixed-size info block — verify
+   clipping at small viewports.
+4. Startup/main-menu uses its own palette — cosmetic only.
 
 ## Work log
 
 | Date | Change | Commit |
 |---|---|---|
-| | | |
+| 2026-09-25 | Extended `native_ui_theme` with shared components: `focus_ring`, `metric_tile`, `badge`, `key_value`, `empty_state`, `tab`, plus a `clipped` rect-intersection helper — the Phase-2/3 vocabulary the audit found missing. | pending |
+| 2026-09-25 | Galaxy map: collapsible MAP LEGEND panel under the zoom readout (charted/uncharted star, lane, territory swatch, fleet marker, selection halo glyphs matching the live render vocabulary). Collapse toggle joins the HUD focus ring ahead of Switch view, announces "Map legend", and is reserved as a label-layout HUD obstacle; clicks inside the panel never become star selections. | pending |
+| 2026-09-25 | Colony command center: headline vitals strip (POPULATION / STABILITY / POWER net / FOOD days / EMPLOYED) between the hero block and the fact list, and a two-column issue-chip grid inside the alerts block — chips carry real magnitudes (POWER -99, LIFE SUPPORT 84%) and focus the economy tab on activation. All rows/chips gated on `!observer_only` so the survey-only surface stays leak-free. | pending |
+
+### Implementation notes
+
+- Legend toggle state is client-local (`map_legend_collapsed_`); it is not
+  persisted. `smoke_map_point_exposed` now excludes the legend bounds.
+- The legend panel shifts right together with the zoom readout when the
+  inspection card or fleet panel claims the left edge (shared
+  `map_zoom_bounds` origin).
+- Vitals/alerts consume `NativeColonyView` fields only — no simulation
+  changes, no new engine capability required.
+- New localization keys added to `en.json` + `de.json`:
+  `HUD_MAP_LEGEND`, `MAP_LEGEND_*` (7), `PLANET_VITAL_*` (6),
+  `PLANET_CHIP_*` (5), `PLANET_ALERT_NONE_SHORT`.

@@ -3,6 +3,7 @@
 #include "native_colony_controller.hpp"
 #include "native_surface_construction_controller.hpp"
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 #include "native_ui_layout.hpp"
 #include "native_planet_globe.hpp"
 #include <stellar/engine/accessibility.hpp>
@@ -24,7 +25,7 @@ enum class PlanetaryAction {None, Back, Build, Upgrade, Repair, Enable, Priority
 struct PlanetaryCommand { PlanetaryAction action{}; int slot{-1}, building_id{}; std::string type; bool value{}; };
 struct PlanetaryLayout {
   float s{};int font{},small{},heading{};UiRect screen,back,save,hero,portrait,metrics,left,command,facts,slots,right,queue,tabs,details,notice,modal,confirm,cancel;
-  UiRect globe,layers,actions,view_modes,alerts,region_art;
+  UiRect globe,layers,actions,view_modes,alerts,region_art,vitals;
   static PlanetaryLayout make(int width,int height){
     PlanetaryLayout l;l.s=std::clamp(height/1080.f,.8f,2.f);const float s=l.s,g=10*s;
     l.font=std::max(13,static_cast<int>(16*s));l.small=std::max(12,static_cast<int>(14*s));l.heading=static_cast<int>(24*s);
@@ -37,8 +38,13 @@ struct PlanetaryLayout {
     l.hero={x+12*s,y+38*s,pw-24*s,98*s};l.portrait={x+12*s,y+40*s,82*s,82*s};
     l.back={x+10*s,y+5*s,pw-20*s,28*s};
     l.layers={x+12*s,bottom-194*s,pw-24*s,178*s};
-    l.alerts={x+12*s,l.layers.y-70*s,pw-24*s,60*s};
-    l.facts={x+12*s,y+166*s,pw-24*s,l.alerts.y-y-178*s};
+    // The alerts block grew to hold a title, a two-column issue-chip grid and
+    // the review button; its bottom edge stays glued to the layers strip.
+    l.alerts={x+12*s,l.layers.y-136*s,pw-24*s,126*s};
+    // The owned-colony vitals strip sits between the hero block and the
+    // fact list so the headline numbers are visible without scrolling.
+    l.vitals={x+12*s,y+166*s,pw-24*s,58*s};
+    l.facts={x+12*s,y+232*s,pw-24*s,std::max(0.f,l.alerts.y-y-244*s)};
     l.region_art={l.right.x+12*s,y+76*s,pw-24*s,132*s};
     l.command={l.right.x+12*s,bottom-102*s,pw-24*s,32*s};
     l.queue={l.right.x+12*s,bottom-64*s,pw-24*s,54*s};
@@ -166,6 +172,23 @@ class NativePlanetaryScreen {
     label(out,{l.hero.x+94*s,l.hero.y+42*s,l.hero.width-94*s,22*s},classification(v),l.small,cyan);
     label(out,{l.hero.x+94*s,l.hero.y+66*s,l.hero.width-94*s,22*s},world_class(v),l.small,ink);
     label(out,{l.hero.x,l.hero.y+92*s,l.hero.width,28*s},v.natural_habitability?trf("PLANET_HABITABILITY",{number(*v.natural_habitability*100,0)},"HABITABILITY  {0}%"):tr("PLANET_HABITABILITY_UNKNOWN","HABITABILITY  UNKNOWN"),l.font,v.natural_habitability&&*v.natural_habitability>.6?Color{113,233,158,255}:gold);
+    if(!v.observer_only){
+      // Headline vitals — the five numbers a colony operator scans first.
+      const double power_net=v.power_supply+v.storage_discharge_per_day-v.power_demand;
+      const bool workers_short=v.workforce_demand_millions>v.workforce_available_millions;
+      const float vgap=6*s,vw=(l.vitals.width-4.f*vgap)/5.f;
+      int vi=0;
+      const auto vital=[&](std::string label,std::string value,native_ui::Tone tone){
+        native_ui::metric_tile(out,{l.vitals.x+vi*(vw+vgap),l.vitals.y,vw,l.vitals.height},
+            std::move(label),std::move(value),std::max(9,l.small-3),l.small,tone);
+        ++vi;
+      };
+      vital(tr("PLANET_VITAL_POPULATION","POPULATION"),population(v.population_millions),native_ui::Tone::Neutral);
+      vital(tr("PLANET_VITAL_STABILITY","STABILITY"),trf("PLANET_UNIT_PERCENT",{number(v.stability*100,0)},"{0}%"),v.stability<.5?native_ui::Tone::Danger:v.stability<.8?native_ui::Tone::Caution:native_ui::Tone::Neutral);
+      vital(tr("PLANET_VITAL_POWER","POWER"),(power_net>0?"+":"")+number(power_net,0),power_net<0?native_ui::Tone::Danger:native_ui::Tone::Success);
+      vital(tr("PLANET_VITAL_FOOD","FOOD"),trf("PLANET_VITAL_DAYS",{number(v.food_reserve_days,0)},"{0} d"),v.food_reserve_days<7?native_ui::Tone::Danger:v.food_reserve_days<21?native_ui::Tone::Caution:native_ui::Tone::Neutral);
+      vital(tr("PLANET_VITAL_EMPLOYED","EMPLOYED"),trf("PLANET_UNIT_PERCENT",{number(v.employment_rate*100,0)},"{0}%"),workers_short?native_ui::Tone::Danger:native_ui::Tone::Neutral);
+    }
     float fy=l.facts.y-fact_scroll_.scroll_offset;
     const auto fact=[&](std::string title,std::string value,Color color=ink){
       const float rh=std::max(28*s,static_cast<float>(l.small+8));
@@ -182,7 +205,32 @@ class NativePlanetaryScreen {
     else fact(tr("PLANET_FACT_ENVIRONMENT","Environment"),tr("PLANET_UNSURVEYED","Unsurveyed"),gold);
     if(!v.observer_only){fact(tr("PLANET_FACT_POPULATION","Population"),population(v.population_millions),cyan);fact(tr("PLANET_FACT_SPECIES","Species"),v.population_species_name);fact(tr("PLANET_FACT_STABILITY","Stability"),trf("PLANET_UNIT_PERCENT",{number(v.stability*100,0)},"{0}%"));fact(tr("PLANET_FACT_INFRASTRUCTURE","Infrastructure"),trf("PLANET_UNIT_PERCENT",{number(v.infrastructure*100,0)},"{0}%"));fact(tr("PLANET_FACT_COMMAND","Command Center"),trf("PLANET_LEVEL",{std::to_string(v.surface_hub_level)},"Level {0}"));fact(tr("PLANET_FACT_DEVELOPMENT","Development"),v.specialization_name);}
     fact_height_=fy-l.facts.y+fact_scroll_.scroll_offset;fact_scroll_.sync(fact_height_,l.facts.height);scrollbar(out,l.facts,fact_scroll_);
-    if(!v.observer_only){const bool critical=v.sustenance_support_ratio<1||v.operating_funding<.999;label(out,{l.alerts.x,l.alerts.y,l.alerts.width,22*s},critical?tr("PLANET_ALERTS_TITLE","!  COLONY ALERTS"):tr("PLANET_STATUS_TITLE","COLONY STATUS"),l.small,critical?bad:cyan);button(out,{l.alerts.x,l.alerts.y+24*s,l.alerts.width,30*s},critical?tr("PLANET_REVIEW_CRITICAL","Review critical needs"):tr("PLANET_REVIEW_STATUS","Review colony conditions"),{},l);hits_.back().tab=0;}
+    if(!v.observer_only){
+      const double power_gap=v.power_demand-v.power_supply-v.storage_discharge_per_day;
+      const double workers_gap=v.workforce_demand_millions-v.workforce_available_millions;
+      const bool critical=v.surface_hub_level==0||power_gap>0||workers_gap>1e-9||v.sustenance_support_ratio<1||v.operating_funding<.999;
+      label(out,{l.alerts.x,l.alerts.y,l.alerts.width,20*s},critical?tr("PLANET_ALERTS_TITLE","!  COLONY ALERTS"):tr("PLANET_STATUS_TITLE","COLONY STATUS"),l.small,critical?bad:cyan);
+      if(critical){
+        // One chip per live issue; activating a chip focuses the economy tab
+        // where the deficit and its drivers are detailed.
+        const float cw=(l.alerts.width-6*s)/2.f,ch=20*s,cg=4*s;
+        int ci=0;
+        const auto chip=[&](std::string text,native_ui::Tone tone){
+          const UiRect r{l.alerts.x+(ci%2)*(cw+6*s),l.alerts.y+22*s+(ci/2)*(ch+cg),cw,ch};
+          native_ui::badge(out,r,text,std::max(9,l.small-2),tone);
+          hits_.push_back({r,static_cast<int>(hits_.size()),{},true,-1,0,-1,text,{},0});
+          ++ci;
+        };
+        if(v.surface_hub_level==0)chip(tr("PLANET_CHIP_HUB","NO COMMAND CENTER"),native_ui::Tone::Danger);
+        if(power_gap>0)chip(trf("PLANET_CHIP_POWER",{number(power_gap,0)},"POWER -{0}"),native_ui::Tone::Danger);
+        if(workers_gap>1e-9)chip(trf("PLANET_CHIP_WORKERS",{population(workers_gap)},"WORKERS -{0}"),native_ui::Tone::Danger);
+        if(v.sustenance_support_ratio<1)chip(trf("PLANET_CHIP_LIFE",{number(v.sustenance_support_ratio*100,0)},"LIFE SUPPORT {0}%"),native_ui::Tone::Danger);
+        if(v.operating_funding<.999)chip(trf("PLANET_CHIP_FUNDING",{number(v.operating_funding*100,0)},"FUNDING {0}%"),native_ui::Tone::Danger);
+      }else{
+        label(out,{l.alerts.x,l.alerts.y+22*s,l.alerts.width,18*s},tr("PLANET_ALERT_NONE_SHORT","No critical needs"),l.small,muted);
+      }
+      button(out,{l.alerts.x,l.alerts.y+l.alerts.height-32*s,l.alerts.width,30*s},critical?tr("PLANET_REVIEW_CRITICAL","Review critical needs"):tr("PLANET_REVIEW_STATUS","Review colony conditions"),{},l);hits_.back().tab=0;
+    }
     label(out,{l.layers.x,l.layers.y,l.layers.width,23*s},tr("PLANET_LAYERS_TITLE","PLANETARY MAP LAYERS"),l.small,cyan);
     const std::array<const char*,5> layer_keys={"PLANET_LAYER_PROVINCES","PLANET_LAYER_INFRA","PLANET_LAYER_POWER","PLANET_LAYER_RESOURCES","PLANET_LAYER_MILITARY"};
     const std::array<const char*,5> layer_names={"Geographic provinces","Infrastructure","Operational power","Resources · unavailable","Military · unavailable"};
