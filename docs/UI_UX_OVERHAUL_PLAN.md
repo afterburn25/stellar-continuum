@@ -302,6 +302,14 @@ breaks navigation/AT flow, or presents wrong state)
 
 ### Implementation notes
 
+- Settlement smoke fixtures: `tools/author_settlement_save.py` grafts the
+  smoke preconditions (idle populated colony vessel + full survey of the
+  target system) onto any v17 save — following `author_battle_save.py`.
+  Run `--settlement-smoke` on the output first; its autosave leaves an
+  active mission, so the same file then satisfies
+  `--settlement-reload-smoke`. Verified on the fleet fixture at 720p:
+  ordered flow (`accepted`, `cancel_no_charge`) and `paused_reload`
+  (mission revision 2 survives save/reload).
 - Branch scope audit: the only `engine/` file touched is
   `engine/src/native_audio.cpp` (`939e23b6`, predating this overhaul) — a
   compatibility bugfix where the stream decoder borrows the SDL-initialized
