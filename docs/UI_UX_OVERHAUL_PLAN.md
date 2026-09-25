@@ -193,8 +193,12 @@ breaks navigation/AT flow, or presents wrong state)
    in UI). HUD chrome (nav rail, pause/speed/notifications, zoom, legend
    toggles, Switch view) now renders hover hints via `theme::hint` reusing
    the exact localized labels the focus ring announces — pointer and
-   keyboard/AT share one vocabulary. Still open: incidental "what does
-   this do" coverage on non-action content (meters, status rows).
+   keyboard/AT share one vocabulary. Non-action content now explains
+   itself too: diplomacy relationship meters (TRUST/RESPECT/FEAR/
+   HOSTILITY/COOPERATION) and the six economy KPI tiles carry localized
+   hover explainers (`DIPLOMACY_TIP_*` / `ECONOMY_TIP_*`, en+de) through
+   `theme::hover_tooltip`. Still open: a few minor status rows elsewhere
+   could use the same treatment if captures flag them.
 2. ~~Notifications feed has no severity iconography or grouping~~ — severity
    axis and severity filtering shipped (see work log). Category-based
    grouping remains a possible future refinement.
@@ -277,6 +281,8 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | Fleet composition in the detail card: `NativeOwnFleet` now projects `design_name` (resolved through `find_ship_design`), `cargo_materials`/`cargo_material_capacity`, `embarked_population_millions`, and `has_vessel_state`/`hull_integrity` from `tactical_vessel`. The detail block renders Design/Condition/Cargo/Embarked rows (`FLEET_STAT_*`, en+de) after the core telemetry — extras land last so cramped cards clip the least-critical rows first — and stat rows now clip to the details block so they can never spill into the route preview (the armed-fleet stack had silently overdrawn the rail gap before). `fleet_height` grows to 215s when the detail space can spare it (>300s), keeping the 720p behavior identical. Test covers all four composition rows; `--fleet-smoke` capture shows a colony ship reporting Design "Interstellar Colony" + Embarked 250.0M. | 675262f1 |
 
 | 2026-09-25 | Interstellar logistics coverage: the supply view's projector now returns the canonical `CivilizationLogisticsCoverage` (which embeds the home network) instead of `home_system_logistics` alone — `View` gains `external` rows (`ExternalRow{system, name, condition, colonies, local capacity, demand, import, corridor}`), `owned_system_count` and `support_gap_per_day`. Sealing is unchanged: external rows whose civilization or system record can't be verified are dropped, same rule as node/link endpoints. The workspace renders a third scroll section — INTERSTELLAR COVERAGE — with per-system rows and an amber "unrepresented interstellar demand" callout sourced from Core's gap flag. Tests cover canonical row parity, foreign/home exclusion, header/row/gap rendering and clip bounds; `--logistics-check` smoke verified live on a fixture with a Velari colony (row renders Critical). Also fixed a stale assertion in `native_startup_artwork`: it pinned the pre-theme accent literal `{122,230,190}` instead of `theme::color::success`. | 87b4a468 |
+
+| 2026-09-25 | "What does this do" tooltips on non-action content: the five diplomacy relationship meters each gain a hover explainer describing what the axis measures (`DIPLOMACY_TIP_*`), and `NativeEconomyCard` gained a `detail` field — projected localized explainers (`ECONOMY_TIP_*`) rendered through `theme::hover_tooltip` on each KPI tile, with the tile detail folded into the cache signature. Tests cover meter-tooltip text on hover and KPI-tile explainer rendering; `--economy-check` smoke re-verified canonical totals and priority save. | 00759a07 |
 
 ### Implementation notes
 
