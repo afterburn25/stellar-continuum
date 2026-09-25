@@ -123,7 +123,9 @@ void require_scrolled_draw_clipped(const DrawList &draw, UiRect region,
   view.proposals.push_back({11, "INCOMING", "Agreement", "Non Aggression",
                             "Join a pact of non-aggression.", true, true,
                             false});
-  view.agreements.push_back({5, "Access", "ACTIVE", "2050-06-01", ""});
+  view.agreements.push_back({5, "Access", "ACTIVE",
+                             stellar::core::DiplomaticAgreementStatus::active,
+                             "2050-06-01", ""});
   view.history.push_back({9, "2050-03-01", "Contact Established",
                           "A channel opened with Nova Concord."});
   return view;

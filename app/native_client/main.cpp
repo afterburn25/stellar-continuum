@@ -1027,6 +1027,13 @@ class NativeCampaign final {
     feedback_.set_localization(&table);
     supply_controller_.set_localization(&table);
     system_travel_controller_.set_localization(&table);
+    system_controller_.set_localization(&table);
+    fleet_controller_.set_localization(&table);
+    outpost_freight_controller_.set_localization(&table);
+    surface_controller_.set_localization(&table);
+    shipyard_controller_.set_localization(&table);
+    diplomacy_controller_.set_localization(&table);
+    settlement_controller_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 

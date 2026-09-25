@@ -1,5 +1,6 @@
 #include "native_system_view.hpp"
 #include <stellar/core/campaign_observation.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -73,6 +74,12 @@ void NativeSystemViewController::require_owner() const {
   if (std::this_thread::get_id() != owner_)
     throw std::logic_error("Native system views must be built on the simulation owner thread.");
 }
+std::string NativeSystemViewController::tr(std::string_view key,
+                                           std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
 void NativeSystemViewController::bind_generation(const std::uint64_t value) {
   if (generation_ && value < *generation_)
     throw std::invalid_argument("A stale campaign generation cannot replace the current system view.");
@@ -96,12 +103,12 @@ NativeSystemViewResult NativeSystemViewController::build(
   // This is the secrecy boundary. Do not find or copy raw system/body records first.
   const auto level = observation_survey_level(world, observer, selected_system_id);
   if (level < SystemSurveyLevel::partially_surveyed)
-    return {std::nullopt, "Orbital details require reconnaissance of this system."};
+    return {std::nullopt, tr("SYSTEM_DENY_SURVEY", "Orbital details require reconnaissance of this system.")};
 
   const auto system = std::ranges::find(world.systems, selected_system_id,
                                          &StellarSystem::id);
   if (system == world.systems.end())
-    return {std::nullopt, "The known system is unavailable in this campaign."};
+    return {std::nullopt, tr("SYSTEM_DENY_UNAVAILABLE", "The known system is unavailable in this campaign.")};
   const bool detailed = level == SystemSurveyLevel::fully_surveyed;
   const bool canonical_sol = detailed && system->catalog_preset_id &&
                              *system->catalog_preset_id == sol_catalog_preset_id;
