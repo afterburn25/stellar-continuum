@@ -318,8 +318,10 @@ struct MeshInstance3D {
   // they collapse into one view-aligned lod_group_proxy draw placed at
   // the merged centre, scaled to cover it, and shaded with the
   // representative member's material — a fleet/cluster impostor for
-  // extreme zoom-out. The switch is hard; at authored proxy sizes the
-  // swap is sub-visible. Empty group or null proxy disables.
+  // extreme zoom-out. The representative's lod_fade widens the collapse
+  // into a screen-door transition band (members thin 1-p, proxy keeps
+  // the complementary p); lod_fade=0 or Low tier keeps the hard switch.
+  // Empty group or null proxy disables.
   std::string lod_group;
   std::shared_ptr<const Mesh3D> lod_group_proxy;
   float lod_group_pixels{0.f};

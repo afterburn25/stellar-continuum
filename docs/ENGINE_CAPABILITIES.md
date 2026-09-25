@@ -109,8 +109,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   diameter drops below `lod_group_pixels` [1,4096] the whole group
   renders as one view-aligned `lod_group_proxy` draw centred on the
   merged sphere, scaled to cover it, shaded with the representative
-  member's material. The representative is the first contributing
-  member in instance order; `lod_groups` audits replaced members.
+  member's material. The representative's `lod_fade` widens the
+  collapse into a screen-door band — members thin by `1-p` while the
+  proxy keeps the complementary `p` (audited via `lod_fades`); Low
+  tier and `lod_fade=0` keep the hard switch. The representative is
+  the first contributing member in instance order; `lod_groups` audits
+  replaced members.
 - **Persistence:** entity `lods` (spec array, ≤ 8 bounded strings) +
   `lodPixels` [1,4096] + `lodFade` [0,.5] + `lodGroup` (≤64 chars) +
   `lodProxy` (≤256-char spec) + `lodProxyPixels` [1,4096] round-trip
@@ -151,10 +155,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   a sprite marker. The flag is per-mesh, so a fading pair can mix a
   card with solid geometry.
 - **Limitations:** flat halving chain — no mesh decimation or deeper
-  LOD trees beyond the named group collapse; the group proxy is a hard
-  switch (no dithered transition — author `lodProxyPixels` small enough
-  that the swap is sub-visible) and shades with the representative
-  member's material, so groups should share materials; merged members
+  LOD trees beyond the named group collapse; the proxy shades with the
+  representative member's material, so groups should share materials;
+  merged members
   still pay CPU prepare work (the collapse saves vertex/fragment and
   uniform-record load, not the per-instance iteration); impostor cards
   are flat quads (no baked view-dependent shading); the crossfade is a

@@ -196,8 +196,10 @@ merged view-space bounding sphere projects below the authored pixel
 size — a fleet or asteroid-field impostor. The first contributing
 member's material shades the proxy, `lod_groups` audits replaced
 members, and emission volumes are excluded (a marched volume cannot
-collapse into a surface proxy). The switch is hard — author the pixel
-threshold small enough that the swap is sub-visible.
+collapse into a surface proxy). The representative's `lod_fade`
+widens the collapse into a screen-door band — members thin by `1-p`
+while the proxy keeps the complementary `p`; `lod_fade=0` or Low tier
+keeps the hard switch.
 
 A fleet-scale benchmark runs inside `native_scene3d_gpu`: a 1024-ship
 grid spread over a depth sweep submits 60 timed frames and reports
@@ -420,7 +422,7 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   modes yet, and LightingOnly divides by sampled albedo so untextured
   or near-black surfaces clip to black.
 - `visible_range` is distance culling and `lod_meshes` a flat halving
-  chain; `lodGroup` collapse is a hard switch with the representative
+  chain; `lodGroup` collapse shades the proxy with the representative
   member's material (groups should share materials, and members still
   pay CPU prepare work), and shadow casters always take
   the full mesh (a fading-out instance keeps casting until the cull

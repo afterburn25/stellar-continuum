@@ -385,7 +385,7 @@ struct Scene3DRenderer::Storage {
     // proxy draw — a fleet/cluster impostor for extreme zoom-out.
     // Volume proxies are excluded: a marched volume cannot collapse
     // into a surface proxy.
-    struct GroupBounds{double x,y,z,r;const MeshInstance3D*rep{};std::size_t count{};bool collapse{};};
+    struct GroupBounds{double x,y,z,r;const MeshInstance3D*rep{};std::size_t count{};bool collapse{};float share{};};
     std::map<std::string,GroupBounds> groups;
     std::unordered_map<const MeshInstance3D*,GroupBounds*> group_of;
     for(const auto& instance:view.scene->instances()){
@@ -410,7 +410,16 @@ struct Scene3DRenderer::Storage {
       const double dist=std::sqrt(g.x*g.x+g.y*g.y+g.z*g.z);
       const float diameter=2.f*static_cast<float>(g.r)*lod_focal/
         (lod_camera.projection==Projection3D::Orthographic?1.f:static_cast<float>(std::max(dist,1e-4)));
-      g.collapse=diameter<g.rep->lod_group_pixels;
+      const float threshold=g.rep->lod_group_pixels;
+      g.collapse=diameter<threshold;
+      // The representative's lod_fade widens the collapse into a
+      // screen-door band: inside it members thin out by 1-p while the
+      // proxy keeps p through the complementary mask — the swap is
+      // continuous, like a chain-level crossfade.
+      if(!g.collapse&&!low_tier&&g.rep->lod_fade>0.f){
+        const float top=threshold*(1.f+g.rep->lod_fade);
+        if(diameter<top)g.share=std::clamp((top-diameter)/(threshold*g.rep->lod_fade),0.f,1.f);
+      }
     }
     for(const auto& instance:view.scene->instances()){
       auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
@@ -474,34 +483,37 @@ struct Scene3DRenderer::Storage {
       const bool inside_volume=instance.material.surface_effect&&
         instance.material.surface_effect->volume_depth>0.f&&
         dist<instance.scale*instance.mesh->bounding_radius();
-      if(const auto it=group_of.find(&instance);it!=group_of.end()&&it->second->collapse){
-        ++stats.lod_groups;
-        if(it->second->rep!=&instance)continue;
-        // The representative member carries the group's proxy draw: a
-        // view-aligned card at the merged sphere's centre, scaled to
-        // cover it, shaded with the representative's material. The
-        // identity rotation is the same collapse `billboard` applies —
-        // a `card:` proxy always presents its face.
+      // Group proxy: inside the collapse zone the representative member
+      // carries the whole group as one view-aligned draw centred on the
+      // merged sphere, scaled to cover it — the identity rotation is the
+      // same collapse `billboard` applies, so a `card:` proxy always
+      // presents its face. Inside the transition band the members thin
+      // out by 1-p while the proxy keeps the complementary p.
+      float group_keep=1.f;
+      if(const auto it=group_of.find(&instance);it!=group_of.end()){
         const GroupBounds&g=*it->second;
-        const auto& proxy_mesh=instance.lod_group_proxy;
-        const double ps=g.r/std::max(static_cast<double>(proxy_mesh->bounding_radius()),1e-9);
-        PreparedInstance3D proxy_t{};
-        for(int c=0;c<3;++c)proxy_t.model_view.values[c*4+c]=static_cast<float>(ps);
-        proxy_t.model_view.values[12]=static_cast<float>(g.x);
-        proxy_t.model_view.values[13]=static_cast<float>(g.y);
-        proxy_t.model_view.values[14]=static_cast<float>(g.z);
-        proxy_t.model_view.values[15]=1.f;
-        proxy_t.model_view_projection=multiply(projection3d_matrix(lod_camera,view.destination.width/view.destination.height),proxy_t.model_view);
-        proxy_t.camera_depth=static_cast<float>(-g.z);proxy_t.visible=true;
-        draws.push_back({&instance,proxy_t,geometry(proxy_mesh),surface,
-          optical?texture(optical->surface):surface,
-          optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
-          response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,
-          instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
-          instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
-          pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
-          pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),1.f});
-        continue;
+        const auto emit_proxy=[&](float keep){
+          const auto& proxy_mesh=instance.lod_group_proxy;
+          const double ps=g.r/std::max(static_cast<double>(proxy_mesh->bounding_radius()),1e-9);
+          PreparedInstance3D proxy_t{};
+          for(int c=0;c<3;++c)proxy_t.model_view.values[c*4+c]=static_cast<float>(ps);
+          proxy_t.model_view.values[12]=static_cast<float>(g.x);
+          proxy_t.model_view.values[13]=static_cast<float>(g.y);
+          proxy_t.model_view.values[14]=static_cast<float>(g.z);
+          proxy_t.model_view.values[15]=1.f;
+          proxy_t.model_view_projection=multiply(projection3d_matrix(lod_camera,view.destination.width/view.destination.height),proxy_t.model_view);
+          proxy_t.camera_depth=static_cast<float>(-g.z);proxy_t.visible=true;
+          draws.push_back({&instance,proxy_t,geometry(proxy_mesh),surface,
+            optical?texture(optical->surface):surface,
+            optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
+            response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,
+            instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
+            instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
+            pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
+            pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),keep});};
+        if(g.collapse){++stats.lod_groups;if(g.rep==&instance)emit_proxy(1.f);continue;}
+        if(g.share>0.f){group_keep=1.f-g.share;
+          if(g.rep==&instance){++stats.lod_fades;emit_proxy(-g.share);}}
       }
       draws.push_back({&instance,facing(drawn_mesh),geometry(drawn_mesh),surface,
         optical?texture(optical->surface):surface,
@@ -511,7 +523,7 @@ struct Scene3DRenderer::Storage {
         instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
         pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
         pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
-        fading?1.f-lod_share:range_keep});
+        (fading?1.f-lod_share:range_keep)*group_keep});
       draws.back().inside_volume=inside_volume;
       if(fading)draws.push_back({&instance,facing(instance.lod_meshes[lod_level]),geometry(instance.lod_meshes[lod_level]),surface,
         optical?texture(optical->surface):surface,
@@ -521,7 +533,7 @@ struct Scene3DRenderer::Storage {
         instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
         pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
         pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
-        -lod_share}); // negative = keep the high mask (complement of 1-p)
+        -lod_share*group_keep}); // negative = keep the high mask (complement of 1-p)
       if(fading)draws.back().inside_volume=inside_volume;
     }
     // Engine DrawBatcher owns submission ordering/batching: opaque groups by

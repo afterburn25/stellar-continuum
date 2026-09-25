@@ -778,6 +778,17 @@ int main(int argc,char** argv)try{
     check(window.scene3d_statistics().lod_groups==0,"Group collapsed above the authored pixel size");
     check(channel(*separate,160,160,0)==5,"Ungrouped members already covered the seam");
     check(channel(*separate,96,160,0)>150&&channel(*separate,224,160,0)>150,"Group members lost their own silhouettes");
+    // Transition band: lod_fade .5 widens the 160px collapse to a
+    // [160,240] band — the merged 192px sits at share .6, so members
+    // thin to 40% while the proxy keeps the complementary 60%.
+    auto band_left=left;band_left.lod_group_pixels=160;band_left.lod_fade=.5f;
+    auto band_right=right;band_right.lod_group_pixels=160;band_right.lod_fade=.5f;
+    const auto banded=capture({band_left,band_right},"lod-group-fade.png");
+    check(window.scene3d_statistics().lod_fades==1,"Group fade did not submit the proxy share");
+    check(window.scene3d_statistics().lod_groups==0,"Banded group counted as collapsed");
+    int band_lit=0;
+    for(int y=60;y<260;++y)for(int x=60;x<260;++x)band_lit+=channel(*banded,x,y,0)>100;
+    check(band_lit>6424&&band_lit<18496,"Group fade band did not partition members and proxy");
     std::cout<<"lod_group_gpu=merged_proxy_collapse_passed\n";
   }
   {

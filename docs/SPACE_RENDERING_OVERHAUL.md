@@ -129,9 +129,10 @@ same document headless-tested.
     view-space bounding sphere and collapse to a single view-aligned
     proxy draw once it projects below the authored pixel size — a
     fleet/cluster impostor for extreme zoom-out, audited by
-    `lod_groups`. The collapse is a hard switch (no dithered
-    transition) and the proxy shades with the representative member's
-    material, so groups should share materials.
+    `lod_groups`. The representative's `lod_fade` widens the collapse
+    into a screen-door band (members thin `1-p`, proxy keeps `p`); the
+    proxy shades with the representative member's material, so groups
+    should share materials.
 
 ## Top wins (ordered)
 
