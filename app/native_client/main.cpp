@@ -2546,12 +2546,19 @@ class NativeCampaign final {
     std::ostringstream proof;proof<<"{\"player_id\":"<<target.player_civilization_id<<",\"colony_id\":"<<target.colony_id
       <<",\"rows\":"<<row_count<<",\"opened\":true,\"selected\":true,\"readonly\":true,\"exclusive\":true,\"scrolled\":true}";
     smoke_colony_roster_evidence_=proof.str();
-    // Missions chrome capture: open the board through its rail affordance,
-    // keep the frame for review, then close it to restore state.
+  }
+  // Missions chrome capture: open the board through its rail affordance,
+  // keep the frame for review, then close it to restore state. Runs after the
+  // planetary/freight proofs because rail navigation closes the colony
+  // workspace they depend on.
+  void prepare_missions_board_smoke(int width,int height){
+    const auto ui=NativeUiLayout::for_viewport(width,height);
+    const auto click=[&](Point point){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Missions capture input closed the campaign.");};
     click(center(ui.missions));
     if(!mission_view_.visible())throw std::runtime_error("Missions rail button did not open the board for capture.");
     smoke_missions_capture_=scene(width,height);
-    route({{InputEventType::EscapePressed}});
+    InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.events={{InputEventType::EscapePressed}};
+    if(!update(input,width,height,0.,false))throw std::runtime_error("Missions capture input closed the campaign.");
     if(mission_view_.visible())throw std::runtime_error("Missions board did not close after its capture.");
   }
   void capture_colony_roster_smoke(const std::function<void(const DrawList&,const wchar_t*)>& draw)const{
@@ -10313,6 +10320,7 @@ int main(int argc,char **argv){
         campaign.prepare_colony_smoke(window.drawable_width(),window.drawable_height(),options.colony_reload_smoke);
         if(options.planetary_smoke)campaign.prepare_planetary_smoke(window.drawable_width(),window.drawable_height(),options.colony_reload_smoke);
         else campaign.prepare_outpost_freight_smoke(window.drawable_width(),window.drawable_height(),options.colony_reload_smoke);
+        campaign.prepare_missions_board_smoke(window.drawable_width(),window.drawable_height());
       }
       else if(options.settlement_smoke||options.settlement_reload_smoke)
         campaign.prepare_settlement_smoke(window.drawable_width(),
