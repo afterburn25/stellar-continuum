@@ -159,6 +159,17 @@ stellar::engine::AnnouncementControl Navigator::focused_control(int w,int h)cons
   const auto search=Layout::make(w,h).search;
   return bounds&&!preferences_.hidden&&bounds->x==search.x&&bounds->y==search.y&&bounds->width==search.width&&bounds->height==search.height?stellar::engine::AnnouncementControl::Edit:stellar::engine::AnnouncementControl::Custom;
 }
+std::optional<stellar::engine::AnnouncementValue> Navigator::focused_value(int w,int h)const{
+  if(focused_control(w,h)!=stellar::engine::AnnouncementControl::Edit)return std::nullopt;
+  return stellar::engine::AnnouncementValue{search_};
+}
+bool Navigator::set_focused_text(std::string text,int w,int h){
+  if(focused_control(w,h)!=stellar::engine::AnnouncementControl::Edit)return false;
+  // Same byte cap as the typed path, truncated on a code-point boundary.
+  if(text.size()>120){std::size_t n=120;while(n>0&&(static_cast<unsigned char>(text[n])&0xc0)==0x80)--n;text.resize(n);}
+  search_=std::move(text);
+  return true;
+}
 void Navigator::commit_preferences(Preferences next){if(persist_&&!persist_(next)){error_=tr("ASSETS_PREFS_FAIL","Could not save navigator preferences.");return;}preferences_=next;error_.clear();pressed_.reset();rebuild();}
 Command Navigator::handle(const InputEvent& e,int w,int h){
   const auto l=Layout::make(w,h);pointer_=e.position;Command out;out.generation=view_.generation;out.observer=view_.observer;

@@ -109,6 +109,17 @@ stellar::engine::AnnouncementControl NativeShipyardWorkspace::focused_control(co
   const auto bounds=focused_bounds(l);
   return bounds&&bounds->x==l.search.x&&bounds->y==l.search.y&&bounds->width==l.search.width&&bounds->height==l.search.height?stellar::engine::AnnouncementControl::Edit:stellar::engine::AnnouncementControl::Custom;
 }
+std::optional<stellar::engine::AnnouncementValue> NativeShipyardWorkspace::focused_value(const ShipyardWorkspaceLayout& l)const{
+  if(focused_control(l)!=stellar::engine::AnnouncementControl::Edit)return std::nullopt;
+  return stellar::engine::AnnouncementValue{search_};
+}
+bool NativeShipyardWorkspace::set_focused_text(std::string text,const ShipyardWorkspaceLayout& l){
+  if(focused_control(l)!=stellar::engine::AnnouncementControl::Edit)return false;
+  // Same byte cap as the typed path, truncated on a code-point boundary.
+  if(text.size()>128){std::size_t n=128;while(n>0&&(static_cast<unsigned char>(text[n])&0xc0)==0x80)--n;text.resize(n);}
+  search_=std::move(text);
+  return true;
+}
 std::string NativeShipyardWorkspace::batch_blocker()const{
   const auto* d=selected_design();if(!d)return tr("SHIPYARD_SELECT_DESIGN","Select a ship design.");
   const auto q=std::ranges::find(d->batch_quotes,quantity_,&stellar::core::ShipbuildingBatchAssessment::quantity);

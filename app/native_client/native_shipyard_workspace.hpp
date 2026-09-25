@@ -66,6 +66,12 @@ public:
   // Custom elsewhere.
   [[nodiscard]] stellar::engine::AnnouncementControl
   focused_control(const ShipyardWorkspaceLayout &) const;
+  // Current text of the ringed Edit — null when focus is elsewhere.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue>
+  focused_value(const ShipyardWorkspaceLayout &) const;
+  // Applies a platform value SetValue to the ringed Edit — false when the
+  // focus sits on a non-edit control.
+  bool set_focused_text(std::string text, const ShipyardWorkspaceLayout &);
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
   [[nodiscard]] bool confirmation_open() const noexcept {

@@ -1215,8 +1215,13 @@ queues the value (latest wins), the owner drains it once per frame and
 routes through `set_focused_range` to whichever visible settings panel
 owns the focused slider (audio master/music/effects; voice
 volume/subtitle-background/comms-filter — clamped to 0..1, previewed),
-then re-announces focus so AT reads the applied position. Open: AT-SPI/
-non-Windows backends and a full fragment tree.
+then re-announces focus so AT reads the applied position.
+`IValueProvider` closed the Edit side: announcements carry an optional
+`AnnouncementValue{text, writable}`, seven surfaces report their search
+text and accept `set_focused_text` (typed-path byte cap, code-point
+boundary truncation, refilter), and the setup seed field reports
+read-only — its value flows through the SeedEdited intent, not direct
+writes. Open: AT-SPI/non-Windows backends and a full fragment tree.
 Per-control focus geometry (row 26): `AccessibilityAnnouncement` now
 carries optional `AnnouncementBounds` and every focus-bearing surface
 exposes `focused_bounds(...)` mirroring its `focused_label` — settings

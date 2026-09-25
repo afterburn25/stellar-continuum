@@ -494,7 +494,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
                 :std::nullopt,
             std::nullopt,
             workspace.focused_control(input.drawable_width,
-                                      input.drawable_height,measure));
+                                      input.drawable_height,measure),
+            std::nullopt,
+            workspace.focused_value(input.drawable_width,
+                                    input.drawable_height,measure));
       }
     };
     if (!input.renderable()) {

@@ -53,6 +53,28 @@ public:
     const auto targets=focusables(layout(w,h));
     return ring_>=0&&ring_<static_cast<int>(targets.size())?targets[static_cast<std::size_t>(ring_)].control:stellar::engine::AnnouncementControl::Custom;
   }
+  // Current text of the ringed Edit — entity/event search by target id;
+  // null when focus is elsewhere.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue> focused_value(int w,int h)const{
+    const auto targets=focusables(layout(w,h));
+    if(ring_<0||ring_>=static_cast<int>(targets.size()))return std::nullopt;
+    const auto hit=targets[static_cast<std::size_t>(ring_)].hit;
+    if(hit==50)return stellar::engine::AnnouncementValue{entity_search_};
+    if(hit==51)return stellar::engine::AnnouncementValue{event_search_};
+    return std::nullopt;
+  }
+  // Applies a platform value SetValue to the ringed Edit — false when the
+  // focus sits on a non-edit control.
+  bool set_focused_text(std::string text,int w,int h){
+    const auto targets=focusables(layout(w,h));
+    if(ring_<0||ring_>=static_cast<int>(targets.size()))return false;
+    const auto hit=targets[static_cast<std::size_t>(ring_)].hit;
+    // Same byte cap as the typed path, truncated on a code-point boundary.
+    if(text.size()>120){std::size_t n=120;while(n>0&&(static_cast<unsigned char>(text[n])&0xc0)==0x80)--n;text.resize(n);}
+    if(hit==50){entity_search_=std::move(text);entities_dirty_=true;return true;}
+    if(hit==51){event_search_=std::move(text);return true;}
+    return false;
+  }
   bool handle(const InputEvent &e,int w,int h,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     if(!visible_)return false;const auto l=layout(w,h);pointer_=e.position;
     if(dropdown_.visible()){

@@ -1137,5 +1137,14 @@ NativeNewGameWorkspace::focused_control(int width, int height,
              ? stellar::engine::AnnouncementControl::Edit
              : stellar::engine::AnnouncementControl::Custom;
 }
+std::optional<stellar::engine::AnnouncementValue>
+NativeNewGameWorkspace::focused_value(int width, int height,
+                                      const TextMeasurer &measure) const {
+  if (focused_control(width, height, measure) !=
+      stellar::engine::AnnouncementControl::Edit)
+    return std::nullopt;
+  // Read-only: seeds apply through the SeedEdited intent, not direct writes.
+  return stellar::engine::AnnouncementValue{seed_text_, false};
+}
 
 } // namespace stellar::native_setup_ui

@@ -291,6 +291,66 @@ int main() try {
   toggle2->Release();
   unknown_toggle->Release();
   toggle_fragment->Release();
+  // An Edit focus with a value exposes the value pattern: the text reads
+  // back, writable edits queue SetValue for the owner, read-only edits
+  // report IsReadOnly and reject writes.
+  (void)bridge.focus_changed(
+      "Search", stellar::engine::AnnouncementBounds{8.f, 9.f, 40.f, 16.f},
+      std::nullopt, stellar::engine::AnnouncementControl::Edit, std::nullopt,
+      stellar::engine::AnnouncementValue{"kestrel", true});
+  IUIAutomationElement* edit_fragment = find_fragment(element);
+  require(edit_fragment != nullptr,
+          "focus fragment was not exposed for the edit announcement");
+  IUIAutomationValuePattern* value_pattern{};
+  require(SUCCEEDED(edit_fragment->GetCurrentPattern(
+              UIA_ValuePatternId,
+              reinterpret_cast<IUnknown**>(&value_pattern))) && value_pattern,
+          "edit fragment did not expose the value pattern");
+  BSTR edit_text{};
+  require(SUCCEEDED(value_pattern->get_CurrentValue(&edit_text)) && edit_text &&
+              std::wstring(edit_text) == L"kestrel",
+          "value pattern did not report the announced edit text");
+  SysFreeString(edit_text);
+  require(SUCCEEDED(value_pattern->get_CurrentIsReadOnly(&read_only)) &&
+              read_only == FALSE,
+          "writable edit reported itself read-only");
+  require(!bridge.take_text_set().has_value(),
+          "text-set queue was not empty before SetValue");
+  BSTR replacement = SysAllocString(L"voideyes");
+  require(replacement != nullptr, "SysAllocString failed");
+  require(SUCCEEDED(value_pattern->SetValue(replacement)),
+          "UIA SetValue failed on a writable edit");
+  const auto queued_text = bridge.take_text_set();
+  require(queued_text.has_value() && *queued_text == "voideyes",
+          "UIA SetValue did not queue the replacement text");
+  require(!bridge.take_text_set().has_value(),
+          "drained text-set value was not cleared");
+  value_pattern->Release();
+  edit_fragment->Release();
+  // A read-only edit (the setup seed field) reports the text but refuses
+  // SetValue — nothing queues for the owner.
+  (void)bridge.focus_changed(
+      "Seed", std::nullopt, std::nullopt,
+      stellar::engine::AnnouncementControl::Edit, std::nullopt,
+      stellar::engine::AnnouncementValue{"42", false});
+  IUIAutomationElement* seed_fragment = find_fragment(element);
+  require(seed_fragment != nullptr,
+          "focus fragment was not exposed for the read-only edit");
+  IUIAutomationValuePattern* seed_value{};
+  require(SUCCEEDED(seed_fragment->GetCurrentPattern(
+              UIA_ValuePatternId,
+              reinterpret_cast<IUnknown**>(&seed_value))) && seed_value,
+          "read-only edit lost the value pattern");
+  require(SUCCEEDED(seed_value->get_CurrentIsReadOnly(&read_only)) &&
+              read_only == TRUE,
+          "read-only edit did not report IsReadOnly");
+  require(FAILED(seed_value->SetValue(replacement)),
+          "UIA SetValue succeeded on a read-only edit");
+  SysFreeString(replacement);
+  require(!bridge.take_text_set().has_value(),
+          "read-only SetValue queued text for the owner");
+  seed_value->Release();
+  seed_fragment->Release();
   // An empty focus label is the ring-release signal — the fragment must
   // stop claiming keyboard focus so AT stops tracking a stale control.
   (void)bridge.focus_changed("");

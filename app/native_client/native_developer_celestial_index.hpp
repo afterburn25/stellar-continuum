@@ -40,6 +40,20 @@ public:
     const auto targets=focusables(layout(w,h));
     return ring_>=0&&ring_<static_cast<int>(targets.size())?targets[static_cast<std::size_t>(ring_)].control:stellar::engine::AnnouncementControl::Custom;
   }
+  // Current text of the ringed Edit — null when focus is elsewhere.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue> focused_value(int w,int h)const{
+    if(focused_control(w,h)!=stellar::engine::AnnouncementControl::Edit)return std::nullopt;
+    return stellar::engine::AnnouncementValue{search_};
+  }
+  // Applies a platform value SetValue to the ringed Edit — false when the
+  // focus sits on a non-edit control.
+  bool set_focused_text(std::string text,int w,int h){
+    if(focused_control(w,h)!=stellar::engine::AnnouncementControl::Edit)return false;
+    // Same byte cap as the typed path, truncated on a code-point boundary.
+    if(text.size()>96){std::size_t n=96;while(n>0&&(static_cast<unsigned char>(text[n])&0xc0)==0x80)--n;text.resize(n);}
+    search_=std::move(text);list_view_.scroll_offset=0;rebuild();
+    return true;
+  }
   bool handle(const InputEvent &e,int w,int h,stellar::core::CampaignFrame &frame){
     if(!visible_)return false;
     const auto l=layout(w,h);pointer_=e.position;

@@ -362,6 +362,25 @@ RosterWorkspace::focused_control(int width, int height) const {
              ? stellar::engine::AnnouncementControl::Edit
              : stellar::engine::AnnouncementControl::Custom;
 }
+std::optional<stellar::engine::AnnouncementValue>
+RosterWorkspace::focused_value(int width, int height) const {
+  if (focused_control(width, height) != stellar::engine::AnnouncementControl::Edit)
+    return std::nullopt;
+  return stellar::engine::AnnouncementValue{search_};
+}
+bool RosterWorkspace::set_focused_text(std::string text, int width, int height) {
+  if (focused_control(width, height) != stellar::engine::AnnouncementControl::Edit)
+    return false;
+  // Same byte cap as the typed path, truncated on a code-point boundary.
+  if (text.size() > 64) {
+    std::size_t n = 64;
+    while (n > 0 && (static_cast<unsigned char>(text[n]) & 0xc0) == 0x80) --n;
+    text.resize(n);
+  }
+  search_ = std::move(text);
+  table_.refilter(search_);
+  return true;
+}
 int RosterWorkspace::header_column(Point point,
                                    const RosterLayout &layout) const noexcept {
   const float s = layout.scale;

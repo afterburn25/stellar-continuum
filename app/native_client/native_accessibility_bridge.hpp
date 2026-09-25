@@ -2,7 +2,9 @@
 
 #include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <optional>
+#include <string>
 #include <string_view>
 
 #include <stellar/engine/accessibility.hpp>
@@ -42,7 +44,8 @@ class NativeAccessibilityBridge final {
       std::optional<stellar::engine::AnnouncementRange> range = std::nullopt,
       stellar::engine::AnnouncementControl control =
           stellar::engine::AnnouncementControl::Custom,
-      std::optional<bool> checked = std::nullopt);
+      std::optional<bool> checked = std::nullopt,
+      std::optional<stellar::engine::AnnouncementValue> value = std::nullopt);
   // Subclassed window-procedure sink installed while attached — platform
   // plumbing for the WM_GETOBJECT answer, not a general event API.
   std::intptr_t handle_window_message(std::uintptr_t hwnd, unsigned message,
@@ -62,6 +65,11 @@ class NativeAccessibilityBridge final {
   // the focused slider.
   void queue_range_set(double value) noexcept;
   [[nodiscard]] std::optional<double> take_range_set() noexcept;
+  // Writable value slice: Value SetValue calls on an Edit focus fragment
+  // queue the text (latest wins) for the owner to route through
+  // set_focused_text to whichever surface owns the focused edit.
+  void queue_text_set(std::string text);
+  [[nodiscard]] std::optional<std::string> take_text_set();
 
  private:
   void *hwnd_{};
@@ -70,6 +78,8 @@ class NativeAccessibilityBridge final {
   std::atomic<unsigned> pending_activations_{};
   std::atomic<double> pending_range_set_{};
   std::atomic<bool> range_set_pending_{};
+  std::mutex text_set_mutex_;
+  std::optional<std::string> pending_text_set_;
 };
 
 } // namespace stellar::native_client

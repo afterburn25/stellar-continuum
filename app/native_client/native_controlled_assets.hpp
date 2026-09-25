@@ -74,6 +74,11 @@ public:
   // UIA control kind of the ringed control — Edit on the search field,
   // Custom elsewhere.
   [[nodiscard]] stellar::engine::AnnouncementControl focused_control(int,int)const;
+  // Current text of the ringed Edit — null when focus is elsewhere.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue> focused_value(int,int)const;
+  // Applies a platform value SetValue to the ringed Edit — false when the
+  // focus sits on a non-edit control.
+  bool set_focused_text(std::string,int,int);
   [[nodiscard]] std::optional<stellar::native_map::UiRect> row_bounds(Key,int,int)const;
   [[nodiscard]] stellar::native_map::UiRect category_bounds(Category,int,int)const;
   [[nodiscard]] Command handle(const stellar::native_map::InputEvent&,int,int);

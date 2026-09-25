@@ -92,6 +92,18 @@ enum class AnnouncementControl {
   Group,
 };
 
+// Current text of a focused Edit control — platform bridges expose it
+// through the value pattern so AT reads what is typed, not just the
+// label. writable marks controls that accept a programmatic SetValue
+// (search/filter boxes); read-only edits (e.g. the setup seed field,
+// which applies through intents) report IsReadOnly instead.
+struct AnnouncementValue {
+  std::string text;
+  bool writable{true};
+
+  bool operator==(const AnnouncementValue &) const = default;
+};
+
 struct AccessibilityAnnouncement {
   std::string text;
   AnnouncementPriority priority{AnnouncementPriority::Polite};
@@ -102,6 +114,9 @@ struct AccessibilityAnnouncement {
   // Checked state of a focused CheckBox — platform bridges expose it as a
   // toggle pattern so AT reports on/off, not just the control name.
   std::optional<bool> checked;
+  // Current text of a focused Edit — platform bridges expose it as the
+  // value pattern so AT hears the typed content, not just the label.
+  std::optional<AnnouncementValue> value;
   std::uint64_t sequence{};
 };
 
@@ -120,9 +135,11 @@ public:
                       std::optional<AnnouncementRange> range = std::nullopt,
                       AnnouncementControl control = AnnouncementControl::Custom,
                       std::optional<bool> checked = std::nullopt,
+                      std::optional<AnnouncementValue> value = std::nullopt,
                       AnnouncementPriority priority = AnnouncementPriority::Polite) {
     announce(std::move(text), priority, AnnouncementKind::Focus,
-             std::move(bounds), std::move(range), control, checked);
+             std::move(bounds), std::move(range), control, checked,
+             std::move(value));
   }
   // Oldest pending announcement, or nullopt when drained.
   [[nodiscard]] std::optional<AccessibilityAnnouncement> take();
@@ -138,7 +155,8 @@ private:
                 std::optional<AnnouncementBounds> bounds,
                 std::optional<AnnouncementRange> range,
                 AnnouncementControl control,
-                std::optional<bool> checked = std::nullopt);
+                std::optional<bool> checked = std::nullopt,
+                std::optional<AnnouncementValue> value = std::nullopt);
   std::deque<AccessibilityAnnouncement> pending_;
   std::size_t capacity_;
   std::uint64_t sequence_{};

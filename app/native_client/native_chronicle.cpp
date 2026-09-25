@@ -592,6 +592,25 @@ NativeChronicleView::focused_control(int width, int height) const {
              ? stellar::engine::AnnouncementControl::Edit
              : stellar::engine::AnnouncementControl::Custom;
 }
+std::optional<stellar::engine::AnnouncementValue>
+NativeChronicleView::focused_value(int width, int height) const {
+  if (focused_control(width, height) != stellar::engine::AnnouncementControl::Edit)
+    return std::nullopt;
+  return stellar::engine::AnnouncementValue{search_};
+}
+bool NativeChronicleView::set_focused_text(std::string text, int width, int height) {
+  if (focused_control(width, height) != stellar::engine::AnnouncementControl::Edit)
+    return false;
+  // Same byte cap as the typed path, truncated on a code-point boundary.
+  if (text.size() > 120) {
+    std::size_t n = 120;
+    while (n > 0 && (static_cast<unsigned char>(text[n]) & 0xc0) == 0x80) --n;
+    text.resize(n);
+  }
+  search_ = std::move(text);
+  refresh();
+  return true;
+}
 
 bool NativeChronicleView::handle(const native_map::InputEvent &event,
                                  int width, int height) {

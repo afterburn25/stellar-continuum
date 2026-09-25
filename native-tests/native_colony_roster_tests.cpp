@@ -431,11 +431,24 @@ void keyboard_focus_rings_controls_and_activates_rows() {
   require(workspace.focused_control(width, height) ==
               stellar::engine::AnnouncementControl::Edit,
           "search field did not classify as an edit control");
+  // The value pattern reports the field's text and accepts writes.
+  const auto search_value = workspace.focused_value(width, height);
+  require(search_value.has_value() && search_value->text.empty() &&
+              search_value->writable,
+          "search field did not report an empty writable value");
+  require(workspace.set_focused_text("Terra", width, height) &&
+              workspace.focused_value(width, height)->text == "Terra",
+          "set_focused_text did not update the search field");
+  require(workspace.set_focused_text("", width, height),
+          "set_focused_text did not clear the search field");
   require(key(kDown).captured && workspace.focus() == 1,
           "Down did not advance the ring");
   require(workspace.focused_control(width, height) ==
               stellar::engine::AnnouncementControl::Custom,
           "non-text control did not classify as custom");
+  require(!workspace.focused_value(width, height).has_value() &&
+              !workspace.set_focused_text("x", width, height),
+          "non-edit control answered the value pattern");
   require(key(kUp).captured && workspace.focus() == 0,
           "Up did not walk back");
   require(key(kEnd).captured && workspace.focus() > 5,

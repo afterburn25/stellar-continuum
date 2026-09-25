@@ -137,6 +137,10 @@ public:
   // Custom elsewhere.
   [[nodiscard]] stellar::engine::AnnouncementControl
   focused_control(int width, int height, const TextMeasurer &) const;
+  // Current text of the ringed Edit — the seed field reports its text but
+  // stays read-only: seeds apply through the SeedEdited intent path.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue>
+  focused_value(int width, int height, const TextMeasurer &) const;
   [[nodiscard]] float detail_scroll() const noexcept {
     return detail_scroll_.scroll_offset;
   }

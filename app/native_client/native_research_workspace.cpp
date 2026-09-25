@@ -676,6 +676,26 @@ NativeResearchWorkspace::focused_control(int width, int height) const {
              ? stellar::engine::AnnouncementControl::Edit
              : stellar::engine::AnnouncementControl::Custom;
 }
+std::optional<stellar::engine::AnnouncementValue>
+NativeResearchWorkspace::focused_value(int width, int height) const {
+  if (focused_control(width, height) != stellar::engine::AnnouncementControl::Edit)
+    return std::nullopt;
+  return stellar::engine::AnnouncementValue{query_.search};
+}
+bool NativeResearchWorkspace::set_focused_text(std::string text, int width, int height) {
+  if (focused_control(width, height) != stellar::engine::AnnouncementControl::Edit)
+    return false;
+  // Same byte cap as the typed path, truncated on a code-point boundary.
+  if (text.size() > 256) {
+    std::size_t n = 256;
+    while (n > 0 && (static_cast<unsigned char>(text[n]) & 0xc0) == 0x80) --n;
+    text.resize(n);
+  }
+  query_.search = std::move(text);
+  rebuild_topology();
+  guided_scroll_ = {};
+  return true;
+}
 
 WorkspaceCommand NativeResearchWorkspace::handle(const InputEvent &event,
                                                  int width, int height) {

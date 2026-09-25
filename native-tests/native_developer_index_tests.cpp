@@ -128,6 +128,10 @@ int main(int argc,char **argv)try{
       index.open(frame.runtime().world().campaign());
       check(press(kTab)&&press(kTab)&&press(kTab),"Index navigation leaked.");
       check(index.focused_control(w,h)==stellar::engine::AnnouncementControl::Edit,"Search field was not classified as an Edit control.");
+      const auto search_value=index.focused_value(w,h);
+      check(search_value.has_value()&&search_value->text.empty()&&search_value->writable,"Search field did not report an empty writable value.");
+      check(index.set_focused_text("Sol",w,h)&&index.focused_value(w,h)->text=="Sol","set_focused_text did not update the index search.");
+      check(index.set_focused_text("",w,h),"set_focused_text did not clear the index search.");
       check(press(kReturn)&&index.wants_text_input(),"Search activation did not enter edit mode.");
       check(index.handle({InputEventType::TextEntered,{}, {},0,"Galactic center"},w,h,frame),"Search text leaked.");
       check(press(kTab)&&!index.wants_text_input(),"Tab did not commit out of search editing.");
