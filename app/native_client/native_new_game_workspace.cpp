@@ -919,13 +919,10 @@ void NativeNewGameWorkspace::render(
               number(species->metabolic_demand, 2)},
              "Lifespan  {0} years · Metabolic demand  {1}x Terran baseline"));
     const float maximum_scroll = detail_scroll_.max_scroll();
-    if (const auto thumb = detail_scroll_.thumb(facts_clip.height, 22.f * s);
-        thumb.size > 0.f) {
+    {
       const UiRect track{facts_clip.x + facts_clip.width - 3.f * s,
                          facts_clip.y, 2.f * s, facts_clip.height};
-      fill(out, track, {91, 151, 205, 80});
-      fill(out, {track.x, track.y + thumb.offset, track.width, thumb.size},
-           accent);
+      stellar::native_ui::scrollbar(out, track, detail_scroll_, 22.f * s);
       if (detail_scroll_.scroll_offset + .5f < maximum_scroll) {
         const UiRect fade{facts_clip.x, facts_clip.y + facts_clip.height - 24.f * s,
                           facts_clip.width - 6.f * s, 24.f * s};

@@ -1259,14 +1259,10 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
                  layout.small_font_pixels);
     block_y += block.height + block_gap;
   }
-  if (const auto thumb = inspector_scroll_.thumb(details_clip.height,
-                                                 18.f * layout.scale);
-      thumb.size > 0.f) {
-    fill(out,
-         {details_clip.x + details_clip.width - 3.f * layout.scale,
-          details_clip.y + thumb.offset, 2.f * layout.scale, thumb.size},
-         muted);
-  }
+  theme::scrollbar(
+      out, {details_clip.x + details_clip.width - 3.f * layout.scale,
+            details_clip.y, 2.f * layout.scale, details_clip.height},
+      inspector_scroll_, 18.f * layout.scale);
   const auto action_text = node->cancelled && node->primary_action.intent == NativeResearchIntent::Start ? tr("RESEARCH_ACTION_RESTART", "Restart research") : tr(action_key(node->primary_action.intent), action_label(node->primary_action.intent));
   if (!action_text.empty()) {
     const auto enabled = node->primary_action.enabled;

@@ -89,7 +89,7 @@ void NativeResearchWorkspace::render_dashboard(DrawList& out,const ResearchWorks
   }
   if(cards.empty())text(out,{content.x+18*s,content.y+18*s,content.width-36*s,96*s},tr(mode_==ResearchViewMode::Queue?"RESEARCH_EMPTY_QUEUE":mode_==ResearchViewMode::Recent?"RESEARCH_EMPTY_RECENT":"RESEARCH_EMPTY_VIEW",mode_==ResearchViewMode::Queue?"No technologies queued. Add a known program from the inspector. Queued programs wait for their requirements and funding; blocked entries are never skipped.":mode_==ResearchViewMode::Recent?"No completion records in the saved research history yet. Established starting knowledge is listed under Completed Research.":"No technologies match this view. Change the category, search or filter."),muted,l.body_font_pixels);
   guided_scroll_.sync(extent,content.height);
-  if(const auto thumb=guided_scroll_.thumb(content.height,20*s);thumb.size>0)fill(out,{content.x+content.width-4*s,content.y+thumb.offset,2*s,thumb.size},border);
+  theme::scrollbar(out,{content.x+content.width-4*s,content.y,2*s,content.height},guided_scroll_,20*s);
 }
 void NativeResearchWorkspace::render_controls(DrawList& out,const ResearchWorkspaceLayout& l){
   const float s=l.scale;

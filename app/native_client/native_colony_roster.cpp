@@ -814,19 +814,13 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
             : std::string{},
         font);
   if (maximum > 0) {
-    const float thumb =
-        std::max(24.f * layout.scale, layout.list.height * layout.list.height /
-                                          (maximum + layout.list.height));
-    const float y =
-        layout.list.y + (layout.list.height - thumb) * list_.scroll_offset / maximum;
-    out.overlay.emplace_back(
-        FilledRectangle{{layout.list.x + layout.list.width + 5.f * layout.scale,
-                         layout.list.y, 3.f * layout.scale, layout.list.height},
-                        theme::color::keyline});
-    out.overlay.emplace_back(
-        FilledRectangle{{layout.list.x + layout.list.width + 5.f * layout.scale,
-                         y, 3.f * layout.scale, thumb},
-                        cyan});
+    const stellar::engine::ScrollView proxy{
+        maximum + layout.list.height, layout.list.height,
+        list_.scroll_offset};
+    theme::scrollbar(out,
+                     {layout.list.x + layout.list.width + 5.f * layout.scale,
+                      layout.list.y, 3.f * layout.scale, layout.list.height},
+                     proxy, 24.f * layout.scale);
   }
   if (focus_ >= 0) {
     const auto rects = focusables(layout);

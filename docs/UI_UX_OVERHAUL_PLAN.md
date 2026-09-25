@@ -196,7 +196,13 @@ breaks navigation/AT flow, or presents wrong state)
 
 ### LOW
 
-1. Scrollbar width/track styling differs per workspace.
+1. ~~Scrollbar width/track styling differs per workspace.~~ → DONE: new
+   `theme::scrollbar` (faint keyline rail + `selected` thumb) replaces the
+   per-surface hand-rolled thumbs in body inspector, chronicle, controlled
+   assets, economy, system inspection, logistics, new-game species
+   details, notifications, research inspector + guided dashboard, and the
+   planetary facts/queue rails. The fleet outliner list gained a scrollbar
+   for the first time (render-path `sync` keeps the thumb honest).
 2. ~~`zoom_text` shows a bare number; a zoom-band label ("OVERVIEW /
    SECTOR / LOCAL") would orient players.~~ → DONE with the legend work
    (the readout carries the matching band label).

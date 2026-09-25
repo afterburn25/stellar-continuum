@@ -2,6 +2,7 @@
 
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/accessibility.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -372,6 +373,17 @@ inline void hover_tooltip(DrawList &out, UiRect bounds, Point pointer,
   tooltip(out, {pointer.x + 14.f * scale, pointer.y + 20.f * scale},
           std::move(title), std::move(body), viewport_width, viewport_height,
           scale, tone);
+}
+
+// Shared scrollbar: faint rail + selected-tone thumb inside `rail`. Draws
+// nothing while the content fits the viewport — one treatment everywhere.
+inline void scrollbar(DrawList &out, UiRect rail,
+                      const engine::ScrollView &scroll, float min_thumb_px) {
+  const auto thumb = scroll.thumb(rail.height, min_thumb_px);
+  if (thumb.size <= 0.f) return;
+  fill(out, rail, {color::keyline.r, color::keyline.g, color::keyline.b, 90});
+  fill(out, {rail.x, rail.y + thumb.offset, rail.width, thumb.size},
+       color::selected);
 }
 
 }

@@ -189,7 +189,9 @@ private:
   std::string return_warning_;
   bool notice_accepted_{};
   stellar::native_map::Point pointer_{};
-  stellar::engine::ScrollView list_scroll_{};
+  // Render-time geometry sync keeps the scrollbar thumb honest — mutable so
+  // the const render path can re-clamp without lying about state changes.
+  mutable stellar::engine::ScrollView list_scroll_{};
   PressTarget pressed_action_{PressTarget::None};
   stellar::native_map::UiRect pressed_bounds_{};
   std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> pressed_military_quote_;

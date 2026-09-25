@@ -1,6 +1,7 @@
 #include "native_controlled_assets.hpp"
 #include "native_menu_style.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -327,7 +328,7 @@ void Navigator::render(DrawList& out,int w,int h,const Art& art){
     if(hovered)tooltip=std::pair{&row,r};
   }
   if(entries_.empty())label(out,{l.list.x+10*s,l.list.y+18*s,l.list.width-20*s,150*s},view_.rows.empty()?tr("ASSETS_EMPTY","No controlled assets.\n\nExplore the galaxy or establish a colony to begin expanding your civilization."):tr("ASSETS_EMPTY_SEARCH","No assets match your search."),muted,normal,l.list);
-  if(const auto thumb=scroll_.thumb(l.list.height,24*s);thumb.size>0){out.overlay.emplace_back(FilledRectangle{{l.list.x+l.list.width-2*s,l.list.y+thumb.offset,2*s,thumb.size},{72,158,192,255}});}
+  stellar::native_ui::scrollbar(out,{l.list.x+l.list.width-2*s,l.list.y,2*s,l.list.height},scroll_,24*s);
   if(tooltip){const UiRect box{l.panel.x-300*s-8*s,std::clamp(tooltip->second.y,80*s,h-174*s),300*s,158*s};native_menu_style::panel(out,box,s);label(out,{box.x+12*s,box.y+12*s,box.width-24*s,box.height-24*s},tooltip->first->tooltip,ink,small,box);}
   if(!error_.empty())label(out,{l.panel.x+10*s,l.panel.y+l.panel.height-22*s,l.panel.width-20*s,22*s},error_,amber,small,l.panel);
   if(focus_>=0){const auto targets=focusables(l);if(focus_<static_cast<int>(targets.size()))out.overlay.emplace_back(StrokedRectangle{targets[static_cast<std::size_t>(focus_)].bounds,cyan});}

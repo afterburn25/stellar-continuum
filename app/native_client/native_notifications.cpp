@@ -596,9 +596,10 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
         action_text, title_color, action_pixels, entry.system_button->width - 4.f * s,
         *entry.system_button, TextAlign::Center); }
   }
-  if (const auto thumb = layout.scroll.thumb(layout.list_viewport.height, 16.f * s); thumb.size > 0.f) {
-    fill(out, {layout.list_viewport.x + layout.list_viewport.width - 3.f * s,
-               layout.list_viewport.y + thumb.offset, 2.f * s, thumb.size}, muted_color); }
+  stellar::native_ui::scrollbar(
+      out, {layout.list_viewport.x + layout.list_viewport.width - 3.f * s,
+            layout.list_viewport.y, 2.f * s, layout.list_viewport.height},
+      layout.scroll, 16.f * s);
   }
   if (focus_ >= 0) {
     std::vector<FocusTarget> focusables;

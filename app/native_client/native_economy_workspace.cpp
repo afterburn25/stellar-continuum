@@ -285,7 +285,7 @@ void NativeEconomyWorkspace::render(DrawList& out,const NativeEconomyView& view,
       }
     }
   }
-  if(const auto thumb=scroll_.thumb(layout.body.height,20.f*layout.scale);thumb.size>0.f) { fill(out,{layout.body.x+layout.body.width-3*layout.scale,layout.body.y,2*layout.scale,layout.body.height},theme::color::keyline); fill(out,{layout.body.x+layout.body.width-3*layout.scale,layout.body.y+thumb.offset,2*layout.scale,thumb.size},accent); }
+  theme::scrollbar(out,{layout.body.x+layout.body.width-3*layout.scale,layout.body.y,2*layout.scale,layout.body.height},scroll_,20.f*layout.scale);
   if(focus_>=0) { const std::array<UiRect,5> focusables{layout.refresh,layout.close,layout.priority_buttons[0],layout.priority_buttons[1],layout.priority_buttons[2]}; theme::focus_ring(out,focusables[static_cast<std::size_t>(focus_)]); }
 }
 } // namespace stellar::native_economy

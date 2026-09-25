@@ -321,13 +321,12 @@ void SystemInspectionCard::render(DrawList& out, UiRect bounds) const {
     out.overlay.emplace_back(Text{{row.x,row.y},item.value,item.color,item.font,
                                   row.width,*clipped});
   }
-  if(const auto thumb=scroll_.thumb(layout.clip.height,18.f*scale);thumb.size>0.f){
+  {
     const float indicator_width=3.f*scale;
     const float indicator_x=layout.clip.x+layout.clip.width-indicator_width;
-    out.overlay.emplace_back(FilledRectangle{{indicator_x,layout.clip.y,
-        indicator_width,layout.clip.height},{25,49,64,210}});
-    out.overlay.emplace_back(FilledRectangle{{indicator_x,layout.clip.y+thumb.offset,
-        indicator_width,thumb.size},{105,213,244,230}});
+    stellar::native_ui::scrollbar(
+        out, {indicator_x, layout.clip.y, indicator_width, layout.clip.height},
+        scroll_, 18.f*scale);
   }
   const auto close=close_bounds(bounds);
   text(out,close,"X",{235,244,255,255},small);

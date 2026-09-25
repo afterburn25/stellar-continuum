@@ -838,6 +838,11 @@ void NativeFleetWorkspace::render(
             muted, layout.small_font_pixels,
             text_width, *role_clip});
     }
+    list_scroll_.sync(fleet_content_height(layout), layout.list.height);
+    theme::scrollbar(out,
+                     {layout.list.x + layout.list.width - 2.f * layout.scale,
+                      layout.list.y, 2.f * layout.scale, layout.list.height},
+                     list_scroll_, 20.f * layout.scale);
   }
 
   }

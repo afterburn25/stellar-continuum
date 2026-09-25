@@ -1175,14 +1175,11 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                  std::max(11, static_cast<int>(std::lround(13.f * s))),
                  card.message_bounds.width, layout.list_viewport);
   }
-  if (const auto thumb = layout.scroll.thumb(layout.list_viewport.height,
-                                             16.f * s);
-      thumb.size > 0.f) {
-    fill(out,
-         {layout.list_viewport.x + layout.list_viewport.width - 3.f * s,
-          layout.list_viewport.y + thumb.offset, 2.f * s, thumb.size},
-         muted_color);
-  }
+  stellar::native_ui::scrollbar(
+      out,
+      {layout.list_viewport.x + layout.list_viewport.width - 3.f * s,
+       layout.list_viewport.y, 2.f * s, layout.list_viewport.height},
+      layout.scroll, 16.f * s);
   if (focus_ >= 0) {
     const auto items = focusables(layout, snapshot_, locale_);
     if (focus_ < static_cast<int>(items.size()))

@@ -1,4 +1,5 @@
 #include "native_body_inspection_panel.hpp"
+#include "native_ui_theme.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -68,9 +69,8 @@ void BodyInspectionPanel::render(DrawList& out,UiRect panel,float footer_top) co
     draw_text(out,{body_.x+item.x,body_.y+item.y-scroll_.scroll_offset,item.width,item.height},item.text,
               item.heading?cyan:item.x==0.f?muted:ink,font,body_);
   }
-  if(const auto thumb=scroll_.thumb(body_.height,24.f);thumb.size>0.f){
-    out.overlay.emplace_back(FilledRectangle{{panel.x+panel.width-8.f,body_.y,2.f,body_.height},{29,59,75,255}});
-    out.overlay.emplace_back(FilledRectangle{{panel.x+panel.width-8.f,body_.y+thumb.offset,2.f,thumb.size},cyan});
-  }
+  stellar::native_ui::scrollbar(
+      out, {panel.x + panel.width - 8.f, body_.y, 2.f, body_.height}, scroll_,
+      24.f);
 }
 }

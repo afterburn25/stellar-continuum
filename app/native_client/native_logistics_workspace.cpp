@@ -255,9 +255,6 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
   }
   if(view.nodes.empty())
     theme::empty_state(out,b,tr("SUPPLY_EMPTY","No owned supply locations in the home system."),{},font);
-  if(const auto thumb=scroll_.thumb(b.height,24.f*s);thumb.size>0){
-    theme::fill(out,{b.x+b.width+7.f*s,b.y,3.f*s,b.height},theme::color::keyline);
-    theme::fill(out,{b.x+b.width+7.f*s,b.y+thumb.offset,3.f*s,thumb.size},theme::color::selected);
-  }
+  theme::scrollbar(out,{b.x+b.width+7.f*s,b.y,3.f*s,b.height},scroll_,24.f*s);
 }
 } // namespace stellar::native_logistics
