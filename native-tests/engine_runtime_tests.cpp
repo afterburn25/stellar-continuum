@@ -1805,6 +1805,24 @@ int main() {
     }
   }
 
+  // A mod package with an unsatisfiable dependency fails the load plan:
+  // the loop still runs (the HUD reports "load plan FAILED") but the
+  // process exit code reports the broken mod set.
+  {
+    const auto sub = root / "broken-mod";
+    std::filesystem::create_directories(sub / "mods" / "broken");
+    {
+      std::ofstream out(sub / "mods" / "broken" / "package.json");
+      out << R"({"id":"mod.broken","version":"1.0.0",
+                 "dependencies":[{"id":"mod.absent","version":">=1.0"}]})";
+    }
+    RuntimeHost host{headless_options(sub)};
+    int updates = 0;
+    host.on_update = [&](World &, float) { ++updates; };
+    check(host.run() == 1, "a broken mod set exits 1");
+    check(updates > 0, "the loop still ran to report the failure");
+  }
+
   std::filesystem::remove_all(root, ec);
   if (failures == 0)
     std::cout << "engine runtime host tests passed\n";
