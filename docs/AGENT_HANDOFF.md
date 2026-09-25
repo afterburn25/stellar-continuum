@@ -369,7 +369,9 @@ dumps), `--world-w/--world-h`, `--speed`, `--width/--height`,
 P pauses, F12 screenshots to `<root>/screenshots/`. Input journaling:
 `--record`/`--replay` (frame-indexed input + world-hash checkpoints
 every 30 frames, `replay_verified`/`replay_diverged`), `--replay-info`
-(headless inventory), `--replay-exit` (0 verified / 1 diverged), and
+(headless inventory), `--replay-exit` (0 verified / 1 diverged),
+`--replay-until N` (canonical world-snapshot dump at journal tick N
+for divergence bisection), and
 `--headless` runs the loop with no Window/Vulkan/audio — synthetic
 input snapshot at the configured drawable size, one deterministic sim
 step per frame, so generated games smoke-test and replay-verify on
@@ -380,10 +382,11 @@ spawn/land/collision/anim-event callbacks (2D + 3D, incl. solid-landing
 MTV resolution and 3D collision exit), injected-input F5/F9
 quicksave-load in both 2D and scene3d modes, save_data blobs, scene
 switching + live hot-reload polling, 2D/3D ttl/parent/bounds, input-map
-rebinding, accessors, VFX stepping, snapshot parity, run(argc, argv)
+rebinding, accessors, VFX stepping (2D + 3D projected anchors), snapshot parity, run(argc, argv)
 flag parsing and the replay contract; the Projects tool's TEST passes
-`--headless` by default). Headless limits: `on_draw`/`on_status` never fire (no
-DrawList) and `audio()` must not be called (no audio device).
+`--headless` by default). Headless limits: `audio()` must not be called (no audio
+device) — `on_draw`/`on_status` still fire with a fully built
+DrawList that is simply never submitted to a GPU.
 `SceneEntity` authoring surface: name, position/extent/velocity,
 tint, sprite path, layer (stable-sorted draw order), parallax
 (0 = screen-pinned), text label, gravityScale + solid (platformer
