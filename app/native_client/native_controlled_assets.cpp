@@ -66,7 +66,7 @@ View build(const stellar::core::FreshCampaignState& world,const stellar::native_
     // predicates, so rank and label never disagree.
     if(source.combat&&(source.combat->retreat_started||source.combat->target_fleet_id))r.urgency=0;
     else if(source.transit_phase!=FleetTransitPhase::None||source.destination_system_id)r.urgency=1;
-    else if(source.return_to_base_requested||source.hold_requested||source.freight_target_outpost_id||source.settlement_body_id||(f.science_survey&&!f.science_survey->completed&&!f.science_survey->held)||(f.reconnaissance&&!f.reconnaissance->completed&&!f.reconnaissance->held)||source.combat)r.urgency=2;
+    else if(source.return_to_base_requested||source.hold_requested||source.freight_target_outpost_id||source.settlement_body_id||(f.science_survey&&!f.science_survey->completed&&!f.science_survey->held)||(f.reconnaissance&&!f.reconnaissance->completed&&!f.reconnaissance->held)||(source.combat&&source.combat->order!=MilitaryOrderType::Hold))r.urgency=2;
     if(source.return_to_base_failure_reason){r.severity=1;r.tooltip+=resolve(locale,"ASSETS_WARN_ROUTE","\nReturn route needs attention.");}
     result.rows.push_back(std::move(r));
   }
