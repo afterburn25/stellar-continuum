@@ -1349,8 +1349,26 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
          text_secondary, layout.body_font_pixels);
   }
 
-  // Recent combat events feed (observer-filtered snapshot tail).
+  // Recent combat events feed (observer-filtered snapshot tail). Severity is
+  // derived from the already-exposed actor/target ids: losses to the observer
+  // read danger, losses inflicted read success, disruption reads caution.
   {
+    const auto event_color=[&](const auto &event){
+      if(!event.details_known)return unknown;
+      using EventType=stellar::core::MassiveCombatEventType;
+      const bool own_actor=event.actor_civilization_id==observer_civilization_id_;
+      const bool own_target=event.target_civilization_id==observer_civilization_id_;
+      switch(event.type){
+        case EventType::Damage:case EventType::FormationDestroyed:
+          return own_target?danger:own_actor?success:caution;
+        case EventType::MissileIntercepted:case EventType::Escaped:
+        case EventType::Surrendered:case EventType::WarpBlocked:
+          return caution;
+        case EventType::WarpSpooling:
+          return own_actor?caution:unknown;
+        default:return text_secondary;
+      }
+    };
     int lines = 0;
     for (auto it = snapshot_->events.rbegin();
          it != snapshot_->events.rend() && lines < 4; ++it, ++lines) {
@@ -1358,7 +1376,7 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
       const auto y = layout.event_feed.y + static_cast<float>(lines) * row_height;
       clipped_text(out, {layout.event_feed.x, y},
                    it->details_known ? it->message : tr("BATTLE_INTERCEPT","Signal intercept."),
-                   it->details_known ? text_secondary : unknown,
+                   event_color(*it),
                    layout.small_font_pixels, layout.event_feed.width,
                    {layout.event_feed.x, y, layout.event_feed.width, row_height - 4.f * layout.scale});
     }
