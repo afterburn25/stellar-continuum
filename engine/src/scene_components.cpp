@@ -526,6 +526,14 @@ void register_scene_components(World &world) {
       decode_fields<AccretionDisc, &AccretionDisc::inner,
                     &AccretionDisc::outer, &AccretionDisc::kelvin,
                     &AccretionDisc::beaming>);
+  world.register_component<EmissionVolume>(
+      "emissionvolume",
+      encode_fields<EmissionVolume, &EmissionVolume::depth,
+                    &EmissionVolume::density, &EmissionVolume::seed,
+                    &EmissionVolume::scatter, &EmissionVolume::steps>,
+      decode_fields<EmissionVolume, &EmissionVolume::depth,
+                    &EmissionVolume::density, &EmissionVolume::seed,
+                    &EmissionVolume::scatter, &EmissionVolume::steps>);
   // u32 count + length-prefixed spec strings + f32 switch size — decode
   // tolerates a truncated tail like MaterialSurface.
   world.register_component<MeshLods>(
@@ -853,6 +861,13 @@ std::vector<EntityId> spawn_scene3d(World &world,
     if (s.accretion[2] >= 100.f)
       world.add(entity, AccretionDisc{s.accretion[0], s.accretion[1],
                                       s.accretion[2], s.accretion[3]});
+    // The volume's emission image is the entity texture — without one
+    // the component would export a `volume` block that fails to parse.
+    if (s.volume_depth > 0.f && !s.texture.empty())
+      world.add(entity,
+                EmissionVolume{s.volume_depth, s.volume_density,
+                               s.volume_seed, s.volume_scatter,
+                               s.volume_steps});
     if (!s.lod_meshes.empty())
       world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels});
     world.add(entity, GravityScale{s.gravity_scale});
@@ -962,6 +977,16 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.star_kelvin = sp->kelvin;
     if (const auto *ad = world.get<AccretionDisc>(entity))
       s.accretion = {ad->inner, ad->outer, ad->kelvin, ad->beaming};
+    // An orphan volume (no TextureRef) would emit a `volume` block the
+    // parser rejects — skip it rather than write an unloadable document.
+    if (const auto *ev = world.get<EmissionVolume>(entity);
+        ev && !s.texture.empty()) {
+      s.volume_depth = ev->depth;
+      s.volume_density = ev->density;
+      s.volume_seed = ev->seed;
+      s.volume_scatter = ev->scatter;
+      s.volume_steps = ev->steps;
+    }
     if (const auto *ml = world.get<MeshLods>(entity)) {
       s.lod_meshes = ml->specs;
       s.lod_pixels = ml->pixels;

@@ -696,6 +696,12 @@ int main() {
         turret.star_kelvin = 5800.0;
         turret.accretion = {0.3f, 1.f, 12000.f, -0.6f};
         turret.forward_scatter = 0.4f;
+        turret.texture = "maps/turret.png";
+        turret.volume_depth = 0.3f;
+        turret.volume_density = 6.f;
+        turret.volume_seed = 2.f;
+        turret.volume_steps = 24;
+        turret.volume_scatter = 0.5f;
         turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
         turret.lod_pixels = 64.f;
         doc.entities.push_back(turret);
@@ -775,6 +781,12 @@ int main() {
               "spawn_scene3d accretiondisc component");
         check(world3.get<AccretionDisc>(ship_e) == nullptr,
               "no accretion key does not attach a component");
+        const auto *ev = world3.get<EmissionVolume>(turret_e);
+        check(ev != nullptr && ev->depth == 0.3f && ev->density == 6.f &&
+                  ev->seed == 2.f && ev->steps == 24 && ev->scatter == 0.5f,
+              "spawn_scene3d emissionvolume component");
+        check(world3.get<EmissionVolume>(ship_e) == nullptr,
+              "no volume key does not attach a component");
         check(world3.get<Lifetime>(turret_e)->remaining == 3.f,
               "spawn_scene3d lifetime");
         const auto *pt = world3.get<Parent3D>(turret_e);
@@ -847,6 +859,11 @@ int main() {
             check(rad != nullptr && rad->inner == 0.3f &&
                       rad->kelvin == 12000.f && rad->beaming == -0.6f,
                   "accretiondisc codec round-trips");
+            const auto *rev = restored.get<EmissionVolume>(*re_turret);
+            check(rev != nullptr && rev->depth == 0.3f &&
+                      rev->density == 6.f && rev->steps == 24 &&
+                      rev->scatter == 0.5f,
+                  "emissionvolume codec round-trips");
         }
         if (re_turret) {
             resolve_hierarchy3d(restored);
@@ -889,6 +906,13 @@ int main() {
                   out.entities[1].accretion[3] == -0.6f &&
                   out.entities[1].forward_scatter == 0.4f,
               "scene3d_from_world exports surface response");
+        check(out.entities[1].texture == "maps/turret.png" &&
+                  out.entities[1].volume_depth == 0.3f &&
+                  out.entities[1].volume_density == 6.f &&
+                  out.entities[1].volume_seed == 2.f &&
+                  out.entities[1].volume_steps == 24 &&
+                  out.entities[1].volume_scatter == 0.5f,
+              "scene3d_from_world exports the emission volume");
         check(out.entities[1].lod_meshes.size() == 2 &&
                   out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&
                   out.entities[1].lod_pixels == 64.f,

@@ -2571,6 +2571,21 @@ int RuntimeHost::run() {
           inst.material.atmosphere =
               native_map::Atmosphere3D{{at->r, at->g, at->b}, at->strength,
                                        at->power, at->night_floor};
+        // Emission volume: the entity's own texture is the emission
+        // image and the volume branch requires transparency — a missing
+        // texture drops the component rather than failing the instance.
+        if (const auto *vol = world.get<EmissionVolume>(e);
+            vol && inst.material.texture) {
+          native_map::SurfaceEffect3D effect;
+          effect.next_texture = inst.material.texture;
+          effect.volume_depth = vol->depth;
+          effect.volume_density = vol->density;
+          effect.volume_seed = vol->seed;
+          effect.volume_steps = vol->steps;
+          effect.volume_scatter = vol->scatter;
+          inst.material.surface_effect = effect;
+          inst.material.transparent = true;
+        }
         if (const auto *vr = world.get<VisibleRange>(e))
           inst.visible_range = vr->range;
         if (const auto *ml = world.get<MeshLods>(e)) {

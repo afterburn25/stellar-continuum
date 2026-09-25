@@ -97,14 +97,18 @@ same document headless-tested.
    with a dark sphere), `forward_scatter`/`forwardScatter` adds a
    single-lobe phase function (backlit dusty rings brighten, icy
    opposition surges), and `SurfaceEffect3D::volume_scatter` makes
-   emission volumes read star-lit. Remaining: the deck is
+   emission volumes read star-lit; volumes are document-authored via the
+   `volume` block / `EmissionVolume` component (entity texture supplies
+   the emission image). Remaining: the deck is
    a texture-space composite — no volumetric cloud shells or cloud
    self-shadowing; banding is a single cosine, not zonal winds; the
    phase term is one lobe, no HG g-parameter.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
-9. **Editor** — scene3d tool exposes tint/texture/opacity/double_sided
-   only; no material/lighting/post controls, no preview debug modes.
+9. **Editor** — scene3d tool exposes every material field (PBR, surface
+   maps, atmosphere, limb/beaming/shear/scatter, presets, volume, LODs),
+   render options, and preview debug modes. Remaining: no live lighting
+   or per-camera authoring inside the tool.
 10. **Fleet scale** — `maximum_scene3d_instances=4096`, CPU-side uniform
     fill per instance. Instancing is real but bounded by per-frame CPU
     record build. `visible_range` distance culling landed (phase 16) and

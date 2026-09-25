@@ -212,6 +212,16 @@ struct StarPhotosphere {
 struct AccretionDisc {
   float inner{0.f}, outer{0.f}, kelvin{0.f}, beaming{0.85f};
 };
+// Image-shaped emission volume (nebula, plasma plume, accretion glow) —
+// the component counterpart of the entity document's `volume` block.
+// The entity's own texture supplies the emission image; `depth`
+// (0,0.75] enables the front-to-back march inside the closed proxy,
+// `steps` bounds the integration budget [8,64], and `scatter` [0,1] is
+// the directional star-lit limb term. Attached only when authored.
+struct EmissionVolume {
+  float depth{0.f}, density{5.f}, seed{0.f}, scatter{0.f};
+  int steps{32};
+};
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
 // weighted to the day side with a nightside floor.
 struct AtmosphereShell {

@@ -235,6 +235,15 @@ struct Scene3dEntity {
   // describe the annulus mesh the material is authored for; pair with
   // an "annulus:i,o" mesh spec at matching radii.
   std::array<float,4> accretion{0.f,0.f,0.f,0.f};
+  // Image-shaped emission volume (nebula, plasma plume): `volume` is a
+  // {depth,density,seed,steps,scatter} block; depth (0,0.75] enables the
+  // front-to-back march inside the closed proxy, steps bounds the
+  // integration budget [8,64], scatter [0,1] is the directional
+  // star-lit limb term. The entity's own texture supplies the emission
+  // image, and the material renders transparent automatically.
+  float volume_depth{0.f}, volume_density{5.f}, volume_seed{0.f};
+  int volume_steps{32};
+  float volume_scatter{0.f};
   // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
   // coarsest-first. lod_meshes[i] draws once the projected bounding
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).

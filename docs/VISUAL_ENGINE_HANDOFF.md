@@ -106,8 +106,11 @@ the star-lit side brightens ~1.65×, the far side dims to ~0.35, so
 nebulae read illuminated rather than uniformly self-glowing. It rides
 the `atmo_shape.z` lane: `main()` early-returns into `emission_volume`
 whenever `volume_depth > 0`, so atmosphere lanes are inert on volume
-materials and free to carry it. No document/component key yet — volume
-materials are authored through the C++ API today.
+materials and free to carry it. Authored scenes use the `volume` entity
+block (`{depth,density,seed,steps,scatter}`) or the `EmissionVolume`
+component; the entity's own `texture` supplies the emission image and
+the material turns transparent automatically — a `volume` block without
+a texture is rejected at parse and dropped at runtime.
 
 Per-instance distance culling lives on `MeshInstance3D`:
 
@@ -258,7 +261,9 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `environment`, `environment_strength`, `alpha_cutout`, `uv_tile_x/y`,
 `atmo_strength/power/night/r/g/b`, `range` (per-entity
 `visible_range`), `terminator_wrap`, `limb_darkening`, `bandShear`
-([-0.5,0.5]), `lods` (array of
+([-0.5,0.5]), `orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
+([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
+(`{depth,density,seed,steps,scatter}` — requires a `texture`), `lods` (array of
 mesh specs, ≤ 8) with `lodPixels`, and a `surface`
 block —
 `{normal, properties, cloud, normalStrength, relief, cloudOpacity,

@@ -436,6 +436,11 @@ int main() {
     cube.star_kelvin = 3200.0;
     cube.accretion = {0.4f, 1.f, 9000.f, 0.8f};
     cube.forward_scatter = 0.5f;
+    cube.volume_depth = 0.3f;
+    cube.volume_density = 6.f;
+    cube.volume_seed = 2.f;
+    cube.volume_steps = 24;
+    cube.volume_scatter = 0.5f;
     cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
     cube.lod_pixels = 48.f;
     scene.entities.push_back(cube);
@@ -572,6 +577,10 @@ int main() {
                 rc.lod_meshes[1] == "models/crate_low.obj" &&
                 rc.lod_pixels == 48.f,
             "scene3d mesh LOD chain round-trips");
+      check(rc.volume_depth == 0.3f && rc.volume_density == 6.f &&
+                rc.volume_seed == 2.f && rc.volume_steps == 24 &&
+                rc.volume_scatter == 0.5f,
+            "scene3d emission-volume block round-trips");
       check(reparsed->point_lights.size() == 1 &&
                 reparsed->point_lights[0].x == 1.f &&
                 reparsed->point_lights[0].z == -1.f &&
@@ -709,6 +718,22 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"forwardScatter":1.4}]})")
               .has_value(),
           "scene3d forward scatter above 1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.9}}]})")
+              .has_value(),
+          "scene3d volume depth above 0.75 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"volume":{"depth":0.3}}]})")
+              .has_value(),
+          "scene3d volume without an emission texture rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"steps":4}}]})")
+              .has_value(),
+          "scene3d volume steps below 8 rejected");
+    check(engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"density":8,"steps":48,"scatter":0.7}}]})")
+              .has_value(),
+          "scene3d volume rejected a legal nebula block");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

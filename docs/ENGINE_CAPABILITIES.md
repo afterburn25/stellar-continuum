@@ -232,7 +232,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   returns into `emission_volume`); validated [0,1]; `engine_scene3d`
   bounds + GPU probe measuring a ~4× lit/dark limb gradient with light
   from view +x. Remaining: gradient only — no secondary extinction
-  march toward the light; volumes stay C++-authored (no doc key).
+  march toward the light.
 
 ### Follow-up: `Material3D::forward_scatter` phase function
 
@@ -247,6 +247,20 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   row. GPU probe measures the authored ×1.8 backlit boost and ×0.2
   face-lit dim on a tilted annulus. Remaining: one lobe — no
   Henyey-Greenstein g parameter or wavelength split; radiance only.
+
+### Follow-up: `EmissionVolume` document/component authoring
+
+- `SurfaceEffect3D`'s emission-volume march becomes authorable: the
+  `volume` entity block (`{depth,density,seed,steps,scatter}`) maps to
+  a new `EmissionVolume` component (codec + spawn + world export), and
+  `RuntimeHost`/editor preview attach the surface effect using the
+  entity's own texture as the emission image — transparency is enabled
+  automatically, and a `volume` block without a `texture` fails parse.
+  Nebulae/star-lit plasma clouds are now document-authored instead of
+  C++-only. Validated: doc bounds (depth (0,.75], steps [8,64], scatter
+  [0,1]), `engine_project` round-trip + rejects, `engine_world`
+  codec/spawn/export. Remaining: flow/blend/distortion params and the
+  camera-inside sphere stay C++-only; one emission image per entity.
 
 ## Scene3D directional shadow mapping (2026-09-25)
 

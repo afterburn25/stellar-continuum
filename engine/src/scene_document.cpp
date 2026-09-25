@@ -472,6 +472,12 @@ std::string Scene3dDocument::to_json() const {
       item["forwardScatter"] = e.forward_scatter;
     if (e.star_kelvin != 0.0) item["starKelvin"] = e.star_kelvin;
     if (e.accretion[2] != 0.f) item["accretion"] = e.accretion;
+    if (e.volume_depth != 0.f)
+      item["volume"] = {{"depth", e.volume_depth},
+                        {"density", e.volume_density},
+                        {"seed", e.volume_seed},
+                        {"steps", e.volume_steps},
+                        {"scatter", e.volume_scatter}};
     if (!e.lod_meshes.empty()) {
       item["lods"] = e.lod_meshes;
       item["lodPixels"] = e.lod_pixels;
@@ -686,6 +692,23 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
           return fail("accretion kelvin must be in [100,100000]");
         if (!(std::abs(e.accretion[3]) <= 1.f))
           return fail("accretion beaming must be in [-1,1]");
+      }
+      if (item.contains("volume")) {
+        const auto &vol = item.at("volume");
+        if (!vol.is_object()) return fail("volume must be an object");
+        e.volume_depth = vol.value("depth", 0.0f);
+        e.volume_density = vol.value("density", 5.0f);
+        e.volume_seed = vol.value("seed", 0.0f);
+        e.volume_steps = vol.value("steps", 32);
+        e.volume_scatter = vol.value("scatter", 0.0f);
+        if (!(e.volume_depth > 0.f && e.volume_depth <= 0.75f) ||
+            !(e.volume_density > 0.f && e.volume_density <= 32.f) ||
+            !(std::abs(e.volume_seed) <= 1e4f) ||
+            !(e.volume_steps >= 8 && e.volume_steps <= 64) ||
+            !(e.volume_scatter >= 0.f && e.volume_scatter <= 1.f))
+          return fail("volume fields out of range");
+        if (e.texture.empty())
+          return fail("volume requires a texture for the emission image");
       }
       if (item.contains("lods")) {
         const auto &lods = item.at("lods");
