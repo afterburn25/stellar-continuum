@@ -2144,12 +2144,31 @@ void commit_scene3_field(Shell &shell) {
           break;
   case 55: {
           float albedo;
-          valid = parse_quad(shell.scene3_buffer, a, albedo, b, c);
+          // Optional 5th field: cloud-deck height (object units, [0,.1]).
+          float height = 0.f;
+          std::string_view text = shell.scene3_buffer;
+          const auto c4 = [&] {
+            auto p = text.find(',');
+            for (int i = 0; i < 3 && p != std::string_view::npos; ++i)
+              p = text.find(',', p + 1);
+            return p;
+          }();
+          if (c4 != std::string_view::npos) {
+            try {
+              height = std::stof(std::string(text.substr(c4 + 1)));
+            } catch (const std::exception &) {
+              valid = false;
+              break;
+            }
+            text = text.substr(0, c4);
+          }
+          valid = parse_quad(text, a, albedo, b, c);
           if (valid && a >= 0.f && a <= 1.f && albedo >= 0.f &&
               albedo <= 1.f && b >= -2.f && b <= 2.f && c >= -2.f &&
-              c <= 2.f) {
+              c <= 2.f && height >= 0.f && height <= 0.1f) {
             next.cloud_opacity = a; next.cloud_albedo = albedo;
             next.cloud_offset_x = b; next.cloud_offset_y = c;
+            next.cloud_height = height;
           } else valid = false;
           break; }
   case 56:
@@ -2493,6 +2512,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         response.relief = e.relief;
         response.cloud_opacity = e.cloud_opacity;
         response.cloud_albedo = e.cloud_albedo;
+        response.cloud_height = e.cloud_height;
         response.cloud_offset = {e.cloud_offset_x, e.cloud_offset_y};
         inst.material.surface_response = response;
       }
@@ -2780,9 +2800,12 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_clouddeck, "cloudDeck",
         entity ? std::to_string(entity->cloud_opacity) + "," +
                      std::to_string(entity->cloud_albedo) + "," +
-                     fmt_pair(entity->cloud_offset_x, entity->cloud_offset_y)
+                     fmt_pair(entity->cloud_offset_x, entity->cloud_offset_y) +
+                     (entity->cloud_height != 0.f
+                          ? "," + std::to_string(entity->cloud_height)
+                          : "")
                : "",
-        ed(55), "shadow opacity, deck albedo 0..1, uv offset");
+        ed(55), "shadow opacity, deck albedo 0..1, uv offset[, height 0..0.1]");
   field(shell.hit3_termwrap, "termWrap",
         entity ? std::to_string(entity->terminator_wrap) : "", ed(56),
         "wrap-diffuse 0..1 - 0 keeps Lambert");
@@ -6872,7 +6895,10 @@ int main(int argc, char **argv) {
               edit3(55, std::to_string(se->cloud_opacity) + "," +
                             std::to_string(se->cloud_albedo) + "," +
                             std::to_string(se->cloud_offset_x) + "," +
-                            std::to_string(se->cloud_offset_y));
+                            std::to_string(se->cloud_offset_y) +
+                            (se->cloud_height != 0.f
+                                 ? "," + std::to_string(se->cloud_height)
+                                 : ""));
             else if (shell.hit3_termwrap.contains(event.position) && se)
               edit3(56, std::to_string(se->terminator_wrap));
             else if (shell.hit3_limbdark.contains(event.position) && se)

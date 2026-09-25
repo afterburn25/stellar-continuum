@@ -107,7 +107,7 @@ void validate_instance(const MeshInstance3D& i){
       throw std::invalid_argument("Invalid emission volume depth, density or integration budget");
   }
   if(m.surface_response){const auto& s=*m.surface_response;
-    if((!s.properties&&!s.normal&&!s.cloud_shadow)||!bounded(s.normal_strength,2)||s.normal_strength<0||!bounded(s.relief,.02)||s.relief<0||!bounded(s.cloud_opacity,1)||s.cloud_opacity<0||!bounded(s.cloud_albedo,1)||s.cloud_albedo<0||!bounded(s.cloud_offset.x,2)||!bounded(s.cloud_offset.y,2))
+    if((!s.properties&&!s.normal&&!s.cloud_shadow)||!bounded(s.normal_strength,2)||s.normal_strength<0||!bounded(s.relief,.02)||s.relief<0||!bounded(s.cloud_opacity,1)||s.cloud_opacity<0||!bounded(s.cloud_albedo,1)||s.cloud_albedo<0||!bounded(s.cloud_offset.x,2)||!bounded(s.cloud_offset.y,2)||!bounded(s.cloud_height,.1)||s.cloud_height<0)
       throw std::invalid_argument("3D surface response requires at least one map and bounded parameters.");
   }
   if(m.shadow){const auto& s=*m.shadow;

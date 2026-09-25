@@ -2559,6 +2559,7 @@ int RuntimeHost::run() {
           response.relief = sf->relief;
           response.cloud_opacity = sf->cloud_opacity;
           response.cloud_albedo = sf->cloud_albedo;
+          response.cloud_height = sf->cloud_height;
           response.cloud_offset = {sf->cloud_offset_x, sf->cloud_offset_y};
           if (response.normal || response.properties ||
               response.cloud_shadow)

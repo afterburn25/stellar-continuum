@@ -40,6 +40,7 @@ m.surface_response->normal_strength = .8f;  // [0,2]
 m.surface_response->relief = 0.01f;         // [0,0.02] height-of-instance
 m.surface_response->cloud_opacity = .6f;    // [0,1] surface shadow strength
 m.surface_response->cloud_albedo = .7f;     // [0,1] visible deck brightness
+m.surface_response->cloud_height = .04f;    // [0,.1] deck altitude — parallax + displaced shadows
 m.surface_response->cloud_offset = {.1f,0}; // UV drift, each |≤2|
 m.terminator_wrap = 0.4f;                   // [0,1] wrap-diffuse softening
 m.limb_darkening = 0.6f;                    // [0,1] N.V radiance falloff
@@ -310,7 +311,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 mesh specs, ≤ 8) with `lodPixels`, and a `surface`
 block —
 `{normal, properties, cloud, normalStrength, relief, cloudOpacity,
-cloudAlbedo, cloudOffset:[x,y]}`; `surface` requires at least one map.
+cloudAlbedo, cloudHeight, cloudOffset:[x,y]}`; `surface` requires at
+least one map.
 Non-array `lods`, oversized chains, and `lodPixels` outside [1,4096]
 are rejected.
 Scene fields: `point_lights[]` (max 4), `exposure`,
@@ -380,8 +382,10 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   path and are evaluated independently of the map.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or
   aerial perspective.
-- The cloud deck is a texture-space composite — no volumetric cloud
-  shells or self-shadowing; `band_shear`+`band_waves` are static
+- The cloud deck is a texture-space composite with a bounded altitude
+  term (`cloud_height` gives limb parallax, sun-displaced ground shadows
+  and zenith-gated self-shading) — still no volumetric shell or
+  per-layer thickness; `band_shear`+`band_waves` are static
   two-harmonic longitude warps, not animated turbulence.
 - Limb darkening is the single-coefficient linear law — no quadratic
   two-term coefficients or wavelength-dependent profiles.

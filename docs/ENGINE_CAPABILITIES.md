@@ -177,24 +177,40 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   by the same wrapped sunlight and shadowed by the same
   analytic/shadow-map visibility as the surface.
 - **Persistence:** entity `surface` block `{normal, properties, cloud,
-  normalStrength, relief, cloudOpacity, cloudAlbedo, cloudOffset:[x,y]}`
-  plus flat `terminatorWrap`/`limbDarken` round-trip through
-  `Scene3dDocument`; `surface` requires at least one map and rejects
-  out-of-range scalars. `MaterialSurface` component codecs the same
-  fields; `spawn_scene3d` attaches it when any field differs from
-  defaults and `scene3d_from_world` exports it back.
+  normalStrength, relief, cloudOpacity, cloudAlbedo, cloudHeight,
+  cloudOffset:[x,y]}` plus flat `terminatorWrap`/`limbDarken` round-trip
+  through `Scene3dDocument`; `surface` requires at least one map and
+  rejects out-of-range scalars. `MaterialSurface` component codecs the
+  same fields (`cloud_height` tails the payload after the map strings so
+  pre-field saves still decode); `spawn_scene3d` attaches it when any
+  field differs from defaults and `scene3d_from_world` exports it back.
+- **Deck height:** `SurfaceResponse3D::cloud_height` [0,.1] (object
+  units, scaled like `relief`) lifts the deck off the surface. In the
+  shader a least-squares UV jacobian maps view-space displacements to UV
+  shifts: the deck texel shifts by the projected normal offset (limb
+  parallax — limb clouds peek past the silhouette, disc centre stays
+  registered), the ground shadow samples `h·tan(zenith)` sunward along
+  the tangential light component (capped 4h), and a sin²(zenith)-gated
+  sunward tap shades the deck itself — overhead sun stays fully lit.
+  `texture_options.z` carries the world-space height; 0 keeps the
+  texture-space deck path untouched.
 - **Editor:** Scene3D tool entity rows `surfMaps`, `surfShape`,
-  `cloudDeck`, `termWrap`, `limbDark` edit the live preview.
+  `cloudDeck` (5th field = height), `termWrap`, `limbDark` edit the
+  live preview.
 - **Tests:** `native_scene3d_gpu` — deck compositing brightness,
   `cloud_albedo` scaling, wrap-diffuse lighting at the geometric
   terminator, wrap invariance at the fully lit pole, limb-darkened disc
-  edge with unchanged centre; `engine_scene3d` — cloud-only acceptance +
-  scalar bound rejects; `engine_project` — document round-trip +
-  `surface`/`terminatorWrap`/`limbDarken` rejections; `engine_world` —
-  `MaterialSurface` spawn/codec/export round-trips.
-- **Limitations:** the deck is a texture-space composite — no volumetric
-  cloud shells or cloud self-shadowing; wrap and limb darkening are
-  single-coefficient laws, not wavelength-dependent models.
+  edge with unchanged centre, and a `cloud_height` capture showing
+  limb-ring parallax against an unchanged disc centre; `engine_scene3d`
+  — cloud-only acceptance + scalar bound rejects; `engine_project` —
+  document round-trip + `surface`/`terminatorWrap`/`limbDarken`/
+  `cloudHeight` rejections; `engine_world` — `MaterialSurface`
+  spawn/codec/export round-trips.
+- **Limitations:** the deck remains a texture-space composite — the
+  height term is a bounded parallax/shadow approximation, not a
+  volumetric shell (no ray-marched interior, no per-layer thickness);
+  wrap and limb darkening are single-coefficient laws, not
+  wavelength-dependent models.
 
 ### Follow-up: `Material3D::band_shear` (same change set's successor)
 

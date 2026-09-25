@@ -355,6 +355,36 @@ int main(int argc,char** argv)try{
     check(channel(*dim_deck,160,160,0)<channel(*deck_lit,160,160,0)-60,"Cloud albedo did not scale the deck brightness");
   }
   {
+    // Raised cloud deck: height gives the layer view parallax — limb
+    // texels slide tangentially while the disc centre (deck displaced
+    // along the view axis) stays put.
+    auto lifted=lit;lifted.mesh=Mesh3D::uv_sphere(64,32);lifted.scale=.85f;
+    lifted.material.tint={125,125,125,255};lifted.material.ambient=.05f;lifted.material.diffuse=.85f;
+    lifted.material.light_direction=Vec3{0,0,1};
+    lifted.material.surface_response=SurfaceResponse3D{};
+    auto& rs=*lifted.material.surface_response;
+    std::vector<std::uint8_t> cpix(256*64*4);
+    for(int y=0;y<64;++y)for(int x=0;x<256;++x){
+      const std::uint8_t v=(x/16)%2?255:40;
+      cpix[(y*256+x)*4]=v;cpix[(y*256+x)*4+1]=v;cpix[(y*256+x)*4+2]=v;cpix[(y*256+x)*4+3]=255;
+    }
+    rs.cloud_shadow=RgbaImage::create(256,64,std::move(cpix));
+    rs.cloud_opacity=1;rs.cloud_albedo=1;
+    const auto flat=capture({lifted},"cloud-height-flat.png");
+    rs.cloud_height=.06f;
+    const auto raised=capture({lifted},"cloud-height-raised.png");
+    double inner=0,outer=0;int inner_px=0,outer_px=0;
+    for(int y=40;y<290;++y)for(int x=30;x<300;++x){
+      const double r=std::hypot(x-164.0,y-160.0);
+      if(r>130.0)continue;
+      const int d=std::abs(channel(*raised,x,y,0)-channel(*flat,x,y,0));
+      if(r<55.0){inner+=d;++inner_px;}
+      else if(r>95.0){outer+=d;++outer_px;}
+    }
+    check(outer>2.0*inner*(static_cast<double>(outer_px)/inner_px)&&outer>40000.0,
+          "Raised cloud deck showed no limb parallax");
+  }
+  {
     auto wrapped=lit;wrapped.material.tint={255,255,255,255};wrapped.material.ambient=.05f;wrapped.material.diffuse=.95f;
     wrapped.material.light_direction=Vec3{1,0,0};
     const auto edge=capture({wrapped},"terminator-flat.png");

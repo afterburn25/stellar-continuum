@@ -200,6 +200,9 @@ struct MaterialSurface {
   // alternating mid-latitude jets.
   float band_waves{0.f};
   std::string normal_map, properties_map, cloud_map;
+  // Cloud-deck altitude in object units [0,.1]: view parallax, displaced
+  // ground shadows and deck self-shading. 0 keeps a texture-space deck.
+  float cloud_height{0.f};
 };
 // Spectral-class star photosphere — the component counterpart of the
 // entity document's `starKelvin` key. The runtime maps it through

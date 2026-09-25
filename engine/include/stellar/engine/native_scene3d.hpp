@@ -102,6 +102,10 @@ struct SurfaceResponse3D {
   float normal_strength{.35f},relief{},cloud_opacity{};
   // [0,1] visible cloud-deck strength; 0 keeps the map shadow-only.
   float cloud_albedo{};
+  // Deck altitude in object units [0,.1]: raises the cloud layer off the
+  // surface for view parallax, displaced ground shadows and deck
+  // self-shadowing toward the key light. 0 keeps the texture-space deck.
+  float cloud_height{};
   Point cloud_offset{};
 };
 enum class AnalyticShadowShape3D { Ellipsoid,Annulus };

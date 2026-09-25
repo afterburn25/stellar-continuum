@@ -688,6 +688,7 @@ int main() {
         turret.normal_strength = 0.9f;
         turret.cloud_opacity = 0.7f;
         turret.cloud_albedo = 0.8f;
+        turret.cloud_height = 0.05f;
         turret.cloud_offset_x = 0.1f;
         turret.cloud_offset_y = 0.2f;
         turret.terminator_wrap = 0.5f;
@@ -763,6 +764,7 @@ int main() {
                   ms->cloud_map == "maps/turret_clouds.png" &&
                   ms->normal_strength == 0.9f &&
                   ms->cloud_opacity == 0.7f && ms->cloud_albedo == 0.8f &&
+                  ms->cloud_height == 0.05f &&
                   ms->cloud_offset_x == 0.1f && ms->cloud_offset_y == 0.2f &&
                   ms->terminator_wrap == 0.5f && ms->limb_darkening == 0.6f &&
                   ms->band_shear == -0.3f && ms->orbital_beaming == 0.65f &&
@@ -851,6 +853,7 @@ int main() {
             check(rms != nullptr && rms->cloud_map == "maps/turret_clouds.png" &&
                       rms->normal_map == "maps/turret_n.png" &&
                       rms->cloud_albedo == 0.8f &&
+                      rms->cloud_height == 0.05f &&
                       rms->terminator_wrap == 0.5f &&
                       rms->limb_darkening == 0.6f &&
                       rms->band_shear == -0.3f &&
@@ -911,6 +914,7 @@ int main() {
                   out.entities[1].normal_strength == 0.9f &&
                   out.entities[1].cloud_opacity == 0.7f &&
                   out.entities[1].cloud_albedo == 0.8f &&
+                  out.entities[1].cloud_height == 0.05f &&
                   out.entities[1].cloud_offset_y == 0.2f &&
                   out.entities[1].terminator_wrap == 0.5f &&
                   out.entities[1].limb_darkening == 0.6f &&

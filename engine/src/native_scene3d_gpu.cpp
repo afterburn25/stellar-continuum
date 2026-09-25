@@ -533,6 +533,9 @@ struct Scene3DRenderer::Storage {
       if(material.surface_response){const auto& s=*material.surface_response;
         fragment.surface_response={1,s.normal_strength,s.relief*draw.instance->scale,s.cloud_shadow?s.cloud_opacity:0};
         fragment.surface_options[0]=s.cloud_offset.x;fragment.surface_options[1]=s.cloud_offset.y;
+        // Deck altitude shares the texture_options block (x = cubic
+        // sampling, y = zonal waves): world-units height like relief.
+        if(s.cloud_height>0.f)fragment.texture_options[2]=s.cloud_height*draw.instance->scale;
         // Map presence flags gate the shader's per-map sampling so a
         // cloud-only or normal-only material needs no placeholder art.
         const float map_flags=(s.normal?1.f:0.f)+(s.properties?2.f:0.f)+(s.cloud_shadow?4.f:0.f);

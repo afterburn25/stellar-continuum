@@ -37,7 +37,7 @@ struct Material {
     vec4 additional_direction[2];
     vec4 additional_illumination[2];
     vec4 additional_shadow[2];
-    vec4 texture_options; // cubic magnification enabled, zonal waves
+    vec4 texture_options; // cubic magnification enabled, zonal waves, cloud deck height
     vec4 pbr_options; // enabled, packed map bound, night-emissive gate, alpha threshold
     vec4 pbr_values; // metallic, roughness, emissive strength, environment strength
     vec4 emissive_tint; // rgb, band shear (latitude-weighted u shift)
@@ -138,6 +138,19 @@ float direct_visibility(vec3 blocker_light) {
         }
     }
     return 1.0-material.shadow_options.z*blocked;
+}
+// Maps a view-space displacement to the UV shift producing the same
+// on-screen move (least squares through the pixel's tangent frame).
+// Raises the cloud deck: view parallax vs the surface and displaced
+// shadowing. Degenerate edge-on pixels return zero.
+vec2 uv_shift_for(vec3 dp,vec2 uv){
+    vec3 px=dFdx(view_position),py=dFdy(view_position);
+    vec2 ux=dFdx(uv),uy=dFdy(uv);
+    float aa=dot(px,px),ab=dot(px,py),bb=dot(py,py),det=aa*bb-ab*ab;
+    if(det<1e-20)return vec2(0);
+    vec2 s=vec2(dot(px,dp),dot(py,dp));
+    vec2 scr=vec2(bb*s.x-ab*s.y,-ab*s.x+aa*s.y)/det;
+    return ux*scr.x+uy*scr.y;
 }
 vec3 linear_color(vec3 c) {return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c));}
 vec3 display_color(vec3 c) {c=max(c,vec3(0));return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}
@@ -275,7 +288,7 @@ void main() {
     vec3 N=normalize(view_normal);
     vec3 V=material.view_options.x>0.5?vec3(0,0,1):normalize(-view_position);
     vec4 properties=vec4(1,0,0,0);
-    float cloud_shadow=1.0;
+    float cloud_shadow=1.0,deck_shade=1.0;
     vec4 cloud_layer=vec4(0);
     if(material.surface_response.x>0.5) {
         float map_flags=material.response_options.z;
@@ -300,8 +313,34 @@ void main() {
             N=normalize(abs(d)*N-material.surface_response.z*sign(d)*(dFdx(properties.a)*rx+dFdy(properties.a)*ry));
         // The sampler wraps longitude, preserving continuous pixel derivatives.
         if(has_cloud) {
-            cloud_layer=texture(cloud_map,uv+material.surface_options.xy);
-            cloud_shadow=1.0-material.surface_response.w*cloud_layer.a;
+            vec2 cloud_uv=uv+material.surface_options.xy;
+            float deck_h=material.texture_options.z;
+            if(deck_h>0.0){
+                // Raised deck: the visible texel shifts toward the camera
+                // (normal displacement projected through the tangent
+                // frame), so limb clouds peek past the silhouette.
+                vec3 Nv=normalize(view_normal);
+                vec2 dshift=uv_shift_for(deck_h*Nv,uv);
+                // The sunward caster sits h*tan(zenith) along the
+                // tangential light component; the cap keeps grazing
+                // angles from running off the map.
+                vec3 Ld=material.light_direction.xyz;
+                vec3 Lt=Ld-Nv*dot(Ld,Nv);
+                vec3 caster=Lt*min(deck_h/max(dot(Ld,Nv),.15),deck_h*4.0);
+                vec2 sshift=uv_shift_for(caster,uv);
+                cloud_layer=texture(cloud_map,cloud_uv-dshift);
+                cloud_shadow=1.0-material.surface_response.w
+                    *texture(cloud_map,cloud_uv+sshift).a;
+                // Sun-facing deck tops stay lit; lee neighbours shade.
+                // |Lt|^2 = sin^2(zenith) gates it — an overhead sun does
+                // not self-shadow a single-altitude deck.
+                deck_shade=1.0-material.surface_response.w*.6
+                    *clamp(dot(Lt,Lt),0.0,1.0)
+                    *texture(cloud_map,cloud_uv-dshift+sshift).a;
+            }else{
+                cloud_layer=texture(cloud_map,cloud_uv);
+                cloud_shadow=1.0-material.surface_response.w*cloud_layer.a;
+            }
         }
     }
     float incidence=dot(N,material.light_direction.xyz);
@@ -496,7 +535,7 @@ void main() {
     // brightness so a zero albedo leaves the layer shadow-only.
     if(material.response_options.y>0.0&&material.surface_response.w>0.0) {
         float cover=clamp(cloud_layer.a*material.surface_response.w,0.0,1.0);
-        vec3 deck=cloud_layer.rgb*material.response_options.y*(material.parameters.x+material.parameters.y*sunlight*visibility*light_color);
+        vec3 deck=cloud_layer.rgb*material.response_options.y*(material.parameters.x+material.parameters.y*sunlight*deck_shade*visibility*light_color);
         result=mix(result,deck,cover);
     }
     // Linear limb darkening: emitted/reflected radiance falls toward the

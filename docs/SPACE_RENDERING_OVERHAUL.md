@@ -102,10 +102,13 @@ same document headless-tested.
    the emission image; `flow`/`distort` re-pose the marched filaments and
    `image2`+`blend` mix a second authored image, so sibling nebulae don't
    repeat; `occlude` masks the volume behind its own photosphere sphere).
+   `cloudHeight` lifts the deck off the surface — a UV-jacobian parallax
+   shifts limb texels, displaces the ground shadow sunward by
+   h·tan(zenith), and zenith-gates deck self-shading.
    Remaining: the deck is
-   a texture-space composite — no volumetric cloud shells or cloud
-   self-shadowing; banding is a static two-harmonic warp (`band_shear`
-   + `band_waves` jets), not animated turbulence.
+   still a bounded parallax composite — no volumetric cloud shells or
+   per-layer thickness; banding is a static two-harmonic warp
+   (`band_shear` + `band_waves` jets), not animated turbulence.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes every material field (PBR, surface

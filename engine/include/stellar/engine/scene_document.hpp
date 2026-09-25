@@ -213,6 +213,10 @@ struct Scene3dEntity {
   std::string normal_map, properties_map, cloud_map;
   float normal_strength{0.35f}, relief{0.f}, cloud_opacity{0.f};
   float cloud_albedo{0.f}, cloud_offset_x{0.f}, cloud_offset_y{0.f};
+  // Cloud-deck altitude in object units [0,.1]: raises the cloud layer
+  // for view parallax and displaced/self shadowing; 0 keeps the deck
+  // texture-space.
+  float cloud_height{0.f};
   // Wrap-diffuse terminator softening [0,1]; 0 keeps Lambert shading.
   float terminator_wrap{0.f};
   // Linear limb darkening [0,1] for self-luminous discs (stars, hot

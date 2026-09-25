@@ -110,6 +110,8 @@ int main()try{
   rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->normal=RgbaImage::create(1,1,{128,128,255,255});i.material.surface_response->normal_strength=2.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_opacity=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_albedo=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_height=.2f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_height=-.01f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->properties=RgbaImage::create(1,1,{255,0,0,128});i.material.surface_response->cloud_offset={2.5f,0};(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.terminator_wrap=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.terminator_wrap=-.1f;(void)Scene3D::create(camera,{i});});

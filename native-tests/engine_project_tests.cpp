@@ -428,6 +428,7 @@ int main() {
     cube.relief = 0.01f;
     cube.cloud_opacity = 0.6f;
     cube.cloud_albedo = 0.7f;
+    cube.cloud_height = 0.04f;
     cube.cloud_offset_x = 0.25f;
     cube.cloud_offset_y = -0.5f;
     cube.terminator_wrap = 0.4f;
@@ -573,6 +574,7 @@ int main() {
                 rc.cloud_map == "maps/crate_clouds.png" &&
                 rc.normal_strength == 0.8f && rc.relief == 0.01f &&
                 rc.cloud_opacity == 0.6f && rc.cloud_albedo == 0.7f &&
+                rc.cloud_height == 0.04f &&
                 rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
                 rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f &&
                 rc.band_shear == -0.25f && rc.band_waves == 0.6f &&
@@ -694,6 +696,10 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"surface":{"cloud":"c.png","cloudAlbedo":2}}]})")
               .has_value(),
           "scene3d cloud albedo above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"surface":{"cloud":"c.png","cloudHeight":0.5}}]})")
+              .has_value(),
+          "scene3d cloud height above bound rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"terminatorWrap":3}]})")
               .has_value(),
