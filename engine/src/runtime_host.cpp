@@ -708,11 +708,9 @@ int RuntimeHost::run() {
       }
     }
   }
-  if (options.replay_until && !impl.replaying) {
+  if (options.replay_until && !impl.replaying)
     std::fprintf(stderr,
                  "--replay-until requires --replay — ignored\n");
-    options.replay_until.reset();
-  }
   if (!options.record_file.empty()) {
     ReplayHeader header;
     header.seed = options.seed;
@@ -2642,7 +2640,8 @@ int RuntimeHost::run() {
     ++rendered;
     // --replay-until: once journal tick N completes, dump the canonical
     // world snapshot for offline divergence bisection and exit clean.
-    if (options.replay_until && frame_tick == *options.replay_until) {
+    if (options.replay_until && impl.replaying &&
+        frame_tick == *options.replay_until) {
       const auto out = options.replay_file.generic_string() + ".until-" +
                        std::to_string(frame_tick) + ".stw";
       try {

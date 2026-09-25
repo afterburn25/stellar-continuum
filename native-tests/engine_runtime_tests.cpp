@@ -222,11 +222,17 @@ int main() {
     register_scene_components(restored);
     check(load_world_from_file(restored, dump),
           "--replay-until dump loads");
+    // The dump is the post-step world at frame tick 10 — the same state a
+    // world checkpoint at that tick would hash. on_update observes the
+    // pre-step state, so advance positions[10] by the final step delta.
+    const float ex = positions[10].first +
+                     (positions[10].first - positions[9].first);
+    const float ey = positions[10].second +
+                     (positions[10].second - positions[9].second);
     const auto *t =
         restored.get<Transform2D>(*find_entity_by_name(restored, "demo"));
-    check(std::abs(t->x - positions[10].first) < 1e-4f &&
-              std::abs(t->y - positions[10].second) < 1e-4f,
-          "the dump captures the tick-10 world state");
+    check(std::abs(t->x - ex) < 1e-4f && std::abs(t->y - ey) < 1e-4f,
+          "the dump captures the post-step tick-10 world state");
   }
   // control surface (request_quit, set_paused, sim_time, rng) — all only
   // reachable inside run(), so headless mode is what makes them testable.
