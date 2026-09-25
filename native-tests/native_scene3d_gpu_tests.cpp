@@ -690,6 +690,30 @@ int main(int argc,char** argv)try{
     std::cout<<"lod_fade_gpu=dithered_crossfade_passed\n";
   }
   {
+    // Visible-range fade-out: at dist 5 the sphere sits halfway through a
+    // 15%-of-range band ending at the range+radius cull edge — the single
+    // draw keeps ~1/2 of its pixels through the screen-door mask. A zero
+    // fade width keeps the hard cut: same range renders the full disc,
+    // a range short of the camera culls it entirely.
+    auto ranged=a;ranged.mesh=Mesh3D::uv_sphere(64,32);ranged.scale=.3f;
+    ranged.visible_range=5.081f;ranged.visible_fade=.15f;
+    auto hard=ranged;hard.visible_fade=0;
+    const auto hardref=capture({hard},"range-fade-off.png");
+    check(window.scene3d_statistics().visible_fades==0,"Zero range fade still thinned the draw");
+    int hard_lit=0;
+    for(int y=140;y<180;++y)for(int x=140;x<180;++x)hard_lit+=channel(*hardref,x,y,0)>100;
+    check(hard_lit==1600,"Hard-cut reference lost the sphere's lit pixels");
+    const auto faded=capture({ranged},"range-fade.png");
+    check(window.scene3d_statistics().visible_fades==1,"Range fade band did not count a thinned draw");
+    int keep_lit=0;
+    for(int y=140;y<180;++y)for(int x=140;x<180;++x)keep_lit+=channel(*faded,x,y,0)>100;
+    check(keep_lit>400&&keep_lit<1200,"Screen-door range fade did not thin the draw");
+    auto gone=ranged;gone.visible_range=4.5f;
+    const auto culled=capture({gone},"range-fade-out.png");
+    check(channel(*culled,160,160,0)==5,"Instance past the fade edge stayed visible");
+    std::cout<<"visible_fade_gpu=dithered_fadeout_passed\n";
+  }
+  {
     // Billboard impostor: a card mesh ignores instance rotation — turn
     // it edge-on and it still faces the camera, while an ordinary quad
     // at the same rotation shrinks to an invisible line.

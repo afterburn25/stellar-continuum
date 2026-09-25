@@ -201,6 +201,10 @@ struct Scene3dEntity {
   // Distance culling: hidden once the camera is farther than this many
   // world units from the bounding-sphere surface. 0 = always visible.
   float visible_range{0.f};
+  // Screen-door fade-out width ahead of the range cull, as a fraction of
+  // `range` [0,0.5] — the object dithers out instead of popping. The
+  // authored disappearance distance is unchanged.
+  float visible_fade{0.15f};
   // Opaque surface response — content-relative maps; any subset binds.
   // The cloud map's alpha self-shadows the surface (cloud_opacity) and
   // its RGB can composite as a visible deck (cloud_albedo), drifted by

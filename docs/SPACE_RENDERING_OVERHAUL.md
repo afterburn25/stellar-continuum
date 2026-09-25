@@ -114,8 +114,9 @@ same document headless-tested.
     record build. `visible_range` distance culling landed (phase 16) and
     screen-space mesh LOD chains (`lod_meshes`/`lod_pixels`, ≤8 halving
     levels, shared streamer/draw selection, `lod_instances` stat) landed
-    later, along with the `lod_fade` screen-door band and `card:w,h`
-    billboard impostor meshes — still no hierarchical LOD trees.
+    later, along with the `lod_fade` screen-door band, `card:w,h`
+    billboard impostor meshes and the `visible_fade` dithered range
+    fade-out — still no hierarchical LOD trees.
 
 ## Top wins (ordered)
 
@@ -125,6 +126,10 @@ aniso + cubic magnification and caps emission-volume marching at 16
 steps, Medium at 32; bloom Medium+, sharpen High+, MSAA Ultra).
 Per-instance `visible_range` distance culling is landed: culled
 instances skip both the draw and their TextureStreamer residency demand.
+`visible_fade` (fraction of `range`, [0,.5], default .15) dithers the
+draw out through the same screen-door mask ahead of the cull edge —
+ranged objects fade instead of popping; `visibleFade` authors it per
+entity and `visible_fades` counts thinned draws.
 Directional shadow mapping is landed: `ShadowMap3D` ortho coverage ahead
 of the camera, depth-only `scene3d_shadow` pass through the RenderGraph,
 8-tap PCF at High/Ultra, tier-scaled resolution, Low-tier skip,

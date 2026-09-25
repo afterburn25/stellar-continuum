@@ -97,7 +97,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   diameter / distance). Shadow casters always take the full mesh: the
   shadow volume is camera-independent, so a near receiver's shadow must
   not degrade with camera zoom. Low tier and `lod_fade=0` keep the hard
-  switch (single draw, zero fade cost). `lod_instances`/`lod_fades` on
+  switch (single draw, zero fade cost). A `visible_fade` band degrades a
+  fading pair to the selected level's single thinned draw — which level
+  shows stops mattering while the whole object dithers out.
+  `lod_instances`/`lod_fades` on
   `Scene3DStatistics` audit substitutions and dual submissions per
   frame.
 - **Persistence:** entity `lods` (spec array, ≤ 8 bounded strings) +
@@ -351,10 +354,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   strategy-scale scenes.
 - **Modules:** `native_map_platform.hpp` (`DebugView3D` +
   `RenderOptions3D::debug_view`), `native_scene3d.hpp`
-  (`MeshInstance3D::visible_range`), `native_scene3d.cpp`
+  (`MeshInstance3D::visible_range`/`visible_fade`,
+  `Scene3DStatistics::visible_fades`), `native_scene3d.cpp`
   (validation + cull in `prepare_instance3d`),
   `native_scene3d_gpu.cpp` (per-view debug uniform, tier-gated samplers,
-  volume step caps, culled instances skip streamer demand),
+  volume step caps, culled instances skip streamer demand, range-fade
+  keep mask),
   `scene3d.frag` (diagnostic shading branches),
   `scene_document.*`/`scene_components.*` (`range` entity key,
   `VisibleRange` component, `render.debug`), `runtime_host.cpp`,
@@ -364,19 +369,29 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   view inside the production fragment path. `visible_range` = world-unit
   camera distance beyond which the instance culls (bounding-sphere
   surface distance; 0 = unlimited; validated finite ≥ 0 ≤ 1e12).
+  `visible_fade` [0,.5] = fraction of `range` ahead of the cull edge over
+  which the draw dithers out via the same screen-door mask as the LOD
+  crossfade — no alpha blending, no extra submission; the disappearance
+  distance is unchanged. Low tier and `visible_fade=0` keep the hard
+  cut; a LOD pair inside the band degrades to one thinned draw;
+  `visible_fades` audits thinned submissions.
   Quality gates: Low disables anisotropic + cubic-magnification sampling
   and caps emission-volume ray marching at 16 steps; Medium caps at 32;
   bloom remains Medium+, sharpen High+, MSAA Ultra.
 - **Persistence:** entity `range` key (`>0` only is serialized; negative
-  rejected) maps to the `VisibleRange` world component; `render.debug`
-  validates against the eight mode names.
-- **Editor:** Scene3D tool gains `debugView` (scene) and `visRange`
-  (entity) rows driving the real preview path.
+  rejected) plus `visibleFade` [0,.5] map to the `VisibleRange` world
+  component — its codec carries a trailing f32 fade that legacy 4-byte
+  payloads decode as 0 (the hard cut they were authored with);
+  `render.debug` validates against the eight mode names.
+- **Editor:** Scene3D tool gains `debugView` (scene), `visRange` and
+  `visFade` (entity) rows driving the real preview path.
 - **Tests:** `engine_scene3d` (range validation + `prepare_instance3d`
   cull), `native_scene3d_gpu` (debug-view pixel probes per channel,
   culled-instance accounting), `engine_project` (document round-trip +
   malformed rejection), `engine_world` (`VisibleRange` spawn/codec/
-  export round-trip), `engine_runtime`.
+  export round-trip), `engine_runtime`; range-fade census probe — a
+  sphere halfway through the band lights ~1/2 its pixels (798/1600)
+  vs the hard-cut control's full disc and a fully culled zero.
 - **Bug fix bundled:** `native_scene3d_gpu.cpp` streamer registration is
   now owner-verified via `weak_ptr` — a new `RgbaImage` reusing a dead
   image's address no longer inherits the stale `TextureId` (wrong mip

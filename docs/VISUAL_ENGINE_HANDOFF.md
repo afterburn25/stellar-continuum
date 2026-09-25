@@ -117,7 +117,14 @@ Per-instance distance culling lives on `MeshInstance3D`:
 ```cpp
 MeshInstance3D inst;
 inst.visible_range = 2500.f;  // world units; 0 = visible at any range
+inst.visible_fade = .15f;     // [0,.5] fraction of range; 0 = hard cut
 ```
+
+`visible_fade` dithers the object out over the last fraction of the
+range through the same screen-door mask the LOD crossfade uses — the
+fade completes exactly at the range+radius cull edge, so the authored
+disappearance distance is unchanged and a fully faded instance still
+costs a (fully discarded) draw inside the sliver.
 
 `prepare_instance3d` marks the instance invisible once the camera is
 farther than `visible_range` + the scaled bounding radius — the same
@@ -279,7 +286,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `emissive`, `emissive_strength`, `emissive_r/g/b`, `night_emissive`,
 `environment`, `environment_strength`, `alpha_cutout`, `uv_tile_x/y`,
 `atmo_strength/power/night/r/g/b`, `range` (per-entity
-`visible_range`), `terminator_wrap`, `limb_darkening`, `bandShear`
+`visible_range`) with `visibleFade` ([0,.5] dithered fade-out),
+`terminator_wrap`, `limb_darkening`, `bandShear`
 ([-0.5,0.5]), `orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
 (`{depth,density,seed,steps,scatter}` — requires a `texture`), `lods` (array of
@@ -379,9 +387,13 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   or near-black surfaces clip to black.
 - `visible_range` is distance culling and `lod_meshes` a flat halving
   chain — no hierarchical LOD trees yet, and shadow casters always take
-  the full mesh. Impostor cards (`Mesh3D::billboard_card`, `card:w,h`
+  the full mesh (a fading-out instance keeps casting until the cull
+  edge — the screen-door mask only applies to the lit draw). Impostor
+  cards (`Mesh3D::billboard_card`, `card:w,h`
   spec) face the camera but carry no baked view-dependent shading — the
   impostor image is whatever texture the instance maps onto it. The
-  screen-door LOD fade is a per-pixel dither (fine up close on stills;
-  reads as noise if a coarse proxy differs sharply).
+  screen-door fades (`lod_fade`, `visible_fade`) are per-pixel dithers
+  (fine up close on stills; read as noise if a coarse proxy differs
+  sharply); inside a `visible_fade` band the LOD pair degrades to the
+  selected level's single thinned draw.
 - No indirect draw / GPU culling — CPU record build is the scale bound.

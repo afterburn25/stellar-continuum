@@ -682,6 +682,7 @@ int main() {
         turret.atmo_g = 0.5f;
         turret.atmo_b = 0.8f;
         turret.visible_range = 400.f;
+        turret.visible_fade = .2f;
         turret.normal_map = "maps/turret_n.png";
         turret.cloud_map = "maps/turret_clouds.png";
         turret.normal_strength = 0.9f;
@@ -746,7 +747,7 @@ int main() {
                   world3.get<AtmosphereShell>(ship_e) == nullptr,
               "defaults do not attach material extensions");
         const auto *vr = world3.get<VisibleRange>(turret_e);
-        check(vr != nullptr && vr->range == 400.f,
+        check(vr != nullptr && vr->range == 400.f && vr->fade == .2f,
               "spawn_scene3d visible-range component");
         check(world3.get<VisibleRange>(ship_e) == nullptr,
               "unset range does not attach a component");
@@ -835,7 +836,7 @@ int main() {
             check(ra != nullptr && ra->strength == 2.f && ra->power == 4.f,
                   "atmosphere codec round-trips");
             const auto *rv = restored.get<VisibleRange>(*re_turret);
-            check(rv != nullptr && rv->range == 400.f,
+            check(rv != nullptr && rv->range == 400.f && rv->fade == .2f,
                   "visiblerange codec round-trips");
             const auto *rms = restored.get<MaterialSurface>(*re_turret);
             check(rms != nullptr && rms->cloud_map == "maps/turret_clouds.png" &&
@@ -889,7 +890,8 @@ int main() {
                   out.entities[1].uv_tile_x == 3.f &&
                   out.entities[1].atmo_strength == 2.f &&
                   out.entities[1].atmo_b == 0.8f &&
-                  out.entities[1].visible_range == 400.f,
+                  out.entities[1].visible_range == 400.f &&
+                  out.entities[1].visible_fade == .2f,
               "scene3d_from_world exports material extensions");
         check(out.entities[1].normal_map == "maps/turret_n.png" &&
                   out.entities[1].cloud_map == "maps/turret_clouds.png" &&

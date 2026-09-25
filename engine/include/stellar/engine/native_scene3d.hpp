@@ -274,6 +274,13 @@ struct MeshInstance3D {
   // than this from the sphere surface — distant impostor/LOD hand-off and
   // fleet-scale budget policy. 0 keeps the instance visible at any range.
   float visible_range{};
+  // Screen-door fade-out width ahead of the range cull, as a fraction of
+  // visible_range [0,0.5]. Inside the band the draw keeps a shrinking
+  // share of its pixels through the same deterministic per-pixel mask as
+  // the LOD crossfade — no alpha blending, no extra submission. The fade
+  // completes exactly at the existing range+radius cull edge, so the
+  // authored disappearance distance is unchanged. 0 keeps the hard cut.
+  float visible_fade{.15f};
   // Optional screen-space LOD chain: lod_meshes[i] substitutes for `mesh`
   // once the projected bounding-sphere diameter drops below
   // lod_pixels/2^i pixels in the view being drawn — a 64px cruiser can
@@ -357,6 +364,9 @@ struct Scene3DStatistics {
   // Instances inside a screen-door LOD transition band this frame —
   // each submits a second draw with a complementary keep probability.
   std::uint64_t lod_fades{};
+  // Instances drawing inside the visible-range fade band this frame —
+  // single thinned draws, no paired submission.
+  std::uint64_t visible_fades{};
   std::size_t mesh_cache_entries{},mesh_cache_bytes{},texture_cache_entries{},texture_cache_bytes{},target_bytes{};
   // Binds served by the pinned fallback because the TextureStreamer denied
   // residency under the frame's byte budget (budget-pressure pop-in count).

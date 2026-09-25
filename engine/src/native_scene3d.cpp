@@ -150,8 +150,9 @@ void validate_instance(const MeshInstance3D& i){
      !bounded(m.texture_tiling.x,64)||m.texture_tiling.x<.01f||
      !bounded(m.texture_tiling.y,64)||m.texture_tiling.y<.01f)
     throw std::invalid_argument("3D alpha threshold and texture tiling must be finite and bounded.");
-  if(!bounded(i.visible_range,1e12)||i.visible_range<0)
-    throw std::invalid_argument("3D visible range must be finite and non-negative.");
+  if(!bounded(i.visible_range,1e12)||i.visible_range<0||
+     !bounded(i.visible_fade,.5f)||i.visible_fade<0.f)
+    throw std::invalid_argument("3D visible range must be finite and non-negative with a [0,.5] fade.");
 }
 }
 Quaternion rotation_axis_angle(Vec3 axis,float radians){

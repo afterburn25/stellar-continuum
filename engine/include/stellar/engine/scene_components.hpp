@@ -230,9 +230,12 @@ struct AtmosphereShell {
 };
 // Distance culling for a 3D entity: the renderer drops the instance once
 // the camera is farther than `range` world units from its bounding-sphere
-// surface. Only attached when the document authors a limit (> 0).
+// surface. `fade` is the screen-door fade-out width ahead of that edge as
+// a fraction of `range` [0,0.5] — 0 keeps the hard cut. Only attached
+// when the document authors a limit (> 0).
 struct VisibleRange {
   float range{0.f};
+  float fade{0.f};
 };
 // Screen-space mesh LOD chain for a 3D entity — the component
 // counterpart of the entity document's `lods`/`lodPixels` keys. Specs

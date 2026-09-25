@@ -193,7 +193,9 @@ int main()try{
    ranged.visible_range=1.5f;check(!prepare_instance3d(camera,ranged,1).visible,"Instance beyond its visible range stayed visible");
    ranged.visible_range=0;check(prepare_instance3d(camera,ranged,1).visible,"Zero visible range culled the instance");
    rejects([&]{auto i=instance;i.visible_range=-1;(void)Scene3D::create(camera,{i});});
-   rejects([&]{auto i=instance;i.visible_range=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
+   rejects([&]{auto i=instance;i.visible_range=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.visible_fade=.6f;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.visible_fade=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
   // Screen-space LOD: the level is a pure function of projected diameter
   // — each chain step halves the switch threshold.
   {auto loded=instance;loded.lod_meshes={sphere,sphere};

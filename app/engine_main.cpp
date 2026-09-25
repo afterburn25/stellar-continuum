@@ -317,7 +317,8 @@ struct Shell {
       hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
       hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
       hit3_bandshear{}, hit3_orbitbeam{}, hit3_starkelvin{},
-      hit3_accretion{}, hit3_fwdscatter{}, hit3_volume{}, hit3_lodfade{};
+      hit3_accretion{}, hit3_fwdscatter{}, hit3_volume{}, hit3_lodfade{},
+      hit3_visfade{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2233,6 +2234,11 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 0.f && a <= 0.5f) { next.lod_fade = a; valid = true; }
           break;
+  case 67:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 0.5f) { next.visible_fade = a; valid = true; }
+          break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2290,7 +2296,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                                         shell.hit3_accretion =
                                                                             shell.hit3_fwdscatter =
                                                                                 shell.hit3_volume =
-                                                                                    shell.hit3_lodfade = {};
+                                                                                    shell.hit3_lodfade =
+                                                                                        shell.hit3_visfade = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2488,6 +2495,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
             Atmosphere3D{{e.atmo_r, e.atmo_g, e.atmo_b}, e.atmo_strength,
                          e.atmo_power, e.atmo_night};
       inst.visible_range = e.visible_range;
+      inst.visible_fade = e.visible_fade;
       inst.lod_pixels = e.lod_pixels;
       inst.lod_fade = e.lod_fade;
       for (const auto &spec : e.lod_meshes)
@@ -2726,6 +2734,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_range, "visRange",
         entity ? std::to_string(entity->visible_range) : "", ed(51),
         "distance cull, world units - 0 always");
+  field(shell.hit3_visfade, "visFade",
+        entity ? std::to_string(entity->visible_fade) : "", ed(67),
+        "screen-door fade width 0..0.5 x range - 0 = hard cut");
   field(shell.hit3_surfmaps, "surfMaps",
         entity ? entity->normal_map + "," + entity->properties_map + "," +
                      entity->cloud_map
@@ -6806,6 +6817,8 @@ int main(int argc, char **argv) {
                             : "");
             else if (shell.hit3_range.contains(event.position) && se)
               edit3(51, std::to_string(se->visible_range));
+            else if (shell.hit3_visfade.contains(event.position) && se)
+              edit3(67, std::to_string(se->visible_fade));
             else if (shell.hit3_surfmaps.contains(event.position) && se)
               edit3(53, se->normal_map + "," + se->properties_map + "," +
                             se->cloud_map);

@@ -391,17 +391,30 @@ struct Scene3DRenderer::Storage {
         return out;};
       std::shared_ptr<const Mesh3D> drawn_mesh=instance.mesh;
       std::size_t lod_level=0;float lod_share=0.f;
+      // The view-space translation length is the camera distance —
+      // identical to the streamer footprint's world-space delta.
+      const float vx=prepared.model_view.values[12],vy=prepared.model_view.values[13],vz=prepared.model_view.values[14];
+      const float dist=std::sqrt(vx*vx+vy*vy+vz*vz);
       if(!instance.lod_meshes.empty()){
-        // The view-space translation length is the camera distance —
-        // identical to the streamer footprint's world-space delta.
-        const float vx=prepared.model_view.values[12],vy=prepared.model_view.values[13],vz=prepared.model_view.values[14];
-        const float dist=std::sqrt(vx*vx+vy*vy+vz*vz);
         const float diameter=2.f*instance.scale*static_cast<float>(instance.mesh->bounding_radius())*lod_focal/
           (lod_camera.projection==Projection3D::Orthographic?1.f:std::max(dist,1e-4f));
         lod_level=select_lod3d_level(instance,diameter);
         if(lod_level>0){drawn_mesh=instance.lod_meshes[lod_level-1];++stats.lod_instances;}
         if(!low_tier)lod_share=lod3d_fade_share(instance,diameter);
       }
+      // Visible-range fade-out: inside the authored band the single draw
+      // keeps a shrinking share of its pixels through the same screen-door
+      // mask the LOD crossfade uses — the fade completes exactly at the
+      // existing range+radius cull edge, so the disappearance distance is
+      // unchanged. The band overlaps the cull boundary only, so a fully
+      // faded instance is already culled upstream; keep<=0 is a guard.
+      float range_keep=1.f;
+      if(!low_tier&&instance.visible_range>0.f&&instance.visible_fade>0.f){
+        const double edge=static_cast<double>(instance.visible_range)+instance.scale*instance.mesh->bounding_radius();
+        range_keep=std::clamp(static_cast<float>((edge-dist)/(instance.visible_fade*instance.visible_range)),0.f,1.f);
+      }
+      if(range_keep<=0.f){++stats.culled_instances;continue;}
+      if(range_keep<1.f)++stats.visible_fades;
       const auto& optical=instance.material.dielectric;
       const auto& pbr=instance.material.pbr;
       // Disabled optics reuse the existing texture binding, without an upload.
@@ -412,7 +425,10 @@ struct Scene3DRenderer::Storage {
       // next-coarser level keeps p — complementary discards partition
       // the silhouette so opaque geometry crossfades without blending.
       // Low tier keeps the hard switch (one draw, zero cost).
-      const bool fading=lod_share>0.f&&lod_level<instance.lod_meshes.size();
+      // Inside the range fade band the whole object is thinning out —
+      // which level shows stops mattering, so the LOD pair degrades to the
+      // selected level's single thinned draw.
+      const bool fading=lod_share>0.f&&lod_level<instance.lod_meshes.size()&&range_keep>=1.f;
       if(fading)++stats.lod_fades;
       draws.push_back({&instance,facing(drawn_mesh),geometry(drawn_mesh),surface,
         optical?texture(optical->surface):surface,
@@ -422,7 +438,7 @@ struct Scene3DRenderer::Storage {
         instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
         pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
         pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
-        fading?1.f-lod_share:1.f});
+        fading?1.f-lod_share:range_keep});
       if(fading)draws.push_back({&instance,facing(instance.lod_meshes[lod_level]),geometry(instance.lod_meshes[lod_level]),surface,
         optical?texture(optical->surface):surface,
         optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
@@ -761,7 +777,7 @@ struct Scene3DRenderer::Storage {
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
 Scene3DRenderer::~Scene3DRenderer()=default;
 void Scene3DRenderer::prepare(const DrawList& list){
-  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=0;
+  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=s.stats.visible_fades=0;
   for(const auto& c:list.world)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   for(const auto& c:list.overlay)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");

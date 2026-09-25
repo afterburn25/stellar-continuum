@@ -510,10 +510,29 @@ void register_scene_components(World &world) {
                     &AtmosphereShell::g, &AtmosphereShell::b,
                     &AtmosphereShell::strength, &AtmosphereShell::power,
                     &AtmosphereShell::night_floor>);
+  // f32 range + f32 fade — decode tolerates the legacy 4-byte payload so
+  // older saves keep their authored range and the hard cut they had.
   world.register_component<VisibleRange>(
       "visiblerange",
-      encode_fields<VisibleRange, &VisibleRange::range>,
-      decode_fields<VisibleRange, &VisibleRange::range>);
+      [](const VisibleRange &v) {
+        std::vector<std::uint8_t> out;
+        put_f32(out, v.range);
+        put_f32(out, v.fade);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        VisibleRange v;
+        std::size_t at = 0;
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.range, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.fade, &bits, 4);
+        }
+        return v;
+      });
   world.register_component<StarPhotosphere>(
       "starphotosphere",
       encode_fields<StarPhotosphere, &StarPhotosphere::kelvin>,
@@ -860,7 +879,7 @@ std::vector<EntityId> spawn_scene3d(World &world,
                                         s.atmo_strength, s.atmo_power,
                                         s.atmo_night});
     if (s.visible_range > 0.f)
-      world.add(entity, VisibleRange{s.visible_range});
+      world.add(entity, VisibleRange{s.visible_range, s.visible_fade});
     if (s.star_kelvin >= 100.0)
       world.add(entity, StarPhotosphere{s.star_kelvin});
     if (s.accretion[2] >= 100.f)
@@ -976,8 +995,10 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.atmo_power = at->power;
       s.atmo_night = at->night_floor;
     }
-    if (const auto *vr = world.get<VisibleRange>(entity))
+    if (const auto *vr = world.get<VisibleRange>(entity)) {
       s.visible_range = vr->range;
+      s.visible_fade = vr->fade;
+    }
     if (const auto *sp = world.get<StarPhotosphere>(entity))
       s.star_kelvin = sp->kelvin;
     if (const auto *ad = world.get<AccretionDisc>(entity))
