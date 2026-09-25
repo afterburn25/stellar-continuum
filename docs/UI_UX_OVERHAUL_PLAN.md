@@ -159,10 +159,12 @@ breaks navigation/AT flow, or presents wrong state)
    Section headers, metric tiles, tone colors, shared buttons and focus
    ring; verified via live capture (which caught a text-anchor defect the
    tests missed).
-7. **Fleet list is flat.** → PARTIALLY DONE. The detail block now uses a
-   heading + identity line + `key_value` stat rows; chrome is on the theme.
-   Still open: `NativeOwnFleet` has no battle-group layer — grouping by
-   role/location/readiness needs a projection change, not more styling.
+7. ~~**Fleet list is flat.**~~ → DONE for display organization: the
+   outliner renders a status-grouped projection (IN COMBAT → IN TRANSIT →
+   ON MISSION → STATIONED) shared by click/focus/scroll/render/tooltip
+   paths, and Controlled Assets sorts the FLEETS section urgent-first.
+   Still open: `NativeOwnFleet` has no battle-group layer — per-fleet
+   ships/strength breakdown needs a projection change, not more styling.
 
 ### MEDIUM
 
@@ -186,14 +188,18 @@ breaks navigation/AT flow, or presents wrong state)
    minor lists that have no meaningful next action.
 4. Typography hierarchy varies per workspace (heading/body/small pixel
    triples differ slightly everywhere); unify through theme tokens.
-5. System view + battle workspace need live visual review — cannot be
-   verified from source alone (Phase 30 captures).
+5. ~~System view + battle workspace need live visual review~~ → REVIEWED.
+   `--system-smoke` and `--battle-smoke` captures inspected: system view
+   inspector/orbits/controls are sound; battle feed events were bare text
+   on the starfield — they now render as translucent cards with severity
+   accent bars matching the notification-card vocabulary.
 
 ### LOW
 
 1. Scrollbar width/track styling differs per workspace.
-2. `zoom_text` shows a bare number; a zoom-band label ("OVERVIEW /
-   SECTOR / LOCAL") would orient players.
+2. ~~`zoom_text` shows a bare number; a zoom-band label ("OVERVIEW /
+   SECTOR / LOCAL") would orient players.~~ → DONE with the legend work
+   (the readout carries the matching band label).
 3. Selected-system card (bottom-left) is a fixed-size info block — verify
    clipping at small viewports.
 4. ~~Startup/main-menu uses its own palette~~ → DONE. Startup screens and

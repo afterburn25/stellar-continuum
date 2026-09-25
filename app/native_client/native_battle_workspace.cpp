@@ -1376,11 +1376,18 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
          it != snapshot_->events.rend() && lines < 4; ++it, ++lines) {
       const auto row_height = 42.f * layout.scale;
       const auto y = layout.event_feed.y + static_cast<float>(lines) * row_height;
-      clipped_text(out, {layout.event_feed.x, y},
+      // Translucent card + severity accent bar keep event text legible over
+      // the starfield — same severity vocabulary as notification cards.
+      const UiRect card{layout.event_feed.x, y, layout.event_feed.width,
+                        row_height - 4.f * layout.scale};
+      fill(out, card, {7, 19, 31, 170});
+      fill(out, {card.x, card.y, 2.5f * layout.scale, card.height},
+           event_color(*it));
+      clipped_text(out, {card.x + 7.f * layout.scale, y},
                    it->details_known ? it->message : tr("BATTLE_INTERCEPT","Signal intercept."),
                    event_color(*it),
-                   layout.small_font_pixels, layout.event_feed.width,
-                   {layout.event_feed.x, y, layout.event_feed.width, row_height - 4.f * layout.scale});
+                   layout.small_font_pixels,
+                   card.width - 7.f * layout.scale, card);
     }
   }
 
