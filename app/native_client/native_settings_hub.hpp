@@ -59,6 +59,9 @@ public:
   void close(){visible_=false;controls_=false;focus_=-1;capture_=-1;notice_.clear();}
   bool visible()const{return visible_;}
   bool showing_categories()const{return visible_&&(!child_visible_||!child_visible_());}
+  // True while a controls row waits for a trigger — pad presses must reach
+  // handle() untranslated so they can be captured as bindings.
+  bool capturing()const noexcept{return capture_>=0;}
   int focused()const noexcept{return focus_;}
   // Localized label of the ringed control for screen-reader/live-region
   // consumers. Empty when nothing is focused.

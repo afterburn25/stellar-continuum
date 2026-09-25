@@ -11,6 +11,7 @@
 #include "native_campaign_feedback.hpp"
 #include "native_audio_settings.hpp"
 #include "native_settings_hub.hpp"
+#include "native_pad_input.hpp"
 #include "native_voice.hpp"
 #include "native_voice_bridge.hpp"
 #include "native_voice_playback.hpp"
@@ -3087,6 +3088,42 @@ class NativeCampaign final {
     send({InputEventType::EscapePressed});
     if(mission_view_.visible()||menu_)
       throw std::runtime_error("Escape did not close the missions board after ring release.");
+    // Pad UI navigation: with the board open and the dpad unbound, a pad
+    // press translates to ring input — dpad arms the ring, south activates,
+    // east backs out exactly like Escape.
+    click(layout.missions);
+    InputEvent pad_down{InputEventType::GamepadPressed};pad_down.gamepad_button=12;
+    InputEvent pad_down_up{InputEventType::GamepadReleased};pad_down_up.gamepad_button=12;
+    send(pad_down);send(pad_down_up);
+    if(mission_view_.focus()<0)
+      throw std::runtime_error("Pad dpad did not arm the missions focus ring.");
+    InputEvent pad_back{InputEventType::GamepadPressed};pad_back.gamepad_button=1;
+    InputEvent pad_back_up{InputEventType::GamepadReleased};pad_back_up.gamepad_button=1;
+    send(pad_back);send(pad_back_up);
+    if(!mission_view_.visible()||mission_view_.focus()>=0)
+      throw std::runtime_error("Pad back did not release the missions ring first.");
+    send(pad_back);send(pad_back_up);
+    if(mission_view_.visible()||menu_)
+      throw std::runtime_error("Pad back did not close the missions board.");
+    // Bindings win: a pad button bound in GALAXY keeps its gameplay meaning
+    // while an unarmed overlay is showing — it does not translate to nav.
+    if(input_mapper_.rebind("toggle_pause",
+           {{stellar::engine::RawInputEvent::Kind::GamepadButton,0}})!=1)
+      throw std::runtime_error("Pause rebind to pad south failed.");
+    click(layout.missions);
+    const auto bound_speed=session_->frame().clock().speed();
+    InputEvent pad_south{InputEventType::GamepadPressed};pad_south.gamepad_button=0;
+    InputEvent pad_south_up{InputEventType::GamepadReleased};pad_south_up.gamepad_button=0;
+    send(pad_south);send(pad_south_up);
+    if(session_->frame().clock().speed()==bound_speed)
+      throw std::runtime_error("Bound pad button did not reach gameplay with the board open.");
+    send(pad_south);send(pad_south_up); // restore
+    if(input_mapper_.rebind("toggle_pause",
+           {{stellar::engine::RawInputEvent::Kind::KeyPress,32}})!=1)
+      throw std::runtime_error("Pause keyboard binding restore failed.");
+    send({InputEventType::EscapePressed});
+    if(mission_view_.visible()||menu_)
+      throw std::runtime_error("Missions board did not close after the pad-binding check.");
     const auto& after=session_->frame().runtime().world().campaign();
     const auto after_economy=std::ranges::find(after.economies,
         after.player_civilization_id,&CivilizationEconomy::civilization_id);
@@ -5921,6 +5958,54 @@ class NativeCampaign final {
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
   }
+  // Does any active-context binding claim this pad button? Device rules
+  // mirror binding_matches — an unset device is a wildcard.
+  [[nodiscard]] bool pad_button_bound(std::uint8_t code,int device)const{
+    for(const char* context_name:{"GALAXY","GALAXY_PAD"})
+      if(const auto* context=input_mapper_.context(context_name))
+        for(const auto& action:context->actions)
+          for(const auto& binding:action.bindings)
+            if(binding.kind==stellar::engine::RawInputEvent::Kind::GamepadButton&&
+               binding.code==code&&
+               (binding.device<0||device<0||binding.device==device))return true;
+    return false;
+  }
+  // When a pad press cannot reach gameplay — a modal/overlay owns input —
+  // it translates to navigation keys instead of going dead. While a
+  // navigable surface is merely showing, unbound nav buttons translate too
+  // (a pad-only user can arm the ring); buttons bound to a galaxy action
+  // keep their gameplay meaning — bindings win.
+  [[nodiscard]] bool ui_owns_pad_input(const InputEvent& event)const{
+    // Rebind capture needs raw pad presses — translating them to navigation
+    // keys would make pad bindings impossible to record.
+    if(settings_hub_&&settings_hub_->capturing())return false;
+    const bool gameplay_blocked=
+        menu_||settings_visible()||wants_text_input()||wants_keyboard_focus()||
+        diplomacy_workspace_.visible()||settlement_workspace_.visible()||
+        colony_workspace_.planetary_modal()||
+        shipyard_workspace_.confirmation_open()||
+        construction_workspace_.confirmation_open()||fleet_workspace_.preview();
+    if(gameplay_blocked)return true;
+    if(pad_button_bound(event.gamepad_button,event.gamepad_device))return false;
+    return navigable_surface_visible();
+  }
+  // A surface carrying a focus ring is showing (armed or not) — pad nav
+  // buttons should reach it even before its ring claims keyboard focus.
+  [[nodiscard]] bool navigable_surface_visible()const{
+    return research_workspace_.visible()||shipyard_workspace_.visible()||
+           economy_workspace_.visible()||supply_workspace_.visible()||
+           construction_workspace_.visible()||chronicle_view_.visible()||
+           notification_view_.visible()||colony_roster_.visible()||
+           colony_workspace_.visible()||mission_view_.visible()||
+           diplomacy_workspace_.visible()||settlement_workspace_.visible()||
+           system_workspace_.visible()||map_hud_visible()||
+           inspection_card_.visible()||
+           developer_index_.visible()||developer_planet_index_.visible()||
+           developer_empires_.visible()||developer_panel_.visible()||
+           developer_diagnostics_.visible()||giant_test_panel_.visible()||
+           stellar_activity_panel_.visible()||background_debug_.visible()||
+           phenomena_debug_.visible;
+  }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
     input_mapper_.begin_frame();
@@ -6316,7 +6401,14 @@ class NativeCampaign final {
       frame_events.insert(frame_events.end(),input.events.begin(),input.events.end());
       frame_event_stream=&frame_events;
     }
-    for(const auto &event:*frame_event_stream){
+    for(const auto &raw_event:*frame_event_stream){
+      // Pad presses are gameplay bindings in free play; while a UI surface
+      // owns input they translate into the equivalent navigation key so
+      // every focus ring answers the pad (native_pad_input.hpp).
+      const InputEvent event=[&]{
+        if(raw_event.type==InputEventType::GamepadPressed&&ui_owns_pad_input(raw_event))
+          if(auto nav=stellar::native_client::pad_navigation_event(raw_event))return *nav;
+        return raw_event;}();
       // Journal pointer input: positions (and drag deltas) are what dispatch
       // consumes, so the recording stores the raw event and replay re-runs
       // hit-testing against reproduced state instead of trusting a resolved

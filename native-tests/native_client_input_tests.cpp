@@ -1,5 +1,6 @@
 #include "map_camera.hpp"
 #include "map_interaction.hpp"
+#include "native_pad_input.hpp"
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -57,5 +58,31 @@ int main(){
   InputSnapshot activity;activity.drawable_width=1280;activity.drawable_height=720;
   check(activity.renderable(),"active drawable was rejected");activity.minimized=true;
   check(!activity.renderable(),"minimized drawable remained renderable");
+  // Pad UI navigation (native_pad_input.hpp): dpad synthesizes arrow keys,
+  // south activates, east/start back out, and unmapped buttons/releases/
+  // axes stay untranslated for the gameplay mapper.
+  {
+    using stellar::native_client::pad_navigation_event;
+    auto pad=[](std::uint8_t button){InputEvent e{};e.type=InputEventType::GamepadPressed;e.gamepad_button=button;return e;};
+    const auto up=pad_navigation_event(pad(11));
+    check(up&&up->type==InputEventType::KeyPressed&&up->key==0x40000052u,"dpad up did not synthesize Up");
+    const auto down=pad_navigation_event(pad(12));
+    check(down&&down->key==0x40000051u,"dpad down did not synthesize Down");
+    const auto left=pad_navigation_event(pad(13));
+    check(left&&left->key==0x40000050u,"dpad left did not synthesize Left");
+    const auto right=pad_navigation_event(pad(14));
+    check(right&&right->key==0x4000004fu,"dpad right did not synthesize Right");
+    const auto south=pad_navigation_event(pad(0));
+    check(south&&south->type==InputEventType::KeyPressed&&south->key==13u,"pad south did not synthesize Return");
+    const auto east=pad_navigation_event(pad(1));
+    check(east&&east->type==InputEventType::EscapePressed,"pad east did not synthesize Escape");
+    const auto start=pad_navigation_event(pad(6));
+    check(start&&start->type==InputEventType::EscapePressed,"pad start did not synthesize Escape");
+    check(!pad_navigation_event(pad(9)),"shoulder button translated unexpectedly");
+    InputEvent release{};release.type=InputEventType::GamepadReleased;release.gamepad_button=0;
+    check(!pad_navigation_event(release),"pad release translated unexpectedly");
+    InputEvent axis{};axis.type=InputEventType::GamepadAxis;axis.gamepad_axis=0;axis.gamepad_axis_value=.9f;
+    check(!pad_navigation_event(axis),"pad axis translated unexpectedly");
+  }
   return failures==0?0:1;
 }
