@@ -313,7 +313,8 @@ struct Shell {
       hit3_emis{}, hit3_emit{}, hit3_night{}, hit3_env{},
       hit3_envstr{}, hit3_cutout{}, hit3_tile{}, hit3_atmo{},
       hit3_atmotint{}, hit3_exposure{}, hit3_bloom{}, hit3_grade{},
-      hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{};
+      hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{},
+      hit3_shadow{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -1971,6 +1972,37 @@ void commit_scene3_field(Shell &shell) {
     doc.debug_view = d;
     return ok("debug view updated");
   }
+  case 52: { // key-light shadow map: "extent,dist,depth[,strength,bias[,res]]"
+    if (shell.scene3_buffer.empty()) { // empty clears
+      commit();
+      doc.shadow_extent = 0.f;
+      return ok("shadow map disabled");
+    }
+    float v[6]{};
+    {
+      std::istringstream values(shell.scene3_buffer);
+      std::string token;
+      int n = 0;
+      while (n < 6 && std::getline(values, token, ',')) {
+        try {
+          v[n++] = std::stof(token);
+        } catch (const std::exception &) {
+          return fail("use extent,distance,depth[,strength,bias[,resolution]]");
+        }
+      }
+      if (n < 3)
+        return fail("use extent,distance,depth[,strength,bias[,resolution]]");
+      commit();
+      doc.shadow_extent = v[0];
+      doc.shadow_distance = v[1];
+      doc.shadow_depth = v[2];
+      doc.shadow_strength = n > 3 ? v[3] : 1.f;
+      doc.shadow_bias = n > 4 ? v[4] : .0005f;
+      doc.shadow_resolution =
+          n > 5 ? static_cast<std::uint32_t>(std::max(0.f, v[5])) : 0u;
+    }
+    return ok("shadow map updated");
+  }
   default:
     break;
   }
@@ -2131,7 +2163,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                 shell.hit3_atmotint = shell.hit3_exposure =
                     shell.hit3_bloom = shell.hit3_grade =
                         shell.hit3_quality = shell.hit3_plights =
-                            shell.hit3_debug = shell.hit3_range = {};
+                            shell.hit3_debug = shell.hit3_range =
+                                shell.hit3_shadow = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2293,8 +2326,13 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       point_lights.push_back(PointLight3D{{l.x, l.y, l.z},
                                           {l.r, l.g, l.b},
                                           l.intensity, l.range});
+    std::optional<ShadowMap3D> shadow_map;
+    if (doc.shadow_extent > 0.f)
+      shadow_map = ShadowMap3D{doc.shadow_extent, doc.shadow_distance,
+                               doc.shadow_depth, doc.shadow_strength,
+                               doc.shadow_bias, doc.shadow_resolution};
     if (auto scene = Scene3D::create(cam, std::move(instances), light_cam,
-                                     std::move(point_lights))) {
+                                     std::move(point_lights), shadow_map)) {
       Scene3DView view{std::move(scene), pv};
       view.options.exposure = doc.exposure;
       view.options.bloom_strength = doc.bloom;
@@ -2521,6 +2559,13 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         ed(38), "x,y,z,r,g,b,intensity,range; ... - max 4, empty clears");
   field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
         "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting");
+  field(shell.hit3_shadow, "shadowMap",
+        doc.shadow_extent > 0.f
+            ? std::to_string(doc.shadow_extent) + "," +
+                  std::to_string(doc.shadow_distance) + "," +
+                  std::to_string(doc.shadow_depth)
+            : "",
+        ed(52), "extent,dist,depth[,strength,bias[,res]] - empty disables");
 }
 
 std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
@@ -6493,6 +6538,12 @@ int main(int argc, char **argv) {
               edit3(38, "");
             else if (shell.hit3_debug.contains(event.position))
               edit3(39, doc.debug_view);
+            else if (shell.hit3_shadow.contains(event.position))
+              edit3(52, doc.shadow_extent > 0.f
+                            ? std::to_string(doc.shadow_extent) + "," +
+                                  std::to_string(doc.shadow_distance) + "," +
+                                  std::to_string(doc.shadow_depth)
+                            : "");
             else if (shell.hit3_range.contains(event.position) && se)
               edit3(51, std::to_string(se->visible_range));
             else if (shell.scene3_rows.contains(event.position)) {

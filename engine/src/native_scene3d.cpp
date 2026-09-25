@@ -174,8 +174,15 @@ std::shared_ptr<const Mesh3D> Mesh3D::uv_sphere(int columns,int rows){
   }
   return create(std::move(vertices),std::move(indices));
 }
-std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights){
+std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map){
   validate_camera(camera);camera.orientation=normalized(camera.orientation);light=normalized(light);
+  if(shadow_map){
+    const auto& s=*shadow_map;
+    if(!bounded(s.extent,1e9)||s.extent<=0||!bounded(s.distance,1e12)||s.distance<0||
+       !bounded(s.depth,1e9)||s.depth<=0||!bounded(s.strength,1)||s.strength<0||
+       !bounded(s.bias,.1)||s.bias<0||(s.resolution&&(s.resolution<64||s.resolution>8192)))
+      throw std::invalid_argument("3D shadow map requires positive extent/depth, bounded distance, strength, bias and resolution.");
+  }
   if(instances.size()>maximum_scene3d_instances)throw std::length_error("3D scene exceeds its instance budget.");
   if(point_lights.size()>maximum_scene3d_point_lights)throw std::length_error("3D scene exceeds its point light budget.");
   for(const auto& l:point_lights)
@@ -204,7 +211,7 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
   }
   if(geometry>maximum_mesh3d_cache_bytes||images>maximum_scene3d_texture_cache_bytes||meshes.size()>maximum_scene3d_resource_entries||textures.size()>maximum_scene3d_resource_entries)
     throw std::length_error("3D scene exceeds its resident resource budget.");
-  return std::shared_ptr<const Scene3D>(new Scene3D(camera,std::move(instances),light,std::move(point_lights)));
+  return std::shared_ptr<const Scene3D>(new Scene3D(camera,std::move(instances),light,std::move(point_lights),std::move(shadow_map)));
 }
 PreparedInstance3D prepare_instance3d(const Camera3D& camera,const MeshInstance3D& instance,float aspect){
   validate_camera(camera);validate_instance(instance);

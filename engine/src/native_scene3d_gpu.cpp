@@ -61,10 +61,10 @@ struct Texture {
   std::size_t bytes()const{return owner->byte_size()+gpu_bytes;}
 };
 struct Target {
-  SDL_GPUDevice* device;SDL_GPUTexture* color{};SDL_GPUTexture* depth{};SDL_GPUTexture* hdr{};SDL_GPUTexture* msaa_color{};SDL_GPUTexture* msaa_depth{};SDL_Texture* composite{};int width{},height{};Uint32 hdr_levels{1};
+  SDL_GPUDevice* device;SDL_GPUTexture* color{};SDL_GPUTexture* depth{};SDL_GPUTexture* hdr{};SDL_GPUTexture* msaa_color{};SDL_GPUTexture* msaa_depth{};SDL_GPUTexture* shadow{};SDL_Texture* composite{};int width{},height{};Uint32 hdr_levels{1};int shadow_size{};
   explicit Target(SDL_GPUDevice* d):device(d){}
-  ~Target(){if(composite)SDL_DestroyTexture(composite);if(msaa_depth)SDL_ReleaseGPUTexture(device,msaa_depth);if(msaa_color)SDL_ReleaseGPUTexture(device,msaa_color);if(hdr)SDL_ReleaseGPUTexture(device,hdr);if(depth)SDL_ReleaseGPUTexture(device,depth);if(color)SDL_ReleaseGPUTexture(device,color);}
-  std::size_t bytes()const{auto base=static_cast<std::size_t>(width)*height*(hdr?16u:8u);return base+(msaa_color?base*4+static_cast<std::size_t>(width)*height*16u:0);}
+  ~Target(){if(composite)SDL_DestroyTexture(composite);if(shadow)SDL_ReleaseGPUTexture(device,shadow);if(msaa_depth)SDL_ReleaseGPUTexture(device,msaa_depth);if(msaa_color)SDL_ReleaseGPUTexture(device,msaa_color);if(hdr)SDL_ReleaseGPUTexture(device,hdr);if(depth)SDL_ReleaseGPUTexture(device,depth);if(color)SDL_ReleaseGPUTexture(device,color);}
+  std::size_t bytes()const{auto base=static_cast<std::size_t>(width)*height*(hdr?16u:8u);return base+(msaa_color?base*4+static_cast<std::size_t>(width)*height*16u:0)+static_cast<std::size_t>(shadow_size)*shadow_size*4;}
 };
 SDL_GPUTexture* make_texture(SDL_GPUDevice* d,int w,int h,SDL_GPUTextureFormat format,SDL_GPUTextureUsageFlags usage,Uint32 levels=1,SDL_GPUSampleCount samples=SDL_GPU_SAMPLECOUNT_1){
   SDL_GPUTextureCreateInfo info{};info.type=SDL_GPU_TEXTURETYPE_2D;info.format=format;info.usage=usage;
@@ -80,11 +80,23 @@ template<class Map> void evict(Map& cache,std::size_t& bytes,std::size_t incomin
 struct VertexUniform {Matrix4 mvp,model_view,shadow_from_model;};
 struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<std::array<float,4>,4> point_position,point_energy;};
 struct PostUniform {std::array<float,4> a,b;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==656&&sizeof(PostUniform)==32);
+// View-wide fragment uniform: debug selector, then the key light's
+// view→shadow-clip transform and {texel size (>0 enables), PCF radius in
+// texels, strength, bias} for the directional shadow map.
+struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;};
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==656&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==96);
+// Column-major rotation for a unit quaternion — same convention as
+// rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
+Matrix4 rotation_from(Quaternion q){
+  const auto [x,y,z,w]=q;
+  return {{{1-2*(y*y+z*z),2*(x*y+z*w),2*(x*z-y*w),0,
+            2*(x*y-z*w),1-2*(x*x+z*z),2*(y*z+x*w),0,
+            2*(x*z+y*w),2*(y*z-x*w),1-2*(x*x+y*y),0,0,0,0,1}}};
+}
 }
 struct Scene3DRenderer::Storage {
   SDL_GPUDevice* device;SDL_Renderer* renderer;std::thread::id owner=std::this_thread::get_id();
-  SDL_GPUSampler* sampler{};SDL_GPUSampler* environment_sampler{};SDL_GPUSampler* detail_sampler{};SDL_GPUSampler* repeat_sampler{};SDL_GPUSampler* repeat_aniso_sampler{};std::array<SDL_GPUGraphicsPipeline*,4> pipelines{},pipelines_ms4{};SDL_GPUGraphicsPipeline* tonemap_pipeline{};
+  SDL_GPUSampler* sampler{};SDL_GPUSampler* environment_sampler{};SDL_GPUSampler* detail_sampler{};SDL_GPUSampler* repeat_sampler{};SDL_GPUSampler* repeat_aniso_sampler{};std::array<SDL_GPUGraphicsPipeline*,4> pipelines{},pipelines_ms4{};SDL_GPUGraphicsPipeline* tonemap_pipeline{};SDL_GPUGraphicsPipeline* shadow_pipeline{};bool shadow_supported{};
   std::unordered_map<const Mesh3D*,std::shared_ptr<Geometry>> meshes;
   std::unordered_map<const RgbaImage*,std::shared_ptr<Texture>> textures;
   std::vector<std::unique_ptr<Target>> targets;std::vector<const Scene3DView*> views;
@@ -101,9 +113,9 @@ struct Scene3DRenderer::Storage {
   std::unordered_map<engine::TextureId,std::weak_ptr<const RgbaImage>> stream_owners;
   std::uint64_t stream_frame{},stream_registrations{};
   Scene3DStatistics stats;std::uint64_t serial{};std::size_t next_view{};bool hdr{},msaa_supported{};SDL_GPUTextureFormat scene_format{};
-  SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};std::size_t vertex_capacity{64},fragment_capacity{64};
+  SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};SDL_GPUBuffer* shadow_buffer{};std::size_t vertex_capacity{64},fragment_capacity{64},shadow_capacity{64};
   Storage(SDL_GPUDevice* d,SDL_Renderer* r):device(d),renderer(r){}
-  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);for(auto* p:pipelines_ms4)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);if(repeat_sampler)SDL_ReleaseGPUSampler(device,repeat_sampler);if(repeat_aniso_sampler)SDL_ReleaseGPUSampler(device,repeat_aniso_sampler);}
+  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);for(auto* p:pipelines_ms4)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(shadow_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,shadow_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);if(shadow_buffer)SDL_ReleaseGPUBuffer(device,shadow_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);if(repeat_sampler)SDL_ReleaseGPUSampler(device,repeat_sampler);if(repeat_aniso_sampler)SDL_ReleaseGPUSampler(device,repeat_aniso_sampler);}
   void require_owner()const{if(std::this_thread::get_id()!=owner)throw std::logic_error("3D rendering must run on the window thread.");}
   void initialize(){
     SDL_GPUSamplerCreateInfo sampling{};sampling.min_filter=sampling.mag_filter=SDL_GPU_FILTER_LINEAR;
@@ -131,7 +143,7 @@ struct Scene3DRenderer::Storage {
     const auto release=[&](SDL_GPUShader* value){SDL_ReleaseGPUShader(device,value);};
     msaa_supported=SDL_GPUTextureSupportsSampleCount(device,scene_format,SDL_GPU_SAMPLECOUNT_4)&&
       SDL_GPUTextureSupportsSampleCount(device,SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_SAMPLECOUNT_4);
-    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,1,10,1),release);
+    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,1,11,1),release);
     SDL_GPUVertexBufferDescription buffer{0,sizeof(Vertex3D),SDL_GPU_VERTEXINPUTRATE_VERTEX,0};
     const SDL_GPUVertexAttribute attributes[]{{0,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,position)},{1,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,normal)},{2,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,offsetof(Vertex3D,uv)}};
     for(int index=0;index<4;++index){
@@ -152,6 +164,23 @@ struct Scene3DRenderer::Storage {
         info.multisample_state.sample_count=SDL_GPU_SAMPLECOUNT_4;
         pipelines_ms4[index]=SDL_CreateGPUGraphicsPipeline(device,&info);if(!pipelines_ms4[index])throw gpu_error("3D MSAA pipeline creation failed");
       }
+    }
+    // Depth-only directional shadow pipeline: same vertex layout and SSBO
+    // transform convention as the scene pass, no colour target, and a
+    // slope-scaled rasterizer bias that complements the shader's constant
+    // receiver bias. Unculled rasterization keeps thin hulls casting.
+    shadow_supported=SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
+    if(shadow_supported){
+      std::unique_ptr<SDL_GPUShader,decltype(release)> shadow_vertex(shader(shaders::scene3d_shadow_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),shadow_fragment(shader(shaders::scene3d_shadow_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,0,0),release);
+      SDL_GPUGraphicsPipelineCreateInfo info{};info.vertex_shader=shadow_vertex.get();info.fragment_shader=shadow_fragment.get();
+      info.vertex_input_state={&buffer,1,attributes,3};info.primitive_type=SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+      info.rasterizer_state.fill_mode=SDL_GPU_FILLMODE_FILL;info.rasterizer_state.cull_mode=SDL_GPU_CULLMODE_NONE;
+      info.rasterizer_state.front_face=SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;info.rasterizer_state.enable_depth_clip=true;
+      info.rasterizer_state.enable_depth_bias=true;info.rasterizer_state.depth_bias_slope_factor=1.5f;
+      info.multisample_state.sample_count=SDL_GPU_SAMPLECOUNT_1;
+      info.depth_stencil_state.compare_op=SDL_GPU_COMPAREOP_LESS_OR_EQUAL;info.depth_stencil_state.enable_depth_test=true;info.depth_stencil_state.enable_depth_write=true;
+      info.target_info.num_color_targets=0;info.target_info.depth_stencil_format=SDL_GPU_TEXTUREFORMAT_D32_FLOAT;info.target_info.has_depth_stencil_target=true;
+      shadow_pipeline=SDL_CreateGPUGraphicsPipeline(device,&info);if(!shadow_pipeline)throw gpu_error("3D shadow pipeline creation failed");
     }
     if(hdr){
       std::unique_ptr<SDL_GPUShader,decltype(release)> tonemap_vertex(shader(shaders::tonemap_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0),release),tonemap_fragment(shader(shaders::tonemap_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,1,1),release);
@@ -443,6 +472,85 @@ struct Scene3DRenderer::Storage {
         fragment.atmo_shape={a.power,a.night_floor,0.f,0.f};}
       fragment.point_position=pl_position;fragment.point_energy=pl_energy;
     }
+    // Directional shadow map: an authored ortho volume centres `distance`
+    // along camera forward, so strategy scenes pick shadowed coverage
+    // explicitly rather than fitting the camera frustum. Low tier skips the
+    // pass; resolution and PCF radius default per tier. All light-space math
+    // is double-precision so far-field system coordinates stay stable.
+    const auto& shadow_settings=view.scene->shadow_map();
+    const bool use_shadow=shadow_supported&&!low_tier&&shadow_settings.has_value()&&shadow_settings->strength>0.f;
+    Uint32 shadow_res=0;ViewUniform view_uniform{};view_uniform.debug_mode[0]=static_cast<float>(opt.debug_view);
+    std::vector<std::shared_ptr<Geometry>> caster_geometry;std::vector<Matrix4> shadow_transforms;
+    engine::DrawBatcher shadow_batcher;
+    if(use_shadow){
+      const auto& s=*shadow_settings;const auto& cam=view.scene->camera();
+      shadow_res=s.resolution?std::min<Uint32>(s.resolution,8192)
+          :opt.quality==RenderQuality3D::Ultra?4096u:opt.quality==RenderQuality3D::High?2048u:1024u;
+      const Quaternion& cq=cam.orientation; // unit by Scene3D::create
+      const Vec3 lw=rotate_vec(cq,view.scene->light_direction());
+      const Vec3 fw=rotate_vec(cq,{0,0,-1});
+      const Vec3 uw=rotate_vec(cq,{0,1,0});
+      const double zx=lw.x,zy=lw.y,zz=lw.z; // light-space +Z toward the star
+      double xx=uw.y*zz-uw.z*zy,xy=uw.z*zx-uw.x*zz,xz=uw.x*zy-uw.y*zx;
+      const double xl=std::sqrt(xx*xx+xy*xy+xz*xz);
+      if(xl>1e-12){xx/=xl;xy/=xl;xz/=xl;}else{xx=1;xy=0;xz=0;}
+      const double yx=zy*xz-zz*xy,yy=zz*xx-zx*xz,yz=zx*xy-zy*xx; // z × x
+      const double fx=cam.position.x+static_cast<double>(fw.x)*s.distance,fy=cam.position.y+static_cast<double>(fw.y)*s.distance,fz=cam.position.z+static_cast<double>(fw.z)*s.distance;
+      const double ex=fx+zx*s.depth*.5,ey=fy+zy*s.depth*.5,ez=fz+zz*s.depth*.5;
+      const double extent=s.extent,depth=s.depth;
+      Matrix4 light_rotation{};light_rotation.values={{static_cast<float>(xx),static_cast<float>(yx),static_cast<float>(zx),0,
+        static_cast<float>(xy),static_cast<float>(yy),static_cast<float>(zy),0,
+        static_cast<float>(xz),static_cast<float>(yz),static_cast<float>(zz),0,0,0,0,1}};
+      Matrix4 light_projection{};light_projection.values={{1.f/s.extent,0,0,0,0,1.f/s.extent,0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
+      // world = R_cam·view + cam, so LV·world = R_l·R_cam·view + R_l·(cam-eye).
+      Matrix4 from_view=multiply(light_rotation,rotation_from(cq));
+      const double cx=cam.position.x-ex,cy=cam.position.y-ey,cz=cam.position.z-ez;
+      from_view.values[12]=static_cast<float>(xx*cx+xy*cy+xz*cz);
+      from_view.values[13]=static_cast<float>(yx*cx+yy*cy+yz*cz);
+      from_view.values[14]=static_cast<float>(zx*cx+zy*cy+zz*cz);
+      view_uniform.shadow_from_view=multiply(light_projection,from_view);
+      const float radius_texels=opt.quality==RenderQuality3D::Ultra?1.5f:opt.quality==RenderQuality3D::High?1.f:0.f;
+      view_uniform.shadow_options={1.f/static_cast<float>(shadow_res),radius_texels,s.strength,s.bias};
+      // Casters: transparent blends never occlude; visible_range culls cast
+      // shadows identically to the camera draw; the light-space box test is
+      // the only frustum cut — off-camera casters still write the map.
+      for(const auto& instance:view.scene->instances()){
+        if(instance.material.transparent)continue;
+        const double radius=static_cast<double>(instance.mesh->bounding_radius())*instance.scale;
+        const double px=instance.position.x-cam.position.x,py=instance.position.y-cam.position.y,pz=instance.position.z-cam.position.z;
+        if(instance.visible_range>0.f&&std::sqrt(px*px+py*py+pz*pz)>static_cast<double>(instance.visible_range)+radius)continue;
+        const double dx=instance.position.x-ex,dy=instance.position.y-ey,dz=instance.position.z-ez;
+        const double lx=xx*dx+xy*dy+xz*dz,ly=yx*dx+yy*dy+yz*dz,lz=zx*dx+zy*dy+zz*dz;
+        if(std::abs(lx)>extent+radius||std::abs(ly)>extent+radius||lz>radius||lz<-depth-radius)continue;
+        Matrix4 model=rotation_from(instance.rotation);
+        for(int c=0;c<3;++c)for(int r=0;r<3;++r)model.values[c*4+r]*=instance.scale;
+        Matrix4 light_model=multiply(light_rotation,model);
+        light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);
+        caster_geometry.push_back(geometry(instance.mesh));
+        shadow_transforms.push_back(multiply(light_projection,light_model));
+      }
+      // Same instancing convention as the scene pass: batch by mesh, then
+      // reorder transforms/geometry to sorted order so gl_InstanceIndex maps.
+      shadow_batcher.begin_frame();
+      std::map<const Mesh3D*,std::uint32_t> shadow_mesh_ids;
+      for(std::size_t i=0;i<caster_geometry.size();++i){
+        const auto mesh_id=shadow_mesh_ids.try_emplace(caster_geometry[i]->owner.get(),static_cast<std::uint32_t>(shadow_mesh_ids.size())).first->second;
+        engine::DrawItem item{};item.mesh_id=mesh_id;item.material_id=mesh_id;item.instance_index=static_cast<std::uint32_t>(i);
+        shadow_batcher.submit(item);
+      }
+      shadow_batcher.build();
+      {
+        const auto& shadow_sorted=shadow_batcher.sorted_items();
+        std::vector<Matrix4> ordered(shadow_sorted.size());
+        std::vector<std::shared_ptr<Geometry>> ordered_geometry(shadow_sorted.size());
+        for(std::size_t slot=0;slot<shadow_sorted.size();++slot){
+          ordered[slot]=shadow_transforms[shadow_sorted[slot].instance_index];
+          ordered_geometry[slot]=std::move(caster_geometry[shadow_sorted[slot].instance_index]);
+        }
+        shadow_transforms=std::move(ordered);caster_geometry=std::move(ordered_geometry);
+        stats.shadow_casters+=shadow_transforms.size();
+      }
+    }
     // Pass scheduling goes through the engine RenderGraph: resources and
     // dependencies are declared per frame, compile() validates the DAG and
     // emits the execution order, and the backend binds routines by tag.
@@ -451,12 +559,15 @@ struct Scene3DRenderer::Storage {
     const auto hdr_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"hdr-scene",res_w,res_h,"rgba16f",true});
     const auto color_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"color",res_w,res_h,"rgba8",true});
     const auto depth_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"depth",res_w,res_h,"d32",true});
-    graph.add_pass({"scene3d",{},{target.hdr?hdr_target:color_target,depth_target},{},"scene3d"});
+    const auto shadow_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"shadow-depth",shadow_res,shadow_res,"d32",true});
+    graph.add_pass({"shadow",{},{shadow_target},{},"shadow",use_shadow});
+    graph.add_pass({"scene3d",{use_shadow?std::vector<engine::ResourceId>{shadow_target}:std::vector<engine::ResourceId>{}},{target.hdr?hdr_target:color_target,depth_target},{},"scene3d"});
     graph.add_pass({"tonemap",{hdr_target},{color_target},{},"tonemap",target.hdr!=nullptr});
     std::vector<std::string> order;std::vector<engine::RenderGraphDiagnostic> diagnostics;
     if(!graph.compile(&order,&diagnostics))throw std::runtime_error("3D render graph compile failed: "+(diagnostics.empty()?std::string("unknown"):diagnostics.front().message));
     Command command(device);
-    if(!sorted.empty()){
+    const auto shadow_bytes=static_cast<Uint32>(shadow_transforms.size()*sizeof(Matrix4));
+    if(!sorted.empty()||shadow_bytes){
       const auto vertex_bytes=static_cast<Uint32>(vertex_data.size()*sizeof(VertexUniform)),fragment_bytes=static_cast<Uint32>(fragment_data.size()*sizeof(FragmentUniform));
       if(!vertex_buffer||!fragment_buffer||vertex_capacity<vertex_data.size()||fragment_capacity<fragment_data.size()){
         if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);
@@ -467,11 +578,22 @@ struct Scene3DRenderer::Storage {
         info.size=static_cast<Uint32>(fragment_capacity*sizeof(FragmentUniform));
         fragment_buffer=SDL_CreateGPUBuffer(device,&info);if(!fragment_buffer)throw gpu_error("3D instance material buffer creation failed");
       }
-      Transfer transfer(device,vertex_bytes+fragment_bytes);auto* memory=static_cast<std::byte*>(transfer.map());
-      std::memcpy(memory,vertex_data.data(),vertex_bytes);std::memcpy(memory+vertex_bytes,fragment_data.data(),fragment_bytes);SDL_UnmapGPUTransferBuffer(device,transfer.value);
+      if(shadow_bytes&&(!shadow_buffer||shadow_capacity<shadow_transforms.size())){
+        if(shadow_buffer)SDL_ReleaseGPUBuffer(device,shadow_buffer);
+        shadow_capacity=std::max<std::size_t>(shadow_transforms.size(),shadow_capacity*2);
+        SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(shadow_capacity*sizeof(Matrix4));
+        shadow_buffer=SDL_CreateGPUBuffer(device,&info);if(!shadow_buffer)throw gpu_error("3D shadow transform buffer creation failed");
+      }
+      Transfer transfer(device,vertex_bytes+fragment_bytes+shadow_bytes);auto* memory=static_cast<std::byte*>(transfer.map());
+      if(vertex_bytes)std::memcpy(memory,vertex_data.data(),vertex_bytes);
+      if(fragment_bytes)std::memcpy(memory+vertex_bytes,fragment_data.data(),fragment_bytes);
+      if(shadow_bytes)std::memcpy(memory+vertex_bytes+fragment_bytes,shadow_transforms.data(),shadow_bytes);
+      SDL_UnmapGPUTransferBuffer(device,transfer.value);
       auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D instance upload copy pass failed");
-      SDL_GPUTransferBufferLocation from{transfer.value,0};SDL_GPUBufferRegion to{vertex_buffer,0,vertex_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);
-      from.offset=vertex_bytes;to={fragment_buffer,0,fragment_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);
+      SDL_GPUTransferBufferLocation from{transfer.value,0};
+      if(vertex_bytes){SDL_GPUBufferRegion to{vertex_buffer,0,vertex_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);}
+      if(fragment_bytes){from.offset=vertex_bytes;SDL_GPUBufferRegion to{fragment_buffer,0,fragment_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);}
+      if(shadow_bytes){from.offset=vertex_bytes+fragment_bytes;SDL_GPUBufferRegion to{shadow_buffer,0,shadow_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);}
       SDL_EndGPUCopyPass(copy);
     }
     // Resolve per-view quality policy once: Low keeps the tonemap-only path,
@@ -490,7 +612,27 @@ struct Scene3DRenderer::Storage {
     post.b={std::clamp(std::isfinite(opt.saturation)?opt.saturation:1.f,0.f,2.f),
       opt.quality>=RenderQuality3D::High?std::clamp(std::isfinite(opt.sharpen)?opt.sharpen:0.f,0.f,1.f):0.f,0.f,0.f};
     for(const auto& name:order){
-      if(name=="scene3d"){
+      if(name=="shadow"){
+        if(target.shadow_size!=static_cast<int>(shadow_res)){
+          if(target.shadow)SDL_ReleaseGPUTexture(device,target.shadow);
+          target.shadow=make_texture(device,static_cast<int>(shadow_res),static_cast<int>(shadow_res),SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
+          target.shadow_size=static_cast<int>(shadow_res);
+        }
+        SDL_GPUDepthStencilTargetInfo map{};map.texture=target.shadow;map.clear_depth=1;map.load_op=SDL_GPU_LOADOP_CLEAR;map.store_op=SDL_GPU_STOREOP_STORE;map.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;map.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
+        auto* pass=SDL_BeginGPURenderPass(command.value,nullptr,0,&map);if(!pass)throw gpu_error("3D shadow pass failed");
+        if(!shadow_transforms.empty()){
+          SDL_BindGPUGraphicsPipeline(pass,shadow_pipeline);
+          SDL_BindGPUVertexStorageBuffers(pass,0,&shadow_buffer,1);
+          for(const auto& batch:shadow_batcher.batches()){
+            // Geometry is already in sorted order, so first_item addresses it.
+            const auto& geo=*caster_geometry[batch.first_item];
+            const SDL_GPUBufferBinding vertices{geo.vertices,0},indices{geo.indices,0};
+            SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
+            SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(geo.owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
+          }
+        }
+        SDL_EndGPURenderPass(pass);
+      }else if(name=="scene3d"){
         SDL_GPUColorTargetInfo color{};
         color.texture=use_msaa?target.msaa_color:(target.hdr?target.hdr:target.color);
         color.load_op=SDL_GPU_LOADOP_CLEAR;
@@ -498,10 +640,9 @@ struct Scene3DRenderer::Storage {
         else color.store_op=SDL_GPU_STOREOP_STORE;
         SDL_GPUDepthStencilTargetInfo depth{};depth.texture=use_msaa?target.msaa_depth:target.depth;depth.clear_depth=1;depth.load_op=SDL_GPU_LOADOP_CLEAR;depth.store_op=SDL_GPU_STOREOP_DONT_CARE;depth.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;depth.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
         auto* pass=SDL_BeginGPURenderPass(command.value,&color,1,&depth);if(!pass)throw gpu_error("3D render pass failed");
-        // View-level fragment uniform: the debug shading selector applies to
-        // every draw in the pass.
-        const std::array<float,4> view_params{static_cast<float>(opt.debug_view),0.f,0.f,0.f};
-        SDL_PushGPUFragmentUniformData(command.value,0,view_params.data(),static_cast<Uint32>(sizeof(view_params)));
+        // View-level fragment uniform: debug selector plus the key light's
+        // shadow-map transform/options — identical for every draw in the pass.
+        SDL_PushGPUFragmentUniformData(command.value,0,&view_uniform,static_cast<Uint32>(sizeof(view_uniform)));
         if(!sorted.empty()){
           SDL_BindGPUVertexStorageBuffers(pass,0,&vertex_buffer,1);SDL_BindGPUFragmentStorageBuffers(pass,0,&fragment_buffer,1);
           for(const auto& batch:batcher.batches()){
@@ -517,8 +658,9 @@ struct Scene3DRenderer::Storage {
               {draw.optical->texture,sampler},{draw.environment->texture,environment_sampler},
               {draw.normal->texture,environment_sampler},{draw.properties->texture,environment_sampler},
               {draw.cloud->texture,environment_sampler},{draw.shadow->texture,sampler},{draw.next->texture,sampler},
-              {draw.emissive->texture,tiled?repeat_sampler:sampler},{draw.mr->texture,tiled?repeat_sampler:sampler}};
-            SDL_BindGPUFragmentSamplers(pass,0,sampled,10);
+              {draw.emissive->texture,tiled?repeat_sampler:sampler},{draw.mr->texture,tiled?repeat_sampler:sampler},
+              {use_shadow?target.shadow:texture(white)->texture,sampler}};
+            SDL_BindGPUFragmentSamplers(pass,0,sampled,11);
             SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(draw.mesh->owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
           }
         }
@@ -554,7 +696,7 @@ struct Scene3DRenderer::Storage {
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
 Scene3DRenderer::~Scene3DRenderer()=default;
 void Scene3DRenderer::prepare(const DrawList& list){
-  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=0;
+  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=0;
   for(const auto& c:list.world)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   for(const auto& c:list.overlay)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");

@@ -250,6 +250,12 @@ struct Scene3dDocument {
   // Diagnostic shading override for the 3D view:
   // lit|unlit|albedo|normals|roughness|metallic|emissive|lighting.
   std::string debug_view{"lit"};
+  // Key-light directional shadow map: an ortho coverage volume centred
+  // shadow_distance units along camera forward. shadow_extent<=0 disables;
+  // resolution 0 picks the quality-tier default (1024/2048/4096).
+  float shadow_extent{0.f}, shadow_distance{64.f}, shadow_depth{256.f};
+  float shadow_strength{1.f}, shadow_bias{0.0005f};
+  std::uint32_t shadow_resolution{0};
   // Background clear color.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward (-Y) acceleration in units/s²; 0 disables gravity.

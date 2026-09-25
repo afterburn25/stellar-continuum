@@ -14,6 +14,8 @@ layout(set=2,binding=6) uniform sampler2D shadow_map;
 layout(set=2,binding=7) uniform sampler2D sequence_map;
 layout(set=2,binding=8) uniform sampler2D emissive_map;
 layout(set=2,binding=9) uniform sampler2D metallic_roughness_map;
+// Key-light depth map — a depth-only ortho pass ahead of the scene pass.
+layout(set=2,binding=10) uniform sampler2D shadow_depth_map;
 struct Material {
     vec4 tint;
     vec4 light_direction;
@@ -45,13 +47,17 @@ struct Material {
     vec4 point_position[4]; // view-space position, range (0 = unbounded)
     vec4 point_energy[4]; // rgb, intensity
 };
-layout(set=2,binding=10,std430) readonly buffer Materials {
+layout(set=2,binding=11,std430) readonly buffer Materials {
     Material materials[];
 };
 // Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
 // 2 albedo, 3 normals, 4 roughness, 5 metallic, 6 emissive, 7 lighting.
 layout(set=3,binding=0) uniform ViewParams {
     vec4 debug_mode;
+    // view → shadow-map clip space, then texel size / strength / bias /
+    // enabled in shadow_options
+    mat4 shadow_from_view;
+    vec4 shadow_options;
 } view_params;
 // Per-invocation material copy — populated from the instance-indexed buffer
 // at the top of main so helper functions keep their shared access.
@@ -207,6 +213,31 @@ void main() {
     // Evaluate derivatives before per-pixel alpha rejection; annulus horizon
     // rejection above is arithmetic so neighbouring fragments remain coherent.
     float visibility=direct_visibility(material.shadow_light.xyz);
+    // Directional shadow map: receivers project into the key light's ortho
+    // box. Coverage is an authored strategy-scale policy — fragments outside
+    // the box stay lit instead of smearing. Fixed 8-tap kernel keeps PCF
+    // cheap; the radius (in texels) and strength come from the quality tier.
+    if(view_params.shadow_options.x>0.0) {
+        vec4 clip=view_params.shadow_from_view*vec4(view_position,1.0);
+        vec3 ndc=clip.xyz/max(clip.w,1e-9);
+        vec2 suv=ndc.xy*0.5+0.5;
+        if(clip.w>0.0&&suv.x>=0.0&&suv.x<=1.0&&suv.y>=0.0&&suv.y<=1.0&&ndc.z>=0.0&&ndc.z<=1.0) {
+            float texel=view_params.shadow_options.x;
+            float radius=view_params.shadow_options.y*texel;
+            float bias=view_params.shadow_options.w;
+            float lit;
+            if(radius>0.0) {
+                vec2 taps[8]=vec2[](vec2(-1.0,-1.0),vec2(1.0,-1.0),vec2(-1.0,1.0),vec2(1.0,1.0),
+                                    vec2(-0.4,0.0),vec2(0.4,0.0),vec2(0.0,-0.4),vec2(0.0,0.4));
+                lit=0.0;
+                for(int i=0;i<8;++i)
+                    lit+=step(ndc.z-bias,texture(shadow_depth_map,suv+taps[i]*radius).r);
+                lit*=0.125;
+            } else
+                lit=step(ndc.z-bias,texture(shadow_depth_map,suv).r);
+            visibility*=mix(1.0,lit,view_params.shadow_options.z);
+        }
+    }
     float extra_visibility[2];
     for(int i=0;i<2;++i)extra_visibility[i]=material.additional_illumination[i].a>0.0?direct_visibility(material.additional_shadow[i].xyz):1.0;
     vec3 N=normalize(view_normal);

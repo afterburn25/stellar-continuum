@@ -65,8 +65,11 @@ same document headless-tested.
    tiling, no metallic-roughness map. Ships/stations cannot express metal.
 2. **Lighting** — directional only, ≤3 per material, no point/spot lights,
    no distance attenuation (engine glow, station floods impossible).
-3. **Shadows** — analytic ellipsoid/annulus only; no general shadow
-   mapping for ships/stations, no cascade/distance policy.
+3. **Shadows** — landed: key-light directional shadow map (authored
+   ortho volume centred ahead of the camera, depth pass + 8-tap PCF,
+   tier-scaled resolution, Low skips). Remaining: no CSM splits for
+   extreme zoom ranges, point lights stay unshadowed; analytic
+   ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — environment map reachable only through `Dielectric3D`;
    ordinary materials get no diffuse irradiance or specular environment.
 5. **Post** — tonemap only; no exposure, bloom, contrast/saturation
@@ -92,10 +95,13 @@ aniso + cubic magnification and caps emission-volume marching at 16
 steps, Medium at 32; bloom Medium+, sharpen High+, MSAA Ultra).
 Per-instance `visible_range` distance culling is landed: culled
 instances skip both the draw and their TextureStreamer residency demand.
-Also fixed: streamer registrations keyed by `RgbaImage*` are now
-liveness-verified (`weak_ptr` owner), closing a stale-TextureId reuse
-bug that intermittently skipped mip-tail promotions. See
-`docs/VISUAL_ENGINE_HANDOFF.md`.
+Directional shadow mapping is landed: `ShadowMap3D` ortho coverage ahead
+of the camera, depth-only `scene3d_shadow` pass through the RenderGraph,
+8-tap PCF at High/Ultra, tier-scaled resolution, Low-tier skip,
+`shadow_casters` workload counter. Also fixed: streamer registrations
+keyed by `RgbaImage*` are now liveness-verified (`weak_ptr` owner),
+closing a stale-TextureId reuse bug that intermittently skipped mip-tail
+promotions. See `docs/VISUAL_ENGINE_HANDOFF.md`.
 
 1. **PBR material block**: metallic + scalar/map roughness driving the
    existing GGX, emissive map × tint × strength with optional
@@ -118,8 +124,10 @@ bug that intermittently skipped mip-tail promotions. See
 
 ## Explicitly deferred / blockers
 
-- General shadow mapping (CSM + PCF): needs a depth pass + atlas plumbing;
-  analytic blockers already cover planet↔ring. Documented limitation.
+- Cascaded shadow maps (CSM splits for extreme zoom ranges) and
+  point-light shadows: the single `ShadowMap3D` ortho volume covers
+  authored mid-zoom strategy scenes; analytic blockers still cover
+  planet↔ring. Documented limitation.
 - Indirect draws / GPU culling: SDL_GPU does not yet expose
   `SDL_DrawGPUIndexedPrimitivesIndirect` paths here; CPU record build is
   the known bound. Not a blocker at strategy scale (4096 cap).

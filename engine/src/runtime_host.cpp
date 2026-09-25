@@ -234,6 +234,7 @@ struct RuntimeHost::Impl {
   std::vector<Scene3dLight> lights3;
   std::vector<Scene3dPointLight> point_lights3;
   native_map::RenderOptions3D render3;
+  std::optional<native_map::ShadowMap3D> shadow3;
   float gravity3 = 0.f, ground_y3 = 0.f, bounds3 = 0.f;
   bool look_held = false; // right-button mouse-look
   // Input journaling: --record fills `recorder` with frame-indexed input
@@ -1158,6 +1159,17 @@ int RuntimeHost::run() {
         : doc.debug_view == "lighting"
             ? native_map::DebugView3D::LightingOnly
                                       : native_map::DebugView3D::Lit;
+    if (doc.shadow_extent > 0.f) {
+      native_map::ShadowMap3D map{};
+      map.extent = doc.shadow_extent;
+      map.distance = doc.shadow_distance;
+      map.depth = doc.shadow_depth;
+      map.strength = doc.shadow_strength;
+      map.bias = doc.shadow_bias;
+      map.resolution = doc.shadow_resolution;
+      impl.shadow3 = map;
+    } else
+      impl.shadow3.reset();
     impl.gravity3 = doc.gravity;
     impl.ground_y3 = doc.ground_y;
     impl.bounds3 = doc.bounds;
@@ -2548,7 +2560,8 @@ int RuntimeHost::run() {
                                             {l.r, l.g, l.b},
                                             l.intensity, l.range});
       if (auto scene = Scene3D::create(cam, std::move(instances),
-                                       light_cam, std::move(point_lights))) {
+                                       light_cam, std::move(point_lights),
+                                       impl.shadow3)) {
         Scene3DView view{std::move(scene), {0, 0, w, h}};
         view.options = impl.render3;
         draw.overlay.insert(draw.overlay.begin() + 1, std::move(view));

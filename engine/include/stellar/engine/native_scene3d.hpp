@@ -204,21 +204,36 @@ struct MeshInstance3D {
   // fleet-scale budget policy. 0 keeps the instance visible at any range.
   float visible_range{};
 };
+// Directional shadow map for the scene key light. Instead of fitting the
+// camera frustum, the ortho coverage box centres `distance` world units
+// along the camera forward axis — the authored extent picks how much of a
+// strategy scene is shadowed, and receivers outside it stay lit. Rendered
+// as a depth-only pass at `resolution` (0 = per-tier default); Low tier
+// skips it entirely. Analytic blockers and point lights are unaffected.
+struct ShadowMap3D {
+  float extent{64.f};    // half-extent of the ortho box, world units
+  float distance{64.f};  // box centre distance along camera forward
+  float depth{256.f};    // light-axis depth of the shadow volume
+  float strength{1.f};   // 0..1 darkness applied to the key light
+  float bias{0.0005f};   // receiver-side depth bias in shadow-NDC units
+  std::uint32_t resolution{0}; // 0 = tier default (1024/2048/4096)
+};
 class Scene3D final {
  public:
   [[nodiscard]] static std::shared_ptr<const Scene3D> create(
       Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light_direction={.42f,.2f,.87f},
-      std::vector<PointLight3D> point_lights={});
+      std::vector<PointLight3D> point_lights={},std::optional<ShadowMap3D> shadow_map=std::nullopt);
   [[nodiscard]] const auto& camera()const noexcept{return camera_;}
   [[nodiscard]] const auto& instances()const noexcept{return instances_;}
   [[nodiscard]] Vec3 light_direction()const noexcept{return light_;} // camera space
   // World-space point lights (station floods, engine glow); at most
   // maximum_scene3d_point_lights are evaluated.
   [[nodiscard]] const auto& point_lights()const noexcept{return point_lights_;}
+  [[nodiscard]] const auto& shadow_map()const noexcept{return shadow_map_;}
  private:
-  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights)
-      :camera_(camera),instances_(std::move(instances)),light_(light),point_lights_(std::move(point_lights)){}
-  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;std::vector<PointLight3D> point_lights_;
+  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map)
+      :camera_(camera),instances_(std::move(instances)),light_(light),point_lights_(std::move(point_lights)),shadow_map_(std::move(shadow_map)){}
+  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;std::vector<PointLight3D> point_lights_;std::optional<ShadowMap3D> shadow_map_;
 };
 struct PreparedInstance3D { Matrix4 model_view,model_view_projection;float camera_depth{};bool visible{}; };
 // Conservative sphere/frustum test, camera-relative matrices; no GPU required.
@@ -232,6 +247,9 @@ struct Scene3DStatistics {
   // Instanced batches submitted this frame — diverges from draw_calls only
   // in counting (they are equal), kept for fleet-scale batching audits.
   std::uint64_t draw_batches{},submitted_instances{};
+  // Instances written to the directional shadow map this frame (post
+  // volume/visible_range culling) — the shadow-pass workload audit counter.
+  std::uint64_t shadow_casters{};
   std::size_t mesh_cache_entries{},mesh_cache_bytes{},texture_cache_entries{},texture_cache_bytes{},target_bytes{};
   // Binds served by the pinned fallback because the TextureStreamer denied
   // residency under the frame's byte budget (budget-pressure pop-in count).

@@ -570,6 +570,48 @@ int main(int argc,char** argv)try{
         "visible_range did not cull the distant instance");
     std::cout<<"debug_views_gpu=channels_distance_cull_passed\n";
   }
+  {
+    // Directional shadow mapping: an authored ortho volume on the key light.
+    // A 45-degree star displaces the occluder's footprint onto the receiver;
+    // coverage, bias, tier and distance policies all assert pixel probes.
+    camera.projection=Projection3D::Orthographic;camera.position={0,0,5};camera.orthographic_height=2;
+    Material3D diffuse;diffuse.tint={255,255,255,255};diffuse.ambient=0;diffuse.diffuse=1;diffuse.light_direction=Vec3{.7f,0,.7f};
+    MeshInstance3D receiver{quad(0,0),{},{},1,diffuse};
+    auto occluder=receiver;occluder.scale=.3f;occluder.position={.5f,0,.4f};
+    ShadowMap3D shadow;shadow.extent=4;shadow.distance=4;shadow.depth=8;shadow.resolution=512;
+    const Vec3 light{.7f,0,.7f};
+    const auto shadow_view=[&](std::vector<MeshInstance3D> objects,RenderOptions3D o,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},shadow),{0,0,320,320},o});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto open=shadow_view({receiver},{},"shadow-open.png");
+    const auto occluded=shadow_view({receiver,occluder},{},"shadow-blocked.png");
+    check(window.scene3d_statistics().shadow_casters==2,"Shadow pass did not submit receiver and occluder casters");
+    check(channel(*open,176,160,0)>100,"Lit receiver pixel was dark without any occluder");
+    check(channel(*occluded,176,160,0)<channel(*open,176,160,0)/2,"Blocker did not shadow the receiver");
+    check(channel(*occluded,60,160,0)>100,"Shadow volume darkened unoccluded receiver pixels");
+    // Bias stability: a lone receiver under the map stays as bright as a
+    // shadow-free render — no self-shadow acne.
+    {DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{receiver},light),{0,0,320,320}});
+     window.draw(list,folder/"shadow-reference.png");const auto reference=decode_rgba_image(folder/"shadow-reference.png");
+     check(std::abs(int(channel(*open,176,160,0))-int(channel(*reference,176,160,0)))<8,"Shadow map biased the lit receiver into acne");}
+    // Direction: moving the occluder left moves the shadow left with it.
+    auto shifted=occluder;shifted.position={-.1f,0,.4f};
+    const auto moved=shadow_view({receiver,shifted},{},"shadow-moved.png");
+    check(channel(*moved,80,160,0)<channel(*open,80,160,0)/2&&channel(*moved,176,160,0)>100,"Shadow did not follow the occluder");
+    // Quality tiers: Low pays no shadow pass at all; High keeps it via PCF.
+    RenderOptions3D low;low.quality=RenderQuality3D::Low;
+    const auto low_tier=shadow_view({receiver,occluder},low,"shadow-low.png");
+    check(channel(*low_tier,176,160,0)>100,"Low quality tier still evaluated the shadow map");
+    check(window.scene3d_statistics().shadow_casters==0,"Low tier still submitted shadow casters");
+    RenderOptions3D high;high.quality=RenderQuality3D::High;
+    const auto pcf=shadow_view({receiver,occluder},high,"shadow-pcf.png");
+    check(channel(*pcf,176,160,0)<channel(*open,176,160,0)/2,"High tier lost the shadow entirely");
+    // Distance policy: a culled caster stops occluding receivers.
+    auto ranged=occluder;ranged.visible_range=1.f;
+    const auto culled_caster=shadow_view({receiver,ranged},{},"shadow-culled.png");
+    check(channel(*culled_caster,176,160,0)>100,"Distance-culled caster still wrote the shadow map");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");

@@ -485,6 +485,13 @@ std::string Scene3dDocument::to_json() const {
                      {"sharpen", sharpen},
                      {"quality", quality},
                      {"debug", debug_view}};
+  if (shadow_extent > 0.f)
+    doc["render"]["shadow"] = {{"extent", shadow_extent},
+                               {"distance", shadow_distance},
+                               {"depth", shadow_depth},
+                               {"strength", shadow_strength},
+                               {"bias", shadow_bias},
+                               {"resolution", shadow_resolution}};
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
   if (gravity != 0.0f) doc["gravity"] = gravity;
@@ -674,6 +681,23 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
           scene.debug_view != "emissive" && scene.debug_view != "lighting")
         return fail("render debug must be lit|unlit|albedo|normals|roughness"
                     "|metallic|emissive|lighting");
+      if (r.contains("shadow")) {
+        const auto &s = r.at("shadow");
+        if (!s.is_object()) return fail("render shadow must be an object");
+        scene.shadow_extent = s.value("extent", 0.0f);
+        scene.shadow_distance = s.value("distance", 64.0f);
+        scene.shadow_depth = s.value("depth", 256.0f);
+        scene.shadow_strength = s.value("strength", 1.0f);
+        scene.shadow_bias = s.value("bias", 0.0005f);
+        scene.shadow_resolution = s.value("resolution", 0u);
+        if (scene.shadow_extent < 0.f || scene.shadow_distance < 0.f ||
+            scene.shadow_depth <= 0.f || scene.shadow_strength < 0.f ||
+            scene.shadow_strength > 1.f || scene.shadow_bias < 0.f ||
+            scene.shadow_bias > 0.1f ||
+            (scene.shadow_resolution != 0u &&
+             (scene.shadow_resolution < 64u || scene.shadow_resolution > 8192u)))
+          return fail("render shadow fields out of range");
+      }
     }
     if (doc.contains("background")) {
       const auto &bg = doc.at("background");

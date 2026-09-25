@@ -59,7 +59,8 @@ reject path as the frustum test, so culled instances skip the draw call
 ## Scene lights — `PointLight3D`
 
 ```cpp
-auto scene = Scene3D::create(camera, instances, key_light, point_lights);
+auto scene = Scene3D::create(camera, instances, key_light, point_lights,
+                             shadow_map);
 ```
 
 - Up to `maximum_scene3d_point_lights` = 4 per scene.
@@ -68,6 +69,37 @@ auto scene = Scene3D::create(camera, instances, key_light, point_lights);
   hard cutoff; `range == 0` means unbounded inverse-square.
 - Point lights are independent of the key/fill directional lights and
   are unshadowed.
+
+## Directional shadows — `ShadowMap3D`
+
+```cpp
+ShadowMap3D shadow;
+shadow.extent = 64.f;       // ortho half-extent, world units
+shadow.distance = 64.f;     // box centre along camera forward
+shadow.depth = 256.f;       // light-axis depth of the shadow volume
+shadow.strength = 1.f;      // [0,1] darkness applied to the key light
+shadow.bias = 0.0005f;      // receiver-side depth bias, shadow-NDC units
+shadow.resolution = 0;      // 0 = tier default (Medium 1024 / High 2048 / Ultra 4096)
+```
+
+- Strategy-scale fitting: instead of covering the camera frustum, the
+  ortho box centres `distance` units along the camera forward axis, so
+  the authored `extent` picks how much of the scene is shadowed —
+  receivers outside the box stay lit. The light direction and camera
+  orientation both track the scene's key light each frame.
+- Rendered as a depth-only pass (`scene3d_shadow.vert/.frag`) before the
+  scene pass through the RenderGraph; the scene fragment shader applies
+  a fixed 8-tap PCF kernel at High (1-texel radius) and Ultra (1.5),
+  and a single depth tap at Medium.
+- Low tier skips the pass entirely (no depth target, no shader work);
+  `visible_range`-culled and non-casting volumes are excluded.
+  `Scene3DStatistics::shadow_casters` reports the per-frame caster
+  workload.
+- Shadow darkness scales the key light only — ambient, point lights,
+  emissive and the analytic `AnalyticShadow3D` blockers are independent.
+- `bias` is a receiver-side constant in NDC space; the rasterizer
+  additionally applies a fixed slope-scaled bias (1.5) at cast time.
+  Raise `bias` if grazing self-shadows band, lower it if shadows detach.
 
 ## Per-view post — `RenderOptions3D` (native_map_platform.hpp)
 
@@ -114,8 +146,12 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `visible_range`). Scene fields: `point_lights[]` (max 4), `exposure`,
 `bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
-("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting").
-Negative `range` and unknown `debug`/`quality` strings are rejected.
+("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting"), and
+`render.shadow` — `{extent, distance, depth, strength, bias,
+resolution}`; `extent ≤ 0` (or the key absent) disables the map.
+Negative `range` and unknown `debug`/`quality` strings are rejected, as
+are nonpositive `depth`, `strength` outside [0,1], negative `bias`, and
+`resolution` outside [64,8192].
 
 `spawn_scene3d` attaches `MaterialPbr`/`AtmosphereShell` components
 (binary codec round-trip), a `VisibleRange` component when `range > 0`,
@@ -129,7 +165,8 @@ Entity rows: PBR map paths + metallic/roughness scalars, emissive
 path/tint/strength/night gate, environment path/strength, alpha cutout,
 UV tiling, atmosphere tint/strength/power/night floor, visible range.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
-quality tier, debug view, point lights (pos/color/intensity/range).
+quality tier, debug view, point lights (pos/color/intensity/range),
+shadow map (extent/distance/depth/strength/bias/resolution).
 The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
 ## Performance notes
@@ -148,11 +185,19 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - Low tier skips aniso/cubic samplers entirely (linear clamp/repeat
   samplers bound instead) and caps emission-volume marching at 16
   steps (Medium: 32; authored `volume_steps` applies at High+).
+- The shadow pass is one extra depth-only draw set per frame (casters
+  already culled by `visible_range` and the shadow volume); the depth
+  target is `resolution`² D32 — tier-scaled, allocated lazily per
+  target and shared across views.
 
 ## Known limitations
 
-- No general shadow mapping (CSM/PCF); analytic ellipsoid/annulus
-  blockers cover planet↔ring only. Point lights unshadowed.
+- `ShadowMap3D` is a single ortho cascade for the key light only —
+  no CSM splits, no point-light shadows, no spot lights; receivers
+  outside the authored box stay lit (by design) so extreme zoom-outs
+  need a larger `extent`.
+- Analytic ellipsoid/annulus blockers remain the ring↔planet shadow
+  path and are evaluated independently of the map.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or
   aerial perspective.
 - One shared equirect env map per material — no probe grid.

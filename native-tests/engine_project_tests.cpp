@@ -471,6 +471,12 @@ int main() {
     scene.sharpen = 0.3f;
     scene.quality = "ultra";
     scene.debug_view = "normals";
+    scene.shadow_extent = 32.f;
+    scene.shadow_distance = 48.f;
+    scene.shadow_depth = 128.f;
+    scene.shadow_strength = 0.7f;
+    scene.shadow_bias = 0.001f;
+    scene.shadow_resolution = 2048;
     const auto reparsed =
         engine::Scene3dDocument::from_json(scene.to_json());
     check(reparsed.has_value(), "scene3d json round-trips");
@@ -544,6 +550,10 @@ int main() {
                 reparsed->sharpen == 0.3f && reparsed->quality == "ultra" &&
                 reparsed->debug_view == "normals",
             "scene3d render options round-trip");
+      check(reparsed->shadow_extent == 32.f && reparsed->shadow_distance == 48.f &&
+                reparsed->shadow_depth == 128.f && reparsed->shadow_strength == 0.7f &&
+                reparsed->shadow_bias == 0.001f && reparsed->shadow_resolution == 2048,
+            "scene3d shadow map settings round-trip");
       check(reparsed->entities[1].metallic == 0.f &&
                 reparsed->entities[1].emissive_strength == 0.f &&
                 reparsed->entities[1].atmo_strength == 0.f &&
@@ -584,6 +594,18 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"quality":"extreme"}})")
               .has_value(),
           "scene3d unknown quality tier rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"depth":0}}})")
+              .has_value(),
+          "scene3d nonpositive shadow depth rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"strength":2}}})")
+              .has_value(),
+          "scene3d shadow strength above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"resolution":16}}})")
+              .has_value(),
+          "scene3d undersized shadow resolution rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"pointLights":[{},{},{},{},{}]})")
               .has_value(),
