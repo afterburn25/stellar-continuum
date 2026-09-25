@@ -247,6 +247,28 @@ int main() {
               root / "host.rec.until-4.stw"),
           "argv --replay-until writes the dump");
   }
+  {
+    // --replay-info is standalone: prints the journal inventory and
+    // exits before the loop — a missing or corrupt recording fails
+    // instead of hanging a headless host.
+    RuntimeHost host{headless_options(root)};
+    const auto rec = recording.generic_string();
+    const auto missing = (root / "no-such.rec").generic_string();
+    const auto corrupt = (root / "corrupt.rec").generic_string();
+    {
+      std::ofstream out(root / "corrupt.rec", std::ios::binary);
+      out << "not a replay journal";
+    }
+    const char *ok[] = {"game", "--replay-info", rec.c_str()};
+    const char *gone[] = {"game", "--replay-info", missing.c_str()};
+    const char *bad[] = {"game", "--replay-info", corrupt.c_str()};
+    check(host.run(3, const_cast<char **>(ok)) == 0,
+          "--replay-info on a valid journal exits 0");
+    check(host.run(3, const_cast<char **>(gone)) == 1,
+          "--replay-info on a missing file exits 1");
+    check(host.run(3, const_cast<char **>(bad)) == 1,
+          "--replay-info on a corrupt file exits 1");
+  }
   // control surface (request_quit, set_paused, sim_time, rng) — all only
   // reachable inside run(), so headless mode is what makes them testable.
   {
