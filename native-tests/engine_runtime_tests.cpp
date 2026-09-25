@@ -4,6 +4,7 @@
 // (entities_in_rect/radius, entities3d_in_radius/box) that otherwise
 // need a windowed run(), plus headless record→replay verification.
 
+#include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/replay.hpp>
 #include <stellar/engine/runtime_host.hpp>
 #include <stellar/engine/scene_components.hpp>
@@ -88,6 +89,18 @@ int main() {
       if (updates == 2)
         picked_hidden = !host.entity_at(710.f, 710.f).has_value();
     };
+    // on_draw/on_status still fire headless — the DrawList is built and
+    // handed to the game; only GPU submission is skipped.
+    int draws = 0, statuses = 0;
+    host.on_draw = [&](native_map::DrawList &draw, float w, float h) {
+      ++draws;
+      check(w == 640.f && h == 480.f, "headless on_draw gets the drawable size");
+      check(!draw.overlay.empty(), "the HUD overlay is built headless");
+    };
+    host.on_status = [&] {
+      ++statuses;
+      return "status line";
+    };
     check(host.run() == 0, "headless run exits cleanly");
     check(updates == 4, "headless steps once per frame under --frames");
     check(rect_hits == 1, "entities_in_rect finds the demo entity");
@@ -96,6 +109,8 @@ int main() {
     check(picked, "entity_at hits the demo rect");
     check(picked_miss, "entity_at misses empty space");
     check(picked_hidden, "entity_at skips Hidden entities");
+    check(draws == 4, "on_draw fires once per headless frame");
+    check(statuses == 4, "on_status fires once per headless frame");
   }
 
   // Headless runs are deterministic: identical options produce
