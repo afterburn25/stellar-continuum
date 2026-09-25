@@ -12,7 +12,9 @@ namespace stellar::native_quick_find {
 
 // A command-palette row projected from authoritative campaign state by the
 // caller — the palette never reaches into the simulation itself.
-enum class EntryKind { System, Colony, Fleet, Contact };
+// Workspace rows carry a caller-assigned id that activation maps back onto
+// the native navigation actions; Mission rows carry a fleet id.
+enum class EntryKind { System, Colony, Fleet, Contact, Mission, Workspace };
 struct Entry {
   EntryKind kind{};
   int id{};

@@ -8773,9 +8773,14 @@ class NativeCampaign final {
   }
 
   // Global command palette (Ctrl+K): a searchable projection of known
-  // systems, owned colonies/fleets and identified contacts. Entries come
-  // from the same FoW-filtered view models the workspaces consume — the
-  // palette never exposes uncharted names.
+  // systems, owned colonies/fleets, identified contacts, active mission
+  // fleets and navigation workspaces. Entries come from the same
+  // FoW-filtered view models the workspaces consume — the palette never
+  // exposes uncharted names.
+  enum class QuickFindTarget : int {
+    Research = 1, Economy, Supply, Shipyard, Construction, Diplomacy,
+    Missions, Colonies
+  };
   void open_quick_find(int width,int height){
     std::vector<stellar::native_quick_find::Entry> entries;
     const auto &world=session_->frame().runtime().world().campaign();
@@ -8805,6 +8810,28 @@ class NativeCampaign final {
         entries.push_back({stellar::native_quick_find::EntryKind::Contact,
                            *contact.civilization_id,contact.display_name,
                            contact.status});
+    for(const auto &mission:
+        native_missions::build_mission_board(world,locale_).missions)
+      entries.push_back({stellar::native_quick_find::EntryKind::Mission,
+                         mission.fleet_id,mission.fleet_name,
+                         mission.destination});
+    // Command rows: open the same surfaces the navigation rail dispatches.
+    static const std::pair<QuickFindTarget,std::pair<const char*,const char*>>
+        workspace_targets[]={
+          {QuickFindTarget::Research,{"NAV_RESEARCH","Research"}},
+          {QuickFindTarget::Economy,{"NAV_ECONOMY","Economy"}},
+          {QuickFindTarget::Supply,{"NAV_LOGISTICS","Logistics"}},
+          {QuickFindTarget::Shipyard,{"NAV_SHIPYARD","Shipyard"}},
+          {QuickFindTarget::Construction,{"NAV_CONSTRUCTION","Construction"}},
+          {QuickFindTarget::Diplomacy,{"NAV_DIPLOMACY","Diplomacy"}},
+          {QuickFindTarget::Missions,{"NAV_MISSIONS","Missions"}},
+          {QuickFindTarget::Colonies,{"NAV_PLANETS","Planets"}},
+        };
+    for(const auto &target:workspace_targets)
+      entries.push_back({stellar::native_quick_find::EntryKind::Workspace,
+                         static_cast<int>(target.first),
+                         tr(target.second.first,target.second.second),
+                         tr("QUICK_FIND_KIND_WORKSPACE","Workspace")});
     quick_find_.open(std::move(entries));
     announcer_.announce_focus(quick_find_.focused_label(width,height),
         announcement_bounds(quick_find_.focused_bounds(width,height)),
@@ -8835,8 +8862,27 @@ class NativeCampaign final {
       open_overview_colony(entry.id,width,height);
       break;
     case EntryKind::Fleet:
+    case EntryKind::Mission:
       focus_mission_fleet(entry.id);
       break;
+    case EntryKind::Workspace:{
+      research_workspace_.close();shipyard_workspace_.close();
+      construction_workspace_.close();diplomacy_workspace_.close();
+      colony_roster_.close();economy_workspace_.close();
+      supply_workspace_.close();mission_view_.close();
+      notification_view_.close();chronicle_view_.close();
+      system_workspace_.close();colony_workspace_.close();
+      switch(static_cast<QuickFindTarget>(entry.id)){
+      case QuickFindTarget::Research:research_workspace_.open();refresh_research(true);break;
+      case QuickFindTarget::Economy:economy_workspace_.open();refresh_economy(true,false);break;
+      case QuickFindTarget::Supply:supply_workspace_.open();refresh_supply(true,false);break;
+      case QuickFindTarget::Shipyard:shipyard_workspace_.open();refresh_shipyard(true);break;
+      case QuickFindTarget::Construction:construction_workspace_.open();refresh_construction(true);break;
+      case QuickFindTarget::Diplomacy:diplomacy_workspace_.open();refresh_diplomacy(true);break;
+      case QuickFindTarget::Missions:mission_view_.open();refresh_missions(true);break;
+      case QuickFindTarget::Colonies:colony_roster_.open();refresh_roster(true);break;
+      }
+      break;}
     case EntryKind::Contact:
       research_workspace_.close();shipyard_workspace_.close();
       construction_workspace_.close();colony_roster_.close();

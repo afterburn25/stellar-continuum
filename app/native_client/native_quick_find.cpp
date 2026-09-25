@@ -91,8 +91,9 @@ void QuickFind::refilter() {
   for (std::size_t index = 0; index < entries_.size(); ++index) {
     const auto &entry = entries_[index];
     if (query.empty() ||
-        folded(entry.label + " " + entry.detail).find(query) !=
-            std::string::npos)
+        folded(entry.label + " " + entry.detail + " " +
+               kind_label(entry.kind))
+            .find(query) != std::string::npos)
       matches_.push_back(index);
   }
   if (matches_.empty())
@@ -127,6 +128,8 @@ std::string QuickFind::kind_label(EntryKind kind) const {
   case EntryKind::Colony: return tr("QUICK_FIND_KIND_COLONY", "COLONY");
   case EntryKind::Fleet: return tr("QUICK_FIND_KIND_FLEET", "FLEET");
   case EntryKind::Contact: return tr("QUICK_FIND_KIND_CONTACT", "CONTACT");
+  case EntryKind::Mission: return tr("QUICK_FIND_KIND_MISSION", "MISSION");
+  case EntryKind::Workspace: return tr("QUICK_FIND_KIND_WORKSPACE", "WORKSPACE");
   }
   return {};
 }
@@ -291,7 +294,7 @@ void QuickFind::render(DrawList &out, int width, int height) const {
                                       layout.body_pixels) * .5f},
               query_.empty()
                   ? tr("QUICK_FIND_PLACEHOLDER",
-                       "Search systems, colonies, fleets, contacts…")
+                       "Search systems, colonies, fleets, missions, screens…")
                   : query_ + "|",
               query_.empty() ? theme::color::text_muted
                              : theme::color::text_primary,
@@ -326,6 +329,8 @@ void QuickFind::render(DrawList &out, int width, int height) const {
                  entry.kind == EntryKind::System    ? theme::Tone::Selected
                  : entry.kind == EntryKind::Colony  ? theme::Tone::Economy
                  : entry.kind == EntryKind::Fleet   ? theme::Tone::Military
+                 : entry.kind == EntryKind::Mission ? theme::Tone::Science
+                 : entry.kind == EntryKind::Workspace ? theme::Tone::Neutral
                                                     : theme::Tone::Diplomacy);
     theme::text(out,
                 {badge_bounds.x + badge_bounds.width + 10.f * s,

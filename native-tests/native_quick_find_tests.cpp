@@ -164,6 +164,47 @@ int main() {
               "Palette layout escaped its panel.");
     }
     {
+      // Mission and workspace rows render their badges, match by kind label,
+      // and activate through the same entry contract.
+      QuickFind palette;
+      palette.open({
+          {EntryKind::Mission, 55, "SCV Horizon", "Tau Ceti"},
+          {EntryKind::Workspace, 4, "Shipyard", "Workspace"},
+      });
+      require(palette.match_count() == 2,
+              "Mission/workspace entries did not populate.");
+      (void)palette.handle({InputEventType::TextEntered, {}, {}, 0.f, "mission"},
+                           1280, 720);
+      require(palette.match_count() == 1,
+              "Kind label was not part of the searchable text.");
+      const auto command = palette.handle(key(13), 1280, 720);
+      require(command.activated &&
+                  command.activated->kind == EntryKind::Mission &&
+                  command.activated->id == 55,
+              "Mission activation did not return its fleet id.");
+      palette.open({
+          {EntryKind::Mission, 55, "SCV Horizon", "Tau Ceti"},
+          {EntryKind::Workspace, 4, "Shipyard", "Workspace"},
+      });
+      (void)palette.handle({InputEventType::TextEntered, {}, {}, 0.f, "shipy"},
+                           1280, 720);
+      require(palette.match_count() == 1,
+              "Workspace command did not filter by label.");
+      const auto opened = palette.handle(key(13), 1280, 720);
+      require(opened.activated &&
+                  opened.activated->kind == EntryKind::Workspace &&
+                  opened.activated->id == 4,
+              "Workspace activation did not return its target id.");
+      palette.open({
+          {EntryKind::Mission, 55, "SCV Horizon", "Tau Ceti"},
+          {EntryKind::Workspace, 4, "Shipyard", "Workspace"},
+      });
+      DrawList draw;
+      palette.render(draw, 1280, 720);
+      require(has_text(draw, "MISSION") && has_text(draw, "WORKSPACE"),
+              "New entry kinds did not render their badges.");
+    }
+    {
       // Empty result set still renders the empty state and stays closable.
       QuickFind palette;
       palette.open(entries());
