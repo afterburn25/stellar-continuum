@@ -1032,6 +1032,10 @@ int RuntimeHost::run() {
     if (on_spawn) on_spawn(world, ids.front(), entity);
     return ids.front();
   };
+  const auto unpack_entity = [](std::uint64_t v) {
+    return EntityId{static_cast<std::uint32_t>(v & 0xffffffffu),
+                    static_cast<std::uint32_t>(v >> 32)};
+  };
   impl.destroy_fn = [&](EntityId id) -> bool {
     const auto it =
         std::find(impl.entities.begin(), impl.entities.end(), id);
@@ -1040,11 +1044,17 @@ int RuntimeHost::run() {
           impl.sprites.begin() + (it - impl.entities.begin()));
       impl.entities.erase(it);
       if (impl.player && *impl.player == id) impl.player.reset();
+      // Destroying an overlapped entity ends the contact — fire the exit
+      // (the surviving id may still be live) rather than silently
+      // dropping the pair.
       for (auto p = impl.overlapping.begin();
            p != impl.overlapping.end();)
-        if (p->first == id.value() || p->second == id.value())
+        if (p->first == id.value() || p->second == id.value()) {
+          if (on_collision_exit)
+            on_collision_exit(unpack_entity(p->first),
+                              unpack_entity(p->second));
           p = impl.overlapping.erase(p);
-        else
+        } else
           ++p;
       world.destroy(id);
       return true;
@@ -1055,9 +1065,12 @@ int RuntimeHost::run() {
     impl.entities3d.erase(it3);
     for (auto p = impl.overlapping3d.begin();
          p != impl.overlapping3d.end();)
-      if (p->first == id.value() || p->second == id.value())
+      if (p->first == id.value() || p->second == id.value()) {
+        if (on_collision_exit)
+          on_collision_exit(unpack_entity(p->first),
+                            unpack_entity(p->second));
         p = impl.overlapping3d.erase(p);
-      else
+      } else
         ++p;
     impl.grounded3d.erase(id.value());
     impl.prev_grounded3d.erase(id.value());

@@ -550,6 +550,34 @@ int main() {
     check(exits >= 1, "on_collision_exit fires on separation");
   }
 
+  // Destroying an overlapped entity also ends the contact: the exit
+  // fires with the (now stale) ids rather than dropping the pair.
+  {
+    RuntimeHost host{headless_options(root)};
+    int updates = 0;
+    int exits = 0;
+    EntityId mover{};
+    host.on_collision_exit = [&](EntityId, EntityId) { ++exits; };
+    host.on_update = [&](World &world, float) {
+      ++updates;
+      if (updates == 1) {
+        SceneEntity a{};
+        a.name = "destroy-a";
+        a.x = 500.f;
+        a.y = 500.f;
+        SceneEntity b{};
+        b.name = "destroy-b";
+        b.x = 505.f;
+        b.y = 505.f;
+        host.spawn_entity(a);
+        mover = host.spawn_entity(b);
+      }
+      if (updates == 3) host.destroy_entity(mover);
+    };
+    check(host.run() == 0, "destroy-contact run exits cleanly");
+    check(exits == 1, "on_collision_exit fires when a member is destroyed");
+  }
+
   // Tilemap collision: a gravity-affected entity falls onto a colliding
   // row of cells — on_tile_land reports the exact cell once and the
   // entity rests on the tile top.
