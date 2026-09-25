@@ -382,7 +382,12 @@ spawn/land/collision/anim-event callbacks (2D + 3D, incl. solid-landing
 MTV resolution and 3D collision exit), injected-input F5/F9
 quicksave-load in both 2D and scene3d modes, save_data blobs, scene
 switching + live hot-reload polling, 2D/3D ttl/parent/bounds, input-map
-rebinding, accessors, VFX stepping (2D + 3D projected anchors), snapshot parity, run(argc, argv)
+rebinding (incl. the missing/malformed-file fail-safe advisory),
+custom --scene/--scene3d-file/--save paths, journaled gamepad
+button + latched-axis replay through the real mapper, --world-w/
+--world-h bounce bounds independent of the window, --move-speed/
+--jump/--fly-speed behavioral scaling, accessors, VFX stepping (2D + 3D
+projected anchors), snapshot parity, run(argc, argv)
 flag parsing (incl. --replay/--replay-until/--replay-info and a trailing
 --scene3d), the replay contract, and fail-fast exits on missing/corrupt
 journals; the Projects tool's TEST passes
