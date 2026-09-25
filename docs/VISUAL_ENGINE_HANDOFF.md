@@ -144,6 +144,14 @@ must not degrade with the camera's zoom. Validation: ≤ 8 levels, all
 non-null, `lod_pixels` in [1,4096]; `lod_instances` on
 `Scene3DStatistics` audits the substitution count per frame.
 
+For extreme zoom-out a chain can end on an impostor card:
+`Mesh3D::billboard_card(w,h)` (or the `card:w,h` mesh spec) builds a
+quad whose `billboard()` flag makes the draw collapse its view-space
+rotation to uniform scale — it always presents its face regardless of
+instance or camera orientation, while position, scale and depth stay
+correct. The flag is per-mesh, so a fading pair can mix a card with
+solid geometry, and a primary `card:` mesh doubles as a sprite marker.
+
 `lod_fade` (default .15, [0,.5]) widens each switch threshold into a
 screen-door transition band: inside the band the view submits both
 adjacent levels and the fragment shader keeps exactly one per pixel via
@@ -370,8 +378,10 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   modes yet, and LightingOnly divides by sampled albedo so untextured
   or near-black surfaces clip to black.
 - `visible_range` is distance culling and `lod_meshes` a flat halving
-  chain — no hierarchical LOD trees or billboard impostors yet, and
-  shadow casters always take the full mesh. The screen-door LOD fade
-  is a per-pixel dither (fine up close on stills; reads as noise if a
-  coarse proxy differs sharply).
+  chain — no hierarchical LOD trees yet, and shadow casters always take
+  the full mesh. Impostor cards (`Mesh3D::billboard_card`, `card:w,h`
+  spec) face the camera but carry no baked view-dependent shading — the
+  impostor image is whatever texture the instance maps onto it. The
+  screen-door LOD fade is a per-pixel dither (fine up close on stills;
+  reads as noise if a coarse proxy differs sharply).
 - No indirect draw / GPU culling — CPU record build is the scale bound.

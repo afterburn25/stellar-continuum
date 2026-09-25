@@ -47,9 +47,18 @@ class Mesh3D final {
   [[nodiscard]] static std::shared_ptr<const Mesh3D> create(
       std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices);
   [[nodiscard]] static std::shared_ptr<const Mesh3D> uv_sphere(int columns=128,int rows=64);
+  // A camera-facing quad (width × height, centred at origin, normal +Z,
+  // full uv range). Cards drop their view-space rotation at draw time,
+  // so they work as the last LOD level of a mesh chain (impostor) or as
+  // a primary marker/sprite mesh. Use the `card:w,h` mesh spec to
+  // author one from a scene document.
+  [[nodiscard]] static std::shared_ptr<const Mesh3D> billboard_card(float width=1.f,float height=1.f);
   [[nodiscard]] const auto& vertices()const noexcept{return vertices_;}
   [[nodiscard]] const auto& indices()const noexcept{return indices_;}
   [[nodiscard]] float bounding_radius()const noexcept{return radius_;}
+  // Cards draw camera-facing: the renderer collapses their view-space
+  // rotation to uniform scale, keeping position, scale and depth.
+  [[nodiscard]] bool billboard()const noexcept{return billboard_;}
   // Local-space axis-aligned bounds — collision and ground resting use
   // these (scaled by instance scale) instead of the bounding sphere so
   // boxes collide as boxes.
@@ -57,10 +66,10 @@ class Mesh3D final {
   [[nodiscard]] Vec3 bounds_max()const noexcept{return bounds_max_;}
   [[nodiscard]] std::size_t byte_size()const noexcept{return vertices_.size()*sizeof(Vertex3D)+indices_.size()*sizeof(std::uint32_t);}
  private:
-  Mesh3D(std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices,float radius,Vec3 bounds_min,Vec3 bounds_max)
-      :vertices_(std::move(vertices)),indices_(std::move(indices)),radius_(radius),bounds_min_(bounds_min),bounds_max_(bounds_max){}
+  Mesh3D(std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices,float radius,Vec3 bounds_min,Vec3 bounds_max,bool billboard=false)
+      :vertices_(std::move(vertices)),indices_(std::move(indices)),radius_(radius),bounds_min_(bounds_min),bounds_max_(bounds_max),billboard_(billboard){}
   std::vector<Vertex3D> vertices_;std::vector<std::uint32_t> indices_;float radius_{};
-  Vec3 bounds_min_{},bounds_max_{};
+  Vec3 bounds_min_{},bounds_max_{};bool billboard_{};
 };
 enum class Projection3D { Perspective,Orthographic };
 struct Camera3D {
@@ -326,6 +335,10 @@ struct PreparedInstance3D { Matrix4 model_view,model_view_projection;float camer
 // the selected level keeps 1-p. Shared by the draw submission and the
 // streamer demand so both charge the same resident levels.
 [[nodiscard]] float lod3d_fade_share(const MeshInstance3D&,float projected_diameter_px)noexcept;
+// The camera's clip-space projection — the same matrix prepare_instance3d
+// composes into model_view_projection. The GPU backend rebuilds an MVP
+// with it when a billboard mesh collapses the view-space rotation.
+[[nodiscard]] Matrix4 projection3d_matrix(const Camera3D&,float aspect)noexcept;
 struct PreparedShadow3D { Matrix4 from_model;Vec3 light; };
 // Light is the resolved camera-space direction. Local geometry stays precise
 // even when both blocker and receiver are at astronomical world coordinates.

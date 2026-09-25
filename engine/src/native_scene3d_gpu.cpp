@@ -377,6 +377,18 @@ struct Scene3DRenderer::Storage {
     for(const auto& instance:view.scene->instances()){
       auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
       if(!prepared.visible){++stats.culled_instances;continue;}
+      // A card mesh is camera-facing: its view-space rotation collapses
+      // to uniform scale (position and depth stay) so the impostor always
+      // presents its face regardless of instance or camera orientation.
+      // Per drawn mesh — a fading pair can mix a card with solid geometry.
+      const auto facing=[&](const std::shared_ptr<const Mesh3D>& mesh){
+        PreparedInstance3D out=prepared;
+        if(mesh->billboard()){
+          for(int c=0;c<3;++c)for(int r=0;r<3;++r)
+            out.model_view.values[c*4+r]=c==r?instance.scale:0.f;
+          out.model_view_projection=multiply(projection3d_matrix(lod_camera,view.destination.width/view.destination.height),out.model_view);
+        }
+        return out;};
       std::shared_ptr<const Mesh3D> drawn_mesh=instance.mesh;
       std::size_t lod_level=0;float lod_share=0.f;
       if(!instance.lod_meshes.empty()){
@@ -402,7 +414,7 @@ struct Scene3DRenderer::Storage {
       // Low tier keeps the hard switch (one draw, zero cost).
       const bool fading=lod_share>0.f&&lod_level<instance.lod_meshes.size();
       if(fading)++stats.lod_fades;
-      draws.push_back({&instance,prepared,geometry(drawn_mesh),surface,
+      draws.push_back({&instance,facing(drawn_mesh),geometry(drawn_mesh),surface,
         optical?texture(optical->surface):surface,
         optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
         response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,
@@ -411,7 +423,7 @@ struct Scene3DRenderer::Storage {
         pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
         pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
         fading?1.f-lod_share:1.f});
-      if(fading)draws.push_back({&instance,prepared,geometry(instance.lod_meshes[lod_level]),surface,
+      if(fading)draws.push_back({&instance,facing(instance.lod_meshes[lod_level]),geometry(instance.lod_meshes[lod_level]),surface,
         optical?texture(optical->surface):surface,
         optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
         response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,

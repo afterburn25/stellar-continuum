@@ -185,6 +185,16 @@ std::shared_ptr<const Mesh3D> Mesh3D::create(std::vector<Vertex3D> vertices,std:
   for(auto i:indices)if(i>=vertices.size())throw std::invalid_argument("3D mesh index is outside its vertex array.");
   return std::shared_ptr<const Mesh3D>(new Mesh3D(std::move(vertices),std::move(indices),radius,bounds_min,bounds_max));
 }
+std::shared_ptr<const Mesh3D> Mesh3D::billboard_card(float width,float height){
+  if(!bounded(width,1e4)||width<1e-6f||!bounded(height,1e4)||height<1e-6f)
+    throw std::invalid_argument("3D billboard card requires positive bounded dimensions.");
+  const float hw=width*.5f,hh=height*.5f;
+  const Vec3 n{0,0,1};
+  std::vector<Vertex3D> vertices{{{-hw,-hh,0},n,{0,1}},{{hw,-hh,0},n,{1,1}},{{hw,hh,0},n,{1,0}},{{-hw,hh,0},n,{0,0}}};
+  const float radius=std::hypot(hw,hh);
+  const Vec3 lo{-hw,-hh,0},hi{hw,hh,0};
+  return std::shared_ptr<const Mesh3D>(new Mesh3D(std::move(vertices),{0,1,2,0,2,3},radius,lo,hi,true));
+}
 std::shared_ptr<const Mesh3D> Mesh3D::uv_sphere(int columns,int rows){
   if(columns<3||rows<2||columns>512||rows>256)throw std::invalid_argument("3D sphere tessellation is out of range.");
   std::vector<Vertex3D> vertices;std::vector<std::uint32_t> indices;
@@ -260,17 +270,26 @@ PreparedInstance3D prepare_instance3d(const Camera3D& camera,const MeshInstance3
   const auto q=normalized(camera.orientation);const auto view=rotation_matrix({-q.x,-q.y,-q.z,q.w});
   PreparedInstance3D result;result.model_view=multiply(view,model);
   const float x=result.model_view.values[12],y=result.model_view.values[13],z=-result.model_view.values[14];result.camera_depth=z;
-  Matrix4 p;const float n=camera.near_plane,f=camera.far_plane;
+  const float n=camera.near_plane,f=camera.far_plane;
   if(camera.projection==Projection3D::Perspective){
     const float ty=std::tan(camera.vertical_fov_radians*.5f),tx=ty*aspect;
     result.visible=z+radius>=n&&z-radius<=f&&std::abs(x)<=z*tx+radius*std::sqrt(1+tx*tx)&&std::abs(y)<=z*ty+radius*std::sqrt(1+ty*ty);
-    p.values={1/tx,0,0,0,0,1/ty,0,0,0,0,f/(n-f),-1,0,0,n*f/(n-f),0};
   }else{
     const float hy=camera.orthographic_height*.5f,hx=hy*aspect;
     result.visible=z+radius>=n&&z-radius<=f&&std::abs(x)<=hx+radius&&std::abs(y)<=hy+radius;
+  }
+  result.model_view_projection=multiply(projection3d_matrix(camera,aspect),result.model_view);return result;
+}
+Matrix4 projection3d_matrix(const Camera3D& camera,float aspect)noexcept{
+  Matrix4 p;const float n=camera.near_plane,f=camera.far_plane;
+  if(camera.projection==Projection3D::Perspective){
+    const float ty=std::tan(camera.vertical_fov_radians*.5f),tx=ty*aspect;
+    p.values={1/tx,0,0,0,0,1/ty,0,0,0,0,f/(n-f),-1,0,0,n*f/(n-f),0};
+  }else{
+    const float hy=camera.orthographic_height*.5f,hx=hy*aspect;
     p.values={1/hx,0,0,0,0,1/hy,0,0,0,0,1/(n-f),0,0,0,n/(n-f),1};
   }
-  result.model_view_projection=multiply(p,result.model_view);return result;
+  return p;
 }
 std::size_t select_lod3d_level(const MeshInstance3D& instance,float projected_diameter_px)noexcept{
   std::size_t level=0;float threshold=instance.lod_pixels;

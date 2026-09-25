@@ -200,6 +200,11 @@ resolve_mesh_spec(std::string_view spec, const ContentResolver *content) {
       return native_map::annulus_mesh(
           args[0], args[1],
           args.size() > 2 ? static_cast<int>(args[2]) : 64);
+    // Camera-facing card — an LOD impostor or marker sprite.
+    if (head == "card")
+      return Mesh3D::billboard_card(
+          args.size() > 0 ? args[0] : 1.f,
+          args.size() > 1 ? args[1] : (args.size() > 0 ? args[0] : 1.f));
     if (content != nullptr && spec.size() > 4 &&
         spec.substr(spec.size() - 4) == ".obj")
       if (const auto bytes = content->read_bytes(spec))

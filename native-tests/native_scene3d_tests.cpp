@@ -220,6 +220,14 @@ int main()try{
    check(lod3d_fade_share(off,110)==0.f,"Zero fade width still produced a share");
    rejects([&]{auto i=instance;i.lod_fade=.6f;(void)Scene3D::create(camera,{i});});
    rejects([&]{auto i=instance;i.lod_fade=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
+  // Billboard cards: a camera-facing quad for LOD impostors and sprite
+  // markers — the renderer drops its view-space rotation at draw time.
+  {const auto card=Mesh3D::billboard_card(2.f,1.f);
+   check(card->billboard()&&!sphere->billboard(),"Billboard flag did not distinguish the card mesh");
+   check(std::abs(card->bounding_radius()-std::hypot(1.f,.5f))<1e-5f,"Billboard card bounds did not match its dimensions");
+   check(card->vertices().size()==4&&card->indices().size()==6,"Billboard card is not a single quad");
+   rejects([]{(void)Mesh3D::billboard_card(0,1);});
+   rejects([]{(void)Mesh3D::billboard_card(1,std::numeric_limits<float>::quiet_NaN());});}
   for(int field=0;field<8;++field){auto invalid=receiver;auto& s=*invalid.material.shadow;
     if(field==0)s.scale=0;if(field==1)s.position.x=std::numeric_limits<double>::infinity();
     if(field==2)s.rotation={0,0,0,0};if(field==3)s.radii.y=0;

@@ -945,6 +945,10 @@ int main() {
         check(resolve_mesh_spec("box", nullptr) != nullptr &&
                   resolve_mesh_spec("bogus", nullptr) == nullptr,
               "resolve_mesh_spec primitives and rejection");
+        const auto card = resolve_mesh_spec("card:2,1", nullptr);
+        check(card != nullptr && card->billboard() &&
+                  card->bounds_max().x == 1.f,
+              "resolve_mesh_spec card spec did not build a billboard");
         // Ray straight down over the ship: box:2,1,1 scaled 2, yaw 90 —
         // top face sits at y = 5 + 0.5*2 = 6 → distance 4 from y=10.
         const auto down = raycast_world3d(restored, entities3d(restored),

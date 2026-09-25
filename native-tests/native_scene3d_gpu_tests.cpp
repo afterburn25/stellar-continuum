@@ -690,6 +690,21 @@ int main(int argc,char** argv)try{
     std::cout<<"lod_fade_gpu=dithered_crossfade_passed\n";
   }
   {
+    // Billboard impostor: a card mesh ignores instance rotation — turn
+    // it edge-on and it still faces the camera, while an ordinary quad
+    // at the same rotation shrinks to an invisible line.
+    const auto edge_on=rotation_axis_angle({0,1,0},1.570796327f);
+    auto card=a;card.mesh=Mesh3D::billboard_card(1.8f,1.8f);card.scale=.4f;
+    card.rotation=edge_on;
+    const auto faced=capture({card},"impostor.png");
+    check(channel(*faced,160,160,0)>150&&channel(*faced,200,160,0)>150,
+        "Billboard card did not face the camera");
+    auto edge=a;edge.mesh=quad(0,0);edge.scale=.4f;edge.rotation=edge_on;
+    const auto edgeon=capture({edge},"impostor-edge.png");
+    check(channel(*edgeon,160,160,0)<50,"Ordinary quad billboarded without the card flag");
+    std::cout<<"impostor_gpu=billboard_facing_passed\n";
+  }
+  {
     // Differential rotation: a longitude shear weighted by latitude —
     // cos(2pi*v) is zero-mean and equator-symmetric, so the equator shifts
     // one way while the polar rows shift the other on a striped sphere.

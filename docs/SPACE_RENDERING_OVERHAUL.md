@@ -114,7 +114,8 @@ same document headless-tested.
     record build. `visible_range` distance culling landed (phase 16) and
     screen-space mesh LOD chains (`lod_meshes`/`lod_pixels`, ≤8 halving
     levels, shared streamer/draw selection, `lod_instances` stat) landed
-    later — still no impostors or hierarchical LOD trees.
+    later, along with the `lod_fade` screen-door band and `card:w,h`
+    billboard impostor meshes — still no hierarchical LOD trees.
 
 ## Top wins (ordered)
 

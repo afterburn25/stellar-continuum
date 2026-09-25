@@ -115,7 +115,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `lod_instances` stat delta, above-threshold frames keep the full mesh;
   screen-door probe: a sphere fading to a quad inside the band dithers
   its sphere-only silhouette (~2/3 lit of 80px vs fully lit hard-switch
-  control) and counts one `lod_fades` submission; `fleet3d` benchmark
+  control) and counts one `lod_fades` submission; impostor probe: an
+  edge-on `billboard_card` still renders face-on while an ordinary quad
+  at the same rotation vanishes; `fleet3d` benchmark
   block — a 1024-ship depth-sweep fleet, 60 timed frames reporting
   `cpu_submit_mean_ms`/`frame_wall_mean_ms` plus
   `draw_calls`/`lod_instances` assertions (one instanced draw per LOD
@@ -125,10 +127,17 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `engine_project` — `lods`/`lodPixels`/`lodFade` round-trip + malformed
   rejections; `engine_world` — `MeshLods` spawn/codec/export
   round-trips.
-- **Limitations:** flat halving chain — no hierarchical LOD trees,
-  billboard impostors, or mesh decimation; the crossfade is a per-pixel
-  dither (stable while the camera holds still; reads as fine noise on
-  stills when a coarse proxy diverges sharply); casters stay full-res.
+- **Impostors:** `Mesh3D::billboard_card(w,h)` (mesh spec `card:w,h`)
+  builds a camera-facing quad — `billboard()` collapses its view-space
+  rotation to uniform scale at draw time, so a chain's last level can be
+  an always-facing impostor card, and a primary `card:` mesh doubles as
+  a sprite marker. The flag is per-mesh, so a fading pair can mix a
+  card with solid geometry.
+- **Limitations:** flat halving chain — no hierarchical LOD trees or
+  mesh decimation; impostor cards are flat quads (no baked
+  view-dependent shading); the crossfade is a per-pixel dither (stable
+  while the camera holds still; reads as fine noise on stills when a
+  coarse proxy diverges sharply); casters stay full-res.
 
 ## Scene3D surface detail — cloud decks and terminator wrap (2026-09-25)
 
@@ -1485,6 +1494,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
 - **Mesh sources:** `MeshRef::spec` accepts `box[:sx,sy,sz]` and
   `annulus:inner,outer[,segments]` primitives
   (native_geometry3d.hpp), `sphere[:cols,rows]` (`Mesh3D::uv_sphere`),
+  `card[:w,h]` (`Mesh3D::billboard_card` — a camera-facing quad for
+  impostor/marker use),
   or a content-relative `.obj` path loaded through `ContentResolver`
   (cooked bytes or loose file) by `load_obj_mesh` — a minimal Wavefront
   OBJ parser (v/vn/vt/f, fan triangulation, generated flat normals).
