@@ -146,12 +146,14 @@ int main() {
 #endif
 
 #if defined(STELLAR_SOURCE_DIR) && defined(STELLAR_LOCALE_DIR)
-  // Source-reference audit: every catalog-shaped literal the native client
-  // passes to a localization resolver (tr/mt/resolve/format/translate/…),
-  // returns from a *_key mapper, or lists in a *_keys table must exist in the
-  // baseline catalog — a missing key silently renders the English fallback in
-  // every shipped locale. Concatenation fragments ("PREFIX_" + value) are
-  // dynamic key families and are intentionally skipped.
+  // Source-reference audit: every ALL_CAPS_WITH_UNDERSCORES literal in the
+  // native client is a localization key reference (resolver argument, *_key
+  // field value, *_keys table entry, or *_key mapper return). Each one must
+  // exist in the baseline catalog — a missing key silently renders the
+  // English fallback in every shipped locale. Concatenation fragments
+  // ("PREFIX_" + value) are dynamic key families; the handful of intentional
+  // non-key identifiers (input contexts, env vars, dataset tokens) are
+  // allowlisted explicitly.
   {
     const std::filesystem::path locale_dir{STELLAR_LOCALE_DIR};
     const std::filesystem::path src_root{STELLAR_SOURCE_DIR};
@@ -162,12 +164,14 @@ int main() {
     };
     const auto en_doc = nlohmann::json::parse(slurp(locale_dir / "en.json"));
     const auto &catalog = en_doc.at("strings");
-    const std::set<std::string> resolvers{
-        "tr",        "trf",      "mt",       "mtf",    "mtfn",
-        "resolve",   "resolved", "format",   "plural", "translate",
-        "contains",  "tr_at",    "quality_name"};
+    const std::set<std::string> allowlist{
+        "GALAXY_PAD",                 // InputMapper axis context name
+        "STELLAR_CONTINUUM_DEVTOOLS", // environment variable
+        "MAJOR_FLARE",                // eruption dataset classification token
+        "SMALL_PROMINENCE",           // eruption dataset classification token
+        "SETTINGS_ACTION_",           // dynamic prefix for controls-rebind keys
+    };
     const auto key_shaped = [](const std::string &text) {
-      // Taxonomy ids are ALL_CAPS_WITH_UNDERSCORES and at least two segments.
       if (text.size() < 5 || text.find('_') == std::string::npos)
         return false;
       return std::ranges::all_of(text, [](char c) {
@@ -185,18 +189,9 @@ int main() {
     std::size_t references = 0;
     for (const auto &file : sources) {
       const std::string src = slurp(file);
-      std::vector<std::string> callees;   // paren stack: callee identifier
-      std::vector<bool> key_braces;       // brace stack: *_key/_keys initializer
-      std::string ident, prev_word;
       char prev_char = 0;
       int line = 1;
       std::size_t i = 0;
-      const auto flush = [&] {
-        if (!ident.empty()) {
-          prev_word = ident;
-          ident.clear();
-        }
-      };
       while (i < src.size()) {
         const char c = src[i];
         if (c == '\n') {
@@ -218,13 +213,6 @@ int main() {
           i = end == std::string::npos ? src.size() : end + 2;
           continue;
         }
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-            (c >= '0' && c <= '9') || c == '_') {
-          ident += c;
-          prev_char = c;
-          ++i;
-          continue;
-        }
         if (c == '\'') {
           // Digit separator (1'000) is not a character literal.
           const bool separator =
@@ -238,51 +226,20 @@ int main() {
             continue;
           }
         }
-        flush();
-        if (c == '(') {
-          callees.push_back(prev_word);
-          prev_word.clear();
-          prev_char = '(';
-          ++i;
-          continue;
-        }
-        if (c == ')') {
-          if (!callees.empty()) callees.pop_back();
-          prev_char = ')';
-          ++i;
-          continue;
-        }
-        if (c == '{') {
-          const bool keys =
-              (!key_braces.empty() && key_braces.back()) ||
-              prev_word.ends_with("_key") || prev_word.ends_with("_keys");
-          key_braces.push_back(keys);
-          prev_char = '{';
-          ++i;
-          continue;
-        }
-        if (c == '}') {
-          if (!key_braces.empty()) key_braces.pop_back();
-          prev_char = '}';
-          ++i;
-          continue;
-        }
         if (c == '"') {
-          // Raw string literal: R"delim(...)delim"
-          if (!prev_word.empty() && prev_word.ends_with('R')) {
+          // Raw string literal: R"delim(...)delim" — an identifier ending in
+          // R immediately before the quote (only legal in raw prefixes).
+          if (prev_char == 'R') {
             const auto paren = src.find('(', i + 1);
-            const std::size_t span =
-                paren == std::string::npos ? 0 : paren - i - 1;
-            if (paren != std::string::npos && span <= 16) {
+            if (paren != std::string::npos && paren - i - 1 <= 16) {
               const std::string close =
-                  ")" + src.substr(i + 1, span) + "\"";
+                  ")" + src.substr(i + 1, paren - i - 1) + "\"";
               const auto end = src.find(close, paren);
               const std::size_t stop =
                   end == std::string::npos ? src.size() : end;
               for (std::size_t j = i; j < stop; ++j)
                 if (src[j] == '\n') ++line;
               i = end == std::string::npos ? src.size() : end + close.size();
-              prev_word.clear();
               prev_char = '"';
               continue;
             }
@@ -301,30 +258,30 @@ int main() {
             ++k;
           const char next = k < src.size() ? src[k] : 0;
           if (key_shaped(text) && next != '+' && next != '"' &&
-              prev_char != '+' && prev_char != '"') {
-            const bool referenced =
-                (!callees.empty() && resolvers.contains(callees.back())) ||
-                prev_word == "return" ||
-                (!key_braces.empty() && key_braces.back());
-            if (referenced) {
-              ++references;
-              check(catalog.contains(text),
-                    (file.filename().string() + ":" +
-                     std::to_string(literal_line) +
-                     " references missing localization key " + text)
-                        .c_str());
-            }
+              prev_char != '+' && prev_char != '"' &&
+              !allowlist.contains(text)) {
+            ++references;
+            check(catalog.contains(text),
+                  (file.filename().string() + ":" +
+                   std::to_string(literal_line) +
+                   " references missing localization key " + text)
+                      .c_str());
           }
-          prev_word.clear();
           prev_char = '"';
           i = j;
+          continue;
+        }
+        // Whitespace (besides newlines, handled above) does not update
+        // prev_char, so `x + "KEY"` still sees the preceding '+'.
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\v' || c == '\f') {
+          ++i;
           continue;
         }
         prev_char = c;
         ++i;
       }
     }
-    check(references > 500, "audit scanned source key references");
+    check(references > 1500, "audit scanned source key references");
   }
 #endif
 
