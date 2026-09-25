@@ -748,6 +748,38 @@ int main() {
     }
   }
 
+  // scene3d record → replay: checkpoint hashing covers the 3D
+  // component codecs — a recorded 3D run verifies clean end-to-end.
+  {
+    const auto sub = root / "scene3d-replay";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene3d.json");
+      out << R"({"entities":[
+                   {"name":"mover","mesh":"box","pos":[0,0,0],
+                    "vel":[1,0.5,0]}]})";
+    }
+    const auto rec = sub / "host3d.rec";
+    {
+      auto opts = headless_options(sub);
+      opts.scene3d = true;
+      opts.frame_limit = 40;
+      opts.record_file = rec;
+      RuntimeHost host{opts};
+      check(host.run() == 0, "3D recording run exits cleanly");
+    }
+    {
+      auto opts = headless_options(sub);
+      opts.scene3d = true;
+      opts.frame_limit = 0;
+      opts.replay_file = rec;
+      opts.replay_exit = true;
+      RuntimeHost host{opts};
+      check(host.run() == 0,
+            "3D replay verifies world checkpoints over the 3D codecs");
+    }
+  }
+
   // save_data/load_data round-trip named blobs under saves/data/ —
   // no run() needed, and key validation rejects path escapes.
   {
