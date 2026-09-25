@@ -883,6 +883,38 @@ int main() {
           "the replaced entity is destroyed on reload");
   }
 
+  // set_scene on a missing or malformed file fails safe — the running
+  // scene is kept instead of being torn down into an empty world.
+  {
+    const auto sub = root / "bad-switch";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[{"name":"kept","x":10,"y":10}]})";
+      std::ofstream bad(sub / "editor" / "broken.json");
+      bad << "{not json";
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 6;
+    RuntimeHost host{opts};
+    int updates = 0;
+    bool kept_after_missing = false, kept_after_broken = false;
+    host.on_update = [&](World &, float) {
+      ++updates;
+      if (updates == 2) host.set_scene("editor/nonexistent.json");
+      if (updates == 3)
+        kept_after_missing = host.find_entity("kept").has_value();
+      if (updates == 4) host.set_scene("editor/broken.json");
+      if (updates == 5)
+        kept_after_broken = host.find_entity("kept").has_value();
+    };
+    check(host.run() == 0, "bad-switch run exits cleanly");
+    check(kept_after_missing,
+          "a missing scene file keeps the running scene");
+    check(kept_after_broken,
+          "a malformed scene file keeps the running scene");
+  }
+
   // Scene-authored animations: a clip's "x" track owns the entity's
   // Transform2D.x while playing, and a named event marker fires exactly
   // once when the playhead crosses it.
