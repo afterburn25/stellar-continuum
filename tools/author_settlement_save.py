@@ -12,16 +12,26 @@ copy of an existing save without touching production simulation code:
 Usage:
     python tools/author_settlement_save.py --in save.json --out save.json
         [--fleet-id 1] [--system-id 18]
+    python tools/author_settlement_save.py --in save.json --out save.json
+        --travel --known-neighbor 17 [--relocate-to 11]
 
 Defaults match the fleet smoke fixture: fleet 1 ("Pioneer One") retargeted
 at system 18, which contains the viable uncolonized body 18002 (Elara).
 Run the ordered smoke first; its autosave leaves an active settlement
 mission, so the same output file then also satisfies
 --settlement-reload-smoke.
+
+--travel instead authors a --system-travel-smoke fixture: the transiting
+vessel is left untouched, one lane-connected neighbor gains partial
+survey (so it carries a known_label while others stay "????"), and other
+idle player fleets are relocated out of the home system so a single click
+on the anchored marker selects the transiting vessel unambiguously.
 """
 
 import argparse
 import json
+
+_OTHER_SYSTEM_POSITION = (-154.1, 166.9)  # fleet fixture's system 11
 
 
 def main() -> None:
@@ -30,6 +40,12 @@ def main() -> None:
     parser.add_argument("--out", dest="dst", required=True, help="output save JSON")
     parser.add_argument("--fleet-id", type=int, default=1)
     parser.add_argument("--system-id", type=int, default=18)
+    parser.add_argument("--travel", action="store_true",
+                        help="author a --system-travel-smoke fixture")
+    parser.add_argument("--known-neighbor", type=int, default=17,
+                        help="lane-connected neighbor to partially survey")
+    parser.add_argument("--relocate-to", type=int, default=11,
+                        help="system that receives co-located idle fleets")
     args = parser.parse_args()
 
     doc = json.load(open(args.src, encoding="utf-8"))
@@ -38,6 +54,30 @@ def main() -> None:
     vessel = next(
         f for f in galaxy["Fleets"]
         if f["Id"] == args.fleet_id and f["CivilizationId"] == 0)
+
+    if args.travel:
+        # Keep the vessel's local transit; give it one known neighbor and
+        # clear co-located idle fleets so the marker click is unambiguous.
+        home = vessel["CurrentSystemId"]
+        known = next(
+            k for k in galaxy["Knowledge"] if k["CivilizationId"] == 0)
+        if args.known_neighbor not in known["KnownSystemIds"]:
+            known["KnownSystemIds"].append(args.known_neighbor)
+            known["KnownSystemIds"].sort()
+        surveys = known.setdefault("SystemSurveys", [])
+        if not any(s["SystemId"] == args.known_neighbor for s in surveys):
+            surveys.append({"SystemId": args.known_neighbor, "Level": 2,
+                            "Progress": 1.0})
+        for other in galaxy["Fleets"]:
+            if (other["CivilizationId"] == 0 and other["Id"] != args.fleet_id
+                    and other["CurrentSystemId"] == home):
+                other["CurrentSystemId"] = args.relocate_to
+                other["X"], other["Y"] = _OTHER_SYSTEM_POSITION
+        json.dump(doc, open(args.dst, "w", encoding="utf-8"))
+        print(f"authored {args.dst}: travel fixture, neighbor "
+              f"{args.known_neighbor} partially surveyed")
+        return
+
     if not vessel.get("EmbarkedPopulationMillions"):
         raise SystemExit(f"fleet {args.fleet_id} carries no embarked population")
 

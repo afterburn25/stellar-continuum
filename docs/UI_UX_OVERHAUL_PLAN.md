@@ -309,7 +309,13 @@ breaks navigation/AT flow, or presents wrong state)
   active mission, so the same file then satisfies
   `--settlement-reload-smoke`. Verified on the fleet fixture at 720p:
   ordered flow (`accepted`, `cancel_no_charge`) and `paused_reload`
-  (mission revision 2 survives save/reload).
+  (mission revision 2 survives save/reload). The script's `--travel` mode
+  authors `--system-travel-smoke` fixtures instead — partial-survey of one
+  lane neighbor (known_label beside "????" lanes) plus relocating
+  co-located idle player fleets so the anchored marker click selects the
+  transiting vessel. Verified live: navigation, selection, canonical and
+  rendered movement, paused stability, and observer-gated lane denial all
+  pass at 720p.
 - Branch scope audit: the only `engine/` file touched is
   `engine/src/native_audio.cpp` (`939e23b6`, predating this overhaul) — a
   compatibility bugfix where the stream decoder borrows the SDL-initialized
