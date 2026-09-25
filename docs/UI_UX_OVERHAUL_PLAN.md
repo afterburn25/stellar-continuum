@@ -126,10 +126,12 @@ breaks navigation/AT flow, or presents wrong state)
    palettes alias the semantic colors. Shipyard, construction and
    diplomacy are now migrated as well. Still open: research, missions,
    startup chrome migrations.
-2. **No global quick-find / command palette** (Phase 5). Known/accessible
-   systems, colonies, fleets, contacts, shipyards and missions are only
-   findable through per-surface searches or manual map hunting. Design must
-   reuse the existing Edit-focused AT contract and FoW-filtered name sources.
+2. ~~**No global quick-find / command palette**~~ → DONE for systems,
+   colonies, fleets and identified contacts (see work log): Ctrl+K opens a
+   modal palette built from FoW-filtered view models, with type badges,
+   context labels, arrow/Enter/Escape navigation and the shared Edit-focus
+   AT contract. Shipyards and missions remain reachable only through their
+   surfaces — indexing them is a follow-up.
 3. ~~**Galaxy map has no legend or overlay vocabulary.**~~ → DONE for the
    render vocabulary: collapsible legend explains charted/uncharted stars,
    lanes, territory, fleet markers, selection halo and the planned-route
@@ -195,7 +197,7 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | Notification severity axis: `NotificationSeverity` (Info/Positive/Caution/Alert) on `NativePlayerNotification`, assigned by every publisher — campaign feedback (combat→Alert, contact→Caution, completions→Positive), chronicle seeding (`war.*`→Alert), diplomatic events (war→Alert, rejected/terminated→Caution, accepted/activated/contact→Positive), and rejected player commands→Caution. Cards render a tone accent bar plus a color-independent "!" marker on Alerts; category hue is preserved. Verified via `--diplomacy-smoke` capture and new test coverage for feed retention, per-publisher mapping, and accent rendering. | 2d3e6cb3 |
 | 2026-09-25 | Shipyard workspace migrated onto the shared theme: palette constants alias `theme::color`, the shared `button` helper replaces the hand-rolled panel+text chrome (categories/search/sort/filter/qty/favorite/action all get real hover/active/disabled states — the build action now visibly disables instead of just re-tinting), design cards and order rows use themed fills/keylines with a selection accent bar, BUILD ORDERS uses `section_header`, empty surfaces use `empty_state` with a next-action hint (SHIPYARD_EMPTY_HINT / SHIPYARD_NO_ORDERS_HINT, en+de), and the focus ring uses the shared helper. Verified via `--shipyard-smoke` capture. | d337de8f |
 | 2026-09-25 | Construction workspace migrated onto the shared theme: palette aliases `theme::color`, section panels use `panel` + `section_header` (KNOWN PROJECTS / PROJECT DETAILS / CONSTRUCTION STATUS now read as headers with rules), actions use the shared `button` with real disabled state and a construction-tone accent, selected rows carry a selection accent bar, empty lists use `empty_state` with localized hints (CONSTRUCTION_NO_PROJECTS_HINT / CONSTRUCTION_NO_ACTIVE_HINT, en+de), focus ring is the shared helper. Verified via `--construction-smoke` capture; the thin-track containment test now scopes to the orders panel since section-header rules are also thin rects. | d3661410 |
-| 2026-09-25 | Diplomacy workspace migrated onto the shared theme: palette constants alias `theme::color` (relations teal → `diplomacy`, status gold → `economy`, hostility red → `danger`), surfaces use `menu_panel`/keylined regions, filter chips and action buttons use the shared `button` with hover/active states (Declare war keeps a danger keyline + accent bar), the tab strip uses `tab` (active underbar), relationship meters draw on `canvas` tracks with semantic tones, modal negotiation/confirm/cancel buttons use `button` with danger tone on destructive confirms, CONTACT DIRECTORY / RELATIONSHIP use `section_header`, and the focus ring is the shared helper (test now asserts `color::focus` instead of the retired local accent). Verified via `--diplomacy-smoke` capture (progress mode, proposal accepted, notifications read). | pending |
+| 2026-09-25 | Diplomacy workspace migrated onto the shared theme: palette constants alias `theme::color` (relations teal → `diplomacy`, status gold → `economy`, hostility red → `danger`), surfaces use `menu_panel`/keylined regions, filter chips and action buttons use the shared `button` with hover/active states (Declare war keeps a danger keyline + accent bar), the tab strip uses `tab` (active underbar), relationship meters draw on `canvas` tracks with semantic tones, modal negotiation/confirm/cancel buttons use `button` with danger tone on destructive confirms, CONTACT DIRECTORY / RELATIONSHIP use `section_header`, and the focus ring is the shared helper (test now asserts `color::focus` instead of the retired local accent). Verified via `--diplomacy-smoke` capture (progress mode, proposal accepted, notifications read). | 15e21b1d |
 
 ### Implementation notes
 

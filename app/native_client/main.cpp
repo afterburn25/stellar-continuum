@@ -38,6 +38,7 @@
 #include "native_economy.hpp"
 #include "native_logistics.hpp"
 #include "native_missions.hpp"
+#include "native_quick_find.hpp"
 #include "native_overview.hpp"
 #include "native_campaign_session.hpp"
 #include "native_developer_simulation_panel.hpp"
@@ -333,6 +334,7 @@ struct Options {
   bool fleet_smoke{};
   bool shipyard_smoke{};
   bool construction_smoke{};
+  bool quick_find_smoke{};
   bool system_smoke{};
   bool system_travel_smoke{};
   bool system_travel_reload_smoke{};
@@ -417,6 +419,7 @@ struct Options {
     else if(arg==L"--fleet-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.fleet_smoke=true;result.windowed=true;}
     else if(arg==L"--shipyard-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.shipyard_smoke=true;result.windowed=true;}
     else if(arg==L"--construction-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.construction_smoke=true;result.windowed=true;}
+    else if(arg==L"--quick-find-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.quick_find_smoke=true;result.windowed=true;}
     else if(arg==L"--system-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.system_smoke=true;result.windowed=true;}
     else if(arg==L"--system-travel-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.system_travel_smoke=true;result.windowed=true;}
     else if(arg==L"--system-travel-reload-smoke"&&i+1<argc){result.smoke_screenshot=std::filesystem::path(argv[++i]);result.system_travel_reload_smoke=true;result.windowed=true;}
@@ -478,6 +481,7 @@ struct Options {
     else if(arg=="--fleet-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.fleet_smoke=true;result.windowed=true;}
     else if(arg=="--shipyard-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.shipyard_smoke=true;result.windowed=true;}
     else if(arg=="--construction-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.construction_smoke=true;result.windowed=true;}
+    else if(arg=="--quick-find-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.quick_find_smoke=true;result.windowed=true;}
     else if(arg=="--system-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.system_smoke=true;result.windowed=true;}
     else if(arg=="--system-travel-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.system_travel_smoke=true;result.windowed=true;}
     else if(arg=="--system-travel-reload-smoke"&&i+1<argc){result.smoke_screenshot=argv[++i];result.system_travel_reload_smoke=true;result.windowed=true;}
@@ -518,7 +522,7 @@ struct Options {
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
   if(result.campaign_profile&&!result.profile_frames)throw std::invalid_argument("--campaign-profile requires --profile-frames.");
   if(result.campaign_profile&&result.menu_smoke)throw std::invalid_argument("--campaign-profile cannot be combined with --smoke.");
-  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.settlement_preparation_smoke)+static_cast<int>(result.settlement_completion_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
+  if(static_cast<int>(result.research_smoke)+static_cast<int>(result.navigation_smoke)+static_cast<int>(result.fleet_smoke)+static_cast<int>(result.shipyard_smoke)+static_cast<int>(result.construction_smoke)+static_cast<int>(result.system_smoke)+static_cast<int>(result.system_travel_smoke)+static_cast<int>(result.system_travel_reload_smoke)+static_cast<int>(result.colony_smoke)+static_cast<int>(result.colony_reload_smoke)+static_cast<int>(result.settlement_smoke)+static_cast<int>(result.settlement_reload_smoke)+static_cast<int>(result.new_game_smoke)+static_cast<int>(result.restart_smoke)+static_cast<int>(result.galaxy_art_smoke)+static_cast<int>(result.ship_art_smoke)+static_cast<int>(result.diplomacy_smoke)+static_cast<int>(result.diplomacy_reload_smoke)+static_cast<int>(result.fresh_progression_smoke)+static_cast<int>(result.fresh_progression_reload_smoke)+static_cast<int>(result.first_exploration_mode.has_value())+static_cast<int>(result.first_survey_mode.has_value())+static_cast<int>(result.settlement_preparation_smoke)+static_cast<int>(result.settlement_completion_mode.has_value())+static_cast<int>(result.campaign_profile)+static_cast<int>(result.battle_smoke)+static_cast<int>(result.quick_find_smoke)>1)throw std::invalid_argument("Choose one native graphical smoke mode.");
   if(result.fresh_progression_smoke&&result.load)throw std::invalid_argument("--fresh-progression-smoke cannot be combined with --load.");
   if(result.fresh_progression_reload_smoke&&!result.load)throw std::invalid_argument("--fresh-progression-reload-smoke requires --load.");
   if((result.fresh_progression_smoke||result.fresh_progression_reload_smoke)&&result.seed!=115501)throw std::invalid_argument("Fresh progression smoke requires --seed 115501.");
@@ -1025,6 +1029,7 @@ class NativeCampaign final {
     research_controller_.set_localization(&table);
     phenomena_.set_localization(&table);
     mission_view_.set_localization(&table);
+    quick_find_.set_localization(&table);
     feedback_.set_localization(&table);
     supply_controller_.set_localization(&table);
     system_travel_controller_.set_localization(&table);
@@ -3870,6 +3875,30 @@ class NativeCampaign final {
                     send_key('b',width,height)&&
                     shortcut_status_reported();
   }
+  void prepare_quick_find_smoke(int width,int height){
+    const auto route=[&](InputEvent event){
+      InputSnapshot input;
+      input.drawable_width=width;input.drawable_height=height;
+      input.pointer=event.position;input.events={std::move(event)};
+      if(!update(input,width,height,0.,false))
+        throw std::runtime_error("Quick-find smoke input closed the campaign.");
+    };
+    // Ctrl+K opens the palette exactly as a player's chord does.
+    route(InputEvent{InputEventType::KeyPressed,{},{},0.f,{},0,107u,true});
+    if(!quick_find_.visible())
+      throw std::runtime_error("Quick-find smoke could not open the palette.");
+    // Type the prefix of the first charted system so the capture shows a
+    // filtered list rather than the open catalog.
+    const auto &world=session_->frame().runtime().world().campaign();
+    const auto known=std::ranges::find_if(world.systems,
+        [&](const auto &system){return known_.contains(system.id);});
+    const std::string query=known!=world.systems.end()
+        ?known->name.substr(0,std::min<std::size_t>(3,known->name.size()))
+        :std::string{"x"};
+    route(InputEvent{InputEventType::TextEntered,{},{},0.f,query});
+    // Arrow into the results so the capture shows the highlight treatment.
+    route(InputEvent{InputEventType::KeyPressed,{},{},0.f,{},0,0x40000051u});
+  }
   void prepare_fresh_progression_smoke(int width, int height, bool reload,
                                        const std::function<void()> &pump) {
     constexpr double maximum_days = 10'958.;
@@ -5942,11 +5971,20 @@ class NativeCampaign final {
   }
   [[nodiscard]] std::string settlement_smoke_status()const{std::ostringstream out;out<<std::fixed<<std::setprecision(6)<<std::boolalpha<<"{\"mode\":\""<<(smoke_settlement_reload_?"paused_reload":"ordered")<<"\",\"kind\":\""<<(smoke_settlement_kind_==NativeSettlementMissionKind::ResourceOutpost?"outpost":"colony")<<"\",\"fleet_id\":"<<smoke_settlement_fleet_id_.value_or(-1)<<",\"system_id\":"<<smoke_settlement_system_id_.value_or(-1)<<",\"body_id\":"<<smoke_settlement_body_id_.value_or(-1)<<",\"mission_revision\":"<<smoke_settlement_revision_<<",\"before_days\":"<<smoke_settlement_before_day_<<",\"saved_days\":"<<smoke_settlement_saved_day_<<",\"settlement_days\":"<<smoke_settlement_progress_<<",\"authorization\":"<<smoke_settlement_authorization_<<",\"treasury_before\":"<<smoke_settlement_treasury_before_<<",\"treasury_after\":"<<smoke_settlement_treasury_after_<<",\"requires_authorization\":"<<smoke_settlement_requires_authorization_<<",\"selected\":"<<smoke_settlement_selected_<<",\"previewed\":"<<smoke_settlement_previewed_<<",\"cancelled\":"<<smoke_settlement_cancelled_<<",\"cancel_no_charge\":"<<smoke_settlement_cancel_no_charge_<<",\"accepted\":"<<smoke_settlement_accepted_<<",\"no_instant_colony\":"<<smoke_settlement_no_instant_colony_<<",\"paused\":"<<(session_->frame().clock().speed()==StrategicSpeed::Paused)<<'}';return out.str();}
 
+  [[nodiscard]] std::string quick_find_smoke_status()const{
+    std::ostringstream out;
+    out<<std::boolalpha<<"{\"opened\":"<<quick_find_.visible()
+       <<",\"entries\":"<<quick_find_.entry_count()
+       <<",\"matches\":"<<quick_find_.match_count()
+       <<",\"query_length\":"<<quick_find_.query().size()
+       <<",\"highlighted\":"<<quick_find_.focus()<<'}';
+    return out.str();
+  }
   [[nodiscard]] std::string system_travel_smoke_status()const{std::ostringstream out;out<<std::fixed<<std::setprecision(9)<<std::boolalpha<<"{\"mode\":\""<<(smoke_system_travel_reload_?"paused_reload":"progress")<<"\",\"fleet_id\":"<<smoke_system_travel_fleet_id_.value_or(-1)<<",\"system_id\":"<<smoke_system_travel_system_id_.value_or(-1)<<",\"destination_id\":"<<smoke_system_travel_destination_id_.value_or(-1)<<",\"order_revision\":"<<smoke_system_travel_mission_revision_<<",\"lane_count\":"<<smoke_system_travel_lane_count_<<",\"before_x\":"<<smoke_system_travel_before_x_<<",\"before_y\":"<<smoke_system_travel_before_y_<<",\"after_x\":"<<smoke_system_travel_after_x_<<",\"after_y\":"<<smoke_system_travel_after_y_<<",\"before_days\":"<<smoke_system_travel_before_day_<<",\"after_days\":"<<smoke_system_travel_after_day_<<",\"selected\":"<<smoke_system_travel_selected_<<",\"canonical_moved\":"<<smoke_system_travel_canonical_moved_<<",\"rendered_moved\":"<<smoke_system_travel_rendered_moved_<<",\"paused_stable\":"<<smoke_system_travel_paused_stable_<<",\"pause_retained\":"<<smoke_system_travel_pause_retained_<<",\"known_arrow\":"<<smoke_system_travel_known_opened_<<",\"unknown_denied\":"<<smoke_system_travel_unknown_denied_<<",\"knowledge_unchanged\":"<<smoke_system_travel_knowledge_unchanged_<<",\"lanes_connected\":"<<smoke_system_travel_lanes_connected_<<'}';return out.str();}
   [[nodiscard]] bool wants_text_input() const noexcept {
     if(developer_planet_index_.visible()||giant_test_panel_.visible())return false;
     if(developer_index_.visible())return developer_index_.wants_text_input();
-    return !menu_ && !battle_workspace_.visible() && (research_workspace_.wants_text_input() || shipyard_workspace_.wants_text_input() || chronicle_view_.wants_text_input() || colony_roster_.wants_text_input() || developer_diagnostics_.wants_text_input() || (map_hud_visible()&&assets_.wants_text_input())) &&
+    return !menu_ && !battle_workspace_.visible() && (quick_find_.wants_text_input() || research_workspace_.wants_text_input() || shipyard_workspace_.wants_text_input() || chronicle_view_.wants_text_input() || colony_roster_.wants_text_input() || developer_diagnostics_.wants_text_input() || (map_hud_visible()&&assets_.wants_text_input())) &&
            !construction_workspace_.visible();
   }
   // true while a focus-ring surface owns keyboard activation, so bound galaxy
@@ -5974,6 +6012,7 @@ class NativeCampaign final {
            (developer_panel_.visible()&&developer_panel_.focus()>=0)||
            (developer_diagnostics_.visible()&&developer_diagnostics_.focus()>=0)||
            hud_focus_>=0||
+           quick_find_.visible()||
            system_workspace_.small_body_keyboard_focus()||
            inspection_card_.focus()>=0;
   }
@@ -6031,7 +6070,7 @@ class NativeCampaign final {
            notification_view_.visible()||colony_roster_.visible()||
            colony_workspace_.visible()||mission_view_.visible()||
            diplomacy_workspace_.visible()||settlement_workspace_.visible()||
-           system_workspace_.visible()||map_hud_visible()||
+           system_workspace_.visible()||quick_find_.visible()||map_hud_visible()||
            inspection_card_.visible()||
            developer_index_.visible()||developer_planet_index_.visible()||
            developer_empires_.visible()||developer_panel_.visible()||
@@ -6084,7 +6123,7 @@ class NativeCampaign final {
       territory_refresh_elapsed_=.5;
       feedback_.reset();
       notifications_.clear();
-      notification_view_.close();chronicle_view_.close();
+      notification_view_.close();chronicle_view_.close();quick_find_.close();
       seed_notifications();
       last_event_sound_={};
       if(presentation_audio_)presentation_audio_->stop_voice();
@@ -6461,7 +6500,8 @@ class NativeCampaign final {
     // so only the owning field accepts).
     if(accessibility_bridge_)
       if(const auto text_set=accessibility_bridge_->take_text_set())
-        (void)(assets_.set_focused_text(*text_set,width,height)||
+        (void)(quick_find_.set_focused_text(*text_set,width,height)||
+               assets_.set_focused_text(*text_set,width,height)||
                chronicle_view_.set_focused_text(*text_set,width,height)||
                colony_roster_.set_focused_text(*text_set,width,height)||
                developer_index_.set_focused_text(*text_set,width,height)||
@@ -6649,6 +6689,26 @@ class NativeCampaign final {
             announcer_.announce_focus(developer_panel_.focused_label(width,height,session_->frame()),
               announcement_bounds(developer_panel_.focused_bounds(width,height,session_->frame())),
               std::nullopt,developer_panel_.focused_control(width,height,session_->frame()));
+          gesture_.capture_for_ui();continue;
+        }
+      }
+      // Global quick-find palette: Ctrl+K toggles it; while open it is a
+      // modal text surface and captures every event (its own Escape and
+      // outside-click handling close it).
+      if(event.type==InputEventType::KeyPressed&&event.control&&
+         event.key==107u&&!menu_&&!battle_workspace_.visible()&&
+         !session_->new_campaign_pending()){
+        if(quick_find_.visible())quick_find_.close();
+        else open_quick_find(width,height);
+        gesture_.capture_for_ui();continue;
+      }
+      if(quick_find_.visible()){
+        const int focus_before=quick_find_.focus();
+        const auto command=quick_find_.handle(event,width,height);
+        if(command.captured){
+          if(quick_find_.focus()!=focus_before)
+            announcer_.announce_focus(quick_find_.focused_label(width,height),announcement_bounds(quick_find_.focused_bounds(width,height)),std::nullopt,quick_find_.focused_control(width,height),std::nullopt,quick_find_.focused_value(width,height));
+          if(command.activated){activate_quick_find(*command.activated,width,height);if(audio_confirm_)audio_confirm_();}
           gesture_.capture_for_ui();continue;
         }
       }
@@ -8005,6 +8065,7 @@ class NativeCampaign final {
     }
     if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);
     if(notifications_available())chronicle_view_.render(out,width,height);
+    quick_find_.render(out,width,height);
     stellar::native_audio::render_voice_caption(out,presentation_audio_,width,height,text_measurer_,
         general_settings_?general_settings_->saved().effective():stellar::engine::AccessibilitySettings{},
         voice_playback_?&*voice_playback_:nullptr,announcement_caption(),locale_);
@@ -8711,6 +8772,82 @@ class NativeCampaign final {
     refresh_colony_entry(true);
   }
 
+  // Global command palette (Ctrl+K): a searchable projection of known
+  // systems, owned colonies/fleets and identified contacts. Entries come
+  // from the same FoW-filtered view models the workspaces consume — the
+  // palette never exposes uncharted names.
+  void open_quick_find(int width,int height){
+    std::vector<stellar::native_quick_find::Entry> entries;
+    const auto &world=session_->frame().runtime().world().campaign();
+    for(const auto &system:world.systems)
+      if(known_.contains(system.id))
+        entries.push_back({stellar::native_quick_find::EntryKind::System,
+                           system.id,system.name,{}});
+    const auto player=world.player_civilization_id;
+    for(const auto &colony:world.colonies)
+      if(colony.civilization_id==player)
+        entries.push_back({stellar::native_quick_find::EntryKind::Colony,
+                           colony.id,colony.name,
+                           system_display_name(colony.system_id)});
+    refresh_fleets(true);
+    if(const auto &fleets=fleet_workspace_.view();fleets)
+      for(const auto &fleet:fleets->own_fleets)
+        entries.push_back({stellar::native_quick_find::EntryKind::Fleet,
+                           fleet.id,fleet.name,
+                           fleet.current_system_id
+                               ? system_display_name(*fleet.current_system_id)
+                               : tr("ASSETS_EN_ROUTE","En route")});
+    const auto diplomacy=diplomacy_controller_.build(
+        session_->frame(),session_->cache().generation,
+        diplomacy_workspace_.selected_contact_index());
+    for(const auto &contact:diplomacy.contacts)
+      if(contact.identified&&contact.civilization_id)
+        entries.push_back({stellar::native_quick_find::EntryKind::Contact,
+                           *contact.civilization_id,contact.display_name,
+                           contact.status});
+    quick_find_.open(std::move(entries));
+    announcer_.announce_focus(quick_find_.focused_label(width,height),
+        announcement_bounds(quick_find_.focused_bounds(width,height)),
+        std::nullopt,quick_find_.focused_control(width,height),std::nullopt,
+        quick_find_.focused_value(width,height));
+  }
+  void activate_quick_find(const stellar::native_quick_find::Entry &entry,
+                           int width,int height){
+    using stellar::native_quick_find::EntryKind;
+    switch(entry.kind){
+    case EntryKind::System:{
+      research_workspace_.close();shipyard_workspace_.close();
+      construction_workspace_.close();diplomacy_workspace_.close();
+      colony_roster_.close();economy_workspace_.close();
+      supply_workspace_.close();system_workspace_.close();
+      colony_workspace_.close();notification_view_.close();
+      chronicle_view_.close();mission_view_.close();
+      if(const auto it=session_->cache().systems_by_id.find(entry.id);
+         it!=session_->cache().systems_by_id.end()){
+        camera_.center={it->second->position.x,it->second->position.y};
+        camera_.pixels_per_world=std::max(camera_.pixels_per_world,
+                                        fitted_pixels_per_world_*8.);
+        selected_id_=entry.id;constrain_galaxy_camera(width,height);
+        refresh_inspection();
+      }
+      break;}
+    case EntryKind::Colony:
+      open_overview_colony(entry.id,width,height);
+      break;
+    case EntryKind::Fleet:
+      focus_mission_fleet(entry.id);
+      break;
+    case EntryKind::Contact:
+      research_workspace_.close();shipyard_workspace_.close();
+      construction_workspace_.close();colony_roster_.close();
+      economy_workspace_.close();supply_workspace_.close();
+      mission_view_.close();
+      diplomacy_workspace_.open();refresh_diplomacy(true);
+      (void)diplomacy_workspace_.select_contact_civilization(entry.id);
+      break;
+    }
+  }
+
   void refresh_fleets(bool force){
     if(!force&&fleet_refresh_elapsed_<.1)return;
     auto view=fleet_controller_.build(session_->frame(),
@@ -9016,7 +9153,7 @@ class NativeCampaign final {
     if(!presentation_audio_||!presentation_audio_->voice_preferences().subtitles)return std::nullopt;
     return announcement_caption_;
   }
-  void toggle_menu(){menu_focus_=-1;settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();chronicle_view_.close();mission_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  void toggle_menu(){menu_focus_=-1;settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();chronicle_view_.close();mission_view_.close();quick_find_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());
     if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));
     std::unordered_set<int> owned;
@@ -9346,6 +9483,7 @@ class NativeCampaign final {
   stellar::native_logistics::SupplyWorkspace supply_workspace_;
   stellar::native_colony_roster::RosterWorkspace colony_roster_;
   native_missions::NativeMissionView mission_view_;
+  stellar::native_quick_find::QuickFind quick_find_;
   native_missions::NativeMissionBoard mission_board_;
   std::vector<NativeSettlementMissionView> mission_fleets_;
   std::vector<native_missions::NativeMissionColonyRow> mission_colonies_;
@@ -9985,6 +10123,9 @@ int main(int argc,char **argv){
       else if(options.construction_smoke)
         campaign.prepare_construction_smoke(window.drawable_width(),
                                             window.drawable_height());
+      else if(options.quick_find_smoke)
+        campaign.prepare_quick_find_smoke(window.drawable_width(),
+                                        window.drawable_height());
       else if(options.system_smoke)
         campaign.prepare_system_smoke(window.drawable_width(),
                                       window.drawable_height());
@@ -10192,7 +10333,7 @@ int main(int argc,char **argv){
       if(options.smoke_screenshot){
         ++frames;
         // Navigation replay saves through its actual F6 input, with no fallback.
-        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)&&((!options.voice_check&&frames==60)||(options.voice_check&&voice_prepared&&frames==capture_frame-60)))
+        if((options.research_smoke||options.fleet_smoke||options.shipyard_smoke||options.construction_smoke||options.quick_find_smoke||options.system_smoke||options.system_travel_smoke||options.system_travel_reload_smoke||options.colony_smoke||options.colony_reload_smoke||options.settlement_smoke||options.settlement_reload_smoke||options.galaxy_art_smoke||options.ship_art_smoke||options.diplomacy_smoke||options.diplomacy_reload_smoke)&&((!options.voice_check&&frames==60)||(options.voice_check&&voice_prepared&&frames==capture_frame-60)))
           campaign.request_smoke_save();
       }
       if(options.campaign_profile&&frames>=campaign_active_first&&frames<=campaign_active_last){
@@ -10478,6 +10619,8 @@ int main(int argc,char **argv){
         if(options.construction_smoke)
           std::cout<<" construction="<<campaign.construction_smoke_status()
                    <<" shortcut="<<(campaign.shortcut_smoke_succeeded()?1:0);
+        if(options.quick_find_smoke)
+          std::cout<<" quick_find="<<campaign.quick_find_smoke_status();
         if(options.system_smoke)
           std::cout<<" system="<<campaign.system_smoke_status();
         if(options.system_travel_smoke||options.system_travel_reload_smoke)
