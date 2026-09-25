@@ -268,6 +268,22 @@ int main() {
           "--replay-info on a missing file exits 1");
     check(host.run(3, const_cast<char **>(bad)) == 1,
           "--replay-info on a corrupt file exits 1");
+    // --replay with an unparseable journal fails fast before the window
+    // opens — distinct from a forged-checkpoint divergence mid-replay.
+    {
+      auto options = headless_options(root);
+      options.replay_file = root / "corrupt.rec";
+      RuntimeHost bad_replay{options};
+      check(bad_replay.run() == 1,
+            "--replay on a corrupt journal exits 1");
+    }
+    {
+      auto options = headless_options(root);
+      options.replay_file = root / "no-such.rec";
+      RuntimeHost gone_replay{options};
+      check(gone_replay.run() == 1,
+            "--replay on a missing file exits 1");
+    }
   }
   // control surface (request_quit, set_paused, sim_time, rng) — all only
   // reachable inside run(), so headless mode is what makes them testable.
