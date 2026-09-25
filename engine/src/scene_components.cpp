@@ -10,21 +10,53 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 namespace stellar::engine {
 namespace {
 
-template <class T> std::vector<std::uint8_t> encode_pod(const T &v) {
-  std::vector<std::uint8_t> bytes(sizeof(T));
-  std::memcpy(bytes.data(), &v, sizeof(T));
+// Snapshots must be byte-deterministic — memcpy'ing an object with
+// padding (or an empty marker struct) leaks uninitialized bytes into
+// snapshots and replay checkpoint hashes. encode_fields serializes each
+// listed member instead of the object representation: the sizeof check
+// statically requires the member list to cover the whole struct, so a
+// new member trips it until added to the codec and padding can never
+// reach the output. For the current padding-free layouts the byte
+// stream is identical to a whole-struct memcpy.
+template <class T, auto M>
+using member_t = std::remove_cvref_t<decltype(std::declval<T &>().*M)>;
+
+template <class T, auto... M>
+std::vector<std::uint8_t> encode_fields(const T &v) {
+  static_assert(sizeof...(M) > 0,
+                "encode_fields cannot serialize empty markers — use a "
+                "fixed-byte codec");
+  static_assert(sizeof(T) == (sizeof(member_t<T, M>) + ...),
+                "encode_fields must list every member in order; an "
+                "omitted member or layout padding trips this check");
+  std::vector<std::uint8_t> bytes;
+  bytes.reserve(sizeof(T));
+  const auto put = [&bytes](const auto &f) {
+    const auto *p = reinterpret_cast<const std::uint8_t *>(&f);
+    bytes.insert(bytes.end(), p, p + sizeof(f));
+  };
+  (put(v.*M), ...);
   return bytes;
 }
 
-template <class T> T decode_pod(const std::vector<std::uint8_t> &b) {
+template <class T, auto... M>
+T decode_fields(const std::vector<std::uint8_t> &b) {
   T v{};
-  if (b.size() == sizeof(T)) std::memcpy(&v, b.data(), sizeof(T));
+  if (b.size() != sizeof(T)) return v;
+  std::size_t at = 0;
+  const auto get = [&b, &at](auto &f) {
+    std::memcpy(&f, b.data() + at, sizeof(f));
+    at += sizeof(f);
+  };
+  (get(v.*M), ...);
   return v;
 }
 
@@ -188,23 +220,30 @@ Anim decode_anim(const std::vector<std::uint8_t> &b) {
 } // namespace
 
 void register_scene_components(World &world) {
-  world.register_component<Transform2D>("transform", encode_pod<Transform2D>,
-                                        decode_pod<Transform2D>);
-  world.register_component<Velocity2D>("velocity", encode_pod<Velocity2D>,
-                                       decode_pod<Velocity2D>);
-  world.register_component<Extent2D>("extent", encode_pod<Extent2D>,
-                                     decode_pod<Extent2D>);
-  world.register_component<Tint>("tint", encode_pod<Tint>, decode_pod<Tint>);
+  world.register_component<Transform2D>(
+      "transform", encode_fields<Transform2D, &Transform2D::x, &Transform2D::y>,
+      decode_fields<Transform2D, &Transform2D::x, &Transform2D::y>);
+  world.register_component<Velocity2D>(
+      "velocity",
+      encode_fields<Velocity2D, &Velocity2D::dx, &Velocity2D::dy>,
+      decode_fields<Velocity2D, &Velocity2D::dx, &Velocity2D::dy>);
+  world.register_component<Extent2D>(
+      "extent", encode_fields<Extent2D, &Extent2D::w, &Extent2D::h>,
+      decode_fields<Extent2D, &Extent2D::w, &Extent2D::h>);
+  world.register_component<Tint>(
+      "tint", encode_fields<Tint, &Tint::r, &Tint::g, &Tint::b>,
+      decode_fields<Tint, &Tint::r, &Tint::g, &Tint::b>);
   world.register_component<EntityName>("name", encode_name, decode_name);
   world.register_component<SpriteRef>("sprite", encode_sprite, decode_sprite);
-  world.register_component<Layer>("layer", encode_pod<Layer>,
-                                  decode_pod<Layer>);
-  world.register_component<Parallax>("parallax", encode_pod<Parallax>,
-                                     decode_pod<Parallax>);
+  world.register_component<Layer>("layer", encode_fields<Layer, &Layer::value>,
+                                  decode_fields<Layer, &Layer::value>);
+  world.register_component<Parallax>(
+      "parallax", encode_fields<Parallax, &Parallax::value>,
+      decode_fields<Parallax, &Parallax::value>);
   world.register_component<Label>("label", encode_label, decode_label);
-  world.register_component<GravityScale>("gravityScale",
-                                         encode_pod<GravityScale>,
-                                         decode_pod<GravityScale>);
+  world.register_component<GravityScale>(
+      "gravityScale", encode_fields<GravityScale, &GravityScale::value>,
+      decode_fields<GravityScale, &GravityScale::value>);
   world.register_component<Solid>("solid",
                                   [](const Solid &) {
                                     return std::vector<std::uint8_t>{1};
@@ -213,24 +252,38 @@ void register_scene_components(World &world) {
                                     return Solid{};
                                   });
   world.register_component<Anim>("anim", encode_anim, decode_anim);
-  world.register_component<Rotation>("rotation", encode_pod<Rotation>,
-                                     decode_pod<Rotation>);
-  world.register_component<Spin>("spin", encode_pod<Spin>,
-                                 decode_pod<Spin>);
-  world.register_component<Lifetime>("lifetime", encode_pod<Lifetime>,
-                                     decode_pod<Lifetime>);
-  world.register_component<Flip>("flip", encode_pod<Flip>,
-                                 decode_pod<Flip>);
-  world.register_component<Hidden>("hidden", encode_pod<Hidden>,
-                                   decode_pod<Hidden>);
-  world.register_component<Oneway>("oneway", encode_pod<Oneway>,
-                                   decode_pod<Oneway>);
-  world.register_component<NoBounce>("nobounce", encode_pod<NoBounce>,
-                                     decode_pod<NoBounce>);
+  world.register_component<Rotation>(
+      "rotation", encode_fields<Rotation, &Rotation::value>,
+      decode_fields<Rotation, &Rotation::value>);
+  world.register_component<Spin>("spin", encode_fields<Spin, &Spin::value>,
+                                 decode_fields<Spin, &Spin::value>);
+  world.register_component<Lifetime>(
+      "lifetime", encode_fields<Lifetime, &Lifetime::remaining>,
+      decode_fields<Lifetime, &Lifetime::remaining>);
+  world.register_component<Flip>("flip",
+                                 encode_fields<Flip, &Flip::x, &Flip::y>,
+                                 decode_fields<Flip, &Flip::x, &Flip::y>);
+  // Marker components carry no data — encode_fields cannot serialize an
+  // empty struct (it would emit zero bytes, indistinguishable from a
+  // truncated payload). Emit a fixed byte like Solid/DoubleSided;
+  // decode ignores the payload so existing saves still load.
+  const auto encode_marker = [](const auto &) {
+    return std::vector<std::uint8_t>{1};
+  };
+  world.register_component<Hidden>(
+      "hidden", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return Hidden{}; });
+  world.register_component<Oneway>(
+      "oneway", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return Oneway{}; });
+  world.register_component<NoBounce>(
+      "nobounce", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return NoBounce{}; });
   world.register_component<UserData>("userdata", encode_user_data,
                                      decode_user_data);
-  world.register_component<Opacity>("opacity", encode_pod<Opacity>,
-                                    decode_pod<Opacity>);
+  world.register_component<Opacity>(
+      "opacity", encode_fields<Opacity, &Opacity::value>,
+      decode_fields<Opacity, &Opacity::value>);
   world.register_component<Tilemap>("tilemap", encode_tilemap,
                                     decode_tilemap);
   world.register_component<Parent>("parent", encode_parent, decode_parent);
@@ -242,15 +295,58 @@ void register_scene_components(World &world) {
       [](const std::vector<std::uint8_t> &b) {
         return VfxRef{{b.begin(), b.end()}};
       });
-  world.register_component<Camera3DState>("camera3d",
-                                          encode_pod<Camera3DState>,
-                                          decode_pod<Camera3DState>);
-  world.register_component<Transform3D>("transform3",
-                                        encode_pod<Transform3D>,
-                                        decode_pod<Transform3D>);
-  world.register_component<Velocity3D>("velocity3",
-                                       encode_pod<Velocity3D>,
-                                       decode_pod<Velocity3D>);
+  // AnimTimeline codec: NUL-terminated clip id, then the playhead time and
+  // playing flag into saved_* scratch — the timeline re-attaches by id on
+  // restore. A still-detached component re-encodes its scratch verbatim.
+  world.register_component<AnimTimeline>(
+      "animtimeline",
+      [](const AnimTimeline &a) {
+        std::vector<std::uint8_t> out{a.id.begin(), a.id.end()};
+        out.push_back(0);
+        const float time =
+            a.player.timeline() != nullptr ? a.player.time() : a.saved_time;
+        const bool playing = a.player.timeline() != nullptr
+                                 ? !a.player.paused()
+                                 : a.saved_playing;
+        put_f32(out, time);
+        out.push_back(playing ? 1 : 0);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        AnimTimeline a;
+        const auto nul = std::find(b.begin(), b.end(), std::uint8_t{0});
+        a.id.assign(b.begin(), nul);
+        std::size_t at = static_cast<std::size_t>(nul - b.begin()) + 1;
+        if (at + 4 <= b.size()) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&a.saved_time, &bits, 4);
+        }
+        if (at < b.size())
+          a.saved_playing = b[at] != 0;
+        return a;
+      });
+  world.register_component<Camera3DState>(
+      "camera3d",
+      encode_fields<Camera3DState, &Camera3DState::x, &Camera3DState::y,
+                    &Camera3DState::z, &Camera3DState::yaw_deg,
+                    &Camera3DState::pitch_deg, &Camera3DState::fov_deg>,
+      decode_fields<Camera3DState, &Camera3DState::x, &Camera3DState::y,
+                    &Camera3DState::z, &Camera3DState::yaw_deg,
+                    &Camera3DState::pitch_deg, &Camera3DState::fov_deg>);
+  world.register_component<Transform3D>(
+      "transform3",
+      encode_fields<Transform3D, &Transform3D::x, &Transform3D::y,
+                    &Transform3D::z, &Transform3D::qx, &Transform3D::qy,
+                    &Transform3D::qz, &Transform3D::qw, &Transform3D::scale>,
+      decode_fields<Transform3D, &Transform3D::x, &Transform3D::y,
+                    &Transform3D::z, &Transform3D::qx, &Transform3D::qy,
+                    &Transform3D::qz, &Transform3D::qw, &Transform3D::scale>);
+  world.register_component<Velocity3D>(
+      "velocity3",
+      encode_fields<Velocity3D, &Velocity3D::dx, &Velocity3D::dy,
+                    &Velocity3D::dz>,
+      decode_fields<Velocity3D, &Velocity3D::dx, &Velocity3D::dy,
+                    &Velocity3D::dz>);
   world.register_component<MeshRef>(
       "meshref",
       [](const MeshRef &m) {
@@ -360,15 +456,19 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
                 Parent{s.parent, s.x - px, s.y - py, px, py, true});
     }
     if (!s.vfx.empty()) world.add(entity, VfxRef{s.vfx});
+    if (!s.anim.empty()) world.add(entity, AnimTimeline{s.anim});
     spawned.push_back(entity);
   }
   // Each tilemap lives on its own entity (not returned) so runtime cell
   // edits snapshot with the world; order matches the document so layer
   // semantics stay stable.
-  for (const auto &s : doc.tilemaps)
-    world.add(world.create(),
+  for (const auto &s : doc.tilemaps) {
+    const auto entity = world.create();
+    world.add(entity,
               Tilemap{s.tileset, s.x, s.y, s.tile_w, s.tile_h, s.columns,
                       s.layer, s.parallax, s.collide, s.cells});
+    if (!s.name.empty()) world.add(entity, EntityName{s.name});
+  }
   return spawned;
 }
 
@@ -388,11 +488,12 @@ SceneDocument scene_from_world(const World &world) {
   SceneDocument doc;
   for (const auto entity : world.entities()) {
     if (const auto *tm = world.get<Tilemap>(entity)) {
-      doc.tilemaps.push_back(SceneTilemap{tm->tileset, tm->x, tm->y,
-                                          tm->tile_w, tm->tile_h,
-                                          tm->columns, tm->layer,
-                                          tm->parallax, tm->collide,
-                                          tm->cells});
+      auto &map = doc.tilemaps.emplace_back(
+          SceneTilemap{tm->tileset, tm->x, tm->y, tm->tile_w, tm->tile_h,
+                       tm->columns, tm->layer, tm->parallax, tm->collide,
+                       tm->cells});
+      if (const auto *n = world.get<EntityName>(entity))
+        map.name = n->value;
       continue;
     }
     const auto *name = world.get<EntityName>(entity);
@@ -445,6 +546,7 @@ SceneDocument scene_from_world(const World &world) {
     if (const auto *o = world.get<Opacity>(entity)) s.opacity = o->value;
     if (const auto *par = world.get<Parent>(entity)) s.parent = par->name;
     if (const auto *vr = world.get<VfxRef>(entity)) s.vfx = vr->name;
+    if (const auto *at = world.get<AnimTimeline>(entity)) s.anim = at->id;
     doc.entities.push_back(std::move(s));
   }
   return doc;
@@ -458,6 +560,17 @@ std::optional<EntityId> find_entity_by_name(const World &world,
       return entity;
   }
   return std::nullopt;
+}
+
+std::optional<std::size_t> tilemap_index(const World &world,
+                                         std::string_view name) {
+  const auto entity = find_entity_by_name(world, name);
+  if (!entity) return std::nullopt;
+  const auto all = tilemap_entities(world);
+  const auto it = std::find(all.begin(), all.end(), *entity);
+  return it != all.end()
+             ? std::optional<std::size_t>{it - all.begin()}
+             : std::nullopt;
 }
 
 void resolve_hierarchy(World &world) {
@@ -567,6 +680,7 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, Parent3D{s.parent, s.x - px, s.y - py, s.z - pz,
                                  px, py, pz, true});
     }
+    if (!s.vfx.empty()) world.add(entity, VfxRef{s.vfx});
     spawned.push_back(entity);
   }
   return spawned;
@@ -613,6 +727,7 @@ Scene3dDocument scene3d_from_world(const World &world) {
     if (const auto *lt = world.get<Lifetime>(entity)) s.ttl = lt->remaining;
     if (const auto *d = world.get<UserData>(entity)) s.data = d->value;
     if (const auto *p = world.get<Parent3D>(entity)) s.parent = p->name;
+    if (const auto *v = world.get<VfxRef>(entity)) s.vfx = v->name;
     doc.entities.push_back(std::move(s));
   }
   return doc;

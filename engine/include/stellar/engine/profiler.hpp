@@ -1,9 +1,11 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <deque>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -35,10 +37,38 @@ struct ProfileAggregate {
     std::uint64_t max_nanoseconds{};
 };
 
-// Process-wide CPU profiler. Span recording is per-thread and cheap (a mutex
-// is only touched when a thread-local buffer flushes at frame end); counters
-// and gauges are aggregated under the same lock. GPU pass timings are left to
-// the render layer, which records them as ordinary spans.
+// A profiler snapshot as exported by Profiler::export_json — frames plus
+// aggregates. Captures parse back for offline comparison (e.g. before/after
+// a change, or this build vs a shipped baseline saved to disk).
+struct ProfileCapture {
+    std::vector<ProfileFrame> frames;
+    std::vector<ProfileAggregate> aggregates;
+
+    // Parses an export_json() document; nullopt on malformed input.
+    static std::optional<ProfileCapture> parse(std::string_view json);
+    // Re-serializes to the export schema for file persistence.
+    [[nodiscard]] std::string to_json() const;
+};
+
+struct ProfileComparisonRow {
+    std::string name;
+    std::string category;
+    std::uint64_t calls_a{}, calls_b{};
+    double mean_ns_a{}, mean_ns_b{};
+};
+
+// Mean-duration diff over the union of aggregate keys from two captures —
+// sorted by |meanB - meanA| descending so the top rows are the largest
+// regressions/improvements between scenarios.
+[[nodiscard]] std::vector<ProfileComparisonRow>
+compare_captures(const ProfileCapture &a, const ProfileCapture &b);
+
+// Process-wide CPU profiler. Span recording is per-thread and cheap: spans
+// and their call aggregates accumulate in a thread-local buffer under its own
+// lock, merged into the shared registries at frame boundaries and thread
+// exit — the global mutex is never taken on the recording path. Counters and
+// gauges remain under the global lock. GPU pass timings are left to the
+// render layer, which records them as ordinary spans.
 class Profiler {
 public:
     static Profiler& instance();
@@ -107,10 +137,14 @@ private:
     void register_thread_buffer(ThreadSpans* buffer);
     void unregister_thread_buffer(ThreadSpans* buffer);
     void register_once(ThreadSpans& storage);
+    void merge_thread_aggregates_locked(ThreadSpans& buffer);
     void drain_thread_buffers_locked();
+    // Callers hold mutex_: merged view of aggregates_ plus per-thread
+    // aggregates that have not reached a frame boundary yet.
+    std::vector<ProfileAggregate> aggregates_merged_locked() const;
     static std::uint64_t thread_key();
 
-    bool enabled_{true};
+    std::atomic<bool> enabled_{true};
     mutable std::mutex mutex_;
     std::deque<ProfileFrame> frames_;
     std::size_t retained_frames_{240};

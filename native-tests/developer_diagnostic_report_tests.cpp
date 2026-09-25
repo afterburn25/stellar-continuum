@@ -24,8 +24,29 @@ int main(int argc,char **argv)try{
   const auto before=capture_developer_campaign_json(frame.runtime(),{0,"test",stamp});
   CampaignDiagnosticMonitor monitor;
   monitor.observe(frame,{},stamp);
-  check(monitor.invariant_checks()==1&&monitor.history().records().size()==1,"Native monitor did not initialize with current-state inspection.");
-  monitor.observe(frame,{},stamp);check(monitor.invariant_checks()==1&&monitor.history().records().size()==1,"Paused rendering spammed diagnostics.");
+  // Seeded campaigns can carry genuine operational findings (e.g.
+  // sustenance shortfalls); init is proven by the check counter and the
+  // monitor-start record, not by an empty finding list.
+  check(monitor.invariant_checks()==1&&!monitor.history().records().empty()&&
+        monitor.history().records().front().record.event_type=="native_monitor_started",
+        "Native monitor did not initialize with current-state inspection.");
+  // The research pass replays the codec's save-path validation on live
+  // state — a fresh campaign must produce no false-positive findings.
+  const auto research_findings=inspect_research_invariants(
+      frame.runtime().research(),frame.runtime().research_runtime(),
+      frame.runtime().world().campaign(),0,0);
+  for(const auto &f:research_findings)std::cerr<<f.subsystem<<" "<<f.event_type<<" "<<f.message<<'\n';
+  check(research_findings.empty(),"Fresh research state failed invariants.");
+  // The continuation pass replays the save-path schedule validation on a
+  // live capture — a fresh runtime must produce no findings.
+  const auto continuation_findings=inspect_continuation_invariants(frame.runtime(),0,0);
+  for(const auto &f:continuation_findings)std::cerr<<f.subsystem<<" "<<f.event_type<<" "<<f.message<<'\n';
+  check(continuation_findings.empty(),"Fresh runtime continuation failed invariants.");
+  check(std::none_of(monitor.history().records().begin(),monitor.history().records().end(),
+        [](const auto &r){return r.record.subsystem=="research"||r.record.subsystem=="diplomacy"||r.record.subsystem=="continuation";}),
+        "Monitor reported false-positive research/diplomacy/continuation findings.");
+  const auto initialized_records=monitor.history().records().size();
+  monitor.observe(frame,{},stamp);check(monitor.invariant_checks()==1&&monitor.history().records().size()==initialized_records,"Paused rendering spammed diagnostics.");
   const auto memory_id=stellar::engine::MemoryTracker::instance().register_subsystem("test-subsystem");
   stellar::engine::MemoryTracker::instance().report(memory_id,1234,4096);
   const auto entries=capture_developer_report(frame,{"test","engine-test","commit-test",hash},stamp,&monitor.history());
@@ -35,7 +56,7 @@ int main(int argc,char **argv)try{
   const auto files=diagnostic_zip_test::unzip(archive);
   check(files.at("latest.dev17.json")==before&&!files.contains("campaign.player17.json"),"Checkpoint altered or mislabeled.");
   const auto metadata=Json::parse(files.at("session.json"));
-  check(!files.at("native-events.jsonl").empty()&&metadata["nativeHistory"]["retainedRecords"]==1,"Historical native records omitted.");
+  check(!files.at("native-events.jsonl").empty()&&metadata["nativeHistory"]["retainedRecords"]==initialized_records,"Historical native records omitted.");
   check(metadata["seed"]==-42&&metadata["forcedCelestialCoverage"]==true&&metadata["executableSha256"]==hash,"Wrong provenance in report.");
   check(!Json::parse(files.at("replay.json"))["fullCommandReplayAvailable"].get<bool>(),"Report promised unsupported command replay.");
   const auto restored=restore_developer_campaign_json(load_adaptive_research_strategic_runtime(argv[2]),files.at("latest.dev17.json"));

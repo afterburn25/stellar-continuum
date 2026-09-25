@@ -6,6 +6,7 @@
 #include <stellar/core/developer_campaign.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <iostream>
+#include <limits>
 using namespace stellar::core;
 using namespace stellar::native_map;
 void check(bool v,const char *s){if(!v)throw std::runtime_error(s);}
@@ -75,12 +76,263 @@ int main(int argc,char **argv)try{
       (void)control(draw(),"client/test.phase");
       profiler.set_enabled(false);profiler.reset_aggregates();
     }
+    // The phase table sorts through TableModel — clicking a column
+    // header cycles ascending→descending and resets the scroll. The
+    // first rendered row's phase text is the oracle.
+    {
+      const auto top_phase=[&](const DrawList &d){
+        // Rows sit below the "Phase" header; the first row's phase text
+        // is the leftmost cell at the smallest row y.
+        float header_y=-1.f;
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value.starts_with("Phase"))header_y=t->clip->y;
+        float top=std::numeric_limits<float>::max();
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->clip->y>header_y)top=std::min(top,t->clip->y);
+        std::string phase;float left=std::numeric_limits<float>::max();
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->clip->y==top&&t->clip->x<left){left=t->clip->x;phase=t->value;}
+        return phase;};
+      click("Phase");
+      const auto ascending_top=top_phase(draw());
+      click("Phase");
+      const auto descending_top=top_phase(draw());
+      check(!ascending_top.empty()&&!descending_top.empty()&&ascending_top<descending_top,"Column sort did not reorder the phase table.");
+      bool marker=false;
+      for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value=="Phase v")marker=true;
+      check(marker,"Sort direction marker missing from the phase header.");
+    }
     for(const auto &c:view.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){const auto &r=*t->clip;
       check(r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h,"Diagnostics text escaped viewport.");}
-    click("RECENT EVENTS");(void)control(draw(),"Observing the isolated");
+    click("RECENT EVENTS");
+    // The newest-first list renders eight rows; the session-start record
+    // is the oldest entry, so scroll to the tail before asserting it.
+    {const auto anchor=control(draw(),"Colony logistics");InputEvent scroll{InputEventType::Wheel,anchor,{},-1000.f};(void)window.handle(scroll,w,h,monitor);}
+    (void)control(draw(),"Observing the isolated");
     click("Record:");click("Errors only");check(monitor.history().detail()==stellar::engine::DiagnosticDetail::ErrorsOnly,"Recording dropdown did not commit.");
     click("Record:");click("Normal");
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Diagnostics UI modified world/discovery/time.");
+    click("ENTITIES");
+    {
+      const auto entity_view=draw();bool census=false,domain_row=false;
+      for(const auto &c:entity_view.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){
+        if(t->value.find("projected entities")!=std::string::npos&&t->value.find("KiB")!=std::string::npos)census=true;
+        if(t->value.find("system ")!=std::string::npos&&t->value.find("·")!=std::string::npos)domain_row=true;
+      }
+      check(census&&domain_row,"Entities inspector did not project the campaign world.");
+    }
+    // A second refresh reconciles through sync_campaign_world — the
+    // header reports drift counts instead of a fresh projection.
+    click("ENTITIES");
+    {
+      const auto synced=draw();bool sync_counts=false;
+      for(const auto &c:synced.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)
+        if(t->value.find("synced +")!=std::string::npos)sync_counts=true;
+      check(sync_counts,"Entities inspector did not reuse the projected world.");
+    }
+    // Entity rows form the projected hierarchy — clicking a parent row
+    // collapses its subtree, and the collapse survives sync refreshes.
+    // The list clamps to 14 rendered rows and the projection is larger,
+    // so row identity — not row count — is the oracle: clip.x encodes
+    // the depth indent, making a parent's rendered children the
+    // contiguous deeper-indented run below it.
+    {
+      const auto rows=[](const DrawList &d){
+        std::vector<std::pair<std::string,float>> out;
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)
+          if(t->value.starts_with("▾ ")||t->value.starts_with("› ")||t->value.starts_with("· "))out.emplace_back(t->value,t->clip->x);
+        return out;};
+      const auto expanded_view=rows(draw());
+      bool pane_hint=false;
+      for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value.starts_with("Select a row"))pane_hint=true;
+      check(pane_hint,"Entities inspector rendered no selection hint.");
+      std::size_t pi=expanded_view.size();
+      for(std::size_t i=0;i<expanded_view.size();++i)if(expanded_view[i].first.starts_with("▾ ")){pi=i;break;}
+      check(pi<expanded_view.size(),"Entities tree rendered no expanded parent rows.");
+      const std::string collapsed_text="› "+expanded_view[pi].first.substr(std::string_view("▾ ").size());
+      std::size_t children=0;
+      for(std::size_t k=pi+1;k<expanded_view.size()&&expanded_view[k].second>expanded_view[pi].second;++k)++children;
+      check(children>0,"Expanded parent row rendered no children.");
+      const auto parent_point=control(draw(),expanded_view[pi].first);
+      (void)window.handle({InputEventType::LeftPressed,parent_point},w,h,monitor);
+      (void)window.handle({InputEventType::LeftReleased,parent_point},w,h,monitor);
+      const auto collapsed_view=rows(draw());
+      check(collapsed_view.size()>pi&&collapsed_view[pi].first==collapsed_text,"Collapsing a parent row did not collapse its glyph.");
+      bool hidden=std::ranges::none_of(collapsed_view,[&](const auto &r){return r.first==expanded_view[pi+1].first;});
+      for(std::size_t k=pi+1;hidden&&k<collapsed_view.size()&&k+children<expanded_view.size();++k)
+        hidden=collapsed_view[k].first==expanded_view[k+children].first;
+      check(hidden,"Collapsing a parent row did not hide its subtree.");
+      // Sync rebuild keeps the user's collapse.
+      click("ENTITIES");
+      (void)control(draw(),collapsed_text);
+      const auto collapsed_point=control(draw(),collapsed_text);
+      (void)window.handle({InputEventType::LeftPressed,collapsed_point},w,h,monitor);
+      (void)window.handle({InputEventType::LeftReleased,collapsed_point},w,h,monitor);
+      const auto restored=rows(draw());
+      bool same=restored.size()==expanded_view.size();
+      for(std::size_t k=0;same&&k<expanded_view.size();++k)same=restored[k].first==expanded_view[k].first;
+      check(same,"Re-expanding a parent row did not restore its subtree.");
+      // Keyboard contract: arrows move a cyan-marked selection over the
+      // flattened rows, Left collapses an expanded parent or jumps to
+      // the parent row, Right expands or descends, Home/End jump the
+      // ends and the scroll window follows the selection.
+      {
+        const auto selected=[](const DrawList &d){
+          for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&
+              t->color.g==221&&t->color.b==240&&
+              (t->value.starts_with("▾ ")||t->value.starts_with("› ")||t->value.starts_with("· ")))return t->value;
+          return std::string{};};
+        const auto key=[&](std::uint32_t k){InputEvent e{InputEventType::KeyPressed};e.key=k;(void)window.handle(e,w,h,monitor);};
+        constexpr std::uint32_t kReturn=13u,kSpace=32u;
+        constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+        constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+        key(kEnd);check(selected(draw())==rows(draw()).back().first,"End did not select the last entity row.");
+        key(kHome);check(selected(draw())==expanded_view[0].first,"Home did not select the first entity row.");
+        key(kDown);check(selected(draw())==expanded_view[1].first,"Down did not advance the entity selection.");
+        key(kUp);check(selected(draw())==expanded_view[0].first,"Up did not move the entity selection back.");
+        for(std::size_t i=0;i<pi;++i)key(kDown);
+        check(selected(draw())==expanded_view[pi].first,"Arrows did not reach the parent row.");
+        key(kLeft);check(selected(draw())==collapsed_text,"Left did not collapse the selected parent row.");
+        key(kRight);check(selected(draw())==expanded_view[pi].first,"Right did not re-expand the selected row.");
+        key(kDown);check(selected(draw())==expanded_view[pi+1].first,"Down did not descend to the first child row.");
+        key(kLeft);check(selected(draw())==expanded_view[pi].first,"Left on a child row did not jump to its parent.");
+        key(kSpace);check(selected(draw())==collapsed_text,"Space did not toggle the selected parent row.");
+        key(kReturn);check(selected(draw())==expanded_view[pi].first,"Return did not re-expand the selected row.");
+        // Expand/collapse pattern route: a ringed entity row reports its
+        // node state and accepts programmatic direction; the ring
+        // re-resolves onto the toggled node after the flatten rebuild so
+        // focus does not land on a neighbor.
+        {
+          bool ringed=false;
+          for(int i=0;i<64&&!ringed;++i){key(9u);ringed=window.focused_expanded(w,h).has_value();}
+          check(ringed,"Tab did not ring an expandable entity row.");
+          const bool expanded_state=*window.focused_expanded(w,h);
+          check(window.set_focused_expanded(!expanded_state,w,h)&&window.focused_expanded(w,h).has_value()&&*window.focused_expanded(w,h)==!expanded_state,"Programmatic expand/collapse did not flip the ringed entity row.");
+          check(window.set_focused_expanded(expanded_state,w,h)&&*window.focused_expanded(w,h)==expanded_state,"Programmatic expand/collapse did not restore the ringed entity row.");
+          key(0x4000001bu);// Escape releases the ring for the pointer cases.
+        }
+        // The selection feeds a detail pane — the projected entity's
+        // tag fields list beside the rows.
+        const auto tag_line=[&](std::string_view row_text){
+          const auto label_part=std::string(row_text.substr(row_text.find(' ')+1));
+          return "tag campaign."+label_part.substr(0,label_part.find(' '));};
+        const auto has_text=[](const DrawList &d,const std::string &v){
+          for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value==v)return true;
+          return false;};
+        check(has_text(draw(),tag_line(expanded_view[pi].first)),"Selected entity did not surface its tag fields.");
+        // A plain row click selects without toggling — a leaf's tag
+        // fields list too (the glyph may flip if the child is a parent).
+        const auto child_point=control(draw(),expanded_view[pi+1].first);
+        (void)window.handle({InputEventType::LeftPressed,child_point},w,h,monitor);
+        (void)window.handle({InputEventType::LeftReleased,child_point},w,h,monitor);
+        const auto sel=selected(draw());
+        check(sel.substr(sel.find(' ')+1)==expanded_view[pi+1].first.substr(expanded_view[pi+1].first.find(' ')+1),"Clicking a row did not select it.");
+        check(has_text(draw(),tag_line(expanded_view[pi+1].first)),"Clicked row did not surface its tag fields.");
+      }
+      // Pointer-focused search keeps matching entities plus their
+      // ancestor chain (expanded, like the navigator's reveal) —
+      // Escape blurs instead of closing, and clearing the text
+      // restores the unfiltered tree.
+      {
+        const auto baseline=rows(draw());
+        const auto search_anchor=control(draw(),"Search entities…");
+        (void)window.handle({InputEventType::LeftPressed,search_anchor},w,h,monitor);
+        (void)window.handle({InputEventType::LeftReleased,search_anchor},w,h,monitor);
+        check(window.wants_text_input(),"Entities search did not take focus.");
+        InputEvent typed{InputEventType::TextEntered};typed.text="colony";
+        (void)window.handle(typed,w,h,monitor);
+        const auto filtered=rows(draw());
+        bool any_match=false,leaves_match=true,no_collapsed=true,shown_count=false;
+        for(const auto &[text,x]:filtered){
+          any_match|=text.find("colony")!=std::string::npos;
+          if(text.starts_with("· ")&&text.find("colony")==std::string::npos)leaves_match=false;
+          if(text.starts_with("› "))no_collapsed=false;
+        }
+        for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value.find(" shown")!=std::string::npos)shown_count=true;
+        check(!filtered.empty()&&any_match&&leaves_match&&no_collapsed&&shown_count,"Entities search did not filter to matches and ancestors.");
+        // Backspace edits while the field holds focus; Escape blurs
+        // (instead of closing) only after the text is gone.
+        for(int i=0;i<6;++i)(void)window.handle({InputEventType::BackspacePressed},w,h,monitor);
+        const auto unfiltered=rows(draw());
+        bool back=unfiltered.size()==baseline.size();
+        for(std::size_t k=0;back&&k<baseline.size();++k)back=unfiltered[k].first==baseline[k].first;
+        check(back,"Clearing the entity search did not restore the tree.");
+        (void)window.handle({InputEventType::EscapePressed},w,h,monitor);
+        check(!window.wants_text_input()&&window.visible(),"Escape in entity search closed the panel.");
+      }
+    }
+    check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Entities inspector modified world state.");
+    // Events search — the same pointer-focused field filters the
+    // retained ring down to cards carrying the needle.
+    click("RECENT EVENTS");
+    {
+      const auto count_cards=[](const DrawList &d){
+        std::size_t n=0;
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value.find(" · tick ")!=std::string::npos)++n;
+        return n;};
+      const auto all=count_cards(draw());
+      check(all>1,"Events view rendered no retained records.");
+      const auto anchor=control(draw(),"Search events…");
+      (void)window.handle({InputEventType::LeftPressed,anchor},w,h,monitor);
+      (void)window.handle({InputEventType::LeftReleased,anchor},w,h,monitor);
+      check(window.wants_text_input(),"Events search did not take focus.");
+      InputEvent typed{InputEventType::TextEntered};typed.text="isolated";
+      (void)window.handle(typed,w,h,monitor);
+      const auto filtered=draw();std::size_t shown_cards=0;bool message=false,shown_count=false;
+      for(const auto &c:filtered.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){
+        if(t->value.find(" · tick ")!=std::string::npos)++shown_cards;
+        if(t->value.find("Observing the isolated developer campaign")!=std::string::npos)message=true;
+        if(t->value.find(" shown")!=std::string::npos)shown_count=true;
+      }
+      check(shown_cards==1&&shown_cards<all&&message&&shown_count,"Events search did not isolate the matching record.");
+      (void)window.handle({InputEventType::EscapePressed},w,h,monitor);
+      check(!window.wants_text_input()&&window.visible(),"Escape in event search closed the panel.");
+    }
+    check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Events search modified world state.");
+    // Keyboard focus ring: chrome, the record-detail dropdown, sort
+    // headers, the search field (Edit) and rendered entity rows ring in
+    // (y,x) order; activation replays the same dispatch pointer input
+    // takes, and Escape releases the ring before closing.
+    {
+      const auto ring_key=[&](std::uint32_t k){InputEvent e{InputEventType::KeyPressed};e.key=k;return window.handle(e,w,h,monitor);};
+      click("LIVE PERFORMANCE");
+      check(window.focus()<0,"Diagnostics ring persisted across view switches.");
+      check(ring_key(9)&&window.focus()>=0,"Tab did not enter the diagnostics ring.");
+      check(window.focused_label(w,h)=="Close diagnostics","First diagnostics target is not the close control.");
+      check(window.focused_bounds(w,h).has_value(),"Focused diagnostics control lacks bounds.");
+      check(window.focused_control(w,h)==stellar::engine::AnnouncementControl::Button,"Diagnostics chrome misclassified.");
+      int ring_guard=0;
+      while(window.focused_label(w,h)!="Sort by phase"&&ring_guard++<24)check(ring_key(9),"Diagnostics navigation leaked.");
+      check(window.focused_label(w,h)=="Sort by phase","Phase sort header never joined the ring.");
+      check(ring_key(13),"Sort activation leaked.");
+      bool sort_marker=false;
+      for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->value=="Phase ^")sort_marker=true;
+      check(sort_marker,"Keyboard sort activation did not replay the header dispatch.");
+      check(window.handle({InputEventType::EscapePressed},w,h,monitor)&&window.focus()<0&&window.visible(),"Escape closed diagnostics instead of releasing its ring.");
+      check(window.handle({InputEventType::EscapePressed},w,h,monitor)&&!window.visible(),"Second Escape did not close diagnostics.");
+      window.open(monitor);
+      click("RECENT EVENTS");
+      check(ring_key(9)&&window.focus()>=0,"Tab did not re-enter the diagnostics ring.");
+      ring_guard=0;
+      while(window.focused_label(w,h)!="Search events"&&ring_guard++<24)check(ring_key(9),"Diagnostics navigation leaked.");
+      check(window.focused_control(w,h)==stellar::engine::AnnouncementControl::Edit,"Events search misclassified.");
+      check(ring_key(13)&&window.wants_text_input(),"Keyboard activation did not focus the events search.");
+      check(window.handle({InputEventType::EscapePressed},w,h,monitor)&&!window.wants_text_input()&&window.focus()<0,"Escape did not release the events search.");
+      click("ENTITIES");(void)draw();
+      check(ring_key(9)&&window.focus()>=0,"Tab did not enter the diagnostics ring in entities view.");
+      const auto entity_labels=[](const DrawList &d){
+        std::vector<std::string> out;
+        for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)
+          if(t->value.starts_with("\xE2\x96\xBE ")||t->value.starts_with("\xE2\x80\xBA ")||t->value.starts_with("\xC2\xB7 "))out.push_back(t->value.substr(t->value.find(' ')+1));
+        return out;};
+      const auto labels=entity_labels(draw());
+      check(!labels.empty(),"Entities view rendered no rows for the ring test.");
+      ring_guard=0;
+      while(window.focused_label(w,h)!=labels.front()&&ring_guard++<40)check(ring_key(9),"Diagnostics navigation leaked.");
+      check(window.focused_label(w,h)==labels.front(),"Entity row never joined the ring.");
+      check(ring_key(13),"Entity row activation leaked.");
+      bool row_selected=false;
+      for(const auto &c:draw().overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip&&t->color.g==221&&t->color.b==240&&t->value.find(labels.front())!=std::string::npos)row_selected=true;
+      check(row_selected,"Keyboard row activation did not select the entity row.");
+    }
+    check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Diagnostics keyboard ring modified world state.");
     click("CLOSE");check(!window.visible()&&!window.handle({InputEventType::LeftPressed},w,h,monitor),"Closed diagnostics captured gameplay.");
     panel.toggle();controls={};panel.render(controls,w,h,frame);point=control(controls,"EMPIRE MONITOR");
     (void)panel.handle({InputEventType::LeftPressed,point},w,h,frame);(void)panel.handle({InputEventType::LeftReleased,point},w,h,frame);

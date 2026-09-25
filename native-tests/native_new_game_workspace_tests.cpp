@@ -1,5 +1,6 @@
 #include "native_new_game_workspace.hpp"
 #include "native_developer_access.hpp"
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
@@ -213,5 +214,60 @@ void developer_research_controls(){
   }
 }
 
+void keyboard_focus(){
+  constexpr std::uint32_t kTab=9u,kReturn=13u,kHome=0x4000004au,kEnd=0x4000004du,kRight=0x4000004fu;
+  const int width=1280,height=720;
+  NativeNewGameWorkspace w;w.set_view(setup());w.begin_sandbox();
+  int cues=0;w.set_hover_callback([&]{++cues;});
+  const auto key=[&](std::uint32_t k,bool shift=false){InputEvent e{InputEventType::KeyPressed};e.key=k;e.shift=shift;return w.handle(e,width,height,measure);};
+  require(w.page()==SandboxPage::GalaxyType&&w.focus()<0,"sandbox did not open on the galaxy page without focus");
+  require(w.focused_label(width,height,measure).empty(),"unfocused workspace reported a label");
+  (void)key(kTab);require(w.focus()==0,"Tab did not focus the first galaxy card");
+  require(w.focused_label(width,height,measure)=="Spiral Galaxy","galaxy card label mismatch");
+  require(cues==1,"focus change did not play the hover cue");
+  (void)key(kTab);(void)key(kTab);(void)key(kTab);
+  (void)key(kTab,true);require(w.focus()==2,"Shift+Tab did not retreat the focus ring");
+  (void)key(kHome);require(w.focus()==0,"Home did not select the first focusable");
+  (void)key(kReturn);require(w.selected_morphology().has_value(),"Return did not select the focused galaxy card");
+  require(w.focus()==0,"card selection moved the focus ring");
+  (void)key(kEnd);(void)key(kReturn);
+  require(w.page()==SandboxPage::Population,"Next activation did not reach the population page");
+  require(w.focus()<0,"page transition kept stale focus");
+  (void)key(kHome);(void)key(kReturn);
+  (void)key(kTab);require(w.focus()==0,"open dropdown did not capture navigation");
+  (void)w.handle({InputEventType::EscapePressed},width,height,measure);
+  (void)key(kEnd);(void)key(kReturn);
+  require(w.page()==SandboxPage::Configuration,"Next activation did not reach the configuration page");
+  require(w.focus()<0,"configuration transition kept stale focus");
+  const auto measured=w.measure_layout(width,height,measure);const auto&l=measured.base;
+  std::vector<UiRect> order{l.cancel,l.morphology,l.population,l.mode_story,l.mode_sandbox};
+  for(const auto&row:measured.species_rows)if(l.species_rows.contains(center(row)))order.push_back(row);
+  const auto sizes=std::min(std::size_t{4},l.size_buttons.size());
+  for(std::size_t i=0;i<sizes;++i)order.push_back(l.size_buttons[i]);
+  order.insert(order.end(),{l.seed_input,l.randomize_seed,l.restore_defaults,l.copy_setup,l.create});
+  std::stable_sort(order.begin(),order.end(),[](const UiRect&a,const UiRect&b){return a.y!=b.y?a.y<b.y:a.x<b.x;});
+  const auto index_of=[&](UiRect r){const auto at=std::ranges::find_if(order,[&](const UiRect&a){return a.x==r.x&&a.y==r.y;});return at==order.end()?-1:static_cast<int>(at-order.begin());};
+  const int seed_index=index_of(l.seed_input),species_index=index_of(measured.species_rows[0]),create_index=index_of(l.create);
+  require(seed_index>=0&&species_index>=0&&create_index>=0,"focus order replication missed a control");
+  (void)key(kHome);require(w.focus()==0,"Home did not focus the first configuration control");
+  require(w.focused_label(width,height,measure)=="Back","configuration first control label mismatch");
+  for(int i=0;i<seed_index;++i)(void)key(kTab);
+  require(w.focus()==seed_index,"Tab did not reach the seed field");
+  require(w.focused_label(width,height,measure)=="Galaxy seed","seed field label mismatch");
+  (void)key(kReturn);require(w.seed_focused(),"Return on the seed field did not enter edit mode");
+  require(w.focus()==seed_index,"entering edit mode moved the focus ring");
+  (void)w.handle({InputEventType::TextEntered,{},{},0,"42"},width,height,measure);
+  require(w.seed_text()=="42","edit-mode typing did not reach the seed field");
+  (void)key(kRight);require(w.focus()==seed_index&&w.seed_focused(),"arrow key escaped edit mode");
+  (void)key(kTab);require(!w.seed_focused(),"Tab did not leave edit mode");
+  require(w.focus()==seed_index+1,"Tab after edit mode did not advance the ring");
+  (void)key(kHome);for(int i=0;i<species_index;++i)(void)key(kTab);
+  const auto chosen=key(kReturn);
+  require(chosen.kind==NativeNewGameIntentKind::SelectSpecies,"focused species row did not activate selection");
+  (void)key(kHome);for(int i=0;i<create_index;++i)(void)key(kTab);
+  const auto created=key(kReturn);require(created.kind==NativeNewGameIntentKind::Create,"focused create button did not dispatch the intent");
+  (void)w.handle({InputEventType::LeftPressed,{10,10}},width,height,measure);
+  require(w.focus()<0,"pointer interaction kept the keyboard focus ring");
 }
-int main()try{galaxy_flow();developer_research_controls();responsive_layout();presentations();mouse_and_text();rendered_facts();portrait_provider();physical_range_presentation();std::cout<<"native new-game workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
+}
+int main()try{galaxy_flow();developer_research_controls();responsive_layout();presentations();mouse_and_text();rendered_facts();portrait_provider();physical_range_presentation();keyboard_focus();std::cout<<"native new-game workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}

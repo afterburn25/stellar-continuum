@@ -1,11 +1,13 @@
 {
   "compiler": "Glslang Version: 11:16.6.0\nESSL Version: OpenGL ES GLSL 3.20 glslang Khronos. 16.6.0\nGLSL Version: 4.60 glslang Khronos. 16.6.0\nSPIR-V Version 0x00010600, Revision 1\nGLSL.std.450 Version 100, Revision 1\nKhronos Tool ID 8\nSPIR-V Generator Version 11\nGL_KHR_vulkan_glsl version 100\nARB_GL_gl_spirv version 100",
-  "compilerSha256": "88c37802aa521bafd65bdf3ba1524344fc238b45c50d168fb28c52fc2e175122",
+  "compilerSha256": "9643709c02c83e26773f96b6a87f197ab2e84f78be0879ad8fb3619418b5d9ad",
   "compilerSource": "https://github.com/KhronosGroup/glslang",
   "target": "vulkan1.0",
   "files": {
-    "engine/shaders/scene3d.vert": "b4ec6cf1ea4d44f843ac8f094bf312bb3db4d485d9e2850c54288e30668f6337",
-    "engine/shaders/scene3d.frag": "086db5bc737ef64b0bfbd865b490c21a1a5c6cf0bddd5a91bbfd85d0714aebf5",
-    "engine/src/generated/scene3d_shaders.hpp": "a78f86418c791f89dc24d9e60cf44f272aa77f4305b818045fcc9cee50a2d4dd"
+    "engine/shaders/scene3d.vert": "b68509833dbea3871867ca76309f954b8bcd98ccb3745ef8e5dc0d15fa5a2b8d",
+    "engine/shaders/scene3d.frag": "cd15765590c2431935d726330345559379283864ed5418316b20d623251c789f",
+    "engine/shaders/tonemap.vert": "2be2745c671496f0136b2d403ab88fdc78f5cdc697aeac0261bb95f5d4d44e24",
+    "engine/shaders/tonemap.frag": "00ff00b453eda57dd41f171f6de7a84d96034605b13ab52b9bccd0c67bdb1d8e",
+    "engine/src/generated/scene3d_shaders.hpp": "61627b9beddff78582e5e34578d251e376536a9652223e9e54d55d2503fbffcb"
   }
 }

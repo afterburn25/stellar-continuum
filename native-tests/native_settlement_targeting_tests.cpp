@@ -6,6 +6,7 @@
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/player_campaign_json.hpp>
 #include <stellar/core/player_campaign_persistence.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -365,6 +366,17 @@ void bounded_live_status(const fs::path &research_root,
           "bounded live status exposed a foreign, inactive, or empty vessel");
   require(controller.live_status(prepared.frame, 25, prepared.fleet_id).has_value(),
           "unrelated fleets displaced the selected live status");
+
+  stellar::engine::LocalizationTable locale{"en", "en"};
+  require(locale.load_json(
+              R"({"locale":"en","strings":{"SETTLE_STATUS_READY":"BEREIT"}})"),
+          "locale fixture did not parse");
+  controller.set_localization(&locale);
+  const auto localized = controller.live_status(prepared.frame, 25,
+                                                prepared.fleet_id);
+  require(localized && localized->status == "BEREIT",
+          "locale did not resolve the bounded live status label");
+  controller.set_localization(nullptr);
 
   const auto outcome = controller.issue_exact(prepared.frame, 25,
                                                exact.revision);

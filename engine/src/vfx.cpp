@@ -69,15 +69,33 @@ void VfxSystem::set_lod_distance(VfxInstanceId instance, float distance) {
     found->second.lod_distance = distance;
 }
 
+void VfxSystem::set_particle_budget(std::size_t particles) {
+  particle_budget_ = particles;
+}
+
+std::size_t VfxSystem::particle_budget() const noexcept {
+  return particle_budget_;
+}
+
 void VfxSystem::advance(double dt_seconds) {
   if (dt_seconds <= 0)
     return;
+  // Phase 1: integrate, expire and retire emptied emitters while counting
+  // live particles and this frame's total spawn demand — the budget scale
+  // needs settled residency and demand before any instance spawns.
+  std::size_t live = 0, demand = 0;
+  const auto lod_scale = [](const Instance &instance,
+                            const EmitterDefinition &def) {
+    if (def.lod_fade_distance <= 0.0f || instance.lod_distance <= 0.0f)
+      return 1.0f;
+    const auto t =
+        std::min(1.0f, instance.lod_distance / def.lod_fade_distance);
+    return lerp(1.0f, def.lod_min_rate_scale, t);
+  };
   for (auto it = instances_.begin(); it != instances_.end();) {
     auto &instance = it->second;
     const auto &def = definitions_.at(instance.definition_id);
     auto &pool = instance.pool;
-
-    // Integrate and expire particles.
     for (std::size_t i = 0; i < pool.size();) {
       auto &p = pool[i];
       p.age += static_cast<float>(dt_seconds);
@@ -96,21 +114,49 @@ void VfxSystem::advance(double dt_seconds) {
         ++i;
       }
     }
+    live += pool.size();
+    if (const float lod = lod_scale(instance, def);
+        instance.active && lod > 0.0f)
+      demand += std::min(
+          static_cast<std::size_t>(std::floor(
+              instance.spawn_credit +
+              def.spawn_rate_per_second * lod *
+                  static_cast<float>(dt_seconds))),
+          def.max_particles - pool.size());
+    if (!instance.active && pool.empty())
+      it = instances_.erase(it);
+    else
+      ++it;
+  }
 
-    // LOD rate scaling.
-    float rate_scale = 1.0f;
-    if (def.lod_fade_distance > 0.0f && instance.lod_distance > 0.0f) {
-      const auto t = std::min(1.0f, instance.lod_distance /
-                                        def.lod_fade_distance);
-      rate_scale = lerp(1.0f, def.lod_min_rate_scale, t);
-    }
+  // Global budget: taper every emitter's spawn rate by the share of demand
+  // the headroom admits, then enforce the remainder as a hard counter —
+  // the live count can never exceed the budget.
+  std::size_t headroom = 0;
+  budget_scale_ = 1.0f;
+  if (particle_budget_ > 0) {
+    headroom = live < particle_budget_ ? particle_budget_ - live : 0;
+    if (demand > 0)
+      budget_scale_ = std::min(
+          1.0f, static_cast<float>(headroom) / static_cast<float>(demand));
+  }
 
+  // Phase 2: spawn with LOD and budget scaling applied.
+  for (auto &[id, instance] : instances_) {
+    (void)id;
+    const auto &def = definitions_.at(instance.definition_id);
+    auto &pool = instance.pool;
+
+    const float rate_scale = lod_scale(instance, def) * budget_scale_;
     if (instance.active && rate_scale > 0.0f) {
       instance.spawn_credit += static_cast<float>(
           def.spawn_rate_per_second * rate_scale * dt_seconds);
       while (instance.spawn_credit >= 1.0f &&
-             pool.size() < def.max_particles) {
+             pool.size() < def.max_particles &&
+             (particle_budget_ == 0 || headroom > 0)) {
         instance.spawn_credit -= 1.0f;
+        if (particle_budget_ > 0)
+          --headroom;
         Particle p;
         p.position = instance.position;
         const auto sample = [&](float lo, float hi) {
@@ -129,11 +175,6 @@ void VfxSystem::advance(double dt_seconds) {
       if (pool.size() >= def.max_particles)
         instance.spawn_credit = std::min(instance.spawn_credit, 1.0f);
     }
-
-    if (!instance.active && pool.empty())
-      it = instances_.erase(it);
-    else
-      ++it;
   }
 }
 
@@ -166,6 +207,8 @@ VfxSystem::Visual VfxSystem::visual_for(const EmitterDefinition &def,
 
 VfxStats VfxSystem::stats() const {
   VfxStats result;
+  result.particle_budget = particle_budget_;
+  result.budget_scale = budget_scale_;
   for (const auto &[id, instance] : instances_) {
     (void)id;
     ++result.live_instances;

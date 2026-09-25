@@ -12,8 +12,12 @@ VirtualizedList::Range VirtualizedList::visible_range() const {
   range.content_height = row_height * static_cast<float>(row_count);
   if (row_count == 0 || row_height <= 0.0f || viewport_height <= 0.0f)
     return range;
+  // Snap tolerance: a scroll offset within a thousandth of a row of a row
+  // boundary is treated as being on the boundary — without it, a clamped
+  // max scroll like 91.12/22.78 floors to 3.999998 and the final row can
+  // never occupy the first rendered slot.
   const auto first = static_cast<std::size_t>(
-      std::clamp(std::floor(scroll_offset / row_height), 0.0f,
+      std::clamp(std::floor(scroll_offset / row_height + 1e-3f), 0.0f,
                  static_cast<float>(row_count - 1)));
   const auto visible = static_cast<std::size_t>(
       std::ceil(viewport_height / row_height)) + 1; // one row of overscan
@@ -40,6 +44,67 @@ float VirtualizedList::max_scroll() const {
 
 void VirtualizedList::scroll_to(float offset) {
   scroll_offset = std::clamp(offset, 0.0f, max_scroll());
+}
+
+void VirtualizedList::configure(std::size_t rows, float new_row_height,
+                                float new_viewport_height) {
+  row_count = rows;
+  row_height = new_row_height;
+  viewport_height = new_viewport_height;
+  scroll_to(scroll_offset);
+}
+
+void VirtualizedList::set_row_count(std::size_t rows) {
+  row_count = rows;
+  scroll_to(scroll_offset);
+}
+
+std::size_t VirtualizedList::sync_rows(std::size_t rows, float new_row_height,
+                                       float new_viewport_height) {
+  configure(rows, new_row_height, new_viewport_height);
+  if (row_height > 0.0f)
+    scroll_offset =
+        std::floor(scroll_offset / row_height + 1e-3f) * row_height;
+  return row_height > 0.0f
+             ? static_cast<std::size_t>(scroll_offset / row_height + 1e-3f)
+             : 0;
+}
+
+float ScrollView::max_scroll() const {
+  return std::max(0.0f, content_height - viewport_height);
+}
+
+void ScrollView::scroll_to(float offset) {
+  scroll_offset = std::isfinite(offset)
+                      ? std::clamp(offset, 0.0f, max_scroll())
+                      : 0.0f;
+}
+
+void ScrollView::scroll_by(float delta) { scroll_to(scroll_offset + delta); }
+
+void ScrollView::scroll_interval_into_view(float interval_top,
+                                           float interval_bottom,
+                                           float viewport_top,
+                                           float viewport_bottom) {
+  if (interval_top < viewport_top)
+    scroll_to(scroll_offset + interval_top - viewport_top);
+  else if (interval_bottom > viewport_bottom)
+    scroll_to(scroll_offset + interval_bottom - viewport_bottom);
+}
+
+float ScrollView::sync(float new_content_height, float new_viewport_height) {
+  content_height = new_content_height;
+  viewport_height = new_viewport_height;
+  scroll_to(scroll_offset);
+  return scroll_offset;
+}
+
+ScrollView::Thumb ScrollView::thumb(float track, float min_size) const {
+  const float maximum = max_scroll();
+  if (maximum <= 0.0f || track <= 0.0f || content_height <= 0.0f) return {};
+  const float size = std::min(
+      track, std::max(min_size, track * viewport_height / content_height));
+  return {(track - size) * scroll_offset / maximum, size};
 }
 
 void TableModel::set_columns(std::vector<TableColumn> columns) {
@@ -147,6 +212,29 @@ void TreeModel::set_expanded(std::string_view id, bool expanded) {
 bool TreeModel::is_expanded(std::string_view id) const {
   const auto *node = find(id);
   return node != nullptr && node->expanded;
+}
+
+void TreeModel::select(std::string_view id) {
+  selected_ = find(id) != nullptr ? std::string(id) : std::string{};
+}
+const TreeModel::Node *TreeModel::selected() const {
+  return selected_.empty() ? nullptr : find(selected_);
+}
+bool TreeModel::move_selection(int delta) {
+  if (delta == 0)
+    return false;
+  const auto flat = flattened();
+  for (std::size_t i = 0; i < flat.size(); ++i) {
+    if (flat[i].first->id != selected_)
+      continue;
+    const auto next = static_cast<std::ptrdiff_t>(i) + delta;
+    if (next < 0 || next >= static_cast<std::ptrdiff_t>(flat.size()))
+      return false;
+    selected_ = flat[static_cast<std::size_t>(next)].first->id;
+    return true;
+  }
+  selected_.clear();
+  return false;
 }
 
 std::vector<std::pair<const TreeModel::Node *, int>>

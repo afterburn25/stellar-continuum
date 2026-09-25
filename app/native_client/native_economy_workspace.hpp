@@ -4,6 +4,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <array>
 #include <cstdint>
@@ -41,10 +42,19 @@ class NativeEconomyWorkspace final {
   void close() noexcept;
   void clear() noexcept;
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(const NativeEconomyView &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<native_map::UiRect>
+  focused_bounds(int width, int height) const;
   void set_text_measurer(TextMeasurer measure);
   void set_localization(const stellar::engine::LocalizationTable *table);
   void set_notice(std::string notice);
-  [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
+  [[nodiscard]] float scroll_offset() const noexcept {
+    return scroll_.scroll_offset;
+  }
 
   [[nodiscard]] EconomyCommand handle(const native_map::InputEvent&, const NativeEconomyView&,
                                       int width, int height);
@@ -74,10 +84,11 @@ class NativeEconomyWorkspace final {
 
   const stellar::engine::LocalizationTable *locale_{};
   bool visible_{}, pointer_owned_{}, dragging_{};
+  int focus_{-1};
   PressTarget pressed_{PressTarget::None};
   native_map::Point press_point_{};
   float press_scroll_{};
-  mutable float scroll_{};
+  mutable stellar::engine::ScrollView scroll_{};
   TextMeasurer measure_;
   std::string notice_;
   std::uint64_t measure_revision_{};

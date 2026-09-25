@@ -1,8 +1,12 @@
 #include <stellar/engine/profiler.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <functional>
+#include <span>
 #include <sstream>
 #include <thread>
 
@@ -33,6 +37,50 @@ std::string json_escape(std::string_view text) {
     return out;
 }
 
+std::string serialize_capture(std::span<const ProfileFrame> frames,
+                              std::span<const ProfileAggregate> aggregates) {
+    std::ostringstream out;
+    out << "{\"frames\":[";
+    bool first_frame = true;
+    for (const auto& frame : frames) {
+        if (!first_frame) out << ',';
+        first_frame = false;
+        out << "{\"index\":" << frame.index
+            << ",\"wallNs\":" << frame.wall_nanoseconds << ",\"spans\":[";
+        bool first_span = true;
+        for (const auto& span : frame.spans) {
+            if (!first_span) out << ',';
+            first_span = false;
+            out << "{\"name\":\"" << json_escape(span.name)
+                << "\",\"category\":\"" << json_escape(span.category)
+                << "\",\"thread\":" << span.thread_id
+                << ",\"startNs\":" << span.start_nanoseconds
+                << ",\"durationNs\":" << span.duration_nanoseconds << '}';
+        }
+        out << "],\"counters\":{";
+        bool first_counter = true;
+        for (const auto& [name, value] : frame.counters) {
+            if (!first_counter) out << ',';
+            first_counter = false;
+            out << '\"' << json_escape(name) << "\":" << value;
+        }
+        out << "}}";
+    }
+    out << "],\"aggregates\":[";
+    bool first = true;
+    for (const auto& aggregate : aggregates) {
+        if (!first) out << ',';
+        first = false;
+        out << "{\"name\":\"" << json_escape(aggregate.name)
+            << "\",\"category\":\"" << json_escape(aggregate.category)
+            << "\",\"calls\":" << aggregate.calls
+            << ",\"totalNs\":" << aggregate.total_nanoseconds
+            << ",\"maxNs\":" << aggregate.max_nanoseconds << '}';
+    }
+    out << "]}";
+    return out.str();
+}
+
 } // namespace
 
 // Per-thread span storage registered with the profiler so the frame owner can
@@ -42,6 +90,7 @@ struct Profiler::ThreadSpans {
     ~ThreadSpans();
     std::mutex mutex;
     std::vector<ProfileSpan> spans;
+    std::unordered_map<AggregateKey, AggregateState, AggregateHash> aggregates;
 };
 
 namespace {
@@ -75,6 +124,17 @@ void Profiler::unregister_thread_buffer(ThreadSpans* buffer) {
     std::lock_guard buffer_lock(buffer->mutex);
     for (auto& span : buffer->spans) pending_spans_.push_back(std::move(span));
     buffer->spans.clear();
+    merge_thread_aggregates_locked(*buffer);
+}
+
+void Profiler::merge_thread_aggregates_locked(ThreadSpans& buffer) {
+    for (const auto& [key, state] : buffer.aggregates) {
+        auto& aggregate = aggregates_[key];
+        aggregate.calls += state.calls;
+        aggregate.total_nanoseconds += state.total_nanoseconds;
+        aggregate.max_nanoseconds = std::max(aggregate.max_nanoseconds, state.max_nanoseconds);
+    }
+    buffer.aggregates.clear();
 }
 
 void Profiler::drain_thread_buffers_locked() {
@@ -82,6 +142,7 @@ void Profiler::drain_thread_buffers_locked() {
         std::lock_guard buffer_lock(buffer->mutex);
         for (auto& span : buffer->spans) pending_spans_.push_back(std::move(span));
         buffer->spans.clear();
+        merge_thread_aggregates_locked(*buffer);
     }
 }
 
@@ -133,18 +194,15 @@ Profiler::Scope Profiler::span(std::string_view name, std::string_view category)
 
 void Profiler::record_span(ProfileSpan span) {
     if (!enabled_) return;
-    {
-        std::lock_guard lock(mutex_);
-        auto& aggregate = aggregates_[{span.name, span.category}];
-        ++aggregate.calls;
-        aggregate.total_nanoseconds += span.duration_nanoseconds;
-        aggregate.max_nanoseconds = std::max(aggregate.max_nanoseconds, span.duration_nanoseconds);
-    }
     auto& storage = thread_spans();
     // First use on this thread registers the buffer so frame boundaries can
     // drain it; register before pushing so the drain cannot miss this span.
     register_once(storage);
     std::lock_guard buffer_lock(storage.mutex);
+    auto& aggregate = storage.aggregates[{span.name, span.category}];
+    ++aggregate.calls;
+    aggregate.total_nanoseconds += span.duration_nanoseconds;
+    aggregate.max_nanoseconds = std::max(aggregate.max_nanoseconds, span.duration_nanoseconds);
     storage.spans.push_back(std::move(span));
 }
 
@@ -201,14 +259,33 @@ std::deque<ProfileFrame> Profiler::recent_frames() const {
     return frames_;
 }
 
-std::vector<ProfileAggregate> Profiler::aggregates() const {
-    std::lock_guard lock(mutex_);
+std::vector<ProfileAggregate> Profiler::aggregates_merged_locked() const {
+    // Snapshot the shared aggregates, then merge per-thread buffers that
+    // have not drained since the last frame boundary so readers keep the
+    // real-time contract the recording path had before aggregation moved
+    // off the global lock.
+    std::unordered_map<AggregateKey, AggregateState, AggregateHash> merged = aggregates_;
+    for (auto* buffer : thread_buffers_) {
+        std::lock_guard buffer_lock(buffer->mutex);
+        for (const auto& [key, state] : buffer->aggregates) {
+            auto& aggregate = merged[key];
+            aggregate.calls += state.calls;
+            aggregate.total_nanoseconds += state.total_nanoseconds;
+            aggregate.max_nanoseconds = std::max(aggregate.max_nanoseconds, state.max_nanoseconds);
+        }
+    }
     std::vector<ProfileAggregate> out;
-    out.reserve(aggregates_.size());
-    for (const auto& [key, state] : aggregates_) {
+    out.reserve(merged.size());
+    for (const auto& [key, state] : merged) {
         out.push_back({key.name, key.category, state.calls,
                        state.total_nanoseconds, state.max_nanoseconds});
     }
+    return out;
+}
+
+std::vector<ProfileAggregate> Profiler::aggregates() const {
+    std::lock_guard lock(mutex_);
+    auto out = aggregates_merged_locked();
     std::sort(out.begin(), out.end(), [](const ProfileAggregate& a, const ProfileAggregate& b) {
         return a.total_nanoseconds > b.total_nanoseconds;
     });
@@ -217,51 +294,124 @@ std::vector<ProfileAggregate> Profiler::aggregates() const {
 
 void Profiler::reset_aggregates() {
     std::lock_guard lock(mutex_);
+    // Drain first so per-thread aggregates accumulated before the reset
+    // cannot resurface afterwards.
+    drain_thread_buffers_locked();
     aggregates_.clear();
 }
 
 std::string Profiler::export_json() const {
     std::lock_guard lock(mutex_);
-    std::ostringstream out;
-    out << "{\"frames\":[";
-    bool first_frame = true;
-    for (const auto& frame : frames_) {
-        if (!first_frame) out << ',';
-        first_frame = false;
-        out << "{\"index\":" << frame.index
-            << ",\"wallNs\":" << frame.wall_nanoseconds << ",\"spans\":[";
-        bool first_span = true;
-        for (const auto& span : frame.spans) {
-            if (!first_span) out << ',';
-            first_span = false;
-            out << "{\"name\":\"" << json_escape(span.name)
-                << "\",\"category\":\"" << json_escape(span.category)
-                << "\",\"thread\":" << span.thread_id
-                << ",\"startNs\":" << span.start_nanoseconds
-                << ",\"durationNs\":" << span.duration_nanoseconds << '}';
-        }
-        out << "],\"counters\":{";
-        bool first_counter = true;
-        for (const auto& [name, value] : frame.counters) {
-            if (!first_counter) out << ',';
-            first_counter = false;
-            out << '\"' << json_escape(name) << "\":" << value;
-        }
-        out << "}}";
+    const std::vector<ProfileFrame> frames(frames_.begin(), frames_.end());
+    const auto aggregate_list = aggregates_merged_locked();
+    return serialize_capture(
+        std::span<const ProfileFrame>(frames),
+        std::span<const ProfileAggregate>(aggregate_list));
+}
+
+std::optional<ProfileCapture>
+ProfileCapture::parse(std::string_view json_document) {
+    nlohmann::json doc;
+    try {
+        doc = nlohmann::json::parse(json_document);
+    } catch (...) {
+        return std::nullopt;
     }
-    out << "],\"aggregates\":[";
-    bool first = true;
-    for (const auto& [key, state] : aggregates_) {
-        if (!first) out << ',';
-        first = false;
-        out << "{\"name\":\"" << json_escape(key.name)
-            << "\",\"category\":\"" << json_escape(key.category)
-            << "\",\"calls\":" << state.calls
-            << ",\"totalNs\":" << state.total_nanoseconds
-            << ",\"maxNs\":" << state.max_nanoseconds << '}';
+    if (!doc.is_object() || !doc.contains("frames") ||
+        !doc["frames"].is_array() || !doc.contains("aggregates") ||
+        !doc["aggregates"].is_array())
+        return std::nullopt;
+    ProfileCapture capture;
+    for (const auto& frame_json : doc["frames"]) {
+        if (!frame_json.is_object()) return std::nullopt;
+        ProfileFrame frame;
+        frame.index = frame_json.value("index", std::uint64_t{});
+        frame.wall_nanoseconds =
+            frame_json.value("wallNs", std::uint64_t{});
+        for (const auto& span_json :
+             frame_json.value("spans", nlohmann::json::array())) {
+            ProfileSpan span;
+            span.name = span_json.value("name", std::string{});
+            span.category = span_json.value("category", std::string{});
+            span.thread_id = span_json.value("thread", std::uint64_t{});
+            span.start_nanoseconds =
+                span_json.value("startNs", std::uint64_t{});
+            span.duration_nanoseconds =
+                span_json.value("durationNs", std::uint64_t{});
+            frame.spans.push_back(std::move(span));
+        }
+        for (const auto& [name, value] :
+             frame_json.value("counters", nlohmann::json::object()).items())
+            if (value.is_number_integer())
+                frame.counters[name] = value.get<std::int64_t>();
+        capture.frames.push_back(std::move(frame));
     }
-    out << "]}";
-    return out.str();
+    for (const auto& aggregate_json : doc["aggregates"]) {
+        if (!aggregate_json.is_object()) return std::nullopt;
+        ProfileAggregate aggregate;
+        aggregate.name = aggregate_json.value("name", std::string{});
+        aggregate.category =
+            aggregate_json.value("category", std::string{});
+        aggregate.calls = aggregate_json.value("calls", std::uint64_t{});
+        aggregate.total_nanoseconds =
+            aggregate_json.value("totalNs", std::uint64_t{});
+        aggregate.max_nanoseconds =
+            aggregate_json.value("maxNs", std::uint64_t{});
+        capture.aggregates.push_back(std::move(aggregate));
+    }
+    return capture;
+}
+
+std::string ProfileCapture::to_json() const {
+    return serialize_capture(
+        std::span<const ProfileFrame>(frames),
+        std::span<const ProfileAggregate>(aggregates));
+}
+
+namespace {
+struct ComparisonKeyHash {
+    std::size_t
+    operator()(const std::pair<std::string, std::string> &key) const noexcept {
+        return std::hash<std::string>{}(key.first + '\x1f' + key.second);
+    }
+};
+} // namespace
+
+std::vector<ProfileComparisonRow>
+compare_captures(const ProfileCapture &a, const ProfileCapture &b) {
+    std::unordered_map<std::pair<std::string, std::string>,
+                       ProfileComparisonRow, ComparisonKeyHash>
+        rows;
+    const auto add = [&rows](const ProfileAggregate &aggregate, bool second) {
+        auto &row = rows[{aggregate.name, aggregate.category}];
+        row.name = aggregate.name;
+        row.category = aggregate.category;
+        const double mean =
+            aggregate.calls
+                ? static_cast<double>(aggregate.total_nanoseconds) /
+                      static_cast<double>(aggregate.calls)
+                : 0.0;
+        if (second) {
+            row.calls_b = aggregate.calls;
+            row.mean_ns_b = mean;
+        } else {
+            row.calls_a = aggregate.calls;
+            row.mean_ns_a = mean;
+        }
+    };
+    for (const auto &aggregate : a.aggregates) add(aggregate, false);
+    for (const auto &aggregate : b.aggregates) add(aggregate, true);
+    std::vector<ProfileComparisonRow> out;
+    out.reserve(rows.size());
+    for (auto &[key, row] : rows) {
+        (void)key;
+        out.push_back(std::move(row));
+    }
+    std::sort(out.begin(), out.end(), [](const auto &lhs, const auto &rhs) {
+        return std::fabs(lhs.mean_ns_b - lhs.mean_ns_a) >
+               std::fabs(rhs.mean_ns_b - rhs.mean_ns_a);
+    });
+    return out;
 }
 
 std::vector<std::string> Profiler::overlay_lines(std::size_t max_rows) const {

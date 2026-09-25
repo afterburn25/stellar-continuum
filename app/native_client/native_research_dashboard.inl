@@ -34,7 +34,7 @@ std::vector<NativeResearchWorkspace::GuidedCard> NativeResearchWorkspace::guided
     if(sort_==0&&a->recommendation_score!=b->recommendation_score)return a->recommendation_score>b->recommendation_score;
     return a->display_name<b->display_name;
   });
-  const float s=l.scale,gap=10*s,x=l.graph.x+12*s,available=l.graph.width-24*s;float y=l.graph.y+82*s-guided_scroll_;
+  const float s=l.scale,gap=10*s,x=l.graph.x+12*s,available=l.graph.width-24*s;float y=l.graph.y+82*s-guided_scroll_.scroll_offset;
   const bool rows=list_view_||mode_==ResearchViewMode::Queue;
   const int columns=rows?1:std::clamp(static_cast<int>(available/std::max(220*s,220.f)),2,4);
   const float cw=(available-gap*(columns-1))/columns;
@@ -54,7 +54,7 @@ void NativeResearchWorkspace::render_dashboard(DrawList& out,const ResearchWorks
   const auto title=tr(mode_==ResearchViewMode::Recent?"RESEARCH_VIEW_RECENT":mode_==ResearchViewMode::Favorites?"RESEARCH_VIEW_FAVORITES":mode_==ResearchViewMode::Completed?"RESEARCH_VIEW_COMPLETED":mode_==ResearchViewMode::Queue?"RESEARCH_VIEW_QUEUE":plan_.suggestions?"RESEARCH_VIEW_RECOMMENDED":"RESEARCH_VIEW_AVAILABLE",mode_==ResearchViewMode::Recent?"RECENTLY COMPLETED":mode_==ResearchViewMode::Favorites?"FAVORITE TECHNOLOGIES":mode_==ResearchViewMode::Completed?"COMPLETED RESEARCH":mode_==ResearchViewMode::Queue?"RESEARCH QUEUE":plan_.suggestions?"RECOMMENDED & AVAILABLE":"AVAILABLE TECHNOLOGIES");
   text(out,{l.graph.x+12*s,l.graph.y+49*s,l.graph.width-24*s,26*s},title,bright,l.body_font_pixels);
   const UiRect content{l.graph.x,l.graph.y+80*s,l.graph.width,l.graph.height-80*s};float extent=0;bool section=false;
-  for(const auto& card:cards){const auto clip=intersection(card.bounds,content);extent=std::max(extent,card.bounds.y+card.bounds.height+guided_scroll_-content.y);if(!clip)continue;
+  for(const auto& card:cards){const auto clip=intersection(card.bounds,content);extent=std::max(extent,card.bounds.y+card.bounds.height+guided_scroll_.scroll_offset-content.y);if(!clip)continue;
     const auto n=std::ranges::find(window_->nodes,card.id,&NativeResearchNode::id);if(n==window_->nodes.end())continue;
     if(!card.recommended&&!section&&std::ranges::any_of(cards,[](const auto& c){return c.recommended;})){clipped_text(out,{card.bounds.x,card.bounds.y-30*s,l.graph.width-24*s,25*s},content,tr("RESEARCH_OTHER_AVAILABLE","OTHER AVAILABLE TECHNOLOGIES"),muted,l.small_font_pixels);section=true;}
     const auto r=card.bounds;stellar::engine::ui_skin::surface(out,r,s,selected_node_id_==n->id,content);
@@ -74,23 +74,24 @@ void NativeResearchWorkspace::render_dashboard(DrawList& out,const ResearchWorks
     };
     line(n->display_name,bright,l.body_font_pixels,row?23*s:40*s);
     line(n->domain_label+" · Tier "+std::to_string(n->graph_depth+1),muted,l.small_font_pixels,22*s);
-    const std::string state=n->active?(n->paused?"PAUSED":"RESEARCHING"):established(*n)?"✓ COMPLETED":includes(plan_.queue,n->id)?"QUEUED":n->primary_action.enabled?(card.recommended?"RECOMMENDED":"AVAILABLE"):(n->requirements_met?"WAITING · Capacity / funding":"LOCKED · Requirements");
+    const std::string state=n->active?(n->paused?tr("RESEARCH_CARD_PAUSED","PAUSED"):tr("RESEARCH_CARD_RESEARCHING","RESEARCHING")):established(*n)?tr("RESEARCH_CARD_COMPLETED","✓ COMPLETED"):includes(plan_.queue,n->id)?tr("RESEARCH_CARD_QUEUED","QUEUED"):n->primary_action.enabled?(card.recommended?tr("RESEARCH_RECOMMENDED_BADGE","RECOMMENDED"):tr("RESEARCH_CARD_AVAILABLE","AVAILABLE")):(n->requirements_met?tr("RESEARCH_CARD_WAITING","WAITING · Capacity / funding"):tr("RESEARCH_CARD_LOCKED","LOCKED · Requirements"));
     line(state,n->active||established(*n)?positive:n->primary_action.enabled?Color{124,226,246,255}:warning,l.small_font_pixels,22*s);
     if(!row){line(n->cost&&std::isfinite(n->cost->estimated_years_at_full_funding)?trf("RESEARCH_DURATION_FUNDED",{stellar::native_campaign::format_campaign_duration(n->cost->estimated_years_at_full_funding*365.25)},"{0} at full funding"):tr("RESEARCH_DURATION_STAFFED","Duration requires staffed labs"),muted,l.small_font_pixels,35*s);line(concise(n->benefits,95),positive,l.small_font_pixels,card.recommended?48*s:36*s);
       if(card.recommended&&!n->recommendation_reasons.empty()){line(tr("RESEARCH_RECOMMENDED_BECAUSE","Recommended because:"),warning,l.small_font_pixels,20*s);line(concise(n->recommendation_reasons.front(),90),muted,l.small_font_pixels,44*s);}}
     if(mode_==ResearchViewMode::Recent&&n->recent_year)line(trf("RESEARCH_COMPLETED_YEAR",{fixed(*n->recent_year,2)},"Completed in year {0}"),muted,l.small_font_pixels,20*s);
     if(mode_==ResearchViewMode::Queue){
       const auto index=std::ranges::find(plan_.queue,n->id)-plan_.queue.begin();const float bx=r.x+r.width-143*s,by=r.y+r.height-32*s;
-      for(int k=0;k<3;++k){const UiRect b{bx+k*46*s,by,42*s,26*s};if(const auto visible=intersection(b,content)){native_menu_style::button(out,*visible,k==0?"↑":k==1?"↓":"×",l.body_font_pixels,b.contains(pointer_),true,s);interface_hits_.push_back({*visible,20+k,n->id});}}
-      clipped_text(out,{tx,r.y+r.height-28*s,tw-150*s,26*s},*clip,"#"+std::to_string(index+1)+" · "+(n->active?"Running":established(*n)?"Complete":n->primary_action.enabled?"Ready":concise(n->primary_action.reason,72)),n->primary_action.enabled?positive:warning,l.small_font_pixels);
+      for(int k=0;k<3;++k){const UiRect b{bx+k*46*s,by,42*s,26*s};if(const auto visible=intersection(b,content)){native_menu_style::button(out,*visible,k==0?"↑":k==1?"↓":"×",l.body_font_pixels,b.contains(pointer_),true,s);interface_hits_.push_back({*visible,20+k,n->id,trf(k==0?"RESEARCH_QUEUE_UP":k==1?"RESEARCH_QUEUE_DOWN":"RESEARCH_QUEUE_REMOVE",{n->display_name},k==0?"Move {0} earlier":k==1?"Move {0} later":"Remove {0} from queue")});}}
+      clipped_text(out,{tx,r.y+r.height-28*s,tw-150*s,26*s},*clip,"#"+std::to_string(index+1)+" · "+(n->active?tr("RESEARCH_QUEUE_RUNNING","Running"):established(*n)?tr("RESEARCH_QUEUE_COMPLETE","Complete"):n->primary_action.enabled?tr("RESEARCH_QUEUE_READY","Ready"):concise(n->primary_action.reason,72)),n->primary_action.enabled?positive:warning,l.small_font_pixels);
     }
   }
   if(cards.empty())text(out,{content.x+18*s,content.y+18*s,content.width-36*s,96*s},tr(mode_==ResearchViewMode::Queue?"RESEARCH_EMPTY_QUEUE":mode_==ResearchViewMode::Recent?"RESEARCH_EMPTY_RECENT":"RESEARCH_EMPTY_VIEW",mode_==ResearchViewMode::Queue?"No technologies queued. Add a known program from the inspector. Queued programs wait for their requirements and funding; blocked entries are never skipped.":mode_==ResearchViewMode::Recent?"No completion records in the saved research history yet. Established starting knowledge is listed under Completed Research.":"No technologies match this view. Change the category, search or filter."),muted,l.body_font_pixels);
-  if(extent>content.height){const float thumb=std::max(20*s,content.height*content.height/extent),y=content.y+(content.height-thumb)*std::clamp(guided_scroll_/(extent-content.height),0.f,1.f);fill(out,{content.x+content.width-4*s,y,2*s,thumb},border);}
+  guided_scroll_.sync(extent,content.height);
+  if(const auto thumb=guided_scroll_.thumb(content.height,20*s);thumb.size>0)fill(out,{content.x+content.width-4*s,content.y+thumb.offset,2*s,thumb.size},border);
 }
 void NativeResearchWorkspace::render_controls(DrawList& out,const ResearchWorkspaceLayout& l){
   const float s=l.scale;
-  const auto button=[&](UiRect r,std::string label,int action,std::string id={},bool enabled=true){native_menu_style::button(out,r,std::move(label),l.small_font_pixels,r.contains(pointer_),enabled,s);if(enabled)interface_hits_.push_back({r,action,std::move(id)});};
+  const auto button=[&](UiRect r,std::string label,int action,std::string id={},bool enabled=true){native_menu_style::button(out,r,label,l.small_font_pixels,r.contains(pointer_),enabled,s);if(enabled)interface_hits_.push_back({r,action,std::move(id),std::move(label)});};
   for(int i=0;i<4;++i){UiRect r{l.view_tabs.x+i*l.view_tabs.width/4,l.view_tabs.y,l.view_tabs.width/4-4*s,l.view_tabs.height};button(r,tr(std::array{"RESEARCH_TAB_GUIDED","RESEARCH_TAB_TREE","RESEARCH_TAB_RECENT","RESEARCH_TAB_FAVORITES"}[i],std::array{"Guided","Tech Tree","Recent","Favorites"}[i]),100+i);if(static_cast<int>(mode_)==i)fill(out,{r.x,r.y+r.height-2*s,r.width,2*s},{108,223,251,255});}
   button(l.completed,tr("RESEARCH_TAB_COMPLETED","✓ Completed Research"),104);button(l.queue,trf("RESEARCH_TAB_QUEUE",{std::to_string(plan_.queue.size())},"Research Queue · {0}"),105);
   if(mode_==ResearchViewMode::Tree){button({l.graph.x+8*s,l.graph.y+6*s,100*s,30*s},tr("RESEARCH_RESET_VIEW","Reset view"),30);button({l.graph.x+116*s,l.graph.y+6*s,108*s,30*s},tr("RESEARCH_FOCUS_SELECTED","Focus selected"),31);button({l.graph.x+232*s,l.graph.y+6*s,100*s,30*s},tr("RESEARCH_FOCUS_ACTIVE","Focus active"),32);}
@@ -113,19 +114,20 @@ void NativeResearchWorkspace::render_controls(DrawList& out,const ResearchWorksp
   }
   native_menu_style::panel(out,l.active,s);
   text(out,{l.active.x+12*s,l.active.y+8*s,l.active.width-24*s,24*s},trf("RESEARCH_ACTIVE_PROGRAMS",{std::to_string(window_->active_program_count),window_->lab_capacity_only?tr("RESEARCH_ACTIVE_LIMITED"," programs · laboratory capacity limited"):trf("RESEARCH_ACTIVE_SLOTS",{std::to_string(window_->maximum_programs.value_or(0))}," / {0} slots")},"ACTIVE RESEARCH  ·  {0}{1}"),bright,l.body_font_pixels);
-  float x=l.active.x+10*s-active_scroll_;const UiRect area{l.active.x+8*s,l.active.y+38*s,l.active.width-16*s,l.active.height-44*s};
+  active_scroll_.sync((window_?window_->active_program_count+1:1)*264*s+16*s,l.active.width);
+  float x=l.active.x+10*s-active_scroll_.scroll_offset;const UiRect area{l.active.x+8*s,l.active.y+38*s,l.active.width-16*s,l.active.height-44*s};
   for(const auto& n:window_->nodes)if(n.active){const UiRect r{x,area.y,255*s,area.height};x+=264*s;if(const auto clip=intersection(r,area)){
     stellar::engine::ui_skin::surface(out,r,s,false,area);clipped_text(out,{r.x+8*s,r.y+7*s,r.width-52*s,28*s},*clip,concise(n.display_name,26),bright,l.small_font_pixels);
     const float progress=static_cast<float>(std::clamp(n.total_progress,0.,1.));const UiRect bar{r.x+8*s,r.y+38*s,r.width-16*s,6*s};stellar::engine::ui_skin::progress(out,bar,progress,s,area);
-    clipped_text(out,{r.x+8*s,r.y+52*s,r.width-16*s,25*s},*clip,(n.paused?"Paused · ":"")+fixed(progress*100,0)+"% · "+fixed(n.assigned_effective_labs,1)+" labs",n.paused?warning:muted,l.small_font_pixels);interface_hits_.push_back({*clip,10,n.id});
+    clipped_text(out,{r.x+8*s,r.y+52*s,r.width-16*s,25*s},*clip,(n.paused?"Paused · ":"")+fixed(progress*100,0)+"% · "+fixed(n.assigned_effective_labs,1)+" labs",n.paused?warning:muted,l.small_font_pixels);interface_hits_.push_back({*clip,10,n.id,n.display_name});
     const UiRect cancel{r.x+r.width-38*s,r.y+5*s,30*s,30*s};
     if (const auto c=intersection(cancel,area)) {
       fill(out,*c,raised);clipped_stroke(out,cancel,area,border);
       clipped_text(out,cancel,area,"×",n.cancel_action.enabled?warning:muted,l.body_font_pixels);
-      if(n.cancel_action.enabled)interface_hits_.push_back({*c,11,n.id});
+      if(n.cancel_action.enabled)interface_hits_.push_back({*c,11,n.id,trf("RESEARCH_CANCEL_NODE",{n.display_name},"Cancel {0}")});
     }
   }}
-  if(window_->free_effective_labs>0&&(window_->lab_capacity_only||window_->active_program_count<window_->maximum_programs.value_or(0))){UiRect r{x,area.y,245*s,area.height};if(const auto clip=intersection(r,area)){fill(out,*clip,raised);clipped_stroke(out,r,area,border);clipped_text(out,{r.x+8*s,r.y+10*s,r.width-16*s,area.height-16*s},*clip,trf("RESEARCH_AVAILABLE_CAPACITY",{fixed(window_->free_effective_labs,1)},"+  AVAILABLE CAPACITY\n{0} free labs · choose research"),positive,l.small_font_pixels);interface_hits_.push_back({*clip,100,{}});}}
+  if(window_->free_effective_labs>0&&(window_->lab_capacity_only||window_->active_program_count<window_->maximum_programs.value_or(0))){UiRect r{x,area.y,245*s,area.height};if(const auto clip=intersection(r,area)){fill(out,*clip,raised);clipped_stroke(out,r,area,border);clipped_text(out,{r.x+8*s,r.y+10*s,r.width-16*s,area.height-16*s},*clip,trf("RESEARCH_AVAILABLE_CAPACITY",{fixed(window_->free_effective_labs,1)},"+  AVAILABLE CAPACITY\n{0} free labs · choose research"),positive,l.small_font_pixels);interface_hits_.push_back({*clip,100,{},tr("RESEARCH_CAPACITY_ACTION","Choose research")});}}
   if(why_open_){native_menu_style::panel(out,l.graph,s);text(out,{l.graph.x+18*s,l.graph.y+16*s,l.graph.width-36*s,36*s},tr("RESEARCH_WHY_TITLE","WHY THESE RECOMMENDATIONS?"),bright,l.body_font_pixels);float y=l.graph.y+58*s;int count=0;for(const auto& c:guided_cards(l))if(c.recommended&&count++<3){const auto n=std::ranges::find(window_->nodes,c.id,&NativeResearchNode::id);if(n==window_->nodes.end())continue;text(out,{l.graph.x+18*s,y,l.graph.width-36*s,30*s},n->display_name,positive,l.body_font_pixels);y+=32*s;for(const auto& reason:n->recommendation_reasons){text(out,{l.graph.x+18*s,y,l.graph.width-36*s,38*s},"• "+reason,muted,l.small_font_pixels);y+=38*s;}y+=10*s;}
     if(!count)text(out,{l.graph.x+18*s,y,l.graph.width-36*s,100*s},tr("RESEARCH_WHY_EXPLANATION","Recommendations use the existing adaptive agenda: recognized pressures, readiness, capability gaps, research priorities and laboratory opportunity cost. No recommendation is available in this view."),muted,l.small_font_pixels);
     button({l.graph.x+l.graph.width-90*s,l.graph.y+10*s,76*s,30*s},tr("RESEARCH_WHY_CLOSE","Close"),1);
@@ -133,16 +135,16 @@ void NativeResearchWorkspace::render_controls(DrawList& out,const ResearchWorksp
 }
 std::optional<WorkspaceCommand> NativeResearchWorkspace::handle_controls(const InputEvent& e,const ResearchWorkspaceLayout& l,int width,int height){
   const WorkspaceCommand consumed{WorkspaceCommandKind::None,true};
-  if(dropdown_.visible()){const int id=dropdown_.id();if(auto value=dropdown_.handle(e,id==1?l.filter:id==2?l.sort:l.toolbar,width,height)){if(id==1)filter_=*value;else if(id==2)sort_=*value;else return WorkspaceCommand{WorkspaceCommandKind::Execute,true,{},*value==1?NativeResearchIntent::SuggestionsOn:NativeResearchIntent::SuggestionsOff};guided_scroll_=0;}return consumed;}
+  if(dropdown_.visible()){const int id=dropdown_.id();if(auto value=dropdown_.handle(e,id==1?l.filter:id==2?l.sort:l.toolbar,width,height)){if(id==1)filter_=*value;else if(id==2)sort_=*value;else return WorkspaceCommand{WorkspaceCommandKind::Execute,true,{},*value==1?NativeResearchIntent::SuggestionsOn:NativeResearchIntent::SuggestionsOff};guided_scroll_={};}return consumed;}
   if(e.type==InputEventType::EscapePressed&&why_open_){why_open_=false;return consumed;}
-  if(e.type==InputEventType::Wheel&&l.active.contains(e.position)){active_scroll_=std::clamp(active_scroll_-e.wheel_y*120*l.scale,0.f,std::max(0.f,(window_?window_->active_program_count+1:1)*264*l.scale-l.active.width+16*l.scale));return consumed;}
+  if(e.type==InputEventType::Wheel&&l.active.contains(e.position)){active_scroll_.sync((window_?window_->active_program_count+1:1)*264*l.scale+16*l.scale,l.active.width);active_scroll_.scroll_by(-e.wheel_y*120*l.scale);return consumed;}
   if(e.type!=InputEventType::LeftPressed)return {};
   if(why_open_){why_open_=false;return consumed;}
   for(auto hit=interface_hits_.rbegin();hit!=interface_hits_.rend();++hit)if(hit->bounds.contains(e.position)){
     const auto action=hit->action;const auto id=hit->id;
-    if(action>=100){mode_=static_cast<ResearchViewMode>(action-100);guided_scroll_=0;search_focused_=false;return consumed;}
+    if(action>=100){mode_=static_cast<ResearchViewMode>(action-100);guided_scroll_={};search_focused_=false;return consumed;}
     if(action==1)why_open_=!why_open_;
-    else if(action==2){list_view_=!list_view_;guided_scroll_=0;}
+    else if(action==2){list_view_=!list_view_;guided_scroll_={};}
     else if(action==3)dropdown_.open(3,{tr("RESEARCH_ASSIST_OFF","Off"),tr("RESEARCH_ASSIST_SUGGESTIONS","Suggestions only")},plan_.suggestions?1:0);
     else if(action==4)dropdown_.open(1,{tr("RESEARCH_DD_AVAILABLE","Available"),tr("RESEARCH_DD_ALL_KNOWN","All known"),tr("RESEARCH_DD_RECOMMENDED","Recommended"),tr("RESEARCH_DD_RESEARCHING","Researching"),tr("RESEARCH_DD_QUEUED","Queued"),tr("RESEARCH_DD_LOCKED","Locked"),tr("RESEARCH_DD_COMPLETED","Completed"),tr("RESEARCH_DD_FAVORITES","Favorites")},filter_);
     else if(action==5)dropdown_.open(2,{tr("RESEARCH_DD_RELEVANCE","Relevance"),tr("RESEARCH_DD_TIME","Research time"),tr("RESEARCH_DD_TIER","Tier"),tr("RESEARCH_DD_CATEGORY","Category"),tr("RESEARCH_DD_NAME","Name")},sort_);

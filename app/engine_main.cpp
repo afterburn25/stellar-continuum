@@ -28,6 +28,20 @@
 #include <stellar/engine/package.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/project.hpp>
+#include <stellar/engine/population.hpp>
+#include <stellar/engine/colony.hpp>
+#include <stellar/engine/economy_catalog.hpp>
+#include <stellar/engine/resource_economy.hpp>
+#include <stellar/engine/strategic_ai.hpp>
+#include <stellar/engine/warfare.hpp>
+#include <stellar/engine/mission_graph.hpp>
+#include <stellar/engine/event_bus.hpp>
+#include <stellar/engine/physics.hpp>
+#include <stellar/engine/terraforming.hpp>
+#include <stellar/engine/flow_network.hpp>
+#include <stellar/engine/logistics.hpp>
+#include <stellar/engine/galaxy_map.hpp>
+#include <stellar/engine/simulation_executor.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
@@ -46,6 +60,7 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -67,13 +82,19 @@ constexpr Color row_hover{16, 40, 56, 255};
 constexpr Color row_selected{22, 62, 92, 255};
 
 enum class Tool { Projects, Dashboard, Scene, Scene3D, Assets, Profiler,
-                  Localization };
+                  Localization, Simulation, Colony, Economy, Planet,
+                  Ai, Warfare, Missions, Physics, Galaxy };
 constexpr std::array kTools{Tool::Projects, Tool::Dashboard, Tool::Scene,
                             Tool::Scene3D, Tool::Assets, Tool::Profiler,
-                            Tool::Localization};
-constexpr std::array<const char *, 7> kToolNames{
-    "Projects", "Dashboard", "Scene", "Scene3D",
-    "Assets",   "Profiler",  "Localization"};
+                            Tool::Localization, Tool::Simulation,
+                            Tool::Colony, Tool::Economy, Tool::Planet,
+                            Tool::Ai, Tool::Warfare, Tool::Missions,
+                            Tool::Physics, Tool::Galaxy};
+constexpr std::array<const char *, 16> kToolNames{
+    "Projects", "Dashboard", "Scene",     "Scene3D",
+    "Assets",   "Profiler",  "Localization", "Simulation", "Colony",
+    "Economy",  "Planet",    "AI",        "Warfare",   "Missions",
+    "Physics",  "Galaxy"};
 
 std::filesystem::path find_path(const char *relative) {
   // Beside the executable first (packaged layout), then upward so a
@@ -166,6 +187,13 @@ struct Shell {
   bool blank_template{};
   engine::PackageLoadPlan load_plan;
   std::vector<std::string> package_errors;
+  // Profiler tool: two capture slots compared via compare_captures —
+  // slots fill in-memory (CAPTURE) or from disk (LOAD/SAVE under
+  // <exe>/profiler_captures/) so builds can diff against saved baselines.
+  std::optional<engine::ProfileCapture> prof_capture_a, prof_capture_b;
+  std::string prof_status;
+  UiRect hit_prof_cap_a{}, hit_prof_cap_b{}, hit_prof_save_a{},
+      hit_prof_save_b{}, hit_prof_load_a{}, hit_prof_load_b{};
   // New-project name field and panel hit regions.
   bool editing_project_name{}, editing_import{}, editing_package{};
   std::string project_name_buffer, import_buffer, package_buffer;
@@ -215,8 +243,9 @@ struct Shell {
       hit_scene_tilesize{}, hit_scene_tilecols{},
       hit_scene_tilecollide{}, hit_scene_tilelayer{},
       hit_scene_tilepar{}, hit_scene_tilecells{},
-      hit_scene_tileorigin{},
-      hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_music{},
+      hit_scene_tileorigin{}, hit_scene_tilename{},
+      hit_scene_paint{}, hit_scene_paintcell{}, hit_scene_brushsz{},
+      hit_scene_fill{}, hit_scene_music{},
       hit_scene_spin{}, hit_scene_worldsize{}, hit_scene_bounce{},
       scene_preview{}, scene_rows{};
   // Decoded scene sprites keyed by resolved content path; cleared on
@@ -230,6 +259,8 @@ struct Shell {
   bool scene_paint{};    // PAINT mode: clicks write cells, not select
   bool scene_painting{}; // pointer is mid paint stroke
   int scene_paint_cell{}; // brush value written into tilemap cells
+  int scene_paint_brush{1}; // NxN cells per stamp, centered on the click
+  bool scene_paint_fill{}; // FILL mode: clicks flood a connected region
   // Which document tilemap the tile fields/paint mode edit — scenes can
   // stack several grids (decor, collision, foreground) on own layers.
   std::size_t scene_tile_index{};
@@ -250,21 +281,234 @@ struct Shell {
   std::unordered_map<std::string,
                      std::shared_ptr<const stellar::native_map::Mesh3D>>
       scene3_meshes;
-  std::unordered_map<std::string, std::shared_ptr<const RgbaImage>>
+  // Decoded scene3d textures arrive through a shared state so misses can
+  // decode on the JobSystem instead of stalling the draw thread; `done`
+  // is set release/acquire after `image`.
+  struct Scene3Tex {
+    std::shared_ptr<const RgbaImage> image;
+    std::string error;                 // job-written before done
+    std::atomic<bool> done{false};
+    bool reported{false};              // UI-thread: error surfaced once
+  };
+  std::unordered_map<std::string, std::shared_ptr<Scene3Tex>>
       scene3_textures;
+  engine::JobSystem *jobs{}; // main() wires the shell's JobSystem once
   std::unique_ptr<engine::ContentResolver> scene3_content;
   bool scene3_looking{};  // right-drag orbit is active in the preview
-  bool scene3_dragging{}; // left-drag moves the picked entity on its
-                          // current-Y plane
+  bool scene3_dragging{}; // left-drag applies the transform mode below
+                          // to the picked entity
+  int scene3_drag_mode{0}; // 0 move (Y-plane), 1 rotate (yaw/pitch),
+                           // 2 scale (uniform)
   UiRect scene3_preview{}, scene3_rows{};
+  UiRect hit3_mode_move{}, hit3_mode_rot{}, hit3_mode_scale{};
   UiRect hit3_add{}, hit3_del{}, hit3_save{}, hit3_undo{}, hit3_redo{},
       hit3_dup{}, hit3_name{}, hit3_mesh{}, hit3_pos{}, hit3_rot{},
       hit3_scale{}, hit3_vel{}, hit3_color{}, hit3_tex{},
       hit3_opacity{}, hit3_dbl{}, hit3_solid{}, hit3_gravs{},
-      hit3_ttl{}, hit3_data{}, hit3_parent{}, hit3_cam{},
+      hit3_ttl{}, hit3_data{}, hit3_parent{}, hit3_vfx{}, hit3_cam{},
       hit3_camrot{}, hit3_fov{}, hit3_lightdir{}, hit3_lightint{},
       hit3_grav{}, hit3_ground{}, hit3_bounds{}, hit3_bg{},
-      hit3_music{};
+      hit3_music{}, hit3_filla_dir{}, hit3_filla_tint{},
+      hit3_fillb_dir{}, hit3_fillb_tint{};
+
+  // Simulation tool: a live engine::SimulationExecutor driving real
+  // framework state (per-settlement Population cohorts, a shared power
+  // FlowNetwork and a LogisticsNetwork freight route) — the visible
+  // proof of the engine's simulation LOD machinery. Tasks span Active /
+  // Normal / Dormant tiers; STEP advances one tick, RUN auto-advances,
+  // WAKE exercises the event-wakeup path on the dormant relay.
+  struct SimDemo {
+    bool initialized{false};
+    engine::SimulationExecutor executor;
+    std::vector<engine::Population> settlements;
+    engine::FlowNetwork power{"power"};
+    engine::LogisticsNetwork freight;
+    double relay_pings{0.0};
+    double delivered{0.0};
+    bool running{false};
+    double run_accum{0.0};
+    engine::SimulationStepReport last{};
+    std::size_t selected{0};
+  } sim;
+  UiRect hit_sim_step{}, hit_sim_run{}, hit_sim_wake{}, hit_sim_tier{},
+      hit_sim_list{};
+
+  // Colony tool: a live engine::Colony designer — author districts and
+  // structures from the spec catalog, advance construction/operations
+  // over days, and watch jobs/housing/utilities/upkeep resolve against a
+  // real Inventory stockpile. Demonstrates the specialization colony
+  // framework end to end (specs -> construction -> operation ->
+  // shortfalls), not a mockup.
+  struct ColonyDemo {
+    bool initialized{false};
+    engine::Colony colony;
+    engine::Inventory stockpile{10000.0};
+    std::uint64_t next_id{1};
+    double workers{400.0};
+    double maintenance{1.0};
+    double day{0.0};
+    engine::ColonyDelta last{};
+    // Flattened row model rebuilt each render: districts first, each
+    // followed by its hosted structures, then standalone structures.
+    // (is_district, id) — selection + hit testing index into this.
+    std::vector<std::pair<bool, std::uint64_t>> rows;
+    std::size_t selected{0};
+    std::string notice;
+  } col;
+  UiRect hit_col_step{}, hit_col_run30{}, hit_col_workers_dn{},
+      hit_col_workers_up{}, hit_col_maint{}, hit_col_resupply{},
+      hit_col_enable{}, hit_col_demolish{};
+  std::vector<UiRect> hit_col_build;
+  std::vector<UiRect> hit_col_rows;
+
+  // Economy tool: a catalog/network inspector over the specialization
+  // economy framework — a fixed EconomyCatalog (ResourceSpec +
+  // RecipeSpec rows) validated on demand, bridged into a live
+  // ResourceNetwork (two nodes, producers, a transfer lane) that
+  // advances over days, with analyze_economy demand/bottleneck
+  // diagnostics rolled up from real network state. A BREAK toggle
+  // injects a dangling recipe to exercise the validation diagnostics.
+  struct EconomyDemo {
+    bool initialized{false};
+    engine::EconomyCatalog catalog;
+    engine::ResourceNetwork network;
+    std::uint64_t smelter_producer{0};
+    bool validated{false};
+    bool break_catalog{false};
+    std::vector<engine::ValidationIssue> issues;
+    bool analyzed{false};
+    std::vector<engine::EconomyDiagnostic> diagnostics;
+    double day{0.0};
+  } eco;
+  UiRect hit_eco_validate{}, hit_eco_break{}, hit_eco_analyze{},
+      hit_eco_step{}, hit_eco_run10{}, hit_eco_producer{};
+
+  // Planet tool: habitability + terraforming over the specialization
+  // planetary framework — a PlanetEnvironment with editable
+  // temperature/atmosphere/gravity/water, evaluated live against
+  // selectable HabitabilityProfiles, with real Terraforming projects
+  // (staged linear deltas + discrete tag application) advancing the
+  // environment over days.
+  struct PlanetDemo {
+    bool initialized{false};
+    engine::Terraforming terra;
+    int profile{0};
+    double day{0.0};
+    engine::TerraformAdvance last{};
+  } planet;
+  enum : std::size_t { kPlanTemp, kPlanAtm, kPlanGrav, kPlanWater,
+                       kPlanParamCount };
+  std::array<UiRect, kPlanParamCount * 2> hit_plan_param{};
+  UiRect hit_plan_profile{}, hit_plan_start{}, hit_plan_cancel{},
+      hit_plan_step{}, hit_plan_run30{}, hit_plan_project{};
+  int planet_project{0};
+
+  // AI tool: a StrategicMind debugger — a small deterministic world
+  // (minerals/mines/fleets/threat drift per day) with four registered
+  // UtilityActions across economy and military domains. DECIDE runs
+  // decide() at the campaign clock, RUN auto-advances, action rows
+  // toggle enabled live, and the bounded decision journal renders WHY
+  // the AI acted (utility, candidates, incumbent switches).
+  struct AiDemo {
+    bool initialized{false};
+    engine::StrategicMind mind{64};
+    double day{0.0};
+    double minerals{80.0};
+    double mines{1.0};
+    double tech{0.0};
+    double fleets{1.0};
+    double forts{0.0};
+    double threat{25.0};
+    bool running{false};
+    double run_accum{0.0};
+  } ai;
+  UiRect hit_ai_decide{}, hit_ai_run{}, hit_ai_threat_dn{},
+      hit_ai_threat_up{}, hit_ai_reset{};
+  std::vector<UiRect> hit_ai_actions;
+
+  // Warfare tool: a theater inspector over WarfareModel — two hostile
+  // fleets plus an interdictor on a strategic plane. Rows select a
+  // fleet; ORDER cycles its order kind (Move steers at the hostile
+  // fleet); ENGAGE resolves deterministic Lanchester attrition; STEP/RUN
+  // advance movement + supply burn at the theater clock.
+  struct WarfareDemo {
+    bool initialized{false};
+    engine::WarfareModel model;
+    double day{0.0};
+    bool running{false};
+    double run_accum{0.0};
+    std::uint64_t selected{1};
+    std::string last_engagement{"none"};
+  } war;
+  UiRect hit_war_step{}, hit_war_run{}, hit_war_order{}, hit_war_engage{},
+      hit_war_reset{};
+  std::vector<UiRect> hit_war_fleets;
+
+  // Missions tool: a MissionRuntime debugger over a real EventBus — two
+  // data-driven mission definitions parsed from JSON, canned domain
+  // events fired through handle_event, stage timers advanced on the
+  // demo clock, choices applied through choose(), and every
+  // MissionEffectEvent the runtime publishes captured into a log.
+  struct MissionDemo {
+    bool initialized{false};
+    engine::EventBus bus;
+    engine::MissionRuntime runtime{&bus};
+    engine::Subscription effects_sub;
+    double day{0.0};
+    std::size_t event_cursor{0};
+    std::uint64_t selected{0};
+    bool running{false};
+    double run_accum{0.0};
+    std::string saved_state;
+    std::vector<std::string> log;
+  } missions;
+  UiRect hit_mis_fire{}, hit_mis_step{}, hit_mis_run{}, hit_mis_choose{},
+      hit_mis_save{}, hit_mis_load{}, hit_mis_reset{};
+  std::vector<UiRect> hit_mis_instances;
+
+  // Physics tool: a PhysicsWorld inspector — circles/AABBs with layers,
+  // a drifting mover crossing a trigger volume, raycast and swept-circle
+  // queries against the live broadphase, and the trigger enter/exit
+  // event log produced by advance().
+  struct PhysicsDemo {
+    bool initialized{false};
+    engine::PhysicsWorld world{128.0f};
+    double seconds{0.0};
+    bool running{false};
+    double run_accum{0.0};
+    engine::PhysicsBodyId selected{0};
+    engine::PhysicsBodyId mover{0};
+    engine::PhysicsBodyId target{0};
+    std::string last_query{"none"};
+    std::vector<std::string> log;
+  } phys;
+  UiRect hit_phys_step{}, hit_phys_run{}, hit_phys_ray{},
+      hit_phys_sweep{}, hit_phys_reset{};
+  std::vector<UiRect> hit_phys_bodies;
+
+  // Galaxy tool: a GalaxyMap debugger — a deterministic synthetic star
+  // chart with lanes, colony markers and fleet travellers that move
+  // system-to-system along the lane graph as days advance. Click to
+  // select the nearest system, wheel zooms the chart.
+  struct GalaxyDemo {
+    bool initialized{false};
+    engine::GalaxyMap map;
+    double day{0.0};
+    bool running{false};
+    double run_accum{0.0};
+    std::uint64_t selected{0};
+    std::uint64_t destination{0}; // right-click sets a route target
+    float zoom{1.0f};
+    // Fleet markers in transit between neighbor systems.
+    struct Traveller {
+      std::uint64_t marker{0};
+      std::uint64_t from{0}, to{0};
+      double progress{0.0}; // light-years covered along the leg
+      std::size_t next_hop{0};
+    };
+    std::vector<Traveller> travellers;
+  } gal;
+  UiRect hit_gal_step{}, hit_gal_run{}, hit_gal_reset{}, hit_gal_map{};
   std::string status{"ready"};
 };
 
@@ -309,8 +553,8 @@ void scan_assets(Shell &shell, std::filesystem::path root) {
     if (shell.asset_files.size() >= 20000) break;
   }
   std::ranges::sort(shell.asset_files);
-  shell.asset_list.row_count = shell.asset_files.size();
   shell.asset_list.row_height = 22.f;
+  shell.asset_list.set_row_count(shell.asset_files.size());
 }
 
 // Projects tool -----------------------------------------------------------
@@ -323,8 +567,8 @@ void scan_assets(Shell &shell, std::filesystem::path root) {
 
 void refresh_projects(Shell &shell) {
   shell.projects = engine::find_projects(shell.projects_root);
-  shell.project_list.row_count = shell.projects.size();
   shell.project_list.row_height = 24.f;
+  shell.project_list.set_row_count(shell.projects.size());
   if (shell.selected_project >= shell.projects.size())
     shell.selected_project = shell.projects.empty()
                                  ? static_cast<std::size_t>(-1)
@@ -555,16 +799,19 @@ void start_build(Shell &shell, engine::JobSystem &jobs) {
                     });
 }
 
-// Smoke-tests the built host: launches it hidden with `--frames N`, waits up
-// to 30s, and reports pass/fail. Shared by the UI TEST job and the headless
-// --test path.
+// Smoke-tests the built host: launches it hidden with `--frames N
+// --headless`, waits up to 30s, and reports pass/fail. Headless skips
+// Window/audio entirely, so TEST also works on machines with no display
+// or GPU; hosts built against an older SDK ignore the flag and still run
+// hidden. Shared by the UI TEST job and the headless --test path.
 std::string test_project_sync(const std::filesystem::path &root,
                               const std::string &exe_name, int frames) {
   for (const auto dir : {root / "build" / "host" / "Release",
                          root / "build" / "host"}) {
     const auto exe = dir / (exe_name + ".exe");
     if (std::filesystem::is_regular_file(exe)) {
-      const std::string frames_arg = "--frames " + std::to_string(frames);
+      const std::string frames_arg =
+          "--frames " + std::to_string(frames) + " --headless";
       SHELLEXECUTEINFOA info{};
       info.cbSize = sizeof(info);
       info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NO_CONSOLE;
@@ -1006,6 +1253,31 @@ bool parse_pair(std::string_view text, float &a, float &b) {
   return true;
 }
 
+// Parses "a,b,c,d" into four floats.
+bool parse_quad(std::string_view text, float &a, float &b, float &c,
+                float &d) {
+  const auto c1 = text.find(',');
+  const auto c2 = c1 == std::string_view::npos
+                      ? c1
+                      : text.find(',', c1 + 1);
+  const auto c3 = c2 == std::string_view::npos
+                      ? c2
+                      : text.find(',', c2 + 1);
+  if (c1 == std::string_view::npos || c2 == std::string_view::npos ||
+      c3 == std::string_view::npos)
+    return false;
+  try {
+    a = std::stof(std::string(text.substr(0, c1)));
+    b = std::stof(std::string(text.substr(c1 + 1, c2 - c1 - 1)));
+    c = std::stof(std::string(text.substr(c2 + 1, c3 - c2 - 1)));
+    d = std::stof(std::string(text.substr(c3 + 1)));
+    return std::isfinite(a) && std::isfinite(b) && std::isfinite(c) &&
+           std::isfinite(d);
+  } catch (const std::exception &) {
+    return false;
+  }
+}
+
 // Parses "r,g,b" into clamped 0-255 channels.
 bool parse_color(std::string_view text, std::uint8_t &r, std::uint8_t &g,
                  std::uint8_t &b) {
@@ -1130,6 +1402,9 @@ void commit_scene_field(Shell &shell) {
       }
     } else if (shell.scene_field == 40) {
       ok = parse_pair(shell.scene_buffer, tm.x, tm.y);
+    } else if (shell.scene_field == 41) {
+      tm.name = shell.scene_buffer;
+      ok = true;
     } else if (shell.scene_field == 36) {
       tm.cells.clear();
       std::stringstream ss(shell.scene_buffer);
@@ -1150,6 +1425,19 @@ void commit_scene_field(Shell &shell) {
         shell.status = "paint brush " + shell.scene_buffer;
       } catch (const std::exception &) {
         shell.status = "invalid value - use a tile index or -1";
+      }
+      shell.scene_buffer.clear();
+      return;
+    }
+    if (shell.scene_field == 42) {
+      try {
+        shell.scene_paint_brush =
+            std::clamp(std::stoi(shell.scene_buffer), 1, 8);
+        shell.status = "brush size " +
+                       std::to_string(shell.scene_paint_brush) + "x" +
+                       std::to_string(shell.scene_paint_brush);
+      } catch (const std::exception &) {
+        shell.status = "invalid value - use 1..8";
       }
       shell.scene_buffer.clear();
       return;
@@ -1365,15 +1653,54 @@ std::shared_ptr<const Mesh3D> scene3_mesh(Shell &shell,
 std::shared_ptr<const RgbaImage> scene3_tex(Shell &shell,
                                             const std::string &path) {
   if (const auto it = shell.scene3_textures.find(path);
-      it != shell.scene3_textures.end())
-    return it->second;
-  std::shared_ptr<const RgbaImage> img;
-  if (shell.scene3_content)
-    if (const auto loose = shell.scene3_content->loose_path(path);
-        std::filesystem::is_regular_file(loose))
-      img = decode_rgba_image(loose, 4096);
-  shell.scene3_textures.emplace(path, img);
-  return img;
+      it != shell.scene3_textures.end()) {
+    auto &state = *it->second;
+    if (!state.done.load(std::memory_order_acquire)) return nullptr;
+    if (!state.error.empty() && !state.reported) {
+      state.reported = true;
+      shell.status = "texture decode failed: " + path;
+    }
+    return state.image;
+  }
+  auto state = std::make_shared<Shell::Scene3Tex>();
+  shell.scene3_textures.emplace(path, state);
+  const auto loose = shell.scene3_content
+                         ? shell.scene3_content->loose_path(path)
+                         : std::filesystem::path{};
+  if (!std::filesystem::is_regular_file(loose)) {
+    state->done.store(true, std::memory_order_release);
+    return nullptr;
+  }
+  if (shell.jobs) {
+    // Decode off the draw thread; the entity binds untextured until the
+    // job publishes the image.
+    (void)shell.jobs->submit("scene3d.texture",
+                             engine::JobPriority::Normal, {},
+                             [state, loose] {
+      try {
+        state->image = decode_rgba_image(loose, 4096);
+      } catch (const std::exception &error) {
+        state->error = error.what();
+      } catch (...) {
+        state->error = "unknown decode error";
+      }
+      state->done.store(true, std::memory_order_release);
+    });
+    return nullptr;
+  }
+  try {
+    state->image = decode_rgba_image(loose, 4096);
+  } catch (const std::exception &error) {
+    state->error = error.what();
+  } catch (...) {
+    state->error = "unknown decode error";
+  }
+  state->done.store(true, std::memory_order_release);
+  if (!state->error.empty()) {
+    state->reported = true;
+    shell.status = "texture decode failed: " + path;
+  }
+  return state->image;
 }
 
 // Parses "x,y,z" into three floats.
@@ -1523,6 +1850,46 @@ void commit_scene3_field(Shell &shell) {
     doc.music = shell.scene3_buffer;
     return ok(shell.scene3_buffer.empty() ? "scene music cleared"
                                           : "scene music set");
+  // Fill lights: fields 30/32 set a slot's direction, 31/33 set its
+  // "r,g,b,intensity" tint (0..1 channels); an empty direction removes
+  // the slot — the material pipeline evaluates at most two.
+  case 30:
+  case 32: {
+    const std::size_t slot = shell.scene3_field == 30 ? 0 : 1;
+    if (shell.scene3_buffer.empty()) {
+      if (slot >= doc.lights.size()) {
+        shell.scene3_buffer.clear();
+        return;
+      }
+      commit();
+      doc.lights.erase(doc.lights.begin() + slot);
+      return ok("fill light removed");
+    }
+    if (!parse_triple(shell.scene3_buffer, a, b, c))
+      return fail("use \"x,y,z\" direction, empty removes");
+    commit();
+    while (doc.lights.size() <= slot)
+      doc.lights.push_back(engine::Scene3dLight{});
+    doc.lights[slot].dir_x = a;
+    doc.lights[slot].dir_y = b;
+    doc.lights[slot].dir_z = c;
+    return ok("fill light direction updated");
+  }
+  case 31:
+  case 33: {
+    const std::size_t slot = shell.scene3_field == 31 ? 0 : 1;
+    float intensity;
+    if (!parse_quad(shell.scene3_buffer, a, b, c, intensity))
+      return fail("use \"r,g,b,intensity\" like 0.4,0.6,1,0.5");
+    commit();
+    while (doc.lights.size() <= slot)
+      doc.lights.push_back(engine::Scene3dLight{});
+    doc.lights[slot].r = a;
+    doc.lights[slot].g = b;
+    doc.lights[slot].b = c;
+    doc.lights[slot].intensity = std::max(0.f, intensity);
+    return ok("fill light tint updated");
+  }
   default:
     break;
   }
@@ -1578,6 +1945,7 @@ void commit_scene3_field(Shell &shell) {
           next.ttl = std::max(0.f, a); valid = true; break;
   case 14: next.data = shell.scene3_buffer; valid = true; break;
   case 15: next.parent = shell.scene3_buffer; valid = true; break;
+  case 16: next.vfx = shell.scene3_buffer; valid = true; break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -1600,7 +1968,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                     shell.hit3_tex = shell.hit3_opacity = shell.hit3_dbl =
                         shell.hit3_solid = shell.hit3_gravs =
                             shell.hit3_ttl = shell.hit3_data =
-                                shell.hit3_parent = shell.hit3_cam =
+                                shell.hit3_parent = shell.hit3_vfx =
+                                    shell.hit3_cam =
                                     shell.hit3_camrot = shell.hit3_fov =
                                         shell.hit3_lightdir =
                                             shell.hit3_lightint =
@@ -1609,7 +1978,13 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                         shell.hit3_bounds =
                                                             shell.hit3_bg =
                                                                 shell.hit3_music =
+                                                                    shell.hit3_filla_dir =
+                                                                        shell.hit3_filla_tint =
+                                                                            shell.hit3_fillb_dir =
+                                                                                shell.hit3_fillb_tint =
                                                                     {};
+    shell.hit3_mode_move = shell.hit3_mode_rot =
+        shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
     return;
   }
@@ -1640,6 +2015,17 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   shell.hit3_dup = {x + 568 * s, y, 128 * s, bh};
   shell_button(out, shell.hit3_dup, "DUPLICATE",
                shell.scene3_sel < doc.entities.size(), font, s);
+  // LMB drag transform mode — what a left-drag does to the picked
+  // entity in the preview below.
+  shell.hit3_mode_move = {x + 716 * s, y, 86 * s, bh};
+  shell_button(out, shell.hit3_mode_move, "MOVE",
+               shell.scene3_drag_mode == 0, font, s);
+  shell.hit3_mode_rot = {x + 810 * s, y, 100 * s, bh};
+  shell_button(out, shell.hit3_mode_rot, "ROTATE",
+               shell.scene3_drag_mode == 1, font, s);
+  shell.hit3_mode_scale = {x + 918 * s, y, 90 * s, bh};
+  shell_button(out, shell.hit3_mode_scale, "SCALE",
+               shell.scene3_drag_mode == 2, font, s);
   y += bh + 14 * s;
 
   // Entity list (left) + live 3D preview (right).
@@ -1647,9 +2033,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
   shell.scene3_rows = list_rect;
-  shell.scene3_list.viewport_height = list_rect.height;
-  shell.scene3_list.row_height = 22 * s;
-  shell.scene3_list.row_count = doc.entities.size();
+  shell.scene3_list.configure(doc.entities.size(), 22 * s,
+                              list_rect.height);
   const auto range = shell.scene3_list.visible_range();
   float ry = list_rect.y - shell.scene3_list.scroll_offset +
              range.first * shell.scene3_list.row_height;
@@ -1731,7 +2116,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   out.overlay.push_back(StrokedRectangle{pv, panel_edge});
   out.overlay.push_back(
       Text{{pv.x + 8 * s, pv.y + 6 * s},
-           "click/drag: pick + move | RMB drag: orbit | wheel: fov",
+           "click: pick | LMB drag: move/rotate/scale (mode above) | "
+           "RMB drag: orbit | wheel: fov",
            muted, font - 2});
 
   // Fields under the list: entity props, then document-level props.
@@ -1801,6 +2187,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         "freeform game data");
   field(shell.hit3_parent, "parent", entity ? entity->parent : "",
         ed(15), "entity name to follow");
+  field(shell.hit3_vfx, "vfx", entity ? entity->vfx : "", ed(16),
+        "named emitter attached on spawn");
   // Second column: document-level fields.
   fx = list_rect.x + col_w + 20 * s;
   fy = list_rect.y + list_rect.height + 16 * s;
@@ -1829,6 +2217,26 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         ed(28), "clear color r,g,b");
   field(shell.hit3_music, "music", doc.music, ed(29),
         "content-relative track");
+  const auto fill_dir = [&doc, &fmt3](std::size_t slot) {
+    return slot < doc.lights.size()
+               ? fmt3(doc.lights[slot].dir_x, doc.lights[slot].dir_y,
+                      doc.lights[slot].dir_z)
+               : std::string{};
+  };
+  const auto fill_tint = [&doc](std::size_t slot) {
+    if (slot >= doc.lights.size()) return std::string{};
+    const auto &l = doc.lights[slot];
+    return std::to_string(l.r) + "," + std::to_string(l.g) + "," +
+           std::to_string(l.b) + "," + std::to_string(l.intensity);
+  };
+  field(shell.hit3_filla_dir, "fillA dir", fill_dir(0), ed(30),
+        "x,y,z - empty removes slot");
+  field(shell.hit3_filla_tint, "fillA tint", fill_tint(0), ed(31),
+        "r,g,b,intensity 0..1");
+  field(shell.hit3_fillb_dir, "fillB dir", fill_dir(1), ed(32),
+        "x,y,z - empty removes slot");
+  field(shell.hit3_fillb_tint, "fillB tint", fill_tint(1), ed(33),
+        "r,g,b,intensity 0..1");
 }
 
 std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
@@ -1851,13 +2259,63 @@ void paint_tile_at(Shell &shell, float wx, float wy) {
       static_cast<int>(std::floor((wx - tm.x) / tm.tile_w));
   const int cy =
       static_cast<int>(std::floor((wy - tm.y) / tm.tile_h));
-  if (cx < 0 || cy < 0 || cx >= tm.columns) return;
-  const std::size_t idx = static_cast<std::size_t>(cy) * tm.columns + cx;
-  if (idx >= tm.cells.size())
-    tm.cells.resize(static_cast<std::size_t>(cy + 1) * tm.columns, -1);
-  if (tm.cells[idx] == shell.scene_paint_cell) return;
-  tm.cells[idx] = shell.scene_paint_cell;
-  shell.scene_modified = true;
+  // Brush footprint: an NxN block centered on the clicked cell (1 = the
+  // single-cell stamp). The same one-undo-step-per-stroke rule applies.
+  const int brush = std::clamp(shell.scene_paint_brush, 1, 8);
+  const int lo = -(brush / 2), hi = brush - brush / 2;
+  for (int dy = lo; dy < hi; ++dy)
+    for (int dx = lo; dx < hi; ++dx) {
+      const int px = cx + dx, py = cy + dy;
+      if (px < 0 || py < 0 || px >= tm.columns) continue;
+      const std::size_t idx =
+          static_cast<std::size_t>(py) * tm.columns + px;
+      if (idx >= tm.cells.size())
+        tm.cells.resize(static_cast<std::size_t>(py + 1) * tm.columns, -1);
+      if (tm.cells[idx] == shell.scene_paint_cell) continue;
+      tm.cells[idx] = shell.scene_paint_cell;
+      shell.scene_modified = true;
+    }
+}
+
+// Flood-fills the 4-connected region of same-valued cells under the click
+// with the brush value — the FILL toggle in paint mode. Bounded to the
+// map's existing cells (fills never extend the grid).
+void fill_tile_at(Shell &shell, float wx, float wy) {
+  auto *tmap = scene_tile(shell);
+  if (tmap == nullptr) return;
+  auto &tm = *tmap;
+  if (tm.tile_w <= 0 || tm.tile_h <= 0 || tm.columns <= 0 ||
+      tm.cells.empty())
+    return;
+  const int cx =
+      static_cast<int>(std::floor((wx - tm.x) / tm.tile_w));
+  const int cy =
+      static_cast<int>(std::floor((wy - tm.y) / tm.tile_h));
+  const int rows = static_cast<int>(tm.cells.size()) / tm.columns;
+  if (cx < 0 || cy < 0 || cx >= tm.columns || cy >= rows) return;
+  const int target = tm.cells[static_cast<std::size_t>(cy) * tm.columns +
+                              cx];
+  if (target == shell.scene_paint_cell) return;
+  std::vector<char> seen(tm.cells.size(), 0);
+  std::vector<int> stack{cy * tm.columns + cx};
+  while (!stack.empty()) {
+    const int flat = stack.back();
+    stack.pop_back();
+    if (seen[static_cast<std::size_t>(flat)]) continue;
+    seen[static_cast<std::size_t>(flat)] = 1;
+    if (tm.cells[static_cast<std::size_t>(flat)] != target) continue;
+    tm.cells[static_cast<std::size_t>(flat)] = shell.scene_paint_cell;
+    shell.scene_modified = true;
+    const int px = flat % tm.columns, py = flat / tm.columns;
+    for (const auto [ox, oy] : {std::pair{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+      const int nx = px + ox, ny = py + oy;
+      if (nx < 0 || ny < 0 || nx >= tm.columns || ny >= rows) continue;
+      const int nflat = ny * tm.columns + nx;
+      if (static_cast<std::size_t>(nflat) < tm.cells.size() &&
+          !seen[static_cast<std::size_t>(nflat)])
+        stack.push_back(nflat);
+    }
+  }
 }
 
 void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
@@ -1891,8 +2349,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         shell.hit_scene_tilesize = shell.hit_scene_tilecols =
             shell.hit_scene_tilecollide = shell.hit_scene_tilelayer =
                 shell.hit_scene_tilepar = shell.hit_scene_tilecells =
-                shell.hit_scene_tileorigin =
+                shell.hit_scene_tileorigin = shell.hit_scene_tilename =
                     shell.hit_scene_paint = shell.hit_scene_paintcell =
+                        shell.hit_scene_brushsz = shell.hit_scene_fill =
                         shell.hit_scene_music = shell.hit_scene_spin =
                             shell.hit_scene_worldsize =
                                 shell.hit_scene_bounce =
@@ -1947,11 +2406,13 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   shell.hit_scene_tilemap = {x + 876 * s, y, 86 * s, bh};
   shell_button(out, shell.hit_scene_tilemap, "TILES +", false, font, s);
   shell.hit_scene_tilesel = {x + 970 * s, y, 104 * s, bh};
+  const auto sel_tile = std::min(shell.scene_tile_index, ntiles - 1);
   const std::string map_label =
-      ntiles ? "MAP " +
-                   std::to_string(
-                       std::min(shell.scene_tile_index, ntiles - 1) + 1) +
-                   "/" + std::to_string(ntiles)
+      ntiles ? "MAP " + std::to_string(sel_tile + 1) + "/" +
+                   std::to_string(ntiles) +
+                   (shell.scene_doc.tilemaps[sel_tile].name.empty()
+                        ? ""
+                        : ":" + shell.scene_doc.tilemaps[sel_tile].name)
              : "MAP -";
   shell_button(out, shell.hit_scene_tilesel, map_label.c_str(),
                ntiles == 0, font, s);
@@ -1962,6 +2423,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   shell_button(out, shell.hit_scene_paint,
                shell.scene_paint ? "PAINT *" : "PAINT", ntiles == 0, font,
                s);
+  shell.hit_scene_fill = {x + 1284 * s, y, 70 * s, bh};
+  shell_button(out, shell.hit_scene_fill,
+               shell.scene_paint_fill ? "FILL *" : "FILL",
+               ntiles == 0 || !shell.scene_paint, font, s);
   y += bh + 14 * s;
 
   // Entity list (left) + scene preview (right).
@@ -1969,9 +2434,8 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
   shell.scene_rows = list_rect;
-  shell.entity_list.viewport_height = list_rect.height;
-  shell.entity_list.row_height = 22 * s;
-  shell.entity_list.row_count = shell.scene_doc.entities.size();
+  shell.entity_list.configure(shell.scene_doc.entities.size(), 22 * s,
+                              list_rect.height);
   const auto range = shell.entity_list.visible_range();
   float ry = list_rect.y - shell.entity_list.scroll_offset +
              range.first * shell.entity_list.row_height;
@@ -2175,12 +2639,16 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
           ((shell.pointer_x - pv.x) / sx - tm.x) / tm.tile_w));
       const int hy = static_cast<int>(std::floor(
           ((shell.pointer_y - pv.y) / sy - tm.y) / tm.tile_h));
-      if (hx >= 0 && hx < tm.columns && hy >= 0)
+      if (hx >= 0 && hx < tm.columns && hy >= 0) {
+        // Outline the whole brush footprint, not just the hovered cell.
+        const int brush = std::clamp(shell.scene_paint_brush, 1, 8);
+        const int lo = -(brush / 2);
         out.overlay.push_back(StrokedRectangle{
-            {pv.x + (tm.x + hx * tm.tile_w) * sx,
-             pv.y + (tm.y + hy * tm.tile_h) * sy, tm.tile_w * sx,
-             tm.tile_h * sy},
+            {pv.x + (tm.x + (hx + lo) * tm.tile_w) * sx,
+             pv.y + (tm.y + (hy + lo) * tm.tile_h) * sy,
+             brush * tm.tile_w * sx, brush * tm.tile_h * sy},
             accent});
+      }
     }
     // Tile picker: the decoded sheet as a strip along the preview's top —
     // clicking a cell selects it as the brush instead of painting.
@@ -2212,8 +2680,11 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
   }
   out.overlay.push_back(Text{
       {pv.x + 6 * s, pv.y + pv.height - 16 * s},
-      shell.scene_paint ? "paint mode - click/drag writes cells"
-                        : "click selects - drag moves entities",
+      shell.scene_paint
+          ? (shell.scene_paint_fill
+                 ? "fill mode - click floods a same-value region"
+                 : "paint mode - click/drag writes cells")
+          : "click selects - drag moves entities",
       muted, static_cast<int>(11 * s), 0, pv});
 
   // Property fields for the selected entity. Column count adapts to the
@@ -2396,6 +2867,9 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         tm ? fmt_pair(tm->x, tm->y) : "",
         shell.editing_scene && shell.scene_field == 40,
         "grid origin x,y in world px");
+  field(shell.hit_scene_tilename, "tilename", tm ? tm->name : "",
+        shell.editing_scene && shell.scene_field == 41,
+        "layer name for tilemap_index lookups");
   field(shell.hit_scene_tilecells, "tilecells", cell_list(),
         shell.editing_scene && shell.scene_field == 36,
         "csv cells, -1 empty");
@@ -2403,6 +2877,10 @@ void render_scene(DrawList &out, Shell &shell, UiRect body, float s) {
         std::to_string(shell.scene_paint_cell),
         shell.editing_scene && shell.scene_field == 37,
         "brush tile id, -1 erases");
+  field(shell.hit_scene_brushsz, "brushsz",
+        std::to_string(shell.scene_paint_brush),
+        shell.editing_scene && shell.scene_field == 42,
+        "NxN stamp per click, 1..8");
   field(shell.hit_scene_music, "music", shell.scene_doc.music,
         shell.editing_scene && shell.scene_field == 38,
         "content-relative track played on scene load");
@@ -2510,13 +2988,12 @@ void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
   }
   if (shell.show_cooked && shell.cooked_dirty.exchange(false))
     load_cooked(shell);
-  shell.asset_list.row_count = row_count;
-
   const UiRect list_rect = tool_list_rect(body, s, 0.48f);
   out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
 
-  shell.asset_list.viewport_height = list_rect.height;
+  shell.asset_list.configure(row_count, shell.asset_list.row_height,
+                             list_rect.height);
   const auto range = shell.asset_list.visible_range();
   const float row_h = shell.asset_list.row_height;
   float ry = list_rect.y - shell.asset_list.scroll_offset +
@@ -2585,19 +3062,40 @@ void render_assets(DrawList &out, Shell &shell, UiRect body, float s) {
   }
 }
 
-void render_profiler(DrawList &out, UiRect body, float s,
+std::filesystem::path profiler_capture_path(int slot) {
+  return engine::executable_directory() / "profiler_captures" /
+         ("capture_" + std::string(slot == 0 ? "a" : "b") + ".json");
+}
+
+void render_profiler(DrawList &out, Shell &shell, UiRect body, float s,
                      engine::Profiler &profiler) {
   float x = body.x + 22 * s;
   float y = body.y + 18 * s;
   const int font = static_cast<int>(13 * s);
   heading(out, x, y, "PROFILER");
+  const float bw = 92 * s, bh = 24 * s, gap = 8 * s;
+  shell.hit_prof_cap_a = {x, y, bw, bh};
+  shell.hit_prof_cap_b = {x + (bw + gap), y, bw, bh};
+  shell.hit_prof_save_a = {x + (bw + gap) * 2, y, bw, bh};
+  shell.hit_prof_load_a = {x + (bw + gap) * 3, y, bw, bh};
+  shell.hit_prof_save_b = {x + (bw + gap) * 4, y, bw, bh};
+  shell.hit_prof_load_b = {x + (bw + gap) * 5, y, bw, bh};
+  shell_button(out, shell.hit_prof_cap_a, "CAPTURE A", false, font, s);
+  shell_button(out, shell.hit_prof_cap_b, "CAPTURE B", false, font, s);
+  shell_button(out, shell.hit_prof_save_a, "SAVE A", false, font, s);
+  shell_button(out, shell.hit_prof_load_a, "LOAD A", false, font, s);
+  shell_button(out, shell.hit_prof_save_b, "SAVE B", false, font, s);
+  shell_button(out, shell.hit_prof_load_b, "LOAD B", false, font, s);
+  y += bh + 8 * s;
+  if (!shell.prof_status.empty())
+    line(out, x, y, "status", shell.prof_status, font);
   for (const auto &row : profiler.overlay_lines(18)) {
     out.overlay.push_back(Text{{x, y}, row, ink, font});
     y += font + 8.f;
   }
   const auto aggregates = profiler.aggregates();
   heading(out, x, y, "AGGREGATES");
-  const auto count = std::min<std::size_t>(aggregates.size(), 14);
+  const auto count = std::min<std::size_t>(aggregates.size(), 10);
   for (std::size_t i = 0; i < count; ++i) {
     const auto &a = aggregates[i];
     line(out, x, y,
@@ -2605,6 +3103,21 @@ void render_profiler(DrawList &out, UiRect body, float s,
          std::to_string(a.calls) + " calls, " +
              ms(static_cast<double>(a.total_nanoseconds) / 1e6) + " total",
          font);
+  }
+  if (shell.prof_capture_a && shell.prof_capture_b) {
+    heading(out, x, y, "A vs B (largest mean deltas)");
+    const auto rows = engine::compare_captures(*shell.prof_capture_a,
+                                               *shell.prof_capture_b);
+    for (std::size_t i = 0; i < std::min<std::size_t>(rows.size(), 12); ++i) {
+      const auto &r = rows[i];
+      const double delta = (r.mean_ns_b - r.mean_ns_a) / 1e6;
+      char buf[160];
+      std::snprintf(buf, sizeof(buf), "A %.2f ms -> B %.2f ms  (%+.2f ms)",
+                    r.mean_ns_a / 1e6, r.mean_ns_b / 1e6, delta);
+      line(out, x, y,
+           r.category.empty() ? r.name : r.category + "/" + r.name, buf,
+           font);
+    }
   }
 }
 
@@ -2622,9 +3135,8 @@ void render_localization(DrawList &out, Shell &shell, UiRect body, float s,
   const UiRect list_rect = tool_list_rect(body, s, 1.0f);
   out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
-  shell.key_list.row_count = shell.sample_keys.size();
-  shell.key_list.row_height = 22.f;
-  shell.key_list.viewport_height = list_rect.height;
+  shell.key_list.configure(shell.sample_keys.size(), 22.f,
+                           list_rect.height);
   const auto range = shell.key_list.visible_range();
   float ry = list_rect.y - shell.key_list.scroll_offset +
              range.first * shell.key_list.row_height;
@@ -2657,6 +3169,1821 @@ void field_box(DrawList &out, const UiRect &rect, const std::string &value,
       {rect.x + 8 * s, rect.y + 7 * s},
       value.empty() ? hint : value,
       value.empty() ? muted : ink, font, rect.width - 12 * s, rect});
+}
+
+// ---- Simulation tool: live executor + framework demo ------------------
+
+void init_sim(Shell::SimDemo &sim) {
+  namespace eng = engine;
+  // Three settlements — real cohort populations, not counters.
+  for (int i = 0; i < 3; ++i) {
+    eng::Population pop;
+    pop.define_profile({.id = "human"});
+    pop.add({.profile = "human", .occupation = "miner"},
+            800.0 + i * 300.0);
+    pop.add({.profile = "human", .occupation = "farmer"}, 200.0);
+    sim.settlements.push_back(std::move(pop));
+  }
+  sim.power.add_node(1, 12.0, 0.0, 40.0);
+  sim.power.add_node(2, 0.0, 5.0, 10.0);
+  sim.power.add_node(3, 0.0, 3.0, 10.0);
+  sim.power.add_edge(1, 1, 2, 8.0);
+  sim.power.add_edge(2, 1, 3, 6.0);
+  sim.freight.add_node(1);
+  sim.freight.add_node(2);
+  sim.freight.add_route(10, {1, 2}, {2.0}, 20.0);
+
+  for (std::size_t i = 0; i < sim.settlements.size(); ++i) {
+    sim.executor.add(
+        static_cast<eng::SimulationExecutor::Key>(10 + i),
+        {.run = [&sim, i](const eng::SimulationTickContext &ctx) {
+           eng::SettlementConditions conditions;
+           sim.settlements[i].advance(
+               static_cast<double>(ctx.elapsed_ticks), conditions);
+         },
+         .tier = i == 2 ? eng::SimulationTier::Background
+                        : eng::SimulationTier::Normal,
+         .domain = "colony"});
+  }
+  sim.executor.add(20, {.run = [&sim](const eng::SimulationTickContext &ctx) {
+                          sim.power.advance(
+                              static_cast<double>(ctx.elapsed_ticks));
+                        },
+                        .tier = eng::SimulationTier::Active,
+                        .domain = "infrastructure"});
+  sim.executor.add(21, {.run = [&sim](const eng::SimulationTickContext &ctx) {
+                          static std::uint64_t next_shipment = 100;
+                          sim.freight.dispatch(next_shipment++, 10, "ore",
+                                               6.0);
+                          sim.delivered += static_cast<double>(
+                              sim.freight
+                                  .advance(static_cast<double>(
+                                      ctx.elapsed_ticks))
+                                  .deliveries.size());
+                        },
+                        .tier = eng::SimulationTier::Active,
+                        .domain = "logistics"});
+  sim.executor.add(30, {.run = [&sim](const eng::SimulationTickContext &) {
+                          sim.relay_pings += 1.0;
+                        },
+                        .tier = eng::SimulationTier::Dormant,
+                        .domain = "exploration"});
+  sim.initialized = true;
+}
+
+const char *tier_name(engine::SimulationTier tier) {
+  switch (tier) {
+  case engine::SimulationTier::Active: return "Active";
+  case engine::SimulationTier::Nearby: return "Nearby";
+  case engine::SimulationTier::Normal: return "Normal";
+  case engine::SimulationTier::Background: return "Background";
+  case engine::SimulationTier::Dormant: return "Dormant";
+  case engine::SimulationTier::Count: break;
+  }
+  return "?";
+}
+
+struct SimTaskRow {
+  engine::SimulationExecutor::Key key;
+  const char *name;
+  const char *domain;
+};
+constexpr std::array<SimTaskRow, 6> kSimTasks{{
+    {10, "settlement.alpha", "colony"},
+    {11, "settlement.beta", "colony"},
+    {12, "settlement.gamma", "colony"},
+    {20, "power.grid", "infrastructure"},
+    {21, "freight.ore_line", "logistics"},
+    {30, "relay.deep_space", "exploration"},
+}};
+
+void render_simulation(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &sim = shell.sim;
+  if (!sim.initialized) init_sim(sim);
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "SIMULATION");
+
+  shell.hit_sim_step = {x, y, 74 * s, 24 * s};
+  shell_button(out, shell.hit_sim_step, "STEP", !sim.running, font, s);
+  shell.hit_sim_run = {x + 82 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_sim_run, sim.running ? "PAUSE" : "RUN",
+               sim.running, font, s);
+  shell.hit_sim_wake = {x + 172 * s, y, 106 * s, 24 * s};
+  shell_button(out, shell.hit_sim_wake, "WAKE RELAY", false, font, s);
+  const auto sel_key = kSimTasks[sim.selected].key;
+  const auto sel_tier = sim.executor.tier(sel_key);
+  shell.hit_sim_tier = {x + 286 * s, y, 170 * s, 24 * s};
+  shell_button(out, shell.hit_sim_tier,
+               ("TIER: " + std::string(tier_name(sel_tier))).c_str(),
+               false, font, s);
+  y += 32 * s;
+
+  line(out, x, y, "tick", std::to_string(sim.executor.tick()), font);
+  line(out, x, y, "last step",
+       "eligible " + std::to_string(sim.last.eligible) + "  ran " +
+           std::to_string(sim.last.ran) + "  deferred " +
+           std::to_string(sim.last.deferred) + "  wakes " +
+           std::to_string(sim.last.dirty_wakeups + sim.last.event_wakeups),
+       font);
+  {
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%.1f us",
+                  static_cast<double>(sim.last.wall_ns) / 1000.0);
+    line(out, x, y, "wall time", buf, font);
+  }
+  double people = 0.0;
+  for (const auto &pop : sim.settlements) people += pop.total();
+  line(out, x, y, "population", std::to_string(static_cast<long long>(people)),
+       font);
+  double stored = 0.0;
+  for (const auto &node : sim.power.capture_state().nodes)
+    stored += node.storage;
+  line(out, x, y, "power stored", std::to_string(static_cast<int>(stored)),
+       font);
+  line(out, x, y, "ore delivered",
+       std::to_string(static_cast<int>(sim.delivered)), font);
+  line(out, x, y, "relay pings",
+       std::to_string(static_cast<int>(sim.relay_pings)), font);
+  y += 4 * s;
+
+  // Task table: left column list, domain stats on the right.
+  const float row_h = 22 * s;
+  const UiRect list_rect{x, y, body.width * 0.52f - 22 * s,
+                         kSimTasks.size() * row_h + 12 * s};
+  shell.hit_sim_list = list_rect;
+  out.overlay.push_back(FilledRectangle{list_rect, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{list_rect, panel_edge});
+  for (std::size_t i = 0; i < kSimTasks.size(); ++i) {
+    const auto &row = kSimTasks[i];
+    const float ry = list_rect.y + 6 * s + i * row_h;
+    const bool selected = i == sim.selected;
+    if (selected)
+      out.overlay.push_back(FilledRectangle{
+          {list_rect.x + 2 * s, ry, list_rect.width - 4 * s, row_h},
+          row_selected});
+    const auto tier = sim.executor.tier(row.key);
+    const auto elapsed =
+        sim.executor.scheduler().elapsed_since_run(row.key);
+    out.overlay.push_back(Text{
+        {list_rect.x + 8 * s, ry + 4 * s},
+        std::string(row.name), selected ? ink : muted, font});
+    out.overlay.push_back(Text{
+        {list_rect.x + list_rect.width - 150 * s, ry + 4 * s},
+        std::string(tier_name(tier)) + "  +" + std::to_string(elapsed),
+        selected ? ink : muted, font});
+  }
+
+  float rx = list_rect.x + list_rect.width + 16 * s;
+  float ry2 = y + 4 * s;
+  const auto tiers = sim.executor.tier_counts();
+  line(out, rx, ry2, "tiers",
+       "act " + std::to_string(tiers[0]) + "  nrm " +
+           std::to_string(tiers[2]) + "  bkg " +
+           std::to_string(tiers[3]) + "  dor " +
+           std::to_string(tiers[4]),
+       font);
+  for (const auto &domain : sim.executor.domains()) {
+    const auto *stats = sim.executor.domain_stats(domain);
+    if (!stats) continue;
+    char buf[96];
+    std::snprintf(buf, sizeof(buf), "%llu runs  %.1f us total",
+                  static_cast<unsigned long long>(stats->runs),
+                  static_cast<double>(stats->total_ns) / 1000.0);
+    line(out, rx, ry2, domain, buf, font);
+  }
+}
+
+// ---- Colony tool: live settlement designer over engine::Colony -------
+
+void init_colony(Shell::ColonyDemo &col) {
+  namespace eng = engine;
+  col.colony.define_district(
+      {.id = "district.residential",
+       .category = "residential",
+       .structure_slots = 4,
+       .build_cost = {{"res.alloys", 20}},
+       .build_days = 15,
+       .utility_demand_per_day = {{"power", 1}},
+       .upkeep_per_day = {{"res.alloys", 0.02}}});
+  col.colony.define_district(
+      {.id = "district.industrial",
+       .category = "industrial",
+       .structure_slots = 6,
+       .build_cost = {{"res.alloys", 40}},
+       .build_days = 25,
+       .utility_demand_per_day = {{"power", 2}},
+       .upkeep_per_day = {{"res.alloys", 0.05}}});
+  col.colony.define_structure(
+      {.id = "structure.hab_block",
+       .category = "civic",
+       .district = "district.residential",
+       .build_cost = {{"res.alloys", 10}},
+       .build_days = 10,
+       .utility_demand_per_day = {{"power", 1}},
+       .jobs = 10,
+       .housing = 500});
+  col.colony.define_structure(
+      {.id = "structure.hydroponics",
+       .category = "food",
+       .district = "district.residential",
+       .build_cost = {{"res.alloys", 12}},
+       .build_days = 10,
+       .utility_demand_per_day = {{"power", 2}},
+       .inputs_per_day = {{"res.water", 1}},
+       .outputs_per_day = {{"res.food", 3}},
+       .jobs = 25});
+  col.colony.define_structure(
+      {.id = "structure.mine",
+       .category = "industry",
+       .district = "district.industrial",
+       .build_cost = {{"res.alloys", 15}},
+       .build_days = 12,
+       .utility_demand_per_day = {{"power", 3}},
+       .upkeep_per_day = {{"res.alloys", 0.1}},
+       .outputs_per_day = {{"res.ore", 2}},
+       .jobs = 60});
+  col.colony.define_structure(
+      {.id = "structure.smelter",
+       .category = "industry",
+       .district = "district.industrial",
+       .build_cost = {{"res.alloys", 25}},
+       .build_days = 20,
+       .utility_demand_per_day = {{"power", 5}},
+       .inputs_per_day = {{"res.ore", 2}},
+       .outputs_per_day = {{"res.alloys", 1}},
+       .jobs = 80});
+  col.colony.define_structure(
+      {.id = "structure.solar_array",
+       .category = "power",
+       .build_cost = {{"res.alloys", 8}},
+       .build_days = 5,
+       .utility_supply_per_day = {{"power", 6}},
+       .jobs = 2});
+  col.colony.define_structure(
+      {.id = "structure.fusion_plant",
+       .category = "power",
+       .build_cost = {{"res.alloys", 50}},
+       .build_days = 30,
+       .utility_supply_per_day = {{"power", 20}},
+       .upkeep_per_day = {{"res.fuel", 0.2}},
+       .jobs = 40});
+  col.colony.set_standalone_slots(6);
+  col.stockpile.add("res.alloys", 200);
+  col.stockpile.add("res.food", 50);
+  col.stockpile.add("res.fuel", 100);
+  col.stockpile.add("res.water", 100);
+  // A starter settlement so the tool opens live.
+  col.colony.build_district(col.next_id++, "district.residential");
+  col.colony.build_district(col.next_id++, "district.industrial");
+  col.colony.build_structure(col.next_id++, "structure.solar_array");
+  col.initialized = true;
+}
+
+struct ColonyBuildRow {
+  const char *spec;
+  const char *label;
+  bool district;
+};
+constexpr std::array<ColonyBuildRow, 8> kColonyBuild{{
+    {"district.residential", "Residential district", true},
+    {"district.industrial", "Industrial district", true},
+    {"structure.hab_block", "Hab block", false},
+    {"structure.hydroponics", "Hydroponics", false},
+    {"structure.mine", "Mine", false},
+    {"structure.smelter", "Smelter", false},
+    {"structure.solar_array", "Solar array", false},
+    {"structure.fusion_plant", "Fusion plant", false},
+}};
+
+bool pay_build_cost(engine::Inventory &stockpile,
+                    const std::vector<engine::ResourceAmount> &cost) {
+  std::vector<engine::ResourceAmount> paid;
+  for (const auto &[resource, amount] : cost) {
+    const double got = stockpile.remove(resource, amount);
+    if (got < amount - 1e-9) {
+      for (const auto &[r, a] : paid) stockpile.add(r, a);
+      if (got > 0) stockpile.add(resource, got);
+      return false;
+    }
+    paid.push_back({resource, got});
+  }
+  return true;
+}
+
+std::string cost_text(const std::vector<engine::ResourceAmount> &cost) {
+  std::string out;
+  for (const auto &[resource, amount] : cost) {
+    if (!out.empty()) out += " ";
+    const auto slash = resource.find_last_of('.');
+    out += resource.substr(slash == std::string::npos ? 0 : slash + 1);
+    out += " " + std::to_string(static_cast<int>(amount));
+  }
+  return out.empty() ? std::string("free") : out;
+}
+
+void render_colony(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &col = shell.col;
+  if (!col.initialized) init_colony(col);
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "COLONY DESIGNER");
+
+  shell.hit_col_step = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_col_step, "ADV 1D", false, font, s);
+  shell.hit_col_run30 = {x + 100 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_col_run30, "ADV 30D", false, font, s);
+  shell.hit_col_workers_dn = {x + 200 * s, y, 30 * s, 24 * s};
+  shell_button(out, shell.hit_col_workers_dn, "-", false, font, s);
+  shell.hit_col_workers_up = {x + 234 * s, y, 30 * s, 24 * s};
+  shell_button(out, shell.hit_col_workers_up, "+", false, font, s);
+  shell.hit_col_maint = {x + 272 * s, y, 128 * s, 24 * s};
+  shell_button(out, shell.hit_col_maint,
+               col.maintenance > 0.5 ? "UPKEEP: FULL" : "UPKEEP: LOW",
+               col.maintenance > 0.5, font, s);
+  shell.hit_col_resupply = {x + 408 * s, y, 104 * s, 24 * s};
+  shell_button(out, shell.hit_col_resupply, "RESUPPLY", false, font, s);
+  y += 32 * s;
+
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), "day %.0f", col.day);
+  line(out, x, y, "date", buf, font);
+  line(out, x, y, "workers", std::to_string(static_cast<int>(col.workers)),
+       font);
+  line(out, x, y, "jobs",
+       std::to_string(static_cast<int>(col.last.jobs_filled)) + " / " +
+           std::to_string(static_cast<int>(col.colony.jobs_total())),
+       font);
+  line(out, x, y, "housing",
+       std::to_string(static_cast<int>(col.colony.housing_capacity())),
+       font);
+  if (!col.notice.empty()) {
+    out.overlay.push_back(
+        Text{{x, y}, col.notice, {255, 180, 90, 255}, font});
+    y += 18 * s;
+  }
+  y += 4 * s;
+
+  // Left column: build catalog.
+  const float row_h = 22 * s;
+  const UiRect build_rect{x, y, 240 * s,
+                          kColonyBuild.size() * row_h + 26 * s};
+  out.overlay.push_back(FilledRectangle{build_rect, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{build_rect, panel_edge});
+  out.overlay.push_back(Text{{build_rect.x + 8 * s, build_rect.y + 5 * s},
+                             "BUILD", muted, font});
+  shell.hit_col_build.resize(kColonyBuild.size());
+  for (std::size_t i = 0; i < kColonyBuild.size(); ++i) {
+    const float by = build_rect.y + 24 * s + i * row_h;
+    shell.hit_col_build[i] = {build_rect.x + 4 * s, by,
+                              build_rect.width - 8 * s, row_h - 2 * s};
+    const auto &row = kColonyBuild[i];
+    const auto &cost =
+        row.district ? col.colony.district_spec(row.spec)->build_cost
+                     : col.colony.structure_spec(row.spec)->build_cost;
+    std::string label =
+        std::string(row.label) + "  (" + cost_text(cost) + ")";
+    out.overlay.push_back(
+        Text{{build_rect.x + 10 * s, by + 4 * s}, label, ink, font});
+  }
+
+  // Middle: settlement rows (districts, their structures, standalones).
+  const float mx = build_rect.x + build_rect.width + 16 * s;
+  const UiRect rows_rect{mx, y, body.x + body.width - mx - 20 * s,
+                         300 * s};
+  out.overlay.push_back(FilledRectangle{rows_rect, {6, 16, 26, 255}});
+  out.overlay.push_back(StrokedRectangle{rows_rect, panel_edge});
+  col.rows.clear();
+  for (const auto *district : col.colony.districts()) {
+    col.rows.push_back({true, district->id});
+    for (const auto *structure :
+         col.colony.structures_in(district->id))
+      col.rows.push_back({false, structure->id});
+  }
+  for (const auto *structure : col.colony.structures())
+    if (structure->district_id == 0)
+      col.rows.push_back({false, structure->id});
+  if (col.selected >= col.rows.size()) col.selected = 0;
+
+  shell.hit_col_rows.resize(col.rows.size());
+  float ry = rows_rect.y + 6 * s;
+  const float row_step = 20 * s;
+  for (std::size_t i = 0; i < col.rows.size(); ++i) {
+    if (ry + row_step > rows_rect.y + rows_rect.height) break;
+    const auto [is_district, id] = col.rows[i];
+    shell.hit_col_rows[i] = {rows_rect.x + 2 * s, ry,
+                             rows_rect.width - 4 * s, row_step};
+    const bool selected = i == col.selected;
+    if (selected)
+      out.overlay.push_back(FilledRectangle{shell.hit_col_rows[i],
+                                            row_selected});
+    std::string text;
+    if (is_district) {
+      const auto *district = col.colony.district(id);
+      text = "[" + std::to_string(id) + "] " +
+             district->spec_id +
+             (district->construction_remaining > 0
+                  ? "  building " +
+                        std::to_string(
+                            static_cast<int>(
+                                district->construction_remaining)) +
+                        "d"
+                  : "") +
+             (district->enabled ? "" : "  DISABLED");
+    } else {
+      const auto *structure = col.colony.structure(id);
+      char line_buf[160];
+      std::snprintf(
+          line_buf, sizeof(line_buf),
+          "  %s[%llu] %s  cond %.0f%%  op %.0f%%%s%s",
+          structure->district_id == 0 ? "" : "    ",
+          static_cast<unsigned long long>(id), structure->spec_id.c_str(),
+          structure->condition * 100.0, structure->operating * 100.0,
+          structure->construction_remaining > 0 ? "  building" : "",
+          structure->enabled ? "" : "  DISABLED");
+      text = line_buf;
+    }
+    out.overlay.push_back(Text{{rows_rect.x + 8 * s, ry + 3 * s}, text,
+                               selected ? ink : muted, font});
+    ry += row_step;
+  }
+  if (col.rows.empty())
+    out.overlay.push_back(Text{{rows_rect.x + 8 * s, ry + 3 * s},
+                               "empty settlement — build a district",
+                               muted, font});
+
+  // Selection actions.
+  const float ay = rows_rect.y + rows_rect.height + 10 * s;
+  if (!col.rows.empty()) {
+    const auto [is_district, id] = col.rows[col.selected];
+    bool enabled = true;
+    if (is_district) {
+      const auto *district = col.colony.district(id);
+      enabled = district && district->enabled;
+    } else {
+      const auto *structure = col.colony.structure(id);
+      enabled = structure && structure->enabled;
+    }
+    shell.hit_col_enable = {mx, ay, 110 * s, 24 * s};
+    shell_button(out, shell.hit_col_enable,
+                 enabled ? "DISABLE" : "ENABLE", false, font, s);
+    shell.hit_col_demolish = {mx + 118 * s, ay, 110 * s, 24 * s};
+    shell_button(out, shell.hit_col_demolish, "DEMOLISH", false, font, s);
+  } else {
+    shell.hit_col_enable = {};
+    shell.hit_col_demolish = {};
+  }
+
+  // Right-of-build column: last step report + stockpile + utilities.
+  float sy = y + build_rect.height + 14 * s;
+  heading(out, x, sy, "LAST STEP");
+  if (col.last.elapsed_days > 0) {
+    line(out, x, sy, "elapsed",
+         std::to_string(static_cast<int>(col.last.elapsed_days)) + " d",
+         font);
+    line(out, x, sy, "completed",
+         std::to_string(col.last.districts_completed) + " district  " +
+             std::to_string(col.last.structures_completed) + " structure",
+         font);
+    auto amounts_text = [](const std::vector<engine::ResourceAmount> &v) {
+      std::string text;
+      for (const auto &[resource, amount] : v) {
+        if (!text.empty()) text += "  ";
+        const auto slash = resource.find_last_of('.');
+        text += resource.substr(slash == std::string::npos ? 0 : slash + 1);
+        char num[32];
+        std::snprintf(num, sizeof(num), " %+.1f", amount);
+        text += num;
+      }
+      return text.empty() ? std::string("none") : text;
+    };
+    line(out, x, sy, "outputs", amounts_text(col.last.outputs_produced),
+         font);
+    line(out, x, sy, "upkeep short",
+         amounts_text(col.last.upkeep_shortfall), font);
+    line(out, x, sy, "input short",
+         amounts_text(col.last.input_shortfall), font);
+    for (const auto &[utility, sd] : col.last.utilities) {
+      char ubuf[80];
+      std::snprintf(ubuf, sizeof(ubuf), "supply %.1f  demand %.1f",
+                    sd.first, sd.second);
+      line(out, x, sy, utility, ubuf, font);
+    }
+  } else {
+    line(out, x, sy, "state", "advance to run operations", font);
+  }
+
+  const auto snapshot = col.stockpile.snapshot();
+  std::vector<std::pair<std::string, double>> stock(snapshot.begin(),
+                                                   snapshot.end());
+  std::sort(stock.begin(), stock.end());
+  heading(out, x, sy, "STOCKPILE");
+  for (const auto &[resource, amount] : stock) {
+    char sbuf[64];
+    std::snprintf(sbuf, sizeof(sbuf), "%.1f", amount);
+    line(out, x, sy, resource, sbuf, font);
+  }
+}
+
+// ---- Economy tool: catalog validation + live network diagnostics -----
+
+void init_economy(Shell::EconomyDemo &eco) {
+  namespace eng = engine;
+  using Cat = eng::ResourceCategory;
+  using Store = eng::StorageClass;
+  auto def = [&eco](std::string id, Cat cat, Store store,
+                    double mass, bool stockpiles) {
+    eng::ResourceSpec spec;
+    spec.id = std::move(id);
+    spec.name_key = "RES_" + spec.id;
+    spec.category = cat;
+    spec.storage = store;
+    spec.mass_per_unit = mass;
+    eco.catalog.define(std::move(spec));
+    eng::ResourceDefinition runtime;
+    runtime.id = spec.id;
+    runtime.name_key = spec.name_key;
+    runtime.stockpiles = stockpiles;
+    eco.network.define(std::move(runtime));
+  };
+  def("res.ore", Cat::Raw, Store::Bulk, 1.0, true);
+  def("res.alloys", Cat::Refined, Store::Bulk, 0.8, true);
+  def("res.fuel", Cat::Refined, Store::Liquid, 0.6, true);
+  def("res.food", Cat::Consumable, Store::Bulk, 0.4, true);
+  def("res.water", Cat::Raw, Store::Liquid, 1.0, true);
+
+  auto recipe = [&eco](std::string id,
+                       std::vector<eng::ResourceAmount> inputs,
+                       std::vector<eng::ResourceAmount> outputs,
+                       double days) {
+    eco.catalog.add_recipe({.id = id,
+                            .name_key = "RECIPE_" + id,
+                            .inputs = std::move(inputs),
+                            .outputs = std::move(outputs),
+                            .duration_days = days});
+    eco.network.add_recipe(
+        eng::to_runtime_recipe(*eco.catalog.recipe(id)));
+  };
+  recipe("recipe.smelt", {{"res.ore", 2}}, {{"res.alloys", 1}}, 2.0);
+  recipe("recipe.refine", {{"res.ore", 3}}, {{"res.fuel", 1}}, 3.0);
+  recipe("recipe.hydroponics", {{"res.water", 1}}, {{"res.food", 2}}, 1.0);
+
+  auto &homeworld = eco.network.add_node(1);
+  homeworld.inventory.add("res.ore", 200);
+  homeworld.inventory.add("res.water", 80);
+  auto &colony = eco.network.add_node(2);
+  colony.inventory.add("res.food", 10);
+  eco.smelter_producer = eco.network.add_producer(1, "recipe.smelt");
+  eco.network.add_producer(1, "recipe.hydroponics");
+  eco.network.transfer(1, 2, "res.alloys", 40.0, 5.0);
+  eco.initialized = true;
+}
+
+void render_economy(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &eco = shell.eco;
+  if (!eco.initialized) init_economy(eco);
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "ECONOMY");
+
+  shell.hit_eco_validate = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_eco_validate, "VALIDATE", false, font, s);
+  shell.hit_eco_break = {x + 100 * s, y, 150 * s, 24 * s};
+  shell_button(out, shell.hit_eco_break,
+               eco.break_catalog ? "DANGLING: ON" : "DANGLING: OFF",
+               eco.break_catalog, font, s);
+  shell.hit_eco_analyze = {x + 258 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_eco_analyze, "ANALYZE", false, font, s);
+  shell.hit_eco_step = {x + 358 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_eco_step, "ADV 1D", false, font, s);
+  shell.hit_eco_run10 = {x + 458 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_eco_run10, "ADV 10D", false, font, s);
+  shell.hit_eco_producer = {x + 558 * s, y, 130 * s, 24 * s};
+  shell_button(out, shell.hit_eco_producer, "SMELTER ON/OFF", false, font,
+               s);
+  y += 32 * s;
+
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), "day %.0f", eco.day);
+  line(out, x, y, "date", buf, font);
+  line(out, x, y, "catalog",
+       std::to_string(eco.catalog.resource_count()) + " resources  " +
+           std::to_string(eco.catalog.recipe_count()) + " recipes",
+       font);
+  const auto &unproducible = eco.catalog.graph().unproducible_resources();
+  std::string unp;
+  for (const auto &id : unproducible) {
+    if (!unp.empty()) unp += " ";
+    unp += id;
+  }
+  line(out, x, y, "unproducible", unp.empty() ? "none" : unp, font);
+  y += 4 * s;
+
+  // Validation issues.
+  heading(out, x, y, "VALIDATION");
+  if (!eco.validated) {
+    line(out, x, y, "state", "not run — VALIDATE checks the catalog",
+         font);
+  } else if (eco.issues.empty()) {
+    line(out, x, y, "result", "no issues", font);
+  } else {
+    for (const auto &issue : eco.issues) {
+      const char *sev =
+          issue.severity == engine::ValidationSeverity::Error ? "ERR"
+                                                              : "warn";
+      out.overlay.push_back(Text{
+          {x, y},
+          sev + std::string("  ") + issue.record + "." + issue.field +
+              "  " + issue.reason,
+          issue.severity == engine::ValidationSeverity::Error
+              ? Color{255, 120, 100, 255}
+              : Color{255, 200, 90, 255},
+          font});
+      y += 16 * s;
+    }
+  }
+  y += 4 * s;
+
+  // Analysis table.
+  heading(out, x, y, "ANALYSIS");
+  if (!eco.analyzed) {
+    line(out, x, y, "state",
+         "not run — ANALYZE rolls demand + observed production into "
+         "bottleneck diagnostics",
+         font);
+  } else {
+    out.overlay.push_back(
+        Text{{x, y}, "resource      demand  supply  unmet  reserve  util  flags",
+             muted, font});
+    y += 16 * s;
+    for (const auto &d : eco.diagnostics) {
+      std::string flags;
+      if (d.bottleneck) flags += "BOTTLENECK ";
+      if (d.import_dependent) flags += "IMPORT";
+      char row[160];
+      std::snprintf(
+          row, sizeof(row), "%-13s %6.1f  %6.1f  %5.1f  %7.1f  %4.0f%%  %s",
+          d.resource.c_str(), d.demand_per_day, d.supply_per_day,
+          d.unmet_per_day,
+          std::isinf(d.reserve_days) ? 9999.0 : d.reserve_days,
+          d.utilization * 100.0, flags.c_str());
+      out.overlay.push_back(
+          Text{{x, y}, row, d.bottleneck ? Color{255, 140, 100, 255}
+                                         : ink,
+               font});
+      y += 16 * s;
+    }
+  }
+
+  // Right column: live network state.
+  const float rx = body.x + body.width * 0.52f;
+  float ry = body.y + 60 * s;
+  heading(out, rx, ry, "NETWORK");
+  for (const std::uint64_t node_id : {1ull, 2ull}) {
+    const auto *node = eco.network.node(node_id);
+    if (!node) continue;
+    std::string inv;
+    auto snap = node->inventory.snapshot();
+    std::vector<std::pair<std::string, double>> rows(snap.begin(),
+                                                   snap.end());
+    std::sort(rows.begin(), rows.end());
+    for (const auto &[res, qty] : rows) {
+      if (!inv.empty()) inv += "  ";
+      const auto slash = res.find_last_of('.');
+      inv += res.substr(slash == std::string::npos ? 0 : slash + 1);
+      char num[24];
+      std::snprintf(num, sizeof(num), " %.0f", qty);
+      inv += num;
+    }
+    line(out, rx, ry,
+         "node " + std::to_string(node_id), inv.empty() ? "empty" : inv,
+         font);
+  }
+  const auto state = eco.network.capture_state();
+  for (const auto &p : state.producers) {
+    std::string line_text =
+        p.recipe_id + (p.enabled ? "" : "  DISABLED") + "  progress " +
+        std::to_string(static_cast<int>(p.progress_days * 10) / 10) + "d";
+    line(out, rx, ry, "producer " + std::to_string(p.id), line_text, font);
+  }
+  for (const auto &t : state.transfers) {
+    char tbuf[80];
+    std::snprintf(tbuf, sizeof(tbuf), "%.0f/%.0f %s @ %.0f/d",
+                  t.shipped, t.amount, t.resource.c_str(),
+                  t.rate_per_day);
+    line(out, rx, ry, "lane " + std::to_string(t.id), tbuf, font);
+  }
+  ry += 4 * s;
+  heading(out, rx, ry, "SHORTAGES");
+  const auto shortages = eco.network.shortages();
+  if (shortages.empty()) {
+    line(out, rx, ry, "state", "none", font);
+  } else {
+    for (const auto &shortage : shortages) {
+      char sbuf[96];
+      std::snprintf(sbuf, sizeof(sbuf),
+                    "producer %llu  %s  %.1f/%.1f",
+                    static_cast<unsigned long long>(shortage.producer_id),
+                    shortage.resource.c_str(), shortage.available,
+                    shortage.required);
+      out.overlay.push_back(Text{{rx, ry}, sbuf,
+                                 {255, 140, 100, 255}, font});
+      ry += 16 * s;
+    }
+  }
+}
+
+// ---- Planet tool: habitability evaluation + staged terraforming ------
+
+const std::array<engine::HabitabilityProfile, 3> kPlanetProfiles{{
+    {.id = "terran",
+     .temperature_min_k = 273, .temperature_max_k = 310,
+     .atmosphere_min = 0.5, .atmosphere_max = 2.0,
+     .gravity_min_g = 0.5, .gravity_max_g = 1.5,
+     .water_min = 0.3, .tolerance = 0.25,
+     .forbidden_tags = {"hazard.vacuum", "hazard.high_radiation"}},
+    {.id = "desert_adapted",
+     .temperature_min_k = 300, .temperature_max_k = 345,
+     .atmosphere_min = 0.2, .atmosphere_max = 1.5,
+     .gravity_min_g = 0.3, .gravity_max_g = 2.0,
+     .water_min = 0.0, .tolerance = 0.2,
+     .forbidden_tags = {"hazard.vacuum"}},
+    {.id = "cryo_dweller",
+     .temperature_min_k = 180, .temperature_max_k = 270,
+     .atmosphere_min = 0.0, .atmosphere_max = 1.0,
+     .gravity_min_g = 0.1, .gravity_max_g = 1.0,
+     .water_min = 0.0, .tolerance = 0.25},
+}};
+
+void init_planet(Shell::PlanetDemo &planet) {
+  engine::PlanetEnvironment env;
+  env.temperature_k = 220.0;
+  env.atmosphere_atm = 0.01;
+  env.gravity_g = 0.38;
+  env.water_fraction = 0.0;
+  env.tags = {"hazard.vacuum", "tidal_lock"};
+  planet.terra.set_environment(env);
+
+  engine::TerraformProject warm;
+  warm.id = "terraform.warm";
+  warm.stages = {
+      {.id = "mirrors",
+       .duration_days = 100,
+       .temperature_delta_k = 55,
+       .water_delta = 0.05},
+      {.id = "melt",
+       .duration_days = 100,
+       .temperature_delta_k = 15,
+       .water_delta = 0.35,
+       .add_tags = {"hydrosphere.stable"}},
+  };
+  engine::TerraformProject atmosphere;
+  atmosphere.id = "terraform.atmosphere";
+  atmosphere.stages = {
+      {.id = "seeding",
+       .duration_days = 150,
+       .atmosphere_delta = 0.6},
+      {.id = "processing",
+       .duration_days = 150,
+       .atmosphere_delta = 0.4,
+       .add_tags = {"atmosphere.breathable"},
+       .remove_tags = {"hazard.vacuum"}},
+  };
+  planet.terra.define_project(std::move(warm));
+  planet.terra.define_project(std::move(atmosphere));
+  planet.initialized = true;
+}
+
+void render_planet(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &planet = shell.planet;
+  if (!planet.initialized) init_planet(planet);
+  const auto &env = planet.terra.environment();
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "PLANET");
+
+  shell.hit_plan_step = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_plan_step, "ADV 1D", false, font, s);
+  shell.hit_plan_run30 = {x + 100 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_plan_run30, "ADV 30D", false, font, s);
+  shell.hit_plan_profile = {x + 200 * s, y, 190 * s, 24 * s};
+  shell_button(out, shell.hit_plan_profile,
+               ("PROFILE: " +
+                std::string(kPlanetProfiles[planet.profile].id))
+                   .c_str(),
+               false, font, s);
+  y += 32 * s;
+
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), "day %.0f", planet.day);
+  line(out, x, y, "date", buf, font);
+  y += 4 * s;
+
+  // Environment parameters with -/+ adjusters (idle env only — while a
+  // project runs the deltas are driven by Terraforming).
+  struct ParamRow {
+    const char *label;
+    double value;
+    const char *unit;
+    double step;
+  };
+  const std::array<ParamRow, Shell::kPlanParamCount> params{{
+      {"temperature", env.temperature_k, "K", 10.0},
+      {"atmosphere", env.atmosphere_atm, "atm", 0.1},
+      {"gravity", env.gravity_g, "g", 0.1},
+      {"water", env.water_fraction, "frac", 0.05},
+  }};
+  for (std::size_t i = 0; i < params.size(); ++i) {
+    const auto &p = params[i];
+    shell.hit_plan_param[i * 2] = {x, y, 30 * s, 22 * s};
+    shell_button(out, shell.hit_plan_param[i * 2], "-", false, font, s);
+    shell.hit_plan_param[i * 2 + 1] = {x + 34 * s, y, 30 * s, 22 * s};
+    shell_button(out, shell.hit_plan_param[i * 2 + 1], "+", false, font,
+                 s);
+    char vbuf[64];
+    std::snprintf(vbuf, sizeof(vbuf), "%.2f %s", p.value, p.unit);
+    out.overlay.push_back(
+        Text{{x + 76 * s, y + 4 * s}, std::string(p.label), muted, font});
+    out.overlay.push_back(
+        Text{{x + 190 * s, y + 4 * s}, vbuf, ink, font});
+    y += 26 * s;
+  }
+  std::string tagline;
+  for (const auto &tag : env.tags) {
+    if (!tagline.empty()) tagline += " ";
+    tagline += tag;
+  }
+  line(out, x, y, "tags", tagline.empty() ? "none" : tagline, font);
+  y += 6 * s;
+
+  // Habitability for the selected profile.
+  const auto &profile = kPlanetProfiles[planet.profile];
+  const auto report = engine::evaluate_habitability(env, profile);
+  heading(out, x, y, "HABITABILITY");
+  std::snprintf(buf, sizeof(buf), "%.2f  %s", report.suitability,
+                report.habitable ? "HABITABLE" : "uninhabitable");
+  line(out, x, y, profile.id, buf, font);
+  for (const auto &reason : report.unmet) {
+    out.overlay.push_back(Text{{x, y}, "- " + reason,
+                               {255, 140, 100, 255}, font});
+    y += 16 * s;
+  }
+
+  // Terraforming.
+  const float tx = body.x + body.width * 0.5f;
+  float ty = body.y + 60 * s;
+  heading(out, tx, ty, "TERRAFORMING");
+  constexpr std::array<const char *, 2> kProjects{"terraform.warm",
+                                                  "terraform.atmosphere"};
+  shell.hit_plan_project = {tx, ty, 250 * s, 24 * s};
+  shell_button(out, shell.hit_plan_project,
+               ("PROJECT: " +
+                std::string(kProjects[shell.planet_project]))
+                   .c_str(),
+               false, font, s);
+  shell.hit_plan_start = {tx + 258 * s, ty, 92 * s, 24 * s};
+  shell_button(out, shell.hit_plan_start, "START",
+               !planet.terra.active(), font, s);
+  shell.hit_plan_cancel = {tx + 358 * s, ty, 92 * s, 24 * s};
+  shell_button(out, shell.hit_plan_cancel, "CANCEL",
+               planet.terra.active(), font, s);
+  ty += 32 * s;
+  if (planet.terra.active()) {
+    std::snprintf(buf, sizeof(buf),
+                  "%s  stage %d (%.0f%%)  project %.0f%%",
+                  planet.terra.active_project().c_str(),
+                  static_cast<int>(planet.terra.stage_index()),
+                  planet.terra.stage_progress() * 100.0,
+                  planet.terra.project_progress() * 100.0);
+    line(out, tx, ty, "active", buf, font);
+  } else {
+    line(out, tx, ty, "active", "none", font);
+  }
+  if (!planet.last.stages_completed.empty() || planet.last.project_completed) {
+    std::string done;
+    for (const auto &stage : planet.last.stages_completed) {
+      if (!done.empty()) done += " ";
+      done += stage;
+    }
+    if (planet.last.project_completed) done += "  [COMPLETE]";
+    line(out, tx, ty, "last step", done, font);
+  }
+  ty += 6 * s;
+  // Stage preview for the selected project.
+  if (const auto *project =
+          planet.terra.project(kProjects[shell.planet_project])) {
+    for (const auto &stage : project->stages) {
+      std::string deltas;
+      auto push = [&deltas](const char *name, double v) {
+        if (v == 0.0) return;
+        char dbuf[40];
+        std::snprintf(dbuf, sizeof(dbuf), "  %s %+.2f", name, v);
+        deltas += dbuf;
+      };
+      push("temp", stage.temperature_delta_k);
+      push("atm", stage.atmosphere_delta);
+      push("water", stage.water_delta);
+      push("grav", stage.gravity_delta);
+      char sbuf[160];
+      std::snprintf(sbuf, sizeof(sbuf), "%s  %.0fd%s%s%s", stage.id.c_str(),
+                    stage.duration_days, deltas.c_str(),
+                    stage.add_tags.empty() ? "" : "  +tags",
+                    stage.remove_tags.empty() ? "" : "  -tags");
+      out.overlay.push_back(Text{{tx, ty}, sbuf, muted, font});
+      ty += 16 * s;
+    }
+  }
+}
+
+// ---- AI tool: StrategicMind utility decision debugger -----------------
+
+constexpr std::array<const char *, 4> kAiActions{
+    "expand.mining", "research.push", "build.fleet", "fortify"};
+
+void init_ai(Shell::AiDemo &ai) {
+  namespace eng = engine;
+  auto reg = [&ai](const char *id, const char *domain,
+                   std::function<double()> score,
+                   std::function<void()> commit, double cooldown,
+                   double weight = 1.0) {
+    ai.mind.add_action({.id = id, .domain = domain,
+                        .score = std::move(score),
+                        .commit = std::move(commit),
+                        .cooldown_days = cooldown,
+                        .weight = weight});
+  };
+  reg("expand.mining", "economy",
+      [&ai] { return ai.minerals < 100.0 ? 0.8 : 0.3; },
+      [&ai] { ai.mines += 1.0; }, 15.0);
+  reg("research.push", "economy",
+      [&ai] { return ai.minerals >= 100.0 ? 0.7 : 0.2; },
+      [&ai] { ai.tech += 1.0; ai.minerals -= 50.0; }, 20.0);
+  reg("build.fleet", "military",
+      [&ai] { return std::min(1.0, ai.threat / 50.0 + 0.1); },
+      [&ai] { ai.fleets += 1.0; ai.minerals -= 40.0; ai.threat -= 15.0; },
+      30.0);
+  reg("fortify", "military",
+      [&ai] { return ai.threat < 20.0 ? 0.4 : 0.1; },
+      [&ai] { ai.forts += 1.0; ai.minerals -= 15.0; }, 15.0);
+  ai.initialized = true;
+}
+
+void render_ai(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &ai = shell.ai;
+  if (!ai.initialized) init_ai(ai);
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "AI DEBUGGER");
+
+  shell.hit_ai_decide = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_ai_decide, "DECIDE", !ai.running, font, s);
+  shell.hit_ai_run = {x + 100 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_ai_run, ai.running ? "PAUSE" : "RUN",
+               ai.running, font, s);
+  shell.hit_ai_threat_dn = {x + 190 * s, y, 30 * s, 24 * s};
+  shell_button(out, shell.hit_ai_threat_dn, "-", false, font, s);
+  shell.hit_ai_threat_up = {x + 224 * s, y, 30 * s, 24 * s};
+  shell_button(out, shell.hit_ai_threat_up, "+", false, font, s);
+  out.overlay.push_back(Text{{x + 262 * s, y + 4 * s}, "threat", muted,
+                             font});
+  shell.hit_ai_reset = {x + 340 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_ai_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), "day %.0f", ai.day);
+  line(out, x, y, "date", buf, font);
+  std::snprintf(buf, sizeof(buf), "%.0f (+%.1f/d)", ai.minerals,
+                ai.mines * 2.0 - ai.fleets * 0.5);
+  line(out, x, y, "minerals", buf, font);
+  std::snprintf(buf, sizeof(buf), "%.0f mines  %.0f fleets  %.0f forts",
+                ai.mines, ai.fleets, ai.forts);
+  line(out, x, y, "assets", buf, font);
+  std::snprintf(buf, sizeof(buf), "%.0f  (tech %.0f)", ai.threat, ai.tech);
+  line(out, x, y, "threat", buf, font);
+  for (const char *domain : {"economy", "military"}) {
+    const auto inc = ai.mind.incumbent(domain);
+    line(out, x, y, domain,
+         inc ? *inc + "  (day " +
+                   std::to_string(static_cast<int>(
+                       ai.mind.last_commit_day(domain))) +
+                   ")"
+             : "none committed", font);
+  }
+  y += 6 * s;
+
+  // Action table — live utility scores, click toggles enabled.
+  heading(out, x, y, "ACTIONS");
+  const float row_h = 22 * s;
+  shell.hit_ai_actions.resize(kAiActions.size());
+  for (std::size_t i = 0; i < kAiActions.size(); ++i) {
+    const auto *action = ai.mind.action(kAiActions[i]);
+    if (!action) continue;
+    shell.hit_ai_actions[i] = {x, y, body.width * 0.46f, row_h};
+    out.overlay.push_back(FilledRectangle{shell.hit_ai_actions[i],
+                                          {6, 16, 26, 255}});
+    std::snprintf(buf, sizeof(buf),
+                  "%-16s %-8s util %.2f  w%.1f  cd %.0fd%s",
+                  action->id.c_str(), action->domain.c_str(),
+                  action->score(), action->weight, action->cooldown_days,
+                  action->enabled ? "" : "  DISABLED");
+    out.overlay.push_back(
+        Text{{x + 6 * s, y + 4 * s}, buf,
+             action->enabled ? ink : muted, font});
+    y += row_h + 2 * s;
+  }
+  y += 6 * s;
+
+  // Decision journal — newest first.
+  heading(out, x, y, "JOURNAL");
+  const auto &journal = ai.mind.journal();
+  if (journal.empty()) {
+    line(out, x, y, "state", "no decisions — DECIDE or RUN", font);
+  } else {
+    std::size_t shown = 0;
+    for (auto it = journal.rbegin();
+         it != journal.rend() && shown < 12; ++it, ++shown) {
+      std::snprintf(buf, sizeof(buf), "d%.0f  %-8s %-16s u%.2f  %u cand%s",
+                    it->at_day, it->domain.c_str(), it->action_id.c_str(),
+                    it->utility, it->candidates,
+                    it->switched ? "  SWITCH" : "");
+      out.overlay.push_back(Text{{x, y}, buf, muted, font});
+      y += 15 * s;
+    }
+  }
+}
+
+void init_warfare(Shell::WarfareDemo &war) {
+  auto &m = war.model;
+  m.define_class({.id = "class.destroyer",
+                  .role = "line",
+                  .attack = 14.0,
+                  .defense = 2.0,
+                  .hull = 90.0,
+                  .speed = 8.0,
+                  .supply_per_day = 0.4,
+                  .interdiction = 0.0});
+  m.define_class({.id = "class.escort",
+                  .role = "escort",
+                  .attack = 6.0,
+                  .defense = 5.0,
+                  .hull = 45.0,
+                  .speed = 10.0,
+                  .supply_per_day = 0.2,
+                  .interdiction = 3.0});
+  m.define_class({.id = "class.transport",
+                  .role = "transport",
+                  .attack = 0.0,
+                  .defense = 0.0,
+                  .hull = 120.0,
+                  .speed = 5.0,
+                  .supply_per_day = 0.6,
+                  .interdiction = 0.0});
+  m.add_fleet(1, 1, 0.0, 0.0);
+  m.add_ships(1, "class.destroyer", 40.0, 1.0, 0.2);
+  m.add_ships(1, "class.escort", 12.0, 0.9, 0.1);
+  m.add_fleet(2, 2, 90.0, 60.0);
+  m.add_ships(2, "class.destroyer", 32.0, 0.85, 0.0);
+  m.add_ships(2, "class.transport", 8.0, 1.0, 0.0);
+  m.add_fleet(3, 1, 45.0, 30.0);
+  m.add_ships(3, "class.escort", 20.0, 1.0, 0.4);
+  m.set_order(3, {engine::FleetOrderKind::Interdict, 45.0, 30.0});
+  m.set_order(2, {engine::FleetOrderKind::Move, 0.0, 0.0});
+  war.day = 0.0;
+  war.running = false;
+  war.run_accum = 0.0;
+  war.selected = 1;
+  war.last_engagement = "none";
+  war.initialized = true;
+}
+
+const char *war_order_name(engine::FleetOrderKind kind) {
+  switch (kind) {
+    case engine::FleetOrderKind::Hold: return "HOLD";
+    case engine::FleetOrderKind::Move: return "MOVE";
+    case engine::FleetOrderKind::Interdict: return "INTERDICT";
+    case engine::FleetOrderKind::Retreat: return "RETREAT";
+  }
+  return "?";
+}
+
+void render_warfare(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &war = shell.war;
+  if (!war.initialized) init_warfare(war);
+  auto &m = war.model;
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "WARFARE THEATER");
+
+  shell.hit_war_step = {x, y, 86 * s, 24 * s};
+  shell_button(out, shell.hit_war_step, "STEP 5D", !war.running, font, s);
+  shell.hit_war_run = {x + 94 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_war_run, war.running ? "PAUSE" : "RUN",
+               war.running, font, s);
+  shell.hit_war_order = {x + 184 * s, y, 96 * s, 24 * s};
+  shell_button(out, shell.hit_war_order, "ORDER", !war.running, font, s);
+  shell.hit_war_engage = {x + 288 * s, y, 96 * s, 24 * s};
+  shell_button(out, shell.hit_war_engage, "ENGAGE", !war.running, font, s);
+  shell.hit_war_reset = {x + 392 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_war_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[160];
+  std::snprintf(buf, sizeof(buf), "day %.0f", war.day);
+  line(out, x, y, "date", buf, font);
+  line(out, x, y, "last engagement", war.last_engagement, font);
+  {
+    const auto *sel = m.fleet(war.selected);
+    std::snprintf(buf, sizeof(buf), "fleet %llu %s",
+                  static_cast<unsigned long long>(war.selected),
+                  sel ? war_order_name(sel->order.kind) : "(gone)");
+    line(out, x, y, "selected", buf, font);
+  }
+  y += 6 * s;
+
+  // Fleet table — click a row to select it for ORDER/ENGAGE.
+  heading(out, x, y, "FLEETS");
+  const float row_h = 22 * s;
+  const auto fleets = m.fleets();
+  shell.hit_war_fleets.clear();
+  for (const auto *fleet : fleets) {
+    const auto report = m.report(fleet->id);
+    UiRect row{x, y, body.width * 0.62f, row_h};
+    shell.hit_war_fleets.push_back(row);
+    out.overlay.push_back(FilledRectangle{
+        row, fleet->id == war.selected ? Color{26, 48, 76, 255}
+                                       : Color{6, 16, 26, 255}});
+    std::snprintf(buf, sizeof(buf),
+                  "fleet %-2llu owner %-2llu pos (%5.0f,%5.0f)  %-9s%s",
+                  static_cast<unsigned long long>(fleet->id),
+                  static_cast<unsigned long long>(fleet->owner),
+                  fleet->x, fleet->y, war_order_name(fleet->order.kind),
+                  fleet->engaged ? "  ENGAGED" : "");
+    out.overlay.push_back(Text{{x + 8 * s, y + 4 * s}, buf, ink, font});
+    std::snprintf(buf, sizeof(buf),
+                  "ships %.0f  atk %.0f/d  hull %.0f  spd %.1f  int %.1f  "
+                  "sup %.1f/d",
+                  report.ships, report.attack, report.hull, report.speed,
+                  report.interdiction_radius, report.supply_per_day);
+    out.overlay.push_back(
+        Text{{x + 8 * s, y + 4 * s + row_h}, buf, muted, font});
+    y += row_h * 2 + 4 * s;
+  }
+  if (fleets.empty()) {
+    out.overlay.push_back(Text{{x, y}, "no fleets in theater", muted,
+                               font});
+    y += row_h;
+  }
+  y += 8 * s;
+
+  // Cohort detail for the selected fleet.
+  heading(out, x, y, "SELECTED FLEET COHORTS");
+  const auto cohorts = m.cohorts(war.selected);
+  for (const auto *cohort : cohorts) {
+    std::snprintf(buf, sizeof(buf),
+                  "%-16s ships %6.0f  cond %.2f  exp %.2f",
+                  cohort->ship_class.c_str(), cohort->count,
+                  cohort->condition, cohort->experience);
+    out.overlay.push_back(Text{{x, y}, buf, muted, font});
+    y += 16 * s;
+  }
+  if (cohorts.empty()) {
+    out.overlay.push_back(Text{{x, y}, "no cohorts", muted, font});
+    y += 16 * s;
+  }
+
+  // Interdiction check at the hostile fleet's position.
+  if (const auto *hostile = m.fleet(2)) {
+    const bool gated =
+        m.interdicted(hostile->x, hostile->y, hostile->owner, hostile->id);
+    std::snprintf(buf, sizeof(buf), "fleet 2 position %s by hostile "
+                  "interdiction", gated ? "GATED" : "clear of");
+    y += 8 * s;
+    out.overlay.push_back(Text{{x, y}, buf, gated ? ink : muted, font});
+    y += 16 * s;
+  }
+}
+
+void mission_log(Shell::MissionDemo &mis, std::string entry) {
+  mis.log.push_back(std::move(entry));
+  if (mis.log.size() > 14) mis.log.erase(mis.log.begin());
+}
+
+void init_missions(Shell::MissionDemo &mis) {
+  mis.runtime.clear(); // drops definitions + instances; keeps the bus
+  mis.effects_sub.unsubscribe();
+  mis.log.clear();
+  // Data-driven definitions parsed from JSON — the same path a game's
+  // content packages would take.
+  constexpr const char *kSurvey = R"json({
+    "id": "survey.helion",
+    "triggers": [{"event": "SurveyComplete",
+                  "conditions": [{"field": "system_id", "equals": "7"}],
+                  "stage": "briefing"}],
+    "stages": {
+      "briefing": {"title_key": "M_HEL_B_T", "body_key": "M_HEL_B_B",
+                   "timer_days": 20, "timeout_stage": "expired",
+                   "choices": [{"id": "investigate", "next": "dig",
+                                "effects": ["spawn_excavation"]},
+                               {"id": "ignore", "next": "", "effects": []}]},
+      "dig": {"title_key": "M_HEL_D_T", "body_key": "M_HEL_D_B",
+              "choices": [{"id": "open_vault", "next": "",
+                           "effects": ["reveal_vault", "grant_artifact"]}]},
+      "expired": {"title_key": "M_HEL_E_T", "body_key": "M_HEL_E_B"}
+    }
+  })json";
+  constexpr const char *kAnomaly = R"json({
+    "id": "anomaly.whisper",
+    "triggers": [{"event": "AnomalyFound", "conditions": [],
+                  "stage": "arrival"}],
+    "stages": {
+      "arrival": {"title_key": "M_W_A_T", "body_key": "M_W_A_B",
+                  "timer_days": 30, "timeout_stage": "expired",
+                  "choices": [{"id": "investigate", "next": "dig",
+                               "effects": ["spawn_excavation"]},
+                              {"id": "dismiss", "next": "", "effects": []}]},
+      "dig": {"title_key": "M_W_D_T", "body_key": "M_W_D_B",
+              "choices": [{"id": "catalog", "next": "",
+                           "effects": ["grant_data"]}]},
+      "expired": {"title_key": "M_W_E_T", "body_key": "M_W_E_B"}
+    }
+  })json";
+  std::string error;
+  auto survey = engine::MissionDefinition::parse(kSurvey, &error);
+  if (survey) mis.runtime.add_definition(std::move(*survey), &error);
+  auto anomaly = engine::MissionDefinition::parse(kAnomaly, &error);
+  if (anomaly) mis.runtime.add_definition(std::move(*anomaly), &error);
+  if (!error.empty()) mission_log(mis, "definition error: " + error);
+  mis.effects_sub = mis.bus.subscribe<engine::MissionEffectEvent>(
+      [&mis](const engine::MissionEffectEvent &e) {
+        std::string entry = "#" + std::to_string(e.instance_id) + " " +
+                            e.mission_id + " -> " + e.stage_id;
+        for (const auto &fx : e.effects) entry += "  [" + fx + "]";
+        mission_log(mis, std::move(entry));
+      });
+  mis.day = 0.0;
+  mis.event_cursor = 0;
+  mis.selected = 0;
+  mis.running = false;
+  mis.run_accum = 0.0;
+  mis.saved_state.clear();
+  mis.initialized = true;
+}
+
+// Canned domain events FIRE cycles through: one matching each definition
+// and one that matches nothing, so filtering is visible.
+void fire_mission_event(Shell::MissionDemo &mis) {
+  static constexpr std::array<std::pair<const char *, const char *>, 3>
+      kEvents{{{"SurveyComplete", "{\"system_id\":7}"},
+               {"AnomalyFound", "{\"sector\":\"drift\"}"},
+               {"SurveyComplete", "{\"system_id\":12}"}}};
+  const auto &[name, payload] = kEvents[mis.event_cursor % kEvents.size()];
+  ++mis.event_cursor;
+  mission_log(mis, std::string("event ") + name + " " + payload);
+  mis.runtime.handle_event(name, payload);
+}
+
+void render_missions(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &mis = shell.missions;
+  if (!mis.initialized) init_missions(mis);
+  auto &rt = mis.runtime;
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "MISSION RUNTIME");
+
+  shell.hit_mis_fire = {x, y, 100 * s, 24 * s};
+  shell_button(out, shell.hit_mis_fire, "FIRE EVENT", !mis.running, font, s);
+  shell.hit_mis_step = {x + 108 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_mis_step, "STEP 10D", !mis.running, font, s);
+  shell.hit_mis_run = {x + 208 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_mis_run, mis.running ? "PAUSE" : "RUN",
+               mis.running, font, s);
+  shell.hit_mis_choose = {x + 298 * s, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_mis_choose, "CHOOSE", !mis.running, font, s);
+  shell.hit_mis_save = {x + 398 * s, y, 72 * s, 24 * s};
+  shell_button(out, shell.hit_mis_save, "SAVE", false, font, s);
+  shell.hit_mis_load = {x + 478 * s, y, 72 * s, 24 * s};
+  shell_button(out, shell.hit_mis_load, "LOAD", mis.saved_state.empty(),
+               font, s);
+  shell.hit_mis_reset = {x + 558 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_mis_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[200];
+  std::snprintf(buf, sizeof(buf), "day %.0f", mis.day);
+  line(out, x, y, "date", buf, font);
+  std::snprintf(buf, sizeof(buf), "%zu bytes",
+                mis.saved_state.size());
+  line(out, x, y, "saved snapshot",
+       mis.saved_state.empty() ? "(none)" : buf, font);
+  y += 6 * s;
+
+  heading(out, x, y, "INSTANCES");
+  const float row_h = 20 * s;
+  const auto instances = rt.instances();
+  shell.hit_mis_instances.clear();
+  for (const auto &inst : instances) {
+    UiRect row{x, y, body.width * 0.62f, row_h};
+    shell.hit_mis_instances.push_back(row);
+    out.overlay.push_back(FilledRectangle{
+        row, inst.id == mis.selected ? Color{26, 48, 76, 255}
+                                     : Color{6, 16, 26, 255}});
+    std::string choices;
+    if (const auto *def = rt.definition(inst.mission_id)) {
+      const auto stage = def->stages.find(inst.stage_id);
+      if (stage != def->stages.end())
+        for (const auto &c : stage->second.choices)
+          choices += "  <" + c.id + ">";
+    }
+    std::snprintf(buf, sizeof(buf), "#%-3llu %-16s stage %-10s %.0fd left%s",
+                  static_cast<unsigned long long>(inst.id),
+                  inst.mission_id.c_str(), inst.stage_id.c_str(),
+                  inst.days_remaining, choices.c_str());
+    out.overlay.push_back(Text{{x + 8 * s, y + 3 * s}, buf, ink, font});
+    y += row_h + 3 * s;
+  }
+  if (instances.empty()) {
+    out.overlay.push_back(Text{{x, y}, "no running instances - fire an "
+                               "event to trigger one", muted, font});
+    y += row_h;
+  }
+  y += 8 * s;
+
+  heading(out, x, y, "EFFECT LOG");
+  for (const auto &entry : mis.log) {
+    out.overlay.push_back(Text{{x, y}, entry, muted, font});
+    y += 16 * s;
+  }
+  if (mis.log.empty()) {
+    out.overlay.push_back(Text{{x, y}, "no MissionEffectEvents yet",
+                               muted, font});
+    y += 16 * s;
+  }
+}
+
+void phys_log(Shell::PhysicsDemo &phys, std::string entry) {
+  phys.log.push_back(std::move(entry));
+  if (phys.log.size() > 12) phys.log.erase(phys.log.begin());
+}
+
+void init_physics(Shell::PhysicsDemo &phys) {
+  phys.world = engine::PhysicsWorld{128.0f};
+  // A drifting mover that crosses a trigger volume, a wall AABB and a
+  // static target the raycast/sweep queries aim at.
+  phys.mover = phys.world.add_body(
+      {engine::PhysicsShapeKind::Circle, 24.0f, 0.0f, 0.0f},
+      40.0f, 200.0f, /*layer*/ 1, /*trigger*/ false);
+  phys.world.set_velocity(phys.mover, 90.0f, 6.0f);
+  phys.world.add_body({engine::PhysicsShapeKind::Aabb, 0.0f, 16.0f, 90.0f},
+                      320.0f, 60.0f, 1, false); // wall
+  phys.world.add_body(
+      {engine::PhysicsShapeKind::Circle, 70.0f, 0.0f, 0.0f},
+      430.0f, 160.0f, 2, true); // trigger zone (own layer)
+  phys.target = phys.world.add_body(
+      {engine::PhysicsShapeKind::Circle, 30.0f, 0.0f, 0.0f},
+      560.0f, 260.0f, 1, false);
+  phys.world.add_body({engine::PhysicsShapeKind::Aabb, 0.0f, 20.0f, 20.0f},
+                      180.0f, 420.0f, 4, false); // off-mask platform
+  phys.seconds = 0.0;
+  phys.selected = phys.mover;
+  phys.last_query = "none";
+  phys.log.clear();
+  phys.running = false;
+  phys.run_accum = 0.0;
+  phys.initialized = true;
+}
+
+void phys_step(Shell::PhysicsDemo &phys, double dt) {
+  const auto events = phys.world.advance(static_cast<float>(dt));
+  phys.seconds += dt;
+  for (const auto &e : events) {
+    char buf[160];
+    std::snprintf(buf, sizeof(buf), "trigger %llu %s body %llu",
+                  static_cast<unsigned long long>(e.trigger),
+                  e.entered ? "ENTER" : "EXIT",
+                  static_cast<unsigned long long>(e.other));
+    phys_log(phys, buf);
+  }
+}
+
+void render_physics(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &phys = shell.phys;
+  if (!phys.initialized) init_physics(phys);
+  auto &w = phys.world;
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "PHYSICS WORLD");
+
+  shell.hit_phys_step = {x, y, 96 * s, 24 * s};
+  shell_button(out, shell.hit_phys_step, "STEP 0.5", !phys.running, font, s);
+  shell.hit_phys_run = {x + 104 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_phys_run, phys.running ? "PAUSE" : "RUN",
+               phys.running, font, s);
+  shell.hit_phys_ray = {x + 194 * s, y, 96 * s, 24 * s};
+  shell_button(out, shell.hit_phys_ray, "RAYCAST", !phys.running, font, s);
+  shell.hit_phys_sweep = {x + 298 * s, y, 84 * s, 24 * s};
+  shell_button(out, shell.hit_phys_sweep, "SWEEP", !phys.running, font, s);
+  shell.hit_phys_reset = {x + 390 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_phys_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[200];
+  std::snprintf(buf, sizeof(buf), "t=%.1fs  bodies %zu", phys.seconds,
+                w.size());
+  line(out, x, y, "world", buf, font);
+  line(out, x, y, "last query", phys.last_query, font);
+  y += 6 * s;
+
+  heading(out, x, y, "BODIES");
+  const float row_h = 20 * s;
+  shell.hit_phys_bodies.clear();
+  std::vector<const engine::PhysicsBody *> bodies;
+  // PhysicsWorld exposes ids via queries, not an iterator — gather the
+  // live set with a broad overlap query over the demo bounds.
+  for (const auto id : w.overlap_aabb(-1000.0f, -1000.0f, 2000.0f,
+                                      2000.0f)) {
+    if (const auto *b = w.body(id)) bodies.push_back(b);
+  }
+  std::sort(bodies.begin(), bodies.end(),
+            [](const auto *a, const auto *b) { return a->id < b->id; });
+  for (const auto *b : bodies) {
+    UiRect row{x, y, body.width * 0.62f, row_h};
+    shell.hit_phys_bodies.push_back(row);
+    out.overlay.push_back(FilledRectangle{
+        row, b->id == phys.selected ? Color{26, 48, 76, 255}
+                                    : Color{6, 16, 26, 255}});
+    std::snprintf(buf, sizeof(buf),
+                  "#%-3llu %-6s pos (%5.0f,%5.0f) vel (%4.0f,%4.0f) "
+                  "layer %u%s",
+                  static_cast<unsigned long long>(b->id),
+                  b->shape.kind == engine::PhysicsShapeKind::Circle
+                      ? "circle" : "aabb",
+                  b->x, b->y, b->velocity_x, b->velocity_y, b->layer,
+                  b->trigger ? "  TRIGGER" : "");
+    out.overlay.push_back(Text{{x + 8 * s, y + 3 * s}, buf, ink, font});
+    y += row_h + 3 * s;
+  }
+  y += 8 * s;
+
+  heading(out, x, y, "TRIGGER EVENT LOG");
+  for (const auto &entry : phys.log) {
+    out.overlay.push_back(Text{{x, y}, entry, muted, font});
+    y += 16 * s;
+  }
+  if (phys.log.empty()) {
+    out.overlay.push_back(
+        Text{{x, y}, "no trigger events yet - the mover crosses a "
+              "trigger volume as time advances", muted, font});
+    y += 16 * s;
+  }
+}
+
+// Builds the deterministic demo star chart: a golden-angle spiral disk of
+// systems, each connected to its two nearest neighbors (deduplicated
+// pairs), colony markers on every fifth system and three fleet travellers
+// that hop along the lane graph while the demo runs.
+void init_galaxy(Shell::GalaxyDemo &gal) {
+  gal.map.clear();
+  constexpr int count = 26;
+  for (int i = 0; i < count; ++i) {
+    const double radius = 3.2 * std::sqrt(static_cast<double>(i + 1));
+    const double theta = i * 2.3999632297286533;
+    const double jitter = ((i * 37) % 11) * 0.13;
+    engine::GalaxySystem s;
+    s.id = static_cast<std::uint64_t>(i + 1);
+    s.name = "SYS-" + std::to_string(i + 1);
+    s.x_light_years = std::cos(theta) * (radius + jitter);
+    s.y_light_years = std::sin(theta) * (radius + jitter);
+    s.classification = i % 4 == 0 ? "G yellow dwarf" :
+                       i % 4 == 1 ? "M red dwarf"   :
+                       i % 4 == 2 ? "K orange dwarf" : "A white star";
+    if (i % 6 == 0) s.tags.push_back("habitable");
+    if (i % 9 == 4) s.tags.push_back("anomaly");
+    gal.map.add_system(std::move(s));
+  }
+  // Two nearest neighbors per system, deduplicated unordered pairs.
+  std::set<std::pair<std::uint64_t, std::uint64_t>> pairs;
+  const auto ids = gal.map.system_ids();
+  for (const auto id : ids) {
+    std::vector<std::pair<double, std::uint64_t>> nearest;
+    for (const auto other : ids) {
+      if (other == id) continue;
+      nearest.emplace_back(gal.map.distance_light_years(id, other), other);
+    }
+    std::sort(nearest.begin(), nearest.end());
+    for (int hop = 0; hop < 2 && hop < static_cast<int>(nearest.size());
+         ++hop) {
+      const auto other = nearest[hop].second;
+      pairs.emplace(std::min(id, other), std::max(id, other));
+    }
+  }
+  std::uint64_t lane_id = 1;
+  for (const auto &[a, b] : pairs)
+    gal.map.add_lane({lane_id++, a, b, gal.map.distance_light_years(a, b),
+                      true});
+  // Colony markers on every fifth system, owner cycles 1..3.
+  std::uint64_t marker_id = 100;
+  for (const auto id : ids) {
+    if (id % 5 != 0) continue;
+    const auto *s = gal.map.system(id);
+    engine::GalaxyMarker colony;
+    colony.id = marker_id++;
+    colony.kind = engine::GalaxyMarker::Kind::Colony;
+    colony.label = s->name + " colony";
+    colony.owner_id = id % 3 + 1;
+    colony.x_light_years = s->x_light_years;
+    colony.y_light_years = s->y_light_years;
+    colony.system_id = id;
+    gal.map.add_marker(colony);
+  }
+  // Three fleet travellers on distinct starts.
+  gal.travellers.clear();
+  for (int t = 0; t < 3; ++t) {
+    const auto home = ids[static_cast<std::size_t>(t * 8) % ids.size()];
+    const auto hops = gal.map.neighbors(home);
+    if (hops.empty()) continue;
+    const auto *s = gal.map.system(home);
+    engine::GalaxyMarker fleet;
+    fleet.id = marker_id++;
+    fleet.kind = engine::GalaxyMarker::Kind::Fleet;
+    fleet.label = "FTL-" + std::to_string(t + 1);
+    fleet.owner_id = static_cast<std::uint64_t>(t + 1);
+    fleet.x_light_years = s->x_light_years;
+    fleet.y_light_years = s->y_light_years;
+    fleet.system_id = home;
+    fleet.destination_system_id = hops.front();
+    gal.map.add_marker(fleet);
+    gal.travellers.push_back(
+        {fleet.id, home, hops.front(), 0.0, 0});
+  }
+  gal.day = 0.0;
+  gal.running = false;
+  gal.run_accum = 0.0;
+  gal.selected = ids.front();
+  gal.destination = ids.back();
+  gal.zoom = 1.0f;
+  gal.initialized = true;
+}
+
+// Advances travellers along their current leg at 1.5 ly/day; on arrival
+// the next enabled-lane neighbor becomes the destination (cycling), which
+// exercises neighbors()/update_marker_position over real map state.
+void gal_step(Shell::GalaxyDemo &gal, double days) {
+  gal.day += days;
+  for (auto &t : gal.travellers) {
+    const auto *a = gal.map.system(t.from), *b = gal.map.system(t.to);
+    if (!a || !b || !gal.map.marker(t.marker)) continue;
+    const double leg = gal.map.distance_light_years(t.from, t.to);
+    t.progress += 1.5 * days;
+    if (t.progress >= leg) {
+      const auto hops = gal.map.neighbors(t.to);
+      t.from = t.to;
+      t.next_hop = hops.empty() ? 0 : (t.next_hop + 1) % hops.size();
+      t.to = hops.empty() ? t.from : hops[t.next_hop];
+      t.progress = 0.0;
+      gal.map.set_marker_system(t.marker, t.from);
+      gal.map.set_marker_destination(t.marker, t.to);
+      if (const auto *s = gal.map.system(t.from))
+        gal.map.update_marker_position(t.marker, s->x_light_years,
+                                       s->y_light_years);
+    } else {
+      const double f = t.progress / leg;
+      gal.map.set_marker_system(t.marker, std::nullopt);
+      gal.map.update_marker_position(
+          t.marker, a->x_light_years + (b->x_light_years - a->x_light_years) * f,
+          a->y_light_years + (b->y_light_years - a->y_light_years) * f);
+    }
+  }
+}
+
+// Inverse of the canvas transform: screen point -> light-year position
+// under the same fit+zoom projection render_galaxy applies.
+std::optional<std::pair<double, double>>
+gal_unproject(const engine::GalaxyMap &map, const UiRect &canvas,
+              const Point &position, float zoom) {
+  double min_x = 1e30, min_y = 1e30, max_x = -1e30, max_y = -1e30;
+  for (const auto id : map.system_ids()) {
+    const auto *sys = map.system(id);
+    min_x = std::min(min_x, sys->x_light_years);
+    max_x = std::max(max_x, sys->x_light_years);
+    min_y = std::min(min_y, sys->y_light_years);
+    max_y = std::max(max_y, sys->y_light_years);
+  }
+  const double span_x = std::max(1e-6, max_x - min_x);
+  const double span_y = std::max(1e-6, max_y - min_y);
+  const double scale =
+      std::min(canvas.width / span_x, canvas.height / span_y) * 0.86 * zoom;
+  if (scale <= 0) return std::nullopt;
+  return std::pair{(min_x + max_x) / 2.0 +
+                       (position.x - canvas.x - canvas.width / 2.0) / scale,
+                   (min_y + max_y) / 2.0 +
+                       (position.y - canvas.y - canvas.height / 2.0) / scale};
+}
+
+void render_galaxy(DrawList &out, Shell &shell, UiRect body, float s) {
+  auto &gal = shell.gal;
+  if (!gal.initialized) init_galaxy(gal);
+  auto &map = gal.map;
+
+  float x = body.x + 22 * s;
+  float y = body.y + 18 * s;
+  const int font = static_cast<int>(13 * s);
+  heading(out, x, y, "GALAXY MAP");
+
+  shell.hit_gal_step = {x, y, 92 * s, 24 * s};
+  shell_button(out, shell.hit_gal_step, "STEP DAY", !gal.running, font, s);
+  shell.hit_gal_run = {x + 100 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_gal_run, gal.running ? "PAUSE" : "RUN",
+               gal.running, font, s);
+  shell.hit_gal_reset = {x + 190 * s, y, 82 * s, 24 * s};
+  shell_button(out, shell.hit_gal_reset, "RESET", false, font, s);
+  y += 32 * s;
+
+  char buf[200];
+  std::snprintf(buf, sizeof(buf), "day %.0f  systems %zu  lanes %zu  markers %zu",
+                gal.day, map.system_count(), map.lane_count(),
+                map.marker_count());
+  line(out, x, y, "chart", buf, font);
+  y += 4 * s;
+
+  // Selected-system detail column.
+  heading(out, x, y, "SELECTED SYSTEM");
+  if (const auto *sel = map.system(gal.selected)) {
+    line(out, x, y, "id", std::to_string(sel->id), font);
+    line(out, x, y, "name", sel->name, font);
+    line(out, x, y, "class", sel->classification.empty() ? "unclassified"
+                                                       : sel->classification,
+         font);
+    std::snprintf(buf, sizeof(buf), "(%.1f, %.1f) ly",
+                  sel->x_light_years, sel->y_light_years);
+    line(out, x, y, "position", buf, font);
+    std::string tags;
+    for (const auto &tag : sel->tags) {
+      if (!tags.empty()) tags += ", ";
+      tags += tag;
+    }
+    line(out, x, y, "tags", tags.empty() ? "none" : tags, font);
+    const auto hops = map.neighbors(gal.selected);
+    std::string hop_text;
+    for (const auto hop : hops) {
+      if (!hop_text.empty()) hop_text += ", ";
+      hop_text += std::to_string(hop);
+    }
+    line(out, x, y, "lane neighbors", hop_text.empty() ? "none" : hop_text,
+         font);
+    for (const auto lane_id : map.lanes_for(gal.selected)) {
+      const auto *l = map.lane(lane_id);
+      std::snprintf(buf, sizeof(buf), "lane %llu -> SYS %llu  %.1f ly%s",
+                    static_cast<unsigned long long>(lane_id),
+                    static_cast<unsigned long long>(
+                        l->other(gal.selected)),
+                    l->length_light_years,
+                    l->enabled ? "" : "  DISABLED");
+      line(out, x, y, "", buf, font);
+    }
+    y += 4 * s;
+    heading(out, x, y, "MARKERS HERE");
+    for (const auto mid : map.markers_in_system(gal.selected)) {
+      const auto *m = map.marker(mid);
+      const char *kind = m->kind == engine::GalaxyMarker::Kind::Colony
+                             ? "colony" :
+                         m->kind == engine::GalaxyMarker::Kind::Fleet ? "fleet"
+                                                                      : "other";
+      std::snprintf(buf, sizeof(buf), "%s %s  owner %llu%s", kind,
+                    m->label.c_str(),
+                    static_cast<unsigned long long>(m->owner_id),
+                    m->destination_system_id ? "  EN ROUTE" : "");
+      line(out, x, y, "", buf, font);
+    }
+  } else {
+    line(out, x, y, "selection", "click a system on the chart", font);
+  }
+  // Lane-graph route from the selected system to the right-clicked
+  // destination, via engine::GalaxyMap::find_route (weighted Dijkstra).
+  y += 6 * s;
+  heading(out, x, y, "ROUTE");
+  std::vector<std::uint64_t> route;
+  if (gal.destination && map.system(gal.destination))
+    route = map.find_route(gal.selected, gal.destination);
+  if (route.empty()) {
+    line(out, x, y, "route", "unreachable", font);
+  } else {
+    const double length =
+        map.route_length_light_years(gal.selected, gal.destination);
+    std::snprintf(buf, sizeof(buf), "%zu legs  %.1f ly", route.size() - 1,
+                  length);
+    line(out, x, y, "route", buf, font);
+    std::string path;
+    for (const auto hop : route) {
+      if (!path.empty()) path += " -> ";
+      path += std::to_string(hop);
+    }
+    line(out, x, y, "", path, font);
+  }
+
+  // Chart canvas: right side of the body, dark field, lanes as lines,
+  // systems as rings, colony markers filled, fleet markers accent.
+  const UiRect canvas{body.x + body.width * 0.46f, body.y + 18 * s,
+                      body.width * 0.52f, body.height - 60 * s};
+  shell.hit_gal_map = canvas;
+  out.overlay.push_back(FilledRectangle{canvas, Color{4, 8, 14, 255}});
+  out.overlay.push_back(StrokedRectangle{canvas, Color{40, 64, 96, 255}});
+
+  double min_x = 1e30, min_y = 1e30, max_x = -1e30, max_y = -1e30;
+  for (const auto id : map.system_ids()) {
+    const auto *sys = map.system(id);
+    min_x = std::min(min_x, sys->x_light_years);
+    max_x = std::max(max_x, sys->x_light_years);
+    min_y = std::min(min_y, sys->y_light_years);
+    max_y = std::max(max_y, sys->y_light_years);
+  }
+  const double span_x = std::max(1e-6, max_x - min_x);
+  const double span_y = std::max(1e-6, max_y - min_y);
+  const double scale = std::min(canvas.width / span_x,
+                                canvas.height / span_y) *
+                       0.86 * gal.zoom;
+  const double cx = (min_x + max_x) / 2.0, cy = (min_y + max_y) / 2.0;
+  const auto project = [&](double wx, double wy) -> Point {
+    return {static_cast<float>(canvas.x + canvas.width / 2.0 +
+                               (wx - cx) * scale),
+            static_cast<float>(canvas.y + canvas.height / 2.0 +
+                               (wy - cy) * scale)};
+  };
+  // Lanes on the computed route draw bright; everything else stays dim.
+  std::set<std::pair<std::uint64_t, std::uint64_t>> route_legs;
+  for (std::size_t i = 1; i < route.size(); ++i)
+    route_legs.emplace(std::min(route[i - 1], route[i]),
+                       std::max(route[i - 1], route[i]));
+  for (const auto lane_id : map.lane_ids()) {
+    const auto *l = map.lane(lane_id);
+    const auto *a = map.system(l->first_system_id);
+    const auto *b = map.system(l->second_system_id);
+    const bool on_route =
+        route_legs.contains({std::min(l->first_system_id,
+                                      l->second_system_id),
+                             std::max(l->first_system_id,
+                                      l->second_system_id)});
+    out.lines.push_back(
+        {project(a->x_light_years, a->y_light_years),
+         project(b->x_light_years, b->y_light_years),
+         on_route ? Color{120, 200, 240, 255}
+         : l->enabled ? Color{36, 58, 86, 255}
+                      : Color{70, 30, 30, 255}});
+  }
+  for (const auto id : map.system_ids()) {
+    const auto *sys = map.system(id);
+    bool habitable = false, anomaly = false;
+    for (const auto &tag : sys->tags) {
+      habitable = habitable || tag == "habitable";
+      anomaly = anomaly || tag == "anomaly";
+    }
+    const Color color = id == gal.selected   ? Color{140, 200, 255, 255}
+                        : id == gal.destination ? Color{250, 180, 90, 255}
+                        : anomaly            ? Color{220, 120, 120, 255}
+                        : habitable          ? Color{110, 190, 140, 255}
+                                             : Color{190, 200, 214, 255};
+    out.circles.push_back({project(sys->x_light_years, sys->y_light_years),
+                           id == gal.selected ? 7.f * s : 4.5f * s, color});
+  }
+  for (const auto mid : map.marker_ids()) {
+    const auto *m = map.marker(mid);
+    const auto at = project(m->x_light_years, m->y_light_years);
+    out.circles.push_back(
+        {at, 2.6f * s,
+         m->kind == engine::GalaxyMarker::Kind::Colony
+             ? Color{240, 210, 110, 255}
+             : Color{130, 230, 230, 255}});
+    if (m->destination_system_id) {
+      if (const auto *d = map.system(*m->destination_system_id))
+        out.lines.push_back(
+            {at, project(d->x_light_years, d->y_light_years),
+             Color{90, 140, 160, 160}});
+    }
+  }
+  if (const auto *sel = map.system(gal.selected))
+    out.text.push_back(
+        {project(sel->x_light_years, sel->y_light_years), sel->name,
+         Color{180, 220, 255, 255}, font});
+  out.overlay.push_back(
+      Text{{canvas.x + 8 * s, canvas.y + canvas.height - 20 * s},
+           "L-click: select | R-click: route target | wheel: zoom", muted,
+           font});
 }
 
 // Summarizes project content freshness: source file count and whether the
@@ -2838,7 +5165,9 @@ void render_projects(DrawList &out, Shell &shell, UiRect body, float s) {
                         body.y + body.height - y - 16 * s};
   out.overlay.push_back(FilledRectangle{shell.project_rows, {6, 16, 26, 255}});
   out.overlay.push_back(StrokedRectangle{shell.project_rows, panel_edge});
-  shell.project_list.viewport_height = shell.project_rows.height;
+  shell.project_list.configure(shell.projects.size(),
+                               shell.project_list.row_height,
+                               shell.project_rows.height);
   const auto range = shell.project_list.visible_range();
   float ry = shell.project_rows.y - shell.project_list.scroll_offset +
              range.first * shell.project_list.row_height;
@@ -2975,6 +5304,7 @@ int main(int argc, char **argv) {
     }
 
     Shell shell;
+    shell.jobs = &jobs;
     shell.projects_root = find_path("projects");
     std::filesystem::create_directories(shell.projects_root);
     refresh_projects(shell);
@@ -3048,6 +5378,12 @@ int main(int argc, char **argv) {
             shell.tool = kTools[t];
             break;
           }
+    // --frames N renders N frames then exits 0 — CI smoke coverage that
+    // every tool initializes and renders without crashing.
+    int frame_limit = 0;
+    for (int i = 1; i + 1 < argc; ++i)
+      if (arg_str(i) == "--frames")
+        frame_limit = std::max(0, std::atoi(arg_str(i + 1).c_str()));
     for (const char *probe :
          {"GENERAL_TITLE", "STARTUP_TITLE", "MENU_RESUME", "ECONOMY_TITLE",
           "RESEARCH_TITLE", "FLEET_TITLE", "SYSTEM_BACK",
@@ -3072,7 +5408,9 @@ int main(int argc, char **argv) {
     double fps{};
     std::string last_input = "none";
 
+    int frames_rendered = 0;
     for (;;) {
+      if (frame_limit > 0 && frames_rendered >= frame_limit) break;
       const auto snapshot = window.poll();
       if (snapshot.quit_requested) break;
       shell.pointer_x = snapshot.pointer.x;
@@ -3137,22 +5475,38 @@ int main(int argc, char **argv) {
             shell.scene3_modified = true;
           } else if (shell.scene3_dragging &&
                      shell.scene3_preview.contains(event.position)) {
-            // Drag along the entity's current-Y plane: unproject the
-            // cursor ray onto y = e.y and write back x,z.
             auto &d = shell.scene3_doc;
             if (auto *e = selected_scene3_entity(shell)) {
-              const Vec3 dir =
-                  scene3_ray(d, shell.scene3_preview, event.position);
-              if (std::abs(dir.y) > 1e-5f) {
-                const float t = (e->y - d.cam_y) / dir.y;
-                if (t > 0.f) {
-                  e->x = d.cam_x + dir.x * t;
-                  e->z = d.cam_z + dir.z * t;
-                  shell.scene3_modified = true;
+              if (shell.scene3_drag_mode == 1) {
+                // Rotate: horizontal drag yaws, vertical pitches (roll
+                // stays field-authored — two axes fit a 2D drag).
+                e->yaw_deg = std::fmod(e->yaw_deg + event.delta.x * .5f,
+                                       360.f);
+                e->pitch_deg =
+                    std::fmod(e->pitch_deg - event.delta.y * .5f, 360.f);
+                shell.scene3_modified = true;
+              } else if (shell.scene3_drag_mode == 2) {
+                // Scale: horizontal drag multiplies the uniform scale.
+                e->scale = std::clamp(
+                    e->scale * (1.f + event.delta.x * .005f), .01f,
+                    1000.f);
+                shell.scene3_modified = true;
+              } else {
+                // Move: unproject the cursor ray onto the entity's
+                // current-Y plane and write back x,z.
+                const Vec3 dir =
+                    scene3_ray(d, shell.scene3_preview, event.position);
+                if (std::abs(dir.y) > 1e-5f) {
+                  const float t = (e->y - d.cam_y) / dir.y;
+                  if (t > 0.f) {
+                    e->x = d.cam_x + dir.x * t;
+                    e->z = d.cam_z + dir.z * t;
+                    shell.scene3_modified = true;
+                  }
                 }
               }
             }
-          } else if (shell.scene_painting &&
+          } else if (shell.scene_painting && !shell.scene_paint_fill &&
               scene_tile(shell) != nullptr &&
               shell.scene_preview.contains(event.position)) {
             const auto &pv = shell.scene_preview;
@@ -3259,10 +5613,13 @@ int main(int argc, char **argv) {
                     "paint brush " + std::to_string(shell.scene_paint_cell);
                 break;
               }
-              // One undo step per stroke.
+              // One undo step per stroke — a fill is a single stroke.
               shell.scene_history.commit(shell.scene_doc);
               shell.scene_painting = true;
-              paint_tile_at(shell, wx, wy);
+              if (shell.scene_paint_fill)
+                fill_tile_at(shell, wx, wy);
+              else
+                paint_tile_at(shell, wx, wy);
               break;
             }
             const auto order = scene_draw_order(shell.scene_doc);
@@ -3520,10 +5877,14 @@ int main(int argc, char **argv) {
               edit_field(35);
             else if (shell.hit_scene_tileorigin.contains(event.position))
               edit_field(40);
+            else if (shell.hit_scene_tilename.contains(event.position))
+              edit_field(41);
             else if (shell.hit_scene_tilecells.contains(event.position))
               edit_field(36);
             else if (shell.hit_scene_paintcell.contains(event.position))
               edit_field(37);
+            else if (shell.hit_scene_brushsz.contains(event.position))
+              edit_field(42);
             else if (shell.hit_scene_music.contains(event.position))
               edit_field(38);
             else if (shell.hit_scene_spin.contains(event.position))
@@ -3639,6 +6000,10 @@ int main(int argc, char **argv) {
               }
             } else if (shell.hit_scene_paint.contains(event.position)) {
               shell.scene_paint = !shell.scene_paint;
+              if (!shell.scene_paint) shell.scene_paint_fill = false;
+            } else if (shell.hit_scene_fill.contains(event.position) &&
+                       shell.scene_paint) {
+              shell.scene_paint_fill = !shell.scene_paint_fill;
             } else if (shell.scene_preview.contains(event.position)) {
               // Press already selected/placed; release ends the drag.
               shell.scene_dragging = false;
@@ -3695,6 +6060,12 @@ int main(int argc, char **argv) {
                 doc = std::move(*d);
                 shell.scene3_modified = true;
               }
+            } else if (shell.hit3_mode_move.contains(event.position)) {
+              shell.scene3_drag_mode = 0;
+            } else if (shell.hit3_mode_rot.contains(event.position)) {
+              shell.scene3_drag_mode = 1;
+            } else if (shell.hit3_mode_scale.contains(event.position)) {
+              shell.scene3_drag_mode = 2;
             } else if (shell.hit3_name.contains(event.position) && se)
               edit3(1, se->name);
             else if (shell.hit3_pos.contains(event.position) && se)
@@ -3733,6 +6104,8 @@ int main(int argc, char **argv) {
               edit3(14, se->data);
             else if (shell.hit3_parent.contains(event.position) && se)
               edit3(15, se->parent);
+            else if (shell.hit3_vfx.contains(event.position) && se)
+              edit3(16, se->vfx);
             else if (shell.hit3_cam.contains(event.position))
               edit3(20, std::to_string((int)doc.cam_x) + "," +
                             std::to_string((int)doc.cam_y) + "," +
@@ -3760,6 +6133,36 @@ int main(int argc, char **argv) {
                             std::to_string((int)doc.bg_b));
             else if (shell.hit3_music.contains(event.position))
               edit3(29, doc.music);
+            else if (shell.hit3_filla_dir.contains(event.position))
+              edit3(30,
+                    doc.lights.empty()
+                        ? ""
+                        : std::to_string(doc.lights[0].dir_x) + "," +
+                              std::to_string(doc.lights[0].dir_y) + "," +
+                              std::to_string(doc.lights[0].dir_z));
+            else if (shell.hit3_filla_tint.contains(event.position))
+              edit3(31,
+                    doc.lights.empty()
+                        ? ""
+                        : std::to_string(doc.lights[0].r) + "," +
+                              std::to_string(doc.lights[0].g) + "," +
+                              std::to_string(doc.lights[0].b) + "," +
+                              std::to_string(doc.lights[0].intensity));
+            else if (shell.hit3_fillb_dir.contains(event.position))
+              edit3(32,
+                    doc.lights.size() < 2
+                        ? ""
+                        : std::to_string(doc.lights[1].dir_x) + "," +
+                              std::to_string(doc.lights[1].dir_y) + "," +
+                              std::to_string(doc.lights[1].dir_z));
+            else if (shell.hit3_fillb_tint.contains(event.position))
+              edit3(33,
+                    doc.lights.size() < 2
+                        ? ""
+                        : std::to_string(doc.lights[1].r) + "," +
+                              std::to_string(doc.lights[1].g) + "," +
+                              std::to_string(doc.lights[1].b) + "," +
+                              std::to_string(doc.lights[1].intensity));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -
@@ -3931,10 +6334,37 @@ int main(int argc, char **argv) {
         render_assets(draw, shell, body, s);
         break;
       case Tool::Profiler:
-        render_profiler(draw, body, s, profiler);
+        render_profiler(draw, shell, body, s, profiler);
         break;
       case Tool::Localization:
         render_localization(draw, shell, body, s, locale);
+        break;
+      case Tool::Simulation:
+        render_simulation(draw, shell, body, s);
+        break;
+      case Tool::Colony:
+        render_colony(draw, shell, body, s);
+        break;
+      case Tool::Economy:
+        render_economy(draw, shell, body, s);
+        break;
+      case Tool::Planet:
+        render_planet(draw, shell, body, s);
+        break;
+      case Tool::Ai:
+        render_ai(draw, shell, body, s);
+        break;
+      case Tool::Warfare:
+        render_warfare(draw, shell, body, s);
+        break;
+      case Tool::Missions:
+        render_missions(draw, shell, body, s);
+        break;
+      case Tool::Physics:
+        render_physics(draw, shell, body, s);
+        break;
+      case Tool::Galaxy:
+        render_galaxy(draw, shell, body, s);
         break;
       }
 
@@ -3980,10 +6410,585 @@ int main(int argc, char **argv) {
             shell.key_list.scroll_to(shell.key_list.scroll_offset -
                                      event.wheel_y * 44.f);
         }
+        if (shell.tool == Tool::Profiler &&
+            event.type == InputEventType::LeftReleased) {
+          const auto capture_slot = [&](int slot) {
+            auto parsed =
+                engine::ProfileCapture::parse(profiler.export_json());
+            if (!parsed) {
+              shell.prof_status = "capture failed";
+              return;
+            }
+            (slot == 0 ? shell.prof_capture_a : shell.prof_capture_b) =
+                std::move(*parsed);
+            shell.prof_status = std::string("captured ") +
+                                (slot == 0 ? "A" : "B");
+          };
+          const auto save_slot = [&](int slot) {
+            const auto &capture = slot == 0 ? shell.prof_capture_a
+                                            : shell.prof_capture_b;
+            if (!capture) {
+              shell.prof_status = "nothing captured";
+              return;
+            }
+            const auto path = profiler_capture_path(slot);
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+            std::ofstream out(path, std::ios::binary | std::ios::trunc);
+            out << capture->to_json();
+            shell.prof_status = out ? "saved " + path.filename().string()
+                                    : "save failed";
+          };
+          const auto load_slot = [&](int slot) {
+            const auto path = profiler_capture_path(slot);
+            std::ifstream in(path, std::ios::binary);
+            if (!in) {
+              shell.prof_status = "no saved capture";
+              return;
+            }
+            const std::string text{std::istreambuf_iterator<char>(in),
+                                   std::istreambuf_iterator<char>()};
+            auto parsed = engine::ProfileCapture::parse(text);
+            if (!parsed) {
+              shell.prof_status = "capture file corrupt";
+              return;
+            }
+            (slot == 0 ? shell.prof_capture_a : shell.prof_capture_b) =
+                std::move(*parsed);
+            shell.prof_status = std::string("loaded ") +
+                                (slot == 0 ? "A" : "B");
+          };
+          if (shell.hit_prof_cap_a.contains(event.position))
+            capture_slot(0);
+          else if (shell.hit_prof_cap_b.contains(event.position))
+            capture_slot(1);
+          else if (shell.hit_prof_save_a.contains(event.position))
+            save_slot(0);
+          else if (shell.hit_prof_save_b.contains(event.position))
+            save_slot(1);
+          else if (shell.hit_prof_load_a.contains(event.position))
+            load_slot(0);
+          else if (shell.hit_prof_load_b.contains(event.position))
+            load_slot(1);
+        }
+        if (shell.tool == Tool::Simulation &&
+            event.type == InputEventType::LeftReleased) {
+          if (shell.hit_sim_step.contains(event.position)) {
+            shell.sim.last = shell.sim.executor.advance();
+          } else if (shell.hit_sim_run.contains(event.position)) {
+            shell.sim.running = !shell.sim.running;
+            shell.sim.run_accum = 0.0;
+          } else if (shell.hit_sim_wake.contains(event.position)) {
+            shell.sim.executor.wake(30);
+          } else if (shell.hit_sim_tier.contains(event.position)) {
+            const auto key = kSimTasks[shell.sim.selected].key;
+            const auto tier = shell.sim.executor.tier(key);
+            using eng_tier = engine::SimulationTier;
+            const eng_tier next =
+                tier == eng_tier::Normal      ? eng_tier::Background
+                : tier == eng_tier::Background ? eng_tier::Dormant
+                : tier == eng_tier::Dormant    ? eng_tier::Active
+                                               : eng_tier::Normal;
+            shell.sim.executor.set_tier(key, next);
+          } else if (shell.hit_sim_list.contains(event.position)) {
+            const float local = event.position.y - shell.hit_sim_list.y -
+                                6 * s;
+            const auto row =
+                static_cast<std::size_t>(std::max(0.f, local / (22 * s)));
+            if (row < kSimTasks.size()) shell.sim.selected = row;
+          }
+        }
+        if (shell.tool == Tool::Colony &&
+            event.type == InputEventType::LeftReleased) {
+          auto &col = shell.col;
+          auto advance_days = [&col](double days) {
+            engine::ColonyInputs inputs;
+            inputs.workers_available = col.workers;
+            inputs.stockpile = &col.stockpile;
+            inputs.maintenance = col.maintenance;
+            col.last = col.colony.advance(days, inputs);
+            col.day += days;
+            col.notice.clear();
+          };
+          if (shell.hit_col_step.contains(event.position)) {
+            advance_days(1.0);
+          } else if (shell.hit_col_run30.contains(event.position)) {
+            advance_days(30.0);
+          } else if (shell.hit_col_workers_dn.contains(event.position)) {
+            col.workers = std::max(0.0, col.workers - 100.0);
+          } else if (shell.hit_col_workers_up.contains(event.position)) {
+            col.workers += 100.0;
+          } else if (shell.hit_col_maint.contains(event.position)) {
+            col.maintenance = col.maintenance > 0.5 ? 0.2 : 1.0;
+          } else if (shell.hit_col_resupply.contains(event.position)) {
+            col.stockpile.add("res.alloys", 200);
+            col.stockpile.add("res.food", 50);
+            col.stockpile.add("res.fuel", 100);
+            col.stockpile.add("res.water", 100);
+          } else if (shell.hit_col_enable.contains(event.position) &&
+                     !col.rows.empty()) {
+            const auto [is_district, id] = col.rows[col.selected];
+            if (is_district) {
+              const auto *district = col.colony.district(id);
+              if (district)
+                col.colony.set_district_enabled(id, !district->enabled);
+            } else {
+              const auto *structure = col.colony.structure(id);
+              if (structure)
+                col.colony.set_enabled(id, !structure->enabled);
+            }
+          } else if (shell.hit_col_demolish.contains(event.position) &&
+                     !col.rows.empty()) {
+            const auto [is_district, id] = col.rows[col.selected];
+            const bool ok =
+                is_district ? col.colony.demolish_district(id)
+                            : col.colony.demolish_structure(id);
+            col.notice =
+                ok ? "" : "demolish failed — district still hosts structures";
+          } else {
+            for (std::size_t i = 0; i < shell.hit_col_build.size(); ++i) {
+              if (!shell.hit_col_build[i].contains(event.position))
+                continue;
+              const auto &row = kColonyBuild[i];
+              const auto &cost =
+                  row.district
+                      ? col.colony.district_spec(row.spec)->build_cost
+                      : col.colony.structure_spec(row.spec)->build_cost;
+              if (!pay_build_cost(col.stockpile, cost)) {
+                col.notice = std::string("insufficient stockpile for ") +
+                             row.label + " (" + cost_text(cost) + ")";
+                break;
+              }
+              const std::uint64_t id = col.next_id;
+              bool ok = false;
+              if (row.district) {
+                ok = col.colony.build_district(id, row.spec);
+              } else {
+                const auto *spec = col.colony.structure_spec(row.spec);
+                if (spec->district.empty()) {
+                  ok = col.colony.build_structure(id, row.spec);
+                } else {
+                  // Prefer the selected district if compatible and open,
+                  // else first matching district with a free slot.
+                  std::uint64_t target = 0;
+                  auto compatible = [&col, &spec](std::uint64_t did) {
+                    const auto *district = col.colony.district(did);
+                    return district && district->spec_id == spec->district &&
+                           district->construction_remaining <= 0.0 &&
+                           district->enabled &&
+                           col.colony.structures_in(did).size() <
+                               col.colony.district_spec(spec->district)
+                                   ->structure_slots;
+                  };
+                  if (!col.rows.empty() &&
+                      col.rows[col.selected].first &&
+                      compatible(col.rows[col.selected].second))
+                    target = col.rows[col.selected].second;
+                  if (target == 0)
+                    for (const auto *district : col.colony.districts())
+                      if (compatible(district->id)) {
+                        target = district->id;
+                        break;
+                      }
+                  if (target != 0)
+                    ok = col.colony.build_structure(id, row.spec, target);
+                  else
+                    col.notice = std::string("no open ") + spec->district +
+                                 " slot for " + row.label;
+                }
+              }
+              if (ok) {
+                ++col.next_id;
+                col.notice.clear();
+              } else if (col.notice.empty()) {
+                col.notice = std::string("cannot build ") + row.label;
+              }
+              if (!ok) // refund — nothing was constructed
+                for (const auto &[resource, amount] : cost)
+                  col.stockpile.add(resource, amount);
+              break;
+            }
+            for (std::size_t i = 0; i < shell.hit_col_rows.size(); ++i) {
+              if (shell.hit_col_rows[i].contains(event.position)) {
+                col.selected = i;
+                break;
+              }
+            }
+          }
+        }
+        if (shell.tool == Tool::Economy &&
+            event.type == InputEventType::LeftReleased) {
+          auto &eco = shell.eco;
+          if (shell.hit_eco_validate.contains(event.position)) {
+            engine::EconomyCatalog check = eco.catalog;
+            if (eco.break_catalog)
+              // Injects a recipe consuming a resource nothing defines —
+              // exercises the validation diagnostics live.
+              check.add_recipe(
+                  {.id = "recipe.broken",
+                   .name_key = "RECIPE_BROKEN",
+                   .inputs = {{"res.nonexistent", 1}},
+                   .outputs = {{"res.alloys", 1}},
+                   .duration_days = 1.0});
+            eco.issues = check.validate();
+            eco.validated = true;
+          } else if (shell.hit_eco_break.contains(event.position)) {
+            eco.break_catalog = !eco.break_catalog;
+            eco.validated = false;
+          } else if (shell.hit_eco_analyze.contains(event.position)) {
+            // Demand + observed rollups derived from the live network:
+            // enabled producers' recipe throughput per day.
+            std::unordered_map<std::string, engine::ResourceObservation>
+                observed;
+            for (const auto &p : eco.network.capture_state().producers) {
+              if (!p.enabled) continue;
+              const auto *spec = eco.catalog.recipe(p.recipe_id);
+              if (!spec || spec->duration_days <= 0.0) continue;
+              const double runs_per_day = 1.0 / spec->duration_days;
+              for (const auto &a : spec->inputs)
+                observed[a.resource].consumed_per_day +=
+                    a.amount * runs_per_day;
+              for (const auto &a : spec->outputs)
+                observed[a.resource].produced_per_day +=
+                    a.amount * runs_per_day;
+              for (const auto &a : spec->outputs)
+                observed[a.resource].capacity_per_day +=
+                    a.amount * runs_per_day;
+            }
+            for (const std::uint64_t node_id : {1ull, 2ull}) {
+              const auto *node = eco.network.node(node_id);
+              if (!node) continue;
+              for (const auto &[res, qty] : node->inventory.snapshot())
+                observed[res].stock += qty;
+            }
+            std::vector<engine::ResourceAmount> demand;
+            for (const auto &[res, obs] : observed)
+              if (obs.consumed_per_day > 0.0)
+                demand.push_back({res, obs.consumed_per_day});
+            eco.diagnostics =
+                engine::analyze_economy(eco.catalog, demand, observed);
+            eco.analyzed = true;
+          } else if (shell.hit_eco_step.contains(event.position)) {
+            eco.network.advance(1.0);
+            eco.day += 1.0;
+          } else if (shell.hit_eco_run10.contains(event.position)) {
+            eco.network.advance(10.0);
+            eco.day += 10.0;
+          } else if (shell.hit_eco_producer.contains(event.position)) {
+            const auto state = eco.network.capture_state();
+            const auto p =
+                std::find_if(state.producers.begin(), state.producers.end(),
+                             [&](const auto &prod) {
+                               return prod.id == eco.smelter_producer;
+                             });
+            if (p != state.producers.end())
+              eco.network.set_producer_enabled(eco.smelter_producer,
+                                               !p->enabled);
+          }
+        }
+        if (shell.tool == Tool::Planet &&
+            event.type == InputEventType::LeftReleased) {
+          auto &planet = shell.planet;
+          auto advance_days = [&planet](double days) {
+            planet.last = planet.terra.advance(days);
+            planet.day += days;
+          };
+          if (shell.hit_plan_step.contains(event.position)) {
+            advance_days(1.0);
+          } else if (shell.hit_plan_run30.contains(event.position)) {
+            advance_days(30.0);
+          } else if (shell.hit_plan_profile.contains(event.position)) {
+            planet.profile =
+                (planet.profile + 1) %
+                static_cast<int>(kPlanetProfiles.size());
+          } else if (shell.hit_plan_project.contains(event.position)) {
+            shell.planet_project = (shell.planet_project + 1) % 2;
+          } else if (shell.hit_plan_start.contains(event.position)) {
+            constexpr std::array<const char *, 2> kProjects{
+                "terraform.warm", "terraform.atmosphere"};
+            planet.terra.start(kProjects[shell.planet_project]);
+          } else if (shell.hit_plan_cancel.contains(event.position)) {
+            planet.terra.cancel();
+          } else {
+            for (std::size_t i = 0; i < Shell::kPlanParamCount; ++i) {
+              int delta = 0;
+              if (shell.hit_plan_param[i * 2].contains(event.position))
+                delta = -1;
+              else if (shell.hit_plan_param[i * 2 + 1].contains(
+                           event.position))
+                delta = 1;
+              if (delta == 0) continue;
+              auto &env = planet.terra.environment();
+              switch (i) {
+              case Shell::kPlanTemp:
+                env.temperature_k =
+                    std::max(0.0, env.temperature_k + delta * 10.0);
+                break;
+              case Shell::kPlanAtm:
+                env.atmosphere_atm =
+                    std::max(0.0, env.atmosphere_atm + delta * 0.1);
+                break;
+              case Shell::kPlanGrav:
+                env.gravity_g =
+                    std::max(0.0, env.gravity_g + delta * 0.1);
+                break;
+              case Shell::kPlanWater:
+                env.water_fraction =
+                    std::clamp(env.water_fraction + delta * 0.05, 0.0,
+                               1.0);
+                break;
+              default: break;
+              }
+            }
+          }
+        }
+        if (shell.tool == Tool::Ai &&
+            event.type == InputEventType::LeftReleased) {
+          auto &ai = shell.ai;
+          auto tick_day = [&ai] {
+            ai.minerals = std::max(0.0, ai.minerals + ai.mines * 2.0 -
+                                            ai.fleets * 0.5);
+            ai.threat += 1.0;
+            ai.day += 1.0;
+            ai.mind.decide("economy", ai.day, 0.0, 1.1);
+            ai.mind.decide("military", ai.day, 0.0, 1.1);
+          };
+          if (shell.hit_ai_decide.contains(event.position)) {
+            for (int i = 0; i < 5; ++i) tick_day();
+          } else if (shell.hit_ai_run.contains(event.position)) {
+            ai.running = !ai.running;
+            ai.run_accum = 0.0;
+          } else if (shell.hit_ai_threat_dn.contains(event.position)) {
+            ai.threat = std::max(0.0, ai.threat - 10.0);
+          } else if (shell.hit_ai_threat_up.contains(event.position)) {
+            ai.threat += 10.0;
+          } else if (shell.hit_ai_reset.contains(event.position)) {
+            ai = Shell::AiDemo{};
+            init_ai(ai);
+          } else {
+            for (std::size_t i = 0; i < shell.hit_ai_actions.size(); ++i) {
+              if (shell.hit_ai_actions[i].contains(event.position)) {
+                const auto *action = ai.mind.action(kAiActions[i]);
+                if (action)
+                  ai.mind.set_enabled(action->id, !action->enabled);
+                break;
+              }
+            }
+          }
+        }
+        if (shell.tool == Tool::Warfare &&
+            event.type == InputEventType::LeftReleased) {
+          auto &war = shell.war;
+          auto &m = war.model;
+          if (shell.hit_war_step.contains(event.position)) {
+            m.advance(5.0);
+            war.day += 5.0;
+          } else if (shell.hit_war_run.contains(event.position)) {
+            war.running = !war.running;
+            war.run_accum = 0.0;
+          } else if (shell.hit_war_order.contains(event.position)) {
+            if (const auto *fleet = m.fleet(war.selected)) {
+              const auto next = static_cast<engine::FleetOrderKind>(
+                  (static_cast<int>(fleet->order.kind) + 1) % 4);
+              engine::FleetOrder order{next, 0.0, 0.0};
+              if (next == engine::FleetOrderKind::Move) {
+                // Steer at the other side's fleet.
+                const std::uint64_t target =
+                    war.selected == 1 ? 2 : 1;
+                if (const auto *foe = m.fleet(target)) {
+                  order.target_x = foe->x;
+                  order.target_y = foe->y;
+                }
+              } else if (next == engine::FleetOrderKind::Interdict) {
+                order.target_x = fleet->x;
+                order.target_y = fleet->y;
+              }
+              m.set_order(war.selected, order);
+            }
+          } else if (shell.hit_war_engage.contains(event.position)) {
+            const auto result = m.resolve(1, 2, 5.0);
+            char buf[160];
+            std::snprintf(buf, sizeof(buf),
+                          "%.0fd: -%.1f vs -%.1f ships%s%s",
+                          result.elapsed_days, result.a_ships_lost,
+                          result.b_ships_lost,
+                          result.a_destroyed ? " [A destroyed]" : "",
+                          result.b_destroyed ? " [B destroyed]" : "");
+            war.last_engagement = buf;
+          } else if (shell.hit_war_reset.contains(event.position)) {
+            war = Shell::WarfareDemo{};
+            init_warfare(war);
+          } else {
+            const auto fleets = m.fleets();
+            for (std::size_t i = 0; i < shell.hit_war_fleets.size() &&
+                                   i < fleets.size();
+                 ++i) {
+              if (shell.hit_war_fleets[i].contains(event.position)) {
+                war.selected = fleets[i]->id;
+                break;
+              }
+            }
+          }
+        }
+        if (shell.tool == Tool::Missions &&
+            event.type == InputEventType::LeftReleased) {
+          auto &mis = shell.missions;
+          if (shell.hit_mis_fire.contains(event.position)) {
+            fire_mission_event(mis);
+          } else if (shell.hit_mis_step.contains(event.position)) {
+            mis.runtime.advance(10.0);
+            mis.day += 10.0;
+          } else if (shell.hit_mis_run.contains(event.position)) {
+            mis.running = !mis.running;
+            mis.run_accum = 0.0;
+          } else if (shell.hit_mis_choose.contains(event.position)) {
+            if (const auto *def = [&]() -> const engine::MissionDefinition * {
+                  for (const auto &inst : mis.runtime.instances())
+                    if (inst.id == mis.selected)
+                      return mis.runtime.definition(inst.mission_id);
+                  return nullptr;
+                }()) {
+              for (const auto &inst : mis.runtime.instances()) {
+                if (inst.id != mis.selected) continue;
+                const auto stage = def->stages.find(inst.stage_id);
+                if (stage != def->stages.end() &&
+                    !stage->second.choices.empty())
+                  mis.runtime.choose(inst.id, stage->second.choices.front().id);
+                break;
+              }
+            }
+          } else if (shell.hit_mis_save.contains(event.position)) {
+            mis.saved_state = mis.runtime.serialize();
+            mission_log(mis, "snapshot saved (" +
+                        std::to_string(mis.saved_state.size()) + " bytes)");
+          } else if (shell.hit_mis_load.contains(event.position)) {
+            std::string error;
+            if (!mis.saved_state.empty() &&
+                mis.runtime.restore(mis.saved_state, &error)) {
+              mission_log(mis, "snapshot restored");
+            } else if (!error.empty()) {
+              mission_log(mis, "restore failed: " + error);
+            }
+          } else if (shell.hit_mis_reset.contains(event.position)) {
+            init_missions(mis);
+          } else {
+            const auto instances = mis.runtime.instances();
+            for (std::size_t i = 0;
+                 i < shell.hit_mis_instances.size() && i < instances.size();
+                 ++i) {
+              if (shell.hit_mis_instances[i].contains(event.position)) {
+                mis.selected = instances[i].id;
+                break;
+              }
+            }
+          }
+        }
+        if (shell.tool == Tool::Physics &&
+            event.type == InputEventType::LeftReleased) {
+          auto &phys = shell.phys;
+          auto &world = phys.world;
+          if (shell.hit_phys_step.contains(event.position)) {
+            phys_step(phys, 0.5);
+          } else if (shell.hit_phys_run.contains(event.position)) {
+            phys.running = !phys.running;
+            phys.run_accum = 0.0;
+          } else if (shell.hit_phys_ray.contains(event.position)) {
+            if (const auto *from = world.body(phys.selected)) {
+              if (const auto *to = world.body(phys.target)) {
+                const float dx = to->x - from->x;
+                const float dy = to->y - from->y;
+                const float dist = std::sqrt(dx * dx + dy * dy);
+                if (const auto hit =
+                        world.raycast(from->x, from->y, dx, dy, dist)) {
+                  char buf[160];
+                  std::snprintf(buf, sizeof(buf),
+                                "ray -> body %llu at %.0f (%.0f,%.0f)",
+                                static_cast<unsigned long long>(hit->body),
+                                hit->distance, hit->x, hit->y);
+                  phys.last_query = buf;
+                } else {
+                  phys.last_query = "ray -> no hit";
+                }
+              }
+            }
+          } else if (shell.hit_phys_sweep.contains(event.position)) {
+            if (const auto *from = world.body(phys.selected)) {
+              if (const auto *to = world.body(phys.target)) {
+                const float dx = to->x - from->x;
+                const float dy = to->y - from->y;
+                const float dist = std::sqrt(dx * dx + dy * dy);
+                if (const auto hit =
+                        world.sweep_circle(from->x, from->y, 12.0f, dx, dy,
+                                       dist)) {
+                  char buf[160];
+                  std::snprintf(buf, sizeof(buf),
+                                "sweep r12 -> body %llu at %.0f",
+                                static_cast<unsigned long long>(hit->body),
+                                hit->distance);
+                  phys.last_query = buf;
+                } else {
+                  phys.last_query = "sweep -> no hit";
+                }
+              }
+            }
+          } else if (shell.hit_phys_reset.contains(event.position)) {
+            phys = Shell::PhysicsDemo{};
+            init_physics(phys);
+          } else {
+            auto ids = world.overlap_aabb(-1000.0f, -1000.0f, 2000.0f,
+                                          2000.0f);
+            std::sort(ids.begin(), ids.end());
+            for (std::size_t i = 0;
+                 i < shell.hit_phys_bodies.size() && i < ids.size(); ++i) {
+              if (shell.hit_phys_bodies[i].contains(event.position)) {
+                phys.selected = ids[i];
+                break;
+              }
+            }
+          }
+        }
+        if (shell.tool == Tool::Galaxy) {
+          auto &gal = shell.gal;
+          if (event.type == InputEventType::Wheel &&
+              shell.hit_gal_map.contains(event.position)) {
+            gal.zoom =
+                std::clamp(gal.zoom + event.wheel_y * 0.12f, 0.3f, 6.0f);
+          }
+          if (event.type == InputEventType::LeftReleased) {
+            if (shell.hit_gal_step.contains(event.position)) {
+              gal_step(gal, 1.0);
+            } else if (shell.hit_gal_run.contains(event.position)) {
+              gal.running = !gal.running;
+              gal.run_accum = 0.0;
+            } else if (shell.hit_gal_reset.contains(event.position)) {
+              gal = Shell::GalaxyDemo{};
+              init_galaxy(gal);
+            } else if (shell.hit_gal_map.contains(event.position)) {
+              if (const auto world =
+                      gal_unproject(gal.map, shell.hit_gal_map,
+                                    event.position, gal.zoom)) {
+                if (const auto hit =
+                        gal.map.nearest_system(world->first, world->second))
+                  gal.selected = *hit;
+              }
+            }
+          }
+          if (event.type == InputEventType::RightReleased &&
+              shell.hit_gal_map.contains(event.position)) {
+            if (const auto world =
+                    gal_unproject(gal.map, shell.hit_gal_map,
+                                  event.position, gal.zoom)) {
+              if (const auto hit =
+                      gal.map.nearest_system(world->first, world->second))
+                gal.destination = *hit;
+            }
+          }
+        }
       }
 
       FrameTiming timing;
       window.draw(draw, std::nullopt, &timing);
+      ++frames_rendered;
       profiler.set_gauge("frame.submission_ms", timing.submission_ms);
       profiler.set_gauge("frame.present_ms", timing.present_ms);
       profiler.set_gauge("frame.fps", fps);
@@ -3994,6 +6999,56 @@ int main(int argc, char **argv) {
           std::chrono::duration<double>(now - last_frame).count();
       last_frame = now;
       if (elapsed > 0) fps = fps * 0.9 + (1.0 / elapsed) * 0.1;
+      if (shell.tool == Tool::Simulation && shell.sim.running) {
+        shell.sim.run_accum += elapsed;
+        if (shell.sim.run_accum >= 0.5) {
+          shell.sim.run_accum = 0.0;
+          shell.sim.last = shell.sim.executor.advance();
+        }
+      }
+      if (shell.tool == Tool::Warfare && shell.war.running) {
+        shell.war.run_accum += elapsed;
+        if (shell.war.run_accum >= 0.5) {
+          shell.war.run_accum = 0.0;
+          shell.war.model.advance(5.0);
+          shell.war.day += 5.0;
+        }
+      }
+      if (shell.tool == Tool::Physics && shell.phys.running) {
+        shell.phys.run_accum += elapsed;
+        if (shell.phys.run_accum >= 0.25) {
+          shell.phys.run_accum = 0.0;
+          phys_step(shell.phys, 0.25);
+        }
+      }
+      if (shell.tool == Tool::Galaxy && shell.gal.running) {
+        shell.gal.run_accum += elapsed;
+        if (shell.gal.run_accum >= 0.4) {
+          shell.gal.run_accum = 0.0;
+          gal_step(shell.gal, 1.0);
+        }
+      }
+      if (shell.tool == Tool::Missions && shell.missions.running) {
+        shell.missions.run_accum += elapsed;
+        if (shell.missions.run_accum >= 0.5) {
+          shell.missions.run_accum = 0.0;
+          shell.missions.runtime.advance(10.0);
+          shell.missions.day += 10.0;
+        }
+      }
+      if (shell.tool == Tool::Ai && shell.ai.running) {
+        shell.ai.run_accum += elapsed;
+        if (shell.ai.run_accum >= 0.25) {
+          shell.ai.run_accum = 0.0;
+          auto &ai = shell.ai;
+          ai.minerals = std::max(
+              0.0, ai.minerals + ai.mines * 2.0 - ai.fleets * 0.5);
+          ai.threat += 1.0;
+          ai.day += 1.0;
+          ai.mind.decide("economy", ai.day, 0.0, 1.1);
+          ai.mind.decide("military", ai.day, 0.0, 1.1);
+        }
+      }
     }
     return 0;
   } catch (const std::exception &error) {

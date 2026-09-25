@@ -2,6 +2,7 @@
 
 #include <stellar/core/adaptive_research_campaign.hpp>
 #include <stellar/core/detail/adaptive_research_outcome_snapshot_json.hpp>
+#include <stellar/engine/history.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -178,6 +179,36 @@ inline Json encode_research(const AdaptiveResearchCampaignSnapshot &snapshot) {
   return {{"SchemaVersion", snapshot.schema_version},
           {"CatalogId", snapshot.catalog_id},
           {"Civilizations", civilizations}};
+}
+
+// Player17 persists the persistent chronicle as a tail field next to
+// Diplomacy/AdaptiveResearch. Shared by the streaming encoder and the
+// compatibility oracle so both compose identical persisted bytes.
+inline Json encode_event_history(const engine::EventHistory::State &state) {
+  Json events = Json::array();
+  for (const auto &e : state.events) {
+    Json actors = Json::array();
+    for (const auto id : e.actors)
+      actors.push_back(id);
+    Json visible = Json::array();
+    for (const auto id : e.visible_to)
+      visible.push_back(id);
+    Json tags = Json::array();
+    for (const auto &tag : e.tags)
+      tags.push_back(tag);
+    events.push_back({{"Id", e.id},
+                      {"AtDay", e.at_day},
+                      {"Category", e.category},
+                      {"Summary", e.summary},
+                      {"Actors", std::move(actors)},
+                      {"Location", e.location},
+                      {"Significance", e.significance},
+                      {"VisibleTo", std::move(visible)},
+                      {"Tags", std::move(tags)}});
+  }
+  return {{"Version", state.version},
+          {"NextId", state.next_id},
+          {"Events", std::move(events)}};
 }
 
 } // namespace stellar::core::player_json_detail

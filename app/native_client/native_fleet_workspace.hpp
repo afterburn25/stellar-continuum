@@ -6,6 +6,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <initializer_list>
 #include <optional>
@@ -131,8 +132,25 @@ public:
   [[nodiscard]] const std::optional<stellar::native_fleet::NativeFleetRoutePreview> &
   preview() const noexcept;
   [[nodiscard]] std::optional<int> selected_fleet_id() const noexcept;
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  void reset_focus() noexcept { focus_ = -1; }
+  // Localized label of the ringed control — the announcement surface for
+  // screen-reader/live-region consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(const FleetWorkspaceLayout &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(const FleetWorkspaceLayout &) const;
 
 private:
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+    // Set when `bounds` was clipped to the outliner list viewport: the
+    // row's translated, unclipped rect so keyboard focus can snap the list.
+    std::optional<stellar::native_map::UiRect> unclipped;
+  };
+  [[nodiscard]] std::vector<FocusRect>
+  focusables(const FleetWorkspaceLayout &) const;
   FleetWorkspacePresentation presentation_;
   enum class PressTarget { None, Hold, Defend, Retreat, Locate };
   [[nodiscard]] const stellar::native_fleet::NativeOwnFleet *
@@ -156,12 +174,13 @@ private:
   std::string return_warning_;
   bool notice_accepted_{};
   stellar::native_map::Point pointer_{};
-  float list_scroll_{};
+  stellar::engine::ScrollView list_scroll_{};
   PressTarget pressed_action_{PressTarget::None};
   stellar::native_map::UiRect pressed_bounds_{};
   std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> pressed_military_quote_;
   std::optional<stellar::native_fleet::NativeFleetLocateQuote> pressed_locate_quote_;
   mutable int last_ship_art_rows_{};
+  int focus_{-1};
 };
 
 } // namespace stellar::native_fleet_ui

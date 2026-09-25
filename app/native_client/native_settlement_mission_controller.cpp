@@ -2,6 +2,7 @@
 
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/species_environment.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <ranges>
@@ -165,6 +166,13 @@ std::string species_name(const std::string &id) {
 
 } // namespace
 
+std::string NativeSettlementMissionController::tr(
+    std::string_view key, std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
 void NativeSettlementMissionController::require_owner() const {
   if (std::this_thread::get_id() != owner_)
     throw std::logic_error(
@@ -205,7 +213,7 @@ NativeSettlementTargetPreview NativeSettlementMissionController::preview_exact(
       fleet->role != FleetRole::Colony ||
       fleet->embarked_population_millions <= 0.) {
     result.message =
-        "No controllable populated settlement vessel with that fleet ID is available.";
+        tr("SETTLE_MSG_NO_VESSEL", "No controllable populated settlement vessel with that fleet ID is available.");
     exact_ = result;
     return result;
   }
@@ -266,13 +274,13 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue_exact(
       exact_->campaign_generation != campaign_generation ||
       exact_->revision != preview_revision)
     return {false,
-            "That settlement destination preview is stale; preview it again.",
+            tr("SETTLE_MSG_PREVIEW_STALE", "That settlement destination preview is stale; preview it again."),
             0};
   const auto prior = *exact_;
   auto current = context(frame);
   if (prior.player_civilization_id != current.player.id)
     return {false,
-            "The campaign changed; preview that settlement destination again.",
+            tr("SETTLE_MSG_CAMPAIGN_PREVIEW", "The campaign changed; preview that settlement destination again."),
             0};
   const auto fleet = std::ranges::find(current.world.fleets, prior.fleet_id,
                                         &FleetState::id);
@@ -280,7 +288,7 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue_exact(
       fleet->civilization_id != current.player.id ||
       fleet->role != FleetRole::Colony ||
       fleet->embarked_population_millions <= 0.)
-    return {false, "That owned settlement vessel is no longer available.", 0};
+    return {false, tr("SETTLE_MSG_VESSEL_GONE", "That owned settlement vessel is no longer available."), 0};
   const bool outpost =
       ResourceOutpostOpportunityPlanner::is_outpost_fleet(*fleet);
   const auto kind = outpost ? NativeSettlementMissionKind::ResourceOutpost
@@ -302,7 +310,7 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue_exact(
       prior.authorization_budget_units != authorization.charge_budget_units ||
       !same_currency(prior.currency, currency))
     return {false,
-            "The settlement vessel or authorization changed; preview again.",
+            tr("SETTLE_MSG_AUTH_CHANGED", "The settlement vessel or authorization changed; preview again."),
             fleet->mission_order_revision};
 
   bool accepted{};
@@ -328,7 +336,7 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue_exact(
   if (!prior.accepted || !prior.candidate || !candidate ||
       !same_candidate(*prior.candidate, *candidate))
     return {false,
-            "That settlement destination changed; preview it again.",
+            tr("SETTLE_MSG_DEST_CHANGED", "That settlement destination changed; preview it again."),
             fleet->mission_order_revision};
 
   const auto result = outpost
@@ -373,10 +381,10 @@ NativeSettlementMissionController::live_status(
       fleet->embarked_population_millions <= 0.)
     return std::nullopt;
   const auto status = fleet->settlement_body_id
-                          ? "Establishing settlement"
+                          ? tr("SETTLE_STATUS_ESTABLISHING", "Establishing settlement")
                           : fleet->destination_planetary_body_id
-                                ? "Settlement mission assigned"
-                                : "Ready for settlement orders";
+                                ? tr("SETTLE_STATUS_ASSIGNED", "Settlement mission assigned")
+                                : tr("SETTLE_STATUS_READY", "Ready for settlement orders");
   return NativeSettlementLiveStatus{
       fleet->id,
       status,
@@ -469,26 +477,26 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue(
   require_owner();
   if (!generation_ || *generation_ != campaign_generation)
     return {false,
-            "The campaign changed; refresh settlement opportunities first.",
+            tr("SETTLE_MSG_CAMPAIGN_REFRESH", "The campaign changed; refresh settlement opportunities first."),
             0};
   const auto *prior = find_projection(projected_, revision, fleet_id);
   if (!prior ||
       !find_candidate(*prior, destination_system_id, body_id))
     return {false,
-            "That settlement opportunity is stale; refresh before ordering.",
+            tr("SETTLE_MSG_OPPORTUNITY_STALE", "That settlement opportunity is stale; refresh before ordering."),
             0};
 
   auto current = context(frame);
   if (prior->player_civilization_id != current.player.id)
     return {false,
-            "The campaign changed; refresh settlement opportunities first.",
+            tr("SETTLE_MSG_CAMPAIGN_REFRESH", "The campaign changed; refresh settlement opportunities first."),
             0};
   const auto fleet = std::ranges::find(current.world.fleets, fleet_id,
                                         &FleetState::id);
   if (fleet == current.world.fleets.end() || !fleet->is_active ||
       fleet->civilization_id != current.player.id ||
       fleet->role != FleetRole::Colony)
-    return {false, "That owned settlement vessel is no longer available.", 0};
+    return {false, tr("SETTLE_MSG_VESSEL_GONE", "That owned settlement vessel is no longer available."), 0};
   const auto outpost =
       ResourceOutpostOpportunityPlanner::is_outpost_fleet(*fleet);
   const auto expected_kind = outpost
@@ -512,7 +520,7 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue(
           current_authorization.charge_budget_units ||
       !same_currency(prior->currency, current_currency))
     return {false,
-            "The settlement vessel or authorization changed; refresh first.",
+            tr("SETTLE_MSG_AUTH_REFRESH", "The settlement vessel or authorization changed; refresh first."),
             fleet->mission_order_revision};
 
   bool candidate_is_current = false;
@@ -535,7 +543,7 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue(
   }
   if (!candidate_is_current)
     return {false,
-            "That destination is no longer an available settlement opportunity.",
+            tr("SETTLE_MSG_DEST_UNAVAILABLE", "That destination is no longer an available settlement opportunity."),
             fleet->mission_order_revision};
 
   const auto result = outpost

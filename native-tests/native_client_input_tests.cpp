@@ -1,5 +1,6 @@
 #include "map_camera.hpp"
 #include "map_interaction.hpp"
+#include "native_pad_input.hpp"
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -57,5 +58,102 @@ int main(){
   InputSnapshot activity;activity.drawable_width=1280;activity.drawable_height=720;
   check(activity.renderable(),"active drawable was rejected");activity.minimized=true;
   check(!activity.renderable(),"minimized drawable remained renderable");
+  // Pad UI navigation (native_pad_input.hpp): dpad synthesizes arrow keys,
+  // south activates, east/start back out, and unmapped buttons/releases/
+  // axes stay untranslated for the gameplay mapper.
+  {
+    using stellar::native_client::pad_navigation_event;
+    auto pad=[](std::uint8_t button){InputEvent e{};e.type=InputEventType::GamepadPressed;e.gamepad_button=button;return e;};
+    const auto up=pad_navigation_event(pad(11));
+    check(up&&up->type==InputEventType::KeyPressed&&up->key==0x40000052u,"dpad up did not synthesize Up");
+    const auto down=pad_navigation_event(pad(12));
+    check(down&&down->key==0x40000051u,"dpad down did not synthesize Down");
+    const auto left=pad_navigation_event(pad(13));
+    check(left&&left->key==0x40000050u,"dpad left did not synthesize Left");
+    const auto right=pad_navigation_event(pad(14));
+    check(right&&right->key==0x4000004fu,"dpad right did not synthesize Right");
+    const auto south=pad_navigation_event(pad(0));
+    check(south&&south->type==InputEventType::KeyPressed&&south->key==13u,"pad south did not synthesize Return");
+    const auto east=pad_navigation_event(pad(1));
+    check(east&&east->type==InputEventType::EscapePressed,"pad east did not synthesize Escape");
+    const auto start=pad_navigation_event(pad(6));
+    check(start&&start->type==InputEventType::EscapePressed,"pad start did not synthesize Escape");
+    check(!pad_navigation_event(pad(9)),"shoulder button translated unexpectedly");
+    InputEvent release{};release.type=InputEventType::GamepadReleased;release.gamepad_button=0;
+    check(!pad_navigation_event(release),"pad release translated unexpectedly");
+    InputEvent axis{};axis.type=InputEventType::GamepadAxis;axis.gamepad_axis=0;axis.gamepad_axis_value=.9f;
+    check(!pad_navigation_event(axis),"pad axis translated unexpectedly");
+  }
+  // PadNavigationRepeater: a held dpad direction re-fires after the
+  // initial delay and then at the repeat interval; releases disarm,
+  // discrete buttons never repeat, and each pad tracks independently.
+  {
+    using stellar::native_client::PadNavigationRepeater;
+    PadNavigationRepeater repeater;
+    std::vector<InputEvent> emitted;
+    const auto collect=[&](float dt){repeater.update(dt,[&](const InputEvent&e){emitted.push_back(e);});};
+    auto press=[](std::uint8_t button,std::uint8_t device=0){InputEvent e{};e.type=InputEventType::GamepadPressed;e.gamepad_button=button;e.gamepad_device=device;return e;};
+    auto release=[](std::uint8_t button,std::uint8_t device=0){InputEvent e{};e.type=InputEventType::GamepadReleased;e.gamepad_button=button;e.gamepad_device=device;return e;};
+    repeater.note(press(12));
+    collect(PadNavigationRepeater::kInitialDelay-.01f);
+    check(emitted.empty(),"dpad repeat fired before the initial delay");
+    collect(.02f);
+    check(emitted.size()==1&&emitted.front().gamepad_button==12,
+        "held dpad direction did not re-fire after the initial delay");
+    collect(PadNavigationRepeater::kRepeatInterval*2.f);
+    check(emitted.size()==2,"a slow frame burst extra repeats");
+    collect(PadNavigationRepeater::kRepeatInterval+.01f);
+    check(emitted.size()==3,"held dpad direction did not keep repeating at the interval");
+    repeater.note(release(12));
+    emitted.clear();
+    collect(PadNavigationRepeater::kRepeatInterval*10.f);
+    check(emitted.empty(),"released dpad direction kept repeating");
+    repeater.note(press(0));repeater.note(press(1));repeater.note(press(6));
+    collect(10.f);
+    check(emitted.empty(),"discrete pad buttons repeated");
+    // A release on another pad must not disarm this device.
+    repeater.note(press(11,1));
+    repeater.note(release(11,2));
+    collect(PadNavigationRepeater::kInitialDelay+.01f);
+    check(emitted.size()==1&&emitted.front().gamepad_device==1,
+        "a release on a different pad disarmed the held direction");
+    repeater.note(release(11,1));
+    emitted.clear();
+    collect(1.f);
+    check(emitted.empty(),"cleared direction kept repeating");
+  }
+  // PadStickNavigator: a left-stick deflection engages a synthetic dpad
+  // press — arming the repeater only while UI owns input — the hysteresis
+  // band holds the direction, reversal re-engages, and the right stick
+  // stays on camera duty.
+  {
+    using stellar::native_client::PadNavigationRepeater;
+    using stellar::native_client::PadStickNavigator;
+    PadNavigationRepeater repeater;PadStickNavigator stick;
+    auto axis=[](std::uint8_t code,float value,std::uint8_t device=0){InputEvent e{};e.type=InputEventType::GamepadAxis;e.gamepad_axis=code;e.gamepad_axis_value=value;e.gamepad_device=device;return e;};
+    std::vector<InputEvent> emitted;
+    const auto collect=[&](float dt){repeater.update(dt,[&](const InputEvent&e){emitted.push_back(e);});};
+    const auto engaged=stick.note(axis(1,.9f),repeater,true);
+    check(engaged&&engaged->type==InputEventType::GamepadPressed&&engaged->gamepad_button==12,
+        "left-stick down did not engage a dpad-down press");
+    collect(PadNavigationRepeater::kInitialDelay+.01f);
+    check(emitted.size()==1&&emitted.front().gamepad_button==12,
+        "held stick direction did not auto-repeat");
+    check(!stick.note(axis(1,.4f),repeater,true),"stick inside the hysteresis band re-engaged");
+    emitted.clear();
+    check(!stick.note(axis(1,.1f),repeater,true),"stick release produced a press");
+    collect(1.f);
+    check(emitted.empty(),"released stick direction kept repeating");
+    (void)stick.note(axis(1,.9f),repeater,true);
+    const auto reversed=stick.note(axis(1,-.9f),repeater,true);
+    check(reversed&&reversed->gamepad_button==11,"stick reversal did not engage the opposite direction");
+    (void)stick.note(axis(1,.05f),repeater,true); // release the armed direction
+    emitted.clear();
+    PadStickNavigator free_stick;
+    check(!free_stick.note(axis(0,.9f),repeater,false),"a UI-rejected stick engaged navigation");
+    collect(PadNavigationRepeater::kInitialDelay+.01f);
+    check(emitted.empty(),"a UI-rejected stick armed auto-repeat");
+    check(!stick.note(axis(3,.9f),repeater,true),"right stick engaged navigation");
+  }
   return failures==0?0:1;
 }

@@ -88,6 +88,22 @@ int main(int argc,char** argv)try{
  const auto identity=sky.catalog.profile(id);for(int q=0;q<4;++q)for(int d=0;d<3;++d){window.draw(draw(q,d),output/("quality-"+std::to_string(q)+"-density-"+std::to_string(d)+".png"));check(sky.catalog.profile(id)==identity,"Graphics preference changed generated identity");check(sky.cache_bytes()<=64u*1024*1024,"Unbounded sky cache");}
  sky.options.blend_test=true;sky.options.blend_scale=2;check(sky.resolved(id).blend_asset_id.empty(),"QA blend reintroduced a rejected bright secondary");window.draw(draw(),output/"blend-test.png");sky.options.blend_test=false;
  NativeBackgroundDebug panel;panel.toggle(sky);panel.data(sky,id);scene=draw();panel.render(scene,1280,720,sky);window.draw(scene,output/"debug-panel.png");
+ // Keyboard ring: the eight option/navigation buttons walk in (y,x) order
+ // and Return/Space replay the same dispatch a pointer press takes.
+ {
+  const auto press=[&](std::uint32_t key){InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;return panel.handle(ev,1280,720,sky);};
+  check(panel.focus()<0,"Background debug opened with stale focus.");
+  check(press(9)&&panel.focus()==0,"Tab did not enter the background debug ring.");
+  check(!panel.focused_label(1280,720,sky).empty()&&panel.focused_bounds(1280,720).has_value(),"Focused background control lacks label or bounds.");
+  check(panel.focused_control(1280,720)==stellar::engine::AnnouncementControl::Button,"Background button misclassified.");
+  const bool nebula_before=sky.options.nebula;
+  check(press(13),"Background debug activation leaked.");
+  check(sky.options.nebula!=nebula_before,"Keyboard activation did not toggle the nebula layer.");
+  sky.options.nebula=nebula_before;
+  check(press(9)&&panel.focus()>=0,"Background ring did not stay live after activation.");
+  check(panel.handle({InputEventType::EscapePressed},1280,720,sky)&&panel.focus()<0&&panel.visible(),"Escape closed the background panel instead of releasing its ring.");
+  check(panel.handle({InputEventType::EscapePressed},1280,720,sky)&&!panel.visible(),"Second Escape did not close the background panel.");
+ }
  // Exercise the actual generated gas/dust contexts through the same native
  // environment assembly used in System View, not only a synthetic overlay.
  sky.options={};double deepest=0;for(const auto& s:world.systems){const double depth=sky.catalog.profile(s.id).environment.dark_optical_depth;if(depth>deepest){deepest=depth;id=s.id;}}

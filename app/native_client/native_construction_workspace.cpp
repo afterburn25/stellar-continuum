@@ -205,10 +205,14 @@ std::string NativeConstructionWorkspace::category_label(
   return tr(category_key(category), category_name(category));
 }
 
-void NativeConstructionWorkspace::open() noexcept { visible_ = true; }
+void NativeConstructionWorkspace::open() noexcept {
+  visible_ = true;
+  focus_ = -1;
+}
 void NativeConstructionWorkspace::close() noexcept {
   visible_ = false;
   cancel_confirmation_id_.reset();
+  focus_ = -1;
 }
 bool NativeConstructionWorkspace::visible() const noexcept { return visible_; }
 
@@ -220,8 +224,9 @@ void NativeConstructionWorkspace::set_view(NativeConstructionView view) {
   if (generation_changed) {
     selected_project_id_.reset();
     notice_.clear();
-    project_scroll_ = 0.f;
-    order_scroll_ = 0.f;
+    project_scroll_ = {};
+    order_scroll_ = {};
+    focus_ = -1;
   }
   if (generation_changed || revision_changed) cancel_confirmation_id_.reset();
   view_ = std::move(view);
@@ -234,9 +239,10 @@ void NativeConstructionWorkspace::discard_campaign() {
   selected_project_id_.reset();
   cancel_confirmation_id_.reset();
   notice_.clear();
-  project_scroll_ = 0.f;
-  order_scroll_ = 0.f;
+  project_scroll_ = {};
+  order_scroll_ = {};
   status_order_.clear();
+  focus_ = -1;
 }
 
 void NativeConstructionWorkspace::set_notice(std::string message,
@@ -281,8 +287,10 @@ std::optional<UiRect> NativeConstructionWorkspace::project_bounds(
   const UiRect rows{layout.projects.x, layout.projects.y + 27.f * layout.scale,
                     layout.projects.width,
                     layout.projects.height - 27.f * layout.scale};
+  project_scroll_.configure(view_->projects.size(), 58.f * layout.scale,
+                            rows.height);
   const auto index = static_cast<std::size_t>(found - view_->projects.begin());
-  const UiRect bounds{rows.x, rows.y + project_scroll_ +
+  const UiRect bounds{rows.x, rows.y - project_scroll_.scroll_offset +
                                   static_cast<float>(index) * 58.f * layout.scale,
                       rows.width, 54.f * layout.scale};
   return intersection(bounds, rows);
@@ -324,6 +332,92 @@ void NativeConstructionWorkspace::rebuild_status_order() {
       status_order_.push_back(index);
 }
 
+std::vector<NativeConstructionWorkspace::FocusRect>
+NativeConstructionWorkspace::focusables(
+    const ConstructionWorkspaceLayout &layout) const {
+  std::vector<FocusRect> out;
+  out.push_back({layout.close, tr("CONSTRUCTION_CLOSE", "Close construction")});
+  const UiRect project_rows{layout.projects.x,
+                            layout.projects.y + 27.f * layout.scale,
+                            layout.projects.width,
+                            layout.projects.height - 27.f * layout.scale};
+  const UiRect order_rows{layout.orders.x,
+                          layout.orders.y + 27.f * layout.scale,
+                          layout.orders.width,
+                          layout.orders.height - 27.f * layout.scale};
+  project_scroll_.configure(view_ ? view_->projects.size() : 0,
+                            58.f * layout.scale, project_rows.height);
+  order_scroll_.configure(status_order_.size(), 72.f * layout.scale,
+                          order_rows.height);
+  if (view_) {
+    for (std::size_t index = 0; index < view_->projects.size(); ++index) {
+      const UiRect bounds{project_rows.x,
+                          project_rows.y - project_scroll_.scroll_offset +
+                                  static_cast<float>(index) * 58.f * layout.scale,
+                          project_rows.width, 54.f * layout.scale};
+      if (const auto clipped = intersection(bounds, project_rows))
+        out.push_back({*clipped, view_->projects[index].name,
+                       static_cast<int>(index), /*scroll_lane=*/1});
+    }
+    for (std::size_t order_index = 0; order_index < status_order_.size();
+         ++order_index) {
+      const UiRect bounds{
+          order_rows.x,
+          order_rows.y - order_scroll_.scroll_offset +
+              static_cast<float>(order_index) * 72.f * layout.scale,
+          order_rows.width, 68.f * layout.scale};
+      if (const auto clipped = intersection(bounds, order_rows))
+        out.push_back(
+            {*clipped, view_->projects[status_order_[order_index]].name,
+             static_cast<int>(order_index), /*scroll_lane=*/2});
+    }
+  }
+  if (const auto *project = selected_project()) {
+    if (project->active || project->queued) {
+      out.push_back({layout.secondary_action,
+                     tr(cancel_confirmation_id_ == project->id
+                            ? "CONSTRUCTION_CONFIRM_CANCEL"
+                            : "CONSTRUCTION_CANCEL_REFUND",
+                        cancel_confirmation_id_ == project->id
+                            ? "Confirm cancel"
+                            : "Cancel and refund")});
+    } else if (!project->complete) {
+      out.push_back({layout.primary_action,
+                     tr(project->start.will_queue
+                            ? "CONSTRUCTION_START_QUEUE_BTN"
+                            : "CONSTRUCTION_START_NOW",
+                        project->start.will_queue ? "Start or queue"
+                                                  : "Start now")});
+      out.push_back({layout.secondary_action,
+                     tr("CONSTRUCTION_QUEUE", "Queue")});
+    }
+  }
+  std::ranges::sort(out, [](const FocusRect &a, const FocusRect &b) {
+    if (a.bounds.y != b.bounds.y) return a.bounds.y < b.bounds.y;
+    return a.bounds.x < b.bounds.x;
+  });
+  return out;
+}
+
+std::string NativeConstructionWorkspace::focused_label(
+    const ConstructionWorkspaceLayout &layout) const {
+  if (focus_ < 0) return {};
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
+}
+std::optional<stellar::native_map::UiRect>
+NativeConstructionWorkspace::focused_bounds(
+    const ConstructionWorkspaceLayout &layout) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
+
 ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
     const InputEvent &event, int width, int height) {
   if (!visible_) return {};
@@ -331,6 +425,7 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
   const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
   if (event.type == InputEventType::PointerCancelled) {
     cancel_confirmation_id_.reset();
+    focus_ = -1;
     return {ConstructionWorkspaceCommandKind::None, true};
   }
   const UiRect project_rows{layout.projects.x,
@@ -341,23 +436,74 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
                           layout.orders.y + 27.f * layout.scale,
                           layout.orders.width,
                           layout.orders.height - 27.f * layout.scale};
+  project_scroll_.configure(view_ ? view_->projects.size() : 0,
+                            58.f * layout.scale, project_rows.height);
+  order_scroll_.configure(status_order_.size(), 72.f * layout.scale,
+                          order_rows.height);
   if (event.type == InputEventType::Wheel) {
-    const auto scroll = [&](float &offset, UiRect bounds, std::size_t count) {
-      const auto content = static_cast<float>(count) * 58.f * layout.scale;
-      offset = std::clamp(offset + event.wheel_y * 40.f * layout.scale,
-                          std::min(0.f, bounds.height - content), 0.f);
-    };
     if (layout.projects.contains(event.position)) {
-      scroll(project_scroll_, project_rows, view_ ? view_->projects.size() : 0);
+      project_scroll_.configure(view_ ? view_->projects.size() : 0,
+                                58.f * layout.scale, project_rows.height);
+      project_scroll_.scroll_to(project_scroll_.scroll_offset - event.wheel_y * 40.f * layout.scale);
       return {ConstructionWorkspaceCommandKind::None, true};
     }
     if (layout.orders.contains(event.position)) {
-      const auto content = static_cast<float>(status_order_.size()) *
-                           72.f * layout.scale;
-      order_scroll_ = std::clamp(
-          order_scroll_ + event.wheel_y * 40.f * layout.scale,
-          std::min(0.f, order_rows.height - content), 0.f);
+      order_scroll_.configure(status_order_.size(), 72.f * layout.scale,
+                              order_rows.height);
+      order_scroll_.scroll_to(order_scroll_.scroll_offset - event.wheel_y * 40.f * layout.scale);
       return {ConstructionWorkspaceCommandKind::None, true};
+    }
+    return {ConstructionWorkspaceCommandKind::None,
+            layout.surface.contains(event.position)};
+  }
+  if (event.type == InputEventType::KeyPressed) {
+    constexpr std::uint32_t kTab = 9u;
+    constexpr std::uint32_t kReturn = 13u;
+    constexpr std::uint32_t kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu;
+    constexpr std::uint32_t kLeft = 0x40000050u;
+    constexpr std::uint32_t kDown = 0x40000051u;
+    constexpr std::uint32_t kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au;
+    constexpr std::uint32_t kEnd = 0x4000004du;
+    const auto items = focusables(layout);
+    const auto count = static_cast<int>(items.size());
+    const bool forward = (event.key == kTab && !event.shift) ||
+                         event.key == kRight || event.key == kDown;
+    const bool backward = (event.key == kTab && event.shift) ||
+                          event.key == kLeft || event.key == kUp;
+    // Rows clipped by a list viewport stay in the ring; when focus lands
+    // on one, snap its list so the row is fully visible — which exposes
+    // the next row and keeps the whole list keyboard-reachable.
+    const auto snap_focused = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto &target = items[static_cast<std::size_t>(focus_)];
+      if (target.scroll_row < 0) return;
+      (target.scroll_lane == 1 ? project_scroll_ : order_scroll_)
+          .ensure_visible(static_cast<std::size_t>(target.scroll_row));
+    };
+    if (count > 0 && (forward || backward)) {
+      focus_ = focus_ < 0 ? (forward ? 0 : count - 1)
+                          : (focus_ + (forward ? 1 : -1) + count) % count;
+      snap_focused();
+      return {ConstructionWorkspaceCommandKind::None, true};
+    }
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused();
+      return {ConstructionWorkspaceCommandKind::None, true};
+    }
+    if (focus_ >= 0 && focus_ < count &&
+        (event.key == kReturn || event.key == kSpace)) {
+      const UiRect target = items[static_cast<std::size_t>(focus_)].bounds;
+      InputEvent press{InputEventType::LeftPressed};
+      press.position = {target.x + target.width * .5f,
+                        target.y + target.height * .5f};
+      const int keep = focus_;
+      auto command = handle(press, width, height);
+      focus_ = visible_ ? keep : -1;
+      command.captured = true;
+      return command;
     }
     return {ConstructionWorkspaceCommandKind::None,
             layout.surface.contains(event.position)};
@@ -370,10 +516,11 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
     return {ConstructionWorkspaceCommandKind::None, true};
   }
   if (!layout.surface.contains(event.position)) return {};
+  focus_ = -1;
   if (view_) {
     for (std::size_t index = 0; index < view_->projects.size(); ++index) {
       const UiRect bounds{project_rows.x,
-                          project_rows.y + project_scroll_ +
+                          project_rows.y - project_scroll_.scroll_offset +
                               static_cast<float>(index) * 58.f * layout.scale,
                           project_rows.width, 54.f * layout.scale};
       const auto clipped = intersection(bounds, project_rows);
@@ -388,7 +535,7 @@ ConstructionWorkspaceCommand NativeConstructionWorkspace::handle(
          ++order_index) {
       const auto &project = view_->projects[status_order_[order_index]];
       const UiRect bounds{order_rows.x,
-                          order_rows.y + order_scroll_ +
+                          order_rows.y - order_scroll_.scroll_offset +
                               static_cast<float>(order_index) * 72.f * layout.scale,
                           order_rows.width, 68.f * layout.scale};
       const auto clipped = intersection(bounds, order_rows);
@@ -448,6 +595,8 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                             layout.projects.y + 27.f * layout.scale,
                             layout.projects.width,
                             layout.projects.height - 27.f * layout.scale};
+  project_scroll_.configure(view_ ? view_->projects.size() : 0,
+                            58.f * layout.scale, project_rows.height);
   if (!view_ || view_->projects.empty()) {
     text(out, {project_rows.x + 10.f * layout.scale,
                project_rows.y + 8.f * layout.scale,
@@ -461,7 +610,7 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
     for (std::size_t index = 0; index < view_->projects.size(); ++index) {
       const auto &project = view_->projects[index];
       const UiRect bounds{project_rows.x,
-                          project_rows.y + project_scroll_ +
+                          project_rows.y - project_scroll_.scroll_offset +
                               static_cast<float>(index) * 58.f * layout.scale,
                           project_rows.width, 54.f * layout.scale};
       const auto clipped = intersection(bounds, project_rows);
@@ -518,12 +667,14 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                           layout.orders.y + 27.f * layout.scale,
                           layout.orders.width,
                           layout.orders.height - 27.f * layout.scale};
+  order_scroll_.configure(status_order_.size(), 72.f * layout.scale,
+                          order_rows.height);
   if (view_)
     for (std::size_t order_index = 0; order_index < status_order_.size();
          ++order_index) {
       const auto &value = view_->projects[status_order_[order_index]];
       const UiRect bounds{order_rows.x,
-                          order_rows.y + order_scroll_ +
+                          order_rows.y - order_scroll_.scroll_offset +
                               static_cast<float>(order_index) * 72.f * layout.scale,
                           order_rows.width, 68.f * layout.scale};
       const auto clipped = intersection(bounds, order_rows);
@@ -650,6 +801,13 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
       action(layout.primary_action,
              tr("CONSTRUCTION_STATE_COMPLETED", "COMPLETED"), false);
     }
+  }
+
+  if (focus_ >= 0) {
+    const auto items = focusables(layout);
+    if (focus_ < static_cast<int>(items.size()))
+      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
+             {160, 210, 255, 255});
   }
 }
 

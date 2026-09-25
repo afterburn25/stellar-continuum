@@ -139,17 +139,20 @@ struct RestoredPlayerCampaignV17::Storage {
   std::string game_version;
   std::string saved_at_utc;
   std::optional<CampaignRuntimeContinuation> continuation;
+  std::optional<engine::EventHistory::State> event_history;
 
   Storage(AdaptiveResearchStrategicRuntime runtime,
           RestoredGalaxyPayloadV16 restored,
           const AdaptiveResearchCampaignSnapshot &research_snapshot,
           const DiplomacyStateSnapshot &diplomacy_snapshot,
+          std::optional<engine::EventHistory::State> history,
           const PlayerCampaignRestoreHooks &hooks)
       : research_runtime(std::move(runtime)),
         galaxy(std::move(restored.galaxy)),
         simulation_days(restored.simulation_days),
         game_version(std::move(restored.game_version)),
-        saved_at_utc(std::move(restored.saved_at_utc)) {
+        saved_at_utc(std::move(restored.saved_at_utc)),
+        event_history(std::move(history)) {
     research = std::make_unique<AdaptiveResearchCampaignState>(
         AdaptiveResearchCampaignSnapshotCodec(research_runtime)
             .restore(galaxy, research_snapshot));
@@ -218,6 +221,14 @@ IntegratedAdaptiveCampaignRuntime RestoredPlayerCampaignV17::activate() && {
       std::move(owned->research_runtime), std::move(owned->galaxy),
       research_snapshot, std::move(diplomacy), owned->simulation_days);
   if(owned->continuation)runtime.restore_continuation(*owned->continuation,owned->simulation_days);
+  if(owned->event_history){
+    try{
+      runtime.history().restore_state(*owned->event_history);
+    }catch(const std::invalid_argument &error){
+      throw PlayerCampaignPersistenceDataError(
+          std::string("Format v17 event history failed validation: ")+error.what());
+    }
+  }
   return runtime;
 }
 
@@ -226,6 +237,7 @@ RestoredPlayerCampaignV17 detail::finalize_restored_player_campaign_v17(
     RestoredGalaxyPayloadV16 restored_galaxy,
     std::function<AdaptiveResearchCampaignSnapshot()> decode_research,
     const DiplomacyStateSnapshot &diplomacy_snapshot,
+    std::optional<engine::EventHistory::State> event_history,
     const PlayerCampaignRestoreHooks &hooks) {
   if (hooks.before_diplomacy_references)
     hooks.before_diplomacy_references();
@@ -237,7 +249,8 @@ RestoredPlayerCampaignV17 detail::finalize_restored_player_campaign_v17(
   return RestoredPlayerCampaignV17(
       std::make_unique<RestoredPlayerCampaignV17::Storage>(
           std::move(research_runtime), std::move(restored_galaxy),
-          research_snapshot, diplomacy_snapshot, hooks));
+          research_snapshot, diplomacy_snapshot, std::move(event_history),
+          hooks));
 }
 
 PlayerCampaignPayloadV17Dto capture_player_campaign_v17(
@@ -270,7 +283,8 @@ PlayerCampaignPayloadV17Dto capture_player_campaign_v17(
           .capture(campaign.research());
   return {PlayerCampaignPayloadV17Dto::current_format_version,
           GalaxyPayloadV16Dto::current_format_version,
-          std::move(galaxy_payload), diplomacy, std::move(research)};
+          std::move(galaxy_payload), diplomacy, std::move(research),
+          campaign.history().capture_state()};
 }
 
 RestoredPlayerCampaignV17 restore_player_campaign_v17(
@@ -316,7 +330,7 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17(
               "Format v17 save is missing Adaptive Research state.");
         return *payload.adaptive_research;
       },
-      *payload.diplomacy);
+      *payload.diplomacy, payload.event_history);
 }
 
 } // namespace stellar::core

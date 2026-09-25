@@ -1,5 +1,6 @@
 #include "native_system_travel.hpp"
 #include <stellar/core/campaign_observation.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <stellar/core/fleet_transit.hpp>
 #include <stellar/core/knowledge.hpp>
@@ -42,6 +43,10 @@ const StellarSystem* find_system(std::span<const StellarSystem> systems,int id){
 } // namespace
 
 void NativeSystemTravelController::require_owner()const{if(std::this_thread::get_id()!=owner_)throw std::logic_error("Native system travel projection must run on its owner thread.");}
+std::string NativeSystemTravelController::tr(std::string_view key,std::string_view fallback)const{
+  if(locale_&&locale_->contains(key))return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
 bool NativeSystemTravelController::is_current_generation(std::uint64_t value)const noexcept{return generation_&&*generation_==value;}
 
 NativeSystemTravelBuildResult NativeSystemTravelController::build(CampaignFrame&frame,const std::uint64_t campaign_generation,const NativeSystemSnapshot&system_view){
@@ -49,10 +54,10 @@ NativeSystemTravelBuildResult NativeSystemTravelController::build(CampaignFrame&
   if(generation_&&campaign_generation<*generation_)throw std::invalid_argument("A stale campaign generation cannot replace the current system travel view.");
   auto&simulation=frame.runtime().world();auto&world=simulation.campaign();const auto observer=world.player_civilization_id;
   const auto player=std::ranges::find(world.civilizations,observer,&Civilization::id);
-  if(player==world.civilizations.end()||!player->is_player)return {std::nullopt,"The campaign has no valid player observer."};
-  if(system_view.campaign_generation!=campaign_generation||system_view.observer_civilization_id!=observer)return {std::nullopt,"The system view belongs to a different campaign observer."};
-  if(observation_survey_level(world,observer,system_view.system_id)<SystemSurveyLevel::partially_surveyed)return {std::nullopt,"Reconnaissance-grade knowledge is required for local travel presentation."};
-  const auto*current=find_system(world.systems,system_view.system_id);if(!current)return {std::nullopt,"The known system is unavailable in this campaign."};
+  if(player==world.civilizations.end()||!player->is_player)return {std::nullopt,tr("TRAVEL_DENY_OBSERVER","The campaign has no valid player observer.")};
+  if(system_view.campaign_generation!=campaign_generation||system_view.observer_civilization_id!=observer)return {std::nullopt,tr("TRAVEL_DENY_CAMPAIGN","The system view belongs to a different campaign observer.")};
+  if(observation_survey_level(world,observer,system_view.system_id)<SystemSurveyLevel::partially_surveyed)return {std::nullopt,tr("TRAVEL_DENY_SURVEY","Reconnaissance-grade knowledge is required for local travel presentation.")};
+  const auto*current=find_system(world.systems,system_view.system_id);if(!current)return {std::nullopt,tr("TRAVEL_DENY_SYSTEM","The known system is unavailable in this campaign.")};
 
   NativeSystemTravelSnapshot result{.campaign_generation=campaign_generation,.observer_civilization_id=observer,.system_id=system_view.system_id};
   std::vector<const FleetState*> local;

@@ -4,6 +4,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -97,6 +98,13 @@ public:
   [[nodiscard]] std::size_t selected_contact_index() const noexcept;
   [[nodiscard]] bool select_contact_civilization(int civilization_id);
   [[nodiscard]] const std::string &notice() const noexcept;
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control — the announcement surface for
+  // screen-reader/live-region consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
 
   [[nodiscard]] DiplomacyWorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);
@@ -121,8 +129,19 @@ private:
   };
 
   void reconcile_selection();
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+    // Set when `bounds` was clipped to a scroll viewport: the row's
+    // translated, unclipped rect plus which lane scrolls it — 1 contacts,
+    // 2 detail — so keyboard focus can snap the row fully into view.
+    std::optional<stellar::native_map::UiRect> unclipped;
+    int scroll_lane{0};
+  };
+  [[nodiscard]] std::vector<FocusRect>
+  focusables(const DiplomacyWorkspaceLayout &layout) const;
   [[nodiscard]] float
-  detail_scroll_limit(const DiplomacyWorkspaceLayout &layout) const noexcept;
+  detail_content_height(const DiplomacyWorkspaceLayout &layout) const noexcept;
   [[nodiscard]] std::vector<const stellar::native_diplomacy::
                                 NativeDiplomacyContact *>
   filtered_contacts() const;
@@ -144,8 +163,9 @@ private:
   std::optional<ModalState> modal_;
   std::string notice_;
   bool notice_accepted_{};
-  float contact_scroll_{};
-  float detail_scroll_{};
+  stellar::engine::ScrollView contact_scroll_{};
+  stellar::engine::ScrollView detail_scroll_{};
+  int focus_{-1};
 };
 
 } // namespace stellar::native_diplomacy_ui

@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cctype>
+#include <cmath>
 #include <stdexcept>
 
 namespace stellar::editor {
@@ -11,12 +12,29 @@ std::string serialize_project(const EditorProject &project) {
   auto serialize_map = [](const std::unordered_map<int, SystemEdit> &map) {
     auto rows = nlohmann::json::array();
     for (const auto &[id, edit] : map) {
-      if (edit.name.empty() && edit.note.empty() && !edit.bookmarked)
+      if (edit.name.empty() && edit.note.empty() && !edit.bookmarked &&
+          !edit.anomaly && !edit.rare_resource && !edit.pre_warp_civilization &&
+          !edit.radius_earth && !edit.orbit_au && !edit.mass_earth)
         continue;
-      rows.push_back({{"id", id},
-                      {"name", edit.name},
-                      {"note", edit.note},
-                      {"bookmarked", edit.bookmarked}});
+      auto row = nlohmann::json{{"id", id},
+                                {"name", edit.name},
+                                {"note", edit.note},
+                                {"bookmarked", edit.bookmarked}};
+      if (edit.anomaly) row["anomaly"] = *edit.anomaly;
+      if (edit.rare_resource) row["rareResource"] = *edit.rare_resource;
+      if (edit.pre_warp_civilization)
+        row["preWarpCivilization"] = *edit.pre_warp_civilization;
+      if (edit.radius_earth) row["radiusEarth"] = *edit.radius_earth;
+      if (edit.orbit_au) row["orbitAu"] = *edit.orbit_au;
+      if (edit.mass_earth) row["massEarth"] = *edit.mass_earth;
+      if (edit.eccentricity) row["eccentricity"] = *edit.eccentricity;
+      if (edit.inclination_degrees)
+        row["inclinationDeg"] = *edit.inclination_degrees;
+      if (edit.position_x) row["positionX"] = *edit.position_x;
+      if (edit.position_y) row["positionY"] = *edit.position_y;
+      if (edit.satellite_orbit_km)
+        row["satelliteOrbitKm"] = *edit.satellite_orbit_km;
+      rows.push_back(std::move(row));
     }
     return rows;
   };
@@ -49,7 +67,56 @@ EditorProject parse_project(std::string_view text) {
         edit.name = row.value("name", std::string{});
         edit.note = row.value("note", std::string{});
         edit.bookmarked = row.value("bookmarked", false);
-        if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked)
+        const auto flag = [](const nlohmann::json &row, const char *key) {
+          const auto it = row.find(key);
+          return it != row.end() && it->is_boolean()
+                     ? std::optional<bool>{it->get<bool>()}
+                     : std::nullopt;
+        };
+        edit.anomaly = flag(row, "anomaly");
+        edit.rare_resource = flag(row, "rareResource");
+        edit.pre_warp_civilization = flag(row, "preWarpCivilization");
+        if (const auto it = row.find("radiusEarth");
+            it != row.end() && it->is_number() && it->get<double>() > 0.)
+          edit.radius_earth = it->get<double>();
+        if (const auto it = row.find("orbitAu");
+            it != row.end() && it->is_number() && it->get<double>() > 0.)
+          edit.orbit_au = it->get<double>();
+        if (const auto it = row.find("massEarth");
+            it != row.end() && it->is_number() && it->get<double>() > 0.)
+          edit.mass_earth = it->get<double>();
+        // Eccentricity is the one override where zero is meaningful
+        // (circular orbit); AnalyticOrbit rejects >= 0.95.
+        if (const auto it = row.find("eccentricity");
+            it != row.end() && it->is_number() && it->get<double>() >= 0. &&
+            it->get<double>() < 0.95)
+          edit.eccentricity = it->get<double>();
+        // Inclination is bounded to the generated domain 0-180 degrees.
+        if (const auto it = row.find("inclinationDeg");
+            it != row.end() && it->is_number() && it->get<double>() >= 0. &&
+            it->get<double>() <= 180.)
+          edit.inclination_degrees = it->get<double>();
+        // Map position axes are unbounded finite numbers — the galaxy is
+        // centered on the origin so negatives are normal coordinates.
+        const auto finite_number = [](const nlohmann::json &row,
+                                      const char *key) {
+          const auto it = row.find(key);
+          return it != row.end() && it->is_number() &&
+                         std::isfinite(it->get<double>())
+                     ? std::optional<double>{it->get<double>()}
+                     : std::nullopt;
+        };
+        edit.position_x = finite_number(row, "positionX");
+        edit.position_y = finite_number(row, "positionY");
+        // Moon orbit radius is a positive distance in kilometres.
+        if (const auto it = row.find("satelliteOrbitKm");
+            it != row.end() && it->is_number() && it->get<double>() > 0.)
+          edit.satellite_orbit_km = it->get<double>();
+        if (!edit.name.empty() || !edit.note.empty() || edit.bookmarked ||
+            edit.anomaly || edit.rare_resource || edit.pre_warp_civilization ||
+            edit.radius_earth || edit.orbit_au || edit.mass_earth ||
+            edit.eccentricity || edit.inclination_degrees ||
+            edit.position_x || edit.position_y || edit.satellite_orbit_km)
           out[row.at("id").get<int>()] = std::move(edit);
       }
     };

@@ -314,10 +314,14 @@ std::string NativeDiplomacyWorkspace::trf(
   return out;
 }
 
-void NativeDiplomacyWorkspace::open() noexcept { visible_ = true; }
+void NativeDiplomacyWorkspace::open() noexcept {
+  visible_ = true;
+  focus_ = -1;
+}
 void NativeDiplomacyWorkspace::close() noexcept {
   visible_ = false;
   modal_.reset();
+  focus_ = -1;
 }
 bool NativeDiplomacyWorkspace::visible() const noexcept { return visible_; }
 void NativeDiplomacyWorkspace::set_view(NativeDiplomacyView view) {
@@ -358,7 +362,8 @@ void NativeDiplomacyWorkspace::discard_campaign() {
   tab_ = DiplomacyWorkspaceTab::agreements;
   modal_.reset();
   notice_.clear();
-  contact_scroll_ = detail_scroll_ = 0;
+  contact_scroll_ = {}; detail_scroll_ = {};
+  focus_ = -1;
 }
 void NativeDiplomacyWorkspace::set_notice(std::string message, bool accepted) {
   notice_ = visible_message(std::move(message));
@@ -408,7 +413,7 @@ void NativeDiplomacyWorkspace::reconcile_selection() {
   selected_contact_index_ = fallback.source_index;
   selected_contact_id_ = fallback.contact_id;
 }
-float NativeDiplomacyWorkspace::detail_scroll_limit(
+float NativeDiplomacyWorkspace::detail_content_height(
     const DiplomacyWorkspaceLayout &layout) const noexcept {
   if (!view_) return 0.f;
   const auto s = layout.scale;
@@ -458,7 +463,7 @@ float NativeDiplomacyWorkspace::detail_scroll_limit(
                           view_->contacts.empty() ? 64.f * s : 44.f * s);
     break;
   }
-  return std::max(0.f, content - layout.detail_rows.height + 8.f * s);
+  return content + 8.f * s;
 }
 std::vector<const NativeDiplomacyContact *>
 NativeDiplomacyWorkspace::filtered_contacts() const {
@@ -466,26 +471,220 @@ NativeDiplomacyWorkspace::filtered_contacts() const {
   return filter_native_diplomacy_contacts(*view_, filter_);
 }
 
+// Focusables walk actionable rects in (y,x) order: header close, the filter
+// grid, contact rows clipped to their viewport, the conditional action
+// buttons, the tab strip, and the detail region's buttons (proposal card
+// actions, the intelligence FOCUS link) — narrowed to the modal's own
+// controls while one is open. Inert surfaces never focus.
+std::vector<NativeDiplomacyWorkspace::FocusRect>
+NativeDiplomacyWorkspace::focusables(
+    const DiplomacyWorkspaceLayout &layout) const {
+  std::vector<FocusRect> out;
+  if (modal_) {
+    if (modal_->negotiation)
+      for (std::size_t index = 0; index < modal_->terms.size(); ++index)
+        out.push_back({modal_term_button(layout, index),
+                       modal_->terms[index].first});
+    else
+      out.push_back({modal_confirm_button(layout), modal_->confirm_label});
+    out.push_back({modal_cancel_button(layout),
+                   tr("SETTINGS_CANCEL", "Cancel")});
+  } else {
+    out.push_back({layout.close, tr("DIPLOMACY_RETURN", "RETURN")});
+    for (std::size_t index = 0; index < std::size(filter_labels); ++index)
+      out.push_back({filter_button(layout, index),
+                     tr(filter_keys[index], filter_labels[index].second)});
+    const auto rows = filtered_contacts();
+    for (std::size_t index = 0; index < rows.size(); ++index) {
+      const auto row_rect =
+          contact_row(layout, index, contact_scroll_.scroll_offset);
+      if (const auto clipped = intersection(row_rect, layout.contact_rows))
+        out.push_back(
+            {*clipped, rows[index]->display_name, row_rect, /*scroll_lane=*/1});
+    }
+    const auto &sel = view_->selected;
+    if (sel.present) {
+      // Same enumeration order as the click dispatch and renderer.
+      std::size_t action_index = 0;
+      const bool transmission =
+          sel.has_visible_communication || sel.can_attempt_communication;
+      const bool negotiate = sel.can_offer_non_aggression ||
+                             sel.can_request_access || sel.can_offer_peace ||
+                             sel.can_offer_ceasefire || sel.can_set_access;
+      const std::string action_names[] = {
+          sel.has_visible_communication
+              ? tr("DIPLOMACY_OPEN_TRANSMISSION", "Open transmission")
+              : tr("DIPLOMACY_ESTABLISH_COMMUNICATION",
+                   "Establish communication"),
+          tr("DIPLOMACY_NEGOTIATE", "Negotiate"),
+          tr("DIPLOMACY_DECLARE_WAR_ACTION", "Declare war")};
+      std::size_t which = 0;
+      for (const bool enabled : {transmission, negotiate, sel.can_declare_war}) {
+        if (!enabled) { ++which; continue; }
+        out.push_back({action_button(layout, action_index++),
+                       action_names[which++]});
+      }
+    }
+    for (std::size_t index = 0; index < std::size(tab_labels); ++index)
+      out.push_back({tab_button(layout, index),
+                     tr(tab_keys[index], tab_labels[index].second)});
+    if (tab_ == DiplomacyWorkspaceTab::proposals) {
+      const char *const proposal_names[] = {"DIPLOMACY_ACCEPT",
+                                            "DIPLOMACY_REJECT",
+                                            "DIPLOMACY_WITHDRAW"};
+      const char *const proposal_fallbacks[] = {"Accept", "Reject",
+                                                "Withdraw"};
+      for (std::size_t card = 0; card < view_->proposals.size(); ++card) {
+        const auto &proposal = view_->proposals[card];
+        const bool legal[] = {proposal.can_accept, proposal.can_reject,
+                              proposal.can_withdraw};
+        for (int which = 0; which < 3; ++which)
+          if (legal[which]) {
+            const auto button = proposal_button(layout, card, which,
+                                                detail_scroll_.scroll_offset);
+            if (const auto clipped =
+                    intersection(button, layout.detail_rows))
+              out.push_back(
+                  {*clipped,
+                   tr(proposal_names[which], proposal_fallbacks[which]),
+                   button, /*scroll_lane=*/2});
+          }
+      }
+    }
+    if (tab_ == DiplomacyWorkspaceTab::intelligence && sel.present) {
+      const auto &contact = view_->contacts[sel.contact_index];
+      if (contact.last_observed_system_id) {
+        const auto s = layout.scale;
+        const UiRect link{layout.detail_rows.x + 16.f * s,
+                          layout.detail_rows.y + 78.f * s - detail_scroll_.scroll_offset,
+                          layout.detail_rows.width - 32.f * s, 34.f * s};
+        if (const auto clipped = intersection(link, layout.detail_rows))
+          out.push_back(
+              {*clipped,
+               trf("DIPLOMACY_LAST_OBSERVATION",
+                   {contact.last_observed_system_name},
+                   "Last observation · {0}"),
+               link, /*scroll_lane=*/2});
+      }
+    }
+  }
+  std::sort(out.begin(), out.end(), [](const FocusRect &a, const FocusRect &b) {
+    return a.bounds.y == b.bounds.y ? a.bounds.x < b.bounds.x
+                                    : a.bounds.y < b.bounds.y;
+  });
+  return out;
+}
+
+std::string NativeDiplomacyWorkspace::focused_label(int width,
+                                                    int height) const {
+  if (focus_ < 0) return {};
+  const auto items =
+      focusables(DiplomacyWorkspaceLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
+}
+std::optional<stellar::native_map::UiRect>
+NativeDiplomacyWorkspace::focused_bounds(int width, int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto items =
+      focusables(DiplomacyWorkspaceLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
+
 DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
     const InputEvent &event, int width, int height) {
   if (!visible_ || !view_) return {};
   pointer_ = event.position;
   const auto layout = DiplomacyWorkspaceLayout::for_viewport(width, height);
-  if (event.type == InputEventType::PointerCancelled) return {};
+  if (event.type == InputEventType::PointerCancelled) {
+    focus_ = -1;
+    return {};
+  }
+
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    // SDL_Keycode: Tab/arrows walk the (y,x)-ordered focusables, Home/End
+    // jump to the ends, and Return/Space replay the click at the focused
+    // rect through the same dispatch pointer input takes.
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const auto rects = focusables(layout);
+    const int count = static_cast<int>(rects.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    // Rows clipped by a scroll viewport stay in the ring; when focus lands
+    // on a clipped row, snap its lane so the row is fully visible — which
+    // exposes the next row and keeps the whole list keyboard-reachable.
+    const auto snap_focused = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto &target = rects[static_cast<std::size_t>(focus_)];
+      if (!target.unclipped) return;
+      if (target.scroll_lane == 1) {
+        contact_scroll_.sync(filtered_contacts().size() * 62.f *
+                                     layout.scale +
+                                 12.f * layout.scale,
+                             layout.contact_rows.height);
+        contact_scroll_.scroll_interval_into_view(
+            target.unclipped->y, target.unclipped->y + target.unclipped->height,
+            layout.contact_rows.y,
+            layout.contact_rows.y + layout.contact_rows.height);
+      } else if (target.scroll_lane == 2) {
+        detail_scroll_.sync(detail_content_height(layout),
+                            layout.detail_rows.height);
+        detail_scroll_.scroll_interval_into_view(
+            target.unclipped->y, target.unclipped->y + target.unclipped->height,
+            layout.detail_rows.y,
+            layout.detail_rows.y + layout.detail_rows.height);
+      }
+    };
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused();
+      return {DiplomacyWorkspaceCommandKind::None, true};
+    }
+    if (count > 0 && (fwd || bwd)) {
+      focus_ = focus_ < 0 || focus_ >= count
+                   ? (bwd ? count - 1 : 0)
+                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      snap_focused();
+      return {DiplomacyWorkspaceCommandKind::None, true};
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto &rect = rects[static_cast<std::size_t>(focus_)].bounds;
+      InputEvent press{InputEventType::LeftPressed};
+      press.position = {rect.x + rect.width * .5f,
+                        rect.y + rect.height * .5f};
+      const int keep = focus_;
+      auto command = handle(press, width, height);
+      if (visible_ && !modal_) focus_ = keep;
+      command.captured = true;
+      return command;
+    }
+    // Unhandled keys keep falling through to global shortcuts.
+    return {};
+  }
 
   if (event.type == InputEventType::Wheel) {
     if (layout.contact_rows.contains(event.position)) {
       const auto rows = filtered_contacts();
-      const auto content = rows.size() * 62.f * layout.scale;
-      const auto limit = std::max(
-          0.f, content - layout.contact_rows.height + 12.f * layout.scale);
-      contact_scroll_ = std::clamp(contact_scroll_ - event.wheel_y * 26.f,
-                                   0.f, limit);
+      contact_scroll_.sync(
+          rows.size() * 62.f * layout.scale + 12.f * layout.scale,
+          layout.contact_rows.height);
+      contact_scroll_.scroll_by(-event.wheel_y * 26.f);
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
     if (layout.detail_rows.contains(event.position)) {
-      detail_scroll_ = std::clamp(detail_scroll_ - event.wheel_y * 26.f, 0.f,
-                                  detail_scroll_limit(layout));
+      detail_scroll_.sync(detail_content_height(layout),
+                          layout.detail_rows.height);
+      detail_scroll_.scroll_by(-event.wheel_y * 26.f);
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
     if (layout.surface.contains(event.position))
@@ -494,6 +693,10 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
   }
 
   if (event.type != InputEventType::LeftPressed) return {};
+
+  if (layout.surface.contains(event.position) ||
+      layout.modal_panel.contains(event.position))
+    focus_ = -1;
 
   if (modal_) {
     const auto &modal = *modal_;
@@ -549,21 +752,21 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
   for (std::size_t index = 0; index < std::size(filter_labels); ++index) {
     if (filter_button(layout, index).contains(event.position)) {
       filter_ = filter_labels[index].first;
-      contact_scroll_ = 0;
+      contact_scroll_ = {};
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
   }
   for (std::size_t index = 0; index < std::size(tab_labels); ++index) {
     if (tab_button(layout, index).contains(event.position)) {
       tab_ = tab_labels[index].first;
-      detail_scroll_ = 0;
+      detail_scroll_ = {};
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
   }
 
   const auto rows = filtered_contacts();
   for (std::size_t index = 0; index < rows.size(); ++index) {
-    const auto bounds = contact_row(layout, index, contact_scroll_);
+    const auto bounds = contact_row(layout, index, contact_scroll_.scroll_offset);
     const auto clipped = intersection(bounds, layout.contact_rows);
     if (clipped && clipped->contains(event.position)) {
       selected_contact_index_ = rows[index]->source_index;
@@ -668,7 +871,7 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
       for (int which = 0; which < 3; ++which) {
         if (!buttons[which].first) continue;
         const auto clipped = intersection(
-            proposal_button(layout, card, which, detail_scroll_),
+            proposal_button(layout, card, which, detail_scroll_.scroll_offset),
             layout.detail_rows);
         if (clipped && clipped->contains(event.position)) {
           DiplomacyWorkspaceCommand command{
@@ -687,7 +890,7 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
     if (contact.last_observed_system_id) {
       const auto s2 = layout.scale;
       const UiRect focus{layout.detail_rows.x + 16.f * s2,
-                         layout.detail_rows.y + 78.f * s2 - detail_scroll_,
+                         layout.detail_rows.y + 78.f * s2 - detail_scroll_.scroll_offset,
                          layout.detail_rows.width - 32.f * s2, 34.f * s2};
       if (const auto clipped = intersection(focus, layout.detail_rows);
           clipped && clipped->contains(event.position))
@@ -745,7 +948,7 @@ void NativeDiplomacyWorkspace::render(
          muted, layout.body_font_pixels);
   }
   for (std::size_t index = 0; index < rows.size(); ++index) {
-    const auto bounds = contact_row(layout, index, contact_scroll_);
+    const auto bounds = contact_row(layout, index, contact_scroll_.scroll_offset);
     if (bounds.y >= layout.contact_rows.y + layout.contact_rows.height ||
         bounds.y + bounds.height <= layout.contact_rows.y)
       continue;
@@ -949,7 +1152,7 @@ void NativeDiplomacyWorkspace::render(
   const auto card = [&](std::size_t index, float card_h) {
     const auto top = layout.detail_rows.y + 8.f * s +
                      static_cast<float>(index) * (card_h + 8.f * s) -
-                     detail_scroll_;
+                     detail_scroll_.scroll_offset;
     return UiRect{layout.detail_rows.x + 8.f * s, top,
                   layout.detail_rows.width - 16.f * s, card_h};
   };
@@ -1048,7 +1251,7 @@ void NativeDiplomacyWorkspace::render(
           {proposal.can_withdraw, tr("DIPLOMACY_WITHDRAW", "Withdraw")}};
       for (int which = 0; which < 3; ++which) {
         if (!buttons[which].first) continue;
-        const auto button = proposal_button(layout, index, which, detail_scroll_);
+        const auto button = proposal_button(layout, index, which, detail_scroll_.scroll_offset);
         const auto clipped = detail_clip(button);
         if (!clipped) continue;
         detail_fill(button, button.contains(pointer_) ? hover : inset);
@@ -1119,7 +1322,7 @@ void NativeDiplomacyWorkspace::render(
                 bright, layout.body_font_pixels);
       if (contact.last_observed_system_id) {
         const UiRect focus{layout.detail_rows.x + 16.f * s,
-                           layout.detail_rows.y + 78.f * s - detail_scroll_,
+                           layout.detail_rows.y + 78.f * s - detail_scroll_.scroll_offset,
                            layout.detail_rows.width - 32.f * s, 34.f * s};
         if (const auto clipped = detail_clip(focus)) {
           detail_fill(focus, focus.contains(pointer_) ? hover : row);
@@ -1225,6 +1428,11 @@ void NativeDiplomacyWorkspace::render(
     stroke(out, cancel, border);
     text(out, cancel, tr("SETTINGS_CANCEL", "Cancel"), muted,
          layout.body_font_pixels, TextAlign::Center);
+  }
+  if (focus_ >= 0) {
+    const auto rects = focusables(layout);
+    if (focus_ < static_cast<int>(rects.size()))
+      stroke(out, rects[static_cast<std::size_t>(focus_)].bounds, accent);
   }
 }
 

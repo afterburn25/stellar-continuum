@@ -1,8 +1,10 @@
 #include "native_system_workspace.hpp"
 #include "native_ui_layout.hpp"
 #include <algorithm>
+#include <cstdint>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 
 namespace stellar::native_system_ui {
 using namespace stellar::native_map;
@@ -43,9 +45,64 @@ void NativeSystemWorkspace::focus_small_body(int width,int height){tracked_body_
   small_body_focus_=true;
   dragging_=false;pending_initial_travel_fit_=false;small_body_panel_=false;
 }
+std::vector<std::pair<UiRect,std::string>>
+NativeSystemWorkspace::small_body_ring_targets(int width,int height)const{
+  const auto l=layout_for(width,height);
+  const auto fields=snapshot_?snapshot_->small_body_fields.size():0;
+  std::vector<std::pair<UiRect,std::string>> t;
+  t.emplace_back(l.launcher,trf("SMALLBODY_LAUNCHER",{std::to_string(fields)},"BELTS & DEBRIS  {0}"));
+  t.emplace_back(l.motion,motion_running_?tr("SMALLBODY_MOTION_ON","Motion ON / Pause"):tr("SMALLBODY_MOTION_OFF","Paused / Resume"));
+  if(small_body_panel_){
+    t.emplace_back(l.close,tr("SMALLBODY_CLOSE","Close"));
+    if(fields){
+      t.emplace_back(l.previous,tr("SMALLBODY_PREV","Previous field"));
+      t.emplace_back(l.next,tr("SMALLBODY_NEXT","Next field"));
+      t.emplace_back(l.body,tr("SMALLBODY_NEXT_BODY","Next body"));
+      t.emplace_back(l.large,tr("SMALLBODY_NEXT_LARGE","Next large"));
+      t.emplace_back(l.focus,tr("SMALLBODY_FOCUS","Focus body"));
+    }
+    if(snapshot_&&snapshot_->developer){
+      t.emplace_back(l.debug,small_body_debug_?tr("SMALLBODY_DEBUG_HIDE","Hide orbital bands / density debug"):tr("SMALLBODY_DEBUG_SHOW","Show orbital bands / density debug"));
+      constexpr std::array spawn_keys{"SMALLBODY_SPAWN_BELT","SMALLBODY_SPAWN_ICE","SMALLBODY_SPAWN_DISK","SMALLBODY_SPAWN_CRACKED"};
+      const std::array<std::string,4> spawn_names{tr(spawn_keys[0],"+ Asteroid belt"),tr(spawn_keys[1],"+ Ice belt"),tr(spawn_keys[2],"+ Debris disk"),tr(spawn_keys[3],"+ Cracked debris")};
+      for(std::size_t i=0;i<4;++i)t.emplace_back(l.spawn[i],spawn_names[i]);
+    }
+  }
+  std::sort(t.begin(),t.end(),[](const auto&a,const auto&b){return a.first.y!=b.first.y?a.first.y<b.first.y:a.first.x<b.first.x;});
+  return t;
+}
+std::string NativeSystemWorkspace::focused_label(int width,int height)const{
+  if(small_body_ring_<0||!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return{};
+  const auto ring=small_body_ring_targets(width,height);
+  if(small_body_ring_>=static_cast<int>(ring.size()))return{};
+  return ring[static_cast<std::size_t>(small_body_ring_)].second;
+}
+std::optional<UiRect> NativeSystemWorkspace::focused_bounds(int width,int height)const{
+  if(small_body_ring_<0||!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return std::nullopt;
+  const auto ring=small_body_ring_targets(width,height);
+  if(small_body_ring_>=static_cast<int>(ring.size()))return std::nullopt;
+  return ring[static_cast<std::size_t>(small_body_ring_)].first;
+}
 std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies(const InputEvent& e,int width,int height){
-  if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return std::nullopt;
+  if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed){small_body_ring_=-1;return std::nullopt;}
   const auto l=layout_for(width,height);const SystemWorkspaceCommand handled{SystemWorkspaceCommandKind::none,true};
+  if(e.type==InputEventType::LeftPressed||e.type==InputEventType::PointerCancelled)small_body_ring_=-1;
+  if(e.type==InputEventType::KeyPressed&&e.key){
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u,kHome=0x4000004au,kEnd=0x4000004du;
+    const auto targets=small_body_ring_targets(width,height);
+    const int count=static_cast<int>(targets.size());
+    const bool backward=e.key==kLeft||e.key==kUp||(e.key==kTab&&e.shift);
+    if(e.key==kTab||e.key==kRight||e.key==kDown||backward){small_body_ring_=small_body_ring_<0?0:(backward?small_body_ring_+count-1:small_body_ring_+1)%count;return handled;}
+    if(e.key==kHome||e.key==kEnd){small_body_ring_=e.key==kHome?0:count-1;return handled;}
+    if((e.key==kReturn||e.key==kSpace)&&small_body_ring_>=0&&small_body_ring_<count){
+      const auto r=targets[small_body_ring_].first;const int keep=small_body_ring_;
+      InputEvent press{InputEventType::LeftPressed,{r.x+r.width*.5f,r.y+r.height*.5f}};
+      const auto command=handle_small_bodies(press,width,height);
+      small_body_ring_=keep;
+      return command?*command:handled;
+    }
+    return std::nullopt;
+  }
   if(l.motion.contains(e.position)){
     dragging_=false;
     if(e.type==InputEventType::LeftPressed)return SystemWorkspaceCommand{SystemWorkspaceCommandKind::toggle_motion,true};
@@ -86,7 +143,12 @@ void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int 
   if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return;
   const auto l=layout_for(width,height);button(out,l.launcher,trf("SMALLBODY_LAUNCHER",{std::to_string(snapshot_->small_body_fields.size())},"BELTS & DEBRIS  {0}"));
   button(out,l.motion,motion_running_?tr("SMALLBODY_MOTION_ON","Motion ON / Pause"):tr("SMALLBODY_MOTION_OFF","Paused / Resume"));
-  if(!small_body_panel_)return;
+  const auto ring=[&]{
+    if(small_body_ring_<0)return;
+    const auto t=small_body_ring_targets(width,height);
+    if(small_body_ring_<static_cast<int>(t.size()))out.overlay.emplace_back(StrokedRectangle{t[static_cast<std::size_t>(small_body_ring_)].first,{164,221,237,255}});
+  };
+  if(!small_body_panel_){ring();return;}
   out.overlay.emplace_back(FilledRectangle{l.panel,{5,17,28,252}});out.overlay.emplace_back(StrokedRectangle{l.panel,{77,151,178,255}});
   label(out,{l.panel.x,l.panel.y+6*l.scale,l.panel.width-76*l.scale,32*l.scale},tr("SMALLBODY_TITLE","SMALL-BODY SURVEY"),{164,221,237,255},15);
   button(out,l.close,tr("SMALLBODY_CLOSE","Close"));button(out,l.previous,tr("SMALLBODY_PREV","Previous field"));button(out,l.next,tr("SMALLBODY_NEXT","Next field"));
@@ -120,5 +182,6 @@ void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int 
     for(std::size_t i=0;i<4;++i)button(out,l.spawn[i],spawn_names[i]);
     const auto& cfg=small_body_configuration();label(out,{l.panel.x,l.panel.y+429*l.scale,l.panel.width,17*l.scale},trf("SMALLBODY_CFG",{number(cfg.orbit_exponent),number(cfg.planet_scale),std::to_string(small_bodies_.statistics().batches)},"Orbit exponent {0} / planet x{1} / draws {2}"),{137,176,195,255},11);
   }
+  ring();
 }
 }

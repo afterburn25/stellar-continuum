@@ -312,11 +312,72 @@ void NativeVideoSettingsView::open(const NativeVideoSettings current) noexcept {
   reconcile_resolution();
   visible_ = true;
   confirming_ = false;
+  focus_ = -1;
 }
 void NativeVideoSettingsView::close() noexcept {
   dropdown_.close();
   visible_ = false;
   confirming_ = false;
+  focus_ = -1;
+}
+int NativeVideoSettingsView::collect_focusables(
+    const VideoSettingsLayout &layout, std::array<Focusable, 11> &out) const {
+  int count = 0;
+  if (confirming_) {
+    out[count++] = {layout.keep, -4, 1};
+    out[count++] = {layout.revert, -5, 2};
+    return count;
+  }
+  for (std::size_t i = 0; i < layout.choice_buttons.size(); ++i) {
+    if (i == 1 && values_.display == VideoDisplayMode::Borderless) continue;
+    out[count++] = {layout.choice_buttons[i], static_cast<int>(i), 10 + i};
+  }
+  if (open_panel_) out[count++] = {layout.nvidia, -1, 3};
+  out[count++] = {layout.apply, -2, 1};
+  out[count++] = {layout.cancel, -3, 2};
+  return count;
+}
+std::optional<stellar::native_map::UiRect>
+NativeVideoSettingsView::focused_bounds(int width, int height) const {
+  if (!visible_ || focus_ < 0) return std::nullopt;
+  const auto layout = VideoSettingsLayout::for_viewport(width, height);
+  std::array<Focusable, 11> focusables{};
+  const int count = collect_focusables(layout, focusables);
+  return focus_ < count
+             ? std::optional<stellar::native_map::UiRect>{
+                   focusables[static_cast<std::size_t>(focus_)].rect}
+             : std::nullopt;
+}
+std::string NativeVideoSettingsView::focused_label(int width, int height) const {
+  if (!visible_ || focus_ < 0) return {};
+  const auto layout = VideoSettingsLayout::for_viewport(width, height);
+  std::array<Focusable, 11> focusables{};
+  const int count = collect_focusables(layout, focusables);
+  if (focus_ >= count) return {};
+  const int target = focusables[static_cast<std::size_t>(focus_)].target;
+  switch (target) {
+  case -1: return tr("SETTINGS_VIDEO_OPEN_NVIDIA", "Open NVIDIA Control Panel");
+  case -2: return tr("SETTINGS_VIDEO_APPLY", "Apply");
+  case -3: return tr("SETTINGS_CANCEL", "Cancel");
+  case -4: return tr("SETTINGS_VIDEO_KEEP", "Keep");
+  case -5: return tr("SETTINGS_VIDEO_REVERT", "Revert");
+  default: break;
+  }
+  if (target < 0 || target >= 8) return {};
+  const std::array<std::string, 8> choice_values = {
+      std::string(display_name(values_.display)),
+      resolution_name(values_, actual_display_label_), std::string(vsync_name(values_.vsync)),
+      std::string(frame_cap_name(values_.frame_cap))+(values_.frame_cap==VideoFrameCap::Automatic?" · "+actual_display_label_:""),
+      values_.scene_samples==1?"Off":std::to_string(values_.scene_samples)+"x supersampling",
+      std::to_string(values_.scene_resolution_percent)+"%"+(values_.scene_resolution_percent==100?" · Native":" · Reduced"),
+      std::array<std::string,4>{"Low","Medium","High","Ultra"}[values_.starfield_quality],
+      std::array<std::string,3>{"Low","Normal","High"}[values_.starfield_density]};
+  const std::array<std::string_view, 8> choice_keys = {
+      "SETTINGS_VIDEO_DISPLAY", "SETTINGS_VIDEO_RESOLUTION", "SETTINGS_VIDEO_VSYNC",
+      "SETTINGS_VIDEO_FRAME_CAP", "SETTINGS_VIDEO_SMOOTHING", "SETTINGS_VIDEO_SCENE_RES",
+      "SETTINGS_VIDEO_STARFIELD_QUALITY", "SETTINGS_VIDEO_STARFIELD_DENSITY"};
+  const auto index = static_cast<std::size_t>(target);
+  return tr(choice_keys[index], choice_names[index]) + ": " + choice_values[index];
 }
 void NativeVideoSettingsView::set_display_choices(
     std::vector<VideoDisplayChoice> choices, std::string actual_display_label) {
@@ -425,6 +486,46 @@ NativeVideoSettingsView::handle(const InputEvent &event, const int width,
     if(layout.choice_buttons[i].contains(event.position))target=10+i;
   }
   hover_feedback_.update(event,target);
+
+  if (event.type == InputEventType::LeftPressed) focus_ = -1;
+  if (event.type == InputEventType::KeyPressed) {
+    // SDL_Keycode: Tab/arrows ring the live controls, Home/End jump to
+    // the ends, Return/Space activate through the same commands/clicks.
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    std::array<Focusable, 11> focusables{};
+    const int count = collect_focusables(layout, focusables);
+    if (event.key == kHome || event.key == kEnd) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      hover_feedback_.cue(focusables[focus_].cue);
+      return result;
+    }
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    if (fwd || bwd) {
+      if (focus_ < 0) focus_ = bwd ? count - 1 : 0;
+      else focus_ = (focus_ + (bwd ? -1 : 1) + count) % count;
+      if (focus_ >= count) focus_ = 0;
+      hover_feedback_.cue(focusables[focus_].cue);
+      return result;
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 && focus_ < count) {
+      switch (focusables[focus_].target) {
+        case -1: try { open_panel_(); } catch (const std::exception &e) { set_error(e.what()); } break;
+        case -2: result.command = VideoSettingsCommand::Apply; break;
+        case -3: result.command = VideoSettingsCommand::Cancel; break;
+        case -4: result.command = VideoSettingsCommand::Keep; break;
+        case -5: result.command = VideoSettingsCommand::Revert; break;
+        default: open_choice(focusables[focus_].target); break;
+      }
+      return result;
+    }
+    return result;
+  }
 
   if (confirming_) {
     if (event.type == InputEventType::EscapePressed ||
@@ -562,6 +663,13 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
          text_muted, layout.body_font_pixels);
     draw_button(layout.keep, tr("SETTINGS_VIDEO_KEEP", "KEEP"));
     draw_button(layout.revert, tr("SETTINGS_VIDEO_REVERT", "REVERT"));
+  }
+  if (focus_ >= 0) {
+    std::array<Focusable, 11> focusables{};
+    const int count = collect_focusables(layout, focusables);
+    if (focus_ < count)
+      out.overlay.emplace_back(stellar::native_map::StrokedRectangle{
+          focusables[focus_].rect, {160, 210, 255, 255}});
   }
 }
 

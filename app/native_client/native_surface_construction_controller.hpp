@@ -6,11 +6,15 @@
 #include <stellar/core/surface_construction.hpp>
 
 #include <cstdint>
+#include <initializer_list>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <variant>
+
+namespace stellar::engine { class LocalizationTable; }
 
 namespace stellar::native_colony {
 
@@ -87,6 +91,10 @@ public:
   [[nodiscard]] bool cancel_quote(std::uint64_t campaign_generation,
                                   std::uint64_t quote_revision);
   [[nodiscard]] bool is_current_generation(std::uint64_t) const noexcept;
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
 
 private:
   struct PlacementRecord {
@@ -122,6 +130,12 @@ private:
       const stellar::core::Colony &, NativeSurfaceManagementAction, int);
   void require_owner() const;
   void bind_generation(std::uint64_t);
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string trf(std::string_view key,
+                                std::initializer_list<std::string> args,
+                                std::string_view fallback) const;
+  const stellar::engine::LocalizationTable *locale_{};
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
   std::uint64_t next_quote_revision_{1};

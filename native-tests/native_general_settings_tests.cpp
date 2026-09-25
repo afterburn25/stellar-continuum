@@ -1,9 +1,12 @@
 #include "native_general_settings.hpp"
+#include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/engine/localization.hpp>
 
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -65,7 +68,7 @@ void empty_default_and_unicode_round_trip(const TempDirectory& temp) {
   require(json.find("\"schemaVersion\":1") != std::string::npos,
           "schema version was not persisted");
   require(reloaded.saved().nebula_density==1,"Nebula preference did not default to Medium");
-  auto navigator=reloaded.saved();navigator.asset_categories_collapsed={true,false,true,false,true};navigator.assets_hidden=true;navigator.nebula_density=2;navigator.reduce_motion=true;
+  auto navigator=reloaded.saved();navigator.asset_categories_collapsed={true,false,true,false,true};navigator.assets_hidden=true;navigator.nebula_density=2;navigator.accessibility.reduce_motion=true;navigator.accessibility.subtitles_enabled=false;navigator.accessibility.subtitle_scale=1.5f;navigator.accessibility.text_scale=0.75f;
   require(reloaded.save(navigator),"Navigator preferences failed to save");
   NativeGeneralSettings navigator_reload(file);
   require(navigator_reload.saved()==navigator,"Category collapse/hide preferences did not round-trip with screenshot path");
@@ -86,6 +89,7 @@ void invalid_files_use_default(const TempDirectory& temp) {
       "{\"schemaVersion\":1,\"screenshotDirectory\":\"" + non_directory + "\"}",
       "{\"schemaVersion\":1,\"screenshotDirectory\":\"" + nul_path + "\"}",
       R"({"schemaVersion":1,"screenshotDirectory":"","assetCategoriesCollapsed":[false,true,false,true,false],"assetsHidden":false,"nebulaDensity":1,"eruptionQuality":2,"reduceMotion":1})",
+      R"({"schemaVersion":1,"screenshotDirectory":"","interfaceScale":4})",
       std::string(4097, 'x')};
   for (const auto& contents : invalid) {
     write_raw(file, contents);
@@ -195,8 +199,17 @@ void layouts_fit_and_keep_controls_separate() {
     };
     for (const auto rect : {layout.panel, layout.audio, layout.video, layout.folder,
                             layout.status, layout.browse, layout.defaults,
-                            layout.cancel, layout.save, layout.motion})
+                            layout.cancel, layout.save, layout.motion,
+                            layout.subtitles, layout.subtitle_scale,
+                            layout.text_scale})
       require(inside(rect), "General Settings layout escaped the viewport");
+    require(!overlaps(layout.subtitles, layout.folder) &&
+                !overlaps(layout.subtitle_scale, layout.folder) &&
+                !overlaps(layout.text_scale, layout.folder) &&
+                !overlaps(layout.subtitles, layout.language) &&
+                !overlaps(layout.subtitle_scale, layout.subtitles) &&
+                !overlaps(layout.text_scale, layout.subtitle_scale),
+            "subtitle/text scale rows overlap another General Settings region");
     require(!overlaps(layout.audio, layout.video), "audio and video navigation overlap");
     require(!overlaps(layout.folder, layout.status), "folder path and status areas overlap");
     require(!overlaps(layout.motion, layout.nebula) && !overlaps(layout.motion, layout.eruptions) &&
@@ -341,6 +354,104 @@ void navigation_cancels_and_closed_view_ignores_events(const TempDirectory& temp
   }
 }
 
+void keyboard_focus_traversal(const TempDirectory& temp) {
+  NativeGeneralSettings settings(temp.path / "focus.json");
+  require(settings.save({}), "could not seed focus preference");
+  int cues{}, audio_calls{};
+  settings.set_hover_callback([&] { ++cues; });
+  settings.set_navigation([&] { ++audio_calls; }, [] {});
+  settings.set_browse([](std::uint64_t, const auto&) { return true; });
+  settings.open();
+  const auto press = [&](std::uint32_t k, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = k;
+    event.shift = shift;
+    return settings.handle(event, 1280, 720);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kRight = 0x4000004fu, kUp = 0x40000052u;
+  require(settings.focused() < 0, "General Settings opened with stale focus");
+  require(settings.focused_label().empty(), "unfocused panel reported a label");
+  require(press(kTab) && settings.focused() == 0 && cues == 1,
+          "Tab did not focus AUDIO");
+  require(settings.focused_label() == "Audio", "focused_label did not name AUDIO");
+  require(press(kTab) && settings.focused() == 1, "second Tab did not reach VIDEO");
+  require(press(kTab, true) && settings.focused() == 0,
+          "Shift+Tab did not retreat focus");
+  require(press(kRight) && settings.focused() == 1 && press(kUp) &&
+              settings.focused() == 0,
+          "arrow keys did not move focus");
+  require(press(kReturn), "Return on focused AUDIO was not consumed");
+  require(!settings.visible() && audio_calls == 1,
+          "Return on focused AUDIO did not navigate");
+  settings.open();
+  // Space activates the focused toggle through the same dispatch as a click.
+  for (int i = 0; i < 5; ++i) (void)press(kTab);
+  require(settings.focused() == 4, "Tab chain did not reach REDUCE MOTION");
+  const bool motion = settings.draft().accessibility.reduce_motion;
+  require(settings.focused_label() ==
+              std::string("Reduced motion (decorative animation): ") +
+                  (motion ? "On" : "Off"),
+          "focused_label did not name REDUCE MOTION with its state");
+  require(press(kSpace) && settings.draft().accessibility.reduce_motion == !motion &&
+              settings.focused() == 4,
+          "Space did not toggle the focused preference in place");
+  require(settings.focused_label() ==
+              std::string("Reduced motion (decorative animation): ") +
+                  (!motion ? "On" : "Off"),
+          "focused_label did not track the toggled state");
+  // The subtitle/text rows announce their accessibility state and cycle
+  // their presets through the same dispatch.
+  for (int i = 0; i < 6; ++i) (void)press(kTab);
+  require(settings.focused() == 10 && settings.focused_label() ==
+              std::string("Subtitles: ") +
+                  (settings.draft().accessibility.subtitles_enabled ? "On" : "Off"),
+          "Tab chain did not reach SUBTITLES with its state");
+  require(press(kSpace) &&
+              settings.draft().accessibility.subtitles_enabled ==
+                  !settings.saved().accessibility.subtitles_enabled,
+          "Space did not toggle subtitles");
+  require(press(kTab) && settings.focused() == 11 &&
+              settings.focused_label() == "Subtitle size: 100%",
+          "Tab did not reach SUBTITLE SIZE at its default");
+  require(press(kSpace) && settings.draft().accessibility.subtitle_scale ==
+                                   1.25f &&
+              settings.focused_label() == "Subtitle size: 125%",
+          "Space did not cycle the subtitle scale preset");
+  require(press(kTab) && settings.focused() == 12 &&
+              settings.focused_label() == "Text size: 100%",
+          "Tab did not reach TEXT SIZE at its default");
+  require(press(kSpace) && settings.draft().accessibility.text_scale ==
+                                   1.25f &&
+              settings.focused_label() == "Text size: 125%",
+          "Space did not cycle the text scale preset");
+  // Focus wraps past SAVE (index 16) back onto AUDIO.
+  for (int i = 0; i < 4; ++i) (void)press(kTab);
+  require(settings.focused() == 16 && settings.focused_label() == "Save",
+          "Tab chain did not reach SAVE");
+  require(press(kTab) && settings.focused() == 0,
+          "focus did not wrap to the first control");
+  // Pointer presses take focus back; Return without focus activates nothing.
+  require(settings.focused() == 0, "refocus failed");
+  InputEvent click{};
+  click.type = InputEventType::LeftPressed;
+  click.position = {-20.f, -20.f};
+  require(settings.handle(click, 1280, 720) && settings.focused() < 0,
+          "pointer press did not clear keyboard focus");
+  require(press(kReturn) && settings.visible() && settings.focused() < 0,
+          "activation ran without focus");
+  // A pending folder browser narrows the ring to Cancel.
+  for (int i = 0; i < 14; ++i) (void)press(kTab);
+  require(settings.focused() == 13, "Tab chain did not reach BROWSE");
+  require(press(kReturn) && settings.browsing(),
+          "Return on focused BROWSE did not open the picker");
+  require(press(kTab) && settings.focused() == 0,
+          "browsing focus was not limited to Cancel");
+  require(press(kReturn) && !settings.visible() && !settings.browsing(),
+          "focused Cancel did not dismiss the pending browser");
+}
+
 void failed_save_keeps_draft_and_does_not_apply(const TempDirectory& temp) {
   const auto file = temp.path / "failed-ui-save.json";
   const auto first = temp.path / "failed-ui-first";
@@ -456,14 +567,87 @@ int main() {
     {
       NativeGeneralSettings motion(temp.path/"motion.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
       motion.open();click_button(motion,l.motion,"reduced motion toggle");
-      require(motion.draft().reduce_motion&&!motion.saved().reduce_motion,"Reduced motion click did not stay in draft");
+      require(motion.draft().accessibility.reduce_motion&&!motion.saved().accessibility.reduce_motion,"Reduced motion click did not stay in draft");
       click_button(motion,l.save,"save reduced motion");
       NativeGeneralSettings reloaded(temp.path/"motion.json");
-      require(reloaded.saved().reduce_motion,"Reduced motion preference did not persist");
+      require(reloaded.saved().accessibility.reduce_motion,"Reduced motion preference did not persist");
       reloaded.open();click_button(reloaded,l.motion,"reduced motion off");reloaded.cancel();
-      require(reloaded.saved().reduce_motion,"Cancel changed reduced motion");
+      require(reloaded.saved().accessibility.reduce_motion,"Cancel changed reduced motion");
       DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
       require(find_text_label(draw,"Reduced motion (decorative animation): On").value.size()>0,"Reduced motion state was not rendered");
+    }
+    {
+      NativeGeneralSettings scale(temp.path/"iscale.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      scale.open();click_button(scale,l.iscale,"interface scale cycle");
+      require(scale.draft().interface_scale==2&&scale.saved().interface_scale==1,"Interface scale click did not stay in draft");
+      click_button(scale,l.save,"save interface scale");
+      NativeGeneralSettings reloaded(temp.path/"iscale.json");
+      require(reloaded.saved().interface_scale==2,"Interface scale preference did not persist");
+      reloaded.open();click_button(reloaded,l.iscale,"interface scale cycle");click_button(reloaded,l.iscale,"interface scale wrap");reloaded.cancel();
+      require(reloaded.saved().interface_scale==2,"Cancel changed interface scale");
+      require(interface_scale_multiplier(0)<1.f&&interface_scale_multiplier(1)==1.f&&interface_scale_multiplier(2)>1.f,"Interface scale multipliers are not ordered");
+      const auto base=NativeUiLayout::for_viewport(1920,1080).scale;
+      NativeUiLayout::set_user_scale(interface_scale_multiplier(2));
+      const auto enlarged=NativeUiLayout::for_viewport(1920,1080).scale;
+      NativeUiLayout::set_user_scale(1.f);
+      require(enlarged>base,"Interface scale preference did not enlarge UI layout");
+      DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
+      require(find_text_label(draw,"Interface scale: Large").value.size()>0,"Interface scale state was not rendered");
+    }
+    {
+      NativeGeneralSettings flash(temp.path/"flash.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      flash.open();click_button(flash,l.flashing,"reduce flashing toggle");
+      require(flash.draft().accessibility.reduce_flashing&&!flash.saved().accessibility.reduce_flashing,"Reduce flashing click did not stay in draft");
+      click_button(flash,l.save,"save reduce flashing");
+      NativeGeneralSettings reloaded(temp.path/"flash.json");
+      require(reloaded.saved().accessibility.reduce_flashing,"Reduce flashing preference did not persist");
+      DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
+      require(find_text_label(draw,"Reduce flashing: On").value.size()>0,"Reduce flashing state was not rendered");
+    }
+    {
+      NativeGeneralSettings contrast(temp.path/"contrast.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      contrast.open();click_button(contrast,l.contrast,"high contrast toggle");
+      require(contrast.draft().accessibility.high_contrast&&!contrast.saved().accessibility.high_contrast,"High contrast click did not stay in draft");
+      click_button(contrast,l.save,"save high contrast");
+      NativeGeneralSettings reloaded(temp.path/"contrast.json");
+      require(reloaded.saved().accessibility.high_contrast,"High contrast preference did not persist");
+      DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
+      require(find_text_label(draw,"High contrast: On").value.size()>0,"High contrast state was not rendered");
+      // The global pass snaps dim text to the primary ink, leaves bright text.
+      DrawList sample;
+      sample.text.push_back(Text{{0,0},"dim",Color{111,132,148,255},15});
+      sample.overlay.emplace_back(Text{{0,0},"bright",Color{230,240,246,255},15});
+      stellar::native_ui::apply_high_contrast(sample);
+      require(sample.text.front().color.r>200,"High contrast pass left dim text dim");
+      require(std::get_if<Text>(&sample.overlay.front())->color.r==230,"High contrast pass recolored bright text");
+    }
+    {
+      NativeGeneralSettings colorblind(temp.path/"colorblind.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      colorblind.open();click_button(colorblind,l.colorblind,"color-blind cycle");
+      click_button(colorblind,l.colorblind,"color-blind cycle to deuteranopia");
+      require(colorblind.draft().accessibility.color_blind==stellar::engine::ColorBlindMode::Deuteranopia&&colorblind.saved().accessibility.color_blind==stellar::engine::ColorBlindMode::None,"Color-blind clicks did not stay in draft");
+      click_button(colorblind,l.save,"save color-blind mode");
+      NativeGeneralSettings reloaded(temp.path/"colorblind.json");
+      require(reloaded.saved().accessibility.color_blind==stellar::engine::ColorBlindMode::Deuteranopia,"Color-blind preference did not persist");
+      reloaded.open();click_button(reloaded,l.colorblind,"color-blind to tritanopia");
+      require(reloaded.draft().accessibility.color_blind==stellar::engine::ColorBlindMode::Tritanopia,"Color-blind cycle did not reach Tritanopia");
+      click_button(reloaded,l.colorblind,"color-blind wrap");
+      require(reloaded.draft().accessibility.color_blind==stellar::engine::ColorBlindMode::None,"Color-blind cycle did not wrap to Off");
+      reloaded.cancel();
+      DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
+      require(find_text_label(draw,"Color-blind mode: Deuteranopia").value.size()>0,"Color-blind state was not rendered");
+      // Daltonization keeps red/green accents distinguishable: the lost
+      // red-green contrast lands in the blue channel a deuteranope sees.
+      DrawList pair;
+      pair.overlay.emplace_back(FilledRectangle{{0,0,10,10},Color{220,40,40,255}});
+      pair.overlay.emplace_back(FilledRectangle{{0,0,10,10},Color{40,180,60,255}});
+      stellar::native_ui::apply_color_blind(pair,stellar::engine::ColorBlindMode::Deuteranopia);
+      const auto* red=std::get_if<FilledRectangle>(&pair.overlay.front());
+      const auto* green=std::get_if<FilledRectangle>(&pair.overlay.back());
+      require(red&&green&&std::abs(int(red->color.b)-int(green->color.b))>40,"Color-blind pass left a confused red/green pair indistinguishable");
+      DrawList untouched;untouched.overlay.emplace_back(FilledRectangle{{0,0,10,10},Color{220,40,40,255}});
+      stellar::native_ui::apply_color_blind(untouched,stellar::engine::ColorBlindMode::None);
+      require(std::get_if<FilledRectangle>(&untouched.overlay.front())->color.r==220,"Color-blind None mode altered a color");
     }
     {
       // Localization: loaded keys override literals; missing keys fall back.
@@ -480,11 +664,47 @@ int main() {
       require(find_text_label(draw,"SAVE").value=="SAVE","Missing key did not fall back to the literal");
       require(find_text_label(draw,"SCREENSHOT FOLDER").value=="SCREENSHOT FOLDER","Unlisted label did not fall back to the literal");
     }
+    {
+      // Language: the preference persists and cycles the discovered list.
+      NativeGeneralSettings language(temp.path/"language.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      language.set_locales({"en","de"});
+      language.open();click_button(language,l.language,"language cycle to German");
+      require(language.draft().locale=="de"&&language.saved().locale=="en","Language click did not stay in draft");
+      DrawList german_draw;language.render(german_draw,1280,720);
+      require(find_text_label(german_draw,"Language: Deutsch").value=="Language: Deutsch","Language state was not rendered");
+      click_button(language,l.save,"save language");
+      NativeGeneralSettings reloaded(temp.path/"language.json");
+      require(reloaded.saved().locale=="de","Language preference did not persist");
+      reloaded.set_locales({"en","de"});
+      reloaded.open();click_button(reloaded,l.language,"language wrap");
+      require(reloaded.draft().locale=="en","Language cycle did not wrap to English");
+      reloaded.cancel();
+    }
+#ifdef STELLAR_LOCALE_DIR
+    {
+      // Layout expansion: render General Settings under the shipped German
+      // catalog — translations run longer than the English literals, so this
+      // exercises the same label paths against the longest shipped strings.
+      stellar::engine::LocalizationTable german{"de","en"};
+      std::string gerr;
+      require(german.load_file(std::string(STELLAR_LOCALE_DIR)+"/de.json",&gerr),("de.json rejected: "+gerr).c_str());
+      NativeGeneralSettings settings(temp.path/"german-render.json");
+      settings.set_localization(&german);
+      settings.set_locales({"en","de"});
+      settings.open();
+      DrawList draw;settings.render(draw,1280,720);
+      require(find_text_label(draw,"ALLGEMEINE EINSTELLUNGEN").value=="ALLGEMEINE EINSTELLUNGEN","German title was not rendered");
+      require(find_text_label(draw,"Sprache: English").value=="Sprache: English","German language label was not rendered");
+      require(find_text_label(draw,"SPEICHERN").value=="SPEICHERN","German save label was not rendered");
+      settings.cancel();
+    }
+#endif
     invalid_files_use_default(temp);
     rejected_saves_retain_saved_preference(temp);
     picker_save_cancel_and_default_flow(temp);
     layouts_fit_and_keep_controls_separate();
     navigation_cancels_and_closed_view_ignores_events(temp);
+    keyboard_focus_traversal(temp);
     failed_save_keeps_draft_and_does_not_apply(temp);
     long_unicode_path_wrap_cache_and_scroll(temp);
   } catch (const std::exception& error) {

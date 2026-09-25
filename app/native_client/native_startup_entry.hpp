@@ -4,6 +4,7 @@
 #include "native_startup_workspace.hpp"
 #include "native_developer_access.hpp"
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <chrono>
@@ -18,6 +19,7 @@ namespace stellar::native_audio { class NativeAudioSettings; }
 namespace stellar::native_general { class NativeGeneralSettings; }
 namespace stellar::native_settings { class NativeSettingsHub; }
 namespace stellar::native_audio { class NativeVoiceSettings; }
+namespace stellar::native_client { class NativeAccessibilityBridge; }
 namespace stellar::engine { class LocalizationTable; }
 namespace stellar::native_startup_ui {
 struct StartupAudioHooks {
@@ -38,6 +40,13 @@ struct StartupEntryConfig {
   stellar::native_settings::NativeSettingsHub* settings_hub{};
   stellar::native_audio::NativeVoiceSettings* voice_settings{};
   std::function<void(stellar::native_map::DrawList&,int,int)> caption;
+  // Optional live-region sink — focus-ring changes announce localized labels
+  // here; the caption hook drains it into the voice-caption fallback.
+  stellar::engine::AccessibilityAnnouncer *announcer{};
+  // Optional interactive-AT sink — queued UIA Invoke calls drain here as
+  // Return press+release events so assistive activation rides the same
+  // dispatch path as the keyboard.
+  stellar::native_client::NativeAccessibilityBridge *accessibility_bridge{};
   stellar::engine::DeveloperAccess *developer_access{};
   const stellar::engine::LocalizationTable *locale{};
 };

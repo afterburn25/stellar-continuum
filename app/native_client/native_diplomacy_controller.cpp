@@ -4,6 +4,7 @@
 #include <stellar/core/diplomacy_lifecycle.hpp>
 #include <stellar/core/diplomacy_observer_commands.hpp>
 #include <stellar/core/species_environment.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -40,6 +41,31 @@ using namespace stellar::core;
                           std::toupper(static_cast<unsigned char>(c)))
                     : c;
     boundary = false;
+  }
+  return out;
+}
+
+std::string resolve(const stellar::engine::LocalizationTable *locale,
+                    std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+
+std::string resolved(const stellar::engine::LocalizationTable *locale,
+                     std::string_view key,
+                     std::initializer_list<std::string> args,
+                     std::string_view fallback) {
+  if (locale && locale->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
   }
   return out;
 }
@@ -111,6 +137,49 @@ using namespace stellar::core;
   }
   return "proposal";
 }
+// Display-name resolvers for the two vocabularies players read as statuses.
+// Enum-derived strings for agreements, proposals, events, awareness and
+// condition remain stable data tokens until they get keyed coverage.
+std::string political_name(const stellar::engine::LocalizationTable *locale,
+                           DiplomaticPoliticalState value) {
+  switch (value) {
+  case DiplomaticPoliticalState::unknown:
+    return resolve(locale, "DIPLOMACY_STATE_UNKNOWN", "Unknown");
+  case DiplomaticPoliticalState::peace:
+    return resolve(locale, "DIPLOMACY_STATE_PEACE", "Peace");
+  case DiplomaticPoliticalState::hostile:
+    return resolve(locale, "DIPLOMACY_STATE_HOSTILE", "Hostile");
+  case DiplomaticPoliticalState::at_war:
+    return resolve(locale, "DIPLOMACY_STATE_AT_WAR", "AtWar");
+  case DiplomaticPoliticalState::ceasefire:
+    return resolve(locale, "DIPLOMACY_STATE_CEASEFIRE", "Ceasefire");
+  }
+  return resolve(locale, "DIPLOMACY_STATE_UNKNOWN", "Unknown");
+}
+std::string access_name(const stellar::engine::LocalizationTable *locale,
+                        AccessPermission value) {
+  switch (value) {
+  case AccessPermission::unspecified:
+    return resolve(locale, "DIPLOMACY_ACCESS_UNSPECIFIED", "UNSPECIFIED");
+  case AccessPermission::granted:
+    return resolve(locale, "DIPLOMACY_ACCESS_GRANTED", "GRANTED");
+  case AccessPermission::denied:
+    return resolve(locale, "DIPLOMACY_ACCESS_DENIED", "DENIED");
+  }
+  return resolve(locale, "DIPLOMACY_ACCESS_UNSPECIFIED", "UNSPECIFIED");
+}
+std::string agreement_status_name(
+    const stellar::engine::LocalizationTable *locale,
+    DiplomaticAgreementStatus value) {
+  switch (value) {
+  case DiplomaticAgreementStatus::active:
+    return resolve(locale, "DIPLOMACY_AGREEMENT_ACTIVE", "ACTIVE");
+  case DiplomaticAgreementStatus::terminated:
+    return resolve(locale, "DIPLOMACY_AGREEMENT_TERMINATED", "TERMINATED");
+  }
+  return resolve(locale, "DIPLOMACY_AGREEMENT_TERMINATED", "TERMINATED");
+}
+
 [[nodiscard]] std::string_view name_of(DiplomaticEventKind value) noexcept {
   switch (value) {
   case DiplomaticEventKind::contact_observed: return "contact observed";
@@ -278,7 +347,8 @@ struct Projection {
 }
 
 [[nodiscard]] Projection project(CampaignFrame &frame, std::uint64_t generation,
-                                 std::size_t contact_index) {
+                                 std::size_t contact_index,
+                                 const stellar::engine::LocalizationTable *locale) {
   auto &runtime = frame.runtime();
   auto &world = runtime.world().campaign();
   const auto observer = world.player_civilization_id;
@@ -290,7 +360,8 @@ struct Projection {
         std::ranges::find(world.civilizations, id, &Civilization::id);
     return found != world.civilizations.end()
                ? found->name
-               : "Civilization " + std::to_string(id);
+               : resolved(locale, "DIPLOMACY_CIVILIZATION_NAME",
+                          {std::to_string(id)}, "Civilization {0}");
   };
 
   Projection out;
@@ -320,8 +391,11 @@ struct Projection {
           });
       if (found != view.relationships.end()) relationship = &*found;
       row.display_name = identified_name(target);
-      row.status = relationship ? std::string(name_of(relationship->political_state))
-                                : "NO FORMAL RELATIONSHIP";
+      row.political_state =
+          relationship ? std::optional{relationship->political_state}
+                       : std::nullopt;
+      row.status = relationship ? political_name(locale, relationship->political_state)
+                                : resolve(locale, "DIPLOMACY_NO_RELATIONSHIP", "NO FORMAL RELATIONSHIP");
       row.cooperation = relationship
                             ? std::optional<double>{relationship->cooperation}
                             : std::nullopt;
@@ -340,14 +414,15 @@ struct Projection {
             row.species_name = profile.display_name;
       }
     } else {
-      row.display_name = "UNKNOWN CONTACT";
-      row.status = "IDENTITY UNKNOWN";
+      row.display_name = resolve(locale, "DIPLOMACY_UNKNOWN_CONTACT", "UNKNOWN CONTACT");
+      row.status = resolve(locale, "DIPLOMACY_IDENTITY_UNKNOWN", "IDENTITY UNKNOWN");
     }
     const bool channel = contact.communication_available &&
                          contact.condition != ContactCondition::stale_or_lost;
     row.communication_available = channel;
     row.communication =
-        channel ? "CHANNEL AVAILABLE" : "CHANNEL UNAVAILABLE";
+        channel ? resolve(locale, "DIPLOMACY_CHANNEL_AVAILABLE", "CHANNEL AVAILABLE")
+                : resolve(locale, "DIPLOMACY_CHANNEL_UNAVAILABLE", "CHANNEL UNAVAILABLE");
     if (row.last_observed_system_id)
       row.last_observed_system_name = observer_safe_system_name(
           world, view, *row.last_observed_system_id);
@@ -368,14 +443,17 @@ struct Projection {
     s.has_visible_communication = channel;
     s.contact_name = raw.target_civilization_id
                          ? contact_row.display_name
-                         : "UNIDENTIFIED CONTACT " + contact_row.contact_id;
+                         : resolved(locale, "DIPLOMACY_UNIDENTIFIED_CONTACT",
+                                    {contact_row.contact_id}, "UNIDENTIFIED CONTACT {0}");
     s.contact_status =
-        std::string(name_of(raw.awareness)) + " · " +
-        std::string(name_of(raw.condition)) + " · " +
-        std::to_string(static_cast<int>(std::lround(raw.confidence * 100.))) +
-        "% confidence";
+        resolved(locale, "DIPLOMACY_CONTACT_STATUS",
+                 {std::string(name_of(raw.awareness)),
+                  std::string(name_of(raw.condition)),
+                  std::to_string(static_cast<int>(std::lround(raw.confidence * 100.)))},
+                 "{0} · {1} · {2}% confidence");
     s.communication_status =
-        channel ? "Channel available" : "Channel unavailable";
+        channel ? resolve(locale, "DIPLOMACY_CHANNEL_AVAILABLE_SHORT", "Channel available")
+                : resolve(locale, "DIPLOMACY_CHANNEL_UNAVAILABLE_SHORT", "Channel unavailable");
 
     const DiplomaticRelationshipView *relationship = nullptr;
     if (s.target_civilization_id) {
@@ -388,9 +466,10 @@ struct Projection {
     const auto political = relationship ? relationship->political_state
                                         : DiplomaticPoliticalState::unknown;
     s.political_status =
-        relationship ? std::string(name_of(relationship->political_state))
-                     : (s.target_civilization_id ? "No formal relationship"
-                                                 : "Identity unknown");
+        relationship ? political_name(locale, relationship->political_state)
+                     : (s.target_civilization_id
+                            ? resolve(locale, "DIPLOMACY_NO_RELATIONSHIP_LONG", "No formal relationship")
+                            : resolve(locale, "DIPLOMACY_IDENTITY_UNKNOWN_LONG", "Identity unknown"));
     if (relationship) {
       s.trust = relationship->trust;
       s.hostility = relationship->hostility;
@@ -413,12 +492,15 @@ struct Projection {
                               ? latest_access(view, observer,
                                               *s.target_civilization_id)
                               : AccessPermission::unspecified;
-    s.their_access = std::string(name_of(inbound));
-    s.our_access = std::string(name_of(outbound));
+    s.their_access = access_name(locale, inbound);
+    s.our_access = access_name(locale, outbound);
     s.access_summary =
         s.target_civilization_id
-            ? "Your access: " + s.our_access + " · Their access: " + s.their_access
-            : "Transit rights unavailable until identification";
+            ? resolved(locale, "DIPLOMACY_ACCESS_SUMMARY",
+                       {s.our_access, s.their_access},
+                       "Your access: {0} · Their access: {1}")
+            : resolve(locale, "DIPLOMACY_ACCESS_UNIDENTIFIED",
+                      "Transit rights unavailable until identification");
 
     if (s.target_civilization_id) {
       const auto target = *s.target_civilization_id;
@@ -429,7 +511,8 @@ struct Projection {
         NativeDiplomacyAgreementRow row;
         row.agreement_id = agreement.agreement_id;
         row.type = words(name_of(agreement.type));
-        row.status = std::string(name_of(agreement.status));
+        row.agreement_status = agreement.status;
+        row.status = agreement_status_name(locale, agreement.status);
         row.started = format_campaign_date(
             static_cast<double>(agreement.started_at_tick) /
             static_cast<double>(DiplomacyCampaignClock::ticks_per_simulation_day));
@@ -442,15 +525,15 @@ struct Projection {
       }
       std::ranges::sort(v.agreements, {}, &NativeDiplomacyAgreementRow::agreement_id);
       const auto active = std::ranges::count_if(v.agreements, [](const auto &row) {
-        return row.status == "ACTIVE";
+        return row.agreement_status == DiplomaticAgreementStatus::active;
       });
       if (active == 0) {
-        s.agreements_summary = "No active agreements";
+        s.agreements_summary = resolve(locale, "DIPLOMACY_NO_AGREEMENTS", "No active agreements");
       } else {
         s.agreements_summary.clear();
         bool first = true;
         for (const auto &row : v.agreements)
-          if (row.status == "ACTIVE") {
+          if (row.agreement_status == DiplomaticAgreementStatus::active) {
             if (!first) s.agreements_summary += " · ";
             s.agreements_summary += row.type;
             first = false;
@@ -465,7 +548,8 @@ struct Projection {
         NativeDiplomacyProposalRow row;
         row.proposal_id = proposal.proposal_id;
         const bool incoming = proposal.recipient_civilization_id == observer;
-        row.direction = incoming ? "INCOMING" : "OUTGOING";
+        row.direction = incoming ? resolve(locale, "DIPLOMACY_INCOMING", "INCOMING")
+                                 : resolve(locale, "DIPLOMACY_OUTGOING", "OUTGOING");
         row.kind = words(name_of(proposal.kind));
         if (proposal.agreement_type)
           row.agreement_type = words(name_of(*proposal.agreement_type));
@@ -477,9 +561,10 @@ struct Projection {
       }
       std::ranges::sort(v.proposals, {}, &NativeDiplomacyProposalRow::proposal_id);
       s.proposal_summary = v.proposals.empty()
-                               ? "No pending proposals"
-                               : std::to_string(v.proposals.size()) +
-                                     " pending proposal(s)";
+                               ? resolve(locale, "DIPLOMACY_NO_PROPOSALS", "No pending proposals")
+                               : resolved(locale, "DIPLOMACY_PENDING_PROPOSALS",
+                                          {std::to_string(v.proposals.size())},
+                                          "{0} pending proposal(s)");
 
       for (const auto &event : view.recent_events) {
         if (!pair_matches(event.primary_civilization_id,
@@ -535,8 +620,10 @@ struct Projection {
   return out;
 }
 
-[[nodiscard]] NativeDiplomacyCommandOutcome stale() {
-  return {false, "The diplomacy state changed; review the current terms."};
+[[nodiscard]] NativeDiplomacyCommandOutcome stale(
+    const stellar::engine::LocalizationTable *locale) {
+  return {false, resolve(locale, "DIPLOMACY_MSG_CHANGED",
+                         "The diplomacy state changed; review the current terms.")};
 }
 
 } // namespace
@@ -553,12 +640,14 @@ std::vector<const NativeDiplomacyContact *> filter_native_diplomacy_contacts(
       case NativeDiplomacyContactFilter::cooperative:
         return contact.cooperation && *contact.cooperation >= .5;
       case NativeDiplomacyContactFilter::neutral:
-        return contact.status == "NO FORMAL RELATIONSHIP" ||
-               contact.status == "Unknown" || contact.status == "Peace";
+        return contact.identified &&
+               (!contact.political_state ||
+                *contact.political_state == stellar::core::DiplomaticPoliticalState::unknown ||
+                *contact.political_state == stellar::core::DiplomaticPoliticalState::peace);
       case NativeDiplomacyContactFilter::hostile:
-        return contact.status == "Hostile";
+        return contact.political_state == stellar::core::DiplomaticPoliticalState::hostile;
       case NativeDiplomacyContactFilter::at_war:
-        return contact.status == "AtWar";
+        return contact.political_state == stellar::core::DiplomaticPoliticalState::at_war;
       case NativeDiplomacyContactFilter::pending_proposal:
         return contact.pending_proposal_count > 0;
       case NativeDiplomacyContactFilter::communication_available:
@@ -584,7 +673,7 @@ NativeDiplomacyController::build(CampaignFrame &frame,
     revision_ = 0;
     signature_.reset();
   }
-  auto p = project(frame, generation, contact_index);
+  auto p = project(frame, generation, contact_index, locale_);
   if (!signature_ || *signature_ != p.signature) {
     if (revision_ == std::numeric_limits<std::uint64_t>::max())
       throw std::overflow_error("Native diplomacy revision is exhausted.");
@@ -602,9 +691,9 @@ NativeDiplomacyCommandOutcome NativeDiplomacyController::execute(
   require_owner();
   if (!generation_ || *generation_ != generation || revision != revision_ ||
       !signature_)
-    return stale();
-  auto check = project(frame, generation, 0);
-  if (check.signature != *signature_) return stale();
+    return stale(locale_);
+  auto check = project(frame, generation, 0, locale_);
+  if (check.signature != *signature_) return stale(locale_);
   auto &runtime = frame.runtime();
   const auto observer =
       runtime.world().campaign().player_civilization_id;
@@ -614,63 +703,68 @@ NativeDiplomacyCommandOutcome NativeDiplomacyController::execute(
   ObserverDiplomacyCommandResult result;
   switch (action) {
   case DiplomacyWorkspaceAction::establish_communication:
-    if (!target) return stale();
+    if (!target) return stale(locale_);
     result = service.establish_communication(observer, *target, tick);
     break;
   case DiplomacyWorkspaceAction::propose_non_aggression:
-    if (!target) return stale();
+    if (!target) return stale(locale_);
     result = service.send_proposal(
         observer, *target, DiplomaticProposalKind::agreement, tick,
         "Proposal for a non-aggression agreement.",
         DiplomaticAgreementType::non_aggression);
     break;
   case DiplomacyWorkspaceAction::request_access:
-    if (!target) return stale();
+    if (!target) return stale(locale_);
     result = service.send_proposal(observer, *target,
                                    DiplomaticProposalKind::access_request, tick,
                                    "Request for transit access.");
     break;
   case DiplomacyWorkspaceAction::offer_peace:
-    if (!target) return stale();
+    if (!target) return stale(locale_);
     result = service.send_proposal(observer, *target,
                                    DiplomaticProposalKind::peace_offer, tick,
                                    "Offer to establish peace.");
     break;
   case DiplomacyWorkspaceAction::offer_ceasefire:
-    if (!target) return stale();
+    if (!target) return stale(locale_);
     result = service.send_proposal(observer, *target,
                                    DiplomaticProposalKind::ceasefire_offer, tick,
                                    "Offer to establish a ceasefire.");
     break;
   case DiplomacyWorkspaceAction::grant_access:
-    if (!target) return stale();
+    if (!target) return stale(locale_);
     result = service.set_access_permission(observer, *target,
                                            AccessPermission::granted, tick);
     break;
   case DiplomacyWorkspaceAction::deny_access:
-    if (!target) return stale();
+    if (!target) return stale(locale_);
     result = service.set_access_permission(observer, *target,
                                            AccessPermission::denied, tick);
     break;
   case DiplomacyWorkspaceAction::declare_war:
-    if (!target) return stale();
+    if (!target) return stale(locale_);
     result = service.declare_war(observer, *target, tick);
     break;
   case DiplomacyWorkspaceAction::accept_proposal:
-    if (!proposal_id) return stale();
+    if (!proposal_id) return stale(locale_);
     result = service.respond_to_proposal(observer, *proposal_id, true, tick);
     break;
   case DiplomacyWorkspaceAction::reject_proposal:
-    if (!proposal_id) return stale();
+    if (!proposal_id) return stale(locale_);
     result = service.respond_to_proposal(observer, *proposal_id, false, tick);
     break;
   case DiplomacyWorkspaceAction::withdraw_proposal:
-    if (!proposal_id) return stale();
+    if (!proposal_id) return stale(locale_);
     result = service.withdraw_proposal(observer, *proposal_id, tick);
     break;
   }
   if (result.accepted) signature_.reset();
   return {result.accepted, result.message};
+}
+
+std::string NativeDiplomacyController::tr(std::string_view key,
+                                          std::string_view fallback) const {
+  return resolve(locale_, key, fallback);
 }
 
 void NativeDiplomacyController::require_owner() const {

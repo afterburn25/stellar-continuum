@@ -1,0 +1,94 @@
+#pragma once
+
+#include <atomic>
+#include <cstdint>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <string_view>
+
+#include <stellar/engine/accessibility.hpp>
+
+namespace stellar::native_client {
+
+// Platform assistive-technology bridge: raises OS notification events for each
+// drained AccessibilityAnnouncer item so screen readers can announce them.
+// Windows supplies a UI Automation provider over the game HWND (WM_GETOBJECT
+// subclass) and raises NotificationKind events; other platforms no-op.
+// Owner-thread only, matching the surfaces that feed it.
+class NativeAccessibilityBridge final {
+ public:
+  NativeAccessibilityBridge() = default;
+  ~NativeAccessibilityBridge();
+  NativeAccessibilityBridge(const NativeAccessibilityBridge &) = delete;
+  NativeAccessibilityBridge &operator=(const NativeAccessibilityBridge &) = delete;
+  NativeAccessibilityBridge(NativeAccessibilityBridge &&) = delete;
+  NativeAccessibilityBridge &operator=(NativeAccessibilityBridge &&) = delete;
+
+  // native_window is Window::native_window_handle() (HWND on Windows).
+  // Returns false when the platform supplies no backend.
+  [[nodiscard]] bool attach(void *native_window);
+  void detach();
+  [[nodiscard]] bool attached() const noexcept { return hwnd_ != nullptr; }
+  // Raises a notification for a live-region announcement. Returns false when
+  // unattached, the text is empty, or no assistive client is listening.
+  bool announce(std::string_view text);
+  // Raises a UIA focus-changed event carrying the label on a synthetic
+  // fragment so assistive clients see real focus tracking. Bounds (client
+  // pixels) project the control's real rect onto the fragment; control maps
+  // to the UIA control type so AT announces "button"/"slider" rather than a
+  // generic custom control. Same gates.
+  bool focus_changed(
+      std::string_view label,
+      std::optional<stellar::engine::AnnouncementBounds> bounds = std::nullopt,
+      std::optional<stellar::engine::AnnouncementRange> range = std::nullopt,
+      stellar::engine::AnnouncementControl control =
+          stellar::engine::AnnouncementControl::Custom,
+      std::optional<bool> checked = std::nullopt,
+      std::optional<stellar::engine::AnnouncementValue> value = std::nullopt,
+      std::optional<bool> expanded = std::nullopt);
+  // Subclassed window-procedure sink installed while attached — platform
+  // plumbing for the WM_GETOBJECT answer, not a general event API.
+  std::intptr_t handle_window_message(std::uintptr_t hwnd, unsigned message,
+                                      std::uintptr_t wparam, std::intptr_t lparam);
+  // Interactive slice: the Windows focus fragment answers IInvokeProvider
+  // for activatable controls (button/checkbox/edit/custom — sliders and
+  // groups stay read-only). Invoke calls arrive on a UIA worker thread, so
+  // they only queue here; the owner drains once per frame and injects the
+  // equivalent Return press+release through normal input dispatch, so AT
+  // activation stays on the same path as a keyboard user.
+  void queue_activation() noexcept;
+  [[nodiscard]] unsigned drain_activations() noexcept;
+  // Writable range slice: RangeValue SetValue calls on the focus fragment
+  // arrive on the same UIA worker thread, so they only queue here — latest
+  // wins, since a slider only cares about its final value. The owner drains
+  // once per frame and routes the value to whichever visible surface owns
+  // the focused slider.
+  void queue_range_set(double value) noexcept;
+  [[nodiscard]] std::optional<double> take_range_set() noexcept;
+  // Writable value slice: Value SetValue calls on an Edit focus fragment
+  // queue the text (latest wins) for the owner to route through
+  // set_focused_text to whichever surface owns the focused edit.
+  void queue_text_set(std::string text);
+  [[nodiscard]] std::optional<std::string> take_text_set();
+  // Expand/collapse slice: ExpandCollapse calls on a tree-node focus
+  // fragment queue the requested state (latest wins) for the owner to
+  // route through set_focused_expanded to whichever surface owns the
+  // focused expandable row.
+  void queue_expansion(bool expand) noexcept;
+  [[nodiscard]] std::optional<bool> take_expansion_set() noexcept;
+
+ private:
+  void *hwnd_{};
+  void *provider_{};        // IRawElementProviderSimple*, owned by the bridge
+  void *original_proc_{};   // previous WNDPROC
+  std::atomic<unsigned> pending_activations_{};
+  std::atomic<double> pending_range_set_{};
+  std::atomic<bool> range_set_pending_{};
+  std::mutex text_set_mutex_;
+  std::optional<std::string> pending_text_set_;
+  std::atomic<bool> pending_expansion_{};
+  std::atomic<bool> expansion_pending_{};
+};
+
+} // namespace stellar::native_client

@@ -83,6 +83,9 @@ int main() {
               text.find("host.run(argc, argv)") != std::string::npos &&
               text.find("on_update") != std::string::npos,
           "windowed starter is a RuntimeHost client");
+    check(text.find("engine::SimulationExecutor") != std::string::npos &&
+              text.find("sim.advance()") != std::string::npos,
+          "windowed starter demonstrates the simulation executor");
   }
 
   // The blank template emits a console host linking stellar::engine only.
@@ -395,6 +398,7 @@ int main() {
     cube.ttl = 12.f;
     cube.data = "loot:gold";
     cube.parent = "ship";
+    cube.vfx = "trail";
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -423,6 +427,15 @@ int main() {
     scene.emitters.push_back(engine::SceneEmitterDef{});
     scene.emitters.back().id = "trail";
     scene.emitters.back().rate = 12.f;
+    engine::Scene3dLight fill;
+    fill.dir_x = -0.5f;
+    fill.dir_y = 0.1f;
+    fill.dir_z = -0.8f;
+    fill.r = 0.3f;
+    fill.g = 0.5f;
+    fill.b = 1.0f;
+    fill.intensity = 0.6f;
+    scene.lights.push_back(fill);
     const auto reparsed =
         engine::Scene3dDocument::from_json(scene.to_json());
     check(reparsed.has_value(), "scene3d json round-trips");
@@ -439,7 +452,7 @@ int main() {
                 rc.opacity == 0.75f && rc.double_sided &&
                 rc.gravity_scale == 0.5f && rc.solid &&
                 rc.ttl == 12.f && rc.data == "loot:gold" &&
-                rc.parent == "ship",
+                rc.parent == "ship" && rc.vfx == "trail",
             "scene3d entity fields round-trip");
       check(reparsed->cam_y == 2.f && reparsed->cam_z == 8.f &&
                 reparsed->cam_yaw_deg == 30.f &&
@@ -460,6 +473,15 @@ int main() {
                 reparsed->emitters[0].id == "trail" &&
                 reparsed->emitters[0].rate == 12.f,
             "scene3d world fields round-trip");
+      check(reparsed->lights.size() == 1 &&
+                reparsed->lights[0].dir_x == -0.5f &&
+                reparsed->lights[0].dir_y == 0.1f &&
+                reparsed->lights[0].dir_z == -0.8f &&
+                reparsed->lights[0].r == 0.3f &&
+                reparsed->lights[0].g == 0.5f &&
+                reparsed->lights[0].b == 1.0f &&
+                reparsed->lights[0].intensity == 0.6f,
+            "scene3d fill light round-trips");
       const auto path = root / "editor" / "scene3d.json";
       scene.save(path);
       const auto loaded = engine::Scene3dDocument::load(path);

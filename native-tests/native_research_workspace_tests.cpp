@@ -199,6 +199,97 @@ void pan_graph(NativeResearchWorkspace &workspace, UiRect graph, Point delta) {
           lines * (text.font_pixel_size + 3)};
 }
 
+void keyboard_focus_traversal() {
+  constexpr std::uint32_t kTab = 9u;
+  constexpr std::uint32_t kReturn = 13u;
+  constexpr std::uint32_t kHome = 0x4000004au;
+  constexpr std::uint32_t kEnd = 0x4000004du;
+  constexpr std::uint32_t kDigit5 = '5';
+  const int width = 1280, height = 720;
+  NativeResearchWorkspace workspace;
+  workspace.open();
+  workspace.set_window(sample_window());
+  DrawList draw;
+  workspace.render(draw, width, height); // registers interface hits
+  const auto key = [&](std::uint32_t k, bool shift = false) {
+    InputEvent event{InputEventType::KeyPressed};
+    event.key = k;
+    event.shift = shift;
+    return workspace.handle(event, width, height);
+  };
+  require(workspace.focus() < 0, "Focus should start unset.");
+  require(workspace.focused_label(width, height).empty(),
+          "Unfocused workspace reported a label.");
+  // Ordered ring begins with the close control at the surface top.
+  require(key(kTab).captured && workspace.focus() == 0,
+          "Tab did not land on the first focusable.");
+  require(workspace.focused_label(width, height) == "Close research",
+          "Focused close control label mismatch.");
+  require(key(kTab).captured && workspace.focus() == 1,
+          "Tab did not advance focus.");
+  require(key(kTab, true).captured && workspace.focus() == 0,
+          "Shift+Tab did not retreat focus.");
+  // Four view tabs then the search field occupy the top control row.
+  for (int i = 0; i < 5; ++i)
+    (void)key(kTab);
+  require(workspace.focus() == 5, "Search field is not the sixth focusable.");
+  require(workspace.focused_label(width, height) == "Search research",
+          "Focused search field label mismatch.");
+  require(key(kReturn).captured && workspace.wants_text_input() &&
+              workspace.focus() == 5,
+          "Search activation did not enter edit mode.");
+  InputEvent typing{InputEventType::TextEntered};
+  typing.text = "zz";
+  (void)workspace.handle(typing, width, height);
+  require(workspace.query().search == "zz",
+          "Focused search field did not accept text.");
+  (void)key(kTab);
+  require(!workspace.wants_text_input() && workspace.focus() == 6,
+          "Tab did not leave search edit mode and advance focus.");
+  // Domain tab activation routes through the non-hit dispatch: arm a domain
+  // filter by pointer first, then verify the "All Research" tab clears it.
+  const auto initial_layout =
+      ResearchWorkspaceLayout::for_viewport(width, height, 2);
+  (void)workspace.handle(
+      {InputEventType::LeftPressed, center(initial_layout.tabs[1].bounds)},
+      width, height);
+  require(workspace.query().domain_id ==
+              std::optional<std::string>{"physics"},
+          "Pointer domain selection did not apply its filter.");
+  (void)key(kHome);
+  for (int i = 0; i < 6; ++i)
+    (void)key(kTab);
+  require(workspace.focus() == 6,
+          "First domain tab is not the seventh focusable.");
+  auto command = key(kReturn);
+  require(command.captured && !workspace.query().domain_id,
+          "Domain tab activation did not clear the domain filter.");
+  // End lands on the queue tab; activation routes through interface hits.
+  require(key(kEnd).captured, "End did not reach the last focusable.");
+  command = key(kReturn);
+  require(workspace.view_mode() == ResearchViewMode::Queue,
+          "Queue tab activation did not switch the view mode.");
+  require(!key(kDigit5).captured,
+          "Unhandled key was captured by the focus handler.");
+  // Home returns to close; activation closes the surface.
+  (void)key(kHome);
+  command = key(kReturn);
+  require(command.kind == WorkspaceCommandKind::Close && !workspace.visible(),
+          "Close activation did not close the workspace.");
+  // Pointer presses inside the surface clear keyboard focus.
+  workspace.open();
+  workspace.set_window(sample_window());
+  draw = {};
+  workspace.render(draw, width, height);
+  (void)key(kTab);
+  const auto layout =
+      ResearchWorkspaceLayout::for_viewport(width, height, 2);
+  (void)workspace.handle(
+      {InputEventType::LeftPressed, center(layout.graph)}, width, height);
+  require(workspace.focus() < 0,
+          "In-surface pointer press did not clear keyboard focus.");
+}
+
 } // namespace
 
 void measured_text_fitting() {
@@ -243,6 +334,7 @@ void cancellation_controls() {
 int main() try {
   measured_text_fitting();
   cancellation_controls();
+  keyboard_focus_traversal();
   for (const auto [width, height] :
        std::array{std::pair{1280, 720}, std::pair{1920, 1080},
                   std::pair{2560, 1440}, std::pair{3840, 2160}})

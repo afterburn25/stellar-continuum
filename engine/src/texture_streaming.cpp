@@ -94,9 +94,19 @@ TextureStreamer::advance_frame(std::uint64_t frame_index) {
   std::uint64_t spent = 0;
   std::unordered_map<TextureId, std::uint32_t> admitted;
   for (const auto &demand : demands) {
-    if (spent + demand.bytes_needed <= budget_) {
-      spent += demand.bytes_needed;
-      admitted.emplace(demand.id, demand.desired_mip);
+    const auto &state = textures_[demand.id];
+    const auto mip_count =
+        static_cast<std::uint32_t>(state.desc.mip_bytes.size());
+    std::uint32_t finest = demand.desired_mip;
+    std::uint64_t bytes = demand.bytes_needed;
+    // A denied request degrades to the coarsest mip tail that fits rather
+    // than evicting outright — a blurry bind beats the fallback. Pinned
+    // textures keep their all-or-nothing full-residency contract.
+    while (!state.pinned && spent + bytes > budget_ && finest + 1 < mip_count)
+      bytes -= mip_bytes(state, finest++);
+    if (spent + bytes <= budget_) {
+      spent += bytes;
+      admitted.emplace(demand.id, finest);
     }
   }
 

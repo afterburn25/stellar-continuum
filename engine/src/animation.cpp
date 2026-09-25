@@ -129,4 +129,31 @@ Timeline::events_crossed(float previous, float current, LoopMode mode) const {
   return result;
 }
 
+void AnimationPlayer::play(const Timeline *timeline, LoopMode mode) {
+  timeline_ = timeline;
+  mode_ = mode;
+  time_ = 0.f;
+  speed_ = 1.f;
+  paused_ = false;
+}
+
+void AnimationPlayer::stop() noexcept {
+  timeline_ = nullptr;
+  time_ = 0.f;
+}
+
+AnimationPlayer::Step AnimationPlayer::advance(float dt) {
+  Step step;
+  if (!timeline_ || paused_)
+    return step;
+  const float previous = time_;
+  time_ += dt * speed_;
+  if (mode_ == LoopMode::Once && time_ > timeline_->duration)
+    time_ = timeline_->duration;
+  step.events = timeline_->events_crossed(previous, time_, mode_);
+  step.values =
+      timeline_->evaluate(wrap_time(time_, timeline_->duration, mode_));
+  return step;
+}
+
 } // namespace stellar::engine

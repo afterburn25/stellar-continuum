@@ -1,5 +1,7 @@
 #pragma once
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 #include "native_colony_roster.hpp"
 #include "native_fleet_controller.hpp"
 #include "native_shipyard_controller.hpp"
@@ -60,14 +62,42 @@ public:
   [[nodiscard]] const std::string& search()const{return search_;}
   [[nodiscard]] bool wants_text_input()const{return search_focused_&&!preferences_.hidden;}
   [[nodiscard]] std::optional<Key> selection()const{return selected_;}
-  [[nodiscard]] float scroll_offset()const{return scroll_;}
+  [[nodiscard]] float scroll_offset()const{return scroll_.scroll_offset;}
+  [[nodiscard]] int focus()const noexcept{return focus_;}
+  // Localized label of the ringed control — the announcement surface for
+  // screen-reader/live-region consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int,int)const;
+  // Client-pixel rect of the ringed control — platform AT consumers project
+  // real focus geometry from it. Null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int,int)const;
+  // UIA control kind of the ringed control — Edit on the search field,
+  // Custom elsewhere.
+  [[nodiscard]] stellar::engine::AnnouncementControl focused_control(int,int)const;
+  // Current text of the ringed Edit — null when focus is elsewhere.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue> focused_value(int,int)const;
+  // Applies a platform value SetValue to the ringed Edit — false when the
+  // focus sits on a non-edit control.
+  bool set_focused_text(std::string,int,int);
+  // Expanded state of the ringed category header — null when focus sits
+  // on a leaf row or a non-list control. Reports the effective state
+  // (persisted collapse, search reveal, temporary reveal).
+  [[nodiscard]] std::optional<bool> focused_expanded(int,int)const;
+  // Applies a platform expand/collapse request to the ringed category
+  // header — false when the focus sits on a non-expandable control.
+  bool set_focused_expanded(bool,int,int);
   [[nodiscard]] std::optional<stellar::native_map::UiRect> row_bounds(Key,int,int)const;
   [[nodiscard]] stellar::native_map::UiRect category_bounds(Category,int,int)const;
   [[nodiscard]] Command handle(const stellar::native_map::InputEvent&,int,int);
   void render(stellar::native_map::DrawList&,int,int,const Art&);
-  void cancel_input(){pressed_.reset();search_focused_=false;}
+  void cancel_input(){pressed_.reset();search_focused_=false;focus_=-1;}
 private:
   struct Entry { std::optional<std::size_t> row; Category category{}; };
+  // Ring rect plus the entries_ index it came from (headers and rows
+  // alike); plain controls carry no entry. Scroll-follow uses the entry's
+  // unclipped bounds.
+  struct FocusTarget { stellar::native_map::UiRect bounds; std::optional<std::size_t> entry{}; std::string label; };
+  [[nodiscard]] std::vector<FocusTarget> focusables(const Layout&) const;
   void rebuild();
   void commit_preferences(Preferences);
   [[nodiscard]] std::string tr(std::string_view key,std::string_view fallback)const;
@@ -78,6 +108,11 @@ private:
   Preferences preferences_;
   std::function<bool(const Preferences&)> persist_;
   std::vector<Entry> entries_;
+  // Category headers own the row children — the first player-facing
+  // TreeModel consumer. entries_ is the flattened projection; collapse
+  // truth stays in preferences_ (persisted), search/temporary reveal
+  // force-expand per rebuild.
+  stellar::engine::TreeModel tree_;
   std::array<int,5> counts_{},matches_{};
   std::string search_,error_;
   std::optional<Key> selected_,temporary_reveal_;
@@ -85,7 +120,8 @@ private:
   std::uint64_t pressed_generation_{};
   int pressed_observer_{},click_count_{};
   bool search_focused_{},reveal_selection_{};
-  mutable float scroll_{};
+  int focus_{-1};
+  mutable stellar::engine::ScrollView scroll_{};
   stellar::native_map::Point pointer_{};
   const stellar::engine::LocalizationTable* locale_{};
 };

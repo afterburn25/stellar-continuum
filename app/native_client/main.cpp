@@ -1,3 +1,4 @@
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/spatial_index.hpp>
@@ -10,11 +11,13 @@
 #include "native_campaign_feedback.hpp"
 #include "native_audio_settings.hpp"
 #include "native_settings_hub.hpp"
+#include "native_pad_input.hpp"
 #include "native_voice.hpp"
 #include "native_voice_bridge.hpp"
 #include "native_voice_playback.hpp"
 #include "native_voice_settings.hpp"
 #include "native_general_settings.hpp"
+#include "native_accessibility_bridge.hpp"
 #include "native_video_controller.hpp"
 #include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
@@ -44,6 +47,7 @@
 #include "native_developer_celestial_index.hpp"
 #include "native_developer_planet_index.hpp"
 #include "native_giant_test_panel.hpp"
+#include "native_chronicle.hpp"
 #include "native_notification_events.hpp"
 #include "native_support_service.hpp"
 #include "../developer_diagnostic_report.hpp"
@@ -86,6 +90,7 @@
 #include "native_ui_layout.hpp"
 #include "native_command_hud.hpp"
 #include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 #include "native_startup_entry.hpp"
 #include "native_galaxy_backdrop.hpp"
 #include "native_territory_overlay.hpp"
@@ -133,6 +138,7 @@
 #include <iostream>
 #include <iomanip>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <optional>
 #include <ranges>
@@ -199,6 +205,15 @@ struct SmokePhaseMaximum {
     }
   }
 };
+
+// UiRect → announcement bounds (UiRect converts to the optional implicitly,
+// so call sites pass either).
+[[nodiscard]] std::optional<stellar::engine::AnnouncementBounds>
+announcement_bounds(std::optional<UiRect> rect) {
+  if (!rect) return std::nullopt;
+  return stellar::engine::AnnouncementBounds{rect->x, rect->y, rect->width,
+                                             rect->height};
+}
 
 // Retained only by a bounded graphical smoke run. The ordinary client has no
 // frame timing history or classification work beyond the smoke option check.
@@ -348,6 +363,11 @@ struct Options {
   // under a fixed 60 Hz step and verifies the checkpoint hashes in order.
   std::filesystem::path record_path;
   std::filesystem::path replay_path;
+  std::filesystem::path replay_info_path;
+  std::optional<std::uint64_t> replay_until_tick;
+  // --replay-exit: a scripted verification run exits once the recording
+  // verifies (replay_verified, exit 0) instead of continuing the session.
+  bool replay_exit{};
 };
 
 [[nodiscard]] Options parse_options(int argc,
@@ -417,6 +437,9 @@ struct Options {
     else if((arg==L"--first-survey-smoke"||arg==L"--first-survey-paused-smoke"||arg==L"--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=std::filesystem::path(argv[++i]);result.first_survey_mode=arg==L"--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg==L"--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
     else if(arg==L"--record"&&i+1<argc) result.record_path=argv[++i];
     else if(arg==L"--replay"&&i+1<argc) result.replay_path=argv[++i];
+    else if(arg==L"--replay-until"&&i+1<argc) result.replay_until_tick=std::stoull(argv[++i]);
+    else if(arg==L"--replay-info"&&i+1<argc) result.replay_info_path=argv[++i];
+    else if(arg==L"--replay-exit") result.replay_exit=true;
 #else
     const std::string arg=argv[i];
     if(arg=="--asset-root"&&i+1<argc) result.asset_root=argv[++i];
@@ -475,6 +498,9 @@ struct Options {
     else if((arg=="--first-survey-smoke"||arg=="--first-survey-paused-smoke"||arg=="--first-survey-resume-smoke")&&i+1<argc){if(result.first_survey_mode)throw std::invalid_argument("Choose one first survey mode.");result.smoke_screenshot=argv[++i];result.first_survey_mode=arg=="--first-survey-smoke"?Options::FirstSurveyMode::Depart:arg=="--first-survey-paused-smoke"?Options::FirstSurveyMode::Paused:Options::FirstSurveyMode::Resume;result.windowed=true;}
     else if(arg=="--record"&&i+1<argc) result.record_path=argv[++i];
     else if(arg=="--replay"&&i+1<argc) result.replay_path=argv[++i];
+    else if(arg=="--replay-until"&&i+1<argc) result.replay_until_tick=std::stoull(argv[++i]);
+    else if(arg=="--replay-info"&&i+1<argc) result.replay_info_path=argv[++i];
+    else if(arg=="--replay-exit") result.replay_exit=true;
 #endif
     else throw std::invalid_argument("Unknown or incomplete native client option.");
   }
@@ -516,6 +542,14 @@ struct Options {
   if(result.dev_game&&!result.save_path_overridden)
     result.save_path=default_native_campaign_save_path().parent_path()/"developer"/"campaign.dev17.json";
   if(!result.record_path.empty()&&!result.replay_path.empty())throw std::invalid_argument("--record and --replay are mutually exclusive.");
+  if(result.replay_until_tick&&result.replay_path.empty())throw std::invalid_argument("--replay-until requires --replay.");
+  if(result.replay_exit&&result.replay_path.empty())throw std::invalid_argument("--replay-exit requires --replay.");
+  // Replay feeds commands only once a campaign session exists; without a
+  // session source the run lands on the interactive startup screen and the
+  // recorded stream can never consume — fail fast instead of idling.
+  if(!result.replay_path.empty()&&!result.load&&!result.smoke_screenshot)
+    throw std::invalid_argument("--replay requires --load or a smoke session; the interactive startup screen cannot host a deterministic replay.");
+  if(!result.replay_info_path.empty()&&(!result.replay_path.empty()||!result.record_path.empty()))throw std::invalid_argument("--replay-info is a standalone inspection flag.");
   return result;
 }
 
@@ -587,10 +621,6 @@ struct Options {
     case StellarClass::Pulsar:return GalaxyStarVisualClass::pulsar;
   }
   return GalaxyStarVisualClass::unknown;
-}
-[[nodiscard]] std::string spectral_name(std::optional<StellarClass> value){
-  if(!value)return "Unclassified";
-  switch(*value){case StellarClass::MRedDwarf:return "M red dwarf";case StellarClass::KOrangeDwarf:return "K orange dwarf";case StellarClass::GYellowDwarf:return "G yellow dwarf";case StellarClass::FYellowWhiteDwarf:return "F yellow-white dwarf";case StellarClass::AWhiteStar:return "A white star";case StellarClass::HotBlueStar:return "Hot blue star";case StellarClass::Giant:return "Giant";case StellarClass::WhiteDwarf:return "White dwarf";case StellarClass::NeutronStar:return "Neutron star";case StellarClass::BlackHole:return "Black hole";case StellarClass::Protostar:return "Protostar";case StellarClass::Pulsar:return "Pulsar";} return "Unclassified";
 }
 void fill(DrawList &out,UiRect bounds,Color color){out.overlay.emplace_back(FilledRectangle{bounds,color});}
 void stroke(DrawList &out,UiRect bounds,Color color){out.overlay.emplace_back(StrokedRectangle{bounds,color});}
@@ -678,6 +708,40 @@ struct ReplayState {
   std::size_t checkpoint_cursor{};
   std::uint64_t verified_checkpoints{};
   std::string divergence;
+  // <recording>.expected/<tick>.json sidecars: record mode writes the
+  // canonical capture per checkpoint so a replay divergence can leaf-diff
+  // the expected document instead of stopping at the section hash.
+  std::filesystem::path expected_directory;
+  // --replay-until: once the simulated tick reaches the stop, dump the
+  // canonical document so it can be leaf-diffed against an expected
+  // sidecar — the bisect companion to checkpoint divergence.
+  std::optional<std::uint64_t> stop_at_tick;
+  std::filesystem::path stop_dump_path;
+  // Stall detection for --replay-until: frames since the simulated tick
+  // last advanced. A paused campaign or exhausted command stream can never
+  // reach the stop — the update loop reports it instead of hanging.
+  std::uint64_t last_tick{std::numeric_limits<std::uint64_t>::max()};
+  std::uint32_t stalled_frames{};
+  // One-shot "recording fully consumed and verified" report — a scripted
+  // --replay run greps replay_verified={...} instead of watching for the
+  // absence of a divergence over a timeout.
+  bool completion_reported{};
+  // --replay-exit: a scripted verification run exits once the recording
+  // verifies (exit 0 after replay_verified) instead of continuing the
+  // session, and a run that stalls with work pending reports it rather
+  // than hanging. The trackers record the last tick/cursor positions so
+  // "no progress" is measurable across frames.
+  bool exit_on_completion{};
+  std::uint64_t verification_last_tick{std::numeric_limits<std::uint64_t>::max()};
+  std::size_t verification_last_command{}, verification_last_checkpoint{};
+  std::uint32_t verification_stalled_frames{};
+  // pointer_button commands dequeue into real InputEvents merged into the
+  // next update's event stream (ahead of live events) so hit-testing and
+  // dispatch see exactly what the recorded session saw — not a synthetic
+  // binding. pointer_held bounds move journaling on the record side to
+  // drags, where accumulated motion decides drag-vs-click.
+  std::vector<InputEvent> injected_events;
+  std::uint32_t pointer_held{};
 };
 
 // Writes the recording on scope exit, including early returns and failures.
@@ -687,6 +751,9 @@ struct ReplayFileFlush {
   ~ReplayFileFlush() {
     if (!state || !state->recorder || path.empty()) return;
     try {
+      if (state->recorder->truncated())
+        std::cerr << "Stellar Continuum native client: replay recording hit "
+                     "its memory budget — the file holds a truncated prefix.\n";
       const auto bytes = state->recorder->serialize();
       stellar::engine::write_file_atomically(
           path, std::as_bytes(std::span<const char>(bytes.data(), bytes.size())));
@@ -707,7 +774,8 @@ class NativeCampaign final {
                  stellar::native_video_settings::NativeVideoController* video_settings=nullptr,
                  stellar::native_general::NativeGeneralSettings* general_settings=nullptr,
                  stellar::native_settings::NativeSettingsHub* settings_hub=nullptr,
-                 stellar::native_audio::NativeVoiceSettings* voice_settings=nullptr)
+                 stellar::native_audio::NativeVoiceSettings* voice_settings=nullptr,
+                 stellar::native_client::NativeAccessibilityBridge* accessibility_bridge=nullptr)
       : session_(std::move(session)),
         navigation_art_(std::filesystem::absolute(asset_root)),
         research_art_(std::filesystem::absolute(asset_root)),
@@ -743,6 +811,16 @@ class NativeCampaign final {
     supply_workspace_.set_text_measurer(text_measurer_);
     economy_workspace_.set_text_measurer(text_measurer_);
     notification_view_.set_text_measurer(text_measurer_);
+    chronicle_view_.set_text_measurer(text_measurer_);
+    chronicle_view_.set_actor_name_resolver([this](std::uint64_t id){
+      if(!session_)return std::string{};
+      const auto& world=session_->frame().runtime().world().campaign();
+      const auto it=std::ranges::find(world.civilizations,static_cast<int>(id),&Civilization::id);
+      return it==world.civilizations.end()?std::string{}:it->name;
+    });
+    chronicle_view_.set_campaign_day_source([this]{
+      return session_?session_->frame().clock().simulation_days():0.;
+    });
     seed_notifications();
     galaxy_assets_.use_background_preparation(image_preparation_);
     phenomena_.use_queue(image_preparation_);
@@ -783,12 +861,25 @@ class NativeCampaign final {
     if(general_settings_){const auto& preferences=general_settings_->saved();assets_.set_preferences({preferences.asset_categories_collapsed,preferences.assets_hidden});
       assets_.set_persist([this](const stellar::native_assets::Preferences& p){auto prefs=general_settings_->saved();prefs.asset_categories_collapsed=p.collapsed;prefs.assets_hidden=p.hidden;return general_settings_->save(prefs);});}
     settings_hub_=settings_hub;voice_settings_=voice_settings;
+    accessibility_bridge_=accessibility_bridge;
     presentation_audio_=presentation_audio;
     menu_hover_feedback_.set_callback([this]{if(presentation_audio_)presentation_audio_->hover();});
     configure_input_actions();
     configure_voice_pipeline();
   }
 
+  // Gamepad camera axes are Axis1D actions in a separate context — the
+  // Controls view lists them as rebindable axis rows (stick deflection or
+  // wheel capture). Saves written before the context existed lack it, so
+  // load_user_bindings re-registers the defaults when the loaded map does
+  // not define it. SDL axis ids: 0=left X, 1=left Y, 3=right Y.
+  static constexpr std::string_view kGalaxyPadContext=R"json({
+    "contexts":[{"name":"GALAXY_PAD","exclusive":false,"actions":[
+      {"name":"map_pan_x","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":0}]},
+      {"name":"map_pan_y","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":1}]},
+      {"name":"map_zoom","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":3}]}
+    ]}]}
+  )json";
   // Reference Main.cs keyboard shortcuts, expressed as a data-driven GALAXY
   // input context (engine InputActions): Space pauses, 1-5 select strategic
   // speeds (5 is the Developer-only Demo rate), T/R/C/B cycle and start the
@@ -811,10 +902,36 @@ class NativeCampaign final {
       ]}]}
     )json";
     std::string error;
-    if(input_mapper_.load_contexts(kGalaxyContext,&error))
+    if(input_mapper_.load_contexts(kGalaxyContext,&error)
+        &&input_mapper_.load_contexts(kGalaxyPadContext,&error)){
+      input_mapper_.push_context("GALAXY_PAD");
       input_mapper_.push_context("GALAXY");
+    }
     else SDL_Log("GALAXY input context failed to load: %s",error.c_str());
   }
+
+  // User-customized bindings overlay: replaces the registered GALAXY context
+  // wholesale (the stack resolves by name, so no re-push needed). Returns
+  // true when a saved map loaded; a rejected file keeps the defaults.
+  bool load_user_bindings(const std::filesystem::path &path){
+    std::error_code ec;
+    if(!std::filesystem::exists(path,ec))return false;
+    std::ifstream in(path);std::ostringstream contents;contents<<in.rdbuf();
+    std::string error;
+    if(input_mapper_.load_contexts(contents.str(),&error)){
+      // Saved maps written before pad camera axes existed carry no
+      // GALAXY_PAD context — inject the defaults; a saved map that defines
+      // it already holds the user's own axis bindings.
+      if(!input_mapper_.context("GALAXY_PAD")){
+        std::string pad_error;
+        (void)input_mapper_.load_contexts(kGalaxyPadContext,&pad_error);
+      }
+      return true;
+    }
+    SDL_Log("Saved input bindings rejected: %s",error.c_str());return false;
+  }
+  // Live mapper — the settings hub's Controls view binds against it.
+  stellar::engine::InputMapper& input_mapper()noexcept{return input_mapper_;}
 
   // Maps the persisted UI voice preferences onto the playback controller's
   // settings record (stellar::native_voice::NativeVoiceSettings).
@@ -901,11 +1018,25 @@ class NativeCampaign final {
     battle_workspace_.set_localization(&table);
     shipyard_workspace_.set_localization(&table);
     notification_view_.set_localization(&table);
+    chronicle_view_.set_localization(&table);
     assets_.set_localization(&table);
     settlement_workspace_.set_localization(&table);
     economy_controller_.set_localization(&table);
     research_controller_.set_localization(&table);
     phenomena_.set_localization(&table);
+    mission_view_.set_localization(&table);
+    feedback_.set_localization(&table);
+    supply_controller_.set_localization(&table);
+    system_travel_controller_.set_localization(&table);
+    system_controller_.set_localization(&table);
+    fleet_controller_.set_localization(&table);
+    outpost_freight_controller_.set_localization(&table);
+    surface_controller_.set_localization(&table);
+    shipyard_controller_.set_localization(&table);
+    diplomacy_controller_.set_localization(&table);
+    settlement_controller_.set_localization(&table);
+    construction_controller_.set_localization(&table);
+    colony_controller_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 
@@ -933,38 +1064,76 @@ class NativeCampaign final {
           // The canonical payload carries two wall-clock provenance fields —
           // SavedAtUtc and the campaign's CreatedAtUtc generation stamp. Strip
           // both so checkpoint hashes compare simulation state only.
-          auto document=nlohmann::ordered_json::parse(
-              encode_player_campaign_v17_json(payload));
+          auto document=encode_player_campaign_v17_document(payload);
           document.erase("SavedAtUtc");
           if(const auto galaxy=document.find("Galaxy");galaxy!=document.end())
             if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end())
               meta->erase("CreatedAtUtc");
-          const auto hash=stellar::engine::fnv1a64(document.dump());
+          // Per-section checkpoints: a divergence names the subsystem
+          // ("save:World.Fleets"), not just "state differs at tick N".
+          const auto actual=stellar::engine::document_section_checkpoints(
+              tick,document,"save");
           if(replay_->recorder){
-            replay_->recorder->checkpoint(tick,hash,"save");
+            for(const auto &checkpoint:actual)
+              replay_->recorder->checkpoint(checkpoint.tick,checkpoint.hash,
+                                            checkpoint.label);
+            // Retain the expected-side document so a later replay can
+            // leaf-diff the divergence instead of needing a hand capture.
+            if(!replay_->expected_directory.empty()){
+              const auto expected_path=replay_->expected_directory/
+                  (std::to_string(tick)+".json");
+              std::error_code ec;
+              std::filesystem::create_directories(expected_path.parent_path(),ec);
+              if(std::ofstream out{expected_path,std::ios::binary|std::ios::trunc};out)
+                out<<document.dump(2);
+            }
             return;
           }
-          const auto &expected=replay_->recording->checkpoints();
-          if(replay_->checkpoint_cursor>=expected.size()){
-            replay_->divergence=
-                "replay produced an unrecorded save checkpoint at tick "+
-                std::to_string(tick);
-            return;
+          auto cursor=replay_->checkpoint_cursor;
+          const auto result=stellar::engine::verify_checkpoint_sequence(
+              replay_->recording->checkpoints(),cursor,actual);
+          replay_->checkpoint_cursor=cursor;
+          replay_->verified_checkpoints+=result.verified;
+          if(!result.divergence.empty()){
+            replay_->divergence=result.divergence;
+            // Dump the diverging canonical document next to the save —
+            // diffing it against the original capture names the leaf.
+            const auto dump_path=session_->save_path().parent_path()/
+                ("replay-divergence-"+std::to_string(tick)+".json");
+            if(std::ofstream out{dump_path,std::ios::binary|std::ios::trunc};
+               out){
+              out<<document.dump(2);
+              replay_->divergence+=" (actual state dumped to "+
+                  dump_path.generic_string()+")";
+            }
+            // Leaf-diff against the recorded capture when it was retained.
+            const auto expected_path=replay_->expected_directory/
+                (std::to_string(tick)+".json");
+            if(std::ifstream in{expected_path,std::ios::binary};in){
+              std::ostringstream contents;contents<<in.rdbuf();
+              try{
+                const auto expected_doc=
+                    nlohmann::ordered_json::parse(contents.str());
+                const auto leaves=stellar::engine::document_leaf_diff(
+                    expected_doc,document);
+                if(!leaves.empty()){
+                  const auto diff_path=session_->save_path().parent_path()/
+                      ("replay-divergence-"+std::to_string(tick)+".diff.txt");
+                  std::ostringstream report;
+                  for(const auto&leaf:leaves)
+                    report<<leaf.path<<"\n  expected: "<<leaf.expected
+                          <<"\n  actual:   "<<leaf.actual<<'\n';
+                  if(std::ofstream out{diff_path,std::ios::binary|std::ios::trunc};out){
+                    out<<report.str();
+                    replay_->divergence+=" (first leaf: "+leaves.front().path+
+                        "; full diff in "+diff_path.generic_string()+")";
+                  }
+                }
+              }catch(const std::exception&){
+                // A corrupt expected sidecar still leaves the section name.
+              }
+            }
           }
-          const auto &want=expected[replay_->checkpoint_cursor];
-          if(want.tick!=tick){
-            replay_->divergence=
-                "replay checkpoint tick diverged: expected "+
-                std::to_string(want.tick)+", captured "+std::to_string(tick);
-            return;
-          }
-          if(want.hash!=hash){
-            replay_->divergence=
-                "replay state hash diverged at tick "+std::to_string(tick);
-            return;
-          }
-          ++replay_->checkpoint_cursor;
-          ++replay_->verified_checkpoints;
         });
   }
 
@@ -994,15 +1163,18 @@ class NativeCampaign final {
     if(candidates.empty()){
       research_candidate_index_=0;
       session_->publish_status(
-          "No research choices are currently available. A construction "
-          "prerequisite may be missing.");
+          tr("STATUS_NO_RESEARCH_CHOICES",
+             "No research choices are currently available. A construction "
+             "prerequisite may be missing."));
       return;
     }
     research_candidate_index_=
         (research_candidate_index_+1)%
         static_cast<int>(candidates.size());
-    session_->publish_status("Research candidate: "+
-        candidates[research_candidate_index_]->display_name);
+    session_->publish_status(
+        trf("STATUS_RESEARCH_CANDIDATE",
+            {candidates[research_candidate_index_]->display_name},
+            "Research candidate: {0}"));
   }
   void start_research_candidate(){
     const auto view=research_controller_.build(
@@ -1011,8 +1183,9 @@ class NativeCampaign final {
     if(candidates.empty()){
       research_candidate_index_=0;
       session_->publish_status(
-          "No available research project selected. Check construction "
-          "prerequisites.");
+          tr("STATUS_NO_RESEARCH_SELECTED",
+             "No available research project selected. Check construction "
+             "prerequisites."));
       return;
     }
     research_candidate_index_=std::clamp(research_candidate_index_,0,
@@ -1048,23 +1221,27 @@ class NativeCampaign final {
     if(construction_project_active(view)){
       construction_candidate_index_=0;
       session_->publish_status(
-          "Complete the current construction project before selecting "
-          "another.");
+          tr("STATUS_CONSTRUCTION_IN_PROGRESS",
+             "Complete the current construction project before selecting "
+             "another."));
       return;
     }
     const auto candidates=construction_candidates(view);
     if(candidates.empty()){
       construction_candidate_index_=0;
       session_->publish_status(
-          "No construction choices are currently available. Research may be "
-          "required.");
+          tr("STATUS_NO_CONSTRUCTION_CHOICES",
+             "No construction choices are currently available. Research may be "
+             "required."));
       return;
     }
     construction_candidate_index_=
         (construction_candidate_index_+1)%
         static_cast<int>(candidates.size());
-    session_->publish_status("Construction candidate: "+
-        candidates[construction_candidate_index_]->name);
+    session_->publish_status(
+        trf("STATUS_CONSTRUCTION_CANDIDATE",
+            {candidates[construction_candidate_index_]->name},
+            "Construction candidate: {0}"));
   }
   void start_construction_candidate(){
     const auto view=construction_controller_.build(
@@ -1072,14 +1249,16 @@ class NativeCampaign final {
     if(construction_project_active(view)){
       construction_candidate_index_=0;
       session_->publish_status(
-          "No available construction project selected.");
+          tr("STATUS_NO_CONSTRUCTION_SELECTED",
+             "No available construction project selected."));
       return;
     }
     const auto candidates=construction_candidates(view);
     if(candidates.empty()){
       construction_candidate_index_=0;
       session_->publish_status(
-          "No available construction project selected.");
+          tr("STATUS_NO_CONSTRUCTION_SELECTED",
+             "No available construction project selected."));
       return;
     }
     construction_candidate_index_=std::clamp(construction_candidate_index_,0,
@@ -1140,7 +1319,7 @@ class NativeCampaign final {
       {session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,"2044-05-06T07:08:12Z"}));
     return out.str();
   }
-  void cancel_new_game(){session_->cancel_new_campaign();gesture_.capture_for_ui();}
+  void cancel_new_game(){session_->cancel_new_campaign();menu_focus_=-1;gesture_.capture_for_ui();}
 
 
   void prepare_developer_smoke(){
@@ -1433,6 +1612,30 @@ class NativeCampaign final {
     for(std::size_t i=0;i<reloaded_bodies.size();++i)if(reloaded_bodies[i].appearance!=planet_world.bodies[i].appearance)throw std::runtime_error("Imported appearance rerolled during save/load.");
     std::cout<<"imported_planets=eight_classes_both_views_canonical_materials_developer_index_and_reload_passed\n";
     std::cout<<"planet_portraits=eight_classes_canonical_cached_portraits_submitted_passed\n";
+    // Broad material assertion: the coverage world forces one body per
+    // generation-enabled subclass, so sweeping bodies exercises every
+    // subclass's canonical material through the real cache — admitted art
+    // decodes or the procedural fallback synthesizes — not just the eight
+    // navigated examples above.
+    {
+      std::unordered_set<std::string> pending_subclasses;
+      for(const auto& def:planet_subclass_definitions())if(def.generation_enabled)pending_subclasses.insert(def.id);
+      std::size_t resolved=0;
+      for(const auto& body:planet_world.bodies){
+        if(!body.appearance||!pending_subclasses.erase(body.appearance->subclass))continue;
+        (void)planet_material_cache_.request(*body.appearance,128);
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);
+        while(!planet_material_cache_.ready()&&std::chrono::steady_clock::now()<deadline){
+          planet_material_cache_.poll();std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        const auto pack=planet_material_cache_.request(*body.appearance,128);
+        if(!pack||!pack->albedo)throw std::runtime_error("Canonical material did not resolve for subclass "+body.appearance->subclass);
+        ++resolved;
+      }
+      if(!pending_subclasses.empty())throw std::runtime_error("Coverage world is missing subclass "+*pending_subclasses.begin());
+      if(!planet_material_cache_.errors().empty())throw std::runtime_error("Broad planet material sweep reported a failure.");
+      std::cout<<"broad_planet_materials="<<resolved<<"_subclasses_canonical_albedo_resolved_passed\n";
+    }
     // Explicit smoke-only fault injection into this isolated developer world.
     // Runtime fault handling never repairs state; restore this fixture solely
     // so the rest of the smoke can finish without persisting test corruption.
@@ -1821,6 +2024,23 @@ class NativeCampaign final {
     if(system_workspace_.visible()||selected_id_!=home->id)throw std::runtime_error("Galaxy button lost the focused system");
     click(hud.switch_view);
     if(system_workspace_.system_id()!=home->id)throw std::runtime_error("System button did not reopen the focused system");
+    // The view-switch button joins the HUD keyboard ring only while it is
+    // actionable — Return replays the same activate_hud_switch dispatch.
+    {
+      const auto ring_items=[&]{return hud_ring_items(NativeUiLayout::for_viewport(width,height),width,height);};
+      const auto items=ring_items();
+      if(items.empty()||items.back().second!=UiAction::SwitchView)throw std::runtime_error("Switch view missing from the HUD focus ring");
+      map_focus_group_=2;hud_focus_=static_cast<int>(items.size())-1;
+      const auto key=[&](std::uint32_t k){InputEvent e{InputEventType::KeyPressed};e.key=k;route({e});};
+      key(13u);
+      if(system_workspace_.visible()||selected_id_!=home->id)throw std::runtime_error("Keyboard switch view did not return to the galaxy");
+      const auto galaxy_items=ring_items();
+      if(galaxy_items.empty()||galaxy_items.back().second!=UiAction::SwitchView)throw std::runtime_error("Switch view dropped out of the ring with a live selection");
+      hud_focus_=static_cast<int>(galaxy_items.size())-1;
+      key(13u);
+      if(system_workspace_.system_id()!=home->id)throw std::runtime_error("Keyboard switch view did not reopen the focused system");
+      map_focus_group_=-1;hud_focus_=-1;
+    }
     if(!colony_roster_.view().rows.empty()){
       const auto row=colony_roster_.view().rows.front();
       const auto asset=std::ranges::find_if(assets_.view().rows,[&](const auto& r){return r.body_id==row.body_id;});
@@ -2365,7 +2585,7 @@ class NativeCampaign final {
       if(ship==world.fleets.end()||!ship->freight_home_colony_id)throw std::runtime_error("Freight reload lost its dispatch.");
       quote.fleet_id=ship->id;quote.home_colony_id=*ship->freight_home_colony_id;
       if(state()!=before)throw std::runtime_error("Freight reload changed paused state.");
-      colony_workspace_.set_freight_notice("Freight run restored. Unpause to continue travel, loading and delivery.");
+      colony_workspace_.set_freight_notice(tr("COLONY_FREIGHT_RESTORED","Freight run restored. Unpause to continue travel, loading and delivery."));
     }
     const auto ship=std::ranges::find(world.fleets,quote.fleet_id,&FleetState::id);
     const bool dispatched=ship!=world.fleets.end()&&ship->freight_target_outpost_id==initial.colony_id&&ship->freight_home_colony_id==quote.home_colony_id&&ship->cargo_materials==0.;
@@ -2613,6 +2833,41 @@ class NativeCampaign final {
     const auto canonical_before=encode_player_campaign_v17_json(
         capture_player_campaign_v17(session_->frame().runtime(),capture_options));
     smoke_keyboard_commands_=0;
+    // Pointer replay injection: a recorded pointer_button command must
+    // dequeue into a real InputEvent and dispatch through the same click
+    // path as live input — drive a recorded click on the HUD menu button,
+    // verify the menu opened, then a recorded click on Continue closes it.
+    {
+      ReplayState pointer_replay;
+      auto *const outer_replay=replay_;
+      const auto journal_click=[&](const UiRect &cell){
+        pointer_replay.recording.emplace();
+        const auto point=center(cell);
+        char payload[96];
+        std::snprintf(payload,sizeof payload,"1,%.9g,%.9g,0,0",
+            static_cast<double>(point.x),static_cast<double>(point.y));
+        pointer_replay.recording->record(0,"pointer_button",payload);
+        payload[0]='2';
+        pointer_replay.recording->record(0,"pointer_button",payload);
+      };
+      InputSnapshot idle;idle.drawable_width=width;idle.drawable_height=height;
+      journal_click(layout.menu);
+      replay_=&pointer_replay;
+      const auto opened=update(idle,width,height,0.,false)&&menu_&&
+                        pointer_replay.command_cursor==2;
+      pointer_replay=ReplayState{};
+      if(opened){
+        journal_click(layout.continue_button);
+        const auto closed=update(idle,width,height,0.,false)&&!menu_&&
+                          pointer_replay.command_cursor==2;
+        replay_=outer_replay;
+        if(!closed)
+          throw std::runtime_error("Replayed menu click did not close the menu.");
+      }else{
+        replay_=outer_replay;
+        throw std::runtime_error("Replayed pointer click did not open the menu.");
+      }
+    }
     const auto send=[&](InputEvent event){
       InputSnapshot input;
       input.drawable_width=width;input.drawable_height=height;
@@ -2626,8 +2881,73 @@ class NativeCampaign final {
       InputEvent event{InputEventType::KeyPressed};event.key=value;send(event);
       InputEvent release{InputEventType::KeyReleased};release.key=value;send(release);
     };
+    const auto pad_mouse=[&]{
+      auto& clock=session_->frame().clock();
+      // Bindings captured in the Controls view must reach the live mapper:
+      // rebind pause to pad SOUTH (SDL button 0), verify press+release
+      // toggles, then bind speed 1 to a right-click and verify — restoring
+      // the keyboard defaults afterwards.
+      if(input_mapper_.rebind("toggle_pause",
+             {{stellar::engine::RawInputEvent::Kind::GamepadButton,0}})!=1)
+        throw std::runtime_error("Pause rebind to gamepad button failed.");
+      InputEvent press{InputEventType::GamepadPressed};press.gamepad_button=0;send(press);
+      InputEvent release{InputEventType::GamepadReleased};release.gamepad_button=0;send(release);
+      const auto entry_speed=clock.speed();
+      send(press);send(release);
+      if(clock.speed()==entry_speed)
+        throw std::runtime_error("Gamepad button did not toggle pause.");
+      send(press);send(release);
+      if(clock.speed()!=entry_speed)
+        throw std::runtime_error("Gamepad button did not toggle pause back.");
+      if(input_mapper_.rebind("toggle_pause",
+             {{stellar::engine::RawInputEvent::Kind::KeyPress,32}})!=1)
+        throw std::runtime_error("Pause keyboard binding restore failed.");
+      if(input_mapper_.rebind("speed_normal",
+             {{stellar::engine::RawInputEvent::Kind::MouseButton,3}})!=1)
+        throw std::runtime_error("Speed rebind to right click failed.");
+      InputEvent right{InputEventType::RightPressed};send(right);
+      InputEvent right_release{InputEventType::RightReleased};send(right_release);
+      if(clock.speed()!=StrategicSpeed::Normal)
+        throw std::runtime_error("Right-click binding did not select normal speed.");
+      if(input_mapper_.rebind("speed_normal",
+             {{stellar::engine::RawInputEvent::Kind::KeyPress,49}})!=1)
+        throw std::runtime_error("Speed keyboard binding restore failed.");
+      // Axis bindings (GALAXY_PAD) — the mapper holds the last axis value,
+      // so a deflection persists until a centered event clears it. Zoom in
+      // first so the overview clamp leaves room for the camera to move.
+      const auto send_axis=[&](std::uint32_t axis,float value){
+        InputEvent stick{InputEventType::GamepadAxis};stick.gamepad_axis=static_cast<std::uint8_t>(axis);stick.gamepad_axis_value=value;
+        InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+        input.events.push_back(stick);
+        if(!update(input,width,height,.1,false))
+          throw std::runtime_error("Pad-axis replay closed the campaign.");
+      };
+      camera_.pixels_per_world=std::clamp(
+          fitted_pixels_per_world_>0.?fitted_pixels_per_world_*4.:400.,.01,16000.);
+      camera_.center=galaxy_overview_camera(width,height).center;
+      const auto pan_before=camera_.center;
+      send_axis(0,1.f);
+      if(!system_workspace_.visible()){
+        if(camera_.center.x==pan_before.x)
+          throw std::runtime_error("Left stick did not pan the galaxy camera.");
+        const auto zoom_before=camera_.pixels_per_world;
+        send_axis(3,1.f);
+        if(camera_.pixels_per_world==zoom_before)
+          throw std::runtime_error("Right stick did not zoom the galaxy camera.");
+        send_axis(3,0.f);
+      }else if(camera_.center.x!=pan_before.x)
+        throw std::runtime_error("System view leaked a galaxy-camera pan.");
+      send_axis(0,0.f);
+      camera_.center=galaxy_overview_camera(width,height).center;
+      if(fitted_pixels_per_world_>0.)
+        camera_.pixels_per_world=fitted_pixels_per_world_;
+      key(' '); // Return to the paused state the caller sequence expects.
+      if(clock.speed()!=StrategicSpeed::Paused)
+        throw std::runtime_error("Could not restore paused state after pad/mouse check.");
+    };
     const auto playback=[&]{
       auto& clock=session_->frame().clock();
+      pad_mouse();
       const auto accepted=*smoke_keyboard_commands_;
       for(std::uint32_t value='1';value<='4';++value){
         const auto expected=static_cast<StrategicSpeed>(value-'0');
@@ -2677,6 +2997,12 @@ class NativeCampaign final {
     escape.drawable_width=width;
     escape.drawable_height=height;
     escape.events={{InputEventType::EscapePressed}};
+    // Escape unwinds the topmost layer: an open inspection card consumes the
+    // first press, the pause menu takes the second.
+    if(inspection_card_.visible()){
+      if(!update(escape,width,height,0.,false)||inspection_card_.visible())
+        throw std::runtime_error("Navigation smoke could not close the inspection card.");
+    }
     if(!update(escape,width,height,0.,false)||!menu_)
       throw std::runtime_error("Navigation smoke could not open the pause menu.");
     blocked_keys();
@@ -2735,6 +3061,87 @@ class NativeCampaign final {
     click(layout.diplomacy);
     verify_only(diplomacy_workspace_.visible(),"Relations");
     blocked_keys();
+    // Missions rail affordance: opens exclusively over the workspace class,
+    // re-click toggles closed, and Escape releases the panel without
+    // reaching the pause menu.
+    click(layout.missions);
+    if(!mission_view_.visible()||diplomacy_workspace_.visible())
+      throw std::runtime_error("Missions rail button did not open exclusively.");
+    click(layout.missions);
+    if(mission_view_.visible())
+      throw std::runtime_error("Missions rail button did not close the board.");
+    click(layout.missions);
+    send({InputEventType::EscapePressed});
+    if(mission_view_.visible()||menu_)
+      throw std::runtime_error("Escape did not close the missions board before the menu.");
+    // Focus ring: Tab arms the first control, Escape releases the ring
+    // while the panel stays open, and a second Escape closes it.
+    click(layout.missions);
+    key(9);
+    if(mission_view_.focus()<0)
+      throw std::runtime_error("Tab did not arm the missions focus ring.");
+    if(!wants_keyboard_focus())
+      throw std::runtime_error("The armed missions ring did not claim keyboard focus.");
+    send({InputEventType::EscapePressed});
+    if(!mission_view_.visible()||mission_view_.focus()>=0)
+      throw std::runtime_error("Escape did not release the missions ring first.");
+    send({InputEventType::EscapePressed});
+    if(mission_view_.visible()||menu_)
+      throw std::runtime_error("Escape did not close the missions board after ring release.");
+    // Pad UI navigation: with the board open and the dpad unbound, a pad
+    // press translates to ring input — dpad arms the ring, south activates,
+    // east backs out exactly like Escape.
+    click(layout.missions);
+    InputEvent pad_down{InputEventType::GamepadPressed};pad_down.gamepad_button=12;
+    InputEvent pad_down_up{InputEventType::GamepadReleased};pad_down_up.gamepad_button=12;
+    send(pad_down);send(pad_down_up);
+    if(mission_view_.focus()<0)
+      throw std::runtime_error("Pad dpad did not arm the missions focus ring.");
+    // Stick nav: the armed ring owns input, so a left-stick deflection
+    // navigates like dpad — the axis event is swallowed and map_pan_y
+    // (bound to the same axis) sees nothing.
+    InputEvent stick_down{InputEventType::GamepadAxis};
+    stick_down.gamepad_axis=1;stick_down.gamepad_axis_value=.9f;
+    InputEvent stick_neutral{InputEventType::GamepadAxis};stick_neutral.gamepad_axis=1;
+    send(stick_down);
+    if(mission_view_.focus()<0)
+      throw std::runtime_error("Stick deflection disarmed the missions ring.");
+    if(input_mapper_.axis("map_pan_y")>.5f)
+      throw std::runtime_error("UI-owned stick deflection still reached map_pan_y.");
+    send(stick_neutral);
+    InputEvent pad_back{InputEventType::GamepadPressed};pad_back.gamepad_button=1;
+    InputEvent pad_back_up{InputEventType::GamepadReleased};pad_back_up.gamepad_button=1;
+    send(pad_back);send(pad_back_up);
+    if(!mission_view_.visible()||mission_view_.focus()>=0)
+      throw std::runtime_error("Pad back did not release the missions ring first.");
+    send(pad_back);send(pad_back_up);
+    if(mission_view_.visible()||menu_)
+      throw std::runtime_error("Pad back did not close the missions board.");
+    // Axis bindings win in free play: the same left-stick deflection
+    // reaches map_pan_y — navigation never steals a gameplay axis.
+    send(stick_down);
+    if(input_mapper_.axis("map_pan_y")<.5f)
+      throw std::runtime_error("Free-play stick deflection did not reach map_pan_y.");
+    send(stick_neutral);
+    // Bindings win: a pad button bound in GALAXY keeps its gameplay meaning
+    // while an unarmed overlay is showing — it does not translate to nav.
+    if(input_mapper_.rebind("toggle_pause",
+           {{stellar::engine::RawInputEvent::Kind::GamepadButton,0}})!=1)
+      throw std::runtime_error("Pause rebind to pad south failed.");
+    click(layout.missions);
+    const auto bound_speed=session_->frame().clock().speed();
+    InputEvent pad_south{InputEventType::GamepadPressed};pad_south.gamepad_button=0;
+    InputEvent pad_south_up{InputEventType::GamepadReleased};pad_south_up.gamepad_button=0;
+    send(pad_south);send(pad_south_up);
+    if(session_->frame().clock().speed()==bound_speed)
+      throw std::runtime_error("Bound pad button did not reach gameplay with the board open.");
+    send(pad_south);send(pad_south_up); // restore
+    if(input_mapper_.rebind("toggle_pause",
+           {{stellar::engine::RawInputEvent::Kind::KeyPress,32}})!=1)
+      throw std::runtime_error("Pause keyboard binding restore failed.");
+    send({InputEventType::EscapePressed});
+    if(mission_view_.visible()||menu_)
+      throw std::runtime_error("Missions board did not close after the pad-binding check.");
     const auto& after=session_->frame().runtime().world().campaign();
     const auto after_economy=std::ranges::find(after.economies,
         after.player_civilization_id,&CivilizationEconomy::civilization_id);
@@ -5538,8 +5945,98 @@ class NativeCampaign final {
   [[nodiscard]] bool wants_text_input() const noexcept {
     if(developer_planet_index_.visible()||giant_test_panel_.visible())return false;
     if(developer_index_.visible())return developer_index_.wants_text_input();
-    return !menu_ && !battle_workspace_.visible() && (research_workspace_.wants_text_input() || shipyard_workspace_.wants_text_input() || (map_hud_visible()&&assets_.wants_text_input())) &&
+    return !menu_ && !battle_workspace_.visible() && (research_workspace_.wants_text_input() || shipyard_workspace_.wants_text_input() || chronicle_view_.wants_text_input() || colony_roster_.wants_text_input() || developer_diagnostics_.wants_text_input() || (map_hud_visible()&&assets_.wants_text_input())) &&
            !construction_workspace_.visible();
+  }
+  // true while a focus-ring surface owns keyboard activation, so bound galaxy
+  // actions (Space -> toggle_pause) do not preempt Return/Space activation.
+  [[nodiscard]] bool wants_keyboard_focus() const noexcept {
+    return (research_workspace_.visible()&&research_workspace_.focus()>=0)||
+           (shipyard_workspace_.visible()&&shipyard_workspace_.focus()>=0)||
+           (economy_workspace_.visible()&&economy_workspace_.focus()>=0)||
+           (supply_workspace_.visible()&&supply_workspace_.focus()>=0)||
+           fleet_workspace_.focus()>=0||
+           (construction_workspace_.visible()&&construction_workspace_.focus()>=0)||
+           (chronicle_view_.visible()&&chronicle_view_.focus()>=0)||
+           (notification_view_.visible()&&notification_view_.focus()>=0)||
+           (colony_roster_.visible()&&colony_roster_.focus()>=0)||
+           (colony_workspace_.visible()&&colony_workspace_.focus()>=0)||
+           (mission_view_.visible()&&mission_view_.focus()>=0)||
+           (map_hud_visible()&&assets_.focus()>=0)||
+           (developer_index_.visible()&&developer_index_.focus()>=0)||
+           (developer_planet_index_.visible()&&developer_planet_index_.focus()>=0)||
+           (phenomena_debug_.visible&&phenomena_debug_.focus()>=0)||
+           (background_debug_.visible()&&background_debug_.focus()>=0)||
+           (giant_test_panel_.visible()&&giant_test_panel_.focus()>=0)||
+           (stellar_activity_panel_.visible()&&stellar_activity_panel_.focus()>=0)||
+           (developer_empires_.visible()&&developer_empires_.focus()>=0)||
+           (developer_panel_.visible()&&developer_panel_.focus()>=0)||
+           (developer_diagnostics_.visible()&&developer_diagnostics_.focus()>=0)||
+           hud_focus_>=0||
+           system_workspace_.small_body_keyboard_focus()||
+           inspection_card_.focus()>=0;
+  }
+  // Does any active-context binding claim this pad button? Device rules
+  // mirror binding_matches — an unset device is a wildcard.
+  [[nodiscard]] bool pad_button_bound(std::uint8_t code,int device)const{
+    for(const char* context_name:{"GALAXY","GALAXY_PAD"})
+      if(const auto* context=input_mapper_.context(context_name))
+        for(const auto& action:context->actions)
+          for(const auto& binding:action.bindings)
+            if(binding.kind==stellar::engine::RawInputEvent::Kind::GamepadButton&&
+               binding.code==code&&
+               (binding.device<0||device<0||binding.device==device))return true;
+    return false;
+  }
+  // Axis counterpart of pad_button_bound — a stick already bound to a
+  // camera axis keeps its gameplay meaning instead of driving nav.
+  [[nodiscard]] bool pad_axis_bound(std::uint8_t code,int device)const{
+    for(const char* context_name:{"GALAXY","GALAXY_PAD"})
+      if(const auto* context=input_mapper_.context(context_name))
+        for(const auto& action:context->actions)
+          for(const auto& binding:action.bindings)
+            if(binding.kind==stellar::engine::RawInputEvent::Kind::GamepadAxis&&
+               binding.code==code&&
+               (binding.device<0||device<0||binding.device==device))return true;
+    return false;
+  }
+  // When a pad press cannot reach gameplay — a modal/overlay owns input —
+  // it translates to navigation keys instead of going dead. While a
+  // navigable surface is merely showing, unbound nav buttons translate too
+  // (a pad-only user can arm the ring); buttons bound to a galaxy action
+  // keep their gameplay meaning — bindings win.
+  [[nodiscard]] bool ui_owns_pad_input(const InputEvent& event)const{
+    // Rebind capture needs raw pad presses — translating them to navigation
+    // keys would make pad bindings impossible to record.
+    if(settings_hub_&&settings_hub_->capturing())return false;
+    const bool gameplay_blocked=
+        menu_||settings_visible()||wants_text_input()||wants_keyboard_focus()||
+        diplomacy_workspace_.visible()||settlement_workspace_.visible()||
+        colony_workspace_.planetary_modal()||
+        shipyard_workspace_.confirmation_open()||
+        construction_workspace_.confirmation_open()||fleet_workspace_.preview();
+    if(gameplay_blocked)return true;
+    if(event.type==InputEventType::GamepadAxis
+           ?pad_axis_bound(event.gamepad_axis,event.gamepad_device)
+           :pad_button_bound(event.gamepad_button,event.gamepad_device))return false;
+    return navigable_surface_visible();
+  }
+  // A surface carrying a focus ring is showing (armed or not) — pad nav
+  // buttons should reach it even before its ring claims keyboard focus.
+  [[nodiscard]] bool navigable_surface_visible()const{
+    return research_workspace_.visible()||shipyard_workspace_.visible()||
+           economy_workspace_.visible()||supply_workspace_.visible()||
+           construction_workspace_.visible()||chronicle_view_.visible()||
+           notification_view_.visible()||colony_roster_.visible()||
+           colony_workspace_.visible()||mission_view_.visible()||
+           diplomacy_workspace_.visible()||settlement_workspace_.visible()||
+           system_workspace_.visible()||map_hud_visible()||
+           inspection_card_.visible()||
+           developer_index_.visible()||developer_planet_index_.visible()||
+           developer_empires_.visible()||developer_panel_.visible()||
+           developer_diagnostics_.visible()||giant_test_panel_.visible()||
+           stellar_activity_panel_.visible()||background_debug_.visible()||
+           phenomena_debug_.visible;
   }
 
   bool update(const InputSnapshot &input,int width,int height,double elapsed,bool advance_simulation=true){
@@ -5552,6 +6049,19 @@ class NativeCampaign final {
     if(planet_material_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
       planet_material_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("planet-materials");
     stellar::engine::MemoryTracker::instance().report(planet_material_memory_,planet_material_cache_.resident_bytes(),stellar::native_planets::MaterialCache::budget);
+    if(territory_overlay_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+      territory_overlay_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("territory-overlay");
+    stellar::engine::MemoryTracker::instance().report(territory_overlay_memory_,territory_overlay_.cached_image_bytes(),NativeTerritoryOverlay::maximum_cached_image_bytes);
+    if(image_preparation_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+      image_preparation_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("image-preparation");
+    stellar::engine::MemoryTracker::instance().report(image_preparation_memory_,image_preparation_->reserved_bytes(),ImagePreparationQueue::default_max_reserved_output_bytes);
+    // Recording sessions accumulate command payloads unboundedly — the
+    // recorder's occupancy joins the census while one is active.
+    if(replay_&&replay_->recorder){
+      if(replay_recorder_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+        replay_recorder_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("replay-recorder");
+      stellar::engine::MemoryTracker::instance().report(replay_recorder_memory_,replay_->recorder->estimated_memory_bytes());
+    }
     if(video_settings_)video_settings_->service(input.focused,input.renderable());
     resize_galaxy_camera(width,height);
     assets_refresh_elapsed_+=std::max(0.,elapsed);
@@ -5573,7 +6083,7 @@ class NativeCampaign final {
       territory_refresh_elapsed_=.5;
       feedback_.reset();
       notifications_.clear();
-      notification_view_.close();
+      notification_view_.close();chronicle_view_.close();
       seed_notifications();
       last_event_sound_={};
       if(presentation_audio_)presentation_audio_->stop_voice();
@@ -5625,6 +6135,7 @@ class NativeCampaign final {
       const auto pending_layout=NativeUiLayout::for_viewport(width,height);
       for(const auto& event:input.events)
         if((event.type==InputEventType::EscapePressed)||
+           (event.type==InputEventType::KeyPressed&&(event.key==13u||event.key==32u))||
            (event.type==InputEventType::LeftPressed&&pending_layout.continue_button.contains(event.position))){
           cancel_new_game();if(audio_confirm_)audio_confirm_();break;
         }
@@ -5634,13 +6145,14 @@ class NativeCampaign final {
     refresh_inspection();
     refresh_economy(false,false);
     refresh_roster(false);
+    refresh_missions(false);
     const auto layout=NativeUiLayout::for_viewport(width,height);
     const auto route_navigation=[&](UiAction action){
       const auto close_navigation_workspaces=[&]{
         research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
         diplomacy_workspace_.close();colony_roster_.close();economy_workspace_.close();
         supply_workspace_.close();system_workspace_.close();colony_workspace_.close();
-        notification_view_.close();
+        notification_view_.close();chronicle_view_.close();mission_view_.close();
       };
       if(action==UiAction::Map){
         close_navigation_workspaces();selected_id_.reset();refresh_inspection();return;
@@ -5682,8 +6194,9 @@ class NativeCampaign final {
       if(action!=UiAction::Supply)supply_workspace_.close();
       if(action!=UiAction::Colonies)colony_roster_.close();
       if(action!=UiAction::Economy)economy_workspace_.close();
+      if(action!=UiAction::Missions)mission_view_.close();
       fleet_workspace_.cancel_recovery();
-      notification_view_.close();
+      notification_view_.close();chronicle_view_.close();
       system_workspace_.close();
       colony_workspace_.close();
 
@@ -5708,119 +6221,578 @@ class NativeCampaign final {
       }else if(action==UiAction::Diplomacy){
         if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
         else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.open();refresh_diplomacy(true);}
+      }else if(action==UiAction::Missions){
+        if(mission_view_.visible())mission_view_.close();
+        else{research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();mission_view_.open();refresh_missions(true);}
       }
     };
     if(!input.focused||!input.renderable())menu_hover_feedback_.reset();
-    // Replay: feed recorded keypresses whose ticks have arrived through the
-    // same GALAXY context and dispatch path as live input. The same input
-    // gates apply — a suppressed tick replays when the gate opens.
-    if(replay_&&replay_->recording&&session_&&!menu_&&
-       !diplomacy_workspace_.visible()&&!wants_text_input()){
+    // Replay: feed recorded commands whose ticks have arrived through the
+    // same dispatch paths as live input. pointer_button commands dequeue
+    // into real InputEvents merged into the event stream below — pointer
+    // dispatch doesn't need the menu/text gate because the handlers gate on
+    // UI state exactly as they did during recording. Key/pad/binding
+    // commands resolve through GALAXY under the same input gates — a
+    // suppressed tick replays when the gate opens, and in-order replay
+    // holds later pointer commands behind a gated binding command.
+    if(replay_&&replay_->recording&&session_){
       const auto tick=replay_tick();
       const auto &commands=replay_->recording->commands();
+      const bool input_gate_open=
+          !menu_&&!diplomacy_workspace_.visible()&&!wants_text_input();
       while(replay_->command_cursor<commands.size()&&
             commands[replay_->command_cursor].tick<=tick){
-        const auto &command=commands[replay_->command_cursor++];
-        if(command.name!="key_press")continue;
+        const auto &command=commands[replay_->command_cursor];
+        if(command.name=="pointer_button"){
+          ++replay_->command_cursor;
+          // "type,x,y[,dx,dy]" — replayed through the real event stream so
+          // hit-testing and dispatch see live-shaped input.
+          int type=0;float x=0.f,y=0.f,dx=0.f,dy=0.f;
+          const char *const begin=command.payload.data();
+          const char *const end=begin+command.payload.size();
+          const auto parsed_type=std::from_chars(begin,end,type);
+          if(parsed_type.ec!=std::errc{}||parsed_type.ptr>=end||*parsed_type.ptr!=',')continue;
+          const auto parsed_x=std::from_chars(parsed_type.ptr+1,end,x);
+          if(parsed_x.ec!=std::errc{}||parsed_x.ptr>=end||*parsed_x.ptr!=',')continue;
+          const auto parsed_y=std::from_chars(parsed_x.ptr+1,end,y);
+          if(parsed_y.ec!=std::errc{})continue;
+          if(parsed_y.ptr<end&&*parsed_y.ptr==','){
+            const auto parsed_dx=std::from_chars(parsed_y.ptr+1,end,dx);
+            if(parsed_dx.ec==std::errc{}&&parsed_dx.ptr<end&&*parsed_dx.ptr==',')
+              (void)std::from_chars(parsed_dx.ptr+1,end,dy);
+          }
+          replay_->injected_events.push_back(
+              InputEvent{static_cast<InputEventType>(type),{x,y},{dx,dy}});
+          continue;
+        }
+        if(!input_gate_open)break;
+        ++replay_->command_cursor;
+        stellar::engine::RawInputEvent raw;
+        if(command.name=="key_press")
+          raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
+        else if(command.name=="gamepad_button")
+          raw.kind=stellar::engine::RawInputEvent::Kind::GamepadButton;
+        else if(command.name=="mouse_button")
+          raw.kind=stellar::engine::RawInputEvent::Kind::MouseButton;
+        else continue;
         int code=0;
         const auto parsed=std::from_chars(command.payload.data(),
             command.payload.data()+command.payload.size(),code);
         if(parsed.ec!=std::errc{})continue;
-        stellar::engine::RawInputEvent raw;
-        raw.kind=stellar::engine::RawInputEvent::Kind::KeyPress;
-        raw.code=static_cast<std::uint32_t>(code);
+        raw.code=code;
         (void)input_mapper_.feed(raw);
         const auto action=first_galaxy_action_pressed();
         if(!action.empty())dispatch_galaxy_action(action,width,height);
         // Replayed presses are edge-triggered: release immediately so the next
-        // recorded press of the same key fires like real input does.
-        raw.kind=stellar::engine::RawInputEvent::Kind::KeyRelease;
+        // recorded press of the same input fires like real input does.
+        if(command.name=="key_press")
+          raw.kind=stellar::engine::RawInputEvent::Kind::KeyRelease;
+        else raw.pressed=false;
         (void)input_mapper_.feed(raw);
       }
+      // Completeness and completion are cursor bookkeeping, not dispatch —
+      // they must run even while the input gate is closed: a pointer command
+      // consumed behind the gate (e.g. a menu click) can finish the stream
+      // with the gate held shut, and gating these checks would hang a
+      // scripted --replay-exit run with nothing left pending.
+      if(replay_->divergence.empty()&&
+         replay_->command_cursor>=commands.size()){
+        const auto &expected=replay_->recording->checkpoints();
+        if(replay_->checkpoint_cursor<expected.size()&&
+           expected[replay_->checkpoint_cursor].tick<tick)
+          replay_->divergence=
+              "replay skipped recorded checkpoint at tick "+
+              std::to_string(expected[replay_->checkpoint_cursor].tick)+
+              (expected[replay_->checkpoint_cursor].label.empty()?"":
+               " ("+expected[replay_->checkpoint_cursor].label+")");
+      }
+      // Completion: the whole recorded stream consumed, every recorded
+      // checkpoint verified, no divergence — report it once so a scripted
+      // run has a success signal instead of only an absence of failure.
+      if(replay_->divergence.empty()&&!replay_->completion_reported&&
+         replay_->command_cursor>=commands.size()&&
+         replay_->checkpoint_cursor>=replay_->recording->checkpoints().size()){
+        replay_->completion_reported=true;
+        // Flush: scripted --replay watchers poll for this line — a buffered
+        // stream would hold it hostage until the process exits.
+        std::cout<<"replay_verified={\"commands\":"<<commands.size()
+                 <<",\"checkpoints\":"<<replay_->verified_checkpoints<<"}\n"
+                 <<std::flush;
+        // --replay-exit: a scripted verification run ends here — exit 0
+        // with the verified line, rather than continuing the session.
+        if(replay_->exit_on_completion)return false;
+      }
     }
-    for(const auto &event:input.events){
-      if(developer_session()&&stellar_activity_panel_.handle(event,width,height,session_->frame())){
-        focus_stellar_activity(width,height);gesture_.capture_for_ui();continue;
+    // --replay-exit stall detection, outside the input gate: pending
+    // commands or checkpoints whose tick can never arrive (frozen
+    // simulation, held-closed input gate) mean the verification cannot
+    // complete — report it instead of hanging. Same 600-frame idiom as
+    // the --replay-until stall guard.
+    if(replay_&&replay_->recording&&session_&&replay_->exit_on_completion&&
+       !replay_->completion_reported&&replay_->divergence.empty()){
+      const auto&recording=*replay_->recording;
+      const auto tick=replay_tick();
+      const bool pending=
+          replay_->command_cursor<recording.commands().size()||
+          replay_->checkpoint_cursor<recording.checkpoints().size();
+      const bool progressed=
+          tick!=replay_->verification_last_tick||
+          replay_->command_cursor!=replay_->verification_last_command||
+          replay_->checkpoint_cursor!=replay_->verification_last_checkpoint;
+      replay_->verification_last_tick=tick;
+      replay_->verification_last_command=replay_->command_cursor;
+      replay_->verification_last_checkpoint=replay_->checkpoint_cursor;
+      if(!pending||progressed){
+        replay_->verification_stalled_frames=0;
+      }else if(++replay_->verification_stalled_frames>=600){
+        throw std::runtime_error(
+            "Replay verification stalled: "+
+            std::to_string(recording.commands().size()-replay_->command_cursor)+
+            " command(s) and "+
+            std::to_string(recording.checkpoints().size()-replay_->checkpoint_cursor)+
+            " checkpoint(s) pending with no progress for 600 frames — the "
+            "recording cannot finish verifying.");
       }
-      if(developer_session()&&developer_empires_.handle(event,width,height,session_->frame())){
-        if(const auto id=developer_empires_.take_focus_request()){
-          system_workspace_.close();colony_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();
-          if(const auto it=session_->cache().systems_by_id.find(*id);it!=session_->cache().systems_by_id.end()){
-            camera_.center={it->second->position.x,it->second->position.y};
+    }
+    // --replay-until: once the simulated tick reaches the requested stop,
+    // dump the canonical document next to the recording. The dump is
+    // canonicalized exactly like checkpoint captures so a leaf-diff against
+    // <recording>.expected/<tick>.json names the diverging leaf — this is
+    // the bisect companion to checkpoint divergence. Runs outside the input
+    // gate so a modal that pauses command feeding cannot suppress the dump.
+    if(replay_&&replay_->recording&&session_&&replay_->stop_at_tick){
+      if(const auto current_tick=replay_tick();current_tick<*replay_->stop_at_tick){
+        // Stall detection: a paused campaign or an exhausted command stream
+        // can never reach the stop — report it instead of hanging.
+        if(current_tick!=replay_->last_tick){replay_->last_tick=current_tick;replay_->stalled_frames=0;}
+        else if(++replay_->stalled_frames>600){
+          std::cout<<"replay-until: simulated tick stalled at "<<current_tick
+                   <<" below target "<<*replay_->stop_at_tick
+                   <<" for 600 frames — the recording cannot reach it\n";
+          replay_->stop_at_tick.reset();
+          session_->request_exit();
+        }
+      }else{
+      const auto stop=*replay_->stop_at_tick;
+      const PlayerCampaignCaptureOptions capture_options{
+          session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,""};
+      auto document=encode_player_campaign_v17_document(
+          capture_player_campaign_v17(session_->frame().runtime(),
+                                      capture_options));
+      document.erase("SavedAtUtc");
+      if(const auto galaxy=document.find("Galaxy");galaxy!=document.end())
+        if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end())
+          meta->erase("CreatedAtUtc");
+      std::string message="replay-until: canonical state at tick "+
+          std::to_string(stop)+" dumped to ";
+      if(std::ofstream out{replay_->stop_dump_path,
+                           std::ios::binary|std::ios::trunc};out){
+        out<<document.dump(2);
+        message+=replay_->stop_dump_path.generic_string();
+      }else
+        message+="(write failed: "+replay_->stop_dump_path.generic_string()+")";
+      // Bisect aid: when an expected sidecar exists for the stop tick, leaf-diff
+      // immediately so the dump arrives with its first divergence named.
+      const auto expected_path=replay_->expected_directory/
+          (std::to_string(stop)+".json");
+      if(std::ifstream in{expected_path,std::ios::binary};in){
+        std::ostringstream contents;contents<<in.rdbuf();
+        try{
+          const auto leaves=stellar::engine::document_leaf_diff(
+              nlohmann::ordered_json::parse(contents.str()),document);
+          if(!leaves.empty()){
+            const auto diff_path=replay_->expected_directory.parent_path()/
+                ("replay-until-"+std::to_string(stop)+".diff.txt");
+            std::ostringstream report;
+            for(const auto&leaf:leaves)
+              report<<leaf.path<<"\n  expected: "<<leaf.expected
+                    <<"\n  actual:   "<<leaf.actual<<'\n';
+            if(std::ofstream out{diff_path,std::ios::binary|std::ios::trunc};out)
+              message+=" (first leaf: "+leaves.front().path+
+                  "; full diff in "+diff_path.generic_string()+")";
+          }else
+            message+=" (matches expected sidecar)";
+        }catch(const std::exception&){
+          // A corrupt expected sidecar still leaves the plain dump.
+        }
+      }
+      std::cout<<message<<'\n';
+      replay_->stop_at_tick.reset();
+      session_->request_exit();
+      }
+    }
+    // Replayed pointer commands merge ahead of this frame's live events —
+    // they dispatch through the identical handlers in recorded order.
+    std::vector<InputEvent> frame_events;
+    // Held dpad directions re-fire as nav keys; the emit re-checks the
+    // ownership gate so a direction pressed in free play cannot leak
+    // repeats into a surface opened while held (native_pad_input.hpp).
+    // A focus drop can swallow the release — disarm on unfocused frames.
+    if(!input.focused){pad_nav_repeater_.clear();pad_nav_stick_.clear(pad_nav_repeater_);}
+    pad_nav_repeater_.update(static_cast<float>(std::max(0.,elapsed)),
+        [&](const InputEvent &held){
+          if(ui_owns_pad_input(held))
+            if(auto nav=stellar::native_client::pad_navigation_event(held))
+              frame_events.push_back(*nav);});
+    // Assistive-tech Invoke calls queue on the accessibility bridge from a
+    // UIA worker thread; each becomes a Return press+release so AT
+    // activation rides the same dispatch path as a keyboard user.
+    if(accessibility_bridge_)
+      for(auto activations=accessibility_bridge_->drain_activations();
+          activations>0;--activations){
+        InputEvent press{InputEventType::KeyPressed};press.key=13;
+        InputEvent release{InputEventType::KeyReleased};release.key=13;
+        frame_events.push_back(press);
+        frame_events.push_back(release);
+      }
+    // RangeValue SetValue calls queue likewise — the value routes to
+    // whichever visible settings surface owns the focused slider, then a
+    // fresh focus announcement carries the applied position back to AT.
+    if(accessibility_bridge_)
+      if(const auto set_value=accessibility_bridge_->take_range_set()){
+        if(audio_settings_&&audio_settings_->visible()&&audio_settings_->set_focused_range(*set_value))
+          announcer_.announce_focus(audio_settings_->focused_label(),announcement_bounds(audio_settings_->focused_bounds(width,height)),audio_settings_->focused_range(),audio_settings_->focused_control(),audio_settings_->focused_toggle());
+        else if(voice_settings_&&voice_settings_->visible()&&voice_settings_->set_focused_range(*set_value))
+          announcer_.announce_focus(voice_settings_->focused_label(),announcement_bounds(voice_settings_->focused_bounds(width,height)),voice_settings_->focused_range(),voice_settings_->focused_control(),voice_settings_->focused_toggle());
+      }
+    // Value SetValue calls queue likewise — the text routes to whichever
+    // surface's ring sits on an Edit (each setter checks its own focus,
+    // so only the owning field accepts).
+    if(accessibility_bridge_)
+      if(const auto text_set=accessibility_bridge_->take_text_set())
+        (void)(assets_.set_focused_text(*text_set,width,height)||
+               chronicle_view_.set_focused_text(*text_set,width,height)||
+               colony_roster_.set_focused_text(*text_set,width,height)||
+               developer_index_.set_focused_text(*text_set,width,height)||
+               developer_diagnostics_.set_focused_text(*text_set,width,height)||
+               research_workspace_.set_focused_text(*text_set,width,height)||
+               shipyard_workspace_.set_focused_text(*text_set,ShipyardWorkspaceLayout::for_viewport(width,height)));
+    // ExpandCollapse Expand/Collapse calls queue likewise — the state
+    // routes to whichever surface's ring sits on an expandable node
+    // (each setter checks its own focus), then a fresh focus announcement
+    // carries the applied state back to AT.
+    if(accessibility_bridge_)
+      if(const auto expansion=accessibility_bridge_->take_expansion_set()){
+        if(assets_.set_focused_expanded(*expansion,width,height))
+          announcer_.announce_focus(assets_.focused_label(width,height),announcement_bounds(assets_.focused_bounds(width,height)),std::nullopt,assets_.focused_control(width,height),std::nullopt,assets_.focused_value(width,height),assets_.focused_expanded(width,height));
+        else if(developer_session()&&developer_diagnostics_.set_focused_expanded(*expansion,width,height))
+          announcer_.announce_focus(developer_diagnostics_.focused_label(width,height),announcement_bounds(developer_diagnostics_.focused_bounds(width,height)),std::nullopt,developer_diagnostics_.focused_control(width,height),std::nullopt,developer_diagnostics_.focused_value(width,height),developer_diagnostics_.focused_expanded(width,height));
+      }
+    const std::vector<InputEvent> *frame_event_stream=&input.events;
+    if(replay_&&!replay_->injected_events.empty()){
+      frame_events.insert(frame_events.end(),replay_->injected_events.begin(),
+                          replay_->injected_events.end());
+      replay_->injected_events.clear();
+    }
+    if(!frame_events.empty()){
+      frame_events.insert(frame_events.end(),input.events.begin(),input.events.end());
+      frame_event_stream=&frame_events;
+    }
+    for(const auto &raw_event:*frame_event_stream){
+      pad_nav_repeater_.note(raw_event);
+      // A left-stick deflection engaging a direction synthesizes the dpad
+      // press — armed only when the ownership gate says UI owns the axis,
+      // so a camera-bound stick keeps its gameplay meaning.
+      const auto stick_press=
+          raw_event.type==InputEventType::GamepadAxis
+              ?pad_nav_stick_.note(raw_event,pad_nav_repeater_,
+                                   ui_owns_pad_input(raw_event))
+              :std::optional<InputEvent>{};
+      // Pad presses are gameplay bindings in free play; while a UI surface
+      // owns input they translate into the equivalent navigation key so
+      // every focus ring answers the pad (native_pad_input.hpp).
+      const InputEvent event=[&]{
+        if(stick_press)
+          if(auto nav=stellar::native_client::pad_navigation_event(*stick_press))return *nav;
+        if(raw_event.type==InputEventType::GamepadPressed&&ui_owns_pad_input(raw_event))
+          if(auto nav=stellar::native_client::pad_navigation_event(raw_event))return *nav;
+        return raw_event;}();
+      // Journal pointer input: positions (and drag deltas) are what dispatch
+      // consumes, so the recording stores the raw event and replay re-runs
+      // hit-testing against reproduced state instead of trusting a resolved
+      // action name. Moves record only while a button is held — accumulated
+      // drag motion decides drag-vs-click at release; hovers are cosmetic.
+      if(replay_&&replay_->recorder){
+        bool journal=false;
+        switch(event.type){
+        case InputEventType::LeftPressed:case InputEventType::RightPressed:
+          ++replay_->pointer_held;journal=true;break;
+        case InputEventType::LeftReleased:case InputEventType::RightReleased:
+          if(replay_->pointer_held>0)--replay_->pointer_held;
+          journal=true;break;
+        case InputEventType::PointerCancelled:
+          replay_->pointer_held=0;journal=true;break;
+        case InputEventType::PointerMove:
+          journal=replay_->pointer_held>0;break;
+        default:break;
+        }
+        if(journal){
+          char payload[96];
+          const auto written=std::snprintf(payload,sizeof payload,
+              "%d,%.9g,%.9g,%.9g,%.9g",static_cast<int>(event.type),
+              static_cast<double>(event.position.x),static_cast<double>(event.position.y),
+              static_cast<double>(event.delta.x),static_cast<double>(event.delta.y));
+          if(written>0)
+            replay_->recorder->record(replay_tick(),"pointer_button",
+                std::string(payload,static_cast<std::size_t>(written)));
+        }
+      }
+      if(developer_session()){
+        const int stellar_activity_focus_before=stellar_activity_panel_.focus();
+        if(stellar_activity_panel_.handle(event,width,height,session_->frame())){
+          focus_stellar_activity(width,height);
+          if(stellar_activity_panel_.focus()!=stellar_activity_focus_before)
+            announcer_.announce_focus(stellar_activity_panel_.focused_label(width,height),
+              announcement_bounds(stellar_activity_panel_.focused_bounds(width,height)),
+              std::nullopt,stellar_activity_panel_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
+        }
+      }
+      if(developer_session()){
+        const int developer_empires_focus_before=developer_empires_.focus();
+        if(developer_empires_.handle(event,width,height,session_->frame())){
+          if(const auto id=developer_empires_.take_focus_request()){
+            system_workspace_.close();colony_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();
+            if(const auto it=session_->cache().systems_by_id.find(*id);it!=session_->cache().systems_by_id.end()){
+              camera_.center={it->second->position.x,it->second->position.y};
+              camera_.pixels_per_world=std::max(camera_.pixels_per_world,fitted_pixels_per_world_*8.);
+              selected_id_=*id;constrain_galaxy_camera(width,height);
+            }
+            if(menu_)toggle_menu();
+          }
+          if(developer_empires_.focus()!=developer_empires_focus_before)
+            announcer_.announce_focus(developer_empires_.focused_label(width,height),
+              announcement_bounds(developer_empires_.focused_bounds(width,height)),
+              std::nullopt,developer_empires_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
+        }
+      }
+      if(developer_session()){
+        const int developer_diagnostics_focus_before=developer_diagnostics_.focus();
+        const auto developer_diagnostics_expanded_before=developer_diagnostics_.focused_expanded(width,height);
+        if(developer_diagnostics_.handle(event,width,height,developer_monitor_)){
+          if(developer_diagnostics_.focus()!=developer_diagnostics_focus_before||developer_diagnostics_.focused_expanded(width,height)!=developer_diagnostics_expanded_before)
+            announcer_.announce_focus(developer_diagnostics_.focused_label(width,height),
+              announcement_bounds(developer_diagnostics_.focused_bounds(width,height)),
+              std::nullopt,developer_diagnostics_.focused_control(width,height),std::nullopt,
+              developer_diagnostics_.focused_value(width,height),
+              developer_diagnostics_.focused_expanded(width,height));
+          gesture_.capture_for_ui();continue;
+        }
+      }
+      if(developer_session()){
+        const int giant_test_focus_before=giant_test_panel_.focus();
+        const auto giant_test_toggle_before=giant_test_panel_.focused_toggle(width,height);
+        if(giant_test_panel_.handle(event,width,height,session_->frame())){
+          if(giant_test_panel_.focus()!=giant_test_focus_before||giant_test_panel_.focused_toggle(width,height)!=giant_test_toggle_before)
+            announcer_.announce_focus(giant_test_panel_.focused_label(width,height),
+              announcement_bounds(giant_test_panel_.focused_bounds(width,height)),
+              std::nullopt,giant_test_panel_.focused_control(width,height),giant_test_panel_.focused_toggle(width,height));
+          gesture_.capture_for_ui();continue;
+        }
+      }
+      if(developer_session()){
+        const int developer_planet_index_focus_before=developer_planet_index_.focus();
+        if(developer_planet_index_.handle(event,width,height,session_->frame())){
+          if(developer_planet_index_.take_giant_request()){giant_test_panel_.open(session_->frame());refresh_knowledge();}
+          if(const auto target=developer_planet_index_.take_focus_request()){
+            if(menu_)toggle_menu();
+            if(enter_system(target->first,width,height)&&system_workspace_.select_body(target->second)){
+              system_workspace_.focus_selected_body(width,height);refresh_colony_entry(true);open_colony_from_system(target->second);
+            }
+          }
+          if(developer_planet_index_.focus()!=developer_planet_index_focus_before)
+            announcer_.announce_focus(developer_planet_index_.focused_label(width,height),
+              announcement_bounds(developer_planet_index_.focused_bounds(width,height)),
+              std::nullopt,developer_planet_index_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
+        }
+      }
+      if(developer_session()){
+        const int developer_index_focus_before=developer_index_.focus();
+        if(developer_index_.handle(event,width,height,session_->frame())){
+          if(const auto target=developer_index_.take_focus_request()){
+            colony_roster_.close();economy_workspace_.close();supply_workspace_.close();
+            research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
+            diplomacy_workspace_.close();colony_workspace_.close();
+            settlement_workspace_.clear();colony_entry_view_.reset();system_workspace_.close();
+            camera_.center={target->x,target->y};
             camera_.pixels_per_world=std::max(camera_.pixels_per_world,fitted_pixels_per_world_*8.);
-            selected_id_=*id;constrain_galaxy_camera(width,height);
+            selected_id_=target->system_id;constrain_galaxy_camera(width,height);
+            if(menu_)toggle_menu();
           }
-          if(menu_)toggle_menu();
+          if(developer_index_.focus()!=developer_index_focus_before)
+            announcer_.announce_focus(developer_index_.focused_label(width,height),
+              announcement_bounds(developer_index_.focused_bounds(width,height)),
+              std::nullopt,developer_index_.focused_control(width,height),std::nullopt,
+              developer_index_.focused_value(width,height));
+          gesture_.capture_for_ui();continue;
         }
-        gesture_.capture_for_ui();continue;
       }
-      if(developer_session()&&developer_diagnostics_.handle(event,width,height,developer_monitor_)){gesture_.capture_for_ui();continue;}
-      if(developer_session()&&giant_test_panel_.handle(event,width,height,session_->frame())){gesture_.capture_for_ui();continue;}
-      if(developer_session()&&developer_planet_index_.handle(event,width,height,session_->frame())){
-        if(developer_planet_index_.take_giant_request()){giant_test_panel_.open(session_->frame());refresh_knowledge();}
-        if(const auto target=developer_planet_index_.take_focus_request()){
-          if(menu_)toggle_menu();
-          if(enter_system(target->first,width,height)&&system_workspace_.select_body(target->second)){
-            system_workspace_.focus_selected_body(width,height);refresh_colony_entry(true);open_colony_from_system(target->second);
+      if(developer_session()){
+        const int developer_panel_focus_before=developer_panel_.focus();
+        if(developer_panel_.handle(event,width,height,session_->frame())){
+          if(developer_panel_.take_stellar_request()){
+            stellar_activity_panel_.open(session_->frame(),selected_id_);focus_stellar_activity(width,height);
           }
+          if(developer_panel_.take_empires_request())developer_empires_.open(session_->frame());
+          if(developer_panel_.take_reveal_request()){
+            fully_explore_developer_galaxy(session_->frame().runtime().world().campaign());
+            refresh_knowledge();territory_refresh_elapsed_=.5;refresh_diplomacy(true);
+          }
+          if(developer_panel_.take_diagnostics_request())developer_diagnostics_.open(developer_monitor_);
+          if(developer_panel_.take_export_request())request_support(width,height);
+          if(developer_panel_.take_planet_index_request())developer_planet_index_.open(session_->frame().runtime().world().campaign());
+          if(developer_panel_.take_index_request())developer_index_.open(session_->frame().runtime().world().campaign());
+          if(developer_panel_.focus()!=developer_panel_focus_before)
+            announcer_.announce_focus(developer_panel_.focused_label(width,height,session_->frame()),
+              announcement_bounds(developer_panel_.focused_bounds(width,height,session_->frame())),
+              std::nullopt,developer_panel_.focused_control(width,height,session_->frame()));
+          gesture_.capture_for_ui();continue;
         }
-        gesture_.capture_for_ui();continue;
-      }
-      if(developer_session()&&developer_index_.handle(event,width,height,session_->frame())){
-        if(const auto target=developer_index_.take_focus_request()){
-          colony_roster_.close();economy_workspace_.close();supply_workspace_.close();
-          research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
-          diplomacy_workspace_.close();colony_workspace_.close();
-          settlement_workspace_.clear();colony_entry_view_.reset();system_workspace_.close();
-          camera_.center={target->x,target->y};
-          camera_.pixels_per_world=std::max(camera_.pixels_per_world,fitted_pixels_per_world_*8.);
-          selected_id_=target->system_id;constrain_galaxy_camera(width,height);
-          if(menu_)toggle_menu();
-        }
-        gesture_.capture_for_ui();continue;
-      }
-      if(developer_session()&&developer_panel_.handle(event,width,height,session_->frame())){
-        if(developer_panel_.take_stellar_request()){
-          stellar_activity_panel_.open(session_->frame(),selected_id_);focus_stellar_activity(width,height);
-        }
-        if(developer_panel_.take_empires_request())developer_empires_.open(session_->frame());
-        if(developer_panel_.take_reveal_request()){
-          fully_explore_developer_galaxy(session_->frame().runtime().world().campaign());
-          refresh_knowledge();territory_refresh_elapsed_=.5;refresh_diplomacy(true);
-        }
-        if(developer_panel_.take_diagnostics_request())developer_diagnostics_.open(developer_monitor_);
-        if(developer_panel_.take_export_request())request_support(width,height);
-        if(developer_panel_.take_planet_index_request())developer_planet_index_.open(session_->frame().runtime().world().campaign());
-        if(developer_panel_.take_index_request())developer_index_.open(session_->frame().runtime().world().campaign());
-        gesture_.capture_for_ui();continue;
       }
       const bool hover_blocked=settings_visible()||(!menu_&&(battle_workspace_.visible()||settlement_workspace_.visible()||colony_workspace_.planetary_modal()||diplomacy_workspace_.modal_open()||shipyard_workspace_.confirmation_open()||construction_workspace_.confirmation_open()||fleet_workspace_.preview()));
       const auto hover_action=(!hover_blocked&&input.focused&&input.renderable())?layout.hit(event.position,menu_):UiAction::None;
       menu_hover_feedback_.update(event,static_cast<std::uint64_t>(hover_action));
       if(session_->new_campaign_pending()) break;
       if(event.type==InputEventType::PointerCancelled){settlement_workspace_.cancel_pending_input();(void)colony_roster_.handle(event,width,height);fleet_workspace_.cancel_recovery();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();}
-      if(voice_settings_&&voice_settings_->visible()){(void)voice_settings_->handle(event,width,height);gesture_.capture_for_ui();continue;}
-      if(settings_hub_&&settings_hub_->handle(event,width,height)){gesture_.capture_for_ui();continue;}
+      if(voice_settings_&&voice_settings_->visible()){
+        const int focus_before=voice_settings_->focused();
+        const auto toggle_before=voice_settings_->focused_toggle();
+        const auto range_before=voice_settings_->focused_range();
+        (void)voice_settings_->handle(event,width,height);
+        // Announce on state change too — a toggle flip or slider nudge
+        // leaves the ring index unchanged, and AT needs the new state.
+        if(voice_settings_->focused()!=focus_before||voice_settings_->focused_toggle()!=toggle_before||voice_settings_->focused_range()!=range_before)announcer_.announce_focus(voice_settings_->focused_label(),announcement_bounds(voice_settings_->focused_bounds(width,height)),voice_settings_->focused_range(),voice_settings_->focused_control(),voice_settings_->focused_toggle());
+        gesture_.capture_for_ui();continue;
+      }
+      if(settings_hub_){
+        const int focus_before=settings_hub_->focused();
+        if(settings_hub_->handle(event,width,height)){
+          if(settings_hub_->focused()!=focus_before)announcer_.announce_focus(settings_hub_->focused_label(),announcement_bounds(settings_hub_->focused_bounds(width,height)));
+          if(auto notice=settings_hub_->take_notice();!notice.empty())announcer_.announce(std::move(notice));
+          gesture_.capture_for_ui();continue;
+        }
+      }
       if(general_settings_&&general_settings_->visible()){
-        notification_view_.close();
+        notification_view_.close();chronicle_view_.close();
+        const int focus_before=general_settings_->focused();
         (void)general_settings_->handle(event,width,height);
+        if(general_settings_->focused()!=focus_before)announcer_.announce_focus(general_settings_->focused_label(),announcement_bounds(general_settings_->focused_bounds(width,height)));
         gesture_.capture_for_ui();
         continue;
       }
       if(video_settings_&&video_settings_->visible()){
-        notification_view_.close();
+        notification_view_.close();chronicle_view_.close();
+        const int focus_before=video_settings_->focused();
         (void)video_settings_->handle(event,width,height);
+        if(video_settings_->focused()!=focus_before)announcer_.announce_focus(video_settings_->focused_label(width,height),announcement_bounds(video_settings_->focused_bounds(width,height)));
         gesture_.capture_for_ui();
         continue;
       }
       if(audio_settings_&&audio_settings_->visible()){
-        notification_view_.close();
+        notification_view_.close();chronicle_view_.close();
+        const int focus_before=audio_settings_->focused();
+        const auto toggle_before=audio_settings_->focused_toggle();
+        const auto range_before=audio_settings_->focused_range();
         (void)audio_settings_->handle(event,width,height);
+        if(audio_settings_->focused()!=focus_before||audio_settings_->focused_toggle()!=toggle_before||audio_settings_->focused_range()!=range_before)announcer_.announce_focus(audio_settings_->focused_label(),announcement_bounds(audio_settings_->focused_bounds(width,height)),audio_settings_->focused_range(),audio_settings_->focused_control(),audio_settings_->focused_toggle());
         gesture_.capture_for_ui();
         continue;
       }
-      if(!map_hud_visible()){hud_switch_pressed_=false;assets_.cancel_input();}
+      if(menu_){
+        if(event.type==InputEventType::LeftPressed||event.type==InputEventType::PointerCancelled)menu_focus_=-1;
+        if(event.type==InputEventType::KeyPressed&&event.key){
+          constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u,kHome=0x4000004au,kEnd=0x4000004du;
+          const bool backward=event.key==kLeft||event.key==kUp||(event.key==kTab&&event.shift);
+          if(event.key==kTab||event.key==kRight||event.key==kDown||backward){
+            menu_focus_=menu_focus_<0?0:(backward?menu_focus_+menu_action_count-1:menu_focus_+1)%menu_action_count;
+            menu_hover_feedback_.cue(static_cast<std::uint64_t>(menu_actions_[menu_focus_]));
+            announce_menu_focus(width,height);
+            gesture_.capture_for_ui();continue;
+          }
+          if(event.key==kHome||event.key==kEnd){
+            menu_focus_=event.key==kHome?0:menu_action_count-1;
+            menu_hover_feedback_.cue(static_cast<std::uint64_t>(menu_actions_[menu_focus_]));
+            announce_menu_focus(width,height);
+            gesture_.capture_for_ui();continue;
+          }
+          if((event.key==kReturn||event.key==kSpace)&&menu_focus_>=0&&menu_focus_<menu_action_count){
+            if(audio_confirm_)audio_confirm_();
+            activate_menu_action(menu_actions_[menu_focus_],width,height);
+            gesture_.capture_for_ui();continue;
+          }
+          gesture_.capture_for_ui();continue;
+        }
+      }
+      if(!map_hud_visible()){hud_switch_pressed_=false;assets_.cancel_input();map_focus_group_=-1;hud_focus_=-1;}
       if(map_hud_visible()){
+        if(event.type==InputEventType::LeftPressed||event.type==InputEventType::PointerCancelled){map_focus_group_=-1;hud_focus_=-1;}
+        if(event.type==InputEventType::KeyPressed&&event.key){
+          constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u,kHome=0x4000004au,kEnd=0x4000004du;
+          const bool bwd=event.key==kLeft||event.key==kUp||(event.key==kTab&&event.shift);
+          const bool nav=event.key==kTab||event.key==kRight||event.key==kDown||bwd||event.key==kHome||event.key==kEnd;
+          const bool activate=event.key==kReturn||event.key==kSpace;
+          if(nav||activate){
+            // Always-on map focus groups: assets navigator -> fleet workspace
+            // -> HUD chrome. A nav key that would wrap a group's boundary
+            // releases the ring so the same key can land in the next group;
+            // activation keys only reach the group currently holding focus.
+            if(map_focus_group_>=0&&(map_focus_group_==0?assets_.focus():map_focus_group_==1?fleet_workspace_.focus():hud_focus_)<0)map_focus_group_=-1;
+            const auto hud_items=hud_ring_items(layout,width,height);
+            const auto send_map_key=[&](int g)->bool{
+              if(g==0){
+                const auto expanded_before=assets_.focused_expanded(width,height);
+                const auto command=assets_.handle(event,width,height);
+                if(command.captured&&((nav&&!activate)||assets_.focused_expanded(width,height)!=expanded_before))announcer_.announce_focus(assets_.focused_label(width,height),announcement_bounds(assets_.focused_bounds(width,height)),std::nullopt,assets_.focused_control(width,height),std::nullopt,assets_.focused_value(width,height),assets_.focused_expanded(width,height));
+                return command.captured;
+              }
+              if(g==1){
+                const auto markers=fleet_markers(width,height);
+                const auto fleet_command=fleet_workspace_.handle(event,width,height,markers,std::nullopt);
+                if(fleet_command.kind==FleetWorkspaceCommandKind::OpenColony)open_overview_colony(fleet_command.colony_id,width,height);
+                else handle_fleet_command(fleet_command);
+                if(fleet_command.captured&&nav&&!activate){const auto fl=fleet_workspace_.layout(width,height);announcer_.announce_focus(fleet_workspace_.focused_label(fl),announcement_bounds(fleet_workspace_.focused_bounds(fl)));}
+                return fleet_command.captured;
+              }
+              const int count=static_cast<int>(hud_items.size());
+              if(event.key==kHome||event.key==kEnd)hud_focus_=event.key==kHome?0:count-1;
+              else if(nav&&!activate){
+                if(hud_focus_<0||hud_focus_>=count)hud_focus_=bwd?count-1:0;
+                else{const int next=hud_focus_+(bwd?-1:1);if(next<0||next>=count){hud_focus_=-1;return false;}hud_focus_=next;}
+              }
+              else if(activate&&hud_focus_>=0&&hud_focus_<count){
+                const auto action=hud_items[static_cast<std::size_t>(hud_focus_)].second;
+                if(audio_confirm_)audio_confirm_();
+                if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
+                else if(action==UiAction::Speed)cycle_speed();
+                else if(action==UiAction::Notifications){if(notifications_available())notification_view_.toggle(notifications_.latest_sequence());}
+                else if(action==UiAction::Menu)toggle_menu();
+                else if(action==UiAction::SwitchView)activate_hud_switch(width,height);
+                else route_navigation(action);
+                return true;
+              }
+              else return false;
+              menu_hover_feedback_.cue(static_cast<std::uint64_t>(hud_items[static_cast<std::size_t>(hud_focus_)].second));
+              announcer_.announce_focus(hud_action_label(hud_items[static_cast<std::size_t>(hud_focus_)].second),announcement_bounds(hud_items[static_cast<std::size_t>(hud_focus_)].first),std::nullopt,stellar::engine::AnnouncementControl::Button);
+              return true;
+            };
+            if(activate){
+              if(map_focus_group_>=0&&send_map_key(map_focus_group_)){gesture_.capture_for_ui();continue;}
+            }else{
+              int g=map_focus_group_>=0?map_focus_group_:(bwd?2:0);
+              bool claimed=false;
+              for(int tries=0;tries<3;++tries){
+                if(send_map_key(g)){map_focus_group_=g;claimed=true;break;}
+                g=(g+(bwd?2:1))%3;
+              }
+              if(!claimed)map_focus_group_=-1;
+              // Nav keys on the clean map belong to the rings — never fall
+              // through to the raw handlers, claimed or not.
+              gesture_.capture_for_ui();continue;
+            }
+          }
+        }
         const auto asset_command=assets_.handle(event,width,height);
         if(asset_command.captured){if(asset_command.key)execute_asset(asset_command,width,height);gesture_.capture_for_ui();continue;}
         const auto hud=CommandHudLayout::make(width,height);
@@ -5828,8 +6800,7 @@ class NativeCampaign final {
         if(event.type==InputEventType::LeftReleased&&hud_switch_pressed_){
           hud_switch_pressed_=false;
           if(hud.switch_view.contains(event.position)){
-            if(system_workspace_.visible()){selected_id_=system_workspace_.system_id();system_workspace_.close();refresh_inspection();}
-            else if(selected_id_&&!enter_system(*selected_id_,width,height))scientist_voice(stellar::native_audio::VoiceCue::ReconnaissanceRequired);
+            activate_hud_switch(width,height);
             if(audio_confirm_)audio_confirm_();
           }gesture_.cancel();continue;
         }
@@ -5841,7 +6812,13 @@ class NativeCampaign final {
       if(battle_workspace_.visible()&&!menu_){
         if(event.type==InputEventType::KeyPressed&&event.key==0x4000003fu&&
            input.focused&&input.renderable())session_->request_save();
-        else execute_battle(battle_workspace_.handle(event,width,height));
+        else{
+          const int focus_before=battle_workspace_.focus();
+          execute_battle(battle_workspace_.handle(event,width,height));
+          if(battle_workspace_.focus()!=focus_before)
+            {const auto battle_layout=stellar::native_battle_ui::BattleWorkspaceLayout::for_viewport(width,height);
+            announcer_.announce_focus(battle_workspace_.focused_label(battle_layout),announcement_bounds(battle_workspace_.focused_bounds(battle_layout)));}
+        }
         gesture_.capture_for_ui();continue;
       }
       if(event.type==InputEventType::KeyPressed&&event.key==0x40000041u&&
@@ -5853,9 +6830,12 @@ class NativeCampaign final {
         continue;
       }
       const bool can_notify=notifications_available();
-      if(!can_notify)notification_view_.close();
+      if(!can_notify){notification_view_.close();chronicle_view_.close();}
       if(can_notify&&notification_view_.visible()){
+        const int focus_before=notification_view_.focus();
         const auto command=notification_view_.handle(event,notifications_.items(),width,height);
+        if(command.captured&&notification_view_.focus()!=focus_before)
+          announcer_.announce_focus(notification_view_.focused_label(notifications_.items(),width,height),announcement_bounds(notification_view_.focused_bounds(notifications_.items(),width,height)));
         if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenDiplomaticContact){
           system_workspace_.close();colony_workspace_.close();
           research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
@@ -5864,7 +6844,38 @@ class NativeCampaign final {
             diplomacy_workspace_.set_notice(tr("DIPLOMACY_NOTICE_UNIDENTIFIED","This contact is no longer identified. Review the contact list."),false);
           refresh_diplomacy(true);
         }
+        if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenSystem){
+          (void)enter_system(command.system_id,width,height);
+        }
+        if(command.kind==stellar::native_notifications::NotificationViewCommandKind::OpenChronicle){
+          notification_view_.close();
+          chronicle_view_.open(session_->frame().runtime().history(),
+              session_->frame().runtime().world().campaign().player_civilization_id);
+          if(audio_confirm_)audio_confirm_();
+          gesture_.capture_for_ui();continue;
+        }
         if(command.captured){gesture_.capture_for_ui();continue;}
+      }
+      if(can_notify&&chronicle_view_.visible()){
+        const int focus_before=chronicle_view_.focus();
+        if(chronicle_view_.handle(event,width,height)){
+          if(chronicle_view_.focus()!=focus_before)
+            announcer_.announce_focus(chronicle_view_.focused_label(width,height),announcement_bounds(chronicle_view_.focused_bounds(width,height)),std::nullopt,chronicle_view_.focused_control(width,height),std::nullopt,chronicle_view_.focused_value(width,height));
+          if(const auto nav=chronicle_view_.navigation()){
+            chronicle_view_.close();
+            (void)enter_system(static_cast<int>(*nav),width,height);
+          }
+          if(const auto contact=chronicle_view_.contact_navigation()){
+            chronicle_view_.close();
+            system_workspace_.close();colony_workspace_.close();
+            research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();
+            colony_roster_.close();economy_workspace_.close();supply_workspace_.close();diplomacy_workspace_.open();refresh_diplomacy(true);
+            if(!diplomacy_workspace_.select_contact_civilization(static_cast<int>(*contact)))
+              diplomacy_workspace_.set_notice(tr("DIPLOMACY_NOTICE_UNIDENTIFIED","This contact is no longer identified. Review the contact list."),false);
+            refresh_diplomacy(true);
+          }
+          gesture_.capture_for_ui();continue;
+        }
       }
       if(can_notify&&event.type==InputEventType::LeftPressed&&
          layout.notifications.contains(event.position)){
@@ -5875,12 +6886,31 @@ class NativeCampaign final {
       // Strategic shortcuts precede system-view capture, but never take keys
       // from text entry, a confirmation or a gameplay-blocking view.
       if(developer_session()&&event.type==InputEventType::KeyPressed&&event.control&&event.alt&&event.key=='b'){background_debug_.toggle(system_background_);gesture_.capture_for_ui();continue;}
-      if(developer_session()&&background_debug_.handle(event,width,height,system_background_)){if(auto id=background_debug_.navigation())(void)enter_system(*id,width,height);gesture_.capture_for_ui();continue;}
+      if(developer_session()){
+        const int background_debug_focus_before=background_debug_.focus();
+        if(background_debug_.handle(event,width,height,system_background_)){
+          if(auto id=background_debug_.navigation())(void)enter_system(*id,width,height);
+          if(background_debug_.focus()!=background_debug_focus_before)
+            announcer_.announce_focus(background_debug_.focused_label(width,height,system_background_),
+              announcement_bounds(background_debug_.focused_bounds(width,height)),
+              std::nullopt,background_debug_.focused_control(width,height));
+          gesture_.capture_for_ui();continue;
+        }
+      }
       if(developer_session()&&event.type==InputEventType::KeyPressed&&event.control&&event.alt&&event.key=='n'){phenomena_debug_.toggle();gesture_.capture_for_ui();continue;}
-      if(developer_session()&&phenomena_debug_.handle(event,width,height)){
-        if(const auto* field=phenomena_.field())if(auto index=phenomena_debug_.take_navigation(field->regions.size())){
-          const auto& r=field->regions[*index];system_workspace_.close();camera_.center={r.shape.x,r.shape.y};camera_.pixels_per_world=std::max(galaxy_overview_camera(width,height).pixels_per_world,std::min(width,height)/(5*std::max(r.shape.extent_x,r.shape.extent_y)));selected_id_.reset();refresh_inspection();
-        }gesture_.capture_for_ui();continue;
+      if(developer_session()){
+        const int phenomena_debug_focus_before=phenomena_debug_.focus();
+        const auto phenomena_debug_toggle_before=phenomena_debug_.focused_toggle(width,height);
+        if(phenomena_debug_.handle(event,width,height)){
+          if(const auto* field=phenomena_.field())if(auto index=phenomena_debug_.take_navigation(field->regions.size())){
+            const auto& r=field->regions[*index];system_workspace_.close();camera_.center={r.shape.x,r.shape.y};camera_.pixels_per_world=std::max(galaxy_overview_camera(width,height).pixels_per_world,std::min(width,height)/(5*std::max(r.shape.extent_x,r.shape.extent_y)));selected_id_.reset();refresh_inspection();
+          }
+          if(phenomena_debug_.focus()!=phenomena_debug_focus_before||phenomena_debug_.focused_toggle(width,height)!=phenomena_debug_toggle_before)
+            announcer_.announce_focus(phenomena_debug_.focused_label(width,height),
+              announcement_bounds(phenomena_debug_.focused_bounds(width,height)),
+              std::nullopt,phenomena_debug_.focused_control(width,height),phenomena_debug_.focused_toggle(width,height));
+          gesture_.capture_for_ui();continue;
+        }
       }
       // Key releases always reach the input mapper so held state clears even
       // when a menu or workspace suppressed the matching press.
@@ -5898,6 +6928,7 @@ class NativeCampaign final {
          !menu_&&!diplomacy_workspace_.visible()&&
          !colony_workspace_.planetary_modal()&&
          !settlement_workspace_.visible()&&!wants_text_input()&&
+         !wants_keyboard_focus()&&
          !shipyard_workspace_.confirmation_open()&&
          !construction_workspace_.confirmation_open()&&!fleet_workspace_.preview()){
         stellar::engine::RawInputEvent raw;
@@ -5920,6 +6951,94 @@ class NativeCampaign final {
           continue;
         }
       }
+      // Pad releases and axis state always reach the mapper — like key
+      // releases — so held bindings clear and stick values stay live even
+      // when a menu suppressed the matching press.
+      if(event.type==InputEventType::GamepadReleased){
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::GamepadButton;
+        raw.code=event.gamepad_button;raw.device=event.gamepad_device;raw.pressed=false;
+        (void)input_mapper_.feed(raw);continue;
+      }
+      if(event.type==InputEventType::GamepadAxis){
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::GamepadAxis;
+        raw.code=event.gamepad_axis;raw.device=event.gamepad_device;raw.value=event.gamepad_axis_value;
+        (void)input_mapper_.feed(raw);continue;
+      }
+      if(event.type==InputEventType::RightReleased){
+        // Feed but never consume — map right-gesture release handling still
+        // needs the event; this only clears mapper held-state.
+        stellar::engine::RawInputEvent raw;
+        raw.kind=stellar::engine::RawInputEvent::Kind::MouseButton;
+        raw.code=3;raw.pressed=false;
+        (void)input_mapper_.feed(raw);
+      }
+      // Pad presses and right-clicks resolve through GALAXY under the same
+      // gameplay gate as keys, so bindings captured in the Controls view
+      // actually fire. Left click stays the universal UI gesture — the
+      // rebind UI never captures it.
+      if((event.type==InputEventType::GamepadPressed||
+          event.type==InputEventType::RightPressed)&&
+         input.focused&&input.renderable()&&
+         !menu_&&!diplomacy_workspace_.visible()&&
+         !colony_workspace_.planetary_modal()&&
+         !settlement_workspace_.visible()&&!wants_text_input()&&
+         !wants_keyboard_focus()&&
+         !shipyard_workspace_.confirmation_open()&&
+         !construction_workspace_.confirmation_open()&&!fleet_workspace_.preview()){
+        stellar::engine::RawInputEvent raw;
+        const char *record_name="mouse_button";
+        if(event.type==InputEventType::GamepadPressed){
+          raw.kind=stellar::engine::RawInputEvent::Kind::GamepadButton;
+          raw.code=event.gamepad_button;raw.device=event.gamepad_device;
+          record_name="gamepad_button";
+        }else{
+          raw.kind=stellar::engine::RawInputEvent::Kind::MouseButton;
+          raw.code=3;
+        }
+        bool handled=input_mapper_.feed(raw);
+        if(handled){
+          const auto action=first_galaxy_action_pressed();
+          if(action.empty())handled=false;
+          else{
+            // Right-clicks already journal as pointer_button events at the
+            // top of the loop — recording mouse_button too would dispatch
+            // the binding twice on replay (the injected event reaches this
+            // same feed). Pad buttons carry no position, so they keep the
+            // binding-level record.
+            if(replay_&&replay_->recorder&&event.type==InputEventType::GamepadPressed)
+              replay_->recorder->record(replay_tick(),record_name,
+                                        std::to_string(raw.code));
+            dispatch_galaxy_action(action,width,height);
+          }
+        }
+        if(handled){
+          if(smoke_keyboard_commands_)++*smoke_keyboard_commands_;
+          if(audio_confirm_)audio_confirm_();
+          continue;
+        }
+      }
+      // The missions board is a floating panel — it owns its pointer input
+      // and routes its commands to the authoritative paths (fleet focus,
+      // colony open, planetary surface entry, outpost freight review).
+      // Keyboard events reach the view first: a live focus ring consumes
+      // Escape to release itself; otherwise the panel closes.
+      if(mission_view_.visible()&&!menu_){
+        const int focus_before=mission_view_.focus();
+        const auto command=mission_view_.handle(event,mission_board_,mission_fleets_,mission_colonies_,width,height);
+        if(command.captured){
+          if(mission_view_.focus()!=focus_before)
+            announcer_.announce_focus(mission_view_.focused_label(mission_board_,mission_fleets_,mission_colonies_,width,height),announcement_bounds(mission_view_.focused_bounds(mission_board_,mission_fleets_,mission_colonies_,width,height)),std::nullopt,stellar::engine::AnnouncementControl::Button);
+          if(command.kind==native_missions::MissionViewCommandKind::Close)mission_view_.close();
+          else if(command.kind==native_missions::MissionViewCommandKind::FocusFleet)focus_mission_fleet(command.fleet_id);
+          else if(command.kind==native_missions::MissionViewCommandKind::OpenColony){mission_view_.close();open_overview_colony(command.colony_id,width,height);}
+          else if(command.kind==native_missions::MissionViewCommandKind::LandColony){mission_view_.close();open_mission_colony(command.colony_id,width,height,false);}
+          else if(command.kind==native_missions::MissionViewCommandKind::CollectOutpostFreight){mission_view_.close();open_mission_colony(command.colony_id,width,height,true);}
+          gesture_.cancel();continue;
+        }
+        if(event.type==InputEventType::EscapePressed||event.type==InputEventType::PointerCancelled){mission_view_.close();continue;}
+      }
       const auto modal_blocks_navigation=!native_navigation_available(
           menu_,settlement_workspace_.visible(),diplomacy_workspace_.modal_open(),
           (colony_workspace_.planetary_modal()),
@@ -5929,7 +7048,7 @@ class NativeCampaign final {
         const auto navigation=action==UiAction::Map||action==UiAction::Home||action==UiAction::Inspect||action==UiAction::ZoomIn||action==UiAction::ZoomOut||action==UiAction::Explore||action==UiAction::Menu||action==UiAction::Research||
                               action==UiAction::Shipyard||
                               action==UiAction::Construction||
-                              action==UiAction::Diplomacy||action==UiAction::Supply||action==UiAction::Economy||action==UiAction::Colonies;
+                              action==UiAction::Diplomacy||action==UiAction::Supply||action==UiAction::Economy||action==UiAction::Colonies||action==UiAction::Missions;
         if(navigation){
           if(audio_confirm_)audio_confirm_();
           route_navigation(action);
@@ -5946,7 +7065,10 @@ class NativeCampaign final {
       if(colony_roster_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed?layout.hit(event.position,false):UiAction::None;
         if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
+          const int focus_before=colony_roster_.focus();
           const auto command=colony_roster_.handle(event,width,height);
+          if(command.captured&&colony_roster_.focus()!=focus_before)
+            announcer_.announce_focus(colony_roster_.focused_label(width,height),announcement_bounds(colony_roster_.focused_bounds(width,height)),std::nullopt,colony_roster_.focused_control(width,height),std::nullopt,colony_roster_.focused_value(width,height));
           if(command.refresh)refresh_roster(true);
           else if(command.open_colony_id)open_roster_colony(command,width,height);
           if(command.captured){gesture_.cancel();continue;}
@@ -5956,7 +7078,10 @@ class NativeCampaign final {
         const auto top_action=event.type==InputEventType::LeftPressed?layout.hit(event.position,false):UiAction::None;
         if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
           using stellar::native_economy::EconomyCommandKind;
+          const int focus_before=economy_workspace_.focus();
           const auto command=economy_workspace_.handle(event,economy_controller_.view(),width,height);
+          if(command.captured&&economy_workspace_.focus()!=focus_before)
+            announcer_.announce_focus(economy_workspace_.focused_label(economy_controller_.view()),announcement_bounds(economy_workspace_.focused_bounds(width,height)));
           if(command.kind==EconomyCommandKind::Refresh){refresh_economy(true,true);if(audio_confirm_)audio_confirm_();}
           else if(command.kind==EconomyCommandKind::SetIndustryPriority){
             const auto outcome=economy_controller_.change_priority(session_->frame(),session_->cache().generation,command.view_revision,command.priority);
@@ -5970,14 +7095,20 @@ class NativeCampaign final {
       if(supply_workspace_.visible()&&!menu_){
         const auto top_action=event.type==InputEventType::LeftPressed?layout.hit(event.position,false):UiAction::None;
         if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
+          const int focus_before=supply_workspace_.focus();
           const auto command=supply_workspace_.handle(event,supply_controller_.view(),width,height);
+          if(command.captured&&supply_workspace_.focus()!=focus_before)
+            announcer_.announce_focus(supply_workspace_.focused_label(supply_controller_.view()),announcement_bounds(supply_workspace_.focused_bounds(width,height)));
           if(command.refresh){refresh_supply(true,true);if(audio_confirm_)audio_confirm_();}
           if(command.captured){gesture_.cancel();continue;}
         }
       }
 
       if(settlement_workspace_.visible()&&!menu_){
+        const int focus_before=settlement_workspace_.focus();
         const auto command=settlement_workspace_.handle(event,width,height);
+        if(command.captured&&settlement_workspace_.focus()!=focus_before)
+          announcer_.announce_focus(settlement_workspace_.focused_label(),announcement_bounds(settlement_workspace_.focused_bounds(width,height)));
         if(command.kind==SettlementWorkspaceCommandKind::Confirm)
           execute_settlement();
         if(command.captured)continue;
@@ -5986,7 +7117,10 @@ class NativeCampaign final {
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
         if(colony_workspace_.freight_preview()||(top_action!=UiAction::Pause&&top_action!=UiAction::Speed)){
+          const int focus_before=colony_workspace_.focus();
           const auto command=colony_workspace_.handle(event,width,height);
+          if(command.captured&&colony_workspace_.focus()!=focus_before)
+            announcer_.announce_focus(colony_workspace_.focused_label(),announcement_bounds(colony_workspace_.focused_bounds(width,height)),std::nullopt,colony_workspace_.focused_control());
           if(command.kind==ColonyWorkspaceCommandKind::Close)gesture_.cancel();
           else if(command.kind==ColonyWorkspaceCommandKind::Planetary)execute_planetary(command.planetary);
           else if(command.kind==ColonyWorkspaceCommandKind::ReviewFreight || command.kind==ColonyWorkspaceCommandKind::ConfirmFreight || command.kind==ColonyWorkspaceCommandKind::CancelFreight)
@@ -5998,7 +7132,10 @@ class NativeCampaign final {
         const auto top_action=event.type==InputEventType::LeftPressed
                                   ?layout.hit(event.position,false):UiAction::None;
         if(top_action!=UiAction::Pause&&top_action!=UiAction::Speed){
+          const int focus_before=system_workspace_.focused();
           const auto command=system_workspace_.handle(event,width,height);
+          if(command.captured&&system_workspace_.focused()!=focus_before)
+            announcer_.announce_focus(system_workspace_.focused_label(width,height),announcement_bounds(system_workspace_.focused_bounds(width,height)));
           if(command.kind==SystemWorkspaceCommandKind::close){system_workspace_.close();gesture_.cancel();}
           else if(command.kind==SystemWorkspaceCommandKind::toggle_motion){
             auto& clock=session_->frame().clock();if(clock.speed()==StrategicSpeed::Paused)clock.resume();else clock.set_speed(StrategicSpeed::Paused);
@@ -6034,12 +7171,16 @@ class NativeCampaign final {
       }
 
       if(event.type==InputEventType::EscapePressed){
-        if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
+        if(map_focus_group_==0){assets_.cancel_input();map_focus_group_=-1;}
+        else if(map_focus_group_==1){fleet_workspace_.reset_focus();map_focus_group_=-1;}
+        else if(map_focus_group_==2){hud_focus_=-1;map_focus_group_=-1;}
+        else if(diplomacy_workspace_.modal_open())diplomacy_workspace_.dismiss_modal();
         else if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
         else if(colony_workspace_.visible())colony_workspace_.close();
         else if(construction_workspace_.visible())construction_workspace_.close();
         else if(shipyard_workspace_.visible()){if(shipyard_workspace_.popover_open())(void)shipyard_workspace_.handle(event,width,height);else shipyard_workspace_.close();}
         else if(research_workspace_.visible()){if(research_workspace_.popover_open())(void)research_workspace_.handle(event,width,height);else research_workspace_.close();}
+        else if(inspection_card_.visible()){inspection_card_.clear();selected_id_.reset();}
         else toggle_menu();
         gesture_.cancel();
         continue;
@@ -6069,24 +7210,39 @@ class NativeCampaign final {
         else if(command.kind==DiplomacyWorkspaceCommandKind::FocusSystem){
           if(!enter_system(command.focus_system_id,width,height))
             diplomacy_workspace_.set_notice(
-                "The last observation is outside surveyed space.",false);
+                tr("DIPLOMACY_NOTICE_UNSURVEYED","The last observation is outside surveyed space."),false);
         }
+        if(command.captured&&event.type==InputEventType::KeyPressed&&
+           diplomacy_workspace_.focus()>=0)
+          announcer_.announce_focus(diplomacy_workspace_.focused_label(width,height),announcement_bounds(diplomacy_workspace_.focused_bounds(width,height)));
         if(command.captured)continue;
       }
       if(construction_workspace_.visible()){
+        const int focus_before=construction_workspace_.focus();
         const auto command=construction_workspace_.handle(event,width,height);
+        if(command.captured&&construction_workspace_.focus()!=focus_before)
+          {const auto cl=ConstructionWorkspaceLayout::for_viewport(width,height);
+          announcer_.announce_focus(construction_workspace_.focused_label(cl),announcement_bounds(construction_workspace_.focused_bounds(cl)));}
         if(command.kind!=ConstructionWorkspaceCommandKind::None)
           execute_construction(command);
         if(command.captured)continue;
       }
       if(shipyard_workspace_.visible()){
+        const int focus_before=shipyard_workspace_.focus();
         const auto command=shipyard_workspace_.handle(event,width,height);
+        if(command.captured&&shipyard_workspace_.focus()!=focus_before)
+          {const auto sl=ShipyardWorkspaceLayout::for_viewport(width,height);
+          announcer_.announce_focus(shipyard_workspace_.focused_label(sl),announcement_bounds(shipyard_workspace_.focused_bounds(sl)),std::nullopt,shipyard_workspace_.focused_control(sl),std::nullopt,shipyard_workspace_.focused_value(sl));}
         if(command.kind!=ShipyardWorkspaceCommandKind::None)
           execute_shipyard(command);
         if(command.captured)continue;
       }
       if(research_workspace_.visible()){
+        const int focus_before=research_workspace_.focus();
         const auto command=research_workspace_.handle(event,width,height);
+        if(command.captured&&research_workspace_.focus()!=focus_before)
+          announcer_.announce_focus(
+              research_workspace_.focused_label(width,height),announcement_bounds(research_workspace_.focused_bounds(width,height)),std::nullopt,research_workspace_.focused_control(width,height),std::nullopt,research_workspace_.focused_value(width,height));
         if(command.kind==WorkspaceCommandKind::Select){
           research_controller_.select(command.node_id);
           refresh_research(true);
@@ -6097,7 +7253,10 @@ class NativeCampaign final {
            event.type==InputEventType::BackspacePressed)continue;
       }
       if(inspection_visible()){
+        const int focus_before=inspection_card_.focus();
         const auto result=inspection_card_.handle(event,inspection_bounds(width,height));
+        if(result.captured&&inspection_card_.focus()!=focus_before)
+          announcer_.announce_focus(inspection_card_.focused_label(),announcement_bounds(inspection_card_.focused_bounds(inspection_bounds(width,height))));
         if(result.closed)selected_id_.reset();
         if(result.captured){gesture_.cancel();continue;}
       }
@@ -6127,15 +7286,10 @@ class NativeCampaign final {
       if(event.type==InputEventType::LeftPressed){
         const auto action=layout.hit(event.position,menu_);bool captured=menu_||action!=UiAction::None;
         if(action!=UiAction::None&&audio_confirm_)audio_confirm_();
-        if(action==UiAction::Continue)toggle_menu();
-        else if(action==UiAction::NewGame){gesture_.capture_for_ui();(void)session_->request_new_campaign();}
-        else if(action==UiAction::Save)session_->request_save();
-        else if(action==UiAction::Load)session_->request_load();
-        else if(action==UiAction::Settings){if(settings_hub_)settings_hub_->open();else if(audio_settings_)audio_settings_->open();}
-        else if(action==UiAction::Support)request_support(width,height);
-        else if(action==UiAction::Exit)session_->request_exit();
-        else if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
+        if(action==UiAction::Pause){if(session_->frame().clock().speed()==StrategicSpeed::Paused)session_->frame().clock().resume();else session_->frame().clock().set_speed(StrategicSpeed::Paused);}
         else if(action==UiAction::Speed)cycle_speed();
+        else if(action==UiAction::Menu)toggle_menu();
+        else activate_menu_action(action,width,height);
         if(colony_roster_.visible()||economy_workspace_.visible()||supply_workspace_.visible()||research_workspace_.visible()||shipyard_workspace_.visible()||construction_workspace_.visible()||diplomacy_workspace_.visible()||colony_workspace_.visible())captured=true;
         gesture_.begin(captured);continue;
       }
@@ -6147,10 +7301,22 @@ class NativeCampaign final {
     if(advance_simulation){
       const auto& tumble_world=session_->frame().runtime().world().campaign();
       system_workspace_.advance_tumble(elapsed,!menu_&&session_->frame().clock().speed()!=StrategicSpeed::Paused&&
-          (!general_settings_||!general_settings_->saved().reduce_motion)&&
+          (!general_settings_||!general_settings_->saved().accessibility.reduce_motion)&&
           (!tumble_world.active_combat_encounter||tumble_world.active_combat_encounter->reconciled));
       const bool single_step=developer_panel_.take_step_request()&&session_->frame().can_step_developer();
-      const auto frame_result=[&]{const auto advance_scope=stellar::engine::Profiler::instance().span("simulation","client");return session_->advance(menu_?0.:elapsed,timestamp,single_step);}();
+      const auto frame_result=[&]{
+        const auto advance_scope=stellar::engine::Profiler::instance().span("simulation","client");
+        try{return session_->advance(menu_?0.:elapsed,timestamp,single_step);}
+        catch(...){
+          // A step that throws mid-frame in a developer session latches the
+          // fault path (pause + diagnostic capture) instead of crashing; the
+          // failure record lives on the frame. Player sessions still throw.
+          if(!developer_session()||!session_->frame().last_advance_failure())throw;
+          developer_monitor_.observe_advance_failure(session_->frame(),timestamp);
+          respond_to_developer_fault(width,height);
+          return stellar::core::CampaignFrameResult{};
+        }
+      }();
       if(developer_session()){
         developer_monitor_.observe(session_->frame(),frame_result,timestamp);
         respond_to_developer_fault(width,height);
@@ -6211,6 +7377,22 @@ class NativeCampaign final {
           session_->cache().generation);
       territory_refresh_elapsed_=0.;
     }
+    // Gamepad camera input — Axis1D bindings in the GALAXY_PAD context read
+    // the held stick values the mapper keeps live between axis events. Pan
+    // moves the view in the stick direction (opposite the drag gesture's
+    // sign); zoom acts on the viewport center like a centered wheel.
+    if(!system_workspace_.visible()&&map_hud_visible()){
+      const auto dead=[](float v){return std::abs(v)<.18f?0.f:v;};
+      const float dt=static_cast<float>(std::max(0.,elapsed));
+      const float pan_x=dead(input_mapper_.axis("map_pan_x"));
+      const float pan_y=dead(input_mapper_.axis("map_pan_y"));
+      if(pan_x!=0.f||pan_y!=0.f)
+        pan_galaxy_camera({-pan_x*1000.f*dt,-pan_y*1000.f*dt},width,height);
+      if(const float zoom=dead(input_mapper_.axis("map_zoom"));zoom!=0.f)
+        zoom_galaxy_camera(-zoom*3.f*dt,
+            {static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},
+            width,height);
+    }
     return true;
   }
 
@@ -6253,6 +7435,10 @@ class NativeCampaign final {
       stellar::native_menu_style::text(out,{banner.x+10*s,banner.y+6*s,banner.width-20*s,banner.height-12*s},
           developer_fault_capture_.notice(),std::max(12,static_cast<int>(16*s)),{255,180,110,255});
     }
+    if(general_settings_&&general_settings_->saved().accessibility.high_contrast)
+      stellar::native_ui::apply_high_contrast(out);
+    if(general_settings_&&general_settings_->saved().accessibility.color_blind!=stellar::engine::ColorBlindMode::None)
+      stellar::native_ui::apply_color_blind(out,general_settings_->saved().accessibility.color_blind);
     return out;
   }
   [[nodiscard]] DrawList scene_content(int width,int height){
@@ -6274,7 +7460,7 @@ class NativeCampaign final {
         if(star!=battle_world.systems.end()){DrawList environment;system_background_.append(environment,sid,width,height,starfield_quality(),starfield_density());phenomena_.append_system(environment,sid,star->position.x,star->position.y,width,height,1.,phenomena_options(sid),true);
           std::vector<UiOverlayCommand> commands;for(const auto& command:environment.world)std::visit([&](const auto& c){using T=std::decay_t<decltype(c)>;if constexpr(std::is_same_v<T,Image>||std::is_same_v<T,Scene3DView>)commands.emplace_back(c);},command);
           tactical.overlay.insert(tactical.overlay.begin()+std::min<std::size_t>(1,tactical.overlay.size()),commands.begin(),commands.end());
-          if(!system_background_.ready()||!phenomena_.ready()){tactical={};tactical.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},"Loading system environment…",{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
+          if(!system_background_.ready()||!phenomena_.ready()){tactical={};tactical.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},tr("MAP_ENVIRONMENT_LOADING","Loading system environment…"),{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
         }
       }
       return tactical;
@@ -6286,8 +7472,9 @@ class NativeCampaign final {
     stellar::engine::RuntimeDiagnostics::context(crash_context);
     const auto screen_height=static_cast<float>(height);
     last_galaxy_label_stats_ = {};
+    stellar_art_.set_reduce_flashing(general_settings_&&general_settings_->saved().accessibility.reduce_flashing);
     stellar_art_.begin_frame();
-    eruption_art_.begin_frame(session_->cache().generation,session_->frame().runtime().stellar_activity_day(),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!general_settings_||!general_settings_->saved().reduce_motion),general_settings_?general_settings_->saved().eruption_quality:2);
+    eruption_art_.begin_frame(session_->cache().generation,session_->frame().runtime().stellar_activity_day(),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!general_settings_||!general_settings_->saved().accessibility.reduce_motion),general_settings_?general_settings_->saved().eruption_quality:2);
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
     if(system_workspace_.visible()){
       const auto sid=*system_workspace_.system_id();const auto system=std::ranges::find(world.systems,sid,&StellarSystem::id);
@@ -6297,7 +7484,7 @@ class NativeCampaign final {
       system_workspace_.set_motion_running(session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!world.active_combat_encounter||world.active_combat_encounter->reconciled));
       system_workspace_.render(out,width,height,false);
       render_system_environment(out,width,height);
-      if(!system_background_.ready()||!phenomena_.ready()){out={};out.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},"Loading system environment…",{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
+      if(!system_background_.ready()||!phenomena_.ready()){out={};out.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},tr("MAP_ENVIRONMENT_LOADING","Loading system environment…"),{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
     }else{
     galaxy_backdrop_.append(out,{cache.generation,width,height,camera_,fitted_pixels_per_world_,true});
     phenomena_.append_map(out,camera_,width,height,phenomena_options(),surveyed_phenomena());
@@ -6313,7 +7500,7 @@ class NativeCampaign final {
       stellar_art_.append(out,point,radius,std::string(*central_art),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),UiRect{0,0,static_cast<float>(width),static_cast<float>(height)});
       label_obstacles.push_back({{point.x-radius,point.y-radius,radius*2,radius*2},NativeGalaxyLabelObstacleKind::star});
       label_candidates.push_back({NativeGalaxyLabelKind::central_object,0,point,radius,
-          Text{{},"Supermassive black hole",{205,222,245,255},13},false,1e12});
+          Text{{},tr("GALAXY_CENTRAL_OBJECT","Supermassive black hole"),{205,222,245,255},13},false,1e12});
     }
     for (const auto &system : world.systems) {
       const auto point = camera_.project(
@@ -6531,11 +7718,12 @@ class NativeCampaign final {
     colony_workspace_.render(out, width, height);
     settlement_workspace_.render(out,width,height);
     if(!menu_)colony_roster_.render(out,width,height);
+    if(!menu_)mission_view_.render(out,mission_board_,mission_fleets_,mission_colonies_,width,height);
     if(!menu_)supply_workspace_.render(out,supply_controller_.view(),width,height);
     if(!menu_)economy_workspace_.render(out,economy_controller_.view(),width,height);
     if(!menu_&&!colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&!research_workspace_.visible()&&!shipyard_workspace_.visible()&&
        !construction_workspace_.visible()&&!diplomacy_workspace_.visible()&&
-       !colony_workspace_.visible()&&!settlement_workspace_.visible())
+       !colony_workspace_.visible()&&!settlement_workspace_.visible()&&!mission_view_.visible())
       feedback_.render(out,width,height);
     const auto layout = NativeUiLayout::for_viewport(width, height);
     using stellar::native_ui_style::panel;
@@ -6578,7 +7766,7 @@ class NativeCampaign final {
     if(notifications_available()){
       panel(out,layout.notifications,layout.notifications.contains(pointer_),notification_view_.visible());
       const auto unread=notifications_.unread_count(notification_view_.last_read());
-      control_label(out,layout.notifications,"EVENTS "+std::to_string(unread),
+      control_label(out,layout.notifications,trf("HUD_EVENTS",{std::to_string(unread)},"EVENTS {0}"),
           unread?Color{240,197,106,255}:Color{225,238,250,255},
           layout.control_font_pixels,layout.scale,text_measurer_);
     }
@@ -6608,14 +7796,21 @@ class NativeCampaign final {
       draw_navigation(layout.zoom_in,UiAction::ZoomIn,false,tr("NAV_ZOOM_IN","Zoom in"));
       draw_navigation(layout.zoom_out,UiAction::ZoomOut,false,tr("NAV_ZOOM_OUT","Zoom out"));
       draw_navigation(layout.economy,UiAction::Economy,economy_workspace_.visible(),tr("NAV_ECONOMY","Economy"));
-      draw_navigation(layout.research,UiAction::Research,research_workspace_.visible(),"Research");
-      draw_navigation(layout.construction,UiAction::Construction,construction_workspace_.visible(),"Construction");
-      draw_navigation(layout.shipyard,UiAction::Shipyard,shipyard_workspace_.visible(),"Shipyard");
+      draw_navigation(layout.research,UiAction::Research,research_workspace_.visible(),tr("NAV_RESEARCH","Research"));
+      draw_navigation(layout.construction,UiAction::Construction,construction_workspace_.visible(),tr("NAV_CONSTRUCTION","Construction"));
+      draw_navigation(layout.shipyard,UiAction::Shipyard,shipyard_workspace_.visible(),tr("NAV_SHIPYARD","Shipyard"));
       draw_navigation(layout.explore,UiAction::Explore,fleet_controller_.selection().has_value(),tr("NAV_EXPLORE","Explore"));
+      draw_navigation(layout.missions,UiAction::Missions,mission_view_.visible(),tr("NAV_MISSIONS","Missions"));
+      {const UiRect icon_rect{layout.missions.x+6.f*layout.scale,layout.missions.y+4.f*layout.scale,layout.missions.width-12.f*layout.scale,layout.missions.height-8.f*layout.scale};out.overlay.emplace_back(Text{{icon_rect.x+icon_rect.width*.5f,icon_rect.y+icon_rect.height*.5f-8.f*layout.scale},"M",{245,250,255,255},static_cast<int>(16.f*layout.scale),0,icon_rect,TextAlign::Center,FontFace::Heading});}
       draw_navigation(layout.colonies,UiAction::Colonies,colony_roster_.visible()||colony_workspace_.visible(),tr("NAV_PLANETS","Planets"));
       draw_navigation(layout.supply,UiAction::Supply,supply_workspace_.visible(),tr("NAV_LOGISTICS","Logistics"));
       draw_navigation(layout.diplomacy,UiAction::Diplomacy,diplomacy_workspace_.visible(),tr("NAV_DIPLOMACY","Diplomacy"));
       draw_navigation(layout.menu,UiAction::Menu,false,tr("NAV_MENU","Menu"));
+      if(map_hud_visible()&&hud_focus_>=0){
+        const auto items=hud_ring_items(layout,width,height);
+        if(hud_focus_<static_cast<int>(items.size()))
+          out.overlay.emplace_back(StrokedRectangle{items[static_cast<std::size_t>(hud_focus_)].first,{164,221,237,255}});
+      }
     }
     out.overlay.emplace_back(Text{
         {layout.day_text.x, layout.day_text.y},
@@ -6633,13 +7828,14 @@ class NativeCampaign final {
        !colony_workspace_.visible()&&!diplomacy_workspace_.visible()&&
        !shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
        !economy_workspace_.visible()&&!supply_workspace_.visible()&&!menu_){
-      std::ostringstream zoom;
-      zoom << "Map zoom " << std::fixed << std::setprecision(1)
-           << camera_.pixels_per_world / fitted_pixels_per_world_ << "x";
+      std::ostringstream zoom_factor;
+      zoom_factor << std::fixed << std::setprecision(1)
+                  << camera_.pixels_per_world / fitted_pixels_per_world_;
       const auto zoom_bounds=map_zoom_bounds(width,height);
       out.overlay.emplace_back(Text{
           {zoom_bounds.x, zoom_bounds.y + 2.f * layout.scale},
-          zoom.str(), {184, 223, 239, 255}, layout.metric_font_pixels,
+          trf("HUD_MAP_ZOOM", {zoom_factor.str()}, "Map zoom {0}x"),
+          {184, 223, 239, 255}, layout.metric_font_pixels,
           zoom_bounds.width, zoom_bounds});
     }
     if(inspection_visible())inspection_card_.render(out,inspection_bounds(width,height));
@@ -6652,18 +7848,20 @@ class NativeCampaign final {
     const bool quiet_workspace_notice=(research_workspace_.visible()||colony_workspace_.visible()) && !support_notice &&
         (notice.kind==SessionNoticeKind::Saved||notice.kind==SessionNoticeKind::Loaded);
     if (!quiet_workspace_notice && (notice.kind != SessionNoticeKind::None || preparing_galaxy || support_notice)) {
-      auto message = notice.message;
+      auto message = notice.message_key.empty()
+                         ? notice.message
+                         : tr(notice.message_key, notice.message);
       if(preparing_galaxy&&(notice.kind==SessionNoticeKind::None||notice.kind==SessionNoticeKind::Saved||notice.kind==SessionNoticeKind::Loaded))
-        message="Updating star chart...";
+        message=tr("HUD_UPDATING_CHART","Updating star chart...");
       if (notice.kind == SessionNoticeKind::Loading) {
         message += " " +
                    std::to_string(static_cast<int>(notice.progress * 100.)) +
                    "%";
       }
-      if(support_notice)message=support_.busy()?"Preparing local diagnostics...":
+      if(support_notice)message=support_.busy()?tr("SUPPORT_PREPARING","Preparing local diagnostics..."):
           support_.state()==stellar::native_support::SupportExportState::Succeeded?
-          "Diagnostics exported. See the location in the pause menu.":
-          "Diagnostic export failed. Open the pause menu for details.";
+          tr("SUPPORT_EXPORTED","Diagnostics exported. See the location in the pause menu."):
+          tr("SUPPORT_FAILED","Diagnostic export failed. Open the pause menu for details.");
       const auto status_bounds=colony_workspace_.visible()?PlanetaryLayout::make(width,height).notice:layout.status_text;
       if(colony_workspace_.visible())fill(out,status_bounds,{3,12,18,255});
       out.overlay.emplace_back(Text{
@@ -6695,6 +7893,10 @@ class NativeCampaign final {
       draw_button(layout.new_game_button, tr("MENU_NEW_GAME","NEW GAME"));
       draw_button(layout.exit_button, tr("MENU_EXIT","EXIT TO WINDOWS"));
       }
+      if(menu_focus_>=0&&menu_focus_<menu_action_count&&(!session_->new_campaign_pending()||menu_focus_==0)){
+        const std::array<UiRect,7> focus_rects{layout.continue_button,layout.save_button,layout.load_button,layout.settings_button,layout.support_button,layout.new_game_button,layout.exit_button};
+        out.overlay.emplace_back(StrokedRectangle{focus_rects[menu_focus_],{164,221,237,255}});
+      }
       const float footer_y=layout.menu_panel.y+layout.menu_panel.height+8.f*layout.scale;
       const UiRect footer{36.f*layout.scale,footer_y,
           static_cast<float>(width)-72.f*layout.scale,
@@ -6714,8 +7916,10 @@ class NativeCampaign final {
       }
     }
     if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);
+    if(notifications_available())chronicle_view_.render(out,width,height);
     stellar::native_audio::render_voice_caption(out,presentation_audio_,width,height,text_measurer_,
-        voice_playback_?&*voice_playback_:nullptr);
+        general_settings_?general_settings_->saved().effective():stellar::engine::AccessibilitySettings{},
+        voice_playback_?&*voice_playback_:nullptr,announcement_caption(),locale_);
     if(audio_settings_)audio_settings_->render(out,width,height);
     if(general_settings_)general_settings_->render(out,width,height);
     if(video_settings_)video_settings_->render(out,width,height);
@@ -6731,7 +7935,7 @@ class NativeCampaign final {
     if(!active){if(battle_workspace_.visible())battle_workspace_.close();battle_refresh_elapsed_=0.;battle_art_bindings_.clear();return;}
     bool observed_changed=false;
     if(!battle_workspace_.visible()){
-      colony_roster_.close();economy_workspace_.close();supply_workspace_.close();notification_view_.close();research_workspace_.close();shipyard_workspace_.close();
+      colony_roster_.close();economy_workspace_.close();supply_workspace_.close();notification_view_.close();chronicle_view_.close();research_workspace_.close();shipyard_workspace_.close();
       construction_workspace_.close();diplomacy_workspace_.close();system_workspace_.close();
       colony_workspace_.close();
       battle_workspace_.open(frame.tactical_snapshot(),world.player_civilization_id,width,height);
@@ -6850,6 +8054,8 @@ class NativeCampaign final {
     auto& runtime=session_->frame().runtime();
     diplomatic_notifications_.seed(runtime.diplomacy().build_view_for(
         runtime.world().campaign().player_civilization_id));
+    native_notifications::seed_chronicle_notifications(notifications_,
+        runtime.history(),runtime.world().campaign().player_civilization_id);
     notification_refresh_elapsed_=0.;
   }
   void refresh_notifications(){
@@ -6860,6 +8066,7 @@ class NativeCampaign final {
   }
   void publish_notification(std::string category,std::string message){
     support_.record(category,utc_timestamp()+" "+message);
+    announcer_.announce(message);
     notifications_.publish(std::move(category),stellar::native_campaign::format_campaign_date(
         session_->frame().clock().simulation_days()),std::move(message));
   }
@@ -6920,7 +8127,7 @@ class NativeCampaign final {
     auto built=system_controller_.build(session_->frame(),session_->cache().generation,system_id);
     if(!built.snapshot)return false;
     auto travel=system_travel_controller_.build(session_->frame(),session_->cache().generation,*built.snapshot);
-    colony_roster_.close();economy_workspace_.close();supply_workspace_.close();gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();colony_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();
+    colony_roster_.close();economy_workspace_.close();supply_workspace_.close();gesture_.cancel();research_workspace_.close();shipyard_workspace_.close();construction_workspace_.close();diplomacy_workspace_.close();colony_workspace_.close();settlement_workspace_.clear();colony_entry_view_.reset();mission_view_.close();
     system_workspace_.open(std::move(*built.snapshot),width,height);selected_id_=system_id;
     system_background_.preload(system_id,starfield_quality(),starfield_density());
     {const auto& world=session_->frame().runtime().world().campaign();const auto star=std::ranges::find(world.systems,system_id,&StellarSystem::id);if(star!=world.systems.end()){DrawList preload;phenomena_.append_system(preload,system_id,star->position.x,star->position.y,width,height,1,phenomena_options(system_id));}}
@@ -7021,10 +8228,10 @@ class NativeCampaign final {
     if(view.observer_only||view.foreign_settlement)return;
     if(command.action==PlanetaryAction::Cancel){
       std::visit([&](const auto& quote){using T=std::decay_t<decltype(quote)>;if constexpr(!std::is_same_v<T,std::monostate>)(void)surface_controller_.cancel_quote(generation,quote.quote_revision);},screen.pending());
-      screen.complete("Order cancelled. No resources spent.");return;
+      screen.complete(tr("PLANET_ORDER_CANCELLED","Order cancelled. No resources spent."));return;
     }
     if(command.action==PlanetaryAction::Confirm){
-      NativeSurfaceCommandOutcome outcome{false,"Review the order again."};
+      NativeSurfaceCommandOutcome outcome{false,tr("PLANET_ORDER_REVIEW","Review the order again.")};
       std::visit([&](const auto& quote){using T=std::decay_t<decltype(quote)>;
         if constexpr(std::is_same_v<T,NativeSurfacePlacementQuote>)outcome=surface_controller_.confirm_placement(session_->frame(),generation,quote);
         else if constexpr(std::is_same_v<T,NativeSurfaceManagementQuote>)outcome=surface_controller_.confirm_management(session_->frame(),generation,quote);
@@ -7208,7 +8415,7 @@ class NativeCampaign final {
     const auto &view=construction_workspace_.view();
     if(!view){
       construction_workspace_.set_notice(
-          "Construction details are still loading.",false);
+          tr("CONSTRUCTION_NOTICE_LOADING","Construction details are still loading."),false);
       return;
     }
     if(command.kind==ConstructionWorkspaceCommandKind::PrepareCancel){
@@ -7332,9 +8539,9 @@ class NativeCampaign final {
   }
 
   [[nodiscard]] std::string system_display_name(int system_id)const{
-    if(!known_.contains(system_id))return "Unknown system";
+    if(!known_.contains(system_id))return tr("SYSTEM_NAME_UNKNOWN","Unknown system");
     const auto found=session_->cache().systems_by_id.find(system_id);
-    return found==session_->cache().systems_by_id.end()?"Unknown system":found->second->name;
+    return found==session_->cache().systems_by_id.end()?tr("SYSTEM_NAME_UNKNOWN","Unknown system"):found->second->name;
   }
 
   [[nodiscard]] std::vector<ObservedSystemName> observed_system_names()const{
@@ -7346,6 +8553,55 @@ class NativeCampaign final {
     return result;
   }
 
+  // Missions board feed: mission cards, active settlement fleets and the
+  // owned-colony rows are rebuilt when the campaign generation turns over
+  // while the panel is open.
+  void refresh_missions(bool force){
+    if(!mission_view_.visible()){mission_generation_.reset();return;}
+    const auto generation=session_->cache().generation;
+    if(!force&&mission_generation_==generation)return;
+    mission_generation_=generation;
+    auto&frame=session_->frame();
+    const auto&campaign=frame.runtime().world().campaign();
+    mission_board_=native_missions::build_mission_board(campaign,locale_);
+    mission_fleets_.clear();
+    for(auto&view:settlement_controller_.build(frame,generation))
+      if(has_active_settlement_target(view))mission_fleets_.push_back(std::move(view));
+    mission_colonies_=native_missions::build_owned_colony_rows(campaign,locale_);
+  }
+  // "Select ship on map": select the colony ship and center the galaxy map
+  // on it — the settle order itself is issued from the destination system.
+  void focus_mission_fleet(int fleet_id){
+    const auto outcome=fleet_controller_.select(session_->frame(),session_->cache().generation,fleet_id);
+    if(!outcome.accepted){publish_notification("Fleet",observer_safe_fleet_message(outcome.message,observed_system_names(),locale_));return;}
+    refresh_fleets(true);
+    if(fleet_workspace_.view()){
+      const auto fleet=std::ranges::find(fleet_workspace_.view()->own_fleets,fleet_id,&NativeOwnFleet::id);
+      if(fleet!=fleet_workspace_.view()->own_fleets.end()){
+        mission_view_.close();
+        camera_.center={fleet->position.x,fleet->position.y};
+        if(audio_confirm_)audio_confirm_();
+      }
+    }else mission_view_.close();
+  }
+  // Owned-colony card actions: enter the colony's planetary management
+  // screen (surface entry is the reference "Land"), optionally opening the
+  // freight review for a resource outpost (the reference "Collect").
+  void open_mission_colony(int colony_id,int width,int height,bool review_freight){
+    const auto&world=session_->frame().runtime().world().campaign();
+    const auto colony=std::ranges::find(world.colonies,colony_id,&Colony::id);
+    if(colony==world.colonies.end()||!colony->planetary_body_id)return;
+    if(!enter_system(colony->system_id,width,height)||
+       !system_workspace_.select_body(*colony->planetary_body_id))return;
+    open_colony_from_system(*colony->planetary_body_id);
+    if(!review_freight||!colony_workspace_.visible()||!colony_workspace_.view())return;
+    const auto&view=*colony_workspace_.view();
+    if(view.observer_only||view.foreign_settlement)return;
+    session_->frame().clock().set_speed(StrategicSpeed::Paused);
+    colony_workspace_.set_freight_preview(outpost_freight_controller_.preview(
+        session_->frame(),session_->cache().generation,view));
+    gesture_.capture_for_ui();
+  }
   // Reference UiOpenOwnedColony(colonyId, land:false): enter the owning
   // system's orbital view already focused on the colony world.
   void open_overview_colony(int colony_id,int width,int height){
@@ -7353,11 +8609,12 @@ class NativeCampaign final {
     const auto colony=std::ranges::find(campaign.colonies,colony_id,
                                         &Colony::id);
     if(colony==campaign.colonies.end()||!colony->planetary_body_id)return;
-    notification_view_.close();
+    notification_view_.close();chronicle_view_.close();
     if(!enter_system(colony->system_id,width,height)||
        !system_workspace_.select_body(*colony->planetary_body_id)){
       session_->publish_status(
-          "The colony world is not available in the current orbital survey.");
+          tr("STATUS_COLONY_WORLD_UNAVAILABLE",
+             "The colony world is not available in the current orbital survey."));
       return;
     }
     refresh_colony_entry(true);
@@ -7369,7 +8626,7 @@ class NativeCampaign final {
                                       session_->cache().generation);
     const auto names=observed_system_names();
     for(auto &fleet:view.own_fleets)
-      fleet.recovery_message=observer_safe_fleet_message(fleet.recovery_message,names);
+      fleet.recovery_message=observer_safe_fleet_message(fleet.recovery_message,names,locale_);
     if(pending_fleet_preview_){
       const auto selected=view.selected_fleet_id
                               ?std::ranges::find(view.own_fleets,
@@ -7403,6 +8660,7 @@ class NativeCampaign final {
         colony_workspace_.visible()||research_workspace_.visible()||
         shipyard_workspace_.visible()||construction_workspace_.visible()||
         diplomacy_workspace_.visible()||notification_view_.visible()||
+        chronicle_view_.visible()||
         gesture_.captured_by_ui()||gesture_.allows_world_drag()||
         !fleet_workspace_.selected_fleet_id();
     const auto target=!blocked?system_hit(pointer,width,height):std::nullopt;
@@ -7422,7 +8680,7 @@ class NativeCampaign final {
     auto preview=fleet_controller_.preview_selected_route(
         session_->frame(),session_->cache().generation,*target);
     preview.message=observer_safe_fleet_message(preview.message,
-                                                observed_system_names());
+                                                observed_system_names(),locale_);
     preview.command_available=false;
     fleet_workspace_.set_preview(std::move(preview),
                                  system_display_name(*target));
@@ -7437,7 +8695,7 @@ class NativeCampaign final {
       auto outcome=fleet_controller_.issue_civilian_recovery(
           session_->frame(),*command.recovery_quote,command.recovery_action,
           command.confirm_abandon);
-      outcome.message=observer_safe_fleet_message(outcome.message,observed_system_names());
+      outcome.message=observer_safe_fleet_message(outcome.message,observed_system_names(),locale_);
       pending_fleet_preview_.reset();
       fleet_workspace_.clear_preview();
       fleet_workspace_.set_recovery_result(*command.recovery_quote,outcome);
@@ -7450,7 +8708,7 @@ class NativeCampaign final {
       if(!command.military_order_quote)return;
       const auto outcome=fleet_controller_.issue_selected_military_order(
           session_->frame(),*command.military_order_quote,command.military_order);
-      const auto message=observer_safe_fleet_message(outcome.message,observed_system_names());
+      const auto message=observer_safe_fleet_message(outcome.message,observed_system_names(),locale_);
       last_fleet_command_accepted_=outcome.accepted;
       if(outcome.accepted){
         pending_fleet_preview_.reset();fleet_workspace_.clear_preview();
@@ -7467,12 +8725,12 @@ class NativeCampaign final {
         camera_.center={outcome.position.x,outcome.position.y};
         if(audio_confirm_)audio_confirm_();
       }
-      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names()),outcome.accepted);
+      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names(),locale_),outcome.accepted);
       refresh_fleets(true);return;
     }
     if(command.kind==FleetWorkspaceCommandKind::Engage){
       const auto outcome=session_->frame().begin_tactical(command.fleet_id);
-      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names()),outcome.accepted);
+      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names(),locale_),outcome.accepted);
       if(outcome.accepted)publish_notification("Combat",outcome.message);
       refresh_fleets(true);return;
     }
@@ -7498,7 +8756,7 @@ class NativeCampaign final {
           command.target_system_id);
       pending_fleet_preview_=preview;
       preview.message=observer_safe_fleet_message(preview.message,
-                                                  observed_system_names());
+                                                  observed_system_names(),locale_);
       fleet_workspace_.set_preview(std::move(preview),
                                    system_display_name(command.target_system_id));
       return;
@@ -7510,7 +8768,8 @@ class NativeCampaign final {
       pending_fleet_preview_.reset();
       fleet_workspace_.clear_preview();
       fleet_workspace_.set_notice(observer_safe_fleet_message(
-                                      outcome.message,observed_system_names()),
+                                      outcome.message,observed_system_names(),
+                                      locale_),
                                   outcome.accepted);
       last_fleet_command_accepted_=outcome.accepted;
       refresh_fleets(true);
@@ -7565,7 +8824,105 @@ class NativeCampaign final {
     constrain_galaxy_camera(width,height);
   }
   void fit_camera(int width,int height){if(galaxy_backdrop_.artwork_frame()){camera_=galaxy_overview_camera(width,height);fitted_pixels_per_world_=camera_.pixels_per_world;return;}const auto &systems=session_->frame().runtime().world().campaign().systems;double minx=std::numeric_limits<double>::max(),maxx=std::numeric_limits<double>::lowest(),miny=minx,maxy=maxx;for(const auto&s:systems){minx=std::min(minx,static_cast<double>(s.position.x));maxx=std::max(maxx,static_cast<double>(s.position.x));miny=std::min(miny,static_cast<double>(s.position.y));maxy=std::max(maxy,static_cast<double>(s.position.y));}camera_.center={(minx+maxx)*.5,(miny+maxy)*.5};camera_.pixels_per_world=std::max(.01,std::min(static_cast<double>(width)/std::max(1.,maxx-minx),static_cast<double>(height)/std::max(1.,maxy-miny))*.88);fitted_pixels_per_world_=camera_.pixels_per_world;}
-  void toggle_menu(){settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
+  static constexpr std::array<UiAction,7> menu_actions_{UiAction::Continue,UiAction::Save,UiAction::Load,UiAction::Settings,UiAction::Support,UiAction::NewGame,UiAction::Exit};
+  static constexpr int menu_action_count=static_cast<int>(menu_actions_.size());
+  void activate_menu_action(UiAction action,int width,int height){
+    if(action==UiAction::Continue)toggle_menu();
+    else if(action==UiAction::NewGame){gesture_.capture_for_ui();menu_focus_=-1;(void)session_->request_new_campaign();}
+    else if(action==UiAction::Save)session_->request_save();
+    else if(action==UiAction::Load)session_->request_load();
+    else if(action==UiAction::Settings){if(settings_hub_)settings_hub_->open();else if(audio_settings_)audio_settings_->open();}
+    else if(action==UiAction::Support)request_support(width,height);
+    else if(action==UiAction::Exit)session_->request_exit();
+  }
+  std::string menu_action_label(UiAction action)const{
+    const bool pending=session_->new_campaign_pending();
+    switch(action){
+      case UiAction::Continue:return tr(pending?"MENU_CANCEL_NEW_GAME":"MENU_CONTINUE",pending?"CANCEL NEW GAME":"CONTINUE");
+      case UiAction::Save:return tr("MENU_SAVE","SAVE");
+      case UiAction::Load:return tr("MENU_LOAD","LOAD");
+      case UiAction::Settings:return tr("MENU_SETTINGS","SETTINGS");
+      case UiAction::Support:return tr(support_.busy()?"MENU_EXPORTING":"MENU_EXPORT",support_.busy()?"EXPORTING...":"EXPORT DIAGNOSTICS");
+      case UiAction::NewGame:return tr("MENU_NEW_GAME","NEW GAME");
+      case UiAction::Exit:return tr("MENU_EXIT","EXIT TO WINDOWS");
+      default:return {};
+    }
+  }
+  void announce_menu_focus(int width,int height){if(menu_focus_>=0&&menu_focus_<menu_action_count){const auto layout=NativeUiLayout::for_viewport(width,height);const std::array<UiRect,7> rects{layout.continue_button,layout.save_button,layout.load_button,layout.settings_button,layout.support_button,layout.new_game_button,layout.exit_button};announcer_.announce_focus(menu_action_label(menu_actions_[menu_focus_]),announcement_bounds(rects[static_cast<std::size_t>(menu_focus_)]),std::nullopt,stellar::engine::AnnouncementControl::Button);}}
+  // HUD focus-ring items: the layout's chrome actions plus the command
+  // plate's view-switch button — the latter only while it is actionable
+  // (a system is open or one is selected), matching the pointer path's
+  // dimmed-when-inert rendering.
+  [[nodiscard]] std::vector<std::pair<UiRect,UiAction>> hud_ring_items(const NativeUiLayout &layout,int width,int height)const{
+    std::vector<std::pair<UiRect,UiAction>> items;
+    for(const auto &item:layout.hud_actions())
+      if(item.second!=UiAction::Notifications||notifications_available())items.push_back(item);
+    if(system_workspace_.visible()||selected_id_)
+      items.emplace_back(CommandHudLayout::make(width,height).switch_view,UiAction::SwitchView);
+    return items;
+  }
+  void activate_hud_switch(int width,int height){
+    if(system_workspace_.visible()){selected_id_=system_workspace_.system_id();system_workspace_.close();refresh_inspection();}
+    else if(selected_id_&&!enter_system(*selected_id_,width,height))scientist_voice(stellar::native_audio::VoiceCue::ReconnaissanceRequired);
+  }
+  std::string hud_action_label(UiAction action)const{
+    switch(action){
+      case UiAction::Notifications:return tr("NAV_EVENTS","Events");
+      case UiAction::Pause:return tr("NAV_PAUSE","Pause");
+      case UiAction::Speed:return tr("NAV_SPEED","Speed");
+      case UiAction::Map:return tr("NAV_GALAXY","Galaxy");
+      case UiAction::Home:return tr("NAV_SYSTEM","System");
+      case UiAction::Colonies:return tr("NAV_PLANETS","Planets");
+      case UiAction::Economy:return tr("NAV_ECONOMY","Economy");
+      case UiAction::Research:return tr("NAV_RESEARCH","Research");
+      case UiAction::Diplomacy:return tr("NAV_DIPLOMACY","Diplomacy");
+      case UiAction::Supply:return tr("NAV_LOGISTICS","Logistics");
+      case UiAction::Shipyard:return tr("NAV_SHIPYARD","Shipyard");
+      case UiAction::Menu:return tr("NAV_MENU","Menu");
+      case UiAction::Inspect:return tr("NAV_INSPECT","Inspect");
+      case UiAction::ZoomIn:return tr("NAV_ZOOM_IN","Zoom in");
+      case UiAction::ZoomOut:return tr("NAV_ZOOM_OUT","Zoom out");
+      case UiAction::Construction:return tr("NAV_CONSTRUCTION","Construction");
+      case UiAction::Explore:return tr("NAV_EXPLORE","Explore");
+      case UiAction::Missions:return tr("NAV_MISSIONS","Missions");
+      case UiAction::SwitchView:return tr("HUD_SWITCH_VIEW","Switch view");
+      default:return {};
+    }
+  }
+  std::optional<stellar::native_audio::VoiceCaption> announcement_caption(){
+    while(auto item=announcer_.take()){
+      if(accessibility_bridge_){
+        if(item->kind==stellar::engine::AnnouncementKind::Focus)
+          accessibility_bridge_->focus_changed(item->text, item->bounds,
+                                               item->range, item->control,
+                                               item->checked, item->value,
+                                               item->expanded);
+        else
+          accessibility_bridge_->announce(item->text);
+      }
+      // Empty focus items only signal the ring releasing to the bridge —
+      // nothing to speak or caption.
+      if(item->text.empty())continue;
+      if(voice_playback_&&presentation_audio_&&
+         presentation_audio_->voice_preferences().interface_announcements){
+        stellar::native_voice::NativeSpeechRequest request;
+        request.text=item->text;
+        request.category="interface";
+        request.priority=static_cast<int>(stellar::native_voice::VoicePriority::Important);
+        request.queue_behavior=stellar::native_voice::SpeechQueueBehavior::ReplaceCategory;
+        request.interruptible=true;
+        request.dedupe_key="interface|"+std::to_string(++announcement_seq_);
+        request.expires_at=std::chrono::system_clock::now()+std::chrono::seconds(10);
+        voice_playback_->speak(std::move(request));
+      }
+      announcement_caption_=stellar::native_audio::VoiceCaption{"",std::move(item->text),
+          std::chrono::steady_clock::now()+std::chrono::seconds(4)};
+    }
+    if(!announcement_caption_||std::chrono::steady_clock::now()>=announcement_caption_->expires_at)return std::nullopt;
+    if(!presentation_audio_||!presentation_audio_->voice_preferences().subtitles)return std::nullopt;
+    return announcement_caption_;
+  }
+  void toggle_menu(){menu_focus_=-1;settlement_workspace_.cancel_pending_input();colony_roster_.cancel_pending_input();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();fleet_workspace_.cancel_recovery();notification_view_.close();chronicle_view_.close();mission_view_.close();menu_=!menu_;auto &frame=session_->frame();frame.set_menu_open(menu_);if(menu_){gesture_.capture_for_ui();pre_menu_speed_=frame.clock().speed();frame.clock().set_speed(StrategicSpeed::Paused);frame.pause_tactical_for_menu();}else{frame.resume_tactical_after_menu();frame.clock().set_speed(pre_menu_speed_);}}
   void refresh_knowledge(){const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);known_.clear();known_.insert(known.begin(),known.end());
     if(galaxy_backdrop_.artwork_frame())galaxy_backdrop_.set_galactic_core_discovered(session_->cache().generation,world.knowledge.is_galactic_core_discovered(world.player_civilization_id));
     std::unordered_set<int> owned;
@@ -7607,14 +8964,16 @@ class NativeCampaign final {
         !settlement_workspace_.visible()&&!research_workspace_.visible()&&
         !shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
         !diplomacy_workspace_.visible()&&!battle_workspace_.visible()&&
-        !notification_view_.visible()&&!settings_visible();
+        !notification_view_.visible()&&!chronicle_view_.visible()&&
+        !settings_visible();
   }
   [[nodiscard]] bool map_hud_visible() const {
     return !menu_&&!settings_visible()&&!battle_workspace_.visible()&&!settlement_workspace_.visible()&&
         !colony_roster_.visible()&&!economy_workspace_.visible()&&!supply_workspace_.visible()&&
         !research_workspace_.visible()&&!shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
         !diplomacy_workspace_.visible()&&!colony_workspace_.visible()&&
-        !notification_view_.visible()&&!fleet_workspace_.preview();
+        !notification_view_.visible()&&!chronicle_view_.visible()&&
+        !mission_view_.visible()&&!fleet_workspace_.preview();
   }
   void render_command_hud(DrawList& out,int width,int height){
     const auto l=CommandHudLayout::make(width,height);const float s=l.scale;
@@ -7824,7 +9183,7 @@ class NativeCampaign final {
     const auto& r=*std::ranges::find(phenomena_.field()->regions,*context.dominant,&GalaxyPhenomenon::id);
     const bool known=world.knowledge.system_survey_level(world.player_civilization_id,id)>=SystemSurveyLevel::partially_surveyed||developer_session();
     const float s=std::clamp(height/1080.f,.7f,1.7f);const auto layout=SystemWorkspaceLayout::for_viewport(width,height);const auto row=layout.controls_row;const UiRect box{row.x+row.width*.53f,row.y+4*s,row.width*.45f,row.height-8*s};
-    std::ostringstream label;label<<(known?phenomenon_definition(r.type).name:"Uncharted cloud environment");if(known)label<<" · Sensors "<<static_cast<int>(context.effects.sensor*100)<<"% · Survey effort "<<std::fixed<<std::setprecision(2)<<context.effects.scanning<<"x";
+    std::ostringstream label;label<<(known?std::string(phenomenon_definition(r.type).name):tr("PHENOMENA_UNKNOWN","Uncharted interstellar cloud"));if(known)label<<" · "<<tr("PHENOMENA_SENSOR","Sensor range")<<" "<<static_cast<int>(context.effects.sensor*100)<<"% · "<<tr("PHENOMENA_SURVEY","Survey effort")<<" "<<std::fixed<<std::setprecision(2)<<context.effects.scanning<<"x";
     stellar::native_menu_style::text(out,box,label.str(),std::max(12,static_cast<int>(13*s)),{150,215,235,255});
   }
   void refresh_inspection() {
@@ -7871,6 +9230,11 @@ class NativeCampaign final {
   stellar::native_logistics::HomeLogisticsController supply_controller_;
   stellar::native_logistics::SupplyWorkspace supply_workspace_;
   stellar::native_colony_roster::RosterWorkspace colony_roster_;
+  native_missions::NativeMissionView mission_view_;
+  native_missions::NativeMissionBoard mission_board_;
+  std::vector<NativeSettlementMissionView> mission_fleets_;
+  std::vector<native_missions::NativeMissionColonyRow> mission_colonies_;
+  std::optional<std::uint64_t> mission_generation_;
   stellar::native_assets::Navigator assets_;
   NativeDeveloperSimulationPanel developer_panel_;
   stellar::app_diagnostics::CampaignDiagnosticMonitor developer_monitor_;
@@ -8061,6 +9425,9 @@ class NativeCampaign final {
   std::function<void()> audio_confirm_;
   stellar::native_campaign_feedback::NativeCampaignFeedback feedback_;
   stellar::native_notifications::NativeNotificationFeed notifications_;
+  stellar::engine::AccessibilityAnnouncer announcer_;
+  std::optional<stellar::native_audio::VoiceCaption> announcement_caption_;
+  std::uint64_t announcement_seq_{};
   stellar::native_support::NativeSupportService support_;
   native_battle_ui::NativeBattleWorkspace battle_workspace_;
   double battle_refresh_elapsed_{};
@@ -8074,10 +9441,14 @@ class NativeCampaign final {
   // backend; attach a real backend here when one ships.
   stellar::engine::PlatformServices platform_services_;
   stellar::engine::MemoryTracker::SubsystemId planet_material_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
+  stellar::engine::MemoryTracker::SubsystemId territory_overlay_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
+  stellar::engine::MemoryTracker::SubsystemId image_preparation_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
+  stellar::engine::MemoryTracker::SubsystemId replay_recorder_memory_{stellar::engine::MemoryTracker::invalid_subsystem};
   SessionNoticeKind last_support_notice_kind_{};
   double support_notice_seconds_{};
   stellar::native_notifications::NativeNotificationView notification_view_;
   stellar::native_notifications::NativeDiplomaticNotifications diplomatic_notifications_;
+  stellar::native_chronicle::NativeChronicleView chronicle_view_;
   double notification_refresh_elapsed_{};
   stellar::engine::InputMapper input_mapper_;
   int research_candidate_index_{};
@@ -8098,16 +9469,33 @@ class NativeCampaign final {
     if(locale_&&locale_->contains(key))return std::string(locale_->translate(key));
     return std::string(fallback);
   }
+  [[nodiscard]] std::string trf(std::string_view key,std::initializer_list<std::string> args,
+                                std::string_view fallback)const{
+    if(locale_&&locale_->contains(key)){
+      const std::vector<std::string> values(args.begin(),args.end());
+      return locale_->format(key,std::span<const std::string>(values));
+    }
+    std::string out{fallback};
+    std::size_t index=0;
+    for(const auto& arg:args){
+      const std::string marker="{"+std::to_string(index++)+"}";
+      if(const auto at=out.find(marker);at!=std::string::npos)out.replace(at,marker.size(),arg);
+    }
+    return out;
+  }
   int voice_ui_sequence_{};
   stellar::native_menu_audio::HoverFeedback menu_hover_feedback_;
   std::chrono::steady_clock::time_point last_event_sound_{};
   bool settings_visible() const { return (settings_hub_&&settings_hub_->visible()) || (voice_settings_&&voice_settings_->visible()) || (general_settings_&&general_settings_->visible()) || (audio_settings_&&audio_settings_->visible()) || (video_settings_&&video_settings_->visible()); }
   stellar::native_general::NativeGeneralSettings* general_settings_{};
   stellar::native_settings::NativeSettingsHub* settings_hub_{};
+  stellar::native_client::PadNavigationRepeater pad_nav_repeater_{};
+  stellar::native_client::PadStickNavigator pad_nav_stick_{};
   stellar::native_audio::NativeVoiceSettings* voice_settings_{};
+  stellar::native_client::NativeAccessibilityBridge* accessibility_bridge_{};
   stellar::native_video_settings::NativeVideoController* video_settings_{};
   stellar::native_audio::NativeAudioSettings* audio_settings_{};
-  bool menu_{};bool smoke_save_pending_{};bool smoke_shortcut_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
+  bool menu_{};int menu_focus_{-1};int map_focus_group_{-1};int hud_focus_{-1};bool smoke_save_pending_{};bool smoke_shortcut_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
   double smoke_galaxy_day_{},smoke_galaxy_fitted_scale_{},smoke_galaxy_regional_scale_{};
   GalaxyArtSceneEvidence smoke_galaxy_overview_{},smoke_galaxy_regional_{},smoke_galaxy_system_{};
@@ -8122,6 +9510,26 @@ int main(int argc,char **argv){
   stellar::engine::RuntimeDiagnostics diagnostics(STELLAR_GAME_VERSION,STELLAR_ENGINE_VERSION);
   try{
     const auto options=parse_options(argc,argv);
+    // --replay-info: headless recording inventory — header, command-stream
+    // summary, and per-tick checkpoint counts with expected-sidecar presence
+    // (the ticks --replay-until bisects on). Exits before window/session
+    // creation so it runs in scripts without a GPU or a valid install.
+    if(!options.replay_info_path.empty()){
+      std::ifstream in(options.replay_info_path,std::ios::binary);
+      if(!in)
+        throw std::invalid_argument("Cannot open replay recording: "+
+            utf8_path(options.replay_info_path));
+      std::ostringstream contents;contents<<in.rdbuf();
+      std::string parse_error;
+      const auto recording=stellar::engine::ReplayRecorder::parse(
+          contents.str(),&parse_error);
+      if(!recording)
+        throw std::invalid_argument("Replay file is not a valid recording: "+
+            parse_error);
+      std::cout<<stellar::engine::replay_info_json(*recording,
+          options.replay_info_path)<<'\n';
+      return 0;
+    }
     stellar::engine::RuntimeDiagnostics::context(options.dev_game?"startup developer game":"startup player game");
     const auto installation_root=stellar::engine::executable_directory();
     stellar::engine::RuntimeDirectoryLease maintenance_lease(installation_root);
@@ -8158,25 +9566,64 @@ int main(int argc,char **argv){
     Window window("Stellar Continuum - Native Galaxy",options.window_width,
                   options.window_height,!options.windowed&&initial_video.display!=stellar::native_video_settings::VideoDisplayMode::Windowed,
                   asset_root/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
+    stellar::native_client::NativeAccessibilityBridge accessibility_bridge;
+    if(!accessibility_bridge.attach(window.native_window_handle()))
+      SDL_Log("Accessibility bridge unavailable on this platform.");
     // English is the built-in baseline; a shipped Data/locale/<locale>.json
-    // table overrides panel text through the engine localization service.
+    // table overrides panel text through the engine localization service and
+    // falls back to English for any key it does not cover.
+    const auto load_locale=[&](stellar::engine::LocalizationTable& table,const std::string& id){
+      if(auto stream=stellar::engine::resource_stream(asset_root/"Data/locale"/(id+".json"))){
+        std::ostringstream contents;contents<<stream.rdbuf();
+        std::string error;
+        if(!table.load_json(contents.str(),&error))std::cerr<<"Locale catalog '"<<id<<"' rejected: "<<error<<'\n';
+      }
+    };
+    std::vector<std::string> locale_ids{"en"};
+    try {
+      for(const auto& entry:std::filesystem::directory_iterator(asset_root/"Data/locale"))
+        if(entry.is_regular_file()&&entry.path().extension()==".json"){
+          const auto id=entry.path().stem().string();
+          if(id!="en"&&std::find(locale_ids.begin(),locale_ids.end(),id)==locale_ids.end())locale_ids.push_back(id);
+        }
+      std::sort(locale_ids.begin()+1,locale_ids.end());
+    } catch(const std::exception& error){std::cerr<<"Locale discovery failed: "<<error.what()<<'\n';}
     stellar::engine::LocalizationTable locale_table{"en","en"};
-    if(auto stream=stellar::engine::resource_stream(asset_root/"Data/locale/en.json")){
-      std::ostringstream contents;contents<<stream.rdbuf();
-      std::string error;
-      if(!locale_table.load_json(contents.str(),&error))std::cerr<<"Locale catalog rejected: "<<error<<'\n';
-    }
+    load_locale(locale_table,"en");
     stellar::native_general::NativeGeneralSettings general_settings(general_settings_path);
+    if(const auto& wanted=general_settings.saved().locale;
+       wanted!="en"&&std::find(locale_ids.begin(),locale_ids.end(),wanted)!=locale_ids.end()){
+      locale_table=stellar::engine::LocalizationTable{wanted,"en"};
+      load_locale(locale_table,wanted);load_locale(locale_table,"en");
+    }
+    general_settings.set_locales(locale_ids);
     general_settings.set_localization(&locale_table);
     window.set_screenshot_directory(general_settings.saved().screenshot_directory);
+    stellar::native_map::NativeUiLayout::set_user_scale(
+      stellar::native_general::interface_scale_multiplier(general_settings.saved().interface_scale));
+    stellar::native_map::NativeUiLayout::set_text_scale(
+      general_settings.saved().effective().text_scale);
     general_settings.set_text_measurer([&](const Text& text){return window.measure_text(text);});
-    general_settings.set_apply([&](const auto& value){window.set_screenshot_directory(value.screenshot_directory);});
+    general_settings.set_apply([&](const auto& value){
+      window.set_screenshot_directory(value.screenshot_directory);
+      stellar::native_map::NativeUiLayout::set_user_scale(
+        stellar::native_general::interface_scale_multiplier(value.interface_scale));
+      stellar::native_map::NativeUiLayout::set_text_scale(
+        value.effective().text_scale);
+      if(value.locale!=locale_table.locale()){
+        locale_table=stellar::engine::LocalizationTable{value.locale,"en"};
+        load_locale(locale_table,value.locale);load_locale(locale_table,"en");
+      }});
     try{general_settings.set_default_directory(Window::default_screenshot_directory());}
     catch(const std::exception& error){std::cerr<<"Default screenshot folder unavailable: "<<error.what()<<'\n';}
     general_settings.set_browse([&](auto id,const auto& path){return window.request_folder_dialog(id,path);});
     const auto service_general=[&]{if(auto result=window.take_folder_dialog_result())general_settings.accept_browse_result(std::move(*result));};
     // Declared after Window: audio closes its streams/device before SDL teardown.
     stellar::native_audio::NativeAudioDirector audio(asset_root,!options.smoke_screenshot||options.audio_check);
+    // Audio queue occupancy joins the memory census — the bounded music and
+    // voice queues report their current fill against their combined limit.
+    stellar::engine::MemoryTracker::SubsystemId audio_queue_memory_{
+        stellar::engine::MemoryTracker::invalid_subsystem};
     stellar::native_audio::NativeAudioSettings audio_settings(settings_path,
       [&audio](const stellar::native_audio::AudioPreferences& value){audio.set_volumes(value.muted?0.f:value.master,value.music,value.effects);},
       [&audio]{audio.confirm();});
@@ -8242,20 +9689,29 @@ int main(int argc,char **argv){
       [&]{audio.service();service_general();audio_settings.set_device_status(audio.failure_message());if(!audio_menu_ready){++audio_boot_services;if(audio.stats().music_started)throw std::runtime_error("Music started before the startup menu was ready.");}},
       [&]{audio_menu_ready=true;audio.menu_ready();},
       [&]{audio.confirm();},[&]{return audio.assets_ready();},[&]{audio.hover();}};
+    stellar::engine::AccessibilityAnnouncer startup_announcer;
+    std::optional<stellar::native_audio::VoiceCaption> startup_announcement;
     const auto startup_config=[&]{
       StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
       config.developer_access=&developer_access;config.locale=&locale_table;
-      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.caption=[&](DrawList& draw,int w,int h){stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);});};return config;
+      config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.accessibility_bridge=&accessibility_bridge;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){if(item->kind==stellar::engine::AnnouncementKind::Focus)accessibility_bridge.focus_changed(item->text,item->bounds,item->range,item->control,item->checked,item->value,item->expanded);else accessibility_bridge.announce(item->text);if(!item->text.empty())startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},general_settings.saved().effective(),nullptr,ui);};return config;
     };
     std::unique_ptr<NativeCampaignSession> session;
     StartupEntryEvidence startup_evidence,restart_evidence;
     std::optional<std::filesystem::path> generated_save_path,setup_screenshot,loading_screenshot,restart_save_path;
     bool new_game_restart{};
     ReplayState replay;
-    if(!options.record_path.empty())
+    if(!options.record_path.empty()){
       replay.recorder.emplace(stellar::engine::ReplayHeader{
-          static_cast<std::uint64_t>(options.seed),STELLAR_GAME_VERSION,
-          STELLAR_GAME_VERSION});
+          static_cast<std::uint64_t>(options.seed),STELLAR_SOURCE_COMMIT,
+          STELLAR_GAME_VERSION,
+          static_cast<std::uint32_t>(window.drawable_width()),
+          static_cast<std::uint32_t>(window.drawable_height())});
+      // Bounded recording: past the budget the recorder keeps an honest
+      // prefix (no later commands or checkpoints claim fidelity) and
+      // serializes a truncated flag rather than growing without limit.
+      replay.recorder->set_memory_budget(128ull*1024*1024);
+    }
     if(!options.replay_path.empty()){
       std::ifstream replay_file(options.replay_path,std::ios::binary);
       if(!replay_file)throw std::invalid_argument("Replay file cannot be opened.");
@@ -8263,7 +9719,63 @@ int main(int argc,char **argv){
       std::string parse_error;
       auto parsed=stellar::engine::ReplayRecorder::parse(contents.str(),&parse_error);
       if(!parsed)throw std::invalid_argument("Replay file is not a valid recording: "+parse_error);
+      // Provenance check: a recording made under a different seed or build
+      // cannot reproduce this session — flag it so a divergence is read as
+      // a provenance mismatch, not a simulation defect. Advisory only:
+      // cross-build replay is a legitimate compatibility probe.
+      // build_id carries the source commit in new recordings; older ones
+      // stamped the game version there — skip the commit check for those.
+      const bool legacy_header=
+          parsed->header().build_id==parsed->header().game_version;
+      if(parsed->header().seed!=static_cast<std::uint64_t>(options.seed)||
+         (!legacy_header&&parsed->header().build_id!=STELLAR_SOURCE_COMMIT)||
+         parsed->header().game_version!=STELLAR_GAME_VERSION)
+        std::cerr<<"Stellar Continuum native client: replay provenance differs "
+                   "(recorded seed "<<parsed->header().seed<<" vs "<<options.seed
+                 <<", recorded build "<<parsed->header().build_id
+                 <<" vs "<<STELLAR_SOURCE_COMMIT
+                 <<", recorded version "<<parsed->header().game_version
+                 <<" vs "<<STELLAR_GAME_VERSION
+                 <<") — divergence may reflect the mismatch.\n";
+      // Pointer commands carry drawable-pixel positions — a replay under a
+      // different drawable size (windowed vs scaled fullscreen) lands them
+      // on different UI cells, so flag the mismatch like a provenance
+      // difference.
+      if(parsed->header().window_width!=0&&parsed->header().window_height!=0&&
+         (parsed->header().window_width!=static_cast<std::uint32_t>(window.drawable_width())||
+          parsed->header().window_height!=static_cast<std::uint32_t>(window.drawable_height())))
+        std::cerr<<"Stellar Continuum native client: recording was made on a "
+                 <<parsed->header().window_width<<"x"<<parsed->header().window_height
+                 <<" drawable — replaying at "<<window.drawable_width()<<"x"
+                 <<window.drawable_height()
+                 <<" moves pointer hit-testing; divergence may reflect the mismatch.\n";
+      // A truncated recording is an honest prefix: its command stream and
+      // checkpoints end mid-session, so nothing past them is verified.
+      if(parsed->truncated())
+        std::cerr<<"Stellar Continuum native client: recording is truncated "
+                   "(memory budget) — commands and checkpoints end "
+                   "mid-session; nothing past the prefix is verified.\n";
+      // The feed loop and cursor verifier assume non-decreasing ticks —
+      // a hand-edited recording would silently drop commands.
+      if(!std::ranges::is_sorted(parsed->commands(),{},
+             &stellar::engine::ReplayCommand::tick)||
+         !std::ranges::is_sorted(parsed->checkpoints(),{},
+             &stellar::engine::ReplayCheckpoint::tick))
+        std::cerr<<"Stellar Continuum native client: recording streams are "
+                   "not in tick order — out-of-order entries never fire.\n";
       replay.recording=std::move(parsed);
+    }
+    // Expected-document sidecars live next to the recording: record writes
+    // <path>.expected/<tick>.json, replay reads them for leaf-level diffs.
+    if(!options.record_path.empty())
+      replay.expected_directory=options.record_path.generic_string()+".expected";
+    else if(!options.replay_path.empty())
+      replay.expected_directory=options.replay_path.generic_string()+".expected";
+    replay.exit_on_completion=options.replay_exit;
+    if(options.replay_until_tick){
+      replay.stop_at_tick=options.replay_until_tick;
+      replay.stop_dump_path=options.replay_path.parent_path()/
+          ("replay-until-"+std::to_string(*options.replay_until_tick)+".json");
     }
     // Fixed-step: record/replay share one deterministic advance quantum so
     // command ticks and checkpoint days reproduce exactly.
@@ -8319,9 +9831,25 @@ int main(int argc,char **argv){
     const auto restart_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(60);
     while(session){
     NativeCampaign campaign(std::move(session),window.drawable_width(),window.drawable_height(),options.asset_root,
-                             [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings,&settings_hub,&voice_settings);
+                             [&window](const Text &label){return window.measure_text(label);},[&]{audio.confirm();},&audio_settings,&audio,&video_settings,&general_settings,&settings_hub,&voice_settings,&accessibility_bridge);
     campaign.attach_replay(&replay);
     campaign.set_locale(locale_table);
+    // Rebindable galaxy controls: the hub's Controls view edits the live
+    // mapper and persists the rebound map beside the other settings files.
+    const auto controls_path=settings_path.parent_path()/"galaxy-controls.json";
+    campaign.load_user_bindings(controls_path);
+    settings_hub.set_input_mapper(&campaign.input_mapper(),"GALAXY","GALAXY_PAD");
+    settings_hub.set_pad_name_lookup([&window](int slot){
+      const auto names=window.gamepad_names();
+      return slot>=0&&slot<static_cast<int>(names.size())?names[static_cast<std::size_t>(slot)]:std::string{};
+    });
+    settings_hub.set_bindings_persist([&campaign,&controls_path]{
+      const auto text=campaign.input_mapper().save_contexts();
+      try {
+        stellar::engine::write_file_atomically(controls_path,
+          std::span{reinterpret_cast<const std::byte*>(text.data()),text.size()});
+      } catch(const std::exception& error){std::cerr<<"Input bindings save failed: "<<error.what()<<'\n';}
+    });
     active_voice_playback=campaign.voice_playback();
     campaign.configure_support(window.gpu_driver(),window.presentation_mode());
     std::cout<<"renderer="<<window.gpu_driver()<<" presentation="<<window.presentation_mode()<<" drawable="<<window.drawable_width()<<'x'<<window.drawable_height()<<'\n';
@@ -8453,6 +9981,12 @@ int main(int argc,char **argv){
       }
 
       audio.service();
+      if(audio_queue_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+        audio_queue_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("audio-queues");
+      if(const auto audio_stats=audio.stats();audio_stats.music_queue_limit_bytes!=0)
+        stellar::engine::MemoryTracker::instance().report(audio_queue_memory_,
+            audio_stats.queued_music_bytes+audio_stats.queued_voice_bytes,
+            audio_stats.music_queue_limit_bytes+audio_stats.voice_queue_limit_bytes);
       service_general();
       audio_settings.set_device_status(audio.failure_message());
       if(options.voice_check){
@@ -8775,6 +10309,14 @@ int main(int argc,char **argv){
                  <<",\"scene_texture_bytes\":"<<gpu_residency.texture_cache_bytes
                  <<",\"scene_mesh_bytes\":"<<gpu_residency.mesh_cache_bytes
                  <<",\"scene_render_target_bytes\":"<<gpu_residency.target_bytes<<"}\n";
+        { // The client's bounded caches must be registered in the memory census.
+          const auto census=stellar::engine::MemoryTracker::instance().snapshot();
+          const auto tracked=[&](std::string_view name){
+            return std::find_if(census.subsystems.begin(),census.subsystems.end(),
+                [&](const auto& s){return s.name==name;})!=census.subsystems.end();};
+          if(!tracked("planet-materials")||!tracked("territory-overlay")||!tracked("image-preparation"))
+            throw std::runtime_error("Memory census is missing the client's bounded cache subsystems.");
+        }
         std::cout<<std::fixed<<std::setprecision(3)
                  <<"native-map smoke ok: gpu_driver="<<window.gpu_driver()
                  <<" presentation="<<window.presentation_mode()

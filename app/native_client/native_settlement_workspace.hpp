@@ -36,10 +36,18 @@ public:
     locale_ = table;
   }
   [[nodiscard]] bool visible() const noexcept { return preview_.has_value(); }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeSettlementTargetPreview>& preview() const noexcept { return preview_; }
   [[nodiscard]] SettlementWorkspaceCommand handle(
       const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label() const;
+  // Client-pixel rect of the ringed modal control — null when nothing is
+  // focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
 private:
   enum class PressTarget { None, Confirm, Cancel };
   void reset_gesture() noexcept;
@@ -53,7 +61,7 @@ private:
   stellar::native_map::Point pointer_{};
   bool pointer_owned_{};
   PressTarget pressed_{PressTarget::None};
-  int press_width_{}, press_height_{};
+  int press_width_{}, press_height_{}, focus_{-1};
 };
 
 } // namespace stellar::native_colony_ui

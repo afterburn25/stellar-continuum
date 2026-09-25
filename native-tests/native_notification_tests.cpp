@@ -1,6 +1,9 @@
 #include "native_notifications.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -40,11 +43,11 @@ void bounded_feed_and_reachable_scroll() {
   view.open(notifications.latest_sequence());
   require(view.last_read() == notifications.latest_sequence(), "opening did not acknowledge browseable retained list");
   auto layout = notification_layout_for(notifications.items(), 720, 720, measured, 0.f);
-  require(layout.max_scroll > 0.f && layout.entries.size() == 32, "all retained events were not represented in scroll layout");
+  require(layout.scroll.max_scroll() > 0.f && layout.entries.size() == 32, "all retained events were not represented in scroll layout");
   const auto last_before = layout.cards.back();
   require(!intersects(last_before, layout.list_viewport), "long list unexpectedly fits without scrolling");
   for (int i = 0; i < 200; ++i) (void)view.handle({InputEventType::Wheel, center(layout.panel), {}, -1.f}, notifications.items(), 720, 720);
-  require(std::abs(view.scroll_offset() - layout.max_scroll) < .1f, "scroll did not clamp at lower bound");
+  require(std::abs(view.scroll_offset() - layout.scroll.max_scroll()) < .1f, "scroll did not clamp at lower bound");
   auto end = notification_layout_for(notifications.items(), 720, 720, measured, view.scroll_offset());
   require(intersects(end.cards.back(), end.list_viewport), "oldest retained event is inaccessible at end scroll");
   for (int i = 0; i < 200; ++i) (void)view.handle({InputEventType::Wheel, center(layout.panel), {}, 1.f}, notifications.items(), 720, 720);
@@ -132,13 +135,153 @@ void activation_owns_full_press_release_gesture() {
   command = view.handle({InputEventType::LeftReleased, center(layout.close_button)}, notifications.items(), 1280, 720);
   require(command.kind == NotificationViewCommandKind::Close && !view.visible(), "matching close press and release did not dismiss panel");
 }
+void system_navigation_command() {
+  NativeNotificationFeed notifications;
+  notifications.publish("Combat", "Day 10", "Fleet engaged over Halcyon",
+                        std::nullopt, 9);
+  notifications.publish("Research", "Day 11", "Discovery completed");
+  NativeNotificationView view;
+  view.set_text_measurer(measured);
+  view.open(notifications.latest_sequence());
+  const auto layout = notification_layout_for(notifications.items(), 1280, 720, measured);
+  // Newest first: entry 0 is the locationless report, entry 1 located.
+  require(!layout.entries[0].system_button &&
+              layout.entries[1].system_button &&
+              !layout.entries[0].contact_button,
+          "system action row missing or leaked onto locationless report");
+  const Point at = center(*layout.entries[1].system_button);
+  auto command = view.handle({InputEventType::LeftReleased, at}, notifications.items(), 1280, 720);
+  require(command.kind == NotificationViewCommandKind::None && command.captured,
+          "orphan release on system action leaked");
+  command = view.handle({InputEventType::LeftPressed, at}, notifications.items(), 1280, 720);
+  require(command.captured, "system action press not captured");
+  command = view.handle({InputEventType::LeftReleased, at}, notifications.items(), 1280, 720);
+  require(command.kind == NotificationViewCommandKind::OpenSystem &&
+              command.system_id == 9 && !view.visible(),
+          "system action did not emit OpenSystem");
+}
+
+void keyboard_focus() {
+  // Keyboard-focus contract: Tab/arrows ring every actionable rect in
+  // (y,x) order — header controls, then each card's action buttons —
+  // Home/End jump to the ends, Return/Space replay the press/release
+  // dispatch, and pointer presses reset the ring. Inert card bodies and
+  // partially-clipped action buttons never gain focus.
+  NativeNotificationFeed notifications;
+  notifications.publish("Research", "Day 10", "Discovery completed", 42);
+  notifications.publish("Combat", "Day 11", "Fleet engaged over Halcyon",
+                        std::nullopt, 9);
+  // Newest first: entry 0 is the located combat card, entry 1 the
+  // contact card — focus order is chronicle, close, system, contact.
+  NativeNotificationView view;
+  view.set_text_measurer(measured);
+  view.open(notifications.latest_sequence());
+  const auto layout = notification_layout_for(notifications.items(), 1280, 720, measured);
+  const auto key = [&](std::uint32_t code, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = code;
+    event.shift = shift;
+    return view.handle(event, notifications.items(), 1280, 720);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                          kDown = 0x40000051u, kUp = 0x40000052u;
+  constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+  constexpr std::uint32_t kF5 = 0x4000003fu;
+  require(view.focus() < 0, "focus ring present before any key");
+  require(view.focused_label(notifications.items(), 1280, 720).empty(),
+          "unfocused feed returned a label");
+  require(key(kTab).captured && view.focus() == 0, "Tab did not focus the first control");
+  require(view.focused_label(notifications.items(), 1280, 720) == "Chronicle",
+          "focused label did not name the chronicle button");
+  require(key(kDown).captured && view.focus() == 1, "Down did not advance the ring");
+  require(view.focused_label(notifications.items(), 1280, 720) == "Close feed",
+          "focused label did not name the close button");
+  require(key(kLeft).captured && view.focus() == 0, "Left did not walk back");
+  require(key(kEnd).captured && view.focus() == 3, "End did not land on the last action");
+  require(key(kTab, true).captured && view.focus() == 2, "Shift+Tab did not step backwards");
+  require(key(kRight).captured && view.focus() == 3, "Right did not walk forward");
+  require(key(kHome).captured && view.focus() == 0, "Home did not return to the head");
+  require(!key(kF5).captured, "unrelated key was captured");
+  require(key(kTab).captured && view.focus() == 1, "Tab did not resume cycling after Home");
+  // Activation replays the real press/release dispatch through handle().
+  key(kEnd); // entry 1's contact button
+  auto command = key(kReturn);
+  require(command.kind == NotificationViewCommandKind::OpenDiplomaticContact &&
+              command.civilization_id == 42 && command.captured && !view.visible(),
+          "Return on a contact action did not dispatch OpenDiplomaticContact");
+  view.open(notifications.latest_sequence());
+  key(kEnd);
+  command = key(kUp); // entry 0's system button
+  require(command.captured && view.focus() == 2, "Up did not step back to the located card");
+  command = key(kSpace);
+  require(command.kind == NotificationViewCommandKind::OpenSystem &&
+              command.system_id == 9 && !view.visible(),
+          "Space on a located action did not dispatch OpenSystem");
+  view.open(notifications.latest_sequence());
+  // Chronicle activation keeps the panel open and preserves the ring.
+  require(key(kTab).captured && view.focus() == 0, "reopen did not reset the ring");
+  command = key(kReturn);
+  require(command.kind == NotificationViewCommandKind::OpenChronicle &&
+              view.visible() && view.focus() == 0,
+          "chronicle activation closed the panel or lost the ring");
+  // The ring renders as the last stroke over the focused control.
+  DrawList draw;
+  view.render(draw, notifications.items(), 1280, 720);
+  const auto* ring = std::get_if<StrokedRectangle>(&draw.overlay.back());
+  require(ring && std::abs(ring->bounds.x - layout.chronicle_button.x) < .01f &&
+              std::abs(ring->bounds.y - layout.chronicle_button.y) < .01f,
+          "focus ring was not drawn over the focused control");
+  // A pointer press hands ownership back to the pointer.
+  require(view.handle({InputEventType::LeftPressed, center(layout.panel)},
+                      notifications.items(), 1280, 720).captured &&
+              view.focus() < 0,
+          "pointer press did not clear the ring");
+  // The empty feed still rings its header controls.
+  NativeNotificationFeed empty;
+  view.open(empty.latest_sequence());
+  require(key(kTab).captured && view.focus() == 0, "empty feed did not focus a header control");
+  const auto empty_layout = notification_layout_for(empty.items(), 1280, 720, measured);
+  DrawList empty_draw;
+  view.render(empty_draw, empty.items(), 1280, 720);
+  ring = std::get_if<StrokedRectangle>(&empty_draw.overlay.back());
+  require(ring && std::abs(ring->bounds.x - empty_layout.chronicle_button.x) < .01f,
+          "empty feed rendered no header focus ring");
+}
+
 } // namespace
+
+void keyed_message_translation() {
+  NativeNotificationFeed feed;
+  feed.publish("Research", "2050-03-21", "Research report available (2)",
+               std::nullopt, std::nullopt, "NOTIFY_MSG_RESEARCH", " (2)");
+  stellar::engine::LocalizationTable locale{"en", "en"};
+  require(locale.load_json(
+              R"({"locale":"en","strings":{"NOTIFY_MSG_RESEARCH":"BERICHT{0}"}})"),
+          "the test catalog must parse");
+  NativeNotificationView view;
+  view.set_text_measurer(measured);
+  view.set_localization(&locale);
+  view.open(feed.latest_sequence());
+  DrawList draw;
+  view.render(draw, feed.items(), 720, 720);
+  bool translated = false;
+  for (const auto& command : draw.overlay)
+    if (const auto* text = std::get_if<Text>(&command);
+        text && text->value == "BERICHT (2)")
+      translated = true;
+  require(translated,
+          "keyed feed message did not resolve through the bound catalog");
+}
 
 int main() {
   try {
     bounded_feed_and_reachable_scroll();
+    keyed_message_translation();
     measured_wrapping_and_narrow_geometry();
     activation_owns_full_press_release_gesture();
+    system_navigation_command();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

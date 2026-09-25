@@ -4,12 +4,16 @@
 
 #include "native_new_campaign_setup.hpp"
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -121,7 +125,25 @@ public:
     return seed_text_;
   }
   [[nodiscard]] bool seed_focused() const noexcept { return seed_focused_; }
-  [[nodiscard]] float detail_scroll() const noexcept { return detail_scroll_; }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height,
+                                          const TextMeasurer &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height, const TextMeasurer &) const;
+  // UIA control kind of the ringed control — Edit on the seed field,
+  // Custom elsewhere.
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(int width, int height, const TextMeasurer &) const;
+  // Current text of the ringed Edit — the seed field reports its text but
+  // stays read-only: seeds apply through the SeedEdited intent path.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue>
+  focused_value(int width, int height, const TextMeasurer &) const;
+  [[nodiscard]] float detail_scroll() const noexcept {
+    return detail_scroll_.scroll_offset;
+  }
 
   [[nodiscard]] NativeNewGameMeasuredLayout measure_layout(
       int width, int height, const TextMeasurer &) const;
@@ -135,7 +157,7 @@ public:
                   {}) const;
 
 private:
-  NativeNewGameIntent handle_galaxy_page(const stellar::native_map::InputEvent&,int,int);
+  NativeNewGameIntent handle_galaxy_page(const stellar::native_map::InputEvent&,int,int,const TextMeasurer&);
   void render_galaxy_page(stellar::native_map::DrawList&,int,int,const PortraitProvider*,std::shared_ptr<const stellar::native_map::RgbaImage>)const;
   SandboxPage page_{SandboxPage::Configuration};
   bool morphology_selected_{};
@@ -150,6 +172,23 @@ private:
   void reconcile();
   void restore_defaults();
   void reset_interaction() noexcept;
+  // Keyboard-focus contract: ordered (y,x) focusables per page. Targets are
+  // nonzero cue ids; activation replays through the authoritative click path.
+  struct FocusItem {
+    stellar::native_map::UiRect rect;
+    std::uint64_t target;
+    // Set when `rect` was clipped to the species list viewport: the row's
+    // translated, unclipped bounds so keyboard focus can snap the list.
+    std::optional<stellar::native_map::UiRect> unclipped;
+  };
+  [[nodiscard]] std::vector<FocusItem> configuration_focusables(
+      const NativeNewGameMeasuredLayout &) const;
+  [[nodiscard]] std::vector<FocusItem> galaxy_focusables(
+      const GalaxyChoiceLayout &) const;
+  [[nodiscard]] NativeNewGameIntent handle_focus_key(
+      const stellar::native_map::InputEvent &, std::span<const FocusItem>,
+      int, int, const TextMeasurer &,
+      const NativeNewGameMeasuredLayout *measured = nullptr);
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
   [[nodiscard]] std::string trf(std::string_view key,
@@ -164,8 +203,9 @@ private:
   bool developer_exploration_{};
   int selected_system_count_{}, selected_pre_warp_civilization_count_{},
       selected_ancient_civilization_count_{};
-  float species_scroll_{}, detail_scroll_{};
+  mutable stellar::engine::ScrollView species_scroll_{}, detail_scroll_{};
   bool seed_focused_{}, seed_replace_pending_{}, assessment_accepted_{}, pressed_{};
+  int focus_{-1};
   stellar::native_map::Point pointer_{};
   const stellar::engine::LocalizationTable *locale_{};
 };

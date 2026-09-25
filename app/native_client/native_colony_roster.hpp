@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/fresh_campaign.hpp>
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
@@ -17,6 +18,7 @@ namespace stellar::native_colony_roster {
 struct Row {
   int colony_id{}, body_id{}, system_id{};
   std::string name, body_name, system_name, kind_label, population;
+  double population_millions{};
   bool can_open{};
   std::string reason;
   bool operator==(const Row &) const = default;
@@ -37,7 +39,7 @@ struct View {
                              nullptr);
 
 struct RosterLayout {
-  stellar::native_map::UiRect panel, list, close, refresh;
+  stellar::native_map::UiRect panel, list, close, refresh, search;
   float scale{}, row_height{};
   [[nodiscard]] static RosterLayout for_viewport(int width,
                                                  int height) noexcept;
@@ -59,7 +61,27 @@ public:
   void discard_campaign() noexcept;
   void cancel_pending_input() noexcept { clear_press(); }
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] bool wants_text_input() const noexcept {
+    return visible_ && search_focused_;
+  }
   [[nodiscard]] float scroll_offset() const noexcept { return list_.scroll_offset; }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
+  // UIA control kind of the ringed control — Edit on the search field,
+  // Custom elsewhere.
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(int width, int height) const;
+  // Current text of the ringed Edit — null when focus is elsewhere.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue>
+  focused_value(int width, int height) const;
+  // Applies a platform value SetValue to the ringed Edit — false when the
+  // focus sits on a non-edit control.
+  bool set_focused_text(std::string text, int width, int height);
   void set_notice(std::string value) { notice_ = std::move(value); }
   void set_localization(
       const stellar::engine::LocalizationTable *table) noexcept {
@@ -78,14 +100,30 @@ private:
   [[nodiscard]] float maximum_scroll(const RosterLayout &) const noexcept;
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
+  void rebuild_table();
+  void apply_display_order();
+  void apply_filter();
+  // 0=colony,1=world,2=population; -1 when the point misses the headers.
+  [[nodiscard]] int header_column(stellar::native_map::Point,
+                                  const RosterLayout &) const noexcept;
+  struct FocusTarget {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+    int display_row{-1};
+  };
+  [[nodiscard]] std::vector<FocusTarget> focusables(const RosterLayout &) const;
   const stellar::engine::LocalizationTable *locale_{};
   View view_;
   bool visible_{};
   mutable stellar::engine::VirtualizedList list_{};
-  std::string notice_;
+  stellar::engine::TableModel table_{};
+  std::vector<int> display_order_{}; // display position -> view_.rows index
+  std::string notice_, search_;
+  bool search_focused_{};
   std::optional<int> pressed_row_;
   PressTarget pressed_target_{PressTarget::none};
   bool pointer_owned_{};
+  int focus_{-1};
   stellar::native_map::Point pointer_{};
   int viewport_width_{}, viewport_height_{};
   std::uint64_t pressed_generation_{};

@@ -217,8 +217,8 @@ void NativeNewGameWorkspace::set_view(NativeNewCampaignSetupView value) {
     selected_ancient_civilization_count_ =
         view_->default_ancient_civilization_count;
   }
-  species_scroll_ = 0;
-  detail_scroll_ = 0;
+  species_scroll_ = {};
+  detail_scroll_ = {};
   message_.clear();
   reset_interaction();
   reconcile();
@@ -229,6 +229,7 @@ void NativeNewGameWorkspace::reset_interaction() noexcept {
   hover_feedback_.reset();
   seed_focused_ = false;
   pressed_ = false;
+  focus_ = -1;
   pointer_ = {};
 }
 void NativeNewGameWorkspace::set_assessment_message(std::string message,
@@ -257,7 +258,7 @@ void NativeNewGameWorkspace::restore_defaults() {
       view_->default_ancient_civilization_count;
   reconcile();
   randomize_seed();
-  detail_scroll_ = 0;
+  detail_scroll_ = {};
   message_.clear();
 }
 void NativeNewGameWorkspace::reconcile() {
@@ -305,7 +306,7 @@ NativeNewGameMeasuredLayout NativeNewGameWorkspace::measure_layout(
                                      wrap_width});
     return static_cast<float>(std::max(extent.height, pixels));
   };
-  float y = layout.species_rows.y - species_scroll_;
+  float y = layout.species_rows.y - species_scroll_.scroll_offset;
   for (const auto &option : view_->species) {
     const float label_height = measured_height(
         option.display_name, layout.body_font,
@@ -317,6 +318,8 @@ NativeNewGameMeasuredLayout NativeNewGameWorkspace::measure_layout(
     y += row_height + 4.f * layout.scale;
     result.species_content_height += row_height + 4.f * layout.scale;
   }
+  species_scroll_.sync(result.species_content_height,
+                       layout.species_rows.height);
   if (const auto *option = selected_species(*view_, selected_species_id_)) {
     const float identity_width = layout.details_content.width -
                                  layout.portrait.width - 12.f * layout.scale;
@@ -426,13 +429,128 @@ std::optional<std::size_t> NativeNewGameWorkspace::size_hit(
   return std::nullopt;
 }
 
+std::vector<NativeNewGameWorkspace::FocusItem>
+NativeNewGameWorkspace::configuration_focusables(
+    const NativeNewGameMeasuredLayout &measured) const {
+  std::vector<FocusItem> items;
+  if (!view_) return items;
+  const auto &layout = measured.base;
+  const auto push = [&](UiRect rect, std::uint64_t target) {
+    if (rect.width > 0 && rect.height > 0) items.push_back({rect, target});
+  };
+  push(layout.cancel, 1);
+  push(layout.morphology, 2);
+  push(layout.population, 3);
+  push(layout.mode_story, 4);
+  push(layout.mode_sandbox, 5);
+  if (view_->developer_mode) {
+    push(layout.developer_normal_research, 6);
+    push(layout.developer_special_research, 7);
+    push(layout.developer_coverage, 8);
+    push(layout.developer_exploration, 9);
+  }
+  for (std::size_t index = 0; index < measured.species_rows.size(); ++index) {
+    const auto &row = measured.species_rows[index];
+    if (const auto clip = intersection(row, layout.species_rows))
+      items.push_back({*clip, 100 + index, row});
+  }
+  const auto sizes =
+      std::min(view_->size_presets.size(), layout.size_buttons.size());
+  for (std::size_t index = 0; index < sizes; ++index)
+    items.push_back({layout.size_buttons[index], 200 + index});
+  push(layout.seed_input, 10);
+  push(layout.randomize_seed, 11);
+  push(layout.restore_defaults, 12);
+  push(layout.copy_setup, 13);
+  push(layout.create, 14);
+  std::stable_sort(items.begin(), items.end(), [](const auto &a, const auto &b) {
+    return a.rect.y != b.rect.y ? a.rect.y < b.rect.y : a.rect.x < b.rect.x;
+  });
+  return items;
+}
+
+std::vector<NativeNewGameWorkspace::FocusItem>
+NativeNewGameWorkspace::galaxy_focusables(const GalaxyChoiceLayout &layout) const {
+  std::vector<FocusItem> items;
+  if (page_ == SandboxPage::GalaxyType)
+    for (std::size_t index = 0; index < layout.cards.size(); ++index)
+      items.push_back({layout.cards[index], 100 + index});
+  else
+    items.push_back({layout.population, 3});
+  items.push_back({layout.back, 1});
+  if (page_ == SandboxPage::Population || morphology_selected_)
+    items.push_back({layout.next, 2});
+  std::stable_sort(items.begin(), items.end(), [](const auto &a, const auto &b) {
+    return a.rect.y != b.rect.y ? a.rect.y < b.rect.y : a.rect.x < b.rect.x;
+  });
+  return items;
+}
+
+NativeNewGameIntent NativeNewGameWorkspace::handle_focus_key(
+    const InputEvent &event, std::span<const FocusItem> items, int width,
+    int height, const TextMeasurer &measure,
+    const NativeNewGameMeasuredLayout *measured) {
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                          kDown = 0x40000051u, kUp = 0x40000052u;
+  constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+  const int count = static_cast<int>(items.size());
+  if (count == 0 || !event.key) return {NativeNewGameIntentKind::None, true};
+  // Species rows clipped by the list viewport stay in the ring; when
+  // focus lands on one, snap the list so the row is fully visible — which
+  // exposes the next row and keeps the whole list keyboard-reachable.
+  const auto snap_focused = [&] {
+    if (!measured || focus_ < 0 || focus_ >= count) return;
+    const auto &target = items[static_cast<std::size_t>(focus_)];
+    if (!target.unclipped) return;
+    species_scroll_.sync(measured->species_content_height,
+                         measured->base.species_rows.height);
+    species_scroll_.scroll_interval_into_view(
+        target.unclipped->y, target.unclipped->y + target.unclipped->height,
+        measured->base.species_rows.y,
+        measured->base.species_rows.y + measured->base.species_rows.height);
+  };
+  if (event.key == kHome || event.key == kEnd) {
+    focus_ = event.key == kHome ? 0 : count - 1;
+    snap_focused();
+    hover_feedback_.cue(items[static_cast<std::size_t>(focus_)].target);
+    return {NativeNewGameIntentKind::None, true};
+  }
+  const bool fwd = (event.key == kTab && !event.shift) || event.key == kRight ||
+                   event.key == kDown;
+  const bool bwd = (event.key == kTab && event.shift) || event.key == kLeft ||
+                   event.key == kUp;
+  if (fwd || bwd) {
+    if (focus_ < 0 || focus_ >= count) focus_ = bwd ? count - 1 : 0;
+    else focus_ = (focus_ + (bwd ? -1 : 1) + count) % count;
+    snap_focused();
+    hover_feedback_.cue(items[static_cast<std::size_t>(focus_)].target);
+    return {NativeNewGameIntentKind::None, true};
+  }
+  if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+      focus_ < count) {
+    const auto &rect = items[static_cast<std::size_t>(focus_)].rect;
+    InputEvent press{InputEventType::LeftPressed},
+        release{InputEventType::LeftReleased};
+    press.position = release.position = {rect.x + rect.width * .5f,
+                                         rect.y + rect.height * .5f};
+    const int keep = focus_;
+    const auto page = page_;
+    auto intent = handle(press, width, height, measure);
+    static_cast<void>(handle(release, width, height, measure));
+    if (page_ == page) focus_ = keep;
+    return intent;
+  }
+  return {NativeNewGameIntentKind::None, true};
+}
+
 #include "native_galaxy_creation.inl"
 
 NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
                                                     int width, int height,
                                                     const TextMeasurer &measure) {
   if (!view_) return {};
-  if(page_!=SandboxPage::Configuration)return handle_galaxy_page(event,width,height);
+  if(page_!=SandboxPage::Configuration)return handle_galaxy_page(event,width,height,measure);
   const auto measured = measure_layout(width, height, measure);
   const auto &layout = measured.base;
   const std::array choice_bounds{layout.mode_story,layout.mode_sandbox,layout.morphology,layout.population};
@@ -475,21 +593,37 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
   }
   if (event.type == InputEventType::Wheel) {
     if (layout.species.contains(event.position)) {
-      const float maximum = std::max(
-          0.f, measured.species_content_height - layout.species_rows.height);
-      species_scroll_ = std::clamp(species_scroll_ - event.wheel_y * 42.f *
-                                   layout.scale, 0.f, maximum);
+      species_scroll_.sync(measured.species_content_height,
+                           layout.species_rows.height);
+      species_scroll_.scroll_by(-event.wheel_y * 42.f * layout.scale);
       return {NativeNewGameIntentKind::None, true};
     }
     if (layout.details.contains(event.position)) {
-      const float maximum = std::max(
-          0.f, measured.details_content_height -
-                   std::max(1.f, layout.details_content.height -
-                                     measured.details_header_height));
-      detail_scroll_ = std::clamp(detail_scroll_ - event.wheel_y * 42.f *
-                                  layout.scale, 0.f, maximum);
+      detail_scroll_.sync(
+          measured.details_content_height,
+          std::max(1.f, layout.details_content.height -
+                            measured.details_header_height));
+      detail_scroll_.scroll_by(-event.wheel_y * 42.f * layout.scale);
       return {NativeNewGameIntentKind::None, true};
     }
+  }
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    if (seed_focused_) {
+      // While editing the seed the field owns key input; Tab/Return commit and
+      // leave edit mode, everything else is captured.
+      if (event.key == 9u) {
+        seed_focused_ = false;
+        seed_replace_pending_ = false;
+      } else if (event.key == 13u) {
+        seed_focused_ = false;
+        seed_replace_pending_ = false;
+        return {NativeNewGameIntentKind::None, true};
+      } else {
+        return {NativeNewGameIntentKind::None, true};
+      }
+    }
+    return handle_focus_key(event, configuration_focusables(measured), width,
+                            height, measure, &measured);
   }
   if (event.type == InputEventType::LeftReleased) {
     pressed_ = false;
@@ -498,6 +632,7 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
   if (event.type != InputEventType::LeftPressed)
     return {NativeNewGameIntentKind::None, layout.panel.contains(event.position)};
   pressed_ = true;
+  focus_ = -1;
   pointer_ = event.position;
   seed_focused_ = layout.seed_input.contains(event.position);
   if (seed_focused_) seed_replace_pending_ = true;
@@ -523,7 +658,7 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
   }
   if (const auto index = species_hit(event.position, measured)) {
     selected_species_id_ = view_->species[*index].id;
-    detail_scroll_ = 0;
+    detail_scroll_ = {};
     message_.clear();
     return {NativeNewGameIntentKind::SelectSpecies, true,
             selected_species_id_};
@@ -716,7 +851,8 @@ void NativeNewGameWorkspace::render(
                             clip.width,
                             std::max(1.f, clip.height -
                                              measured.details_header_height)};
-    float y = facts_clip.y - detail_scroll_;
+    detail_scroll_.sync(measured.details_content_height, facts_clip.height);
+    float y = facts_clip.y - detail_scroll_.scroll_offset;
     auto line = [&](std::string value, Color color = bright,
                     int font = 0, float gap = 4.f) {
       const int pixels = font == 0 ? layout.body_font : font;
@@ -781,20 +917,15 @@ void NativeNewGameWorkspace::render(
              {number(species->lifespan_years, 0),
               number(species->metabolic_demand, 2)},
              "Lifespan  {0} years · Metabolic demand  {1}x Terran baseline"));
-    const float maximum_scroll =
-        std::max(0.f, measured.details_content_height - facts_clip.height);
-    if (maximum_scroll > 0.f) {
+    const float maximum_scroll = detail_scroll_.max_scroll();
+    if (const auto thumb = detail_scroll_.thumb(facts_clip.height, 22.f * s);
+        thumb.size > 0.f) {
       const UiRect track{facts_clip.x + facts_clip.width - 3.f * s,
                          facts_clip.y, 2.f * s, facts_clip.height};
       fill(out, track, {91, 151, 205, 80});
-      const float handle_height =
-          std::max(22.f * s, facts_clip.height * facts_clip.height /
-                                   measured.details_content_height);
-      const float handle_y =
-          track.y + (track.height - handle_height) *
-                        (detail_scroll_ / maximum_scroll);
-      fill(out, {track.x, handle_y, track.width, handle_height}, accent);
-      if (detail_scroll_ + .5f < maximum_scroll) {
+      fill(out, {track.x, track.y + thumb.offset, track.width, thumb.size},
+           accent);
+      if (detail_scroll_.scroll_offset + .5f < maximum_scroll) {
         const UiRect fade{facts_clip.x, facts_clip.y + facts_clip.height - 24.f * s,
                           facts_clip.width - 6.f * s, 24.f * s};
         fill(out, fade, {8, 20, 36, 235});
@@ -886,7 +1017,134 @@ void NativeNewGameWorkspace::render(
        layout.body_font, TextAlign::Center);
   const std::array choice_bounds{layout.mode_story,layout.mode_sandbox,layout.morphology,layout.population};
   for(const auto r:choice_bounds)text(out,{r.x+r.width-24*s,r.y+(r.height-layout.small_font)*.5f,20*s,24*s},"▼",accent,layout.small_font,TextAlign::Center);
+  const auto focus_items = configuration_focusables(measured);
+  if (focus_ >= 0 && focus_ < static_cast<int>(focus_items.size()))
+    stroke(out, focus_items[static_cast<std::size_t>(focus_)].rect,
+           {160, 210, 255, 255});
   if(dropdown_.visible())dropdown_.render(out,choice_bounds[dropdown_.id()],width,height,layout.body_font);
+}
+
+std::string NativeNewGameWorkspace::focused_label(
+    int width, int height, const TextMeasurer &measure) const {
+  if (focus_ < 0) return {};
+  const auto label_for = [&](std::uint64_t target) -> std::string {
+    if (target >= 200) {
+      const auto index = static_cast<std::size_t>(target - 200);
+      return view_ && index < view_->size_presets.size()
+                 ? view_->size_presets[index].label
+                 : std::string{};
+    }
+    if (target >= 100) {
+      const auto index = static_cast<std::size_t>(target - 100);
+      if (page_ == SandboxPage::GalaxyType)
+        return index < galaxy_card_names.size()
+                   ? tr(galaxy_card_name_keys[index], galaxy_card_names[index])
+                   : std::string{};
+      return view_ && index < view_->species.size()
+                 ? view_->species[index].display_name
+                 : std::string{};
+    }
+    const auto count_label = [&](const auto &choices, int count) {
+      const auto found =
+          std::ranges::find(choices, count, &NativeCivilizationCountOption::count);
+      return found == choices.end() ? tr("SETUP_UNAVAILABLE", "Unavailable")
+                                    : found->label;
+    };
+    switch (target) {
+    case 1:
+      return tr("STARTUP_BACK", "Back");
+    case 2:
+      return page_ == SandboxPage::GalaxyType
+                 ? trf("SETUP_SHAPE",
+                       {population_.morphology ==
+                                stellar::core::GalaxyMorphology::BarredSpiral
+                            ? std::string("Barred Spiral")
+                            : std::string(stellar::core::morphology_name(
+                                  population_.morphology))},
+                       "Shape: {0}")
+                 : tr("SETUP_NEXT", "Next");
+    case 3:
+      return trf("SETUP_POPULATION",
+                 {std::string(stellar::core::population_selection_label(
+                     requested_population_))},
+                 "Population: {0}");
+    case 4:
+      return view_ ? trf("SETUP_RIVALS_LABEL",
+                         {count_label(view_->pre_warp_civilization_presets,
+                                      selected_pre_warp_civilization_count_)},
+                         "Rival empires: {0}")
+                   : tr("SETUP_RIVAL_EMPIRES", "Rival empires");
+    case 5:
+      return view_ ? trf("SETUP_ANCIENTS_LABEL",
+                         {count_label(view_->ancient_civilization_presets,
+                                      selected_ancient_civilization_count_)},
+                         "Ancient empires: {0}")
+                   : tr("SETUP_ANCIENT_EMPIRES", "Ancient empires");
+    case 6:
+      return tr("SETUP_DEV_NORMAL_RESEARCH", "All normal research completed");
+    case 7:
+      return tr("SETUP_DEV_SPECIAL_RESEARCH", "Include special research");
+    case 8:
+      return tr("SETUP_DEV_COVERAGE", "Full celestial coverage");
+    case 9:
+      return tr("SETUP_DEV_EXPLORATION", "Entire galaxy explored and surveyed");
+    case 10:
+      return tr("SETUP_SEED_LABEL", "Galaxy seed");
+    case 11:
+      return tr("SETUP_RANDOMIZE", "Randomize");
+    case 12:
+      return tr("SETUP_RESTORE_DEFAULTS", "Restore defaults");
+    case 13:
+      return tr("SETUP_COPY", "Copy setup");
+    case 14:
+      return tr("SETUP_CREATE", "Create campaign");
+    default:
+      return {};
+    }
+  };
+  const auto items =
+      page_ == SandboxPage::Configuration
+          ? configuration_focusables(measure_layout(width, height, measure))
+          : galaxy_focusables(GalaxyChoiceLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(items.size())
+             ? label_for(items[static_cast<std::size_t>(focus_)].target)
+             : std::string{};
+}
+
+std::optional<stellar::native_map::UiRect>
+NativeNewGameWorkspace::focused_bounds(int width, int height,
+                                       const TextMeasurer &measure) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto items =
+      page_ == SandboxPage::Configuration
+          ? configuration_focusables(measure_layout(width, height, measure))
+          : galaxy_focusables(GalaxyChoiceLayout::for_viewport(width, height));
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].rect}
+             : std::nullopt;
+}
+
+stellar::engine::AnnouncementControl
+NativeNewGameWorkspace::focused_control(int width, int height,
+                                        const TextMeasurer &measure) const {
+  if (page_ != SandboxPage::Configuration)
+    return stellar::engine::AnnouncementControl::Custom;
+  const auto bounds = focused_bounds(width, height, measure);
+  const auto seed = measure_layout(width, height, measure).base.seed_input;
+  return bounds && bounds->x == seed.x && bounds->y == seed.y &&
+                 bounds->width == seed.width && bounds->height == seed.height
+             ? stellar::engine::AnnouncementControl::Edit
+             : stellar::engine::AnnouncementControl::Custom;
+}
+std::optional<stellar::engine::AnnouncementValue>
+NativeNewGameWorkspace::focused_value(int width, int height,
+                                      const TextMeasurer &measure) const {
+  if (focused_control(width, height, measure) !=
+      stellar::engine::AnnouncementControl::Edit)
+    return std::nullopt;
+  // Read-only: seeds apply through the SeedEdited intent, not direct writes.
+  return stellar::engine::AnnouncementValue{seed_text_, false};
 }
 
 } // namespace stellar::native_setup_ui

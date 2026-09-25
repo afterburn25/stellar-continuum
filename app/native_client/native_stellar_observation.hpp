@@ -1,4 +1,5 @@
 #pragma once
+#include "native_ui_layout.hpp"
 #include <stellar/core/fresh_campaign.hpp>
 #include <algorithm>
 #include <optional>
@@ -47,7 +48,8 @@ inline std::optional<ObservedStellarArtwork> observed_stellar_artwork(
 // This presentation scale never changes its authoritative mass or physics.
 inline float central_black_hole_map_radius(
     double exclusion_radius, double pixels_per_world, int width, int height) {
-  const double ui_scale = std::clamp(height / 1080., .67, 2.);
+  const double ui_scale = std::clamp(height / 1080. *
+      static_cast<double>(native_map::NativeUiLayout::user_scale()), .67, 2.);
   const double maximum = .34 * std::min(width, height);
   return static_cast<float>(std::clamp(exclusion_radius * pixels_per_world * .9,
       std::min(55. * ui_scale, maximum), maximum));

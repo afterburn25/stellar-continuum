@@ -8,6 +8,8 @@
 #include "stellar/core/fleet_state.hpp"
 #include "stellar/core/fresh_campaign.hpp"
 #include "stellar/engine/native_map_platform.hpp"
+#include "stellar/engine/localization.hpp"
+#include "stellar/engine/ui_viewmodels.hpp"
 #include "native_settlement_mission_controller.hpp"
 
 namespace stellar::native_missions {
@@ -35,7 +37,8 @@ struct NativeMissionBoard {
 };
 
 [[nodiscard]] NativeMissionBoard
-build_mission_board(const core::FreshCampaignState &campaign);
+build_mission_board(const core::FreshCampaignState &campaign,
+                    const engine::LocalizationTable *locale = nullptr);
 
 [[nodiscard]] std::string_view
 mission_phase_label(NativeMissionPhase phase) noexcept;
@@ -55,7 +58,8 @@ struct NativeColonySiteSelection {
 
 [[nodiscard]] NativeColonySiteSelection colony_site_selection(
     std::span<const native_colony::NativeSettlementMissionView> fleets,
-    int requested_fleet_index, int requested_site_index);
+    int requested_fleet_index, int requested_site_index,
+    const engine::LocalizationTable *locale = nullptr);
 
 // Reference UiOwnedColonies card row (bounded fields — the full snapshot
 // stays inside the colony workspace once the card's View action opens it).
@@ -71,7 +75,8 @@ struct NativeMissionColonyRow {
 };
 
 [[nodiscard]] std::vector<NativeMissionColonyRow>
-build_owned_colony_rows(const core::FreshCampaignState &campaign);
+build_owned_colony_rows(const core::FreshCampaignState &campaign,
+                        const engine::LocalizationTable *locale = nullptr);
 
 // Reference FindAvailableFreighter: the lowest-id idle player bulk freighter
 // stationed at one of the player's developed colonies.
@@ -86,6 +91,9 @@ struct MissionLayout {
   native_map::UiRect previous_fleet, next_fleet, previous_site, next_site,
       select_ship;
   native_map::UiRect details, action_status;
+  // Clips the scrolled mission-card / colony-row region: rows are translated
+  // by -scroll_offset and only the intersecting band is drawn or focusable.
+  native_map::UiRect list_viewport{};
   std::vector<native_map::UiRect> cards;
   std::vector<native_map::UiRect> colony_rows, colony_view_buttons,
       colony_land_buttons, colony_collect_buttons;
@@ -95,7 +103,7 @@ struct MissionLayout {
 mission_layout_for(const NativeMissionBoard &board,
                    const NativeColonySiteSelection &selection,
                    std::size_t colony_rows, int width, int height,
-                   bool show_sites);
+                   bool show_sites, float scroll_offset = 0.f);
 
 enum class MissionViewCommandKind {
   None, Close, FocusFleet, OpenColony, LandColony, CollectOutpostFreight
@@ -107,14 +115,55 @@ struct MissionViewCommand {
   int fleet_id{-1}, colony_id{-1};
 };
 
+// A focusable control inside the panel — actionable buttons only (disabled
+// pagers and display-only mission cards never join the ring), (y,x) ordered.
+struct MissionFocusTarget {
+  native_map::UiRect bounds;
+  std::string label;
+  // Unclipped (already scroll-translated) bounds for focus-follow snapping;
+  // set when the target is clipped to the scroll viewport.
+  std::optional<native_map::UiRect> unclipped;
+};
+
+[[nodiscard]] std::vector<MissionFocusTarget> mission_focus_targets(
+    const MissionLayout &layout, const NativeColonySiteSelection &selection,
+    bool show_sites, std::span<const NativeMissionColonyRow> colonies,
+    const stellar::engine::LocalizationTable *locale);
+
 // Toggleable MISSIONS & SETTLEMENT panel (reference ExplorationMissionPanel's
 // missions tab). Mission cards are display-only, matching the reference.
 class NativeMissionView final {
  public:
   [[nodiscard]] bool visible() const noexcept { return visible_; }
-  void open() noexcept { visible_ = true; }
-  void close() noexcept { visible_ = false; }
-  void toggle() noexcept { visible_ = !visible_; }
+  void open() noexcept { visible_ = true; focus_ = -1; scroll_ = {}; }
+  void close() noexcept { visible_ = false; focus_ = -1; }
+  void toggle() noexcept {
+    visible_ = !visible_;
+    focus_ = -1;
+    if (visible_) scroll_ = {};
+  }
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
+
+  // Keyboard focus contract: -1 until a nav key arms the ring; the label and
+  // bounds of the ringed control feed the accessibility announcer.
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Current list scroll offset — the sites/missions lists share one view.
+  [[nodiscard]] float scroll_offset() const noexcept {
+    return scroll_.scroll_offset;
+  }
+  [[nodiscard]] std::string focused_label(
+      const NativeMissionBoard &board,
+      std::span<const native_colony::NativeSettlementMissionView> fleets,
+      std::span<const NativeMissionColonyRow> colonies, int width,
+      int height) const;
+  [[nodiscard]] std::optional<native_map::UiRect> focused_bounds(
+      const NativeMissionBoard &board,
+      std::span<const native_colony::NativeSettlementMissionView> fleets,
+      std::span<const NativeMissionColonyRow> colonies, int width,
+      int height) const;
 
   [[nodiscard]] MissionViewCommand handle(
       const native_map::InputEvent &event, const NativeMissionBoard &board,
@@ -129,6 +178,11 @@ class NativeMissionView final {
  private:
   bool visible_{}, show_sites_{};
   int fleet_index_{}, site_index_{};
+  int focus_{-1};
+  // Scrolls whichever list the active tab shows (mission cards or colony
+  // rows); reset when the panel or the tab changes.
+  stellar::engine::ScrollView scroll_{};
+  const stellar::engine::LocalizationTable *locale_{};
 };
 
 }  // namespace stellar::native_missions

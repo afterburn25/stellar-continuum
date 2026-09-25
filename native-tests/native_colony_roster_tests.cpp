@@ -1,6 +1,7 @@
 #include "native_colony_roster.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <ranges>
@@ -291,6 +292,216 @@ void cancellation_and_compact_hover_are_bounded() {
   require(population_heading && hover_outline,
           "compact roster did not expose population or row hover feedback");
 }
+
+void column_sort_orders_rows() {
+  constexpr int width = 1920, height = 1080;
+  RosterWorkspace workspace;
+  workspace.set_view(build(world(40), 4));
+  workspace.open();
+  const auto layout = RosterLayout::for_viewport(width, height);
+  const auto open_row = [&](std::size_t index) {
+    const auto box = workspace.row_button(static_cast<int>(index), width, height);
+    (void)workspace.handle({InputEventType::LeftPressed, center(box)}, width,
+                           height);
+    return workspace
+        .handle({InputEventType::LeftReleased, center(box)}, width, height)
+        .open_colony_id;
+  };
+  require(open_row(0) && *open_row(0) == 1,
+          "default roster order did not start at the first colony");
+  const auto click_header = [&](Point position) {
+    (void)workspace.handle({InputEventType::LeftPressed, position}, width,
+                           height);
+    (void)workspace.handle({InputEventType::LeftReleased, position}, width,
+                           height);
+  };
+  const Point name_header{layout.list.x + 8.f * layout.scale + 4.f,
+                          layout.list.y - 14.f * layout.scale};
+  click_header(name_header);
+  const auto ascending_first = open_row(0);
+  click_header(name_header);
+  const auto descending_first = open_row(0);
+  require(ascending_first && descending_first &&
+              *ascending_first != *descending_first,
+          "column sort did not reorder roster rows");
+  const Point population_header{
+      layout.list.x + layout.list.width * .79f + 4.f,
+      layout.list.y - 14.f * layout.scale};
+  click_header(population_header);
+  click_header(population_header); // second click: descending
+  const auto largest = open_row(0);
+  require(largest && *largest == 40,
+          "descending population sort did not lead with the largest colony");
+  DrawList draw;
+  workspace.render(draw, width, height);
+  const bool sorted_marker = std::ranges::any_of(draw.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value == "POPULATION / ACTION v";
+  });
+  require(sorted_marker, "sorted column header did not show direction");
+}
+
+void search_filters_rows() {
+  constexpr int width = 1920, height = 1080;
+  RosterWorkspace workspace;
+  workspace.set_view(build(world(40), 4));
+  workspace.open();
+  const auto layout = RosterLayout::for_viewport(width, height);
+  const auto open_row = [&](std::size_t index) {
+    const auto box = workspace.row_button(static_cast<int>(index), width, height);
+    (void)workspace.handle({InputEventType::LeftPressed, center(box)}, width,
+                           height);
+    return workspace
+        .handle({InputEventType::LeftReleased, center(box)}, width, height)
+        .open_colony_id;
+  };
+  require(!workspace.wants_text_input(), "unfocused roster requested text input");
+  (void)workspace.handle({InputEventType::LeftPressed, center(layout.search)},
+                         width, height);
+  (void)workspace.handle({InputEventType::LeftReleased, center(layout.search)},
+                         width, height);
+  require(workspace.wants_text_input(), "search field did not take text focus");
+  // "Colony 9" is a contained-needle unique to "Terra Colony 9".
+  for (const char ch : std::string_view{"Colony 9"})
+    (void)workspace.handle(
+        {InputEventType::TextEntered, {}, {}, 0.f, std::string(1, ch)}, width,
+        height);
+  require(workspace.row_button(0, width, height).height > 0 &&
+              workspace.row_button(1, width, height).height == 0,
+          "search did not narrow the roster to one row");
+  const auto opened = open_row(0);
+  require(opened && *opened == 9, "filtered row opened the wrong colony");
+  // The filter survives a live refresh, like the column sort does.
+  workspace.set_view(build(world(40), 4));
+  require(workspace.row_button(1, width, height).height == 0,
+          "live refresh dropped the active filter");
+  // Escape blurs the field instead of closing the workspace (the row
+  // click above dropped focus, so focus the field first).
+  (void)workspace.handle({InputEventType::LeftPressed, center(layout.search)},
+                         width, height);
+  (void)workspace.handle({InputEventType::LeftReleased, center(layout.search)},
+                         width, height);
+  require(workspace.wants_text_input(), "refocus did not retake text input");
+  (void)workspace.handle({InputEventType::EscapePressed}, width, height);
+  require(workspace.visible() && !workspace.wants_text_input(),
+          "escape closed the workspace instead of blurring search");
+  // Refocus and clear the needle — the full list returns.
+  (void)workspace.handle({InputEventType::LeftPressed, center(layout.search)},
+                         width, height);
+  (void)workspace.handle({InputEventType::LeftReleased, center(layout.search)},
+                         width, height);
+  for (int i = 0; i < 8; ++i)
+    (void)workspace.handle({InputEventType::BackspacePressed}, width, height);
+  require(workspace.row_button(39, width, height).height > 0,
+          "clearing the search did not restore the full roster");
+}
+
+void keyboard_focus_rings_controls_and_activates_rows() {
+  // Keyboard-focus contract: Tab/arrows ring every actionable rect in
+  // (y,x) order — search, refresh, close, the sort headers and each
+  // visible row — Home/End jump to the ends, Return/Space replay the
+  // matched press/release pair through the same dispatch, and pointer
+  // presses reset the ring. The search field owns the keyboard while
+  // editing; Tab/Return commit out of it.
+  constexpr int width = 1280, height = 720;
+  RosterWorkspace workspace;
+  workspace.set_view(build(world(6), 4));
+  workspace.open();
+  const auto layout = RosterLayout::for_viewport(width, height);
+  const auto key = [&](std::uint32_t code, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = code;
+    event.shift = shift;
+    return workspace.handle(event, width, height);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kDown = 0x40000051u, kUp = 0x40000052u;
+  constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+  constexpr std::uint32_t kF5 = 0x4000003fu;
+  // Header row x-sorted: search, refresh, close — then the three sort
+  // headers, then visible rows.
+  require(workspace.focus() < 0, "focus ring present before any key");
+  require(workspace.focused_label(width, height).empty(),
+          "unfocused roster returned a label");
+  require(key(kTab).captured && workspace.focus() == 0,
+          "Tab did not focus the search field");
+  require(workspace.focused_label(width, height) == "Search colonies",
+          "focused label did not name the search field");
+  require(workspace.focused_control(width, height) ==
+              stellar::engine::AnnouncementControl::Edit,
+          "search field did not classify as an edit control");
+  // The value pattern reports the field's text and accepts writes.
+  const auto search_value = workspace.focused_value(width, height);
+  require(search_value.has_value() && search_value->text.empty() &&
+              search_value->writable,
+          "search field did not report an empty writable value");
+  require(workspace.set_focused_text("Terra", width, height) &&
+              workspace.focused_value(width, height)->text == "Terra",
+          "set_focused_text did not update the search field");
+  require(workspace.set_focused_text("", width, height),
+          "set_focused_text did not clear the search field");
+  require(key(kDown).captured && workspace.focus() == 1,
+          "Down did not advance the ring");
+  require(workspace.focused_control(width, height) ==
+              stellar::engine::AnnouncementControl::Custom,
+          "non-text control did not classify as custom");
+  require(!workspace.focused_value(width, height).has_value() &&
+              !workspace.set_focused_text("x", width, height),
+          "non-edit control answered the value pattern");
+  require(key(kUp).captured && workspace.focus() == 0,
+          "Up did not walk back");
+  require(key(kEnd).captured && workspace.focus() > 5,
+          "End did not land on a row");
+  require(workspace.focused_label(width, height).starts_with("Terra Colony"),
+          "focused label did not name the roster row");
+  const int last = workspace.focus();
+  require(key(kHome).captured && workspace.focus() == 0,
+          "Home did not return to the head");
+  require(key(kTab, true).captured && workspace.focus() == last,
+          "Shift+Tab did not wrap to the last control");
+  require(!key(kF5).captured, "unrelated key was captured");
+  // The ring renders over the focused control.
+  {
+    DrawList draw;
+    workspace.render(draw, width, height);
+    const auto *ring = std::get_if<StrokedRectangle>(&draw.overlay.back());
+    require(ring && ring->color.r == 108 && ring->color.g == 218,
+            "focused roster control rendered no ring");
+  }
+  // Return on a row replays the matched press/release and opens the colony.
+  // At 720p the roster is compact: one sort header, so the first visible
+  // row is focus index 4.
+  (void)key(kHome);
+  while (workspace.focus() < 4)
+    (void)key(kDown);
+  const auto opened = key(kReturn);
+  require(opened.open_colony_id && *opened.open_colony_id == 1 &&
+              opened.captured,
+          "Return on a roster row did not open the colony");
+  // The sort header sorts through the same dispatch.
+  while (workspace.focus() > 3)
+    (void)key(kUp);
+  require(workspace.focus() == 3, "ring did not reach the sort header");
+  auto command = key(kSpace);
+  require(command.captured && !command.open_colony_id,
+          "sort header activation issued a command");
+  require(workspace.focus() == 3,
+          "sort activation did not keep the ring");
+  // The search field enters edit mode on activation and owns its keys.
+  (void)key(kHome);
+  command = key(kReturn);
+  require(command.captured && workspace.wants_text_input(),
+          "Return on search did not enter edit mode");
+  require(key(kDown).captured && workspace.focus() == 0,
+          "editing search leaked a key to the ring");
+  require(key(kTab).captured && !workspace.wants_text_input(),
+          "Tab did not commit out of search editing");
+  // A pointer press hands ownership back to the pointer.
+  (void)workspace.handle(
+      {InputEventType::LeftPressed, center(layout.panel)}, width, height);
+  require(workspace.focus() < 0, "pointer press did not clear the ring");
+}
 } // namespace
 
 int main() {
@@ -301,6 +512,9 @@ int main() {
     press_lifecycle_and_clipping_are_strict();
     live_refresh_preserves_scroll_but_invalidates_press();
     cancellation_and_compact_hover_are_bounded();
+    column_sort_orders_rows();
+    search_filters_rows();
+    keyboard_focus_rings_controls_and_activates_rows();
     std::cout << "native colony roster tests passed\n";
     return 0;
   } catch (const std::exception &error) {

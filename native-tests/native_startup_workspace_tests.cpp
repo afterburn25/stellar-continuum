@@ -87,6 +87,49 @@ void continue_and_development(){
 }
 }
 namespace {
+void keyboard_focus_traversal(){
+  NativeStartupWorkspace ui;ui.set_setup(setup());int cues=0;
+  ui.set_hover_callback([&]{++cues;});
+  const auto key=[&](std::uint32_t k,bool shift=false){
+    InputEvent e{};e.type=InputEventType::KeyPressed;e.key=k;e.shift=shift;
+    return ui.handle(e,1280,720,measure);};
+  constexpr std::uint32_t kTab=9u,kReturn=13u,kHome=0x4000004au,kEnd=0x4000004du;
+  require(ui.focused()<0,"startup workspace began focused");
+  require(ui.focused_label(1280,720).empty(),"unfocused workspace reported a label");
+  require(key(kTab).captured&&ui.focused()==0&&cues==1,"Tab did not focus New Game");
+  require(ui.focused_label(1280,720)=="New Game","New Game label mismatch");
+  require(key(kTab).captured&&ui.focused()==1,"Tab did not reach Load");
+  require(ui.focused_label(1280,720)=="Load saved campaign","Load label mismatch");
+  require(key(kEnd).captured&&ui.focused()==4,"End did not reach Exit");
+  require(ui.focused_label(1280,720)=="Exit to Windows","Exit label mismatch");
+  require(key(kTab).captured&&ui.focused()==0,"focus did not wrap to New Game");
+  require(key(kTab,true).captured&&ui.focused()==4,"Shift+Tab did not wrap to Exit");
+  require(key(kHome).captured&&ui.focused()==0,"Home did not focus New Game");
+  require(key(kReturn).kind==StartupIntentKind::OpenModeSelection&&ui.screen()==StartupScreen::ModeSelection,
+          "Return on New Game did not open mode selection");
+  require(ui.focused()<0,"mode transition kept a stale focus index");
+  require(key(kTab).captured&&ui.focused()==0,"Mode Selection Tab did not focus Sandbox");
+  require(key(kReturn).kind==StartupIntentKind::OpenSetup&&ui.screen()==StartupScreen::Setup,
+          "Return on Sandbox did not open setup");
+  (void)ui.handle({InputEventType::EscapePressed},1280,720,measure);
+  require(ui.screen()==StartupScreen::ModeSelection,"setup cancel did not return to mode selection");
+  require(key(kTab).captured&&key(kTab).captured&&ui.focused()==1,
+          "Mode Selection Tab did not reach Back");
+  require(key(kReturn).kind==StartupIntentKind::Back&&ui.screen()==StartupScreen::Entry,
+          "Return on Back did not restore the entry screen");
+  // Development screen: focused primary routes the diagnostics copy.
+  for(int i=0;i<4;++i)(void)key(kTab);
+  require(ui.focused()==3,"Tab chain did not reach Development");
+  require(key(kReturn).kind==StartupIntentKind::None&&ui.screen()==StartupScreen::Development,
+          "Return on Development did not open the diagnostics screen");
+  require(key(kTab).captured&&ui.focused()==0,"Development Tab did not focus the copy button");
+  require(ui.focused_label(1280,720)=="Copy system info","Development primary label mismatch");
+  require(key(kReturn).kind==StartupIntentKind::CopyDiagnostics,
+          "Return on the copy button did not route diagnostics");
+  require(key(kTab).captured&&ui.focused()==1,"Development Tab did not reach Back");
+  require(key(kReturn).kind==StartupIntentKind::Back&&ui.screen()==StartupScreen::Entry,
+          "Development Back did not restore the entry screen");
+}
 void menu_hover_feedback(){
   for(const auto [w,h]:{std::pair{1280,720},std::pair{1920,1080}}){
     NativeStartupWorkspace ui;ui.set_setup(setup());int cues=0;
@@ -120,7 +163,204 @@ void menu_hover_feedback(){
     child=false;hub.close();hub.open();
     (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[4])},w,h);
     (void)hub.handle({InputEventType::PointerMove,hp},w,h);require(cues==7,"Controls help text played hover audio");
+    // Keyboard focus: Tab/arrows ring the buttons, Return/Space activate.
+    auto key=[&](std::uint32_t k,bool shift=false){
+      InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=k;ev.shift=shift;
+      return hub.handle(ev,w,h);};
+    hub.close();hub.open();require(hub.focused()<0,"hub opened with stale focus");
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    require(hub.focused_label().empty(),"unfocused hub reported a label");
+    require(key(kTab),"Tab was not consumed by the settings hub");
+    require(hub.focused()==0,"Tab did not focus the first category");
+    require(hub.focused_label()=="General","focused_label did not name the General category");
+    require(cues==8,"focus change did not play the hover cue");
+    require(key(kTab)&&hub.focused()==1&&cues==9,"second Tab did not advance focus");
+    require(hub.focused_label()=="Audio","focused_label did not name the Audio category");
+    require(key(kTab,true)&&hub.focused()==0,"Shift+Tab did not move focus back");
+    require(key(kDown)&&hub.focused()==1&&key(kRight)&&hub.focused()==2,"arrow keys did not advance focus");
+    require(key(kUp)&&hub.focused()==1&&key(kLeft)&&hub.focused()==0,"arrow keys did not retreat focus");
+    require(key(kTab,true)&&hub.focused()==5,"Shift+Tab did not wrap focus to Back");
+    require(hub.focused_label()=="Back","focused_label did not name the Back control");
+    require(key(kReturn),"Return on focused Back was not consumed");
+    require(!hub.visible(),"Return on focused Back did not close the hub");
+    hub.open();require(key(kTab)&&key(kSpace),"keyboard activation sequence failed");
+    require(child,"Space on a focused category did not open it");child=false;
+    require(hub.focused()==0,"activated category did not retain focus");
+    // The Controls help view exposes Back as its only focusable; leaving it
+    // lands back on the Controls category that invoked it.
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[4])},w,h);
+    require(key(kTab)&&hub.focused()==0&&hub.focused_label()=="Back","Controls view did not focus Back");
+    require(key(kReturn)&&hub.focused()==4,"Controls Back did not restore focus to its invoker");
+    require(hub.focused_label()=="Controls","focused_label did not name the Controls category");
+    require(key(kTab)&&hub.focused()==5,"focus did not resume on the category list");
+    // Pointer clicks take over from the focus ring.
+    (void)hub.handle({InputEventType::LeftPressed,center(hub_layout.categories[0])},w,h);child=false;
+    require(hub.focused()<0,"pointer activation did not clear keyboard focus");
+    hub.close();hub.open();require(key(kTab)&&hub.focused()==0,"focus restart failed");
+    (void)hub.handle({InputEventType::LeftPressed,{1,1}},w,h);
+    require(hub.focused()<0&&key(kReturn)&&hub.focused()<0,"activation ran without focus");
+  }
+  // Controls view with a live InputMapper: bindable rows ring, activation
+  // captures the next keypress as the primary binding (alternates survive),
+  // the persist callback fires, and Escape/click cancel capture.
+  {
+    const int w=1280,h=720;
+    stellar::engine::InputMapper mapper;
+    std::string mapper_error;
+    require(mapper.load_contexts(R"json({"contexts":[{"name":"GALAXY","exclusive":false,"actions":[
+      {"name":"toggle_pause","type":"Button","bindings":[{"kind":"KeyPress","code":32},{"kind":"KeyPress","code":112}]},
+      {"name":"quicksave","type":"Button","bindings":[{"kind":"KeyPress","code":1073741887}]},
+      {"name":"zoom","type":"Axis1D","bindings":[{"kind":"MouseWheel","scale":0.1}]}]}]})json",&mapper_error),mapper_error.c_str());
+    mapper.push_context("GALAXY");
+    stellar::native_settings::NativeSettingsHub hub;
+    hub.set_input_mapper(&mapper);
+    int persists=0;hub.set_bindings_persist([&]{++persists;});
+    hub.open();
+    const auto l=stellar::native_settings::HubLayout::for_viewport(w,h);
+    // Enter Controls: click the Controls category.
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    constexpr std::uint32_t kTab=9u,kReturn=13u;
+    auto key=[&](std::uint32_t k){
+      InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=k;return hub.handle(ev,w,h);};
+    // Ring: Button rows (Axis1D excluded) then Back — 2 actions + Back = 3.
+    require(key(kTab)&&hub.focused()==0,"Controls row 0 did not focus");
+    require(hub.focused_label()=="Toggle pause: Space, P","row label did not name action and bindings");
+    require(key(kTab)&&hub.focused_label()=="Quicksave: F6","row label did not describe the F6 binding");
+    require(key(kTab)&&hub.focused()==2&&hub.focused_label()=="Back","Controls Back did not focus last");
+    // Activate row 0 → capture; a keypress rebinds the primary binding.
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    (void)key(kTab);(void)key(kReturn); // capture row 0
+    require(hub.focused_label()=="Press a key or button for Toggle pause","capture label did not prompt");
+    InputEvent rebind{};rebind.type=InputEventType::KeyPressed;rebind.key='x';
+    require(hub.handle(rebind,w,h),"capture keypress not consumed");
+    const auto bound=mapper.bindings("toggle_pause");
+    require(bound.size()==2&&bound[0].code=='x'&&bound[1].code==112,
+            "rebind replaced the primary binding and kept the alternate");
+    require(persists==1,"persist callback did not fire after rebind");
+    require(hub.focused_label()=="Toggle pause: X, P","label did not reflect the rebound key");
+    // Chord capture: Ctrl+click-capture quicksave, then Ctrl+Q.
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    (void)key(kTab);(void)key(kTab);(void)key(kReturn); // capture row 1
+    InputEvent chord{};chord.type=InputEventType::KeyPressed;chord.key='q';chord.control=true;
+    (void)hub.handle(chord,w,h);
+    const auto save_keys=mapper.bindings("quicksave");
+    require(save_keys.size()==1&&save_keys[0].code=='q'&&save_keys[0].chord_keys.size()==1,
+            "Ctrl+key did not capture as a chorded binding");
+    // Escape during capture cancels without rebinding (focus stayed on row 1;
+    // Shift+Tab retreats to row 0, Return captures it).
+    InputEvent back_tab{};back_tab.type=InputEventType::KeyPressed;back_tab.key=kTab;back_tab.shift=true;
+    require(hub.handle(back_tab,w,h)&&hub.focused()==0&&key(kReturn),"capture restart failed");
+    InputEvent escape{};escape.type=InputEventType::EscapePressed;
+    require(hub.handle(escape,w,h)&&mapper.bindings("toggle_pause")[0].code=='x',
+            "Escape did not cancel capture cleanly");
+    // A pointer click during capture cancels without rebinding.
+    require(key(kReturn),"second capture did not start");
+    (void)hub.handle({InputEventType::LeftPressed,{1,1}},w,h);
+    require(mapper.bindings("toggle_pause")[0].code=='x',"click did not cancel capture");
+    // Conflict steal: binding a key already bound elsewhere strips it from
+    // the other action and raises a one-shot notice for the announcer.
+    (void)key(kTab);(void)key(kReturn); // capture quicksave (row 1)
+    InputEvent steal{};steal.type=InputEventType::KeyPressed;steal.key='x';
+    (void)hub.handle(steal,w,h);
+    const auto pause_keys=mapper.bindings("toggle_pause");
+    require(pause_keys.size()==1&&pause_keys[0].code==112,
+            "conflicting key was not stripped from the sibling action");
+    require(mapper.bindings("quicksave")[0].code=='x',"steal did not bind the captured key");
+    require(hub.take_notice()=="Rebound — removed from Toggle pause","steal notice missing");
+    require(hub.take_notice().empty(),"notice did not drain once");
+    // Right-click and gamepad buttons are capturable triggers too.
+    (void)key(kReturn); // capture quicksave (still focused)
+    InputEvent right{};right.type=InputEventType::RightPressed;
+    (void)hub.handle(right,w,h);
+    require(mapper.bindings("quicksave")[0].kind==stellar::engine::RawInputEvent::Kind::MouseButton&&
+            mapper.bindings("quicksave")[0].code==3,"right-click did not capture as Mouse 3");
+    (void)key(kReturn);
+    InputEvent pad{};pad.type=InputEventType::GamepadPressed;pad.gamepad_button=7;
+    (void)hub.handle(pad,w,h);
+    require(mapper.bindings("quicksave")[0].kind==stellar::engine::RawInputEvent::Kind::GamepadButton&&
+            mapper.bindings("quicksave")[0].code==7,"pad button did not capture");
+    require(hub.focused_label()=="Quicksave: Pad 7","label did not describe the pad binding");
+    // Device pinning: D on the focused row cycles the pad slot on the
+    // row's gamepad-kind bindings (any → pad 1..4 → any), persists, and
+    // announces through the notice channel. Non-pad rows are unaffected.
+    const auto pad_row=mapper.bindings("quicksave");
+    require(pad_row[0].device<0,"captured pad binding was not a wildcard");
+    const int persists_before_pin=persists;
+    // A connected-pad name lookup makes the pin notice name the hardware.
+    hub.set_pad_name_lookup([](int slot){
+      return slot==0?std::string("Test Pad"):std::string{};});
+    auto dkey=[&]{
+      InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key='d';
+      return hub.handle(ev,w,h);};
+    require(dkey()&&mapper.bindings("quicksave")[0].device==0,"D did not pin the binding to pad 1");
+    require(hub.focused_label()=="Quicksave: Pad 1 Btn 7","label did not show the pinned pad");
+    require(hub.take_notice()=="Pad device: Test Pad","pin notice did not name the pad");
+    require(persists==persists_before_pin+1,"pin did not persist");
+    for(int slot=1;slot<4;++slot)require(dkey()&&mapper.bindings("quicksave")[0].device==slot,
+            "D did not advance the pad pin");
+    require(dkey()&&mapper.bindings("quicksave")[0].device<0,"pin did not wrap back to any-pad");
+    require(hub.take_notice()=="Pad device: any controller","any-pad notice missing");
+    // A key-only row has no pad binding — D is a no-op (no persist/notice).
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    (void)key(kTab); // row 0: toggle_pause binds keys only
+    require(dkey()&&mapper.bindings("toggle_pause")[0].device<0&&persists==persists_before_pin+5,
+            "D moved a pin on a key-only row");
+    require(hub.take_notice().empty(),"key-only row raised a pin notice");
+    // Right-click on a row cycles the pin for pointer users (outside
+    // capture, where RightPressed is a capturable trigger).
+    (void)key(kTab); // quicksave row
+    const auto row_bounds=hub.focused_bounds(w,h);
+    require(row_bounds.has_value(),"focused row had no bounds");
+    InputEvent rclick{};rclick.type=InputEventType::RightPressed;rclick.position=center(*row_bounds);
+    require(hub.handle(rclick,w,h)&&mapper.bindings("quicksave")[0].device==0,
+            "right-click did not pin the row's pad binding");
+    // Pin conflicts: a sibling holding the same trigger on the target pad
+    // (reachable via hand-edited JSON or a later rebind) fires alongside —
+    // the notice names it rather than stripping it.
+    mapper.rebind("toggle_pause",{stellar::engine::InputBinding{
+        stellar::engine::RawInputEvent::Kind::GamepadButton,7,1.f,{},1}});
+    require(dkey()&&mapper.bindings("quicksave")[0].device==1,"D did not pin to pad 2");
+    require(hub.take_notice()=="Pad device: controller 2 — also fires Toggle pause",
+            "pin conflict was not announced");
+    // Axis rows: an axis context contributes Axis1D rows that capture a
+    // stick deflection or wheel scroll — discrete keys are swallowed.
+    require(mapper.load_contexts(R"json({"contexts":[{"name":"GALAXY_PAD","exclusive":false,"actions":[
+      {"name":"map_pan_x","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":0}]},
+      {"name":"map_zoom","type":"Axis1D","bindings":[{"kind":"GamepadAxis","code":3}]}]}]})json",&mapper_error),mapper_error.c_str());
+    mapper.push_context("GALAXY_PAD");
+    hub.set_input_mapper(&mapper,"GALAXY","GALAXY_PAD");
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    // Ring: 2 Button rows + 2 Axis1D rows + Back.
+    (void)key(kTab);(void)key(kTab);(void)key(kTab);
+    require(hub.focused_label()=="Map pan x: Axis 0","axis row label did not name the stick binding");
+    require(key(kTab)&&hub.focused()==3&&hub.focused_label()=="Map zoom: Axis 3","zoom axis row did not focus");
+    require(key(kReturn),"axis row activation did not start capture");
+    require(hub.focused_label()=="Move a stick or scroll for Map zoom","axis capture label did not prompt");
+    // A below-dead-zone deflection and a keypress keep waiting.
+    InputEvent jitter{};jitter.type=InputEventType::GamepadAxis;jitter.gamepad_axis=0;jitter.gamepad_axis_value=0.2f;
+    require(hub.handle(jitter,w,h)&&mapper.bindings("map_zoom")[0].code==3,"jitter deflection rebound the axis");
+    InputEvent stray{};stray.type=InputEventType::KeyPressed;stray.key='z';
+    require(hub.handle(stray,w,h)&&mapper.bindings("map_zoom")[0].code==3,"keypress bound a discrete trigger to an axis row");
+    // A real deflection captures — stealing axis 0 from map_pan_x.
+    InputEvent deflect{};deflect.type=InputEventType::GamepadAxis;deflect.gamepad_axis=0;deflect.gamepad_axis_value=0.9f;
+    require(hub.handle(deflect,w,h),"axis capture was not consumed");
+    require(mapper.bindings("map_zoom")[0].kind==stellar::engine::RawInputEvent::Kind::GamepadAxis&&
+            mapper.bindings("map_zoom")[0].code==0,"stick deflection did not capture as an axis binding");
+    require(mapper.bindings("map_pan_x").empty(),"stolen axis was not stripped from the sibling");
+    require(hub.take_notice()=="Rebound — removed from Map pan x","axis steal notice missing");
+    // Wheel capture on the same row binds MouseWheel.
+    require(key(kReturn),"axis recapture did not start");
+    InputEvent scroll{};scroll.type=InputEventType::Wheel;scroll.wheel_y=1.f;
+    require(hub.handle(scroll,w,h)&&mapper.bindings("map_zoom")[0].kind==stellar::engine::RawInputEvent::Kind::MouseWheel,
+            "wheel scroll did not capture on an axis row");
+    DrawList draw;hub.render(draw,w,h);
   }
 }
 }
-int main()try{menu_hover_feedback();responsive();entry_setup_create();load_and_failure();long_load_list_scrolls();live_campaign_return_lifecycle();continue_and_development();std::cout<<"native startup workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
+int main()try{menu_hover_feedback();keyboard_focus_traversal();responsive();entry_setup_create();load_and_failure();long_load_list_scrolls();live_campaign_return_lifecycle();continue_and_development();std::cout<<"native startup workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}

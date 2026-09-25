@@ -2,8 +2,10 @@
 
 #include "native_research_controller.hpp"
 #include "native_dropdown.hpp"
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <cstddef>
 #include <functional>
@@ -66,7 +68,7 @@ public:
     locale_ = table;
   }
   [[nodiscard]] const stellar::core::AdaptiveResearchPlan& plan()const{return plan_;}
-  void set_view_mode(ResearchViewMode mode){mode_=mode;guided_scroll_=0;}
+  void set_view_mode(ResearchViewMode mode){mode_=mode;guided_scroll_={};}
   [[nodiscard]] ResearchViewMode view_mode()const{return mode_;}
   void set_artwork_resolver(ArtworkResolver resolve);
   void open();
@@ -94,6 +96,23 @@ public:
   card_bounds(std::string_view node_id, int width, int height) const;
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   first_actionable_card(int width, int height) const;
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
+  // UIA control kind of the ringed control — Edit on the search field,
+  // Custom elsewhere.
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(int width, int height) const;
+  // Current text of the ringed Edit — null when focus is elsewhere.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue>
+  focused_value(int width, int height) const;
+  // Applies a platform value SetValue to the ringed Edit — false when the
+  // focus sits on a non-edit control.
+  bool set_focused_text(std::string text, int width, int height);
 
 private:
   struct NodePlacement {
@@ -108,15 +127,26 @@ private:
 
   void rebuild_topology();
   struct GuidedCard{std::string id;stellar::native_map::UiRect bounds;bool recommended{};};
-  struct InterfaceHit{stellar::native_map::UiRect bounds;int action{};std::string id;};
+  struct InterfaceHit{stellar::native_map::UiRect bounds;int action{};std::string id;std::string label;};
   [[nodiscard]] std::vector<GuidedCard> guided_cards(const ResearchWorkspaceLayout&)const;
   void render_dashboard(stellar::native_map::DrawList&,const ResearchWorkspaceLayout&);
   void render_controls(stellar::native_map::DrawList&,const ResearchWorkspaceLayout&);
   std::optional<WorkspaceCommand> handle_controls(const stellar::native_map::InputEvent&,const ResearchWorkspaceLayout&,int,int);
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+    // Set when `bounds` was clipped to a panned/scrolled region: the
+    // translated, unclipped rect plus which lane moves it — 1 guided list,
+    // 2 tree graph — so keyboard focus can snap the row into view.
+    std::optional<stellar::native_map::UiRect> unclipped;
+    int scroll_lane{0};
+  };
+  [[nodiscard]] std::vector<FocusRect>
+  focusables(const ResearchWorkspaceLayout&)const;
   stellar::core::AdaptiveResearchPlan plan_;
   ResearchViewMode mode_{ResearchViewMode::Guided};
   int filter_{},sort_{};bool list_view_{},why_open_{};
-  float guided_scroll_{},active_scroll_{};
+  stellar::engine::ScrollView guided_scroll_{},active_scroll_{};
   std::vector<InterfaceHit> interface_hits_;
   stellar::native_ui::Dropdown dropdown_;
   std::optional<stellar::native_map::UiRect> inspector_content_clip_;
@@ -151,8 +181,8 @@ private:
   std::string topology_signature_;
   std::string notice_;
   bool notice_accepted_{};
-  float inspector_scroll_{};
-  float inspector_scroll_limit_{};
+  stellar::engine::ScrollView inspector_scroll_{};
+  int focus_{-1};
   int inspector_viewport_width_{}, inspector_viewport_height_{};
   TextMeasurer text_measurer_;
   ArtworkResolver artwork_resolver_;

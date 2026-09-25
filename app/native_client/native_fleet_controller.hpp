@@ -5,12 +5,15 @@
 #include <stellar/core/own_combat_fleet_status.hpp>
 
 #include <cstdint>
+#include <initializer_list>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
+
+namespace stellar::engine { class LocalizationTable; }
 
 namespace stellar::native_fleet {
 
@@ -191,11 +194,21 @@ public:
   [[nodiscard]] NativeFleetLocateOutcome locate_selected(
       stellar::core::CampaignFrame &, const NativeFleetLocateQuote &);
   [[nodiscard]] std::optional<int> selection() const;
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
 
 private:
   void require_owner() const;
   void bind_generation(std::uint64_t campaign_generation);
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string trf(std::string_view key,
+                                std::initializer_list<std::string> args,
+                                std::string_view fallback) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
   std::optional<int> selected_fleet_id_;

@@ -2,6 +2,7 @@
 #include <stellar/core/campaign_frame.hpp>
 #include <stellar/core/campaign_calendar.hpp>
 #include <stellar/core/campaign_diagnostics.hpp>
+#include <stellar/core/campaign_world_projection.hpp>
 #include <stellar/core/developer_campaign.hpp>
 #include <stellar/core/developer_celestial_index.hpp>
 #include <stellar/engine/diagnostic_bundle.hpp>
@@ -58,6 +59,22 @@ inline std::vector<Entry> capture_developer_report(stellar::core::CampaignFrame 
     {"systemCount",world.systems.size()},{"simulationDay",day},{"gameDate",format_campaign_date(day)},
     {"tick",tick},{"playerAiControl",dev.player_ai_control},{"forcedCelestialCoverage",dev.full_celestial_coverage},
     {"speed",dev.simulation.speed},{"fixedStrategicDays",.25},{"fixedTacticalSeconds",.1}};
+  // Typed-store bridge census: the read-only projection carries the
+  // whole campaign into engine::World — entity/tag counts and
+  // legacy/parent resolution make the bridge measurable over real
+  // state rather than a mock fixture.
+  const auto projected=campaign_world_projection_census(world);
+  // The projection's container footprint joins the tracked-subsystem
+  // census — memory.json carries it beside the cache reporters.
+  static const auto world_subsystem=stellar::engine::MemoryTracker::instance().register_subsystem("campaign-world-projection");
+  stellar::engine::MemoryTracker::instance().report(world_subsystem,projected.estimated_memory_bytes);
+  metadata["worldProjection"]={{"entities",projected.entities},{"systems",projected.systems},
+    {"bodies",projected.bodies},{"civilizations",projected.civilizations},{"colonies",projected.colonies},
+    {"fleets",projected.fleets},{"economies",projected.economies},{"technologies",projected.technologies},
+    {"construction",projected.construction},{"shipyards",projected.shipyards},
+    {"legacyBound",projected.legacy_bound},
+    {"parented",projected.parented},{"unparented",projected.unparented},
+    {"estimatedMemoryBytes",projected.estimated_memory_bytes}};
   if(world.generation_metadata){const auto &g=*world.generation_metadata;metadata["generatorVersion"]=g.generator_version;
     metadata["galaxyShape"]=g.galaxy_shape;metadata["stellarProfileVersion"]=g.stellar_profile_version.value_or("legacy");}
   if(world.generation_metadata&&world.generation_metadata->configuration){
@@ -71,6 +88,12 @@ inline std::vector<Entry> capture_developer_report(stellar::core::CampaignFrame 
   const auto critical=findings.size();
   auto operations=inspect_campaign_operations(world,tick,day);
   const auto warnings=operations.size();findings.insert(findings.end(),operations.begin(),operations.end());
+  auto diplomatic=inspect_diplomacy_invariants(frame.runtime().diplomacy(),world,tick,day);
+  findings.insert(findings.end(),diplomatic.begin(),diplomatic.end());
+  auto research=inspect_research_invariants(frame.runtime().research(),frame.runtime().research_runtime(),world,tick,day);
+  findings.insert(findings.end(),research.begin(),research.end());
+  auto continuation=inspect_continuation_invariants(frame.runtime(),tick,day);
+  findings.insert(findings.end(),continuation.begin(),continuation.end());
   std::string errors,warning_log,diagnostics;
   for(auto &f:findings){f.real_timestamp=timestamp;const auto line=stellar::engine::diagnostic_record_json(f);diagnostics+=line;
     if(f.severity==stellar::engine::DiagnosticSeverity::Warning)warning_log+=line;else errors+=line;}
@@ -99,7 +122,7 @@ inline std::vector<Entry> capture_developer_report(stellar::core::CampaignFrame 
     {"summary.md","# Developer diagnostic snapshot\n\nDate: "+format_campaign_date(day)+".\n\nInvariant findings: "+std::to_string(critical)+
       ". Operational warnings: "+std::to_string(warnings)+".\n\n"+(checkpoint.empty()?"Current checkpoint unavailable: see checkpoint-error.txt.\n\n":"")+"This is a current-state inspection, not a completed automated soak. Empty logs mean no findings from these checks, not proof that every subsystem is correct.\n"},
     {"README.md","# Stellar Continuum diagnostic bundle\n\n"
-      "- session.json: build, generator, seed, developer configuration and capture time.\n"
+      "- session.json: build, generator, seed, developer configuration, capture time and the typed-store projection census.\n"
       "- latest.dev17.json: current isolated developer checkpoint when encoding succeeds. Includes research and pending simulation state; player loaders reject it. If absent, checkpoint-error.txt explains the failure.\n"
       "- summary.md: result of current-state checks.\n"
       "- diagnostics.jsonl, errors.jsonl, warnings.jsonl: typed current invariant/operational findings; not historical AI decisions.\n"

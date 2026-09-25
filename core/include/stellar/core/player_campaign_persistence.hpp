@@ -4,6 +4,7 @@
 #include <stellar/core/diplomacy_state.hpp>
 #include <stellar/core/galaxy_payload_persistence.hpp>
 #include <stellar/core/integrated_adaptive_campaign.hpp>
+#include <stellar/engine/history.hpp>
 
 #include <functional>
 #include <optional>
@@ -25,7 +26,9 @@ namespace detail {
     AdaptiveResearchStrategicRuntime,
     RestoredGalaxyPayloadV16,
     std::function<AdaptiveResearchCampaignSnapshot()>,
-    const DiplomacyStateSnapshot &, const PlayerCampaignRestoreHooks & = {});
+    const DiplomacyStateSnapshot &,
+    std::optional<engine::EventHistory::State> event_history = std::nullopt,
+    const PlayerCampaignRestoreHooks & = {});
 }
 
 class PlayerCampaignPersistenceDataError final : public std::runtime_error {
@@ -69,6 +72,9 @@ struct PlayerCampaignPayloadV17Dto {
   GalaxyPayloadV16Dto galaxy;
   std::optional<DiplomacyStateSnapshot> diplomacy;
   std::optional<AdaptiveResearchCampaignSnapshot> adaptive_research;
+  // Campaign chronicle (EventHistory records). Absent in saves written
+  // before the chronicle existed; restored runtimes then start empty.
+  std::optional<engine::EventHistory::State> event_history;
 };
 
 class DiplomacyCampaignReferenceValidator final {
@@ -123,7 +129,9 @@ private:
        AdaptiveResearchStrategicRuntime,
        RestoredGalaxyPayloadV16,
        std::function<AdaptiveResearchCampaignSnapshot()>,
-       const DiplomacyStateSnapshot &, const PlayerCampaignRestoreHooks &);
+       const DiplomacyStateSnapshot &,
+       std::optional<engine::EventHistory::State>,
+       const PlayerCampaignRestoreHooks &);
 };
 
 [[nodiscard]] PlayerCampaignPayloadV17Dto capture_player_campaign_v17(

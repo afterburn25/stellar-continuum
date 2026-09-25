@@ -162,7 +162,7 @@ void NativeSystemWorkspace::set_settlement_status(std::optional<NativeSystemSett
   if(relevant)sync_body_inspection();
 }
 void NativeSystemWorkspace::set_notice(std::string value){notice_=std::move(value);}
-void NativeSystemWorkspace::close()noexcept{tracked_body_id_.reset();small_bodies_.clear();small_body_panel_=false;small_body_focus_=false;preparation_.reset();preparation_pressed_=false;celestial_appearance_.cancel_preparation();artwork_ready_=true;body_inspection_.clear();snapshot_.reset();spatial_.reset();viewport_.reset();selected_body_id_.reset();colony_body_id_.reset();clear_travel();dragging_=false;pending_initial_travel_fit_=false;width_=height_=0;}
+void NativeSystemWorkspace::close()noexcept{tracked_body_id_.reset();small_bodies_.clear();small_body_panel_=false;small_body_focus_=false;small_body_ring_=-1;preparation_.reset();preparation_pressed_=false;celestial_appearance_.cancel_preparation();artwork_ready_=true;body_inspection_.clear();snapshot_.reset();spatial_.reset();viewport_.reset();selected_body_id_.reset();colony_body_id_.reset();clear_travel();dragging_=false;pending_initial_travel_fit_=false;width_=height_=0;}
 void NativeSystemWorkspace::discard_campaign()noexcept{close();celestial_appearance_.clear();}
 std::optional<int> NativeSystemWorkspace::system_id()const noexcept{return snapshot_?std::optional<int>{snapshot_->system_id}:std::nullopt;}
 std::optional<std::uint64_t> NativeSystemWorkspace::campaign_generation()const noexcept{return snapshot_?std::optional<std::uint64_t>{snapshot_->campaign_generation}:std::nullopt;}

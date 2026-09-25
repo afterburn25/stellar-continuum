@@ -4,6 +4,7 @@
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/shipbuilding.hpp>
 #include <stellar/core/sovereign_currency.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -36,8 +37,34 @@ void append(std::ostringstream &out, std::string_view value) {
   out << value.size() << ':' << value << ';';
 }
 
+std::string resolve(const stellar::engine::LocalizationTable *locale,
+                    std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+
+std::string resolved(const stellar::engine::LocalizationTable *locale,
+                     std::string_view key,
+                     std::initializer_list<std::string> args,
+                     std::string_view fallback) {
+  if (locale && locale->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
 [[nodiscard]] Projection project(CampaignFrame &frame,
-                                 std::uint64_t generation) {
+                                 std::uint64_t generation,
+                                 const stellar::engine::LocalizationTable *locale) {
   auto &runtime = frame.runtime();
   auto &world = runtime.world().campaign();
   const auto *player = find_one(world.civilizations,
@@ -72,7 +99,9 @@ void append(std::ostringstream &out, std::string_view value) {
   view.player_civilization_id = player->id;
   view.home_system_id = player->home_system_id;
   const auto home=std::ranges::find(world.systems,player->home_system_id,&StellarSystem::id);
-  view.yard_name=(home==world.systems.end()?std::string("Home"):home->name)+" Orbital Shipyard";
+  view.yard_name=resolved(locale,"SHIPYARD_YARD_NAME",
+      {home==world.systems.end()?std::string("Home"):home->name},
+      "{0} Orbital Shipyard");
   view.orbital_shipyard_complete = std::ranges::contains(
       construction->completed_project_ids, std::string("orbital_shipyard"));
   view.currency = sovereign_currency_for_civilization(world.civilizations,
@@ -141,7 +170,7 @@ void append(std::ostringstream &out, std::string_view value) {
     view.orders.push_back(
         {.order_id = std::move(order_id),
          .design_id = std::move(design_id),
-         .design_name = design ? design->name : "Unavailable design",
+         .design_name = design ? design->name : resolve(locale,"SHIPYARD_DESIGN_UNAVAILABLE","Unavailable design"),
          .active = active,
          .progress_fraction = industry_cost <= 0.
                                   ? (active ? 1. : 0.)
@@ -269,6 +298,11 @@ void NativeShipyardController::require_owner() const {
         "Native shipyard control must run on the simulation owner thread.");
 }
 
+std::string NativeShipyardController::tr(std::string_view key,
+                                         std::string_view fallback) const {
+  return resolve(locale_, key, fallback);
+}
+
 NativeShipyardView NativeShipyardController::build(
     CampaignFrame &frame, const std::uint64_t campaign_generation) {
   require_owner();
@@ -282,7 +316,7 @@ NativeShipyardView NativeShipyardController::build(
     projected_player_species_id_.reset();
     projected_view_.reset();
   }
-  auto current = project(frame, campaign_generation);
+  auto current = project(frame, campaign_generation, locale_);
   if (!signature_ || *signature_ != current.signature) {
     if (revision_ == std::numeric_limits<std::uint64_t>::max())
       throw std::overflow_error("Native shipyard revision space is exhausted.");
@@ -302,9 +336,9 @@ NativeShipyardCommandOutcome NativeShipyardController::start(
   require_owner();
   if (!valid_bound_command(campaign_generation, expected_shipyard_revision,
                            generation_, revision_, projected_view_))
-    return {false, "The shipyard changed; refresh it before issuing an order.",
+    return {false, tr("SHIPYARD_MSG_CHANGED", "The shipyard changed; refresh it before issuing an order."),
             0.};
-  const auto current = project(frame, campaign_generation);
+  const auto current = project(frame, campaign_generation, locale_);
   const auto expected = std::ranges::find(
       projected_view_->available_designs, design_id, &NativeShipDesign::id);
   const auto design = std::ranges::find(
@@ -320,12 +354,12 @@ NativeShipyardCommandOutcome NativeShipyardController::start(
       *projected_player_species_id_ != current.player_species_id ||
       !currency_matches(projected_view_->currency, current.view.currency) ||
       !same_authorization_terms(*expected, *design))
-    return {false, "The shipyard changed; refresh it before issuing an order.",
+    return {false, tr("SHIPYARD_MSG_CHANGED", "The shipyard changed; refresh it before issuing an order."),
             0.};
   if (!design->can_start)
     return {false, design->start_blocker.value(), 0.};
   if (!same_admission_selection(*expected, *design))
-    return {false, "The shipyard changed; refresh it before issuing an order.",
+    return {false, tr("SHIPYARD_MSG_CHANGED", "The shipyard changed; refresh it before issuing an order."),
             0.};
   auto &runtime = frame.runtime();
   auto &world = runtime.world().campaign();
@@ -355,20 +389,20 @@ NativeShipyardCommandOutcome NativeShipyardController::cancel(
   require_owner();
   if (!valid_bound_command(campaign_generation, expected_shipyard_revision,
                            generation_, revision_, projected_view_))
-    return {false, "The shipyard changed; refresh it before issuing an order.",
+    return {false, tr("SHIPYARD_MSG_CHANGED", "The shipyard changed; refresh it before issuing an order."),
             0.};
-  const auto current = project(frame, campaign_generation);
+  const auto current = project(frame, campaign_generation, locale_);
   if (projected_view_->player_civilization_id !=
           current.view.player_civilization_id ||
       projected_view_->home_system_id != current.view.home_system_id)
-    return {false, "The shipyard changed; refresh it before issuing an order.",
+    return {false, tr("SHIPYARD_MSG_CHANGED", "The shipyard changed; refresh it before issuing an order."),
             0.};
   const auto order = std::ranges::find(
       current.view.orders, order_id, &NativeShipyardOrder::order_id);
   if (order == current.view.orders.end())
-    return {false, "That shipyard order is no longer pending.", 0.};
+    return {false, tr("SHIPYARD_MSG_ORDER_GONE", "That shipyard order is no longer pending."), 0.};
   if (!signature_ || current.signature != *signature_)
-    return {false, "The shipyard changed; refresh it before issuing an order.",
+    return {false, tr("SHIPYARD_MSG_CHANGED", "The shipyard changed; refresh it before issuing an order."),
             0.};
   auto &runtime = frame.runtime();
   auto &world = runtime.world().campaign();
@@ -392,10 +426,10 @@ NativeShipyardCommandOutcome NativeShipyardController::cancel(
 }
 
 NativeShipyardCommandOutcome NativeShipyardController::reorder(CampaignFrame& frame,std::uint64_t generation,std::uint64_t revision,std::string_view id,int direction){
-  require_owner();if(!valid_bound_command(generation,revision,generation_,revision_,projected_view_))return {false,"The queue changed; review it again."};
-  const auto current=project(frame,generation);
+  require_owner();if(!valid_bound_command(generation,revision,generation_,revision_,projected_view_))return {false,tr("SHIPYARD_MSG_QUEUE_CHANGED","The queue changed; review it again.")};
+  const auto current=project(frame,generation,locale_);
   if(current.view.player_civilization_id!=projected_view_->player_civilization_id||current.view.home_system_id!=projected_view_->home_system_id||
-      !std::ranges::equal(current.view.orders,projected_view_->orders,{},&NativeShipyardOrder::order_id,&NativeShipyardOrder::order_id))return {false,"The queue changed; review it again."};
+      !std::ranges::equal(current.view.orders,projected_view_->orders,{},&NativeShipyardOrder::order_id,&NativeShipyardOrder::order_id))return {false,tr("SHIPYARD_MSG_QUEUE_CHANGED","The queue changed; review it again.")};
   auto& world=frame.runtime().world().campaign();
   ShipbuildingWorld command{world.civilizations,world.systems,world.construction,world.shipyards,world.colonies,world.economies,world.fleets,{},{},{},{}};
   const auto result=move_queued_ship_build(command,current.view.player_civilization_id,id,direction);

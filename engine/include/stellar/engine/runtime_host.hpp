@@ -84,12 +84,47 @@ struct RuntimeHostOptions {
   std::string scene3d_file{"editor/scene3d.json"};
   // Fly-camera move speed in 3D world units/second.
   float fly_speed{4.0f};
+  // Input journaling (CLI: --record <file> / --replay <file>). --record
+  // journals every input event against the frame it arrived on plus a
+  // world-snapshot hash every 30 frames; --replay injects the recorded
+  // stream ahead of live input and verifies each retained checkpoint,
+  // reporting replay_verified/replay_diverged on stderr. Replays are only
+  // deterministic under --fixed-hz — wall-clock stepping makes frame
+  // boundaries nondeterministic.
+  std::filesystem::path record_file;
+  std::filesystem::path replay_file;
+  // --replay-exit: quit once the recorded stream is fully consumed —
+  // exit 0 after replay_verified, exit 1 as soon as a checkpoint
+  // diverges. Without it a replay keeps running like a normal session.
+  bool replay_exit{false};
+  // --replay-until N (requires --replay): dump the canonical world
+  // snapshot to "<replay>.until-N.stw" once journal tick N completes,
+  // then exit 0 — the artifact load_world_from_file can diff against a
+  // reference dump when bisecting where a replay diverges.
+  std::optional<std::uint64_t> replay_until;
+  // --headless: run without a Window or audio device — for CI machines
+  // with no display/GPU. The loop polls a synthetic input snapshot sized
+  // to width/height, skips drawing, and steps the simulation once per
+  // frame (fixed-hz when configured, 1/60 otherwise) so --frames N runs
+  // are deterministic regardless of host speed. With no --frames,
+  // --replay-exit or recorded Escape the loop never exits on its own.
+  // audio() must not be called in a headless run — there is no device;
+  // has_audio() reports whether the accessor is valid.
+  bool headless{false};
+  // --dump-bindings: print the resolved input map (built-in "game"
+  // context plus any --input-map contexts) as
+  // "context <name> / <action> [<type>] <bindings>" lines and exit 0
+  // before the loop. Pair with --headless to skip window creation.
+  bool dump_bindings{false};
 };
 
 // A ready-made windowed 2D game host: owns the Window, package/content
 // resolution, the ECS World, scene-document hot reload, WASD/arrow 'player'
 // input, velocity integration + wall bounce, sprite rendering (cooked BC7 or
-// loose images), audio playback and F5/F9 world quicksave/quickload. Games
+// loose images), audio playback and F5/F9 world quicksave/quickload. Saves
+// record the resolved package load plan in a "<save>.packages.json" sidecar;
+// loads verify it and report missing/version-mismatched packages through
+// RuntimeDiagnostics (report-only — the load still proceeds). Games
 // customize through the callbacks rather than reimplementing the loop — the
 // same role Unreal's GameInstance plays for its projects.
 class RuntimeHost {
@@ -105,8 +140,11 @@ public:
   [[nodiscard]] const ContentResolver &content() const;
   // Valid only while run() is on the stack (i.e. inside callbacks) — the
   // output device is scoped to the SDL loop so it tears down before the
-  // window does.
+  // window does. Null in a headless run — check has_audio() first.
   [[nodiscard]] audio::AudioOutput &audio();
+  // False in a headless run (no SDL audio device) — games that play
+  // sounds from callbacks guard audio() calls with this.
+  [[nodiscard]] bool has_audio() const;
   // The entity named "player" in the active scene, if any.
   [[nodiscard]] std::optional<EntityId> player() const;
   // A tracked entity by its authored scene name — doors, waypoints,
@@ -140,8 +178,20 @@ public:
                             float world_y) const;
   bool set_tile_at(std::size_t map, float world_x, float world_y,
                    int value);
+  // Name overloads resolve through tilemap_index() each call — the right
+  // shape for infrequent queries; hot loops should hoist the index.
+  [[nodiscard]] int tile_at(std::string_view map_name, float world_x,
+                            float world_y) const;
+  bool set_tile_at(std::string_view map_name, float world_x,
+                   float world_y, int value);
   // Number of tilemap layers in the loaded scene.
   [[nodiscard]] std::size_t tilemap_count() const;
+  // Document-order index of the tilemap named in the scene document
+  // (SceneTilemap::name attaches EntityName to the carrier), or nullopt —
+  // feed the result to the indexed tile_at/set_tile_at overloads, or call
+  // their name overloads directly for infrequent queries.
+  [[nodiscard]] std::optional<std::size_t>
+  tilemap_index(std::string_view name) const;
   // Spawns a new tilemap layer at runtime (procedural terrain): creates
   // a dedicated Tilemap-component entity that renders, collides and
   // snapshots like a scene-authored map, appended after the existing
@@ -231,10 +281,20 @@ public:
   // separate from the 2D gameplay list); entities3d_in_radius runs a
   // sphere query (aggro/AoE/pick volumes).
   [[nodiscard]] bool scene3d() const;
+  // 3D counterpart of set_scene — switches the active Scene3dDocument
+  // (project-relative path), respawning the 3D entity set. Before run()
+  // it sets the initial scene.
+  void set_scene3d(std::string file);
   EntityId spawn_entity3d(const Scene3dEntity &entity);
   [[nodiscard]] std::vector<EntityId> entities3d() const;
   [[nodiscard]] std::vector<EntityId>
   entities3d_in_radius(float x, float y, float z, float radius) const;
+  // Axis-aligned box query on center points — half-extents around
+  // (x,y,z); the box counterpart of entities3d_in_radius for trigger
+  // volumes and zone tests.
+  [[nodiscard]] std::vector<EntityId>
+  entities3d_in_box(float x, float y, float z, float half_w,
+                    float half_h, float half_d) const;
   // Fly camera: world position + yaw/pitch degrees (0,0 looks down -Z).
   void set_camera3d(double x, double y, double z, float yaw_deg,
                     float pitch_deg);
@@ -311,6 +371,11 @@ public:
   std::function<void(World &, EntityId, const SceneEntity &)> on_spawn;
   // 3D counterpart — fires per spawned Scene3dEntity (scene3d mode).
   std::function<void(World &, EntityId, const Scene3dEntity &)> on_spawn3d;
+  // Named Timeline events crossed while a scene-authored `anim` clip
+  // advances — door-opened markers, patrol turnarounds. Fires once per
+  // crossing inside the sim step.
+  std::function<void(const std::string &event, EntityId entity)>
+      on_anim_event;
 
   // Owns the SDL loop; returns the process exit code. The argv overload
   // applies `--frames N` / `--fixed-hz N` / `--snapshot-out <path>` /

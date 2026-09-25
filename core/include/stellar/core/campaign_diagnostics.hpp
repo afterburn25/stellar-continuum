@@ -14,6 +14,29 @@ namespace stellar::core {
 [[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
     const FreshCampaignState &,std::uint64_t tick,double simulation_day,
     std::size_t maximum_findings=128);
+// Inspects the persisted diplomatic state — which lives on the campaign
+// runtime, outside FreshCampaignState — against its own snapshot
+// invariant validator and the campaign's entity universe. Read-only.
+[[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> inspect_diplomacy_invariants(
+    const DiplomacyState &, const FreshCampaignState &,
+    std::uint64_t tick, double simulation_day,
+    std::size_t maximum_findings=128);
+// Inspects the adaptive research campaign state — also runtime-held —
+// by capturing its authoritative snapshot codec and replaying the
+// save-path restore validation, plus the campaign-entity refs the
+// codec cannot check alone. Read-only.
+[[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> inspect_research_invariants(
+    const AdaptiveResearchCampaignState &, const AdaptiveResearchStrategicRuntime &,
+    const FreshCampaignState &, std::uint64_t tick, double simulation_day,
+    std::size_t maximum_findings=128);
+// Inspects the runtime's persisted continuation — the strategic
+// coordinator's cached plans and the diplomacy schedule — by capturing
+// `continuation()` and replaying `validate_campaign_runtime_continuation`,
+// the same validator the save/restore path applies. Read-only; the
+// capture is validated, never restored into the runtime.
+[[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> inspect_continuation_invariants(
+    const IntegratedAdaptiveCampaignRuntime &, std::uint64_t tick,
+    double simulation_day, std::size_t maximum_findings=128);
 // Observer adapter of returned canonical events; does not infer fake events
 // from UI state or advance any subsystem.
 [[nodiscard]] std::vector<stellar::engine::DiagnosticRecord> campaign_step_diagnostics(

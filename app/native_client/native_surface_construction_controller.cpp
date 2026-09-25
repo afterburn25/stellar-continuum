@@ -1,6 +1,7 @@
 #include "native_surface_construction_controller.hpp"
 
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -93,15 +94,44 @@ bool live_binding(const Context &current, const int player_id,
   return body && body->system_id == system_id;
 }
 
-NativeSurfaceCommandOutcome stale() {
+std::string resolve(const stellar::engine::LocalizationTable *locale,
+                    std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+
+std::string resolved(const stellar::engine::LocalizationTable *locale,
+                     std::string_view key,
+                     std::initializer_list<std::string> args,
+                     std::string_view fallback) {
+  if (locale && locale->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
+NativeSurfaceCommandOutcome stale(
+    const stellar::engine::LocalizationTable *locale) {
   return {false,
-          "The campaign or surface quote changed; review it before confirming."};
+          resolve(locale, "SURFACE_MSG_QUOTE_CHANGED",
+                  "The campaign or surface quote changed; review it before confirming.")};
 }
 
 std::string placement_preview_message(
-    const SurfaceBuildingPlacementAssessment &assessment) {
-  return "Authorize construction for " + assessment.formatted_authorization +
-         ". Materials are consumed as work progresses.";
+    const SurfaceBuildingPlacementAssessment &assessment,
+    const stellar::engine::LocalizationTable *locale) {
+  return resolved(locale, "SURFACE_PLACEMENT_AUTHORIZE",
+                  {assessment.formatted_authorization},
+                  "Authorize construction for {0}. Materials are consumed as work progresses.");
 }
 
 struct PreviewWorld {
@@ -130,20 +160,23 @@ PreviewWorld preview_world(const Context &current) {
 }
 
 std::string management_action_label(const NativeSurfaceManagementAction action,
-                                    const bool value) {
+                                    const bool value,
+                                    const stellar::engine::LocalizationTable *locale) {
   switch (action) {
   case NativeSurfaceManagementAction::UpgradeBuilding:
-    return "Upgrade building";
+    return resolve(locale, "SURFACE_ACTION_UPGRADE", "Upgrade building");
   case NativeSurfaceManagementAction::RepairBuilding:
-    return "Repair building";
+    return resolve(locale, "SURFACE_ACTION_REPAIR", "Repair building");
   case NativeSurfaceManagementAction::SetEnabled:
-    return value ? "Restart building" : "Shut down building";
+    return value ? resolve(locale, "SURFACE_ACTION_RESTART", "Restart building")
+                 : resolve(locale, "SURFACE_ACTION_SHUTDOWN", "Shut down building");
   case NativeSurfaceManagementAction::SetPriority:
-    return value ? "Prioritize building" : "Set normal priority";
+    return value ? resolve(locale, "SURFACE_ACTION_PRIORITIZE", "Prioritize building")
+                 : resolve(locale, "SURFACE_ACTION_NORMAL", "Set normal priority");
   case NativeSurfaceManagementAction::UpgradeHub:
-    return "Upgrade hub";
+    return resolve(locale, "SURFACE_ACTION_UPGRADE_HUB", "Upgrade hub");
   }
-  return "Manage surface";
+  return resolve(locale, "SURFACE_ACTION_MANAGE", "Manage surface");
 }
 
 bool is_management_action(const NativeSurfaceManagementAction action) {
@@ -175,45 +208,55 @@ std::string formatted_days(const double days) {
 std::string management_description(
     const PreviewWorld &world, const int colony_id,
     const NativeSurfaceManagementAction action, const int building_id,
-    const bool value, const bool accepted) {
-  if (!accepted) return "Confirmation is currently unavailable.";
+    const bool value, const bool accepted,
+    const stellar::engine::LocalizationTable *locale) {
+  const auto unavailable =
+      resolve(locale, "SURFACE_DESC_UNAVAILABLE", "Confirmation is currently unavailable.");
+  if (!accepted) return unavailable;
   const auto *colony = find_one(world.colonies, colony_id, &Colony::id);
-  if (!colony) return "Confirmation is currently unavailable.";
+  if (!colony) return unavailable;
   switch (action) {
   case NativeSurfaceManagementAction::UpgradeBuilding: {
     const auto *building = find_one(colony->surface_buildings, building_id,
                                     &SurfaceBuilding::id);
-    return building
-               ? "Confirmation will start a " +
-                     formatted_days(building->upgrade_days_remaining) +
-                     "-day upgrade; " +
-                     (building->is_enabled
-                          ? "the current facility will remain operational."
-                          : "the current facility will remain shut down.")
-               : "Confirmation will start the building upgrade.";
+    if (!building)
+      return resolve(locale, "SURFACE_DESC_UPGRADE",
+                     "Confirmation will start the building upgrade.");
+    const std::string days = formatted_days(building->upgrade_days_remaining);
+    return building->is_enabled
+               ? resolved(locale, "SURFACE_DESC_UPGRADE_ON", {days},
+                          "Confirmation will start a {0}-day upgrade; the current facility will remain operational.")
+               : resolved(locale, "SURFACE_DESC_UPGRADE_OFF", {days},
+                          "Confirmation will start a {0}-day upgrade; the current facility will remain shut down.");
   }
   case NativeSurfaceManagementAction::RepairBuilding:
-    return "Confirmation will restore this building immediately.";
+    return resolve(locale, "SURFACE_DESC_REPAIR",
+                   "Confirmation will restore this building immediately.");
   case NativeSurfaceManagementAction::SetEnabled:
     return value
-               ? "Confirmation will resume staffing, power use, output, and upkeep."
-               : "Confirmation will suspend staffing, power use, output, and upkeep.";
+               ? resolve(locale, "SURFACE_DESC_RESUME",
+                         "Confirmation will resume staffing, power use, output, and upkeep.")
+               : resolve(locale, "SURFACE_DESC_SUSPEND",
+                         "Confirmation will suspend staffing, power use, output, and upkeep.");
   case NativeSurfaceManagementAction::SetPriority:
     return value
-               ? "Confirmation will give this building workers and power first."
-               : "Confirmation will return this building to normal allocation.";
+               ? resolve(locale, "SURFACE_DESC_PRIORITY",
+                         "Confirmation will give this building workers and power first.")
+               : resolve(locale, "SURFACE_DESC_NORMAL",
+                         "Confirmation will return this building to normal allocation.");
   case NativeSurfaceManagementAction::UpgradeHub:
-    return "Confirmation will start a " +
-           formatted_days(colony->surface_hub_upgrade_days_remaining) +
-           "-day hub expansion.";
+    return resolved(locale, "SURFACE_DESC_HUB",
+                    {formatted_days(colony->surface_hub_upgrade_days_remaining)},
+                    "Confirmation will start a {0}-day hub expansion.");
   }
-  return "Confirmation is currently unavailable.";
+  return unavailable;
 }
 
 ConstructionOrderResult execute_management(
     ConstructionWorld world, const int player_id, const int colony_id,
     const NativeSurfaceManagementAction action, const int building_id,
-    const bool value) {
+    const bool value,
+    const stellar::engine::LocalizationTable *locale) {
   switch (action) {
   case NativeSurfaceManagementAction::UpgradeBuilding:
     return upgrade_surface_building(world, player_id, colony_id, building_id);
@@ -228,14 +271,16 @@ ConstructionOrderResult execute_management(
   case NativeSurfaceManagementAction::UpgradeHub:
     return upgrade_surface_hub(world, player_id, colony_id);
   }
-  return {false, "The selected surface management action is unavailable."};
+  return {false, resolve(locale, "SURFACE_MSG_ACTION_UNAVAILABLE",
+                         "The selected surface management action is unavailable.")};
 }
 
 NativeSurfaceManagementQuote assess_management(
     const Context &current, const std::uint64_t generation,
     const std::uint64_t colony_revision, const int system_id, const int body_id,
     const int colony_id, const NativeSurfaceManagementAction action,
-    const int building_id, const bool value) {
+    const int building_id, const bool value,
+    const stellar::engine::LocalizationTable *locale) {
   NativeSurfaceManagementQuote quote;
   quote.campaign_generation = generation;
   quote.colony_revision = colony_revision;
@@ -246,28 +291,32 @@ NativeSurfaceManagementQuote assess_management(
   quote.building_id = building_id;
   quote.action = action;
   quote.value = value;
-  quote.action_label = management_action_label(action, value);
+  quote.action_label = management_action_label(action, value, locale);
 
   const auto *colony = find_one(current.world.colonies, colony_id, &Colony::id);
   if (!colony) {
-    quote.message = "That owned settlement is no longer available.";
+    quote.message = resolve(locale, "SURFACE_MSG_SETTLEMENT_GONE",
+                            "That owned settlement is no longer available.");
     return quote;
   }
   if (action == NativeSurfaceManagementAction::UpgradeHub) {
-    quote.building_name = colony->name + " hub";
-    quote.description = "Authorize the next timed expansion of this colony hub.";
+    quote.building_name = resolved(locale, "SURFACE_HUB_NAME", {colony->name}, "{0} hub");
+    quote.description = resolve(locale, "SURFACE_DESC_HUB_EXPAND",
+                                "Authorize the next timed expansion of this colony hub.");
   } else if (const auto *building = find_one(colony->surface_buildings,
                                                building_id, &SurfaceBuilding::id)) {
     if (const auto *definition = find_surface_building(building->type_id)) {
       quote.building_name = definition->name;
       quote.description = definition->description;
     } else {
-      quote.building_name = "Surface building";
-      quote.description = "Review the selected surface building before confirming.";
+      quote.building_name = resolve(locale, "SURFACE_BUILDING_NAME", "Surface building");
+      quote.description = resolve(locale, "SURFACE_DESC_REVIEW",
+                                  "Review the selected surface building before confirming.");
     }
   } else {
-    quote.building_name = "Surface building";
-    quote.description = "Review the selected surface building before confirming.";
+    quote.building_name = resolve(locale, "SURFACE_BUILDING_NAME", "Surface building");
+    quote.description = resolve(locale, "SURFACE_DESC_REVIEW",
+                                "Review the selected surface building before confirming.");
   }
 
   auto copied = preview_world(current);
@@ -276,13 +325,15 @@ NativeSurfaceManagementQuote assess_management(
   const double credits_before = before ? before->credits : 0.;
   const double industry_before = before ? before->industry : 0.;
   const auto result = execute_management(copied.command(), current.player.id,
-                                         colony_id, action, building_id, value);
+                                         colony_id, action, building_id, value,
+                                         locale);
   const auto *after = find_one(copied.economies, current.player.id,
                                &CivilizationEconomy::civilization_id);
   quote.accepted = result.accepted;
   quote.message = result.message;
   quote.description = management_description(copied, colony_id, action,
-                                             building_id, value, result.accepted);
+                                             building_id, value, result.accepted,
+                                             locale);
   quote.authorization_budget_units =
       after ? std::max(0., credits_before - after->credits) : 0.;
   quote.industry_cost =
@@ -339,6 +390,17 @@ void NativeSurfaceConstructionController::require_owner() const {
         "Native surface construction must run on the simulation owner thread.");
 }
 
+std::string NativeSurfaceConstructionController::tr(
+    std::string_view key, std::string_view fallback) const {
+  return resolve(locale_, key, fallback);
+}
+
+std::string NativeSurfaceConstructionController::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  return resolved(locale_, key, args, fallback);
+}
+
 void NativeSurfaceConstructionController::bind_generation(
     const std::uint64_t generation) {
   if (generation_ && generation < *generation_)
@@ -376,7 +438,7 @@ NativeSurfaceConstructionController::preview_placement(
   auto current = context(frame);
   if (!bound_colony(current, view, generation)) {
     result.message =
-        "The owned known settlement changed; refresh it before placement.";
+        tr("SURFACE_MSG_PLACEMENT_CHANGED", "The owned known settlement changed; refresh it before placement.");
     return result;
   }
   auto assessment = slot ? assess_planetary_building_slot(current.command.read(),current.player.id,view.colony_id,*slot,type_id)
@@ -392,7 +454,7 @@ NativeSurfaceConstructionController::preview_placement(
   result.industry_cost = assessment.industry_cost;
   result.formatted_authorization = assessment.formatted_authorization;
   result.accepted = assessment.accepted;
-  result.message = assessment.accepted ? placement_preview_message(assessment)
+  result.message = assessment.accepted ? placement_preview_message(assessment, locale_)
                                       : assessment.message;
   if (assessment.accepted)
     quotes_.emplace(result.quote_revision,
@@ -421,7 +483,7 @@ NativeSurfaceRemovalQuote NativeSurfaceConstructionController::preview_removal(
   auto current = context(frame);
   if (!bound_colony(current, view, generation)) {
     result.message =
-        "The owned known settlement changed; refresh it before removal.";
+        tr("SURFACE_MSG_REMOVAL_CHANGED", "The owned known settlement changed; refresh it before removal.");
     return result;
   }
   auto assessment = assess_surface_building_removal(
@@ -447,11 +509,11 @@ NativeSurfaceConstructionController::confirm_placement(
   require_owner();
   if (!generation_ || *generation_ != generation ||
       quote.campaign_generation != generation)
-    return stale();
+    return stale(locale_);
   const auto found = quotes_.find(quote.quote_revision);
   if (found == quotes_.end() ||
       !std::holds_alternative<PlacementRecord>(found->second))
-    return stale();
+    return stale(locale_);
   const auto record = std::get<PlacementRecord>(found->second);
   quotes_.erase(found); // confirmation tokens are single-use, including denial.
   const auto &assessment = record.assessment;
@@ -467,12 +529,12 @@ NativeSurfaceConstructionController::confirm_placement(
       quote.authorization_budget_units != assessment.authorization_cost ||
       quote.industry_cost != assessment.industry_cost ||
       quote.formatted_authorization != assessment.formatted_authorization ||
-      quote.message != placement_preview_message(assessment))
-    return stale();
+      quote.message != placement_preview_message(assessment, locale_))
+    return stale(locale_);
   auto current = context(frame);
   if (!live_binding(current, assessment.civilization_id, record.system_id,
                     record.body_id, assessment.colony_id))
-    return stale();
+    return stale(locale_);
   const auto result =
       commit_surface_building_placement(current.command, assessment);
   return {result.accepted, result.message};
@@ -485,11 +547,11 @@ NativeSurfaceConstructionController::confirm_removal(
   require_owner();
   if (!generation_ || *generation_ != generation ||
       quote.campaign_generation != generation)
-    return stale();
+    return stale(locale_);
   const auto found = quotes_.find(quote.quote_revision);
   if (found == quotes_.end() ||
       !std::holds_alternative<RemovalRecord>(found->second))
-    return stale();
+    return stale(locale_);
   const auto record = std::get<RemovalRecord>(found->second);
   quotes_.erase(found);
   const auto &assessment = record.assessment;
@@ -503,11 +565,11 @@ NativeSurfaceConstructionController::confirm_removal(
       quote.refund_budget_units != assessment.refund ||
       quote.formatted_refund != assessment.formatted_refund ||
       quote.message != assessment.message)
-    return stale();
+    return stale(locale_);
   auto current = context(frame);
   if (!live_binding(current, assessment.civilization_id, record.system_id,
                     record.body_id, assessment.colony_id))
-    return stale();
+    return stale(locale_);
   const auto result = commit_surface_building_removal(current.command, assessment);
   return {result.accepted, result.message};
 }
@@ -534,22 +596,22 @@ NativeSurfaceConstructionController::preview_management(
   result.building_id = building_id;
   result.action = action;
   result.value = value;
-  result.action_label = management_action_label(action, value);
+  result.action_label = management_action_label(action, value, locale_);
   if (!bound_colony(current, view, generation)) {
     result.message =
-        "The owned known settlement changed; refresh it before managing it.";
+        tr("SURFACE_MSG_MANAGE_CHANGED", "The owned known settlement changed; refresh it before managing it.");
     return result;
   }
   const auto *colony = find_one(current.world.colonies, view.colony_id,
                                 &Colony::id);
   if (!is_management_action(action) || !colony ||
       !has_management_site(*colony, action, building_id)) {
-    result.message = "The selected surface target changed; refresh it first.";
+    result.message = tr("SURFACE_MSG_TARGET_CHANGED", "The selected surface target changed; refresh it first.");
     return result;
   }
   result = assess_management(current, generation, view.revision, view.system_id,
                              view.body_id, view.colony_id, action, building_id,
-                             value);
+                             value, locale_);
   result.quote_revision = next_quote_revision_ - 1;
   if (result.accepted)
     quotes_.emplace(result.quote_revision,
@@ -567,36 +629,37 @@ NativeSurfaceConstructionController::confirm_management(
   require_owner();
   if (!generation_ || *generation_ != generation ||
       quote.campaign_generation != generation)
-    return stale();
+    return stale(locale_);
   const auto found = quotes_.find(quote.quote_revision);
   if (found == quotes_.end() ||
       !std::holds_alternative<ManagementRecord>(found->second))
-    return stale();
+    return stale(locale_);
   const auto record = std::get<ManagementRecord>(found->second);
   quotes_.erase(found); // Tokens are single-use, including a rejected confirm.
-  if (!same_management_quote(quote, record.quote)) return stale();
+  if (!same_management_quote(quote, record.quote)) return stale(locale_);
 
   auto current = context(frame);
   if (!live_binding(current, record.quote.player_civilization_id,
                     record.system_id, record.body_id, record.quote.colony_id))
-    return stale();
+    return stale(locale_);
   const auto *colony = find_one(current.world.colonies, record.quote.colony_id,
                                 &Colony::id);
   if (!colony || management_snapshot(*colony, record.quote.action,
                                      record.quote.building_id) != record.snapshot)
-    return stale();
+    return stale(locale_);
 
   auto refreshed = assess_management(
       current, generation, record.colony_revision, record.system_id,
       record.body_id, record.quote.colony_id, record.quote.action,
-      record.quote.building_id, record.quote.value);
+      record.quote.building_id, record.quote.value, locale_);
   refreshed.quote_revision = record.quote.quote_revision;
-  if (!same_management_quote(refreshed, record.quote)) return stale();
+  if (!same_management_quote(refreshed, record.quote)) return stale(locale_);
 
   quotes_.clear();
   const auto result = execute_management(
       current.command, current.player.id, record.quote.colony_id,
-      record.quote.action, record.quote.building_id, record.quote.value);
+      record.quote.action, record.quote.building_id, record.quote.value,
+      locale_);
   return {result.accepted, result.message};
 }
 

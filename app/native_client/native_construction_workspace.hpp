@@ -4,6 +4,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <initializer_list>
 #include <optional>
@@ -74,8 +75,26 @@ public:
   [[nodiscard]] ConstructionWorkspaceCommand
   handle(const stellar::native_map::InputEvent &event, int width, int height);
   void render(stellar::native_map::DrawList &out, int width, int height) const;
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string
+  focused_label(const ConstructionWorkspaceLayout &layout) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(const ConstructionWorkspaceLayout &) const;
 
 private:
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+    // Row position in its list plus which lane scrolls it — 1 projects,
+    // 2 build orders — so keyboard focus can snap the row into view.
+    int scroll_row{-1};
+    int scroll_lane{0};
+  };
+  [[nodiscard]] std::vector<FocusRect>
+  focusables(const ConstructionWorkspaceLayout &layout) const;
   [[nodiscard]] const stellar::native_construction::NativeConstructionProject *
   selected_project() const noexcept;
   void reconcile_selection();
@@ -98,9 +117,10 @@ private:
   std::optional<std::string> cancel_confirmation_id_;
   std::string notice_;
   bool notice_accepted_{};
-  float project_scroll_{};
-  float order_scroll_{};
+  mutable stellar::engine::VirtualizedList project_scroll_{};
+  mutable stellar::engine::VirtualizedList order_scroll_{};
   std::vector<std::size_t> status_order_;
+  int focus_{-1};
 };
 
 } // namespace stellar::native_construction_ui

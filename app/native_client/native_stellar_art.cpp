@@ -142,7 +142,7 @@ void Artwork::append(DrawList& out,Point p,float radius,const std::string& id,do
     transition->weight+=std::clamp(blend-transition->weight,-step,step);
     transition->seconds=seconds;blend=near?transition->weight:0;
   }
-  const float pulse=a.fallback=="polar-pulse"?.8f+.2f*static_cast<float>(std::sin(seconds*2.4)):1;
+  const float pulse=a.fallback=="polar-pulse"?(reduce_flashing_?.8f:.8f+.2f*static_cast<float>(std::sin(seconds*2.4))):1;
   if(distant&&blend<1){const float extent=radius*4;out.world.emplace_back(Image{distant,{p.x-extent,p.y-extent,extent*2,extent*2},{},{255,255,255,byte(255*(1-blend)*pulse)},clip});}
   if(near&&blend>0){const float extent=radius*1.45f;out.world.emplace_back(Image{near,{p.x-extent,p.y-extent,extent*2,extent*2},{},{255,255,255,byte(255*blend)},clip});}
   if(!distant&&blend<1){auto color=a.color;color.a=byte(255*(1-blend));out.world.emplace_back(Circle{p,radius*.8f,color});}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "stellar/engine/animation.hpp"
 #include "stellar/engine/scene_document.hpp"
 #include "stellar/engine/world.hpp"
 
@@ -127,6 +128,16 @@ struct VfxRef {
   // spawns it on scene load/runtime spawn and stops it on destroy.
   std::string name;
 };
+struct AnimTimeline {
+  // Document animation clip driving this entity's channels each sim step.
+  // `player` owns the live playhead; saved_* are restore scratch written by
+  // the snapshot codec because the Timeline resolves by id only after the
+  // world restores — the host re-attaches and seeks on load.
+  std::string id;
+  AnimationPlayer player;
+  float saved_time{0.f};
+  bool saved_playing{true};
+};
 // 3D scene components — the spatial counterparts spawned from a
 // Scene3dDocument. Transforms carry a normalized quaternion orientation
 // (authored euler degrees are converted at spawn) and uniform scale.
@@ -154,8 +165,11 @@ struct DoubleSided {
 // resolved world entity so F5/F9 snapshots restore the camera too (the
 // document seeds it only on scene load).
 struct Camera3DState {
+  // All-double members keep the layout padding-free — the snapshot codec
+  // serializes members individually and requires the member list to cover
+  // the whole struct, so mixed-width members would need explicit care.
   double x{}, y{}, z{3.0};
-  float yaw_deg{}, pitch_deg{}, fov_deg{60.f};
+  double yaw_deg{}, pitch_deg{}, fov_deg{60.0};
 };
 // 3D positional attachment — same contract as Parent, with a z offset.
 struct Parent3D {
@@ -196,6 +210,11 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc);
 std::optional<EntityId> tilemap_entity(const World &world);
 // All entities carrying a Tilemap component, in spawn order.
 std::vector<EntityId> tilemap_entities(const World &world);
+// Document-order index of the tilemap whose EntityName matches, or nullopt
+// — composes find_entity_by_name with tilemap_entities so games address
+// authored layers ("ground", "decor") by name instead of position.
+std::optional<std::size_t> tilemap_index(const World &world,
+                                         std::string_view name);
 
 // The inverse of spawn_scene: every live entity carrying EntityName (or, when
 // unnamed, every entity with a Transform2D) becomes a SceneEntity built from

@@ -1,3 +1,4 @@
+#include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/native_scene3d.hpp>
 #include <stellar/engine/native_geometry3d.hpp>
 #include <stellar/engine/surface_attachment.hpp>
@@ -41,6 +42,15 @@ int main(int argc,char** argv)try{
   check(channel(*first,80,160,0)>220&&channel(*first,240,160,1)>200,"Intersecting meshes failed the depth test");
   check(channel(*first,30,30,2)==240,"3D viewport covered a later 2D overlay");
   check(channel(*first,400,160,0)==5,"3D viewport escaped its rectangle");
+  { // Window::draw attributes the 3D backend's VRAM residency to MemoryTracker.
+    const auto snapshot=stellar::engine::MemoryTracker::instance().snapshot();
+    const auto find=[&](std::string_view name){return std::find_if(snapshot.subsystems.begin(),snapshot.subsystems.end(),[&](const auto& s){return s.name==name;});};
+    const auto residency=window.scene3d_statistics();
+    const auto tex=find("scene3d-textures"),meshes=find("scene3d-meshes"),targets=find("scene3d-targets");
+    check(tex!=snapshot.subsystems.end()&&meshes!=snapshot.subsystems.end()&&targets!=snapshot.subsystems.end(),"3D renderer VRAM is not attributed to MemoryTracker subsystems");
+    check(tex->current_bytes==residency.texture_cache_bytes&&meshes->current_bytes==residency.mesh_cache_bytes&&targets->current_bytes==residency.target_bytes,"Attributed VRAM bytes do not match renderer residency");
+    check(find("ui-image-cache")!=snapshot.subsystems.end()&&find("ui-text-cache")!=snapshot.subsystems.end(),"2D image/text caches are not attributed to MemoryTracker subsystems");
+  }
   {
     std::vector<std::uint8_t> pixels(64*64*4);
     for(int y=0;y<64;++y)for(int x=0;x<64;++x){const auto i=(y*64+x)*4;pixels[i]=x<32?255:0;pixels[i+1]=x>=32?255:0;pixels[i+3]=255;}
@@ -127,9 +137,49 @@ int main(int argc,char** argv)try{
   // Near-plane rejection and correct perspective size/depth are exercised on GPU.
   camera.projection=Projection3D::Perspective;auto behind=a;behind.position.z=6;
   (void)capture({behind},"behind.png");check(window.scene3d_statistics().draw_calls==0,"Behind-camera object was drawn");
+  {
+    // Identical mesh+material draws merge into a single instanced call whose
+    // per-instance state comes from the storage buffers.
+    camera.projection=Projection3D::Orthographic;
+    auto left=a,right=a;left.position.x=-.55f;right.position.x=.55f;
+    const auto instanced=capture({left,right},"instanced.png");
+    check(window.scene3d_statistics().draw_calls==1,"Identical 3D objects were not batched into one instanced draw");
+    check(channel(*instanced,40,160,0)>200&&channel(*instanced,280,160,0)>200,"Instanced copies did not each apply their own transform");
+  }
   auto textured=b;textured.material.tint={255,255,255,255};textured.material.texture=RgbaImage::create(2,2,{255,0,0,255,0,255,0,255,0,0,255,255,255,255,255,255});
   camera.projection=Projection3D::Orthographic;const auto uv=capture({textured},"uv.png");
   check(channel(*uv,40,80,0)>200&&channel(*uv,280,80,1)>200&&channel(*uv,40,280,2)>200,"3D texture coordinates are flipped or ignored");
+  {
+    // Texture streaming under a tight byte budget: at this footprint the
+    // ~5.6MB chains demand only their ~87KB mip-3 tails, so the budget is
+    // sized to degrade the second texture to a coarser tail rather than
+    // evict outright.
+    window.set_scene3d_texture_budget(100000u);
+    const auto big=[&](std::uint8_t shade){
+      std::vector<std::uint8_t> pixels(1024u*1024u*4u);
+      for(std::size_t i=0;i<pixels.size();i+=4){pixels[i]=pixels[i+1]=pixels[i+2]=shade;pixels[i+3]=255;}
+      return RgbaImage::create(1024,1024,std::move(pixels));};
+    Material3D dark_material=green;dark_material.tint={255,255,255,255};dark_material.texture=big(0);
+    Material3D light_material=dark_material;light_material.texture=big(220);
+    MeshInstance3D dark{quad(0,0),{-.55f,0,0},{},.3f,dark_material},light{quad(0,0),{.55f,0,0},{},.3f,light_material};
+    const auto stream_base=window.scene3d_statistics().streamed_fallbacks;
+    (void)capture({dark},"stream-dark.png");(void)capture({light},"stream-light.png");
+    check(window.scene3d_statistics().texture_cache_entries<=2,"Texture streamer did not evict the unrequested texture under budget");
+    const auto uploads=window.scene3d_statistics().texture_uploads;
+    const auto pair=capture({dark,light},"stream-both.png");
+    // Equal distances tie; the earlier-registered texture wins its mip-3
+    // tail (~87KB), leaving ~12KB — the second degrades to its ~5KB mip-5
+    // tail and still binds its own 220 texels rather than the white fallback.
+    check(window.scene3d_statistics().streamed_partial_binds>0,"Streamer did not admit a degraded mip tail under budget pressure");
+    check(window.scene3d_statistics().texture_uploads>uploads,"Evicted texture was not re-uploaded on re-admission");
+    check(channel(*pair,72,160,0)<30&&channel(*pair,248,160,0)>150&&channel(*pair,248,160,0)<235,"Streaming degraded-bind pixels are wrong");
+    // A zero budget denies even the smallest tail: the pinned white fallback
+    // serves the bind, keeping the pop-in path reachable.
+    window.set_scene3d_texture_budget(0);
+    (void)capture({dark},"stream-denied.png");
+    check(window.scene3d_statistics().streamed_fallbacks>stream_base,"Fully denied texture did not fall back to the pinned texture");
+    window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
+  }
   {
     std::vector<std::uint8_t> checks(1024u*1024u*4u,255);
     for(int y=0;y<1024;++y)for(int x=0;x<1024;++x)for(int c=0;c<3;++c)
@@ -137,7 +187,10 @@ int main(int argc,char** argv)try{
     auto fine=textured;fine.scale=.23f;fine.material.texture=RgbaImage::create(1024,1024,std::move(checks));
     const auto before=window.scene3d_statistics();
     const auto small=capture({fine},"mip-checker.png");const auto charged=window.scene3d_statistics();
-    check(charged.texture_cache_bytes-before.texture_cache_bytes==texture_mip_layout3d(fine.material.texture.get()).resident_bytes,"GPU cache did not account for the full mip chain");
+    // At this footprint the checker demands its mip-3 tail: resident GPU
+    // bytes are the 128..1 tail levels, not the full chain.
+    std::size_t tail3=0;for(int w=128,h=128;;){tail3+=static_cast<std::size_t>(w)*h*4;if(w==1&&h==1)break;w=std::max(1,w/2);h=std::max(1,h/2);}
+    check(charged.texture_cache_bytes-before.texture_cache_bytes+charged.streamed_evicted_bytes-before.streamed_evicted_bytes==fine.material.texture->byte_size()+tail3,"GPU cache did not account for the resident mip tail");
     fine.position.x=.00175;
     const auto moved=capture({fine},"mip-checker-moved.png");
     for(int y=140;y<180;++y)for(int x=140;x<180;++x){
@@ -152,8 +205,14 @@ int main(int argc,char** argv)try{
     fine.position={};fine.material.texture=RgbaImage::create(1024,1,std::move(bands));fine.material.transparent=true;
     const auto ring=capture({fine},"mip-ring-alpha.png");
     check(channel(*ring,160,160,0)==5&&std::abs(channel(*ring,138,160,0)-130)<=3,"Thin mip texture lost ring gap or mean opacity");
+    const auto uploads_before_promotion=window.scene3d_statistics().texture_uploads;
     fine.scale=1;const auto close_ring=capture({fine},"mip-ring-close.png");
+    check(window.scene3d_statistics().texture_uploads==uploads_before_promotion+1,"Footprint growth did not promote the resident mip tail");
     check(channel(*close_ring,160,160,0)==5,"Magnification filled a transparent ring gap");
+    // The 160px views demand a coarser mip than the 360px capture did —
+    // warm the resident tail at their footprint so the two-view draw below
+    // shares it without re-uploading.
+    DrawList warm;warm.world.emplace_back(Scene3DView{Scene3D::create(camera,{fine}),{0,0,160,160}});window.draw(warm);
     const auto retained=window.scene3d_statistics();
     auto shadow=fine;shadow.material.texture.reset();shadow.material.shadow=AnalyticShadow3D{};shadow.material.shadow->shape=AnalyticShadowShape3D::Annulus;shadow.material.shadow->opacity_map=fine.material.texture;
     DrawList shared;shared.world.emplace_back(Scene3DView{Scene3D::create(camera,{fine}),{0,0,160,160}});
@@ -177,12 +236,14 @@ int main(int argc,char** argv)try{
       pixels[(static_cast<std::size_t>(y)*256+x)*4+c]=(x/4)%2?230:30;
     auto bands=textured;bands.material.texture=RgbaImage::create(256,4096,std::move(pixels));
     const auto isotropic=capture({bands},"ring-isotropic.png");
-    const auto uploads=window.scene3d_statistics().texture_uploads;
+    const auto entries=window.scene3d_statistics().texture_cache_entries;
     bands.material.anisotropic_texture=true;
     const auto detailed=capture({bands},"ring-anisotropic.png");
     const auto contrast=[&](const RgbaImage& im){double deviation=0;for(int x=70;x<250;++x)deviation+=std::abs(channel(im,x,160,0)-130);return deviation/180;};
     check(contrast(*detailed)>contrast(*isotropic)*2+20,"Anisotropic ring filtering failed to preserve resolvable radial contrast");
-    check(window.scene3d_statistics().texture_uploads==uploads,"Changing the material sampler duplicated its texture");
+    // The flag promotes the texture to full-chain residency — one cache
+    // entry is replaced in place, never duplicated.
+    check(window.scene3d_statistics().texture_cache_entries==entries,"Changing the material sampler duplicated its texture entry");
     bands.scale=.05f;const auto distant=capture({bands},"ring-anisotropic-distant.png");
     for(int x=157;x<=162;++x)check(std::abs(channel(*distant,x,160,0)-130)<4,"Distant ring detail no longer converges to a stable average");
     std::cout<<"ring_filter_contrast="<<contrast(*isotropic)<<" -> "<<contrast(*detailed)<<"; distant average and cached upload passed\n";
@@ -202,6 +263,7 @@ int main(int argc,char** argv)try{
   DrawList object_lit;object_lit.world.emplace_back(Scene3DView{Scene3D::create(camera,{lit},{0,0,-1}),{0,0,320,320}});
   window.draw(object_lit,folder/"object-lighting.png");const auto object_lighting=decode_rgba_image(folder/"object-lighting.png");
   check(channel(*object_lighting,160,160,0)>250,"Per-object lighting did not override shared scene light on GPU");
+  if(window.scene3d_statistics().hdr)check(channel(*object_lighting,160,160,0)>=251&&channel(*object_lighting,160,160,0)<=254,"HDR resolve did not tonemap the fully lit surface");
   auto shadowed=lit;AnalyticShadow3D blocker;blocker.position={0,0,.6};blocker.radii={.3f,.15f,.1f};shadowed.material.shadow=blocker;
   const auto ellipse=capture({shadowed},"shadow-ellipsoid.png");
   check(std::abs(channel(*ellipse,160,160,0)-51)<=1&&channel(*ellipse,192,160,0)<55&&channel(*ellipse,160,192,0)>250,
@@ -365,7 +427,7 @@ int main(int argc,char** argv)try{
   std::cout<<"scene3d frames=120 cpu_submit_mean_ms="<<submission/120<<" frame_wall_mean_ms="<<elapsed/120<<" mesh_uploads="<<window.scene3d_statistics().mesh_uploads<<" gpu_driver="<<window.gpu_driver()<<'\n';
   DrawList invalid;invalid.world.emplace_back(Scene3DView{Scene3D::create(camera,{a}),{0,0,8192,8192}});
   bool rejected=false;try{window.draw(invalid);}catch(const std::length_error&){rejected=true;}check(rejected,"Oversized 3D target was accepted");
-  window.draw(stable);check(window.scene3d_statistics().target_bytes==320u*320u*8u,"Target budget did not recover after rejection/resize");
+  window.draw(stable);check(window.scene3d_statistics().target_bytes==320u*320u*(window.scene3d_statistics().hdr?16u:8u),"Target budget did not recover after rejection/resize");
   const auto rejects_before_upload=[&](const DrawList& list){
     const auto before=window.scene3d_statistics();bool refused=false;
     try{window.draw(list);}catch(const std::length_error&){refused=true;}

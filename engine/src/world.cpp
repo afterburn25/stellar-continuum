@@ -191,6 +191,31 @@ void World::clear() {
     membership_.clear();
 }
 
+namespace {
+template <class Map>
+std::size_t map_storage_estimate(const Map &map) noexcept {
+    // Node-based unordered_map: one allocation per node (value + link) plus
+    // the bucket array.
+    return map.size()*(sizeof(typename Map::value_type)+2*sizeof(void*))
+         + map.bucket_count()*sizeof(void*);
+}
+} // namespace
+
+std::size_t World::estimated_memory_bytes() const {
+    std::size_t total = registry_.memory_bytes();
+    for (const auto &[key, store] : stores_) total += store->memory_bytes();
+    total += map_storage_estimate(stores_);
+    total += map_storage_estimate(parents_);
+    total += map_storage_estimate(legacy_to_entity_);
+    total += map_storage_estimate(entity_to_legacy_);
+    total += map_storage_estimate(codecs_);
+    for (const auto &[key, children] : children_)
+        total += children.capacity()*sizeof(EntityId);
+    total += map_storage_estimate(children_);
+    total += membership_.capacity()*sizeof(EntityId);
+    return total;
+}
+
 std::vector<std::uint8_t> World::snapshot() const {
     Writer writer;
     writer.u32(snapshot_magic);
@@ -237,6 +262,39 @@ std::vector<std::uint8_t> World::snapshot() const {
     const auto checksum = fnv1a64(writer.out.data(), writer.out.size());
     writer.u64(checksum);
     return writer.out;
+}
+
+std::vector<std::pair<std::string, std::uint64_t>> World::component_hashes()
+    const {
+    // Sorted codec names → deterministic section order matching the
+    // per-entity sorted encoding in snapshot().
+    std::vector<const Codec*> codecs;
+    codecs.reserve(codecs_.size());
+    for (const auto& [name, codec] : codecs_) codecs.push_back(&codec);
+    std::sort(codecs.begin(), codecs.end(),
+              [](const Codec* a, const Codec* b) { return a->name < b->name; });
+    const auto all = entities();
+    std::vector<std::pair<std::string, std::uint64_t>> sections;
+    for (const Codec* codec : codecs) {
+        // Section hash: FNV-1a over (entity index+generation, encoded
+        // bytes) for every entity carrying the component, in entity
+        // order — the same bytes snapshot() writes under this name.
+        Writer section;
+        bool present = false;
+        for (EntityId id : all) {
+            const void* component = codec->fetch(id);
+            if (!component) continue;
+            present = true;
+            section.u32(id.index);
+            section.u32(id.generation);
+            const auto bytes = codec->encode(component);
+            section.bytes(bytes.data(), bytes.size());
+        }
+        if (present)
+            sections.emplace_back(codec->name, fnv1a64(section.out.data(),
+                                                       section.out.size()));
+    }
+    return sections;
 }
 
 void World::restore(const std::vector<std::uint8_t>& bytes) {

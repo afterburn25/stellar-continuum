@@ -226,6 +226,50 @@ void pointer_and_commands_route_without_leakage() {
   command = workspace.handle({InputEventType::EscapePressed}, view, 1280, 720);
   require(command.captured && !workspace.visible(), "Escape did not close and capture the supply workspace");
 }
+
+void keyboard_focus() {
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kHome = 0x4000004au,
+                          kEnd = 0x4000004du, kDigit5 = '5';
+  SupplyWorkspace workspace;
+  workspace.open();
+  const auto view = ready_view(4);
+  const auto key = [&](std::uint32_t value, bool shift = false) {
+    InputEvent event{InputEventType::KeyPressed};
+    event.key = value;
+    event.shift = shift;
+    return workspace.handle(event, view, 1280, 720);
+  };
+  require(workspace.focus() < 0, "supply panel opened with stale focus");
+  require(key(kTab).captured && workspace.focus() == 0,
+          "Tab did not focus the refresh control");
+  require(key(kTab).captured && workspace.focus() == 1,
+          "Tab did not focus the close control");
+  require(key(kTab, true).captured && workspace.focus() == 0,
+          "Shift+Tab did not retreat the ring");
+  require(key(kEnd).captured && workspace.focus() == 1,
+          "End did not select the last control");
+  require(key(kHome).captured && workspace.focus() == 0,
+          "Home did not select the first control");
+  require(workspace.focused_label(view) == "Refresh",
+          "focused refresh control reported the wrong label");
+  (void)key(kEnd);
+  require(workspace.focused_label(view) == "Close supply network",
+          "focused close control reported the wrong label");
+  (void)key(kHome);
+  const auto refreshed = key(kReturn);
+  require(refreshed.captured && refreshed.refresh,
+          "Return on the focused refresh control did not emit the command");
+  require(workspace.focus() == 0 && workspace.visible(),
+          "refresh activation moved focus or closed the panel");
+  require(!key(kDigit5).captured,
+          "unrelated key was swallowed by the non-modal panel");
+  (void)key(kEnd);
+  const auto closed = key(kReturn);
+  require(closed.captured && !workspace.visible(),
+          "Return on the focused close control did not dismiss the panel");
+  workspace.open();
+  require(workspace.focus() < 0, "reopened panel kept a stale focus index");
+}
 }  // namespace
 
 int main() {
@@ -237,6 +281,7 @@ int main() {
     cache_reuses_measurements_and_invalidates_exactly_when_needed();
     tiny_positive_totals_are_not_rendered_as_zero();
     pointer_and_commands_route_without_leakage();
+    keyboard_focus();
     return 0;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

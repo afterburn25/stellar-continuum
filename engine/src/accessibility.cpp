@@ -80,4 +80,58 @@ AccessibilitySettings::from_json(std::string_view document) {
   return result;
 }
 
+void AccessibilityAnnouncer::announce(std::string text,
+                                      AnnouncementPriority priority) {
+  announce(std::move(text), priority, AnnouncementKind::Status, std::nullopt,
+           std::nullopt, AnnouncementControl::Custom);
+}
+
+void AccessibilityAnnouncer::announce(std::string text,
+                                      AnnouncementPriority priority,
+                                      AnnouncementKind kind,
+                                      std::optional<AnnouncementBounds> bounds,
+                                      std::optional<AnnouncementRange> range,
+                                      AnnouncementControl control,
+                                      std::optional<bool> checked,
+                                      std::optional<AnnouncementValue> value,
+                                      std::optional<bool> expanded) {
+  // Empty status text is dropped, but an empty Focus item is meaningful:
+  // it marks the ring releasing, so platform bridges can retire the stale
+  // focused fragment instead of leaving the last label claiming focus.
+  if (text.empty() && kind != AnnouncementKind::Focus)
+    return;
+  if (!pending_.empty() && pending_.back().text == text &&
+      pending_.back().priority == priority && pending_.back().kind == kind &&
+      pending_.back().range == range && pending_.back().checked == checked &&
+      pending_.back().value == value && pending_.back().expanded == expanded)
+    return;
+  if (priority == AnnouncementPriority::Assertive) {
+    std::erase_if(pending_, [](const AccessibilityAnnouncement &item) {
+      return item.priority == AnnouncementPriority::Polite;
+    });
+  }
+  while (pending_.size() >= capacity_) {
+    const auto polite = std::find_if(
+        pending_.begin(), pending_.end(), [](const AccessibilityAnnouncement &i) {
+          return i.priority == AnnouncementPriority::Polite;
+        });
+    pending_.erase(polite != pending_.end() ? polite : pending_.begin());
+  }
+  pending_.push_back(AccessibilityAnnouncement{
+      std::move(text), priority, kind, std::move(bounds), std::move(range),
+      control, checked, std::move(value), expanded, sequence_++});
+}
+
+std::optional<AccessibilityAnnouncement> AccessibilityAnnouncer::take() {
+  if (pending_.empty())
+    return std::nullopt;
+  auto item = std::move(pending_.front());
+  pending_.pop_front();
+  return item;
+}
+
+const AccessibilityAnnouncement *AccessibilityAnnouncer::latest() const noexcept {
+  return pending_.empty() ? nullptr : &pending_.back();
+}
+
 } // namespace stellar::engine

@@ -116,12 +116,14 @@ void NativeColonyWorkspace::discard_campaign() noexcept {
 }
 
 void NativeColonyWorkspace::cancel_freight() noexcept {
-  freight_preview_.reset(); freight_text_.clear(); freight_scroll_ = 0;
+  freight_preview_.reset(); freight_text_.clear(); freight_scroll_ = {};
   freight_pressed_ = ColonyWorkspaceCommandKind::None;
+  focus_ = -1;
 }
 
 void NativeColonyWorkspace::set_freight_preview(NativeOutpostFreightPreview preview) {
   cancel_freight();
+  planetary_.release_focus();
   if (!visible_ || !view_ || !view_->resource_outpost ||
       preview.campaign_generation != view_->campaign_generation ||
       preview.player_civilization_id != view_->player_civilization_id ||
@@ -149,6 +151,22 @@ float NativeColonyWorkspace::freight_content_height(const ColonyWorkspaceLayout&
   return lines * (layout.body_font_pixels + 4.f * layout.scale);
 }
 
+std::string NativeColonyWorkspace::focused_label() const {
+  if (!freight_preview_) return planetary_.focused_label();
+  if (focus_ < 0) return {};
+  return focus_ == 0 ? tr("COLONY_FREIGHT_CANCEL", "Cancel")
+                     : tr("COLONY_FREIGHT_CONFIRM", "Confirm dispatch");
+}
+
+std::optional<UiRect>
+NativeColonyWorkspace::focused_bounds(int width, int height) const {
+  if (!freight_preview_) return planetary_.focused_bounds();
+  if (focus_ < 0) return std::nullopt;
+  const auto layout = ColonyWorkspaceLayout::for_viewport(width, height);
+  return focus_ == 0 ? std::optional<UiRect>{layout.freight_cancel}
+                     : std::optional<UiRect>{layout.freight_confirm};
+}
+
 ColonyWorkspaceCommand NativeColonyWorkspace::handle(const InputEvent &event,
                                                        int width, int height) {
   if (!visible_) return {};
@@ -168,11 +186,33 @@ ColonyWorkspaceCommand NativeColonyWorkspace::handle(const InputEvent &event,
     if (event.type == InputEventType::EscapePressed) {
       cancel_freight(); return {ColonyWorkspaceCommandKind::CancelFreight, true};
     }
+    if (event.type == InputEventType::KeyPressed && event.key) {
+      // SDL_Keycode: Tab/arrows move the ring over [cancel, confirm];
+      // Return/Space replay the press+release gesture. Confirm stays
+      // unreachable while the preview rejects the dispatch.
+      constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+      constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+      constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+      const int count=freight_preview_->accepted?2:1;
+      const bool fwd=(event.key==kTab&&!event.shift)||event.key==kRight||event.key==kDown;
+      const bool bwd=(event.key==kTab&&event.shift)||event.key==kLeft||event.key==kUp;
+      if(event.key==kHome||event.key==kEnd){focus_=event.key==kHome?0:count-1;return {ColonyWorkspaceCommandKind::None,true};}
+      if(fwd||bwd){focus_=focus_<0?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;return {ColonyWorkspaceCommandKind::None,true};}
+      if((event.key==kReturn||event.key==kSpace)&&focus_>=0){
+        const auto&rect=focus_==0?layout.freight_cancel:layout.freight_confirm;
+        InputEvent press{InputEventType::LeftPressed},release{InputEventType::LeftReleased};
+        press.position=release.position={rect.x+rect.width*.5f,rect.y+rect.height*.5f};
+        const int keep=focus_;static_cast<void>(handle(press,width,height));
+        auto command=handle(release,width,height);
+        if(freight_preview_)focus_=keep;return command;
+      }
+      return {ColonyWorkspaceCommandKind::None,true};
+    }
     const auto target = layout.freight_cancel.contains(event.position)
         ? ColonyWorkspaceCommandKind::CancelFreight
         : freight_preview_->accepted && layout.freight_confirm.contains(event.position)
         ? ColonyWorkspaceCommandKind::ConfirmFreight : ColonyWorkspaceCommandKind::None;
-    if (event.type == InputEventType::LeftPressed) freight_pressed_ = target;
+    if (event.type == InputEventType::LeftPressed) { freight_pressed_ = target; focus_ = -1; }
     if (event.type == InputEventType::LeftReleased) {
       const auto pressed = std::exchange(freight_pressed_, ColonyWorkspaceCommandKind::None);
       if (pressed == target && target != ColonyWorkspaceCommandKind::None) {
@@ -182,8 +222,9 @@ ColonyWorkspaceCommand NativeColonyWorkspace::handle(const InputEvent &event,
       }
     }
     if (event.type == InputEventType::Wheel && layout.freight_text.contains(event.position)) {
-      freight_scroll_ = std::clamp(freight_scroll_ + event.wheel_y * 44.f * layout.scale,
-          std::min(0.f, layout.freight_text.height - freight_content_height(layout)), 0.f);
+      freight_scroll_.sync(freight_content_height(layout),
+                           layout.freight_text.height);
+      freight_scroll_.scroll_by(-event.wheel_y * 44.f * layout.scale);
     }
     return {ColonyWorkspaceCommandKind::None, true};
   }
@@ -196,9 +237,10 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
     if(freight_preview_){
       const auto l=ColonyWorkspaceLayout::for_viewport(width,height);
       fill(out,l.surface,{0,4,10,185});stellar::native_menu_style::panel(out,l.freight_review,l.scale);
-      const auto clip=l.freight_text;clipped_text(out,{clip.x,clip.y+freight_scroll_,clip.width,freight_content_height(l)},clip,freight_text_,bright,l.body_font_pixels);
+      const auto clip=l.freight_text;clipped_text(out,{clip.x,clip.y-freight_scroll_.scroll_offset,clip.width,freight_content_height(l)},clip,freight_text_,bright,l.body_font_pixels);
       stellar::native_menu_style::button(out,l.freight_cancel,tr("COLONY_FREIGHT_CANCEL","Cancel"),l.body_font_pixels,l.freight_cancel.contains(pointer_));
       stellar::native_menu_style::button(out,l.freight_confirm,tr("COLONY_FREIGHT_CONFIRM","Confirm dispatch"),l.body_font_pixels,l.freight_confirm.contains(pointer_),freight_preview_->accepted);
+      if(focus_>=0)out.overlay.emplace_back(stellar::native_map::StrokedRectangle{focus_==0?l.freight_cancel:l.freight_confirm,{160,210,255,255}});
     }
 }
 

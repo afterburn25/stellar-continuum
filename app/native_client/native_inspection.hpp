@@ -3,6 +3,7 @@
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <functional>
 #include <optional>
@@ -44,18 +45,26 @@ public:
   void clear() noexcept;
   [[nodiscard]] static stellar::native_map::UiRect close_bounds(stellar::native_map::UiRect) noexcept;
   [[nodiscard]] static stellar::native_map::UiRect body_bounds(stellar::native_map::UiRect) noexcept;
-  [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
+  [[nodiscard]] float scroll_offset() const noexcept { return scroll_.scroll_offset; }
   [[nodiscard]] bool visible() const noexcept { return inspection_.has_value(); }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label() const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(stellar::native_map::UiRect) const;
   [[nodiscard]] InspectionHandleResult handle(const stellar::native_map::InputEvent&,
                                               stellar::native_map::UiRect);
   void render(stellar::native_map::DrawList&, stellar::native_map::UiRect) const;
 private:
   std::optional<SystemInspection> inspection_;
-  mutable float scroll_{};
+  mutable stellar::engine::ScrollView scroll_{};
   mutable std::optional<stellar::native_map::UiRect> last_bounds_;
   std::function<stellar::native_map::TextExtent(
       const stellar::native_map::Text&)> text_measurer_;
   const stellar::engine::LocalizationTable *locale_{};
   bool pointer_owned_{};
+  int focus_{-1};
 };
 } // namespace stellar::native_inspection

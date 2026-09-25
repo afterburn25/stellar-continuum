@@ -1,12 +1,17 @@
 #include <stellar/engine/texture_cook.hpp>
+#include <stellar/engine/draw_batcher.hpp>
+#include <stellar/engine/render_graph.hpp>
+#include <stellar/engine/texture_streaming.hpp>
 #include "native_scene3d_gpu.hpp"
 #include "generated/scene3d_shaders.hpp"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <map>
 #include <stdexcept>
 #include <thread>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -32,17 +37,34 @@ struct Geometry {
   ~Geometry(){if(vertices)SDL_ReleaseGPUBuffer(device,vertices);if(indices)SDL_ReleaseGPUBuffer(device,indices);}
   std::size_t bytes()const{return owner->byte_size()*2;}
 };
+// One 2x box-filter step matching the halving rule the GPU blit chain uses
+// (clamped edges make 1-wide/1-high tails safe). Partial residency uploads a
+// downsampled level 0 because RgbaImage keeps only full-resolution pixels.
+std::vector<std::uint8_t> downsample_rgba2x(const std::vector<std::uint8_t>& src,int w,int h,int& out_w,int& out_h){
+  out_w=std::max(1,w/2);out_h=std::max(1,h/2);
+  std::vector<std::uint8_t> out(static_cast<std::size_t>(out_w)*out_h*4);
+  for(int y=0;y<out_h;++y)for(int x=0;x<out_w;++x){
+    unsigned sum[4]{};
+    const int xs[2]{std::min(2*x,w-1),std::min(2*x+1,w-1)},ys[2]{std::min(2*y,h-1),std::min(2*y+1,h-1)};
+    for(const int sy:ys)for(const int sx:xs)for(int c=0;c<4;++c)sum[c]+=src[(static_cast<std::size_t>(sy)*w+sx)*4+c];
+    for(int c=0;c<4;++c)out[(static_cast<std::size_t>(y)*out_w+x)*4+c]=static_cast<std::uint8_t>((sum[c]+2)/4);
+  }
+  return out;
+}
 struct Texture {
   SDL_GPUDevice* device;std::shared_ptr<const RgbaImage> owner;SDL_GPUTexture* texture{};std::uint64_t use{};std::size_t gpu_bytes{};
+  // Finest mip level actually uploaded; the texture's level 0 holds source
+  // mip base_mip when the streamer admitted a partial tail under budget.
+  std::uint32_t base_mip{};
   explicit Texture(SDL_GPUDevice* d):device(d){}
   ~Texture(){if(texture)SDL_ReleaseGPUTexture(device,texture);}
   std::size_t bytes()const{return owner->byte_size()+gpu_bytes;}
 };
 struct Target {
-  SDL_GPUDevice* device;SDL_GPUTexture* color{};SDL_GPUTexture* depth{};SDL_Texture* composite{};int width{},height{};
+  SDL_GPUDevice* device;SDL_GPUTexture* color{};SDL_GPUTexture* depth{};SDL_GPUTexture* hdr{};SDL_Texture* composite{};int width{},height{};
   explicit Target(SDL_GPUDevice* d):device(d){}
-  ~Target(){if(composite)SDL_DestroyTexture(composite);if(depth)SDL_ReleaseGPUTexture(device,depth);if(color)SDL_ReleaseGPUTexture(device,color);}
-  std::size_t bytes()const{return static_cast<std::size_t>(width)*height*8u;}
+  ~Target(){if(composite)SDL_DestroyTexture(composite);if(hdr)SDL_ReleaseGPUTexture(device,hdr);if(depth)SDL_ReleaseGPUTexture(device,depth);if(color)SDL_ReleaseGPUTexture(device,color);}
+  std::size_t bytes()const{return static_cast<std::size_t>(width)*height*(hdr?16u:8u);}
 };
 SDL_GPUTexture* make_texture(SDL_GPUDevice* d,int w,int h,SDL_GPUTextureFormat format,SDL_GPUTextureUsageFlags usage,Uint32 levels=1){
   SDL_GPUTextureCreateInfo info{};info.type=SDL_GPU_TEXTURETYPE_2D;info.format=format;info.usage=usage;
@@ -61,14 +83,22 @@ static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentU
 }
 struct Scene3DRenderer::Storage {
   SDL_GPUDevice* device;SDL_Renderer* renderer;std::thread::id owner=std::this_thread::get_id();
-  SDL_GPUSampler* sampler{};SDL_GPUSampler* environment_sampler{};SDL_GPUSampler* detail_sampler{};std::array<SDL_GPUGraphicsPipeline*,4> pipelines{};
+  SDL_GPUSampler* sampler{};SDL_GPUSampler* environment_sampler{};SDL_GPUSampler* detail_sampler{};std::array<SDL_GPUGraphicsPipeline*,4> pipelines{};SDL_GPUGraphicsPipeline* tonemap_pipeline{};
   std::unordered_map<const Mesh3D*,std::shared_ptr<Geometry>> meshes;
   std::unordered_map<const RgbaImage*,std::shared_ptr<Texture>> textures;
   std::vector<std::unique_ptr<Target>> targets;std::vector<const Scene3DView*> views;
   std::shared_ptr<const RgbaImage> white=RgbaImage::create(1,1,{255,255,255,255});
-  Scene3DStatistics stats;std::uint64_t serial{};std::size_t next_view{};
+  // Engine TextureStreamer owns the byte-budget residency decision; this
+  // backend registers real per-mip sizes, declares each frame's demand with
+  // a camera-distance priority, and executes the streamer's load/evict list.
+  engine::TextureStreamer streamer{maximum_scene3d_texture_cache_bytes};
+  std::unordered_map<const RgbaImage*,engine::TextureId> stream_ids;
+  std::unordered_map<engine::TextureId,const RgbaImage*> stream_owners;
+  std::uint64_t stream_frame{};
+  Scene3DStatistics stats;std::uint64_t serial{};std::size_t next_view{};bool hdr{};SDL_GPUTextureFormat scene_format{};
+  SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};std::size_t vertex_capacity{64},fragment_capacity{64};
   Storage(SDL_GPUDevice* d,SDL_Renderer* r):device(d),renderer(r){}
-  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);}
+  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);}
   void require_owner()const{if(std::this_thread::get_id()!=owner)throw std::logic_error("3D rendering must run on the window thread.");}
   void initialize(){
     SDL_GPUSamplerCreateInfo sampling{};sampling.min_filter=sampling.mag_filter=SDL_GPU_FILTER_LINEAR;
@@ -81,16 +111,18 @@ struct Scene3DRenderer::Storage {
     sampling.enable_anisotropy=false;sampling.max_anisotropy=1.f;
     sampling.address_mode_u=SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
     environment_sampler=SDL_CreateGPUSampler(device,&sampling);if(!environment_sampler)throw gpu_error("3D environment sampler creation failed");
-    const auto shader=[&](const auto& code,SDL_GPUShaderStage stage){
-      SDL_GPUShaderCreateInfo info{};info.code=reinterpret_cast<const Uint8*>(code);info.code_size=sizeof(code);info.entrypoint="main";info.format=SDL_GPU_SHADERFORMAT_SPIRV;info.stage=stage;info.num_uniform_buffers=1;info.num_samplers=stage==SDL_GPU_SHADERSTAGE_FRAGMENT?8:0;
+    hdr=SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_COLOR_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
+    scene_format=hdr?SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT:SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    const auto shader=[&](const auto& code,SDL_GPUShaderStage stage,Uint32 uniforms,Uint32 samplers,Uint32 storage=0){
+      SDL_GPUShaderCreateInfo info{};info.code=reinterpret_cast<const Uint8*>(code);info.code_size=sizeof(code);info.entrypoint="main";info.format=SDL_GPU_SHADERFORMAT_SPIRV;info.stage=stage;info.num_uniform_buffers=uniforms;info.num_samplers=samplers;info.num_storage_buffers=storage;
       auto* result=SDL_CreateGPUShader(device,&info);if(!result)throw gpu_error("3D shader creation failed");return result;
     };
     const auto release=[&](SDL_GPUShader* value){SDL_ReleaseGPUShader(device,value);};
-    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT),release);
+    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,0,8,1),release);
     SDL_GPUVertexBufferDescription buffer{0,sizeof(Vertex3D),SDL_GPU_VERTEXINPUTRATE_VERTEX,0};
     const SDL_GPUVertexAttribute attributes[]{{0,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,position)},{1,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,normal)},{2,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,offsetof(Vertex3D,uv)}};
     for(int index=0;index<4;++index){
-      SDL_GPUColorTargetDescription color{};color.format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+      SDL_GPUColorTargetDescription color{};color.format=scene_format;
       auto& blend=color.blend_state;blend.enable_blend=(index&1)!=0;
       blend.src_color_blendfactor=blend.src_alpha_blendfactor=SDL_GPU_BLENDFACTOR_ONE;
       blend.dst_color_blendfactor=blend.dst_alpha_blendfactor=SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
@@ -104,6 +136,17 @@ struct Scene3DRenderer::Storage {
       info.target_info.color_target_descriptions=&color;info.target_info.num_color_targets=1;info.target_info.depth_stencil_format=SDL_GPU_TEXTUREFORMAT_D32_FLOAT;info.target_info.has_depth_stencil_target=true;
       pipelines[index]=SDL_CreateGPUGraphicsPipeline(device,&info);if(!pipelines[index])throw gpu_error("3D depth pipeline creation failed");
     }
+    if(hdr){
+      std::unique_ptr<SDL_GPUShader,decltype(release)> tonemap_vertex(shader(shaders::tonemap_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0),release),tonemap_fragment(shader(shaders::tonemap_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,0,1),release);
+      SDL_GPUColorTargetDescription color{};color.format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+      SDL_GPUGraphicsPipelineCreateInfo info{};info.vertex_shader=tonemap_vertex.get();info.fragment_shader=tonemap_fragment.get();
+      info.primitive_type=SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+      info.rasterizer_state.fill_mode=SDL_GPU_FILLMODE_FILL;info.rasterizer_state.cull_mode=SDL_GPU_CULLMODE_NONE;info.rasterizer_state.front_face=SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;info.rasterizer_state.enable_depth_clip=true;
+      info.multisample_state.sample_count=SDL_GPU_SAMPLECOUNT_1;
+      info.target_info.color_target_descriptions=&color;info.target_info.num_color_targets=1;
+      tonemap_pipeline=SDL_CreateGPUGraphicsPipeline(device,&info);if(!tonemap_pipeline)throw gpu_error("3D tonemap pipeline creation failed");
+    }
+    streamer.set_pinned(stream_id_for(*white),true);
   }
   std::shared_ptr<Geometry> geometry(std::shared_ptr<const Mesh3D> resource){
     if(auto it=meshes.find(resource.get());it!=meshes.end()){it->second->use=++serial;return it->second;}
@@ -118,12 +161,57 @@ struct Scene3DRenderer::Storage {
     from.offset=vb;to={result->indices,0,ib};SDL_UploadToGPUBuffer(copy,&from,&to,false);SDL_EndGPUCopyPass(copy);command.submit();
     meshes.emplace(result->owner.get(),result);stats.mesh_cache_bytes+=result->bytes();++stats.mesh_uploads;return result;
   }
+  engine::TextureId stream_id_for(const RgbaImage& image){
+    if(const auto it=stream_ids.find(&image);it!=stream_ids.end())return it->second;
+    engine::TextureDesc desc{};desc.name="tex:"+std::to_string(reinterpret_cast<std::uintptr_t>(&image));
+    if(!image.cooked_mips().empty()){
+      SDL_GPUTextureFormat format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+      switch(image.cooked_format()){
+        case TextureFormat::Bc7:format=SDL_GPU_TEXTUREFORMAT_BC7_RGBA_UNORM;break;
+        case TextureFormat::Bc5:format=SDL_GPU_TEXTUREFORMAT_BC5_RG_UNORM;break;
+        case TextureFormat::Bc4:format=SDL_GPU_TEXTUREFORMAT_BC4_R_UNORM;break;
+        default:break;
+      }
+      if(SDL_GPUTextureSupportsFormat(device,format,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER))
+        for(const auto& m:image.cooked_mips())desc.mip_bytes.push_back(m.blocks.size());
+      else
+        for(const auto& m:image.cooked_mips())desc.mip_bytes.push_back(static_cast<std::uint64_t>(m.width)*m.height*4);
+    }else if(!image.bc1_mips().empty()&&SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER))
+      for(const auto& m:image.bc1_mips())desc.mip_bytes.push_back(m.blocks.size());
+    else{
+      const auto levels=texture_mip_layout3d(&image).levels;
+      for(std::uint32_t i=0;i<levels;++i)desc.mip_bytes.push_back(static_cast<std::uint64_t>(std::max(1,image.width()>>i))*std::max(1,image.height()>>i)*4);
+    }
+    const auto id=streamer.register_texture(std::move(desc));stream_ids.emplace(&image,id);stream_owners.emplace(id,&image);return id;
+  }
+  // advance_frame() yields the frame's residency changes: evictions apply
+  // whole-texture (backend granularity); loads stay lazy — the first bind
+  // uploads. Unadmitted requests bind the pinned fallback, keeping GPU
+  // residency under the streamer's byte budget.
+  void apply_streaming(){
+    std::unordered_set<engine::TextureId> touched;
+    for(const auto& change:streamer.advance_frame(++stream_frame))touched.insert(change.id);
+    for(const auto id:touched){
+      const auto owner_it=stream_owners.find(id);
+      if(owner_it==stream_owners.end())continue;
+      const auto it=textures.find(owner_it->second);if(it==textures.end())continue;
+      const auto finest=streamer.finest_resident_mip(id);
+      // Any residency change invalidates the cached granularity — demotions
+      // and promotions alike re-upload the new resident tail on next bind.
+      if(!finest||*finest!=it->second->base_mip){stats.texture_cache_bytes-=it->second->bytes();stats.streamed_evicted_bytes+=it->second->bytes();textures.erase(it);}
+    }
+  }
   std::shared_ptr<Texture> texture(std::shared_ptr<const RgbaImage> resource){
     if(!resource)resource=white;
     if(auto it=textures.find(resource.get());it!=textures.end()){it->second->use=++serial;return it->second;}
+    std::uint32_t base_mip=0;
+    if(resource.get()!=white.get())if(const auto sid=stream_ids.find(resource.get());sid!=stream_ids.end()){
+      const auto finest=streamer.finest_resident_mip(sid->second);
+      if(!finest){++stats.streamed_fallbacks;return texture(white);}
+      base_mip=*finest;if(base_mip)++stats.streamed_partial_binds;
+    }
     auto result=std::make_shared<Texture>(device);result->owner=std::move(resource);result->use=++serial;
     const auto& image=*result->owner;const auto layout=texture_mip_layout3d(&image);
-    result->gpu_bytes=layout.gpu_bytes;
     if(!image.cooked_mips().empty()){
       SDL_GPUTextureFormat format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
       switch(image.cooked_format()){
@@ -136,46 +224,54 @@ struct Scene3DRenderer::Storage {
       std::vector<Bc1MipLevel> fallback_mips;
       if(!supported){format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;for(const auto& m:image.cooked_mips())fallback_mips.push_back({m.width,m.height,decode_texture_level(image.cooked_format(),m)});}
       const auto& levels=supported?image.cooked_mips():fallback_mips;
+      const auto base=std::min(base_mip,static_cast<std::uint32_t>(levels.size()-1));result->base_mip=base;
       const bool block=format!=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-      result->gpu_bytes=0;for(const auto&m:levels)result->gpu_bytes+=m.blocks.size();
-      evict(textures,stats.texture_cache_bytes,result->bytes(),maximum_scene3d_texture_cache_bytes);
-      result->texture=make_texture(device,image.width(),image.height(),format,SDL_GPU_TEXTUREUSAGE_SAMPLER,static_cast<Uint32>(levels.size()));
+      result->gpu_bytes=0;for(std::size_t i=base;i<levels.size();++i)result->gpu_bytes+=levels[i].blocks.size();
+      if(textures.size()>=maximum_scene3d_resource_entries)evict(textures,stats.texture_cache_bytes,0,std::numeric_limits<std::size_t>::max());
+      result->texture=make_texture(device,levels[base].width,levels[base].height,format,SDL_GPU_TEXTUREUSAGE_SAMPLER,static_cast<Uint32>(levels.size()-base));
       // Every transfer offset is aligned, including the tiny 1x1 RGBA tail.
-      std::size_t transfer_bytes=0;for(const auto&m:levels)transfer_bytes+=((m.blocks.size()+15)/16)*16;
+      std::size_t transfer_bytes=0;for(std::size_t i=base;i<levels.size();++i)transfer_bytes+=((levels[i].blocks.size()+15)/16)*16;
       Transfer transfer(device,static_cast<Uint32>(transfer_bytes));auto* memory=static_cast<std::uint8_t*>(transfer.map());std::size_t offset=0;
-      for(const auto&m:levels){std::memcpy(memory+offset,m.blocks.data(),m.blocks.size());offset+=((m.blocks.size()+15)/16)*16;}SDL_UnmapGPUTransferBuffer(device,transfer.value);
+      for(std::size_t i=base;i<levels.size();++i){std::memcpy(memory+offset,levels[i].blocks.data(),levels[i].blocks.size());offset+=((levels[i].blocks.size()+15)/16)*16;}SDL_UnmapGPUTransferBuffer(device,transfer.value);
       Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("Cooked texture upload failed");offset=0;
-      for(Uint32 level=0;level<levels.size();++level){const auto&m=levels[level];SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.offset=static_cast<Uint32>(offset);from.pixels_per_row=block?(m.width+3)/4*4:m.width;from.rows_per_layer=block?(m.height+3)/4*4:m.height;
-        SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=((m.blocks.size()+15)/16)*16;
+      for(Uint32 level=base;level<levels.size();++level){const auto&m=levels[level];SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.offset=static_cast<Uint32>(offset);from.pixels_per_row=block?(m.width+3)/4*4:m.width;from.rows_per_layer=block?(m.height+3)/4*4:m.height;
+        SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level-base;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=((m.blocks.size()+15)/16)*16;
       }SDL_EndGPUCopyPass(copy);command.submit();textures.emplace(result->owner.get(),result);stats.texture_cache_bytes+=result->bytes();++stats.texture_uploads;return result;
     }
     const bool compressed=!image.bc1_mips().empty()&&SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER);
-    if(compressed){result->gpu_bytes=0;for(const auto& m:image.bc1_mips())result->gpu_bytes+=m.blocks.size();}
-    evict(textures,stats.texture_cache_bytes,result->bytes(),maximum_scene3d_texture_cache_bytes);
+    const auto bc1_base=image.bc1_mips().empty()?0u:std::min(base_mip,static_cast<std::uint32_t>(image.bc1_mips().size()-1));result->base_mip=bc1_base;
+    if(compressed){result->gpu_bytes=0;for(std::size_t i=bc1_base;i<image.bc1_mips().size();++i)result->gpu_bytes+=image.bc1_mips()[i].blocks.size();}
+    if(textures.size()>=maximum_scene3d_resource_entries)evict(textures,stats.texture_cache_bytes,0,std::numeric_limits<std::size_t>::max());
     if(compressed){
-      result->texture=make_texture(device,image.width(),image.height(),SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER,layout.levels);
+      const auto& tail=image.bc1_mips()[bc1_base];
+      result->texture=make_texture(device,tail.width,tail.height,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER,static_cast<Uint32>(image.bc1_mips().size()-bc1_base));
       Transfer transfer(device,static_cast<Uint32>(result->gpu_bytes));auto* data=static_cast<std::uint8_t*>(transfer.map());std::size_t offset=0;
-      for(const auto& m:image.bc1_mips()){std::memcpy(data+offset,m.blocks.data(),m.blocks.size());offset+=m.blocks.size();}SDL_UnmapGPUTransferBuffer(device,transfer.value);
+      for(std::size_t i=bc1_base;i<image.bc1_mips().size();++i){std::memcpy(data+offset,image.bc1_mips()[i].blocks.data(),image.bc1_mips()[i].blocks.size());offset+=image.bc1_mips()[i].blocks.size();}SDL_UnmapGPUTransferBuffer(device,transfer.value);
       Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("Compressed texture copy pass failed");offset=0;
-      for(Uint32 level=0;level<image.bc1_mips().size();++level){const auto& m=image.bc1_mips()[level];
+      for(Uint32 level=bc1_base;level<image.bc1_mips().size();++level){const auto& m=image.bc1_mips()[level];
         SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.offset=static_cast<Uint32>(offset);from.pixels_per_row=(m.width+3)/4*4;from.rows_per_layer=(m.height+3)/4*4;
-        SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=m.blocks.size();
+        SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level-bc1_base;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=m.blocks.size();
       }SDL_EndGPUCopyPass(copy);command.submit();
       textures.emplace(result->owner.get(),result);stats.texture_cache_bytes+=result->bytes();++stats.texture_uploads;return result;
     }
-    result->texture=make_texture(device,image.width(),image.height(),SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,layout.levels);
-    Transfer transfer(device,static_cast<Uint32>(image.pixels().size()));std::memcpy(transfer.map(),image.pixels().data(),image.pixels().size());SDL_UnmapGPUTransferBuffer(device,transfer.value);
+    const auto tail_levels=layout.levels-base_mip;result->base_mip=base_mip;
+    std::vector<std::uint8_t> degraded;int base_width=image.width(),base_height=image.height();
+    if(base_mip){degraded=image.pixels();for(std::uint32_t i=0;i<base_mip;++i)degraded=downsample_rgba2x(degraded,base_width,base_height,base_width,base_height);}
+    const auto& level0=base_mip?degraded:image.pixels();
+    result->gpu_bytes=0;{int w=base_width,h=base_height;for(std::uint32_t i=0;i<tail_levels;++i){result->gpu_bytes+=static_cast<std::size_t>(w)*h*4;if(w==1&&h==1)break;w=std::max(1,w/2);h=std::max(1,h/2);}}
+    result->texture=make_texture(device,base_width,base_height,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,tail_levels);
+    Transfer transfer(device,static_cast<Uint32>(level0.size()));std::memcpy(transfer.map(),level0.data(),level0.size());SDL_UnmapGPUTransferBuffer(device,transfer.value);
     Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D texture copy pass failed");
-    SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.pixels_per_row=image.width();from.rows_per_layer=image.height();
-    SDL_GPUTextureRegion to{};to.texture=result->texture;to.w=image.width();to.h=image.height();to.d=1;
+    SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.pixels_per_row=base_width;from.rows_per_layer=base_height;
+    SDL_GPUTextureRegion to{};to.texture=result->texture;to.w=base_width;to.h=base_height;to.d=1;
     SDL_UploadToGPUTexture(copy,&from,&to,false);SDL_EndGPUCopyPass(copy);
     // Generate once, outside the copy pass and before any consumer samples it.
     // All four channels are data: alpha may encode opacity OR surface height.
     // SDL 3.4.16's Vulkan GenerateMipmaps shifts dimensions without clamping
     // to one, yielding empty blits for rectangular tails and every 1D mip.
     // Explicit blit regions keep both axes valid through the final 1x1 level.
-    Uint32 width=image.width(),height=image.height();
-    for(Uint32 level=1;level<layout.levels;++level){
+    Uint32 width=base_width,height=base_height;
+    for(Uint32 level=1;level<tail_levels;++level){
       const auto next_width=std::max(1u,width/2),next_height=std::max(1u,height/2);
       SDL_GPUBlitInfo blit{};blit.source.texture=blit.destination.texture=result->texture;
       blit.source.mip_level=level-1;blit.source.w=width;blit.source.h=height;
@@ -190,6 +286,7 @@ struct Scene3DRenderer::Storage {
     auto result=std::make_unique<Target>(device);result->width=w;result->height=h;
     result->color=make_texture(device,w,h,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,SDL_GPU_TEXTUREUSAGE_COLOR_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
     result->depth=make_texture(device,w,h,SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET);
+    if(hdr)result->hdr=make_texture(device,w,h,SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT,SDL_GPU_TEXTUREUSAGE_COLOR_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
     const auto props=SDL_CreateProperties();if(!props)throw gpu_error("3D composite properties allocation failed");
     const auto destroy=[](SDL_PropertiesID p){SDL_DestroyProperties(p);};
     try{
@@ -218,18 +315,30 @@ struct Scene3DRenderer::Storage {
         instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
         instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface});
     }
-    std::stable_sort(draws.begin(),draws.end(),[](const Draw& a,const Draw& b){
-      const bool at=a.instance->material.transparent,bt=b.instance->material.transparent;
-      if(at!=bt)return !at;return at?a.transform.camera_depth>b.transform.camera_depth:a.transform.camera_depth<b.transform.camera_depth;
-    });
-    Command command(device);SDL_GPUColorTargetInfo color{};color.texture=target.color;color.load_op=SDL_GPU_LOADOP_CLEAR;color.store_op=SDL_GPU_STOREOP_STORE;
-    SDL_GPUDepthStencilTargetInfo depth{};depth.texture=target.depth;depth.clear_depth=1;depth.load_op=SDL_GPU_LOADOP_CLEAR;depth.store_op=SDL_GPU_STOREOP_DONT_CARE;depth.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;depth.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
-    auto* pass=SDL_BeginGPURenderPass(command.value,&color,1,&depth);if(!pass)throw gpu_error("3D render pass failed");
-    for(const auto& draw:draws){
+    // Engine DrawBatcher owns submission ordering/batching: opaque groups by
+    // (material,mesh), transparent stays back-to-front. A material_id interns
+    // everything the binding must share — all eight textures plus the flags
+    // that change sampler/pipeline selection — so equal ids mean one
+    // instanced call can serve the whole run.
+    using MaterialKey=std::tuple<bool,bool,const Texture*,const Texture*,const Texture*,const Texture*,const Texture*,const Texture*,const Texture*,const Texture*>;
+    std::map<MaterialKey,std::uint32_t> material_ids;std::map<const Mesh3D*,std::uint32_t> mesh_ids;
+    engine::DrawBatcher batcher;batcher.begin_frame();
+    for(std::size_t submission=0;submission<draws.size();++submission){
+      const auto& d=draws[submission];
+      const MaterialKey key{d.instance->material.double_sided,d.instance->material.anisotropic_texture,d.image.get(),d.optical.get(),d.environment.get(),d.normal.get(),d.properties.get(),d.cloud.get(),d.shadow.get(),d.next.get()};
+      engine::DrawItem item{};item.material_id=material_ids.try_emplace(key,static_cast<std::uint32_t>(material_ids.size())).first->second;
+      item.mesh_id=mesh_ids.try_emplace(d.mesh->owner.get(),static_cast<std::uint32_t>(mesh_ids.size())).first->second;
+      item.instance_index=static_cast<std::uint32_t>(submission);item.depth=d.transform.camera_depth;item.transparent=d.instance->material.transparent;
+      batcher.submit(item);
+    }
+    batcher.build();const auto& sorted=batcher.sorted_items();
+    std::vector<VertexUniform> vertex_data(sorted.size());std::vector<FragmentUniform> fragment_data(sorted.size());
+    for(std::size_t slot=0;slot<sorted.size();++slot){
+      const auto& draw=draws[sorted[slot].instance_index];
       const auto& material=draw.instance->material;const auto light=material.light_direction.value_or(view.scene->light_direction());
       const auto shadow=material.shadow?prepare_shadow3d(view.scene->camera(),*draw.instance,light):PreparedShadow3D{};
-      const VertexUniform vertex{draw.transform.model_view_projection,draw.transform.model_view,shadow.from_model};
-      FragmentUniform fragment{};fragment.tint={material.tint.r/255.f,material.tint.g/255.f,material.tint.b/255.f,material.tint.a/255.f};
+      VertexUniform& vertex=vertex_data[slot];vertex={draw.transform.model_view_projection,draw.transform.model_view,shadow.from_model};
+      FragmentUniform& fragment=fragment_data[slot];fragment.tint={material.tint.r/255.f,material.tint.g/255.f,material.tint.b/255.f,material.tint.a/255.f};
       fragment.light={light.x,light.y,light.z,0};fragment.parameters={material.ambient,material.diffuse,material.opacity,material.dark_side_strength};
       const auto q=view.scene->camera().orientation;fragment.camera_orientation={q.x,q.y,q.z,q.w};
       fragment.view_options[3]=material.linear_light?1.f:0.f;
@@ -264,15 +373,67 @@ struct Scene3DRenderer::Storage {
         fragment.optics={d.index_of_refraction,d.roughness,d.transmission,d.thickness};
         fragment.absorption={d.absorption.x,d.absorption.y,d.absorption.z,d.environment_strength};fragment.view_options[1]=d.specular_strength;
         fragment.view_options[2]=d.surface_relief*draw.instance->scale;}
-      SDL_PushGPUVertexUniformData(command.value,0,&vertex,sizeof(vertex));SDL_PushGPUFragmentUniformData(command.value,0,&fragment,sizeof(fragment));
-      SDL_BindGPUGraphicsPipeline(pass,pipelines[(material.transparent?1:0)+(material.double_sided?2:0)]);
-      const SDL_GPUBufferBinding vertices{draw.mesh->vertices,0},indices{draw.mesh->indices,0};
-      SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
-      const SDL_GPUTextureSamplerBinding sampled[]{{draw.image->texture,material.anisotropic_texture?detail_sampler:sampler},{draw.optical->texture,sampler},{draw.environment->texture,environment_sampler},{draw.normal->texture,environment_sampler},{draw.properties->texture,environment_sampler},{draw.cloud->texture,environment_sampler},{draw.shadow->texture,sampler},{draw.next->texture,sampler}};
-      SDL_BindGPUFragmentSamplers(pass,0,sampled,8);
-      SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(draw.mesh->owner->indices().size()),1,0,0,0);++stats.draw_calls;
     }
-    SDL_EndGPURenderPass(pass);command.submit();
+    // Pass scheduling goes through the engine RenderGraph: resources and
+    // dependencies are declared per frame, compile() validates the DAG and
+    // emits the execution order, and the backend binds routines by tag.
+    engine::RenderGraph graph;
+    const auto res_w=static_cast<std::uint32_t>(view.destination.width),res_h=static_cast<std::uint32_t>(view.destination.height);
+    const auto hdr_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"hdr-scene",res_w,res_h,"rgba16f",true});
+    const auto color_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"color",res_w,res_h,"rgba8",true});
+    const auto depth_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"depth",res_w,res_h,"d32",true});
+    graph.add_pass({"scene3d",{},{target.hdr?hdr_target:color_target,depth_target},{},"scene3d"});
+    graph.add_pass({"tonemap",{hdr_target},{color_target},{},"tonemap",target.hdr!=nullptr});
+    std::vector<std::string> order;std::vector<engine::RenderGraphDiagnostic> diagnostics;
+    if(!graph.compile(&order,&diagnostics))throw std::runtime_error("3D render graph compile failed: "+(diagnostics.empty()?std::string("unknown"):diagnostics.front().message));
+    Command command(device);
+    if(!sorted.empty()){
+      const auto vertex_bytes=static_cast<Uint32>(vertex_data.size()*sizeof(VertexUniform)),fragment_bytes=static_cast<Uint32>(fragment_data.size()*sizeof(FragmentUniform));
+      if(!vertex_buffer||!fragment_buffer||vertex_capacity<vertex_data.size()||fragment_capacity<fragment_data.size()){
+        if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);
+        if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);
+        vertex_capacity=std::max<std::size_t>(vertex_data.size(),vertex_capacity*2);fragment_capacity=std::max<std::size_t>(fragment_data.size(),fragment_capacity*2);
+        SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(vertex_capacity*sizeof(VertexUniform));
+        vertex_buffer=SDL_CreateGPUBuffer(device,&info);if(!vertex_buffer)throw gpu_error("3D instance transform buffer creation failed");
+        info.size=static_cast<Uint32>(fragment_capacity*sizeof(FragmentUniform));
+        fragment_buffer=SDL_CreateGPUBuffer(device,&info);if(!fragment_buffer)throw gpu_error("3D instance material buffer creation failed");
+      }
+      Transfer transfer(device,vertex_bytes+fragment_bytes);auto* memory=static_cast<std::byte*>(transfer.map());
+      std::memcpy(memory,vertex_data.data(),vertex_bytes);std::memcpy(memory+vertex_bytes,fragment_data.data(),fragment_bytes);SDL_UnmapGPUTransferBuffer(device,transfer.value);
+      auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D instance upload copy pass failed");
+      SDL_GPUTransferBufferLocation from{transfer.value,0};SDL_GPUBufferRegion to{vertex_buffer,0,vertex_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);
+      from.offset=vertex_bytes;to={fragment_buffer,0,fragment_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);
+      SDL_EndGPUCopyPass(copy);
+    }
+    for(const auto& name:order){
+      if(name=="scene3d"){
+        SDL_GPUColorTargetInfo color{};color.texture=target.hdr?target.hdr:target.color;color.load_op=SDL_GPU_LOADOP_CLEAR;color.store_op=SDL_GPU_STOREOP_STORE;
+        SDL_GPUDepthStencilTargetInfo depth{};depth.texture=target.depth;depth.clear_depth=1;depth.load_op=SDL_GPU_LOADOP_CLEAR;depth.store_op=SDL_GPU_STOREOP_DONT_CARE;depth.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;depth.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
+        auto* pass=SDL_BeginGPURenderPass(command.value,&color,1,&depth);if(!pass)throw gpu_error("3D render pass failed");
+        if(!sorted.empty()){
+          SDL_BindGPUVertexStorageBuffers(pass,0,&vertex_buffer,1);SDL_BindGPUFragmentStorageBuffers(pass,0,&fragment_buffer,1);
+          for(const auto& batch:batcher.batches()){
+            const auto& draw=draws[sorted[batch.first_item].instance_index];const auto& material=draw.instance->material;
+            SDL_BindGPUGraphicsPipeline(pass,pipelines[(material.transparent?1:0)+(material.double_sided?2:0)]);
+            const SDL_GPUBufferBinding vertices{draw.mesh->vertices,0},indices{draw.mesh->indices,0};
+            SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
+            const SDL_GPUTextureSamplerBinding sampled[]{{draw.image->texture,material.anisotropic_texture?detail_sampler:sampler},{draw.optical->texture,sampler},{draw.environment->texture,environment_sampler},{draw.normal->texture,environment_sampler},{draw.properties->texture,environment_sampler},{draw.cloud->texture,environment_sampler},{draw.shadow->texture,sampler},{draw.next->texture,sampler}};
+            SDL_BindGPUFragmentSamplers(pass,0,sampled,8);
+            SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(draw.mesh->owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
+          }
+        }
+        SDL_EndGPURenderPass(pass);
+      }else if(name=="tonemap"){
+        SDL_GPUColorTargetInfo resolve{};resolve.texture=target.color;resolve.load_op=SDL_GPU_LOADOP_DONT_CARE;resolve.store_op=SDL_GPU_STOREOP_STORE;
+        auto* resolve_pass=SDL_BeginGPURenderPass(command.value,&resolve,1,nullptr);if(!resolve_pass)throw gpu_error("3D tonemap pass failed");
+        SDL_BindGPUGraphicsPipeline(resolve_pass,tonemap_pipeline);
+        const SDL_GPUTextureSamplerBinding sampled[]{{target.hdr,sampler}};
+        SDL_BindGPUFragmentSamplers(resolve_pass,0,sampled,1);
+        SDL_DrawGPUPrimitives(resolve_pass,3,1,0,0);
+        SDL_EndGPURenderPass(resolve_pass);
+      }
+    }
+    command.submit();
   }
 };
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
@@ -284,26 +445,61 @@ void Scene3DRenderer::prepare(const DrawList& list){
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");
   std::size_t total=0;
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
+  std::unordered_map<engine::TextureId,std::pair<float,std::uint32_t>> stream_demand;
+  const auto stream_request=[&](const std::shared_ptr<const RgbaImage>& image,float priority,std::uint32_t desired_mip){
+    const auto id=s.stream_id_for(image?*image:*s.white);
+    const auto [it,inserted]=stream_demand.try_emplace(id,priority,desired_mip);
+    if(!inserted){it->second.first=std::max(it->second.first,priority);it->second.second=std::min(it->second.second,desired_mip);}};
   std::size_t geometry_bytes=0,texture_bytes=0;
   for(const auto* view:s.views){const auto r=view->destination;
     if(!view->scene||!std::isfinite(r.x)||!std::isfinite(r.y)||std::abs(r.x)>65536||std::abs(r.y)>65536||
        !std::isfinite(r.width)||!std::isfinite(r.height)||r.width<1||r.height<1||r.width>8192||r.height>8192)
       throw std::invalid_argument("3D viewport requires a scene and finite bounded dimensions.");
-    total+=static_cast<std::size_t>(std::ceil(r.width))*static_cast<std::size_t>(std::ceil(r.height))*8u;
+    total+=static_cast<std::size_t>(std::ceil(r.width))*static_cast<std::size_t>(std::ceil(r.height))*(s.hdr?16u:8u);
+    const auto& cam=view->scene->camera();const auto& camera=cam.position;
+    // Projected px per world unit: the sampler only reaches the mip whose
+    // texel density matches the on-screen footprint, so the resident tail
+    // can start there. Bounding-sphere diameter overestimates surface texel
+    // density — the choice errs finer, never blurrier than the full chain.
+    const float focal=cam.projection==Projection3D::Orthographic?r.height/std::max(cam.orthographic_height,1e-6f)
+      :r.height/std::max(2.f*std::tan(cam.vertical_fov_radians*.5f),1e-6f);
     for(const auto& instance:view->scene->instances()){
       if(meshes.insert(instance.mesh.get()).second)geometry_bytes+=instance.mesh->byte_size()*2;
+      // Nearer instances win texture-budget contention.
+      const auto dx=instance.position.x-camera.x,dy=instance.position.y-camera.y,dz=instance.position.z-camera.z;
+      const float dist=static_cast<float>(std::sqrt(dx*dx+dy*dy+dz*dz));
+      const float priority=1.f/(1.f+dist);
+      const float footprint=2.f*instance.scale*instance.mesh->bounding_radius()*focal/(cam.projection==Projection3D::Orthographic?1.f:std::max(dist,1e-4f));
+      const auto mip_for=[&](const std::shared_ptr<const RgbaImage>& image){
+        const auto& img=image?*image:*s.white;const int tex=std::max(img.width(),img.height());
+        return footprint>=tex||tex<=1?0u:static_cast<std::uint32_t>(std::floor(std::log2(static_cast<float>(tex)/footprint)));};
       const auto& image=instance.material.texture;
       if(textures.insert(image.get()).second)texture_bytes+=texture_mip_layout3d(image.get()).resident_bytes;
-      if(instance.material.dielectric)for(const auto& optical:{instance.material.dielectric->environment,instance.material.dielectric->surface})
+      // anisotropic_texture declares high-frequency content (polar/ring
+      // maps): isotropic LOD erases it, so it keeps full-chain residency.
+      stream_request(image,priority,instance.material.anisotropic_texture?0u:mip_for(image));
+      if(instance.material.dielectric){
+        // The environment map is a view-independent equirect sampled at
+        // reflected/refracted directions — surface footprint does not bound
+        // its texel demand, so it keeps full-chain residency like aniso
+        // content. The roughness/relief surface map IS surface content.
+        const auto& env=instance.material.dielectric->environment;
+        if(textures.insert(env.get()).second)texture_bytes+=texture_mip_layout3d(env.get()).resident_bytes;
+        stream_request(env,priority,0u);
+        const auto& optical=instance.material.dielectric->surface;
         if(textures.insert(optical.get()).second)texture_bytes+=texture_mip_layout3d(optical.get()).resident_bytes;
+        stream_request(optical,priority,mip_for(optical));
+      }
       if(instance.material.surface_response)for(const auto& response_image:{instance.material.surface_response->normal,instance.material.surface_response->properties,instance.material.surface_response->cloud_shadow})
-        if(textures.insert(response_image.get()).second)texture_bytes+=texture_mip_layout3d(response_image.get()).resident_bytes;
+        {if(textures.insert(response_image.get()).second)texture_bytes+=texture_mip_layout3d(response_image.get()).resident_bytes;stream_request(response_image,priority,mip_for(response_image));}
       if(instance.material.surface_effect){const auto& image_next=instance.material.surface_effect->next_texture;
-        if(textures.insert(image_next.get()).second)texture_bytes+=texture_mip_layout3d(image_next.get()).resident_bytes;}
+        if(textures.insert(image_next.get()).second)texture_bytes+=texture_mip_layout3d(image_next.get()).resident_bytes;stream_request(image_next,priority,mip_for(image_next));}
       if(instance.material.shadow&&instance.material.shadow->opacity_map){const auto& shadow_image=instance.material.shadow->opacity_map;
-        if(textures.insert(shadow_image.get()).second)texture_bytes+=texture_mip_layout3d(shadow_image.get()).resident_bytes;}
+        if(textures.insert(shadow_image.get()).second)texture_bytes+=texture_mip_layout3d(shadow_image.get()).resident_bytes;stream_request(shadow_image,priority,mip_for(shadow_image));}
     }
   }
+  for(const auto& [id,demand]:stream_demand)s.streamer.request(id,demand.second,demand.first);
+  s.apply_streaming();
   if(total>maximum_scene3d_target_bytes)throw std::length_error("3D viewports exceed their 128 MiB target budget.");
   if(meshes.size()>maximum_scene3d_resource_entries||textures.size()>maximum_scene3d_resource_entries||geometry_bytes>maximum_mesh3d_cache_bytes||texture_bytes>maximum_scene3d_texture_cache_bytes)
     throw std::length_error("Combined 3D views exceed their resident resource budget.");
@@ -322,6 +518,7 @@ void Scene3DRenderer::composite(const Scene3DView& view){
   const auto r=view.destination;const SDL_FRect destination{r.x,r.y,r.width,r.height};
   checked(SDL_RenderTexture(s.renderer,s.targets[s.next_view++]->composite,nullptr,&destination),"3D viewport composition failed");
 }
-Scene3DStatistics Scene3DRenderer::statistics()const noexcept{auto result=storage_->stats;result.mesh_cache_entries=storage_->meshes.size();result.texture_cache_entries=storage_->textures.size();return result;}
+void Scene3DRenderer::set_texture_budget(std::uint64_t bytes){auto& s=*storage_;s.require_owner();s.streamer.set_budget(bytes);}
+Scene3DStatistics Scene3DRenderer::statistics()const noexcept{auto result=storage_->stats;result.mesh_cache_entries=storage_->meshes.size();result.texture_cache_entries=storage_->textures.size();result.hdr=storage_->hdr;return result;}
 } // namespace stellar::native_map
 

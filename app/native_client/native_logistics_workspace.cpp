@@ -68,8 +68,22 @@ std::string SupplyWorkspace::trf(
 }
 
 void SupplyWorkspace::clear_rows() noexcept { rows_={}; }
-void SupplyWorkspace::open() noexcept { visible_=true;scroll_=0.f;owned_=false;clear_rows(); }
-void SupplyWorkspace::close() noexcept { visible_=false;owned_=false;clear_rows(); }
+void SupplyWorkspace::open() noexcept { visible_=true;scroll_={};owned_=false;focus_=-1;clear_rows(); }
+void SupplyWorkspace::close() noexcept { visible_=false;owned_=false;focus_=-1;clear_rows(); }
+std::string SupplyWorkspace::focused_label(const View &view) const {
+  if (focus_ < 0) return {};
+  if (focus_ == 0)
+    return tr(view.state == LoadState::Failed ? "SUPPLY_RETRY" : "SUPPLY_REFRESH",
+              view.state == LoadState::Failed ? "Retry" : "Refresh");
+  return tr("SUPPLY_CLOSE", "Close supply network");
+}
+std::optional<UiRect> SupplyWorkspace::focused_bounds(int width,
+                                                      int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto layout = SupplyLayout::for_viewport(width, height);
+  return focus_ == 0 ? std::optional<UiRect>{layout.refresh}
+                     : std::optional<UiRect>{layout.close};
+}
 void SupplyWorkspace::set_text_measurer(std::function<TextExtent(const Text&)> value) {
   measure_=std::move(value);++measurer_revision_;clear_rows();
 }
@@ -97,6 +111,26 @@ SupplyCommand SupplyWorkspace::handle(const InputEvent& event,const View& view,i
   const auto layout=SupplyLayout::for_viewport(width,height);
   if(event.type==InputEventType::PointerCancelled){owned_=false;return {true,false};}
   if(event.type==InputEventType::EscapePressed){close();return {true,false};}
+  if(event.type==InputEventType::KeyPressed&&event.key){
+    // SDL_Keycode: Tab/arrows move the ring over [refresh, close];
+    // Return/Space replay the click gesture through the same dispatch.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const bool fwd=(event.key==kTab&&!event.shift)||event.key==kRight||event.key==kDown;
+    const bool bwd=(event.key==kTab&&event.shift)||event.key==kLeft||event.key==kUp;
+    if(event.key==kHome||event.key==kEnd){focus_=event.key==kHome?0:1;return {true,false};}
+    if(fwd||bwd){focus_=focus_<0?(bwd?1:0):(focus_+(bwd?-1:1)+2)%2;return {true,false};}
+    if((event.key==kReturn||event.key==kSpace)&&focus_>=0){
+      const auto&rect=focus_==0?layout.refresh:layout.close;
+      InputEvent press{InputEventType::LeftPressed},release{InputEventType::LeftReleased};
+      press.position=release.position={rect.x+rect.width*.5f,rect.y+rect.height*.5f};
+      const int keep=focus_;auto command=handle(press,view,width,height);
+      static_cast<void>(handle(release,view,width,height));
+      if(visible_)focus_=keep;return command;
+    }
+    return {}; // Non-modal: unhandled keys pass through to global shortcuts.
+  }
   if(!pointer_event(event.type))return {};
   if(event.type==InputEventType::LeftReleased||event.type==InputEventType::RightReleased){
     const bool captured=owned_||layout.panel.contains(event.position);owned_=false;return {captured,false};
@@ -105,14 +139,15 @@ SupplyCommand SupplyWorkspace::handle(const InputEvent& event,const View& view,i
   if(!layout.panel.contains(event.position))return {};
   if(event.type==InputEventType::LeftPressed){
     if(layout.close.contains(event.position)){close();return {true,false};}
+    focus_=-1;
     owned_=true;
     return {true,layout.refresh.contains(event.position)};
   }
   if(event.type==InputEventType::RightPressed)owned_=true;
   if(event.type==InputEventType::Wheel&&layout.body.contains(event.position)) {
     const auto& rows=rows_for(view,layout,width,height);
-    const auto maximum=std::max(0.f,rows.height-layout.body.height);
-    scroll_=std::clamp(scroll_-event.wheel_y*55.f*layout.scale,0.f,maximum);
+    scroll_.sync(rows.height,layout.body.height);
+    scroll_.scroll_by(-event.wheel_y*55.f*layout.scale);
   }
   return {true,false};
 }
@@ -134,6 +169,7 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
                 "{0}  /  HOME SYSTEM  /  {1} TRANSPORT LINKS")
            :tr("SUPPLY_UNAVAILABLE","HOME SYSTEM SUPPLY UNAVAILABLE"),font,cyan,p);
   label(out,{p.x+18.f*s,p.y+85.f*s,p.width-36.f*s,45.f*s},view.message,font,ready?muted:amber,p);
+  if(focus_>=0)out.overlay.emplace_back(StrokedRectangle{focus_==0?layout.refresh:layout.close,{160,210,255,255}});
   if(!ready)return; // Never render stale totals or healthy zeroes after a failure.
   const std::array<const char*,4> metric_keys{"SUPPLY_METRIC_AVAILABLE","SUPPLY_METRIC_DEMAND","SUPPLY_METRIC_DELIVERED","SUPPLY_METRIC_SHORTFALL"};
   const std::array<std::string,4> metric_fallbacks{"AVAILABLE","DEMAND","DELIVERED","SHORTFALL"};
@@ -155,10 +191,9 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
   for(std::size_t i=0;i<columns.size();++i)
     label(out,{b.x+b.width*columns[i]+8.f*s,p.y+215.f*s,b.width*spans[i]-16.f*s,23.f*s},tr(heading_keys[i],heading_fallbacks[i]),font-2,muted,p);
   const auto& rows=rows_for(view,layout,width,height);
-  const auto maximum=std::max(0.f,rows.height-b.height);
-  scroll_=std::clamp(scroll_,0.f,maximum);
+  scroll_.sync(rows.height,b.height);
   for(const auto& row:rows.rows){
-    const UiRect box{b.x,b.y+row.y-scroll_,b.width,row.height};
+    const UiRect box{b.x,b.y+row.y-scroll_.scroll_offset,b.width,row.height};
     const auto visible=intersect(box,b);if(visible.height<=0.f)continue;
     out.overlay.emplace_back(FilledRectangle{visible,{11,29,46,246}});
     const auto& n=view.nodes[row.index];
@@ -170,11 +205,9 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
             i==1&&n.delivered_per_day+.00001<n.demand_per_day?amber:ink,b);
   }
   if(view.nodes.empty())label(out,{b.x+8.f*s,b.y+12.f*s,b.width-16.f*s,50.f*s},tr("SUPPLY_EMPTY","No owned supply locations in the home system."),font,muted,b);
-  if(maximum>0.f){
-    const float thumb=std::max(24.f*s,b.height*b.height/rows.height);
-    const float y=b.y+(b.height-thumb)*scroll_/maximum;
+  if(const auto thumb=scroll_.thumb(b.height,24.f*s);thumb.size>0){
     out.overlay.emplace_back(FilledRectangle{{b.x+b.width+7.f*s,b.y,3.f*s,b.height},{29,61,78,255}});
-    out.overlay.emplace_back(FilledRectangle{{b.x+b.width+7.f*s,y,3.f*s,thumb},cyan});
+    out.overlay.emplace_back(FilledRectangle{{b.x+b.width+7.f*s,b.y+thumb.offset,3.f*s,thumb.size},cyan});
   }
 }
 } // namespace stellar::native_logistics

@@ -37,6 +37,11 @@ public:
     [[nodiscard]] bool destroy(EntityId id);
     [[nodiscard]] bool contains(EntityId id) const noexcept;
     [[nodiscard]] std::size_t size() const noexcept;
+    // Container-storage footprint for MemoryTracker::report — vector
+    // capacities, not allocator truth.
+    [[nodiscard]] std::size_t memory_bytes() const noexcept {
+        return slots_.capacity()*sizeof(Slot)+free_.capacity()*sizeof(std::uint32_t);
+    }
 
 private:
     struct Slot { std::uint32_t generation{1}; bool alive{}; bool retired{}; };

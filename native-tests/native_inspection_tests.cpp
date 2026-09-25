@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
@@ -357,6 +358,34 @@ void card_pointer_ownership_close_and_keyboard() {
               !card.visible(),
           "scaled close button did not dismiss the card");
 }
+
+void card_keyboard_focus() {
+  SystemInspectionCard card;
+  card.set_inspection(long_inspection());
+  const UiRect bounds{80, 90, 360, 220};
+  const auto close = SystemInspectionCard::close_bounds(bounds);
+  constexpr std::uint32_t kTab=9u,kReturn=13u,kRight=0x4000004fu,kEnd=0x4000004du;
+  const auto key=[&](std::uint32_t code){InputEvent e{InputEventType::KeyPressed};e.key=code;return card.handle(e,bounds);};
+  require(card.focus()<0,"card started with a focused control");
+  require(key(kTab).captured&&card.focus()==0,
+          "Tab did not focus the card close control");
+  require(card.focused_label()=="Close inspection",
+          "focused card close control reported the wrong label");
+  DrawList draw;
+  card.render(draw,bounds);
+  require(std::ranges::any_of(draw.overlay,[&](const UiOverlayCommand&item){
+    const auto*stroke=std::get_if<StrokedRectangle>(&item);
+    return stroke&&stroke->bounds.x==close.x&&stroke->bounds.y==close.y&&stroke->color.r==164;}),
+          "focused card did not ring its close control");
+  require(key(kRight).captured&&key(kEnd).captured&&card.focus()==0,
+          "single-control ring left the close control");
+  (void)card.handle({InputEventType::LeftPressed,{100,150}},bounds);
+  require(card.focus()<0,"pointer press did not reset card focus");
+  (void)key(kTab);
+  const auto dismissed=key(kReturn);
+  require(dismissed.closed&&!card.visible()&&card.focus()<0,
+          "Return on the focused close did not dismiss the card");
+}
 } // namespace
 
 int main() try {
@@ -368,6 +397,7 @@ int main() try {
   invalid_observer_and_missing_target_are_independent();
   card_layout_scroll_and_refresh();
   card_pointer_ownership_close_and_keyboard();
+  card_keyboard_focus();
   std::cout << "native inspection tests passed\n";
   return 0;
 } catch (const std::exception& error) {

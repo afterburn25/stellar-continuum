@@ -122,6 +122,68 @@ int main(int argc,char** argv)try{
     check(screen.selected_slot()==-1&&!screen.modal(),"Changing planet retained previous selection or quote");
     check(screen.handle({InputEventType::LeftReleased,slot},w,h).action==PlanetaryAction::None,"Changing planet left stale hit targets");
   }
+  {
+    // Keyboard-focus contract: the ring walks the render-registered hit
+    // registry in (y,x) order, Escape releases it before Back, pointer
+    // presses reset it, Return/Space replays the same dispatch a matched
+    // press+release takes, and the confirmation modal narrows the ring to
+    // its own controls.
+    NativePlanetaryScreen screen;NativeColonyView view;
+    view.body_id=3;view.planet.details.emplace();view.solid_surface=true;
+    view.campaign_generation=1;view.colony_id=7;view.building_capacity=32;
+    view.surface_hub_level=2;view.body_display_name="Earth";
+    screen.set_view(view);
+    const int w=1920,h=1080;
+    DrawList draw;screen.render(draw,view,w,h);
+    const auto key=[&](std::uint32_t k,bool shift=false){
+      InputEvent e{};e.type=InputEventType::KeyPressed;e.key=k;e.shift=shift;
+      return screen.handle(e,w,h);};
+    constexpr std::uint32_t kTab=9u,kReturn=13u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const auto escape=[&]{return screen.handle({InputEventType::EscapePressed},w,h);};
+    check(screen.focus()<0,"Planet ring present before any key");
+    check(screen.focused_label().empty()&&!screen.focused_bounds().has_value(),
+          "Unfocused planet returned a label or bounds");
+    check(key(kTab).action==PlanetaryAction::None&&screen.focus()==0,
+          "Tab did not arm the planet ring");
+    check(!screen.focused_label().empty()&&screen.focused_bounds().has_value(),
+          "Focused planet control has no label or bounds");
+    check(screen.focused_control()==stellar::engine::AnnouncementControl::Button,
+          "Planet control did not classify as a button");
+    check(key(kEnd).action==PlanetaryAction::None&&screen.focus()>0,
+          "End did not reach the planet ring tail");
+    check(key(kHome).action==PlanetaryAction::None&&screen.focus()==0,
+          "Home did not return to the planet ring head");
+    check(escape().action==PlanetaryAction::None&&screen.focus()<0,
+          "Escape did not release the planet ring");
+    check(escape().action==PlanetaryAction::Back,
+          "Escape after release did not emit Back");
+    // Keyboard activation replays the pointer dispatch: walk the ring to
+    // the Save button and confirm it emits Save, not a tab/selection side
+    // effect.
+    (void)key(kTab);bool found_save=false;
+    for(int i=0;i<200&&screen.focus()>=0;++i){
+      if(screen.focused_label()=="Save"){found_save=true;break;}
+      (void)key(kTab);
+    }
+    check(found_save,"Save control missing from the planet ring");
+    check(key(kReturn).action==PlanetaryAction::Save,
+          "Return did not replay the Save dispatch");
+    // A pointer press clears the ring; the modal narrows it to Cancel and
+    // Confirm only.
+    (void)screen.handle({InputEventType::LeftPressed,{10,10}},w,h);
+    check(screen.focus()<0,"Pointer press kept the planet ring");
+    NativeSurfacePlacementQuote quote;quote.accepted=true;
+    quote.building_name="Science lab";quote.message="Authorize construction";
+    screen.set_confirmation(quote);draw={};screen.render(draw,view,w,h);
+    (void)key(kTab);check(screen.focused_label()=="Cancel",
+                          "Modal ring did not start at Cancel");
+    (void)key(kEnd);check(screen.focused_label()=="Confirm",
+                          "Modal ring tail is not Confirm");
+    check(key(kReturn).action==PlanetaryAction::Confirm,
+          "Return did not replay the Confirm dispatch");
+    screen.complete("Done");
+  }
   for (const auto [w,h] : std::array<std::pair<int,int>,2>{{{1280,720},{1920,1080}}}) {
     NativePlanetaryScreen developer; NativeColonyView v;
     v.campaign_generation=10;v.body_id=3;v.developer_inspection=true;v.foreign_settlement=true;

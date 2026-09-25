@@ -563,6 +563,270 @@ int main() {
     panel.render(out, board, fleets, colonies, 1600, 900);
     check(!out.overlay.empty(), "the sites tab must render");
   }
+  {
+    // Keyboard focus ring: nav keys arm and walk the actionable controls in
+    // (y,x) order, activation replays the pointer dispatch, Escape releases
+    // the ring before the host closes, and a pointer press clears it.
+    auto campaign = campaign_fixture();
+    const auto board = build_mission_board(campaign);
+    NativeMissionView panel;
+    panel.open();
+    const auto key = [&](std::uint32_t value) {
+      native_map::InputEvent event{native_map::InputEventType::KeyPressed};
+      event.key = value;
+      return panel.handle(event, board, {}, {}, 1600, 900);
+    };
+    check(panel.focus() < 0 &&
+              panel.focused_label(board, {}, {}, 1600, 900).empty() &&
+              !panel.focused_bounds(board, {}, {}, 1600, 900),
+          "an unfocused panel must report no focus");
+    // (y,x) order in missions mode: Close (header band) → Missions →
+    // Colony sites.
+    check(key(9).captured && panel.focus() == 0,
+          "Tab must arm the ring on the first control");
+    check(panel.focused_label(board, {}, {}, 1600, 900) == "Close" &&
+              panel.focused_bounds(board, {}, {}, 1600, 900).has_value(),
+          "the ringed close control must carry an honest label and bounds");
+    const auto close_command = key(13);
+    check(close_command.kind == MissionViewCommandKind::Close &&
+              close_command.captured,
+          "Return on the ringed close control must replay its dispatch");
+    check(panel.focus() == 0, "activation must retain the ring position");
+    check(key(9).captured &&
+              panel.focused_label(board, {}, {}, 1600, 900) == "Missions",
+          "Tab must advance to the missions tab");
+    check(key(9).captured &&
+              panel.focused_label(board, {}, {}, 1600, 900) ==
+                  "Colony sites",
+          "Tab must advance to the sites tab");
+    (void)key(13); // Activate the sites tab — no fleets/colonies ring below.
+    native_map::InputEvent escape{native_map::InputEventType::EscapePressed};
+    const auto release = panel.handle(escape, board, {}, {}, 1600, 900);
+    check(release.captured && panel.focus() < 0,
+          "Escape must release the ring while the panel stays open");
+    check(!panel.handle(escape, board, {}, {}, 1600, 900).captured,
+          "Escape without a ring must fall through for the host to close");
+    // Rearm, then a pointer press inside the panel clears the ring.
+    (void)key(9);
+    native_map::InputEvent press{native_map::InputEventType::LeftPressed};
+    press.position = {1400.f, 500.f};
+    (void)panel.handle(press, board, {}, {}, 1600, 900);
+    check(panel.focus() < 0, "a pointer press must release the ring");
+    panel.close();
+    check(panel.focus() < 0 &&
+              panel.focused_label(board, {}, {}, 1600, 900).empty(),
+          "closing the panel must retire the ring");
+  }
+  {
+    // Sites-mode ring: the select-ship and colony row buttons join the ring
+    // and emit their real commands through keyboard activation.
+    auto campaign = campaign_fixture();
+    const auto board = build_mission_board(campaign);
+    native_colony::NativeSettlementMissionView view;
+    view.fleet_id = 21;
+    view.fleet_name = "CSV Horizon";
+    view.can_receive_orders = true;
+    native_colony::NativeSettlementCandidate site;
+    site.system_id = 2;
+    site.body_id = 7;
+    site.can_order = true;
+    view.candidates = {site};
+    const std::vector<native_colony::NativeSettlementMissionView> fleets{
+        view};
+    Colony own;
+    own.id = 30;
+    own.civilization_id = 1;
+    own.system_id = 1;
+    own.name = "Landing";
+    campaign.colonies = {own};
+    const auto colonies = build_owned_colony_rows(campaign);
+
+    NativeMissionView panel;
+    panel.open();
+    const auto key = [&](std::uint32_t value) {
+      native_map::InputEvent event{native_map::InputEventType::KeyPressed};
+      event.key = value;
+      return panel.handle(event, board, fleets, colonies, 1600, 900);
+    };
+    // Arm the ring and activate the Colony sites tab (index 2).
+    (void)key(9);
+    (void)key(9);
+    (void)key(9);
+    check(panel.focus() == 2 &&
+              panel.focused_label(board, fleets, colonies, 1600, 900) ==
+                  "Colony sites",
+          "the ring must reach the sites tab");
+    (void)key(13);
+    // Sites-mode ring: Close, Missions, Colony sites, Select ship on map,
+    // View Landing — the single fleet/site pagers stay out of the ring.
+    const auto first = key(9);
+    check(first.captured,
+          "nav keys must stay captured on the sites tab");
+    // End jumps to the last focusable — the colony View button.
+    const auto jump = key(0x4000004du);
+    check(jump.captured &&
+              panel.focused_label(board, fleets, colonies, 1600, 900) ==
+                  "View Landing",
+          "End must ring the colony's View button");
+    const auto open_command = key(13);
+    check(open_command.kind == MissionViewCommandKind::OpenColony &&
+              open_command.colony_id == 30,
+          "Return on a colony View button must issue OpenColony");
+    // Shift+Tab back to Select ship on map, activate → FocusFleet.
+    native_map::InputEvent back{native_map::InputEventType::KeyPressed};
+    back.key = 9;
+    back.shift = true;
+    (void)panel.handle(back, board, fleets, colonies, 1600, 900);
+    check(panel.focused_label(board, fleets, colonies, 1600, 900) ==
+              "Select ship on map",
+          "Shift+Tab must ring the select-ship control");
+    const auto focus_command = key(13);
+    check(focus_command.kind == MissionViewCommandKind::FocusFleet &&
+              focus_command.fleet_id == 21,
+          "Return on select-ship must issue FocusFleet");
+    // An unbound key still falls through to global shortcuts.
+    check(!key(120).captured,
+          "unhandled keys must not be captured by the ring");
+
+    // A bound catalog localizes the focus labels; absent keys fall back to
+    // the literals.
+    stellar::engine::LocalizationTable locale{"en", "en"};
+    check(locale.load_json(
+              R"({"locale":"en","strings":{"MISSIONS_TAB_SITES":"ZIELE","MISSIONS_FOCUS_VIEW":"Open {0}","MISSIONS_NO_SHIPS":"KEINE SCHIFFE","MISSION_SUMMARY_UNFUNDED":"{0} UNFUNDED"}})"),
+          "the test catalog must parse");
+    panel.set_localization(&locale);
+    (void)key(0x4000004au); // Home → first focusable.
+    (void)key(9);
+    (void)key(9);
+    check(panel.focused_label(board, fleets, colonies, 1600, 900) == "ZIELE",
+          "the sites tab label must resolve through the bound catalog");
+    (void)key(0x4000004du); // End → last focusable (the colony View button).
+    check(panel.focused_label(board, fleets, colonies, 1600, 900) ==
+              "Open Landing",
+          "row action labels must format through the bound catalog");
+    panel.set_localization(nullptr);
+    check(panel.focused_label(board, fleets, colonies, 1600, 900) ==
+              "View Landing",
+          "unbound panels must keep the literal fallbacks");
+
+    // The producers resolve through the same table: the empty-sites message
+    // and mission-card summaries translate while unbound calls keep English.
+    check(colony_site_selection({}, 0, 0, &locale).details == "KEINE SCHIFFE",
+          "the bound catalog must resolve the empty-sites message");
+    check(colony_site_selection({}, 0, 0).details.find("No populated colony "
+                                                     "ships") !=
+              std::string::npos,
+          "an unbound call must keep the English fallback");
+    auto suspended = campaign_fixture();
+    CivilizationEconomy suspended_economy;
+    suspended_economy.civilization_id = 1;
+    suspended_economy.last_base_operations_funding_fraction = 0.0;
+    suspended.economies = {suspended_economy};
+    auto suspended_fleet = scout_fleet();
+    suspended_fleet.current_system_id = 1;
+    suspended_fleet.destination_system_id = 2;
+    suspended.fleets = {suspended_fleet};
+    const auto suspended_board = build_mission_board(suspended, &locale);
+    check(!suspended_board.missions.empty() &&
+              suspended_board.missions.front().summary.find("UNFUNDED") !=
+                  std::string::npos,
+          "bound mission summaries must resolve through the catalog");
+  }
+  {
+    // Colony-list scrolling: rows beyond the viewport stay reachable — the
+    // wheel scrolls the list, clipped row buttons keep a visible band in the
+    // ring, and focus snaps each row fully into view.
+    auto campaign = campaign_fixture();
+    const auto board = build_mission_board(campaign);
+    std::vector<NativeMissionColonyRow> colonies;
+    for (int i = 0; i < 9; ++i) {
+      NativeMissionColonyRow row;
+      row.colony_id = 100 + i;
+      row.name = "Colony " + std::to_string(i);
+      colonies.push_back(row);
+    }
+    const std::vector<native_colony::NativeSettlementMissionView> fleets{};
+    const auto selection = colony_site_selection(fleets, 0, 0);
+    const auto layout = mission_layout_for(board, selection, colonies.size(),
+                                           1600, 900, true);
+    check(layout.colony_rows.size() == 9,
+          "scrolled layout must expose every colony row");
+
+    NativeMissionView panel;
+    panel.open();
+    native_map::InputEvent tab;
+    tab.type = native_map::InputEventType::LeftReleased;
+    tab.position = {layout.sites_tab.x + 4.f, layout.sites_tab.y + 4.f};
+    (void)panel.handle(tab, board, fleets, colonies, 1600, 900);
+
+    // Only the rows intersecting the viewport join the ring: three chrome
+    // controls plus roughly three rows of View buttons — far fewer than
+    // three chrome + nine rows.
+    const auto ring = mission_focus_targets(layout, selection, true,
+                                            colonies, nullptr);
+    check(ring.size() < 3 + 9,
+          "rows clipped out of the viewport must stay out of the ring");
+
+    // The wheel scrolls the row list inside the panel.
+    native_map::InputEvent wheel{native_map::InputEventType::Wheel};
+    wheel.position = {layout.list_viewport.x + 10.f,
+                      layout.list_viewport.y + 10.f};
+    wheel.wheel_y = -1.f;
+    check(panel.handle(wheel, board, fleets, colonies, 1600, 900).captured &&
+              panel.scroll_offset() > 0.f,
+          "the wheel must scroll the colony list");
+    // Home scrolls the list back to the top.
+    const auto key = [&](std::uint32_t value) {
+      native_map::InputEvent event{native_map::InputEventType::KeyPressed};
+      event.key = value;
+      return panel.handle(event, board, fleets, colonies, 1600, 900);
+    };
+    (void)key(0x4000004au); // Home
+    check(panel.scroll_offset() == 0.f,
+          "Home must scroll the colony list back to the top");
+
+    // End jumps to the true list end: the last row's button lands fully
+    // inside the viewport.
+    (void)key(0x4000004du); // End
+    const auto snapped =
+        panel.focused_bounds(board, fleets, colonies, 1600, 900);
+    check(snapped && snapped->height > 20.f &&
+              snapped->y + snapped->height <=
+                  layout.list_viewport.y + layout.list_viewport.height +
+                      0.5f,
+          "End must scroll the last row's button fully into view");
+    check(panel.focused_label(board, fleets, colonies, 1600, 900)
+                  .find("Colony 8") != std::string::npos,
+          "End must ring the deepest colony's View button");
+
+    // Up from the list's top edge scrolls the window back up one row while
+    // the ring keeps the edge slot.
+    (void)key(0x4000004au); // Home → top chrome, list at top.
+    int hops = 0;
+    while (hops++ < 12 &&
+           panel.focused_label(board, fleets, colonies, 1600, 900)
+                   .find("Colony 0") == std::string::npos)
+      (void)key(9); // Tab down into the rows.
+    check(panel.focused_label(board, fleets, colonies, 1600, 900)
+                  .find("Colony 0") != std::string::npos,
+          "Tab must reach the first row's View button");
+
+    // Down past the last clipped row edge-scrolls until Colony 8 is reached.
+    int reached = -1;
+    for (int i = 0; i < 12 && reached < 0; ++i) {
+      const auto label =
+          panel.focused_label(board, fleets, colonies, 1600, 900);
+      if (label.find("Colony 8") != std::string::npos) {
+        const auto command = key(13);
+        if (command.kind == MissionViewCommandKind::OpenColony)
+          reached = command.colony_id;
+        continue;
+      }
+      (void)key(0x40000051u); // Down
+    }
+    check(reached == 108,
+          "Down must edge-scroll the ring to the last colony's View button");
+  }
   if (failures > 0) {
     std::cerr << failures << " mission panel checks failed\n";
     return 1;

@@ -149,11 +149,11 @@ std::string NativeShipyardWorkspace::trf(
   return out;
 }
 
-void NativeShipyardWorkspace::open() noexcept { visible_ = true; }
+void NativeShipyardWorkspace::open() noexcept { visible_ = true; focus_ = -1; }
 
 void NativeShipyardWorkspace::close() noexcept {
   visible_ = false;
-  search_focused_=false;dropdown_.close();
+  search_focused_=false;focus_=-1;dropdown_.close();
   cancel_confirmation_id_.reset();
 }
 
@@ -173,8 +173,8 @@ void NativeShipyardWorkspace::set_view(NativeShipyardView view) {
     selected_order_id_.reset();
     cancel_confirmation_id_.reset();
     notice_.clear();
-    design_scroll_ = 0.f;detail_scroll_=0;quantity_=1;search_.clear();category_=0;filter_=0;dropdown_.close();
-    order_scroll_ = 0.f;
+    design_scroll_ = {};detail_scroll_={};quantity_=1;search_.clear();category_=0;filter_=0;dropdown_.close();focus_=-1;
+    order_scroll_ = {};
   }
   if (revision_changed) {
     cancel_confirmation_id_.reset();
@@ -193,10 +193,10 @@ void NativeShipyardWorkspace::discard_campaign() {
   selected_order_id_.reset();
   cancel_confirmation_id_.reset();
   notice_.clear();
-  design_scroll_ = 0.f;
-  order_scroll_ = 0.f;
-  detail_scroll_=0;detail_limit_=0;quantity_=1;search_.clear();search_focused_=false;
-  category_=0;sort_=0;filter_=0;dropdown_.close();
+  design_scroll_ = {};
+  order_scroll_ = {};
+  detail_scroll_={};quantity_=1;search_.clear();search_focused_=false;
+  category_=0;sort_=0;filter_=0;dropdown_.close();focus_=-1;
 }
 
 void NativeShipyardWorkspace::set_notice(std::string message, bool accepted) {

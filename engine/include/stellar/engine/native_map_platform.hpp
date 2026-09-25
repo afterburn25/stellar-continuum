@@ -128,7 +128,10 @@ struct InputEvent {
   std::uint32_t key{};
   bool control{}, shift{}, alt{};
   // SDL_GamepadButton / SDL_GamepadAxis codes; axis_value is -1..1.
-  std::uint8_t gamepad_button{}, gamepad_axis{};
+  // gamepad_device is the platform slot index (0..3) of the pad that
+  // produced the event — bindings can pin a slot, -wildcard consumers
+  // treat all pads alike.
+  std::uint8_t gamepad_button{}, gamepad_axis{}, gamepad_device{};
   float gamepad_axis_value{};
 };
 struct InputSnapshot {
@@ -156,6 +159,13 @@ class Window final {
   [[nodiscard]] std::vector<DisplayMode> windowed_display_modes() const;
   [[nodiscard]] DisplayMode desktop_display_mode() const;
   [[nodiscard]] float display_refresh_hz() const;
+  // Opaque OS handle (HWND on Windows, nullptr elsewhere) for platform
+  // accessibility bridging. Read-only; the window retains ownership.
+  [[nodiscard]] void *native_window_handle() const noexcept;
+  // Display names of the pads occupying the fixed slots — one entry per
+  // slot, empty for a free slot. Rebind UIs show these beside
+  // InputBinding::device pins instead of bare slot numbers.
+  [[nodiscard]] std::vector<std::string> gamepad_names() const;
   // Owner-thread operations. Driver rejection is reported to the host's
   // transactional preview controller; no requested setting is reported saved.
   void set_display_mode(WindowDisplayMode mode,int width=0,int height=0,float refresh_hz=0);
@@ -195,6 +205,8 @@ class Window final {
   [[nodiscard]] std::size_t image_cache_resident_bytes() const noexcept;
   [[nodiscard]] std::uint64_t image_upload_count() const noexcept;
   [[nodiscard]] Scene3DStatistics scene3d_statistics() const noexcept;
+  // Retunes the 3D texture-streaming byte budget; takes effect next frame.
+  void set_scene3d_texture_budget(std::uint64_t bytes);
  private:
   struct Storage; Storage *storage_{};
 };

@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -60,6 +61,81 @@ int main() {
   list.ensure_visible(999);
   check(list.scroll_offset > 0.0f, "ensure_visible scrolls down");
   check(list.scroll_offset <= list.max_scroll(), "scroll clamped");
+  // sync_rows reconfigures, re-clamps a stale offset and snaps to a
+  // whole-row boundary, returning the first visible row.
+  VirtualizedList snapped;
+  snapped.scroll_offset = 24.0f * 100.0f + 7.0f;
+  check(snapped.sync_rows(1000, 24.0f, 240.0f) == 100,
+        "sync_rows returns the snapped first row");
+  check(snapped.scroll_offset == 2400.0f, "sync_rows snaps to a row edge");
+  snapped.scroll_offset = 24.0f * 999.0f;
+  check(snapped.sync_rows(40, 24.0f, 240.0f) == 30,
+        "sync_rows clamps a stale offset to the tail");
+  check(snapped.scroll_offset == snapped.max_scroll(), "clamp lands on max_scroll");
+  check(snapped.sync_rows(0, 24.0f, 240.0f) == 0 && snapped.scroll_offset == 0.0f,
+        "sync_rows empties to row zero");
+  // configure/set_row_count re-clamp without snapping — fractional
+  // (partially-scrolled) offsets stay fractional.
+  VirtualizedList fractional;
+  fractional.configure(1000, 24.0f, 240.0f);
+  fractional.scroll_offset = 100.5f;
+  fractional.set_row_count(1000);
+  check(fractional.scroll_offset == 100.5f,
+        "set_row_count preserves a fractional offset");
+  fractional.scroll_offset = 1000.5f;
+  fractional.set_row_count(40);
+  check(fractional.scroll_offset == 40.0f * 24.0f - 240.0f,
+        "set_row_count clamps a stale offset on shrink");
+  fractional.scroll_offset = 1000.5f;
+  fractional.configure(40, 24.0f, 240.0f);
+  check(fractional.scroll_offset == 720.0f,
+        "configure clamps a stale offset without snapping");
+  fractional.configure(40, 24.0f, 480.0f);
+  check(fractional.scroll_offset == 480.0f,
+        "configure re-clamps when the viewport grows");
+  // Snap tolerance: a max scroll landing a hair under a row multiple must
+  // still expose the final row — otherwise fixed-slot lists keep the last
+  // row permanently out of the rendered window.
+  VirtualizedList tail;
+  tail.configure(16, 22.78f, 273.36f);
+  tail.scroll_to(tail.max_scroll());
+  check(tail.sync_rows(16, 22.78f, 273.36f) == 4,
+        "a boundary-adjacent max scroll must expose the final row");
+  check(tail.visible_range().last == 16,
+        "the final row must be inside the visible range");
+
+  // --- Scroll view (variable-height content) ---
+  ScrollView view;
+  view.sync(1000.0f, 240.0f);
+  check(view.max_scroll() == 760.0f, "scroll view bounds content minus viewport");
+  view.scroll_to(800.0f);
+  check(view.scroll_offset == 760.0f, "scroll_to clamps at the tail");
+  view.scroll_by(-1000.0f);
+  check(view.scroll_offset == 0.0f, "scroll_by clamps at the head");
+  view.scroll_to(380.0f);
+  const auto thumb = view.thumb(240.0f, 16.0f);
+  check(thumb.size == 240.0f * 240.0f / 1000.0f && thumb.offset == (240.0f - thumb.size) * 0.5f,
+        "thumb geometry is proportional and centered at mid-scroll");
+  view.sync(200.0f, 240.0f);
+  check(view.scroll_offset == 0.0f && view.thumb(240.0f, 16.0f).size == 0.0f,
+        "shrunk content clamps the offset and hides the thumb");
+  view.scroll_to(std::numeric_limits<float>::quiet_NaN());
+  check(view.scroll_offset == 0.0f, "non-finite offsets reset to the head");
+  // scroll_interval_into_view snaps a clipped interval fully into the
+  // viewport and no-ops on an already-visible one.
+  view.sync(1000.0f, 200.0f);
+  view.scroll_to(140.0f);
+  view.scroll_interval_into_view(300.0f, 340.0f, 0.0f, 200.0f);
+  check(view.scroll_offset == 280.0f,
+        "an interval clipped below scrolls fully into view");
+  view.scroll_interval_into_view(145.0f, 195.0f, 0.0f, 200.0f);
+  check(view.scroll_offset == 280.0f, "a visible interval does not scroll");
+  view.scroll_interval_into_view(-20.0f, 20.0f, 0.0f, 200.0f);
+  check(view.scroll_offset == 260.0f,
+        "an interval clipped above scrolls up");
+  view.scroll_interval_into_view(180.0f, 5000.0f, 0.0f, 200.0f);
+  check(view.scroll_offset == view.max_scroll(),
+        "oversized intervals clamp through scroll_to");
 
   // --- Table model ---
   TableModel table;
@@ -101,6 +177,26 @@ int main() {
   flat = tree.flattened();
   check(flat.size() == 5, "nested expansion");
   check(flat[3].second == 3, "luna depth 3");
+
+  // Selection is stable by id and navigates the flattened view.
+  tree.select("earth");
+  check(tree.selected() && tree.selected_id() == "earth",
+        "select finds node");
+  check(tree.move_selection(1) && tree.selected_id() == "luna",
+        "selection walks the flat view");
+  check(tree.move_selection(-2) && tree.selected_id() == "sol",
+        "selection climbs across depths");
+  check(tree.move_selection(-1) && tree.selected_id() == "galaxy",
+        "selection reaches the root");
+  check(!tree.move_selection(-1), "selection clamps at the head");
+  tree.select("alpha");
+  check(!tree.move_selection(1), "selection clamps at the tail");
+  tree.select("earth");
+  tree.set_expanded("sol", false); // earth hides inside the collapse
+  check(!tree.move_selection(1) && tree.selected_id().empty(),
+        "a selection hidden by collapse clears on navigation");
+  tree.select("absent");
+  check(tree.selected() == nullptr, "selecting an absent id clears");
 
   if (failures == 0)
     std::cout << "Draw batcher and UI view-model tests passed\n";

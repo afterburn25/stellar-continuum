@@ -1,10 +1,13 @@
+#include <stellar/engine/broadphase.hpp>
 #include <stellar/engine/render_graph.hpp>
 #include <stellar/engine/shader_library.hpp>
 #include <stellar/engine/texture_streaming.hpp>
 #include <stellar/engine/vfx.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -106,13 +109,14 @@ int main() {
   streamer.request(planet, 0, 10.0f); // wants full res, high priority
   streamer.request(nebula, 0, 1.0f);
   auto changes = streamer.advance_frame(1);
-  // Budget 1000: planet needs 1100 (over budget!), nebula 300.
-  // Neither fits? planet 1100 > 1000 alone -> skipped; nebula 300 fits.
+  // Budget 1000: planet's full 1100 chain does not fit, so the streamer
+  // degrades it to the {300,150,50} tail (mip 1, 500 bytes); nebula's 300
+  // fits fully. A denied texture keeps a blurry bind instead of unloading.
   check(streamer.finest_resident_mip(nebula).has_value(),
         "nebula resident under budget");
-  check(!streamer.finest_resident_mip(planet).has_value(),
-        "over-budget texture stays unloaded");
-  check(streamer.resident_bytes() == 300, "resident bytes tracked");
+  check(streamer.finest_resident_mip(planet) == 1u,
+        "over-budget texture did not degrade to a resident mip tail");
+  check(streamer.resident_bytes() == 800, "resident bytes tracked");
 
   // Next frame: request planet at mip 2 (150+50=200) — fits.
   streamer.request(planet, 2, 10.0f);
@@ -214,6 +218,73 @@ int main() {
       vfx.visual_for(flare, flare.particle_lifetime_seconds * 0.5f);
   check(std::abs(visual.opacity - 0.5f) < 1e-5,
         "opacity curve midpoint");
+
+  // Global budget: spawn rates taper as residency approaches the cap and
+  // the live count stays bounded above it.
+  VfxSystem vfx_budget;
+  vfx_budget.define(flare);
+  const auto budgeted = vfx_budget.spawn("stellar_flare", {0, 0, 0});
+  vfx_budget.set_particle_budget(8);
+  check(vfx_budget.particle_budget() == 8, "particle budget stored");
+  vfx_budget.advance(0.5); // unconstrained would be ~10 particles
+  const auto budgeted_count = vfx_budget.particles(budgeted).size();
+  check(budgeted_count <= 8, "live particles exceeded the global budget");
+  const auto budget_stats = vfx_budget.stats();
+  check(budget_stats.particle_budget == 8 &&
+            budget_stats.budget_scale < 1.0f,
+        "budget pressure did not scale spawn rates");
+  vfx_budget.advance(0.5); // still capped as particles age out
+  check(vfx_budget.stats().live_particles <= 8,
+        "budget cap not sustained across advances");
+  VfxSystem vfx_unlimited;
+  vfx_unlimited.define(flare);
+  const auto free = vfx_unlimited.spawn("stellar_flare", {0, 0, 0});
+  vfx_unlimited.advance(0.5);
+  check(vfx_unlimited.particles(free).size() > budgeted_count,
+        "unlimited system was incorrectly budget-scaled");
+  check(vfx_unlimited.stats().budget_scale == 1.0f,
+        "unlimited system reported budget pressure");
+
+  // Broadphase: candidates are a sorted, deduplicated superset of the
+  // true AABB overlaps — never a miss, false positives allowed.
+  {
+    Broadphase2D grid;
+    struct Box { float x, y, w, h; };
+    const std::vector<Box> boxes{
+        {0, 0, 10, 10},   {5, 5, 10, 10}, {50, 50, 4, 4},
+        {52, 52, 4, 4},   {-40, -40, 6, 6}, {1000, 0, 2, 2}};
+    grid.reset(8.f);
+    for (std::size_t i = 0; i < boxes.size(); ++i)
+      grid.insert(i, {boxes[i].x, boxes[i].y},
+                  {boxes[i].x + boxes[i].w, boxes[i].y + boxes[i].h});
+    const auto candidates = grid.pairs();
+    check(std::is_sorted(candidates.begin(), candidates.end()) &&
+              std::adjacent_find(candidates.begin(), candidates.end()) ==
+                  candidates.end(),
+          "broadphase pairs unsorted or duplicated");
+    std::set<std::pair<std::uint64_t, std::uint64_t>> candidate_set(
+        candidates.begin(), candidates.end());
+    for (std::size_t i = 0; i < boxes.size(); ++i)
+      for (std::size_t j = i + 1; j < boxes.size(); ++j) {
+        const auto &ba = boxes[i], &bb = boxes[j];
+        const bool overlap = ba.x < bb.x + bb.w && bb.x < ba.x + ba.w &&
+                             ba.y < bb.y + bb.h && bb.y < ba.y + ba.h;
+        check(!overlap || candidate_set.count({i, j}) == 1,
+              "broadphase missed a true AABB overlap");
+      }
+    check(candidate_set.count({0, 1}) == 1 &&
+              candidate_set.count({2, 3}) == 1,
+          "expected overlapping pairs absent from candidates");
+    Broadphase3D grid3;
+    grid3.reset(4.f);
+    grid3.insert(7, {0, 0, 0}, {2, 2, 2});
+    grid3.insert(9, {1, 1, 1}, {3, 3, 3});
+    grid3.insert(11, {50, 50, 50}, {51, 51, 51});
+    const auto pairs3 = grid3.pairs();
+    check(pairs3.size() == 1 && pairs3.front() ==
+                                     std::pair<std::uint64_t, std::uint64_t>{7, 9},
+          "3D broadphase emitted wrong candidate set");
+  }
 
   if (failures == 0)
     std::cout << "Render graph, streaming, shader and VFX tests passed\n";

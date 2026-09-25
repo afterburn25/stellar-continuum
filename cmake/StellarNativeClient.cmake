@@ -22,7 +22,8 @@ target_link_libraries(stellar_native_platform PUBLIC stellar_native_image
 # documents, content resolution, audio and quicksave so game projects get a
 # running loop from the engine instead of generated glue code.
 add_library(stellar_engine_runtime STATIC engine/src/runtime_host.cpp)
-target_include_directories(stellar_engine_runtime PUBLIC engine/include)
+target_include_directories(stellar_engine_runtime PUBLIC engine/include
+  PRIVATE "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(stellar_engine_runtime PUBLIC stellar_engine
   stellar_native_platform stellar_native_audio)
 if(MSVC)
@@ -49,6 +50,18 @@ if(MSVC)
   target_compile_options(stellar-engine PRIVATE /W4 /WX /permissive-)
   target_compile_definitions(stellar-engine PRIVATE
     STELLAR_CMAKE_COMMAND="${CMAKE_COMMAND}")
+endif()
+
+# Per-tool smoke coverage: --frames N renders N frames and exits, so each
+# tool's init+render path runs under ctest without interaction.
+if(BUILD_TESTING)
+  foreach(tool IN ITEMS Projects Dashboard Scene Scene3D Assets Profiler
+                        Localization Simulation Colony Economy Planet AI
+                        Warfare Missions Physics Galaxy)
+    string(TOLOWER "${tool}" tool_lower)
+    add_test(NAME "engine_shell_tool_${tool_lower}"
+      COMMAND stellar-engine --tool "${tool}" --frames 20)
+  endforeach()
 endif()
 
 # Engine SDK export: stages the redistributable headers, prebuilt libraries,
@@ -130,6 +143,10 @@ target_include_directories(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}
 configure_file(app/native_client/windows_version.rc.in generated/native_client_version.rc @ONLY)
 target_sources(stellar-continuum-native PRIVATE "${CMAKE_BINARY_DIR}/generated/native_client_version.rc")
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_platform stellar_core stellar_json Shell32 Ole32)
+if(WIN32)
+  target_sources(stellar-continuum-native PRIVATE app/native_client/native_accessibility_bridge.cpp)
+  target_link_libraries(stellar-continuum-native PRIVATE Uiautomationcore OleAut32)
+endif()
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_navigation_art)
 target_link_libraries(stellar-continuum-native PRIVATE stellar_native_research_art)
 add_dependencies(stellar-continuum-native stellar_native_research_assets)
@@ -138,6 +155,7 @@ target_link_libraries(stellar-continuum-native PRIVATE stellar_native_audio stel
 target_sources(stellar-continuum-native PRIVATE app/native_client/native_audio_director.cpp)
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp
+  app/native_client/native_chronicle.cpp
   app/native_client/native_support.cpp app/native_client/native_support_service.cpp
   app/native_client/native_battle_workspace.cpp
   app/native_client/native_battle_art.cpp
@@ -149,6 +167,16 @@ add_custom_command(TARGET stellar-continuum-native POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${STELLAR_SDL_runtime}" "$<TARGET_FILE_DIR:stellar-continuum-native>/SDL3.dll")
 if(BUILD_TESTING)
+  add_executable(stellar_engine_runtime_tests native-tests/engine_runtime_tests.cpp)
+  target_link_libraries(stellar_engine_runtime_tests PRIVATE stellar_engine_runtime)
+  add_custom_command(TARGET stellar_engine_runtime_tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STELLAR_SDL_runtime}"
+      "$<TARGET_FILE_DIR:stellar_engine_runtime_tests>/SDL3.dll")
+  add_test(NAME engine_runtime COMMAND stellar_engine_runtime_tests)
+  set_tests_properties(engine_runtime PROPERTIES TIMEOUT 60)
+  if(MSVC)
+    target_compile_options(stellar_engine_runtime_tests PRIVATE /WX)
+  endif()
   add_executable(stellar_native_moon_tests native-tests/native_moon_tests.cpp
     app/native_client/native_system_view.cpp app/native_client/native_system_workspace.cpp
     app/native_client/native_system_travel.cpp app/native_client/native_fleet_controller.cpp
@@ -206,6 +234,19 @@ if(BUILD_TESTING)
   set_tests_properties(native_planet_disc_assets PROPERTIES TIMEOUT 90)
   if(MSVC)
     target_compile_options(stellar_native_planet_disc_assets_tests PRIVATE /WX)
+  endif()
+  if(WIN32)
+    add_executable(stellar_native_accessibility_bridge_tests
+      native-tests/native_accessibility_bridge_tests.cpp
+      app/native_client/native_accessibility_bridge.cpp)
+    target_include_directories(stellar_native_accessibility_bridge_tests PRIVATE app/native_client engine/include)
+    target_link_libraries(stellar_native_accessibility_bridge_tests PRIVATE
+      Uiautomationcore Ole32 OleAut32 User32)
+    add_test(NAME native_accessibility_bridge COMMAND stellar_native_accessibility_bridge_tests)
+    set_tests_properties(native_accessibility_bridge PROPERTIES TIMEOUT 60 RUN_SERIAL TRUE)
+    if(MSVC)
+      target_compile_options(stellar_native_accessibility_bridge_tests PRIVATE /WX)
+    endif()
   endif()
   add_executable(stellar_native_client_platform_tests native-tests/native_client_platform_tests.cpp)
   target_link_libraries(stellar_native_client_platform_tests PRIVATE stellar_native_platform SDL3::SDL3)

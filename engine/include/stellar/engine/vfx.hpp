@@ -58,14 +58,24 @@ struct Particle {
 
 using VfxInstanceId = std::uint64_t;
 inline constexpr VfxInstanceId invalid_vfx_instance = 0;
+// RuntimeHost's default cross-emitter particle cap; unlimited stays
+// opt-in via set_particle_budget(0).
+inline constexpr std::size_t default_particle_budget = 65536;
 
 struct VfxStats {
   std::size_t live_instances{};
   std::size_t live_particles{};
+  // Global soft budget across all live emitters (0 = unlimited) and the
+  // rate scale the last advance() applied as residency neared the cap.
+  std::size_t particle_budget{};
+  float budget_scale{1.0f};
 };
 
 class VfxSystem {
 public:
+  explicit VfxSystem(std::size_t particle_budget = 0)
+      : particle_budget_(particle_budget) {}
+
   void define(EmitterDefinition definition);
   const EmitterDefinition *definition(std::string_view id) const;
 
@@ -82,6 +92,13 @@ public:
   // per-instance LOD uses set_lod_distance below (0 = full rate).
   void advance(double dt_seconds);
   void set_lod_distance(VfxInstanceId instance, float distance);
+
+  // Global particle budget across all live emitters (0 = unlimited).
+  // Each advance() computes the frame's total spawn demand, tapers every
+  // emitter's rate by the share the remaining headroom admits, and enforces
+  // the leftover as a hard counter — live particles never exceed the cap.
+  void set_particle_budget(std::size_t particles);
+  [[nodiscard]] std::size_t particle_budget() const noexcept;
 
   // Read-only particle access for rendering.
   std::span<const Particle> particles(VfxInstanceId instance) const;
@@ -111,6 +128,8 @@ private:
   std::unordered_map<VfxInstanceId, Instance> instances_;
   VfxInstanceId next_instance_id_{1};
   std::uint64_t spawn_ordinal_{};
+  std::size_t particle_budget_{};
+  float budget_scale_{1.0f};
 };
 
 } // namespace stellar::engine

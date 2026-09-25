@@ -12,6 +12,7 @@
 
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/planet_appearance.hpp>
+#include <stellar/core/planetary_adapter.hpp>
 #include <stellar/core/planetary_catalog.hpp>
 #include <stellar/core/planetary_satellites.hpp>
 #include <stellar/core/stellar_orbits.hpp>
@@ -20,6 +21,7 @@
 #include <stellar/engine/foundation.hpp>
 #include <stellar/engine/project.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/planetary.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/runtime_diagnostics.hpp>
 #include <stellar/engine/runtime_paths.hpp>
@@ -181,7 +183,7 @@ std::string_view solvent_name(core::PlanetarySolventRegime regime) {
 
 enum class WorkspaceView { Galaxy, System, Body };
 
-enum class Field { None, Name, Note, Search, ProjectName };
+enum class Field { None, Name, Note, Search, ProjectName, BodyRadius, BodyOrbit, BodyMass, BodyEccentricity, BodyInclination, BodyMoonOrbit, SystemPositionX, SystemPositionY };
 
 struct Editor {
   std::vector<core::CatalogStar> catalog;
@@ -217,6 +219,11 @@ struct Editor {
   double system_days{};
   engine::VirtualizedList system_list;
   std::vector<std::size_t> filtered;
+  // Hierarchy view: filtered systems are roots, their bodies children.
+  // `flat_rows` caches the visible (expanded-aware) row order.
+  engine::TreeModel system_tree;
+  std::vector<std::pair<const engine::TreeModel::Node *, int>> flat_rows;
+  std::unordered_set<std::size_t> expanded_systems; // systems vector indices
 
   // Scrollable authoritative detail rows for the selected system.
   engine::VirtualizedList detail_list;
@@ -241,14 +248,24 @@ struct Editor {
   std::vector<UiRect> hits;
   std::vector<int> hit_sizes;
   UiRect hit_regen{}, hit_seed{}, hit_name{}, hit_note{}, hit_bookmark{},
+      hit_anomaly{}, hit_rare{}, hit_prewarp{},
       hit_save{}, hit_load{}, hit_search{}, hit_undo{}, hit_redo{},
-      hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{};
+      hit_view{}, hit_project_name{}, hit_bkmk_filter{}, hit_file{},
+      hit_radius{}, hit_orbit{}, hit_mass{}, hit_eccentricity{},
+      hit_inclination{}, hit_moon_orbit{}, hit_position_x{}, hit_position_y{};
   // FILE dropdown: rects parallel to menu_labels(), rebuilt each frame.
   bool menu_open{};
   UiRect menu_rect{};
   std::vector<UiRect> menu_item_rects;
   UiRect viewport{}, inspector{}, list_rect{}, rows_rect{}, detail_rect{};
   std::filesystem::path projects_dir, project_path;
+  // Multi-file projects: a saved directory holds project.json plus an
+  // assets/ folder of embedded files (dropped in by the user). The folder
+  // scan is the manifest — discovered pngs preview in the inspector.
+  bool project_dir_form{};
+  std::vector<std::filesystem::path> embedded_assets;
+  std::shared_ptr<const RgbaImage> asset_preview;
+  std::string asset_preview_name;
   // Project open picker: *.json files under projects_dir, modal overlay.
   std::vector<std::filesystem::path> project_files;
   engine::VirtualizedList picker_list;
@@ -272,6 +289,103 @@ std::string display_name(const Editor &ed, const core::PlanetaryBody &body) {
       it != ed.body_edits.end() && !it->second.name.empty())
     return it->second.name;
   return body.name;
+}
+
+// Radius override: the annotation layer wins over the generated record.
+// Stellar orbit with the annotation-layer radius override applied: the
+// generated orbit's elements stay; a set orbit_au wins for the ring and
+// the day-phased position (habitable-zone tagging remains generated).
+engine::AnalyticOrbit body_orbit(const Editor &ed,
+                                 const core::StellarSystem &sys,
+                                 const core::PlanetaryBody &body) {
+  auto orbit = core::planetary_stellar_orbit(sys, body);
+  if (const auto it = ed.body_edits.find(body.id); it != ed.body_edits.end()) {
+    if (it->second.orbit_au) orbit.radius = *it->second.orbit_au;
+    if (it->second.eccentricity) orbit.eccentricity = *it->second.eccentricity;
+    if (it->second.inclination_degrees)
+      orbit.inclination = *it->second.inclination_degrees * std::numbers::pi / 180.;
+  }
+  return orbit;
+}
+core::StellarPosition body_position(const Editor &ed,
+                                    const core::StellarSystem &sys,
+                                    const core::PlanetaryBody &body) {
+  const auto host = core::planetary_stellar_host(sys, body.id);
+  const auto star = core::stellar_positions(sys, ed.system_days)
+      [static_cast<std::size_t>(std::clamp(host, 0, 3))];
+  const auto rel =
+      engine::analytic_orbit_position(body_orbit(ed, sys, body), ed.system_days);
+  return {star[0] + rel[0], star[1] + rel[1], star[2] + rel[2]};
+}
+// Effective stellar orbit radius for display: the annotation wins, then the
+// generated exposure record; nullopt when the body has no stellar orbit.
+std::optional<double> body_orbit_au(const Editor &ed,
+                                    const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.orbit_au)
+    return it->second.orbit_au;
+  if (body.stellar_exposure) return body.stellar_exposure->orbit_au;
+  return std::nullopt;
+}
+// Effective stellar orbit eccentricity for display: the annotation wins,
+// then the generated record.
+double body_effective_eccentricity(const Editor &ed,
+                                   const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.eccentricity)
+    return *it->second.eccentricity;
+  return body.orbital_eccentricity;
+}
+// Effective stellar orbit inclination for display: the annotation wins,
+// then the generated record.
+double body_effective_inclination_degrees(const Editor &ed,
+                                        const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.inclination_degrees)
+    return *it->second.inclination_degrees;
+  return body.orbital_inclination_degrees;
+}
+// Moon orbit with the annotation-layer radius override applied: the
+// generated satellite elements stay; a set satellite_orbit_km wins for the
+// ring, the day-phased marker, picking and the camera fit.
+core::SatelliteOrbit moon_orbit(const Editor &ed,
+                                const core::PlanetaryBody &parent,
+                                const core::PlanetaryBody &moon) {
+  auto orbit = core::planetary_satellite_orbit(parent, moon);
+  if (const auto it = ed.body_edits.find(moon.id);
+      it != ed.body_edits.end() && it->second.satellite_orbit_km)
+    orbit.relative.radius = *it->second.satellite_orbit_km;
+  return orbit;
+}
+// Effective satellite orbit radius for display: the annotation wins, then
+// the generated orbit.
+double body_satellite_orbit_km(const Editor &ed,
+                               const core::PlanetaryBody &parent,
+                               const core::PlanetaryBody &moon) {
+  if (const auto it = ed.body_edits.find(moon.id);
+      it != ed.body_edits.end() && it->second.satellite_orbit_km)
+    return *it->second.satellite_orbit_km;
+  return core::planetary_satellite_orbit(parent, moon).relative.radius;
+}
+double body_radius_earth(const Editor &ed, const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.radius_earth)
+    return *it->second.radius_earth;
+  return body.radius_earth;
+}
+double body_mass_earth(const Editor &ed, const core::PlanetaryBody &body) {
+  if (const auto it = ed.body_edits.find(body.id);
+      it != ed.body_edits.end() && it->second.mass_earth)
+    return *it->second.mass_earth;
+  return body.mass_earth;
+}
+// Surface gravity derives from the effective mass/radius the same way
+// generation computes it (mass / radius^2) — overrides never leave a
+// stale gravity reading.
+double body_gravity_g(const Editor &ed, const core::PlanetaryBody &body) {
+  const auto radius = body_radius_earth(ed, body);
+  if (radius <= 0.) return body.environment.gravity_g;
+  return body_mass_earth(ed, body) / (radius * radius);
 }
 
 bool matches(const Editor &ed, const core::StellarSystem &sys) {
@@ -313,11 +427,38 @@ bool matches(const Editor &ed, const core::StellarSystem &sys) {
   return false;
 }
 
+void rebuild_tree(Editor &ed) {
+  ed.system_tree = engine::TreeModel{};
+  for (const auto sys_index : ed.filtered) {
+    auto &node =
+        ed.system_tree.add("s" + std::to_string(sys_index), std::string{});
+    // Searching surfaces matching bodies automatically; otherwise expansion
+    // follows the user's toggles.
+    node.expanded =
+        !ed.search.empty() || ed.expanded_systems.contains(sys_index);
+    if (const auto it =
+            ed.bodies_by_system.find(ed.systems[sys_index].id);
+        it != ed.bodies_by_system.end())
+      for (const auto body_index : it->second)
+        ed.system_tree.add("b" + std::to_string(body_index), std::string{},
+                           node.id);
+  }
+  ed.flat_rows = ed.system_tree.flattened();
+  ed.system_list.set_row_count(ed.flat_rows.size());
+}
+
+std::size_t flat_pos_of_system(const Editor &ed, std::size_t sys_index) {
+  const auto id = "s" + std::to_string(sys_index);
+  for (std::size_t i = 0; i < ed.flat_rows.size(); ++i)
+    if (ed.flat_rows[i].first->id == id) return i;
+  return 0;
+}
+
 void rebuild_filter(Editor &ed) {
   ed.filtered.clear();
   for (std::size_t i = 0; i < ed.systems.size(); ++i)
     if (matches(ed, ed.systems[i])) ed.filtered.push_back(i);
-  ed.system_list.row_count = ed.filtered.size();
+  rebuild_tree(ed);
 }
 
 void rebuild_detail_rows(Editor &ed);
@@ -339,6 +480,32 @@ std::unordered_map<int, edproj::SystemEdit> &annotation_map(Editor &ed,
   return body ? ed.body_edits : ed.edits;
 }
 
+// Effective galactic position axes: the annotation layer wins per axis over
+// the generated StarPosition — map markers, click picking, camera fit and
+// the inspector all read it.
+float system_position_x(const Editor &ed, const core::StellarSystem &sys) {
+  if (const auto it = ed.edits.find(sys.id);
+      it != ed.edits.end() && it->second.position_x)
+    return static_cast<float>(*it->second.position_x);
+  return sys.position.x;
+}
+float system_position_y(const Editor &ed, const core::StellarSystem &sys) {
+  if (const auto it = ed.edits.find(sys.id);
+      it != ed.edits.end() && it->second.position_y)
+    return static_cast<float>(*it->second.position_y);
+  return sys.position.y;
+}
+
+// Effective trait: an annotation override wins over the generated record.
+template <class Record>
+bool trait(const std::unordered_map<int, edproj::SystemEdit> &map,
+           const Record &record, bool Record::*generated,
+           std::optional<bool> edproj::SystemEdit::*override) {
+  const auto it = map.find(record.id);
+  if (it != map.end() && it->second.*override) return *(it->second.*override);
+  return record.*generated;
+}
+
 // Commits the in-progress field buffer into the annotation layer, recording
 // an undo snapshot only when the value actually changes. In the system
 // workspace with a body selected, fields bind to that body's record.
@@ -354,6 +521,94 @@ void commit_active_field(Editor &ed) {
       ed.history.commit({ed.seed, ed.system_count, ed.edits, ed.body_edits,
                          ed.project_name});
       ed.project_name = ed.edit_buffer;
+    }
+  } else if (ed.editing == Field::BodyRadius ||
+             ed.editing == Field::BodyOrbit || ed.editing == Field::BodyMass ||
+             ed.editing == Field::BodyEccentricity ||
+             ed.editing == Field::BodyInclination ||
+             ed.editing == Field::BodyMoonOrbit ||
+             ed.editing == Field::SystemPositionX ||
+             ed.editing == Field::SystemPositionY) {
+    // Numeric overrides: empty restores AUTO, otherwise a finite in-range
+    // number wins over the generated property. Eccentricity accepts zero
+    // (circular) but is bounded below AnalyticOrbit's 0.95 rejection;
+    // inclination is bounded to the generated 0-180 degree domain; map
+    // positions are unbounded (the galaxy is centered on the origin).
+    struct OverrideSpec {
+      std::optional<double> edproj::SystemEdit::*member;
+      const char *label;
+      // [lo, hi] with lo_inclusive/hi_inclusive endpoints; unbounded fields
+      // carry bounded=false and accept any finite value.
+      double lo, hi;
+      bool lo_inclusive, hi_inclusive, bounded;
+      // true: the field writes the body edit map; false: the system map.
+      bool body_field;
+    };
+    const auto spec = [&]() -> OverrideSpec {
+      switch (ed.editing) {
+      case Field::BodyRadius:
+        return {&edproj::SystemEdit::radius_earth, "radius", 0., 0., false, false, true, true};
+      case Field::BodyOrbit:
+        return {&edproj::SystemEdit::orbit_au, "orbit", 0., 0., false, false, true, true};
+      case Field::BodyEccentricity:
+        return {&edproj::SystemEdit::eccentricity, "eccentricity", 0., 0.95, true, false, true, true};
+      case Field::BodyInclination:
+        return {&edproj::SystemEdit::inclination_degrees, "inclination", 0., 180., true, true, true, true};
+      case Field::BodyMoonOrbit:
+        return {&edproj::SystemEdit::satellite_orbit_km, "moon orbit", 0., 0., false, false, true, true};
+      case Field::SystemPositionX:
+        return {&edproj::SystemEdit::position_x, "position x", 0., 0., false, false, false, false};
+      case Field::SystemPositionY:
+        return {&edproj::SystemEdit::position_y, "position y", 0., 0., false, false, false, false};
+      default:
+        return {&edproj::SystemEdit::mass_earth, "mass", 0., 0., false, false, true, true};
+      }
+    }();
+    const auto member = spec.member;
+    const auto label = spec.label;
+    const auto valid = [&spec](double v) {
+      return !spec.bounded ||
+             ((spec.lo_inclusive ? v >= spec.lo : v > spec.lo) &&
+              (spec.hi_inclusive ? v <= spec.hi : v < spec.hi));
+    };
+    if (const auto target = annotation_target(ed);
+        target && target->second == spec.body_field) {
+      auto &map = annotation_map(ed, target->second);
+      const auto it = map.find(target->first);
+      const auto current = it != map.end()
+                               ? it->second.*member
+                               : std::optional<double>{};
+      if (ed.edit_buffer.empty()) {
+        if (current) {
+          ed.history.commit({ed.seed, ed.system_count, ed.edits,
+                             ed.body_edits, ed.project_name});
+          (map[target->first].*member).reset();
+          rebuild_detail_rows(ed);
+        }
+      } else {
+        try {
+          const auto value = std::stod(ed.edit_buffer);
+          if (!std::isfinite(value) || !valid(value))
+            throw std::runtime_error("out of range");
+          if (!current || *current != value) {
+            ed.history.commit({ed.seed, ed.system_count, ed.edits,
+                               ed.body_edits, ed.project_name});
+            map[target->first].*member = value;
+            rebuild_detail_rows(ed);
+          }
+        } catch (const std::exception &) {
+          ed.status = std::string(label) +
+                      (ed.editing == Field::BodyEccentricity
+                           ? " must be between 0 and 0.95"
+                       : ed.editing == Field::BodyInclination
+                           ? " must be between 0 and 180"
+                       : ed.editing == Field::SystemPositionX ||
+                               ed.editing == Field::SystemPositionY
+                           ? " must be a finite number"
+                           : " must be a positive number");
+          return; // keep the field open so the input is not silently dropped
+        }
+      }
     }
   } else if (const auto target = annotation_target(ed)) {
     auto &map = annotation_map(ed, target->second);
@@ -417,9 +672,9 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
   row("name", body.name);
   row("id", std::to_string(body.id));
   row("kind", std::string(body_kind_name(body.kind)));
-  row("radius", fspec("%.3f", body.radius_earth) + " Re");
-  row("mass", fspec("%.3f", body.mass_earth) + " Me");
-  row("gravity", fspec("%.3f", body.environment.gravity_g) + " g");
+  row("radius", fspec("%.3f", body_radius_earth(ed, body)) + " Re");
+  row("mass", fspec("%.3f", body_mass_earth(ed, body)) + " Me");
+  row("gravity", fspec("%.3f", body_gravity_g(ed, body)) + " g");
   row("temperature",
       fspec("%.0f", body.environment.temperature_kelvin) + " K");
   row("pressure", fspec("%.1f", body.environment.pressure_kpa) + " kPa");
@@ -431,14 +686,27 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
   row("surface", body.environment.has_solid_surface ? "solid" : "none");
   if (body.environment.is_immersed_environment)
     row("environment", "immersed");
-  if (body.parent_body_id)
+  if (body.parent_body_id) {
     row("parent body", std::to_string(*body.parent_body_id));
+    if (const auto parent =
+            std::ranges::find_if(ed.bodies, [&](const auto &b) {
+              return b.id == *body.parent_body_id;
+            });
+        parent != ed.bodies.end()) {
+      try {
+        row("orbit", fspec("%.0f",
+                           body_satellite_orbit_km(ed, *parent, body)) +
+                         " km");
+      } catch (const std::exception &) {
+      }
+    }
+  }
   row("orbit index", std::to_string(body.orbit_index));
-  row("eccentricity", fspec("%.3f", body.orbital_eccentricity));
+  row("eccentricity", fspec("%.3f", body_effective_eccentricity(ed, body)));
   row("inclination",
-      fspec("%.1f", body.orbital_inclination_degrees) + " deg");
+      fspec("%.1f", body_effective_inclination_degrees(ed, body)) + " deg");
   if (body.stellar_exposure) {
-    row("orbit", fspec("%.3f", body.stellar_exposure->orbit_au) + " AU");
+    row("orbit", fspec("%.3f", *body_orbit_au(ed, body)) + " AU");
     row("incident flux", fspec("%.3f", body.stellar_exposure->incident_flux));
     row("habitable zone",
         body.stellar_exposure->in_habitable_zone ? "inside" : "outside");
@@ -450,11 +718,50 @@ void rebuild_body_rows(Editor &ed, const core::PlanetaryBody &body) {
         core::planet_appearance_display_name(*body.appearance));
   std::string flags;
   if (body.legacy_colonization_candidate) flags += "colonization-candidate ";
-  if (body.has_anomaly) flags += "anomaly ";
-  if (body.has_rare_resource) flags += "rare-resource ";
-  if (body.has_pre_warp_civilization) flags += "pre-warp-civ ";
+  if (trait(ed.body_edits, body, &core::PlanetaryBody::has_anomaly,
+            &edproj::SystemEdit::anomaly))
+    flags += "anomaly ";
+  if (trait(ed.body_edits, body, &core::PlanetaryBody::has_rare_resource,
+            &edproj::SystemEdit::rare_resource))
+    flags += "rare-resource ";
+  if (trait(ed.body_edits, body,
+            &core::PlanetaryBody::has_pre_warp_civilization,
+            &edproj::SystemEdit::pre_warp_civilization))
+    flags += "pre-warp-civ ";
   if (body.cracked_world) flags += "cracked ";
   row("traits", flags.empty() ? "none" : flags);
+
+  // Engine planetary-framework assessment: the same projection +
+  // evaluator the engine tools and future games consume
+  // (planetary_adapter → evaluate_habitability), scored against a
+  // terran-like reference profile. Core species suitability stays
+  // authoritative for campaign rules — this row set reports the
+  // reusable engine view.
+  const auto engine_env = core::to_engine_environment(body);
+  static const engine::HabitabilityProfile terran_like = [] {
+    engine::HabitabilityProfile profile;
+    profile.id = "terran_like";
+    profile.temperature_min_k = 240.0;
+    profile.temperature_max_k = 330.0;
+    profile.atmosphere_min = 0.3;
+    profile.atmosphere_max = 3.0;
+    profile.gravity_min_g = 0.4;
+    profile.gravity_max_g = 1.6;
+    profile.water_min = 0.05;
+    profile.tolerance = 0.25;
+    profile.required_tags = {"atmosphere.oxygen_nitrogen",
+                           "solvent.water"};
+    profile.forbidden_tags = {"high_radiation", "gas_giant", "immersed",
+                            "cracked"};
+    return profile;
+  }();
+  const auto report = engine::evaluate_habitability(engine_env,
+                                                    terran_like);
+  row("engine suitability",
+      fspec("%.3f", report.suitability) +
+          (report.habitable ? " (habitable)" : ""));
+  for (const auto &reason : report.unmet)
+    row("suitability unmet", reason);
 }
 
 // Flattens the selected system's authoritative generated record into
@@ -466,11 +773,11 @@ void rebuild_detail_rows(Editor &ed) {
   if (ed.view != WorkspaceView::Galaxy &&
       ed.selected_body < ed.bodies.size()) {
     rebuild_body_rows(ed, ed.bodies[ed.selected_body]);
-    ed.detail_list.row_count = ed.detail_rows.size();
+    ed.detail_list.set_row_count(ed.detail_rows.size());
     return;
   }
   if (ed.selected >= ed.systems.size()) {
-    ed.detail_list.row_count = 0;
+    ed.detail_list.set_row_count(0);
     return;
   }
   const auto &sys = ed.systems[ed.selected];
@@ -480,7 +787,7 @@ void rebuild_detail_rows(Editor &ed) {
   row("name", sys.name);
   row("id", std::to_string(sys.id));
   row("position",
-      fspec("%.1f", sys.position.x) + ", " + fspec("%.1f", sys.position.y));
+      fspec("%.1f", system_position_x(ed, sys)) + ", " + fspec("%.1f", system_position_y(ed, sys)));
   if (sys.primary)
     row("primary", std::string(class_name(*sys.primary)));
   if (sys.secondary)
@@ -490,9 +797,15 @@ void rebuild_detail_rows(Editor &ed) {
   row("archetype", std::string(archetype_name(sys.archetype)));
   std::string flags;
   if (sys.has_habitable_world) flags += "habitable ";
-  if (sys.has_anomaly) flags += "anomaly ";
-  if (sys.has_rare_resource) flags += "rare-resource ";
-  if (sys.has_pre_warp_civilization) flags += "pre-warp-civ";
+  if (trait(ed.edits, sys, &core::StellarSystem::has_anomaly,
+            &edproj::SystemEdit::anomaly))
+    flags += "anomaly ";
+  if (trait(ed.edits, sys, &core::StellarSystem::has_rare_resource,
+            &edproj::SystemEdit::rare_resource))
+    flags += "rare-resource ";
+  if (trait(ed.edits, sys, &core::StellarSystem::has_pre_warp_civilization,
+            &edproj::SystemEdit::pre_warp_civilization))
+    flags += "pre-warp-civ";
   row("traits", flags.empty() ? "none" : flags);
   if (sys.stellar_region)
     row("region", std::string(core::stellar_region_name(*sys.stellar_region)));
@@ -546,18 +859,25 @@ void rebuild_detail_rows(Editor &ed) {
     for (const auto body_index : bodies->second) {
       const auto &body = ed.bodies[body_index];
       std::string value = std::string(body_kind_name(body.kind)) + ", " +
-                          fspec("%.2f", body.radius_earth) + " Re, " +
-                          fspec("%.2f", body.environment.gravity_g) + " g, " +
+                          fspec("%.2f", body_radius_earth(ed, body)) + " Re, " +
+                          fspec("%.2f", body_gravity_g(ed, body)) + " g, " +
                           fspec("%.0f", body.environment.temperature_kelvin) +
                           " K, " + std::string(atmosphere_name(
                                        body.environment.atmosphere));
-      if (body.stellar_exposure)
-        value += ", " + fspec("%.2f", body.stellar_exposure->orbit_au) + " AU";
+      if (const auto au = body_orbit_au(ed, body))
+        value += ", " + fspec("%.2f", *au) + " AU";
       if (body.stellar_exposure && body.stellar_exposure->in_habitable_zone)
         value += " [hz]";
-      if (body.has_anomaly) value += " [anomaly]";
-      if (body.has_rare_resource) value += " [rare]";
-      if (body.has_pre_warp_civilization) value += " [pre-warp]";
+      if (trait(ed.body_edits, body, &core::PlanetaryBody::has_anomaly,
+                &edproj::SystemEdit::anomaly))
+        value += " [anomaly]";
+      if (trait(ed.body_edits, body, &core::PlanetaryBody::has_rare_resource,
+                &edproj::SystemEdit::rare_resource))
+        value += " [rare]";
+      if (trait(ed.body_edits, body,
+                &core::PlanetaryBody::has_pre_warp_civilization,
+                &edproj::SystemEdit::pre_warp_civilization))
+        value += " [pre-warp]";
       if (body.cracked_world) value += " [cracked]";
       const auto bit = ed.body_edits.find(body.id);
       const auto marker =
@@ -567,7 +887,7 @@ void rebuild_detail_rows(Editor &ed) {
     }
   }
 
-  ed.detail_list.row_count = ed.detail_rows.size();
+  ed.detail_list.set_row_count(ed.detail_rows.size());
 }
 
 Point world_to_screen(const Editor &ed, float x, float y) {
@@ -581,10 +901,10 @@ void fit_camera(Editor &ed) {
   float min_x = ed.systems.front().position.x,
         max_x = min_x, min_y = ed.systems.front().position.y, max_y = min_y;
   for (const auto &s : ed.systems) {
-    min_x = std::min(min_x, s.position.x);
-    max_x = std::max(max_x, s.position.x);
-    min_y = std::min(min_y, s.position.y);
-    max_y = std::max(max_y, s.position.y);
+    min_x = std::min(min_x, system_position_x(ed, s));
+    max_x = std::max(max_x, system_position_x(ed, s));
+    min_y = std::min(min_y, system_position_y(ed, s));
+    max_y = std::max(max_y, system_position_y(ed, s));
   }
   ed.camera = {(min_x + max_x) * .5f, (min_y + max_y) * .5f};
   const float span_x = std::max(1.f, max_x - min_x);
@@ -644,6 +964,9 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
     out.overlay.push_back(Text{{x, y}, "No system selected", muted, font});
     y += font + 10 * s;
     ed.hit_name = ed.hit_note = ed.hit_bookmark = {};
+    ed.hit_anomaly = ed.hit_rare = ed.hit_prewarp = {};
+    ed.hit_position_x = ed.hit_position_y = {};
+    ed.hit_moon_orbit = {};
     return;
   }
   const auto &sys = ed.systems[ed.selected];
@@ -689,7 +1012,199 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   small_button(out, ed.hit_bookmark,
                stored.bookmarked ? "BOOKMARKED" : "BOOKMARK",
                stored.bookmarked, font);
-  y += ed.hit_bookmark.height + 10 * s;
+  y += ed.hit_bookmark.height + 8 * s;
+
+  // Trait overrides cycle AUTO -> YES -> NO -> AUTO: AUTO follows the
+  // generated record, YES/NO override it in the annotation layer.
+  const auto trait_button = [&](UiRect &hit, const char *label,
+                                const std::optional<bool> &value) {
+    hit = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto state = value ? (*value ? "YES" : "NO") : "AUTO";
+    small_button(out, hit, std::string(label) + ": " + state,
+                 value && *value, font);
+    y += hit.height + 6 * s;
+  };
+  trait_button(ed.hit_anomaly, "ANOMALY", stored.anomaly);
+  trait_button(ed.hit_rare, "RARE RESOURCE", stored.rare_resource);
+  trait_button(ed.hit_prewarp, "PRE-WARP CIV", stored.pre_warp_civilization);
+  y += 4 * s;
+
+  // Body-only numeric override: radius in Earth radii; empty restores AUTO.
+  if (body_context) {
+    ed.hit_position_x = ed.hit_position_y = {};
+    const auto &body = ed.bodies[ed.selected_body];
+    out.overlay.push_back(
+        Text{{x, y}, "radius override (Earth radii)", muted, font - 1});
+    y += font + 4;
+    ed.hit_radius = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto radius_value =
+        ed.editing == Field::BodyRadius
+            ? ed.edit_buffer
+            : (stored.radius_earth
+                   ? fspec("%.3f", *stored.radius_earth)
+                   : fspec("%.3f", body.radius_earth) + " (auto)");
+    field_box(out, ed.hit_radius, radius_value,
+              ed.editing == Field::BodyRadius, "earth radii, empty = auto...",
+              font);
+    y += ed.hit_radius.height + 8 * s;
+    out.overlay.push_back(
+        Text{{x, y}, "mass override (Earth masses)", muted, font - 1});
+    y += font + 4;
+    ed.hit_mass = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto mass_value =
+        ed.editing == Field::BodyMass
+            ? ed.edit_buffer
+            : (stored.mass_earth
+                   ? fspec("%.3f", *stored.mass_earth)
+                   : fspec("%.3f", body.mass_earth) + " (auto)");
+    field_box(out, ed.hit_mass, mass_value,
+              ed.editing == Field::BodyMass, "earth masses, empty = auto...",
+              font);
+    y += ed.hit_mass.height + 8 * s;
+    // Star-orbiting bodies only: moons ride their parent's satellite orbit.
+    if (!body.parent_body_id) {
+      ed.hit_moon_orbit = {};
+      out.overlay.push_back(
+          Text{{x, y}, "orbit override (AU)", muted, font - 1});
+      y += font + 4;
+      ed.hit_orbit = {x, y, r.width - 28 * s, (font + 12) * s};
+      const auto orbit_value =
+          ed.editing == Field::BodyOrbit
+              ? ed.edit_buffer
+              : (stored.orbit_au
+                     ? fspec("%.4f", *stored.orbit_au)
+                     : (body.stellar_exposure
+                            ? fspec("%.4f", body.stellar_exposure->orbit_au) +
+                                  " (auto)"
+                            : std::string{"none"}));
+      field_box(out, ed.hit_orbit, orbit_value,
+                ed.editing == Field::BodyOrbit, "orbit radius AU, empty = auto...",
+                font);
+      y += ed.hit_orbit.height + 8 * s;
+      out.overlay.push_back(
+          Text{{x, y}, "eccentricity override", muted, font - 1});
+      y += font + 4;
+      ed.hit_eccentricity = {x, y, r.width - 28 * s, (font + 12) * s};
+      const auto eccentricity_value =
+          ed.editing == Field::BodyEccentricity
+              ? ed.edit_buffer
+              : (stored.eccentricity
+                     ? fspec("%.3f", *stored.eccentricity)
+                     : fspec("%.3f", body.orbital_eccentricity) + " (auto)");
+      field_box(out, ed.hit_eccentricity, eccentricity_value,
+                ed.editing == Field::BodyEccentricity,
+                "0 to 0.95, empty = auto...", font);
+      y += ed.hit_eccentricity.height + 8 * s;
+      out.overlay.push_back(
+          Text{{x, y}, "inclination override (deg)", muted, font - 1});
+      y += font + 4;
+      ed.hit_inclination = {x, y, r.width - 28 * s, (font + 12) * s};
+      const auto inclination_value =
+          ed.editing == Field::BodyInclination
+              ? ed.edit_buffer
+              : (stored.inclination_degrees
+                     ? fspec("%.1f", *stored.inclination_degrees)
+                     : fspec("%.1f", body.orbital_inclination_degrees) +
+                           " (auto)");
+      field_box(out, ed.hit_inclination, inclination_value,
+                ed.editing == Field::BodyInclination,
+                "0 to 180 degrees, empty = auto...", font);
+      y += ed.hit_inclination.height + 8 * s;
+    } else {
+      // Moons ride their parent's satellite orbit — the stellar-orbit
+      // overrides don't apply; the satellite radius is theirs.
+      ed.hit_orbit = {};
+      ed.hit_eccentricity = {};
+      ed.hit_inclination = {};
+      out.overlay.push_back(
+          Text{{x, y}, "moon orbit override (km)", muted, font - 1});
+      y += font + 4;
+      ed.hit_moon_orbit = {x, y, r.width - 28 * s, (font + 12) * s};
+      std::string moon_orbit_value;
+      if (ed.editing == Field::BodyMoonOrbit)
+        moon_orbit_value = ed.edit_buffer;
+      else if (stored.satellite_orbit_km)
+        moon_orbit_value = fspec("%.0f", *stored.satellite_orbit_km);
+      else {
+        if (const auto parent =
+                std::ranges::find_if(ed.bodies, [&](const auto &b) {
+                  return b.id == *body.parent_body_id;
+                });
+            parent != ed.bodies.end()) {
+          try {
+            moon_orbit_value =
+                fspec("%.0f", body_satellite_orbit_km(ed, *parent, body)) +
+                " (auto)";
+          } catch (const std::exception &) {
+            moon_orbit_value = "unknown";
+          }
+        }
+      }
+      field_box(out, ed.hit_moon_orbit, moon_orbit_value,
+                ed.editing == Field::BodyMoonOrbit,
+                "kilometres, empty = auto...", font);
+      y += ed.hit_moon_orbit.height + 8 * s;
+    }
+  } else {
+    ed.hit_radius = {};
+    ed.hit_orbit = {};
+    ed.hit_mass = {};
+    ed.hit_eccentricity = {};
+    ed.hit_inclination = {};
+    ed.hit_moon_orbit = {};
+    // Galactic map position: system-level overrides move the star marker,
+    // click picking, camera fit and the inspector row — every consumer reads
+    // the effective axis.
+    out.overlay.push_back(
+        Text{{x, y}, "position x override (ly)", muted, font - 1});
+    y += font + 4;
+    ed.hit_position_x = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto position_x_value =
+        ed.editing == Field::SystemPositionX
+            ? ed.edit_buffer
+            : (stored.position_x
+                   ? fspec("%.2f", *stored.position_x)
+                   : fspec("%.2f", sys.position.x) + " (auto)");
+    field_box(out, ed.hit_position_x, position_x_value,
+              ed.editing == Field::SystemPositionX, "light-years, empty = auto...",
+              font);
+    y += ed.hit_position_x.height + 8 * s;
+    out.overlay.push_back(
+        Text{{x, y}, "position y override (ly)", muted, font - 1});
+    y += font + 4;
+    ed.hit_position_y = {x, y, r.width - 28 * s, (font + 12) * s};
+    const auto position_y_value =
+        ed.editing == Field::SystemPositionY
+            ? ed.edit_buffer
+            : (stored.position_y
+                   ? fspec("%.2f", *stored.position_y)
+                   : fspec("%.2f", sys.position.y) + " (auto)");
+    field_box(out, ed.hit_position_y, position_y_value,
+              ed.editing == Field::SystemPositionY, "light-years, empty = auto...",
+              font);
+    y += ed.hit_position_y.height + 8 * s;
+  }
+
+  // Embedded assets: files dropped under <project>/assets/ ride with the
+  // project; the first png previews here.
+  if (!ed.embedded_assets.empty()) {
+    out.overlay.push_back(
+        Text{{x, y},
+             "assets: " + std::to_string(ed.embedded_assets.size()) +
+                 " embedded",
+             muted, font - 1});
+    y += font + 4;
+    const float thumb = 48 * s;
+    if (ed.asset_preview)
+      out.overlay.push_back(Image{ed.asset_preview,
+                                  {x, y, thumb, thumb}, std::nullopt,
+                                  {255, 255, 255, 255}});
+    out.overlay.push_back(Text{{x + (ed.asset_preview ? thumb + 8 * s : 0),
+                                y + (thumb - font) * .5f},
+                               ed.asset_preview_name, ink, font - 1,
+                               r.width - thumb - 40 * s});
+    y += thumb + 8 * s;
+  }
 
   // Scrollable authoritative detail rows fill the space above the docked
   // project/history buttons.
@@ -698,8 +1213,8 @@ void render_inspector(DrawList &out, Editor &ed, float s) {
   ed.detail_rect = detail;
   out.overlay.push_back(FilledRectangle{detail, {5, 13, 22, 255}});
   out.overlay.push_back(StrokedRectangle{detail, panel_edge});
-  ed.detail_list.viewport_height = detail.height;
-  ed.detail_list.row_height = font + 8.f;
+  ed.detail_list.configure(ed.detail_rows.size(), font + 8.f,
+                           detail.height);
   const auto range = ed.detail_list.visible_range();
   float ry = detail.y + 4 * s - ed.detail_list.scroll_offset +
              range.first * ed.detail_list.row_height;
@@ -757,30 +1272,53 @@ void render_system_list(DrawList &out, Editor &ed, float s) {
   ed.rows_rect = list;
   out.overlay.push_back(FilledRectangle{list, {5, 13, 22, 255}});
   out.overlay.push_back(StrokedRectangle{list, panel_edge});
-  ed.system_list.viewport_height = list.height;
-  ed.system_list.row_height = 20.f;
+  ed.system_list.configure(ed.flat_rows.size(), 20.f, list.height);
   const auto range = ed.system_list.visible_range();
   float ry = list.y - ed.system_list.scroll_offset +
              range.first * ed.system_list.row_height;
   for (std::size_t i = range.first; i < range.last;
        ++i, ry += ed.system_list.row_height) {
-    const auto sys_index = ed.filtered[i];
-    const auto &sys = ed.systems[sys_index];
+    if (i >= ed.flat_rows.size()) break;
+    const auto [node, depth] = ed.flat_rows[i];
     const UiRect row{list.x, ry, list.width, ed.system_list.row_height};
-    if (sys_index == ed.selected)
-      out.overlay.push_back(FilledRectangle{row, row_selected});
-    else if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
-      out.overlay.push_back(FilledRectangle{row, row_hover});
-    const auto marker =
-        ed.edits.contains(sys.id) && ed.edits[sys.id].bookmarked ? "* " : "";
-    out.overlay.push_back(
-        Text{{row.x + 8 * s, row.y + 3 * s},
-             marker + display_name(ed, sys), ink, font, 0, list});
-    if (sys.primary)
+    if (depth == 0) {
+      const auto sys_index =
+          static_cast<std::size_t>(std::stoul(node->id.substr(1)));
+      const auto &sys = ed.systems[sys_index];
+      if (sys_index == ed.selected)
+        out.overlay.push_back(FilledRectangle{row, row_selected});
+      else if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
+        out.overlay.push_back(FilledRectangle{row, row_hover});
+      if (!node->children.empty())
+        out.overlay.push_back(
+            Text{{row.x + 4 * s, row.y + 3 * s},
+                 node->expanded ? "▾" : "›", muted, font, 0, list});
+      const auto marker =
+          ed.edits.contains(sys.id) && ed.edits[sys.id].bookmarked ? "* " : "";
       out.overlay.push_back(
-          Text{{row.x + row.width - 86 * s, row.y + 3 * s},
-               std::string(class_name(*sys.primary)), muted, font, 84 * s,
-               list});
+          Text{{row.x + 18 * s, row.y + 3 * s},
+               marker + display_name(ed, sys), ink, font, 0, list});
+      if (sys.primary)
+        out.overlay.push_back(
+            Text{{row.x + row.width - 86 * s, row.y + 3 * s},
+                 std::string(class_name(*sys.primary)), muted, font, 84 * s,
+                 list});
+    } else {
+      const auto body_index =
+          static_cast<std::size_t>(std::stoul(node->id.substr(1)));
+      const auto &body = ed.bodies[body_index];
+      if (body_index == ed.selected_body)
+        out.overlay.push_back(FilledRectangle{row, row_selected});
+      else if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
+        out.overlay.push_back(FilledRectangle{row, row_hover});
+      const auto marker = ed.body_edits.contains(body.id) &&
+                                  ed.body_edits[body.id].bookmarked
+                              ? "* "
+                              : "";
+      out.overlay.push_back(
+          Text{{row.x + 30 * s, row.y + 3 * s},
+               marker + display_name(ed, body), muted, font, 0, list});
+    }
   }
   if (ed.system_list.max_scroll() > 0) {
     const float track = list.height;
@@ -817,8 +1355,8 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
                     r.height - 30 * s - font * 2};
   out.overlay.push_back(FilledRectangle{rows, {5, 13, 22, 255}});
   out.overlay.push_back(StrokedRectangle{rows, panel_edge});
-  ed.picker_list.viewport_height = rows.height;
-  ed.picker_list.row_height = font + 10.f;
+  ed.picker_list.configure(ed.project_files.size(), font + 10.f,
+                           rows.height);
   // Hit geometry starts at the first row top (below the 4*s inset).
   ed.picker_rows = {rows.x, rows.y + 4 * s, rows.width, rows.height - 4 * s};
   const auto range = ed.picker_list.visible_range();
@@ -832,7 +1370,9 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
     out.overlay.push_back(
         Text{{row.x + 8 * s, ry + 4 * s},
              ed.project_files[i].filename().string(), ink, font, 0, rows});
-    if (ed.project_files[i] == ed.project_path)
+    if (ed.project_files[i] == ed.project_path ||
+        (ed.project_dir_form &&
+         ed.project_files[i] == ed.project_path.parent_path()))
       out.overlay.push_back(Text{{row.x + row.width - 66 * s, ry + 5 * s},
                               "current", accent, font - 2, 0, rows});
   }
@@ -851,21 +1391,68 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
   }
 }
 
+// Discovers embedded assets under a project directory's assets/ folder and
+// decodes the first png for the inspector preview.
+void refresh_embedded_assets(Editor &ed) {
+  ed.embedded_assets.clear();
+  ed.asset_preview.reset();
+  ed.asset_preview_name.clear();
+  const auto dir = ed.project_path.parent_path() / "assets";
+  std::error_code ec;
+  if (std::filesystem::is_directory(dir, ec))
+    for (const auto &entry : std::filesystem::directory_iterator(dir, ec))
+      if (entry.is_regular_file() && entry.path().extension() == ".png")
+        ed.embedded_assets.push_back(entry.path());
+  std::sort(ed.embedded_assets.begin(), ed.embedded_assets.end());
+  if (!ed.embedded_assets.empty()) {
+    try {
+      ed.asset_preview = decode_rgba_image(ed.embedded_assets.front(), 256);
+      ed.asset_preview_name = ed.embedded_assets.front().filename().string();
+    } catch (const std::exception &) {
+      ed.asset_preview_name = "unreadable: " +
+                              ed.embedded_assets.front().filename().string();
+    }
+  }
+}
+
 void save_project(Editor &ed) {
   try {
     // Save-As by name: the document name drives the filename inside the
     // projects directory, so renaming a project never clobbers another.
     const auto slug = edproj::sanitize_project_name(ed.project_name);
-    ed.project_path = ed.projects_dir /
-                      ((slug.empty() ? "editor-project" : slug) + ".json");
+    const auto stem = slug.empty() ? "editor-project" : slug;
+    const auto dir = ed.projects_dir / stem;
+    // Multi-file form: a project directory holding project.json + assets/.
+    // Chosen when the project already lives in one or an assets folder
+    // exists — the user embeds files by dropping them under <slug>/assets/.
+    const auto assets_dir = dir / "assets";
+    ed.project_dir_form =
+        ed.project_dir_form || std::filesystem::is_directory(assets_dir);
+    if (ed.project_dir_form) {
+      std::filesystem::create_directories(assets_dir);
+      ed.project_path = dir / "project.json";
+    } else {
+      ed.project_path = ed.projects_dir / (stem + ".json");
+    }
     const edproj::EditorProject project{ed.seed, ed.system_count, ed.edits,
                                         ed.body_edits, ed.project_name};
     const auto text = edproj::serialize_project(project);
     engine::write_file_atomically(ed.project_path,
                                   std::as_bytes(std::span(text)));
+    // Upgrading a flat save to a directory retires the old single file.
+    if (ed.project_dir_form) {
+      const auto stale = ed.projects_dir / (stem + ".json");
+      std::error_code ec;
+      std::filesystem::remove(stale, ec);
+    }
+    refresh_embedded_assets(ed);
     ed.status = "saved " + ed.project_path.filename().string() + " - " +
                 std::to_string(ed.edits.size() + ed.body_edits.size()) +
-                " annotations";
+                " annotations" +
+                (ed.embedded_assets.empty()
+                     ? ""
+                     : ", " + std::to_string(ed.embedded_assets.size()) +
+                           " assets");
   } catch (const std::exception &error) {
     ed.status = std::string("save failed: ") + error.what();
   }
@@ -873,7 +1460,10 @@ void save_project(Editor &ed) {
 
 void load_project(Editor &ed, const std::filesystem::path &path) {
   try {
-    std::ifstream in(path, std::ios::binary);
+    std::error_code ec;
+    const bool dir_form = std::filesystem::is_directory(path, ec);
+    const auto file = dir_form ? path / "project.json" : path;
+    std::ifstream in(file, std::ios::binary);
     if (!in) {
       ed.status = "no project file at " + path.filename().string();
       return;
@@ -886,13 +1476,19 @@ void load_project(Editor &ed, const std::filesystem::path &path) {
                        ed.project_name});
     ed.edits = std::move(project.edits);
     ed.body_edits = std::move(project.body_edits);
-    ed.project_path = path;
+    ed.project_path = file;
+    ed.project_dir_form = dir_form;
     if (!project.name.empty()) ed.project_name = std::move(project.name);
+    refresh_embedded_assets(ed);
     rebuild_filter(ed);
     rebuild_detail_rows(ed);
     ed.status = "loaded " + path.filename().string() + " - " +
                 std::to_string(ed.edits.size() + ed.body_edits.size()) +
-                " annotations";
+                " annotations" +
+                (ed.embedded_assets.empty()
+                     ? ""
+                     : ", " + std::to_string(ed.embedded_assets.size()) +
+                           " assets");
   } catch (const std::exception &error) {
     ed.status = std::string("load failed: ") + error.what();
   }
@@ -904,11 +1500,16 @@ void open_picker(Editor &ed) {
   std::error_code ec;
   if (std::filesystem::exists(ed.projects_dir, ec))
     for (const auto &entry :
-         std::filesystem::directory_iterator(ed.projects_dir, ec))
+         std::filesystem::directory_iterator(ed.projects_dir, ec)) {
       if (entry.is_regular_file() && entry.path().extension() == ".json")
         ed.project_files.push_back(entry.path());
+      else if (entry.is_directory() &&
+               std::filesystem::is_regular_file(entry.path() / "project.json",
+                                                ec))
+        ed.project_files.push_back(entry.path());
+    }
   std::sort(ed.project_files.begin(), ed.project_files.end());
-  ed.picker_list.row_count = ed.project_files.size();
+  ed.picker_list.set_row_count(ed.project_files.size());
   ed.picker_list.scroll_to(0);
   ed.picker_open = true;
   if (ed.project_files.empty())
@@ -980,7 +1581,7 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
   // window fill doubles as the viewport background; only chrome sits in the
   // overlay here.
   for (const auto &sys : ed.systems) {
-    const auto p = world_to_screen(ed, sys.position.x, sys.position.y);
+    const auto p = world_to_screen(ed, system_position_x(ed, sys), system_position_y(ed, sys));
     if (!v.contains(p)) continue;
     const auto color = sys.primary ? class_color(*sys.primary) : muted;
     out.circles.push_back(
@@ -991,7 +1592,7 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
   }
   if (ed.selected < ed.systems.size()) {
     const auto &sys = ed.systems[ed.selected];
-    const auto p = world_to_screen(ed, sys.position.x, sys.position.y);
+    const auto p = world_to_screen(ed, system_position_x(ed, sys), system_position_y(ed, sys));
     out.overlay.push_back(StrokedRectangle{
         {p.x - 10, p.y - 10, 20, 20}, accent});
     out.world.push_back(
@@ -1000,7 +1601,7 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
   }
   if (ed.pixels_per_unit > 6.f)
     for (const auto &sys : ed.systems) {
-      const auto p = world_to_screen(ed, sys.position.x, sys.position.y);
+      const auto p = world_to_screen(ed, system_position_x(ed, sys), system_position_y(ed, sys));
       if (!v.contains(p)) continue;
       out.world.push_back(Text{{p.x + 7, p.y - 6}, display_name(ed, sys),
                                {150, 180, 195, 220}, static_cast<int>(11 * s),
@@ -1162,11 +1763,10 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
           const int host = core::planetary_stellar_host(sys, body.id);
           const auto &hc = hosts[static_cast<std::size_t>(
               std::clamp(host, 0, 3))];
-          orbit_ring(out, ed, core::planetary_stellar_orbit(sys, body), hc[0],
+          orbit_ring(out, ed, body_orbit(ed, sys, body), hc[0],
                      hc[1], {60, 100, 122, 120});
         }
-        const auto bp =
-            core::stellar_planet_position(sys, body, ed.system_days);
+        const auto bp = body_position(ed, sys, body);
         const auto p = system_to_screen(ed, bp[0], bp[1]);
         if (!v.contains(p)) continue;
         const bool in_hz =
@@ -1242,12 +1842,13 @@ Point body_to_screen(const Editor &ed, double x_km, double y_km) {
 void fit_body_camera(Editor &ed) {
   if (ed.focus_body >= ed.bodies.size()) return;
   const auto &body = ed.bodies[ed.focus_body];
-  const double radius_km = std::max(50.0, body.radius_earth * 6371.0);
+  const double radius_km =
+      std::max(50.0, body_radius_earth(ed, body) * 6371.0);
   double extent = radius_km * 30.0;
   for (const auto mi : moon_indices(ed, ed.focus_body))
     try {
       const auto orbit =
-          core::planetary_satellite_orbit(body, ed.bodies[mi]);
+          moon_orbit(ed, body, ed.bodies[mi]);
       extent = std::max(extent,
                         orbit.relative.radius * (1.0 + orbit.relative.eccentricity) * 1.05);
     } catch (const std::exception &) {
@@ -1283,7 +1884,7 @@ void render_body_view(DrawList &out, Editor &ed, float s) {
   for (const auto mi : moons)
     try {
       orbit_ring_mapped(out,
-                        core::planetary_satellite_orbit(body, ed.bodies[mi])
+                        moon_orbit(ed, body, ed.bodies[mi])
                             .relative,
                         0, 0, {60, 100, 122, 120}, to_screen);
     } catch (const std::exception &) {
@@ -1292,7 +1893,8 @@ void render_body_view(DrawList &out, Editor &ed, float s) {
   // Parent disc at its true angular size, floored for legibility.
   const auto pc = to_screen(0.0, 0.0);
   const float parent_px = std::max(
-      5.f, static_cast<float>(body.radius_earth * 6371.0 * ed.body_ppa));
+      5.f,
+      static_cast<float>(body_radius_earth(ed, body) * 6371.0 * ed.body_ppa));
   const bool in_hz =
       body.stellar_exposure && body.stellar_exposure->in_habitable_zone;
   if (ed.focus_body == ed.selected_body)
@@ -1311,12 +1913,12 @@ void render_body_view(DrawList &out, Editor &ed, float s) {
   for (const auto mi : moons) {
     const auto &moon = ed.bodies[mi];
     try {
-      const auto orbit = core::planetary_satellite_orbit(body, moon);
+      const auto orbit = moon_orbit(ed, body, moon);
       const auto rel =
           core::satellite_relative_position(orbit, ed.system_days);
       const auto p = to_screen(rel[0], rel[1]);
       const float moon_px = std::clamp(
-          static_cast<float>(moon.radius_earth * 6371.0 * ed.body_ppa),
+          static_cast<float>(body_radius_earth(ed, moon) * 6371.0 * ed.body_ppa),
           2.5f, 10.f);
       if (mi == ed.selected_body)
         out.world.push_back(Circle{p, moon_px + 5.f, accent});
@@ -1482,6 +2084,7 @@ int main(int argc, char **argv) {
           ed.selected = static_cast<std::size_t>(-1);
           ed.selected_body = static_cast<std::size_t>(-1);
           ed.focus_body = static_cast<std::size_t>(-1);
+          ed.expanded_systems.clear();
           ed.view = WorkspaceView::Galaxy;
           // Annotations survive regeneration: ids are deterministic for the
           // same seed+count, and a new seed simply orphans old edits.
@@ -1626,7 +2229,8 @@ int main(int argc, char **argv) {
                         : pos - 1;
             ed.selected = ed.filtered[pos];
             ed.selected_body = static_cast<std::size_t>(-1);
-            ed.system_list.ensure_visible(pos);
+            ed.system_list.ensure_visible(
+                flat_pos_of_system(ed, ed.selected));
             rebuild_detail_rows(ed);
             continue;
           }
@@ -1702,6 +2306,26 @@ int main(int argc, char **argv) {
               rebuild_detail_rows(ed); // row bookmark markers refresh
               rebuild_filter(ed); // bookmarked-only view membership changes
             }
+          } else if (ed.hit_anomaly.contains(event.position) ||
+                     ed.hit_rare.contains(event.position) ||
+                     ed.hit_prewarp.contains(event.position)) {
+            if (const auto target = annotation_target(ed)) {
+              ed.history.commit(
+                  {ed.seed, ed.system_count, ed.edits, ed.body_edits,
+                   ed.project_name});
+              auto &map = annotation_map(ed, target->second);
+              auto &field =
+                  ed.hit_anomaly.contains(event.position)
+                      ? map[target->first].anomaly
+                      : ed.hit_rare.contains(event.position)
+                            ? map[target->first].rare_resource
+                            : map[target->first].pre_warp_civilization;
+              // AUTO -> YES -> NO -> AUTO (unset restores the generated trait).
+              field = !field ? std::optional<bool>{true}
+                             : (*field ? std::optional<bool>{false}
+                                       : std::nullopt);
+              rebuild_detail_rows(ed); // trait markers refresh
+            }
           } else if (ed.hit_undo.contains(event.position)) {
             apply_undo(ed);
           } else if (ed.hit_redo.contains(event.position)) {
@@ -1722,6 +2346,90 @@ int main(int argc, char **argv) {
               const auto it = map.find(target->first);
               ed.edit_buffer =
                   it != map.end() ? it->second.note : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_radius.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyRadius;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.radius_earth
+                      ? fspec("%.3f", *it->second.radius_earth)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_orbit.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyOrbit;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.orbit_au
+                      ? fspec("%.4f", *it->second.orbit_au)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_mass.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyMass;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.mass_earth
+                      ? fspec("%.3f", *it->second.mass_earth)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_eccentricity.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyEccentricity;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.eccentricity
+                      ? fspec("%.3f", *it->second.eccentricity)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_inclination.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyInclination;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.inclination_degrees
+                      ? fspec("%.1f", *it->second.inclination_degrees)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_moon_orbit.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && target->second) {
+              ed.editing = Field::BodyMoonOrbit;
+              const auto it = ed.body_edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.body_edits.end() && it->second.satellite_orbit_km
+                      ? fspec("%.0f", *it->second.satellite_orbit_km)
+                      : std::string{};
+              window.set_text_input(true);
+            }
+          } else if (ed.hit_position_x.contains(event.position) ||
+                     ed.hit_position_y.contains(event.position)) {
+            if (const auto target = annotation_target(ed);
+                target && !target->second) {
+              const auto member =
+                  ed.hit_position_x.contains(event.position)
+                      ? &edproj::SystemEdit::position_x
+                      : &edproj::SystemEdit::position_y;
+              ed.editing = member == &edproj::SystemEdit::position_x
+                               ? Field::SystemPositionX
+                               : Field::SystemPositionY;
+              const auto it = ed.edits.find(target->first);
+              ed.edit_buffer =
+                  it != ed.edits.end() && it->second.*member
+                      ? fspec("%.2f", *(it->second.*member))
+                      : std::string{};
               window.set_text_input(true);
             }
           } else if (ed.hit_project_name.contains(event.position)) {
@@ -1762,8 +2470,8 @@ int main(int argc, char **argv) {
               float best = 14.f;
               std::size_t best_index = ed.systems.size();
               for (std::size_t i = 0; i < ed.systems.size(); ++i) {
-                const auto p = world_to_screen(ed, ed.systems[i].position.x,
-                                               ed.systems[i].position.y);
+                const auto p = world_to_screen(ed, system_position_x(ed, ed.systems[i]),
+                                               system_position_y(ed, ed.systems[i]));
                 const float d = std::hypot(p.x - event.position.x,
                                            p.y - event.position.y);
                 if (d < best) {
@@ -1790,7 +2498,7 @@ int main(int argc, char **argv) {
               for (const auto mi : moon_indices(ed, ed.focus_body))
                 try {
                   const auto rel = core::satellite_relative_position(
-                      core::planetary_satellite_orbit(parent,
+                      moon_orbit(ed, parent,
                                                       ed.bodies[mi]),
                       ed.system_days);
                   const auto p = body_to_screen(ed, rel[0], rel[1]);
@@ -1839,12 +2547,35 @@ int main(int argc, char **argv) {
                               ed.system_list.scroll_offset;
           const auto row = static_cast<std::size_t>(std::max(
               0.f, std::floor(local / ed.system_list.row_height)));
-          if (row < ed.filtered.size()) {
-            ed.selected = ed.filtered[row];
-            ed.system_list.ensure_visible(row);
-            ed.selected_body = static_cast<std::size_t>(-1);
-            if (ed.view == WorkspaceView::System) fit_system_camera(ed);
-            rebuild_detail_rows(ed);
+          if (row < ed.flat_rows.size()) {
+            const auto [node, depth] = ed.flat_rows[row];
+            const auto index =
+                static_cast<std::size_t>(std::stoul(node->id.substr(1)));
+            if (depth == 0) {
+              // The leading edge of a system row toggles body expansion when
+              // the system has bodies; the rest selects it.
+              if (!node->children.empty() &&
+                  event.position.x - ed.rows_rect.x < 18.f) {
+                if (ed.expanded_systems.erase(index) == 0)
+                  ed.expanded_systems.insert(index);
+                rebuild_tree(ed);
+                ed.system_list.ensure_visible(row);
+              } else {
+                ed.selected = index;
+                ed.system_list.ensure_visible(row);
+                ed.selected_body = static_cast<std::size_t>(-1);
+                if (ed.view == WorkspaceView::System) fit_system_camera(ed);
+                rebuild_detail_rows(ed);
+              }
+            } else {
+              // Body rows jump to that body's system context, matching the
+              // inspector's body-row behavior.
+              ed.selected = static_cast<std::size_t>(
+                  std::stoul(node->parent_id.substr(1)));
+              ed.selected_body = index;
+              ed.view = WorkspaceView::System;
+              rebuild_detail_rows(ed);
+            }
           }
         }
         // Picker rows load the chosen project file.

@@ -22,6 +22,38 @@ kind_names() {
   return names;
 }
 
+const char *kind_name(RawInputEvent::Kind kind) {
+  switch (kind) {
+  case RawInputEvent::Kind::KeyPress:
+    return "KeyPress";
+  case RawInputEvent::Kind::KeyRelease:
+    return "KeyRelease";
+  case RawInputEvent::Kind::MouseButton:
+    return "MouseButton";
+  case RawInputEvent::Kind::MouseMotion:
+    return "MouseMotion";
+  case RawInputEvent::Kind::MouseWheel:
+    return "MouseWheel";
+  case RawInputEvent::Kind::GamepadButton:
+    return "GamepadButton";
+  case RawInputEvent::Kind::GamepadAxis:
+    return "GamepadAxis";
+  }
+  return "KeyPress";
+}
+
+const char *action_type_name(InputAction::Type type) {
+  switch (type) {
+  case InputAction::Type::Axis1D:
+    return "Axis1D";
+  case InputAction::Type::Axis2D:
+    return "Axis2D";
+  case InputAction::Type::Button:
+    return "Button";
+  }
+  return "Button";
+}
+
 } // namespace
 
 bool InputMapper::load_contexts(std::string_view json_document,
@@ -73,6 +105,7 @@ bool InputMapper::load_contexts(std::string_view json_document,
         binding.kind = found->second;
         binding.code = binding_json.value("code", 0);
         binding.scale = binding_json.value("scale", 1.0f);
+        binding.device = binding_json.value("device", -1);
         for (const auto &chord :
              binding_json.value("chord", nlohmann::json::array()))
           binding.chord_keys.push_back(chord.get<int>());
@@ -124,10 +157,15 @@ bool InputMapper::binding_matches(const InputBinding &binding,
   case RawInputEvent::Kind::KeyPress:
   case RawInputEvent::Kind::KeyRelease:
   case RawInputEvent::Kind::MouseButton:
+    return binding.code == event.code;
   case RawInputEvent::Kind::GamepadButton:
-    return binding.code == event.code;
   case RawInputEvent::Kind::GamepadAxis:
-    return binding.code == event.code;
+    // Device pinning: a binding with device >= 0 answers only that pad;
+    // an event with device < 0 (synthetic/replayed input) is a wildcard
+    // that still matches pinned bindings.
+    return binding.code == event.code &&
+           (binding.device < 0 || event.device < 0 ||
+            binding.device == event.device);
   case RawInputEvent::Kind::MouseMotion:
   case RawInputEvent::Kind::MouseWheel:
     return true; // code-agnostic; scale decides magnitude
@@ -189,7 +227,7 @@ bool InputMapper::feed(const RawInputEvent &event) {
           // Sticks only emit on change; keep the latest value so held
           // deflection stays readable between events. axis() folds this
           // live value into the result for GamepadAxis-bound actions.
-          gamepad_axes_[event.code] = event.value;
+          gamepad_axes_[{event.device, event.code}] = event.value;
           consumed = true;
           break;
         case RawInputEvent::Kind::MouseMotion:
@@ -253,9 +291,18 @@ float InputMapper::axis(std::string_view action) const {
         continue;
       for (const auto &binding : candidate.bindings)
         if (binding.kind == RawInputEvent::Kind::GamepadAxis) {
-          const auto found = gamepad_axes_.find(binding.code);
-          if (found != gamepad_axes_.end())
-            result += found->second * binding.scale;
+          if (binding.device >= 0) {
+            const auto found = gamepad_axes_.find({binding.device, binding.code});
+            if (found != gamepad_axes_.end())
+              result += found->second * binding.scale;
+            const auto wild = gamepad_axes_.find({-1, binding.code});
+            if (wild != gamepad_axes_.end())
+              result += wild->second * binding.scale;
+          } else {
+            for (const auto &[key, value] : gamepad_axes_)
+              if (key.second == binding.code)
+                result += value * binding.scale;
+          }
         }
       return result;
     }
@@ -278,6 +325,167 @@ std::size_t InputMapper::rebind(std::string_view action,
   // Rebinding invalidates any stale held state from the old bindings.
   states_.erase(std::string(action));
   return rebound;
+}
+
+std::vector<InputBinding> InputMapper::bindings(std::string_view action) const {
+  for (const auto &name : stack_) {
+    const auto ctx = contexts_.find(name);
+    if (ctx == contexts_.end())
+      continue;
+    for (const auto &candidate : ctx->second.actions)
+      if (candidate.name == action)
+        return candidate.bindings;
+  }
+  // Not stacked — fall back to any registered context so a rebind UI can
+  // inspect actions on inactive pages too.
+  for (const auto &[name, ctx] : contexts_)
+    for (const auto &candidate : ctx.actions)
+      if (candidate.name == action)
+        return candidate.bindings;
+  return {};
+}
+
+std::string InputMapper::save_contexts() const {
+  nlohmann::json contexts = nlohmann::json::array();
+  std::vector<std::string> names;
+  names.reserve(contexts_.size());
+  for (const auto &[name, ctx] : contexts_) {
+    (void)ctx;
+    names.push_back(name);
+  }
+  std::sort(names.begin(), names.end());
+  for (const auto &name : names) {
+    const auto &ctx = contexts_.at(name);
+    nlohmann::json actions = nlohmann::json::array();
+    for (const auto &action : ctx.actions) {
+      nlohmann::json bindings = nlohmann::json::array();
+      for (const auto &binding : action.bindings) {
+        nlohmann::json b{{"kind", kind_name(binding.kind)},
+                         {"code", binding.code},
+                         {"scale", binding.scale}};
+        if (binding.device >= 0)
+          b["device"] = binding.device;
+        if (!binding.chord_keys.empty())
+          b["chord"] = binding.chord_keys;
+        bindings.push_back(std::move(b));
+      }
+      actions.push_back({{"name", action.name},
+                         {"type", action_type_name(action.type)},
+                         {"bindings", std::move(bindings)}});
+    }
+    contexts.push_back({{"name", ctx.name},
+                        {"exclusive", ctx.exclusive},
+                        {"actions", std::move(actions)}});
+  }
+  return nlohmann::json{{"contexts", std::move(contexts)}}.dump(2);
+}
+
+const InputContext *InputMapper::context(std::string_view name) const {
+  const auto it = contexts_.find(std::string(name));
+  return it == contexts_.end() ? nullptr : &it->second;
+}
+
+std::string key_name(int code) {
+  // Printable ASCII (SDL3 keycodes carry it verbatim); letters render
+  // uppercase like a physical keycap.
+  if (code == 32)
+    return "Space";
+  if (code >= 'a' && code <= 'z')
+    return std::string(1, static_cast<char>(code - 'a' + 'A'));
+  if (code > 32 && code < 127)
+    return std::string(1, static_cast<char>(code));
+  switch (code) {
+  case 8: return "Backspace";
+  case 9: return "Tab";
+  case 13: return "Return";
+  case 27: return "Escape";
+  case 0x40000039: return "Caps Lock";
+  case 0x40000046: return "Print Screen";
+  case 0x40000047: return "Scroll Lock";
+  case 0x40000048: return "Pause";
+  case 0x40000049: return "Insert";
+  case 0x4000004a: return "Home";
+  case 0x4000004b: return "Page Up";
+  case 0x4000004c: return "Delete";
+  case 0x4000004d: return "End";
+  case 0x4000004e: return "Page Down";
+  case 0x4000004f: return "Right";
+  case 0x40000050: return "Left";
+  case 0x40000051: return "Down";
+  case 0x40000052: return "Up";
+  case 0x40000053: return "Num Lock";
+  case 0x40000054: return "Keypad /";
+  case 0x40000055: return "Keypad *";
+  case 0x40000056: return "Keypad -";
+  case 0x40000057: return "Keypad +";
+  case 0x40000058: return "Keypad Enter";
+  case 0x40000063: return "Keypad .";
+  case 0x400000e0: return "Left Ctrl";
+  case 0x400000e1: return "Left Shift";
+  case 0x400000e2: return "Left Alt";
+  case 0x400000e3: return "Left Gui";
+  case 0x400000e4: return "Right Ctrl";
+  case 0x400000e5: return "Right Shift";
+  case 0x400000e6: return "Right Alt";
+  case 0x400000e7: return "Right Gui";
+  default: break;
+  }
+  if (code >= 0x40000059 && code <= 0x40000062)
+    return "Keypad " + std::to_string(code - 0x40000059 + 1);
+  if (code >= 0x4000003a && code <= 0x40000045)
+    return "F" + std::to_string(code - 0x4000003a + 1);
+  if (code >= 0x40000068 && code <= 0x40000073)
+    return "F" + std::to_string(code - 0x40000068 + 13);
+  return "Key " + std::to_string(code);
+}
+
+std::string describe_binding(const InputBinding &binding) {
+  std::string trigger;
+  switch (binding.kind) {
+  case RawInputEvent::Kind::KeyPress:
+  case RawInputEvent::Kind::KeyRelease:
+    trigger = key_name(binding.code);
+    break;
+  case RawInputEvent::Kind::MouseButton:
+    trigger = binding.code == 1   ? "Left Mouse"
+              : binding.code == 2 ? "Middle Mouse"
+              : binding.code == 3 ? "Right Mouse"
+                                  : "Mouse " + std::to_string(binding.code);
+    break;
+  case RawInputEvent::Kind::MouseWheel:
+    trigger = "Wheel";
+    break;
+  case RawInputEvent::Kind::GamepadButton:
+    trigger = binding.device >= 0
+                  ? "Pad " + std::to_string(binding.device + 1) + " Btn " +
+                        std::to_string(binding.code)
+                  : "Pad " + std::to_string(binding.code);
+    break;
+  case RawInputEvent::Kind::GamepadAxis:
+    trigger = binding.device >= 0
+                  ? "Pad " + std::to_string(binding.device + 1) + " Axis " +
+                        std::to_string(binding.code)
+                  : "Axis " + std::to_string(binding.code);
+    break;
+  case RawInputEvent::Kind::MouseMotion:
+    trigger = "Mouse Motion";
+    break;
+  }
+  for (const int chord : binding.chord_keys)
+    trigger = key_name(chord) + "+" + trigger;
+  return trigger;
+}
+
+std::string describe_bindings(const std::vector<InputBinding> &bindings) {
+  if (bindings.empty())
+    return "Unbound";
+  std::string result;
+  for (const auto &binding : bindings) {
+    if (!result.empty())
+      result += ", ";
+    result += describe_binding(binding);
+  }
+  return result;
 }
 
 } // namespace stellar::engine

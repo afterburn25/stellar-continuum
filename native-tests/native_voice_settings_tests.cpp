@@ -49,10 +49,12 @@ void responsive_layout_and_render(const fs::path& path) {
     const UiRect controls[]{layout.title, layout.introduction, layout.enable_voices, layout.volume_track,
                            layout.subtitles, layout.subtitle_size, layout.background_track,
                            layout.speaker_labels, layout.filter_track, layout.frequency,
-                           layout.no_interruptions, layout.replay, layout.stop, layout.defaults,
-                           layout.cancel, layout.save, layout.status};
+                           layout.no_interruptions, layout.interface_announcements, layout.replay,
+                           layout.stop, layout.defaults, layout.cancel, layout.save, layout.status};
     for (const auto control : controls) require(contained(layout.panel, control), "voice control escaped the panel");
-    require(layout.replay.y >= layout.no_interruptions.y + layout.no_interruptions.height,
+    require(layout.interface_announcements.y >= layout.no_interruptions.y + layout.no_interruptions.height,
+            "voice announcement toggle overlaps the controls");
+    require(layout.replay.y >= layout.interface_announcements.y + layout.interface_announcements.height,
             "voice action buttons overlap the controls");
     require(layout.defaults.y >= layout.replay.y + layout.replay.height,
             "voice footer buttons overlap replay controls");
@@ -86,12 +88,14 @@ void input_preview_callbacks_and_rollback(const fs::path& path) {
   click(settings, layout.subtitles);
   click(settings, layout.speaker_labels);
   click(settings, layout.no_interruptions);
+  click(settings, layout.interface_announcements);
   click(settings, layout.subtitle_size);
   {stellar::native_ui::Dropdown menu;menu.open(0,{"14","18","22","26","32"},0);click(settings,menu.layout(layout.subtitle_size,1280,720).rows[2]);}
   click(settings, layout.frequency);
   {stellar::native_ui::Dropdown menu;menu.open(1,{"Minimal","Normal","Frequent"},0);click(settings,menu.layout(layout.frequency,1280,720).rows[2]);}
   require(!settings.values().enabled && !settings.values().subtitles && !settings.values().speaker_labels &&
-          !settings.values().no_interruptions && settings.values().subtitle_size == 22 &&
+          !settings.values().no_interruptions && settings.values().interface_announcements &&
+          settings.values().subtitle_size == 22 &&
           settings.values().frequency == VoiceFrequency::Frequent,
           "toggle and choice controls did not update the draft");
 
@@ -137,6 +141,7 @@ void persistence_and_failed_save(const fs::path& scratch) {
   click(settings, layout.frequency);
   {stellar::native_ui::Dropdown menu;menu.open(1,{"Minimal","Normal","Frequent"},0);click(settings,menu.layout(layout.frequency,1280,720).rows[2]);}
   click(settings, layout.no_interruptions);
+  click(settings, layout.interface_announcements);
   (void)settings.handle({InputEventType::LeftPressed,
                          {layout.volume_track.x + layout.volume_track.width * .4f, center(layout.volume_track).y}},
                         1280, 720);
@@ -147,6 +152,15 @@ void persistence_and_failed_save(const fs::path& scratch) {
   NativeVoiceSettings reopened(path);
   require(reopened.values() == expected && reopened.saved_values() == expected,
           "valid persisted voice settings were not restored");
+  require(reopened.values().interface_announcements,
+          "persisted voice settings lost the interface-announcement flag");
+
+  const auto legacy = scratch / "legacy.json";
+  write_text(legacy,
+             R"({"schemaVersion":1,"enabled":true,"volume":1,"subtitles":true,"subtitleSize":18,"backgroundOpacity":0.7,"speakerLabels":true,"communicationFilter":0,"frequency":1,"noInterruptions":false})");
+  NativeVoiceSettings legacy_settings(legacy);
+  require(legacy_settings.status().empty() && !legacy_settings.values().interface_announcements,
+          "legacy voice settings did not load with announcements defaulting off");
 
   const auto directory_target = scratch / "directory-target";
   fs::create_directory(directory_target);
@@ -176,6 +190,7 @@ void malformed_preferences(const fs::path& scratch) {
       {"size.json", R"({"schemaVersion":1,"enabled":true,"volume":1,"subtitles":true,"subtitleSize":17,"backgroundOpacity":0.7,"speakerLabels":true,"communicationFilter":0,"frequency":1,"noInterruptions":false})"},
       {"frequency.json", R"({"schemaVersion":1,"enabled":true,"volume":1,"subtitles":true,"subtitleSize":18,"backgroundOpacity":0.7,"speakerLabels":true,"communicationFilter":0,"frequency":3,"noInterruptions":false})"},
       {"type.json", R"({"schemaVersion":1,"enabled":1,"volume":1,"subtitles":true,"subtitleSize":18,"backgroundOpacity":0.7,"speakerLabels":true,"communicationFilter":0,"frequency":1,"noInterruptions":false})"},
+      {"announcements.json", R"({"schemaVersion":1,"enabled":true,"volume":1,"subtitles":true,"subtitleSize":18,"backgroundOpacity":0.7,"speakerLabels":true,"communicationFilter":0,"frequency":1,"noInterruptions":false,"interfaceAnnouncements":1})"},
       {"extra.json", R"({"schemaVersion":1,"enabled":true,"volume":1,"subtitles":true,"subtitleSize":18,"backgroundOpacity":0.7,"speakerLabels":true,"communicationFilter":0,"frequency":1,"noInterruptions":false,"extra":0})"},
       {"duplicate.json", R"({"schemaVersion":1,"enabled":true,"enabled":false,"volume":1,"subtitles":true,"subtitleSize":18,"backgroundOpacity":0.7,"speakerLabels":true,"communicationFilter":0,"frequency":1,"noInterruptions":false})"},
       {"nul.json", std::string{"{}\0{}", 5}}};
@@ -226,6 +241,65 @@ void localized_labels(const fs::path& path) {
 }
 } // namespace
 
+void keyboard_focus_and_sliders(const fs::path& path) {
+  int replays{};
+  NativeVoiceSettings settings(path, {}, [&] { ++replays; }, {});
+  settings.open();
+  const auto press = [&](std::uint32_t k, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = k;
+    event.shift = shift;
+    return settings.handle(event, 1280, 720);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+  constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u;
+  constexpr std::uint32_t kEnd = 0x4000004du;
+  require(settings.focused() < 0, "voice settings opened with stale focus");
+  require(settings.focused_label().empty(), "unfocused panel reported a label");
+  require(press(kTab) && settings.focused() == 0, "Tab did not focus ENABLE VOICES");
+  require(settings.focused_label() == "Enable voices: On",
+          "focused_label did not name ENABLE VOICES with its state");
+  require(press(kSpace) && !settings.values().enabled && settings.focused() == 0,
+          "Space did not toggle ENABLE VOICES in place");
+  require(settings.focused_label() == "Enable voices: Off",
+          "focused_label did not track the toggle");
+  // The volume slider (index 1) adjusts on arrows, snaps on Home/End.
+  require(press(kTab) && settings.focused() == 1, "Tab did not reach the volume slider");
+  require(settings.focused_label() == "Voice volume: 100%",
+          "focused_label did not announce the slider value");
+  const float volume = settings.values().volume;
+  require(press(kLeft) && settings.values().volume == volume - .05f,
+          "Left arrow did not lower the focused volume slider");
+  require(press(kRight) && settings.values().volume == volume,
+          "Right arrow did not restore the volume slider");
+  require(press(kEnd) && settings.values().volume == 1.f,
+          "End did not maximize the focused slider");
+  // A platform range SetValue applies to the ringed slider and clamps;
+  // off a slider it declines so the owner can route elsewhere.
+  require(settings.set_focused_range(.4) && settings.values().volume == .4f,
+          "set_focused_range did not apply to the focused volume slider");
+  require(settings.set_focused_range(-2.) && settings.values().volume == 0.f,
+          "set_focused_range did not clamp an out-of-range value");
+  // Off a slider, arrows navigate the ring.
+  require(press(kTab) && settings.focused() == 2 && press(kLeft) && settings.focused() == 1,
+          "arrow keys did not move focus around sliders");
+  // INTERFACE ANNOUNCEMENTS (index 9) reports its state, then REPLAY (index 10).
+  for (int i = 0; i < 8; ++i) (void)press(kTab);
+  require(settings.focused() == 9 &&
+              settings.focused_label() == "Speak interface announcements: Off",
+          "Tab chain did not reach the announcement toggle");
+  require(press(kTab) && settings.focused() == 10, "Tab chain did not reach REPLAY");
+  require(press(kReturn) && replays == 1, "Return on REPLAY did not invoke the callback");
+  // SAVE (index 14) wraps from the last control.
+  require(press(kEnd) && settings.focused() == 14 &&
+              settings.focused_label() == "Save",
+          "End did not reach SAVE");
+  require(press(kTab) && settings.focused() == 0, "focus did not wrap to the first control");
+  require(!settings.set_focused_range(.2),
+          "set_focused_range applied to a non-slider control");
+}
+
 int main(int argc, char** argv) try {
   if (argc != 2) throw std::invalid_argument("Usage: native_voice_settings_tests <scratch>");
   const auto scratch = fs::absolute(argv[1]) /
@@ -235,6 +309,7 @@ int main(int argc, char** argv) try {
   input_preview_callbacks_and_rollback(scratch / "input.json");
   persistence_and_failed_save(scratch);
   malformed_preferences(scratch);
+  keyboard_focus_and_sliders(scratch / "focus.json");
   owner_guard(scratch / "owner.json");
   localized_labels(scratch / "localized.json");
   std::cout << "Native voice settings tests passed\n";

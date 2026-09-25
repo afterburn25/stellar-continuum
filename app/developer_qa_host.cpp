@@ -180,6 +180,12 @@ int run_developer_qa(int argc,char **argv){
   }
   const auto inspect=[&]{
     ++invariant_checks;auto findings=inspect_campaign_invariants(world,initial_ticks+completed,frame.clock().simulation_days());
+    auto diplomatic=inspect_diplomacy_invariants(frame.runtime().diplomacy(),world,initial_ticks+completed,frame.clock().simulation_days());
+    findings.insert(findings.end(),diplomatic.begin(),diplomatic.end());
+    auto research=inspect_research_invariants(frame.runtime().research(),frame.runtime().research_runtime(),world,initial_ticks+completed,frame.clock().simulation_days());
+    findings.insert(findings.end(),research.begin(),research.end());
+    auto continuation=inspect_continuation_invariants(frame.runtime(),initial_ticks+completed,frame.clock().simulation_days());
+    findings.insert(findings.end(),continuation.begin(),continuation.end());
     for(auto &finding:findings){finding.real_timestamp=diagnostic_utc_now();log.append(std::move(finding));++critical;}
     if(critical)throw std::runtime_error("Campaign invariant violation; inspect structured logs.");
   };
@@ -241,6 +247,12 @@ int run_developer_qa(int argc,char **argv){
     record("completed","Requested authoritative ticks completed; checkpoint round-trip passed.");
   }catch(const std::exception &e){
     failure=e.what();++critical;record("critical_failure",failure,DiagnosticSeverity::Critical);
+    if(const auto &step=frame.last_advance_failure();step){
+      DiagnosticRecord r;r.tick=initial_ticks+completed;r.game_date=format_campaign_date(frame.clock().simulation_days());
+      r.real_timestamp=diagnostic_utc_now();r.subsystem="simulation";r.event_type="step_failure";r.severity=DiagnosticSeverity::Critical;
+      r.message="Authoritative step failed in the "+step->phase+" phase: "+step->message;
+      r.values["phase"]=step->phase;log.append(std::move(r));
+    }
     try{checkpoint("critical.dev17.json");}catch(const std::exception &capture){record("critical_capture_failed",capture.what(),DiagnosticSeverity::Critical);}
   }
   Json operational_findings=Json::array();

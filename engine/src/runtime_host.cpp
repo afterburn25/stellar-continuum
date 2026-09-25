@@ -1,25 +1,31 @@
 #include "stellar/engine/runtime_host.hpp"
 
 #include "stellar/engine/atomic_file_write.hpp"
+#include "stellar/engine/broadphase.hpp"
 #include "stellar/engine/mesh3d_loader.hpp"
 #include "stellar/engine/native_audio.hpp"
 #include "stellar/engine/native_geometry3d.hpp"
 #include "stellar/engine/native_map_platform.hpp"
 #include "stellar/engine/native_scene3d.hpp"
 #include "stellar/engine/package.hpp"
+#include "stellar/engine/replay.hpp"
 #include "stellar/engine/runtime_diagnostics.hpp"
 #include "stellar/engine/runtime_paths.hpp"
 #include "stellar/engine/save_history.hpp"
 #include "stellar/engine/texture_cook.hpp"
+#include "stellar/build_version.hpp"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <set>
+#include <sstream>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -37,6 +43,81 @@ Quaternion quat_mul(Quaternion a, Quaternion b) {
           a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
           a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
           a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z};
+}
+
+// InputEvent <-> journal payload. Positional CSV of every field that
+// affects dispatch, then the TextEntered payload hex-encoded (commas are
+// legal text) as the trailing field.
+std::string encode_input_event(const InputEvent &e) {
+  static const char hex[] = "0123456789abcdef";
+  std::string text_hex;
+  text_hex.reserve(e.text.size() * 2);
+  for (const unsigned char ch : e.text) {
+    text_hex += hex[ch >> 4];
+    text_hex += hex[ch & 15];
+  }
+  char buf[256];
+  std::snprintf(buf, sizeof buf, "%d,%u,%g,%g,%g,%g,%g,%u,%d,%d,%d,%u,%u,%u,%g",
+                static_cast<int>(e.type), e.key, e.position.x, e.position.y,
+                e.delta.x, e.delta.y, e.wheel_y, e.click_count,
+                e.control ? 1 : 0, e.shift ? 1 : 0, e.alt ? 1 : 0,
+                e.gamepad_button, e.gamepad_device, e.gamepad_axis,
+                e.gamepad_axis_value);
+  std::string out{buf};
+  out += ',';
+  out += text_hex;
+  return out;
+}
+
+std::optional<InputEvent> decode_input_event(std::string_view payload) {
+  InputEvent e;
+  // Split into at most 16 fields; the last field is the hex text.
+  std::vector<std::string_view> fields;
+  std::size_t pos = 0;
+  while (fields.size() < 15) {
+    const auto comma = payload.find(',', pos);
+    if (comma == std::string_view::npos) return std::nullopt;
+    fields.push_back(payload.substr(pos, comma - pos));
+    pos = comma + 1;
+  }
+  fields.push_back(payload.substr(pos));
+  const auto num = [](std::string_view s, double &v) {
+    try {
+      v = std::stod(std::string(s));
+      return true;
+    } catch (const std::exception &) {
+      return false;
+    }
+  };
+  double v[15];
+  for (int i = 0; i < 15; ++i)
+    if (!num(fields[i], v[i])) return std::nullopt;
+  e.type = static_cast<InputEventType>(static_cast<int>(v[0]));
+  e.key = static_cast<std::uint32_t>(v[1]);
+  e.position = {static_cast<float>(v[2]), static_cast<float>(v[3])};
+  e.delta = {static_cast<float>(v[4]), static_cast<float>(v[5])};
+  e.wheel_y = static_cast<float>(v[6]);
+  e.click_count = static_cast<std::uint8_t>(v[7]);
+  e.control = v[8] != 0;
+  e.shift = v[9] != 0;
+  e.alt = v[10] != 0;
+  e.gamepad_button = static_cast<std::uint8_t>(v[11]);
+  e.gamepad_device = static_cast<std::uint8_t>(v[12]);
+  e.gamepad_axis = static_cast<std::uint8_t>(v[13]);
+  e.gamepad_axis_value = static_cast<float>(v[14]);
+  const std::string_view text_hex = fields[15];
+  if (text_hex.size() % 2 != 0) return std::nullopt;
+  for (std::size_t i = 0; i < text_hex.size(); i += 2) {
+    const auto nib = [](char c) -> int {
+      if (c >= '0' && c <= '9') return c - '0';
+      if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+      return -1;
+    };
+    const int hi = nib(text_hex[i]), lo = nib(text_hex[i + 1]);
+    if (hi < 0 || lo < 0) return std::nullopt;
+    e.text += static_cast<char>((hi << 4) | lo);
+  }
+  return e;
 }
 } // namespace
 
@@ -104,13 +185,24 @@ struct RuntimeHost::Impl {
   // Deterministic particle system stepped inside simulate() and rendered
   // as tinted rects. The host tracks every spawned instance so it can
   // re-anchor attachments, stop emitters whose entity died, and render.
-  VfxSystem vfx;
+  // The global budget keeps runaway scenes bounded; consumers opt out via
+  // vfx().set_particle_budget(0).
+  VfxSystem vfx{default_particle_budget};
   struct VfxTrack {
     VfxInstanceId instance;
     std::string definition_id;
     EntityId attached;
   };
   std::vector<VfxTrack> vfx_tracks;
+
+  // Scene-declared entity animations (document `animations` array):
+  // shared Timelines keyed by clip id — each referencing entity steps
+  // its own AnimTimeline player against these.
+  struct AnimRuntime {
+    Timeline timeline;
+    LoopMode mode{LoopMode::Loop};
+  };
+  std::unordered_map<std::string, AnimRuntime> anims;
 
   // --- 3D scene mode (--scene3d) ---
   // The 3D tracked set lives beside the 2D one: scene-spawned and
@@ -142,6 +234,14 @@ struct RuntimeHost::Impl {
   std::vector<Scene3dLight> lights3;
   float gravity3 = 0.f, ground_y3 = 0.f, bounds3 = 0.f;
   bool look_held = false; // right-button mouse-look
+  // Input journaling: --record fills `recorder` with frame-indexed input
+  // commands + periodic world-hash checkpoints; --replay parses a
+  // recording into `replay` and injects its commands ahead of live input.
+  std::optional<ReplayRecorder> recorder;
+  ReplayRecorder replay{ReplayHeader{}};
+  std::size_t replay_cursor = 0, replay_cp_cursor = 0;
+  bool replaying = false, replay_diverged = false,
+       replay_verified_printed = false;
   // 3D contact/ground tracking — separate sets: a pair can be in contact
   // in one dimensionality and not the other.
   std::set<std::pair<std::uint64_t, std::uint64_t>> overlapping3d;
@@ -176,6 +276,7 @@ RuntimeHost &RuntimeHost::operator=(RuntimeHost &&) noexcept = default;
 World &RuntimeHost::world() { return impl_->world; }
 const ContentResolver &RuntimeHost::content() const { return *impl_->content; }
 audio::AudioOutput &RuntimeHost::audio() { return *impl_->audio; }
+bool RuntimeHost::has_audio() const { return impl_->audio != nullptr; }
 DeterministicRandom &RuntimeHost::rng() {
   // Resolved lazily each call — restore regenerates entity ids, so the
   // carrier is found by component rather than a cached handle.
@@ -206,6 +307,20 @@ std::vector<EntityId> RuntimeHost::tilemap_entities() const {
 }
 std::size_t RuntimeHost::tilemap_count() const {
   return impl_->tilemap_es.size();
+}
+std::optional<std::size_t>
+RuntimeHost::tilemap_index(std::string_view name) const {
+  return engine::tilemap_index(impl_->world, name);
+}
+int RuntimeHost::tile_at(std::string_view map_name, float world_x,
+                         float world_y) const {
+  const auto index = tilemap_index(map_name);
+  return index ? tile_at(*index, world_x, world_y) : -1;
+}
+bool RuntimeHost::set_tile_at(std::string_view map_name, float world_x,
+                              float world_y, int value) {
+  const auto index = tilemap_index(map_name);
+  return index ? set_tile_at(*index, world_x, world_y, value) : false;
 }
 int RuntimeHost::tile_at(float world_x, float world_y) const {
   return tile_at(0, world_x, world_y);
@@ -281,6 +396,17 @@ bool RuntimeHost::destroy_tilemap(EntityId id) {
   return impl_->destroy_tilemap_fn && impl_->destroy_tilemap_fn(id);
 }
 bool RuntimeHost::scene3d() const { return impl_->options.scene3d; }
+void RuntimeHost::set_scene3d(std::string file) {
+  // Outside run() (or before the scene3d wiring exists) the option just
+  // records the initial document — reload_scene3d picks it up.
+  if (impl_->switch_scene3d) {
+    impl_->options.scene3d = true;
+    impl_->switch_scene3d(file);
+  } else {
+    impl_->options.scene3d = true;
+    impl_->options.scene3d_file = std::move(file);
+  }
+}
 EntityId RuntimeHost::spawn_entity3d(const Scene3dEntity &entity) {
   return impl_->spawn3_fn ? impl_->spawn3_fn(entity) : EntityId{};
 }
@@ -297,6 +423,19 @@ RuntimeHost::entities3d_in_radius(float x, float y, float z,
     if (!t) continue;
     const float dx = t->x - x, dy = t->y - y, dz = t->z - z;
     if (dx * dx + dy * dy + dz * dz <= r2) out.push_back(e);
+  }
+  return out;
+}
+std::vector<EntityId>
+RuntimeHost::entities3d_in_box(float x, float y, float z, float half_w,
+                               float half_h, float half_d) const {
+  std::vector<EntityId> out;
+  for (const auto e : impl_->entities3d) {
+    const auto *t = impl_->world.get<Transform3D>(e);
+    if (!t) continue;
+    if (std::fabs(t->x - x) <= half_w && std::fabs(t->y - y) <= half_h &&
+        std::fabs(t->z - z) <= half_d)
+      out.push_back(e);
   }
   return out;
 }
@@ -502,25 +641,144 @@ int RuntimeHost::run() {
   const auto plan = registry.resolve();
 
   const auto exe_dir = executable_directory();
-  impl.time_scale = options.time_scale;
+  // Same clamp set_time_scale applies — a non-positive --speed would
+  // otherwise integrate entities backwards.
+  impl.time_scale = options.time_scale > 0.0 ? options.time_scale : 1.0;
   impl.content = std::make_unique<ContentResolver>(
       options.package_id, options.project_root, exe_dir);
   const std::size_t cooked_assets = impl.content->cooked_count();
 
+  // --replay parses before the window opens so a corrupt recording fails
+  // fast instead of looking like a game hang.
+  if (!options.replay_file.empty()) {
+    std::ifstream in(options.replay_file, std::ios::binary);
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    std::string error;
+    auto parsed = ReplayRecorder::parse(ss.str(), &error);
+    if (!parsed) {
+      std::fprintf(stderr, "replay: cannot parse %s: %s\n",
+                   options.replay_file.generic_string().c_str(),
+                   error.c_str());
+      return 1;
+    }
+    impl.replay = std::move(*parsed);
+    impl.replaying = true;
+    // Provenance advisory matching the client: a recording from another
+    // build cannot reproduce this session — flag it so a divergence is
+    // read as provenance mismatch rather than a simulation defect.
+    if (const auto &h = impl.replay.header();
+        !h.build_id.empty() && h.build_id != STELLAR_SOURCE_COMMIT)
+      std::fprintf(stderr,
+                   "replay: recorded build %s differs from this build "
+                   "(%s) — divergence may reflect the mismatch\n",
+                   h.build_id.c_str(), STELLAR_SOURCE_COMMIT);
+    // The recorded seed is part of the run's identity — the RNG stream
+    // lives on a world entity, so a different seed changes checkpoint
+    // hashes even when the game never draws from it. Apply the recorded
+    // seed so replays verify regardless of a --seed flag.
+    if (impl.replay.header().seed != options.seed) {
+      std::fprintf(stderr, "replay: applying recorded seed %llu\n",
+                   static_cast<unsigned long long>(
+                       impl.replay.header().seed));
+      impl.options.seed = impl.replay.header().seed;
+    }
+    if (impl.replay.truncated())
+      std::fprintf(stderr,
+                   "replay: recording truncated — entries past the "
+                   "retained prefix are absent\n");
+    if (options.fixed_timestep_hz <= 0.)
+      std::fprintf(stderr,
+                   "replay: no --fixed-hz — wall-clock stepping is not "
+                   "deterministic, checkpoints will diverge\n");
+    if (const auto &h = impl.replay.header(); h.window_width != 0 &&
+        (h.window_width != static_cast<std::uint32_t>(options.width) ||
+         h.window_height != static_cast<std::uint32_t>(options.height))) {
+      if (options.headless) {
+        // No real window constrains the drawable — adopt the recorded
+        // size so pointer positions land exactly as recorded.
+        impl.options.width = static_cast<int>(h.window_width);
+        impl.options.height = static_cast<int>(h.window_height);
+      } else {
+        std::fprintf(
+            stderr,
+            "replay: recorded drawable %ux%u differs from this "
+            "window — pointer positions may not land identically\n",
+            h.window_width, h.window_height);
+      }
+    }
+  }
+  if (options.replay_until && !impl.replaying)
+    std::fprintf(stderr,
+                 "--replay-until requires --replay — ignored\n");
+  if (!options.record_file.empty()) {
+    ReplayHeader header;
+    header.seed = options.seed;
+    // Provenance matches the client's convention: build_id is the source
+    // commit, game_version the engine version that built the host.
+    header.build_id = STELLAR_SOURCE_COMMIT;
+    header.game_version = STELLAR_ENGINE_VERSION;
+    header.window_width = static_cast<std::uint32_t>(options.width);
+    header.window_height = static_cast<std::uint32_t>(options.height);
+    impl.recorder.emplace(header);
+    // Same bound the game client uses — a long session truncates to an
+    // honest prefix rather than growing without limit.
+    impl.recorder->set_memory_budget(128ull * 1024 * 1024);
+  }
+  // Writes the finished journal; false on failure.
+  const auto flush_recorder = [&]() -> bool {
+    if (!impl.recorder) return true;
+    try {
+      const auto text = impl.recorder->serialize();
+      write_file_atomically(
+          options.record_file,
+          std::as_bytes(std::span{text.data(), text.size()}));
+      if (impl.recorder->truncated())
+        std::fprintf(stderr,
+                     "record: journal hit the memory budget — the file is "
+                     "an honest prefix, later input is absent\n");
+      return true;
+    } catch (const std::exception &) {
+      std::fprintf(stderr, "record: cannot write %s\n",
+                   options.record_file.generic_string().c_str());
+      return false;
+    }
+  };
+
+  if (options.headless && options.frame_limit <= 0 &&
+      !options.replay_exit)
+    std::fprintf(stderr,
+                 "headless: no --frames or --replay-exit — the run ends "
+                 "only on a recorded Escape or external stop\n");
+
   RuntimeDiagnostics::context("runtime:window-ctor");
-  Window window(options.window_title, options.width, options.height,
-                options.fullscreen, exe_dir / "engine-default-font.ttf");
-  RuntimeDiagnostics::context("runtime:window-init");
-  window.set_auto_frame_cap();
-  // F12/PrintScreen captures land in the project's screenshots/ dir.
-  window.set_screenshot_directory(
-      std::filesystem::absolute(options.project_root / "screenshots"));
+  // Headless runs skip the Window (and its Vulkan device) plus the audio
+  // device so generated games tick on CI machines without a display.
+  std::optional<Window> window;
+  if (!options.headless) {
+    window.emplace(options.window_title, options.width, options.height,
+                   options.fullscreen,
+                   exe_dir / "engine-default-font.ttf");
+    RuntimeDiagnostics::context("runtime:window-init");
+    window->set_auto_frame_cap();
+    // F12/PrintScreen captures land in the project's screenshots/ dir.
+    window->set_screenshot_directory(
+        std::filesystem::absolute(options.project_root / "screenshots"));
+  }
 
   RuntimeDiagnostics::context("runtime:audio-init");
   // Scoped to run() so its SDL audio teardown precedes ~Window's SDL_Quit.
-  audio::AudioOutput audio_output;
-  impl.audio = &audio_output;
-  auto &audio = audio_output;
+  std::optional<audio::AudioOutput> audio_output;
+  if (!options.headless) audio_output.emplace();
+  impl.audio = audio_output ? &*audio_output : nullptr;
+  auto *audio = impl.audio;
+  // impl.audio points into audio_output — clear it on every exit path
+  // (there are several returns) so has_audio() can't observe a dangling
+  // pointer after run() returns.
+  struct AudioScope {
+    Impl &impl;
+    ~AudioScope() { impl.audio = nullptr; }
+  } audio_scope{impl};
 
   auto load_clip = [&](const std::string &name)
       -> std::shared_ptr<const audio::AudioClip> {
@@ -538,11 +796,12 @@ int RuntimeHost::run() {
   if (!bounce_clip && !options.bounce_clip_alt.empty())
     bounce_clip = load_clip(options.bounce_clip_alt);
   if (!options.music_clip.empty()) {
-    if (const auto music = load_clip(options.music_clip))
-      audio.play_music(music);
-    else if (!options.music_clip_alt.empty())
+    if (const auto music = load_clip(options.music_clip)) {
+      if (audio) audio->play_music(music);
+    } else if (!options.music_clip_alt.empty()) {
       if (const auto mp3 = load_clip(options.music_clip_alt))
-        audio.play_music(mp3);
+        if (audio) audio->play_music(mp3);
+    }
   }
 
   // Decodes a content-relative sprite. Prefers the cooked package (BC7 mip
@@ -571,20 +830,53 @@ int RuntimeHost::run() {
     }
   };
 
+  // Projects a 3D entity's position into overlay (screen) pixels — the
+  // inverse of entity3d_at's ray construction. Returns nullopt when the
+  // point sits behind the near plane or the viewport is degenerate.
+  const auto project3d = [&](const Transform3D &t)
+      -> std::optional<VfxVec3> {
+    if (impl.view_w <= 0 || impl.view_h <= 0) return std::nullopt;
+    const Vec3 rel{static_cast<float>(t.x - impl.cam3_x),
+                   static_cast<float>(t.y - impl.cam3_y),
+                   static_cast<float>(t.z - impl.cam3_z)};
+    constexpr float kDeg = 3.14159265f / 180.f;
+    const Quaternion cam_q =
+        quat_mul(rotation_axis_angle({0.f, 1.f, 0.f},
+                                     impl.cam3_yaw * kDeg),
+                 rotation_axis_angle({1.f, 0.f, 0.f},
+                                     impl.cam3_pitch * kDeg));
+    const Vec3 pc =
+        rotate_vec(Quaternion{-cam_q.x, -cam_q.y, -cam_q.z, cam_q.w},
+                   rel);
+    if (pc.z >= -std::max(impl.cam3_near, 1e-6f)) return std::nullopt;
+    const float half_tan = std::tan(impl.cam3_fov * kDeg * .5f);
+    const float aspect =
+        static_cast<float>(impl.view_w) / impl.view_h;
+    const float nx = pc.x / (-pc.z * half_tan * aspect);
+    const float ny = pc.y / (-pc.z * half_tan);
+    return VfxVec3{(nx + 1.f) * .5f * impl.view_w,
+                   (1.f - ny) * .5f * impl.view_h,
+                   std::sqrt(rel.x * rel.x + rel.y * rel.y +
+                             rel.z * rel.z)};
+  };
+
   // Attaches an entity's VfxRef-named emitter, anchored at its center —
   // games register definitions via host.vfx().define(); the track table
   // re-anchors the emitter each step and stops it when the entity dies.
+  // 3D entities anchor at their camera-projected screen position and
+  // feed set_lod_distance with the camera distance.
   const auto attach_vfx = [&](EntityId e) {
     const auto *vr = world.get<VfxRef>(e);
     if (!vr || vr->name.empty() || impl.vfx.definition(vr->name) == nullptr)
       return;
     const auto *t = world.get<Transform2D>(e);
     const auto *x = world.get<Extent2D>(e);
-    const auto id = impl.vfx.spawn(
-        vr->name,
-        {t ? t->x + (x ? x->w * .5f : 0.f) : 0.f,
-         t ? t->y + (x ? x->h * .5f : 0.f) : 0.f, 0.f},
-        e);
+    VfxVec3 at{t ? t->x + (x ? x->w * .5f : 0.f) : 0.f,
+               t ? t->y + (x ? x->h * .5f : 0.f) : 0.f, 0.f};
+    if (!t)
+      if (const auto *t3 = world.get<Transform3D>(e))
+        at = project3d(*t3).value_or(VfxVec3{});
+    const auto id = impl.vfx.spawn(vr->name, at, e);
     if (id != invalid_vfx_instance)
       impl.vfx_tracks.push_back({id, vr->name, e});
   };
@@ -621,11 +913,49 @@ int RuntimeHost::run() {
     }
   };
 
+  // Scene-declared entity animations: one shared Timeline per def;
+  // channels feed the AnimTimeline players stepped inside simulate().
+  const auto register_animations =
+      [&](const std::vector<SceneAnimationDef> &defs) {
+        impl.anims.clear();
+        for (const auto &def : defs) {
+          Impl::AnimRuntime runtime;
+          float duration = 0.f;
+          for (const auto &[channel, keys] : def.tracks) {
+            auto &curve = runtime.timeline.track(channel);
+            for (const auto &[t, v] : keys) {
+              curve.add_key(t, v);
+              duration = std::max(duration, t);
+            }
+          }
+          runtime.timeline.duration = duration;
+          for (const auto &[t, name] : def.events)
+            runtime.timeline.add_event(t, name);
+          runtime.mode = def.loop == "once"    ? LoopMode::Once
+                         : def.loop == "pingpong" ? LoopMode::PingPong
+                                                  : LoopMode::Loop;
+          impl.anims.emplace(def.id, std::move(runtime));
+        }
+      };
+
+  // Attaches a spawned or restored entity's AnimTimeline to its shared
+  // Timeline — restores seek the saved playhead (codec wrote saved_*).
+  const auto attach_anim = [&](EntityId e) {
+    auto *at = world.get<AnimTimeline>(e);
+    if (!at || at->id.empty()) return;
+    const auto it = impl.anims.find(at->id);
+    if (it == impl.anims.end()) return;
+    at->player.play(&it->second.timeline, it->second.mode);
+    at->player.seek(at->saved_time);
+    at->player.set_paused(!at->saved_playing);
+  };
+
   // (Re)spawns World entities from a scene document; sprite decode stays
   // host-side since it depends on this project's content roots.
   std::string scene_music;
   auto spawn_entities = [&](const SceneDocument &doc) {
     register_emitters(doc.emitters);
+    register_animations(doc.animations);
     impl.bg_r = doc.bg_r;
     impl.bg_g = doc.bg_g;
     impl.bg_b = doc.bg_b;
@@ -636,7 +966,7 @@ int RuntimeHost::run() {
     // already playing so levels can share the options/default track.
     if (!doc.music.empty() && doc.music != scene_music)
       if (const auto clip = load_clip(doc.music)) {
-        audio.play_music(clip);
+        if (audio) audio->play_music(clip);
         scene_music = doc.music;
       }
     for (const auto e : impl.entities) world.destroy(e);
@@ -661,6 +991,7 @@ int RuntimeHost::run() {
           sp != nullptr && !sp->value.empty())
         impl.sprites[i] = decode_sprite(sp->value);
       attach_vfx(impl.entities[i]);
+      attach_anim(impl.entities[i]);
       // Game-defined component attach: zip the spawned id with its
       // authored record (spawn order matches document order).
       if (on_spawn && i < doc.entities.size())
@@ -697,22 +1028,52 @@ int RuntimeHost::run() {
     impl.sprites.push_back(
         entity.sprite.empty() ? nullptr : decode_sprite(entity.sprite));
     attach_vfx(ids.front());
+    attach_anim(ids.front());
     if (on_spawn) on_spawn(world, ids.front(), entity);
     return ids.front();
+  };
+  const auto unpack_entity = [](std::uint64_t v) {
+    return EntityId{static_cast<std::uint32_t>(v & 0xffffffffu),
+                    static_cast<std::uint32_t>(v >> 32)};
   };
   impl.destroy_fn = [&](EntityId id) -> bool {
     const auto it =
         std::find(impl.entities.begin(), impl.entities.end(), id);
-    if (it == impl.entities.end()) return false;
-    impl.sprites.erase(
-        impl.sprites.begin() + (it - impl.entities.begin()));
-    impl.entities.erase(it);
-    if (impl.player && *impl.player == id) impl.player.reset();
-    for (auto p = impl.overlapping.begin(); p != impl.overlapping.end();)
-      if (p->first == id.value() || p->second == id.value())
-        p = impl.overlapping.erase(p);
-      else
+    if (it != impl.entities.end()) {
+      impl.sprites.erase(
+          impl.sprites.begin() + (it - impl.entities.begin()));
+      impl.entities.erase(it);
+      if (impl.player && *impl.player == id) impl.player.reset();
+      // Destroying an overlapped entity ends the contact — fire the exit
+      // (the surviving id may still be live) rather than silently
+      // dropping the pair.
+      for (auto p = impl.overlapping.begin();
+           p != impl.overlapping.end();)
+        if (p->first == id.value() || p->second == id.value()) {
+          if (on_collision_exit)
+            on_collision_exit(unpack_entity(p->first),
+                              unpack_entity(p->second));
+          p = impl.overlapping.erase(p);
+        } else
+          ++p;
+      world.destroy(id);
+      return true;
+    }
+    const auto it3 = std::find(impl.entities3d.begin(),
+                               impl.entities3d.end(), id);
+    if (it3 == impl.entities3d.end()) return false;
+    impl.entities3d.erase(it3);
+    for (auto p = impl.overlapping3d.begin();
+         p != impl.overlapping3d.end();)
+      if (p->first == id.value() || p->second == id.value()) {
+        if (on_collision_exit)
+          on_collision_exit(unpack_entity(p->first),
+                            unpack_entity(p->second));
+        p = impl.overlapping3d.erase(p);
+      } else
         ++p;
+    impl.grounded3d.erase(id.value());
+    impl.prev_grounded3d.erase(id.value());
     world.destroy(id);
     return true;
   };
@@ -724,6 +1085,7 @@ int RuntimeHost::run() {
     world.add(e, Tilemap{s.tileset, s.x, s.y, s.tile_w, s.tile_h,
                          s.columns, s.layer, s.parallax, s.collide,
                          s.cells});
+    if (!s.name.empty()) world.add(e, EntityName{s.name});
     impl.tilemap_es.push_back(e);
     impl.tileset_imgs.push_back(
         s.tileset.empty() ? nullptr : decode_sprite(s.tileset));
@@ -785,6 +1147,7 @@ int RuntimeHost::run() {
       if (tr) tex3d_of(tr->value);
       if (on_spawn3d && i < doc.entities.size())
         on_spawn3d(world, impl.entities3d[i], doc.entities[i]);
+      attach_vfx(impl.entities3d[i]);
     }
   };
   auto scene3d_file = options.project_root / options.scene3d_file;
@@ -809,6 +1172,7 @@ int RuntimeHost::run() {
     if (ids.empty()) return {};
     impl.entities3d.push_back(ids.front());
     if (on_spawn3d) on_spawn3d(world, ids.front(), entity);
+    attach_vfx(ids.front());
     return ids.front();
   };
   RuntimeDiagnostics::context("runtime:scene-init");
@@ -841,11 +1205,24 @@ int RuntimeHost::run() {
                           impl.cam3_yaw, impl.cam3_pitch, impl.cam3_fov};
       }
       save_world_to_file(world, save_path);
+      // Record the resolved content set beside the save so a later load
+      // under a different package/mod set attests rather than silently
+      // binding stale content.
+      write_save_package_manifest(save_path, plan);
     } catch (const std::exception &) {
     }
   };
   auto load_world = [&] {
     if (!load_world_from_file(world, save_path)) return;
+    const auto pkg_report = verify_save_package_manifest(save_path, plan);
+    if (!pkg_report.compatible()) {
+      std::string note{"world save package mismatch:"};
+      for (const auto &id : pkg_report.missing_packages)
+        note += " missing " + id;
+      for (const auto &m : pkg_report.version_mismatches)
+        note += " " + m;
+      RuntimeDiagnostics::context(note);
+    }
     impl.entities = world.entities();
     // 3D entities restore with the snapshot too — split them out of the
     // 2D tracked set before the tilemap partition below.
@@ -866,9 +1243,9 @@ int RuntimeHost::run() {
         impl.cam3_x = cam->x;
         impl.cam3_y = cam->y;
         impl.cam3_z = cam->z;
-        impl.cam3_yaw = cam->yaw_deg;
-        impl.cam3_pitch = cam->pitch_deg;
-        impl.cam3_fov = cam->fov_deg;
+        impl.cam3_yaw = static_cast<float>(cam->yaw_deg);
+        impl.cam3_pitch = static_cast<float>(cam->pitch_deg);
+        impl.cam3_fov = static_cast<float>(cam->fov_deg);
         break;
       }
     // Tilemap entities restore with the snapshot — pull them out of the
@@ -899,6 +1276,7 @@ int RuntimeHost::run() {
           sp != nullptr && !sp->value.empty())
         impl.sprites[i] = decode_sprite(sp->value);
       attach_vfx(impl.entities[i]);
+      attach_anim(impl.entities[i]);
     }
   };
 
@@ -952,19 +1330,49 @@ int RuntimeHost::run() {
     if (!options.input_map.empty()) {
       const auto path = options.project_root / options.input_map;
       std::ifstream in(path);
-      if (in) {
+      if (!in) {
+        std::fprintf(stderr,
+                     "input-map: cannot open %s — defaults stay live\n",
+                     path.generic_string().c_str());
+      } else {
         const std::string text{std::istreambuf_iterator<char>(in),
                                std::istreambuf_iterator<char>()};
         // Loaded contexts stack on top of "game": non-exclusive ones fall
         // through to the defaults, exclusive ones take over.
-        if (impl.input.load_contexts(text))
+        if (impl.input.load_contexts(text)) {
           for (const auto &name : impl.input.context_names())
             if (name != "game") impl.input.push_context(name);
+        } else {
+          std::fprintf(stderr,
+                     "input-map: cannot parse %s — defaults stay live\n",
+                     path.generic_string().c_str());
+        }
       }
     }
   }
+  // --dump-bindings prints the resolved action map (defaults plus any
+  // --input-map contexts) and exits before the loop — a scriptable way
+  // to inspect what a generated game's controls resolved to.
+  if (options.dump_bindings) {
+    for (const auto &name : impl.input.context_names()) {
+      const auto *ctx = impl.input.context(name);
+      if (!ctx) continue;
+      std::printf("context %s%s\n", ctx->name.c_str(),
+                  ctx->exclusive ? " (exclusive)" : "");
+      for (const auto &action : ctx->actions) {
+        const char *type =
+            action.type == InputAction::Type::Axis1D  ? "Axis1D"
+            : action.type == InputAction::Type::Axis2D ? "Axis2D"
+                                                       : "Button";
+        std::printf("  %s [%s] %s\n", action.name.c_str(), type,
+                    describe_bindings(action.bindings).c_str());
+      }
+    }
+    return 0;
+  }
   float accumulator = 0.f;
   int rendered = 0;
+  bool replay_until_failed = false;
   auto last = std::chrono::steady_clock::now();
   auto scene_poll = last;
   // Resolve world bounds up front too so the jump handler works before the
@@ -978,11 +1386,39 @@ int RuntimeHost::run() {
                                              : static_cast<float>(options.height);
   RuntimeDiagnostics::context("runtime:loop");
   for (;;) {
-    const auto snapshot = window.poll();
+    // Headless polls a synthetic snapshot: no events, always renderable,
+    // drawable fixed at the configured size. The run ends via --frames,
+    // a recorded/injected Escape or quit_requested (e.g. --replay-exit).
+    const auto snapshot =
+        window ? window->poll()
+               : InputSnapshot{.drawable_width = options.width,
+                               .drawable_height = options.height,
+                               .focused = true};
     if (snapshot.quit_requested || impl.quit_requested) break;
     impl.input.begin_frame();
-    for (const auto &event : snapshot.events) {
-      if (event.type == InputEventType::EscapePressed) return 0;
+    // The frame index is the journal tick — a replayed command lands in
+    // the same frame it was recorded on, ahead of this frame's live
+    // input (a live Escape still quits).
+    const auto frame_tick = static_cast<std::uint64_t>(rendered);
+    std::vector<InputEvent> frame_events;
+    if (impl.replaying) {
+      const auto &cmds = impl.replay.commands();
+      while (impl.replay_cursor < cmds.size() &&
+             cmds[impl.replay_cursor].tick <= frame_tick) {
+        if (cmds[impl.replay_cursor].name == "input")
+          if (auto decoded =
+                  decode_input_event(cmds[impl.replay_cursor].payload))
+            frame_events.push_back(*decoded);
+        ++impl.replay_cursor;
+      }
+    }
+    for (const auto &live : snapshot.events) frame_events.push_back(live);
+    for (const auto &event : frame_events) {
+      if (impl.recorder)
+        impl.recorder->record(frame_tick, "input",
+                              encode_input_event(event));
+      if (event.type == InputEventType::EscapePressed)
+        return flush_recorder() ? 0 : 1;
       // Feed the action mapper with a normalized raw event so game
       // actions (and the built-in player controls) see every input.
       RawInputEvent raw{};
@@ -1025,11 +1461,13 @@ int RuntimeHost::run() {
       case InputEventType::GamepadReleased:
         raw.kind = RawInputEvent::Kind::GamepadButton;
         raw.code = event.gamepad_button;
+        raw.device = event.gamepad_device;
         raw.pressed = event.type == InputEventType::GamepadPressed;
         break;
       case InputEventType::GamepadAxis:
         raw.kind = RawInputEvent::Kind::GamepadAxis;
         raw.code = event.gamepad_axis;
+        raw.device = event.gamepad_device;
         raw.value = event.gamepad_axis_value;
         break;
       default:
@@ -1436,8 +1874,33 @@ int RuntimeHost::run() {
               if (impl.grounded.count(entity.value())) break;
             }
         }
-        if (bounced && impl.player && entity == *impl.player && bounce_clip)
-          audio.play_effect(bounce_clip);
+        if (bounced && impl.player && entity == *impl.player && bounce_clip) {
+          // Pan the impact cue by the entity's screen position and
+          // attenuate by normalized distance from the view center — the
+          // first engine-side consumers of positional effects.
+          const float view = impl.view_w > 0 ? static_cast<float>(impl.view_w)
+                                             : world_w * impl.cam_zoom;
+          const float view_h = impl.view_h > 0 ? static_cast<float>(impl.view_h)
+                                               : world_h * impl.cam_zoom;
+          const float screen_x =
+              (t->x + ext->w * .5f - impl.cam_x) * impl.cam_zoom;
+          const float screen_y =
+              (t->y + ext->h * .5f - impl.cam_y) * impl.cam_zoom;
+          const float pan =
+              view > 0.f ? std::clamp(screen_x / (view * .5f) - 1.f, -1.f, 1.f)
+                         : 0.f;
+          // Corner of the view reads as distance 1 — the bounce still
+          // plays at half gain so off-center impacts stay audible.
+          const float norm_x = view > 0.f ? screen_x / (view * .5f) - 1.f : 0.f;
+          const float norm_y = view_h > 0.f ? screen_y / (view_h * .5f) - 1.f : 0.f;
+          const float distance =
+              std::clamp(std::hypot(std::clamp(norm_x, -1.f, 1.f),
+                                    std::clamp(norm_y, -1.f, 1.f)) /
+                             1.4142135623730951f,
+                         0.f, 1.f);
+          if (audio)
+            audio->play_effect(bounce_clip, pan, 1.f - 0.5f * distance);
+        }
       }
       // Lifetimes tick down in sim time; expired entities self-destruct
       // (collected first so destruction doesn't disturb the scan).
@@ -1457,6 +1920,51 @@ int RuntimeHost::run() {
           }
         }
         for (const auto id : expired) impl.destroy_fn(id);
+      }
+      // Keyframed entity animations: each AnimTimeline steps its playhead
+      // in sim time and the evaluated tracks own their channels — a clip
+      // writing "x" sets Transform2D.x every step (velocity/collisions
+      // still resolve around it). Events fire per crossing.
+      for (const auto entity : impl.entities) {
+        auto *at = world.get<AnimTimeline>(entity);
+        if (!at || at->player.timeline() == nullptr) continue;
+        const auto step = at->player.advance(dt_step);
+        at->saved_time = at->player.time();
+        at->saved_playing = !at->player.paused();
+        if (on_anim_event)
+          for (const auto &event : step.events)
+            on_anim_event(event.name, entity);
+        const auto channel = [&step](const char *name) -> const float * {
+          const auto it = step.values.find(name);
+          return it == step.values.end() ? nullptr : &it->second;
+        };
+        if (auto *t = world.get<Transform2D>(entity)) {
+          if (const float *v = channel("x")) t->x = *v;
+          if (const float *v = channel("y")) t->y = *v;
+        }
+        if (auto *x = world.get<Extent2D>(entity)) {
+          if (const float *v = channel("w")) x->w = *v;
+          if (const float *v = channel("h")) x->h = *v;
+        }
+        if (auto *vel = world.get<Velocity2D>(entity)) {
+          if (const float *v = channel("vx")) vel->dx = *v;
+          if (const float *v = channel("vy")) vel->dy = *v;
+        }
+        if (const float *v = channel("opacity"))
+          if (auto *o = world.get<Opacity>(entity)) o->value = *v;
+        if (const float *v = channel("rotation"))
+          if (auto *r = world.get<Rotation>(entity)) r->value = *v;
+        if (const float *v = channel("spin"))
+          if (auto *sp = world.get<Spin>(entity)) sp->value = *v;
+        if (auto *tint = world.get<Tint>(entity)) {
+          const auto byte_of = [](float v) {
+            return static_cast<std::uint8_t>(
+                std::clamp(std::lround(v * 255.f), 0l, 255l));
+          };
+          if (const float *v = channel("tintR")) tint->r = byte_of(*v);
+          if (const float *v = channel("tintG")) tint->g = byte_of(*v);
+          if (const float *v = channel("tintB")) tint->b = byte_of(*v);
+        }
       }
       // Hierarchy: parented entities snap to parent+offset, folding their
       // own world-space drift into the offset — runs before contacts so
@@ -1577,7 +2085,11 @@ int RuntimeHost::run() {
           const float rest_y =
               impl.ground_y3 + box.hy - (box.cy - t->y);
           const float cx_off = box.cx - t->x, cz_off = box.cz - t->z;
-          if (v && gscale != 0.f) v->dy -= impl.gravity3 * gscale * dt_step;
+          // Solids are kinematic like their 2D counterparts — authored
+          // velocity still integrates (moving platforms), gravity does
+          // not pull them.
+          if (v && gscale != 0.f && !world.get<Solid>(e))
+            v->dy -= impl.gravity3 * gscale * dt_step;
           if (v && (v->dx != 0.f || v->dy != 0.f || v->dz != 0.f)) {
             t->x += v->dx * dt_step;
             t->y += v->dy * dt_step;
@@ -1630,16 +2142,33 @@ int RuntimeHost::run() {
         // not just world axes). The scan always runs — solid resolution
         // is needed even when no callbacks are registered.
         {
+          // Broad-phase: a uniform grid over the world AABBs emits
+          // candidate pairs in sorted order — O(n + cells) instead of the
+          // pairwise scan, deterministic, and no true overlap is missed.
+          Broadphase3D grid;
+          std::unordered_map<std::uint64_t, EntityBox3D> boxes;
+          std::unordered_map<std::uint64_t, EntityId> by_key;
+          float cell = 1.f;
+          boxes.reserve(impl.entities3d.size());
+          for (const auto e : impl.entities3d) {
+            if (!world.get<Transform3D>(e)) continue;
+            auto box = entity_box3d(e);
+            cell = std::max({cell, box.hx, box.hy, box.hz});
+            const auto key = e.value();
+            by_key.emplace(key, e);
+            boxes.emplace(key, std::move(box));
+          }
+          grid.reset(cell * 2.f);
+          for (const auto &[key, box] : boxes)
+            grid.insert(key,
+                        {box.cx - box.hx, box.cy - box.hy, box.cz - box.hz},
+                        {box.cx + box.hx, box.cy + box.hy, box.cz + box.hz});
           std::set<std::pair<std::uint64_t, std::uint64_t>> now;
           std::vector<std::pair<EntityId, EntityId>> entered;
-          for (std::size_t i = 0; i < impl.entities3d.size(); ++i) {
-            auto *ta = world.get<Transform3D>(impl.entities3d[i]);
-            if (!ta) continue;
-            const auto abox = entity_box3d(impl.entities3d[i]);
-            for (std::size_t j = i + 1; j < impl.entities3d.size(); ++j) {
-              const auto *tb = world.get<Transform3D>(impl.entities3d[j]);
-              if (!tb) continue;
-              const auto bbox = entity_box3d(impl.entities3d[j]);
+          for (const auto &[ka, kb] : grid.pairs()) {
+            const auto &abox = boxes.at(ka), &bbox = boxes.at(kb);
+            const auto ea = by_key.at(ka), eb = by_key.at(kb);
+            {
               // Broad-phase: world-AABB reject before the SAT scan.
               if (abox.hx + bbox.hx - std::abs(abox.cx - bbox.cx) <= 0.f ||
                   abox.hy + bbox.hy - std::abs(abox.cy - bbox.cy) <= 0.f ||
@@ -1650,22 +2179,17 @@ int RuntimeHost::run() {
               const auto mtv_ab =
                   obb_separation(abox.obb, bbox.obb);
               if (!mtv_ab) continue;
-              const auto a = impl.entities3d[i].value(),
-                         b = impl.entities3d[j].value();
+              const auto a = ka, b = kb;
               now.insert(std::minmax(a, b));
               if (!impl.overlapping3d.count(std::minmax(a, b)))
-                entered.emplace_back(impl.entities3d[i],
-                                     impl.entities3d[j]);
+                entered.emplace_back(ea, eb);
               // Solid blocker resolution: the non-solid entity is pushed
               // out along the MTV and loses inward velocity along it. A
               // dominantly-upward push counts as a landing surface.
-              const bool sa =
-                  world.get<Solid>(impl.entities3d[i]) != nullptr;
-              const bool sb =
-                  world.get<Solid>(impl.entities3d[j]) != nullptr;
+              const bool sa = world.get<Solid>(ea) != nullptr;
+              const bool sb = world.get<Solid>(eb) != nullptr;
               if (sa != sb) {
-                const auto mover = sa ? impl.entities3d[j]
-                                      : impl.entities3d[i];
+                const auto mover = sa ? eb : ea;
                 auto *tm = world.get<Transform3D>(mover);
                 auto *vm = world.get<Velocity3D>(mover);
                 // obb_separation(a,b) returns the vector that pushes b
@@ -1698,8 +2222,7 @@ int RuntimeHost::run() {
                   impl.grounded3d.insert(mover.value());
                   if (on_land &&
                       !impl.prev_grounded3d.count(mover.value()))
-                    on_land(mover, sa ? impl.entities3d[i]
-                                      : impl.entities3d[j]);
+                    on_land(mover, sa ? ea : eb);
                 }
               }
             }
@@ -1721,25 +2244,40 @@ int RuntimeHost::run() {
       // AABB contact events: collect overlaps during the scan, then fire
       // callbacks afterwards so handlers may spawn/destroy entities safely.
       if (on_collision || on_collision_exit) {
+        // Uniform-grid broad-phase: candidate pairs in sorted order —
+        // O(n + cells) instead of the pairwise scan, deterministic.
+        Broadphase2D grid;
+        std::unordered_map<std::uint64_t, EntityId> by_key;
+        float cell = 1.f;
+        by_key.reserve(impl.entities.size());
+        for (const auto e : impl.entities) {
+          const auto *ta = world.get<Transform2D>(e);
+          const auto *ea = world.get<Extent2D>(e);
+          if (!ta || !ea) continue;
+          cell = std::max({cell, ea->w, ea->h});
+          by_key.emplace(e.value(), e);
+        }
+        grid.reset(cell);
+        for (const auto &[key, e] : by_key) {
+          const auto *ta = world.get<Transform2D>(e);
+          const auto *ea = world.get<Extent2D>(e);
+          grid.insert(key, {ta->x, ta->y},
+                      {ta->x + ea->w, ta->y + ea->h});
+        }
         std::set<std::pair<std::uint64_t, std::uint64_t>> now;
         std::vector<std::pair<EntityId, EntityId>> entered;
-        for (std::size_t i = 0; i < impl.entities.size(); ++i) {
-          const auto *ta = world.get<Transform2D>(impl.entities[i]);
-          const auto *ea = world.get<Extent2D>(impl.entities[i]);
-          if (!ta || !ea) continue;
-          for (std::size_t j = i + 1; j < impl.entities.size(); ++j) {
-            const auto *tb = world.get<Transform2D>(impl.entities[j]);
-            const auto *eb = world.get<Extent2D>(impl.entities[j]);
-            if (!tb || !eb) continue;
-            if (ta->x < tb->x + eb->w && tb->x < ta->x + ea->w &&
-                ta->y < tb->y + eb->h && tb->y < ta->y + ea->h) {
-              const auto a = impl.entities[i].value();
-              const auto b = impl.entities[j].value();
-              const auto key = std::minmax(a, b);
-              now.insert(key);
-              if (!impl.overlapping.count(key))
-                entered.emplace_back(impl.entities[i], impl.entities[j]);
-            }
+        for (const auto &[ka, kb] : grid.pairs()) {
+          const auto ea_e = by_key.at(ka), eb_e = by_key.at(kb);
+          const auto *ta = world.get<Transform2D>(ea_e);
+          const auto *ea = world.get<Extent2D>(ea_e);
+          const auto *tb = world.get<Transform2D>(eb_e);
+          const auto *eb = world.get<Extent2D>(eb_e);
+          if (ta->x < tb->x + eb->w && tb->x < ta->x + ea->w &&
+              ta->y < tb->y + eb->h && tb->y < ta->y + ea->h) {
+            const auto key = std::minmax(ka, kb);
+            now.insert(key);
+            if (!impl.overlapping.count(key))
+              entered.emplace_back(ea_e, eb_e);
           }
         }
         if (on_collision_exit) {
@@ -1770,6 +2308,14 @@ int RuntimeHost::run() {
                 it->instance,
                 {t->x + (e ? e->w * .5f : 0.f),
                  t->y + (e ? e->h * .5f : 0.f), 0.f});
+          } else if (const auto *t3 =
+                         world.get<Transform3D>(it->attached)) {
+            // 3D anchors live in the 3D view's projected screen space;
+            // z carries the camera distance for per-instance LOD.
+            if (const auto p = project3d(*t3)) {
+              impl.vfx.set_position(it->instance, *p);
+              impl.vfx.set_lod_distance(it->instance, p->z);
+            }
           } else {
             impl.vfx.stop(it->instance);
             keep = false;
@@ -1785,7 +2331,15 @@ int RuntimeHost::run() {
       // Frame-limited runs step once per rendered frame so --frames N
       // always produces exactly N simulation steps — byte-identical
       // snapshots across runs for determinism checks.
-      if (options.frame_limit > 0) {
+      // Journaled runs (record or replay) step once per frame like
+      // frame-limited runs — journal ticks are frame indices, and a
+      // wall-clock accumulator would run a variable number of steps per
+      // frame, making recorded checkpoints unverifiable.
+      // Headless steps once per frame too — with no wall-clock pacing a
+      // real-time accumulator would starve on a fast CI machine, and a
+      // fixed step per frame keeps headless runs deterministic.
+      if (options.frame_limit > 0 || impl.replaying || impl.recorder ||
+          options.headless) {
         simulate(step);
       } else {
         accumulator += dt;
@@ -1797,9 +2351,82 @@ int RuntimeHost::run() {
         if (accumulator >= step) accumulator = 0.f;
       }
     } else {
-      simulate(dt);
+      // Wall-clock mode: windowed uses real dt; headless synthesizes a
+      // nominal 60 Hz step so frame counts stay deterministic.
+      simulate(options.headless ? 1.f / 60.f : dt);
     }
-    audio.service();
+    if (audio) audio->service();
+
+    // World checkpoints: --record hashes the post-step world snapshot
+    // every 30 frames plus one labeled section per component type, so a
+    // divergence report names the subsystem that drifted — the same
+    // section-localization contract the client's document checkpoints
+    // provide. --replay consumes each recorded checkpoint once the frame
+    // reaches its tick (a frozen minimized window keeps the world
+    // identical, so a late consume still verifies).
+    if (impl.recorder && rendered % 30 == 0) {
+      const auto bytes = world.snapshot();
+      impl.recorder->checkpoint(
+          frame_tick,
+          fnv1a64({reinterpret_cast<const char *>(bytes.data()),
+                   bytes.size()}),
+          "world");
+      for (const auto &[name, hash] : world.component_hashes())
+        impl.recorder->checkpoint(frame_tick, hash, "world:" + name);
+    }
+    if (impl.replaying) {
+      const auto &cps = impl.replay.checkpoints();
+      std::vector<std::pair<std::string, std::uint64_t>> sections;
+      bool sections_computed = false;
+      while (impl.replay_cp_cursor < cps.size() &&
+             cps[impl.replay_cp_cursor].tick <= frame_tick) {
+        const auto &cp = cps[impl.replay_cp_cursor++];
+        std::uint64_t actual{};
+        bool matched_section = true;
+        constexpr std::string_view prefix{"world:"};
+        if (cp.label.compare(0, prefix.size(), prefix) == 0) {
+          if (!sections_computed) {
+            sections = world.component_hashes();
+            sections_computed = true;
+          }
+          const auto name = cp.label.substr(prefix.size());
+          const auto it = std::ranges::find(sections, name,
+                                            &decltype(sections)::value_type::first);
+          if (it == sections.end()) {
+            actual = 0;
+            matched_section = false;
+          } else {
+            actual = it->second;
+          }
+        } else {
+          const auto bytes = world.snapshot();
+          actual = fnv1a64({reinterpret_cast<const char *>(bytes.data()),
+                            bytes.size()});
+        }
+        if (!matched_section || actual != cp.hash) {
+          std::fprintf(stderr,
+                       "replay_diverged={\"frame\":%llu,\"label\":\"%s\"}\n",
+                       static_cast<unsigned long long>(cp.tick),
+                       cp.label.c_str());
+          impl.replay_diverged = true;
+          if (options.replay_exit) impl.quit_requested = true;
+        }
+      }
+      // The recording is fully verified once its command stream and every
+      // retained checkpoint have been consumed without a divergence.
+      if (!impl.replay_verified_printed && !impl.replay_diverged &&
+          impl.replay_cursor >= impl.replay.commands().size() &&
+          impl.replay_cp_cursor >= cps.size()) {
+        impl.replay_verified_printed = true;
+        std::printf("replay_verified={\"commands\":%llu,\"checkpoints\":%llu}"
+                    "\n",
+                    static_cast<unsigned long long>(
+                        impl.replay.commands().size()),
+                    static_cast<unsigned long long>(cps.size()));
+        std::fflush(stdout);
+        if (options.replay_exit) impl.quit_requested = true;
+      }
+    }
 
     DrawList draw;
     draw.overlay.push_back(
@@ -2054,14 +2681,40 @@ int RuntimeHost::run() {
                                     TextAlign::Center});
     }
     if (on_draw) on_draw(draw, w, h);
-    window.draw(draw);
-    if (options.frame_limit > 0 && ++rendered >= options.frame_limit)
+    if (window) window->draw(draw);
+    // The frame counter is the journal tick — it must advance on every
+    // rendered frame, not only while a --frames budget is active, or
+    // replayed commands and checkpoints stay pinned at tick 0.
+    ++rendered;
+    // --replay-until: once journal tick N completes, dump the canonical
+    // world snapshot for offline divergence bisection and exit clean.
+    if (options.replay_until && impl.replaying &&
+        frame_tick == *options.replay_until) {
+      const auto out = options.replay_file.generic_string() + ".until-" +
+                       std::to_string(frame_tick) + ".stw";
+      try {
+        save_world_to_file(world, out);
+        std::printf("replay-until: dumped world state at tick %llu to %s\n",
+                    static_cast<unsigned long long>(frame_tick),
+                    out.c_str());
+      } catch (const std::exception &e) {
+        std::fprintf(stderr, "replay-until: cannot write %s: %s\n",
+                     out.c_str(), e.what());
+        replay_until_failed = true;
+      }
+      break;
+    }
+    if (options.frame_limit > 0 && rendered >= options.frame_limit)
       break;
   }
   RuntimeDiagnostics::context("runtime:teardown");
+  if (!flush_recorder()) return 1;
+  if (replay_until_failed) return 1;
+  if (impl.replaying && impl.replay_diverged) return 1;
   if (!options.snapshot_out.empty()) {
     try {
       save_world_to_file(world, options.snapshot_out);
+      write_save_package_manifest(options.snapshot_out, plan);
     } catch (const std::exception &) {
       return 1;
     }
@@ -2070,6 +2723,22 @@ int RuntimeHost::run() {
 }
 
 int RuntimeHost::run(int argc, char **argv) {
+  // --replay-info is standalone: it prints the recording inventory and
+  // exits without creating a window, so scripts can inspect a journal on
+  // headless machines.
+  std::filesystem::path replay_info;
+  // Valueless flags are scanned separately — the value-taking loop below
+  // stops at i+1 < argc and would ignore a trailing flag.
+  for (int i = 1; i < argc; ++i) {
+    if (std::string_view{argv[i]} == "--replay-exit")
+      impl_->options.replay_exit = true;
+    else if (std::string_view{argv[i]} == "--headless")
+      impl_->options.headless = true;
+    else if (std::string_view{argv[i]} == "--dump-bindings")
+      impl_->options.dump_bindings = true;
+    else if (std::string_view{argv[i]} == "--scene3d")
+      impl_->options.scene3d = true;
+  }
   for (int i = 1; i + 1 < argc; ++i) {
     const std::string_view arg{argv[i]};
     if (arg == "--frames")
@@ -2106,13 +2775,40 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.input_map = argv[++i];
     else if (arg == "--seed")
       impl_->options.seed = std::strtoull(argv[++i], nullptr, 10);
-    else if (arg == "--scene3d")
-      impl_->options.scene3d = true;
+    else if (arg == "--record")
+      impl_->options.record_file = argv[++i];
+    else if (arg == "--replay")
+      impl_->options.replay_file = argv[++i];
+    else if (arg == "--replay-until")
+      impl_->options.replay_until =
+          std::strtoull(argv[++i], nullptr, 10);
+    else if (arg == "--replay-info")
+      replay_info = argv[++i];
     else if (arg == "--scene3d-file")
       impl_->options.scene3d_file = argv[++i];
     else if (arg == "--fly-speed")
       impl_->options.fly_speed =
           static_cast<float>(std::atof(argv[++i]));
+  }
+  if (!replay_info.empty()) {
+    std::ifstream in(replay_info, std::ios::binary);
+    if (!in) {
+      std::fprintf(stderr, "Cannot open replay recording: %s\n",
+                   replay_info.generic_string().c_str());
+      return 1;
+    }
+    std::ostringstream contents;
+    contents << in.rdbuf();
+    std::string parse_error;
+    const auto recording =
+        ReplayRecorder::parse(contents.str(), &parse_error);
+    if (!recording) {
+      std::fprintf(stderr, "Replay file is not a valid recording: %s\n",
+                   parse_error.c_str());
+      return 1;
+    }
+    std::printf("%s\n", replay_info_json(*recording, replay_info).c_str());
+    return 0;
   }
   return run();
 }

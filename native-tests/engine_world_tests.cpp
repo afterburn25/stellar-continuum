@@ -200,6 +200,33 @@ int main() {
         }
         check(rejected, "checksum rejects corrupted snapshot");
 
+        // component_hashes(): one section per registered type present —
+        // mutating a component moves only its own section, unregistered
+        // components (Health) are invisible like snapshot(), and the
+        // empty world reports no sections.
+        const auto before = world.component_hashes();
+        check(before.size() == 2, "one section per registered type");
+        std::uint64_t position_hash = 0, name_hash = 0;
+        for (const auto& [name, hash] : before) {
+            if (name == "position") position_hash = hash;
+            if (name == "name") name_hash = hash;
+        }
+        check(position_hash != 0 && name_hash != 0,
+              "registered sections carry hashes");
+        world.get<Position>(planet)->x = 9.0;
+        const auto after = world.component_hashes();
+        for (const auto& [name, hash] : after) {
+            if (name == "position")
+                check(hash != position_hash,
+                      "edited component moves its own section");
+            if (name == "name")
+                check(hash == name_hash,
+                      "untouched component keeps its section hash");
+        }
+        check(World{}.component_hashes().empty(),
+              "empty world has no sections");
+        check(after.size() == before.size(), "section set is stable");
+
         // Determinism: identical worlds produce identical bytes.
         World again;
         register_codecs(again);
@@ -211,6 +238,47 @@ int main() {
         again.set_parent(p2, s2);
         again.bind_legacy(s2, 7);
         check(again.snapshot() == bytes, "snapshot bytes are deterministic");
+        // And identical worlds produce identical section hashes (the
+        // replay verifier relies on it — world was edited above, so
+        // compare again's sections against the pre-edit snapshot state).
+        World pristine;
+        register_codecs(pristine);
+        const EntityId s3 = pristine.create();
+        const EntityId p3 = pristine.create();
+        pristine.add(s3, Name{"sol"});
+        pristine.add(p3, Position{3.25, -1.5});
+        pristine.add(p3, Name{"terra"});
+        check(pristine.component_hashes() == again.component_hashes(),
+              "section hashes are deterministic");
+
+        // Forward compatibility: a snapshot carrying a component the
+        // loading build does not register skips its blob cleanly instead
+        // of failing — the rest of the world restores intact.
+        World richer;
+        register_codecs(richer);
+        richer.register_component<Health>(
+            "health",
+            [](const Health& h) {
+                return std::vector<std::uint8_t>{
+                    static_cast<std::uint8_t>(h.points)};
+            },
+            [](const std::vector<std::uint8_t>& b) {
+                return Health{b.empty() ? 0 : b.front()};
+            });
+        const EntityId r1 = richer.create();
+        richer.add(r1, Position{7.0, 8.0});
+        richer.add(r1, Health{55});
+        const auto rich_bytes = richer.snapshot();
+        World lean;
+        register_codecs(lean);  // no "health" codec
+        lean.restore(rich_bytes);
+        const auto lean_entities = lean.entities();
+        check(lean_entities.size() == 1, "unknown-codec snapshot restores");
+        check(lean.has<Position>(lean_entities.front()) &&
+                  lean.get<Position>(lean_entities.front())->x == 7.0,
+              "known components restore around the skipped blob");
+        check(!lean.has<Health>(lean_entities.front()),
+              "the unregistered component is skipped");
     }
     // Scene components: spawn_scene builds the full component set,
     // find_entity_by_name resolves handles, and the file-backed snapshot
@@ -232,6 +300,7 @@ int main() {
         hero.oneway = true;
         hero.data = "checkpoint-7";
         hero.opacity = 0.5f;
+        hero.anim = "patrol";
         // A child attached to the player at a (+64,+16) authored offset.
         SceneEntity turret{"turret", 74.f, 36.f};
         turret.parent = "player";
@@ -258,10 +327,35 @@ int main() {
         deco.layer = -3;
         deco.parallax = 0.5f;
         deco.cells.assign(16, 1);
+        deco.name = "decor";
+        SceneAnimationDef patrol;
+        patrol.id = "patrol";
+        patrol.loop = "pingpong";
+        patrol.tracks.push_back(
+            {"x", {{0.f, 10.f}, {2.f, 200.f}}});
+        patrol.tracks.push_back(
+            {"opacity", {{0.f, 1.f}, {2.f, 0.25f}}});
+        patrol.events.push_back({1.f, "midpoint"});
+        doc.animations.push_back(patrol);
+        // Document codec: animations + the entity anim field round-trip.
+        const auto reparsed =
+            SceneDocument::from_json(doc.to_json());
+        check(reparsed.has_value(), "scene doc reparses");
+        check(reparsed->animations.size() == 1 &&
+                  reparsed->animations[0].id == "patrol" &&
+                  reparsed->animations[0].loop == "pingpong" &&
+                  reparsed->animations[0].tracks.size() == 2 &&
+                  reparsed->animations[0].events.size() == 1,
+              "animation def survives codec");
+        check(reparsed->entities[0].anim == "patrol",
+              "entity anim field survives codec");
         World world;
         register_scene_components(world);
         const auto spawned = spawn_scene(world, doc);
         check(spawned.size() == 3, "spawn_scene creates all entities");
+        check(world.get<AnimTimeline>(spawned[0]) != nullptr &&
+                  world.get<AnimTimeline>(spawned[0])->id == "patrol",
+              "anim field spawns AnimTimeline component");
         const auto tile_es = tilemap_entities(world);
         check(tile_es.size() == 2, "each tilemap spawns its own entity");
         check(std::find(spawned.begin(), spawned.end(), tile_es[0]) ==
@@ -286,6 +380,21 @@ int main() {
                   world.get<Tilemap>(tile_es[1])->layer == -3 &&
                   world.get<Tilemap>(tile_es[1])->cells.size() == 16,
               "spawn_scene second tilemap component");
+        check(tilemap_index(world, "decor").has_value() &&
+                  *tilemap_index(world, "decor") == 1,
+              "named tilemap resolves its document-order index");
+        check(!tilemap_index(world, "ground").has_value(),
+              "unnamed tilemap has no named index");
+        check(world.get<EntityName>(tile_es[1]) != nullptr &&
+                  world.get<EntityName>(tile_es[1])->value == "decor",
+              "tilemap name attaches EntityName to the carrier");
+        const auto reparsed_tm =
+            SceneDocument::from_json(doc.to_json());
+        check(reparsed_tm.has_value() &&
+                  reparsed_tm->tilemaps[1].name == "decor",
+              "tilemap name survives the document codec");
+        check(scene_from_world(world).tilemaps[1].name == "decor",
+              "scene_from_world exports the tilemap name");
         const auto player = find_entity_by_name(world, "player");
         check(player.has_value() && *player == spawned[0],
               "find_entity_by_name resolves");
@@ -334,6 +443,17 @@ int main() {
         check(world.get<Oneway>(spawned[0]) != nullptr &&
                   world.get<Oneway>(spawned[1]) == nullptr,
               "spawn_scene oneway flag");
+        // Marker codecs emit a fixed byte — an empty struct memcpy'd
+        // into the snapshot would leak uninitialized memory and make
+        // replay checkpoint hashes nondeterministic.
+        {
+          const auto snap = world.snapshot();
+          World restored;
+          register_scene_components(restored);
+          restored.restore(snap);
+          check(restored.snapshot() == snap,
+                "marker components snapshot byte-deterministically");
+        }
         check(world.get<UserData>(spawned[0]) &&
                   world.get<UserData>(spawned[0])->value == "checkpoint-7" &&
                   world.get<UserData>(spawned[1]) == nullptr,
@@ -375,6 +495,10 @@ int main() {
         check(world.get<Transform2D>(spawned[2])->x == 74.f,
               "hierarchy reset restores authored offset");
 
+        // Mid-clip playhead state snapshots via the saved_* scratch —
+        // a detached player's time/pause survives save/load verbatim.
+        world.get<AnimTimeline>(spawned[0])->saved_time = 1.25f;
+        world.get<AnimTimeline>(spawned[0])->saved_playing = false;
         const auto path = std::filesystem::temp_directory_path() /
                           "stellar_scene_roundtrip.stw";
         save_world_to_file(world, path);
@@ -398,6 +522,11 @@ int main() {
                   world.get<Parent>(*rep_tur) != nullptr &&
                   world.get<Parent>(*rep_tur)->name == "player",
               "parent attachment survives restore");
+        const auto *rep_anim = world.get<AnimTimeline>(*rep);
+        check(rep_anim != nullptr && rep_anim->id == "patrol" &&
+                  std::abs(rep_anim->saved_time - 1.25f) < 1e-5 &&
+                  !rep_anim->saved_playing,
+              "anim playhead survives restore");
         world.get<Transform2D>(*rep)->x = 60.f;
         resolve_hierarchy(world);
         check(world.get<Transform2D>(*rep_tur)->x == 124.f,

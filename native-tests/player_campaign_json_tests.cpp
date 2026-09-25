@@ -70,6 +70,8 @@ std::string legacy_composed_encoding(const PlayerCampaignPayloadV17Dto &payload)
       ? player_json_detail::jsnapshot(*payload.diplomacy) : nlohmann::ordered_json(nullptr);
   root["AdaptiveResearch"] = payload.adaptive_research
       ? player_json_detail::encode_research(*payload.adaptive_research) : nlohmann::ordered_json(nullptr);
+  root["EventHistory"] = payload.event_history
+      ? player_json_detail::encode_event_history(*payload.event_history) : nlohmann::ordered_json(nullptr);
   return root.dump(2);
 }
 
@@ -215,6 +217,14 @@ void check_success(RestoredPlayerCampaignV17 restored, const Json &expected,
     check(actual_json.at("Galaxy").at("StellarActivityDay")==options.simulation_days,
           label+": old-save activity clock did not initialize at the saved epoch");
     actual_json["Galaxy"].erase("StellarActivityDay");
+  }
+  // The frozen oracle predates the persistent chronicle tail: the second
+  // load/capture above already proves "EventHistory" round-trips through
+  // restore and re-encode, so compare every original fixture field without it.
+  if(!expected_json.contains("EventHistory")){
+    check(actual_json.contains("EventHistory"),
+          label+": missing persistent chronicle tail");
+    actual_json.erase("EventHistory");
   }
   auto& actual_bodies=actual_json["Galaxy"]["PlanetaryBodies"];
   const auto& expected_bodies=expected_json.at("Galaxy").at("PlanetaryBodies");

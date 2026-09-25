@@ -87,13 +87,21 @@ target_link_libraries(stellar_native_notification_tests PRIVATE stellar_engine)
 add_test(NAME native_notifications COMMAND stellar_native_notification_tests)
 add_executable(stellar_native_notification_events_tests
   native-tests/native_notification_events_tests.cpp
-  app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp)
+  app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp
+  app/native_client/native_chronicle.cpp)
 target_include_directories(stellar_native_notification_events_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_notification_events_tests PRIVATE stellar_core stellar_native_campaign_feedback)
 add_test(NAME native_notification_events COMMAND stellar_native_notification_events_tests)
+add_executable(stellar_native_chronicle_tests
+  native-tests/native_chronicle_tests.cpp
+  app/native_client/native_notifications.cpp app/native_client/native_chronicle.cpp)
+target_include_directories(stellar_native_chronicle_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_chronicle_tests PRIVATE stellar_core)
+add_test(NAME native_chronicle COMMAND stellar_native_chronicle_tests)
 if(MSVC)
   target_compile_options(stellar_native_notification_tests PRIVATE /W4 /WX)
   target_compile_options(stellar_native_notification_events_tests PRIVATE /W4 /WX)
+  target_compile_options(stellar_native_chronicle_tests PRIVATE /W4 /WX)
 endif()
 add_executable(stellar_native_system_travel_tests
   native-tests/native_system_travel_tests.cpp

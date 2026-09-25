@@ -19,11 +19,11 @@ void draw_text(DrawList& out,UiRect box,const std::string& value,Color color,int
 }
 void BodyInspectionPanel::set_inspection(std::optional<BodyInspection> value){
   if(value==value_)return;
-  if(!value||!value_||value->body_id!=value_->body_id)scroll_=0.f;
+  if(!value||!value_||value->body_id!=value_->body_id)scroll_.scroll_offset=0.f;
   value_=std::move(value);valid_=false;
 }
 void BodyInspectionPanel::set_text_measurer(std::function<TextExtent(const Text&)> value){measure_=std::move(value);valid_=false;}
-void BodyInspectionPanel::clear(){value_.reset();items_.clear();scroll_=0.f;valid_=false;}
+void BodyInspectionPanel::clear(){value_.reset();items_.clear();scroll_={};valid_=false;}
 void BodyInspectionPanel::layout(UiRect panel,float footer_top) const {
   if(!value_)return;
   if(valid_&&panel.x==panel_.x&&panel.y==panel_.y&&panel.width==panel_.width&&panel.height==panel_.height&&footer_top==footer_top_)return;
@@ -50,11 +50,11 @@ void BodyInspectionPanel::layout(UiRect panel,float footer_top) const {
     }
     y+=12.f;
   }
-  content_height_=y;scroll_=std::clamp(scroll_,0.f,std::max(0.f,content_height_-body_.height));valid_=true;
+  scroll_.sync(y,body_.height);valid_=true;
 }
 void BodyInspectionPanel::scroll(float wheel,UiRect panel,float footer_top){
   layout(panel,footer_top);
-  scroll_=std::clamp(scroll_-wheel*42.f,0.f,std::max(0.f,content_height_-body_.height));
+  scroll_.scroll_by(-wheel*42.f);
 }
 void BodyInspectionPanel::render(DrawList& out,UiRect panel,float footer_top) const {
   if(!value_)return;layout(panel,footer_top);
@@ -65,14 +65,12 @@ void BodyInspectionPanel::render(DrawList& out,UiRect panel,float footer_top) co
             value_->confirmed?Color{109,229,174,255}:Color{248,195,109,255},12,panel);
   for(const auto& item:items_){
     const int font=item.heading?12:item.x==0.f?12:14;
-    draw_text(out,{body_.x+item.x,body_.y+item.y-scroll_,item.width,item.height},item.text,
+    draw_text(out,{body_.x+item.x,body_.y+item.y-scroll_.scroll_offset,item.width,item.height},item.text,
               item.heading?cyan:item.x==0.f?muted:ink,font,body_);
   }
-  if(content_height_>body_.height&&body_.height>0.f){
-    const float thumb=std::min(body_.height,std::max(24.f,body_.height*body_.height/content_height_));
-    const float offset=(body_.height-thumb)*scroll_/(content_height_-body_.height);
+  if(const auto thumb=scroll_.thumb(body_.height,24.f);thumb.size>0.f){
     out.overlay.emplace_back(FilledRectangle{{panel.x+panel.width-8.f,body_.y,2.f,body_.height},{29,59,75,255}});
-    out.overlay.emplace_back(FilledRectangle{{panel.x+panel.width-8.f,body_.y+offset,2.f,thumb},cyan});
+    out.overlay.emplace_back(FilledRectangle{{panel.x+panel.width-8.f,body_.y+thumb.offset,2.f,thumb.size},cyan});
   }
 }
 }

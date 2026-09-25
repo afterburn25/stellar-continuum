@@ -3,7 +3,9 @@
 #include "native_dropdown.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 #include <stellar/engine/localization.hpp>
+#include <stellar/engine/accessibility.hpp>
 #include <filesystem>
 #include <array>
 #include <functional>
@@ -11,8 +13,19 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace stellar::native_general {
+// Presentation multiplier each interface_scale preset contributes to UI
+// layout scale. Kept inside the engine accessibility clamp (0.75..2.0).
+[[nodiscard]] inline float interface_scale_multiplier(int preset) noexcept {
+  switch(preset) {
+    case 0: return .85f;
+    case 2: return 1.2f;
+    case 3: return 1.45f;
+    default: return 1.f;
+  }
+}
 // Application preference only. Empty means the platform Pictures default.
 struct GeneralPreferences final {
   std::filesystem::path screenshot_directory;
@@ -20,9 +33,26 @@ struct GeneralPreferences final {
   bool assets_hidden{};
   int eruption_quality{2}; // Low / Medium / High / Ultra; rendering only.
   int nebula_density{1}; // Low / Medium / High; presentation only.
-  // Accessibility: pauses decorative motion (system tumble, planet spin,
-  // eruption animation) without touching simulation or authoritative clocks.
-  bool reduce_motion{};
+  // Accessibility substrate — the engine's canonical settings: decorative
+  // motion/flashing suppression, high-contrast ink snap, daltonization mode,
+  // and text/subtitle scale fields reserved for per-surface text scaling.
+  // `accessibility.ui_scale` stays 1.0 — the interface_scale preset below is
+  // the UI-facing control; `effective()` folds the preset multiplier in.
+  stellar::engine::AccessibilitySettings accessibility{};
+  // Accessibility: interface scale preset 0=Compact,1=Standard,2=Large,3=Huge.
+  // Applied as a user multiplier on top of the viewport-derived UI scale.
+  int interface_scale{1};
+  // Presentation: active UI locale id (a Data/locale/<id>.json table shipped
+  // with the install). "en" is the baseline; other tables fall back to it.
+  std::string locale{"en"};
+  // The settings consumers should honor — accessibility substrate with the
+  // interface-scale preset folded into `ui_scale`, fully sanitized.
+  [[nodiscard]] stellar::engine::AccessibilitySettings effective() const noexcept {
+    auto result=accessibility;
+    result.ui_scale=interface_scale_multiplier(interface_scale);
+    result.sanitize();
+    return result;
+  }
   bool operator==(const GeneralPreferences&) const = default;
 };
 struct GeneralSettingsLayout final {
@@ -31,7 +61,8 @@ struct GeneralSettingsLayout final {
   stellar::native_map::UiRect panel, audio, video, folder, status;
   stellar::native_map::UiRect browse, defaults, cancel, save;
   stellar::native_map::UiRect nebula,eruptions;
-  stellar::native_map::UiRect motion;
+  stellar::native_map::UiRect motion,iscale,flashing,contrast,colorblind,language;
+  stellar::native_map::UiRect subtitles,subtitle_scale,text_scale;
   [[nodiscard]] static GeneralSettingsLayout for_viewport(int width,int height) noexcept;
 };
 class NativeGeneralSettings final {
@@ -52,11 +83,21 @@ class NativeGeneralSettings final {
   void set_default_directory(std::filesystem::path value) { default_directory_=std::move(value); }
   void set_text_measurer(Measure measure) { measure_=std::move(measure); }
   void set_navigation(Navigate audio,Navigate video) { audio_=std::move(audio);video_=std::move(video); }
+  // Ordered locale ids discovered under Data/locale (e.g. {"en","de"}). The
+  // language button cycles this list; empty keeps the saved value.
+  void set_locales(std::vector<std::string> locales){locales_=std::move(locales);}
   // Borrowed; the owner must outlive this view. Null keeps literal English.
   void set_localization(const stellar::engine::LocalizationTable* table){locale_=table;}
   void open();
   void cancel();
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] int focused() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label() const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
   [[nodiscard]] bool browsing() const noexcept { return pending_request_.has_value(); }
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&,int,int);
   void render(stellar::native_map::DrawList&,int,int) const;
@@ -65,6 +106,7 @@ class NativeGeneralSettings final {
  private:
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
   stellar::native_ui::Dropdown nebula_dropdown_,eruption_dropdown_;
+  void activate_at(const GeneralSettingsLayout&,stellar::native_map::Point);
   [[nodiscard]] stellar::native_map::Text path_text(const GeneralSettingsLayout&) const;
   [[nodiscard]] std::string tr(std::string_view key,std::string_view fallback)const;
   [[nodiscard]] std::string trf(std::string_view key,std::initializer_list<std::string> args,std::string_view fallback)const;
@@ -75,13 +117,15 @@ class NativeGeneralSettings final {
   Apply apply_;
   Navigate audio_,video_;
   Measure measure_;
+  std::vector<std::string> locales_;
   const stellar::engine::LocalizationTable* locale_{};
   mutable std::string cached_path_source_,cached_path_lines_;
   mutable float cached_path_width_{};
   mutable int cached_path_font_{};
-  float path_scroll_{};
+  stellar::engine::ScrollView path_scroll_{};
   std::uint64_t next_request_{};
   std::optional<std::uint64_t> pending_request_;
   bool visible_{};
+  int focus_{-1};
 };
 } // namespace stellar::native_general

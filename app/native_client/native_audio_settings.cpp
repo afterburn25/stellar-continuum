@@ -122,13 +122,13 @@ void NativeAudioSettings::load() {
     values_ = saved_ = loaded;
   } catch (const std::exception& error) {
     values_ = saved_ = {};
-    status_ = "Audio settings were not loaded. Defaults are active.";
+    status_ = tr("SETTINGS_AUDIO_STATUS_LOAD_FAILED", "Audio settings were not loaded. Defaults are active.");
     std::cerr << "Audio settings load failed for " << path_.string() << ": " << error.what() << '\n';
   }
 }
 
 void NativeAudioSettings::preview() { if (apply_) apply_(values_); }
-void NativeAudioSettings::open() { require_owner(); hover_feedback_.reset(); visible_ = true; dragging_ = Dragged::None; viewport_width_ = viewport_height_ = 0; preview(); }
+void NativeAudioSettings::open() { require_owner(); hover_feedback_.reset(); visible_ = true; dragging_ = Dragged::None; focus_ = -1; viewport_width_ = viewport_height_ = 0; preview(); }
 bool NativeAudioSettings::visible() const { require_owner(); return visible_; }
 AudioPreferences NativeAudioSettings::values() const { require_owner(); return values_; }
 AudioPreferences NativeAudioSettings::saved_values() const { require_owner(); return saved_; }
@@ -151,24 +151,67 @@ bool NativeAudioSettings::handle(const InputEvent& event, int width, int height)
       (viewport_width_ != width || viewport_height_ != height)) dragging_ = Dragged::None;
   viewport_width_ = width; viewport_height_ = height;
   const auto layout = AudioSettingsLayout::for_viewport(width, height);
+  // Focusable order is the hover-target order: sliders, then the buttons,
+  // then whichever cross-panel navigation is bound.
+  std::array<UiRect, 9> focusables{layout.master_track, layout.music_track, layout.effects_track,
+                                   layout.mute, layout.defaults, layout.cancel, layout.save};
+  int focusable_count = 7;
+  if (video_navigation_) focusables[focusable_count++] = layout.video;
+  if (general_navigation_) focusables[focusable_count++] = layout.general;
   hover_feedback_.update(event,dragging_==Dragged::None?stellar::native_menu_audio::hit(event.position,{layout.master_track,layout.music_track,layout.effects_track,layout.mute,layout.defaults,layout.cancel,layout.save,video_navigation_?layout.video:UiRect{},general_navigation_?layout.general:UiRect{}}):0);
   if (event.type == InputEventType::PointerCancelled) { dragging_ = Dragged::None; return true; }
   if (event.type == InputEventType::EscapePressed) { cancel(); return true; }
   if (event.type == InputEventType::PointerMove && dragging_ != Dragged::None) { set_from_track(dragging_, event.position, layout); return true; }
   if (event.type == InputEventType::LeftReleased) { dragging_ = Dragged::None; return true; }
+  if (event.type == InputEventType::KeyPressed) {
+    // SDL_Keycode. Tab/Up/Down move the focus ring; on a focused slider
+    // Left/Right nudge the gain and Home/End snap to min/max.
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u, kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const bool slider = focus_ >= 0 && focus_ < 3;
+    auto& gain = focus_ == 0 ? values_.master : focus_ == 1 ? values_.music : values_.effects;
+    if (slider && (event.key == kLeft || event.key == kRight || event.key == kHome || event.key == kEnd)) {
+      constexpr float step = .05f;
+      gain = event.key == kHome ? 0.f : event.key == kEnd ? 1.f
+             : clamp_gain(gain + (event.key == kRight ? step : -step));
+      preview(); return true;
+    }
+    if (event.key == kHome || event.key == kEnd) {
+      focus_ = event.key == kHome ? 0 : focusable_count - 1;
+      hover_feedback_.cue(static_cast<std::uint64_t>(focus_) + 1); return true;
+    }
+    const bool fwd = (event.key == kTab && !event.shift) || event.key == kDown ||
+                     (!slider && event.key == kRight);
+    const bool bwd = (event.key == kTab && event.shift) || event.key == kUp ||
+                     (!slider && event.key == kLeft);
+    if (fwd || bwd) {
+      if (focus_ < 0) focus_ = bwd ? focusable_count - 1 : 0;
+      else focus_ = (focus_ + (bwd ? -1 : 1) + focusable_count) % focusable_count;
+      hover_feedback_.cue(static_cast<std::uint64_t>(focus_) + 1); return true;
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 3) {
+      const auto& rect = focusables[static_cast<std::size_t>(focus_)];
+      activate_at(layout, {rect.x + rect.width * .5f, rect.y + rect.height * .5f}); return true;
+    }
+    return true;
+  }
   if (event.type != InputEventType::LeftPressed) return true;
+  focus_ = -1;
+  activate_at(layout, event.position); return true;
+}
+void NativeAudioSettings::activate_at(const AudioSettingsLayout& layout, stellar::native_map::Point position) {
   const auto invoke_confirm = [&] { if (confirm_) confirm_(); };
-  if (video_navigation_ && layout.video.contains(event.position)) { cancel(); invoke_confirm(); video_navigation_(); return true; }
-  if (general_navigation_ && layout.general.contains(event.position)) { cancel(); invoke_confirm(); general_navigation_(); return true; }
-  if (layout.master_track.contains(event.position)) { dragging_ = Dragged::Master; set_from_track(dragging_, event.position, layout); return true; }
-  if (layout.music_track.contains(event.position)) { dragging_ = Dragged::Music; set_from_track(dragging_, event.position, layout); return true; }
-  if (layout.effects_track.contains(event.position)) { dragging_ = Dragged::Effects; set_from_track(dragging_, event.position, layout); return true; }
+  if (video_navigation_ && layout.video.contains(position)) { cancel(); invoke_confirm(); video_navigation_(); return; }
+  if (general_navigation_ && layout.general.contains(position)) { cancel(); invoke_confirm(); general_navigation_(); return; }
+  if (layout.master_track.contains(position)) { dragging_ = Dragged::Master; set_from_track(dragging_, position, layout); return; }
+  if (layout.music_track.contains(position)) { dragging_ = Dragged::Music; set_from_track(dragging_, position, layout); return; }
+  if (layout.effects_track.contains(position)) { dragging_ = Dragged::Effects; set_from_track(dragging_, position, layout); return; }
   dragging_ = Dragged::None;
-  if (layout.mute.contains(event.position)) { values_.muted = !values_.muted; preview(); invoke_confirm(); return true; }
-  if (layout.defaults.contains(event.position)) { values_ = {}; preview(); status_ = "Default audio levels previewed."; invoke_confirm(); return true; }
-  if (layout.cancel.contains(event.position)) { invoke_confirm(); cancel(); return true; }
-  if (layout.save.contains(event.position)) { invoke_confirm(); save(); return true; }
-  return true;
+  if (layout.mute.contains(position)) { values_.muted = !values_.muted; preview(); invoke_confirm(); return; }
+  if (layout.defaults.contains(position)) { values_ = {}; preview(); status_ = tr("SETTINGS_AUDIO_STATUS_DEFAULTS", "Default audio levels previewed."); invoke_confirm(); return; }
+  if (layout.cancel.contains(position)) { invoke_confirm(); cancel(); return; }
+  if (layout.save.contains(position)) { invoke_confirm(); save(); return; }
 }
 
 void NativeAudioSettings::save() {
@@ -180,10 +223,10 @@ void NativeAudioSettings::save() {
     const auto bytes = std::span{reinterpret_cast<const std::byte*>(text.data()), text.size()};
     stellar::engine::write_file_atomically(path_, bytes);
     saved_ = values_;
-    status_ = "Audio settings saved.";
+    status_ = tr("SETTINGS_AUDIO_STATUS_SAVED", "Audio settings saved.");
     visible_ = false;
   } catch (const std::exception& error) {
-    status_ = "Could not save audio settings. Check the save folder.";
+    status_ = tr("SETTINGS_AUDIO_STATUS_SAVE_FAILED", "Could not save audio settings. Check the save folder.");
     if (!save_diagnostic_emitted_) {
       save_diagnostic_emitted_ = true;
       std::cerr << "Audio settings save failed for " << path_.string() << ": " << error.what() << '\n';
@@ -194,11 +237,75 @@ void NativeAudioSettings::save() {
 void NativeAudioSettings::cancel() {
   require_owner();
   dragging_ = Dragged::None;
+  focus_ = -1;
   values_ = saved_;
   preview();
   visible_ = false;
 }
 
+std::string NativeAudioSettings::focused_label() const {
+  if (focus_ < 0) return {};
+  switch (focus_) {
+  case 0: return tr("SETTINGS_AUDIO_MASTER", "Master volume");
+  case 1: return tr("SETTINGS_AUDIO_MUSIC", "Music volume");
+  case 2: return tr("SETTINGS_AUDIO_EFFECTS", "Effects volume");
+  case 3: return tr(values_.muted ? "SETTINGS_AUDIO_UNMUTE" : "SETTINGS_AUDIO_MUTE",
+                   values_.muted ? "Unmute" : "Mute");
+  case 4: return tr("SETTINGS_DEFAULTS", "Defaults");
+  case 5: return tr("SETTINGS_CANCEL", "Cancel");
+  case 6: return tr("SETTINGS_SAVE", "Save");
+  default: break;
+  }
+  int extra = focus_ - 7;
+  if (video_navigation_ && extra-- == 0) return tr("SETTINGS_NAV_VIDEO", "Video");
+  if (general_navigation_ && extra-- == 0) return tr("SETTINGS_NAV_GENERAL", "General");
+  return {};
+}
+std::optional<stellar::native_map::UiRect>
+NativeAudioSettings::focused_bounds(int width, int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto layout = AudioSettingsLayout::for_viewport(width, height);
+  std::array<stellar::native_map::UiRect, 9> focusables{
+      layout.master_track, layout.music_track, layout.effects_track,
+      layout.mute,         layout.defaults,    layout.cancel,
+      layout.save};
+  int count = 7;
+  if (video_navigation_) focusables[static_cast<std::size_t>(count++)] = layout.video;
+  if (general_navigation_) focusables[static_cast<std::size_t>(count++)] = layout.general;
+  return focus_ < count
+             ? std::optional<stellar::native_map::UiRect>{
+                   focusables[static_cast<std::size_t>(focus_)]}
+             : std::nullopt;
+}
+std::optional<stellar::engine::AnnouncementRange>
+NativeAudioSettings::focused_range() const {
+  switch (focus_) {
+  case 0: return stellar::engine::AnnouncementRange{0., 1., values_.master};
+  case 1: return stellar::engine::AnnouncementRange{0., 1., values_.music};
+  case 2: return stellar::engine::AnnouncementRange{0., 1., values_.effects};
+  default: return std::nullopt;
+  }
+}
+stellar::engine::AnnouncementControl NativeAudioSettings::focused_control() const {
+  using stellar::engine::AnnouncementControl;
+  switch (focus_) {
+  case 0: case 1: case 2: return AnnouncementControl::Slider;
+  case 3: return AnnouncementControl::CheckBox;
+  default: return focus_ >= 4 ? AnnouncementControl::Button
+                              : AnnouncementControl::Custom;
+  }
+}
+std::optional<bool> NativeAudioSettings::focused_toggle() const {
+  return focus_ == 3 ? std::optional<bool>{values_.muted} : std::nullopt;
+}
+bool NativeAudioSettings::set_focused_range(double value) {
+  require_owner();
+  if (focus_ < 0 || focus_ > 2) return false;
+  auto& gain = focus_ == 0 ? values_.master : focus_ == 1 ? values_.music : values_.effects;
+  gain = clamp_gain(static_cast<float>(value));
+  preview();
+  return true;
+}
 std::string NativeAudioSettings::tr(std::string_view key, std::string_view fallback) const {
   if (locale_ && locale_->contains(key)) return std::string(locale_->translate(key));
   return std::string(fallback);
@@ -246,12 +353,23 @@ void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
   button(draw, layout.save, tr("SETTINGS_SAVE", "SAVE"), layout.body_font_pixels, true);
   const auto notice = status_.empty() ? (values_.muted ? tr("SETTINGS_AUDIO_MUTED_NOTICE", "Audio is muted; your levels are retained.")
                                                      : tr("SETTINGS_AUDIO_HINT", "Changes preview immediately.")) : status_;
-  label(draw, {layout.status.x, layout.status.y}, general_navigation_&&!device_status_.empty()?"Playback: unavailable; check your audio device.":notice, std::max(12, layout.body_font_pixels - 2), layout.status, TextAlign::Left);
+  label(draw, {layout.status.x, layout.status.y}, general_navigation_&&!device_status_.empty()?tr("SETTINGS_AUDIO_STATUS_PLAYBACK", "Playback: unavailable; check your audio device."):notice, std::max(12, layout.body_font_pixels - 2), layout.status, TextAlign::Left);
   if (!device_status_.empty()&&!general_navigation_) {
     const UiRect diagnostic{layout.panel.x + 12.f * layout.scale, layout.panel.y + 54.f * layout.scale,
                             std::max(0.f, layout.panel.width - (video_navigation_ ? 168.f : 24.f) * layout.scale), 22.f * layout.scale};
-    draw.overlay.emplace_back(Text{{diagnostic.x, diagnostic.y}, "Playback: unavailable; check your audio device.", muted_color,
+    draw.overlay.emplace_back(Text{{diagnostic.x, diagnostic.y}, tr("SETTINGS_AUDIO_STATUS_PLAYBACK", "Playback: unavailable; check your audio device."), muted_color,
                                    std::max(12, layout.body_font_pixels - 2), diagnostic.width, diagnostic});
+  }
+  if (focus_ >= 0) {
+    std::array<UiRect, 9> focusables{layout.master_track, layout.music_track, layout.effects_track,
+                                     layout.mute, layout.defaults, layout.cancel, layout.save};
+    int count = 7;
+    if (video_navigation_) focusables[count++] = layout.video;
+    if (general_navigation_) focusables[count++] = layout.general;
+    if (focus_ < count) {
+      const auto& rect = focusables[static_cast<std::size_t>(focus_)];
+      draw.overlay.emplace_back(StrokedRectangle{rect, {160, 210, 255, 255}});
+    }
   }
 }
 

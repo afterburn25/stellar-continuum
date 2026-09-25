@@ -43,7 +43,7 @@ constexpr Color success{94, 229, 157, 255};
 constexpr Color unknown{124, 152, 176, 255};
 constexpr Color danger{255, 107, 96, 255};
 constexpr Color caution{245, 177, 82, 255};
-constexpr Color focus{102, 178, 255, 255};
+constexpr Color focus_color{102, 178, 255, 255};
 constexpr Color selected_color{245, 221, 114, 255};
 
 void fill(DrawList &out, UiRect bounds, Color color) {
@@ -346,10 +346,12 @@ void NativeBattleWorkspace::open(MassiveCombatSnapshot snapshot,
   invalidate_ship_targets();
   observer_civilization_id_ = observer_civilization_id;
   visible_ = true;
+  focus_ = -1;
   if (!camera_initialized_) fit(width, height);
 }
 void NativeBattleWorkspace::close() {
   visible_ = false;
+  focus_ = -1;
   snapshot_.reset();
   selection_.clear();
   visual_events_.clear();
@@ -667,6 +669,47 @@ void NativeBattleWorkspace::issue_context(const Point point, int width,
   if(!command.orders.empty())command.kind=BattleWorkspaceCommandKind::IssueOrder;
 }
 
+std::vector<NativeBattleWorkspace::FocusRect>
+NativeBattleWorkspace::focusables(
+    const BattleWorkspaceLayout &layout) const {
+  std::vector<FocusRect> out{
+      {layout.play, tr(tactical_speed_ > 0. ? "BATTLE_PAUSE" : "BATTLE_PLAY",
+                       tactical_speed_ > 0. ? "Pause" : "Play")},
+      {layout.speed,
+       trf("BATTLE_SPEED_LABEL", {std::to_string(tactical_resume_speed_)},
+           "Speed {0}x")},
+      {layout.fit, tr("BATTLE_FIT", "Fit view")},
+      {layout.menu, tr("BATTLE_MENU", "Menu")}};
+  for (std::size_t index = 0; index < layout.order_buttons.size(); ++index)
+    out.push_back({layout.order_buttons[index],
+                   tr(battle_order_buttons()[index].label_key,
+                      battle_order_buttons()[index].label)});
+  std::ranges::sort(out, [](const FocusRect &a, const FocusRect &b) {
+    if (a.bounds.y != b.bounds.y)
+      return a.bounds.y < b.bounds.y;
+    return a.bounds.x < b.bounds.x;
+  });
+  return out;
+}
+
+std::string NativeBattleWorkspace::focused_label(
+    const BattleWorkspaceLayout &layout) const {
+  if (focus_ < 0) return {};
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
+}
+std::optional<stellar::native_map::UiRect> NativeBattleWorkspace::focused_bounds(
+    const BattleWorkspaceLayout &layout) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
+
 BattleWorkspaceCommand
 NativeBattleWorkspace::handle(const InputEvent &event, const int width,
                               const int height) {
@@ -676,6 +719,7 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
   if(event.type==InputEventType::PointerCancelled){
     panning_=false;box_selecting_=false;gesture_=Gesture::None;
     targeting_source_.reset();hovered_formation_.reset();
+    focus_=-1;
     return command;
   }
   const auto pointer_event=event.type==InputEventType::Wheel||
@@ -701,6 +745,40 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
       set_status(tr("BATTLE_TARGET_CANCELLED","Target selection cancelled."));
     } else {
       command.kind = BattleWorkspaceCommandKind::Menu;
+    }
+    return command;
+  }
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const auto items = focusables(layout);
+    const int count = static_cast<int>(items.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      return command;
+    }
+    if (count > 0 && (fwd || bwd)) {
+      focus_ = focus_ < 0 || focus_ >= count
+                   ? (bwd ? count - 1 : 0)
+                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      return command;
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto &r = items[static_cast<std::size_t>(focus_)].bounds;
+      InputEvent press{InputEventType::LeftPressed};
+      press.position = {r.x + r.width * .5f, r.y + r.height * .5f};
+      const int keep = focus_;
+      command = handle(press, width, height);
+      focus_ = keep;
+      command.captured = true;
+      return command;
     }
     return command;
   }
@@ -758,6 +836,7 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
     gesture_ = Gesture::None;
     panning_ = false;
     box_selecting_ = false;
+    focus_ = -1;
     const auto chrome_press = [&] {
       gesture_ = Gesture::Chrome;
       pointer_down_ = event.position;
@@ -1027,11 +1106,11 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
                       center.y + std::sin(a0) * 39.f},
                      {center.x + std::cos(a1) * 39.f,
                       center.y + std::sin(a1) * 39.f},
-                     focus, field);
+                     focus_color, field);
       }
     }
     if (targeting_source_ && *targeting_source_ == formation.formation_id)
-      ring(out, center, 43.f, focus, field, 36);
+      ring(out, center, 43.f, focus_color, field, 36);
 
     // Token sample: bounded by zoom tier and the 4096 reference pool cap.
     const auto midpoint=std::max<std::int64_t>(1,
@@ -1335,11 +1414,18 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
          active_targeting ? selected_color
                           : rect.contains(pointer_) ? hover_color
                                                     : button_color);
-    stroke(out, rect, active_targeting ? focus : border);
+    stroke(out, rect, active_targeting ? focus_color : border);
     clipped_text(out,
                  {rect.x + rect.width * .5f, rect.y + rect.height * .3f},
                  tr(button.label_key, button.label), text_primary, layout.small_font_pixels,
                  rect.width - 6.f, rect, TextAlign::Center);
+  }
+
+  if (focus_ >= 0) {
+    const auto items = focusables(layout);
+    if (focus_ < static_cast<int>(items.size()))
+      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
+             {160, 210, 255, 255});
   }
 }
 } // namespace stellar::native_battle_ui

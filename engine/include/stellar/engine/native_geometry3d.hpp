@@ -166,6 +166,9 @@ inline std::optional<MeshSegmentHit3D> intersect_mesh_segment(
     const Mesh3D& mesh,stellar::engine::CollisionVector3 from,stellar::engine::CollisionVector3 to) {
   using namespace stellar::engine;
   if(!segment_sphere(from,to,{},mesh.bounding_radius()))return {};
+  // The local AABB culls elongated meshes the sphere admits.
+  {const auto mn=mesh.bounds_min(),mx=mesh.bounds_max();
+   if(!segment_aabb(from,to,{mn.x,mn.y,mn.z},{mx.x,mx.y,mx.z}))return {};}
   std::optional<MeshSegmentHit3D> closest;
   const auto& indices=mesh.indices();const auto& vertices=mesh.vertices();
   const auto vertex=[&](std::uint32_t i){const auto p=vertices[i].position;return CollisionVector3{p.x,p.y,p.z};};

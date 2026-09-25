@@ -257,7 +257,8 @@ void NativeFleetWorkspace::set_view(NativeFleetMapView view) {
     preview_.reset();
     target_display_name_.clear();
     notice_.clear();
-    list_scroll_ = 0.f;
+    list_scroll_.scroll_offset = 0.f;
+    focus_ = -1;
   }
   const auto selected_changed = [&] {
     if (!view_ || view_->selected_fleet_id != view.selected_fleet_id ||
@@ -301,8 +302,9 @@ void NativeFleetWorkspace::discard_campaign() {
   preview_.reset();
   target_display_name_.clear();
   notice_.clear();
-  list_scroll_ = 0.f;
+  list_scroll_.scroll_offset = 0.f;
   clear_pressed_action();
+  focus_ = -1;
 }
 
 void NativeFleetWorkspace::set_preview(NativeFleetRoutePreview preview,
@@ -362,6 +364,95 @@ void NativeFleetWorkspace::set_recovery_result(
   set_notice(outcome.message, outcome.accepted || outcome.requires_confirmation);
 }
 
+std::vector<NativeFleetWorkspace::FocusRect> NativeFleetWorkspace::focusables(
+    const FleetWorkspaceLayout &layout) const {
+  std::vector<FocusRect> out;
+  const auto *fleet = selected_fleet();
+  if (view_ && presentation_ == FleetWorkspacePresentation::Outliner)
+    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
+      const UiRect row{layout.list.x,
+                       layout.list.y - list_scroll_.scroll_offset +
+                           static_cast<float>(index) * 45.f * layout.scale,
+                       layout.list.width, 41.f * layout.scale};
+      if (const auto clipped = intersection(row, layout.list))
+        out.push_back({*clipped, view_->own_fleets[index].name, row});
+    }
+  if (overview_ && !selected_fleet_id()) {
+    const UiRect content{layout.details.x, layout.details.y,
+                         layout.details.width,
+                         layout.route.y + layout.route.height -
+                             layout.details.y};
+    for (const auto &row :
+         native_overview::overview_layout_for(*overview_, content).colony_rows)
+      out.push_back({row, tr("FLEET_COLONY", "Colony")});
+  }
+  if (fleet) {
+    if (!preview_ && !pending_return_) {
+      if (fleet->military_order_quote) {
+        out.push_back({layout.order_hold, tr("FLEET_ORDER_HOLD_BTN", "HOLD")});
+        out.push_back({layout.order_defend, tr("FLEET_ORDER_DEFEND_BTN", "DEFEND")});
+        out.push_back({layout.order_retreat, tr("FLEET_ORDER_RETREAT_BTN", "RETREAT")});
+        if (fleet->locate)
+          out.push_back({layout.military_locate, tr("FLEET_LOCATE", "LOCATE")});
+      } else if (fleet->recovery && fleet->locate) {
+        out.push_back({layout.civilian_locate, tr("FLEET_LOCATE", "LOCATE")});
+      } else if (fleet->locate) {
+        out.push_back({layout.locate, tr("FLEET_LOCATE", "LOCATE")});
+      }
+    }
+    if (!preview_ && fleet->recovery) {
+      const auto queued = fleet->recovery->return_requested;
+      out.push_back({layout.recovery_left,
+                     pending_return_
+                         ? tr("FLEET_CONFIRM_RETURN", "CONFIRM RETURN")
+                         : tr(fleet->recovery->hold_requested ? "FLEET_RESUME"
+                                                              : "FLEET_HOLD",
+                              fleet->recovery->hold_requested ? "RESUME"
+                                                              : "HOLD")});
+      if (pending_return_ || !queued)
+        out.push_back({layout.recovery_right,
+                       pending_return_
+                           ? tr("SETTINGS_CANCEL", "CANCEL")
+                           : tr(queued ? "FLEET_RETURN_QUEUED"
+                                       : "FLEET_RETURN_BASE",
+                                queued ? "RETURN QUEUED" : "RETURN TO BASE")});
+    }
+    if (!preview_ && !pending_return_ && !fleet->foreign_inspection &&
+        fleet->role == stellar::core::FleetRole::Military &&
+        fleet->current_system_id && !fleet->destination_system_id &&
+        fleet->combat_status && fleet->combat_status->is_armed)
+      out.push_back({layout.engage, tr("FLEET_ENGAGE", "ENGAGE HOSTILES")});
+  }
+  if (preview_ && preview_->command_available)
+    out.push_back({layout.confirm, tr("FLEET_CONFIRM_TRAVEL", "CONFIRM TRAVEL")});
+  std::ranges::sort(out, [](const FocusRect &a, const FocusRect &b) {
+    if (a.bounds.y != b.bounds.y)
+      return a.bounds.y < b.bounds.y;
+    return a.bounds.x < b.bounds.x;
+  });
+  return out;
+}
+
+std::string NativeFleetWorkspace::focused_label(
+    const FleetWorkspaceLayout &layout) const {
+  if (focus_ < 0)
+    return {};
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
+}
+std::optional<stellar::native_map::UiRect> NativeFleetWorkspace::focused_bounds(
+    const FleetWorkspaceLayout &layout) const {
+  if (focus_ < 0)
+    return std::nullopt;
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
+
 FleetWorkspaceCommand NativeFleetWorkspace::handle(
     const InputEvent &event, int width, int height,
     std::span<const FleetScreenMarker> markers,
@@ -374,6 +465,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
   if (event.type == InputEventType::PointerCancelled) {
     clear_pressed_action();
     cancel_recovery();
+    focus_ = -1;
     return {FleetWorkspaceCommandKind::None, true};
   }
   if (event.type == InputEventType::LeftReleased &&
@@ -404,9 +496,8 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
       presentation_ == FleetWorkspacePresentation::Outliner && layout.list.contains(event.position)) {
     const auto count = view_ ? view_->own_fleets.size() : 0;
     const auto content = static_cast<float>(count) * 45.f * layout.scale;
-    const auto minimum = std::min(0.f, layout.list.height - content);
-    list_scroll_ = std::clamp(list_scroll_ + event.wheel_y * 36.f * layout.scale,
-                              minimum, 0.f);
+    list_scroll_.sync(content, layout.list.height);
+    list_scroll_.scroll_by(-event.wheel_y * 36.f * layout.scale);
     return {FleetWorkspaceCommandKind::None, true};
   }
   if (event.type == InputEventType::RightPressed) {
@@ -417,7 +508,74 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
               *target_system_id};
     return {};
   }
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const auto items = focusables(layout);
+    const int count = static_cast<int>(items.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    // Rows clipped by the outliner viewport stay in the ring; when focus
+    // lands on one, snap the list so the row is fully visible — which
+    // exposes the next row and keeps the whole list keyboard-reachable.
+    const auto snap_focused = [&] {
+      if (focus_ < 0 || focus_ >= count) return;
+      const auto &target = items[static_cast<std::size_t>(focus_)];
+      if (!target.unclipped) return;
+      const auto rows = view_ ? view_->own_fleets.size() : 0;
+      list_scroll_.sync(static_cast<float>(rows) * 45.f * layout.scale,
+                        layout.list.height);
+      list_scroll_.scroll_interval_into_view(
+          target.unclipped->y, target.unclipped->y + target.unclipped->height,
+          layout.list.y, layout.list.y + layout.list.height);
+    };
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      snap_focused();
+      return {FleetWorkspaceCommandKind::None, true};
+    }
+    if (count > 0 && (fwd || bwd)) {
+      if (focus_ < 0 || focus_ >= count) {
+        focus_ = bwd ? count - 1 : 0;
+      } else {
+        // Walking past a boundary releases the ring so the dispatcher can
+        // hand the same key to the next map focus group.
+        const int next = focus_ + (bwd ? -1 : 1);
+        if (next < 0 || next >= count) {
+          focus_ = -1;
+          return {};
+        }
+        focus_ = next;
+      }
+      snap_focused();
+      return {FleetWorkspaceCommandKind::None, true};
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto &r = items[static_cast<std::size_t>(focus_)].bounds;
+      const Point at{r.x + r.width * .5f, r.y + r.height * .5f};
+      InputEvent press{InputEventType::LeftPressed};
+      press.position = at;
+      const int keep = focus_;
+      auto command = handle(press, width, height, markers, target_system_id);
+      if (command.kind == FleetWorkspaceCommandKind::None) {
+        // Release-gated controls (orders, locate) fire on the matched release.
+        InputEvent release{InputEventType::LeftReleased};
+        release.position = at;
+        command = handle(release, width, height, markers, target_system_id);
+      }
+      focus_ = keep;
+      command.captured = true;
+      return command;
+    }
+    return {};
+  }
   if (event.type != InputEventType::LeftPressed) return {};
+  focus_ = -1;
   if (visible_panel && layout.panel.contains(event.position)) {
     // New strategic and Locate controls require an exact matched release and
     // retain the displayed quote, never a later selection's authority.
@@ -479,7 +637,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
     if (view_ && presentation_ == FleetWorkspacePresentation::Outliner) {
       for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
         const UiRect row{layout.list.x,
-                         layout.list.y + list_scroll_ +
+                         layout.list.y - list_scroll_.scroll_offset +
                              static_cast<float>(index) * 45.f * layout.scale,
                          layout.list.width, 41.f * layout.scale};
         const auto clipped = intersection(row, layout.list);
@@ -565,7 +723,7 @@ void NativeFleetWorkspace::render(
     for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
       const auto &fleet = view_->own_fleets[index];
       const UiRect row{layout.list.x,
-                       layout.list.y + list_scroll_ +
+                       layout.list.y - list_scroll_.scroll_offset +
                            static_cast<float>(index) * 45.f * layout.scale,
                        layout.list.width, 41.f * layout.scale};
       const auto clipped = intersection(row, layout.list);
@@ -876,7 +1034,7 @@ void NativeFleetWorkspace::render(
     for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
       const auto &candidate = view_->own_fleets[index];
       const UiRect row{layout.list.x,
-                       layout.list.y + list_scroll_ +
+                       layout.list.y - list_scroll_.scroll_offset +
                            static_cast<float>(index) * 45.f * layout.scale,
                        layout.list.width, 41.f * layout.scale};
       if (!layout.list.contains(pointer_) || !row.contains(pointer_)) continue;
@@ -890,6 +1048,12 @@ void NativeFleetWorkspace::render(
           width, height, layout.scale, native_ui::Tone::Military);
       break;
     }
+  if (focus_ >= 0) {
+    const auto items = focusables(layout);
+    if (focus_ < static_cast<int>(items.size()))
+      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
+             {160, 210, 255, 255});
+  }
 }
 
 const std::optional<NativeFleetMapView> &NativeFleetWorkspace::view() const noexcept {

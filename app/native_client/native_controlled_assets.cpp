@@ -84,7 +84,7 @@ std::string Navigator::tr(std::string_view key,std::string_view fallback)const{r
 std::string Navigator::trf(std::string_view key,std::initializer_list<std::string> args,std::string_view fallback)const{return resolved(locale_,key,args,fallback);}
 
 void Navigator::set_view(View value){
-  if(value.generation!=view_.generation||value.observer!=view_.observer){selected_.reset();temporary_reveal_.reset();search_.clear();scroll_=0;cancel_input();}
+  if(value.generation!=view_.generation||value.observer!=view_.observer){selected_.reset();temporary_reveal_.reset();search_.clear();scroll_={};cancel_input();}
   const bool changed=value.generation!=view_.generation||value.observer!=view_.observer||value.rows!=view_.rows;
   if(!changed)return;
   const auto targets=[&]{std::vector<std::pair<Category,std::optional<Key>>> keys;for(const auto& e:entries_)keys.emplace_back(e.category,e.row?std::optional(view_.rows[*e.row].key):std::nullopt);return keys;};
@@ -98,57 +98,209 @@ void Navigator::set_view(View value){
 }
 void Navigator::set_selection(std::optional<Key> key,bool external){if(key==selected_)return;selected_=key;temporary_reveal_=external?key:std::nullopt;reveal_selection_=external&&key.has_value();rebuild();}
 void Navigator::rebuild(){
-  counts_.fill(0);matches_.fill(0);entries_.clear();const auto query=folded(search_);
+  counts_.fill(0);matches_.fill(0);const auto query=folded(search_);
   for(const auto& r:view_.rows){const auto c=static_cast<std::size_t>(r.key.category);++counts_[c];if(query.empty()||r.search.find(query)!=std::string::npos)++matches_[c];}
-  for(int c=0;c<5;++c){if(!matches_[c])continue;const auto category=static_cast<Category>(c);entries_.push_back({{},category});
+  // TreeModel owns the expand/flatten bookkeeping — "c:<category>"
+  // header nodes parent "r:<row index>" children, and entries_ is the
+  // flattened projection (row index rides the node id, the category
+  // ordinal rides the header label_key).
+  tree_=stellar::engine::TreeModel{};
+  for(int c=0;c<5;++c){if(!matches_[c])continue;const auto category=static_cast<Category>(c);
+    const auto header_id="c:"+std::to_string(c);
+    auto&header=tree_.add(header_id,std::to_string(c));
     const bool reveal=!query.empty()||(temporary_reveal_&&temporary_reveal_->category==category);
-    if(preferences_.collapsed[c]&&!reveal)continue;
-    for(std::size_t i=0;i<view_.rows.size();++i)if(view_.rows[i].key.category==category&&(query.empty()||view_.rows[i].search.find(query)!=std::string::npos))entries_.push_back({i,category});
+    header.expanded=!preferences_.collapsed[c]||reveal;
+    for(std::size_t i=0;i<view_.rows.size();++i)if(view_.rows[i].key.category==category&&(query.empty()||view_.rows[i].search.find(query)!=std::string::npos))tree_.add("r:"+std::to_string(i),{},header_id);
+  }
+  entries_.clear();
+  for(const auto &[node,depth]:tree_.flattened()){
+    if(node->id.front()=='c')entries_.push_back({std::nullopt,static_cast<Category>(std::stoi(node->label_key))});
+    else{const auto i=static_cast<std::size_t>(std::stoul(node->id.substr(2)));entries_.push_back({i,view_.rows[i].key.category});}
   }
 }
 float Navigator::extent(const Layout& l)const{float h=0;for(const auto& e:entries_)h+=e.row?l.row_height:l.category_height;return h;}
-UiRect Navigator::entry_bounds(std::size_t index,const Layout& l)const{float y=l.list.y-scroll_;for(std::size_t i=0;i<index;++i)y+=entries_[i].row?l.row_height:l.category_height;return {l.list.x,y,l.list.width-5*l.scale,entries_[index].row?l.row_height:l.category_height};}
+UiRect Navigator::entry_bounds(std::size_t index,const Layout& l)const{float y=l.list.y-scroll_.scroll_offset;for(std::size_t i=0;i<index;++i)y+=entries_[i].row?l.row_height:l.category_height;return {l.list.x,y,l.list.width-5*l.scale,entries_[index].row?l.row_height:l.category_height};}
 std::optional<UiRect> Navigator::row_bounds(Key key,int w,int h)const{const auto l=Layout::make(w,h);for(std::size_t i=0;i<entries_.size();++i)if(entries_[i].row&&view_.rows[*entries_[i].row].key==key){const auto r=entry_bounds(i,l);if(intersect(r,l.list).height>0)return r;}return {};}
 UiRect Navigator::category_bounds(Category c,int w,int h)const{const auto l=Layout::make(w,h);for(std::size_t i=0;i<entries_.size();++i)if(!entries_[i].row&&entries_[i].category==c)return entry_bounds(i,l);return {};}
+// Focusables walk actionable rects in (y,x) order: the hide control, the
+// search field (and its clear button while text is present), then every
+// entry — category headers and rows — clipped to the list viewport.
+// Entry rects carry their entries_ index so scroll-follow can consult the
+// unclipped bounds.
+std::vector<Navigator::FocusTarget> Navigator::focusables(const Layout& l) const{
+  std::vector<FocusTarget> out;
+  out.push_back({l.hide,std::nullopt,tr("ASSETS_HIDE","Hide assets panel")});
+  out.push_back({l.search,std::nullopt,tr("ASSETS_SEARCH","Search assets")});
+  if(!search_.empty())out.push_back({l.clear,std::nullopt,tr("ASSETS_CLEAR","Clear search")});
+  for(std::size_t i=0;i<entries_.size();++i)
+    if(const auto clip=intersect(entry_bounds(i,l),l.list);clip.height>0.f){
+      const auto&e=entries_[i];
+      out.push_back({clip,i,e.row?view_.rows[*e.row].name
+                                :tr(name_keys[static_cast<int>(e.category)],names[static_cast<int>(e.category)])});
+    }
+  std::ranges::sort(out,[](const FocusTarget& a,const FocusTarget& b){return a.bounds.y==b.bounds.y?a.bounds.x<b.bounds.x:a.bounds.y<b.bounds.y;});
+  return out;
+}
+std::string Navigator::focused_label(int w,int h)const{
+  if(focus_<0)return {};
+  if(preferences_.hidden)return focus_==0?tr("ASSETS_RESTORE","Restore assets panel"):std::string{};
+  const auto targets=focusables(Layout::make(w,h));
+  return focus_<static_cast<int>(targets.size())?targets[static_cast<std::size_t>(focus_)].label:std::string{};
+}
+std::optional<stellar::native_map::UiRect> Navigator::focused_bounds(int w,int h)const{
+  if(focus_<0)return std::nullopt;
+  const Layout l=Layout::make(w,h);
+  if(preferences_.hidden)return focus_==0?std::optional<stellar::native_map::UiRect>{l.restore}:std::nullopt;
+  const auto targets=focusables(l);
+  return focus_<static_cast<int>(targets.size())?std::optional<stellar::native_map::UiRect>{targets[static_cast<std::size_t>(focus_)].bounds}:std::nullopt;
+}
+stellar::engine::AnnouncementControl Navigator::focused_control(int w,int h)const{
+  const auto bounds=focused_bounds(w,h);
+  const auto search=Layout::make(w,h).search;
+  return bounds&&!preferences_.hidden&&bounds->x==search.x&&bounds->y==search.y&&bounds->width==search.width&&bounds->height==search.height?stellar::engine::AnnouncementControl::Edit:stellar::engine::AnnouncementControl::Custom;
+}
+std::optional<stellar::engine::AnnouncementValue> Navigator::focused_value(int w,int h)const{
+  if(focused_control(w,h)!=stellar::engine::AnnouncementControl::Edit)return std::nullopt;
+  return stellar::engine::AnnouncementValue{search_};
+}
+bool Navigator::set_focused_text(std::string text,int w,int h){
+  if(focused_control(w,h)!=stellar::engine::AnnouncementControl::Edit)return false;
+  // Same byte cap as the typed path, truncated on a code-point boundary.
+  if(text.size()>120){std::size_t n=120;while(n>0&&(static_cast<unsigned char>(text[n])&0xc0)==0x80)--n;text.resize(n);}
+  search_=std::move(text);
+  return true;
+}
+std::optional<bool> Navigator::focused_expanded(int w,int h)const{
+  if(focus_<0||preferences_.hidden)return std::nullopt;
+  const auto targets=focusables(Layout::make(w,h));
+  if(focus_>=static_cast<int>(targets.size()))return std::nullopt;
+  const auto entry=targets[static_cast<std::size_t>(focus_)].entry;
+  if(!entry)return std::nullopt;
+  const auto&e=entries_[*entry];
+  if(e.row)return std::nullopt;
+  // Effective expansion — a search or temporary reveal keeps a collapsed
+  // category open, matching what rebuild() projects.
+  return !preferences_.collapsed[static_cast<std::size_t>(e.category)]||
+         !folded(search_).empty()||
+         (temporary_reveal_&&temporary_reveal_->category==e.category);
+}
+bool Navigator::set_focused_expanded(bool expand,int w,int h){
+  if(!focused_expanded(w,h).has_value())return false;
+  const auto targets=focusables(Layout::make(w,h));
+  const auto&e=entries_[*targets[static_cast<std::size_t>(focus_)].entry];
+  auto p=preferences_;p.collapsed[static_cast<std::size_t>(e.category)]=!expand;
+  if(p.collapsed==preferences_.collapsed)return true;
+  temporary_reveal_.reset();
+  commit_preferences(std::move(p));
+  return true;
+}
 void Navigator::commit_preferences(Preferences next){if(persist_&&!persist_(next)){error_=tr("ASSETS_PREFS_FAIL","Could not save navigator preferences.");return;}preferences_=next;error_.clear();pressed_.reset();rebuild();}
 Command Navigator::handle(const InputEvent& e,int w,int h){
   const auto l=Layout::make(w,h);pointer_=e.position;Command out;out.generation=view_.generation;out.observer=view_.observer;
   if(e.type==InputEventType::PointerCancelled){cancel_input();return out;}
-  if(preferences_.hidden){if(l.restore.contains(e.position)){out.captured=true;if(e.type==InputEventType::LeftPressed){auto p=preferences_;p.hidden=false;commit_preferences(p);}}return out;}
+  if(preferences_.hidden){
+    if(e.type==InputEventType::KeyPressed&&e.key){
+      constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+      constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+      constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+      if(e.key==kHome||e.key==kEnd){focus_=0;out.captured=true;}
+      else if(e.key==kTab||e.key==kRight||e.key==kDown||e.key==kLeft||e.key==kUp){
+        // Single-item ring: the first nav key lands on restore, the next
+        // wraps out so the map focus chain can advance to the next group.
+        if(focus_<0){focus_=0;out.captured=true;}
+        else focus_=-1;}
+      else if((e.key==kReturn||e.key==kSpace)&&focus_==0){InputEvent press{InputEventType::LeftPressed,{l.restore.x+l.restore.width*.5f,l.restore.y+l.restore.height*.5f}};(void)handle(press,w,h);focus_=-1;out.captured=true;}
+      return out;
+    }
+    if(e.type==InputEventType::LeftPressed)focus_=-1;
+    if(l.restore.contains(e.position)){out.captured=true;if(e.type==InputEventType::LeftPressed){auto p=preferences_;p.hidden=false;commit_preferences(p);}}
+    return out;
+  }
   if(e.type==InputEventType::EscapePressed&&search_focused_){search_focused_=false;out.captured=true;return out;}
   if(search_focused_&&(e.type==InputEventType::TextEntered||e.type==InputEventType::BackspacePressed)){
     if(e.type==InputEventType::TextEntered&&search_.size()+e.text.size()<=120)search_+=e.text;
     else if(e.type==InputEventType::BackspacePressed&&!search_.empty()){auto n=search_.size()-1;while(n>0&&(static_cast<unsigned char>(search_[n])&0xc0)==0x80)--n;search_.resize(n);}
-    scroll_=0;pressed_.reset();rebuild();out.captured=true;return out;
+    scroll_={};pressed_.reset();rebuild();out.captured=true;return out;
+  }
+  if(search_focused_&&e.type==InputEventType::KeyPressed){
+    // While editing, the search field owns the keyboard — Tab or Return
+    // commit out of it; every other key stays captured.
+    if(e.key==9u||e.key==13u)search_focused_=false;
+    out.captured=true;return out;
+  }
+  if(e.type==InputEventType::KeyPressed&&e.key){
+    // SDL_Keycode: Tab/arrows ring the (y,x)-ordered focusables — hide,
+    // search, clear, then every visible header/row — Home/End jump to the
+    // ends, and Return/Space replay the press/release pair through the
+    // same dispatch a click takes.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const auto targets=focusables(l);
+    const int count=static_cast<int>(targets.size());
+    const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
+    const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
+    if(count>0&&(e.key==kHome||e.key==kEnd))focus_=e.key==kHome?0:count-1;
+    else if(count>0&&(fwd||bwd)){
+      if(focus_<0||focus_>=count)focus_=bwd?count-1:0;
+      else{
+        // Walking past a boundary releases the ring so the dispatcher can
+        // hand the same key to the next map focus group.
+        const int next=focus_+(bwd?-1:1);
+        if(next<0||next>=count){focus_=-1;return out;}
+        focus_=next;
+      }
+    }
+    else if((e.key==kReturn||e.key==kSpace)&&focus_>=0&&focus_<count){
+      const auto& r=targets[static_cast<std::size_t>(focus_)].bounds;
+      InputEvent press{InputEventType::LeftPressed,{r.x+r.width*.5f,r.y+r.height*.5f}};
+      InputEvent release=press;release.type=InputEventType::LeftReleased;
+      const int keep=focus_;
+      (void)handle(press,w,h);
+      out=handle(release,w,h);
+      if(!preferences_.hidden)focus_=keep;
+      out.captured=true;return out;
+    }
+    else return out;
+    out.captured=true;
+    // Scroll-follow: keep the focused entry fully inside the viewport.
+    if(const auto entry=targets[static_cast<std::size_t>(focus_)].entry){
+      const auto bounds=entry_bounds(*entry,l);
+      if(bounds.y<l.list.y)scroll_.scroll_offset=std::max(0.f,scroll_.scroll_offset+bounds.y-l.list.y);
+      else if(bounds.y+bounds.height>l.list.y+l.list.height)scroll_.scroll_offset+=bounds.y+bounds.height-l.list.y-l.list.height;
+      scroll_.sync(extent(l),l.list.height);
+    }
+    return out;
   }
   if(e.type==InputEventType::LeftReleased&&pressed_){const auto index=*pressed_;pressed_.reset();out.captured=true;
     if(pressed_generation_!=view_.generation||pressed_observer_!=view_.observer||index>=entries_.size()||!l.list.contains(e.position)||!entry_bounds(index,l).contains(e.position))return out;
     const auto entry=entries_[index];if(!entry.row){auto p=preferences_;p.collapsed[static_cast<int>(entry.category)]=!p.collapsed[static_cast<int>(entry.category)];temporary_reveal_.reset();commit_preferences(p);return out;}
     const auto& row=view_.rows[*entry.row];if(!row.actionable)return out;out.key=row.key;out.manage=click_count_>=2||e.position.x>l.list.x+l.list.width-32*l.scale;set_selection(row.key,false);return out;
   }
-  if(e.type==InputEventType::LeftPressed&&!l.panel.contains(e.position)){search_focused_=false;pressed_.reset();return out;}
+  if(e.type==InputEventType::LeftPressed&&!l.panel.contains(e.position)){search_focused_=false;pressed_.reset();focus_=-1;return out;}
   if(!l.panel.contains(e.position))return out;
   out.captured=true;
-  if(e.type==InputEventType::Wheel){scroll_=std::clamp(scroll_-e.wheel_y*52*l.scale,0.f,std::max(0.f,extent(l)-l.list.height));pressed_.reset();}
+  if(e.type==InputEventType::LeftPressed)focus_=-1;
+  if(e.type==InputEventType::Wheel){scroll_.sync(extent(l),l.list.height);scroll_.scroll_by(-e.wheel_y*52*l.scale);pressed_.reset();}
   if(e.type==InputEventType::LeftPressed){
     if(l.hide.contains(e.position)){auto p=preferences_;p.hidden=true;search_focused_=false;commit_preferences(p);return out;}
     search_focused_=l.search.contains(e.position);
-    if(l.clear.contains(e.position)){search_.clear();scroll_=0;rebuild();return out;}
+    if(l.clear.contains(e.position)){search_.clear();scroll_={};rebuild();return out;}
     if(l.list.contains(e.position))for(std::size_t i=0;i<entries_.size();++i)if(entry_bounds(i,l).contains(e.position)){pressed_=i;pressed_generation_=view_.generation;pressed_observer_=view_.observer;click_count_=e.click_count;break;}
   }
   return out;
 }
 void Navigator::render(DrawList& out,int w,int h,const Art& art){
   const auto l=Layout::make(w,h);const auto s=l.scale;const int normal=std::max(11,static_cast<int>(15*s)),small=std::max(10,static_cast<int>(12*s));
-  if(preferences_.hidden){native_menu_style::button(out,l.restore,tr("ASSETS_RESTORE","Assets ›"),normal,l.restore.contains(pointer_),true,s);return;}
-  scroll_=std::clamp(scroll_,0.f,std::max(0.f,extent(l)-l.list.height));
-  if(reveal_selection_&&selected_){for(std::size_t i=0;i<entries_.size();++i)if(entries_[i].row&&view_.rows[*entries_[i].row].key==selected_){const auto r=entry_bounds(i,l);if(r.y<l.list.y)scroll_=std::max(0.f,scroll_+r.y-l.list.y);else if(r.y+r.height>l.list.y+l.list.height)scroll_+=r.y+r.height-l.list.y-l.list.height;break;}reveal_selection_=false;}
+  if(preferences_.hidden){native_menu_style::button(out,l.restore,tr("ASSETS_RESTORE","Assets ›"),normal,l.restore.contains(pointer_),true,s);if(focus_>=0)out.overlay.emplace_back(StrokedRectangle{l.restore,cyan});return;}
+  scroll_.sync(extent(l),l.list.height);
+  if(reveal_selection_&&selected_){for(std::size_t i=0;i<entries_.size();++i)if(entries_[i].row&&view_.rows[*entries_[i].row].key==selected_){const auto r=entry_bounds(i,l);if(r.y<l.list.y)scroll_.scroll_offset=std::max(0.f,scroll_.scroll_offset+r.y-l.list.y);else if(r.y+r.height>l.list.y+l.list.height)scroll_.scroll_offset+=r.y+r.height-l.list.y-l.list.height;scroll_.sync(extent(l),l.list.height);break;}reveal_selection_=false;}
   native_menu_style::panel(out,l.panel,s);label(out,l.header,trf("ASSETS_TITLE",{std::to_string(view_.rows.size())},"CONTROLLED ASSETS · {0}"),cyan,normal,l.panel);
   native_menu_style::button(out,l.hide,"›",normal,l.hide.contains(pointer_),true,s);
   out.overlay.emplace_back(FilledRectangle{l.search,{3,13,22,245}});out.overlay.emplace_back(StrokedRectangle{l.search,search_focused_?cyan:Color{54,111,140,255}});
   label(out,{l.search.x+8*s,l.search.y+6*s,l.search.width-40*s,24*s},search_.empty()?tr("ASSETS_SEARCH","Search assets…"):search_,search_.empty()?muted:ink,small,l.search);
   if(!search_.empty())label(out,l.clear,"×",ink,normal,l.search);
-  float y=l.list.y-scroll_;std::optional<std::pair<const Row*,UiRect>> tooltip;
+  float y=l.list.y-scroll_.scroll_offset;std::optional<std::pair<const Row*,UiRect>> tooltip;
   for(const auto& e:entries_){const float height=e.row?l.row_height:l.category_height;const UiRect r{l.list.x,y,l.list.width-5*s,height};y+=height;
     const auto clip=intersect(r,l.list);if(clip.height<=0)continue;
     if(!e.row){const int c=static_cast<int>(e.category);const bool expanded=!preferences_.collapsed[c]||!search_.empty()||(temporary_reveal_&&temporary_reveal_->category==e.category);
@@ -168,8 +320,9 @@ void Navigator::render(DrawList& out,int w,int h,const Art& art){
     if(hovered)tooltip=std::pair{&row,r};
   }
   if(entries_.empty())label(out,{l.list.x+10*s,l.list.y+18*s,l.list.width-20*s,150*s},view_.rows.empty()?tr("ASSETS_EMPTY","No controlled assets.\n\nExplore the galaxy or establish a colony to begin expanding your civilization."):tr("ASSETS_EMPTY_SEARCH","No assets match your search."),muted,normal,l.list);
-  const auto content=extent(l);if(content>l.list.height){const float thumb=std::max(24*s,l.list.height*l.list.height/content);out.overlay.emplace_back(FilledRectangle{{l.list.x+l.list.width-2*s,l.list.y+(l.list.height-thumb)*scroll_/(content-l.list.height),2*s,thumb},{72,158,192,255}});}
+  if(const auto thumb=scroll_.thumb(l.list.height,24*s);thumb.size>0){out.overlay.emplace_back(FilledRectangle{{l.list.x+l.list.width-2*s,l.list.y+thumb.offset,2*s,thumb.size},{72,158,192,255}});}
   if(tooltip){const UiRect box{l.panel.x-300*s-8*s,std::clamp(tooltip->second.y,80*s,h-174*s),300*s,158*s};native_menu_style::panel(out,box,s);label(out,{box.x+12*s,box.y+12*s,box.width-24*s,box.height-24*s},tooltip->first->tooltip,ink,small,box);}
   if(!error_.empty())label(out,{l.panel.x+10*s,l.panel.y+l.panel.height-22*s,l.panel.width-20*s,22*s},error_,amber,small,l.panel);
+  if(focus_>=0){const auto targets=focusables(l);if(focus_<static_cast<int>(targets.size()))out.overlay.emplace_back(StrokedRectangle{targets[static_cast<std::size_t>(focus_)].bounds,cyan});}
 }
 }

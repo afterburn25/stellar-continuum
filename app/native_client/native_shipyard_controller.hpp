@@ -6,10 +6,14 @@
 #include <stellar/core/shipbuilding.hpp>
 
 #include <cstdint>
+#include <initializer_list>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
+
+namespace stellar::engine { class LocalizationTable; }
 
 namespace stellar::native_shipyard {
 
@@ -100,9 +104,16 @@ public:
          std::uint64_t expected_shipyard_revision,
          std::string_view order_id);
 
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
+
 private:
   void require_owner() const;
-
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  const stellar::engine::LocalizationTable *locale_{};
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
   std::uint64_t revision_{};

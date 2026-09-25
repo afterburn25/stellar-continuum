@@ -3,7 +3,9 @@
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <utility>
 
 namespace stellar::native_map {
 
@@ -41,7 +43,9 @@ enum class UiAction {
   Economy,
   Colonies,
   Explore,
-  Menu
+  Menu,
+  Missions,
+  SwitchView
 };
 
 struct NativeUiLayout {
@@ -79,12 +83,33 @@ struct NativeUiLayout {
   UiRect menu;
   UiRect zoom_text;
   UiRect navigation_bar,brand;
+  // Rail utility slot below Explore — assigned via secondary(5), not the
+  // positional initializer, so it must trail every listed member.
+  UiRect missions;
+
+  // Accessibility user multiplier (interface-scale preference). Main-thread
+  // presentation only — applied on top of the viewport-derived scale.
+  static inline float user_scale_factor = 1.f;
+  static void set_user_scale(float factor) noexcept {
+    user_scale_factor = std::clamp(factor, .75f, 2.f);
+  }
+  [[nodiscard]] static float user_scale() noexcept { return user_scale_factor; }
+
+  // Accessibility text multiplier (AccessibilitySettings::text_scale) —
+  // enlarges the shared font metrics without growing chrome geometry, so
+  // larger text does not shrink the world viewport.
+  static inline float text_scale_factor = 1.f;
+  static void set_text_scale(float factor) noexcept {
+    text_scale_factor = std::clamp(factor, .75f, 2.f);
+  }
+  [[nodiscard]] static float text_scale() noexcept { return text_scale_factor; }
 
   [[nodiscard]] static NativeUiLayout for_viewport(int width,
                                                     int height) noexcept {
     const auto screen_width = static_cast<float>(width);
     const auto screen_height = static_cast<float>(height);
-    const auto requested_scale = std::max(1.f, screen_height / 1080.f);
+    const auto requested_scale =
+        std::max(1.f, screen_height / 1080.f) * user_scale_factor;
     const auto width_scale = std::max(.5f, (screen_width - 36.f) / 300.f);
     const auto height_scale = std::max(.5f, (screen_height - 36.f) / 430.f);
     const auto scale = std::min({requested_scale, width_scale, height_scale});
@@ -107,11 +132,12 @@ struct NativeUiLayout {
         std::max(12.f, (screen_height - 2.f * inset - 60.f * scale - 13.f * rail_gap) / 14.f));
     const auto rail_y = inset + 60.f * scale;
 
+    const auto text = text_scale_factor;
     auto result = NativeUiLayout{
         scale,
-        static_cast<int>(std::lround(17.f * scale)),
-        static_cast<int>(std::lround(15.f * scale)),
-        static_cast<int>(std::lround(22.f * scale)),
+        static_cast<int>(std::lround(17.f * scale * text)),
+        static_cast<int>(std::lround(15.f * scale * text)),
+        static_cast<int>(std::lround(22.f * scale * text)),
         {inset, inset, 76.f * scale, 32.f * scale},
         {inset + 86.f * scale, inset, 104.f * scale, 32.f * scale},
         {inset, rail_y, rail_size, rail_size},
@@ -165,6 +191,7 @@ struct NativeUiLayout {
     result.menu={screen_width-52.f*scale,49.f*scale,34.f*scale,34.f*scale};
     const auto secondary=[&](int i){return UiRect{inset,120.f*scale+i*(rail_size+rail_gap),rail_size,rail_size};};
     result.inspect=secondary(0);result.zoom_in=secondary(1);result.zoom_out=secondary(2);result.construction=secondary(3);result.explore=secondary(4);
+    result.missions=secondary(5);
     result.zoom_text={80.f*scale,110.f*scale,210.f*scale,20.f*scale};
     return result;
   }
@@ -196,8 +223,34 @@ struct NativeUiLayout {
     if (economy.contains(point)) return UiAction::Economy;
     if (colonies.contains(point)) return UiAction::Colonies;
     if (explore.contains(point)) return UiAction::Explore;
+    if (missions.contains(point)) return UiAction::Missions;
     if (menu.contains(point)) return UiAction::Menu;
     return UiAction::None;
+  }
+
+  // Always-on chrome in keyboard focus order — top strip left-to-right, then
+  // the navigation bar, then the left rail. `notifications` is only clickable
+  // when the feed is available; callers drop it from the ring in that case.
+  [[nodiscard]] std::array<std::pair<UiRect, UiAction>, 18> hud_actions()
+      const noexcept {
+    return {{{notifications, UiAction::Notifications},
+             {pause, UiAction::Pause},
+             {speed, UiAction::Speed},
+             {map, UiAction::Map},
+             {home, UiAction::Home},
+             {colonies, UiAction::Colonies},
+             {economy, UiAction::Economy},
+             {research, UiAction::Research},
+             {diplomacy, UiAction::Diplomacy},
+             {supply, UiAction::Supply},
+             {shipyard, UiAction::Shipyard},
+             {menu, UiAction::Menu},
+             {inspect, UiAction::Inspect},
+             {zoom_in, UiAction::ZoomIn},
+             {zoom_out, UiAction::ZoomOut},
+             {construction, UiAction::Construction},
+             {explore, UiAction::Explore},
+             {missions, UiAction::Missions}}};
   }
 };
 
