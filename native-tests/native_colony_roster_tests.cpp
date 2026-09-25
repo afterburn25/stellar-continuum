@@ -1,4 +1,5 @@
 #include "native_colony_roster.hpp"
+#include "native_ui_theme.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -14,6 +15,7 @@ namespace {
 using namespace stellar::core;
 using namespace stellar::native_colony_roster;
 using namespace stellar::native_map;
+namespace theme = stellar::native_ui;
 
 void require(bool value, std::string_view message) {
   if (!value)
@@ -287,7 +289,8 @@ void cancellation_and_compact_hover_are_bounded() {
   const bool hover_outline =
       std::ranges::any_of(draw.overlay, [](const auto &item) {
         const auto *outline = std::get_if<StrokedRectangle>(&item);
-        return outline && outline->color.r == 82 && outline->color.g == 155;
+        return outline && outline->color.r == theme::color::keyline_strong.r &&
+               outline->color.g == theme::color::keyline_strong.g;
       });
   require(population_heading && hover_outline,
           "compact roster did not expose population or row hover feedback");
@@ -466,7 +469,8 @@ void keyboard_focus_rings_controls_and_activates_rows() {
     DrawList draw;
     workspace.render(draw, width, height);
     const auto *ring = std::get_if<StrokedRectangle>(&draw.overlay.back());
-    require(ring && ring->color.r == 108 && ring->color.g == 218,
+    require(ring && ring->color.r == theme::color::focus.r &&
+                ring->color.g == theme::color::focus.g,
             "focused roster control rendered no ring");
   }
   // Return on a row replays the matched press/release and opens the colony.

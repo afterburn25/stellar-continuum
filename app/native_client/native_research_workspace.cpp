@@ -997,13 +997,12 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
     return;
   }
   if (mode_==ResearchViewMode::Tree&&placements_.empty()) {
-    text(out,
-         {layout.graph.x + 24.f * layout.scale,
-          layout.graph.y + 24.f * layout.scale,
-          layout.graph.width - 48.f * layout.scale, 60.f * layout.scale},
-         tr("RESEARCH_NO_MATCH", "No known research matches this view."),
-         muted,
-         layout.body_font_pixels);
+    theme::empty_state(
+        out, layout.graph,
+        tr("RESEARCH_NO_MATCH", "No known research matches this view."),
+        tr("RESEARCH_NO_MATCH_HINT",
+           "Adjust the category, search, or view tab."),
+        layout.body_font_pixels);
   }
 
   if(mode_==ResearchViewMode::Tree){
