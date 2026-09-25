@@ -45,6 +45,8 @@ m.terminator_wrap = 0.4f;                   // [0,1] wrap-diffuse softening
 m.limb_darkening = 0.6f;                    // [0,1] N.V radiance falloff
 m.band_shear = -0.2f;                       // [-0.5,0.5] latitude-weighted
                                             // longitude shear (giants)
+m.band_waves = 0.7f;                        // [0,1] zonal-jet harmonic
+                                            // layered on band_shear
 m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
                                             // asymmetry (accretion discs,
                                             // ring forward-scatter)
@@ -70,7 +72,10 @@ equirect surface sample — albedo, normal, properties, cloud deck — shifts
 `u` by `s·cos(2πv)`. The profile is equator-symmetric and zero-mean, so
 authored maps stay registered and net longitude is preserved; with a
 nonzero `cloud_offset` the deck additionally shears against the surface
-underneath it.
+underneath it. `band_waves` [0,1] layers a `cos(6πv)` harmonic on top —
+w = 0 is the single-cosine pole-vs-equator profile, w → 1 adds
+Jupiter-style alternating mid-latitude jets; the mix stays zero-mean
+and equator-symmetric.
 
 `orbital_beaming` is also material-level: fragments recover their
 object-space position through the stored model-view inverse, take the
@@ -291,9 +296,11 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `atmo_strength/power/night/r/g/b`, `range` (per-entity
 `visible_range`) with `visibleFade` ([0,.5] dithered fade-out),
 `terminator_wrap`, `limb_darkening`, `bandShear`
-([-0.5,0.5]), `orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
+([-0.5,0.5]) with `bandWaves` ([0,1] jet harmonic),
+`orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
-(`{depth,density,seed,steps,scatter}` — requires a `texture`), `lods` (array of
+(`{depth,density,seed,steps,scatter,flow,distort}` — requires a
+`texture`), `lods` (array of
 mesh specs, ≤ 8) with `lodPixels`, and a `surface`
 block —
 `{normal, properties, cloud, normalStrength, relief, cloudOpacity,
@@ -368,8 +375,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or
   aerial perspective.
 - The cloud deck is a texture-space composite — no volumetric cloud
-  shells or self-shadowing; `band_shear` is a single-cosine longitude
-  warp, not per-band zonal winds or animated turbulence.
+  shells or self-shadowing; `band_shear`+`band_waves` are static
+  two-harmonic longitude warps, not animated turbulence.
 - Limb darkening is the single-coefficient linear law — no quadratic
   two-term coefficients or wavelength-dependent profiles.
 - `orbital_beaming` is a first-order brightness asymmetry — no doppler

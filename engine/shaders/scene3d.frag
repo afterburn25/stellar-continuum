@@ -37,7 +37,7 @@ struct Material {
     vec4 additional_direction[2];
     vec4 additional_illumination[2];
     vec4 additional_shadow[2];
-    vec4 texture_options; // cubic magnification enabled
+    vec4 texture_options; // cubic magnification enabled, zonal waves
     vec4 pbr_options; // enabled, packed map bound, night-emissive gate, alpha threshold
     vec4 pbr_values; // metallic, roughness, emissive strength, environment strength
     vec4 emissive_tint; // rgb, band shear (latitude-weighted u shift)
@@ -235,10 +235,13 @@ void main() {
     // the bound maps make (1,1) identical to the untiled path.
     vec2 uv=texture_uv*material.uv_options.xy;
     // Differential rotation (gas-giant banding): a latitude-weighted
-    // longitude shear bows authored bands — cos(2πv) is equator-symmetric
-    // and zero-mean, so maps stay registered and net longitude is kept.
+    // longitude shear bows authored bands — the cos(2πv) base is
+    // equator-symmetric and zero-mean, so maps stay registered and net
+    // longitude is kept. band_waves mixes in cos(6πv) for alternating
+    // mid-latitude jets (Jupiter-style); it is zero-mean and equator-
+    // symmetric too, so both properties survive the mix.
     if(material.emissive_tint.w!=0.0)
-        uv.x+=material.emissive_tint.w*cos(2.0*PI*texture_uv.y);
+        uv.x+=material.emissive_tint.w*(cos(2.0*PI*texture_uv.y)+material.texture_options.y*cos(6.0*PI*texture_uv.y));
     // Evaluate derivatives before per-pixel alpha rejection; annulus horizon
     // rejection above is arithmetic so neighbouring fragments remain coherent.
     float visibility=direct_visibility(material.shadow_light.xyz);

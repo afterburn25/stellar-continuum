@@ -124,6 +124,10 @@ int main()try{
   rejects([&]{auto i=instance;i.material.band_shear=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.band_shear=-.25f;const auto sheared=Scene3D::create(camera,{i});
    check(close(sheared->instances()[0].material.band_shear,-.25f),"Band shear did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.band_waves=1.2f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_waves=-.1f;(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.band_shear=.2f;i.material.band_waves=.8f;const auto waved=Scene3D::create(camera,{i});
+   check(close(waved->instances()[0].material.band_waves,.8f),"Band waves did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.orbital_beaming=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=-1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});

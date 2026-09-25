@@ -316,9 +316,9 @@ struct Shell {
       hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{},
       hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
       hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
-      hit3_bandshear{}, hit3_orbitbeam{}, hit3_starkelvin{},
-      hit3_accretion{}, hit3_fwdscatter{}, hit3_volume{}, hit3_lodfade{},
-      hit3_visfade{};
+      hit3_bandshear{}, hit3_bandwaves{}, hit3_orbitbeam{},
+      hit3_starkelvin{}, hit3_accretion{}, hit3_fwdscatter{},
+      hit3_volume{}, hit3_lodfade{}, hit3_visfade{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2242,6 +2242,11 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 0.f && a <= 0.5f) { next.visible_fade = a; valid = true; }
           break;
+  case 68:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 1.f) { next.band_waves = a; valid = true; }
+          break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2294,7 +2299,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                     shell.hit3_lods =
                                                         shell.hit3_lodpixels =
                                                             shell.hit3_bandshear =
-                                                                shell.hit3_orbitbeam =
+                                                                shell.hit3_bandwaves =
+                                                                    shell.hit3_orbitbeam =
                                                                     shell.hit3_starkelvin =
                                                                         shell.hit3_accretion =
                                                                             shell.hit3_fwdscatter =
@@ -2478,6 +2484,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       inst.material.terminator_wrap = e.terminator_wrap;
       inst.material.limb_darkening = e.limb_darkening;
       inst.material.band_shear = e.band_shear;
+      inst.material.band_waves = e.band_waves;
       inst.material.orbital_beaming = e.orbital_beaming;
       inst.material.forward_scatter = e.forward_scatter;
       // Emission volume: the entity texture is the emission image and
@@ -2782,6 +2789,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_bandshear, "bandShear",
         entity ? std::to_string(entity->band_shear) : "", ed(60),
         "latitude uv shear -0.5..0.5 - gas-giant banding");
+  field(shell.hit3_bandwaves, "bandWaves",
+        entity ? std::to_string(entity->band_waves) : "", ed(68),
+        "zonal jet harmonic 0..1 - layered on bandShear");
   field(shell.hit3_orbitbeam, "orbitalBeam",
         entity ? std::to_string(entity->orbital_beaming) : "", ed(61),
         "approaching-lane brightening -1..1 - accretion discs");
@@ -6855,6 +6865,8 @@ int main(int argc, char **argv) {
               edit3(66, std::to_string(se->lod_fade));
             else if (shell.hit3_bandshear.contains(event.position) && se)
               edit3(60, std::to_string(se->band_shear));
+            else if (shell.hit3_bandwaves.contains(event.position) && se)
+              edit3(68, std::to_string(se->band_waves));
             else if (shell.hit3_orbitbeam.contains(event.position) && se)
               edit3(61, std::to_string(se->orbital_beaming));
             else if (shell.hit3_starkelvin.contains(event.position) && se)

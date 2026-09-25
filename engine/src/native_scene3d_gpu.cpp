@@ -546,8 +546,10 @@ struct Scene3DRenderer::Storage {
         fragment.pbr_values={p.metallic,p.roughness,p.emissive_strength,p.environment?p.environment_strength:0.f};
         fragment.emissive_tint={p.emissive_tint.x,p.emissive_tint.y,p.emissive_tint.z,0.f};}
       // Band shear rides the spare emissive_tint.w lane — written after
-      // the PBR block since that branch clears the channel.
+      // the PBR block since that branch clears the channel. The zonal
+      // harmonic strength shares texture_options (x = cubic sampling).
       if(material.band_shear!=0.f)fragment.emissive_tint[3]=material.band_shear;
+      if(material.band_waves!=0.f)fragment.texture_options[1]=material.band_waves;
       if(material.atmosphere){const auto& a=*material.atmosphere;
         fragment.atmo_options={a.tint.x,a.tint.y,a.tint.z,a.strength};
         fragment.atmo_shape={a.power,a.night_floor,fragment.atmo_shape[2],fragment.atmo_shape[3]};}

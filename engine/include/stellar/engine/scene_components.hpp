@@ -192,10 +192,13 @@ struct MaterialSurface {
   // First-order orbital beaming about local +Y (accretion discs, ring
   // forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
-  // Single-lobe scattering phase 1 - s*(V.L): positive brightens the
-  // backlit sheet (dusty rings), negative boosts opposition (icy).
-  // [-1,1]; 0 disables.
+  // Henyey–Greenstein scattering phase: positive brightens the backlit
+  // sheet (dusty rings), negative boosts opposition (icy). [-1,1];
+  // 0 disables.
   float forward_scatter{0.f};
+  // Zonal-wind harmonic strength [0,1] layered on `band_shear` for
+  // alternating mid-latitude jets.
+  float band_waves{0.f};
   std::string normal_map, properties_map, cloud_map;
 };
 // Spectral-class star photosphere — the component counterpart of the

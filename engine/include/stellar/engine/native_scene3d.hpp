@@ -208,6 +208,12 @@ struct Material3D {
   // zero-mean so net longitude registration is preserved. UV units,
   // [-0.5,0.5]; 0 keeps rectilinear sampling.
   float band_shear{};
+  // Zonal-wind harmonic for banded bodies: adds a third spatial cosine
+  // to the shear profile, `u += s·(cos(2πv) + w·cos(6πv))` — w = 0 keeps
+  // the single pole-vs-equator profile, w → 1 gives Jupiter-style
+  // alternating mid-latitude jets. Still zero-mean (registration kept)
+  // and hemispherically symmetric. [0,1].
+  float band_waves{};
   // Orbital beaming: material orbiting local +Y gains a first-order
   // doppler asymmetry — radiance scales by 1 + s·(v̂·V̂), so the
   // approaching lane brightens while the receding lane dims. Face-on

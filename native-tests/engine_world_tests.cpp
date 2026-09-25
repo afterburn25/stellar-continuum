@@ -693,6 +693,7 @@ int main() {
         turret.terminator_wrap = 0.5f;
         turret.limb_darkening = 0.6f;
         turret.band_shear = -0.3f;
+        turret.band_waves = 0.7f;
         turret.orbital_beaming = 0.65f;
         turret.star_kelvin = 5800.0;
         turret.accretion = {0.3f, 1.f, 12000.f, -0.6f};
@@ -762,7 +763,7 @@ int main() {
                   ms->cloud_offset_x == 0.1f && ms->cloud_offset_y == 0.2f &&
                   ms->terminator_wrap == 0.5f && ms->limb_darkening == 0.6f &&
                   ms->band_shear == -0.3f && ms->orbital_beaming == 0.65f &&
-                  ms->forward_scatter == 0.4f,
+                  ms->forward_scatter == 0.4f && ms->band_waves == 0.7f,
               "spawn_scene3d materialsurface component");
         check(world3.get<MaterialSurface>(ship_e) == nullptr,
               "defaults do not attach a surface component");
@@ -850,6 +851,7 @@ int main() {
                       rms->band_shear == -0.3f &&
                       rms->orbital_beaming == 0.65f &&
                       rms->forward_scatter == 0.4f &&
+                      rms->band_waves == 0.7f &&
                       rms->cloud_offset_y == 0.2f,
                   "materialsurface codec round-trips");
             const auto *rml = restored.get<MeshLods>(*re_turret);
@@ -911,7 +913,8 @@ int main() {
                   out.entities[1].accretion[0] == 0.3f &&
                   out.entities[1].accretion[2] == 12000.f &&
                   out.entities[1].accretion[3] == -0.6f &&
-                  out.entities[1].forward_scatter == 0.4f,
+                  out.entities[1].forward_scatter == 0.4f &&
+                  out.entities[1].band_waves == 0.7f,
               "scene3d_from_world exports surface response");
         check(out.entities[1].texture == "maps/turret.png" &&
                   out.entities[1].volume_depth == 0.3f &&

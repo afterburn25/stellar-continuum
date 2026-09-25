@@ -468,6 +468,7 @@ std::string Scene3dDocument::to_json() const {
     if (e.terminator_wrap != 0.f) item["terminatorWrap"] = e.terminator_wrap;
     if (e.limb_darkening != 0.f) item["limbDarken"] = e.limb_darkening;
     if (e.band_shear != 0.f) item["bandShear"] = e.band_shear;
+    if (e.band_waves != 0.f) item["bandWaves"] = e.band_waves;
     if (e.orbital_beaming != 0.f) item["orbitalBeam"] = e.orbital_beaming;
     if (e.forward_scatter != 0.f)
       item["forwardScatter"] = e.forward_scatter;
@@ -678,6 +679,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.band_shear = item.value("bandShear", 0.0f);
       if (!(e.band_shear >= -0.5f && e.band_shear <= 0.5f))
         return fail("bandShear must be in [-0.5,0.5]");
+      e.band_waves = item.value("bandWaves", 0.0f);
+      if (!(e.band_waves >= 0.f && e.band_waves <= 1.f))
+        return fail("bandWaves must be in [0,1]");
       e.orbital_beaming = item.value("orbitalBeam", 0.0f);
       if (!(e.orbital_beaming >= -1.f && e.orbital_beaming <= 1.f))
         return fail("orbitalBeam must be in [-1,1]");

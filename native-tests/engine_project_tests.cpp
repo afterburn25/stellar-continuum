@@ -433,6 +433,7 @@ int main() {
     cube.terminator_wrap = 0.4f;
     cube.limb_darkening = 0.6f;
     cube.band_shear = -0.25f;
+    cube.band_waves = 0.6f;
     cube.orbital_beaming = 0.7f;
     cube.star_kelvin = 3200.0;
     cube.accretion = {0.4f, 1.f, 9000.f, 0.8f};
@@ -571,7 +572,8 @@ int main() {
                 rc.cloud_opacity == 0.6f && rc.cloud_albedo == 0.7f &&
                 rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
                 rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f &&
-                rc.band_shear == -0.25f && rc.orbital_beaming == 0.7f &&
+                rc.band_shear == -0.25f && rc.band_waves == 0.6f &&
+                rc.orbital_beaming == 0.7f &&
                 rc.star_kelvin == 3200.0 && rc.accretion[0] == 0.4f &&
                 rc.accretion[1] == 1.f && rc.accretion[2] == 9000.f &&
                 rc.accretion[3] == 0.8f && rc.forward_scatter == 0.5f,
@@ -715,6 +717,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"bandShear":0.9}]})")
               .has_value(),
           "scene3d band shear above 0.5 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandWaves":1.2}]})")
+              .has_value(),
+          "scene3d band waves above 1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandWaves":-0.1}]})")
+              .has_value(),
+          "scene3d band waves below 0 rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"orbitalBeam":-1.2}]})")
               .has_value(),

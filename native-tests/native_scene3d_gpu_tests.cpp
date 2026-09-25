@@ -750,6 +750,16 @@ int main(int argc,char** argv)try{
     // move coverage; points well outside the limb stay background.
     check(channel(*sheared_bands,160,160,3)==255&&channel(*sheared_bands,10,160,0)==5,
         "Band shear distorted the disc silhouette");
+    // Zonal-wind harmonic: the cos(6πv) term reshapes the profile — the
+    // sign flips at mid latitudes, so waved pixels diverge from the
+    // single-cosine shear while the silhouette stays put.
+    giant.material.band_waves=.9f;
+    const auto waved_bands=capture({giant},"bands-waved.png");
+    int wave_px=0;
+    for(int y=30;y<330;++y)for(int x=40;x<280;++x)
+      if(std::abs(channel(*sheared_bands,x,y,0)-channel(*waved_bands,x,y,0))>8)++wave_px;
+    check(wave_px>300,"Band waves did not reshape the shear profile");
+    check(channel(*waved_bands,10,160,0)==5,"Band waves distorted the disc silhouette");
     std::cout<<"band_shear_gpu=equator_pole_antishear_passed\n";
   }
   {

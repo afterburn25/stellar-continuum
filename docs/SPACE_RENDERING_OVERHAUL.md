@@ -88,7 +88,7 @@ same document headless-tested.
    and under the atmosphere rim, `terminator_wrap` softens the
    day/night edge across key/fill/point lights, and `limb_darkening`
    gives self-luminous bodies the photosphere's edge falloff.
-   `band_shear` (latitude-weighted longitude warp, differential rotation)
+   `band_shear`+`band_waves` (two-harmonic longitude warp — differential rotation + alternating jets)
    and `orbital_beaming` (first-order doppler asymmetry about local +Y —
    accretion discs get their approaching-lane brightening)
    landed on top. Ring/scattering physics followed:
@@ -102,7 +102,8 @@ same document headless-tested.
    the emission image; `flow`/`distort` re-pose the marched filaments so
    sibling nebulae don't repeat). Remaining: the deck is
    a texture-space composite — no volumetric cloud shells or cloud
-   self-shadowing; banding is a single cosine, not zonal winds.
+   self-shadowing; banding is a static two-harmonic warp (`band_shear`
+   + `band_waves` jets), not animated turbulence.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes every material field (PBR, surface

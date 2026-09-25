@@ -2564,6 +2564,7 @@ int RuntimeHost::run() {
           inst.material.terminator_wrap = sf->terminator_wrap;
           inst.material.limb_darkening = sf->limb_darkening;
           inst.material.band_shear = sf->band_shear;
+          inst.material.band_waves = sf->band_waves;
           inst.material.orbital_beaming = sf->orbital_beaming;
           inst.material.forward_scatter = sf->forward_scatter;
         }
