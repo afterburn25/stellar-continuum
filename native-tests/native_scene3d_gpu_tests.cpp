@@ -962,6 +962,16 @@ int main(int argc,char** argv)try{
     for(int y=30;y<200;++y)for(int x=80;x<245;++x)
       if(std::abs(channel(*still,x,y,0)-channel(*warped,x,y,0))>8)++warped_px;
     check(warped_px>500,"Flow/distort did not re-pose the volume filaments");
+    // Sequence blend: a second emission image mixes into the march —
+    // blend=1 swaps the orange filament texture for a blue one.
+    plasma.material.surface_effect->flow_phase=0;plasma.material.surface_effect->distortion=0;
+    plasma.material.surface_effect->next_texture=RgbaImage::create(1,1,{20,60,255,190});
+    const auto primary=capture({plasma},"plasma-blend-off.png");
+    plasma.material.surface_effect->blend=1.f;
+    const auto seq=capture({plasma},"plasma-blend-on.png");
+    check(channel(*primary,160,120,0)>channel(*primary,160,120,2)&&
+          channel(*seq,160,120,2)>channel(*seq,160,120,0),
+        "Volume blend did not swap the emission image");
     std::cout<<"volume_scatter_gpu=lit_limb_passed\n";
   }
   {

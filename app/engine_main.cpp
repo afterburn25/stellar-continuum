@@ -2209,18 +2209,24 @@ void commit_scene3_field(Shell &shell) {
           if (a >= -1.f && a <= 1.f) { next.forward_scatter = a; valid = true; }
           break;
   case 65: {
-          float v[7]{};
+          float v[8]{};
           std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> toks;
           std::string tok;
+          while (std::getline(csv, tok, ',')) toks.push_back(tok);
           int n = 0;
-          while (std::getline(csv, tok, ',') && n < 7) {
-            try { v[n++] = std::stof(tok); }
+          for (; n < 8 && n < (int)toks.size(); ++n) {
+            try { v[n] = std::stof(toks[n]); }
             catch (const std::exception &) { n = -1; break; }
           }
+          const std::string img2 = n >= 0 && toks.size() > 8
+              ? toks[8] : "";
           if (n >= 5 && v[0] >= 0.f && v[0] <= 0.75f && v[1] > 0.f &&
               v[1] <= 32.f && std::abs(v[2]) <= 1e4f && v[3] >= 8.f &&
               v[3] <= 64.f && v[4] >= 0.f && v[4] <= 1.f &&
               std::abs(v[5]) <= 1e4f && v[6] >= 0.f && v[6] <= 0.1f &&
+              v[7] >= 0.f && v[7] <= 1.f &&
+              (v[7] == 0.f || !img2.empty()) &&
               (v[0] == 0.f || !next.texture.empty())) {
             next.volume_depth = v[0];
             next.volume_density = v[1];
@@ -2229,6 +2235,8 @@ void commit_scene3_field(Shell &shell) {
             next.volume_scatter = v[4];
             next.volume_flow = v[5];
             next.volume_distort = v[6];
+            next.volume_blend = v[7];
+            next.volume_image2 = img2;
             valid = true;
           }
           break; }
@@ -2499,6 +2507,10 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         effect.volume_scatter = e.volume_scatter;
         effect.flow_phase = e.volume_flow;
         effect.distortion = e.volume_distort;
+        effect.blend = e.volume_blend;
+        if (!e.volume_image2.empty())
+          if (const auto alt = scene3_tex(shell, e.volume_image2))
+            effect.next_texture = alt;
         inst.material.surface_effect = effect;
         inst.material.transparent = true;
       }
@@ -2816,10 +2828,14 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                   std::to_string(entity->volume_steps) + "," +
                   std::to_string(entity->volume_scatter) + "," +
                   std::to_string(entity->volume_flow) + "," +
-                  std::to_string(entity->volume_distort)
+                  std::to_string(entity->volume_distort) + "," +
+                  std::to_string(entity->volume_blend) +
+                  (entity->volume_image2.empty()
+                       ? ""
+                       : "," + entity->volume_image2)
             : "",
         ed(65),
-        "depth,density,seed,steps,scatter[,flow,distort] - emission volume; 0 clears");
+        "depth,density,seed,steps,scatter[,flow,distort[,blend,image2]] - emission volume; 0 clears");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -6885,7 +6901,11 @@ int main(int argc, char **argv) {
                             std::to_string(se->volume_steps) + "," +
                             std::to_string(se->volume_scatter) + "," +
                             std::to_string(se->volume_flow) + "," +
-                            std::to_string(se->volume_distort));
+                            std::to_string(se->volume_distort) + "," +
+                            std::to_string(se->volume_blend) +
+                            (se->volume_image2.empty()
+                                 ? ""
+                                 : "," + se->volume_image2));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

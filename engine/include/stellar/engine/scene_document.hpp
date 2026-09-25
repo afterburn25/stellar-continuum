@@ -255,6 +255,11 @@ struct Scene3dEntity {
   // re-poses the warp field (variety between otherwise identical
   // nebulae), `distort` [0,.1] is the secondary warp amplitude.
   float volume_flow{0.f}, volume_distort{0.f};
+  // Optional second emission image: `image2` names another texture and
+  // `blend` [0,1] mixes it against the entity texture (0 = the entity
+  // texture alone). A missing/unloadable image2 leaves the primary.
+  float volume_blend{0.f};
+  std::string volume_image2;
   // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
   // coarsest-first. lod_meshes[i] draws once the projected bounding
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).

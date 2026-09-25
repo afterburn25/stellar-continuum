@@ -99,8 +99,9 @@ same document headless-tested.
    opposition surges), and `SurfaceEffect3D::volume_scatter` makes
    emission volumes read star-lit; volumes are document-authored via the
    `volume` block / `EmissionVolume` component (entity texture supplies
-   the emission image; `flow`/`distort` re-pose the marched filaments so
-   sibling nebulae don't repeat). Remaining: the deck is
+   the emission image; `flow`/`distort` re-pose the marched filaments and
+   `image2`+`blend` mix a second authored image, so sibling nebulae don't
+   repeat). Remaining: the deck is
    a texture-space composite — no volumetric cloud shells or cloud
    self-shadowing; banding is a static two-harmonic warp (`band_shear`
    + `band_waves` jets), not animated turbulence.

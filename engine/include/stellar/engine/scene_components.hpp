@@ -227,6 +227,10 @@ struct EmissionVolume {
   // Filament warp: `flow` re-poses the phase field (nebula variety),
   // `distort` [0,.1] is the secondary warp amplitude.
   float flow{0.f}, distort{0.f};
+  // Optional second emission image: `image2` names another texture,
+  // `blend` [0,1] mixes it against the entity texture (0 = primary only).
+  float blend{0.f};
+  std::string image2;
 };
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
 // weighted to the day side with a nightside floor.

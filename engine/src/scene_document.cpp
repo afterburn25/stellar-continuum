@@ -482,6 +482,8 @@ std::string Scene3dDocument::to_json() const {
                         {"scatter", e.volume_scatter},
                         {"flow", e.volume_flow},
                         {"distort", e.volume_distort}};
+    if (e.volume_blend != 0.f) item["volume"]["blend"] = e.volume_blend;
+    if (!e.volume_image2.empty()) item["volume"]["image2"] = e.volume_image2;
     if (!e.lod_meshes.empty()) {
       item["lods"] = e.lod_meshes;
       item["lodPixels"] = e.lod_pixels;
@@ -714,14 +716,23 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         e.volume_scatter = vol.value("scatter", 0.0f);
         e.volume_flow = vol.value("flow", 0.0f);
         e.volume_distort = vol.value("distort", 0.0f);
+        e.volume_blend = vol.value("blend", 0.0f);
+        if (vol.contains("image2")) {
+          if (!vol.at("image2").is_string())
+            return fail("volume image2 must be a texture path");
+          e.volume_image2 = vol.at("image2").get<std::string>();
+        }
         if (!(e.volume_depth > 0.f && e.volume_depth <= 0.75f) ||
             !(e.volume_density > 0.f && e.volume_density <= 32.f) ||
             !(std::abs(e.volume_seed) <= 1e4f) ||
             !(e.volume_steps >= 8 && e.volume_steps <= 64) ||
             !(e.volume_scatter >= 0.f && e.volume_scatter <= 1.f) ||
             !(std::abs(e.volume_flow) <= 1e4f) ||
-            !(e.volume_distort >= 0.f && e.volume_distort <= 0.1f))
+            !(e.volume_distort >= 0.f && e.volume_distort <= 0.1f) ||
+            !(e.volume_blend >= 0.f && e.volume_blend <= 1.f))
           return fail("volume fields out of range");
+        if (e.volume_blend != 0.f && e.volume_image2.empty())
+          return fail("volume blend requires an image2 texture");
         if (e.texture.empty())
           return fail("volume requires a texture for the emission image");
       }

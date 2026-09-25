@@ -112,13 +112,16 @@ nebulae read illuminated rather than uniformly self-glowing. It rides
 the `atmo_shape.z` lane: `main()` early-returns into `emission_volume`
 whenever `volume_depth > 0`, so atmosphere lanes are inert on volume
 materials and free to carry it. Authored scenes use the `volume` entity
-block (`{depth,density,seed,steps,scatter,flow,distort}` — `flow` is
-the filament animation phase in radians and `distort` the spatial warp
-amplitude [0,.1], both re-posing the ray-marched filaments so sibling
-nebulae stop sharing a silhouette) or the `EmissionVolume` component;
-the entity's own `texture` supplies the emission image and the material
-turns transparent automatically — a `volume` block without a texture is
-rejected at parse and dropped at runtime.
+block (`{depth,density,seed,steps,scatter,flow,distort,blend,image2}` —
+`flow` is the filament animation phase in radians and `distort` the
+spatial warp amplitude [0,.1], both re-posing the ray-marched filaments;
+`image2` names a second emission texture and `blend` [0,1] mixes it
+against the primary at the same warped UV, a morph between two authored
+nebula silhouettes — `blend` without `image2` is a parse error) or the
+`EmissionVolume` component; the entity's own `texture` supplies the
+emission image and the material turns transparent automatically — a
+`volume` block without a texture is rejected at parse and dropped at
+runtime, and an unloadable `image2` keeps the primary.
 
 Per-instance distance culling lives on `MeshInstance3D`:
 
@@ -299,8 +302,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 ([-0.5,0.5]) with `bandWaves` ([0,1] jet harmonic),
 `orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
-(`{depth,density,seed,steps,scatter,flow,distort}` — requires a
-`texture`), `lods` (array of
+(`{depth,density,seed,steps,scatter,flow,distort,blend,image2}` —
+requires a `texture`), `lods` (array of
 mesh specs, ≤ 8) with `lodPixels`, and a `surface`
 block —
 `{normal, properties, cloud, normalStrength, relief, cloudOpacity,

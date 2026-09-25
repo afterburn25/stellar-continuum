@@ -560,6 +560,9 @@ void register_scene_components(World &world) {
         put_u32(out, static_cast<std::uint32_t>(v.steps));
         put_f32(out, v.flow);
         put_f32(out, v.distort);
+        put_f32(out, v.blend);
+        put_u32(out, static_cast<std::uint32_t>(v.image2.size()));
+        out.insert(out.end(), v.image2.begin(), v.image2.end());
         return out;
       },
       [](const std::vector<std::uint8_t> &b) {
@@ -590,6 +593,16 @@ void register_scene_components(World &world) {
         if (b.size() - at >= 4) {
           const std::uint32_t bits = get_u32(b, at);
           std::memcpy(&v.distort, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.blend, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len <= b.size() - at)
+            v.image2.assign(reinterpret_cast<const char *>(b.data() + at),
+                            len);
         }
         return v;
       });
@@ -933,7 +946,8 @@ std::vector<EntityId> spawn_scene3d(World &world,
                 EmissionVolume{s.volume_depth, s.volume_density,
                                s.volume_seed, s.volume_scatter,
                                s.volume_steps, s.volume_flow,
-                               s.volume_distort});
+                               s.volume_distort, s.volume_blend,
+                               s.volume_image2});
     if (!s.lod_meshes.empty())
       world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels, s.lod_fade});
     world.add(entity, GravityScale{s.gravity_scale});
@@ -1057,6 +1071,8 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.volume_steps = ev->steps;
       s.volume_flow = ev->flow;
       s.volume_distort = ev->distort;
+      s.volume_blend = ev->blend;
+      s.volume_image2 = ev->image2;
     }
     if (const auto *ml = world.get<MeshLods>(entity)) {
       s.lod_meshes = ml->specs;

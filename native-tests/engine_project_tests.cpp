@@ -445,6 +445,8 @@ int main() {
     cube.volume_scatter = 0.5f;
     cube.volume_flow = 1.5f;
     cube.volume_distort = 0.05f;
+    cube.volume_blend = 0.4f;
+    cube.volume_image2 = "maps/nebula_b.png";
     cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
     cube.lod_pixels = 48.f;
     cube.lod_fade = 0.3f;
@@ -586,7 +588,8 @@ int main() {
       check(rc.volume_depth == 0.3f && rc.volume_density == 6.f &&
                 rc.volume_seed == 2.f && rc.volume_steps == 24 &&
                 rc.volume_scatter == 0.5f && rc.volume_flow == 1.5f &&
-                rc.volume_distort == 0.05f,
+                rc.volume_distort == 0.05f && rc.volume_blend == 0.4f &&
+                rc.volume_image2 == "maps/nebula_b.png",
             "scene3d emission-volume block round-trips");
       check(reparsed->point_lights.size() == 1 &&
                 reparsed->point_lights[0].x == 1.f &&
@@ -769,6 +772,18 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"flow":2e5}}]})")
               .has_value(),
           "scene3d volume flow above bound rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"blend":1.2,"image2":"a.png"}}]})")
+              .has_value(),
+          "scene3d volume blend above 1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"blend":0.5}}]})")
+              .has_value(),
+          "scene3d volume blend without image2 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"image2":5}}]})")
+              .has_value(),
+          "scene3d volume non-string image2 rejected");
     check(engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"density":8,"steps":48,"scatter":0.7}}]})")
               .has_value(),

@@ -1192,6 +1192,8 @@ int RuntimeHost::run() {
         tex3d_of(sf->properties_map);
         tex3d_of(sf->cloud_map);
       }
+      if (const auto *vol = world.get<EmissionVolume>(impl.entities3d[i]))
+        tex3d_of(vol->image2);
       if (on_spawn3d && i < doc.entities.size())
         on_spawn3d(world, impl.entities3d[i], doc.entities[i]);
       attach_vfx(impl.entities3d[i]);
@@ -2586,6 +2588,11 @@ int RuntimeHost::run() {
           effect.volume_scatter = vol->scatter;
           effect.flow_phase = vol->flow;
           effect.distortion = vol->distort;
+          effect.blend = vol->blend;
+          // image2 overrides next_texture for the blend lane; an
+          // unloadable path keeps the entity texture (blend no-ops).
+          if (const auto alt = tex3d_of(vol->image2))
+            effect.next_texture = alt;
           inst.material.surface_effect = effect;
           inst.material.transparent = true;
         }
