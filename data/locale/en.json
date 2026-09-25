@@ -1294,6 +1294,7 @@
     "MAP_LEGEND_ROUTE": "Planned route",
     "MAP_LEGEND_TERRITORY": "Empire territory",
     "MAP_LEGEND_FLEET": "Fleet",
+    "MAP_LEGEND_PHENOMENON": "Surveyed phenomenon",
     "MAP_LEGEND_SELECTED": "Selection",
     "HUD_UPDATING_CHART": "Updating star chart...",
     "MAP_ENVIRONMENT_LOADING": "Loading system environment…",

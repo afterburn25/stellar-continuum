@@ -104,11 +104,24 @@ void NativePhenomena::append_map(DrawList& out,const Camera& camera,int w,int h,
   const auto [tile,columns,rows]=phenomenon_atlas_layout(field_->regions.size());(void)rows;
   const UiRect screen{0,0,static_cast<float>(w),static_cast<float>(h)};const double transition=.35+.65*fade(transition_);
   std::vector<TriangleMesh> batches;DrawList diagnostics;int full_detail_used=0;
+  // Surveyed regions carry a name so the cloud reads as charted geography
+  // rather than ambient art; drawn after the decal batches so labels sit
+  // above the clouds they name, and only once the region is large enough on
+  // screen for the text to be legible.
+  std::vector<Text> surveyed_labels;
   const auto corner=camera.unproject({0,0},w,h),end=camera.unproject({static_cast<float>(w),static_cast<float>(h)},w,h);
   for(const auto i:index_.query({corner.x,corner.y,end.x,end.y})){const auto& r=field_->regions[i];const auto& a=phenomenon_art(*field_,r);const auto mapping=phenomenon_art_mapping(r,a);const auto p=camera.project({r.shape.x,r.shape.y},w,h);const float extent=static_cast<float>(std::max(r.shape.extent_x,r.shape.extent_y)*1.04*camera.pixels_per_world);
     if(p.x+extent<0||p.y+extent<0||p.x-extent>w||p.y-extent>h||extent<.35f)continue;
     const UiRect dest{p.x-extent,p.y-extent,extent*2,extent*2};const bool known=surveyed.contains(r.id);
     const double far_opacity=extent<60?.85:1.;const double strength=std::min(.68,r.opacity*(.6+r.intensity)*visual_multiplier(options))*far_opacity*transition;
+    if(known&&extent>=90.f&&extent<=520.f){
+      const auto& d=phenomenon_definition(r.type);
+      surveyed_labels.emplace_back(Text{{p.x,p.y+extent*.42f},
+          r.designation.empty()?d.name:r.designation+" · "+d.name,
+          {152,230,247,static_cast<std::uint8_t>(std::min(255.,150.+strength*180.))},
+          static_cast<int>(std::clamp(extent*.075f,10.f,14.f)),extent*2.f,screen,
+          TextAlign::Center,FontFace::Heading});
+    }
     if(options.heatmap&&atlas_){const UiRect source{static_cast<float>(i%columns*tile),static_cast<float>(i/columns*tile),static_cast<float>(tile),static_cast<float>(tile)};out.world.emplace_back(Image{atlas_,dest,source,{255,255,255,200},screen});}
     else{
       int lod=decal_lod_width(mapping.half_width*2*camera.pixels_per_world,options.density);if(lod==2944&&full_detail_used++>=3)lod=768;
@@ -123,6 +136,7 @@ void NativePhenomena::append_map(DrawList& out,const Camera& camera,int w,int h,
     if(options.labels||options.region_bias||options.membership||options.filenames)diagnostics.world.emplace_back(Text{p,r.designation+" "+((known||options.labels)?phenomenon_definition(r.type).name:tr(locale_,"PHENOMENA_UNKNOWN_SHORT","Uncharted cloud"))+(options.filenames?" | "+a.filename:"")+(options.region_bias?" | "+std::string(stellar_region_name(r.affinity)):"")+(options.membership?" | systems "+std::to_string(r.systems_contained.size()):""),{152,230,247,255},12,420,screen});
   }
   for(auto& mesh:batches)out.world.emplace_back(std::move(mesh));
+  for(auto& label:surveyed_labels)out.world.emplace_back(std::move(label));
   for(auto& command:diagnostics.world)out.world.emplace_back(std::move(command));
 }
 void NativePhenomena::append_system(DrawList& out,int id,double x,double y,int w,int h,double zoom,const VisualOptions& options,bool combat){

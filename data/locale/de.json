@@ -1454,6 +1454,7 @@
     "MAP_LEGEND_ROUTE": "Geplante Route",
     "MAP_LEGEND_TERRITORY": "Imperiumsgebiet",
     "MAP_LEGEND_FLEET": "Flotte",
+    "MAP_LEGEND_PHENOMENON": "Kartiertes Phänomen",
     "MAP_LEGEND_SELECTED": "Auswahl",
     "HUD_UPDATING_CHART": "Sternenkarte wird aktualisiert...",
     "MAP_ENVIRONMENT_LOADING": "Systemumgebung wird geladen…",

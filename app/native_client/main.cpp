@@ -7985,6 +7985,11 @@ class NativeCampaign final {
         label(tr("MAP_LEGEND_ROUTE","Planned route"));
         fill(out,glyph_box(13.f*s),territory);
         label(tr("MAP_LEGEND_TERRITORY","Empire territory"));
+        // Surveyed phenomena name themselves on the chart — a soft glow
+        // glyph matches the halo the label floats over.
+        fill(out,glyph_box(13.f*s),{152,230,247,40});
+        fill(out,glyph_box(7.f*s),{152,230,247,130});
+        label(tr("MAP_LEGEND_PHENOMENON","Surveyed phenomenon"));
         fill(out,glyph_box(10.f*s),{102,232,164,55});
         fill(out,glyph_box(4.f*s),{102,232,164,255});
         label(tr("MAP_LEGEND_FLEET","Fleet"));
@@ -9344,7 +9349,7 @@ class NativeCampaign final {
     if(map_legend_collapsed_)return toggle;
     const auto scale=NativeUiLayout::for_viewport(width,height).scale;
     return {toggle.x,toggle.y,toggle.width,
-            toggle.height+7.f*17.f*scale+8.f*scale};
+            toggle.height+8.f*17.f*scale+8.f*scale};
   }
   [[nodiscard]] bool map_legend_visible(int width,int height) const {
     return map_hud_visible()&&!system_workspace_.visible()&&
