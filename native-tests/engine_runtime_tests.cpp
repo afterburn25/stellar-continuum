@@ -1323,6 +1323,36 @@ int main() {
     }
   }
 
+  // --fly-speed scales the scene3d fly camera: the same journaled 'd'
+  // strafes the camera through the shared "game" context.
+  {
+    const auto sub = root / "fly-cam";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene3d.json");
+      out << R"({"entities":[{"name":"cube","pos":[0,0,0]}]})";
+    }
+    ReplayRecorder journal;
+    journal.record(1, "input",
+                   "8,100,0,0,0,0,0,0,0,0,0,0,0,0,0,");  // 'd'
+    const auto journal_path = sub / "j.rec";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 12;
+    opts.scene3d = true;
+    opts.fly_speed = 8.f;
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    check(host.run() == 0, "fly-camera replay exits cleanly");
+    // 8 u/s at 60 Hz over the held integrations moves the camera ~1.3
+    // world units right; the default 4.0 would reach ~0.7.
+    check(host.camera3d_x() > 1.0f,
+          "--fly-speed doubles the default camera travel");
+  }
+
   // --input-map stacks a project context over the built-in "game" one:
   // an exclusive rebind of move_right to 'e' disables the default 'd'.
   {
