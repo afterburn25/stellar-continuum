@@ -48,6 +48,9 @@ m.band_shear = -0.2f;                       // [-0.5,0.5] latitude-weighted
 m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
                                             // asymmetry (accretion discs,
                                             // ring forward-scatter)
+m.forward_scatter = 0.6f;                   // [-1,1] phase function:
+                                            // +backlit boost (dusty
+                                            // rings), -opposition surge
 ```
 
 `star_photosphere3d(kelvin)` builds a spectral-class star material in
@@ -288,8 +291,8 @@ UV tiling, atmosphere tint/strength/power/night floor, visible range,
 surface maps (normal/properties/cloud), surface scalars (normal
 strength/relief), cloud deck (opacity/albedo/offset), terminator wrap,
 limb darkening, band shear, orbital beaming, starKelvin photosphere
-preset, accretion disc preset (inner,outer,kelvin,beaming csv), mesh
-LOD chain (csv specs) and LOD switch size.
+preset, accretion disc preset (inner,outer,kelvin,beaming csv),
+forward-scatter phase, mesh LOD chain (csv specs) and LOD switch size.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range),
 shadow map (extent/distance/depth/strength/bias/resolution).
@@ -341,6 +344,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - `volume_scatter` is a limb-gradient approximation — no real
   light-path extinction march inside the volume; volumes remain
   authored through the C++ API only.
+- `forward_scatter` is a single Henyey-Greenstein-style lobe — no
+  multi-term phase functions or wavelength-dependent scattering; it
+  scales radiance only, not alpha.
 - One shared equirect env map per material — no probe grid.
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
 - Debug views are developer tooling — no LOD/residency visualization

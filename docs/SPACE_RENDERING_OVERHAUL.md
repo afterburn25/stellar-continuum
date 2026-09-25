@@ -91,9 +91,16 @@ same document headless-tested.
    `band_shear` (latitude-weighted longitude warp, differential rotation)
    and `orbital_beaming` (first-order doppler asymmetry about local +Y —
    accretion discs get their approaching-lane brightening)
-   landed on top. Remaining: the deck is
+   landed on top. Ring/scattering physics followed:
+   `accretion_disc_material3d` + `accretion`/`AccretionDisc` generate a
+   Shakura–Sunyaev radial disc for `annulus` meshes (black holes compose
+   with a dark sphere), `forward_scatter`/`forwardScatter` adds a
+   single-lobe phase function (backlit dusty rings brighten, icy
+   opposition surges), and `SurfaceEffect3D::volume_scatter` makes
+   emission volumes read star-lit. Remaining: the deck is
    a texture-space composite — no volumetric cloud shells or cloud
-   self-shadowing; banding is a single cosine, not zonal winds.
+   self-shadowing; banding is a single cosine, not zonal winds; the
+   phase term is one lobe, no HG g-parameter.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes tint/texture/opacity/double_sided

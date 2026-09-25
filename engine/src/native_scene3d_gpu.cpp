@@ -461,6 +461,7 @@ struct Scene3DRenderer::Storage {
         // Scatter rides atmo_shape.z — atmospheres never render inside
         // the volume branch, so the lane is free for volume materials.
         fragment.atmo_shape[2]=e.volume_scatter;}
+      fragment.atmo_shape[3]=material.forward_scatter;
       if((material.surface_effect&&material.surface_effect->volume_depth>0.f)||material.orbital_beaming!=0.f){
         // Model transforms use uniform scale and an orthonormal rotation.
         // Invert their camera-relative matrix once per draw, not per
@@ -496,7 +497,7 @@ struct Scene3DRenderer::Storage {
       if(material.band_shear!=0.f)fragment.emissive_tint[3]=material.band_shear;
       if(material.atmosphere){const auto& a=*material.atmosphere;
         fragment.atmo_options={a.tint.x,a.tint.y,a.tint.z,a.strength};
-        fragment.atmo_shape={a.power,a.night_floor,fragment.atmo_shape[2],0.f};}
+        fragment.atmo_shape={a.power,a.night_floor,fragment.atmo_shape[2],fragment.atmo_shape[3]};}
       fragment.point_position=pl_position;fragment.point_energy=pl_energy;
     }
     // Directional shadow map: an authored ortho volume centres `distance`

@@ -317,7 +317,7 @@ struct Shell {
       hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
       hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
       hit3_bandshear{}, hit3_orbitbeam{}, hit3_starkelvin{},
-      hit3_accretion{};
+      hit3_accretion{}, hit3_fwdscatter{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2202,6 +2202,11 @@ void commit_scene3_field(Shell &shell) {
             next.accretion = {inner, outer, kelvin, beam};
           else valid = false;
           break; }
+  case 64:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= -1.f && a <= 1.f) { next.forward_scatter = a; valid = true; }
+          break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2256,7 +2261,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                             shell.hit3_bandshear =
                                                                 shell.hit3_orbitbeam =
                                                                     shell.hit3_starkelvin =
-                                                                        shell.hit3_accretion = {};
+                                                                        shell.hit3_accretion =
+                                                                            shell.hit3_fwdscatter = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2435,6 +2441,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       inst.material.limb_darkening = e.limb_darkening;
       inst.material.band_shear = e.band_shear;
       inst.material.orbital_beaming = e.orbital_beaming;
+      inst.material.forward_scatter = e.forward_scatter;
       if (e.atmo_strength != 0.f)
         inst.material.atmosphere =
             Atmosphere3D{{e.atmo_r, e.atmo_g, e.atmo_b}, e.atmo_strength,
@@ -2727,6 +2734,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                      std::to_string(entity->accretion[3])
                : "",
         ed(63), "inner,outer,kelvin,beaming - annulus disc preset");
+  field(shell.hit3_fwdscatter, "fwdScatter",
+        entity ? std::to_string(entity->forward_scatter) : "", ed(64),
+        "backlit brightening -1..1 - dusty rings, icy opposition");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -6777,6 +6787,8 @@ int main(int argc, char **argv) {
                             std::to_string(se->accretion[1]) + "," +
                             std::to_string(se->accretion[2]) + "," +
                             std::to_string(se->accretion[3]));
+            else if (shell.hit3_fwdscatter.contains(event.position) && se)
+              edit3(64, std::to_string(se->forward_scatter));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

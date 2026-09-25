@@ -745,6 +745,25 @@ int main(int argc,char** argv)try{
         "Accretion disc lost its beamed lane asymmetry");
     std::cout<<"accretion_disc_gpu=radial_beaming_passed\n";
   }
+  {
+    // Scattering phase: the same ring sheet brightens when backlit
+    // (forward scatter) and dims face-lit for s>0.
+    MeshInstance3D ring{annulus_mesh(.45f,1.f,192),{},{},.9f,Material3D{}};
+    ring.material.tint={190,190,200,255};ring.material.two_sided_diffuse=true;
+    ring.material.ambient=.1f;ring.material.diffuse=.9f;
+    ring.rotation=rotation_axis_angle({1,0,0},.55f);
+    DrawList backlit;backlit.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,-1}),{0,0,320,320}});
+    window.draw(backlit,folder/"ring-backlit-off.png");const auto off_back=decode_rgba_image(folder/"ring-backlit-off.png");
+    ring.material.forward_scatter=.8f;
+    DrawList backlit2;backlit2.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,-1}),{0,0,320,320}});
+    window.draw(backlit2,folder/"ring-backlit-on.png");const auto on_back=decode_rgba_image(folder/"ring-backlit-on.png");
+    DrawList face2;face2.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,1}),{0,0,320,320}});
+    window.draw(face2,folder/"ring-facelit-on.png");const auto on_face=decode_rgba_image(folder/"ring-facelit-on.png");
+    const int back_off=channel(*off_back,160,120,0),back_on=channel(*on_back,160,120,0),face_on=channel(*on_face,160,120,0);
+    check(back_off>30&&back_on>back_off*3/2,"Forward scatter did not brighten the backlit ring");
+    check(face_on<back_on*2/3,"Forward scatter did not dim the face-lit ring");
+    std::cout<<"forward_scatter_gpu=backlit_boost_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");

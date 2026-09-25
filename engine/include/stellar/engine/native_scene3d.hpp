@@ -206,6 +206,13 @@ struct Material3D {
   // edge-on discs peak. Accretion discs, ring forward-scatter. [-1,1];
   // negative spins retrograde; 0 disables.
   float orbital_beaming{};
+  // Single-lobe scattering phase: radiance scales by 1 − s·(V̂·L̂), so
+  // s > 0 brightens the sheet when it is backlit (dusty-ring forward
+  // scatter — Saturn E-ring look) and dims it face-lit; s < 0 inverts
+  // to an opposition backscatter surge (icy regolith). Mean-free across
+  // geometries — the sheet's total luminance is preserved on average.
+  // [-1,1]; 0 disables.
+  float forward_scatter{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;

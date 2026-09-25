@@ -435,6 +435,7 @@ int main() {
     cube.orbital_beaming = 0.7f;
     cube.star_kelvin = 3200.0;
     cube.accretion = {0.4f, 1.f, 9000.f, 0.8f};
+    cube.forward_scatter = 0.5f;
     cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
     cube.lod_pixels = 48.f;
     scene.entities.push_back(cube);
@@ -564,7 +565,7 @@ int main() {
                 rc.band_shear == -0.25f && rc.orbital_beaming == 0.7f &&
                 rc.star_kelvin == 3200.0 && rc.accretion[0] == 0.4f &&
                 rc.accretion[1] == 1.f && rc.accretion[2] == 9000.f &&
-                rc.accretion[3] == 0.8f,
+                rc.accretion[3] == 0.8f && rc.forward_scatter == 0.5f,
             "scene3d surface-response fields round-trip");
       check(rc.lod_meshes.size() == 2 &&
                 rc.lod_meshes[0] == "models/crate_mid.obj" &&
@@ -704,6 +705,10 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8]}]})")
               .has_value(),
           "scene3d accretion preset rejected a legal disc");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"forwardScatter":1.4}]})")
+              .has_value(),
+          "scene3d forward scatter above 1 rejected");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

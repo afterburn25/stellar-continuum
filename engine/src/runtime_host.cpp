@@ -2565,6 +2565,7 @@ int RuntimeHost::run() {
           inst.material.limb_darkening = sf->limb_darkening;
           inst.material.band_shear = sf->band_shear;
           inst.material.orbital_beaming = sf->orbital_beaming;
+          inst.material.forward_scatter = sf->forward_scatter;
         }
         if (const auto *at = world.get<AtmosphereShell>(e))
           inst.material.atmosphere =

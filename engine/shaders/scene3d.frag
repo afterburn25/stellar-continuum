@@ -43,7 +43,7 @@ struct Material {
     vec4 emissive_tint; // rgb, band shear (latitude-weighted u shift)
     vec4 uv_options; // surface tiling x, y
     vec4 atmo_options; // tint rgb, strength
-    vec4 atmo_shape; // rim power, nightside floor
+    vec4 atmo_shape; // rim power, nightside floor, volume scatter, forward-scatter phase
     vec4 response_options; // terminator wrap, cloud albedo, map flags (1 normal, 2 properties, 4 cloud), limb darkening
     vec4 point_position[4]; // view-space position, range (0 = unbounded)
     vec4 point_energy[4]; // rgb, intensity
@@ -507,6 +507,12 @@ void main() {
             result*=max(1.0+material.uv_options.z*dot(normalize(beam_v),V),0.0);
         }
     }
+    // Single-lobe scattering phase (atmo_shape.w): 1 - s*(V.L) brightens
+    // backlit sheets (dusty-ring forward scatter) for s>0 and boosts the
+    // opposition view (icy backscatter) for s<0. Radiance-only — the
+    // atmosphere rim and alpha stay untouched.
+    if(material.atmo_shape.w!=0.0)
+        result*=max(1.0-material.atmo_shape.w*dot(V,material.light_direction.xyz),0.0);
     // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
     // nightside floor, tied to the star's actual color.
     if(material.atmo_options.w>0.0){

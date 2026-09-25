@@ -220,6 +220,10 @@ struct Scene3dEntity {
   // First-order orbital beaming for material orbiting local +Y (accretion
   // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
+  // Single-lobe scattering phase 1 - s*(V.L): positive brightens the
+  // backlit sheet (dusty rings), negative boosts opposition (icy
+  // regolith). [-1,1]; 0 disables.
+  float forward_scatter{0.f};
   // Spectral-class star photosphere preset (K): derives blackbody tint,
   // emissive response, and a temperature-graded limb coefficient.
   // [100,100000]; 0 leaves the material untouched. Overrides `tint`

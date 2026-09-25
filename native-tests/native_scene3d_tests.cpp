@@ -129,6 +129,10 @@ int main()try{
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.orbital_beaming=.8f;const auto beamed=Scene3D::create(camera,{i});
    check(close(beamed->instances()[0].material.orbital_beaming,.8f),"Orbital beaming did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.forward_scatter=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.forward_scatter=-.6f;const auto phased=Scene3D::create(camera,{i});
+   check(close(phased->instances()[0].material.forward_scatter,-.6f),"Forward scatter did not survive scene creation");}
   {const auto tex=RgbaImage::create(1,1,{255,255,255,255});
    MeshInstance3D plasma;plasma.mesh=volume;plasma.material.transparent=true;plasma.material.texture=tex;
    SurfaceEffect3D effect;effect.next_texture=tex;effect.volume_depth=.3f;
