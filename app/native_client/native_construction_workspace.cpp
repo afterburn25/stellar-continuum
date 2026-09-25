@@ -766,10 +766,13 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
          notice_.empty() || notice_accepted_ ? muted : failure,
          layout.small_font_pixels);
 
-  const auto action = [&](UiRect bounds, std::string label, bool enabled) {
-    theme::button(out, bounds, std::move(label), pointer_,
-                  layout.body_font_pixels, theme::Tone::Construction,
-                  enabled, enabled);
+  const auto action = [&](UiRect bounds, std::string label, bool enabled,
+                          std::string reason = {}) {
+    theme::button(out, bounds, label, pointer_, layout.body_font_pixels,
+                  theme::Tone::Construction, enabled, enabled);
+    if (!enabled)
+      theme::hover_tooltip(out, bounds, pointer_, std::move(label),
+                           std::move(reason), width, height, layout.scale);
   };
   if (project) {
     if (project->active || project->queued) {
@@ -787,9 +790,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
              tr(project->start.will_queue ? "CONSTRUCTION_START_QUEUE_BTN"
                                           : "CONSTRUCTION_START_NOW",
                 project->start.will_queue ? "START / QUEUE" : "START NOW"),
-             project->start.enabled);
+             project->start.enabled, project->start.message);
       action(layout.secondary_action, tr("CONSTRUCTION_QUEUE", "QUEUE"),
-             project->queue.enabled);
+             project->queue.enabled, project->queue.message);
     } else {
       action(layout.primary_action,
              tr("CONSTRUCTION_STATE_COMPLETED", "COMPLETED"), false);

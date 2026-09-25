@@ -7871,12 +7871,7 @@ class NativeCampaign final {
           active?Color{137,229,255,255}:Color{194,219,238,255},static_cast<int>(13.f*layout.scale),bounds.width-4.f*layout.scale,bounds,TextAlign::Center,FontFace::Interface});
       if(action==UiAction::ZoomIn||action==UiAction::ZoomOut){const auto glyph=action==UiAction::ZoomIn?"+":"−";out.overlay.emplace_back(Text{{bounds.x+bounds.width*.5f,bounds.y+bounds.height*.5f-9.f*layout.scale},glyph,{245,250,255,255},static_cast<int>(18.f*layout.scale),0,bounds,TextAlign::Center,FontFace::Heading});}
       if(tab||!bounds.contains(pointer_))return;
-      const Color tooltip_text{235,244,255,255};
-      const Text probe{{},std::string(tip),tooltip_text,layout.metric_font_pixels};
-      const auto extent=text_measurer_?text_measurer_(probe):TextExtent{static_cast<int>(tip.size()*7),layout.metric_font_pixels+4};
-      const UiRect tooltip{std::min(bounds.x+bounds.width+8.f,static_cast<float>(width-extent.width-12)),bounds.y,std::max(1.f,static_cast<float>(extent.width+12)),static_cast<float>(extent.height+8)};
-      fill(out,tooltip,{4,14,27,245});stroke(out,tooltip,{82,155,194,230});
-      out.overlay.emplace_back(Text{{tooltip.x+6.f,tooltip.y+4.f},std::string(tip),tooltip_text,layout.metric_font_pixels,tooltip.width-12.f,tooltip});
+      stellar::native_ui::hint(out,{bounds.x+bounds.width+8.f,bounds.y},std::string(tip),width,height,layout.metric_font_pixels,layout.scale,text_measurer_);
     };
     const auto navigation_visible=native_navigation_available(
         menu_,settlement_workspace_.visible(),diplomacy_workspace_.modal_open(),

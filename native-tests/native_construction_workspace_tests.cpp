@@ -199,6 +199,42 @@ void full_720p_content_keeps_cost_feedback_and_actions_clipped() {
   REQUIRE(authorization && upkeep && start && queue && capped_feedback);
 }
 
+void disabled_actions_explain_the_blocker_on_hover() {
+  NativeConstructionWorkspace workspace;
+  workspace.open();
+  auto content = view();
+  content.projects.front().start.enabled = false;
+  content.projects.front().start.message =
+      "Insufficient authorization for this project.";
+  content.projects.front().queue.enabled = false;
+  content.projects.front().queue.message = "The production line is full.";
+  workspace.set_view(std::move(content));
+  const auto layout = ConstructionWorkspaceLayout::for_viewport(1280, 720);
+  const auto explains = [](const DrawList &draw, std::string_view reason) {
+    for (const auto &item : draw.overlay)
+      if (const auto *label = std::get_if<Text>(&item))
+        if (label->value == reason) return true;
+    return false;
+  };
+  DrawList draw;
+  (void)workspace.handle({InputEventType::PointerMove, {4.f, 4.f}}, 1280, 720);
+  workspace.render(draw, 1280, 720);
+  REQUIRE(
+      !explains(draw, "Insufficient authorization for this project."));
+  DrawList hovered;
+  (void)workspace.handle(
+      {InputEventType::PointerMove, center(layout.primary_action)}, 1280, 720);
+  workspace.render(hovered, 1280, 720);
+  REQUIRE(
+      explains(hovered, "Insufficient authorization for this project."));
+  DrawList queued;
+  (void)workspace.handle(
+      {InputEventType::PointerMove, center(layout.secondary_action)}, 1280,
+      720);
+  workspace.render(queued, 1280, 720);
+  REQUIRE(explains(queued, "The production line is full."));
+}
+
 void progress_bar_clamps_nonfinite_fraction_inside_orders() {
   NativeConstructionWorkspace workspace;
   workspace.open();
@@ -363,6 +399,7 @@ int main() try {
   mouse_routes_start_queue_and_stable_cancel_confirmation();
   replacement_and_empty_view_do_not_retain_old_context();
   full_720p_content_keeps_cost_feedback_and_actions_clipped();
+  disabled_actions_explain_the_blocker_on_hover();
   progress_bar_clamps_nonfinite_fraction_inside_orders();
   long_status_list_uses_72_pitch_and_canonical_presentation_order();
   keyboard_focus_traversal();

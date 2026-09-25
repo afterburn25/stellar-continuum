@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
@@ -328,6 +329,49 @@ inline void tooltip(DrawList &out, Point anchor, std::string title,
   text(out, {x + 12.f * scale, y + 31.f * scale}, std::move(body),
        color::text_secondary, static_cast<int>(12.f * scale),
        width - 24.f * scale);
+}
+
+// Compact single-line hint for icon rails and tight controls: auto-sizes to
+// the measured text when a measurer is supplied, else estimates by pixel
+// width. Clamped inside the viewport like `tooltip`.
+inline void hint(DrawList &out, Point anchor, std::string caption,
+                 int viewport_width, int viewport_height, int pixels,
+                 float scale = 1.f,
+                 const std::function<native_map::TextExtent(const Text &)>
+                     &measure = {}) {
+  const Text probe{{}, caption, color::text_primary, pixels};
+  const auto extent = measure ? measure(probe)
+                              : native_map::TextExtent{
+                                    static_cast<int>(caption.size() * pixels *
+                                                     .55f),
+                                    pixels + 4};
+  const float width =
+      static_cast<float>(extent.width) + 14.f * scale,
+      height = static_cast<float>(extent.height) + 10.f * scale;
+  const float x = std::clamp(
+      anchor.x, 8.f,
+      std::max(8.f, static_cast<float>(viewport_width) - width - 8.f));
+  const float y = std::clamp(
+      anchor.y, 8.f,
+      std::max(8.f, static_cast<float>(viewport_height) - height - 8.f));
+  const UiRect bounds{x, y, std::max(1.f, width), std::max(1.f, height)};
+  fill(out, bounds, color::surface_opaque);
+  stroke(out, bounds, color::keyline_strong);
+  text(out, {x + 7.f * scale, y + 5.f * scale}, std::move(caption),
+       color::text_primary, pixels, width - 14.f * scale, TextAlign::Left,
+       FontFace::Interface, bounds);
+}
+
+// The shared "why is this unavailable" pattern: renders `tooltip` beside the
+// pointer only while `bounds` is hovered and `body` carries a reason.
+inline void hover_tooltip(DrawList &out, UiRect bounds, Point pointer,
+                          std::string title, std::string body,
+                          int viewport_width, int viewport_height,
+                          float scale = 1.f, Tone tone = Tone::Caution) {
+  if (body.empty() || !bounds.contains(pointer)) return;
+  tooltip(out, {pointer.x + 14.f * scale, pointer.y + 20.f * scale},
+          std::move(title), std::move(body), viewport_width, viewport_height,
+          scale, tone);
 }
 
 }

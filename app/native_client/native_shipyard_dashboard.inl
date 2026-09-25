@@ -289,6 +289,13 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
   if(o){enabled=o->can_cancel;action=cancel_confirmation_id_==o->order_id?tr("SHIPYARD_CONFIRM_REFUND","CONFIRM CANCEL + REFUND"):tr("SHIPYARD_CANCEL_ORDER","CANCEL ORDER");}
   else if(d){enabled=batch_blocker().empty();action=enabled?(d->will_queue?tr("SHIPYARD_QUEUE_BUILD","QUEUE BUILD"):tr("SHIPYARD_START_BUILD","START BUILD")):tr("SHIPYARD_BUILD_UNAVAILABLE","BUILD UNAVAILABLE");}
   if(!action.empty())button(l.action,action,enabled,enabled);
+  // Disabled state carries the authoritative blocker as a hover tooltip so the
+  // reason is discoverable at the point of interaction, not only in the
+  // readiness text above.
+  if(!action.empty()&&!enabled){
+    const std::string reason=o?o->cancellation_blocker.value_or(tr("SHIPYARD_UNAVAILABLE","Construction unavailable.")):batch_blocker();
+    theme::hover_tooltip(out,l.action,pointer_,action,reason,w,h,l.scale);
+  }
   const auto focus_items=focusables(l);
   if(focus_>=0&&focus_<static_cast<int>(focus_items.size()))theme::focus_ring(out,focus_items[static_cast<std::size_t>(focus_)].rect);
   dropdown_.render(out,dropdown_.id()==1?l.sort:l.filter,w,h,l.body_font_pixels);

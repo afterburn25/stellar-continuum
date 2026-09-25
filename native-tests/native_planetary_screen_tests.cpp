@@ -236,6 +236,23 @@ int main(int argc,char** argv)try{
     bool empty=false;for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item))empty|=t->value.find("Population 0")!=std::string::npos;
     check(empty,"Developer unsettled world does not state that it has zero colony population");
   }
+  {
+    // A disabled command-center button surfaces the authoritative lock reason
+    // as a hover tooltip at the point of interaction.
+    NativePlanetaryScreen screen;NativeColonyView v;
+    v.campaign_generation=12;v.body_id=5;v.body_display_name="Held World";
+    v.planet.visual_class=stellar::native_system::NativeSystemBodyVisualClass::rocky;
+    v.planet.details.emplace();
+    v.hub_upgrade_available=false;v.can_afford_hub_upgrade=false;
+    v.hub_upgrade_lock_reason="Requires planetary shield coverage.";
+    screen.set_view(v);
+    const int w=1280,h=720;const auto l=PlanetaryLayout::make(w,h);
+    (void)screen.handle({InputEventType::PointerMove,{l.command.x+10,l.command.y+10}},w,h);
+    DrawList draw;screen.render(draw,v,w,h);
+    bool reason=false,title=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item)){reason|=t->value=="Requires planetary shield coverage.";title|=t->value=="Command Center unavailable";}
+    check(reason&&title,"Disabled command center did not explain the blocker on hover");
+  }
   NativePlanetaryScreen observer;NativeColonyView secret;secret.campaign_generation=9;secret.body_id=8;secret.observer_only=true;secret.body_display_name="Unknown";observer.set_view(secret);DrawList hidden;observer.render(hidden,secret,1920,1080);
   check(observer.globe().regions().empty(),"Unsurveyed planet leaked regions");
   secret.planet.details.emplace();secret.planet.visual_class=stellar::native_system::NativeSystemBodyVisualClass::gas_giant;observer.set_view(secret);
