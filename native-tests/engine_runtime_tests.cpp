@@ -699,6 +699,52 @@ int main() {
           "the destroyed 3D entity leaves the tracked set");
   }
 
+  // 3D quicksave: F5/F9 in scene3d mode snapshots the 3D tracked set —
+  // load_world partitions the restored entities back into entities3d
+  // and the mover's Transform3D returns to the tick-2 state.
+  {
+    ReplayRecorder journal;
+    journal.record(2, "input",
+                   "8,1073741886,0,0,0,0,0,0,0,0,0,0,0,0,0,");
+    journal.record(6, "input",
+                   "8,1073741890,0,0,0,0,0,0,0,0,0,0,0,0,0,");
+    const auto sub = root / "scene3d-save";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene3d.json");
+      out << R"({"entities":[
+                   {"name":"mover","mesh":"box","pos":[0,0,0],
+                    "vel":[1,0,0]}]})";
+    }
+    const auto journal_path = sub / "save_journal.json";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(sub);
+    opts.scene3d = true;
+    opts.frame_limit = 8;
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    std::vector<float> xs;
+    host.on_update = [&](World &world, float) {
+      if (!host.entities3d().empty())
+        if (const auto *t =
+                world.get<Transform3D>(host.entities3d().front()))
+          xs.push_back(t->x);
+    };
+    check(host.run() == 0, "3D save/load replay exits cleanly");
+    check(xs.size() == 8, "the 3D mover reports every frame");
+    check(host.entities3d().size() == 1,
+          "load_world repartitions the 3D entity");
+    if (xs.size() == 8) {
+      check(xs[5] != xs[2],
+            "the 3D world drifts between save and restore");
+      check(xs[6] == xs[2],
+            "F9 restores the 3D snapshot exactly");
+    }
+  }
+
   // save_data/load_data round-trip named blobs under saves/data/ —
   // no run() needed, and key validation rejects path escapes.
   {
