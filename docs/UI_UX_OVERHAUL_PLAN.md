@@ -119,7 +119,7 @@ breaks navigation/AT flow, or presents wrong state)
 
 ### HIGH
 
-1. **No adopted shared design language.** → IN PROGRESS. The theme now
+1. ~~**No adopted shared design language.**~~ → DONE. The theme now
    provides `metric_tile`, `badge`, `key_value`, `focus_ring`,
    `empty_state`, `tab`, `section_header` and `clipped`; planetary,
    economy, supply/logistics and fleet workspaces consume them and their
