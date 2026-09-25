@@ -50,7 +50,7 @@ float measured_height(const NativeEconomyWorkspace::TextMeasurer& measure, const
 }
 std::string signature(const NativeEconomyView& v, const std::string& notice) {
   std::ostringstream out; out << static_cast<int>(v.state) << '|' << v.message << '|' << v.diagnostic << '|' << v.treasury_status << '|' << v.priority_status << '|' << notice;
-  for(const auto& c:v.cards) out << '|' << c.label << ':' << c.value;
+  for(const auto& c:v.cards) out << '|' << c.label << ':' << c.value << ':' << c.detail;
   for(const auto& r:v.income_rows) out << '|' << r.label << ':' << r.value << r.suffix;
   for(const auto& r:v.cost_rows) out << '|' << r.label << ':' << r.value << r.suffix;
   return out.str();
@@ -142,7 +142,7 @@ const NativeEconomyWorkspace::Cache& NativeEconomyWorkspace::cache_for(const Nat
     const auto left_h=measured_height(measure_,left,layout.body.width*.36f-16.f*layout.scale,layout.small_font_pixels,layout.scale);
     const auto right_h=measured_height(measure_,right,layout.body.width*.60f-16.f*layout.scale,layout.body_font_pixels,layout.scale);
     const auto row_h=std::max(32.f*layout.scale,std::max(left_h,right_h)+14.f*layout.scale);
-    cache_.rows.push_back({std::move(left),std::move(right),inc,warn_row,false,0,cache_.content_height,row_h}); cache_.content_height+=row_h+6.f*layout.scale;
+    cache_.rows.push_back({std::move(left),std::move(right),{},inc,warn_row,false,0,cache_.content_height,row_h}); cache_.content_height+=row_h+6.f*layout.scale;
   };
   if(view.state==EconomyState::Ready) {
     const auto tile_gap=6.f*layout.scale;
@@ -156,7 +156,7 @@ const NativeEconomyWorkspace::Cache& NativeEconomyWorkspace::cache_for(const Nat
       }
       for(int col=0;col<3;++col) {
         const auto& card=view.cards[static_cast<std::size_t>(row_index*3+col)];
-        cache_.rows.push_back({card.label,card.value,!card.warning,card.warning,true,col,
+        cache_.rows.push_back({card.label,card.value,card.detail,!card.warning,card.warning,true,col,
             cache_.content_height,tile_height});
       }
       cache_.content_height+=tile_height+tile_gap;
@@ -267,6 +267,9 @@ void NativeEconomyWorkspace::render(DrawList& out,const NativeEconomyView& view,
         // KPI cards share the shared metric-tile chrome.
         theme::metric_tile(out,box,r.left,r.right,layout.small_font_pixels,
             layout.body_font_pixels,r.warning?theme::Tone::Caution:theme::Tone::Success,true,*visible);
+        // Hovering a KPI tile explains what it measures.
+        theme::hover_tooltip(out,box,pointer_,r.left,r.detail,width,height,
+            layout.scale,theme::Tone::Neutral);
       } else if(r.right.empty()) {
         // Heading rows (INCOME / OPERATING COSTS / …) get the shared
         // section-header rule instead of looking like data rows.

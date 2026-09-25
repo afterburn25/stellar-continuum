@@ -1100,13 +1100,26 @@ void NativeDiplomacyWorkspace::render(
       {tr("DIPLOMACY_FEAR", "FEAR"), sel.fear},
       {tr("DIPLOMACY_HOSTILITY", "HOSTILITY"), sel.hostility},
       {tr("DIPLOMACY_COOPERATION", "COOPERATION"), sel.cooperation}};
+  const char *meter_tip_keys[] = {"DIPLOMACY_TIP_TRUST", "DIPLOMACY_TIP_RESPECT",
+                                  "DIPLOMACY_TIP_FEAR", "DIPLOMACY_TIP_HOSTILITY",
+                                  "DIPLOMACY_TIP_COOPERATION"};
+  const char *meter_tip_fallbacks[] = {
+      "How reliably this contact honors its agreements.",
+      "How much weight this contact gives our power and competence.",
+      "How threatened this contact feels by us.",
+      "How openly hostile this contact is toward us.",
+      "How willing this contact is to work with us right now."};
   const Color meter_colors[] = {theme::color::diplomacy, theme::color::selected,
                                 theme::color::economy, theme::color::danger,
                                 theme::color::science};
   for (std::size_t index = 0; index < 5; ++index) {
     const auto y = layout.meters.y + static_cast<float>(index) * 30.f * s;
+    const UiRect row_bounds{layout.meters.x, y, layout.meters.width, 28.f * s};
     text(out, {layout.meters.x, y, layout.meters.width * .62f, 18.f * s},
          meter_rows[index].first, muted, layout.small_font_pixels);
+    theme::hover_tooltip(out, row_bounds, pointer_, meter_rows[index].first,
+                         tr(meter_tip_keys[index], meter_tip_fallbacks[index]),
+                         width, height, s, theme::Tone::Neutral);
     const auto &value = meter_rows[index].second;
     text(out,
          {layout.meters.x + layout.meters.width * .62f, y,

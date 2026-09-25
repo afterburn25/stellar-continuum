@@ -622,6 +622,21 @@ int main() try {
             "A disabled diplomacy action dispatched a command.");
   }
 
+  // Hovering a relationship meter explains what it measures.
+  NativeDiplomacyWorkspace meters;
+  meters.open();
+  meters.set_view(dark);
+  (void)meters.handle({InputEventType::PointerMove,
+                       {layout.meters.x + 4.f * s,
+                        layout.meters.y + 4.f * s}},
+                      1280, 720);
+  DrawList meters_draw;
+  meters.render(meters_draw, 1280, 720, nullptr);
+  require(has_text(meters_draw, "TRUST") &&
+              has_text(meters_draw,
+                       "How reliably this contact honors its agreements."),
+          "A relationship meter did not explain itself on hover.");
+
   // The close control emits Close.
   const auto closed = workspace.handle(
       {InputEventType::LeftPressed, center(layout.close)}, 1280, 720);
