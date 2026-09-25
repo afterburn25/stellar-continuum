@@ -375,11 +375,14 @@ input snapshot at the configured drawable size, one deterministic sim
 step per frame, so generated games smoke-test and replay-verify on
 CI machines without a display (`engine_runtime` covers the public
 surface headlessly: stepping, 2D/3D region queries, entity_at/
-entity3d_at/raycast3d picking, spawn/destroy + spawn/land/collision/
-anim-event callbacks, injected-input F5/F9 quicksave-load, save_data
-blobs, scene switching, accessors, VFX stepping, snapshot parity and
-the replay contract; the Projects tool's TEST passes `--headless`
-by default). Headless limits: `on_draw`/`on_status` never fire (no
+entity3d_at/raycast3d picking, spawn/destroy (2D and 3D tracked sets),
+spawn/land/collision/anim-event callbacks (2D + 3D, incl. solid-landing
+MTV resolution and 3D collision exit), injected-input F5/F9
+quicksave-load in both 2D and scene3d modes, save_data blobs, scene
+switching + live hot-reload polling, 2D/3D ttl/parent/bounds, input-map
+rebinding, accessors, VFX stepping, snapshot parity, run(argc, argv)
+flag parsing and the replay contract; the Projects tool's TEST passes
+`--headless` by default). Headless limits: `on_draw`/`on_status` never fire (no
 DrawList) and `audio()` must not be called (no audio device).
 `SceneEntity` authoring surface: name, position/extent/velocity,
 tint, sprite path, layer (stable-sorted draw order), parallax
