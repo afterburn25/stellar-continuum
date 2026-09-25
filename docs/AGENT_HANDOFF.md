@@ -383,7 +383,9 @@ MTV resolution and 3D collision exit), injected-input F5/F9
 quicksave-load in both 2D and scene3d modes, save_data blobs, scene
 switching + live hot-reload polling, 2D/3D ttl/parent/bounds, input-map
 rebinding, accessors, VFX stepping (2D + 3D projected anchors), snapshot parity, run(argc, argv)
-flag parsing and the replay contract; the Projects tool's TEST passes
+flag parsing (incl. --replay/--replay-until/--replay-info and a trailing
+--scene3d), the replay contract, and fail-fast exits on missing/corrupt
+journals; the Projects tool's TEST passes
 `--headless` by default). Headless limits: `audio()` must not be called (no audio
 device) — `on_draw`/`on_status` still fire with a fully built
 DrawList that is simply never submitted to a GPU.
