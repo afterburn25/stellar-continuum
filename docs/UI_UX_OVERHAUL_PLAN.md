@@ -166,8 +166,11 @@ breaks navigation/AT flow, or presents wrong state)
    outliner renders a status-grouped projection (IN COMBAT → IN TRANSIT →
    ON MISSION → STATIONED) shared by click/focus/scroll/render/tooltip
    paths, and Controlled Assets sorts the FLEETS section urgent-first.
-   Still open: `NativeOwnFleet` has no battle-group layer — per-fleet
-   ships/strength breakdown needs a projection change, not more styling.
+   Per-fleet composition now surfaces too: `NativeOwnFleet` projects the
+   resolved design name, cargo fill, embarked population, and tactical
+   vessel condition, rendered as trailing stat rows. Fleets are single
+   vessels in the model — a true battle-group layer would need a
+   fleet-composition change in core, out of client scope.
 
 ### MEDIUM
 
@@ -267,6 +270,8 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | Strategic overlay toggles: the MAP LEGEND's lane / empire territory / surveyed phenomenon rows are now show/hide layer switches — each draws a checkbox at the row's right edge, dims glyph + label while off, and hover-highlights like the panel's other interactive rows. State is client-local (like the collapse toggle), click press/release matching reuses the shared `map_legend_row_bounds` geometry, and the three rows join the HUD focus ring after the legend toggle with localized AT labels (`HUD_MAP_LAYER_*`, en+de). Territory hiding uses a new `NativeTerritoryRenderStyle::draw_ownership` flag that suppresses fill/contours/claims/region labels while the unexplored-space fog shroud keeps rendering — FoW geometry is never toggleable. Phenomena hide also suppresses the map hover inspection for the hidden layer; lanes hide only the charted-lane lines (markers and knowledge vocabulary untouched). Territory tests assert ownership marks vanish while `fog_images` still emit; `--galaxy-art-smoke` re-verified (territory stats unchanged with all layers on). | d5eacf30 |
 
 | 2026-09-25 | HUD hover hints: pointer resting on any HUD ring item (nav rail, pause/speed/notifications, zoom controls, legend toggle + its three layer rows, Switch view) renders a compact `theme::hint` with the same localized label the focus ring announces for that action — one vocabulary for pointer, keyboard and AT users. Gated off while the pause menu, settings, or quick-find modal is open. `--galaxy-art-smoke` re-verified clean (no hint when the pointer rests off-chrome). | cf52ea0e |
+
+| 2026-09-25 | Fleet composition in the detail card: `NativeOwnFleet` now projects `design_name` (resolved through `find_ship_design`), `cargo_materials`/`cargo_material_capacity`, `embarked_population_millions`, and `has_vessel_state`/`hull_integrity` from `tactical_vessel`. The detail block renders Design/Condition/Cargo/Embarked rows (`FLEET_STAT_*`, en+de) after the core telemetry — extras land last so cramped cards clip the least-critical rows first — and stat rows now clip to the details block so they can never spill into the route preview (the armed-fleet stack had silently overdrawn the rail gap before). `fleet_height` grows to 215s when the detail space can spare it (>300s), keeping the 720p behavior identical. Test covers all four composition rows; `--fleet-smoke` capture shows a colony ship reporting Design "Interstellar Colony" + Embarked 250.0M. | 675262f1 |
 
 ### Implementation notes
 
