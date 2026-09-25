@@ -580,6 +580,8 @@ int main() {
     auto opts = headless_options(sub_root);
     opts.frame_limit = 8;
     opts.replay_file = journal_path;
+    // A custom --save path: F5 must write here, not the default.
+    opts.save_file = "custom/quick.stw";
     RuntimeHost host{opts};
     int updates = 0;
     int events_seen = 0;
@@ -598,6 +600,9 @@ int main() {
       }
     };
     check(host.run() == 0, "save/load replay exits cleanly");
+    check(std::filesystem::exists(sub_root / "custom" / "quick.stw") &&
+              !std::filesystem::exists(sub_root / "saves" / "quicksave.stw"),
+          "F5 writes the configured --save path");
     check(updates == 8 && demo_found,
           "the demo entity resolves every frame");
     check(events_seen == 2, "on_event receives injected input");
