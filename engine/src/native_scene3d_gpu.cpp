@@ -367,7 +367,10 @@ struct Scene3DRenderer::Storage {
     const bool low_tier=opt.quality==RenderQuality3D::Low;
     struct Draw {const MeshInstance3D* instance;PreparedInstance3D transform;std::shared_ptr<Geometry> mesh;std::shared_ptr<Texture> image,optical,environment,normal,properties,cloud,shadow,next,emissive,mr;
       // Screen-door LOD keep-probability (1 = draw every fragment).
-      float lod_keep{1.f};};
+      float lod_keep{1.f};
+      // Camera inside an emission volume's proxy: rasterize both faces
+      // and lift the shader's front-face gate so the interior marches.
+      bool inside_volume{false};};
     std::vector<Draw> draws;draws.reserve(view.scene->instances().size());
     // Screen-space LOD uses the same px-per-world-unit convention as the
     // streamer footprint so both agree on which level is submitted.
@@ -430,6 +433,12 @@ struct Scene3DRenderer::Storage {
       // selected level's single thinned draw.
       const bool fading=lod_share>0.f&&lod_level<instance.lod_meshes.size()&&range_keep>=1.f;
       if(fading)++stats.lod_fades;
+      // Camera inside the proxy sphere: the outward-facing walls all
+      // turn away, so the draw needs both faces rasterized and the
+      // fragment gate lifted (packed into volume_options.y bit 7).
+      const bool inside_volume=instance.material.surface_effect&&
+        instance.material.surface_effect->volume_depth>0.f&&
+        dist<instance.scale*instance.mesh->bounding_radius();
       draws.push_back({&instance,facing(drawn_mesh),geometry(drawn_mesh),surface,
         optical?texture(optical->surface):surface,
         optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
@@ -439,6 +448,7 @@ struct Scene3DRenderer::Storage {
         pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
         pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
         fading?1.f-lod_share:range_keep});
+      draws.back().inside_volume=inside_volume;
       if(fading)draws.push_back({&instance,facing(instance.lod_meshes[lod_level]),geometry(instance.lod_meshes[lod_level]),surface,
         optical?texture(optical->surface):surface,
         optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
@@ -448,6 +458,7 @@ struct Scene3DRenderer::Storage {
         pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
         pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
         -lod_share}); // negative = keep the high mask (complement of 1-p)
+      if(fading)draws.back().inside_volume=inside_volume;
     }
     // Engine DrawBatcher owns submission ordering/batching: opaque groups by
     // (material,mesh), transparent stays back-to-front. A material_id interns
@@ -460,7 +471,7 @@ struct Scene3DRenderer::Storage {
     for(std::size_t submission=0;submission<draws.size();++submission){
       const auto& d=draws[submission];
       const auto& tm=d.instance->material.texture_tiling;
-      const MaterialKey key{d.instance->material.double_sided,d.instance->material.anisotropic_texture&&!low_tier,tm.x!=1.f||tm.y!=1.f,
+      const MaterialKey key{d.instance->material.double_sided||d.inside_volume,d.instance->material.anisotropic_texture&&!low_tier,tm.x!=1.f||tm.y!=1.f,
         d.image.get(),d.optical.get(),d.environment.get(),d.normal.get(),d.properties.get(),d.cloud.get(),d.shadow.get(),d.next.get(),d.emissive.get(),d.mr.get()};
       engine::DrawItem item{};item.material_id=material_ids.try_emplace(key,static_cast<std::uint32_t>(material_ids.size())).first->second;
       item.mesh_id=mesh_ids.try_emplace(d.mesh->owner.get(),static_cast<std::uint32_t>(mesh_ids.size())).first->second;
@@ -515,7 +526,7 @@ struct Scene3DRenderer::Storage {
         // caps at 16 steps, Medium at 32; authored budgets apply above.
         const int volume_steps=low_tier?std::min(e.volume_steps,16)
             :opt.quality==RenderQuality3D::Medium?std::min(e.volume_steps,32):e.volume_steps;
-        fragment.volume_options={e.volume_depth,static_cast<float>(volume_steps),e.volume_density,e.volume_seed};
+        fragment.volume_options={e.volume_depth,static_cast<float>(volume_steps+(draw.inside_volume?128:0)),e.volume_density,e.volume_seed};
         // Scatter rides atmo_shape.z — atmospheres never render inside
         // the volume branch, so the lane is free for volume materials.
         fragment.atmo_shape[2]=e.volume_scatter;}
@@ -742,7 +753,7 @@ struct Scene3DRenderer::Storage {
           for(const auto& batch:batcher.batches()){
             const auto& draw=draws[sorted[batch.first_item].instance_index];const auto& material=draw.instance->material;
             const auto* pipe_set=use_msaa?&pipelines_ms4:&pipelines;
-            SDL_BindGPUGraphicsPipeline(pass,(*pipe_set)[(material.transparent?1:0)+(material.double_sided?2:0)]);
+            SDL_BindGPUGraphicsPipeline(pass,(*pipe_set)[(material.transparent?1:0)+((material.double_sided||draw.inside_volume)?2:0)]);
             const SDL_GPUBufferBinding vertices{draw.mesh->vertices,0},indices{draw.mesh->indices,0};
             SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
             const bool tiled=material.texture_tiling.x!=1.f||material.texture_tiling.y!=1.f;

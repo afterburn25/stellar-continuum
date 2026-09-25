@@ -125,7 +125,11 @@ a corona stops shining through its own star) or the `EmissionVolume`
 component; the entity's own `texture` supplies the
 emission image and the material turns transparent automatically — a
 `volume` block without a texture is rejected at parse and dropped at
-runtime, and an unloadable `image2` keeps the primary.
+runtime, and an unloadable `image2` keeps the primary. With the camera
+inside the proxy's bounding sphere the draw switches to the
+double-sided pipeline and the shader marches from the camera (bit 7 of
+`volume_options.y` lifts the front-face gate), so nebula fly-throughs
+render the interior instead of popping to black.
 
 Per-instance distance culling lives on `MeshInstance3D`:
 

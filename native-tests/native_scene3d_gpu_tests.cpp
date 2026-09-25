@@ -1012,6 +1012,14 @@ int main(int argc,char** argv)try{
       if(channel(*primary,x,y,0)-channel(*occluded,x,y,0)>12)++hole;
     check(hole>80,"Authored occlude sphere did not mask the volume centre");
     check(channel(*occluded,120,90,0)>30,"Occlude sphere removed the whole volume");
+    // Camera inside the proxy: the volume marches its interior instead
+    // of popping out — backfaces of the exit wall carry the ray from the
+    // camera rather than the fragment.
+    plasma.material.surface_effect->occlude=0;
+    camera.position={0,0,.15f};
+    const auto inside=capture({plasma},"plasma-inside.png");
+    check(energy(*inside)>20000,"Volume vanished with the camera inside its proxy");
+    camera.position={0,0,5};
     std::cout<<"volume_scatter_gpu=lit_limb_passed\n";
   }
   {

@@ -104,7 +104,9 @@ same document headless-tested.
    repeat; `occlude` masks the volume behind its own photosphere sphere).
    `cloudHeight` lifts the deck off the surface — a UV-jacobian parallax
    shifts limb texels, displaces the ground shadow sunward by
-   h·tan(zenith), and zenith-gates deck self-shading.
+   h·tan(zenith), and zenith-gates deck self-shading; volumes also
+   march correctly with the camera inside the proxy (double-sided
+   raster + camera-origin entry, so nebula fly-throughs don't pop).
    Remaining: the deck is
    still a bounded parallax composite — no volumetric cloud shells or
    per-layer thickness; banding is a static two-harmonic warp

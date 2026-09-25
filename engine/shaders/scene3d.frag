@@ -158,12 +158,18 @@ vec4 emission_volume(vec3 V) {
     // Integrate the interior of a closed proxy, exactly once per camera ray.
     // All density/flow lives in object space: it has parallax and cannot turn
     // into a camera-facing card as the stellar attachment rotates to the limb.
-    vec3 origin=(material.effect_from_view*vec4(view_position,1)).xyz;
+    // Bit 7 of the packed step count marks a camera-inside-proxy draw:
+    // the march then starts at the camera (the view-space origin) rather
+    // than the exit-wall fragment, whose backface is what rasterized.
+    const bool inside_volume=material.volume_options.y>64.0;
+    const vec3 ray_view=!inside_volume?view_position:
+        material.view_options.x>0.5?vec3(view_position.xy,0):vec3(0);
+    vec3 origin=(material.effect_from_view*vec4(ray_view,1)).xyz;
     vec3 direction=mat3(material.effect_from_view)*(-V);
     float scale=1.0/length(direction);direction=normalize(direction);
     float footprint=max(length(dFdx(origin)),length(dFdy(origin)));
     float mip=max(0.0,log2(max(footprint*float(textureSize(surface_map,0).x),1.0)));
-    if(dot(normalize(view_normal),V)<=0.0) discard;
+    if(!inside_volume&&dot(normalize(view_normal),V)<=0.0) discard;
     vec3 lower=vec3(-.5,-.22,-material.volume_options.x),upper=vec3(.5,.78,material.volume_options.x);
     // Signed epsilon keeps parallel rays finite on proxy edges.
     vec3 safe_direction=mix(vec3(-1),vec3(1),greaterThanEqual(direction,vec3(0)))*max(abs(direction),vec3(.000001));
@@ -174,12 +180,12 @@ vec4 emission_volume(vec3 V) {
     // Stop at the near photosphere, retaining foreground plasma and extensions
     // beyond the stellar limb. This clips the whole ray, not just proxy faces.
     if(material.effect_sphere.w>0.0){
-        vec3 p=view_position-material.effect_sphere.xyz;
+        vec3 p=ray_view-material.effect_sphere.xyz;
         float b=dot(p,V),d=b*b-dot(p,p)+material.effect_sphere.w*material.effect_sphere.w;
         if(d>0.0&&b+sqrt(d)>0.0) exit_distance=min(exit_distance,max(0.0,(b-sqrt(d))/scale));
     }
     if(exit_distance<=entry) discard;
-    int steps=int(material.volume_options.y);
+    int steps=int(material.volume_options.y)-(inside_volume?128:0);
     float step_size=(exit_distance-entry)/float(steps);
     vec4 integrated=vec4(0);
     float phase=material.effect_options.z,seed=material.volume_options.w;

@@ -327,6 +327,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   pixels. Remaining: explicit view-space sphere placement stays
   C++-only (`SurfaceEffect3D::view_sphere_center`/`sphere_radius` still
   win when set).
+- **Camera-inside volumes:** when the camera crosses the proxy's
+  bounding sphere the draw flips to the double-sided pipeline slot and
+  bit 7 of `volume_options.y` lifts the fragment's front-face gate; the
+  march then originates at the camera (ortho rays at their own x,y —
+  `view_position.xy,0`) instead of the exit-wall backface, so flying
+  through a nebula keeps rendering interior filaments instead of
+  popping to black. GPU probe: `plasma-inside.png` fills ~20k px where
+  the pre-change path discarded every fragment.
 
 ## Scene3D directional shadow mapping (2026-09-25)
 
