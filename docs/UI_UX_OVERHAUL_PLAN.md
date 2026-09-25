@@ -124,8 +124,8 @@ breaks navigation/AT flow, or presents wrong state)
    `empty_state`, `tab`, `section_header` and `clipped`; planetary,
    economy, supply/logistics and fleet workspaces consume them and their
    palettes alias the semantic colors. Shipyard, construction,
-   diplomacy and research are now migrated as well. Still open:
-   missions and startup chrome migrations.
+   diplomacy, research and the colony roster are now migrated as well.
+   Still open: missions and startup chrome migrations.
 2. ~~**No global quick-find / command palette**~~ → DONE: Ctrl+K opens a
    modal palette built from FoW-filtered view models covering known
    systems, owned colonies, own fleets, identified contacts, active
@@ -169,8 +169,11 @@ breaks navigation/AT flow, or presents wrong state)
    are the exception).
 2. ~~Notifications feed has no severity iconography or grouping~~ — severity
    axis now shipped (see work log); grouping/filtering remains open.
-3. Empty/error states are inconsistent: some surfaces give next-action
-   guidance ("No scout or science vessel…"), others show bare "No X" text.
+3. Empty/error states are inconsistent — PARTIALLY DONE. Colony roster
+   and the research tree now pair the bare "No X" line with a localized
+   next-action hint through the shared `empty_state` helper (shipyard,
+   construction and missions already guided). Remaining bare states:
+   minor lists that have no meaningful next action.
 4. Typography hierarchy varies per workspace (heading/body/small pixel
    triples differ slightly everywhere); unify through theme tokens.
 5. System view + battle workspace need live visual review — cannot be
@@ -203,6 +206,7 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | Global quick-find palette (Ctrl+K): modal searchable overlay indexing known systems, owned colonies, own fleets and identified contacts — all sourced from FoW-filtered authoritative view models so uncharted names never leak. Results render type badges + context labels; field opens focused (AT `Edit`), arrows move into results, Enter activates, Escape/outside-click closes; `set_focused_text`/`focused_value` integrate the existing AT text contract. Activation routes through existing paths: map re-center + inspect for systems, `open_overview_colony`, `focus_mission_fleet`, and diplomacy open + `select_contact_civilization`. New `native_quick_find` test target covers filtering, navigation, activation, capture and AT; `--quick-find-smoke` verified on Vulkan (opened/8 entries/4 matches/1 highlighted, save ok). Shipyards and missions remain unindexed — follow-up. | f43bcc62 |
 | 2026-09-25 | Research workspace migrated onto the shared theme: palette aliases `theme::color`, outer surface uses `menu_panel`, domain tabs gain hover/active fills with a Science accent bar, the four view tabs use the shared `tab` underbar treatment, toolbar/sort/filter/queue buttons use the shared `button` (Cancel research keeps a danger keyline), the search field frames with a focus-colored keyline, RECOMMENDED badges and progress bars take the science tone, SELECTED TECHNOLOGY / ACTIVE RESEARCH are `section_header`s, and the focus ring is the shared helper. Scroll regions (graph, dashboard list, active strip) keep flat clipped fill/stroke so nothing escapes the viewport. Verified via `--research-smoke` Vulkan capture (active program, recommended cards, inspector, queue buttons all render). | 42c01435 |
 | 2026-09-25 | Quick-find extended to missions and workspaces: `EntryKind::Mission` indexes active mission fleets (`build_mission_board`, activating through `focus_mission_fleet`) and `EntryKind::Workspace` adds command rows for the eight navigation surfaces (Research/Economy/Logistics/Shipyard/Construction/Diplomacy/Missions/Planets) routing through the same open+refresh calls as the rail. Kind labels join the searchable text, badges take Science/Neutral tones, placeholder text now names missions/screens (en+de), and new tests cover kind matching, activation and badge rendering. Re-verified via `--quick-find-smoke` (16 entries, filtered query intact). | 47870e62 |
+| 2026-09-25 | Colony roster migrated onto the shared theme: palette constants alias `theme::color` (selection cyan → `selected`, warning amber → `caution`), the search field frames with a focus-colored keyline, REFRESH/close use the shared `button`, rows use `surface_secondary`/`surface_hover` with a `keyline_strong` hover outline, the scrollbar track uses `keyline`, and the focus ring is the shared helper. Empty-state sweep: the roster's bare "No owned colonies" now pairs with a localized next-action hint (`ROSTER_LIST_EMPTY_HINT` — the unavailable state stays hint-free), and the research tree's "No known research" gains `RESEARCH_NO_MATCH_HINT`; both render through the shared `empty_state`. Verified via `--colony-smoke` Vulkan capture (themed search/chrome/rows) and updated roster tests asserting theme constants instead of retired literals. | 7d9dd2d3 |
 
 ### Implementation notes
 
@@ -215,4 +219,5 @@ breaks navigation/AT flow, or presents wrong state)
   changes, no new engine capability required.
 - New localization keys added to `en.json` + `de.json`:
   `HUD_MAP_LEGEND`, `MAP_LEGEND_*` (7), `PLANET_VITAL_*` (6),
-  `PLANET_CHIP_*` (5), `PLANET_ALERT_NONE_SHORT`.
+  `PLANET_CHIP_*` (5), `PLANET_ALERT_NONE_SHORT`,
+  `RESEARCH_NO_MATCH_HINT`, `ROSTER_LIST_EMPTY_HINT`.
