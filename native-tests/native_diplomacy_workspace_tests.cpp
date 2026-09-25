@@ -433,6 +433,10 @@ int main() try {
       layout.tabs.height};
   (void)intelligence.handle({InputEventType::LeftPressed, center(intelligence_tab)},
                             1280, 720);
+  // The detail viewport is shorter than the intelligence content at 720p;
+  // scroll down enough to bring the unresolved card into view.
+  (void)intelligence.handle(
+      {InputEventType::Wheel, center(layout.detail_rows), {}, -2.f}, 1280, 720);
   DrawList intelligence_draw;
   intelligence.render(intelligence_draw, 1280, 720, nullptr);
   require_scrolled_draw_clipped(intelligence_draw, layout.detail_rows,

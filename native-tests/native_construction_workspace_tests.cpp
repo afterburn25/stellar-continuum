@@ -100,6 +100,12 @@ void responsive_layout_contains_full_actions() {
     REQUIRE(!overlaps(layout.costs, layout.feedback));
     REQUIRE(!overlaps(layout.feedback, layout.primary_action));
     REQUIRE(!overlaps(layout.primary_action, layout.secondary_action));
+    // The command HUD's bottom context plate must stay clear of the action
+    // row and its feedback hint.
+    const auto hud = CommandHudLayout::make(width, height);
+    REQUIRE(!overlaps(hud.context, layout.primary_action));
+    REQUIRE(!overlaps(hud.context, layout.secondary_action));
+    REQUIRE(!overlaps(hud.context, layout.feedback));
   }
 }
 

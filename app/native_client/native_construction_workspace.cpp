@@ -137,7 +137,11 @@ ConstructionWorkspaceLayout ConstructionWorkspaceLayout::for_viewport(
                        inner_h - 276.f * scale};
   const UiRect orders{details.x + details.width + gap, inner_y, right_w,
                       inner_h};
-  const auto action_y = inner_y + inner_h - 42.f * scale;
+  // The command HUD's context plate owns the bottom-center strip — the
+  // center column's action row clears it instead of underlapping.
+  const auto context_top = CommandHudLayout::make(width, height).context.y;
+  const auto action_y =
+      std::min(inner_y + inner_h, context_top - 8.f * scale) - 42.f * scale;
   const auto action_gap = 8.f * scale;
   const auto action_w = (details.width - action_gap) * .5f;
   const UiRect primary{details.x, action_y, action_w, 42.f * scale};

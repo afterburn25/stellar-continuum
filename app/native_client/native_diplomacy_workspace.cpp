@@ -263,8 +263,12 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   const UiRect tabs{inner_x, tabs_y, inner_w, 34.f * scale};
   const auto detail_y = tabs.y + tabs.height + gap;
   const auto feedback_h = 34.f * scale;
-  const UiRect feedback{inner_x, inner_y + inner_h - feedback_h, inner_w,
-                        feedback_h};
+  // The command HUD's context plate owns the bottom-center strip — keep the
+  // feedback rail clear of it instead of underlapping.
+  const auto context_top = CommandHudLayout::make(width, height).context.y;
+  const auto feedback_y =
+      std::min(inner_y + inner_h, context_top - 6.f * scale) - feedback_h;
+  const UiRect feedback{inner_x, feedback_y, inner_w, feedback_h};
   const UiRect detail_rows{inner_x, detail_y, inner_w,
                            std::max(30.f * scale,
                                     feedback.y - detail_y - 6.f * scale)};
