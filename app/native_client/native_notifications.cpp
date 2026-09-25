@@ -1,5 +1,6 @@
 #include <stellar/engine/native_ui_skin.hpp>
 #include "native_notifications.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <array>
@@ -251,11 +252,12 @@ void NativeNotificationFeed::publish(std::string category, std::string date, std
                                      std::optional<int> contact,
                                      std::optional<int> system_id,
                                      std::string message_key,
-                                     std::string message_arg) {
+                                     std::string message_arg,
+                                     NotificationSeverity severity) {
   if (category.empty() || date.empty() || message.empty()) return;
   items_.push_back({next_sequence_++, std::move(category), std::move(date),
                     std::move(message), std::move(message_key),
-                    std::move(message_arg), contact, system_id});
+                    std::move(message_arg), contact, system_id, severity});
   while (items_.size() > maximum_items) items_.pop_front();
 }
 
@@ -500,7 +502,24 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
     const auto& entry = layout.entries[i]; if (!intersects(entry.bounds, layout.list_viewport)) continue;
     const auto& item = items[entry.item_index];
     stellar::engine::ui_skin::surface(out,entry.bounds,s,false,layout.list_viewport);
-    clipped_text(out, {entry.metadata_bounds.x, entry.metadata_bounds.y}, category_label(item.category, locale_) + "  " + item.date,
+    // Severity is publisher-assigned and orthogonal to the colored category
+    // label: an accent bar carries the tone, an "!" marker keeps Alert
+    // readable without color.
+    if (item.severity != NotificationSeverity::Info) {
+      const auto tone = item.severity == NotificationSeverity::Positive
+                            ? native_ui::Tone::Success
+                        : item.severity == NotificationSeverity::Caution
+                            ? native_ui::Tone::Caution
+                            : native_ui::Tone::Danger;
+      if (const auto bar = intersection(
+              UiRect{entry.bounds.x, entry.bounds.y, 3.f * s,
+                     entry.bounds.height}, layout.list_viewport);
+          bar.width > 0.f)
+        fill(out, bar, native_ui::accent(tone));
+    }
+    clipped_text(out, {entry.metadata_bounds.x, entry.metadata_bounds.y},
+                 (item.severity == NotificationSeverity::Alert ? "!  " : "") +
+                     category_label(item.category, locale_) + "  " + item.date,
                  category_color(item.category), std::max(9, static_cast<int>(std::lround(11.f * s))), entry.metadata_bounds.width, layout.list_viewport);
     clipped_text(out, {entry.message_bounds.x, entry.message_bounds.y}, display_message(item, locale_), message_color,
                  std::max(11, static_cast<int>(std::lround(13.f * s))), entry.message_bounds.width, layout.list_viewport);

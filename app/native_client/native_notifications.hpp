@@ -18,6 +18,11 @@
 
 namespace stellar::native_notifications {
 
+// Presentation urgency assigned by the publisher — orthogonal to category.
+// Renders as a card accent bar (plus a "!" marker on Alert) so combat losses
+// cannot hide between completion notices in a flat feed.
+enum class NotificationSeverity { Info, Positive, Caution, Alert };
+
 struct NativePlayerNotification {
   std::int64_t sequence{};
   std::string category, date, message;
@@ -26,6 +31,7 @@ struct NativePlayerNotification {
   std::string message_key, message_arg;
   std::optional<int> diplomatic_contact_id;
   std::optional<int> system_id; // located events can navigate there
+  NotificationSeverity severity{NotificationSeverity::Info};
 };
 
 class NativeNotificationFeed final {
@@ -35,7 +41,8 @@ class NativeNotificationFeed final {
   void publish(std::string category, std::string date, std::string message,
                std::optional<int> diplomatic_contact_id = std::nullopt,
                std::optional<int> system_id = std::nullopt,
-               std::string message_key = {}, std::string message_arg = {});
+               std::string message_key = {}, std::string message_arg = {},
+               NotificationSeverity severity = NotificationSeverity::Info);
   [[nodiscard]] const std::deque<NativePlayerNotification>& items() const noexcept { return items_; }
   [[nodiscard]] std::int64_t latest_sequence() const noexcept { return next_sequence_ - 1; }
   [[nodiscard]] int unread_count(std::int64_t last_read) const noexcept;

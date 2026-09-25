@@ -8152,11 +8152,14 @@ class NativeCampaign final {
         runtime.world().campaign().player_civilization_id));
     notification_refresh_elapsed_=0.;
   }
-  void publish_notification(std::string category,std::string message){
+  void publish_notification(std::string category,std::string message,
+      stellar::native_notifications::NotificationSeverity severity=
+          stellar::native_notifications::NotificationSeverity::Info){
     support_.record(category,utc_timestamp()+" "+message);
     announcer_.announce(message);
     notifications_.publish(std::move(category),stellar::native_campaign::format_campaign_date(
-        session_->frame().clock().simulation_days()),std::move(message));
+        session_->frame().clock().simulation_days()),std::move(message),
+        std::nullopt,std::nullopt,{},{},severity);
   }
   void scientist_voice(stellar::native_audio::VoiceCue cue){
     // Human casting must not silently replace another species' advisor.
@@ -8661,7 +8664,7 @@ class NativeCampaign final {
   // on it — the settle order itself is issued from the destination system.
   void focus_mission_fleet(int fleet_id){
     const auto outcome=fleet_controller_.select(session_->frame(),session_->cache().generation,fleet_id);
-    if(!outcome.accepted){publish_notification("Fleet",observer_safe_fleet_message(outcome.message,observed_system_names(),locale_));return;}
+    if(!outcome.accepted){publish_notification("Fleet",observer_safe_fleet_message(outcome.message,observed_system_names(),locale_),stellar::native_notifications::NotificationSeverity::Caution);return;}
     refresh_fleets(true);
     if(fleet_workspace_.view()){
       const auto fleet=std::ranges::find(fleet_workspace_.view()->own_fleets,fleet_id,&NativeOwnFleet::id);

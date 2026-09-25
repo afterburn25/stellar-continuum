@@ -250,6 +250,47 @@ void keyboard_focus() {
           "empty feed rendered no header focus ring");
 }
 
+void severity_accent_treatment() {
+  NativeNotificationFeed notifications;
+  notifications.publish("Combat", "Day 10", "Fleet engaged over Halcyon",
+                        std::nullopt, std::nullopt, {}, {},
+                        NotificationSeverity::Alert);
+  notifications.publish("Research", "Day 11", "Discovery completed");
+  require(notifications.items()[0].severity == NotificationSeverity::Alert &&
+              notifications.items()[1].severity == NotificationSeverity::Info,
+          "feed did not retain published severity");
+  NativeNotificationView view;
+  view.set_text_measurer(measured);
+  view.open(notifications.latest_sequence());
+  const auto layout = notification_layout_for(notifications.items(), 1280, 720, measured);
+  DrawList draw;
+  view.render(draw, notifications.items(), 1280, 720);
+  // The alert card carries a narrow tone bar on its left edge; info cards do not.
+  bool alert_bar = false;
+  int bars = 0;
+  for (const auto& command : draw.overlay)
+    if (const auto* rect = std::get_if<FilledRectangle>(&command); rect &&
+        rect->bounds.width > 0.f && rect->bounds.width < 10.f) {
+      for (const auto& entry : layout.entries)
+        if (std::abs(rect->bounds.x - entry.bounds.x) < .01f &&
+            std::abs(rect->bounds.y - entry.bounds.y) < .01f &&
+            std::abs(rect->bounds.height - entry.bounds.height) < .01f) {
+          ++bars;
+          alert_bar = alert_bar || entry.item_index == 0;
+        }
+    }
+  require(alert_bar && bars == 1,
+          "alert card did not render its severity accent bar");
+  // Alert metadata gains a "!" marker so severity reads without color.
+  bool marker = false;
+  for (const auto& command : draw.overlay)
+    if (const auto* text = std::get_if<Text>(&command);
+        text && text->value.starts_with("!  ") &&
+            text->value.find("COMBAT") != std::string::npos)
+      marker = true;
+  require(marker, "alert card did not mark its severity in text");
+}
+
 } // namespace
 
 void keyed_message_translation() {
@@ -282,6 +323,7 @@ int main() {
     measured_wrapping_and_narrow_geometry();
     activation_owns_full_press_release_gesture();
     system_navigation_command();
+    severity_accent_treatment();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;
