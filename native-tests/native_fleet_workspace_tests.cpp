@@ -212,9 +212,12 @@ int main() try {
   DrawList blocked_draw;
   workspace.render(blocked_draw, 1280, 720, markers);
   require(has_text(blocked_draw, "ISS Wayfinder") &&
-              has_text(blocked_draw, "Strength 7.2") &&
-              has_text(blocked_draw, "Fuel 18.75 / 40.00 ly") &&
-              has_text(blocked_draw, "Range 24.00 ly") &&
+              has_text(blocked_draw, "Strength") &&
+              has_text(blocked_draw, "7.2") &&
+              has_text(blocked_draw, "Fuel") &&
+              has_text(blocked_draw, "18.75 / 40.00 ly") &&
+              has_text(blocked_draw, "Range") &&
+              has_text(blocked_draw, "24.00 ly") &&
               has_text(blocked_draw, "Destination Unknown system") &&
               has_text(blocked_draw, "Insufficient operational range") &&
               !has_text(blocked_draw, "CONFIRM TRAVEL") &&
@@ -383,7 +386,7 @@ int main() try {
     strategic.render(tactical_draw,1280,720,{});
     require(has_text(tactical_draw,"HOLD")&&has_text(tactical_draw,"DEFEND")&&
                 has_text(tactical_draw,"RETREAT")&&has_text(tactical_draw,"LOCATE")&&
-                has_text(tactical_draw,"Order Hold"),
+                has_text(tactical_draw,"Order")&&has_text(tactical_draw,"Hold"),
             "Eligible armed fleet did not show strategic choices and Locate.");
     strategic.set_notice("Persistent command result.",true);
     (void)strategic.handle({InputEventType::PointerMove,center(layout.order_hold)},1280,720,{},std::nullopt);
