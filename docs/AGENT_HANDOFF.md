@@ -1216,6 +1216,13 @@ routes through `set_focused_range` to whichever visible settings panel
 owns the focused slider (audio master/music/effects; voice
 volume/subtitle-background/comms-filter — clamped to 0..1, previewed),
 then re-announces focus so AT reads the applied position.
+Same-focus state changes now re-announce generally: the announce sites
+compare `focused_toggle()`/`focused_range()` before and after each
+handled event (all four CheckBox surfaces and both slider panels in the
+campaign loop, plus the startup settings route which also forwards
+`checked`), so toggling a checkbox or nudging a slider speaks the new
+state instead of staying silent until focus moves; announcer dedupe
+compares range/checked/value so only real changes queue.
 `IValueProvider` closed the Edit side: announcements carry an optional
 `AnnouncementValue{text, writable}`, seven surfaces report their search
 text and accept `set_focused_text` (typed-path byte cap, code-point
@@ -1240,11 +1247,11 @@ window root, and a focus-changed event fires on the root — so a ring
 releasing at a group boundary or on Escape no longer leaves a stale
 control claiming focus. Empty items are skipped for speech/captions.
 Slider announcements additionally carry `AnnouncementRange`
-(min/max/value): the fragment exposes a read-only `IRangeValueProvider`
-via `GetPatternProvider` (the raw-provider pattern entry point — not
-QueryInterface), so Narrator-class AT reports slider position in range;
-`SetValue` fails honestly since adjustment stays on the key/pointer
-contract. Audio and voice settings populate it. Focus announcements also
+(min/max/value): the fragment exposes `IRangeValueProvider` via
+`GetPatternProvider` (the raw-provider pattern entry point — not
+QueryInterface), so Narrator-class AT reports slider position in range
+and can write it via the queued `SetValue` route described above. Audio
+and voice settings populate it. Focus announcements also
 carry `AnnouncementControl` (Button/CheckBox/Edit/Slider/Group/Custom) —
 the fragment reports the matching UIA ControlType, with a valid range
 implying Slider for unclassified announcements. Audio/voice settings

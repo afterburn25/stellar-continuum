@@ -6569,8 +6569,9 @@ class NativeCampaign final {
       }
       if(developer_session()){
         const int giant_test_focus_before=giant_test_panel_.focus();
+        const auto giant_test_toggle_before=giant_test_panel_.focused_toggle(width,height);
         if(giant_test_panel_.handle(event,width,height,session_->frame())){
-          if(giant_test_panel_.focus()!=giant_test_focus_before)
+          if(giant_test_panel_.focus()!=giant_test_focus_before||giant_test_panel_.focused_toggle(width,height)!=giant_test_toggle_before)
             announcer_.announce_focus(giant_test_panel_.focused_label(width,height),
               announcement_bounds(giant_test_panel_.focused_bounds(width,height)),
               std::nullopt,giant_test_panel_.focused_control(width,height),giant_test_panel_.focused_toggle(width,height));
@@ -6644,8 +6645,12 @@ class NativeCampaign final {
       if(event.type==InputEventType::PointerCancelled){settlement_workspace_.cancel_pending_input();(void)colony_roster_.handle(event,width,height);fleet_workspace_.cancel_recovery();colony_workspace_.cancel_freight();outpost_freight_controller_.clear();}
       if(voice_settings_&&voice_settings_->visible()){
         const int focus_before=voice_settings_->focused();
+        const auto toggle_before=voice_settings_->focused_toggle();
+        const auto range_before=voice_settings_->focused_range();
         (void)voice_settings_->handle(event,width,height);
-        if(voice_settings_->focused()!=focus_before)announcer_.announce_focus(voice_settings_->focused_label(),announcement_bounds(voice_settings_->focused_bounds(width,height)),voice_settings_->focused_range(),voice_settings_->focused_control(),voice_settings_->focused_toggle());
+        // Announce on state change too — a toggle flip or slider nudge
+        // leaves the ring index unchanged, and AT needs the new state.
+        if(voice_settings_->focused()!=focus_before||voice_settings_->focused_toggle()!=toggle_before||voice_settings_->focused_range()!=range_before)announcer_.announce_focus(voice_settings_->focused_label(),announcement_bounds(voice_settings_->focused_bounds(width,height)),voice_settings_->focused_range(),voice_settings_->focused_control(),voice_settings_->focused_toggle());
         gesture_.capture_for_ui();continue;
       }
       if(settings_hub_){
@@ -6675,8 +6680,10 @@ class NativeCampaign final {
       if(audio_settings_&&audio_settings_->visible()){
         notification_view_.close();chronicle_view_.close();
         const int focus_before=audio_settings_->focused();
+        const auto toggle_before=audio_settings_->focused_toggle();
+        const auto range_before=audio_settings_->focused_range();
         (void)audio_settings_->handle(event,width,height);
-        if(audio_settings_->focused()!=focus_before)announcer_.announce_focus(audio_settings_->focused_label(),announcement_bounds(audio_settings_->focused_bounds(width,height)),audio_settings_->focused_range(),audio_settings_->focused_control(),audio_settings_->focused_toggle());
+        if(audio_settings_->focused()!=focus_before||audio_settings_->focused_toggle()!=toggle_before||audio_settings_->focused_range()!=range_before)announcer_.announce_focus(audio_settings_->focused_label(),announcement_bounds(audio_settings_->focused_bounds(width,height)),audio_settings_->focused_range(),audio_settings_->focused_control(),audio_settings_->focused_toggle());
         gesture_.capture_for_ui();
         continue;
       }
@@ -6879,11 +6886,12 @@ class NativeCampaign final {
       if(developer_session()&&event.type==InputEventType::KeyPressed&&event.control&&event.alt&&event.key=='n'){phenomena_debug_.toggle();gesture_.capture_for_ui();continue;}
       if(developer_session()){
         const int phenomena_debug_focus_before=phenomena_debug_.focus();
+        const auto phenomena_debug_toggle_before=phenomena_debug_.focused_toggle(width,height);
         if(phenomena_debug_.handle(event,width,height)){
           if(const auto* field=phenomena_.field())if(auto index=phenomena_debug_.take_navigation(field->regions.size())){
             const auto& r=field->regions[*index];system_workspace_.close();camera_.center={r.shape.x,r.shape.y};camera_.pixels_per_world=std::max(galaxy_overview_camera(width,height).pixels_per_world,std::min(width,height)/(5*std::max(r.shape.extent_x,r.shape.extent_y)));selected_id_.reset();refresh_inspection();
           }
-          if(phenomena_debug_.focus()!=phenomena_debug_focus_before)
+          if(phenomena_debug_.focus()!=phenomena_debug_focus_before||phenomena_debug_.focused_toggle(width,height)!=phenomena_debug_toggle_before)
             announcer_.announce_focus(phenomena_debug_.focused_label(width,height),
               announcement_bounds(phenomena_debug_.focused_bounds(width,height)),
               std::nullopt,phenomena_debug_.focused_control(width,height),phenomena_debug_.focused_toggle(width,height));

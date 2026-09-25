@@ -67,12 +67,20 @@ StartupEntryResult run_native_startup_entry(Window &window,
   const auto route_settings = [&](const InputEvent& e,int w,int h) {
     const auto route=[&](auto*settings,const auto&label){
       const int focus_before=settings->focused();
-      const bool captured=settings->handle(e,w,h);
-      if(config.announcer&&settings->focused()!=focus_before){
-        const auto rect=settings->focused_bounds(w,h);
-        std::optional<stellar::engine::AnnouncementRange> range;
+      const auto snapshot=[&]([[maybe_unused]]std::optional<bool>&checked,
+                              [[maybe_unused]]std::optional<stellar::engine::AnnouncementRange>&range){
+        if constexpr(requires{settings->focused_toggle();})
+          checked=settings->focused_toggle();
         if constexpr(requires{settings->focused_range();})
           range=settings->focused_range();
+      };
+      std::optional<bool> checked_before;std::optional<stellar::engine::AnnouncementRange> range_before;
+      snapshot(checked_before,range_before);
+      const bool captured=settings->handle(e,w,h);
+      std::optional<bool> checked;std::optional<stellar::engine::AnnouncementRange> range;
+      snapshot(checked,range);
+      if(config.announcer&&(settings->focused()!=focus_before||checked!=checked_before||range!=range_before)){
+        const auto rect=settings->focused_bounds(w,h);
         stellar::engine::AnnouncementControl control=
             stellar::engine::AnnouncementControl::Custom;
         if constexpr(requires{settings->focused_control();})
@@ -80,7 +88,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
         config.announcer->announce_focus(label(),
             rect?std::optional<stellar::engine::AnnouncementBounds>{
                      {rect->x,rect->y,rect->width,rect->height}}
-                :std::nullopt,range,control);
+                :std::nullopt,range,control,checked);
       }
       return captured;
     };

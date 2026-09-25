@@ -215,6 +215,39 @@ int main() {
         "focus announcement did not retain its control kind");
   check(!announcer.take().has_value(), "announcer did not drain fully");
 
+  // Same-focus state changes must re-announce: identical labels with
+  // different checked/range/value state are not duplicates.
+  announcer.announce_focus("mute", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::CheckBox,
+                           false);
+  announcer.announce_focus("mute", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::CheckBox,
+                           false);
+  check(announcer.size() == 1, "identical checked state deduped");
+  announcer.announce_focus("mute", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::CheckBox,
+                           true);
+  check(announcer.size() == 2, "checked change did not re-announce");
+  announcer.clear();
+  announcer.announce_focus("volume", std::nullopt,
+                           stellar::engine::AnnouncementRange{0.f, 1.f, 0.5f},
+                           stellar::engine::AnnouncementControl::Slider);
+  announcer.announce_focus("volume", std::nullopt,
+                           stellar::engine::AnnouncementRange{0.f, 1.f, 0.75f},
+                           stellar::engine::AnnouncementControl::Slider);
+  check(announcer.size() == 2, "range change did not re-announce");
+  announcer.clear();
+  announcer.announce_focus("search", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::Edit,
+                           std::nullopt,
+                           stellar::engine::AnnouncementValue{"alp"});
+  announcer.announce_focus("search", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::Edit,
+                           std::nullopt,
+                           stellar::engine::AnnouncementValue{"alph"});
+  check(announcer.size() == 2, "edit-value change did not re-announce");
+  announcer.clear();
+
   if (failures == 0)
     std::cout << "Economy, replay, animation and accessibility tests passed\n";
   return failures == 0 ? 0 : 1;
