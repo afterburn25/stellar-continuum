@@ -143,6 +143,9 @@ stellar::engine::AnnouncementControl NativeStartupWorkspace::focused_control(int
 stellar::engine::AnnouncementControl NativeStartupWorkspace::focused_control(int width,int height,const TextMeasurer&measure)const{
   return screen_==StartupScreen::Setup?setup_.focused_control(width,height,measure):focused_control(width,height);
 }
+std::optional<stellar::engine::AnnouncementValue> NativeStartupWorkspace::focused_value(int width,int height,const TextMeasurer&measure)const{
+  return screen_==StartupScreen::Setup?setup_.focused_value(width,height,measure):std::nullopt;
+}
 
 StartupIntent NativeStartupWorkspace::handle(const InputEvent&e,int width,int height,const TextMeasurer&measure){
   if(e.type==InputEventType::PointerMove)pointer_=e.position;

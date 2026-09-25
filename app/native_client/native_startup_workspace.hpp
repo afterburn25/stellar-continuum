@@ -99,6 +99,10 @@ public:
   focused_control(int width, int height) const;
   [[nodiscard]] stellar::engine::AnnouncementControl
   focused_control(int width, int height, const TextMeasurer &) const;
+  // Current text of the ringed Edit — null outside Setup; the setup
+  // workspace's seed field reports its text read-only.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue>
+  focused_value(int width, int height, const TextMeasurer &) const;
   [[nodiscard]] bool wants_text_input() const noexcept;
   [[nodiscard]] StartupIntent handle(const stellar::native_map::InputEvent &,
                                      int width, int height,
