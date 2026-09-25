@@ -165,9 +165,16 @@ breaks navigation/AT flow, or presents wrong state)
 
 ### MEDIUM
 
-1. Tooltip coverage is uneven — workspace controls mostly lack
-   what/why-disabled/what-happens explanations (HUD buttons and asset rows
-   are the exception).
+1. Tooltip coverage is uneven — PARTIALLY DONE. Disabled action buttons now
+   explain themselves at the point of interaction: `theme::hover_tooltip`
+   renders the authoritative blocker (shipyard `batch_blocker`/
+   `cancellation_blocker`, construction `start`/`queue` messages, planetary
+   hub/building lock reasons and affordability/capacity/surface gates) when
+   the pointer rests on an unavailable control, and the HUD rail's hand-rolled
+   hint was folded into a new compact `theme::hint` helper. Still open:
+   workspace controls that render hidden-when-illegal (diplomacy action row,
+   proposal buttons) and general "what does this do" coverage beyond disabled
+   states.
 2. ~~Notifications feed has no severity iconography or grouping~~ — severity
    axis and severity filtering shipped (see work log). Category-based
    grouping remains a possible future refinement.
@@ -216,6 +223,7 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | Startup chrome migrated onto the shared theme: `native_startup_workspace` palette constants alias `theme::color` (brand green → `success`, gold → `economy`, warning → `caution`), dialog surfaces use `menu_panel`, Development/ModeSelection/LoadSlots/Busy/Failure buttons use the shared `button` (LOAD SELECTED is a success-toned primary gated on a chosen slot), and the in-game pause menu's buttons/focus ring use `theme::button`/`focus_ring` with `text_primary`/`text_secondary` chrome. Focus-ring sweep: every remaining hard-coded ring — HUD controls, pause menu, startup, settings (general/audio/video/voice), inspection, chronicle, battle, colony freight confirm, galaxy creation, new-game setup, settlement confirm, small-body survey, planetary — now renders through `theme::focus_ring`. Verified via `--restart-exit-smoke` (entry screen) and `--smoke` (pause menu) captures; three tests updated to assert `color::focus`. | 7617f665 |
 | 2026-09-25 | Colony roster migrated onto the shared theme: palette constants alias `theme::color` (selection cyan → `selected`, warning amber → `caution`), the search field frames with a focus-colored keyline, REFRESH/close use the shared `button`, rows use `surface_secondary`/`surface_hover` with a `keyline_strong` hover outline, the scrollbar track uses `keyline`, and the focus ring is the shared helper. Empty-state sweep: the roster's bare "No owned colonies" now pairs with a localized next-action hint (`ROSTER_LIST_EMPTY_HINT` — the unavailable state stays hint-free), and the research tree's "No known research" gains `RESEARCH_NO_MATCH_HINT`; both render through the shared `empty_state`. Verified via `--colony-smoke` Vulkan capture (themed search/chrome/rows) and updated roster tests asserting theme constants instead of retired literals. | 7d9dd2d3 |
 | 2026-09-25 | Notification severity filtering: ALL / IMPORTANT chips in the feed intro strip (shared `button`, caution tone on IMPORTANT) keep the session filter — IMPORTANT projects the feed down to Caution/Alert items through a view-local projection (`visible_items`; the authoritative deque is never touched). Filtering joins the focus ring (chips ring after CHRONICLE/X with localized AT labels `NOTIFY_FILTER_*_LABEL`), resets scroll and ring on toggle, clamps wheel scroll to the filtered extent, and a filtered-empty feed renders its own hint (`NOTIFY_EMPTY_IMPORTANT`). New `severity_filter` test covers chip activation, feed immutability, filtered rendering, scroll bounds, ring order, Return-activation of a filtered card action, reopen persistence and the filtered-empty state; the previously dead `keyboard_focus` test was wired into `main` with corrected ring indices. Smoke note: `--diplomacy-smoke` feed-count gate (`items==2`) now fails pre-capture with `items=8` — the surplus is chronicle backfill republished on a second session activation, a base-side seeding-order quirk reproduced on a canonically authored fixture; the feed render itself verified live (chips + severity bars visible in `notif-filter-events` capture). The gate now reports the offending items in its failure text. | 31d1f30e |
+| 2026-09-25 | Why-disabled tooltips at the point of interaction: new `theme::hint` (compact single-line, measurer-aware) and `theme::hover_tooltip` (gates the shared `tooltip` on hover + non-empty body). Shipyard's disabled BUILD/CANCEL button surfaces `batch_blocker()`/`cancellation_blocker`; construction START/QUEUE surface the authoritative `start`/`queue` action messages; the planetary command-center button surfaces `hub_upgrade_lock_reason` (with localized affordability/requirements fallbacks); and the structures-tab action rows (Begin construction, Upgrade, Repair) surface their real gates — observer/surface/capacity/authorization/condition — via new `PLANET_TIP_*` keys in en+de. The HUD rail's hand-rolled hint block migrated onto `theme::hint`. Tests cover exact-match tooltip text per surface. | TBD |
 
 ### Implementation notes
 
