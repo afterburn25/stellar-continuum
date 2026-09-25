@@ -8119,6 +8119,20 @@ class NativeCampaign final {
     if(video_settings_)video_settings_->render(out,width,height);
     if(voice_settings_)voice_settings_->render(out,width,height);
     if(settings_hub_)settings_hub_->render(out,width,height);
+    // Hover hints on the HUD chrome + legend toggles reuse the same
+    // localized labels the focus ring announces — pointer and keyboard
+    // users get one vocabulary.
+    if(!menu_&&!settings_visible()&&!quick_find_.visible())
+      for(const auto&[rect,action]:hud_ring_items(layout,width,height))
+        if(rect.contains(pointer_)){
+          if(auto caption=hud_action_label(action);!caption.empty())
+            stellar::native_ui::hint(out,
+                {rect.x+rect.width*.5f,rect.y+rect.height+6.f*layout.scale},
+                std::move(caption),width,height,
+                std::max(11,layout.metric_font_pixels-1),layout.scale,
+                text_measurer_);
+          break;
+        }
     return out;
   }
  private:
