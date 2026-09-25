@@ -343,7 +343,21 @@ if(colony_body_id_&&selected_body_id_==colony_body_id_){overlay_fill(out,layout.
 overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});
 overlay_stroke(out,layout.colony_action,{102,232,164,255});
 overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,tr("SYSTEM_VIEW_SHIPYARD","VIEW SHIPYARD"),text,14,layout.colony_action.width-20,layout.colony_action);
-}else if(!notice_.empty()){const UiRect notice_bounds=selected_body()?layout.colony_action:UiRect{panel.x+12,panel.y+panel.height-88,panel.width-24,74};overlay_fill(out,notice_bounds,{35,25,16,235});overlay_stroke(out,notice_bounds,{139,92,42,255});overlay_text(out,notice_bounds.x+8,notice_bounds.y+8,notice_,{245,183,93,250},13,notice_bounds.width-16,notice_bounds);}}
+}else if(!notice_.empty()){const UiRect notice_base=selected_body()?layout.colony_action:UiRect{panel.x+12,panel.y+panel.height-88,panel.width-24,74};
+// Order results wrap to several lines — grow the banner upward to fit the
+// measured text rather than clipping mid-line.
+float notice_height=notice_base.height;
+if(text_measurer_){const auto measured=text_measurer_(Text{{},notice_,{245,183,93,250},13,notice_base.width-16.f});if(measured.height>0)notice_height=std::max(notice_base.height,static_cast<float>(measured.height)+18.f);}
+notice_height=std::min(notice_height,notice_base.y+notice_base.height-(panel.y+8.f));
+// The command HUD's context plate owns the bottom-center strip — lift the
+// banner above it where the inspector's x-range reaches under the plate.
+auto notice_bottom=notice_base.y+notice_base.height;
+const auto plate=CommandHudLayout::make(width_,height_).context;
+if(notice_base.x<plate.x+plate.width&&notice_base.x+notice_base.width>plate.x)
+  notice_bottom=std::min(notice_bottom,plate.y-4.f);
+const auto notice_top=std::max(panel.y+8.f,notice_bottom-notice_height);
+const UiRect notice_bounds{notice_base.x,notice_top,notice_base.width,notice_bottom-notice_top};
+overlay_fill(out,notice_bounds,{35,25,16,235});overlay_stroke(out,notice_bounds,{139,92,42,255});overlay_text(out,notice_bounds.x+8,notice_bounds.y+8,notice_,{245,183,93,250},13,notice_bounds.width-16,notice_bounds);}}
 void NativeSystemWorkspace::sync_body_inspection(){
   if(!snapshot_||!selected_body_id_){preparation_.reset();preparation_pressed_=false;body_inspection_.clear();return;}
   auto inspection=build_body_inspection(*snapshot_,*selected_body_id_,locale_);

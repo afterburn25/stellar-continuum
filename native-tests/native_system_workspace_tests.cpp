@@ -401,5 +401,36 @@ int main(int argc,char**argv)try{
   const auto fitted_scale=workspace.viewport()->scale;const auto field=SystemWorkspaceLayout::for_viewport(1280,720).world_field;
   (void)workspace.handle({.type=InputEventType::Wheel,.position=center(field),.wheel_y=.1f},1280,720);
   require(workspace.viewport()->scale>fitted_scale&&workspace.viewport()->scale<fitted_scale*1.1f,"Wide-system zoom jumped to the old minimum scale");
+  {
+    // Order-result notices wrap to several lines — the banner must grow to fit
+    // the measured text, stay inside the inspector panel, and never reach the
+    // command HUD's bottom-center context plate.
+    const auto stub_measure=[](const Text& t){
+      const auto per_line=std::max(1,static_cast<int>(t.wrap_width/7.f));
+      const auto lines=std::max(1,static_cast<int>((t.value.size()+per_line-1)/per_line));
+      return TextExtent{per_line*7,lines*16};};
+    const std::string long_notice="Pioneer One: colony mission approved for Neris in SYS-019 with 250.0 million "
+        "Terran Baseline colonists aboard. Neris is currently available through the prototype "
+        "habitat-supported fallback for Terran Baseline. Route: 3 lane legs, total 511.3 ly; "
+        "expedition funded for $1.2B UED.";
+    for(const auto [vw,vh]:std::array<std::pair<int,int>,4>{{{1280,720},{1920,1080},{2560,1440},{3840,2160}}}){
+      NativeSystemWorkspace notice_workspace({},stub_measure);
+      notice_workspace.open(reference,vw,vh);
+      notice_workspace.set_notice(long_notice);
+      DrawList notice_draw;notice_workspace.render(notice_draw,vw,vh);
+      const auto banner=std::ranges::find_if(notice_draw.overlay,[&](const UiOverlayCommand& item){
+        const auto* label=std::get_if<Text>(&item);return label&&label->value==long_notice;});
+      require(banner!=notice_draw.overlay.end(),"Long order notice text was not rendered in full");
+      const auto* notice_label=std::get_if<Text>(&*banner);
+      require(notice_label->clip.has_value(),"Order notice rendered without a bounds clip");
+      const auto bounds=*notice_label->clip;const auto panel=SystemWorkspaceLayout::for_viewport(vw,vh).inspector;
+      const auto plate=CommandHudLayout::make(vw,vh).context;
+      require(bounds.y>=panel.y&&bounds.y+bounds.height<=panel.y+panel.height&&bounds.x>=panel.x&&bounds.x+bounds.width<=panel.x+panel.width,
+          "Grown order notice escaped the inspector panel");
+      const auto needed=stub_measure(Text{{},long_notice,{},13,bounds.width-16.f});
+      require(bounds.height>=static_cast<float>(needed.height),"Order notice banner is shorter than its measured wrapped text");
+      require(!overlaps(bounds,plate),"Order notice underlaps the command HUD context plate");
+    }
+  }
   std::cout<<"native system workspace cases passed\n";return 0;
 }catch(const std::exception&e){std::cerr<<"native system workspace failed: "<<e.what()<<'\n';return 1;}
