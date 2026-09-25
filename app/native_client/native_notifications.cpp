@@ -229,8 +229,14 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
                              chip_y, 104.f * s, chip_height};
   layout.filter_all = {layout.filter_important.x - 56.f * s - chip_gap, chip_y,
                        56.f * s, chip_height};
-  layout.filter_category = {layout.filter_all.x - 118.f * s - chip_gap, chip_y,
-                            118.f * s, chip_height};
+  // The topic chip shrinks first on narrow panels — the ALL/IMPORTANT pair
+  // always keeps its full width, and the subtitle yields to whatever room
+  // remains.
+  const float topic_left = layout.panel.x + pad;
+  const float topic_width = std::clamp(
+      layout.filter_all.x - chip_gap - topic_left, 24.f * s, 118.f * s);
+  layout.filter_category = {layout.filter_all.x - topic_width - chip_gap,
+                            chip_y, topic_width, chip_height};
   layout.list_viewport = {layout.panel.x + pad, layout.header.y + layout.header.height + intro_height,
                           layout.panel.width - 2.f * pad,
                           std::max(1.f, layout.panel.y + layout.panel.height - pad -
