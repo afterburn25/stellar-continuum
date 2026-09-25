@@ -1034,6 +1034,8 @@ class NativeCampaign final {
     shipyard_controller_.set_localization(&table);
     diplomacy_controller_.set_localization(&table);
     settlement_controller_.set_localization(&table);
+    construction_controller_.set_localization(&table);
+    colony_controller_.set_localization(&table);
     if(voice_playback_)voice_playback_->set_localization(&table);
   }
 

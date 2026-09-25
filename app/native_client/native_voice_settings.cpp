@@ -195,7 +195,7 @@ void NativeVoiceSettings::load() {
     values_ = saved_ = loaded;
   } catch (const std::exception& error) {
     values_ = saved_ = {};
-    status_ = "Voice settings were not loaded. Defaults are active.";
+    status_ = tr("SETTINGS_VOICE_STATUS_LOAD_FAILED", "Voice settings were not loaded. Defaults are active.");
     std::cerr << "Voice settings load failed for " << path_.string() << ": " << error.what() << '\n';
   }
 }
@@ -379,7 +379,7 @@ void NativeVoiceSettings::activate_at(const VoiceSettingsLayout& layout, stellar
   else if (layout.replay.contains(position)) { if (replay_) replay_(); return; }
   else if (layout.stop.contains(position)) { if (stop_) stop_(); return; }
   else if (layout.defaults.contains(position)) {
-    values_ = {}; status_ = "Default voice and subtitle settings previewed.";
+    values_ = {}; status_ = tr("SETTINGS_VOICE_STATUS_DEFAULTS", "Default voice and subtitle settings previewed.");
   } else if (layout.cancel.contains(position)) { cancel(); return; }
   else if (layout.save.contains(position)) { save(); return; }
   else return;
@@ -398,9 +398,9 @@ void NativeVoiceSettings::save() {
     if (text.size() > maximum_settings_bytes) throw std::runtime_error("settings payload exceeds 4 KiB");
     stellar::engine::write_file_atomically(path_,
         std::span{reinterpret_cast<const std::byte*>(text.data()), text.size()});
-    saved_ = values_; status_ = "Voice and subtitle settings saved."; visible_ = false;
+    saved_ = values_; status_ = tr("SETTINGS_VOICE_STATUS_SAVED", "Voice and subtitle settings saved."); visible_ = false;
   } catch (const std::exception& error) {
-    status_ = "Could not save voice settings. Check the save folder.";
+    status_ = tr("SETTINGS_VOICE_STATUS_SAVE_FAILED", "Could not save voice settings. Check the save folder.");
     if (!save_diagnostic_emitted_) {
       save_diagnostic_emitted_ = true;
       std::cerr << "Voice settings save failed for " << path_.string() << ": " << error.what() << '\n';

@@ -6,6 +6,7 @@
 #include <stellar/core/adaptive_research_expertise.hpp>
 #include <stellar/core/freight.hpp>
 #include <stellar/core/surface_construction.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -211,6 +212,13 @@ std::string signature(const NativeColonyView &view) {
 
 } // namespace
 
+std::string NativeColonyController::tr(std::string_view key,
+                                       std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
 void NativeColonyController::require_owner() const {
   if (std::this_thread::get_id() != owner_)
     throw std::logic_error(
@@ -245,11 +253,11 @@ NativeColonyViewResult NativeColonyController::build(
       system.observer_civilization_id != current.player.id ||
       observation_survey_level(current.world, current.player.id, system.system_id) <
           SystemSurveyLevel::partially_surveyed)
-    return {{}, "The campaign changed; refresh the known system first."};
+    return {{}, tr("COLONY_MSG_CAMPAIGN", "The campaign changed; refresh the known system first.")};
   const auto shown_body = std::ranges::find(system.bodies, selected_body_id,
                                              &native_system::NativeSystemBody::id);
   if (shown_body == system.bodies.end())
-    return {{}, "Select a known body before opening its settlement."};
+    return {{}, tr("COLONY_MSG_SELECT_BODY", "Select a known body before opening its settlement.")};
   const auto colony = std::ranges::find_if(
       current.world.colonies, [&](const Colony &candidate) {
         return can_inspect_settlement(current.world, current.player.id, candidate) &&
@@ -257,14 +265,14 @@ NativeColonyViewResult NativeColonyController::build(
                candidate.planetary_body_id == selected_body_id;
       });
   if (colony == current.world.colonies.end())
-    return {{}, "The selected known body has no owned settlement."};
+    return {{}, tr("COLONY_MSG_NO_SETTLEMENT", "The selected known body has no owned settlement.")};
 
   const auto *owner = find_one(current.world.civilizations, colony->civilization_id,
                                 &Civilization::id);
   const auto *economy = find_one(current.world.economies, colony->civilization_id,
                                   &CivilizationEconomy::civilization_id);
   if (!owner || !economy)
-    return {{}, "The settlement owner or economy is unavailable."};
+    return {{}, tr("COLONY_MSG_OWNER_UNAVAILABLE", "The settlement owner or economy is unavailable.")};
 
   const auto output = surface_colony_output(*colony);
   const auto specialization = surface_colony_specialization(*colony);

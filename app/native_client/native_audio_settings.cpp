@@ -122,7 +122,7 @@ void NativeAudioSettings::load() {
     values_ = saved_ = loaded;
   } catch (const std::exception& error) {
     values_ = saved_ = {};
-    status_ = "Audio settings were not loaded. Defaults are active.";
+    status_ = tr("SETTINGS_AUDIO_STATUS_LOAD_FAILED", "Audio settings were not loaded. Defaults are active.");
     std::cerr << "Audio settings load failed for " << path_.string() << ": " << error.what() << '\n';
   }
 }
@@ -209,7 +209,7 @@ void NativeAudioSettings::activate_at(const AudioSettingsLayout& layout, stellar
   if (layout.effects_track.contains(position)) { dragging_ = Dragged::Effects; set_from_track(dragging_, position, layout); return; }
   dragging_ = Dragged::None;
   if (layout.mute.contains(position)) { values_.muted = !values_.muted; preview(); invoke_confirm(); return; }
-  if (layout.defaults.contains(position)) { values_ = {}; preview(); status_ = "Default audio levels previewed."; invoke_confirm(); return; }
+  if (layout.defaults.contains(position)) { values_ = {}; preview(); status_ = tr("SETTINGS_AUDIO_STATUS_DEFAULTS", "Default audio levels previewed."); invoke_confirm(); return; }
   if (layout.cancel.contains(position)) { invoke_confirm(); cancel(); return; }
   if (layout.save.contains(position)) { invoke_confirm(); save(); return; }
 }
@@ -223,10 +223,10 @@ void NativeAudioSettings::save() {
     const auto bytes = std::span{reinterpret_cast<const std::byte*>(text.data()), text.size()};
     stellar::engine::write_file_atomically(path_, bytes);
     saved_ = values_;
-    status_ = "Audio settings saved.";
+    status_ = tr("SETTINGS_AUDIO_STATUS_SAVED", "Audio settings saved.");
     visible_ = false;
   } catch (const std::exception& error) {
-    status_ = "Could not save audio settings. Check the save folder.";
+    status_ = tr("SETTINGS_AUDIO_STATUS_SAVE_FAILED", "Could not save audio settings. Check the save folder.");
     if (!save_diagnostic_emitted_) {
       save_diagnostic_emitted_ = true;
       std::cerr << "Audio settings save failed for " << path_.string() << ": " << error.what() << '\n';
@@ -342,11 +342,11 @@ void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
   button(draw, layout.save, tr("SETTINGS_SAVE", "SAVE"), layout.body_font_pixels, true);
   const auto notice = status_.empty() ? (values_.muted ? tr("SETTINGS_AUDIO_MUTED_NOTICE", "Audio is muted; your levels are retained.")
                                                      : tr("SETTINGS_AUDIO_HINT", "Changes preview immediately.")) : status_;
-  label(draw, {layout.status.x, layout.status.y}, general_navigation_&&!device_status_.empty()?"Playback: unavailable; check your audio device.":notice, std::max(12, layout.body_font_pixels - 2), layout.status, TextAlign::Left);
+  label(draw, {layout.status.x, layout.status.y}, general_navigation_&&!device_status_.empty()?tr("SETTINGS_AUDIO_STATUS_PLAYBACK", "Playback: unavailable; check your audio device."):notice, std::max(12, layout.body_font_pixels - 2), layout.status, TextAlign::Left);
   if (!device_status_.empty()&&!general_navigation_) {
     const UiRect diagnostic{layout.panel.x + 12.f * layout.scale, layout.panel.y + 54.f * layout.scale,
                             std::max(0.f, layout.panel.width - (video_navigation_ ? 168.f : 24.f) * layout.scale), 22.f * layout.scale};
-    draw.overlay.emplace_back(Text{{diagnostic.x, diagnostic.y}, "Playback: unavailable; check your audio device.", muted_color,
+    draw.overlay.emplace_back(Text{{diagnostic.x, diagnostic.y}, tr("SETTINGS_AUDIO_STATUS_PLAYBACK", "Playback: unavailable; check your audio device."), muted_color,
                                    std::max(12, layout.body_font_pixels - 2), diagnostic.width, diagnostic});
   }
   if (focus_ >= 0) {
