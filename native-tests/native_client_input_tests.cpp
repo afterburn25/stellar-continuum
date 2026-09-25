@@ -84,5 +84,43 @@ int main(){
     InputEvent axis{};axis.type=InputEventType::GamepadAxis;axis.gamepad_axis=0;axis.gamepad_axis_value=.9f;
     check(!pad_navigation_event(axis),"pad axis translated unexpectedly");
   }
+  // PadNavigationRepeater: a held dpad direction re-fires after the
+  // initial delay and then at the repeat interval; releases disarm,
+  // discrete buttons never repeat, and each pad tracks independently.
+  {
+    using stellar::native_client::PadNavigationRepeater;
+    PadNavigationRepeater repeater;
+    std::vector<InputEvent> emitted;
+    const auto collect=[&](float dt){repeater.update(dt,[&](const InputEvent&e){emitted.push_back(e);});};
+    auto press=[](std::uint8_t button,std::uint8_t device=0){InputEvent e{};e.type=InputEventType::GamepadPressed;e.gamepad_button=button;e.gamepad_device=device;return e;};
+    auto release=[](std::uint8_t button,std::uint8_t device=0){InputEvent e{};e.type=InputEventType::GamepadReleased;e.gamepad_button=button;e.gamepad_device=device;return e;};
+    repeater.note(press(12));
+    collect(PadNavigationRepeater::kInitialDelay-.01f);
+    check(emitted.empty(),"dpad repeat fired before the initial delay");
+    collect(.02f);
+    check(emitted.size()==1&&emitted.front().gamepad_button==12,
+        "held dpad direction did not re-fire after the initial delay");
+    collect(PadNavigationRepeater::kRepeatInterval*2.f);
+    check(emitted.size()==2,"a slow frame burst extra repeats");
+    collect(PadNavigationRepeater::kRepeatInterval+.01f);
+    check(emitted.size()==3,"held dpad direction did not keep repeating at the interval");
+    repeater.note(release(12));
+    emitted.clear();
+    collect(PadNavigationRepeater::kRepeatInterval*10.f);
+    check(emitted.empty(),"released dpad direction kept repeating");
+    repeater.note(press(0));repeater.note(press(1));repeater.note(press(6));
+    collect(10.f);
+    check(emitted.empty(),"discrete pad buttons repeated");
+    // A release on another pad must not disarm this device.
+    repeater.note(press(11,1));
+    repeater.note(release(11,2));
+    collect(PadNavigationRepeater::kInitialDelay+.01f);
+    check(emitted.size()==1&&emitted.front().gamepad_device==1,
+        "a release on a different pad disarmed the held direction");
+    repeater.note(release(11,1));
+    emitted.clear();
+    collect(1.f);
+    check(emitted.empty(),"cleared direction kept repeating");
+  }
   return failures==0?0:1;
 }

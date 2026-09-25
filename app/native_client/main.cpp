@@ -6392,16 +6392,28 @@ class NativeCampaign final {
     // Replayed pointer commands merge ahead of this frame's live events —
     // they dispatch through the identical handlers in recorded order.
     std::vector<InputEvent> frame_events;
+    // Held dpad directions re-fire as nav keys; the emit re-checks the
+    // ownership gate so a direction pressed in free play cannot leak
+    // repeats into a surface opened while held (native_pad_input.hpp).
+    // A focus drop can swallow the release — disarm on unfocused frames.
+    if(!input.focused)pad_nav_repeater_.clear();
+    pad_nav_repeater_.update(static_cast<float>(std::max(0.,elapsed)),
+        [&](const InputEvent &held){
+          if(ui_owns_pad_input(held))
+            if(auto nav=stellar::native_client::pad_navigation_event(held))
+              frame_events.push_back(*nav);});
     const std::vector<InputEvent> *frame_event_stream=&input.events;
     if(replay_&&!replay_->injected_events.empty()){
-      frame_events.reserve(replay_->injected_events.size()+input.events.size());
       frame_events.insert(frame_events.end(),replay_->injected_events.begin(),
                           replay_->injected_events.end());
       replay_->injected_events.clear();
+    }
+    if(!frame_events.empty()){
       frame_events.insert(frame_events.end(),input.events.begin(),input.events.end());
       frame_event_stream=&frame_events;
     }
     for(const auto &raw_event:*frame_event_stream){
+      pad_nav_repeater_.note(raw_event);
       // Pad presses are gameplay bindings in free play; while a UI surface
       // owns input they translate into the equivalent navigation key so
       // every focus ring answers the pad (native_pad_input.hpp).
@@ -9376,6 +9388,7 @@ class NativeCampaign final {
   bool settings_visible() const { return (settings_hub_&&settings_hub_->visible()) || (voice_settings_&&voice_settings_->visible()) || (general_settings_&&general_settings_->visible()) || (audio_settings_&&audio_settings_->visible()) || (video_settings_&&video_settings_->visible()); }
   stellar::native_general::NativeGeneralSettings* general_settings_{};
   stellar::native_settings::NativeSettingsHub* settings_hub_{};
+  stellar::native_client::PadNavigationRepeater pad_nav_repeater_{};
   stellar::native_audio::NativeVoiceSettings* voice_settings_{};
   stellar::native_client::NativeAccessibilityBridge* accessibility_bridge_{};
   stellar::native_video_settings::NativeVideoController* video_settings_{};

@@ -438,9 +438,23 @@ StartupEntryResult run_native_startup_entry(Window &window,
                      &artwork_provider);
     window.draw(loading_draw, automation->loading_screenshot);
   }
+  stellar::native_client::PadNavigationRepeater pad_nav_repeater;
+  auto last_frame = std::chrono::steady_clock::now();
   for (;;) {
     if (config.audio.service) config.audio.service();
     const auto input = window.poll();
+    const auto frame_now = std::chrono::steady_clock::now();
+    const auto frame_dt = std::chrono::duration<float>(frame_now - last_frame).count();
+    last_frame = frame_now;
+    std::vector<InputEvent> pad_nav_events;
+    if (!input.focused) pad_nav_repeater.clear();
+    pad_nav_repeater.update(frame_dt, [&](const InputEvent &held) {
+      if (!(config.settings_hub && config.settings_hub->capturing()))
+        if (auto nav = stellar::native_client::pad_navigation_event(held))
+          pad_nav_events.push_back(*nav);
+    });
+    std::vector<InputEvent> frame_events = pad_nav_events;
+    frame_events.insert(frame_events.end(), input.events.begin(), input.events.end());
     if (config.video_settings) config.video_settings->service(input.focused, input.renderable());
     if (input.quit_requested) {
       evidence.exit_requested = true;
@@ -462,7 +476,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
       }
     };
     if (!input.renderable()) {
-      for (const auto &raw : input.events) {
+      for (const auto &raw : frame_events) {
+        pad_nav_repeater.note(raw);
         const InputEvent event=[&]{
           if(raw.type==InputEventType::GamepadPressed&&
              !(config.settings_hub&&config.settings_hub->capturing()))
@@ -481,7 +496,8 @@ StartupEntryResult run_native_startup_entry(Window &window,
       continue;
     }
     bool exit{};
-    for (const auto &raw : input.events) {
+    for (const auto &raw : frame_events) {
+      pad_nav_repeater.note(raw);
       // Pad presses become navigation keys on the startup screens — no
       // gameplay context exists yet — except while a rebind capture in the
       // settings hub waits for the raw trigger.
