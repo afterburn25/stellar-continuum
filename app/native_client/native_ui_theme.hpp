@@ -55,6 +55,28 @@ inline constexpr Color military{255, 119, 110, 255};
 inline constexpr Color shadow{0, 4, 9, 168};
 }
 
+// Canonical type ramp in unscaled pixels: one vocabulary for workspace
+// chrome so the heading/body/small hierarchy reads identically on every
+// surface. Dense tabular surfaces (fleet/battle/inspection) use the compact
+// body/small rungs instead of inventing their own.
+namespace type {
+[[nodiscard]] inline int title(float scale) noexcept {
+  return static_cast<int>(std::lround(24.f * scale));
+}
+[[nodiscard]] inline int body(float scale) noexcept {
+  return static_cast<int>(std::lround(15.f * scale));
+}
+[[nodiscard]] inline int small(float scale) noexcept {
+  return static_cast<int>(std::lround(12.f * scale));
+}
+[[nodiscard]] inline int compact_body(float scale) noexcept {
+  return static_cast<int>(std::lround(14.f * scale));
+}
+[[nodiscard]] inline int compact_small(float scale) noexcept {
+  return static_cast<int>(std::lround(11.f * scale));
+}
+} // namespace type
+
 // Global high-contrast pass over a finished DrawList: snaps low-luminance
 // text to the primary ink so every surface gains readability without
 // per-screen palette plumbing. Colored accents above the threshold keep

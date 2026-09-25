@@ -67,7 +67,7 @@ EconomyLayout EconomyLayout::for_viewport(int width,int height) noexcept {
   const UiRect panel{x,top,std::max(180.f,w-x-margin),std::max(180.f,h-top-margin)};
   const float pad=14.f*s;
   EconomyLayout result; result.scale=s;
-  result.heading_font_pixels=std::max(14,static_cast<int>(23*s)); result.body_font_pixels=std::max(11,static_cast<int>(15*s)); result.small_font_pixels=std::max(9,static_cast<int>(12*s));
+  result.heading_font_pixels=std::max(14,theme::type::title(s)); result.body_font_pixels=std::max(11,theme::type::body(s)); result.small_font_pixels=std::max(9,theme::type::small(s));
   result.panel=panel; result.header={panel.x+pad,panel.y+pad,panel.width-2*pad,31*s};
   result.close={panel.x+panel.width-pad-30*s,panel.y+pad,30*s,28*s};
   result.refresh={result.close.x-100*s,panel.y+pad,90*s,28*s};

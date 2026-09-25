@@ -274,7 +274,7 @@ ResearchWorkspaceLayout
 ResearchWorkspaceLayout::for_viewport(int width, int height,
                                       std::size_t tab_count) {
   ResearchWorkspaceLayout l;const float s=std::clamp(height/1080.f,.8f,2.f),g=10*s;
-  l.scale=s;l.title_font_pixels=static_cast<int>(24*s);l.body_font_pixels=std::max(13,static_cast<int>(16*s));l.small_font_pixels=std::max(12,static_cast<int>(14*s));
+  l.scale=s;l.title_font_pixels=theme::type::title(s);l.body_font_pixels=std::max(13,static_cast<int>(16*s));l.small_font_pixels=std::max(12,static_cast<int>(14*s));
   const auto chrome=NativeUiLayout::for_viewport(width,height);const float x=native_navigation_content_left*chrome.scale,top=native_workspace_top(width,height),right=width-12*s;
   l.surface={x,top,right-x,height-top-10*s};l.title={x,top,350*s,32*s};l.labs={x,top+36*s,right-x-115*s,25*s};
   l.close={right-80*s,top,80*s,34*s};

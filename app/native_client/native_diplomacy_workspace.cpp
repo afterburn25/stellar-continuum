@@ -273,9 +273,9 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   const UiRect modal_panel{(w - modal_w) * .5f, (h - modal_h) * .5f, modal_w,
                            modal_h};
   return {scale,
-          static_cast<int>(std::lround(26.f * scale)),
-          static_cast<int>(std::lround(15.f * scale)),
-          static_cast<int>(std::lround(12.f * scale)),
+          theme::type::title(scale),
+          theme::type::body(scale),
+          theme::type::small(scale),
           surface,
           {inner_x, surface.y + 14.f * scale, surface.width * .5f,
            32.f * scale},

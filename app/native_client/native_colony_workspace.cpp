@@ -46,9 +46,9 @@ ColonyWorkspaceLayout ColonyWorkspaceLayout::for_viewport(int width,
                        std::max(1.f, h - top - margin)};
   ColonyWorkspaceLayout result;
   result.scale=scale;result.surface=surface;
-  result.title_font_pixels=static_cast<int>(24*scale);
-  result.body_font_pixels=static_cast<int>(15*scale);
-  result.small_font_pixels=static_cast<int>(12*scale);
+  result.title_font_pixels=stellar::native_ui::type::title(scale);
+  result.body_font_pixels=stellar::native_ui::type::body(scale);
+  result.small_font_pixels=stellar::native_ui::type::small(scale);
   const float mw = std::min(surface.width - 30.f * scale, 700.f * scale);
   const float mh = std::min(surface.height - 30.f * scale, 440.f * scale);
   result.freight_review = {surface.x + (surface.width - mw) * .5f,

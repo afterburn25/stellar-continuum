@@ -150,9 +150,9 @@ ConstructionWorkspaceLayout ConstructionWorkspaceLayout::for_viewport(
                      std::max(0.f, feedback.y - details.y -
                                        details.height - 16.f * scale)};
   return {scale,
-          static_cast<int>(std::lround(24.f * scale)),
-          static_cast<int>(std::lround(15.f * scale)),
-          static_cast<int>(std::lround(12.f * scale)),
+          theme::type::title(scale),
+          theme::type::body(scale),
+          theme::type::small(scale),
           surface,
           {inner_x, surface.y + 14.f * scale,
            surface.width - 92.f * scale, 32.f * scale},

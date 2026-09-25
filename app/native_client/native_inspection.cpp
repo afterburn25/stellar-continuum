@@ -94,8 +94,8 @@ ContentLayout content_layout(const SystemInspection& value, UiRect bounds,
   ContentLayout layout;
   layout.scale = scale_for(bounds);
   layout.clip = SystemInspectionCard::body_bounds(bounds);
-  layout.body_font = std::max(11, static_cast<int>(14 * layout.scale));
-  layout.small_font = std::max(9, static_cast<int>(11 * layout.scale));
+  layout.body_font = std::max(11, stellar::native_ui::type::compact_body(layout.scale));
+  layout.small_font = std::max(9, stellar::native_ui::type::compact_small(layout.scale));
   const float s = layout.scale;
   float y = 8.f * s;
   const auto add_block = [&](std::string text_value, float x, float width,
