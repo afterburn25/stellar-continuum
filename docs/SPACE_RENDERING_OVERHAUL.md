@@ -124,7 +124,11 @@ Limb darkening (`Material3D::limb_darkening`, linear N·V law) keeps
 self-luminous star discs from clipping flat; `star_photosphere3d(kelvin)`
 + `starKelvin`/`StarPhotosphere` derive a full spectral-class star
 material (blackbody tint, emissive-dominant, temperature-graded limb
-coefficient). Screen-space mesh LOD
+coefficient). `accretion_disc_material3d(inner,outer,kelvin,beaming)`
+generates a Shakura–Sunyaev thin-disc radial column (`T ∝ r^(−3/4)`,
+flux ∝ T⁴, per-texel blackbody) for `annulus:i,o` meshes with the
+orbital-beaming lane asymmetry — black holes compose it with a dark
+sphere rather than needing an engine concept. Screen-space mesh LOD
 chains are landed: `lod_meshes`/`lod_pixels` swap to coarser meshes by
 projected bounding diameter (halving per level), with the streamer
 demand and draw submission sharing `select_lod3d_level` so only the

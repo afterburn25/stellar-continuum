@@ -729,6 +729,22 @@ int main(int argc,char** argv)try{
     check(edge_r<center_r*3/4&&edge_r>10,"Star preset did not darken the limb");
     std::cout<<"star_photosphere_gpu=blackbody_limb_passed\n";
   }
+  {
+    // Accretion disc preset: the Shakura-Sunyaev radial texture burns
+    // brightest at the inner edge and cools/dims outward, while orbital
+    // beaming splits the approaching/receding lanes.
+    MeshInstance3D bh{annulus_mesh(.45f,1.f,192),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000)};
+    bh.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto disc=capture({bh},"accretion.png");
+    const int outer=channel(*disc,160,90,0),inner=channel(*disc,160,124,0);
+    check(inner>180&&outer<inner*2/3,
+        "Accretion disc lost its radial luminance falloff");
+    const int left=channel(*disc,70,160,0),right=channel(*disc,250,160,0);
+    check(left>150&&right<left*3/4,
+        "Accretion disc lost its beamed lane asymmetry");
+    std::cout<<"accretion_disc_gpu=radial_beaming_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");

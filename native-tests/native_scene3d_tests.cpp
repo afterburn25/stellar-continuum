@@ -140,6 +140,24 @@ int main()try{
    check(dwarf.tint.r>dwarf.tint.b&&dwarf.limb_darkening>sun.limb_darkening,"Cool star lost its red tint or stronger limb darkening");
    const auto ostar=star_photosphere3d(30000);
    check(ostar.tint.b>ostar.tint.r&&ostar.limb_darkening<sun.limb_darkening,"Hot star lost its blue tint or weaker limb darkening");}
+  rejects([&]{(void)accretion_disc_material3d(0,1,8000);});
+  rejects([&]{(void)accretion_disc_material3d(2,1,8000);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1,50);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1,8000,2.f);});
+  {const auto disc=accretion_disc_material3d(0.5f,1.f,8000);
+   check(disc.texture&&disc.texture->width()==256&&disc.texture->height()==1,
+       "Accretion disc did not generate its radial texture");
+   check(disc.ambient==1.f&&disc.diffuse==0.f&&disc.linear_light,
+       "Accretion disc is not emissive-dominant");
+   check(disc.double_sided&&disc.orbital_beaming>.5f&&disc.anisotropic_texture,
+       "Accretion disc lost its sheet/beaming/minification settings");
+   const auto &px=disc.texture->pixels();
+   const auto lum=[&](int u){return px[u*4]*3+px[u*4+1]*4+px[u*4+2];};
+   check(lum(4)>lum(250)*2,"Shakura-Sunyaev profile lost its inner-edge luminance");
+   check(px[250*4+2]<px[4*4+2]&&px[250*4+0]>px[250*4+2],
+       "Accretion outer rim did not cool redward of the inner edge");
+   const auto repeat=accretion_disc_material3d(0.5f,1.f,8000);
+   check(repeat.texture->pixels()==disc.texture->pixels(),"Accretion texture is not deterministic");}
   {PointLight3D light;light.position={0,0,1};light.intensity=2;light.range=50;
    const auto lit=Scene3D::create(camera,{instance},{0,0,1},{light});
    check(lit->point_lights().size()==1,"Scene dropped its point light");}

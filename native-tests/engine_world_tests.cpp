@@ -694,6 +694,7 @@ int main() {
         turret.band_shear = -0.3f;
         turret.orbital_beaming = 0.65f;
         turret.star_kelvin = 5800.0;
+        turret.accretion = {0.3f, 1.f, 12000.f, -0.6f};
         turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
         turret.lod_pixels = 64.f;
         doc.entities.push_back(turret);
@@ -766,6 +767,12 @@ int main() {
               "spawn_scene3d starphotosphere component");
         check(world3.get<StarPhotosphere>(ship_e) == nullptr,
               "no starKelvin does not attach a component");
+        const auto *ad = world3.get<AccretionDisc>(turret_e);
+        check(ad != nullptr && ad->inner == 0.3f && ad->outer == 1.f &&
+                  ad->kelvin == 12000.f && ad->beaming == -0.6f,
+              "spawn_scene3d accretiondisc component");
+        check(world3.get<AccretionDisc>(ship_e) == nullptr,
+              "no accretion key does not attach a component");
         check(world3.get<Lifetime>(turret_e)->remaining == 3.f,
               "spawn_scene3d lifetime");
         const auto *pt = world3.get<Parent3D>(turret_e);
@@ -833,6 +840,10 @@ int main() {
             const auto *rsp = restored.get<StarPhotosphere>(*re_turret);
             check(rsp != nullptr && rsp->kelvin == 5800.0,
                   "starphotosphere codec round-trips");
+            const auto *rad = restored.get<AccretionDisc>(*re_turret);
+            check(rad != nullptr && rad->inner == 0.3f &&
+                      rad->kelvin == 12000.f && rad->beaming == -0.6f,
+                  "accretiondisc codec round-trips");
         }
         if (re_turret) {
             resolve_hierarchy3d(restored);
@@ -869,7 +880,10 @@ int main() {
                   out.entities[1].limb_darkening == 0.6f &&
                   out.entities[1].band_shear == -0.3f &&
                   out.entities[1].orbital_beaming == 0.65f &&
-                  out.entities[1].star_kelvin == 5800.0,
+                  out.entities[1].star_kelvin == 5800.0 &&
+                  out.entities[1].accretion[0] == 0.3f &&
+                  out.entities[1].accretion[2] == 12000.f &&
+                  out.entities[1].accretion[3] == -0.6f,
               "scene3d_from_world exports surface response");
         check(out.entities[1].lod_meshes.size() == 2 &&
                   out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&

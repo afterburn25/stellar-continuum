@@ -232,6 +232,17 @@ struct Material3D {
 // convective cool stars darken more; the monotone falloff clamps to the
 // observed [0.2,0.95] envelope. Throws on kelvin outside [100,100000].
 [[nodiscard]] Material3D star_photosphere3d(double kelvin);
+// Accretion disc material for an `annulus_mesh(inner,outer)` — a
+// Shakura–Sunyaev radial profile generated into the surface texture:
+// T(r) = T_inner·(r/inner)^(−3/4) mapped through the blackbody curve,
+// with emitted flux ∝ T⁴ so the inner edge burns hot while the outer
+// rim cools and dims. Double-sided, emissive-dominant (ambient
+// bypasses light_color), and `orbital_beaming` applies the first-order
+// doppler asymmetry — the approaching lane reads brighter, which is the
+// signature look of a relativistic disc. beaming in [-1,1].
+[[nodiscard]] Material3D accretion_disc_material3d(
+    float inner_radius, float outer_radius, double kelvin,
+    float beaming = .85f);
 struct MeshInstance3D {
   std::shared_ptr<const Mesh3D> mesh;
   Position3 position;

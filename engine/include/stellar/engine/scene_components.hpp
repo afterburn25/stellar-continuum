@@ -201,6 +201,13 @@ struct MaterialSurface {
 struct StarPhotosphere {
   double kelvin{0.0};
 };
+// Accretion-disc material preset — the component counterpart of the
+// entity document's `accretion` key. The runtime maps it through
+// `accretion_disc_material3d`: Shakura–Sunyaev radial blackbody
+// texture + orbital beaming on an `annulus` mesh at matching radii.
+struct AccretionDisc {
+  float inner{0.f}, outer{0.f}, kelvin{0.f}, beaming{0.85f};
+};
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
 // weighted to the day side with a nightside floor.
 struct AtmosphereShell {

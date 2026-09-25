@@ -79,6 +79,22 @@ orbiting material). Real lensing is out of scope for the forward path —
 this is the authored approximation that gives accretion discs their
 asymmetric bright side.
 
+`accretion_disc_material3d(inner,outer,kelvin,beaming)` builds the disc
+itself: a Shakura–Sunyaev thin-disc radial texture (`T(r) = T_inner ·
+(r/inner)^(−3/4)`, each texel mapped through `blackbody_light_color`
+with emitted flux ∝ T⁴ so the inner edge burns hot while the outer rim
+cools and dims), emissive-dominant response, double-sided, anisotropic
+filtering, and `orbital_beaming` for the approaching-lane asymmetry. The
+texture is 256×1 — authored for an `annulus:i,o` mesh at matching radii
+(annulus U is radial, so the column maps straight onto the disc). The
+implementation lives in `spherical_material_preparation.cpp` because
+`RgbaImage::create` lives in `stellar_native_image`, which already links
+`stellar_engine` — keep generated-texture factories on that side of the
+dependency edge. Authored scenes use the `accretion:[i,o,k,beam]` entity
+key (or the `AccretionDisc` component); an authored `texture` still wins
+over the generated column. A black hole is an authoring composition —
+a dark sphere inside the annulus — not an engine concept.
+
 Per-instance distance culling lives on `MeshInstance3D`:
 
 ```cpp
@@ -261,7 +277,8 @@ UV tiling, atmosphere tint/strength/power/night floor, visible range,
 surface maps (normal/properties/cloud), surface scalars (normal
 strength/relief), cloud deck (opacity/albedo/offset), terminator wrap,
 limb darkening, band shear, orbital beaming, starKelvin photosphere
-preset, mesh LOD chain (csv specs) and LOD switch size.
+preset, accretion disc preset (inner,outer,kelvin,beaming csv), mesh
+LOD chain (csv specs) and LOD switch size.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range),
 shadow map (extent/distance/depth/strength/bias/resolution).
@@ -307,6 +324,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   two-term coefficients or wavelength-dependent profiles.
 - `orbital_beaming` is a first-order brightness asymmetry — no doppler
   color shift, gravitational redshift, or lensing.
+- `accretion_disc_material3d` is an azimuthally uniform thin-disc
+  profile — no spiral fluctuations, no relativistic ray-bending; the
+  annulus radii must be re-stated in the `annulus:i,o` mesh spec.
 - One shared equirect env map per material — no probe grid.
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
 - Debug views are developer tooling — no LOD/residency visualization

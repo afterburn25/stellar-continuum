@@ -469,6 +469,7 @@ std::string Scene3dDocument::to_json() const {
     if (e.band_shear != 0.f) item["bandShear"] = e.band_shear;
     if (e.orbital_beaming != 0.f) item["orbitalBeam"] = e.orbital_beaming;
     if (e.star_kelvin != 0.0) item["starKelvin"] = e.star_kelvin;
+    if (e.accretion[2] != 0.f) item["accretion"] = e.accretion;
     if (!e.lod_meshes.empty()) {
       item["lods"] = e.lod_meshes;
       item["lodPixels"] = e.lod_pixels;
@@ -669,6 +670,18 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       if (!(e.star_kelvin == 0.0 ||
             (e.star_kelvin >= 100.0 && e.star_kelvin <= 100000.0)))
         return fail("starKelvin must be in [100,100000]");
+      if (item.contains("accretion")) {
+        const auto &ac = item.at("accretion");
+        if (!ac.is_array() || ac.size() != 4)
+          return fail("accretion must be [inner,outer,kelvin,beaming]");
+        for (int i = 0; i < 4; ++i) e.accretion[i] = ac[i].get<float>();
+        if (!(e.accretion[0] > 0.f && e.accretion[1] > e.accretion[0]))
+          return fail("accretion radii must satisfy 0<inner<outer");
+        if (!(e.accretion[2] >= 100.f && e.accretion[2] <= 100000.f))
+          return fail("accretion kelvin must be in [100,100000]");
+        if (!(std::abs(e.accretion[3]) <= 1.f))
+          return fail("accretion beaming must be in [-1,1]");
+      }
       if (item.contains("lods")) {
         const auto &lods = item.at("lods");
         if (!lods.is_array() || lods.size() > 8)

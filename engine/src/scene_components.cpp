@@ -516,6 +516,14 @@ void register_scene_components(World &world) {
       "starphotosphere",
       encode_fields<StarPhotosphere, &StarPhotosphere::kelvin>,
       decode_fields<StarPhotosphere, &StarPhotosphere::kelvin>);
+  world.register_component<AccretionDisc>(
+      "accretiondisc",
+      encode_fields<AccretionDisc, &AccretionDisc::inner,
+                    &AccretionDisc::outer, &AccretionDisc::kelvin,
+                    &AccretionDisc::beaming>,
+      decode_fields<AccretionDisc, &AccretionDisc::inner,
+                    &AccretionDisc::outer, &AccretionDisc::kelvin,
+                    &AccretionDisc::beaming>);
   // u32 count + length-prefixed spec strings + f32 switch size — decode
   // tolerates a truncated tail like MaterialSurface.
   world.register_component<MeshLods>(
@@ -839,6 +847,9 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, VisibleRange{s.visible_range});
     if (s.star_kelvin >= 100.0)
       world.add(entity, StarPhotosphere{s.star_kelvin});
+    if (s.accretion[2] >= 100.f)
+      world.add(entity, AccretionDisc{s.accretion[0], s.accretion[1],
+                                      s.accretion[2], s.accretion[3]});
     if (!s.lod_meshes.empty())
       world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels});
     world.add(entity, GravityScale{s.gravity_scale});
@@ -945,6 +956,8 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.visible_range = vr->range;
     if (const auto *sp = world.get<StarPhotosphere>(entity))
       s.star_kelvin = sp->kelvin;
+    if (const auto *ad = world.get<AccretionDisc>(entity))
+      s.accretion = {ad->inner, ad->outer, ad->kelvin, ad->beaming};
     if (const auto *ml = world.get<MeshLods>(entity)) {
       s.lod_meshes = ml->specs;
       s.lod_pixels = ml->pixels;

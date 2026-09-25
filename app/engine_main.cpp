@@ -316,7 +316,8 @@ struct Shell {
       hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{},
       hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
       hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
-      hit3_bandshear{}, hit3_orbitbeam{}, hit3_starkelvin{};
+      hit3_bandshear{}, hit3_orbitbeam{}, hit3_starkelvin{},
+      hit3_accretion{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2191,6 +2192,16 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 100.f && a <= 100000.f) { next.star_kelvin = a; valid = true; }
           break;
+  case 63: {
+          float inner, outer, kelvin, beam;
+          valid = parse_quad(shell.scene3_buffer, inner, outer, kelvin,
+                             beam);
+          if (valid && inner > 0.f && outer > inner &&
+              kelvin >= 100.f && kelvin <= 100000.f &&
+              beam >= -1.f && beam <= 1.f)
+            next.accretion = {inner, outer, kelvin, beam};
+          else valid = false;
+          break; }
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2244,7 +2255,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                         shell.hit3_lodpixels =
                                                             shell.hit3_bandshear =
                                                                 shell.hit3_orbitbeam =
-                                                                    shell.hit3_starkelvin = {};
+                                                                    shell.hit3_starkelvin =
+                                                                        shell.hit3_accretion = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2361,6 +2373,22 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         inst.material.light_color = star.light_color;
         inst.material.linear_light = star.linear_light;
         inst.material.limb_darkening = star.limb_darkening;
+      }
+      // Accretion-disc preset: generated radial texture (unless an
+      // authored texture wins) + emissive-dominant response + beaming.
+      if (e.accretion[2] >= 100.f && e.accretion[0] > 0.f &&
+          e.accretion[1] > e.accretion[0] &&
+          std::abs(e.accretion[3]) <= 1.f) {
+        const auto disc = accretion_disc_material3d(
+            e.accretion[0], e.accretion[1], e.accretion[2], e.accretion[3]);
+        if (e.texture.empty()) inst.material.texture = disc.texture;
+        inst.material.ambient = disc.ambient;
+        inst.material.diffuse = disc.diffuse;
+        inst.material.light_color = disc.light_color;
+        inst.material.linear_light = disc.linear_light;
+        inst.material.double_sided = disc.double_sided;
+        inst.material.orbital_beaming = disc.orbital_beaming;
+        inst.material.anisotropic_texture = disc.anisotropic_texture;
       }
       // The same fields the runtime maps through MaterialPbr/AtmosphereShell.
       if (e.metallic != 0.f || e.roughness != 0.55f ||
@@ -2692,6 +2720,13 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_starkelvin, "starKelvin",
         entity ? std::to_string(static_cast<long long>(entity->star_kelvin)) : "", ed(62),
         "photosphere kelvin 100..100000 - blackbody tint + limb");
+  field(shell.hit3_accretion, "accretion",
+        entity ? std::to_string(entity->accretion[0]) + "," +
+                     std::to_string(entity->accretion[1]) + "," +
+                     std::to_string(entity->accretion[2]) + "," +
+                     std::to_string(entity->accretion[3])
+               : "",
+        ed(63), "inner,outer,kelvin,beaming - annulus disc preset");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -6737,6 +6772,11 @@ int main(int argc, char **argv) {
               edit3(61, std::to_string(se->orbital_beaming));
             else if (shell.hit3_starkelvin.contains(event.position) && se)
               edit3(62, std::to_string(static_cast<long long>(se->star_kelvin)));
+            else if (shell.hit3_accretion.contains(event.position) && se)
+              edit3(63, std::to_string(se->accretion[0]) + "," +
+                            std::to_string(se->accretion[1]) + "," +
+                            std::to_string(se->accretion[2]) + "," +
+                            std::to_string(se->accretion[3]));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -224,6 +225,12 @@ struct Scene3dEntity {
   // [100,100000]; 0 leaves the material untouched. Overrides `tint`
   // and `limbDarken` — author explicit fields instead for custom discs.
   double star_kelvin{0.0};
+  // Accretion-disc preset: `accretion:[inner,outer,kelvin,beaming]`
+  // builds the Shakura–Sunyaev radial blackbody texture plus orbital
+  // beaming via accretion_disc_material3d. The `inner`/`outer` values
+  // describe the annulus mesh the material is authored for; pair with
+  // an "annulus:i,o" mesh spec at matching radii.
+  std::array<float,4> accretion{0.f,0.f,0.f,0.f};
   // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
   // coarsest-first. lod_meshes[i] draws once the projected bounding
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).
