@@ -270,6 +270,29 @@ void keyboard_focus() {
   workspace.open();
   require(workspace.focus() < 0, "reopened panel kept a stale focus index");
 }
+
+void corridors_render_in_the_scroll_body() {
+  SupplyWorkspace workspace;
+  workspace.set_text_measurer(measured);
+  workspace.open();
+  auto view = ready_view(2);
+  view.links.push_back({7, "Homeworld", "Depot", "Busy", 4., 3., .5, true, false});
+  DrawList draw;
+  workspace.render(draw, view, 1600, 900);
+  const auto layout = SupplyLayout::for_viewport(1600, 900);
+  bool header = false, route = false;
+  for (const auto &item : draw.overlay)
+    if (const auto *text = std::get_if<Text>(&item)) {
+      header |= text->value == "FREIGHT CORRIDORS";
+      route |= text->value == "Homeworld -> Depot";
+    }
+  require(header && route, "corridor section did not render its title or route");
+  for (const auto &item : draw.overlay)
+    if (const auto *text = std::get_if<Text>(&item))
+      require(!text->clip || contains(layout.body, *text->clip) ||
+                  contains(layout.panel, *text->clip),
+              "corridor text escaped its clip region");
+}
 }  // namespace
 
 int main() {
@@ -282,6 +305,7 @@ int main() {
     tiny_positive_totals_are_not_rendered_as_zero();
     pointer_and_commands_route_without_leakage();
     keyboard_focus();
+    corridors_render_in_the_scroll_body();
     return 0;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

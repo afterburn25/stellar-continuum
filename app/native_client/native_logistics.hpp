@@ -26,6 +26,21 @@ struct NodeRow {
   [[nodiscard]] bool operator==(const NodeRow &) const = default;
 };
 
+// One canonical freight link between two observer-visible nodes. `used_per_day`
+// is the sum of authoritative flow allocations routed over the link.
+struct LinkRow {
+  int id{};
+  std::string from;
+  std::string to;
+  std::string status;
+  double capacity_per_day{};
+  double used_per_day{};
+  double transit_days{};
+  bool enabled{true};
+  bool bidirectional{true};
+  [[nodiscard]] bool operator==(const LinkRow &) const = default;
+};
+
 // A detached, read-only presentation projection of one civilization's home
 // system. Totals are copied verbatim from Core's canonical network result.
 struct View {
@@ -39,6 +54,7 @@ struct View {
   double delivered_per_day{};
   double shortfall_per_day{};
   std::vector<NodeRow> nodes;
+  std::vector<LinkRow> links;
 };
 
 [[nodiscard]] View build_home_logistics(

@@ -94,10 +94,12 @@ void SupplyWorkspace::set_text_measurer(std::function<TextExtent(const Text&)> v
 const SupplyWorkspace::CachedRows &SupplyWorkspace::rows_for(
     const View& view,const SupplyLayout& layout,int width,int height) const {
   if(rows_.valid&&rows_.viewport_width==width&&rows_.viewport_height==height&&
-     rows_.measurer_revision==measurer_revision_&&rows_.nodes==view.nodes)return rows_;
+     rows_.measurer_revision==measurer_revision_&&rows_.nodes==view.nodes&&
+     rows_.links==view.links)return rows_;
   rows_={};rows_.viewport_width=width;rows_.viewport_height=height;
   rows_.measurer_revision=measurer_revision_;rows_.nodes=view.nodes;
-  rows_.rows.reserve(view.nodes.size());
+  rows_.links=view.links;
+  rows_.rows.reserve(view.nodes.size()+view.links.size()+1);
   const auto s=layout.scale;const int font=static_cast<int>(15.f*s);
   for(std::size_t index=0;index<view.nodes.size();++index){
     const auto& node=view.nodes[index];
@@ -105,8 +107,20 @@ const SupplyWorkspace::CachedRows &SupplyWorkspace::rows_for(
     const auto kind=text_height(measure_,node.kind_label,layout.body.width*.30f-20.f*s,font-2);
     const auto state=text_height(measure_,node.status,layout.body.width*.22f-16.f*s,font);
     const auto row_height=std::max({64.f*s,name+kind+22.f*s,state+20.f*s});
-    rows_.rows.push_back({index,rows_.height,row_height,name});
+    rows_.rows.push_back({index,rows_.height,row_height,name,0});
     rows_.height+=row_height+6.f*s;
+  }
+  if(!view.links.empty()){
+    rows_.rows.push_back({0,rows_.height+8.f*s,46.f*s,0.f,1});
+    rows_.height+=54.f*s+6.f*s;
+    for(std::size_t index=0;index<view.links.size();++index){
+      const auto& link=view.links[index];
+      const auto name=text_height(measure_,link.from+(link.bidirectional?" <-> ":" -> ")+link.to,layout.body.width*.30f-20.f*s,font);
+      const auto state=text_height(measure_,link.status,layout.body.width*.22f-16.f*s,font);
+      const auto row_height=std::max({44.f*s,name+20.f*s,state+20.f*s});
+      rows_.rows.push_back({index,rows_.height,row_height,name,2});
+      rows_.height+=row_height+6.f*s;
+    }
   }
   rows_.valid=true;return rows_;
 }
@@ -200,7 +214,37 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
   for(const auto& row:rows.rows){
     const UiRect box{b.x,b.y+row.y-scroll_.scroll_offset,b.width,row.height};
     const auto visible=intersect(box,b);if(visible.height<=0.f)continue;
+    if(row.kind==1){
+      label(out,{box.x,box.y+6.f*s,box.width,20.f*s},
+          tr("SUPPLY_CORRIDORS_TITLE","FREIGHT CORRIDORS"),font,
+          theme::color::keyline_strong,b);
+      const std::array<const char*,4> corridor_keys{"SUPPLY_COL_STATUS","SUPPLY_COL_CAPACITY","SUPPLY_COL_USED","SUPPLY_COL_TRANSIT"};
+      const std::array<const char*,4> corridor_fallbacks{"STATUS","CAPACITY / DAY","USED / DAY","TRANSIT"};
+      for(std::size_t i=0;i<corridor_keys.size();++i)
+        label(out,{box.x+b.width*columns[i+1]+8.f*s,box.y+24.f*s,b.width*spans[i+1]-16.f*s,18.f*s},
+              tr(corridor_keys[i],corridor_fallbacks[i]),font-2,muted,b);
+      if(const auto rule=theme::clipped({box.x,box.y+row.height-3.f*s,box.width,1.f},b))
+        theme::fill(out,*rule,theme::color::keyline);
+      continue;
+    }
     theme::fill(out,visible,theme::color::surface_secondary);
+    if(row.kind==2){
+      const auto& link=view.links[row.index];
+      const Color status_tone=!link.enabled?muted
+          :link.capacity_per_day<=.0001?(link.used_per_day>.0001?amber:muted)
+          :link.used_per_day>=link.capacity_per_day-.0001?amber
+          :link.used_per_day>=link.capacity_per_day*.75?amber
+          :link.used_per_day>.0001?cyan:muted;
+      label(out,{box.x+8.f*s,box.y+10.f*s,b.width*.30f-20.f*s,row.name_height},
+            link.from+(link.bidirectional?" <-> ":" -> ")+link.to,font,ink,b);
+      const std::array<std::string,4> values_text{link.status,
+          number(link.capacity_per_day),number(link.used_per_day),
+          trf("SUPPLY_TRANSIT_DAYS",{number(link.transit_days)},"{0} d")};
+      for(std::size_t i=1;i<columns.size();++i)
+        label(out,{box.x+b.width*columns[i]+8.f*s,box.y+12.f*s,b.width*spans[i]-16.f*s,row.height-20.f*s},values_text[i-1],font,
+              i==1?status_tone:ink,b);
+      continue;
+    }
     const auto& n=view.nodes[row.index];
     label(out,{box.x+8.f*s,box.y+10.f*s,b.width*.30f-20.f*s,row.name_height},n.name,font,ink,b);
     label(out,{box.x+8.f*s,box.y+row.name_height+14.f*s,b.width*.30f-20.f*s,row.height-row.name_height-14.f*s},n.kind_label,font-2,muted,b);

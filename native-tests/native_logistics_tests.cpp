@@ -6,8 +6,10 @@
 #include <stellar/engine/localization.hpp>
 
 #include <iostream>
+#include <ranges>
 #include <stdexcept>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 namespace {
@@ -171,6 +173,36 @@ void locale_resolves_node_labels_and_unavailable_message() {
           "controller locale did not resolve the unavailable message");
 }
 
+void corridors_match_the_canonical_link_graph() {
+  const auto state = world(3);
+  const auto expected = canonical(state, 1);
+  const auto view = build_home_logistics(state, 1);
+  require(view.state == LoadState::Ready,
+          "valid home network did not load for corridor check");
+  require(view.links.size() == expected.links.size(),
+          "corridor rows diverged from the canonical link graph");
+  std::unordered_map<int, double> expected_used;
+  for (const auto &allocation : expected.daily_flow.allocations)
+    for (const int link : allocation.route_link_ids)
+      expected_used[link] += allocation.allocated_per_day;
+  for (const auto &row : view.links) {
+    const auto link =
+        std::ranges::find(expected.links, row.id, &LogisticsLink::id);
+    require(link != expected.links.end() && !row.from.empty() &&
+                !row.to.empty() && !row.status.empty(),
+            "corridor row lost its canonical link, endpoints or status");
+    require(row.capacity_per_day == link->capacity_per_day &&
+                row.transit_days == link->transit_days &&
+                row.enabled == link->enabled &&
+                row.bidirectional == link->bidirectional,
+            "corridor row rewrote canonical link metrics");
+    require(row.used_per_day == expected_used[row.id],
+            "corridor usage diverged from flow allocations");
+  }
+  if (expected.links.empty())
+    std::cout << "note: canonical home network had no links in the fixture\n";
+}
+
 void identity_generation_and_clear_do_not_keep_stale_view() {
   auto state = world();
   HomeLogisticsController controller;
@@ -195,6 +227,7 @@ int main() {
     failure_latches_until_explicit_retry();
     malformed_projector_identity_fails_without_foreign_totals();
     locale_resolves_node_labels_and_unavailable_message();
+    corridors_match_the_canonical_link_graph();
     identity_generation_and_clear_do_not_keep_stale_view();
     std::cout << "native logistics tests passed\n";
     return 0;

@@ -119,40 +119,43 @@ breaks navigation/AT flow, or presents wrong state)
 
 ### HIGH
 
-1. **No adopted shared design language.** `native_ui_theme.hpp` ships a full
-   semantic palette + components but workspaces hand-roll palettes and helpers
-   (economy, logistics, fleet, missions, startup, planetary each define their
-   own `ink`/`muted`/`accent` constants and `fill`/`label`/`scrollbar`
-   utilities). → IN PROGRESS: the theme now provides `metric_tile`, `badge`,
-   `key_value`, `focus_ring`, `empty_state`, `tab` and `clipped`; the
-   planetary screen consumes them. Workspace migrations remain open —
-   economy, logistics, fleet, missions, startup next.
+1. **No adopted shared design language.** → IN PROGRESS. The theme now
+   provides `metric_tile`, `badge`, `key_value`, `focus_ring`,
+   `empty_state`, `tab`, `section_header` and `clipped`; planetary,
+   economy, supply/logistics and fleet workspaces consume them and their
+   palettes alias the semantic colors. Still open: research, shipyard,
+   construction, diplomacy, missions, startup chrome migrations.
 2. **No global quick-find / command palette** (Phase 5). Known/accessible
    systems, colonies, fleets, contacts, shipyards and missions are only
    findable through per-surface searches or manual map hunting. Design must
    reuse the existing Edit-focused AT contract and FoW-filtered name sources.
-3. ~~**Galaxy map has no legend or overlay vocabulary.**~~ → PARTIALLY DONE.
-   A collapsible legend panel now explains charted/uncharted stars, lanes,
-   territory, fleet markers and selection using the live glyph colors.
-   Still open: zoom-band readout label, route-preview green/amber entry,
-   phenomena iconography, strategic overlay toggles.
+3. ~~**Galaxy map has no legend or overlay vocabulary.**~~ → DONE for the
+   render vocabulary: collapsible legend explains charted/uncharted stars,
+   lanes, territory, fleet markers, selection halo and the planned-route
+   green/amber halves; the zoom readout carries a band label
+   (OVERVIEW / SECTOR / LOCAL) matching the label-density thresholds.
+   Still open: phenomena iconography, strategic overlay toggles.
 4. ~~**Colony screen lacks an at-a-glance vitals summary.**~~ → PARTIALLY
    DONE. Vitals strip + numeric alert chips now render for owned colonies
    (observer-safe). Still open: "affected facilities" detail on chips,
    per-issue navigation targets beyond the economy tab.
-5. **Logistics workspace is home-system-scoped only.** No route/corridor
-   list, no origin→destination freight view, no congestion or transit
-   information, no navigation to the affected node. Requires extending the
-   `native_logistics` projection over authoritative
-   `LogisticsNetwork`/`HomeSystemLogisticsNetwork` state before presentation
-   can improve — do not fake corridors.
-6. **Economy workspace is a flat undifferentiated list.** Six KPI tiles +
-   interleaved section rows in one scroll; headings are visually identical
-   to data rows; no grouping chrome or change attribution. Re-skin onto the
-   shared theme: metric tiles, section headers, warning/danger tones.
-7. **Fleet list is flat.** `NativeOwnFleet` has no battle-group layer; large
-   fleets late-game will produce one long undifferentiated list with no
-   grouping by role, location or readiness.
+5. ~~**Logistics workspace is home-system-scoped only.**~~ → DONE within the
+   canonical scope: the view now projects the authoritative link graph as
+   FREIGHT CORRIDORS rows (origin↔destination, capacity/day, used/day summed
+   from real flow allocations, transit days, enabled/bidirectional, and a
+   derived Idle/Normal/Busy/Saturated/Disabled status). Links touching
+   sealed nodes are dropped rather than partially disclosed. Still open:
+   interstellar corridor representation beyond the home system — the
+   authoritative `CivilizationLogisticsCoverage` external-system status
+   would need projection + a wider surface design.
+6. ~~**Economy workspace is a flat undifferentiated list.**~~ → DONE.
+   Section headers, metric tiles, tone colors, shared buttons and focus
+   ring; verified via live capture (which caught a text-anchor defect the
+   tests missed).
+7. **Fleet list is flat.** → PARTIALLY DONE. The detail block now uses a
+   heading + identity line + `key_value` stat rows; chrome is on the theme.
+   Still open: `NativeOwnFleet` has no battle-group layer — grouping by
+   role/location/readiness needs a projection change, not more styling.
 
 ### MEDIUM
 
@@ -186,7 +189,8 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | Colony command center: headline vitals strip (POPULATION / STABILITY / POWER net / FOOD days / EMPLOYED) between the hero block and the fact list, and a two-column issue-chip grid inside the alerts block — chips carry real magnitudes (POWER -99, LIFE SUPPORT 84%) and focus the economy tab on activation. All rows/chips gated on `!observer_only` so the survey-only surface stays leak-free. | 22ca3783 |
 | 2026-09-25 | Economy workspace migrated onto the shared theme: KPI cards now use `metric_tile`, section rows use `section_header` (INCOME / OPERATING COSTS now read as headers, not data), buttons use the shared `button` with hover/active/disabled states, palette constants alias the semantic theme colors, and the focus ring uses the shared helper. Zoom readout gained a band label (OVERVIEW / SECTOR / LOCAL) matching the label-density thresholds, and the legend gained a Planned route row (green/amber halves matching the preview colors). Visual capture review caught and fixed a text-anchor defect: centered/right-aligned helpers anchored on the rect's left edge instead of its midpoint/right edge. | f14cf11f |
 | 2026-09-25 | Supply/logistics workspace migrated onto the shared theme (themed chrome, hover-aware buttons via a tracked pointer, `metric_tile` KPI cards with a caution-toned shortfall, column-header rule, shared `focus_ring`/`empty_state`, theme scrollbar colors). Battle review found the event feed read as one flat tone — it now severity-tones from observer-visible actor/target ids (own losses danger, inflicted losses success, disruptions caution). System view reviewed: inspector/labels/orbits already structurally sound. Planetary test now covers the deficit path (vitals strip + POWER chip → economy tab). | 0281c063 |
-| 2026-09-25 | Fleet workspace migrated onto the shared theme: legacy `ui_skin`/`menu_style` bevel chrome replaced by shared `panel`/`button`/`focus_ring`/`progress`, palette constants alias theme colors, and the fleet detail block is no longer one text blob — it renders as a heading + identity line + `key_value` stat rows (Strength / Fuel / Range / Speed / Order). FLEET_DETAILS/FLEET_ORDER_SUFFIX superseded by FLEET_STAT_* keys in en/de. | pending |
+| 2026-09-25 | Fleet workspace migrated onto the shared theme: legacy `ui_skin`/`menu_style` bevel chrome replaced by shared `panel`/`button`/`focus_ring`/`progress`, palette constants alias theme colors, and the fleet detail block is no longer one text blob — it renders as a heading + identity line + `key_value` stat rows (Strength / Fuel / Range / Speed / Order). FLEET_DETAILS/FLEET_ORDER_SUFFIX superseded by FLEET_STAT_* keys in en/de. | 88777eab |
+| 2026-09-25 | Logistics freight corridors: `native_logistics::View` gained `LinkRow` projection over the canonical `HomeSystemLogisticsNetwork` links (endpoints sealed-checked, capacity/transit/enabled/bidirectional verbatim, usage summed from real `daily_flow.allocations` route membership, localized Idle/Normal/Busy/Saturated/Disabled status). The workspace appends a FREIGHT CORRIDORS section with its own column captions inside the scroll body; cached rows key on nodes+links. | pending |
 
 ### Implementation notes
 

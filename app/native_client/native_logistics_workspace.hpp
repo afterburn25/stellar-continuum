@@ -36,11 +36,18 @@ public:
   SupplyCommand handle(const stellar::native_map::InputEvent&, const View&, int width, int height);
   void render(stellar::native_map::DrawList&, const View&, int width, int height) const;
 private:
-  struct CachedRow { std::size_t index{}; float y{}, height{}, name_height{}; };
+  struct CachedRow {
+    std::size_t index{};
+    float y{}, height{}, name_height{};
+    // 0 = node row (index into View::nodes), 1 = corridor section header,
+    // 2 = corridor row (index into View::links).
+    int kind{};
+  };
   struct CachedRows {
     int viewport_width{}, viewport_height{};
     std::uint64_t measurer_revision{};
     std::vector<NodeRow> nodes;
+    std::vector<LinkRow> links;
     std::vector<CachedRow> rows;
     float height{};
     bool valid{};
