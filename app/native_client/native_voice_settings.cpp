@@ -25,13 +25,15 @@ using namespace stellar::native_map;
 using Json = nlohmann::json;
 
 constexpr std::size_t maximum_settings_bytes = 4u * 1024u;
+// Settings chrome aliases the shared theme palette; the veil scrim has no
+// token equivalent and stays literal.
 constexpr Color veil{2, 8, 17, 48};
-constexpr Color row_fill{20, 57, 84, 230};
-constexpr Color selected_fill{24, 91, 132, 245};
-constexpr Color track_fill{13, 35, 54, 255};
-constexpr Color track_value{82, 190, 222, 255};
-constexpr Color border{99, 178, 210, 245};
-constexpr Color active{133, 228, 244, 255};
+constexpr Color row_fill = stellar::native_ui::color::surface_raised;
+constexpr Color selected_fill = stellar::native_ui::color::surface_hover;
+constexpr Color track_fill = stellar::native_ui::color::surface_secondary;
+constexpr Color track_value = stellar::native_ui::color::selected;
+constexpr Color border = stellar::native_ui::color::keyline_strong;
+constexpr Color active = stellar::native_ui::color::selected;
 
 float clamp_unit(float value) noexcept { return std::clamp(value, 0.f, 1.f); }
 bool valid_unit(float value) noexcept { return std::isfinite(value) && value >= 0.f && value <= 1.f; }
@@ -60,7 +62,7 @@ void toggle(DrawList& draw, UiRect bounds, std::string value, bool selected, int
                bounds.width - 54.f * scale, font * 1.5f}, std::move(value), font);
   const UiRect switch_track{bounds.x + bounds.width - 38.f * scale, bounds.y + bounds.height * .5f - 7.f * scale,
                             27.f * scale, 14.f * scale};
-  native_menu_style::rounded(draw, switch_track, selected ? track_value : Color{61, 86, 103, 255}, 7.f * scale);
+  native_menu_style::rounded(draw, switch_track, selected ? track_value : stellar::native_ui::color::disabled, 7.f * scale);
   const float knob_x = selected ? switch_track.x + switch_track.width - 12.f * scale : switch_track.x + 2.f * scale;
   native_menu_style::rounded(draw, {knob_x, switch_track.y + 2.f * scale, 10.f * scale, 10.f * scale},
                              native_menu_style::ink, 5.f * scale);

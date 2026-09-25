@@ -15,7 +15,7 @@ namespace stellar::native_general {
 namespace {
 using namespace stellar::native_map;
 constexpr std::size_t maximum_bytes=4096;
-constexpr Color text_color{232,243,250,255},panel_fill{10,25,45,250};
+constexpr Color text_color=stellar::native_ui::color::text_primary,panel_fill=stellar::native_ui::color::surface_opaque;
 std::string utf8(const std::filesystem::path& path) {
   const auto raw=path.u8string();
   return {reinterpret_cast<const char*>(raw.data()),raw.size()};
@@ -32,7 +32,7 @@ void label(DrawList& draw,UiRect rect,std::string text,int size) {
 void button(DrawList& draw,UiRect rect,std::string text,int size,bool primary=false,bool disabled=false) {
   stellar::engine::ui_skin::control(draw,rect,false,primary,!disabled,std::max(.5f,size/17.f));
   draw.overlay.emplace_back(Text{{rect.x+rect.width*.5f,rect.y+(rect.height-static_cast<float>(size))*.5f},
-    std::move(text),disabled?Color{123,147,162,255}:text_color,size,rect.width,rect,TextAlign::Center,FontFace::Interface});
+    std::move(text),disabled?stellar::native_ui::color::text_muted:text_color,size,rect.width,rect,TextAlign::Center,FontFace::Interface});
 }
 // Text/subtitle scale presets cycle within the engine accessibility clamp
 // (0.75..2.0); a stored value off the grid snaps to the nearest preset.
