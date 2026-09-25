@@ -8,10 +8,12 @@
 #include <stellar/engine/runtime_host.hpp>
 #include <stellar/engine/world.hpp>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -839,6 +841,42 @@ int main() {
     check(initial.run() == 0, "pre-run set_scene3d exits cleanly");
     check(initial.scene3d() && spawned_b,
           "pre-run set_scene3d selects the initial document");
+  }
+
+  // Hot reload: the host polls the scene file every 500ms of wall
+  // time — overwriting it mid-run respawns the tracked set from the
+  // new document (the live-edit path the scene tool relies on).
+  {
+    const auto sub = root / "hot-reload";
+    std::filesystem::create_directories(sub / "editor");
+    const auto scene_path = sub / "editor" / "scene.json";
+    {
+      std::ofstream out(scene_path);
+      out << R"({"entities":[{"name":"alpha","x":10,"y":10}]})";
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 4;
+    RuntimeHost host{opts};
+    int updates = 0;
+    bool saw_alpha = false, saw_beta = false;
+    host.on_update = [&](World &, float) {
+      ++updates;
+      if (updates == 1) {
+        saw_alpha = host.find_entity("alpha").has_value();
+        std::ofstream out(scene_path);
+        out << R"({"entities":[{"name":"beta","x":20,"y":20}]})";
+        out.close();
+        // Cross the 500ms scene-poll boundary so the next frame
+        // observes the new file stamp.
+        std::this_thread::sleep_for(std::chrono::milliseconds(600));
+      }
+      if (updates >= 2) saw_beta = host.find_entity("beta").has_value();
+    };
+    check(host.run() == 0, "hot-reload run exits cleanly");
+    check(saw_alpha && saw_beta,
+          "the poll respawns the scene from the rewritten file");
+    check(!host.find_entity("alpha").has_value(),
+          "the replaced entity is destroyed on reload");
   }
 
   // Scene-authored animations: a clip's "x" track owns the entity's
