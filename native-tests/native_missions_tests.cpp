@@ -692,7 +692,7 @@ int main() {
     // the literals.
     stellar::engine::LocalizationTable locale{"en", "en"};
     check(locale.load_json(
-              R"({"locale":"en","strings":{"MISSIONS_TAB_SITES":"ZIELE","MISSIONS_FOCUS_VIEW":"Open {0}"}})"),
+              R"({"locale":"en","strings":{"MISSIONS_TAB_SITES":"ZIELE","MISSIONS_FOCUS_VIEW":"Open {0}","MISSIONS_NO_SHIPS":"KEINE SCHIFFE","MISSION_SUMMARY_UNFUNDED":"{0} UNFUNDED"}})"),
           "the test catalog must parse");
     panel.set_localization(&locale);
     (void)key(0x4000004au); // Home → first focusable.
@@ -708,6 +708,29 @@ int main() {
     check(panel.focused_label(board, fleets, colonies, 1600, 900) ==
               "View Landing",
           "unbound panels must keep the literal fallbacks");
+
+    // The producers resolve through the same table: the empty-sites message
+    // and mission-card summaries translate while unbound calls keep English.
+    check(colony_site_selection({}, 0, 0, &locale).details == "KEINE SCHIFFE",
+          "the bound catalog must resolve the empty-sites message");
+    check(colony_site_selection({}, 0, 0).details.find("No populated colony "
+                                                     "ships") !=
+              std::string::npos,
+          "an unbound call must keep the English fallback");
+    auto suspended = campaign_fixture();
+    CivilizationEconomy suspended_economy;
+    suspended_economy.civilization_id = 1;
+    suspended_economy.last_base_operations_funding_fraction = 0.0;
+    suspended.economies = {suspended_economy};
+    auto suspended_fleet = scout_fleet();
+    suspended_fleet.current_system_id = 1;
+    suspended_fleet.destination_system_id = 2;
+    suspended.fleets = {suspended_fleet};
+    const auto suspended_board = build_mission_board(suspended, &locale);
+    check(!suspended_board.missions.empty() &&
+              suspended_board.missions.front().summary.find("UNFUNDED") !=
+                  std::string::npos,
+          "bound mission summaries must resolve through the catalog");
   }
   {
     // Colony-list scrolling: rows beyond the viewport stay reachable — the

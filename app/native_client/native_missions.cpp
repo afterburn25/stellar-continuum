@@ -40,6 +40,23 @@ std::string mtf(const stellar::engine::LocalizationTable *locale,
   if (at != std::string::npos) text.replace(at, 3, arg);
   return text;
 }
+std::string mtfn(const stellar::engine::LocalizationTable *locale,
+                 std::string_view key,
+                 std::initializer_list<std::string> args,
+                 std::string_view fallback) {
+  if (locale && locale->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale->format(key, std::span<const std::string>(values));
+  }
+  std::string text(fallback);
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = text.find(marker); at != std::string::npos)
+      text.replace(at, marker.size(), arg);
+  }
+  return text;
+}
 
 
 using namespace stellar::core;
@@ -109,7 +126,8 @@ const PlanetaryBody *resolve_settlement_body(
 
 // Reference ExplorationMissionStatus.Build.
 MissionStatus evaluate(const FreshCampaignState &campaign,
-                       const FleetState &fleet) {
+                       const FleetState &fleet,
+                       const stellar::engine::LocalizationTable *locale) {
   const int civilization_id = campaign.player_civilization_id;
   const double capacity = operating_capacity(campaign, civilization_id);
   const auto *knowledge = &campaign.knowledge;
@@ -121,21 +139,26 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
   };
 
   if (!fleet.is_active)
-    return awaiting(fleet.name + " is not an active mission fleet.");
+    return awaiting(mtf(locale, "MISSION_SUMMARY_INACTIVE", fleet.name,
+                        "{0} is not an active mission fleet."));
 
   if (capacity <= 1e-7)
-    return awaiting(fleet.name +
-                    " is suspended because fleet operations are unfunded. "
-                    "Restore the operating budget to resume its existing "
-                    "mission.");
+    return awaiting(mtf(locale, "MISSION_SUMMARY_UNFUNDED", fleet.name,
+                        "{0} is suspended because fleet operations are "
+                        "unfunded. Restore the operating budget to resume "
+                        "its existing mission."));
 
   if (fleet.hold_requested) {
     if (fleet.current_system_id) {
       const auto *system = find_system(campaign, *fleet.current_system_id);
       const std::string name =
-          system ? system->name : "the current system";
-      return awaiting(fleet.name + " is held at " + name +
-                      "; resume to continue its existing mission.");
+          system ? system->name
+                 : mt(locale, "MISSION_NAME_CURRENT_SYSTEM",
+                      "the current system");
+      return awaiting(mtfn(locale, "MISSION_SUMMARY_HELD",
+                           {fleet.name, name},
+                           "{0} is held at {1}; resume to continue its "
+                           "existing mission."));
     }
     const std::optional<int> next_stop =
         !fleet.planned_route_system_ids.empty()
@@ -143,18 +166,23 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
             : fleet.destination_system_id;
     const auto *system =
         next_stop ? find_system(campaign, *next_stop) : nullptr;
-    const std::string name = system ? system->name : "its next stop";
+    const std::string name = system ? system->name
+                                    : mt(locale, "MISSION_NAME_NEXT_STOP",
+                                         "its next stop");
     MissionStatus status;
     status.phase = NativeMissionPhase::traveling;
-    status.summary = fleet.name + " is holding after reaching " + name +
-                     "; resume to continue its existing mission.";
+    status.summary = mtfn(locale, "MISSION_SUMMARY_HOLDING",
+                          {fleet.name, name},
+                          "{0} is holding after reaching {1}; resume to "
+                          "continue its existing mission.");
     return status;
   }
 
   if (fleet.destination_system_id) {
     const auto *target = find_system(campaign, *fleet.destination_system_id);
     if (!target)
-      return awaiting(fleet.name + " references an unknown destination system.");
+      return awaiting(mtf(locale, "MISSION_SUMMARY_UNKNOWN_DEST", fleet.name,
+                          "{0} references an unknown destination system."));
 
     const double distance =
         measure_remaining_fleet_route(&campaign.systems, &fleet)
@@ -212,16 +240,19 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
 
     const std::string eta =
         transit_days
-            ? "approximately " + fixed(*transit_days, 0, 1) +
-                  " transit days remain"
-            : "transit ETA is unavailable";
+            ? mtf(locale, "MISSION_ETA_TRANSIT", fixed(*transit_days, 0, 1),
+                  "approximately {0} transit days remain")
+            : mt(locale, "MISSION_ETA_UNKNOWN", "transit ETA is unavailable");
     std::string follow_up;
     if (survey_days)
-      follow_up = "; approximately " + fixed(*survey_days, 0, 1) +
-                  " known detailed-survey days remain after arrival";
+      follow_up = mtf(locale, "MISSION_FOLLOWUP_SURVEY",
+                      fixed(*survey_days, 0, 1),
+                      "; approximately {0} known detailed-survey days "
+                      "remain after arrival");
     else if (fleet.role == FleetRole::Science)
-      follow_up = "; detailed-survey duration remains unknown until "
-                  "reconnaissance establishes system complexity";
+      follow_up = mt(locale, "MISSION_FOLLOWUP_UNKNOWN",
+                     "; detailed-survey duration remains unknown until "
+                     "reconnaissance establishes system complexity");
 
     std::string destination = target->name;
     if (fleet.role == FleetRole::Colony &&
@@ -229,7 +260,8 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
       const auto *body =
           find_body(campaign, *fleet.destination_planetary_body_id);
       if (body && body->system_id == target->id)
-        destination = body->name + " in " + target->name;
+        destination = mtfn(locale, "MISSION_DEST_BODY",
+                           {body->name, target->name}, "{0} in {1}");
     }
 
     MissionStatus status;
@@ -237,8 +269,9 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
     status.transit_days = transit_days;
     status.survey_days = survey_days;
     status.mission_days = mission_days;
-    status.summary = fleet.name + " is traveling to " + destination + "; " +
-                     eta + follow_up + ".";
+    status.summary = mtfn(locale, "MISSION_SUMMARY_TRAVELING",
+                          {fleet.name, destination, eta, follow_up},
+                          "{0} is traveling to {1}; {2}{3}.");
     return status;
   }
 
@@ -246,7 +279,8 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
       fleet.current_system_id ? find_system(campaign, *fleet.current_system_id)
                               : nullptr;
   if (!system)
-    return awaiting(fleet.name + " is awaiting mission orders.");
+    return awaiting(mtf(locale, "MISSION_SUMMARY_AWAITING", fleet.name,
+                        "{0} is awaiting mission orders."));
 
   switch (fleet.role) {
     case FleetRole::Scout: {
@@ -265,19 +299,24 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
         MissionStatus status;
         status.phase = NativeMissionPhase::scouting;
         status.mission_days = remaining;
-        status.summary = fleet.name + " is scouting " + system->name +
-                         "; approximately " + fixed(remaining, 1, 1) +
-                         " game days remain.";
+        status.summary = mtfn(locale, "MISSION_SUMMARY_SCOUTING",
+                              {fleet.name, system->name,
+                               fixed(remaining, 1, 1)},
+                              "{0} is scouting {1}; approximately {2} game "
+                              "days remain.");
         return status;
       }
-      return awaiting(fleet.name +
-                      " has completed reconnaissance-grade work in " +
-                      system->name + " and is awaiting another order.");
+      return awaiting(mtfn(locale, "MISSION_SUMMARY_SCOUT_DONE",
+                           {fleet.name, system->name},
+                           "{0} has completed reconnaissance-grade work in "
+                           "{1} and is awaiting another order."));
     }
     case FleetRole::Science: {
       if (knowledge->is_system_fully_surveyed(civilization_id, system->id))
-        return awaiting(fleet.name + " has completed the detailed survey of " +
-                        system->name + " and is awaiting another order.");
+        return awaiting(mtfn(locale, "MISSION_SUMMARY_SURVEY_DONE",
+                             {fleet.name, system->name},
+                             "{0} has completed the detailed survey of {1} "
+                             "and is awaiting another order."));
       std::optional<double> survey_days;
       if (knowledge->system_survey_level(civilization_id, system->id) >=
           SystemSurveyLevel::partially_surveyed) {
@@ -292,26 +331,31 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
       }
       const std::string estimate =
           survey_days
-              ? "approximately " + fixed(*survey_days, 0, 1) +
-                    " detailed-survey days remain"
-              : "survey duration is not yet known; the first science pass "
-                "will establish reconnaissance-grade complexity";
+              ? mtf(locale, "MISSION_ESTIMATE_DAYS", fixed(*survey_days, 0, 1),
+                    "approximately {0} detailed-survey days remain")
+              : mt(locale, "MISSION_ESTIMATE_UNKNOWN",
+                   "survey duration is not yet known; the first science pass "
+                   "will establish reconnaissance-grade complexity");
       MissionStatus status;
       status.phase = NativeMissionPhase::science_survey;
       status.survey_days = survey_days;
       status.mission_days = survey_days;
-      status.summary = fleet.name + " is conducting a detailed survey of " +
-                       system->name + "; " + estimate + ".";
+      status.summary = mtfn(locale, "MISSION_SUMMARY_SURVEYING",
+                             {fleet.name, system->name, estimate},
+                             "{0} is conducting a detailed survey of {1}; "
+                             "{2}.");
       return status;
     }
     case FleetRole::Colony: {
       if (fleet.embarked_population_millions <= 0.0)
-        return awaiting(fleet.name +
-                        " is not carrying colonists and has no active colony "
-                        "mission.");
+        return awaiting(mtf(locale, "MISSION_SUMMARY_NO_COLONISTS", fleet.name,
+                            "{0} is not carrying colonists and has no active "
+                            "colony mission."));
       if (fleet.prevent_automatic_settlement)
-        return awaiting(fleet.name + " is on station in " + system->name +
-                        "; select a surveyed world to authorize settlement.");
+        return awaiting(mtfn(locale, "MISSION_SUMMARY_ON_STATION",
+                             {fleet.name, system->name},
+                             "{0} is on station in {1}; select a surveyed "
+                             "world to authorize settlement."));
       if (fleet.settlement_body_id) {
         const double remaining = std::max(
             0.0,
@@ -319,14 +363,17 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
              fleet.settlement_days_completed) /
                 capacity);
         const auto *body = find_body(campaign, *fleet.settlement_body_id);
-        const std::string site = body ? body->name : "settlement";
+        const std::string site =
+            body ? body->name
+                 : mt(locale, "MISSION_NAME_SETTLEMENT", "settlement");
         MissionStatus status;
         status.phase = NativeMissionPhase::establishing_colony;
         status.mission_days = remaining;
-        status.summary = "Establishing " + site + ": approximately " +
-                         fixed(remaining, 1, 1) +
-                         " game days remain. Habitats and services are under "
-                         "construction.";
+        status.summary = mtfn(locale, "MISSION_SUMMARY_ESTABLISHING",
+                              {site, fixed(remaining, 1, 1)},
+                              "Establishing {0}: approximately {1} game days "
+                              "remain. Habitats and services are under "
+                              "construction.");
         return status;
       }
       const std::string species_id =
@@ -336,82 +383,99 @@ MissionStatus evaluate(const FreshCampaignState &campaign,
           [&](const auto &profile) { return profile.id == species_id; });
       if (species_id.empty() ||
           species == species_environment_profiles().end())
-        return awaiting(fleet.name +
-                        " carries population without a valid passenger "
-                        "species identity.");
+        return awaiting(mtf(locale, "MISSION_SUMMARY_NO_SPECIES", fleet.name,
+                            "{0} carries population without a valid passenger "
+                            "species identity."));
       if (!knowledge->is_system_fully_surveyed(civilization_id, system->id))
-        return awaiting(fleet.name + " is carrying " +
-                        fixed(fleet.embarked_population_millions, 0, 1) +
-                        " million " + species->display_name + " colonists in " +
-                        system->name +
-                        ", but a completed science survey is still required "
-                        "before settlement.");
+        return awaiting(mtfn(locale, "MISSION_SUMMARY_NEED_SURVEY",
+                             {fleet.name,
+                              fixed(fleet.embarked_population_millions, 0, 1),
+                              species->display_name, system->name},
+                             "{0} is carrying {1} million {2} colonists in "
+                             "{3}, but a completed science survey is still "
+                             "required before settlement."));
       if (std::ranges::find(campaign.colonies, system->id,
                             &Colony::system_id) != campaign.colonies.end())
-        return awaiting(fleet.name + " is carrying colonists in " +
-                        system->name +
-                        ", but that system already contains a founded colony "
-                        "under the current single-colony early-release "
-                        "model.");
+        return awaiting(mtfn(locale, "MISSION_SUMMARY_COLONY_EXISTS",
+                             {fleet.name, system->name},
+                             "{0} is carrying colonists in {1}, but that "
+                             "system already contains a founded colony under "
+                             "the current single-colony early-release "
+                             "model."));
       const auto *candidate =
           resolve_settlement_body(campaign, fleet, system->id, species_id);
       if (!candidate)
-        return awaiting(fleet.name + " is carrying " +
-                        fixed(fleet.embarked_population_millions, 0, 1) +
-                        " million " + species->display_name + " colonists in " +
-                        system->name +
-                        ", but no surveyed body is currently viable for that "
-                        "population.");
+        return awaiting(mtfn(locale, "MISSION_SUMMARY_NO_VIABLE",
+                             {fleet.name,
+                              fixed(fleet.embarked_population_millions, 0, 1),
+                              species->display_name, system->name},
+                             "{0} is carrying {1} million {2} colonists in "
+                             "{3}, but no surveyed body is currently viable "
+                             "for that population."));
       const auto assessment =
           species_colonization_assessment(species_id, *candidate);
-      const char *viability =
+      const std::string viability =
           assessment.viability ==
                   SpeciesColonizationViability::NaturallyViable
-              ? "naturally viable"
-              : "currently supported by the prototype "
-                "habitat-compatibility fallback";
+              ? mt(locale, "MISSION_VIABILITY_NATURAL", "naturally viable")
+              : mt(locale, "MISSION_VIABILITY_HABITAT",
+                   "currently supported by the prototype "
+                   "habitat-compatibility fallback");
       const double establish_days =
           ColonizationSimulation::establishment_days(fleet);
       MissionStatus status;
       status.phase = NativeMissionPhase::establishing_colony;
       status.mission_days = establish_days / capacity;
       status.summary =
-          fleet.name + " has arrived at " + candidate->name + " in " +
-          system->name + "; the world is " + viability + " for " +
-          species->display_name + " and establishment requires " +
-          fixed(establish_days, 0, 0) + " game days.";
+          mtfn(locale, "MISSION_SUMMARY_ARRIVED",
+               {fleet.name, candidate->name, system->name, viability,
+                species->display_name, fixed(establish_days, 0, 0)},
+               "{0} has arrived at {1} in {2}; the world is {3} for {4} and "
+               "establishment requires {5} game days.");
       return status;
     }
     default:
-      return awaiting(fleet.name + " is awaiting mission orders.");
+      return awaiting(mtf(locale, "MISSION_SUMMARY_AWAITING", fleet.name,
+                          "{0} is awaiting mission orders."));
   }
 }
 
 // Reference FormatColonizationViability.
-std::string_view viability_label(SpeciesColonizationViability value) noexcept {
+std::string viability_label(const stellar::engine::LocalizationTable *locale,
+                            SpeciesColonizationViability value) {
   switch (value) {
     case SpeciesColonizationViability::NaturallyViable:
-      return "natural";
+      return mt(locale, "MISSION_VIABILITY_LABEL_NATURAL", "natural");
     case SpeciesColonizationViability::HabitatSupportedFallback:
-      return "habitat support";
+      return mt(locale, "MISSION_VIABILITY_LABEL_HABITAT", "habitat support");
     default:
-      return "unsuitable";
+      return mt(locale, "MISSION_VIABILITY_LABEL_UNSUITABLE", "unsuitable");
   }
 }
 
 // Reference LimitingFactor.ToString() — the enum name verbatim.
-std::string_view limiting_factor_label(EnvironmentalLimitingFactor value) noexcept {
+std::string limiting_factor_label(
+    const stellar::engine::LocalizationTable *locale,
+    EnvironmentalLimitingFactor value) {
   switch (value) {
-    case EnvironmentalLimitingFactor::None: return "None";
-    case EnvironmentalLimitingFactor::Gravity: return "Gravity";
-    case EnvironmentalLimitingFactor::Temperature: return "Temperature";
-    case EnvironmentalLimitingFactor::Pressure: return "Pressure";
-    case EnvironmentalLimitingFactor::Atmosphere: return "Atmosphere";
-    case EnvironmentalLimitingFactor::Solvent: return "Solvent";
-    case EnvironmentalLimitingFactor::Immersion: return "Immersion";
-    case EnvironmentalLimitingFactor::Radiation: return "Radiation";
+    case EnvironmentalLimitingFactor::None:
+      return mt(locale, "MISSION_FACTOR_NONE", "None");
+    case EnvironmentalLimitingFactor::Gravity:
+      return mt(locale, "MISSION_FACTOR_GRAVITY", "Gravity");
+    case EnvironmentalLimitingFactor::Temperature:
+      return mt(locale, "MISSION_FACTOR_TEMPERATURE", "Temperature");
+    case EnvironmentalLimitingFactor::Pressure:
+      return mt(locale, "MISSION_FACTOR_PRESSURE", "Pressure");
+    case EnvironmentalLimitingFactor::Atmosphere:
+      return mt(locale, "MISSION_FACTOR_ATMOSPHERE", "Atmosphere");
+    case EnvironmentalLimitingFactor::Solvent:
+      return mt(locale, "MISSION_FACTOR_SOLVENT", "Solvent");
+    case EnvironmentalLimitingFactor::Immersion:
+      return mt(locale, "MISSION_FACTOR_IMMERSION", "Immersion");
+    case EnvironmentalLimitingFactor::Radiation:
+      return mt(locale, "MISSION_FACTOR_RADIATION", "Radiation");
   }
-  return "None";
+  return mt(locale, "MISSION_FACTOR_NONE", "None");
 }
 
 // .NET P0 and N0 formats used by the reference detail builders.
@@ -441,13 +505,14 @@ std::string compact_reason(std::string_view reason) {
 // BuildSelectedSiteDetails / GetUiResourceOutpostOpportunityState.
 NativeColonySiteSelection colony_site_selection(
     std::span<const native_colony::NativeSettlementMissionView> fleets,
-    int requested_fleet_index, int requested_site_index) {
+    int requested_fleet_index, int requested_site_index,
+    const stellar::engine::LocalizationTable *locale) {
   NativeColonySiteSelection selection;
-  selection.action_label = "Fund & Settle";
+  selection.action_label = mt(locale, "MISSIONS_ACTION_SETTLE", "Fund & Settle");
   if (fleets.empty()) {
-    selection.details =
-        "No populated colony ships are currently available for settlement "
-        "planning.";
+    selection.details = mt(locale, "MISSIONS_NO_SHIPS",
+                           "No populated colony ships are currently "
+                           "available for settlement planning.");
     selection.status = selection.details;
     return selection;
   }
@@ -463,19 +528,28 @@ NativeColonySiteSelection colony_site_selection(
       (view.personnel_species_name.empty()
            ? ""
            : view.personnel_species_name + " - ") +
-      fixed(view.personnel_millions, 0, 1) +
-      (selection.outpost ? "M specialists aboard" : "M aboard");
+      mtf(locale,
+          selection.outpost ? "MISSIONS_ABOARD_SPECIALISTS"
+                            : "MISSIONS_ABOARD",
+          fixed(view.personnel_millions, 0, 1),
+          selection.outpost ? "{0}M specialists aboard" : "{0}M aboard");
   const std::string heading =
-      (selection.outpost ? "Outpost vessel " : "Colony ship ") +
-      std::to_string(selection.fleet_index + 1) + "/" +
-      std::to_string(selection.fleet_count) + ": " + view.fleet_name + " - " +
-      aboard;
+      mtfn(locale,
+           selection.outpost ? "MISSIONS_HEADING_OUTPOST"
+                             : "MISSIONS_HEADING_COLONY",
+           {std::to_string(selection.fleet_index + 1),
+            std::to_string(selection.fleet_count), view.fleet_name, aboard},
+           selection.outpost ? "Outpost vessel {0}/{1}: {2} - {3}"
+                             : "Colony ship {0}/{1}: {2} - {3}");
 
   if (!view.can_receive_orders || view.candidates.empty()) {
     selection.details = heading + "\n\n" + view.status;
     selection.status = view.status;
     selection.action_label =
-        selection.outpost ? "Fund & Deploy" : "Fund & Settle";
+        selection.outpost ? mt(locale, "MISSIONS_ACTION_DEPLOY",
+                               "Fund & Deploy")
+                          : mt(locale, "MISSIONS_ACTION_SETTLE",
+                               "Fund & Settle");
     return selection;
   }
 
@@ -492,55 +566,72 @@ NativeColonySiteSelection colony_site_selection(
 
   std::string details = heading + "\n";
   if (selection.outpost) {
-    details += "Resource site " + std::to_string(selection.site_index + 1) +
-               "/" + std::to_string(selection.site_count) +
-               (site.can_order ? ": OK " : ": - ") + site.system_name + " / " +
-               site.body_name + "\n" + site.deposit_grade + " " +
-               site.deposit_material_name + " | yield " +
-               fixed(site.extraction_yield_multiplier, 2, 2) + "x | access " +
-               percent0(site.deposit_accessibility) + " | reserve " +
-               thousands0(site.initial_deposit_materials) + "\n" +
-               "Natural fit " + percent0(site.natural_habitability) +
-               " | unprotected capacity " +
-               percent0(site.unprotected_operational_capacity) +
-               " | limiting factor " +
-               std::string(limiting_factor_label(site.limiting_factor)) +
-               "\nSealed outpost authorization: " +
-               view.formatted_authorization + "\nTreasury available: " +
-               view.formatted_treasury + " - " +
-               (affordable ? "funded" : "additional funding required") +
-               "\n\n" + compact_reason(site.reason);
-    selection.action_label = "Fund & Deploy";
+    details += mtfn(
+        locale, "MISSIONS_OUTPOST_DETAILS",
+        {std::to_string(selection.site_index + 1),
+         std::to_string(selection.site_count),
+         site.can_order ? mt(locale, "MISSIONS_SITE_OK", ": OK ")
+                        : mt(locale, "MISSIONS_SITE_SKIP", ": - "),
+         site.system_name, site.body_name, site.deposit_grade,
+         site.deposit_material_name,
+         fixed(site.extraction_yield_multiplier, 2, 2),
+         percent0(site.deposit_accessibility),
+         thousands0(site.initial_deposit_materials),
+         percent0(site.natural_habitability),
+         percent0(site.unprotected_operational_capacity),
+         limiting_factor_label(locale, site.limiting_factor),
+         view.formatted_authorization, view.formatted_treasury,
+         affordable ? mt(locale, "MISSIONS_FUNDED", "funded")
+                    : mt(locale, "MISSIONS_FUNDING_NEEDED",
+                         "additional funding required"),
+         compact_reason(site.reason)},
+        "Resource site {0}/{1}{2} {3} / {4}\n{5} {6} | yield {7}x | access "
+        "{8} | reserve {9}\nNatural fit {10} | unprotected capacity {11} | "
+        "limiting factor {12}\nSealed outpost authorization: {13}\nTreasury "
+        "available: {14} - {15}\n\n{16}");
+    selection.action_label = mt(locale, "MISSIONS_ACTION_DEPLOY",
+                                "Fund & Deploy");
     selection.status =
         site.can_order && !affordable
-            ? "Outpost deployment requires " + view.formatted_authorization +
-                  "; " + view.formatted_treasury + " is available."
+            ? mtfn(locale, "MISSIONS_OUTPOST_REQUIRES",
+                   {view.formatted_authorization, view.formatted_treasury},
+                   "Outpost deployment requires {0}; {1} is available.")
             : site.reason;
     return selection;
   }
 
-  details += "Site " + std::to_string(selection.site_index + 1) + "/" +
-             std::to_string(selection.site_count) +
-             (site.can_order ? ": OK " : ": - ") + site.system_name + " / " +
-             site.body_name + "\nViability: " +
-             std::string(viability_label(site.viability)) +
-             " | natural fit " + percent0(site.natural_habitability) +
-             " | unprotected " +
-             percent0(site.unprotected_operational_capacity) + "\n" +
-             "Limiting factor: " +
-             std::string(limiting_factor_label(site.limiting_factor)) +
-             " | reach: " +
-             (site.reach.is_supported ? "supported" : "blocked") +
-             (site.reach.is_authoritative ? "" : " (provisional)") + "\n" +
-             "Expedition authorization: " + view.formatted_authorization +
-             "\nTreasury available: " + view.formatted_treasury + " - " +
-             (affordable ? "funded" : "additional funding required") +
-             "\n\n" + compact_reason(site.reason);
+  details += mtfn(
+      locale, "MISSIONS_SITE_DETAILS",
+      {std::to_string(selection.site_index + 1),
+       std::to_string(selection.site_count),
+       site.can_order ? mt(locale, "MISSIONS_SITE_OK", ": OK ")
+                      : mt(locale, "MISSIONS_SITE_SKIP", ": - "),
+       site.system_name, site.body_name,
+       viability_label(locale, site.viability),
+       percent0(site.natural_habitability),
+       percent0(site.unprotected_operational_capacity),
+       limiting_factor_label(locale, site.limiting_factor),
+       site.reach.is_supported ? mt(locale, "MISSIONS_REACH_SUPPORTED",
+                                    "supported")
+                               : mt(locale, "MISSIONS_REACH_BLOCKED",
+                                    "blocked"),
+       site.reach.is_authoritative
+           ? std::string()
+           : mt(locale, "MISSIONS_REACH_PROVISIONAL", " (provisional)"),
+       view.formatted_authorization, view.formatted_treasury,
+       affordable ? mt(locale, "MISSIONS_FUNDED", "funded")
+                  : mt(locale, "MISSIONS_FUNDING_NEEDED",
+                       "additional funding required"),
+       compact_reason(site.reason)},
+      "Site {0}/{1}{2} {3} / {4}\nViability: {5} | natural fit {6} | "
+      "unprotected {7}\nLimiting factor: {8} | reach: {9}{10}\nExpedition "
+      "authorization: {11}\nTreasury available: {12} - {13}\n\n{14}");
   selection.details = std::move(details);
   selection.status =
       site.can_order && !affordable
-          ? "Settlement requires " + view.formatted_authorization + "; " +
-                view.formatted_treasury + " is available."
+          ? mtfn(locale, "MISSIONS_SETTLE_REQUIRES",
+                 {view.formatted_authorization, view.formatted_treasury},
+                 "Settlement requires {0}; {1} is available.")
           : site.reason;
   return selection;
 }
@@ -568,7 +659,8 @@ const FleetState *find_available_freighter(const FreshCampaignState &campaign) {
 }
 
 std::vector<NativeMissionColonyRow>
-build_owned_colony_rows(const FreshCampaignState &campaign) {
+build_owned_colony_rows(const FreshCampaignState &campaign,
+                        const stellar::engine::LocalizationTable *locale) {
   std::vector<const Colony *> owned;
   for (const auto &colony : campaign.colonies)
     if (colony.civilization_id == campaign.player_civilization_id)
@@ -585,9 +677,12 @@ build_owned_colony_rows(const FreshCampaignState &campaign) {
         colony->planetary_body_id
             ? find_body(campaign, *colony->planetary_body_id)
             : nullptr;
-    row.planet_name = body ? body->name : "Orbital habitat";
+    row.planet_name =
+        body ? body->name
+             : mt(locale, "MISSIONS_ORBITAL_HABITAT", "Orbital habitat");
     const auto *system = find_system(campaign, colony->system_id);
-    row.system_name = system ? system->name : "Deep space";
+    row.system_name = system ? system->name
+                             : mt(locale, "MISSIONS_DEEP_SPACE", "Deep space");
     row.population_millions = colony->population_millions;
     row.is_resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
     row.can_land = body && body->environment.has_solid_surface;
@@ -602,22 +697,26 @@ build_owned_colony_rows(const FreshCampaignState &campaign) {
     if (outpost.is_resource_outpost) {
       if (!freighter)
         row.freight_reason =
-            "Build an Interstellar Bulk Freighter and station it at a "
-            "developed colony.";
+            mt(locale, "MISSIONS_FREIGHT_BUILD",
+               "Build an Interstellar Bulk Freighter and station it at a "
+               "developed colony.");
       else if (!has_material)
         row.freight_reason = outpost.status;
       else
         row.freight_reason =
-            "Dispatch " + freighter->name + " to collect up to " +
-            fixed(freighter->cargo_material_capacity, 0, 1) +
-            " material units.";
+            mtfn(locale, "MISSIONS_FREIGHT_DISPATCH",
+                 {freighter->name,
+                  fixed(freighter->cargo_material_capacity, 0, 1)},
+                 "Dispatch {0} to collect up to {1} material units.");
     }
     rows.push_back(std::move(row));
   }
   return rows;
 }
 
-NativeMissionBoard build_mission_board(const FreshCampaignState &campaign) {
+NativeMissionBoard build_mission_board(
+    const FreshCampaignState &campaign,
+    const stellar::engine::LocalizationTable *locale) {
   NativeMissionBoard board;
   const int player_id = campaign.player_civilization_id;
   // Reference ActiveMissions: IsActive && owned && mission role, ordered by id.
@@ -636,7 +735,7 @@ NativeMissionBoard build_mission_board(const FreshCampaignState &campaign) {
   for (const auto *fleet : active) {
     if (board.missions.size() >= 8)
       break;
-    const auto status = evaluate(campaign, *fleet);
+    const auto status = evaluate(campaign, *fleet, locale);
     NativeMissionCard card;
     card.fleet_id = fleet->id;
     card.role = fleet->role;
@@ -647,12 +746,19 @@ NativeMissionBoard build_mission_board(const FreshCampaignState &campaign) {
                                     : fleet->current_system_id;
     const auto *system =
         destination_id ? find_system(campaign, *destination_id) : nullptr;
-    card.destination = system ? system->name : "Deep space";
-    card.eta = status.mission_days
-                   ? fixed(*status.mission_days, 1, 1) + " days remaining"
-               : status.phase == NativeMissionPhase::awaiting_order
-                   ? "Ready for orders"
-                   : "ETA unavailable";
+    card.destination = system ? system->name
+                              : mt(locale, "MISSIONS_DEEP_SPACE", "Deep space");
+    card.eta =
+        status.mission_days
+            ? mtf(locale, "MISSIONS_ETA_DAYS", fixed(*status.mission_days, 1, 1),
+                  "{0} days remaining")
+            : mt(locale,
+                 status.phase == NativeMissionPhase::awaiting_order
+                     ? "MISSIONS_ETA_READY"
+                     : "MISSIONS_ETA_UNKNOWN",
+                 status.phase == NativeMissionPhase::awaiting_order
+                     ? "Ready for orders"
+                     : "ETA unavailable");
     card.summary = status.summary;
     board.missions.push_back(std::move(card));
   }
@@ -883,7 +989,7 @@ std::string NativeMissionView::focused_label(
     std::span<const NativeMissionColonyRow> colonies, int width,
     int height) const {
   if (!visible_ || focus_ < 0) return {};
-  const auto selection = colony_site_selection(fleets, fleet_index_, site_index_);
+  const auto selection = colony_site_selection(fleets, fleet_index_, site_index_, locale_);
   const auto layout = mission_layout_for(board, selection, colonies.size(),
                                          width, height, show_sites_,
                                          scroll_.scroll_offset);
@@ -899,7 +1005,7 @@ std::optional<native_map::UiRect> NativeMissionView::focused_bounds(
     std::span<const NativeMissionColonyRow> colonies, int width,
     int height) const {
   if (!visible_ || focus_ < 0) return std::nullopt;
-  const auto selection = colony_site_selection(fleets, fleet_index_, site_index_);
+  const auto selection = colony_site_selection(fleets, fleet_index_, site_index_, locale_);
   const auto layout = mission_layout_for(board, selection, colonies.size(),
                                          width, height, show_sites_,
                                          scroll_.scroll_offset);
@@ -918,7 +1024,7 @@ MissionViewCommand NativeMissionView::handle(
   if (!visible_)
     return command;
   const auto selection =
-      colony_site_selection(fleets, fleet_index_, site_index_);
+      colony_site_selection(fleets, fleet_index_, site_index_, locale_);
   const auto layout =
       mission_layout_for(board, selection, colonies.size(), width, height,
                          show_sites_, scroll_.scroll_offset);
@@ -1164,7 +1270,7 @@ void NativeMissionView::render(
   if (!visible_)
     return;
   const auto selection =
-      colony_site_selection(fleets, fleet_index_, site_index_);
+      colony_site_selection(fleets, fleet_index_, site_index_, locale_);
   const auto layout =
       mission_layout_for(board, selection, colonies.size(), width, height,
                          show_sites_, scroll_.scroll_offset);

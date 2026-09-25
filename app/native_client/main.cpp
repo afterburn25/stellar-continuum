@@ -8360,11 +8360,11 @@ class NativeCampaign final {
     mission_generation_=generation;
     auto&frame=session_->frame();
     const auto&campaign=frame.runtime().world().campaign();
-    mission_board_=native_missions::build_mission_board(campaign);
+    mission_board_=native_missions::build_mission_board(campaign,locale_);
     mission_fleets_.clear();
     for(auto&view:settlement_controller_.build(frame,generation))
       if(has_active_settlement_target(view))mission_fleets_.push_back(std::move(view));
-    mission_colonies_=native_missions::build_owned_colony_rows(campaign);
+    mission_colonies_=native_missions::build_owned_colony_rows(campaign,locale_);
   }
   // "Select ship on map": select the colony ship and center the galaxy map
   // on it — the settle order itself is issued from the destination system.

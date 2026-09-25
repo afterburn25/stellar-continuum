@@ -37,7 +37,8 @@ struct NativeMissionBoard {
 };
 
 [[nodiscard]] NativeMissionBoard
-build_mission_board(const core::FreshCampaignState &campaign);
+build_mission_board(const core::FreshCampaignState &campaign,
+                    const engine::LocalizationTable *locale = nullptr);
 
 [[nodiscard]] std::string_view
 mission_phase_label(NativeMissionPhase phase) noexcept;
@@ -57,7 +58,8 @@ struct NativeColonySiteSelection {
 
 [[nodiscard]] NativeColonySiteSelection colony_site_selection(
     std::span<const native_colony::NativeSettlementMissionView> fleets,
-    int requested_fleet_index, int requested_site_index);
+    int requested_fleet_index, int requested_site_index,
+    const engine::LocalizationTable *locale = nullptr);
 
 // Reference UiOwnedColonies card row (bounded fields — the full snapshot
 // stays inside the colony workspace once the card's View action opens it).
@@ -73,7 +75,8 @@ struct NativeMissionColonyRow {
 };
 
 [[nodiscard]] std::vector<NativeMissionColonyRow>
-build_owned_colony_rows(const core::FreshCampaignState &campaign);
+build_owned_colony_rows(const core::FreshCampaignState &campaign,
+                        const engine::LocalizationTable *locale = nullptr);
 
 // Reference FindAvailableFreighter: the lowest-id idle player bulk freighter
 // stationed at one of the player's developed colonies.
