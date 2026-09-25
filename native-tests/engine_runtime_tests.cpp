@@ -1211,6 +1211,47 @@ int main() {
     check(particles > 0, "the attached emitter produces particles");
   }
 
+  // A scene3d `vfx` field attaches the same way — the emitter anchors at
+  // the entity's camera-projected screen position and tracks its motion.
+  {
+    const auto sub = root / "vfx-attach-3d";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene3d.json");
+      out << R"({"entities":[{"name":"comet","pos":[0,0,0],
+                   "vel":[4,0,0],"vfx":"trail"}],
+                  "emitters":[{"id":"trail","rate":240,
+                   "lifetime":0.5}]})";
+    }
+    auto opts = headless_options(sub);
+    opts.scene3d = true;
+    RuntimeHost host{opts};
+    int updates = 0;
+    std::size_t live = 0;
+    float mean_x = 0.f, max_x = 0.f;
+    host.on_update = [&](World &, float) {
+      ++updates;
+      live = host.vfx().live_instance_count();
+      if (updates == 4 && live == 1) {
+        float sum = 0.f;
+        std::size_t count = 0;
+        for (const auto &p : host.vfx().particles(1)) {
+          sum += p.position.x;
+          max_x = std::max(max_x, p.position.x);
+          ++count;
+        }
+        mean_x = count ? sum / count : 0.f;
+      }
+    };
+    check(host.run() == 0, "vfx-attach-3d run exits cleanly");
+    check(live == 1, "the scene3d vfx field spawns an attached emitter");
+    // The default camera looks at the origin: the anchor starts at
+    // screen center (320,240) and drifts right as the comet moves +X —
+    // world-space anchoring would leave particles near x~0 instead.
+    check(mean_x > 320.f, "particles anchor at the projected position");
+    check(max_x > 325.f, "the anchor tracks the moving entity");
+  }
+
   // Spin integrates into Rotation; wall bounce reflects movers but a
   // "bounce":false entity stops dead at the level edge.
   {

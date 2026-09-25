@@ -424,6 +424,7 @@ std::string Scene3dDocument::to_json() const {
     if (e.ttl != 0.0f) item["ttl"] = e.ttl;
     if (!e.data.empty()) item["data"] = e.data;
     if (!e.parent.empty()) item["parent"] = e.parent;
+    if (!e.vfx.empty()) item["vfx"] = e.vfx;
     items.push_back(std::move(item));
   }
   doc["camera"] = {{"pos", {cam_x, cam_y, cam_z}},
@@ -515,6 +516,7 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.ttl = item.value("ttl", 0.0f);
       e.data = item.value("data", std::string{});
       e.parent = item.value("parent", std::string{});
+      e.vfx = item.value("vfx", std::string{});
       scene.entities.push_back(std::move(e));
     }
     if (doc.contains("camera")) {

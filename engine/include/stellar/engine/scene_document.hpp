@@ -169,6 +169,9 @@ struct Scene3dEntity {
   std::string data;
   // Name of another 3D entity to follow at its authored offset.
   std::string parent;
+  // Named emitter from the document's `emitters` table, attached on
+  // spawn — particles anchor to the entity's projected screen position.
+  std::string vfx;
 };
 
 // An extra directional light — the material pipeline evaluates at most

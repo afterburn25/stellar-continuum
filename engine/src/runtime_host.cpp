@@ -825,20 +825,53 @@ int RuntimeHost::run() {
     }
   };
 
+  // Projects a 3D entity's position into overlay (screen) pixels — the
+  // inverse of entity3d_at's ray construction. Returns nullopt when the
+  // point sits behind the near plane or the viewport is degenerate.
+  const auto project3d = [&](const Transform3D &t)
+      -> std::optional<VfxVec3> {
+    if (impl.view_w <= 0 || impl.view_h <= 0) return std::nullopt;
+    const Vec3 rel{static_cast<float>(t.x - impl.cam3_x),
+                   static_cast<float>(t.y - impl.cam3_y),
+                   static_cast<float>(t.z - impl.cam3_z)};
+    constexpr float kDeg = 3.14159265f / 180.f;
+    const Quaternion cam_q =
+        quat_mul(rotation_axis_angle({0.f, 1.f, 0.f},
+                                     impl.cam3_yaw * kDeg),
+                 rotation_axis_angle({1.f, 0.f, 0.f},
+                                     impl.cam3_pitch * kDeg));
+    const Vec3 pc =
+        rotate_vec(Quaternion{-cam_q.x, -cam_q.y, -cam_q.z, cam_q.w},
+                   rel);
+    if (pc.z >= -std::max(impl.cam3_near, 1e-6f)) return std::nullopt;
+    const float half_tan = std::tan(impl.cam3_fov * kDeg * .5f);
+    const float aspect =
+        static_cast<float>(impl.view_w) / impl.view_h;
+    const float nx = pc.x / (-pc.z * half_tan * aspect);
+    const float ny = pc.y / (-pc.z * half_tan);
+    return VfxVec3{(nx + 1.f) * .5f * impl.view_w,
+                   (1.f - ny) * .5f * impl.view_h,
+                   std::sqrt(rel.x * rel.x + rel.y * rel.y +
+                             rel.z * rel.z)};
+  };
+
   // Attaches an entity's VfxRef-named emitter, anchored at its center —
   // games register definitions via host.vfx().define(); the track table
   // re-anchors the emitter each step and stops it when the entity dies.
+  // 3D entities anchor at their camera-projected screen position and
+  // feed set_lod_distance with the camera distance.
   const auto attach_vfx = [&](EntityId e) {
     const auto *vr = world.get<VfxRef>(e);
     if (!vr || vr->name.empty() || impl.vfx.definition(vr->name) == nullptr)
       return;
     const auto *t = world.get<Transform2D>(e);
     const auto *x = world.get<Extent2D>(e);
-    const auto id = impl.vfx.spawn(
-        vr->name,
-        {t ? t->x + (x ? x->w * .5f : 0.f) : 0.f,
-         t ? t->y + (x ? x->h * .5f : 0.f) : 0.f, 0.f},
-        e);
+    VfxVec3 at{t ? t->x + (x ? x->w * .5f : 0.f) : 0.f,
+               t ? t->y + (x ? x->h * .5f : 0.f) : 0.f, 0.f};
+    if (!t)
+      if (const auto *t3 = world.get<Transform3D>(e))
+        at = project3d(*t3).value_or(VfxVec3{});
+    const auto id = impl.vfx.spawn(vr->name, at, e);
     if (id != invalid_vfx_instance)
       impl.vfx_tracks.push_back({id, vr->name, e});
   };
@@ -1096,6 +1129,7 @@ int RuntimeHost::run() {
       if (tr) tex3d_of(tr->value);
       if (on_spawn3d && i < doc.entities.size())
         on_spawn3d(world, impl.entities3d[i], doc.entities[i]);
+      attach_vfx(impl.entities3d[i]);
     }
   };
   auto scene3d_file = options.project_root / options.scene3d_file;
@@ -1120,6 +1154,7 @@ int RuntimeHost::run() {
     if (ids.empty()) return {};
     impl.entities3d.push_back(ids.front());
     if (on_spawn3d) on_spawn3d(world, ids.front(), entity);
+    attach_vfx(ids.front());
     return ids.front();
   };
   RuntimeDiagnostics::context("runtime:scene-init");
@@ -2245,6 +2280,14 @@ int RuntimeHost::run() {
                 it->instance,
                 {t->x + (e ? e->w * .5f : 0.f),
                  t->y + (e ? e->h * .5f : 0.f), 0.f});
+          } else if (const auto *t3 =
+                         world.get<Transform3D>(it->attached)) {
+            // 3D anchors live in the 3D view's projected screen space;
+            // z carries the camera distance for per-instance LOD.
+            if (const auto p = project3d(*t3)) {
+              impl.vfx.set_position(it->instance, *p);
+              impl.vfx.set_lod_distance(it->instance, p->z);
+            }
           } else {
             impl.vfx.stop(it->instance);
             keep = false;

@@ -680,6 +680,7 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, Parent3D{s.parent, s.x - px, s.y - py, s.z - pz,
                                  px, py, pz, true});
     }
+    if (!s.vfx.empty()) world.add(entity, VfxRef{s.vfx});
     spawned.push_back(entity);
   }
   return spawned;
@@ -726,6 +727,7 @@ Scene3dDocument scene3d_from_world(const World &world) {
     if (const auto *lt = world.get<Lifetime>(entity)) s.ttl = lt->remaining;
     if (const auto *d = world.get<UserData>(entity)) s.data = d->value;
     if (const auto *p = world.get<Parent3D>(entity)) s.parent = p->name;
+    if (const auto *v = world.get<VfxRef>(entity)) s.vfx = v->name;
     doc.entities.push_back(std::move(s));
   }
   return doc;
