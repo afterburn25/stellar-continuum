@@ -60,6 +60,13 @@ View build(const stellar::core::FreshCampaignState& world,const stellar::native_
     else if(f.reconnaissance&&!f.reconnaissance->completed&&!f.reconnaissance->held)order=resolve(locale,"ASSETS_ORDER_EXPLORING","Exploring");
     else if(source.combat){switch(source.combat->order){case MilitaryOrderType::Defend:order=resolve(locale,"ASSETS_ORDER_DEFENDING","Defending");break;case MilitaryOrderType::Attack:order=resolve(locale,"ASSETS_ORDER_ATTACKING","Attacking");break;default:break;}}
     r.activity+=order;r.tooltip=resolved(locale,"ASSETS_TIP_FLEET",{f.name,r.detail,r.activity,std::to_string(static_cast<int>(std::lround(f.combat_power)))},"{0}\n{1}\n{2}\nFleet power: {3}");
+    // Urgency orders the fleet list — most demanding first — matching the
+    // fleet workspace outliner's status groups: engaged, in transit, on
+    // mission, stationed. The displayed activity text follows the same
+    // predicates, so rank and label never disagree.
+    if(source.combat&&(source.combat->retreat_started||source.combat->target_fleet_id))r.urgency=0;
+    else if(source.transit_phase!=FleetTransitPhase::None||source.destination_system_id)r.urgency=1;
+    else if(source.return_to_base_requested||source.hold_requested||source.freight_target_outpost_id||source.settlement_body_id||(f.science_survey&&!f.science_survey->completed&&!f.science_survey->held)||(f.reconnaissance&&!f.reconnaissance->completed&&!f.reconnaissance->held)||source.combat)r.urgency=2;
     if(source.return_to_base_failure_reason){r.severity=1;r.tooltip+=resolve(locale,"ASSETS_WARN_ROUTE","\nReturn route needs attention.");}
     result.rows.push_back(std::move(r));
   }
@@ -71,7 +78,7 @@ View build(const stellar::core::FreshCampaignState& world,const stellar::native_
     r.tooltip=resolved(locale,"ASSETS_TIP_YARD",{r.name,r.activity,r.detail},"{0}\n{1}\n{2}\nClick to focus; double-click or › for Ship Construction.");result.rows.push_back(std::move(r));
   }
   for(auto& r:result.rows)r.search=folded(r.name+" "+r.detail+" "+r.activity+" "+system_name(r.system_id));
-  std::ranges::stable_sort(result.rows,[](const Row& a,const Row& b){if(a.key.category!=b.key.category)return a.key.category<b.key.category;return a.key.id<b.key.id;});
+  std::ranges::stable_sort(result.rows,[](const Row& a,const Row& b){if(a.key.category!=b.key.category)return a.key.category<b.key.category;if(a.key.category==Category::Fleets&&a.urgency!=b.urgency)return a.urgency<b.urgency;return a.key.id<b.key.id;});
   return result;
 }
 Layout Layout::make(int width,int height){

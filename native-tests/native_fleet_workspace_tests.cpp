@@ -170,6 +170,56 @@ int main() try {
               empty_draw.circles.empty(),
           "Fresh prewarp fleet state invented a vessel or hid its empty state.");
 
+  {
+    // Status grouping: a fleet in transit lands in the urgent group ahead of
+    // stationed fleets, headers render, and row dispatch still resolves the
+    // correct authoritative fleet beneath each header.
+    NativeFleetWorkspace grouped;
+    auto grouped_view = player_view();
+    grouped_view.own_fleets.back().destination_system_id = 77;
+    grouped.set_view(std::move(grouped_view));
+    constexpr int gw = 1920, gh = 1080;
+    DrawList grouped_draw;
+    grouped.render(grouped_draw, gw, gh, {});
+    require(has_text(grouped_draw, "IN TRANSIT  ·  1") &&
+                has_text(grouped_draw, "STATIONED  ·  1"),
+            "Grouped outliner omitted the status group headers.");
+    const auto gl = FleetWorkspaceLayout::for_viewport(gw, gh);
+    const float gs = gl.scale;
+    // The IN TRANSIT group comes first: header (24) then the colony row (45).
+    const UiRect transit_row{gl.list.x, gl.list.y + 24.f * gs, gl.list.width,
+                             41.f * gs};
+    const auto pick = grouped.handle(
+        {InputEventType::LeftPressed, center(transit_row)}, gw, gh, {},
+        std::nullopt);
+    require(pick.kind == FleetWorkspaceCommandKind::Select &&
+                pick.fleet_id == 12,
+            "Grouped outliner dispatched the wrong fleet row.");
+    // The stationed scout sits below the second header — beyond the list
+    // viewport. Keyboard focus snaps it into view, then the same projected
+    // row must dispatch the scout.
+    InputEvent end{InputEventType::KeyPressed};
+    end.key = 0x4000004du;
+    require(grouped.handle(end, gw, gh, {}, std::nullopt).captured,
+            "End key was not captured by the grouped outliner.");
+    const auto focused = grouped.focused_bounds(gl);
+    require(focused && gl.list.contains(center(*focused)),
+            "End did not snap the scrolled scout row into the outliner.");
+    const auto snapped = grouped.handle(
+        {InputEventType::LeftPressed, center(*focused)}, gw, gh, {},
+        std::nullopt);
+    require(snapped.kind == FleetWorkspaceCommandKind::Select &&
+                snapped.fleet_id == 10,
+            "Scrolled grouped row dispatched the wrong fleet.");
+    // A single-group list renders no headers — unchanged flat geometry.
+    NativeFleetWorkspace flat;
+    flat.set_view(player_view());
+    DrawList flat_draw;
+    flat.render(flat_draw, gw, gh, {});
+    require(!has_text(flat_draw, "STATIONED  ·"),
+            "Single-group outliner rendered a noise header.");
+  }
+
   NativeFleetWorkspace workspace;
   workspace.set_view(player_view());
   const auto layout = FleetWorkspaceLayout::for_viewport(1280, 720);

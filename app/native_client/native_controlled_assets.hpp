@@ -17,6 +17,9 @@ struct Row {
   std::string name, detail, activity, tooltip, search;
   bool controlled{}, actionable{true};
   int severity{};
+  // Display-order rank inside the Fleets category: 0 engaged, 1 in transit,
+  // 2 on mission/active orders, 3 stationed. Lower sorts first.
+  int urgency{3};
   std::optional<double> progress;
   bool operator==(const Row&) const = default;
 };

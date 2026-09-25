@@ -149,6 +149,21 @@ private:
     // row's translated, unclipped rect so keyboard focus can snap the list.
     std::optional<stellar::native_map::UiRect> unclipped;
   };
+  // Outliner display order: fleets grouped by status (in combat → in
+  // transit → on mission → stationed), urgent first, projection order kept
+  // inside a group. Header rows carry a localized "NAME · count" caption and
+  // appear only when at least two status groups are non-empty.
+  struct FleetListRow {
+    std::size_t fleet_index{};   // into view_->own_fleets (header: unused)
+    bool header{};
+    std::string caption;
+    float top{};                 // un-scrolled offset inside the list
+    float height{};              // row pitch / header pitch
+  };
+  [[nodiscard]] std::vector<FleetListRow>
+  fleet_rows(const FleetWorkspaceLayout &) const;
+  [[nodiscard]] float
+  fleet_content_height(const FleetWorkspaceLayout &) const;
   [[nodiscard]] std::vector<FocusRect>
   focusables(const FleetWorkspaceLayout &) const;
   FleetWorkspacePresentation presentation_;

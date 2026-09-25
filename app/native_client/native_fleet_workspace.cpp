@@ -4,6 +4,7 @@
 #include "native_ui_theme.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iomanip>
 #include <memory>
@@ -49,6 +50,21 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
   std::ostringstream out;
   out << std::fixed << std::setprecision(precision) << value;
   return out.str();
+}
+
+// Status group in display order — most urgent first. A fleet belongs to the
+// first group whose predicate it satisfies.
+[[nodiscard]] int fleet_group(const NativeOwnFleet &fleet) {
+  if (fleet.combat_status && fleet.combat_status->has_assigned_attack_target)
+    return 0;
+  if (fleet.destination_system_id ||
+      fleet.transit_phase != stellar::core::FleetTransitPhase::None)
+    return 1;
+  if ((fleet.reconnaissance && !fleet.reconnaissance->completed) ||
+      (fleet.science_survey && !fleet.science_survey->completed) ||
+      fleet.recovery)
+    return 2;
+  return 3;
 }
 
 [[nodiscard]] std::string visible_message(std::string value) {
@@ -363,18 +379,61 @@ void NativeFleetWorkspace::set_recovery_result(
   set_notice(outcome.message, outcome.accepted || outcome.requires_confirmation);
 }
 
+std::vector<NativeFleetWorkspace::FleetListRow>
+NativeFleetWorkspace::fleet_rows(const FleetWorkspaceLayout &layout) const {
+  std::vector<FleetListRow> rows;
+  if (!view_ || view_->own_fleets.empty()) return rows;
+  const float s = layout.scale;
+  std::array<std::vector<std::size_t>, 4> groups;
+  for (std::size_t i = 0; i < view_->own_fleets.size(); ++i)
+    groups[static_cast<std::size_t>(fleet_group(view_->own_fleets[i]))]
+        .push_back(i);
+  int nonempty = 0;
+  for (const auto &group : groups) nonempty += !group.empty();
+  const bool grouped = nonempty > 1;
+  static const std::array<const char *, 4> keys = {
+      "FLEET_GROUP_ENGAGED", "FLEET_GROUP_TRANSIT", "FLEET_GROUP_MISSION",
+      "FLEET_GROUP_STATIONED"};
+  static const std::array<const char *, 4> names = {
+      "IN COMBAT", "IN TRANSIT", "ON MISSION", "STATIONED"};
+  float top = 0.f;
+  for (std::size_t group = 0; group < groups.size(); ++group) {
+    if (groups[group].empty()) continue;
+    if (grouped) {
+      rows.push_back({0, true,
+                      trf(keys[group],
+                          {std::to_string(groups[group].size())},
+                          std::string(names[group]) + "  ·  {0}"),
+                      top, 24.f * s});
+      top += 24.f * s;
+    }
+    for (const auto index : groups[group]) {
+      rows.push_back({index, false, {}, top, 45.f * s});
+      top += 45.f * s;
+    }
+  }
+  return rows;
+}
+
+float NativeFleetWorkspace::fleet_content_height(
+    const FleetWorkspaceLayout &layout) const {
+  const auto rows = fleet_rows(layout);
+  return rows.empty() ? 0.f : rows.back().top + rows.back().height;
+}
+
 std::vector<NativeFleetWorkspace::FocusRect> NativeFleetWorkspace::focusables(
     const FleetWorkspaceLayout &layout) const {
   std::vector<FocusRect> out;
   const auto *fleet = selected_fleet();
   if (view_ && presentation_ == FleetWorkspacePresentation::Outliner)
-    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
-      const UiRect row{layout.list.x,
-                       layout.list.y - list_scroll_.scroll_offset +
-                           static_cast<float>(index) * 45.f * layout.scale,
-                       layout.list.width, 41.f * layout.scale};
-      if (const auto clipped = intersection(row, layout.list))
-        out.push_back({*clipped, view_->own_fleets[index].name, row});
+    for (const auto &row : fleet_rows(layout)) {
+      if (row.header) continue;
+      const UiRect rect{layout.list.x,
+                        layout.list.y - list_scroll_.scroll_offset + row.top,
+                        layout.list.width, row.height - 4.f * layout.scale};
+      if (const auto clipped = intersection(rect, layout.list))
+        out.push_back(
+            {*clipped, view_->own_fleets[row.fleet_index].name, rect});
     }
   if (overview_ && !selected_fleet_id()) {
     const UiRect content{layout.details.x, layout.details.y,
@@ -493,9 +552,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
   }
   if (event.type == InputEventType::Wheel &&
       presentation_ == FleetWorkspacePresentation::Outliner && layout.list.contains(event.position)) {
-    const auto count = view_ ? view_->own_fleets.size() : 0;
-    const auto content = static_cast<float>(count) * 45.f * layout.scale;
-    list_scroll_.sync(content, layout.list.height);
+    list_scroll_.sync(fleet_content_height(layout), layout.list.height);
     list_scroll_.scroll_by(-event.wheel_y * 36.f * layout.scale);
     return {FleetWorkspaceCommandKind::None, true};
   }
@@ -525,8 +582,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
       if (focus_ < 0 || focus_ >= count) return;
       const auto &target = items[static_cast<std::size_t>(focus_)];
       if (!target.unclipped) return;
-      const auto rows = view_ ? view_->own_fleets.size() : 0;
-      list_scroll_.sync(static_cast<float>(rows) * 45.f * layout.scale,
+      list_scroll_.sync(fleet_content_height(layout),
                         layout.list.height);
       list_scroll_.scroll_interval_into_view(
           target.unclipped->y, target.unclipped->y + target.unclipped->height,
@@ -634,15 +690,16 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
         layout.engage.contains(event.position))
       return {FleetWorkspaceCommandKind::Engage,true,fleet->id};
     if (view_ && presentation_ == FleetWorkspacePresentation::Outliner) {
-      for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
-        const UiRect row{layout.list.x,
-                         layout.list.y - list_scroll_.scroll_offset +
-                             static_cast<float>(index) * 45.f * layout.scale,
-                         layout.list.width, 41.f * layout.scale};
-        const auto clipped = intersection(row, layout.list);
+      for (const auto &row : fleet_rows(layout)) {
+        if (row.header) continue;
+        const UiRect rect{layout.list.x,
+                          layout.list.y - list_scroll_.scroll_offset +
+                              row.top,
+                          layout.list.width, row.height - 4.f * layout.scale};
+        const auto clipped = intersection(rect, layout.list);
         if (clipped && clipped->contains(event.position))
           return {FleetWorkspaceCommandKind::Select, true,
-                  view_->own_fleets[index].id};
+                  view_->own_fleets[row.fleet_index].id};
       }
     }
     // EmpireOverviewPanel colony buttons (empire mode — no fleet selected).
@@ -720,14 +777,23 @@ void NativeFleetWorkspace::render(
             "travel orders."),
          muted, layout.body_font_pixels);
   } else {
-    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
-      const auto &fleet = view_->own_fleets[index];
+    for (const auto &entry : fleet_rows(layout)) {
       const UiRect row{layout.list.x,
                        layout.list.y - list_scroll_.scroll_offset +
-                           static_cast<float>(index) * 45.f * layout.scale,
-                       layout.list.width, 41.f * layout.scale};
+                           entry.top,
+                       layout.list.width,
+                       entry.height - (entry.header ? 0.f : 4.f * layout.scale)};
       const auto clipped = intersection(row, layout.list);
       if (!clipped) continue;
+      if (entry.header) {
+        theme::section_header(
+            out, {row.x + 8.f * layout.scale, row.y + 2.f * layout.scale,
+                  row.width - 16.f * layout.scale, row.height - 4.f * layout.scale},
+            entry.caption, layout.small_font_pixels, theme::Tone::Neutral,
+            {}, layout.list);
+        continue;
+      }
+      const auto &fleet = view_->own_fleets[entry.fleet_index];
       const auto selected = view_->selected_fleet_id == fleet.id;
       fill(out, *clipped,
            selected ? selected_color
@@ -1032,12 +1098,13 @@ void NativeFleetWorkspace::render(
     action_button(layout.engage,tr("FLEET_ENGAGE","ENGAGE HOSTILES"));
   }
   if (view_)
-    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
-      const auto &candidate = view_->own_fleets[index];
+    for (const auto &entry : fleet_rows(layout)) {
+      if (entry.header) continue;
+      const auto &candidate = view_->own_fleets[entry.fleet_index];
       const UiRect row{layout.list.x,
                        layout.list.y - list_scroll_.scroll_offset +
-                           static_cast<float>(index) * 45.f * layout.scale,
-                       layout.list.width, 41.f * layout.scale};
+                           entry.top,
+                       layout.list.width, entry.height - 4.f * layout.scale};
       if (!layout.list.contains(pointer_) || !row.contains(pointer_)) continue;
       native_ui::tooltip(
           out, {layout.panel.x - 330.f * layout.scale, row.y}, candidate.name,
