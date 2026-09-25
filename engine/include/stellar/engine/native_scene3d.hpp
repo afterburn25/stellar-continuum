@@ -83,10 +83,16 @@ struct Dielectric3D {
   float surface_relief{}; // height as a fraction of the instance scale
 };
 // Optional opaque surface response. Packed properties are roughness, liquid,
-// ice, height. Maps are immutable and count against the shared texture budget.
+// ice, height. Any subset of the maps may be bound — a cloud-only material
+// needs no normal/properties art. The cloud map's alpha both shadows the
+// surface below (cloud_opacity) and can composite its RGB as a visible deck
+// (cloud_albedo), lit like the surface it occludes.
+// Maps are immutable and count against the shared texture budget.
 struct SurfaceResponse3D {
   std::shared_ptr<const RgbaImage> normal,properties,cloud_shadow;
   float normal_strength{.35f},relief{},cloud_opacity{};
+  // [0,1] visible cloud-deck strength; 0 keeps the map shadow-only.
+  float cloud_albedo{};
   Point cloud_offset{};
 };
 enum class AnalyticShadowShape3D { Ellipsoid,Annulus };
@@ -170,6 +176,11 @@ struct Material3D {
   std::optional<AnalyticShadow3D> shadow;
   // Thin particulate sheets can receive diffuse light from either normal side.
   bool two_sided_diffuse{};
+  // Wrap-diffuse terminator: sunlight = max((N.L + w)/(1 + w), 0) instead of
+  // max(N.L, 0), applied to key, additional and point lights alike. Softens
+  // the day/night transition on thick-atmosphere or dusty bodies.
+  // [0,1]; 0 keeps Lambert shading.
+  float terminator_wrap{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;

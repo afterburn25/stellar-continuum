@@ -78,13 +78,13 @@ template<class Map> void evict(Map& cache,std::size_t& bytes,std::size_t incomin
   }
 }
 struct VertexUniform {Matrix4 mvp,model_view,shadow_from_model;};
-struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<std::array<float,4>,4> point_position,point_energy;};
+struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy;};
 struct PostUniform {std::array<float,4> a,b;};
 // View-wide fragment uniform: debug selector, then the key light's
 // view→shadow-clip transform and {texel size (>0 enables), PCF radius in
 // texels, strength, bias} for the directional shadow map.
 struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==656&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==96);
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==672&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==96);
 // Column-major rotation for a unit quaternion — same convention as
 // rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
 Matrix4 rotation_from(Quaternion q){
@@ -454,7 +454,12 @@ struct Scene3DRenderer::Storage {
         }}
       if(material.surface_response){const auto& s=*material.surface_response;
         fragment.surface_response={1,s.normal_strength,s.relief*draw.instance->scale,s.cloud_shadow?s.cloud_opacity:0};
-        fragment.surface_options[0]=s.cloud_offset.x;fragment.surface_options[1]=s.cloud_offset.y;}
+        fragment.surface_options[0]=s.cloud_offset.x;fragment.surface_options[1]=s.cloud_offset.y;
+        // Map presence flags gate the shader's per-map sampling so a
+        // cloud-only or normal-only material needs no placeholder art.
+        const float map_flags=(s.normal?1.f:0.f)+(s.properties?2.f:0.f)+(s.cloud_shadow?4.f:0.f);
+        fragment.response_options={material.terminator_wrap,s.cloud_shadow?s.cloud_albedo:0.f,map_flags,0.f};}
+      else fragment.response_options={material.terminator_wrap,0.f,0.f,0.f};
       if(material.dielectric){const auto& d=*material.dielectric;
         fragment.optics={d.index_of_refraction,d.roughness,d.transmission,d.thickness};
         fragment.absorption={d.absorption.x,d.absorption.y,d.absorption.z,d.environment_strength};fragment.view_options[1]=d.specular_strength;

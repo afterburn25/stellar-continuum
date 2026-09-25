@@ -420,6 +420,16 @@ int main() {
     cube.atmo_g = 0.5f;
     cube.atmo_b = 0.9f;
     cube.visible_range = 250.f;
+    cube.normal_map = "maps/crate_n.png";
+    cube.properties_map = "maps/crate_p.png";
+    cube.cloud_map = "maps/crate_clouds.png";
+    cube.normal_strength = 0.8f;
+    cube.relief = 0.01f;
+    cube.cloud_opacity = 0.6f;
+    cube.cloud_albedo = 0.7f;
+    cube.cloud_offset_x = 0.25f;
+    cube.cloud_offset_y = -0.5f;
+    cube.terminator_wrap = 0.4f;
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -537,6 +547,14 @@ int main() {
                 rc.atmo_g == 0.5f && rc.atmo_b == 0.9f &&
                 rc.visible_range == 250.f,
             "scene3d pbr/atmosphere/cull fields round-trip");
+      check(rc.normal_map == "maps/crate_n.png" &&
+                rc.properties_map == "maps/crate_p.png" &&
+                rc.cloud_map == "maps/crate_clouds.png" &&
+                rc.normal_strength == 0.8f && rc.relief == 0.01f &&
+                rc.cloud_opacity == 0.6f && rc.cloud_albedo == 0.7f &&
+                rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
+                rc.terminator_wrap == 0.4f,
+            "scene3d surface-response fields round-trip");
       check(reparsed->point_lights.size() == 1 &&
                 reparsed->point_lights[0].x == 1.f &&
                 reparsed->point_lights[0].z == -1.f &&
@@ -622,6 +640,18 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"uvTile":[2]}]})")
               .has_value(),
           "scene3d short uvTile rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"surface":{"cloudOpacity":0.5}}]})")
+              .has_value(),
+          "scene3d surface without maps rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"surface":{"cloud":"c.png","cloudAlbedo":2}}]})")
+              .has_value(),
+          "scene3d cloud albedo above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"terminatorWrap":3}]})")
+              .has_value(),
+          "scene3d terminator wrap above one rejected");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

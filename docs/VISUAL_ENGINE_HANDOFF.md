@@ -32,6 +32,16 @@ m.atmosphere->power = 3.f;                  // (0,8] limb exponent
 m.atmosphere->night_floor = 0.05f;          // [0,1] nightside floor
 m.alpha_threshold = 0.5f;                   // [0,1], 0 = off (discard)
 m.texture_tiling = {2.f, 2.f};              // each in [0.01,64]
+m.surface_response = SurfaceResponse3D{};   // opt-in authored detail maps
+m.surface_response->normal = tex_n;         // tangent-space normal map
+m.surface_response->properties = tex_p;     // packed rough/liquid/ice/height
+m.surface_response->cloud_shadow = tex_c;   // alpha=cloud cover, RGB=deck
+m.surface_response->normal_strength = .8f;  // [0,2]
+m.surface_response->relief = 0.01f;         // [0,0.02] height-of-instance
+m.surface_response->cloud_opacity = .6f;    // [0,1] surface shadow strength
+m.surface_response->cloud_albedo = .7f;     // [0,1] visible deck brightness
+m.surface_response->cloud_offset = {.1f,0}; // UV drift, each |≤2|
+m.terminator_wrap = 0.4f;                   // [0,1] wrap-diffuse softening
 ```
 
 Per-instance distance culling lives on `MeshInstance3D`:
@@ -55,6 +65,14 @@ reject path as the frustum test, so culled instances skip the draw call
   colony lights, city windows, engine glow.
 - Environment map gives ordinary materials diffuse irradiance + GGX
   specular (previously IBL existed only inside `Dielectric3D`).
+- `surface_response` accepts any subset of maps — presence flags gate
+  shader sampling, so a cloud-only material needs no placeholder art.
+  The cloud map's alpha shadows the surface at `cloud_opacity` and its
+  RGB composites as a lit deck at `cloud_albedo` — after surface
+  emissive (clouds occlude night lights) and before the atmosphere rim.
+- `terminator_wrap` widens the diffuse lobe — `(N·L+w)/(1+w)` — applied
+  identically to the key light, additional directionals and point
+  lights; 0 is exact Lambert.
 
 ## Scene lights — `PointLight3D`
 
@@ -143,7 +161,10 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `emissive`, `emissive_strength`, `emissive_r/g/b`, `night_emissive`,
 `environment`, `environment_strength`, `alpha_cutout`, `uv_tile_x/y`,
 `atmo_strength/power/night/r/g/b`, `range` (per-entity
-`visible_range`). Scene fields: `point_lights[]` (max 4), `exposure`,
+`visible_range`), `terminator_wrap`, and a `surface` block —
+`{normal, properties, cloud, normalStrength, relief, cloudOpacity,
+cloudAlbedo, cloudOffset:[x,y]}`; `surface` requires at least one map.
+Scene fields: `point_lights[]` (max 4), `exposure`,
 `bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
 ("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting"), and
@@ -153,17 +174,19 @@ Negative `range` and unknown `debug`/`quality` strings are rejected, as
 are nonpositive `depth`, `strength` outside [0,1], negative `bias`, and
 `resolution` outside [64,8192].
 
-`spawn_scene3d` attaches `MaterialPbr`/`AtmosphereShell` components
-(binary codec round-trip), a `VisibleRange` component when `range > 0`,
-`scene3d_from_world` exports them back, and `RuntimeHost` maps them onto
-`Material3D`/`PointLight3D`/`Scene3DView::options`. Documents without
-the new keys load identically.
+`spawn_scene3d` attaches `MaterialPbr`/`AtmosphereShell`/`MaterialSurface`
+components (binary codec round-trips), a `VisibleRange` component when
+`range > 0`, `scene3d_from_world` exports them back, and `RuntimeHost`
+maps them onto `Material3D`/`PointLight3D`/`Scene3DView::options`.
+Documents without the new keys load identically.
 
 ## Editor controls — `stellar-engine.exe` Scene3D tool
 
 Entity rows: PBR map paths + metallic/roughness scalars, emissive
 path/tint/strength/night gate, environment path/strength, alpha cutout,
-UV tiling, atmosphere tint/strength/power/night floor, visible range.
+UV tiling, atmosphere tint/strength/power/night floor, visible range,
+surface maps (normal/properties/cloud), surface scalars (normal
+strength/relief), cloud deck (opacity/albedo/offset), terminator wrap.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range),
 shadow map (extent/distance/depth/strength/bias/resolution).
@@ -200,6 +223,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   path and are evaluated independently of the map.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or
   aerial perspective.
+- The cloud deck is a texture-space composite — no volumetric cloud
+  shells, self-shadowing or gas-giant banding yet.
 - One shared equirect env map per material — no probe grid.
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
 - Debug views are developer tooling — no LOD/residency visualization

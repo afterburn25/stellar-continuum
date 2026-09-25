@@ -102,6 +102,19 @@ int main()try{
   rejects([&]{auto i=instance;i.material.pbr=PbrSurface3D{};i.material.pbr->night_emissive=2.f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->power=.1f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->strength=-1.f;(void)Scene3D::create(camera,{i});});
+  // Surface response accepts any subset of maps — a cloud-only material is
+  // legal — but still requires at least one and bounds every scalar.
+  {auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});
+   const auto clouded=Scene3D::create(camera,{i});check(clouded->instances()[0].material.surface_response.has_value(),"Cloud-only surface response was rejected");}
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->normal=RgbaImage::create(1,1,{128,128,255,255});i.material.surface_response->normal_strength=2.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_opacity=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_albedo=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->properties=RgbaImage::create(1,1,{255,0,0,128});i.material.surface_response->cloud_offset={2.5f,0};(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.terminator_wrap=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.terminator_wrap=-.1f;(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.terminator_wrap=.6f;const auto wrapped=Scene3D::create(camera,{i});
+   check(close(wrapped->instances()[0].material.terminator_wrap,.6f),"Terminator wrap did not survive scene creation");}
   {PointLight3D light;light.position={0,0,1};light.intensity=2;light.range=50;
    const auto lit=Scene3D::create(camera,{instance},{0,0,1},{light});
    check(lit->point_lights().size()==1,"Scene dropped its point light");}

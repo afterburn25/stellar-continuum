@@ -342,6 +342,31 @@ int main(int argc,char** argv)try{
     clouds.cloud_offset.x=1.5f;const auto full_turn=capture({seam},"mip-cloud-full-turn.png");
     for(int x=70;x<260;++x)check(std::abs(channel(*wrap,x,160,0)-channel(*full_turn,x,160,0))<=1,"Cloud wrapping changed after a full turn");
   }
+  {
+    auto deck=lit;deck.material.tint={125,125,125,255};deck.material.ambient=.05f;deck.material.diffuse=.85f;
+    deck.material.surface_response=SurfaceResponse3D{};
+    auto& deck_surface=*deck.material.surface_response;
+    deck_surface.cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});
+    deck_surface.cloud_opacity=1;deck_surface.cloud_albedo=1;
+    const auto deck_lit=capture({deck},"planet-cloud-deck.png");
+    check(channel(*deck_lit,160,160,0)>channel(*matte,160,160,0)+60,"Opaque cloud deck did not composite over the surface");
+    deck_surface.cloud_albedo=.25f;
+    const auto dim_deck=capture({deck},"planet-cloud-deck-dim.png");
+    check(channel(*dim_deck,160,160,0)<channel(*deck_lit,160,160,0)-60,"Cloud albedo did not scale the deck brightness");
+  }
+  {
+    auto wrapped=lit;wrapped.material.tint={255,255,255,255};wrapped.material.ambient=.05f;wrapped.material.diffuse=.95f;
+    wrapped.material.light_direction=Vec3{1,0,0};
+    const auto edge=capture({wrapped},"terminator-flat.png");
+    wrapped.material.terminator_wrap=.8f;
+    const auto wrapped_edge=capture({wrapped},"terminator-wrap.png");
+    check(channel(*wrapped_edge,160,160,0)>channel(*edge,160,160,0)+80,"Wrap diffuse did not light the terminator");
+    wrapped.material.light_direction=Vec3{0,0,1};
+    const auto lit_wrap=capture({wrapped},"terminator-wrap-lit.png");
+    wrapped.material.terminator_wrap=0;
+    const auto lit_flat=capture({wrapped},"terminator-flat-lit.png");
+    check(std::abs(channel(*lit_wrap,160,160,0)-channel(*lit_flat,160,160,0))<=2,"Wrap changed fully lit response");
+  }
   surface.cloud_opacity=0;surface.properties=RgbaImage::create(1,1,{50,255,0,128});
   const auto ocean=capture({response},"planet-ocean.png");
   check(channel(*ocean,160,160,0)>channel(*matte,160,160,0)+30,"Ocean roughness/specular mask is not evaluated");

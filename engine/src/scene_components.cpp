@@ -452,6 +452,48 @@ void register_scene_components(World &world) {
         }
         return m;
       });
+  // Same layout convention as MaterialPbr: fixed-size float head, then
+  // length-prefixed map paths — decode tolerates a truncated tail.
+  world.register_component<MaterialSurface>(
+      "materialsurface",
+      [](const MaterialSurface &m) {
+        std::vector<std::uint8_t> out;
+        for (const float f :
+             {m.normal_strength, m.relief, m.cloud_opacity, m.cloud_albedo,
+              m.cloud_offset_x, m.cloud_offset_y, m.terminator_wrap})
+          put_f32(out, f);
+        for (const std::string *s :
+             {&m.normal_map, &m.properties_map, &m.cloud_map}) {
+          put_u32(out, static_cast<std::uint32_t>(s->size()));
+          out.insert(out.end(), s->begin(), s->end());
+        }
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        MaterialSurface m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        m.normal_strength = f();
+        m.relief = f();
+        m.cloud_opacity = f();
+        m.cloud_albedo = f();
+        m.cloud_offset_x = f();
+        m.cloud_offset_y = f();
+        m.terminator_wrap = f();
+        for (std::string *s :
+             {&m.normal_map, &m.properties_map, &m.cloud_map}) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) break;
+          s->assign(reinterpret_cast<const char *>(b.data() + at), len);
+          at += len;
+        }
+        return m;
+      });
   world.register_component<AtmosphereShell>(
       "atmosphere",
       encode_fields<AtmosphereShell, &AtmosphereShell::r,
@@ -736,6 +778,17 @@ std::vector<EntityId> spawn_scene3d(World &world,
                             s.alpha_cutout, s.uv_tile_x, s.uv_tile_y,
                             s.metallic_roughness, s.emissive,
                             s.environment});
+    if (!s.normal_map.empty() || !s.properties_map.empty() ||
+        !s.cloud_map.empty() || s.normal_strength != 0.35f ||
+        s.relief != 0.f || s.cloud_opacity != 0.f || s.cloud_albedo != 0.f ||
+        s.cloud_offset_x != 0.f || s.cloud_offset_y != 0.f ||
+        s.terminator_wrap != 0.f)
+      world.add(entity,
+                MaterialSurface{s.normal_strength, s.relief,
+                                s.cloud_opacity, s.cloud_albedo,
+                                s.cloud_offset_x, s.cloud_offset_y,
+                                s.terminator_wrap, s.normal_map,
+                                s.properties_map, s.cloud_map});
     if (s.atmo_strength != 0.f)
       world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
                                         s.atmo_strength, s.atmo_power,
@@ -818,6 +871,18 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.metallic_roughness = p->metallic_roughness;
       s.emissive = p->emissive;
       s.environment = p->environment;
+    }
+    if (const auto *sf = world.get<MaterialSurface>(entity)) {
+      s.normal_map = sf->normal_map;
+      s.properties_map = sf->properties_map;
+      s.cloud_map = sf->cloud_map;
+      s.normal_strength = sf->normal_strength;
+      s.relief = sf->relief;
+      s.cloud_opacity = sf->cloud_opacity;
+      s.cloud_albedo = sf->cloud_albedo;
+      s.cloud_offset_x = sf->cloud_offset_x;
+      s.cloud_offset_y = sf->cloud_offset_y;
+      s.terminator_wrap = sf->terminator_wrap;
     }
     if (const auto *at = world.get<AtmosphereShell>(entity)) {
       s.atmo_r = at->r;

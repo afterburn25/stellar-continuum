@@ -200,6 +200,16 @@ struct Scene3dEntity {
   // Distance culling: hidden once the camera is farther than this many
   // world units from the bounding-sphere surface. 0 = always visible.
   float visible_range{0.f};
+  // Opaque surface response — content-relative maps; any subset binds.
+  // The cloud map's alpha self-shadows the surface (cloud_opacity) and
+  // its RGB can composite as a visible deck (cloud_albedo), drifted by
+  // cloud_offset. Packed properties are roughness / liquid / ice /
+  // height; height also drives relief parallax.
+  std::string normal_map, properties_map, cloud_map;
+  float normal_strength{0.35f}, relief{0.f}, cloud_opacity{0.f};
+  float cloud_albedo{0.f}, cloud_offset_x{0.f}, cloud_offset_y{0.f};
+  // Wrap-diffuse terminator softening [0,1]; 0 keeps Lambert shading.
+  float terminator_wrap{0.f};
 };
 
 // An extra directional light — the material pipeline evaluates at most

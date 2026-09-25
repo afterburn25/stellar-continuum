@@ -682,6 +682,14 @@ int main() {
         turret.atmo_g = 0.5f;
         turret.atmo_b = 0.8f;
         turret.visible_range = 400.f;
+        turret.normal_map = "maps/turret_n.png";
+        turret.cloud_map = "maps/turret_clouds.png";
+        turret.normal_strength = 0.9f;
+        turret.cloud_opacity = 0.7f;
+        turret.cloud_albedo = 0.8f;
+        turret.cloud_offset_x = 0.1f;
+        turret.cloud_offset_y = 0.2f;
+        turret.terminator_wrap = 0.5f;
         doc.entities.push_back(turret);
         const auto spawned = spawn_scene3d(world3, doc);
         check(spawned.size() == 2, "spawn_scene3d creates all entities");
@@ -727,6 +735,17 @@ int main() {
               "spawn_scene3d visible-range component");
         check(world3.get<VisibleRange>(ship_e) == nullptr,
               "unset range does not attach a component");
+        const auto *ms = world3.get<MaterialSurface>(turret_e);
+        check(ms != nullptr && ms->normal_map == "maps/turret_n.png" &&
+                  ms->properties_map.empty() &&
+                  ms->cloud_map == "maps/turret_clouds.png" &&
+                  ms->normal_strength == 0.9f &&
+                  ms->cloud_opacity == 0.7f && ms->cloud_albedo == 0.8f &&
+                  ms->cloud_offset_x == 0.1f && ms->cloud_offset_y == 0.2f &&
+                  ms->terminator_wrap == 0.5f,
+              "spawn_scene3d materialsurface component");
+        check(world3.get<MaterialSurface>(ship_e) == nullptr,
+              "defaults do not attach a surface component");
         check(world3.get<Lifetime>(turret_e)->remaining == 3.f,
               "spawn_scene3d lifetime");
         const auto *pt = world3.get<Parent3D>(turret_e);
@@ -776,6 +795,13 @@ int main() {
             const auto *rv = restored.get<VisibleRange>(*re_turret);
             check(rv != nullptr && rv->range == 400.f,
                   "visiblerange codec round-trips");
+            const auto *rms = restored.get<MaterialSurface>(*re_turret);
+            check(rms != nullptr && rms->cloud_map == "maps/turret_clouds.png" &&
+                      rms->normal_map == "maps/turret_n.png" &&
+                      rms->cloud_albedo == 0.8f &&
+                      rms->terminator_wrap == 0.5f &&
+                      rms->cloud_offset_y == 0.2f,
+                  "materialsurface codec round-trips");
         }
         if (re_turret) {
             resolve_hierarchy3d(restored);
@@ -802,6 +828,14 @@ int main() {
                   out.entities[1].atmo_b == 0.8f &&
                   out.entities[1].visible_range == 400.f,
               "scene3d_from_world exports material extensions");
+        check(out.entities[1].normal_map == "maps/turret_n.png" &&
+                  out.entities[1].cloud_map == "maps/turret_clouds.png" &&
+                  out.entities[1].normal_strength == 0.9f &&
+                  out.entities[1].cloud_opacity == 0.7f &&
+                  out.entities[1].cloud_albedo == 0.8f &&
+                  out.entities[1].cloud_offset_y == 0.2f &&
+                  out.entities[1].terminator_wrap == 0.5f,
+              "scene3d_from_world exports surface response");
 
         // Geometry: box primitive topology + OBJ parse/malformed reject.
         const auto box = stellar::native_map::box_mesh(2.f, 1.f, 1.f);

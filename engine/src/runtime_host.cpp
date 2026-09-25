@@ -1187,6 +1187,11 @@ int RuntimeHost::run() {
         tex3d_of(pbr->emissive);
         tex3d_of(pbr->environment);
       }
+      if (const auto *sf = world.get<MaterialSurface>(impl.entities3d[i])) {
+        tex3d_of(sf->normal_map);
+        tex3d_of(sf->properties_map);
+        tex3d_of(sf->cloud_map);
+      }
       if (on_spawn3d && i < doc.entities.size())
         on_spawn3d(world, impl.entities3d[i], doc.entities[i]);
       attach_vfx(impl.entities3d[i]);
@@ -2528,6 +2533,21 @@ int RuntimeHost::run() {
           inst.material.pbr = surface;
           inst.material.alpha_threshold = pbr->alpha_cutout;
           inst.material.texture_tiling = {pbr->uv_tile_x, pbr->uv_tile_y};
+        }
+        if (const auto *sf = world.get<MaterialSurface>(e)) {
+          native_map::SurfaceResponse3D response;
+          response.normal = tex3d_of(sf->normal_map);
+          response.properties = tex3d_of(sf->properties_map);
+          response.cloud_shadow = tex3d_of(sf->cloud_map);
+          response.normal_strength = sf->normal_strength;
+          response.relief = sf->relief;
+          response.cloud_opacity = sf->cloud_opacity;
+          response.cloud_albedo = sf->cloud_albedo;
+          response.cloud_offset = {sf->cloud_offset_x, sf->cloud_offset_y};
+          if (response.normal || response.properties ||
+              response.cloud_shadow)
+            inst.material.surface_response = response;
+          inst.material.terminator_wrap = sf->terminator_wrap;
         }
         if (const auto *at = world.get<AtmosphereShell>(e))
           inst.material.atmosphere =

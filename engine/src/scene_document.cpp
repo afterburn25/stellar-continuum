@@ -4,6 +4,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cmath>
 #include <fstream>
 #include <iterator>
 #include <span>
@@ -449,6 +450,21 @@ std::string Scene3dDocument::to_json() const {
                             {"power", e.atmo_power},
                             {"nightFloor", e.atmo_night}};
     if (e.visible_range != 0.f) item["range"] = e.visible_range;
+    if (!e.normal_map.empty() || !e.properties_map.empty() ||
+        !e.cloud_map.empty() || e.normal_strength != 0.35f ||
+        e.relief != 0.f || e.cloud_opacity != 0.f ||
+        e.cloud_albedo != 0.f || e.cloud_offset_x != 0.f ||
+        e.cloud_offset_y != 0.f) {
+      item["surface"] = {{"normal", e.normal_map},
+                         {"properties", e.properties_map},
+                         {"cloud", e.cloud_map},
+                         {"normalStrength", e.normal_strength},
+                         {"relief", e.relief},
+                         {"cloudOpacity", e.cloud_opacity},
+                         {"cloudAlbedo", e.cloud_albedo},
+                         {"cloudOffset", {e.cloud_offset_x, e.cloud_offset_y}}};
+    }
+    if (e.terminator_wrap != 0.f) item["terminatorWrap"] = e.terminator_wrap;
     items.push_back(std::move(item));
   }
   doc["camera"] = {{"pos", {cam_x, cam_y, cam_z}},
@@ -601,6 +617,37 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.visible_range = item.value("range", 0.0f);
       if (!(e.visible_range >= 0.f))
         return fail("range must be non-negative");
+      if (item.contains("surface")) {
+        const auto &sf = item.at("surface");
+        if (!sf.is_object()) return fail("surface must be an object");
+        e.normal_map = sf.value("normal", std::string{});
+        e.properties_map = sf.value("properties", std::string{});
+        e.cloud_map = sf.value("cloud", std::string{});
+        e.normal_strength = sf.value("normalStrength", 0.35f);
+        e.relief = sf.value("relief", 0.0f);
+        e.cloud_opacity = sf.value("cloudOpacity", 0.0f);
+        e.cloud_albedo = sf.value("cloudAlbedo", 0.0f);
+        if (sf.contains("cloudOffset")) {
+          const auto &o = sf.at("cloudOffset");
+          if (!o.is_array() || o.size() != 2)
+            return fail("cloudOffset must be [x,y]");
+          e.cloud_offset_x = o[0].get<float>();
+          e.cloud_offset_y = o[1].get<float>();
+        }
+        if (e.normal_map.empty() && e.properties_map.empty() &&
+            e.cloud_map.empty())
+          return fail("surface requires at least one map");
+        if (!(e.normal_strength >= 0.f && e.normal_strength <= 2.f) ||
+            !(e.relief >= 0.f && e.relief <= 0.02f) ||
+            !(e.cloud_opacity >= 0.f && e.cloud_opacity <= 1.f) ||
+            !(e.cloud_albedo >= 0.f && e.cloud_albedo <= 1.f) ||
+            !(std::abs(e.cloud_offset_x) <= 2.f &&
+              std::abs(e.cloud_offset_y) <= 2.f))
+          return fail("surface fields out of range");
+      }
+      e.terminator_wrap = item.value("terminatorWrap", 0.0f);
+      if (!(e.terminator_wrap >= 0.f && e.terminator_wrap <= 1.f))
+        return fail("terminatorWrap must be in [0,1]");
       scene.entities.push_back(std::move(e));
     }
     if (doc.contains("camera")) {

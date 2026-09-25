@@ -314,7 +314,8 @@ struct Shell {
       hit3_envstr{}, hit3_cutout{}, hit3_tile{}, hit3_atmo{},
       hit3_atmotint{}, hit3_exposure{}, hit3_bloom{}, hit3_grade{},
       hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{},
-      hit3_shadow{};
+      hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
+      hit3_termwrap{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2120,6 +2121,39 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 0.f && a <= 1e12f) { next.visible_range = a; valid = true; }
           break;
+  case 53: { // surface maps: "normal,properties,cloud" (empty allowed)
+          std::istringstream maps(shell.scene3_buffer);
+          std::string first, second, third;
+          if (std::getline(maps, first, ',') &&
+              std::getline(maps, second, ',') &&
+              std::getline(maps, third)) {
+            next.normal_map = first;
+            next.properties_map = second;
+            next.cloud_map = third;
+            valid = true;
+          }
+          break; }
+  case 54:
+          valid = parse_pair(shell.scene3_buffer, a, b);
+          if (valid && a >= 0.f && a <= 2.f && b >= 0.f && b <= .02f) {
+            next.normal_strength = a; next.relief = b;
+          } else valid = false;
+          break;
+  case 55: {
+          float albedo;
+          valid = parse_quad(shell.scene3_buffer, a, albedo, b, c);
+          if (valid && a >= 0.f && a <= 1.f && albedo >= 0.f &&
+              albedo <= 1.f && b >= -2.f && b <= 2.f && c >= -2.f &&
+              c <= 2.f) {
+            next.cloud_opacity = a; next.cloud_albedo = albedo;
+            next.cloud_offset_x = b; next.cloud_offset_y = c;
+          } else valid = false;
+          break; }
+  case 56:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 1.f) { next.terminator_wrap = a; valid = true; }
+          break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2164,7 +2198,10 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                     shell.hit3_bloom = shell.hit3_grade =
                         shell.hit3_quality = shell.hit3_plights =
                             shell.hit3_debug = shell.hit3_range =
-                                shell.hit3_shadow = {};
+                                shell.hit3_shadow = shell.hit3_surfmaps =
+                                    shell.hit3_surfshape =
+                                        shell.hit3_clouddeck =
+                                            shell.hit3_termwrap = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2295,6 +2332,24 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         inst.material.alpha_threshold = e.alpha_cutout;
         inst.material.texture_tiling = {e.uv_tile_x, e.uv_tile_y};
       }
+      // The same fields the runtime maps through MaterialSurface.
+      if (!e.normal_map.empty() || !e.properties_map.empty() ||
+          !e.cloud_map.empty()) {
+        SurfaceResponse3D response;
+        if (!e.normal_map.empty())
+          response.normal = scene3_tex(shell, e.normal_map);
+        if (!e.properties_map.empty())
+          response.properties = scene3_tex(shell, e.properties_map);
+        if (!e.cloud_map.empty())
+          response.cloud_shadow = scene3_tex(shell, e.cloud_map);
+        response.normal_strength = e.normal_strength;
+        response.relief = e.relief;
+        response.cloud_opacity = e.cloud_opacity;
+        response.cloud_albedo = e.cloud_albedo;
+        response.cloud_offset = {e.cloud_offset_x, e.cloud_offset_y};
+        inst.material.surface_response = response;
+      }
+      inst.material.terminator_wrap = e.terminator_wrap;
       if (e.atmo_strength != 0.f)
         inst.material.atmosphere =
             Atmosphere3D{{e.atmo_r, e.atmo_g, e.atmo_b}, e.atmo_strength,
@@ -2532,6 +2587,23 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_range, "visRange",
         entity ? std::to_string(entity->visible_range) : "", ed(51),
         "distance cull, world units - 0 always");
+  field(shell.hit3_surfmaps, "surfMaps",
+        entity ? entity->normal_map + "," + entity->properties_map + "," +
+                     entity->cloud_map
+               : "",
+        ed(53), "normal,properties,cloud paths - any subset");
+  field(shell.hit3_surfshape, "surfShape",
+        entity ? fmt_pair(entity->normal_strength, entity->relief) : "",
+        ed(54), "normal strength 0..2, relief 0..0.02");
+  field(shell.hit3_clouddeck, "cloudDeck",
+        entity ? std::to_string(entity->cloud_opacity) + "," +
+                     std::to_string(entity->cloud_albedo) + "," +
+                     fmt_pair(entity->cloud_offset_x, entity->cloud_offset_y)
+               : "",
+        ed(55), "shadow opacity, deck albedo 0..1, uv offset");
+  field(shell.hit3_termwrap, "termWrap",
+        entity ? std::to_string(entity->terminator_wrap) : "", ed(56),
+        "wrap-diffuse 0..1 - 0 keeps Lambert");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -6546,6 +6618,19 @@ int main(int argc, char **argv) {
                             : "");
             else if (shell.hit3_range.contains(event.position) && se)
               edit3(51, std::to_string(se->visible_range));
+            else if (shell.hit3_surfmaps.contains(event.position) && se)
+              edit3(53, se->normal_map + "," + se->properties_map + "," +
+                            se->cloud_map);
+            else if (shell.hit3_surfshape.contains(event.position) && se)
+              edit3(54, std::to_string(se->normal_strength) + "," +
+                            std::to_string(se->relief));
+            else if (shell.hit3_clouddeck.contains(event.position) && se)
+              edit3(55, std::to_string(se->cloud_opacity) + "," +
+                            std::to_string(se->cloud_albedo) + "," +
+                            std::to_string(se->cloud_offset_x) + "," +
+                            std::to_string(se->cloud_offset_y));
+            else if (shell.hit3_termwrap.contains(event.position) && se)
+              edit3(56, std::to_string(se->terminator_wrap));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

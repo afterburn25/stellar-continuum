@@ -62,7 +62,8 @@ void validate_instance(const MeshInstance3D& i){
     throw std::invalid_argument("3D instance requires a mesh and finite bounded transform.");
   (void)normalized(i.rotation);const auto& m=i.material;
   if(!bounded(m.ambient,1)||m.ambient<0||!bounded(m.diffuse,1)||m.diffuse<0||
-     !bounded(m.opacity,1)||m.opacity<0||!bounded(m.dark_side_strength,16)||m.dark_side_strength<0)
+     !bounded(m.opacity,1)||m.opacity<0||!bounded(m.dark_side_strength,16)||m.dark_side_strength<0||
+     !bounded(m.terminator_wrap,1)||m.terminator_wrap<0)
     throw std::invalid_argument("3D material lighting and opacity must be finite and bounded.");
   if(m.light_direction)(void)normalized(*m.light_direction);
   for(const auto& l:m.additional_lights){(void)normalized(l.direction);if(!valid(l.color)||l.color.x<0||l.color.y<0||l.color.z<0||l.color.x>4||l.color.y>4||l.color.z>4||!bounded(l.intensity,16)||l.intensity<0)throw std::invalid_argument("Invalid additional light");}
@@ -78,8 +79,8 @@ void validate_instance(const MeshInstance3D& i){
       throw std::invalid_argument("Invalid emission volume depth, density or integration budget");
   }
   if(m.surface_response){const auto& s=*m.surface_response;
-    if(!s.properties||!s.normal||!bounded(s.normal_strength,2)||s.normal_strength<0||!bounded(s.relief,.02)||s.relief<0||!bounded(s.cloud_opacity,1)||s.cloud_opacity<0||!bounded(s.cloud_offset.x,2)||!bounded(s.cloud_offset.y,2))
-      throw std::invalid_argument("3D surface response requires normal/properties maps and bounded parameters.");
+    if((!s.properties&&!s.normal&&!s.cloud_shadow)||!bounded(s.normal_strength,2)||s.normal_strength<0||!bounded(s.relief,.02)||s.relief<0||!bounded(s.cloud_opacity,1)||s.cloud_opacity<0||!bounded(s.cloud_albedo,1)||s.cloud_albedo<0||!bounded(s.cloud_offset.x,2)||!bounded(s.cloud_offset.y,2))
+      throw std::invalid_argument("3D surface response requires at least one map and bounded parameters.");
   }
   if(m.shadow){const auto& s=*m.shadow;
     if(!valid(s.position)||!bounded(s.scale,1e5)||s.scale<1e-8f||

@@ -44,6 +44,7 @@ struct Material {
     vec4 uv_options; // surface tiling x, y
     vec4 atmo_options; // tint rgb, strength
     vec4 atmo_shape; // rim power, nightside floor
+    vec4 response_options; // terminator wrap, cloud albedo, map flags (1 normal, 2 properties, 4 cloud), unused
     vec4 point_position[4]; // view-space position, range (0 = unbounded)
     vec4 point_energy[4]; // rgb, intensity
 };
@@ -244,27 +245,39 @@ void main() {
     vec3 V=material.view_options.x>0.5?vec3(0,0,1):normalize(-view_position);
     vec4 properties=vec4(1,0,0,0);
     float cloud_shadow=1.0;
+    vec4 cloud_layer=vec4(0);
     if(material.surface_response.x>0.5) {
-        properties=texture(properties_map,uv);
+        float map_flags=material.response_options.z;
+        bool has_normal=mod(map_flags,2.0)>0.5;
+        bool has_properties=mod(floor(map_flags/2.0),2.0)>0.5;
+        bool has_cloud=mod(floor(map_flags/4.0),2.0)>0.5;
+        if(has_properties)
+            properties=texture(properties_map,uv);
         vec3 dx=dFdx(view_position),dy=dFdy(view_position);
         vec2 du=dFdx(texture_uv),dv=dFdy(texture_uv);
         vec3 T=dx*dv.y-dy*du.y;
         vec3 B=dy*du.x-dx*dv.x;
         float det=du.x*dv.y-du.y*dv.x;
-        if(abs(det)>1e-12&&length(T)>1e-10&&length(B)>1e-10) {
+        if(has_normal&&abs(det)>1e-12&&length(T)>1e-10&&length(B)>1e-10) {
             T=normalize(T*sign(det));B=normalize(B*sign(det));
             vec3 mapN=texture(normal_map,uv).xyz*2.0-1.0;
             N=normalize(N+material.surface_response.y*(T*mapN.x+B*mapN.y));
         }
         vec3 rx=cross(dy,N),ry=cross(N,dx);
         float d=dot(dx,rx);
-        if(abs(d)>1e-15&&material.surface_response.z>0.0)
+        if(has_properties&&abs(d)>1e-15&&material.surface_response.z>0.0)
             N=normalize(abs(d)*N-material.surface_response.z*sign(d)*(dFdx(properties.a)*rx+dFdy(properties.a)*ry));
         // The sampler wraps longitude, preserving continuous pixel derivatives.
-        cloud_shadow=1.0-material.surface_response.w*texture(cloud_map,uv+material.surface_options.xy).a;
+        if(has_cloud) {
+            cloud_layer=texture(cloud_map,uv+material.surface_options.xy);
+            cloud_shadow=1.0-material.surface_response.w*cloud_layer.a;
+        }
     }
     float incidence=dot(N,material.light_direction.xyz);
-    float sunlight=material.surface_options.w>0.5?abs(incidence):max(incidence,0.0);
+    // Wrap-diffuse terminator: (N.L + w)/(1 + w) softens the day/night edge
+    // without touching the fully lit or fully dark poles; 0 keeps Lambert.
+    float terminator_wrap=material.response_options.x;
+    float sunlight=material.surface_options.w>0.5?abs(incidence):clamp((incidence+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);
     vec2 sample_uv=uv;
     if(material.effect_options.x>0.5){
         // Smooth bounded flow changes filament shape without wrapping the image.
@@ -384,7 +397,7 @@ void main() {
     for(int i=0;i<2;++i) {
         if(material.additional_illumination[i].a<=0.0) continue;
         vec3 L=material.additional_direction[i].xyz;
-        float nl=material.surface_options.w>0.5?abs(dot(N,L)):max(dot(N,L),0.0);
+        float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);
         vec3 energy=material.additional_illumination[i].rgb*material.additional_illumination[i].a*extra_visibility[i]*cloud_shadow;
         result+=texel.rgb*diffuse_scale*material.parameters.y*nl*energy;
         if(material.surface_response.x>0.5||material.optics.x>=1.0||pbr_active) {
@@ -415,7 +428,7 @@ void main() {
         if(range>0.0){float x=clamp(sqrt(d2)/range,0.0,1.0);window=pow(1.0-x*x*x*x,2.0);}
         if(window<=0.0) continue;
         vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
-        float nl=material.surface_options.w>0.5?abs(dot(N,L)):max(dot(N,L),0.0);
+        float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);
         result+=texel.rgb*diffuse_scale*material.parameters.y*nl*energy;
         if(material.surface_response.x>0.5||material.optics.x>=1.0||pbr_active){
             vec3 sum=V+L,H=length(sum)>0.0001?normalize(sum):N;
@@ -444,6 +457,16 @@ void main() {
             gate=mix(1.0,1.0-smoothstep(-0.1,0.3,incidence),material.pbr_options.z);
         emissive_part+=texture(emissive_map,uv).rgb*material.emissive_tint.rgb*material.pbr_values.z*gate;
         result+=emissive_part;
+    }
+    // Visible cloud deck: the cloud map's RGB composites over the lit
+    // surface — including surface emissive, which a cloud cover occludes —
+    // lit by the same wrapped sunlight. Coverage scales with the same
+    // opacity that drives the deck's surface shadow; albedo scales deck
+    // brightness so a zero albedo leaves the layer shadow-only.
+    if(material.response_options.y>0.0&&material.surface_response.w>0.0) {
+        float cover=clamp(cloud_layer.a*material.surface_response.w,0.0,1.0);
+        vec3 deck=cloud_layer.rgb*material.response_options.y*(material.parameters.x+material.parameters.y*sunlight*visibility*light_color);
+        result=mix(result,deck,cover);
     }
     // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
     // nightside floor, tied to the star's actual color.

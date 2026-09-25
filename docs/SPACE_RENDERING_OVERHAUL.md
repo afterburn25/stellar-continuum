@@ -24,7 +24,10 @@ This document is the phase-1 audit; landed work is tracked in
   - `Dielectric3D` — IOR refraction/reflection against a world-fixed
     equirect environment map, Beer-Lambert absorption, roughness cone filter.
   - `SurfaceResponse3D` — normal map + packed properties (roughness /
-    liquid / ice / height), cloud-shadow map with animated UV offset.
+    liquid / ice / height), cloud map with animated UV offset whose alpha
+    shadows the surface and whose RGB composites as a lit deck
+    (`cloud_albedo`); any map subset binds. `Material3D::terminator_wrap`
+    adds wrap-diffuse terminator softening to every light type.
   - `AnalyticShadow3D` — ellipsoid or annulus blocker of the directional
     light, annulus alpha-map with footprint integration (ring→planet and
     planet→ring shadows, bias-free by construction).
@@ -76,8 +79,14 @@ same document headless-tested.
    grading, sharpen, or AA (pipelines are all SAMPLECOUNT_1).
 6. **Atmosphere** — only the flat `rim_power` alpha shell; no
    wavelength-weighted scattering, no day/night limb behavior.
-7. **Planet features** — cloud shadow+offset exists but no independent
-   cloud albedo layer, no night-lights emissive, no terminator softening.
+7. **Planet features** — landed: `SurfaceResponse3D` is authorable
+   end-to-end (normal/properties/cloud maps, any subset; `surface` doc
+   block + `MaterialSurface` component + editor rows), `cloud_albedo`
+   composites the cloud map's RGB as a lit deck over surface emissive
+   and under the atmosphere rim, and `terminator_wrap` softens the
+   day/night edge across key/fill/point lights. Remaining: the deck is
+   a texture-space composite — no volumetric cloud shells, cloud
+   self-shadowing or gas-giant banding.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes tint/texture/opacity/double_sided
@@ -98,10 +107,14 @@ instances skip both the draw and their TextureStreamer residency demand.
 Directional shadow mapping is landed: `ShadowMap3D` ortho coverage ahead
 of the camera, depth-only `scene3d_shadow` pass through the RenderGraph,
 8-tap PCF at High/Ultra, tier-scaled resolution, Low-tier skip,
-`shadow_casters` workload counter. Also fixed: streamer registrations
-keyed by `RgbaImage*` are now liveness-verified (`weak_ptr` owner),
-closing a stale-TextureId reuse bug that intermittently skipped mip-tail
-promotions. See `docs/VISUAL_ENGINE_HANDOFF.md`.
+`shadow_casters` workload counter. Planet surface detail is landed:
+`SurfaceResponse3D` is reachable from authored documents/components
+(any map subset), `cloud_albedo` turns the cloud map into a lit deck,
+and `terminator_wrap` applies wrap-diffuse to all light types. Also
+fixed: streamer registrations keyed by `RgbaImage*` are now
+liveness-verified (`weak_ptr` owner), closing a stale-TextureId reuse
+bug that intermittently skipped mip-tail promotions. See
+`docs/VISUAL_ENGINE_HANDOFF.md`.
 
 1. **PBR material block**: metallic + scalar/map roughness driving the
    existing GGX, emissive map × tint × strength with optional

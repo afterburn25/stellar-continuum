@@ -174,6 +174,19 @@ struct MaterialPbr {
   float alpha_cutout{0.f}, uv_tile_x{1.f}, uv_tile_y{1.f};
   std::string metallic_roughness, emissive, environment;
 };
+// Opaque surface response for a 3D body — the component counterpart of
+// the entity document's `surface` block plus `terminatorWrap`. Map
+// strings are content-relative paths the host resolves like TextureRef;
+// any subset binds (a cloud-only material needs no normal/properties
+// art). `cloud_albedo` composites the cloud map's RGB as a lit deck over
+// the surface; `terminator_wrap` softens the day/night edge through
+// wrap-diffuse lighting.
+struct MaterialSurface {
+  float normal_strength{0.35f}, relief{0.f}, cloud_opacity{0.f};
+  float cloud_albedo{0.f}, cloud_offset_x{0.f}, cloud_offset_y{0.f};
+  float terminator_wrap{0.f};
+  std::string normal_map, properties_map, cloud_map;
+};
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
 // weighted to the day side with a nightside floor.
 struct AtmosphereShell {
