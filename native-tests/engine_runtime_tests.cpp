@@ -1770,6 +1770,33 @@ int main() {
           "trailing --scene3d run exits cleanly");
     check(host3d.scene3d() && host3d.entities3d().size() == 1,
           "trailing --scene3d flag enables the 3D mode");
+
+    // --seed/--record parse through argv: the recording lands on disk
+    // and the seeded rng stream matches a host configured identically.
+    const auto rec_path = root / "argv.rec";
+    const auto rec_arg = rec_path.generic_string();
+    RuntimeHost host2{headless_options(root)};
+    std::uint64_t argv_draw = 0;
+    host2.on_update = [&](World &, float) {
+      if (!argv_draw) argv_draw = host2.rng().next_u64();
+    };
+    const char *argv2[] = {"game",     "--headless", "--frames", "2",
+                           "--seed",   "7",          "--record",
+                           rec_arg.c_str()};
+    check(host2.run(8, const_cast<char **>(argv2)) == 0,
+          "argv --seed/--record run exits cleanly");
+    check(std::filesystem::exists(rec_path),
+          "--record writes the journal through the argv path");
+    auto ref_options = headless_options(root);
+    ref_options.seed = 7;
+    RuntimeHost reference{ref_options};
+    std::uint64_t ref_draw = 0;
+    reference.on_update = [&](World &, float) {
+      if (!ref_draw) ref_draw = reference.rng().next_u64();
+    };
+    check(reference.run() == 0, "reference seeded run exits cleanly");
+    check(argv_draw != 0 && argv_draw == ref_draw,
+          "--seed 7 reproduces the options-path rng stream");
   }
 
   // --snapshot-out writes a world snapshot at teardown that
