@@ -10,29 +10,53 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 namespace stellar::engine {
 namespace {
 
 // Snapshots must be byte-deterministic — memcpy'ing an object with
 // padding (or an empty marker struct) leaks uninitialized bytes into
-// snapshots and replay checkpoint hashes. Empty markers must use the
-// fixed-byte codecs below; member order in registered structs keeps
-// layouts padding-free (std::is_empty catches the empty case).
-template <class T> std::vector<std::uint8_t> encode_pod(const T &v) {
-  static_assert(!std::is_empty_v<T>,
-                "encode_pod cannot serialize empty markers — use a "
+// snapshots and replay checkpoint hashes. encode_fields serializes each
+// listed member instead of the object representation: the sizeof check
+// statically requires the member list to cover the whole struct, so a
+// new member trips it until added to the codec and padding can never
+// reach the output. For the current padding-free layouts the byte
+// stream is identical to a whole-struct memcpy.
+template <class T, auto M>
+using member_t = std::remove_cvref_t<decltype(std::declval<T &>().*M)>;
+
+template <class T, auto... M>
+std::vector<std::uint8_t> encode_fields(const T &v) {
+  static_assert(sizeof...(M) > 0,
+                "encode_fields cannot serialize empty markers — use a "
                 "fixed-byte codec");
-  std::vector<std::uint8_t> bytes(sizeof(T));
-  std::memcpy(bytes.data(), &v, sizeof(T));
+  static_assert(sizeof(T) == (sizeof(member_t<T, M>) + ...),
+                "encode_fields must list every member in order; an "
+                "omitted member or layout padding trips this check");
+  std::vector<std::uint8_t> bytes;
+  bytes.reserve(sizeof(T));
+  const auto put = [&bytes](const auto &f) {
+    const auto *p = reinterpret_cast<const std::uint8_t *>(&f);
+    bytes.insert(bytes.end(), p, p + sizeof(f));
+  };
+  (put(v.*M), ...);
   return bytes;
 }
 
-template <class T> T decode_pod(const std::vector<std::uint8_t> &b) {
+template <class T, auto... M>
+T decode_fields(const std::vector<std::uint8_t> &b) {
   T v{};
-  if (b.size() == sizeof(T)) std::memcpy(&v, b.data(), sizeof(T));
+  if (b.size() != sizeof(T)) return v;
+  std::size_t at = 0;
+  const auto get = [&b, &at](auto &f) {
+    std::memcpy(&f, b.data() + at, sizeof(f));
+    at += sizeof(f);
+  };
+  (get(v.*M), ...);
   return v;
 }
 
@@ -196,23 +220,30 @@ Anim decode_anim(const std::vector<std::uint8_t> &b) {
 } // namespace
 
 void register_scene_components(World &world) {
-  world.register_component<Transform2D>("transform", encode_pod<Transform2D>,
-                                        decode_pod<Transform2D>);
-  world.register_component<Velocity2D>("velocity", encode_pod<Velocity2D>,
-                                       decode_pod<Velocity2D>);
-  world.register_component<Extent2D>("extent", encode_pod<Extent2D>,
-                                     decode_pod<Extent2D>);
-  world.register_component<Tint>("tint", encode_pod<Tint>, decode_pod<Tint>);
+  world.register_component<Transform2D>(
+      "transform", encode_fields<Transform2D, &Transform2D::x, &Transform2D::y>,
+      decode_fields<Transform2D, &Transform2D::x, &Transform2D::y>);
+  world.register_component<Velocity2D>(
+      "velocity",
+      encode_fields<Velocity2D, &Velocity2D::dx, &Velocity2D::dy>,
+      decode_fields<Velocity2D, &Velocity2D::dx, &Velocity2D::dy>);
+  world.register_component<Extent2D>(
+      "extent", encode_fields<Extent2D, &Extent2D::w, &Extent2D::h>,
+      decode_fields<Extent2D, &Extent2D::w, &Extent2D::h>);
+  world.register_component<Tint>(
+      "tint", encode_fields<Tint, &Tint::r, &Tint::g, &Tint::b>,
+      decode_fields<Tint, &Tint::r, &Tint::g, &Tint::b>);
   world.register_component<EntityName>("name", encode_name, decode_name);
   world.register_component<SpriteRef>("sprite", encode_sprite, decode_sprite);
-  world.register_component<Layer>("layer", encode_pod<Layer>,
-                                  decode_pod<Layer>);
-  world.register_component<Parallax>("parallax", encode_pod<Parallax>,
-                                     decode_pod<Parallax>);
+  world.register_component<Layer>("layer", encode_fields<Layer, &Layer::value>,
+                                  decode_fields<Layer, &Layer::value>);
+  world.register_component<Parallax>(
+      "parallax", encode_fields<Parallax, &Parallax::value>,
+      decode_fields<Parallax, &Parallax::value>);
   world.register_component<Label>("label", encode_label, decode_label);
-  world.register_component<GravityScale>("gravityScale",
-                                         encode_pod<GravityScale>,
-                                         decode_pod<GravityScale>);
+  world.register_component<GravityScale>(
+      "gravityScale", encode_fields<GravityScale, &GravityScale::value>,
+      decode_fields<GravityScale, &GravityScale::value>);
   world.register_component<Solid>("solid",
                                   [](const Solid &) {
                                     return std::vector<std::uint8_t>{1};
@@ -221,19 +252,21 @@ void register_scene_components(World &world) {
                                     return Solid{};
                                   });
   world.register_component<Anim>("anim", encode_anim, decode_anim);
-  world.register_component<Rotation>("rotation", encode_pod<Rotation>,
-                                     decode_pod<Rotation>);
-  world.register_component<Spin>("spin", encode_pod<Spin>,
-                                 decode_pod<Spin>);
-  world.register_component<Lifetime>("lifetime", encode_pod<Lifetime>,
-                                     decode_pod<Lifetime>);
-  world.register_component<Flip>("flip", encode_pod<Flip>,
-                                 decode_pod<Flip>);
-  // Marker components carry no data — encode_pod would memcpy the single
-  // padding byte of an empty struct, leaking uninitialized memory into
-  // snapshots and checkpoint hashes (nondeterministic replays). Emit a
-  // fixed byte like Solid/DoubleSided; decode ignores the payload so
-  // existing saves still load.
+  world.register_component<Rotation>(
+      "rotation", encode_fields<Rotation, &Rotation::value>,
+      decode_fields<Rotation, &Rotation::value>);
+  world.register_component<Spin>("spin", encode_fields<Spin, &Spin::value>,
+                                 decode_fields<Spin, &Spin::value>);
+  world.register_component<Lifetime>(
+      "lifetime", encode_fields<Lifetime, &Lifetime::remaining>,
+      decode_fields<Lifetime, &Lifetime::remaining>);
+  world.register_component<Flip>("flip",
+                                 encode_fields<Flip, &Flip::x, &Flip::y>,
+                                 decode_fields<Flip, &Flip::x, &Flip::y>);
+  // Marker components carry no data — encode_fields cannot serialize an
+  // empty struct (it would emit zero bytes, indistinguishable from a
+  // truncated payload). Emit a fixed byte like Solid/DoubleSided;
+  // decode ignores the payload so existing saves still load.
   const auto encode_marker = [](const auto &) {
     return std::vector<std::uint8_t>{1};
   };
@@ -248,8 +281,9 @@ void register_scene_components(World &world) {
       [](const std::vector<std::uint8_t> &) { return NoBounce{}; });
   world.register_component<UserData>("userdata", encode_user_data,
                                      decode_user_data);
-  world.register_component<Opacity>("opacity", encode_pod<Opacity>,
-                                    decode_pod<Opacity>);
+  world.register_component<Opacity>(
+      "opacity", encode_fields<Opacity, &Opacity::value>,
+      decode_fields<Opacity, &Opacity::value>);
   world.register_component<Tilemap>("tilemap", encode_tilemap,
                                     decode_tilemap);
   world.register_component<Parent>("parent", encode_parent, decode_parent);
@@ -291,15 +325,28 @@ void register_scene_components(World &world) {
           a.saved_playing = b[at] != 0;
         return a;
       });
-  world.register_component<Camera3DState>("camera3d",
-                                          encode_pod<Camera3DState>,
-                                          decode_pod<Camera3DState>);
-  world.register_component<Transform3D>("transform3",
-                                        encode_pod<Transform3D>,
-                                        decode_pod<Transform3D>);
-  world.register_component<Velocity3D>("velocity3",
-                                       encode_pod<Velocity3D>,
-                                       decode_pod<Velocity3D>);
+  world.register_component<Camera3DState>(
+      "camera3d",
+      encode_fields<Camera3DState, &Camera3DState::x, &Camera3DState::y,
+                    &Camera3DState::z, &Camera3DState::yaw_deg,
+                    &Camera3DState::pitch_deg, &Camera3DState::fov_deg>,
+      decode_fields<Camera3DState, &Camera3DState::x, &Camera3DState::y,
+                    &Camera3DState::z, &Camera3DState::yaw_deg,
+                    &Camera3DState::pitch_deg, &Camera3DState::fov_deg>);
+  world.register_component<Transform3D>(
+      "transform3",
+      encode_fields<Transform3D, &Transform3D::x, &Transform3D::y,
+                    &Transform3D::z, &Transform3D::qx, &Transform3D::qy,
+                    &Transform3D::qz, &Transform3D::qw, &Transform3D::scale>,
+      decode_fields<Transform3D, &Transform3D::x, &Transform3D::y,
+                    &Transform3D::z, &Transform3D::qx, &Transform3D::qy,
+                    &Transform3D::qz, &Transform3D::qw, &Transform3D::scale>);
+  world.register_component<Velocity3D>(
+      "velocity3",
+      encode_fields<Velocity3D, &Velocity3D::dx, &Velocity3D::dy,
+                    &Velocity3D::dz>,
+      decode_fields<Velocity3D, &Velocity3D::dx, &Velocity3D::dy,
+                    &Velocity3D::dz>);
   world.register_component<MeshRef>(
       "meshref",
       [](const MeshRef &m) {

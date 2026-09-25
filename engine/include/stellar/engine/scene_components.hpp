@@ -166,8 +166,8 @@ struct DoubleSided {
 // document seeds it only on scene load).
 struct Camera3DState {
   // All-double members keep the layout padding-free — the snapshot codec
-  // memcpy's the object representation and padding bytes would leak
-  // uninitialized memory into byte-compared snapshots.
+  // serializes members individually and requires the member list to cover
+  // the whole struct, so mixed-width members would need explicit care.
   double x{}, y{}, z{3.0};
   double yaw_deg{}, pitch_deg{}, fov_deg{60.0};
 };
