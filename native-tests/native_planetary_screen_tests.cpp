@@ -211,6 +211,26 @@ int main(int argc,char** argv)try{
     for(const auto& item:draw.overlay)
       if(const auto* t=std::get_if<Text>(&item);t&&t->value=="PRODUCTION & REQUIREMENTS")economy=true;
     check(economy,"Issue chip did not activate the economy tab");
+    // With an unpowered structure present the chip routes straight to it and
+    // hover lists the affected facilities.
+    NativeSurfaceSite dark;dark.name="Ore Refinery";dark.slot_index=4;
+    dark.complete=true;dark.enabled=true;dark.staffed=true;dark.condition=1.;
+    dark.efficiency=1.;
+    view.construction_sites={dark};screen.set_view(view);
+    draw={};screen.render(draw,view,w,h);
+    chip=nullptr;for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item);t&&t->value=="POWER -30")chip=t;
+    check(chip,"POWER chip disappeared once a structure was attached");
+    (void)screen.handle({InputEventType::PointerMove,chip->at},w,h);
+    draw={};screen.render(draw,view,w,h);
+    bool detail=false,heading=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item)){detail|=t->value=="Ore Refinery";heading|=t->value=="Affected structures";}
+    check(detail&&heading,"Chip hover did not list the affected structure");
+    (void)screen.handle({InputEventType::LeftPressed,chip->at},w,h);
+    (void)screen.handle({InputEventType::LeftReleased,chip->at},w,h);
+    draw={};screen.render(draw,view,w,h);
+    bool manage=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item);t&&t->value=="Disable building")manage=true;
+    check(manage,"Issue chip did not select the affected structure");
   }
   for (const auto [w,h] : std::array<std::pair<int,int>,2>{{{1280,720},{1920,1080}}}) {
     NativePlanetaryScreen developer; NativeColonyView v;

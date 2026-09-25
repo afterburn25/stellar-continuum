@@ -160,7 +160,7 @@ class NativePlanetaryScreen {
   }
   void render(DrawList& out,const NativeColonyView& v,int width,int height)const{
     using namespace stellar::native_menu_style;
-    const auto l=PlanetaryLayout::make(width,height);const float s=l.s;hits_.clear();
+    const auto l=PlanetaryLayout::make(width,height);const float s=l.s;hits_.clear();chip_tips_.clear();
     out.overlay.emplace_back(FilledRectangle{l.screen,{2,9,16,255}});
     // Seeded starfield belongs to this planet view, with no background galaxies.
     for(int i=0;i<170;++i){const float x=l.globe.x+std::fmod(i*73.79f+v.body_id*.07f,std::max(1.f,l.globe.width)),y=l.globe.y+std::fmod(i*131.31f,std::max(1.f,l.globe.height));out.overlay.emplace_back(FilledRectangle{{x,y,i%17==0?2.f:1.f,1.f},{145,185,221,static_cast<std::uint8_t>(60+i%130)}});}
@@ -211,21 +211,36 @@ class NativePlanetaryScreen {
       const bool critical=v.surface_hub_level==0||power_gap>0||workers_gap>1e-9||v.sustenance_support_ratio<1||v.operating_funding<.999;
       label(out,{l.alerts.x,l.alerts.y,l.alerts.width,20*s},critical?tr("PLANET_ALERTS_TITLE","!  COLONY ALERTS"):tr("PLANET_STATUS_TITLE","COLONY STATUS"),l.small,critical?bad:cyan);
       if(critical){
-        // One chip per live issue; activating a chip focuses the economy tab
-        // where the deficit and its drivers are detailed.
+        // One chip per live issue. When the deficit maps to facilities the
+        // chip selects the first affected structure; otherwise it focuses the
+        // economy tab. Hovering a chip lists the affected structures.
         const float cw=(l.alerts.width-6*s)/2.f,ch=20*s,cg=4*s;
         int ci=0;
-        const auto chip=[&](std::string text,native_ui::Tone tone){
+        const auto chip=[&](std::string text,native_ui::Tone tone,int target_tab,int target_slot,std::string detail){
           const UiRect r{l.alerts.x+(ci%2)*(cw+6*s),l.alerts.y+22*s+(ci/2)*(ch+cg),cw,ch};
           native_ui::badge(out,r,text,std::max(9,l.small-2),tone);
-          hits_.push_back({r,static_cast<int>(hits_.size()),{},true,-1,0,-1,text,{},0});
+          hits_.push_back({r,static_cast<int>(hits_.size()),{},true,target_slot,target_tab,-1,std::move(text),{},0});
+          if(!detail.empty())chip_tips_.push_back({r,std::move(detail)});
           ++ci;
         };
-        if(v.surface_hub_level==0)chip(tr("PLANET_CHIP_HUB","NO COMMAND CENTER"),native_ui::Tone::Danger);
-        if(power_gap>0)chip(trf("PLANET_CHIP_POWER",{number(power_gap,0)},"POWER -{0}"),native_ui::Tone::Danger);
-        if(workers_gap>1e-9)chip(trf("PLANET_CHIP_WORKERS",{population(workers_gap)},"WORKERS -{0}"),native_ui::Tone::Danger);
-        if(v.sustenance_support_ratio<1)chip(trf("PLANET_CHIP_LIFE",{number(v.sustenance_support_ratio*100,0)},"LIFE SUPPORT {0}%"),native_ui::Tone::Danger);
-        if(v.operating_funding<.999)chip(trf("PLANET_CHIP_FUNDING",{number(v.operating_funding*100,0)},"FUNDING {0}%"),native_ui::Tone::Danger);
+        // First affected site (slot index) plus up to four names for the
+        // hover detail; colony-wide deficits return {-1,""}.
+        const auto affected=[&](auto&& pred){
+          int first=-1,total=0,shown=0;std::string names;
+          for(const auto& site:v.construction_sites){
+            if(!pred(site))continue;
+            if(first<0)first=site.slot_index;++total;
+            if(shown<4){if(shown++)names+="  ·  ";names+=site.name;}
+          }
+          if(total>shown)names+=trf("PLANET_CHIP_MORE",{std::to_string(total-shown)},"  +{0} more");
+          return std::pair{first,std::move(names)};
+        };
+        const auto colony_wide=tr("PLANET_TIP_COLONYWIDE","Colony-wide deficit — no single structure is flagged.");
+        if(v.surface_hub_level==0)chip(tr("PLANET_CHIP_HUB","NO COMMAND CENTER"),native_ui::Tone::Danger,1,-1,tr("PLANET_TIP_HUB","Build a Command Center to unlock colony operations."));
+        if(power_gap>0){const auto[slot,names]=affected([](const NativeSurfaceSite& b){return b.complete&&!b.powered;});chip(trf("PLANET_CHIP_POWER",{number(power_gap,0)},"POWER -{0}"),native_ui::Tone::Danger,slot<0?0:-1,slot,names.empty()?colony_wide:names);}
+        if(workers_gap>1e-9){const auto[slot,names]=affected([](const NativeSurfaceSite& b){return b.complete&&b.enabled&&!b.staffed;});chip(trf("PLANET_CHIP_WORKERS",{population(workers_gap)},"WORKERS -{0}"),native_ui::Tone::Danger,slot<0?0:-1,slot,names.empty()?colony_wide:names);}
+        if(v.sustenance_support_ratio<1){const auto[slot,names]=affected([](const NativeSurfaceSite& b){return b.essential_service&&b.complete&&(!b.enabled||!b.powered||!b.staffed);});chip(trf("PLANET_CHIP_LIFE",{number(v.sustenance_support_ratio*100,0)},"LIFE SUPPORT {0}%"),native_ui::Tone::Danger,slot<0?0:-1,slot,names.empty()?colony_wide:names);}
+        if(v.operating_funding<.999){const auto[slot,names]=affected([](const NativeSurfaceSite& b){return b.complete&&b.enabled&&b.efficiency<.999;});chip(trf("PLANET_CHIP_FUNDING",{number(v.operating_funding*100,0)},"FUNDING {0}%"),native_ui::Tone::Danger,slot<0?0:-1,slot,names.empty()?colony_wide:names);}
       }else{
         label(out,{l.alerts.x,l.alerts.y+22*s,l.alerts.width,18*s},tr("PLANET_ALERT_NONE_SHORT","No critical needs"),l.small,muted);
       }
@@ -244,7 +259,10 @@ class NativePlanetaryScreen {
     for(int i=0;i<5;++i){UiRect r{l.actions.x+i*aw,l.actions.y,aw-8*s,l.actions.height};button(out,r,actions[i],{},l,i<3&&(i==2||!v.observer_only),{},action_art_?action_art_(i):Picture{},descriptions[i]);hits_.back().tab=i==0?1:i==1?0:3;}
     button(out,l.save,tr("PLANET_SAVE","Save"),{PlanetaryAction::Save},l);
     label(out,l.notice,notice_.empty()?(v.foreign_settlement?trf("PLANET_NOTICE_FOREIGN",{v.owner_name},"Developer inspection · {0} · Live statistics"):v.observer_only?(v.developer_inspection?tr("PLANET_NOTICE_UNSETTLED","Unsettled world · No colony population or structures."):tr("PLANET_NOTICE_SURVEY","Survey information only. Colony actions require an owned settlement.")):alerts(v)):notice_,l.small,notice_.empty()?muted:cyan);
-    if(!modal())if(const auto hovered=globe_.hit(pointer_,l.globe)){const auto& region=globe_.regions()[*hovered];const float tw=std::min(235*s,l.globe.width),th=68*s;UiRect tip{std::clamp(pointer_.x+14*s,l.globe.x,l.globe.x+l.globe.width-tw),std::clamp(pointer_.y+18*s,l.globe.y,l.globe.y+l.globe.height-th),tw,th};panel(out,tip,s);label(out,{tip.x+10*s,tip.y+8*s,tw-20*s,24*s},region.name,l.small,cyan);label(out,{tip.x+10*s,tip.y+34*s,tw-20*s,25*s},region.terrain,l.small,ink);}
+    if(!modal()){
+      for(const auto&[chip_rect,chip_detail]:chip_tips_)
+        native_ui::hover_tooltip(out,chip_rect,pointer_,tr("PLANET_CHIP_AFFECTED","Affected structures"),chip_detail,static_cast<int>(l.screen.x+l.screen.width),static_cast<int>(l.screen.y+l.screen.height),s);
+      if(const auto hovered=globe_.hit(pointer_,l.globe)){const auto& region=globe_.regions()[*hovered];const float tw=std::min(235*s,l.globe.width),th=68*s;UiRect tip{std::clamp(pointer_.x+14*s,l.globe.x,l.globe.x+l.globe.width-tw),std::clamp(pointer_.y+18*s,l.globe.y,l.globe.y+l.globe.height-th),tw,th};panel(out,tip,s);label(out,{tip.x+10*s,tip.y+8*s,tw-20*s,24*s},region.name,l.small,cyan);label(out,{tip.x+10*s,tip.y+34*s,tw-20*s,25*s},region.terrain,l.small,ink);}}
     if(modal())render_confirmation(out,l);
     if(focus_>=0){const auto items=ring();if(focus_<static_cast<int>(items.size()))stellar::native_ui::focus_ring(out,hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])].rect);}
   }
@@ -297,7 +315,7 @@ class NativePlanetaryScreen {
   mutable NativePlanetGlobe globe_;int layer_{0};
   Art art_;std::function<Picture(int)> action_art_;Picture portrait_;std::function<TextExtent(const Text&)> measure_;
   std::pair<std::uint64_t,int> identity_{};int selected_{-1},tab_{2},focus_{-1};mutable stellar::engine::ScrollView fact_scroll_{},detail_scroll_{},slot_scroll_{},queue_scroll_{};
-  mutable float fact_height_{},detail_height_{},slot_height_{},queue_height_{};mutable std::vector<Hit> hits_;std::optional<Hit> pressed_;Point pointer_{};std::string notice_;
+  mutable float fact_height_{},detail_height_{},slot_height_{},queue_height_{};mutable std::vector<Hit> hits_;mutable std::vector<std::pair<UiRect,std::string>> chip_tips_;std::optional<Hit> pressed_;Point pointer_{};std::string notice_;
   std::variant<std::monostate,NativeSurfacePlacementQuote,NativeSurfaceManagementQuote,NativeSurfaceRemovalQuote> pending_;
   static std::string number(double n,int precision=1){std::ostringstream o;o<<std::fixed<<std::setprecision(precision)<<n;return o.str();}
   static std::string signed_number(double n){return (n>0?"+":"")+number(n,2);}
