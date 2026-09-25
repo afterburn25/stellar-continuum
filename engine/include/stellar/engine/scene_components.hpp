@@ -194,6 +194,13 @@ struct MaterialSurface {
   float orbital_beaming{0.f};
   std::string normal_map, properties_map, cloud_map;
 };
+// Spectral-class star photosphere — the component counterpart of the
+// entity document's `starKelvin` key. The runtime maps it through
+// `star_photosphere3d`: blackbody disc tint + temperature-graded limb
+// darkening + self-consistent light color. Attached only when authored.
+struct StarPhotosphere {
+  double kelvin{0.0};
+};
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
 // weighted to the day side with a nightside floor.
 struct AtmosphereShell {

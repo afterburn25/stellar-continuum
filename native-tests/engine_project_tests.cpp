@@ -433,6 +433,7 @@ int main() {
     cube.limb_darkening = 0.6f;
     cube.band_shear = -0.25f;
     cube.orbital_beaming = 0.7f;
+    cube.star_kelvin = 3200.0;
     cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
     cube.lod_pixels = 48.f;
     scene.entities.push_back(cube);
@@ -559,7 +560,8 @@ int main() {
                 rc.cloud_opacity == 0.6f && rc.cloud_albedo == 0.7f &&
                 rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
                 rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f &&
-                rc.band_shear == -0.25f && rc.orbital_beaming == 0.7f,
+                rc.band_shear == -0.25f && rc.orbital_beaming == 0.7f &&
+                rc.star_kelvin == 3200.0,
             "scene3d surface-response fields round-trip");
       check(rc.lod_meshes.size() == 2 &&
                 rc.lod_meshes[0] == "models/crate_mid.obj" &&
@@ -683,6 +685,10 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"orbitalBeam":-1.2}]})")
               .has_value(),
           "scene3d orbital beaming below -1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"starKelvin":80}]})")
+              .has_value(),
+          "scene3d star kelvin below 100 rejected");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

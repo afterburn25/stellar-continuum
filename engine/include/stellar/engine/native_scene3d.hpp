@@ -224,6 +224,14 @@ struct Material3D {
   // Surface texture UV multiplier — repeat sampling when != (1,1).
   Point texture_tiling{1.f,1.f};
 };
+// Spectral-class star photosphere preset: blackbody disc tint (sRGB
+// encoded, decoded back to linear by `linear_light`), emissive-dominant
+// response (ambient bypasses light_color so the disc shows the true
+// Planckian color), the body's own blackbody as its material
+// `light_color`, and a temperature-graded linear limb coefficient —
+// convective cool stars darken more; the monotone falloff clamps to the
+// observed [0.2,0.95] envelope. Throws on kelvin outside [100,100000].
+[[nodiscard]] Material3D star_photosphere3d(double kelvin);
 struct MeshInstance3D {
   std::shared_ptr<const Mesh3D> mesh;
   Position3 position;

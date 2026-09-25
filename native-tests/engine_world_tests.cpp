@@ -693,6 +693,7 @@ int main() {
         turret.limb_darkening = 0.6f;
         turret.band_shear = -0.3f;
         turret.orbital_beaming = 0.65f;
+        turret.star_kelvin = 5800.0;
         turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
         turret.lod_pixels = 64.f;
         doc.entities.push_back(turret);
@@ -760,6 +761,11 @@ int main() {
               "spawn_scene3d meshlods component");
         check(world3.get<MeshLods>(ship_e) == nullptr,
               "no LOD chain does not attach a component");
+        const auto *sp = world3.get<StarPhotosphere>(turret_e);
+        check(sp != nullptr && sp->kelvin == 5800.0,
+              "spawn_scene3d starphotosphere component");
+        check(world3.get<StarPhotosphere>(ship_e) == nullptr,
+              "no starKelvin does not attach a component");
         check(world3.get<Lifetime>(turret_e)->remaining == 3.f,
               "spawn_scene3d lifetime");
         const auto *pt = world3.get<Parent3D>(turret_e);
@@ -824,6 +830,9 @@ int main() {
                       rml->specs[1] == "models/turret_low.obj" &&
                       rml->pixels == 64.f,
                   "meshlods codec round-trips");
+            const auto *rsp = restored.get<StarPhotosphere>(*re_turret);
+            check(rsp != nullptr && rsp->kelvin == 5800.0,
+                  "starphotosphere codec round-trips");
         }
         if (re_turret) {
             resolve_hierarchy3d(restored);
@@ -859,7 +868,8 @@ int main() {
                   out.entities[1].terminator_wrap == 0.5f &&
                   out.entities[1].limb_darkening == 0.6f &&
                   out.entities[1].band_shear == -0.3f &&
-                  out.entities[1].orbital_beaming == 0.65f,
+                  out.entities[1].orbital_beaming == 0.65f &&
+                  out.entities[1].star_kelvin == 5800.0,
               "scene3d_from_world exports surface response");
         check(out.entities[1].lod_meshes.size() == 2 &&
                   out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&

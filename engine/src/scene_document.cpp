@@ -468,6 +468,7 @@ std::string Scene3dDocument::to_json() const {
     if (e.limb_darkening != 0.f) item["limbDarken"] = e.limb_darkening;
     if (e.band_shear != 0.f) item["bandShear"] = e.band_shear;
     if (e.orbital_beaming != 0.f) item["orbitalBeam"] = e.orbital_beaming;
+    if (e.star_kelvin != 0.0) item["starKelvin"] = e.star_kelvin;
     if (!e.lod_meshes.empty()) {
       item["lods"] = e.lod_meshes;
       item["lodPixels"] = e.lod_pixels;
@@ -664,6 +665,10 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.orbital_beaming = item.value("orbitalBeam", 0.0f);
       if (!(e.orbital_beaming >= -1.f && e.orbital_beaming <= 1.f))
         return fail("orbitalBeam must be in [-1,1]");
+      e.star_kelvin = item.value("starKelvin", 0.0);
+      if (!(e.star_kelvin == 0.0 ||
+            (e.star_kelvin >= 100.0 && e.star_kelvin <= 100000.0)))
+        return fail("starKelvin must be in [100,100000]");
       if (item.contains("lods")) {
         const auto &lods = item.at("lods");
         if (!lods.is_array() || lods.size() > 8)

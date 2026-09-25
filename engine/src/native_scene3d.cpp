@@ -27,6 +27,26 @@ Vec3 blackbody_light_color(double kelvin,double reference_kelvin){
   const double peak=*std::max_element(bands.begin(),bands.end());
   return {static_cast<float>(bands[0]/peak),static_cast<float>(bands[1]/peak),static_cast<float>(bands[2]/peak)};
 }
+Material3D star_photosphere3d(double kelvin){
+  const auto color=blackbody_light_color(kelvin); // also bounds-checks
+  const auto encode=[](float linear){
+    linear=std::clamp(linear,0.f,1.f);
+    const float srgb=linear<=0.0031308f?12.92f*linear:1.055f*std::pow(linear,1.f/2.4f)-0.055f;
+    return static_cast<std::uint8_t>(std::lround(srgb*255.f));
+  };
+  Material3D m;
+  m.tint={encode(color.x),encode(color.y),encode(color.z),255};
+  // Self-luminous: the ambient term bypasses light_color, so the disc
+  // shows the true Planckian tint instead of a squared blackbody.
+  m.ambient=1.f;m.diffuse=0.f;
+  m.light_color=color; // the photosphere is its scene's key light
+  m.linear_light=true; // sRGB bytes decode back to the linear blackbody
+  // Linear limb coefficient falls with temperature — convective
+  // envelopes darken more (Sun ~0.64 at 5778 K, M dwarfs ~0.85,
+  // O stars ~0.3). Clamped to the observed [0.2,0.95] envelope.
+  m.limb_darkening=std::clamp(static_cast<float>(2.762-0.55*std::log10(kelvin)),.2f,.95f);
+  return m;
+}
 namespace {
 bool bounded(double x,double limit){return std::isfinite(x)&&std::abs(x)<=limit;}
 bool valid(Vec3 v){return bounded(v.x,1e6)&&bounded(v.y,1e6)&&bounded(v.z,1e6);}

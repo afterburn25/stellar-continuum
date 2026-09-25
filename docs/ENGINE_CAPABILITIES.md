@@ -191,6 +191,20 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   Remaining: brightness asymmetry only — no wavelength shift, redshift
   or lensing.
 
+### Follow-up: `star_photosphere3d` spectral-class preset
+
+- `star_photosphere3d(kelvin)` derives a physically plausible star
+  material: blackbody disc tint (sRGB + `linear_light`), `ambient=1`
+  emissive-dominant response, the blackbody as `light_color`, and a
+  temperature-graded limb coefficient (`2.762 − 0.55·log10 K`, clamped
+  [0.2,0.95]). Games own the class-letter→kelvin mapping; the engine
+  takes kelvin. Authored via `starKelvin` doc key [100,100000] +
+  `StarPhotosphere` component (codec/spawn/export), runtime applies the
+  preset before explicit components so authored fields still win;
+  editor `starKelvin` row. GPU probe: a 3200 K sphere reads red with a
+  measurably darkened limb. Remaining: single-term limb law; no
+  granulation or activity variation (deliberately anti-procedural).
+
 ## Scene3D directional shadow mapping (2026-09-25)
 
 - **Purpose:** give the generic renderer a real directional shadow path

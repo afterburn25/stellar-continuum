@@ -718,6 +718,17 @@ int main(int argc,char** argv)try{
     check(channel(*disc_ref,30,160,0)==left_flat,"Beaming=0 did not restore the flat disc");
     std::cout<<"orbital_beam_gpu=tilt_asymmetry_faceon_symmetric_passed\n";
   }
+  {
+    // Spectral-class preset: a 3200 K dwarf disc shows the red Planckian
+    // tint plus its temperature-graded limb falloff.
+    MeshInstance3D dwarf{Mesh3D::uv_sphere(64,32),{},{},.85f,star_photosphere3d(3200)};
+    const auto star=capture({dwarf},"star-dwarf.png");
+    const int center_r=channel(*star,160,160,0),center_b=channel(*star,160,160,2);
+    check(center_r>150&&center_r>center_b*4/3,"Cool star lost its blackbody tint");
+    const int edge_r=channel(*star,290,160,0);
+    check(edge_r<center_r*3/4&&edge_r>10,"Star preset did not darken the limb");
+    std::cout<<"star_photosphere_gpu=blackbody_limb_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");

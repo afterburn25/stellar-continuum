@@ -121,7 +121,10 @@ of the camera, depth-only `scene3d_shadow` pass through the RenderGraph,
 (any map subset), `cloud_albedo` turns the cloud map into a lit deck,
 and `terminator_wrap` applies wrap-diffuse to all light types.
 Limb darkening (`Material3D::limb_darkening`, linear N·V law) keeps
-self-luminous star discs from clipping flat. Screen-space mesh LOD
+self-luminous star discs from clipping flat; `star_photosphere3d(kelvin)`
++ `starKelvin`/`StarPhotosphere` derive a full spectral-class star
+material (blackbody tint, emissive-dominant, temperature-graded limb
+coefficient). Screen-space mesh LOD
 chains are landed: `lod_meshes`/`lod_pixels` swap to coarser meshes by
 projected bounding diameter (halving per level), with the streamer
 demand and draw submission sharing `select_lod3d_level` so only the

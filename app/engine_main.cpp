@@ -316,7 +316,7 @@ struct Shell {
       hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{},
       hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
       hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
-      hit3_bandshear{}, hit3_orbitbeam{};
+      hit3_bandshear{}, hit3_orbitbeam{}, hit3_starkelvin{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2186,6 +2186,11 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= -1.f && a <= 1.f) { next.orbital_beaming = a; valid = true; }
           break;
+  case 62:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 100.f && a <= 100000.f) { next.star_kelvin = a; valid = true; }
+          break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2238,7 +2243,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                     shell.hit3_lods =
                                                         shell.hit3_lodpixels =
                                                             shell.hit3_bandshear =
-                                                                shell.hit3_orbitbeam = {};
+                                                                shell.hit3_orbitbeam =
+                                                                    shell.hit3_starkelvin = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2345,6 +2351,17 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       if (!e.texture.empty())
         inst.material.texture = scene3_tex(shell, e.texture);
       inst.material.double_sided = e.double_sided;
+      // Spectral-class preset: seeds tint/ambient/limb; explicit fields
+      // (limbDarken below, texture, atmosphere) still override.
+      if (e.star_kelvin >= 100.0) {
+        const auto star = star_photosphere3d(e.star_kelvin);
+        inst.material.tint = star.tint;
+        inst.material.ambient = star.ambient;
+        inst.material.diffuse = star.diffuse;
+        inst.material.light_color = star.light_color;
+        inst.material.linear_light = star.linear_light;
+        inst.material.limb_darkening = star.limb_darkening;
+      }
       // The same fields the runtime maps through MaterialPbr/AtmosphereShell.
       if (e.metallic != 0.f || e.roughness != 0.55f ||
           !e.metallic_roughness.empty() || !e.emissive.empty() ||
@@ -2672,6 +2689,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_orbitbeam, "orbitalBeam",
         entity ? std::to_string(entity->orbital_beaming) : "", ed(61),
         "approaching-lane brightening -1..1 - accretion discs");
+  field(shell.hit3_starkelvin, "starKelvin",
+        entity ? std::to_string(static_cast<long long>(entity->star_kelvin)) : "", ed(62),
+        "photosphere kelvin 100..100000 - blackbody tint + limb");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -6715,6 +6735,8 @@ int main(int argc, char **argv) {
               edit3(60, std::to_string(se->band_shear));
             else if (shell.hit3_orbitbeam.contains(event.position) && se)
               edit3(61, std::to_string(se->orbital_beaming));
+            else if (shell.hit3_starkelvin.contains(event.position) && se)
+              edit3(62, std::to_string(static_cast<long long>(se->star_kelvin)));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

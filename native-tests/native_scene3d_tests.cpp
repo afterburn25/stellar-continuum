@@ -129,6 +129,17 @@ int main()try{
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.orbital_beaming=.8f;const auto beamed=Scene3D::create(camera,{i});
    check(close(beamed->instances()[0].material.orbital_beaming,.8f),"Orbital beaming did not survive scene creation");}
+  rejects([&]{(void)star_photosphere3d(50);});
+  rejects([&]{(void)star_photosphere3d(2e5);});
+  rejects([&]{(void)star_photosphere3d(std::numeric_limits<double>::quiet_NaN());});
+  {const auto sun=star_photosphere3d(5778);
+   check(sun.ambient==1.f&&sun.diffuse==0.f&&sun.linear_light,"Star preset is not emissive-dominant");
+   check(sun.limb_darkening>.6f&&sun.limb_darkening<.75f,"Solar limb coefficient off the observed envelope");
+   check(sun.tint.r>=sun.tint.b,"Solar tint should not be blue");
+   const auto dwarf=star_photosphere3d(3200);
+   check(dwarf.tint.r>dwarf.tint.b&&dwarf.limb_darkening>sun.limb_darkening,"Cool star lost its red tint or stronger limb darkening");
+   const auto ostar=star_photosphere3d(30000);
+   check(ostar.tint.b>ostar.tint.r&&ostar.limb_darkening<sun.limb_darkening,"Hot star lost its blue tint or weaker limb darkening");}
   {PointLight3D light;light.position={0,0,1};light.intensity=2;light.range=50;
    const auto lit=Scene3D::create(camera,{instance},{0,0,1},{light});
    check(lit->point_lights().size()==1,"Scene dropped its point light");}

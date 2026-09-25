@@ -512,6 +512,10 @@ void register_scene_components(World &world) {
       "visiblerange",
       encode_fields<VisibleRange, &VisibleRange::range>,
       decode_fields<VisibleRange, &VisibleRange::range>);
+  world.register_component<StarPhotosphere>(
+      "starphotosphere",
+      encode_fields<StarPhotosphere, &StarPhotosphere::kelvin>,
+      decode_fields<StarPhotosphere, &StarPhotosphere::kelvin>);
   // u32 count + length-prefixed spec strings + f32 switch size — decode
   // tolerates a truncated tail like MaterialSurface.
   world.register_component<MeshLods>(
@@ -833,6 +837,8 @@ std::vector<EntityId> spawn_scene3d(World &world,
                                         s.atmo_night});
     if (s.visible_range > 0.f)
       world.add(entity, VisibleRange{s.visible_range});
+    if (s.star_kelvin >= 100.0)
+      world.add(entity, StarPhotosphere{s.star_kelvin});
     if (!s.lod_meshes.empty())
       world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels});
     world.add(entity, GravityScale{s.gravity_scale});
@@ -937,6 +943,8 @@ Scene3dDocument scene3d_from_world(const World &world) {
     }
     if (const auto *vr = world.get<VisibleRange>(entity))
       s.visible_range = vr->range;
+    if (const auto *sp = world.get<StarPhotosphere>(entity))
+      s.star_kelvin = sp->kelvin;
     if (const auto *ml = world.get<MeshLods>(entity)) {
       s.lod_meshes = ml->specs;
       s.lod_pixels = ml->pixels;

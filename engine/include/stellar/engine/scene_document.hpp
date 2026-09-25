@@ -219,6 +219,11 @@ struct Scene3dEntity {
   // First-order orbital beaming for material orbiting local +Y (accretion
   // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
+  // Spectral-class star photosphere preset (K): derives blackbody tint,
+  // emissive response, and a temperature-graded limb coefficient.
+  // [100,100000]; 0 leaves the material untouched. Overrides `tint`
+  // and `limbDarken` — author explicit fields instead for custom discs.
+  double star_kelvin{0.0};
   // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
   // coarsest-first. lod_meshes[i] draws once the projected bounding
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).

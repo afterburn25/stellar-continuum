@@ -2511,8 +2511,13 @@ int RuntimeHost::run() {
         const auto *tint = world.get<Tint>(e);
         const auto *op = world.get<Opacity>(e);
         const auto *tex = world.get<TextureRef>(e);
-        inst.material.tint = tint ? Color{tint->r, tint->g, tint->b, 255}
-                                : Color{255, 255, 255, 255};
+        // Spectral-class preset seeds the material; authored components
+        // below still override individual fields.
+        if (const auto *sp = world.get<StarPhotosphere>(e);
+            sp && sp->kelvin >= 100.0)
+          inst.material = star_photosphere3d(sp->kelvin);
+        if (tint)
+          inst.material.tint = Color{tint->r, tint->g, tint->b, 255};
         inst.material.opacity = op ? op->value : 1.f;
         inst.material.transparent = inst.material.opacity < 1.f;
         inst.material.texture = tex ? tex3d_of(tex->value) : nullptr;

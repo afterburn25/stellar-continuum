@@ -50,6 +50,18 @@ m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
                                             // ring forward-scatter)
 ```
 
+`star_photosphere3d(kelvin)` builds a spectral-class star material in
+one call: blackbody disc tint (sRGB bytes + `linear_light` decode),
+emissive-dominant response (`ambient=1` bypasses `light_color`, so the
+disc shows the true Planckian color rather than a squared tint), the
+star's own blackbody as `light_color`, and a temperature-graded limb
+coefficient — `clamp(2.762 − 0.55·log10 K, 0.2, 0.95)`, a Claret-style
+monotone falloff (convective cool stars darken more; Sun ≈ 0.69 at
+5778 K). Games map O/B/A/F/G/K/M letters to kelvin at the call site —
+the engine stays spectral-class agnostic. Authored scenes use the
+`starKelvin` entity key; it seeds the material and explicit fields
+(e.g. `limbDarken`, textures, atmosphere) still override.
+
 `band_shear` is material-level, not tied to `surface_response`: every
 equirect surface sample — albedo, normal, properties, cloud deck — shifts
 `u` by `s·cos(2πv)`. The profile is equator-symmetric and zero-mean, so
@@ -248,8 +260,8 @@ path/tint/strength/night gate, environment path/strength, alpha cutout,
 UV tiling, atmosphere tint/strength/power/night floor, visible range,
 surface maps (normal/properties/cloud), surface scalars (normal
 strength/relief), cloud deck (opacity/albedo/offset), terminator wrap,
-limb darkening, band shear, mesh LOD chain (csv specs) and LOD switch
-size.
+limb darkening, band shear, orbital beaming, starKelvin photosphere
+preset, mesh LOD chain (csv specs) and LOD switch size.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range),
 shadow map (extent/distance/depth/strength/bias/resolution).
