@@ -10,6 +10,7 @@
 namespace stellar::native_logistics {
 using namespace stellar::native_map;
 namespace theme = stellar::native_ui;
+using stellar::core::SupplyCondition;
 namespace {
 constexpr Color ink = theme::color::text_primary;
 constexpr Color muted = theme::color::text_muted;
@@ -95,11 +96,11 @@ const SupplyWorkspace::CachedRows &SupplyWorkspace::rows_for(
     const View& view,const SupplyLayout& layout,int width,int height) const {
   if(rows_.valid&&rows_.viewport_width==width&&rows_.viewport_height==height&&
      rows_.measurer_revision==measurer_revision_&&rows_.nodes==view.nodes&&
-     rows_.links==view.links)return rows_;
+     rows_.links==view.links&&rows_.external==view.external)return rows_;
   rows_={};rows_.viewport_width=width;rows_.viewport_height=height;
   rows_.measurer_revision=measurer_revision_;rows_.nodes=view.nodes;
-  rows_.links=view.links;
-  rows_.rows.reserve(view.nodes.size()+view.links.size()+1);
+  rows_.links=view.links;rows_.external=view.external;
+  rows_.rows.reserve(view.nodes.size()+view.links.size()+view.external.size()+2);
   const auto s=layout.scale;const int font=static_cast<int>(15.f*s);
   for(std::size_t index=0;index<view.nodes.size();++index){
     const auto& node=view.nodes[index];
@@ -119,6 +120,18 @@ const SupplyWorkspace::CachedRows &SupplyWorkspace::rows_for(
       const auto state=text_height(measure_,link.status,layout.body.width*.22f-16.f*s,font);
       const auto row_height=std::max({44.f*s,name+20.f*s,state+20.f*s});
       rows_.rows.push_back({index,rows_.height,row_height,name,2});
+      rows_.height+=row_height+6.f*s;
+    }
+  }
+  if(!view.external.empty()){
+    rows_.rows.push_back({0,rows_.height+8.f*s,46.f*s,0.f,3});
+    rows_.height+=54.f*s+6.f*s;
+    for(std::size_t index=0;index<view.external.size();++index){
+      const auto& external=view.external[index];
+      const auto name=text_height(measure_,external.name,layout.body.width*.30f-20.f*s,font);
+      const auto state=text_height(measure_,external.status,layout.body.width*.22f-16.f*s,font);
+      const auto row_height=std::max({64.f*s,name+26.f*s,state+20.f*s});
+      rows_.rows.push_back({index,rows_.height,row_height,name,4});
       rows_.height+=row_height+6.f*s;
     }
   }
@@ -225,6 +238,42 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
               tr(corridor_keys[i],corridor_fallbacks[i]),font-2,muted,b);
       if(const auto rule=theme::clipped({box.x,box.y+row.height-3.f*s,box.width,1.f},b))
         theme::fill(out,*rule,theme::color::keyline);
+      continue;
+    }
+    if(row.kind==3){
+      label(out,{box.x,box.y+6.f*s,box.width,20.f*s},
+          tr("SUPPLY_EXTERNAL_TITLE","INTERSTELLAR COVERAGE"),font,
+          theme::color::keyline_strong,b);
+      if(view.support_gap_per_day>.00001)
+        label(out,{box.x+b.width*.44f,box.y+6.f*s,b.width*.56f,20.f*s},
+              trf("SUPPLY_SUPPORT_GAP",{number(view.support_gap_per_day)},
+                  "UNREPRESENTED INTERSTELLAR DEMAND  {0} / DAY"),
+              font-2,amber,b);
+      const std::array<const char*,4> external_keys{"SUPPLY_COL_STATUS","SUPPLY_COL_LOCAL","SUPPLY_COL_DEMAND","SUPPLY_COL_IMPORT"};
+      const std::array<const char*,4> external_fallbacks{"STATUS","LOCAL / DAY","DEMAND / DAY","IMPORT / DAY"};
+      for(std::size_t i=0;i<external_keys.size();++i)
+        label(out,{box.x+b.width*columns[i+1]+8.f*s,box.y+24.f*s,b.width*spans[i+1]-16.f*s,18.f*s},
+              tr(external_keys[i],external_fallbacks[i]),font-2,muted,b);
+      if(const auto rule=theme::clipped({box.x,box.y+row.height-3.f*s,box.width,1.f},b))
+        theme::fill(out,*rule,theme::color::keyline);
+      continue;
+    }
+    if(row.kind==4){
+      theme::fill(out,visible,theme::color::surface_secondary);
+      const auto& external=view.external[row.index];
+      const Color condition_tone=external.condition==SupplyCondition::Critical?theme::color::danger
+          :external.condition==SupplyCondition::Strained?amber
+          :external.corridor?cyan:muted;
+      label(out,{box.x+8.f*s,box.y+10.f*s,b.width*.30f-20.f*s,row.name_height},
+            external.name,font,ink,b);
+      label(out,{box.x+8.f*s,box.y+row.name_height+14.f*s,b.width*.30f-20.f*s,row.height-row.name_height-14.f*s},
+            trf("SUPPLY_COLONY_COUNT",{std::to_string(external.colony_count)},"{0} colonies"),font-2,muted,b);
+      const std::array<std::string,4> values_text{external.status,
+          number(external.capacity_per_day),number(external.demand_per_day),
+          number(external.import_per_day)};
+      for(std::size_t i=1;i<columns.size();++i)
+        label(out,{box.x+b.width*columns[i]+8.f*s,box.y+12.f*s,b.width*spans[i]-16.f*s,row.height-20.f*s},values_text[i-1],font,
+              i==1?condition_tone:i==4&&external.import_per_day>.00001&&!external.corridor?amber:ink,b);
       continue;
     }
     theme::fill(out,visible,theme::color::surface_secondary);

@@ -40,7 +40,8 @@ private:
     std::size_t index{};
     float y{}, height{}, name_height{};
     // 0 = node row (index into View::nodes), 1 = corridor section header,
-    // 2 = corridor row (index into View::links).
+    // 2 = corridor row (index into View::links), 3 = external coverage
+    // section header, 4 = external system row (index into View::external).
     int kind{};
   };
   struct CachedRows {
@@ -48,6 +49,7 @@ private:
     std::uint64_t measurer_revision{};
     std::vector<NodeRow> nodes;
     std::vector<LinkRow> links;
+    std::vector<ExternalRow> external;
     std::vector<CachedRow> rows;
     float height{};
     bool valid{};

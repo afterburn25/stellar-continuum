@@ -14,6 +14,7 @@
 namespace {
 using namespace stellar::native_logistics;
 using namespace stellar::native_map;
+using stellar::core::SupplyCondition;
 
 void require(bool value, std::string_view message) {
   if (!value) throw std::runtime_error(std::string(message));
@@ -126,11 +127,19 @@ void unavailable_and_failed_do_not_render_stale_totals() {
   SupplyWorkspace workspace;
   workspace.open();
   const auto ready = ready_view();
-  const std::array<View, 2> states{
-      View{LoadState::Unavailable, "SUPPLY NETWORK", "Economy missing.", {}, 0,
-           999., 999., 999., 999., {}},
-      View{LoadState::Failed, "SUPPLY NETWORK", "Retry after state is ready.",
-           "Core failure", 0, 999., 999., 999., 999., ready.nodes}};
+  std::array<View, 2> states;
+  states[0].state = LoadState::Unavailable;
+  states[0].system_name = "SUPPLY NETWORK";
+  states[0].message = "Economy missing.";
+  states[0].supply_per_day = states[0].demand_per_day =
+      states[0].delivered_per_day = states[0].shortfall_per_day = 999.;
+  states[1].state = LoadState::Failed;
+  states[1].system_name = "SUPPLY NETWORK";
+  states[1].message = "Retry after state is ready.";
+  states[1].diagnostic = "Core failure";
+  states[1].supply_per_day = states[1].demand_per_day =
+      states[1].delivered_per_day = states[1].shortfall_per_day = 999.;
+  states[1].nodes = ready.nodes;
   for (const auto &view : states) {
     DrawList draw;
     workspace.render(draw, view, 1280, 720);
@@ -293,6 +302,37 @@ void corridors_render_in_the_scroll_body() {
                   contains(layout.panel, *text->clip),
               "corridor text escaped its clip region");
 }
+
+void external_coverage_renders_system_rows_and_gap() {
+  SupplyWorkspace workspace;
+  workspace.set_text_measurer(measured);
+  workspace.open();
+  auto view = ready_view(2);
+  view.support_gap_per_day = 3.50;
+  view.external.push_back({3, "Frontier", "Strained",
+                           SupplyCondition::Strained, 2, 4., 6., 2., false});
+  view.external.push_back({4, "Outpost", "Healthy",
+                           SupplyCondition::Healthy, 1, 8., 5., 0., true});
+  DrawList draw;
+  workspace.render(draw, view, 1600, 900);
+  const auto layout = SupplyLayout::for_viewport(1600, 900);
+  bool header = false, system = false, colonies = false, gap = false;
+  for (const auto &item : draw.overlay)
+    if (const auto *text = std::get_if<Text>(&item)) {
+      header |= text->value == "INTERSTELLAR COVERAGE";
+      system |= text->value == "Frontier";
+      colonies |= text->value == "2 colonies";
+      gap |= text->value.find("3.50 / DAY") != std::string::npos;
+    }
+  require(header && system && colonies,
+          "external coverage did not render its title, system or colony count");
+  require(gap, "unrepresented interstellar demand was not surfaced");
+  for (const auto &item : draw.overlay)
+    if (const auto *text = std::get_if<Text>(&item))
+      require(!text->clip || contains(layout.body, *text->clip) ||
+                  contains(layout.panel, *text->clip),
+              "external coverage text escaped its clip region");
+}
 }  // namespace
 
 int main() {
@@ -306,6 +346,7 @@ int main() {
     pointer_and_commands_route_without_leakage();
     keyboard_focus();
     corridors_render_in_the_scroll_body();
+    external_coverage_renders_system_rows_and_gap();
     return 0;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

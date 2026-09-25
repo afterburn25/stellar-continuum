@@ -93,25 +93,40 @@ std::optional<View> unavailable_for(const FreshCampaignState &campaign,
   return std::nullopt;
 }
 
-HomeSystemLogisticsNetwork canonical_project(const FreshCampaignState &campaign,
-                                             const int civilization_id) {
+CivilizationLogisticsCoverage canonical_project(const FreshCampaignState &campaign,
+                                                const int civilization_id) {
   auto construction = economic_construction_projection(campaign.construction);
   auto fleets = economic_fleet_projection(campaign.fleets);
   const EconomyWorldView world{campaign.civilizations, campaign.bodies,
                                construction, fleets};
-  return home_system_logistics(world, campaign.colonies, campaign.economies,
-                               civilization_id);
+  return civilization_logistics_coverage(world, campaign.colonies,
+                                         campaign.economies, civilization_id);
+}
+
+std::string condition_label(const SupplyCondition condition,
+                            const engine::LocalizationTable *locale) {
+  switch (condition) {
+    case SupplyCondition::Critical:
+      return resolve(locale, "SUPPLY_CONDITION_CRITICAL", "Critical");
+    case SupplyCondition::Strained:
+      return resolve(locale, "SUPPLY_CONDITION_STRAINED", "Strained");
+    case SupplyCondition::Healthy:
+      break;
+  }
+  return resolve(locale, "SUPPLY_CONDITION_HEALTHY", "Healthy");
 }
 
 View make_view(const FreshCampaignState &campaign, const int civilization_id,
-               const HomeSystemLogisticsNetwork &network,
+               const CivilizationLogisticsCoverage &coverage,
                const engine::LocalizationTable *locale) {
   const auto observer = std::ranges::find(campaign.civilizations,
                                           civilization_id, &Civilization::id);
-  if (network.civilization_id != civilization_id ||
+  const auto &network = coverage.home_system;
+  if (coverage.civilization_id != civilization_id ||
+      network.civilization_id != civilization_id ||
       observer == campaign.civilizations.end() ||
       network.home_system_id != observer->home_system_id)
-    throw std::invalid_argument("Home logistics projection identity does not match the active observer.");
+    throw std::invalid_argument("Logistics coverage identity does not match the active observer.");
   View view;
   view.state = LoadState::Ready;
   const auto system = std::ranges::find(campaign.systems, network.home_system_id,
@@ -186,6 +201,28 @@ View make_view(const FreshCampaignState &campaign, const int civilization_id,
                           std::string(to->second), resolve(locale, key, fallback),
                           link.capacity_per_day, used, link.transit_days,
                           link.enabled, link.bidirectional});
+  }
+  // External coverage: owned systems beyond the home system. Rows whose
+  // identity or system record cannot be verified are dropped rather than
+  // partially disclosed — same sealing rule as node/link endpoints.
+  view.owned_system_count = coverage.owned_system_count;
+  view.support_gap_per_day =
+      coverage.unrepresented_interstellar_support_per_day;
+  for (const auto &external : coverage.external_systems) {
+    if (external.civilization_id != civilization_id ||
+        external.system_id == network.home_system_id)
+      continue;
+    const auto record = std::ranges::find(campaign.systems,
+                                          external.system_id,
+                                          &StellarSystem::id);
+    if (record == campaign.systems.end()) continue;
+    view.external.push_back({external.system_id, record->name,
+                             condition_label(external.condition, locale),
+                             external.condition, external.colony_count,
+                             external.local_support_capacity_per_day,
+                             external.support_demand_per_day,
+                             external.import_requirement_per_day,
+                             external.has_represented_interstellar_freight_corridor});
   }
   return view;
 }
