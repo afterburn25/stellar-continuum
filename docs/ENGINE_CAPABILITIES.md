@@ -1115,7 +1115,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   inward velocity; `on_collision`/`on_collision_exit`/`on_land` fire for
   the 3D set. Public API: `scene3d()`, `entities3d()`,
   `entities3d_in_radius`, `entities3d_in_box`, `spawn_entity3d`,
-  `on_spawn3d`,
+  `on_spawn3d`, `destroy_entity` (also untracks 3D entities and purges
+  their contact/grounded bookkeeping),
   `set_camera3d` + getters, `gravity3d()`, `ground_y()`, `raycast3d`,
   `entity3d_at`. F5/F9 snapshots capture the 3D set —
   including a `Camera3DState` carrier that restores the fly camera — and

@@ -997,16 +997,32 @@ int RuntimeHost::run() {
   impl.destroy_fn = [&](EntityId id) -> bool {
     const auto it =
         std::find(impl.entities.begin(), impl.entities.end(), id);
-    if (it == impl.entities.end()) return false;
-    impl.sprites.erase(
-        impl.sprites.begin() + (it - impl.entities.begin()));
-    impl.entities.erase(it);
-    if (impl.player && *impl.player == id) impl.player.reset();
-    for (auto p = impl.overlapping.begin(); p != impl.overlapping.end();)
+    if (it != impl.entities.end()) {
+      impl.sprites.erase(
+          impl.sprites.begin() + (it - impl.entities.begin()));
+      impl.entities.erase(it);
+      if (impl.player && *impl.player == id) impl.player.reset();
+      for (auto p = impl.overlapping.begin();
+           p != impl.overlapping.end();)
+        if (p->first == id.value() || p->second == id.value())
+          p = impl.overlapping.erase(p);
+        else
+          ++p;
+      world.destroy(id);
+      return true;
+    }
+    const auto it3 = std::find(impl.entities3d.begin(),
+                               impl.entities3d.end(), id);
+    if (it3 == impl.entities3d.end()) return false;
+    impl.entities3d.erase(it3);
+    for (auto p = impl.overlapping3d.begin();
+         p != impl.overlapping3d.end();)
       if (p->first == id.value() || p->second == id.value())
-        p = impl.overlapping.erase(p);
+        p = impl.overlapping3d.erase(p);
       else
         ++p;
+    impl.grounded3d.erase(id.value());
+    impl.prev_grounded3d.erase(id.value());
     world.destroy(id);
     return true;
   };

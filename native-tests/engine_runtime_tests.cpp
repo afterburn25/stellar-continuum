@@ -686,6 +686,17 @@ int main() {
           "the 3D child follows its parent at the captured offset");
     check(bouncer_z > 0.0f && bouncer_z < 2.4f,
           "the bouncer reflects off the bounds wall");
+    const auto carrier = [&]() -> EntityId {
+      for (const auto e : host.entities3d())
+        if (const auto *n = host.world().get<EntityName>(e);
+            n && n->value == "carrier")
+          return e;
+      return {};
+    }();
+    check(host.destroy_entity(carrier),
+          "destroy_entity removes a 3D entity");
+    check(host.entities3d().size() == 2,
+          "the destroyed 3D entity leaves the tracked set");
   }
 
   // save_data/load_data round-trip named blobs under saves/data/ —
