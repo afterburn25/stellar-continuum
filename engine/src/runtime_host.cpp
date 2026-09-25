@@ -2590,6 +2590,7 @@ int RuntimeHost::run() {
           inst.visible_range = vr->range;
         if (const auto *ml = world.get<MeshLods>(e)) {
           inst.lod_pixels = ml->pixels;
+          inst.lod_fade = ml->fade;
           // Unresolvable specs drop that level — the authored mesh and
           // any levels that did resolve still render.
           for (const auto &spec : ml->specs)

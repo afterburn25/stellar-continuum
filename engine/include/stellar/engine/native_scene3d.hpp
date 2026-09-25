@@ -273,6 +273,13 @@ struct MeshInstance3D {
   // the shadow volume is camera-independent. At most 8 levels.
   std::vector<std::shared_ptr<const Mesh3D>> lod_meshes;
   float lod_pixels{32.f};
+  // Screen-door transition width above each LOD threshold, as a
+  // fraction of that threshold [0,0.5]. Inside the band the view
+  // submits both neighbouring levels with complementary keep
+  // probabilities — the fragment shader discards a deterministic
+  // per-pixel pattern, so opaque geometry crossfades without alpha
+  // blending or a second pass. 0 keeps the hard switch.
+  float lod_fade{.15f};
 };
 // Directional shadow map for the scene key light. Instead of fitting the
 // camera frustum, the ortho coverage box centres `distance` world units
@@ -313,6 +320,12 @@ struct PreparedInstance3D { Matrix4 model_view,model_view_projection;float camer
 // policy shared by the texture-streamer demand and the draw submission
 // so both agree which level is resident this frame.
 [[nodiscard]] std::size_t select_lod3d_level(const MeshInstance3D&,float projected_diameter_px)noexcept;
+// Coarse-level share of the screen-door transition, [0,1). Returns 0
+// outside the band and when no coarser level exists; p > 0 means the
+// view should also draw lod_meshes[level] with keep probability p while
+// the selected level keeps 1-p. Shared by the draw submission and the
+// streamer demand so both charge the same resident levels.
+[[nodiscard]] float lod3d_fade_share(const MeshInstance3D&,float projected_diameter_px)noexcept;
 struct PreparedShadow3D { Matrix4 from_model;Vec3 light; };
 // Light is the resolved camera-space direction. Local geometry stays precise
 // even when both blocker and receiver are at astronomical world coordinates.
@@ -328,6 +341,9 @@ struct Scene3DStatistics {
   // Instances drawn below LOD level 0 this frame — the screen-space LOD
   // workload audit counter for fleet-scale scenes.
   std::uint64_t lod_instances{};
+  // Instances inside a screen-door LOD transition band this frame —
+  // each submits a second draw with a complementary keep probability.
+  std::uint64_t lod_fades{};
   std::size_t mesh_cache_entries{},mesh_cache_bytes{},texture_cache_entries{},texture_cache_bytes{},target_bytes{};
   // Binds served by the pinned fallback because the TextureStreamer denied
   // residency under the frame's byte budget (budget-pressure pop-in count).

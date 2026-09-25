@@ -443,6 +443,7 @@ int main() {
     cube.volume_scatter = 0.5f;
     cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
     cube.lod_pixels = 48.f;
+    cube.lod_fade = 0.3f;
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -575,7 +576,7 @@ int main() {
       check(rc.lod_meshes.size() == 2 &&
                 rc.lod_meshes[0] == "models/crate_mid.obj" &&
                 rc.lod_meshes[1] == "models/crate_low.obj" &&
-                rc.lod_pixels == 48.f,
+                rc.lod_pixels == 48.f && rc.lod_fade == 0.3f,
             "scene3d mesh LOD chain round-trips");
       check(rc.volume_depth == 0.3f && rc.volume_density == 6.f &&
                 rc.volume_seed == 2.f && rc.volume_steps == 24 &&
@@ -690,6 +691,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"lods":["a","b"],"lodPixels":0}]})")
               .has_value(),
           "scene3d lodPixels below range rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lodFade":0.7}]})")
+              .has_value(),
+          "scene3d lodFade above 0.5 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lodFade":-0.1}]})")
+              .has_value(),
+          "scene3d lodFade below zero rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"bandShear":0.9}]})")
               .has_value(),

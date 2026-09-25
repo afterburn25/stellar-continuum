@@ -317,7 +317,7 @@ struct Shell {
       hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
       hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
       hit3_bandshear{}, hit3_orbitbeam{}, hit3_starkelvin{},
-      hit3_accretion{}, hit3_fwdscatter{}, hit3_volume{};
+      hit3_accretion{}, hit3_fwdscatter{}, hit3_volume{}, hit3_lodfade{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2228,6 +2228,11 @@ void commit_scene3_field(Shell &shell) {
             valid = true;
           }
           break; }
+  case 66:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 0.5f) { next.lod_fade = a; valid = true; }
+          break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2284,7 +2289,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                                     shell.hit3_starkelvin =
                                                                         shell.hit3_accretion =
                                                                             shell.hit3_fwdscatter =
-                                                                                shell.hit3_volume = {};
+                                                                                shell.hit3_volume =
+                                                                                    shell.hit3_lodfade = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2483,6 +2489,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                          e.atmo_power, e.atmo_night};
       inst.visible_range = e.visible_range;
       inst.lod_pixels = e.lod_pixels;
+      inst.lod_fade = e.lod_fade;
       for (const auto &spec : e.lod_meshes)
         if (auto lod_mesh = scene3_mesh(shell, spec))
           inst.lod_meshes.push_back(std::move(lod_mesh));
@@ -2753,6 +2760,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_lodpixels, "lodPixels",
         entity ? std::to_string(entity->lod_pixels) : "", ed(59),
         "px diameter for LOD 0->1 - halves per level 1..4096");
+  field(shell.hit3_lodfade, "lodFade",
+        entity ? std::to_string(entity->lod_fade) : "", ed(66),
+        "screen-door crossfade width 0..0.5 - 0 = hard switch");
   field(shell.hit3_bandshear, "bandShear",
         entity ? std::to_string(entity->band_shear) : "", ed(60),
         "latitude uv shear -0.5..0.5 - gas-giant banding");
@@ -6821,6 +6831,8 @@ int main(int argc, char **argv) {
             }
             else if (shell.hit3_lodpixels.contains(event.position) && se)
               edit3(59, std::to_string(se->lod_pixels));
+            else if (shell.hit3_lodfade.contains(event.position) && se)
+              edit3(66, std::to_string(se->lod_fade));
             else if (shell.hit3_bandshear.contains(event.position) && se)
               edit3(60, std::to_string(se->band_shear));
             else if (shell.hit3_orbitbeam.contains(event.position) && se)

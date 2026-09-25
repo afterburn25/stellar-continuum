@@ -669,6 +669,27 @@ int main(int argc,char** argv)try{
     std::cout<<"lod_gpu=screen_size_pick_stat_passed\n";
   }
   {
+    // Screen-door LOD crossfade: at ~110px the instance sits inside the
+    // default 15% band above the 100px switch, so the sphere keeps ~2/3
+    // of its pixels and the quad the rest. The strip x>=210 is sphere
+    // territory the quad silhouette cannot reach — under a hard switch
+    // it is fully lit; under the fade it dithers.
+    auto fading=a;fading.mesh=Mesh3D::uv_sphere(64,32);fading.scale=.34375f;
+    fading.lod_pixels=100;fading.lod_meshes={quad(0,0)};
+    auto hard=fading;hard.lod_fade=0;
+    const auto hardref=capture({hard},"lod-fade-off.png");
+    check(window.scene3d_statistics().lod_fades==0,"Zero fade width still dual-submitted");
+    int hard_lit=0;
+    for(int y=150;y<170;++y)for(int x=210;x<214;++x)hard_lit+=channel(*hardref,x,y,0)>100;
+    check(hard_lit==80,"Hard-switch reference lost the sphere silhouette edge");
+    const auto crossfaded=capture({fading},"lod-fade.png");
+    check(window.scene3d_statistics().lod_fades==1,"Fade band did not count a dual submission");
+    int fade_lit=0;
+    for(int y=150;y<170;++y)for(int x=210;x<214;++x)fade_lit+=channel(*crossfaded,x,y,0)>100;
+    check(fade_lit>20&&fade_lit<80,"Screen-door LOD fade did not partition the silhouette");
+    std::cout<<"lod_fade_gpu=dithered_crossfade_passed\n";
+  }
+  {
     // Differential rotation: a longitude shear weighted by latitude —
     // cos(2pi*v) is zero-mean and equator-symmetric, so the equator shifts
     // one way while the polar rows shift the other on a striped sphere.

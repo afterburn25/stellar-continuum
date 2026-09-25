@@ -208,6 +208,18 @@ int main()try{
    rejects([&]{auto i=instance;i.lod_meshes={sphere};i.lod_pixels=8192;(void)Scene3D::create(camera,{i});});
    const auto lscene=Scene3D::create(camera,{loded});
    check(lscene->instances()[0].lod_meshes.size()==2,"Scene dropped its LOD chain");}
+  // Screen-door LOD fade: the coarser level's share ramps 0->1 across the
+  // band immediately above each switch threshold; 0 disables it outright.
+  {auto fading=instance;fading.lod_meshes={sphere,sphere};fading.lod_pixels=100;fading.lod_fade=.2f;
+   check(lod3d_fade_share(fading,140)==0.f,"LOD fade leaked above the transition band");
+   check(std::abs(lod3d_fade_share(fading,110)-.5f)<1e-6f,"LOD fade midpoint share was not .5");
+   check(lod3d_fade_share(fading,100)==1.f,"LOD fade did not reach the full coarse share at the switch");
+   check(lod3d_fade_share(fading,90)==0.f,"LOD fade engaged below the switch threshold");
+   check(std::abs(lod3d_fade_share(fading,55)-.5f)<1e-6f,"LOD fade did not scale to the second-level band");
+   auto off=fading;off.lod_fade=0;
+   check(lod3d_fade_share(off,110)==0.f,"Zero fade width still produced a share");
+   rejects([&]{auto i=instance;i.lod_fade=.6f;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_fade=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
   for(int field=0;field<8;++field){auto invalid=receiver;auto& s=*invalid.material.shadow;
     if(field==0)s.scale=0;if(field==1)s.position.x=std::numeric_limits<double>::infinity();
     if(field==2)s.rotation={0,0,0,0};if(field==3)s.radii.y=0;

@@ -214,6 +214,19 @@ vec4 emission_volume(vec3 V) {
 }
 void main() {
     material=materials[instance_index];
+    // Screen-door LOD transition: uv_options.w is a signed keep mask —
+    // positive keeps the ign<w fraction, negative keeps ign>=1+w. The
+    // paired draw carries the complement (selected level +1-p, coarser
+    // -p), so each fragment position resolves to exactly one level:
+    // opaque crossfade with no blending and no depth interaction.
+    // Interleaved gradient noise is stable per pixel while the camera
+    // holds still; 1.0 (default) always keeps.
+    const float keep=material.uv_options.w;
+    if(keep<1.0){
+        const vec2 fc=floor(gl_FragCoord.xy);
+        const float ign=fract(52.9829189*fract(fc.x*0.06711056+fc.y*0.00583715));
+        if(keep>=0.0?ign>=keep:ign<1.0+keep)discard;
+    }
     if(material.volume_options.x>0.0){
         vec3 V=material.view_options.x>0.5?vec3(0,0,1):normalize(-view_position);
         color=emission_volume(V);return;

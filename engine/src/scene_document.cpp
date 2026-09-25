@@ -482,6 +482,7 @@ std::string Scene3dDocument::to_json() const {
       item["lods"] = e.lod_meshes;
       item["lodPixels"] = e.lod_pixels;
     }
+    if (e.lod_fade != .15f) item["lodFade"] = e.lod_fade;
     items.push_back(std::move(item));
   }
   doc["camera"] = {{"pos", {cam_x, cam_y, cam_z}},
@@ -723,6 +724,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         if (!(e.lod_pixels >= 1.f && e.lod_pixels <= 4096.f))
           return fail("lodPixels must be in [1,4096]");
       }
+      e.lod_fade = item.value("lodFade", 0.15f);
+      if (!(e.lod_fade >= 0.f && e.lod_fade <= 0.5f))
+        return fail("lodFade must be in [0,0.5]");
       scene.entities.push_back(std::move(e));
     }
     if (doc.contains("camera")) {

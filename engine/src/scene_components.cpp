@@ -546,6 +546,7 @@ void register_scene_components(World &world) {
           out.insert(out.end(), s.begin(), s.end());
         }
         put_f32(out, m.pixels);
+        put_f32(out, m.fade);
         return out;
       },
       [](const std::vector<std::uint8_t> &b) {
@@ -562,6 +563,10 @@ void register_scene_components(World &world) {
         if (b.size() - at >= 4) {
           const std::uint32_t bits = get_u32(b, at);
           std::memcpy(&m.pixels, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&m.fade, &bits, 4);
         }
         return m;
       });
@@ -869,7 +874,7 @@ std::vector<EntityId> spawn_scene3d(World &world,
                                s.volume_seed, s.volume_scatter,
                                s.volume_steps});
     if (!s.lod_meshes.empty())
-      world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels});
+      world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels, s.lod_fade});
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
@@ -990,6 +995,7 @@ Scene3dDocument scene3d_from_world(const World &world) {
     if (const auto *ml = world.get<MeshLods>(entity)) {
       s.lod_meshes = ml->specs;
       s.lod_pixels = ml->pixels;
+      s.lod_fade = ml->fade;
     }
     if (const auto *g = world.get<GravityScale>(entity))
       s.gravity_scale = g->value;

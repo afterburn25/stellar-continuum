@@ -86,8 +86,9 @@ void validate_instance(const MeshInstance3D& i){
      !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0||
      !bounded(m.band_shear,.5f)||!bounded(m.orbital_beaming,1.f)||!bounded(m.forward_scatter,1.f))
     throw std::invalid_argument("3D material lighting and opacity must be finite and bounded.");
-  if(i.lod_meshes.size()>8||!bounded(i.lod_pixels,4096)||i.lod_pixels<1.f)
-    throw std::invalid_argument("3D instance LOD chains allow at most 8 levels with a 1..4096px switch.");
+  if(i.lod_meshes.size()>8||!bounded(i.lod_pixels,4096)||i.lod_pixels<1.f||
+     !bounded(i.lod_fade,.5f)||i.lod_fade<0.f)
+    throw std::invalid_argument("3D instance LOD chains allow at most 8 levels with a 1..4096px switch and a [0,.5] fade.");
   for(const auto& lod:i.lod_meshes)
     if(!lod)throw std::invalid_argument("3D instance LOD meshes must not be null.");
   if(m.light_direction)(void)normalized(*m.light_direction);
@@ -275,6 +276,16 @@ std::size_t select_lod3d_level(const MeshInstance3D& instance,float projected_di
   std::size_t level=0;float threshold=instance.lod_pixels;
   while(level<instance.lod_meshes.size()&&projected_diameter_px<threshold){++level;threshold*=.5f;}
   return level;
+}
+float lod3d_fade_share(const MeshInstance3D& instance,float projected_diameter_px)noexcept{
+  const std::size_t level=select_lod3d_level(instance,projected_diameter_px);
+  // The boundary to the next-coarser level sits at lod_pixels/2^level;
+  // the band is the lod_fade fraction immediately above it.
+  const float threshold=instance.lod_pixels/std::exp2(static_cast<float>(level));
+  const float top=threshold*(1.f+instance.lod_fade);
+  if(instance.lod_fade<=0.f||level>=instance.lod_meshes.size()||
+     projected_diameter_px<threshold||projected_diameter_px>=top)return 0.f;
+  return std::min((top-projected_diameter_px)/(threshold*instance.lod_fade),1.f);
 }
 PreparedShadow3D prepare_shadow3d(const Camera3D& camera,const MeshInstance3D& instance,Vec3 light){
   validate_camera(camera);validate_instance(instance);light=normalized(light);

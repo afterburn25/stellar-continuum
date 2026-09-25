@@ -144,6 +144,17 @@ must not degrade with the camera's zoom. Validation: ≤ 8 levels, all
 non-null, `lod_pixels` in [1,4096]; `lod_instances` on
 `Scene3DStatistics` audits the substitution count per frame.
 
+`lod_fade` (default .15, [0,.5]) widens each switch threshold into a
+screen-door transition band: inside the band the view submits both
+adjacent levels and the fragment shader keeps exactly one per pixel via
+a signed interleaved-gradient-noise mask (`uv_options.w` — the selected
+level keeps `1-p`, the coarser `p`, so the two discards partition the
+silhouette with no blending and no depth fight). `lod3d_fade_share`
+returns the coarser level's share `p`; `lod_fades` counts the dual
+submissions, and the streamer charges the paired level's residency only
+while the band is engaged. Low tier and `lod_fade=0` keep the hard
+switch (one draw, zero fade cost).
+
 A fleet-scale benchmark runs inside `native_scene3d_gpu`: a 1024-ship
 grid spread over a depth sweep submits 60 timed frames and reports
 `fleet3d frames cpu_submit_mean_ms frame_wall_mean_ms draw_calls
@@ -297,7 +308,8 @@ surface maps (normal/properties/cloud), surface scalars (normal
 strength/relief), cloud deck (opacity/albedo/offset), terminator wrap,
 limb darkening, band shear, orbital beaming, starKelvin photosphere
 preset, accretion disc preset (inner,outer,kelvin,beaming csv),
-forward-scatter phase, mesh LOD chain (csv specs) and LOD switch size.
+forward-scatter phase, mesh LOD chain (csv specs), LOD switch size and
+LOD fade width.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range),
 shadow map (extent/distance/depth/strength/bias/resolution).
@@ -358,6 +370,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   modes yet, and LightingOnly divides by sampled albedo so untextured
   or near-black surfaces clip to black.
 - `visible_range` is distance culling and `lod_meshes` a flat halving
-  chain — no hierarchical LOD trees, screen-door fading, or billboard
-  impostors yet, and shadow casters always take the full mesh.
+  chain — no hierarchical LOD trees or billboard impostors yet, and
+  shadow casters always take the full mesh. The screen-door LOD fade
+  is a per-pixel dither (fine up close on stills; reads as noise if a
+  coarse proxy differs sharply).
 - No indirect draw / GPU culling — CPU record build is the scale bound.

@@ -242,6 +242,9 @@ struct VisibleRange {
 struct MeshLods {
   std::vector<std::string> specs;
   float pixels{32.f};
+  // Screen-door transition width above each threshold [0,0.5];
+  // 0 keeps the hard switch.
+  float fade{.15f};
 };
 // Host-owned fly-camera state for 3D scene mode, carried on a lazily
 // resolved world entity so F5/F9 snapshots restore the camera too (the

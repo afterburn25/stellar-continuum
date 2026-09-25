@@ -143,7 +143,12 @@ sphere rather than needing an engine concept. Screen-space mesh LOD
 chains are landed: `lod_meshes`/`lod_pixels` swap to coarser meshes by
 projected bounding diameter (halving per level), with the streamer
 demand and draw submission sharing `select_lod3d_level` so only the
-submitted level holds residency. A fleet benchmark block in
+submitted level holds residency. `lod_fade` [0,.5] widens each switch
+into a screen-door transition band — inside it the view submits both
+levels and a signed interleaved-gradient-noise mask (`uv_options.w`)
+keeps exactly one per pixel, an opaque crossfade with no blending or
+z-fight; Low tier and `lod_fade=0` keep the hard switch, and
+`lod_fades` audits dual submissions. A fleet benchmark block in
 `native_scene3d_gpu` times a 1024-instance depth-sweep fleet over 60
 frames (`fleet3d` line: submission/wall means, draw calls, LOD picks —
 one instanced draw per level). Also

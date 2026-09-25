@@ -249,6 +249,9 @@ struct Scene3dEntity {
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).
   std::vector<std::string> lod_meshes;
   float lod_pixels{32.f};
+  // Screen-door transition width above each LOD threshold, as a
+  // fraction of that threshold [0,0.5]; 0 keeps the hard switch.
+  float lod_fade{.15f};
 };
 
 // An extra directional light — the material pipeline evaluates at most

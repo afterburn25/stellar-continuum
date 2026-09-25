@@ -365,7 +365,9 @@ struct Scene3DRenderer::Storage {
     // fill, and the post/debug uniforms feed the pass below.
     const auto& opt=view.options;
     const bool low_tier=opt.quality==RenderQuality3D::Low;
-    struct Draw {const MeshInstance3D* instance;PreparedInstance3D transform;std::shared_ptr<Geometry> mesh;std::shared_ptr<Texture> image,optical,environment,normal,properties,cloud,shadow,next,emissive,mr;};
+    struct Draw {const MeshInstance3D* instance;PreparedInstance3D transform;std::shared_ptr<Geometry> mesh;std::shared_ptr<Texture> image,optical,environment,normal,properties,cloud,shadow,next,emissive,mr;
+      // Screen-door LOD keep-probability (1 = draw every fragment).
+      float lod_keep{1.f};};
     std::vector<Draw> draws;draws.reserve(view.scene->instances().size());
     // Screen-space LOD uses the same px-per-world-unit convention as the
     // streamer footprint so both agree on which level is submitted.
@@ -376,6 +378,7 @@ struct Scene3DRenderer::Storage {
       auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
       if(!prepared.visible){++stats.culled_instances;continue;}
       std::shared_ptr<const Mesh3D> drawn_mesh=instance.mesh;
+      std::size_t lod_level=0;float lod_share=0.f;
       if(!instance.lod_meshes.empty()){
         // The view-space translation length is the camera distance —
         // identical to the streamer footprint's world-space delta.
@@ -383,13 +386,22 @@ struct Scene3DRenderer::Storage {
         const float dist=std::sqrt(vx*vx+vy*vy+vz*vz);
         const float diameter=2.f*instance.scale*static_cast<float>(instance.mesh->bounding_radius())*lod_focal/
           (lod_camera.projection==Projection3D::Orthographic?1.f:std::max(dist,1e-4f));
-        if(const auto level=select_lod3d_level(instance,diameter);level>0){drawn_mesh=instance.lod_meshes[level-1];++stats.lod_instances;}
+        lod_level=select_lod3d_level(instance,diameter);
+        if(lod_level>0){drawn_mesh=instance.lod_meshes[lod_level-1];++stats.lod_instances;}
+        if(!low_tier)lod_share=lod3d_fade_share(instance,diameter);
       }
       const auto& optical=instance.material.dielectric;
       const auto& pbr=instance.material.pbr;
       // Disabled optics reuse the existing texture binding, without an upload.
       auto surface=texture(instance.material.texture);
       const auto& response=instance.material.surface_response;
+      // Inside a screen-door transition band the view submits the same
+      // material twice: the selected level keeps 1-p of its pixels, the
+      // next-coarser level keeps p — complementary discards partition
+      // the silhouette so opaque geometry crossfades without blending.
+      // Low tier keeps the hard switch (one draw, zero cost).
+      const bool fading=lod_share>0.f&&lod_level<instance.lod_meshes.size();
+      if(fading)++stats.lod_fades;
       draws.push_back({&instance,prepared,geometry(drawn_mesh),surface,
         optical?texture(optical->surface):surface,
         optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
@@ -397,7 +409,17 @@ struct Scene3DRenderer::Storage {
         instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
         instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
         pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
-        pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white)});
+        pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
+        fading?1.f-lod_share:1.f});
+      if(fading)draws.push_back({&instance,prepared,geometry(instance.lod_meshes[lod_level]),surface,
+        optical?texture(optical->surface):surface,
+        optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
+        response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,
+        instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
+        instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
+        pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
+        pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
+        -lod_share}); // negative = keep the high mask (complement of 1-p)
     }
     // Engine DrawBatcher owns submission ordering/batching: opaque groups by
     // (material,mesh), transparent stays back-to-front. A material_id interns
@@ -484,7 +506,10 @@ struct Scene3DRenderer::Storage {
         fragment.optics={d.index_of_refraction,d.roughness,d.transmission,d.thickness};
         fragment.absorption={d.absorption.x,d.absorption.y,d.absorption.z,d.environment_strength};fragment.view_options[1]=d.specular_strength;
         fragment.view_options[2]=d.surface_relief*draw.instance->scale;}
-      fragment.uv_options={material.texture_tiling.x,material.texture_tiling.y,material.orbital_beaming,0};
+      // uv_options.w is this draw's screen-door keep probability —
+      // a fading LOD pair shares the material but keeps complementary
+      // pixel masks (1-p on the selected level, p on the coarser).
+      fragment.uv_options={material.texture_tiling.x,material.texture_tiling.y,material.orbital_beaming,draw.lod_keep};
       fragment.pbr_options[3]=material.alpha_threshold;
       if(material.pbr){const auto& p=*material.pbr;
         fragment.pbr_options={1.f,p.metallic_roughness?1.f:0.f,p.night_emissive,material.alpha_threshold};
@@ -724,7 +749,7 @@ struct Scene3DRenderer::Storage {
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
 Scene3DRenderer::~Scene3DRenderer()=default;
 void Scene3DRenderer::prepare(const DrawList& list){
-  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=0;
+  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=0;
   for(const auto& c:list.world)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   for(const auto& c:list.overlay)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");
@@ -759,8 +784,13 @@ void Scene3DRenderer::prepare(const DrawList& list){
       // Geometry demand follows the same screen-space pick the draw loop
       // makes — only the level this view submits is charged.
       const auto* lod_mesh=instance.mesh.get();
-      if(const auto level=select_lod3d_level(instance,footprint);level>0)lod_mesh=instance.lod_meshes[level-1].get();
+      const auto lod_level=select_lod3d_level(instance,footprint);
+      if(lod_level>0)lod_mesh=instance.lod_meshes[lod_level-1].get();
       if(meshes.insert(lod_mesh).second)geometry_bytes+=lod_mesh->byte_size()*2;
+      // A fading instance draws the next-coarser level too — charge its
+      // residency so the paired draw never binds stale geometry.
+      if(view->options.quality!=RenderQuality3D::Low&&lod3d_fade_share(instance,footprint)>0.f&&lod_level<instance.lod_meshes.size())
+        {const auto* fade_mesh=instance.lod_meshes[lod_level].get();if(meshes.insert(fade_mesh).second)geometry_bytes+=fade_mesh->byte_size()*2;}
       const auto mip_for=[&](const std::shared_ptr<const RgbaImage>& image){
         const auto& img=image?*image:*s.white;const int tex=std::max(img.width(),img.height());
         return footprint>=tex||tex<=1?0u:static_cast<std::uint32_t>(std::floor(std::log2(static_cast<float>(tex)/footprint)));};

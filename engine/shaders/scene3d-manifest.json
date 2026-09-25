@@ -5,11 +5,11 @@
   "target": "vulkan1.0",
   "files": {
     "engine/shaders/scene3d.vert": "b68509833dbea3871867ca76309f954b8bcd98ccb3745ef8e5dc0d15fa5a2b8d",
-    "engine/shaders/scene3d.frag": "a66854800d5b6ef64f0b483bd4de5315d3a31e94ae46d0f9933d624541bf2e7d",
+    "engine/shaders/scene3d.frag": "0ecbbbd4cc2331eb886d79e3d94d12e9f4d525e6ac948edaf36ba941fdb65abe",
     "engine/shaders/tonemap.vert": "2be2745c671496f0136b2d403ab88fdc78f5cdc697aeac0261bb95f5d4d44e24",
     "engine/shaders/tonemap.frag": "c462a7469849a7e5ff66095276e9bcf3df80f7a5a79d096fb4dad04634bf80da",
     "engine/shaders/scene3d_shadow.vert": "24e1aa244dccb80a28a9e70a97ccc09ca756bff6a74f6d9b11e1e3d028039c54",
     "engine/shaders/scene3d_shadow.frag": "3da5719f920fd1110d46cd2c02f6990ee69d15cd87ce2db107b17eae34338bf3",
-    "engine/src/generated/scene3d_shaders.hpp": "8cc3915b1641411daeae99f8a8a66db845ef5500b9a65a1fec368f5da66a851c"
+    "engine/src/generated/scene3d_shaders.hpp": "a135757e87b78560af2eca28f441ea337c5807985c7bd8c678bfc2eec8bf0cde"
   }
 }

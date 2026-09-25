@@ -66,49 +66,69 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 - **Purpose:** strategy fleets need vertex throughput to scale with
   pixels on screen, not authored distance tables — a zoomed-out cruiser
-  at 30px should not submit its 60k-triangle hi-res mesh.
+  at 30px should not submit its 60k-triangle hi-res mesh; and the level
+  swap must not pop when a fleet crosses a threshold.
 - **Modules:** `native_scene3d.hpp` (`MeshInstance3D::lod_meshes` +
-  `lod_pixels`, `select_lod3d_level`, `Scene3DStatistics::lod_instances`),
-  `native_scene3d.cpp` (validation + selection policy),
+  `lod_pixels` + `lod_fade`, `select_lod3d_level`, `lod3d_fade_share`,
+  `Scene3DStatistics::lod_instances`/`lod_fades`),
+  `native_scene3d.cpp` (validation + selection/band policy),
   `native_scene3d_gpu.cpp` (per-view pick in the streamer demand pass
-  and the draw loop), `scene_document.*` (`lods`/`lodPixels` entity
+  and the draw loop, dual submission inside the band),
+  `scene3d.frag` (early screen-door discard on `uv_options.w`),
+  `scene_document.*` (`lods`/`lodPixels`/`lodFade` entity
   keys), `scene_components.*` (`MeshLods` component + codec),
   `runtime_host.cpp`, `app/engine_main.cpp`.
 - **Public interface:** `lod_meshes[i]` substitutes for `mesh` once the
   projected bounding-sphere diameter drops below `lod_pixels/2^i` pixels
-  (≤ 8 levels, all non-null, `lod_pixels` in [1,4096] — else
-  `Scene3D::create` throws). `select_lod3d_level` is pure policy shared
-  by the streamer demand and the draw submission so both agree which
-  level is resident; the demand pass charges only the selected level's
-  geometry bytes.
+  (≤ 8 levels, all non-null, `lod_pixels` in [1,4096], `lod_fade` in
+  [0,.5] — else `Scene3D::create` throws). `select_lod3d_level` is pure
+  policy shared by the streamer demand and the draw submission so both
+  agree which level is resident; the demand pass charges only the
+  submitted levels' geometry bytes. `lod_fade` widens each threshold
+  into a transition band of `lod_fade`×threshold pixels above it:
+  `lod3d_fade_share` returns the coarser level's share `p` rising
+  0→1 across the band, and inside it the view submits both levels with
+  complementary keep probabilities — the shader's signed IGN mask keeps
+  `1-p` of the selected level's pixels and `p` of the coarser's, an
+  exact per-pixel partition so opaque geometry crossfades with no
+  blending and no z-fighting.
 - **Policies:** selection is per-view screen space — identical footprint
   convention as the texture streamer (px-per-world-unit × bounding
   diameter / distance). Shadow casters always take the full mesh: the
   shadow volume is camera-independent, so a near receiver's shadow must
-  not degrade with camera zoom. `lod_instances` on `Scene3DStatistics`
-  audits substitutions per frame.
+  not degrade with camera zoom. Low tier and `lod_fade=0` keep the hard
+  switch (single draw, zero fade cost). `lod_instances`/`lod_fades` on
+  `Scene3DStatistics` audit substitutions and dual submissions per
+  frame.
 - **Persistence:** entity `lods` (spec array, ≤ 8 bounded strings) +
-  `lodPixels` [1,4096] round-trip through `Scene3dDocument`; `MeshLods`
-  component codecs spec count + strings + switch size; `spawn_scene3d`
-  attaches it when `lods` is non-empty and `scene3d_from_world` exports
-  it back. Runtime/editor resolve specs through the same path as
-  `MeshRef` — an unresolvable spec drops just that level.
-- **Editor:** Scene3D tool `meshLods` (csv specs) and `lodPixels` rows
-  edit the live preview.
+  `lodPixels` [1,4096] + `lodFade` [0,.5] round-trip through
+  `Scene3dDocument`; `MeshLods` component codecs spec count + strings +
+  switch size + fade (truncated tails decode with defaults);
+  `spawn_scene3d` attaches it when `lods` is non-empty and
+  `scene3d_from_world` exports it back. Runtime/editor resolve specs
+  through the same path as `MeshRef` — an unresolvable spec drops just
+  that level.
+- **Editor:** Scene3D tool `meshLods` (csv specs), `lodPixels` and
+  `lodFade` rows edit the live preview.
 - **Tests:** `native_scene3d_gpu` — silhouette probe: a quad proxy
   exposes the swap (sphere pixels beyond the quad edge go background),
   `lod_instances` stat delta, above-threshold frames keep the full mesh;
-  `fleet3d` benchmark block — a 1024-ship depth-sweep fleet, 60 timed
-  frames reporting `cpu_submit_mean_ms`/`frame_wall_mean_ms` plus
+  screen-door probe: a sphere fading to a quad inside the band dithers
+  its sphere-only silhouette (~2/3 lit of 80px vs fully lit hard-switch
+  control) and counts one `lod_fades` submission; `fleet3d` benchmark
+  block — a 1024-ship depth-sweep fleet, 60 timed frames reporting
+  `cpu_submit_mean_ms`/`frame_wall_mean_ms` plus
   `draw_calls`/`lod_instances` assertions (one instanced draw per LOD
   level, depth-partitioned picks);
-  `engine_scene3d` — level-pick policy + bound rejects;
-  `engine_project` — `lods`/`lodPixels` round-trip + malformed
+  `engine_scene3d` — level-pick policy, band-share ramp across two
+  levels, zero-width disable, bound rejects;
+  `engine_project` — `lods`/`lodPixels`/`lodFade` round-trip + malformed
   rejections; `engine_world` — `MeshLods` spawn/codec/export
   round-trips.
 - **Limitations:** flat halving chain — no hierarchical LOD trees,
-  screen-door fading, billboard impostors, or mesh decimation; the
-  switch is instantaneous (no crossfade); casters stay full-res.
+  billboard impostors, or mesh decimation; the crossfade is a per-pixel
+  dither (stable while the camera holds still; reads as fine noise on
+  stills when a coarse proxy diverges sharply); casters stay full-res.
 
 ## Scene3D surface detail — cloud decks and terminator wrap (2026-09-25)
 
