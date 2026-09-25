@@ -1,5 +1,6 @@
 #include "native_new_game_workspace.hpp"
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/core/stellar_population_profiles.hpp>
 #include <stellar/engine/localization.hpp>
 
@@ -1019,8 +1020,8 @@ void NativeNewGameWorkspace::render(
   for(const auto r:choice_bounds)text(out,{r.x+r.width-24*s,r.y+(r.height-layout.small_font)*.5f,20*s,24*s},"▼",accent,layout.small_font,TextAlign::Center);
   const auto focus_items = configuration_focusables(measured);
   if (focus_ >= 0 && focus_ < static_cast<int>(focus_items.size()))
-    stroke(out, focus_items[static_cast<std::size_t>(focus_)].rect,
-           {160, 210, 255, 255});
+    stellar::native_ui::focus_ring(
+        out, focus_items[static_cast<std::size_t>(focus_)].rect);
   if(dropdown_.visible())dropdown_.render(out,choice_bounds[dropdown_.id()],width,height,layout.body_font);
 }
 

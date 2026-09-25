@@ -1,5 +1,6 @@
 #include "native_video_settings.hpp"
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/engine/atomic_file_write.hpp>
 
@@ -668,8 +669,7 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
     std::array<Focusable, 11> focusables{};
     const int count = collect_focusables(layout, focusables);
     if (focus_ < count)
-      out.overlay.emplace_back(stellar::native_map::StrokedRectangle{
-          focusables[focus_].rect, {160, 210, 255, 255}});
+      stellar::native_ui::focus_ring(out, focusables[focus_].rect);
   }
 }
 

@@ -1,5 +1,6 @@
 #include "native_colony_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -240,7 +241,7 @@ void NativeColonyWorkspace::render(DrawList &out, int width, int height) const {
       const auto clip=l.freight_text;clipped_text(out,{clip.x,clip.y-freight_scroll_.scroll_offset,clip.width,freight_content_height(l)},clip,freight_text_,bright,l.body_font_pixels);
       stellar::native_menu_style::button(out,l.freight_cancel,tr("COLONY_FREIGHT_CANCEL","Cancel"),l.body_font_pixels,l.freight_cancel.contains(pointer_));
       stellar::native_menu_style::button(out,l.freight_confirm,tr("COLONY_FREIGHT_CONFIRM","Confirm dispatch"),l.body_font_pixels,l.freight_confirm.contains(pointer_),freight_preview_->accepted);
-      if(focus_>=0)out.overlay.emplace_back(stellar::native_map::StrokedRectangle{focus_==0?l.freight_cancel:l.freight_confirm,{160,210,255,255}});
+      if(focus_>=0)stellar::native_ui::focus_ring(out,focus_==0?l.freight_cancel:l.freight_confirm);
     }
 }
 

@@ -1,6 +1,7 @@
 #include "native_audio_settings.hpp"
 
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/engine/atomic_file_write.hpp>
 
 #include <nlohmann/json.hpp>
@@ -368,7 +369,7 @@ void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
     if (general_navigation_) focusables[count++] = layout.general;
     if (focus_ < count) {
       const auto& rect = focusables[static_cast<std::size_t>(focus_)];
-      draw.overlay.emplace_back(StrokedRectangle{rect, {160, 210, 255, 255}});
+      stellar::native_ui::focus_ring(draw, rect);
     }
   }
 }

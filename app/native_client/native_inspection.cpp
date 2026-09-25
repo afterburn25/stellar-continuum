@@ -1,4 +1,5 @@
 #include "native_inspection.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/core/campaign_observation.hpp>
 
 #include <stellar/core/fleet_reach.hpp>
@@ -330,6 +331,6 @@ void SystemInspectionCard::render(DrawList& out, UiRect bounds) const {
   }
   const auto close=close_bounds(bounds);
   text(out,close,"X",{235,244,255,255},small);
-  if(focus_>=0)out.overlay.emplace_back(StrokedRectangle{close,{164,221,237,255}});
+  if(focus_>=0)stellar::native_ui::focus_ring(out,close);
 }
 } // namespace stellar::native_inspection

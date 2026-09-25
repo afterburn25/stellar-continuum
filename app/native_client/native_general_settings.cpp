@@ -1,5 +1,6 @@
 #include "native_general_settings.hpp"
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/engine/atomic_file_write.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -318,7 +319,7 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   if(focus_>=0){
     const std::array<UiRect,17> focusables{l.audio,l.video,l.nebula,l.eruptions,l.motion,l.iscale,l.flashing,l.contrast,l.colorblind,l.language,l.subtitles,l.subtitle_scale,l.text_scale,l.browse,l.defaults,l.cancel,l.save};
     const auto& rect=browsing()?l.cancel:focusables[static_cast<std::size_t>(std::min(focus_,16))];
-    draw.overlay.emplace_back(StrokedRectangle{rect,{160,210,255,255}});
+    stellar::native_ui::focus_ring(draw,rect);
   }
   nebula_dropdown_.render(draw,l.nebula,width,height,l.font_pixels);
   eruption_dropdown_.render(draw,l.eruptions,width,height,l.font_pixels);

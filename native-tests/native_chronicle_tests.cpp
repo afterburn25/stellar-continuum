@@ -1,4 +1,5 @@
 #include "native_chronicle.hpp"
+#include "native_ui_theme.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -605,7 +606,8 @@ void keyboard_focus() {
     for (const auto &command : out.overlay)
       if (const auto *stroke =
               std::get_if<native_map::StrokedRectangle>(&command))
-        if (stroke->color.r == 160 && stroke->color.g == 210)
+        if (stroke->color.r == native_ui::color::focus.r &&
+            stroke->color.g == native_ui::color::focus.g)
           ring = true;
     require(ring, "Focused control rendered no ring");
   }

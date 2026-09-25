@@ -1,5 +1,6 @@
 #include "native_chronicle.hpp"
 #include "native_campaign_calendar.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/engine/native_ui_skin.hpp>
 
@@ -1185,9 +1186,8 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
   if (focus_ >= 0) {
     const auto items = focusables(layout, snapshot_, locale_);
     if (focus_ < static_cast<int>(items.size()))
-      out.overlay.emplace_back(StrokedRectangle{
-          items[static_cast<std::size_t>(focus_)].bounds,
-          {160, 210, 255, 255}});
+      stellar::native_ui::focus_ring(
+          out, items[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 

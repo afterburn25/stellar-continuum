@@ -3,6 +3,7 @@
 #include "native_system_travel.hpp"
 #include "native_fleet_controller.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
@@ -81,7 +82,7 @@ int main(int argc,char**argv)try{
     const float s=NativeUiLayout::for_viewport(1920,1080).scale;
     const UiRect motion{field_rect.x+field_rect.width-168*s,field_rect.y+field_rect.height-69*s,156*s,29*s};
     const UiRect launcher{field_rect.x+12*s,field_rect.y+field_rect.height-35*s,180*s,29*s};
-    const auto ring_at=[&](const DrawList&scene,UiRect r){return std::ranges::any_of(scene.overlay,[&](const UiOverlayCommand&item){const auto*stroke=std::get_if<StrokedRectangle>(&item);return stroke&&stroke->bounds.x==r.x&&stroke->bounds.y==r.y&&stroke->bounds.width==r.width&&stroke->color.r==164;});};
+    const auto ring_at=[&](const DrawList&scene,UiRect r){return std::ranges::any_of(scene.overlay,[&](const UiOverlayCommand&item){const auto*stroke=std::get_if<StrokedRectangle>(&item);return stroke&&stroke->bounds.x==r.x&&stroke->bounds.y==r.y&&stroke->bounds.width==r.width&&stroke->color.r==stellar::native_ui::color::focus.r;});};
     require(!keys.small_body_keyboard_focus(),"small-body ring started focused");
     require(keys.focused()<0&&keys.focused_label(1920,1080).empty(),"unfocused workspace reported a label");
     require(key(kTab).captured&&keys.small_body_keyboard_focus(),"Tab did not focus the small-body ring");

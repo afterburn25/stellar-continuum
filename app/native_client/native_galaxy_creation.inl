@@ -90,6 +90,6 @@ void NativeNewGameWorkspace::render_galaxy_page(DrawList& out,int width,int heig
   native_menu_style::button(out,l.next,tr("SETUP_NEXT","NEXT"),body,l.next.contains(pointer_),page_==SandboxPage::Population||morphology_selected_,s);
   const auto focus_items=galaxy_focusables(l);
   if(focus_>=0&&focus_<static_cast<int>(focus_items.size()))
-    stroke(out,focus_items[static_cast<std::size_t>(focus_)].rect,{160,210,255,255});
+    stellar::native_ui::focus_ring(out,focus_items[static_cast<std::size_t>(focus_)].rect);
   if(dropdown_.visible())dropdown_.render(out,l.population,width,height,body);
 }

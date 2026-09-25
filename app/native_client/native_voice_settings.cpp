@@ -1,6 +1,7 @@
 #include "native_voice_settings.hpp"
 
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/engine/atomic_file_write.hpp>
 #include <nlohmann/json.hpp>
 
@@ -494,7 +495,7 @@ void NativeVoiceSettings::render(DrawList& draw, int width, int height) const {
       layout.subtitle_size, layout.background_track, layout.speaker_labels, layout.filter_track,
       layout.frequency, layout.no_interruptions, layout.interface_announcements, layout.replay,
       layout.stop, layout.defaults, layout.cancel, layout.save};
-    draw.overlay.emplace_back(StrokedRectangle{focusables[static_cast<std::size_t>(focus_)], {160, 210, 255, 255}});
+    stellar::native_ui::focus_ring(draw, focusables[static_cast<std::size_t>(focus_)]);
   }
 }
 

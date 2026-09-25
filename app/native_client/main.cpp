@@ -7898,7 +7898,7 @@ class NativeCampaign final {
       if(map_hud_visible()&&hud_focus_>=0){
         const auto items=hud_ring_items(layout,width,height);
         if(hud_focus_<static_cast<int>(items.size()))
-          out.overlay.emplace_back(StrokedRectangle{items[static_cast<std::size_t>(hud_focus_)].first,{164,221,237,255}});
+          stellar::native_ui::focus_ring(out,items[static_cast<std::size_t>(hud_focus_)].first);
       }
     }
     out.overlay.emplace_back(Text{
@@ -8033,12 +8033,11 @@ class NativeCampaign final {
     }
     if (menu_) {
       stellar::native_ui_style::menu_panel(out, layout.menu_panel);
-      label(out, layout.menu_heading, tr(session_->new_campaign_pending()?"MENU_SAVING":"MENU_PAUSED",session_->new_campaign_pending()?"SAVING CAMPAIGN":"PAUSED"), {238, 244, 255, 255},
+      label(out, layout.menu_heading, tr(session_->new_campaign_pending()?"MENU_SAVING":"MENU_PAUSED",session_->new_campaign_pending()?"SAVING CAMPAIGN":"PAUSED"), stellar::native_ui::color::text_primary,
             layout.heading_font_pixels, layout.scale, FontFace::Heading);
       const auto draw_button = [&](UiRect bounds, std::string text) {
-        panel(out, bounds, bounds.contains(pointer_), false);
-        control_label(out, bounds, std::move(text), {238, 244, 255, 255},
-              layout.control_font_pixels, layout.scale,text_measurer_);
+        stellar::native_ui::button(out, bounds, std::move(text), pointer_,
+                                 layout.control_font_pixels);
       };
       draw_button(layout.continue_button, tr(session_->new_campaign_pending()?"MENU_CANCEL_NEW_GAME":"MENU_CONTINUE",session_->new_campaign_pending()?"CANCEL NEW GAME":"CONTINUE"));
       if(!session_->new_campaign_pending()){
@@ -8051,7 +8050,7 @@ class NativeCampaign final {
       }
       if(menu_focus_>=0&&menu_focus_<menu_action_count&&(!session_->new_campaign_pending()||menu_focus_==0)){
         const std::array<UiRect,7> focus_rects{layout.continue_button,layout.save_button,layout.load_button,layout.settings_button,layout.support_button,layout.new_game_button,layout.exit_button};
-        out.overlay.emplace_back(StrokedRectangle{focus_rects[menu_focus_],{164,221,237,255}});
+        stellar::native_ui::focus_ring(out,focus_rects[menu_focus_]);
       }
       const float footer_y=layout.menu_panel.y+layout.menu_panel.height+8.f*layout.scale;
       const UiRect footer{36.f*layout.scale,footer_y,
@@ -8068,7 +8067,7 @@ class NativeCampaign final {
           else detail=developer_fault_capture_.notice();
         }
         out.overlay.emplace_back(Text{{footer.x,footer.y},std::move(detail),
-            {194,218,238,255},layout.metric_font_pixels,footer.width,footer});
+            stellar::native_ui::color::text_secondary,layout.metric_font_pixels,footer.width,footer});
       }
     }
     if(notifications_available())notification_view_.render(out,notifications_.items(),width,height);

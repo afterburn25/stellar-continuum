@@ -246,7 +246,7 @@ class NativePlanetaryScreen {
     label(out,l.notice,notice_.empty()?(v.foreign_settlement?trf("PLANET_NOTICE_FOREIGN",{v.owner_name},"Developer inspection · {0} · Live statistics"):v.observer_only?(v.developer_inspection?tr("PLANET_NOTICE_UNSETTLED","Unsettled world · No colony population or structures."):tr("PLANET_NOTICE_SURVEY","Survey information only. Colony actions require an owned settlement.")):alerts(v)):notice_,l.small,notice_.empty()?muted:cyan);
     if(!modal())if(const auto hovered=globe_.hit(pointer_,l.globe)){const auto& region=globe_.regions()[*hovered];const float tw=std::min(235*s,l.globe.width),th=68*s;UiRect tip{std::clamp(pointer_.x+14*s,l.globe.x,l.globe.x+l.globe.width-tw),std::clamp(pointer_.y+18*s,l.globe.y,l.globe.y+l.globe.height-th),tw,th};panel(out,tip,s);label(out,{tip.x+10*s,tip.y+8*s,tw-20*s,24*s},region.name,l.small,cyan);label(out,{tip.x+10*s,tip.y+34*s,tw-20*s,25*s},region.terrain,l.small,ink);}
     if(modal())render_confirmation(out,l);
-    if(focus_>=0){const auto items=ring();if(focus_<static_cast<int>(items.size()))out.overlay.emplace_back(StrokedRectangle{hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])].rect,{160,210,255,255}});}
+    if(focus_>=0){const auto items=ring();if(focus_<static_cast<int>(items.size()))stellar::native_ui::focus_ring(out,hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])].rect);}
   }
 
  private:

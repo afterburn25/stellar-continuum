@@ -1,5 +1,7 @@
 #include "native_battle_workspace.hpp"
 
+#include "native_ui_theme.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -1442,8 +1444,8 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
   if (focus_ >= 0) {
     const auto items = focusables(layout);
     if (focus_ < static_cast<int>(items.size()))
-      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
-             {160, 210, 255, 255});
+      stellar::native_ui::focus_ring(
+          out, items[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 } // namespace stellar::native_battle_ui
