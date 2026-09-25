@@ -218,10 +218,11 @@ void progress_bar_clamps_nonfinite_fraction_inside_orders() {
       REQUIRE(std::isfinite(rectangle->bounds.width));
       REQUIRE(std::isfinite(rectangle->bounds.height));
       REQUIRE(contains(layout.surface, rectangle->bounds));
-      if (rectangle->bounds.height <= 3.f * layout.scale) {
+      // Themed section headers also draw thin rule lines; the progress
+      // track is the thin rect inside the orders panel.
+      if (rectangle->bounds.height <= 3.f * layout.scale &&
+          contains(layout.orders, rectangle->bounds))
         thin_track = true;
-        REQUIRE(contains(layout.orders, rectangle->bounds));
-      }
     }
   REQUIRE(thin_track);
 }

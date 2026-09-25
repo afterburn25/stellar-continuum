@@ -1,7 +1,8 @@
-#include <stellar/engine/native_ui_skin.hpp>
 #include "native_campaign_calendar.hpp"
 #include "native_construction_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -15,16 +16,14 @@ namespace {
 using namespace stellar::native_construction;
 using namespace stellar::native_map;
 
-constexpr Color panel{7, 17, 32, 252};
-constexpr Color inset{5, 14, 27, 250};
-constexpr Color row{12, 31, 54, 248};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{19, 73, 68, 252};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color good{102, 232, 164, 255};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color failure{255, 133, 123, 255};
+namespace theme = stellar::native_ui;
+constexpr Color row = theme::color::surface_secondary;
+constexpr Color hover = theme::color::surface_hover;
+constexpr Color selected = theme::color::surface_raised;
+constexpr Color good = theme::color::success;
+constexpr Color bright = theme::color::text_primary;
+constexpr Color muted = theme::color::text_secondary;
+constexpr Color failure = theme::color::danger;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
@@ -571,22 +570,17 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                                          int height) const {
   if (!visible_) return;
   const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
-  stellar::engine::ui_skin::surface(out,layout.surface,layout.scale);
+  stellar::native_ui_style::menu_panel(out,layout.surface);
   text(out, layout.title, tr("CONSTRUCTION_TITLE", "PLAYER CONSTRUCTION"),
        bright,
        layout.title_font_pixels, FontFace::Heading);
-  stellar::engine::ui_skin::control(out,layout.close,layout.close.contains(pointer_),false,true,layout.scale);
-  text(out, {layout.close.x, layout.close.y + 7.f * layout.scale,
-             layout.close.width, layout.close.height - 8.f * layout.scale},
-       "X", bright, layout.body_font_pixels, FontFace::Interface,
-       TextAlign::Center);
+  theme::button(out,layout.close,"X",pointer_,layout.body_font_pixels);
   const auto section = [&](UiRect bounds, std::string heading) {
-    stellar::engine::ui_skin::surface(out,bounds,layout.scale);
-    text(out, {bounds.x + 8.f * layout.scale,
-               bounds.y + 6.f * layout.scale,
-               bounds.width - 16.f * layout.scale, 20.f * layout.scale},
-         std::move(heading), muted, layout.small_font_pixels,
-         FontFace::Heading);
+    theme::panel(out,bounds);
+    theme::section_header(
+        out,{bounds.x + 8.f * layout.scale, bounds.y + 6.f * layout.scale,
+             bounds.width - 16.f * layout.scale, 20.f * layout.scale},
+        std::move(heading), layout.small_font_pixels);
   };
   section(layout.projects, tr("CONSTRUCTION_KNOWN_PROJECTS", "KNOWN PROJECTS"));
   section(layout.details, tr("CONSTRUCTION_DETAILS", "PROJECT DETAILS"));
@@ -598,14 +592,13 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
   project_scroll_.configure(view_ ? view_->projects.size() : 0,
                             58.f * layout.scale, project_rows.height);
   if (!view_ || view_->projects.empty()) {
-    text(out, {project_rows.x + 10.f * layout.scale,
-               project_rows.y + 8.f * layout.scale,
-               project_rows.width - 20.f * layout.scale,
-               project_rows.height - 16.f * layout.scale},
-         tr("CONSTRUCTION_NO_PROJECTS",
-            "No known projects are available. Research prerequisites remain "
-            "locked."),
-         muted, layout.body_font_pixels);
+    theme::empty_state(out, project_rows,
+        tr("CONSTRUCTION_NO_PROJECTS",
+           "No known projects are available. Research prerequisites remain "
+           "locked."),
+        tr("CONSTRUCTION_NO_PROJECTS_HINT",
+           "Completed research unlocks new projects here."),
+        layout.body_font_pixels);
   } else {
     for (std::size_t index = 0; index < view_->projects.size(); ++index) {
       const auto &project = view_->projects[index];
@@ -619,6 +612,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
            selected_project_id_ == project.id
                ? selected
                : clipped->contains(pointer_) ? hover : row);
+      if (selected_project_id_ == project.id)
+        fill(out, {clipped->x, clipped->y, 3.f * layout.scale,
+                   clipped->height}, theme::color::selected);
       if (const auto line = intersection(
               *clipped, {bounds.x + 8.f * layout.scale,
                          bounds.y + 5.f * layout.scale,
@@ -683,6 +679,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
            selected_project_id_ == value.id
                ? selected
                : clipped->contains(pointer_) ? hover : row);
+      if (selected_project_id_ == value.id)
+        fill(out, {clipped->x, clipped->y, 3.f * layout.scale,
+                   clipped->height}, theme::color::selected);
       if (const auto line = intersection(
               *clipped, {bounds.x + 8.f * layout.scale,
                          bounds.y + 5.f * layout.scale,
@@ -718,7 +717,7 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                          bounds.width - 16.f * layout.scale,
                          3.f * layout.scale};
       if (const auto clipped_track = intersection(track, order_rows)) {
-        fill(out, *clipped_track, {23, 45, 67, 255});
+        fill(out, *clipped_track, theme::color::canvas);
         const UiRect completed{track.x, track.y,
                                progress_width(value, track.width),
                                track.height};
@@ -727,14 +726,12 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
       }
     }
   if (status_order_.empty())
-    text(out, {order_rows.x + 10.f * layout.scale,
-               order_rows.y + 8.f * layout.scale,
-               order_rows.width - 20.f * layout.scale,
-               order_rows.height - 16.f * layout.scale},
-         tr("CONSTRUCTION_NO_ACTIVE",
-            "No projects are active, queued, or completed."),
-         muted,
-         layout.body_font_pixels);
+    theme::empty_state(out, order_rows,
+        tr("CONSTRUCTION_NO_ACTIVE",
+           "No projects are active, queued, or completed."),
+        tr("CONSTRUCTION_NO_ACTIVE_HINT",
+           "Start a project from the known list."),
+        layout.body_font_pixels);
 
   if (project && view_) {
     std::string costs = trf(
@@ -770,13 +767,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
          layout.small_font_pixels);
 
   const auto action = [&](UiRect bounds, std::string label, bool enabled) {
-    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),enabled,enabled,layout.scale);
-    text(out, {bounds.x + 6.f * layout.scale,
-               bounds.y + 10.f * layout.scale,
-               bounds.width - 12.f * layout.scale,
-               bounds.height - 12.f * layout.scale},
-         std::move(label), enabled ? bright : muted,
-         layout.body_font_pixels, FontFace::Interface, TextAlign::Center);
+    theme::button(out, bounds, std::move(label), pointer_,
+                  layout.body_font_pixels, theme::Tone::Construction,
+                  enabled, enabled);
   };
   if (project) {
     if (project->active || project->queued) {
@@ -806,8 +799,7 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
   if (focus_ >= 0) {
     const auto items = focusables(layout);
     if (focus_ < static_cast<int>(items.size()))
-      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
-             {160, 210, 255, 255});
+      theme::focus_ring(out, items[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 
