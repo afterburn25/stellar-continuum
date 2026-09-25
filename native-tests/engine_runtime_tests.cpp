@@ -6,6 +6,7 @@
 
 #include <stellar/engine/replay.hpp>
 #include <stellar/engine/runtime_host.hpp>
+#include <stellar/engine/scene_components.hpp>
 #include <stellar/engine/world.hpp>
 
 #include <chrono>
@@ -1237,6 +1238,39 @@ int main() {
     check(updates == 3, "--frames bounds the argv-driven run");
     check(host.viewport_width() == 320 && host.viewport_height() == 240,
           "--width/--height set the synthetic drawable");
+  }
+
+  // --snapshot-out writes a world snapshot at teardown that
+  // load_world_from_file restores bit-exact.
+  {
+    const auto sub = root / "snapshot-out";
+    std::filesystem::create_directories(sub);
+    const auto snap = sub / "end.stellar";
+    auto opts = headless_options(sub);
+    opts.snapshot_out = snap;
+    RuntimeHost host{opts};
+    float last_x = 0.f, last_vx = 0.f;
+    host.on_update = [&](World &world, float) {
+      if (const auto demo = host.find_entity("demo")) {
+        if (const auto *t = world.get<Transform2D>(*demo)) last_x = t->x;
+        if (const auto *v = world.get<Velocity2D>(*demo)) last_vx = v->dx;
+      }
+    };
+    check(host.run() == 0, "snapshot-out run exits cleanly");
+    check(std::filesystem::exists(snap), "the snapshot file is written");
+    World restored;
+    register_scene_components(restored);
+    check(load_world_from_file(restored, snap),
+          "the snapshot loads into a fresh world");
+    if (const auto demo = find_entity_by_name(restored, "demo")) {
+      const auto *t = restored.get<Transform2D>(*demo);
+      // on_update observes the pre-integration state; the teardown
+      // snapshot holds the position after the final step's integrate.
+      check(t && std::abs(t->x - (last_x + last_vx / 60.f)) < 1e-5f,
+            "the restored entity holds the final simulated state");
+    } else {
+      check(false, "the restored world contains the demo entity");
+    }
   }
 
   std::filesystem::remove_all(root, ec);
