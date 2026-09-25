@@ -1222,6 +1222,23 @@ int main() {
     check(!updated, "dump-bindings exits before the sim loop");
   }
 
+  // run(argc, argv) parses the CLI flags end-to-end: --headless selects
+  // the windowless loop, --frames bounds the run, --width/--height size
+  // the synthetic drawable, --fixed-hz fixes the step.
+  {
+    RuntimeHost host{headless_options(root)};
+    const char *argv[] = {"game",   "--headless", "--frames", "3",
+                          "--width", "320",       "--height", "240",
+                          "--fixed-hz", "60"};
+    int updates = 0;
+    host.on_update = [&](World &, float) { ++updates; };
+    check(host.run(9, const_cast<char **>(argv)) == 0,
+          "argv-parsed headless run exits cleanly");
+    check(updates == 3, "--frames bounds the argv-driven run");
+    check(host.viewport_width() == 320 && host.viewport_height() == 240,
+          "--width/--height set the synthetic drawable");
+  }
+
   std::filesystem::remove_all(root, ec);
   if (failures == 0)
     std::cout << "engine runtime host tests passed\n";
