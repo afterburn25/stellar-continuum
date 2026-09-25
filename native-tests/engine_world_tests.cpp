@@ -691,6 +691,8 @@ int main() {
         turret.cloud_offset_y = 0.2f;
         turret.terminator_wrap = 0.5f;
         turret.limb_darkening = 0.6f;
+        turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
+        turret.lod_pixels = 64.f;
         doc.entities.push_back(turret);
         const auto spawned = spawn_scene3d(world3, doc);
         check(spawned.size() == 2, "spawn_scene3d creates all entities");
@@ -747,6 +749,14 @@ int main() {
               "spawn_scene3d materialsurface component");
         check(world3.get<MaterialSurface>(ship_e) == nullptr,
               "defaults do not attach a surface component");
+        const auto *ml = world3.get<MeshLods>(turret_e);
+        check(ml != nullptr && ml->specs.size() == 2 &&
+                  ml->specs[0] == "models/turret_mid.obj" &&
+                  ml->specs[1] == "models/turret_low.obj" &&
+                  ml->pixels == 64.f,
+              "spawn_scene3d meshlods component");
+        check(world3.get<MeshLods>(ship_e) == nullptr,
+              "no LOD chain does not attach a component");
         check(world3.get<Lifetime>(turret_e)->remaining == 3.f,
               "spawn_scene3d lifetime");
         const auto *pt = world3.get<Parent3D>(turret_e);
@@ -804,6 +814,11 @@ int main() {
                       rms->limb_darkening == 0.6f &&
                       rms->cloud_offset_y == 0.2f,
                   "materialsurface codec round-trips");
+            const auto *rml = restored.get<MeshLods>(*re_turret);
+            check(rml != nullptr && rml->specs.size() == 2 &&
+                      rml->specs[1] == "models/turret_low.obj" &&
+                      rml->pixels == 64.f,
+                  "meshlods codec round-trips");
         }
         if (re_turret) {
             resolve_hierarchy3d(restored);
@@ -839,6 +854,10 @@ int main() {
                   out.entities[1].terminator_wrap == 0.5f &&
                   out.entities[1].limb_darkening == 0.6f,
               "scene3d_from_world exports surface response");
+        check(out.entities[1].lod_meshes.size() == 2 &&
+                  out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&
+                  out.entities[1].lod_pixels == 64.f,
+              "scene3d_from_world exports the LOD chain");
 
         // Geometry: box primitive topology + OBJ parse/malformed reject.
         const auto box = stellar::native_map::box_mesh(2.f, 1.f, 1.f);

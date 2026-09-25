@@ -143,6 +143,20 @@ int main()try{
    ranged.visible_range=0;check(prepare_instance3d(camera,ranged,1).visible,"Zero visible range culled the instance");
    rejects([&]{auto i=instance;i.visible_range=-1;(void)Scene3D::create(camera,{i});});
    rejects([&]{auto i=instance;i.visible_range=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
+  // Screen-space LOD: the level is a pure function of projected diameter
+  // — each chain step halves the switch threshold.
+  {auto loded=instance;loded.lod_meshes={sphere,sphere};
+   check(select_lod3d_level(loded,64)==0,"Full-size instance picked a LOD mesh");
+   check(select_lod3d_level(loded,31)==1,"First LOD level did not engage at the switch size");
+   check(select_lod3d_level(loded,15)==2,"Second LOD level did not halve the switch size");
+   check(select_lod3d_level(loded,1)==2,"LOD selection ran past the end of the chain");
+   const auto flat=instance;check(select_lod3d_level(flat,1)==0,"Empty LOD chain picked a level");
+   rejects([&]{auto i=instance;i.lod_meshes.assign(9,sphere);(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_meshes={nullptr};(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_meshes={sphere};i.lod_pixels=0;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_meshes={sphere};i.lod_pixels=8192;(void)Scene3D::create(camera,{i});});
+   const auto lscene=Scene3D::create(camera,{loded});
+   check(lscene->instances()[0].lod_meshes.size()==2,"Scene dropped its LOD chain");}
   for(int field=0;field<8;++field){auto invalid=receiver;auto& s=*invalid.material.shadow;
     if(field==0)s.scale=0;if(field==1)s.position.x=std::numeric_limits<double>::infinity();
     if(field==2)s.rotation={0,0,0,0};if(field==3)s.radii.y=0;

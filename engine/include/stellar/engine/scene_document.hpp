@@ -213,6 +213,11 @@ struct Scene3dEntity {
   // Linear limb darkening [0,1] for self-luminous discs (stars, hot
   // bodies); 0 keeps a uniform disc.
   float limb_darkening{0.f};
+  // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
+  // coarsest-first. lod_meshes[i] draws once the projected bounding
+  // diameter drops below lod_pixels/2^i pixels (at most 8 levels).
+  std::vector<std::string> lod_meshes;
+  float lod_pixels{32.f};
 };
 
 // An extra directional light — the material pipeline evaluates at most

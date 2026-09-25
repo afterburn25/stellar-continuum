@@ -221,6 +221,14 @@ struct MeshInstance3D {
   // than this from the sphere surface — distant impostor/LOD hand-off and
   // fleet-scale budget policy. 0 keeps the instance visible at any range.
   float visible_range{};
+  // Optional screen-space LOD chain: lod_meshes[i] substitutes for `mesh`
+  // once the projected bounding-sphere diameter drops below
+  // lod_pixels/2^i pixels in the view being drawn — a 64px cruiser can
+  // fall back to a 32px proxy mesh without an authored distance table.
+  // Selection is per-view; shadow casters always take the full mesh since
+  // the shadow volume is camera-independent. At most 8 levels.
+  std::vector<std::shared_ptr<const Mesh3D>> lod_meshes;
+  float lod_pixels{32.f};
 };
 // Directional shadow map for the scene key light. Instead of fitting the
 // camera frustum, the ortho coverage box centres `distance` world units
@@ -256,6 +264,11 @@ class Scene3D final {
 struct PreparedInstance3D { Matrix4 model_view,model_view_projection;float camera_depth{};bool visible{}; };
 // Conservative sphere/frustum test, camera-relative matrices; no GPU required.
 [[nodiscard]] PreparedInstance3D prepare_instance3d(const Camera3D&,const MeshInstance3D&,float aspect);
+// Screen-space LOD level for a projected bounding-sphere diameter in
+// pixels: 0 keeps the full mesh, i>0 selects lod_meshes[i-1]. Pure
+// policy shared by the texture-streamer demand and the draw submission
+// so both agree which level is resident this frame.
+[[nodiscard]] std::size_t select_lod3d_level(const MeshInstance3D&,float projected_diameter_px)noexcept;
 struct PreparedShadow3D { Matrix4 from_model;Vec3 light; };
 // Light is the resolved camera-space direction. Local geometry stays precise
 // even when both blocker and receiver are at astronomical world coordinates.
@@ -268,6 +281,9 @@ struct Scene3DStatistics {
   // Instances written to the directional shadow map this frame (post
   // volume/visible_range culling) — the shadow-pass workload audit counter.
   std::uint64_t shadow_casters{};
+  // Instances drawn below LOD level 0 this frame — the screen-space LOD
+  // workload audit counter for fleet-scale scenes.
+  std::uint64_t lod_instances{};
   std::size_t mesh_cache_entries{},mesh_cache_bytes{},texture_cache_entries{},texture_cache_bytes{},target_bytes{};
   // Binds served by the pinned fallback because the TextureStreamer denied
   // residency under the frame's byte budget (budget-pressure pop-in count).

@@ -650,6 +650,25 @@ int main(int argc,char** argv)try{
     check(channel(*culled_caster,176,160,0)>100,"Distance-culled caster still wrote the shadow map");
     std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_passed\n";
   }
+  {
+    // Screen-space mesh LOD: the projected bounding-sphere diameter picks
+    // the chain level. A flat-quad proxy exposes the silhouette swap —
+    // the sphere reaches x=198 (radius 40px), the quad stops at 196.
+    auto fleet=a;fleet.mesh=Mesh3D::uv_sphere(64,32);fleet.scale=.25f;
+    fleet.lod_pixels=100;fleet.lod_meshes={quad(0,0)};
+    auto plain=fleet;plain.lod_meshes.clear();
+    const auto sphere_ref=capture({plain},"lod-full.png");
+    check(channel(*sphere_ref,198,160,0)>150,"Sphere LOD reference lost its silhouette");
+    const auto lod_before=window.scene3d_statistics().lod_instances;
+    const auto proxied=capture({fleet},"lod-proxy.png");
+    check(window.scene3d_statistics().lod_instances==lod_before+1,"LOD pick did not substitute the proxy mesh");
+    check(channel(*proxied,198,160,0)==5,"LOD proxy kept the full mesh silhouette");
+    check(channel(*proxied,160,160,0)>150,"LOD proxy did not render the quad mesh");
+    auto wide=fleet;wide.scale=.5f;
+    const auto no_switch=capture({wide},"lod-noswitch.png");
+    check(channel(*no_switch,198,160,0)>150,"LOD switched while above the pixel threshold");
+    std::cout<<"lod_gpu=screen_size_pick_stat_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");

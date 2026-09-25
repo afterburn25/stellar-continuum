@@ -510,6 +510,37 @@ void register_scene_components(World &world) {
       "visiblerange",
       encode_fields<VisibleRange, &VisibleRange::range>,
       decode_fields<VisibleRange, &VisibleRange::range>);
+  // u32 count + length-prefixed spec strings + f32 switch size — decode
+  // tolerates a truncated tail like MaterialSurface.
+  world.register_component<MeshLods>(
+      "meshlods",
+      [](const MeshLods &m) {
+        std::vector<std::uint8_t> out;
+        put_u32(out, static_cast<std::uint32_t>(m.specs.size()));
+        for (const auto &s : m.specs) {
+          put_u32(out, static_cast<std::uint32_t>(s.size()));
+          out.insert(out.end(), s.begin(), s.end());
+        }
+        put_f32(out, m.pixels);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        MeshLods m;
+        std::size_t at = 0;
+        const std::uint32_t count = get_u32(b, at);
+        for (std::uint32_t i = 0; i < count && i < 8; ++i) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) break;
+          m.specs.emplace_back(reinterpret_cast<const char *>(b.data() + at),
+                               len);
+          at += len;
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&m.pixels, &bits, 4);
+        }
+        return m;
+      });
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -798,6 +829,8 @@ std::vector<EntityId> spawn_scene3d(World &world,
                                         s.atmo_night});
     if (s.visible_range > 0.f)
       world.add(entity, VisibleRange{s.visible_range});
+    if (!s.lod_meshes.empty())
+      world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels});
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
@@ -898,6 +931,10 @@ Scene3dDocument scene3d_from_world(const World &world) {
     }
     if (const auto *vr = world.get<VisibleRange>(entity))
       s.visible_range = vr->range;
+    if (const auto *ml = world.get<MeshLods>(entity)) {
+      s.lod_meshes = ml->specs;
+      s.lod_pixels = ml->pixels;
+    }
     if (const auto *g = world.get<GravityScale>(entity))
       s.gravity_scale = g->value;
     s.solid = world.get<Solid>(entity) != nullptr;

@@ -200,6 +200,15 @@ struct AtmosphereShell {
 struct VisibleRange {
   float range{0.f};
 };
+// Screen-space mesh LOD chain for a 3D entity — the component
+// counterpart of the entity document's `lods`/`lodPixels` keys. Specs
+// resolve through the same path as MeshRef; `specs[i]` substitutes for
+// the full mesh once the projected bounding diameter drops below
+// pixels/2^i. Attached only when the document authors levels.
+struct MeshLods {
+  std::vector<std::string> specs;
+  float pixels{32.f};
+};
 // Host-owned fly-camera state for 3D scene mode, carried on a lazily
 // resolved world entity so F5/F9 snapshots restore the camera too (the
 // document seeds it only on scene load).

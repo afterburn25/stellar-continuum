@@ -65,6 +65,10 @@ void validate_instance(const MeshInstance3D& i){
      !bounded(m.opacity,1)||m.opacity<0||!bounded(m.dark_side_strength,16)||m.dark_side_strength<0||
      !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0)
     throw std::invalid_argument("3D material lighting and opacity must be finite and bounded.");
+  if(i.lod_meshes.size()>8||!bounded(i.lod_pixels,4096)||i.lod_pixels<1.f)
+    throw std::invalid_argument("3D instance LOD chains allow at most 8 levels with a 1..4096px switch.");
+  for(const auto& lod:i.lod_meshes)
+    if(!lod)throw std::invalid_argument("3D instance LOD meshes must not be null.");
   if(m.light_direction)(void)normalized(*m.light_direction);
   for(const auto& l:m.additional_lights){(void)normalized(l.direction);if(!valid(l.color)||l.color.x<0||l.color.y<0||l.color.z<0||l.color.x>4||l.color.y>4||l.color.z>4||!bounded(l.intensity,16)||l.intensity<0)throw std::invalid_argument("Invalid additional light");}
   if(!valid(m.light_color)||m.light_color.x<0||m.light_color.y<0||m.light_color.z<0||
@@ -244,6 +248,11 @@ PreparedInstance3D prepare_instance3d(const Camera3D& camera,const MeshInstance3
     p.values={1/hx,0,0,0,0,1/hy,0,0,0,0,1/(n-f),0,0,0,n/(n-f),1};
   }
   result.model_view_projection=multiply(p,result.model_view);return result;
+}
+std::size_t select_lod3d_level(const MeshInstance3D& instance,float projected_diameter_px)noexcept{
+  std::size_t level=0;float threshold=instance.lod_pixels;
+  while(level<instance.lod_meshes.size()&&projected_diameter_px<threshold){++level;threshold*=.5f;}
+  return level;
 }
 PreparedShadow3D prepare_shadow3d(const Camera3D& camera,const MeshInstance3D& instance,Vec3 light){
   validate_camera(camera);validate_instance(instance);light=normalized(light);

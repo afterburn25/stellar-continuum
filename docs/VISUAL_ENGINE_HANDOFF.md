@@ -58,6 +58,25 @@ reject path as the frustum test, so culled instances skip the draw call
 *and* their TextureStreamer residency demand. Validate: finite, ≥ 0,
 ≤ 1e12; invalid values throw at `Scene3D::create`.
 
+Screen-space mesh LOD chains also live on `MeshInstance3D`:
+
+```cpp
+inst.lod_meshes = {mid, low};  // spec-resolved Mesh3D chain, ≤ 8 levels
+inst.lod_pixels  = 32.f;       // projected diameter that engages level 1
+```
+
+`select_lod3d_level(instance, diameter_px)` picks the level — a pure
+function of the projected bounding-sphere diameter, halving the
+threshold per step (`lod_pixels/2^i`). The GPU backend applies the same
+pick in the streamer demand pass *and* the draw submission, so only the
+level a view submits holds residency. Selection is per-view screen
+space, not distance, so zoomed-out fleets shed vertex throughput without
+an authored distance table. Shadow casters always take the full mesh —
+the shadow volume is camera-independent, and a near receiver's shadow
+must not degrade with the camera's zoom. Validation: ≤ 8 levels, all
+non-null, `lod_pixels` in [1,4096]; `lod_instances` on
+`Scene3DStatistics` audits the substitution count per frame.
+
 - All PBR/atmosphere strengths default to 0 — absence of the optional
   blocks renders exactly as before (authored art untouched).
 - Metallic raises specular albedo tint and removes diffuse response;
@@ -167,10 +186,13 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `emissive`, `emissive_strength`, `emissive_r/g/b`, `night_emissive`,
 `environment`, `environment_strength`, `alpha_cutout`, `uv_tile_x/y`,
 `atmo_strength/power/night/r/g/b`, `range` (per-entity
-`visible_range`), `terminator_wrap`, `limb_darkening`, and a `surface`
+`visible_range`), `terminator_wrap`, `limb_darkening`, `lods` (array of
+mesh specs, ≤ 8) with `lodPixels`, and a `surface`
 block —
 `{normal, properties, cloud, normalStrength, relief, cloudOpacity,
 cloudAlbedo, cloudOffset:[x,y]}`; `surface` requires at least one map.
+Non-array `lods`, oversized chains, and `lodPixels` outside [1,4096]
+are rejected.
 Scene fields: `point_lights[]` (max 4), `exposure`,
 `bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
@@ -183,8 +205,10 @@ are nonpositive `depth`, `strength` outside [0,1], negative `bias`, and
 
 `spawn_scene3d` attaches `MaterialPbr`/`AtmosphereShell`/`MaterialSurface`
 components (binary codec round-trips), a `VisibleRange` component when
-`range > 0`, `scene3d_from_world` exports them back, and `RuntimeHost`
-maps them onto `Material3D`/`PointLight3D`/`Scene3DView::options`.
+`range > 0`, a `MeshLods` component when `lods` is non-empty,
+`scene3d_from_world` exports them back, and `RuntimeHost`
+maps them onto `Material3D`/`MeshInstance3D`/`PointLight3D`/
+`Scene3DView::options` (unresolvable LOD specs drop just that level).
 Documents without the new keys load identically.
 
 ## Editor controls — `stellar-engine.exe` Scene3D tool
@@ -194,7 +218,7 @@ path/tint/strength/night gate, environment path/strength, alpha cutout,
 UV tiling, atmosphere tint/strength/power/night floor, visible range,
 surface maps (normal/properties/cloud), surface scalars (normal
 strength/relief), cloud deck (opacity/albedo/offset), terminator wrap,
-limb darkening.
+limb darkening, mesh LOD chain (csv specs) and LOD switch size.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range),
 shadow map (extent/distance/depth/strength/bias/resolution).
@@ -212,7 +236,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - Instance cap unchanged (`maximum_scene3d_instances`); per-instance
   CPU record build remains the submission bound.
 - `visible_range` culling runs before texture demand declaration —
-  culled instances submit nothing and hold no GPU residency.
+  culled instances submit nothing and hold no GPU residency. Mesh LOD
+  selection shares that pass's footprint math — only the selected
+  level's geometry is charged to the frame budget.
 - Low tier skips aniso/cubic samplers entirely (linear clamp/repeat
   samplers bound instead) and caps emission-volume marching at 16
   steps (Medium: 32; authored `volume_steps` applies at High+).
@@ -240,6 +266,7 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - Debug views are developer tooling — no LOD/residency visualization
   modes yet, and LightingOnly divides by sampled albedo so untextured
   or near-black surfaces clip to black.
-- `visible_range` is distance culling, not geometric LOD — no
-  hierarchical LOD, impostors, or mesh decimation yet.
+- `visible_range` is distance culling and `lod_meshes` a flat halving
+  chain — no hierarchical LOD trees, screen-door fading, or billboard
+  impostors yet, and shadow casters always take the full mesh.
 - No indirect draw / GPU culling — CPU record build is the scale bound.

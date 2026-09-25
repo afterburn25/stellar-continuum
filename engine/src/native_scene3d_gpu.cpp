@@ -367,15 +367,30 @@ struct Scene3DRenderer::Storage {
     const bool low_tier=opt.quality==RenderQuality3D::Low;
     struct Draw {const MeshInstance3D* instance;PreparedInstance3D transform;std::shared_ptr<Geometry> mesh;std::shared_ptr<Texture> image,optical,environment,normal,properties,cloud,shadow,next,emissive,mr;};
     std::vector<Draw> draws;draws.reserve(view.scene->instances().size());
+    // Screen-space LOD uses the same px-per-world-unit convention as the
+    // streamer footprint so both agree on which level is submitted.
+    const auto& lod_camera=view.scene->camera();
+    const float lod_focal=lod_camera.projection==Projection3D::Orthographic?view.destination.height/std::max(lod_camera.orthographic_height,1e-6f)
+      :view.destination.height/std::max(2.f*std::tan(lod_camera.vertical_fov_radians*.5f),1e-6f);
     for(const auto& instance:view.scene->instances()){
       auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
       if(!prepared.visible){++stats.culled_instances;continue;}
+      std::shared_ptr<const Mesh3D> drawn_mesh=instance.mesh;
+      if(!instance.lod_meshes.empty()){
+        // The view-space translation length is the camera distance —
+        // identical to the streamer footprint's world-space delta.
+        const float vx=prepared.model_view.values[12],vy=prepared.model_view.values[13],vz=prepared.model_view.values[14];
+        const float dist=std::sqrt(vx*vx+vy*vy+vz*vz);
+        const float diameter=2.f*instance.scale*static_cast<float>(instance.mesh->bounding_radius())*lod_focal/
+          (lod_camera.projection==Projection3D::Orthographic?1.f:std::max(dist,1e-4f));
+        if(const auto level=select_lod3d_level(instance,diameter);level>0){drawn_mesh=instance.lod_meshes[level-1];++stats.lod_instances;}
+      }
       const auto& optical=instance.material.dielectric;
       const auto& pbr=instance.material.pbr;
       // Disabled optics reuse the existing texture binding, without an upload.
       auto surface=texture(instance.material.texture);
       const auto& response=instance.material.surface_response;
-      draws.push_back({&instance,prepared,geometry(instance.mesh),surface,
+      draws.push_back({&instance,prepared,geometry(drawn_mesh),surface,
         optical?texture(optical->surface):surface,
         optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
         response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,
@@ -730,10 +745,14 @@ void Scene3DRenderer::prepare(const DrawList& list){
       const auto dx=instance.position.x-camera.x,dy=instance.position.y-camera.y,dz=instance.position.z-camera.z;
       const float dist=static_cast<float>(std::sqrt(dx*dx+dy*dy+dz*dz));
       if(instance.visible_range>0.f&&dist>instance.visible_range+instance.scale*instance.mesh->bounding_radius())continue;
-      if(meshes.insert(instance.mesh.get()).second)geometry_bytes+=instance.mesh->byte_size()*2;
       // Nearer instances win texture-budget contention.
       const float priority=1.f/(1.f+dist);
       const float footprint=2.f*instance.scale*instance.mesh->bounding_radius()*focal/(cam.projection==Projection3D::Orthographic?1.f:std::max(dist,1e-4f));
+      // Geometry demand follows the same screen-space pick the draw loop
+      // makes — only the level this view submits is charged.
+      const auto* lod_mesh=instance.mesh.get();
+      if(const auto level=select_lod3d_level(instance,footprint);level>0)lod_mesh=instance.lod_meshes[level-1].get();
+      if(meshes.insert(lod_mesh).second)geometry_bytes+=lod_mesh->byte_size()*2;
       const auto mip_for=[&](const std::shared_ptr<const RgbaImage>& image){
         const auto& img=image?*image:*s.white;const int tex=std::max(img.width(),img.height());
         return footprint>=tex||tex<=1?0u:static_cast<std::uint32_t>(std::floor(std::log2(static_cast<float>(tex)/footprint)));};

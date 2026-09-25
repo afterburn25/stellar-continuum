@@ -96,9 +96,11 @@ same document headless-tested.
 9. **Editor** — scene3d tool exposes tint/texture/opacity/double_sided
    only; no material/lighting/post controls, no preview debug modes.
 10. **Fleet scale** — `maximum_scene3d_instances=4096`, CPU-side uniform
-    fill per instance, no LOD selection or impostors. Instancing is real
-    but bounded by per-frame CPU record build. `visible_range` distance
-    culling landed (phase 16) — it is a visibility cutoff, not LOD.
+    fill per instance. Instancing is real but bounded by per-frame CPU
+    record build. `visible_range` distance culling landed (phase 16) and
+    screen-space mesh LOD chains (`lod_meshes`/`lod_pixels`, ≤8 halving
+    levels, shared streamer/draw selection, `lod_instances` stat) landed
+    later — still no impostors or hierarchical LOD trees.
 
 ## Top wins (ordered)
 
@@ -114,7 +116,13 @@ of the camera, depth-only `scene3d_shadow` pass through the RenderGraph,
 `shadow_casters` workload counter. Planet surface detail is landed:
 `SurfaceResponse3D` is reachable from authored documents/components
 (any map subset), `cloud_albedo` turns the cloud map into a lit deck,
-and `terminator_wrap` applies wrap-diffuse to all light types. Also
+and `terminator_wrap` applies wrap-diffuse to all light types.
+Limb darkening (`Material3D::limb_darkening`, linear N·V law) keeps
+self-luminous star discs from clipping flat. Screen-space mesh LOD
+chains are landed: `lod_meshes`/`lod_pixels` swap to coarser meshes by
+projected bounding diameter (halving per level), with the streamer
+demand and draw submission sharing `select_lod3d_level` so only the
+submitted level holds residency. Also
 fixed: streamer registrations keyed by `RgbaImage*` are now
 liveness-verified (`weak_ptr` owner), closing a stale-TextureId reuse
 bug that intermittently skipped mip-tail promotions. See

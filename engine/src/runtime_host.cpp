@@ -2556,6 +2556,14 @@ int RuntimeHost::run() {
                                        at->power, at->night_floor};
         if (const auto *vr = world.get<VisibleRange>(e))
           inst.visible_range = vr->range;
+        if (const auto *ml = world.get<MeshLods>(e)) {
+          inst.lod_pixels = ml->pixels;
+          // Unresolvable specs drop that level — the authored mesh and
+          // any levels that did resolve still render.
+          for (const auto &spec : ml->specs)
+            if (auto lod_mesh = mesh_of(spec)) inst.lod_meshes.push_back(lod_mesh);
+          if (inst.lod_meshes.empty()) inst.lod_pixels = 32.f;
+        }
         inst.material.light_intensity = impl.light3_intensity;
         inst.material.linear_light = true;
         instances.push_back(std::move(inst));

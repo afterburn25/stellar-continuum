@@ -431,6 +431,8 @@ int main() {
     cube.cloud_offset_y = -0.5f;
     cube.terminator_wrap = 0.4f;
     cube.limb_darkening = 0.6f;
+    cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
+    cube.lod_pixels = 48.f;
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -556,6 +558,11 @@ int main() {
                 rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
                 rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f,
             "scene3d surface-response fields round-trip");
+      check(rc.lod_meshes.size() == 2 &&
+                rc.lod_meshes[0] == "models/crate_mid.obj" &&
+                rc.lod_meshes[1] == "models/crate_low.obj" &&
+                rc.lod_pixels == 48.f,
+            "scene3d mesh LOD chain round-trips");
       check(reparsed->point_lights.size() == 1 &&
                 reparsed->point_lights[0].x == 1.f &&
                 reparsed->point_lights[0].z == -1.f &&
@@ -657,6 +664,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"limbDarken":1.5}]})")
               .has_value(),
           "scene3d limb darkening above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lods":"a,b"}]})")
+              .has_value(),
+          "scene3d non-array lods rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lods":["a","b"],"lodPixels":0}]})")
+              .has_value(),
+          "scene3d lodPixels below range rejected");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

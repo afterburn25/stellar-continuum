@@ -466,6 +466,10 @@ std::string Scene3dDocument::to_json() const {
     }
     if (e.terminator_wrap != 0.f) item["terminatorWrap"] = e.terminator_wrap;
     if (e.limb_darkening != 0.f) item["limbDarken"] = e.limb_darkening;
+    if (!e.lod_meshes.empty()) {
+      item["lods"] = e.lod_meshes;
+      item["lodPixels"] = e.lod_pixels;
+    }
     items.push_back(std::move(item));
   }
   doc["camera"] = {{"pos", {cam_x, cam_y, cam_z}},
@@ -652,6 +656,19 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.limb_darkening = item.value("limbDarken", 0.0f);
       if (!(e.limb_darkening >= 0.f && e.limb_darkening <= 1.f))
         return fail("limbDarken must be in [0,1]");
+      if (item.contains("lods")) {
+        const auto &lods = item.at("lods");
+        if (!lods.is_array() || lods.size() > 8)
+          return fail("lods must be an array of at most 8 mesh specs");
+        for (const auto &spec : lods) {
+          if (!spec.is_string() || spec.get<std::string>().size() > 256)
+            return fail("lods entries must be bounded mesh spec strings");
+          e.lod_meshes.push_back(spec.get<std::string>());
+        }
+        e.lod_pixels = item.value("lodPixels", 32.0f);
+        if (!(e.lod_pixels >= 1.f && e.lod_pixels <= 4096.f))
+          return fail("lodPixels must be in [1,4096]");
+      }
       scene.entities.push_back(std::move(e));
     }
     if (doc.contains("camera")) {
