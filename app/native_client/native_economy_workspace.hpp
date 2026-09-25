@@ -87,6 +87,7 @@ class NativeEconomyWorkspace final {
   int focus_{-1};
   PressTarget pressed_{PressTarget::None};
   native_map::Point press_point_{};
+  native_map::Point pointer_{};
   float press_scroll_{};
   mutable stellar::engine::ScrollView scroll_{};
   TextMeasurer measure_;

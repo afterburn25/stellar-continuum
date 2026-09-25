@@ -158,16 +158,33 @@ inline void panel(DrawList &out, UiRect bounds, Tone tone = Tone::Neutral,
   fill(out, {bounds.x, bounds.y, 3.f, bounds.height}, accent(tone));
 }
 
+// Rectangle intersection shared by the clipped helpers below.
+[[nodiscard]] inline std::optional<UiRect> clipped(UiRect a, UiRect b) {
+  const float x = std::max(a.x, b.x), y = std::max(a.y, b.y);
+  const float r = std::min(a.x + a.width, b.x + b.width),
+              bottom = std::min(a.y + a.height, b.y + b.height);
+  if (r <= x || bottom <= y) return std::nullopt;
+  return UiRect{x, y, r - x, bottom - y};
+}
+
 inline void section_header(DrawList &out, UiRect bounds, std::string title,
                            int pixels, Tone tone = Tone::Neutral,
-                           std::string value = {}) {
+                           std::string value = {},
+                           std::optional<UiRect> clip = std::nullopt) {
+  const auto visible =
+      clip ? clipped(bounds, *clip) : std::optional<UiRect>{bounds};
+  if (!visible) return;
   text(out, {bounds.x, bounds.y}, std::move(title), accent(tone), pixels,
-       bounds.width, TextAlign::Left, FontFace::Heading);
+       bounds.width, TextAlign::Left, FontFace::Heading, visible);
   if (!value.empty())
-    text(out, {bounds.x, bounds.y}, std::move(value), color::text_secondary,
-         pixels, bounds.width, TextAlign::Right);
-  fill(out, {bounds.x, bounds.y + static_cast<float>(pixels) + 5.f,
-             bounds.width, 1.f}, color::keyline);
+    text(out, {bounds.x + bounds.width, bounds.y}, std::move(value),
+         color::text_secondary, pixels, bounds.width, TextAlign::Right,
+         FontFace::Interface, visible);
+  if (const auto rule = clipped(
+          {bounds.x, bounds.y + static_cast<float>(pixels) + 5.f, bounds.width,
+           1.f},
+          *visible))
+    fill(out, *rule, color::keyline);
 }
 
 inline void button(DrawList &out, UiRect bounds, std::string caption,
@@ -181,9 +198,12 @@ inline void button(DrawList &out, UiRect bounds, std::string caption,
                                                     : color::keyline_strong)
                               : color::keyline);
   if (active) fill(out, {bounds.x, bounds.y, 3.f, bounds.height}, accent(tone));
-  text(out, {bounds.x, bounds.y + (bounds.height - pixels) * .5f - 1.f},
+  // Center anchors on at.x — the caption centers on the button's midpoint and
+  // clips to the button if it overflows.
+  text(out, {bounds.x + bounds.width * .5f,
+             bounds.y + (bounds.height - pixels) * .5f - 1.f},
        std::move(caption), enabled ? color::text_primary : color::disabled,
-       pixels, bounds.width, TextAlign::Center, FontFace::Heading, bounds);
+       pixels, 0.f, TextAlign::Center, FontFace::Heading, bounds);
 }
 
 inline void progress(DrawList &out, UiRect bounds, double ratio,
@@ -204,20 +224,29 @@ inline void focus_ring(DrawList &out, UiRect bounds) {
 // The primary Phase-3 hierarchy element for headline numbers.
 inline void metric_tile(DrawList &out, UiRect bounds, std::string label,
                         std::string value, int label_pixels, int value_pixels,
-                        Tone tone = Tone::Neutral, bool filled = true) {
+                        Tone tone = Tone::Neutral, bool filled = true,
+                        std::optional<UiRect> clip = std::nullopt) {
+  const auto visible =
+      clip ? clipped(bounds, *clip) : std::optional<UiRect>{bounds};
+  if (!visible) return;
   if (filled) {
-    fill(out, bounds, color::surface_secondary);
-    stroke(out, bounds, color::keyline);
+    fill(out, *visible, color::surface_secondary);
+    // The keyline only draws when the tile is fully inside its scroll region —
+    // a clipped stroke reads as a stray edge at the viewport boundary.
+    if (!clip || (visible->x == bounds.x && visible->y == bounds.y &&
+                  visible->width == bounds.width &&
+                  visible->height == bounds.height))
+      stroke(out, bounds, color::keyline);
   }
   const float pad = std::max(4.f, bounds.width * .06f);
   text(out, {bounds.x + pad, bounds.y + 5.f}, std::move(label),
        color::text_muted, label_pixels, bounds.width - 2.f * pad,
-       TextAlign::Left, FontFace::Heading, bounds);
+       TextAlign::Left, FontFace::Heading, visible);
   text(out, {bounds.x + pad, bounds.y + bounds.height * .5f - 1.f},
        std::move(value),
        tone == Tone::Neutral ? color::text_primary : accent(tone),
        value_pixels, bounds.width - 2.f * pad, TextAlign::Left,
-       FontFace::Heading, bounds);
+       FontFace::Heading, visible);
 }
 
 // Compact status pill: tone-colored keyline + centered caps label.
@@ -225,18 +254,10 @@ inline void badge(DrawList &out, UiRect bounds, std::string label, int pixels,
                   Tone tone = Tone::Neutral) {
   fill(out, bounds, color::surface_secondary);
   stroke(out, bounds, accent(tone));
-  text(out, {bounds.x, bounds.y + (bounds.height - pixels) * .5f - 1.f},
-       std::move(label), accent(tone), pixels, bounds.width, TextAlign::Center,
+  text(out, {bounds.x + bounds.width * .5f,
+             bounds.y + (bounds.height - pixels) * .5f - 1.f},
+       std::move(label), accent(tone), pixels, 0.f, TextAlign::Center,
        FontFace::Heading, bounds);
-}
-
-// Rectangle intersection shared by the clipped helpers below.
-[[nodiscard]] inline std::optional<UiRect> clipped(UiRect a, UiRect b) {
-  const float x = std::max(a.x, b.x), y = std::max(a.y, b.y);
-  const float r = std::min(a.x + a.width, b.x + b.width),
-              bottom = std::min(a.y + a.height, b.y + b.height);
-  if (r <= x || bottom <= y) return std::nullopt;
-  return UiRect{x, y, r - x, bottom - y};
 }
 
 // Label left / value right row — the standard fact line.
@@ -250,7 +271,7 @@ inline void key_value(DrawList &out, UiRect bounds, std::string label,
   text(out, {bounds.x, bounds.y}, std::move(label), color::text_secondary,
        pixels, bounds.width * .48f, TextAlign::Left, FontFace::Interface,
        visible);
-  text(out, {bounds.x, bounds.y}, std::move(value),
+  text(out, {bounds.x + bounds.width, bounds.y}, std::move(value),
        tone == Tone::Neutral ? color::text_primary : accent(tone), pixels,
        bounds.width * .52f, TextAlign::Right, FontFace::Interface, visible);
 }

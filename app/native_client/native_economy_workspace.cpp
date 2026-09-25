@@ -2,6 +2,7 @@
 
 #include "native_ui_layout.hpp"
 #include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -11,10 +12,16 @@
 namespace stellar::native_economy {
 namespace {
 using namespace stellar::native_map;
-constexpr Color ink{231, 243, 252, 255}, muted{157, 184, 209, 255};
-constexpr Color accent{123, 229, 199, 255}, gold{238, 196, 111, 255};
-constexpr Color income{145, 227, 176, 255}, warning{247, 171, 126, 255};
-constexpr Color inset{10, 29, 48, 246}, row{12, 34, 55, 248};
+// Palette comes from the shared theme — no per-workspace colors.
+namespace theme = stellar::native_ui;
+constexpr Color ink = theme::color::text_primary;
+constexpr Color muted = theme::color::text_muted;
+constexpr Color accent = theme::color::selected;
+constexpr Color gold = theme::color::economy;
+constexpr Color income = theme::color::success;
+constexpr Color warning = theme::color::caution;
+constexpr Color inset = theme::color::surface;
+constexpr Color row = theme::color::surface_secondary;
 
 std::optional<UiRect> intersect(UiRect a, UiRect b) {
   const auto x=std::max(a.x,b.x), y=std::max(a.y,b.y);
@@ -184,7 +191,7 @@ NativeEconomyWorkspace::PressTarget NativeEconomyWorkspace::hit(Point point,cons
 core::IndustryPriority NativeEconomyWorkspace::priority_for(PressTarget target) noexcept { return static_cast<core::IndustryPriority>(static_cast<int>(target)-static_cast<int>(PressTarget::Priority0)); }
 
 EconomyCommand NativeEconomyWorkspace::handle(const InputEvent& event,const NativeEconomyView& view,int width,int height) {
-  EconomyCommand command; if(!visible_) return command;
+  EconomyCommand command; if(!visible_) return command; pointer_=event.position;
   const auto layout=EconomyLayout::for_viewport(width,height);
   if(view.campaign_generation!=observed_generation_||view.revision!=observed_revision_||view.player_civilization_id!=observed_observer_) { reset_gesture(); observed_generation_=view.campaign_generation;observed_revision_=view.revision;observed_observer_=view.player_civilization_id; }
   command.view_revision=view.revision;
@@ -243,30 +250,42 @@ void NativeEconomyWorkspace::render(DrawList& out,const NativeEconomyView& view,
   if(!visible_) return; const auto layout=EconomyLayout::for_viewport(width,height); const auto& rows=cache_for(view,layout,width,height); scroll_.sync(rows.content_height,layout.body.height);
   native_ui_style::menu_panel(out,layout.panel); fill(out,layout.body,inset);
   text(out,layout.header,layout.panel,tr("ECONOMY_TITLE","SOVEREIGN TREASURY"),gold,layout.heading_font_pixels);
-  native_ui_style::panel(out,layout.refresh,false,false); text(out,layout.refresh,layout.refresh,tr(view.state==EconomyState::Ready?"ECONOMY_REFRESH":"ECONOMY_RETRY",view.state==EconomyState::Ready?"REFRESH":"RETRY"),accent,layout.small_font_pixels,TextAlign::Center);
-  native_ui_style::panel(out,layout.close,false,false); text(out,layout.close,layout.close,"X",ink,layout.body_font_pixels,TextAlign::Center);
+  theme::button(out,layout.refresh,tr(view.state==EconomyState::Ready?"ECONOMY_REFRESH":"ECONOMY_RETRY",view.state==EconomyState::Ready?"REFRESH":"RETRY"),pointer_,layout.small_font_pixels);
+  theme::button(out,layout.close,"X",pointer_,layout.body_font_pixels);
   const auto unavailable=tr("ECONOMY_UNAVAILABLE_GUIDANCE","Treasury information is unavailable. Retry when the campaign is ready.");
   const auto guidance=view.state==EconomyState::Ready?view.priority_guidance:unavailable;
   const auto notice=notice_.empty()?guidance:notice_+"  |  "+guidance;
   text(out,layout.notice,layout.notice,notice,view.state==EconomyState::Ready?muted:warning,layout.small_font_pixels);
   constexpr std::array<const char*,3> keys{"ECONOMY_POLICY_BALANCED","ECONOMY_POLICY_INFRASTRUCTURE","ECONOMY_POLICY_SHIPBUILDING"};
   constexpr std::array<const char*,3> labels{"BALANCED","INFRASTRUCTURE","SHIPBUILDING"};
-  for(int i=0;i<3;++i) { const bool active=static_cast<int>(view.industry_priority)==i; const bool enabled=view.state==EconomyState::Ready&&!active; native_ui_style::panel(out,layout.priority_buttons[i],false,active); text(out,layout.priority_buttons[i],layout.panel,tr(keys[i],labels[i]),enabled?ink:muted,layout.small_font_pixels,TextAlign::Center); }
+  for(int i=0;i<3;++i) { const bool active=static_cast<int>(view.industry_priority)==i; const bool enabled=view.state==EconomyState::Ready&&!active; theme::button(out,layout.priority_buttons[i],tr(keys[i],labels[i]),pointer_,layout.small_font_pixels,theme::Tone::Economy,active,enabled); }
   for(const auto& r:rows.rows) {
     UiRect box{layout.body.x,layout.body.y+r.y-scroll_.scroll_offset,layout.body.width,r.height};
     if(r.tile) { const auto gap=6.f*layout.scale; const auto tile_width=(layout.body.width-2.f*gap)/3.f; box.x+=static_cast<float>(r.tile_column)*(tile_width+gap);box.width=tile_width; }
     if(const auto visible=intersect(box,layout.body)) {
-      fill(out,*visible,row); const auto color=r.warning?warning:r.income?income:muted;
-      const UiRect label{box.x+8*layout.scale,box.y+6*layout.scale,
-          (r.tile?box.width:box.width*.36f)-16*layout.scale,r.tile?16.f*layout.scale:box.height-12*layout.scale};
-      const UiRect value{box.x+(r.tile?8*layout.scale:box.width*.40f+8*layout.scale),
-          box.y+(r.tile?23.f:7.f)*layout.scale,(r.tile?box.width:box.width*.60f)-16*layout.scale,
-          box.height-(r.tile?28.f:12.f)*layout.scale};
-      text(out,label,layout.body,r.left,muted,layout.small_font_pixels);
-      text(out,value,layout.body,r.right,color,layout.body_font_pixels,TextAlign::Right);
+      if(r.tile) {
+        // KPI cards share the shared metric-tile chrome.
+        theme::metric_tile(out,box,r.left,r.right,layout.small_font_pixels,
+            layout.body_font_pixels,r.warning?theme::Tone::Caution:theme::Tone::Success,true,*visible);
+      } else if(r.right.empty()) {
+        // Heading rows (INCOME / OPERATING COSTS / …) get the shared
+        // section-header rule instead of looking like data rows.
+        theme::section_header(out,{box.x+8.f*layout.scale,box.y+4.f*layout.scale,
+            box.width-16.f*layout.scale,box.height-8.f*layout.scale},r.left,
+            layout.small_font_pixels,r.warning?theme::Tone::Caution:theme::Tone::Neutral,{},layout.body);
+      } else {
+        fill(out,*visible,row); const auto color=r.warning?warning:r.income?income:ink;
+        const UiRect label{box.x+8*layout.scale,box.y+6*layout.scale,
+            box.width*.36f-16*layout.scale,box.height-12*layout.scale};
+        const UiRect value{box.x+box.width*.40f+8*layout.scale,
+            box.y+7.f*layout.scale,box.width*.60f-16*layout.scale,
+            box.height-12.f*layout.scale};
+        text(out,label,layout.body,r.left,muted,layout.small_font_pixels);
+        text(out,value,layout.body,r.right,color,layout.body_font_pixels,TextAlign::Right);
+      }
     }
   }
-  if(const auto thumb=scroll_.thumb(layout.body.height,20.f*layout.scale);thumb.size>0.f) { fill(out,{layout.body.x+layout.body.width-3*layout.scale,layout.body.y,2*layout.scale,layout.body.height},muted); fill(out,{layout.body.x+layout.body.width-3*layout.scale,layout.body.y+thumb.offset,2*layout.scale,thumb.size},accent); }
-  if(focus_>=0) { const std::array<UiRect,5> focusables{layout.refresh,layout.close,layout.priority_buttons[0],layout.priority_buttons[1],layout.priority_buttons[2]}; out.overlay.emplace_back(StrokedRectangle{focusables[static_cast<std::size_t>(focus_)],{160,210,255,255}}); }
+  if(const auto thumb=scroll_.thumb(layout.body.height,20.f*layout.scale);thumb.size>0.f) { fill(out,{layout.body.x+layout.body.width-3*layout.scale,layout.body.y,2*layout.scale,layout.body.height},theme::color::keyline); fill(out,{layout.body.x+layout.body.width-3*layout.scale,layout.body.y+thumb.offset,2*layout.scale,thumb.size},accent); }
+  if(focus_>=0) { const std::array<UiRect,5> focusables{layout.refresh,layout.close,layout.priority_buttons[0],layout.priority_buttons[1],layout.priority_buttons[2]}; theme::focus_ring(out,focusables[static_cast<std::size_t>(focus_)]); }
 }
 } // namespace stellar::native_economy

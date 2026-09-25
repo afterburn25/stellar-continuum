@@ -7853,9 +7853,15 @@ class NativeCampaign final {
       zoom_factor << std::fixed << std::setprecision(1)
                   << camera_.pixels_per_world / fitted_pixels_per_world_;
       const auto zoom_bounds=map_zoom_bounds(width,height);
+      // A zoom band name orients the player better than the raw factor —
+      // it mirrors the same thresholds the map uses to gate label density.
+      const double relative_zoom=camera_.pixels_per_world/fitted_pixels_per_world_;
+      const std::string band=relative_zoom>=8.?tr("HUD_ZOOM_BAND_LOCAL","LOCAL"):
+          relative_zoom>=2.?tr("HUD_ZOOM_BAND_SECTOR","SECTOR"):
+          tr("HUD_ZOOM_BAND_OVERVIEW","OVERVIEW");
       out.overlay.emplace_back(Text{
           {zoom_bounds.x, zoom_bounds.y + 2.f * layout.scale},
-          trf("HUD_MAP_ZOOM", {zoom_factor.str()}, "Map zoom {0}x"),
+          trf("HUD_MAP_ZOOM", {zoom_factor.str()}, "Map zoom {0}x")+"  ·  "+band,
           {184, 223, 239, 255}, layout.metric_font_pixels,
           zoom_bounds.width, zoom_bounds});
     }
@@ -7905,6 +7911,12 @@ class NativeCampaign final {
         fill(out,{legend_lane.x+legend_lane.width-4.f*s,legend_lane.y,4.f*s,4.f*s},{205,222,245,255});
         out.overlay.emplace_back(Line{{legend_lane.x+4.f*s,legend_lane.y+2.f*s},{legend_lane.x+legend_lane.width-4.f*s,legend_lane.y+2.f*s},{49,74,108,230}});
         label(tr("MAP_LEGEND_LANE","Charted lane"));
+        // Route previews draw green when the command is available and amber
+        // when it is not — show both halves of the same vocabulary.
+        const auto route=glyph_box(16.f*s);
+        out.overlay.emplace_back(Line{{route.x,route.y+2.f*s},{route.x+route.width*.5f,route.y+2.f*s},{102,232,164,230}});
+        out.overlay.emplace_back(Line{{route.x+route.width*.5f,route.y+2.f*s},{route.x+route.width,route.y+2.f*s},{255,190,112,230}});
+        label(tr("MAP_LEGEND_ROUTE","Planned route"));
         fill(out,glyph_box(13.f*s),territory);
         label(tr("MAP_LEGEND_TERRITORY","Empire territory"));
         fill(out,glyph_box(10.f*s),{102,232,164,55});
@@ -9141,7 +9153,7 @@ class NativeCampaign final {
     if(map_legend_collapsed_)return toggle;
     const auto scale=NativeUiLayout::for_viewport(width,height).scale;
     return {toggle.x,toggle.y,toggle.width,
-            toggle.height+6.f*17.f*scale+8.f*scale};
+            toggle.height+7.f*17.f*scale+8.f*scale};
   }
   [[nodiscard]] bool map_legend_visible(int width,int height) const {
     return map_hud_visible()&&!system_workspace_.visible()&&
