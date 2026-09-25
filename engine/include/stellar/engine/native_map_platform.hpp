@@ -162,6 +162,10 @@ class Window final {
   // Opaque OS handle (HWND on Windows, nullptr elsewhere) for platform
   // accessibility bridging. Read-only; the window retains ownership.
   [[nodiscard]] void *native_window_handle() const noexcept;
+  // Display names of the pads occupying the fixed slots — one entry per
+  // slot, empty for a free slot. Rebind UIs show these beside
+  // InputBinding::device pins instead of bare slot numbers.
+  [[nodiscard]] std::vector<std::string> gamepad_names() const;
   // Owner-thread operations. Driver rejection is reported to the host's
   // transactional preview controller; no requested setting is reported saved.
   void set_display_mode(WindowDisplayMode mode,int width=0,int height=0,float refresh_hz=0);

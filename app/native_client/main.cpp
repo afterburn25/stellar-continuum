@@ -9632,6 +9632,10 @@ int main(int argc,char **argv){
     const auto controls_path=settings_path.parent_path()/"galaxy-controls.json";
     campaign.load_user_bindings(controls_path);
     settings_hub.set_input_mapper(&campaign.input_mapper(),"GALAXY","GALAXY_PAD");
+    settings_hub.set_pad_name_lookup([&window](int slot){
+      const auto names=window.gamepad_names();
+      return slot>=0&&slot<static_cast<int>(names.size())?names[static_cast<std::size_t>(slot)]:std::string{};
+    });
     settings_hub.set_bindings_persist([&campaign,&controls_path]{
       const auto text=campaign.input_mapper().save_contexts();
       try {

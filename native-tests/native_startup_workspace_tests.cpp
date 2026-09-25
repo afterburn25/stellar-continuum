@@ -290,12 +290,15 @@ void menu_hover_feedback(){
     const auto pad_row=mapper.bindings("quicksave");
     require(pad_row[0].device<0,"captured pad binding was not a wildcard");
     const int persists_before_pin=persists;
+    // A connected-pad name lookup makes the pin notice name the hardware.
+    hub.set_pad_name_lookup([](int slot){
+      return slot==0?std::string("Test Pad"):std::string{};});
     auto dkey=[&]{
       InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key='d';
       return hub.handle(ev,w,h);};
     require(dkey()&&mapper.bindings("quicksave")[0].device==0,"D did not pin the binding to pad 1");
     require(hub.focused_label()=="Quicksave: Pad 1 Btn 7","label did not show the pinned pad");
-    require(hub.take_notice()=="Pad device: controller 1","pin notice missing");
+    require(hub.take_notice()=="Pad device: Test Pad","pin notice did not name the pad");
     require(persists==persists_before_pin+1,"pin did not persist");
     for(int slot=1;slot<4;++slot)require(dkey()&&mapper.bindings("quicksave")[0].device==slot,
             "D did not advance the pad pin");

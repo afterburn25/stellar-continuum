@@ -1823,7 +1823,8 @@
     "SETTINGS_ACTION_MAP_PAN_Y": "Map pan Y",
     "SETTINGS_ACTION_MAP_ZOOM": "Map zoom",
     "SETTINGS_CONTROLS_DEVICE_ANY": "Pad device: any controller",
-    "SETTINGS_CONTROLS_DEVICE_PINNED": "Pad device: controller {0}",
-    "SETTINGS_CONTROLS_DEVICE": "D / right-click — pin a pad binding to one controller"
+    "SETTINGS_CONTROLS_DEVICE_PINNED": "Pad device: {0}",
+    "SETTINGS_CONTROLS_DEVICE": "D / right-click — pin a pad binding to one controller",
+    "SETTINGS_CONTROLS_PAD_LABEL": "controller {0}"
   }
 }

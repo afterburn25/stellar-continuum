@@ -449,6 +449,14 @@ float Window::display_refresh_hz()const{
   const auto *mode=SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(storage_->window));
   return mode&&std::isfinite(mode->refresh_rate)&&mode->refresh_rate>1.f?mode->refresh_rate:60.f;
 }
+std::vector<std::string> Window::gamepad_names()const{
+  std::vector<std::string> names(engine::kGamepadDeviceCount);
+  for(int i=0;i<engine::kGamepadDeviceCount;++i)
+    if(auto* pad=storage_->gamepads[static_cast<std::size_t>(i)])
+      if(const char* name=SDL_GetGamepadName(pad))
+        names[static_cast<std::size_t>(i)]=name;
+  return names;
+}
 void *Window::native_window_handle()const noexcept{
 #ifdef _WIN32
   return SDL_GetPointerProperty(SDL_GetWindowProperties(storage_->window),

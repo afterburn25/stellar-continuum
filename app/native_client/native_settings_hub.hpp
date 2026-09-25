@@ -44,6 +44,10 @@ public:
                         std::string axis_context_name={}){
     mapper_=mapper;context_name_=std::move(context_name);axis_context_name_=std::move(axis_context_name);
   }
+  // Optional hardware lookup — slot index → connected pad's display name
+  // ("" when the slot is free or unnamed). Pin notices name the pad when
+  // known and fall back to "controller N" otherwise.
+  void set_pad_name_lookup(std::function<std::string(int)> lookup){pad_name_lookup_=std::move(lookup);}
   // Invoked after every successful rebind so the owner persists
   // save_contexts() wherever it keeps settings files.
   void set_bindings_persist(std::function<void()> persist){persist_=std::move(persist);}
@@ -351,9 +355,14 @@ private:
     const int target=first->device>=stellar::engine::kGamepadDeviceCount-1?-1:first->device+1;
     for(auto& b:bound)if(pad(b))b.device=target;
     mapper_->rebind(rows[static_cast<std::size_t>(focus_)]->name,std::move(bound));
+    std::string pad_label;
+    if(target>=0){
+      if(pad_name_lookup_)pad_label=pad_name_lookup_(target);
+      if(pad_label.empty())
+        pad_label=trf("SETTINGS_CONTROLS_PAD_LABEL","controller {0}",{std::to_string(target+1)});
+    }
     notice_=target<0?tr("SETTINGS_CONTROLS_DEVICE_ANY","Pad device: any controller")
-                   :trf("SETTINGS_CONTROLS_DEVICE_PINNED","Pad device: controller {0}",
-                        {std::to_string(target+1)});
+                   :trf("SETTINGS_CONTROLS_DEVICE_PINNED","Pad device: {0}",{std::move(pad_label)});
     if(persist_)persist_();
     return true;
   }
@@ -372,6 +381,6 @@ private:
   bool visible_{},controls_{};Point pointer_{};int focus_{-1};Open open_;std::function<bool()> child_visible_;
   const stellar::engine::LocalizationTable* locale_{};
   stellar::engine::InputMapper* mapper_{};std::string context_name_{"GALAXY"},axis_context_name_;
-  std::function<void()> persist_{};int capture_{-1};std::string notice_;
+  std::function<void()> persist_{};std::function<std::string(int)> pad_name_lookup_;int capture_{-1};std::string notice_;
 };
 }
