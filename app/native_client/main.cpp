@@ -7926,10 +7926,11 @@ class NativeCampaign final {
             session_->frame().clock().simulation_days()) + tr("HUD_TIME_RATE","  |  1x = 1 hour/sec"),
         {139, 174, 194, 255}, static_cast<int>(10.f * layout.scale),
         layout.day_text.width, layout.day_text});
-    if(!system_workspace_.visible()&&!research_workspace_.visible()&&
-       !colony_workspace_.visible()&&!diplomacy_workspace_.visible()&&
-       !shipyard_workspace_.visible()&&!construction_workspace_.visible()&&
-       !economy_workspace_.visible()&&!supply_workspace_.visible()&&!menu_){
+    // Map chrome yields to any modal surface — the HUD-visibility rule
+    // already covers workspaces, the roster, notifications, chronicle,
+    // missions, battle and settings while tolerating the inspection card
+    // and fleet detail panel (the readout shifts right for those).
+    if(map_hud_visible()){
       std::ostringstream zoom_factor;
       zoom_factor << std::fixed << std::setprecision(1)
                   << camera_.pixels_per_world / fitted_pixels_per_world_;
