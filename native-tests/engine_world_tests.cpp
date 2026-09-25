@@ -200,6 +200,33 @@ int main() {
         }
         check(rejected, "checksum rejects corrupted snapshot");
 
+        // component_hashes(): one section per registered type present —
+        // mutating a component moves only its own section, unregistered
+        // components (Health) are invisible like snapshot(), and the
+        // empty world reports no sections.
+        const auto before = world.component_hashes();
+        check(before.size() == 2, "one section per registered type");
+        std::uint64_t position_hash = 0, name_hash = 0;
+        for (const auto& [name, hash] : before) {
+            if (name == "position") position_hash = hash;
+            if (name == "name") name_hash = hash;
+        }
+        check(position_hash != 0 && name_hash != 0,
+              "registered sections carry hashes");
+        world.get<Position>(planet)->x = 9.0;
+        const auto after = world.component_hashes();
+        for (const auto& [name, hash] : after) {
+            if (name == "position")
+                check(hash != position_hash,
+                      "edited component moves its own section");
+            if (name == "name")
+                check(hash == name_hash,
+                      "untouched component keeps its section hash");
+        }
+        check(World{}.component_hashes().empty(),
+              "empty world has no sections");
+        check(after.size() == before.size(), "section set is stable");
+
         // Determinism: identical worlds produce identical bytes.
         World again;
         register_codecs(again);
@@ -211,6 +238,18 @@ int main() {
         again.set_parent(p2, s2);
         again.bind_legacy(s2, 7);
         check(again.snapshot() == bytes, "snapshot bytes are deterministic");
+        // And identical worlds produce identical section hashes (the
+        // replay verifier relies on it — world was edited above, so
+        // compare again's sections against the pre-edit snapshot state).
+        World pristine;
+        register_codecs(pristine);
+        const EntityId s3 = pristine.create();
+        const EntityId p3 = pristine.create();
+        pristine.add(s3, Name{"sol"});
+        pristine.add(p3, Position{3.25, -1.5});
+        pristine.add(p3, Name{"terra"});
+        check(pristine.component_hashes() == again.component_hashes(),
+              "section hashes are deterministic");
     }
     // Scene components: spawn_scene builds the full component set,
     // find_entity_by_name resolves handles, and the file-backed snapshot
