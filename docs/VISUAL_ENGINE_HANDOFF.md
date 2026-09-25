@@ -43,7 +43,16 @@ m.surface_response->cloud_albedo = .7f;     // [0,1] visible deck brightness
 m.surface_response->cloud_offset = {.1f,0}; // UV drift, each |≤2|
 m.terminator_wrap = 0.4f;                   // [0,1] wrap-diffuse softening
 m.limb_darkening = 0.6f;                    // [0,1] N.V radiance falloff
+m.band_shear = -0.2f;                       // [-0.5,0.5] latitude-weighted
+                                            // longitude shear (giants)
 ```
+
+`band_shear` is material-level, not tied to `surface_response`: every
+equirect surface sample — albedo, normal, properties, cloud deck — shifts
+`u` by `s·cos(2πv)`. The profile is equator-symmetric and zero-mean, so
+authored maps stay registered and net longitude is preserved; with a
+nonzero `cloud_offset` the deck additionally shears against the surface
+underneath it.
 
 Per-instance distance culling lives on `MeshInstance3D`:
 
@@ -186,7 +195,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `emissive`, `emissive_strength`, `emissive_r/g/b`, `night_emissive`,
 `environment`, `environment_strength`, `alpha_cutout`, `uv_tile_x/y`,
 `atmo_strength/power/night/r/g/b`, `range` (per-entity
-`visible_range`), `terminator_wrap`, `limb_darkening`, `lods` (array of
+`visible_range`), `terminator_wrap`, `limb_darkening`, `bandShear`
+([-0.5,0.5]), `lods` (array of
 mesh specs, ≤ 8) with `lodPixels`, and a `surface`
 block —
 `{normal, properties, cloud, normalStrength, relief, cloudOpacity,
@@ -218,7 +228,8 @@ path/tint/strength/night gate, environment path/strength, alpha cutout,
 UV tiling, atmosphere tint/strength/power/night floor, visible range,
 surface maps (normal/properties/cloud), surface scalars (normal
 strength/relief), cloud deck (opacity/albedo/offset), terminator wrap,
-limb darkening, mesh LOD chain (csv specs) and LOD switch size.
+limb darkening, band shear, mesh LOD chain (csv specs) and LOD switch
+size.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range),
 shadow map (extent/distance/depth/strength/bias/resolution).
@@ -258,7 +269,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or
   aerial perspective.
 - The cloud deck is a texture-space composite — no volumetric cloud
-  shells, self-shadowing or gas-giant banding yet.
+  shells or self-shadowing; `band_shear` is a single-cosine longitude
+  warp, not per-band zonal winds or animated turbulence.
 - Limb darkening is the single-coefficient linear law — no quadratic
   two-term coefficients or wavelength-dependent profiles.
 - One shared equirect env map per material — no probe grid.

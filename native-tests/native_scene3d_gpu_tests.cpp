@@ -669,6 +669,30 @@ int main(int argc,char** argv)try{
     check(channel(*no_switch,198,160,0)>150,"LOD switched while above the pixel threshold");
     std::cout<<"lod_gpu=screen_size_pick_stat_passed\n";
   }
+  {
+    // Differential rotation: a longitude shear weighted by latitude —
+    // cos(2pi*v) is zero-mean and equator-symmetric, so the equator shifts
+    // one way while the polar rows shift the other on a striped sphere.
+    std::vector<std::uint8_t> stripes(64*64*4);
+    for(int px=0;px<64*64;++px){const bool left=(px%64)<32;stripes[px*4+0]=left?230:30;stripes[px*4+1]=left?30:60;stripes[px*4+2]=left?20:230;stripes[px*4+3]=255;}
+    Material3D striped;striped.ambient=1;striped.diffuse=0;striped.texture=RgbaImage::create(64,64,stripes);
+    MeshInstance3D giant{Mesh3D::uv_sphere(64,32),{},{},.85f,striped};
+    const auto uniform_bands=capture({giant},"bands-flat.png");
+    giant.material.band_shear=.3f;
+    const auto sheared_bands=capture({giant},"bands-sheared.png");
+    // Equator pixel: shear -0.3 at v=.5 pulls the blue half across it.
+    check(channel(*uniform_bands,170,160,2)>150&&channel(*sheared_bands,170,160,0)>150,
+        "Band shear did not displace the equatorial longitude");
+    // Polar-row pixel: +0.3 shear pushes the boundary off the disc limb —
+    // the red half visible here without shear disappears.
+    check(channel(*uniform_bands,150,290,0)>150&&channel(*sheared_bands,150,290,2)>150,
+        "Band shear did not displace polar latitude oppositely");
+    // The disc silhouette survives the warp — a longitude shift cannot
+    // move coverage; points well outside the limb stay background.
+    check(channel(*sheared_bands,160,160,3)==255&&channel(*sheared_bands,10,160,0)==5,
+        "Band shear distorted the disc silhouette");
+    std::cout<<"band_shear_gpu=equator_pole_antishear_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");

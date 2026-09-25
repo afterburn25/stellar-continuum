@@ -119,6 +119,11 @@ int main()try{
   rejects([&]{auto i=instance;i.material.limb_darkening=-.1f;(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.limb_darkening=.6f;const auto darkened=Scene3D::create(camera,{i});
    check(close(darkened->instances()[0].material.limb_darkening,.6f),"Limb darkening did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.band_shear=.6f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_shear=-.6f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_shear=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.band_shear=-.25f;const auto sheared=Scene3D::create(camera,{i});
+   check(close(sheared->instances()[0].material.band_shear,-.25f),"Band shear did not survive scene creation");}
   {PointLight3D light;light.position={0,0,1};light.intensity=2;light.range=50;
    const auto lit=Scene3D::create(camera,{instance},{0,0,1},{light});
    check(lit->point_lights().size()==1,"Scene dropped its point light");}

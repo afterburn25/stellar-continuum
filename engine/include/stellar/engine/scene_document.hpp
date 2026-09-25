@@ -213,6 +213,9 @@ struct Scene3dEntity {
   // Linear limb darkening [0,1] for self-luminous discs (stars, hot
   // bodies); 0 keeps a uniform disc.
   float limb_darkening{0.f};
+  // Gas-giant differential rotation: latitude-weighted longitude shear
+  // of every surface map sample, UV units [-0.5,0.5]; 0 = rectilinear.
+  float band_shear{0.f};
   // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
   // coarsest-first. lod_meshes[i] draws once the projected bounding
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).

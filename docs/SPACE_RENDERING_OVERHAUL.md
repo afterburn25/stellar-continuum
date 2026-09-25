@@ -88,9 +88,10 @@ same document headless-tested.
    and under the atmosphere rim, `terminator_wrap` softens the
    day/night edge across key/fill/point lights, and `limb_darkening`
    gives self-luminous bodies the photosphere's edge falloff.
-   Remaining: the deck is
-   a texture-space composite — no volumetric cloud shells, cloud
-   self-shadowing or gas-giant banding.
+   `band_shear` (latitude-weighted longitude warp, differential rotation)
+   landed on top. Remaining: the deck is
+   a texture-space composite — no volumetric cloud shells or cloud
+   self-shadowing; banding is a single cosine, not zonal winds.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes tint/texture/opacity/double_sided

@@ -691,6 +691,7 @@ int main() {
         turret.cloud_offset_y = 0.2f;
         turret.terminator_wrap = 0.5f;
         turret.limb_darkening = 0.6f;
+        turret.band_shear = -0.3f;
         turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
         turret.lod_pixels = 64.f;
         doc.entities.push_back(turret);
@@ -745,7 +746,8 @@ int main() {
                   ms->normal_strength == 0.9f &&
                   ms->cloud_opacity == 0.7f && ms->cloud_albedo == 0.8f &&
                   ms->cloud_offset_x == 0.1f && ms->cloud_offset_y == 0.2f &&
-                  ms->terminator_wrap == 0.5f && ms->limb_darkening == 0.6f,
+                  ms->terminator_wrap == 0.5f && ms->limb_darkening == 0.6f &&
+                  ms->band_shear == -0.3f,
               "spawn_scene3d materialsurface component");
         check(world3.get<MaterialSurface>(ship_e) == nullptr,
               "defaults do not attach a surface component");
@@ -812,6 +814,7 @@ int main() {
                       rms->cloud_albedo == 0.8f &&
                       rms->terminator_wrap == 0.5f &&
                       rms->limb_darkening == 0.6f &&
+                      rms->band_shear == -0.3f &&
                       rms->cloud_offset_y == 0.2f,
                   "materialsurface codec round-trips");
             const auto *rml = restored.get<MeshLods>(*re_turret);
@@ -852,7 +855,8 @@ int main() {
                   out.entities[1].cloud_albedo == 0.8f &&
                   out.entities[1].cloud_offset_y == 0.2f &&
                   out.entities[1].terminator_wrap == 0.5f &&
-                  out.entities[1].limb_darkening == 0.6f,
+                  out.entities[1].limb_darkening == 0.6f &&
+                  out.entities[1].band_shear == -0.3f,
               "scene3d_from_world exports surface response");
         check(out.entities[1].lod_meshes.size() == 2 &&
                   out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&

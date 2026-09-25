@@ -315,7 +315,8 @@ struct Shell {
       hit3_atmotint{}, hit3_exposure{}, hit3_bloom{}, hit3_grade{},
       hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{},
       hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
-      hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{};
+      hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
+      hit3_bandshear{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2175,6 +2176,11 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 1.f && a <= 4096.f) { next.lod_pixels = a; valid = true; }
           break;
+  case 60:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= -0.5f && a <= 0.5f) { next.band_shear = a; valid = true; }
+          break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2225,7 +2231,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                             shell.hit3_termwrap =
                                                 shell.hit3_limbdark =
                                                     shell.hit3_lods =
-                                                        shell.hit3_lodpixels = {};
+                                                        shell.hit3_lodpixels =
+                                                            shell.hit3_bandshear = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2375,6 +2382,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       }
       inst.material.terminator_wrap = e.terminator_wrap;
       inst.material.limb_darkening = e.limb_darkening;
+      inst.material.band_shear = e.band_shear;
       if (e.atmo_strength != 0.f)
         inst.material.atmosphere =
             Atmosphere3D{{e.atmo_r, e.atmo_g, e.atmo_b}, e.atmo_strength,
@@ -2651,6 +2659,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_lodpixels, "lodPixels",
         entity ? std::to_string(entity->lod_pixels) : "", ed(59),
         "px diameter for LOD 0->1 - halves per level 1..4096");
+  field(shell.hit3_bandshear, "bandShear",
+        entity ? std::to_string(entity->band_shear) : "", ed(60),
+        "latitude uv shear -0.5..0.5 - gas-giant banding");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -6690,6 +6701,8 @@ int main(int argc, char **argv) {
             }
             else if (shell.hit3_lodpixels.contains(event.position) && se)
               edit3(59, std::to_string(se->lod_pixels));
+            else if (shell.hit3_bandshear.contains(event.position) && se)
+              edit3(60, std::to_string(se->band_shear));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

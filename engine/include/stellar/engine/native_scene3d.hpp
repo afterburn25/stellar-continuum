@@ -188,6 +188,12 @@ struct Material3D {
   // the body's emitted and reflected radiance; the additive atmosphere
   // rim stays on top. [0,1]; 0 keeps a uniform disc.
   float limb_darkening{};
+  // Differential rotation for banded bodies (gas giants): a latitude-
+  // weighted longitude shear `u += s·cos(2πv)` applied to every equirect
+  // surface sample — authored bands bow symmetrically equator vs poles,
+  // zero-mean so net longitude registration is preserved. UV units,
+  // [-0.5,0.5]; 0 keeps rectilinear sampling.
+  float band_shear{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;

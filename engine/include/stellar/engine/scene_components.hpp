@@ -186,6 +186,9 @@ struct MaterialSurface {
   float normal_strength{0.35f}, relief{0.f}, cloud_opacity{0.f};
   float cloud_albedo{0.f}, cloud_offset_x{0.f}, cloud_offset_y{0.f};
   float terminator_wrap{0.f}, limb_darkening{0.f};
+  // Latitude-weighted longitude shear of surface maps (differential
+  // rotation / gas-giant banding), [-0.5,0.5] UV units.
+  float band_shear{0.f};
   std::string normal_map, properties_map, cloud_map;
 };
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim

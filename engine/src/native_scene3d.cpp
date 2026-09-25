@@ -63,7 +63,8 @@ void validate_instance(const MeshInstance3D& i){
   (void)normalized(i.rotation);const auto& m=i.material;
   if(!bounded(m.ambient,1)||m.ambient<0||!bounded(m.diffuse,1)||m.diffuse<0||
      !bounded(m.opacity,1)||m.opacity<0||!bounded(m.dark_side_strength,16)||m.dark_side_strength<0||
-     !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0)
+     !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0||
+     !bounded(m.band_shear,.5f))
     throw std::invalid_argument("3D material lighting and opacity must be finite and bounded.");
   if(i.lod_meshes.size()>8||!bounded(i.lod_pixels,4096)||i.lod_pixels<1.f)
     throw std::invalid_argument("3D instance LOD chains allow at most 8 levels with a 1..4096px switch.");
