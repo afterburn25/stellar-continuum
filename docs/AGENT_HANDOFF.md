@@ -1383,6 +1383,9 @@ focus-ring surface owns input (`ui_owns_pad_input` mirrors the
 pad→mapper gameplay gate; rebind capture exempts itself) or while a
 navigable surface is merely showing and the pressed button is unbound
 — bound buttons keep their gameplay meaning, so user bindings win.
+`native_startup_entry.cpp` applies the same translation on the startup
+screens (always-on — no gameplay context exists pre-campaign — with
+rebind capture still exempt), so a pad-only player can reach New Game.
 The navigation smoke covers dpad arming/east back-out on the missions
 board and the bound-button policy; `native_client_input` pins the
 translation table. Open: stick-driven nav (axes never translate),

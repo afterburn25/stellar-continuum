@@ -1,5 +1,6 @@
 #include "native_startup_entry.hpp"
 #include "native_audio_settings.hpp"
+#include "native_pad_input.hpp"
 #include "native_settings_hub.hpp"
 #include "native_voice_settings.hpp"
 #include "native_general_settings.hpp"
@@ -461,20 +462,34 @@ StartupEntryResult run_native_startup_entry(Window &window,
       }
     };
     if (!input.renderable()) {
-      for (const auto &event : input.events)
+      for (const auto &raw : input.events) {
+        const InputEvent event=[&]{
+          if(raw.type==InputEventType::GamepadPressed&&
+             !(config.settings_hub&&config.settings_hub->capturing()))
+            if(auto nav=stellar::native_client::pad_navigation_event(raw))return *nav;
+          return raw;}();
         if (!route_settings(event,input.drawable_width,input.drawable_height)) {
           const int focus_before=workspace.focused();
           (void)workspace.handle(event, input.drawable_width,
                                     input.drawable_height, measure);
           if(workspace.focused()!=focus_before)announce_focus();
         }
+      }
       window.set_text_input(workspace.wants_text_input()&&
           !(config.general_settings&&config.general_settings->visible())&&!(config.settings_hub&&config.settings_hub->visible()));
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
       continue;
     }
     bool exit{};
-    for (const auto &event : input.events) {
+    for (const auto &raw : input.events) {
+      // Pad presses become navigation keys on the startup screens — no
+      // gameplay context exists yet — except while a rebind capture in the
+      // settings hub waits for the raw trigger.
+      const InputEvent event=[&]{
+        if(raw.type==InputEventType::GamepadPressed&&
+           !(config.settings_hub&&config.settings_hub->capturing()))
+          if(auto nav=stellar::native_client::pad_navigation_event(raw))return *nav;
+        return raw;}();
       if(is_developer_shortcut(event)){
         if(config.developer_access&&config.developer_access->eligible()&&workspace.screen()!=StartupScreen::Busy){
           const bool enabled=!config.developer_access->active();
