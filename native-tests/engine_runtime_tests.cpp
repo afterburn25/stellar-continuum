@@ -357,6 +357,30 @@ int main() {
     check(host.paused(), "paused() reports the set state");
   }
 
+  // The journaled 'p' toggles the same pause flag: input after it never
+  // reaches the sim.
+  {
+    ReplayRecorder journal;
+    journal.record(1, "input",
+                   "8,112,0,0,0,0,0,0,0,0,0,0,0,0,0,");  // 'p'
+    journal.record(2, "input",
+                   "8,100,0,0,0,0,0,0,0,0,0,0,0,0,0,");  // 'd'
+    const auto journal_path = root / "pause_journal.json";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(root);
+    opts.frame_limit = 6;
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    int updates = 0;
+    host.on_update = [&](World &, float) { ++updates; };
+    check(host.run() == 0, "journaled pause exits cleanly");
+    check(host.paused(), "journaled 'p' toggles pause on");
+    check(updates <= 1, "the sim steps only until 'p' lands");
+  }
+
   // rng() is a world-carried deterministic stream — same seed, same
   // draws across separate hosts.
   {
