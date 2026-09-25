@@ -318,7 +318,7 @@ struct Shell {
       hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
       hit3_bandshear{}, hit3_bandwaves{}, hit3_orbitbeam{},
       hit3_starkelvin{}, hit3_accretion{}, hit3_fwdscatter{},
-      hit3_volume{}, hit3_lodfade{}, hit3_visfade{};
+      hit3_volume{}, hit3_lodfade{}, hit3_visfade{}, hit3_lodgroup{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2281,6 +2281,29 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 0.f && a <= 1.f) { next.band_waves = a; valid = true; }
           break;
+  case 69: {
+          next.lod_group.clear(); next.lod_proxy.clear();
+          next.lod_proxy_pixels = 16.f;
+          if (shell.scene3_buffer.empty()) { valid = true; break; }
+          std::string part;
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> parts;
+          while (std::getline(csv, part, ';')) parts.push_back(part);
+          if (parts.size() >= 1 && parts.size() <= 3) {
+            valid = parts[0].size() <= 64;
+            next.lod_group = parts[0];
+            if (valid && parts.size() >= 2) {
+              valid = parts[1].size() <= 256;
+              next.lod_proxy = parts[1];
+            }
+            if (valid && parts.size() >= 3) {
+              try { a = std::stof(parts[2]); }
+              catch (const std::exception &) { valid = false; break; }
+              valid = a >= 1.f && a <= 4096.f;
+              next.lod_proxy_pixels = a;
+            }
+          }
+          break; }
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2340,7 +2363,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                                             shell.hit3_fwdscatter =
                                                                                 shell.hit3_volume =
                                                                                     shell.hit3_lodfade =
-                                                                                        shell.hit3_visfade = {};
+                                                                                        shell.hit3_visfade =
+                                                                                            shell.hit3_lodgroup = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2554,6 +2578,11 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         if (auto lod_mesh = scene3_mesh(shell, spec))
           inst.lod_meshes.push_back(std::move(lod_mesh));
       if (inst.lod_meshes.empty()) inst.lod_pixels = 32.f;
+      inst.lod_group = e.lod_group;
+      inst.lod_group_pixels = e.lod_proxy_pixels;
+      // An unresolvable proxy spec drops the collapse, not the group.
+      if (auto proxy_mesh = scene3_mesh(shell, e.lod_proxy))
+        inst.lod_group_proxy = std::move(proxy_mesh);
       inst.material.light_intensity = doc.light_intensity;
       inst.material.linear_light = true;
       // Selected entity highlight: a bright grazing-angle shell marks
@@ -2829,6 +2858,12 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_lodfade, "lodFade",
         entity ? std::to_string(entity->lod_fade) : "", ed(66),
         "screen-door crossfade width 0..0.5 - 0 = hard switch");
+  field(shell.hit3_lodgroup, "lodGroup",
+        entity && !entity->lod_group.empty()
+            ? entity->lod_group + ";" + entity->lod_proxy + ";" +
+                  std::to_string(entity->lod_proxy_pixels)
+            : "", ed(69),
+        "name;proxy spec;px - group collapses to one proxy draw");
   field(shell.hit3_bandshear, "bandShear",
         entity ? std::to_string(entity->band_shear) : "", ed(60),
         "latitude uv shear -0.5..0.5 - gas-giant banding");
@@ -6915,6 +6950,9 @@ int main(int argc, char **argv) {
               edit3(59, std::to_string(se->lod_pixels));
             else if (shell.hit3_lodfade.contains(event.position) && se)
               edit3(66, std::to_string(se->lod_fade));
+            else if (shell.hit3_lodgroup.contains(event.position) && se)
+              edit3(69, se->lod_group + ";" + se->lod_proxy + ";" +
+                            std::to_string(se->lod_proxy_pixels));
             else if (shell.hit3_bandshear.contains(event.position) && se)
               edit3(60, std::to_string(se->band_shear));
             else if (shell.hit3_bandwaves.contains(event.position) && se)

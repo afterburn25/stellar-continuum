@@ -713,6 +713,9 @@ int main() {
         turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
         turret.lod_pixels = 64.f;
         turret.lod_fade = 0.25f;
+        turret.lod_group = "fleet";
+        turret.lod_proxy = "card:4,4";
+        turret.lod_proxy_pixels = 24.f;
         doc.entities.push_back(turret);
         const auto spawned = spawn_scene3d(world3, doc);
         check(spawned.size() == 2, "spawn_scene3d creates all entities");
@@ -776,7 +779,9 @@ int main() {
         check(ml != nullptr && ml->specs.size() == 2 &&
                   ml->specs[0] == "models/turret_mid.obj" &&
                   ml->specs[1] == "models/turret_low.obj" &&
-                  ml->pixels == 64.f && ml->fade == 0.25f,
+                  ml->pixels == 64.f && ml->fade == 0.25f &&
+                  ml->group == "fleet" && ml->proxy == "card:4,4" &&
+                  ml->group_pixels == 24.f,
               "spawn_scene3d meshlods component");
         check(world3.get<MeshLods>(ship_e) == nullptr,
               "no LOD chain does not attach a component");
@@ -865,7 +870,9 @@ int main() {
             const auto *rml = restored.get<MeshLods>(*re_turret);
             check(rml != nullptr && rml->specs.size() == 2 &&
                       rml->specs[1] == "models/turret_low.obj" &&
-                      rml->pixels == 64.f && rml->fade == 0.25f,
+                      rml->pixels == 64.f && rml->fade == 0.25f &&
+                      rml->group == "fleet" && rml->proxy == "card:4,4" &&
+                      rml->group_pixels == 24.f,
                   "meshlods codec round-trips");
             const auto *rsp = restored.get<StarPhotosphere>(*re_turret);
             check(rsp != nullptr && rsp->kelvin == 5800.0,
@@ -942,8 +949,11 @@ int main() {
         check(out.entities[1].lod_meshes.size() == 2 &&
                   out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&
                   out.entities[1].lod_pixels == 64.f &&
-                  out.entities[1].lod_fade == 0.25f,
-              "scene3d_from_world exports the LOD chain");
+                  out.entities[1].lod_fade == 0.25f &&
+                  out.entities[1].lod_group == "fleet" &&
+                  out.entities[1].lod_proxy == "card:4,4" &&
+                  out.entities[1].lod_proxy_pixels == 24.f,
+              "scene3d_from_world exports the LOD chain and group");
 
         // Geometry: box primitive topology + OBJ parse/malformed reject.
         const auto box = stellar::native_map::box_mesh(2.f, 1.f, 1.f);

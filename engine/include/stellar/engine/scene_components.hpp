@@ -264,6 +264,14 @@ struct MeshLods {
   // Screen-door transition width above each threshold [0,0.5];
   // 0 keeps the hard switch.
   float fade{.15f};
+  // Named group proxy — the component counterpart of the entity
+  // document's `lodGroup`/`lodProxy`/`lodProxyPixels` keys. Members of
+  // a named group collapse into a single `proxy` draw (a mesh spec
+  // resolved like `specs`) once the merged bounding sphere projects
+  // below `group_pixels`.
+  std::string group;
+  std::string proxy;
+  float group_pixels{0.f};
 };
 // Host-owned fly-camera state for 3D scene mode, carried on a lazily
 // resolved world entity so F5/F9 snapshots restore the camera too (the

@@ -2610,6 +2610,11 @@ int RuntimeHost::run() {
           for (const auto &spec : ml->specs)
             if (auto lod_mesh = mesh_of(spec)) inst.lod_meshes.push_back(lod_mesh);
           if (inst.lod_meshes.empty()) inst.lod_pixels = 32.f;
+          inst.lod_group = ml->group;
+          inst.lod_group_pixels = ml->group_pixels;
+          // An unresolvable proxy spec drops the collapse, not the group.
+          if (auto proxy = mesh_of(ml->proxy))
+            inst.lod_group_proxy = std::move(proxy);
         }
         inst.material.light_intensity = impl.light3_intensity;
         inst.material.linear_light = true;

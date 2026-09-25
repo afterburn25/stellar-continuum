@@ -189,6 +189,16 @@ submissions, and the streamer charges the paired level's residency only
 while the band is engaged. Low tier and `lod_fade=0` keep the hard
 switch (one draw, zero fade cost).
 
+For whole-cluster zoom-out, `lodGroup`/`lodProxy`/`lodProxyPixels`
+(`MeshLods::group`/`proxy`/`group_pixels`) collapse a named group's
+contributing members into a single view-aligned proxy draw once their
+merged view-space bounding sphere projects below the authored pixel
+size — a fleet or asteroid-field impostor. The first contributing
+member's material shades the proxy, `lod_groups` audits replaced
+members, and emission volumes are excluded (a marched volume cannot
+collapse into a surface proxy). The switch is hard — author the pixel
+threshold small enough that the swap is sub-visible.
+
 A fleet-scale benchmark runs inside `native_scene3d_gpu`: a 1024-ship
 grid spread over a depth sweep submits 60 timed frames and reports
 `fleet3d frames cpu_submit_mean_ms frame_wall_mean_ms draw_calls
@@ -410,7 +420,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   modes yet, and LightingOnly divides by sampled albedo so untextured
   or near-black surfaces clip to black.
 - `visible_range` is distance culling and `lod_meshes` a flat halving
-  chain — no hierarchical LOD trees yet, and shadow casters always take
+  chain; `lodGroup` collapse is a hard switch with the representative
+  member's material (groups should share materials, and members still
+  pay CPU prepare work), and shadow casters always take
   the full mesh (a fading-out instance keeps casting until the cull
   edge — the screen-door mask only applies to the lit draw). Impostor
   cards (`Mesh3D::billboard_card`, `card:w,h`

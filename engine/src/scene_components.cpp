@@ -630,6 +630,12 @@ void register_scene_components(World &world) {
         }
         put_f32(out, m.pixels);
         put_f32(out, m.fade);
+        // Appended fields decode as empty/0 on pre-group payloads.
+        put_u32(out, static_cast<std::uint32_t>(m.group.size()));
+        out.insert(out.end(), m.group.begin(), m.group.end());
+        put_u32(out, static_cast<std::uint32_t>(m.proxy.size()));
+        out.insert(out.end(), m.proxy.begin(), m.proxy.end());
+        put_f32(out, m.group_pixels);
         return out;
       },
       [](const std::vector<std::uint8_t> &b) {
@@ -650,6 +656,21 @@ void register_scene_components(World &world) {
         if (b.size() - at >= 4) {
           const std::uint32_t bits = get_u32(b, at);
           std::memcpy(&m.fade, &bits, 4);
+        }
+        const auto read_string = [&b, &at](std::string &out) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) {
+            at = b.size();
+            return;
+          }
+          out.assign(reinterpret_cast<const char *>(b.data() + at), len);
+          at += len;
+        };
+        read_string(m.group);
+        read_string(m.proxy);
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&m.group_pixels, &bits, 4);
         }
         return m;
       });
@@ -960,8 +981,10 @@ std::vector<EntityId> spawn_scene3d(World &world,
                                s.volume_steps, s.volume_flow,
                                s.volume_distort, s.volume_blend,
                                s.volume_image2, s.volume_occlude});
-    if (!s.lod_meshes.empty())
-      world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels, s.lod_fade});
+    if (!s.lod_meshes.empty() || !s.lod_group.empty())
+      world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels, s.lod_fade,
+                                 s.lod_group, s.lod_proxy,
+                                 s.lod_proxy_pixels});
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
@@ -1092,6 +1115,9 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.lod_meshes = ml->specs;
       s.lod_pixels = ml->pixels;
       s.lod_fade = ml->fade;
+      s.lod_group = ml->group;
+      s.lod_proxy = ml->proxy;
+      s.lod_proxy_pixels = ml->group_pixels;
     }
     if (const auto *g = world.get<GravityScale>(entity))
       s.gravity_scale = g->value;

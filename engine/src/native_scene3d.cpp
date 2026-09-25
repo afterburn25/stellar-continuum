@@ -92,6 +92,10 @@ void validate_instance(const MeshInstance3D& i){
     throw std::invalid_argument("3D instance LOD chains allow at most 8 levels with a 1..4096px switch and a [0,.5] fade.");
   for(const auto& lod:i.lod_meshes)
     if(!lod)throw std::invalid_argument("3D instance LOD meshes must not be null.");
+  if(!i.lod_group.empty()){
+    if(!i.lod_group_proxy||!bounded(i.lod_group_pixels,4096)||i.lod_group_pixels<1.f)
+      throw std::invalid_argument("3D grouped instances require a proxy mesh and a 1..4096px collapse size.");
+  }
   if(m.light_direction)(void)normalized(*m.light_direction);
   for(const auto& l:m.additional_lights){(void)normalized(l.direction);if(!valid(l.color)||l.color.x<0||l.color.y<0||l.color.z<0||l.color.x>4||l.color.y>4||l.color.z>4||!bounded(l.intensity,16)||l.intensity<0)throw std::invalid_argument("Invalid additional light");}
   if(!valid(m.light_color)||m.light_color.x<0||m.light_color.y<0||m.light_color.z<0||

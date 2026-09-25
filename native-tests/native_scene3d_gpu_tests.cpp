@@ -759,6 +759,28 @@ int main(int argc,char** argv)try{
     std::cout<<"impostor_gpu=billboard_facing_passed\n";
   }
   {
+    // Group proxy collapse: two members at +-0.4wu merge into one
+    // bounding sphere r=0.6wu at the origin — 192px projected on the
+    // 320px view. A 200px collapse size swaps both members for a single
+    // view-aligned proxy card covering the merged sphere, so the seam
+    // pixel between the members lights only under the collapse.
+    auto left=a;left.mesh=Mesh3D::uv_sphere(64,32);left.scale=.2f;left.position={-.4f,0,0};
+    auto right=left;right.position={.4f,0,0};
+    const auto proxy=Mesh3D::billboard_card(2.f,2.f);
+    left.lod_group=right.lod_group="fleet";left.lod_group_proxy=right.lod_group_proxy=proxy;
+    left.lod_group_pixels=right.lod_group_pixels=200;
+    const auto collapsed=capture({left,right},"lod-group.png");
+    check(window.scene3d_statistics().lod_groups==2,"Group members were not replaced by the proxy");
+    check(channel(*collapsed,160,160,0)>150,"Collapsed group proxy did not cover the merged sphere");
+    auto tight_left=left;tight_left.lod_group_pixels=10;
+    auto tight_right=right;tight_right.lod_group_pixels=10;
+    const auto separate=capture({tight_left,tight_right},"lod-group-off.png");
+    check(window.scene3d_statistics().lod_groups==0,"Group collapsed above the authored pixel size");
+    check(channel(*separate,160,160,0)==5,"Ungrouped members already covered the seam");
+    check(channel(*separate,96,160,0)>150&&channel(*separate,224,160,0)>150,"Group members lost their own silhouettes");
+    std::cout<<"lod_group_gpu=merged_proxy_collapse_passed\n";
+  }
+  {
     // Differential rotation: a longitude shear weighted by latitude —
     // cos(2pi*v) is zero-mean and equator-symmetric, so the equator shifts
     // one way while the polar rows shift the other on a striped sphere.

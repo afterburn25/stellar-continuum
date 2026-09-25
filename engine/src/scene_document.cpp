@@ -491,6 +491,11 @@ std::string Scene3dDocument::to_json() const {
       item["lodPixels"] = e.lod_pixels;
     }
     if (e.lod_fade != .15f) item["lodFade"] = e.lod_fade;
+    if (!e.lod_group.empty()) {
+      item["lodGroup"] = e.lod_group;
+      if (!e.lod_proxy.empty()) item["lodProxy"] = e.lod_proxy;
+      if (e.lod_proxy_pixels != 16.f) item["lodProxyPixels"] = e.lod_proxy_pixels;
+    }
     items.push_back(std::move(item));
   }
   doc["camera"] = {{"pos", {cam_x, cam_y, cam_z}},
@@ -758,6 +763,15 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.lod_fade = item.value("lodFade", 0.15f);
       if (!(e.lod_fade >= 0.f && e.lod_fade <= 0.5f))
         return fail("lodFade must be in [0,0.5]");
+      e.lod_group = item.value("lodGroup", "");
+      if (e.lod_group.size() > 64)
+        return fail("lodGroup must be a bounded group name");
+      e.lod_proxy = item.value("lodProxy", "");
+      if (e.lod_proxy.size() > 256)
+        return fail("lodProxy must be a bounded mesh spec string");
+      e.lod_proxy_pixels = item.value("lodProxyPixels", 16.0f);
+      if (!(e.lod_proxy_pixels >= 1.f && e.lod_proxy_pixels <= 4096.f))
+        return fail("lodProxyPixels must be in [1,4096]");
       scene.entities.push_back(std::move(e));
     }
     if (doc.contains("camera")) {

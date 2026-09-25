@@ -377,6 +377,41 @@ struct Scene3DRenderer::Storage {
     const auto& lod_camera=view.scene->camera();
     const float lod_focal=lod_camera.projection==Projection3D::Orthographic?view.destination.height/std::max(lod_camera.orthographic_height,1e-6f)
       :view.destination.height/std::max(2.f*std::tan(lod_camera.vertical_fov_radians*.5f),1e-6f);
+    // Group proxy collapse: each named group accumulates the merged
+    // view-space bounding sphere of its contributing members (frustum-
+    // and range-culled members neither contribute nor collapse). When
+    // the merged sphere's projected diameter drops below the authored
+    // lod_group_pixels the whole group renders as one view-aligned
+    // proxy draw — a fleet/cluster impostor for extreme zoom-out.
+    // Volume proxies are excluded: a marched volume cannot collapse
+    // into a surface proxy.
+    struct GroupBounds{double x,y,z,r;const MeshInstance3D*rep{};std::size_t count{};bool collapse{};};
+    std::map<std::string,GroupBounds> groups;
+    std::unordered_map<const MeshInstance3D*,GroupBounds*> group_of;
+    for(const auto& instance:view.scene->instances()){
+      if(instance.lod_group.empty()||!instance.lod_group_proxy||instance.lod_group_pixels<=0.f)continue;
+      if(instance.material.surface_effect&&instance.material.surface_effect->volume_depth>0.f)continue;
+      const auto prepared=prepare_instance3d(lod_camera,instance,view.destination.width/view.destination.height);
+      if(!prepared.visible)continue;
+      const double gx=prepared.model_view.values[12],gy=prepared.model_view.values[13],gz=prepared.model_view.values[14];
+      const double radius=static_cast<double>(instance.scale)*instance.mesh->bounding_radius();
+      if(instance.visible_range>0.f&&std::sqrt(gx*gx+gy*gy+gz*gz)>static_cast<double>(instance.visible_range)+radius)continue;
+      auto&g=groups[instance.lod_group];
+      if(g.count++==0){g.x=gx;g.y=gy;g.z=gz;g.r=radius;g.rep=&instance;}
+      else{
+        const double dx=gx-g.x,dy=gy-g.y,dz=gz-g.z;const double d=std::sqrt(dx*dx+dy*dy+dz*dz);
+        if(d+g.r<=radius+1e-9){g.x=gx;g.y=gy;g.z=gz;g.r=radius;}
+        else if(d+radius>g.r+1e-9){const double nr=(d+g.r+radius)*.5;const double k=(nr-g.r)/d;
+          g.x+=dx*k;g.y+=dy*k;g.z+=dz*k;g.r=nr;}
+      }
+      group_of[&instance]=&g;
+    }
+    for(auto&[group_name,g]:groups){
+      const double dist=std::sqrt(g.x*g.x+g.y*g.y+g.z*g.z);
+      const float diameter=2.f*static_cast<float>(g.r)*lod_focal/
+        (lod_camera.projection==Projection3D::Orthographic?1.f:static_cast<float>(std::max(dist,1e-4)));
+      g.collapse=diameter<g.rep->lod_group_pixels;
+    }
     for(const auto& instance:view.scene->instances()){
       auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
       if(!prepared.visible){++stats.culled_instances;continue;}
@@ -439,6 +474,35 @@ struct Scene3DRenderer::Storage {
       const bool inside_volume=instance.material.surface_effect&&
         instance.material.surface_effect->volume_depth>0.f&&
         dist<instance.scale*instance.mesh->bounding_radius();
+      if(const auto it=group_of.find(&instance);it!=group_of.end()&&it->second->collapse){
+        ++stats.lod_groups;
+        if(it->second->rep!=&instance)continue;
+        // The representative member carries the group's proxy draw: a
+        // view-aligned card at the merged sphere's centre, scaled to
+        // cover it, shaded with the representative's material. The
+        // identity rotation is the same collapse `billboard` applies —
+        // a `card:` proxy always presents its face.
+        const GroupBounds&g=*it->second;
+        const auto& proxy_mesh=instance.lod_group_proxy;
+        const double ps=g.r/std::max(static_cast<double>(proxy_mesh->bounding_radius()),1e-9);
+        PreparedInstance3D proxy_t{};
+        for(int c=0;c<3;++c)proxy_t.model_view.values[c*4+c]=static_cast<float>(ps);
+        proxy_t.model_view.values[12]=static_cast<float>(g.x);
+        proxy_t.model_view.values[13]=static_cast<float>(g.y);
+        proxy_t.model_view.values[14]=static_cast<float>(g.z);
+        proxy_t.model_view.values[15]=1.f;
+        proxy_t.model_view_projection=multiply(projection3d_matrix(lod_camera,view.destination.width/view.destination.height),proxy_t.model_view);
+        proxy_t.camera_depth=static_cast<float>(-g.z);proxy_t.visible=true;
+        draws.push_back({&instance,proxy_t,geometry(proxy_mesh),surface,
+          optical?texture(optical->surface):surface,
+          optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
+          response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,
+          instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
+          instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
+          pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
+          pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),1.f});
+        continue;
+      }
       draws.push_back({&instance,facing(drawn_mesh),geometry(drawn_mesh),surface,
         optical?texture(optical->surface):surface,
         optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
@@ -801,7 +865,7 @@ struct Scene3DRenderer::Storage {
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
 Scene3DRenderer::~Scene3DRenderer()=default;
 void Scene3DRenderer::prepare(const DrawList& list){
-  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=s.stats.visible_fades=0;
+  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=s.stats.visible_fades=s.stats.lod_groups=0;
   for(const auto& c:list.world)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   for(const auto& c:list.overlay)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");

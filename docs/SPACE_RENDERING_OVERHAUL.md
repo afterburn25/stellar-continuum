@@ -124,7 +124,14 @@ same document headless-tested.
     levels, shared streamer/draw selection, `lod_instances` stat) landed
     later, along with the `lod_fade` screen-door band, `card:w,h`
     billboard impostor meshes and the `visible_fade` dithered range
-    fade-out — still no hierarchical LOD trees.
+    fade-out. `lodGroup`/`lodProxy`/`lodProxyPixels` add the
+    hierarchical step: members of a named group merge into one
+    view-space bounding sphere and collapse to a single view-aligned
+    proxy draw once it projects below the authored pixel size — a
+    fleet/cluster impostor for extreme zoom-out, audited by
+    `lod_groups`. The collapse is a hard switch (no dithered
+    transition) and the proxy shades with the representative member's
+    material, so groups should share materials.
 
 ## Top wins (ordered)
 

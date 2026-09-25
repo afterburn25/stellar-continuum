@@ -452,6 +452,9 @@ int main() {
     cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
     cube.lod_pixels = 48.f;
     cube.lod_fade = 0.3f;
+    cube.lod_group = "fleet";
+    cube.lod_proxy = "card:4,4";
+    cube.lod_proxy_pixels = 24.f;
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -588,6 +591,9 @@ int main() {
                 rc.lod_meshes[1] == "models/crate_low.obj" &&
                 rc.lod_pixels == 48.f && rc.lod_fade == 0.3f,
             "scene3d mesh LOD chain round-trips");
+      check(rc.lod_group == "fleet" && rc.lod_proxy == "card:4,4" &&
+                rc.lod_proxy_pixels == 24.f,
+            "scene3d group proxy fields round-trip");
       check(rc.volume_depth == 0.3f && rc.volume_density == 6.f &&
                 rc.volume_seed == 2.f && rc.volume_steps == 24 &&
                 rc.volume_scatter == 0.5f && rc.volume_flow == 1.5f &&
@@ -724,6 +730,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"lodFade":-0.1}]})")
               .has_value(),
           "scene3d lodFade below zero rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lodGroup":"f","lodProxyPixels":0}]})")
+              .has_value(),
+          "scene3d lodProxyPixels below range rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lodGroup":"f","lodProxyPixels":8192}]})")
+              .has_value(),
+          "scene3d lodProxyPixels above range rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"bandShear":0.9}]})")
               .has_value(),

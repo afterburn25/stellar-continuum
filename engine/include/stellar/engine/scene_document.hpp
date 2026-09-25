@@ -276,6 +276,14 @@ struct Scene3dEntity {
   // Screen-door transition width above each LOD threshold, as a
   // fraction of that threshold [0,0.5]; 0 keeps the hard switch.
   float lod_fade{.15f};
+  // Named group proxy: when the merged bounding sphere of a group's
+  // contributing members projects below lod_proxy_pixels, the whole
+  // group collapses into one view-aligned lod_proxy draw (a mesh spec
+  // like `card:8,8`) carrying the representative member's material —
+  // a fleet/cluster impostor for extreme zoom-out. Empty group disables.
+  std::string lod_group;
+  std::string lod_proxy;
+  float lod_proxy_pixels{16.f};
 };
 
 // An extra directional light — the material pipeline evaluates at most

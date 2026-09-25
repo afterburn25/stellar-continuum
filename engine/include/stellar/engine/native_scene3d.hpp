@@ -313,6 +313,16 @@ struct MeshInstance3D {
   // per-pixel pattern, so opaque geometry crossfades without alpha
   // blending or a second pass. 0 keeps the hard switch.
   float lod_fade{.15f};
+  // Named group proxy: when the merged view-space bounding sphere of
+  // the group's contributing members projects below lod_group_pixels,
+  // they collapse into one view-aligned lod_group_proxy draw placed at
+  // the merged centre, scaled to cover it, and shaded with the
+  // representative member's material — a fleet/cluster impostor for
+  // extreme zoom-out. The switch is hard; at authored proxy sizes the
+  // swap is sub-visible. Empty group or null proxy disables.
+  std::string lod_group;
+  std::shared_ptr<const Mesh3D> lod_group_proxy;
+  float lod_group_pixels{0.f};
 };
 // Directional shadow map for the scene key light. Instead of fitting the
 // camera frustum, the ortho coverage box centres `distance` world units
@@ -384,6 +394,9 @@ struct Scene3DStatistics {
   // Instances drawing inside the visible-range fade band this frame —
   // single thinned draws, no paired submission.
   std::uint64_t visible_fades{};
+  // Group members replaced by a merged proxy draw this frame — the
+  // fleet/cluster-impostor workload audit counter.
+  std::uint64_t lod_groups{};
   std::size_t mesh_cache_entries{},mesh_cache_bytes{},texture_cache_entries{},texture_cache_bytes{},target_bytes{};
   // Binds served by the pinned fallback because the TextureStreamer denied
   // residency under the frame's byte budget (budget-pressure pop-in count).

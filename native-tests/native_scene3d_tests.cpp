@@ -228,6 +228,13 @@ int main()try{
    check(lod3d_fade_share(off,110)==0.f,"Zero fade width still produced a share");
    rejects([&]{auto i=instance;i.lod_fade=.6f;(void)Scene3D::create(camera,{i});});
    rejects([&]{auto i=instance;i.lod_fade=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
+  // Group proxy LOD: a grouped instance needs a resolved proxy mesh and
+  // a bounded collapse size; ungrouped instances keep the feature off.
+  {auto grouped=instance;grouped.lod_group="fleet";grouped.lod_group_proxy=sphere;grouped.lod_group_pixels=24;
+   check(Scene3D::create(camera,{grouped})->instances()[0].lod_group=="fleet","Scene dropped the LOD group");
+   rejects([&]{auto i=instance;i.lod_group="fleet";(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_group="fleet";i.lod_group_proxy=sphere;i.lod_group_pixels=0;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_group="fleet";i.lod_group_proxy=sphere;i.lod_group_pixels=8192;(void)Scene3D::create(camera,{i});});}
   // Billboard cards: a camera-facing quad for LOD impostors and sprite
   // markers — the renderer drops its view-space rotation at draw time.
   {const auto card=Mesh3D::billboard_card(2.f,1.f);

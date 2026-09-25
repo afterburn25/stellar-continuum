@@ -69,8 +69,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   at 30px should not submit its 60k-triangle hi-res mesh; and the level
   swap must not pop when a fleet crosses a threshold.
 - **Modules:** `native_scene3d.hpp` (`MeshInstance3D::lod_meshes` +
-  `lod_pixels` + `lod_fade`, `select_lod3d_level`, `lod3d_fade_share`,
-  `Scene3DStatistics::lod_instances`/`lod_fades`),
+  `lod_pixels` + `lod_fade` + `lod_group`/`lod_group_proxy`/
+  `lod_group_pixels`, `select_lod3d_level`, `lod3d_fade_share`,
+  `Scene3DStatistics::lod_instances`/`lod_fades`/`lod_groups`),
   `native_scene3d.cpp` (validation + selection/band policy),
   `native_scene3d_gpu.cpp` (per-view pick in the streamer demand pass
   and the draw loop, dual submission inside the band),
@@ -102,17 +103,27 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   shows stops mattering while the whole object dithers out.
   `lod_instances`/`lod_fades` on
   `Scene3DStatistics` audit substitutions and dual submissions per
-  frame.
+  frame. `lod_group` names a cluster impostor: every contributing
+  member (frustum- and range-visible, non-volume) merges its view-space
+  bounding sphere into a group sphere; once that sphere's projected
+  diameter drops below `lod_group_pixels` [1,4096] the whole group
+  renders as one view-aligned `lod_group_proxy` draw centred on the
+  merged sphere, scaled to cover it, shaded with the representative
+  member's material. The representative is the first contributing
+  member in instance order; `lod_groups` audits replaced members.
 - **Persistence:** entity `lods` (spec array, ≤ 8 bounded strings) +
-  `lodPixels` [1,4096] + `lodFade` [0,.5] round-trip through
-  `Scene3dDocument`; `MeshLods` component codecs spec count + strings +
-  switch size + fade (truncated tails decode with defaults);
-  `spawn_scene3d` attaches it when `lods` is non-empty and
-  `scene3d_from_world` exports it back. Runtime/editor resolve specs
+  `lodPixels` [1,4096] + `lodFade` [0,.5] + `lodGroup` (≤64 chars) +
+  `lodProxy` (≤256-char spec) + `lodProxyPixels` [1,4096] round-trip
+  through `Scene3dDocument`; `MeshLods` component codecs spec count +
+  strings + switch size + fade + group name + proxy spec + collapse
+  size (truncated tails decode with defaults);
+  `spawn_scene3d` attaches it when `lods` or `lodGroup` is non-empty
+  and `scene3d_from_world` exports it back. Runtime/editor resolve specs
   through the same path as `MeshRef` — an unresolvable spec drops just
-  that level.
-- **Editor:** Scene3D tool `meshLods` (csv specs), `lodPixels` and
-  `lodFade` rows edit the live preview.
+  that level; an unresolvable proxy drops just the collapse.
+- **Editor:** Scene3D tool `meshLods` (csv specs), `lodPixels`,
+  `lodFade` and `lodGroup` (`name;proxySpec;px`) rows edit the live
+  preview.
 - **Tests:** `native_scene3d_gpu` — silhouette probe: a quad proxy
   exposes the swap (sphere pixels beyond the quad edge go background),
   `lod_instances` stat delta, above-threshold frames keep the full mesh;
@@ -124,7 +135,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   block — a 1024-ship depth-sweep fleet, 60 timed frames reporting
   `cpu_submit_mean_ms`/`frame_wall_mean_ms` plus
   `draw_calls`/`lod_instances` assertions (one instanced draw per LOD
-  level, depth-partitioned picks);
+  level, depth-partitioned picks); group probe: two member spheres
+  below the authored merged diameter collapse into one proxy card —
+  `lod_groups` counts both and the seam pixel between the members
+  lights only under the collapse;
   `engine_scene3d` — level-pick policy, band-share ramp across two
   levels, zero-width disable, bound rejects;
   `engine_project` — `lods`/`lodPixels`/`lodFade` round-trip + malformed
@@ -136,11 +150,17 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   an always-facing impostor card, and a primary `card:` mesh doubles as
   a sprite marker. The flag is per-mesh, so a fading pair can mix a
   card with solid geometry.
-- **Limitations:** flat halving chain — no hierarchical LOD trees or
-  mesh decimation; impostor cards are flat quads (no baked
-  view-dependent shading); the crossfade is a per-pixel dither (stable
-  while the camera holds still; reads as fine noise on stills when a
-  coarse proxy diverges sharply); casters stay full-res.
+- **Limitations:** flat halving chain — no mesh decimation or deeper
+  LOD trees beyond the named group collapse; the group proxy is a hard
+  switch (no dithered transition — author `lodProxyPixels` small enough
+  that the swap is sub-visible) and shades with the representative
+  member's material, so groups should share materials; merged members
+  still pay CPU prepare work (the collapse saves vertex/fragment and
+  uniform-record load, not the per-instance iteration); impostor cards
+  are flat quads (no baked view-dependent shading); the crossfade is a
+  per-pixel dither (stable while the camera holds still; reads as fine
+  noise on stills when a coarse proxy diverges sharply); casters stay
+  full-res.
 
 ## Scene3D surface detail — cloud decks and terminator wrap (2026-09-25)
 
