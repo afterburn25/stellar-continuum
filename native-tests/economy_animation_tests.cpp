@@ -247,6 +247,14 @@ int main() {
                            stellar::engine::AnnouncementValue{"alph"});
   check(announcer.size() == 2, "edit-value change did not re-announce");
   announcer.clear();
+  announcer.announce_focus("planets", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::Group,
+                           std::nullopt, std::nullopt, true);
+  announcer.announce_focus("planets", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::Group,
+                           std::nullopt, std::nullopt, false);
+  check(announcer.size() == 2, "expanded change did not re-announce");
+  announcer.clear();
 
   if (failures == 0)
     std::cout << "Economy, replay, animation and accessibility tests passed\n";

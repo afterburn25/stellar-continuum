@@ -79,6 +79,13 @@ public:
   // Applies a platform value SetValue to the ringed Edit — false when the
   // focus sits on a non-edit control.
   bool set_focused_text(std::string,int,int);
+  // Expanded state of the ringed category header — null when focus sits
+  // on a leaf row or a non-list control. Reports the effective state
+  // (persisted collapse, search reveal, temporary reveal).
+  [[nodiscard]] std::optional<bool> focused_expanded(int,int)const;
+  // Applies a platform expand/collapse request to the ringed category
+  // header — false when the focus sits on a non-expandable control.
+  bool set_focused_expanded(bool,int,int);
   [[nodiscard]] std::optional<stellar::native_map::UiRect> row_bounds(Key,int,int)const;
   [[nodiscard]] stellar::native_map::UiRect category_bounds(Category,int,int)const;
   [[nodiscard]] Command handle(const stellar::native_map::InputEvent&,int,int);

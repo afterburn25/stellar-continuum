@@ -93,7 +93,8 @@ void AccessibilityAnnouncer::announce(std::string text,
                                       std::optional<AnnouncementRange> range,
                                       AnnouncementControl control,
                                       std::optional<bool> checked,
-                                      std::optional<AnnouncementValue> value) {
+                                      std::optional<AnnouncementValue> value,
+                                      std::optional<bool> expanded) {
   // Empty status text is dropped, but an empty Focus item is meaningful:
   // it marks the ring releasing, so platform bridges can retire the stale
   // focused fragment instead of leaving the last label claiming focus.
@@ -102,7 +103,7 @@ void AccessibilityAnnouncer::announce(std::string text,
   if (!pending_.empty() && pending_.back().text == text &&
       pending_.back().priority == priority && pending_.back().kind == kind &&
       pending_.back().range == range && pending_.back().checked == checked &&
-      pending_.back().value == value)
+      pending_.back().value == value && pending_.back().expanded == expanded)
     return;
   if (priority == AnnouncementPriority::Assertive) {
     std::erase_if(pending_, [](const AccessibilityAnnouncement &item) {
@@ -118,7 +119,7 @@ void AccessibilityAnnouncer::announce(std::string text,
   }
   pending_.push_back(AccessibilityAnnouncement{
       std::move(text), priority, kind, std::move(bounds), std::move(range),
-      control, checked, std::move(value), sequence_++});
+      control, checked, std::move(value), expanded, sequence_++});
 }
 
 std::optional<AccessibilityAnnouncement> AccessibilityAnnouncer::take() {

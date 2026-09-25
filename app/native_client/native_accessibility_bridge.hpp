@@ -45,7 +45,8 @@ class NativeAccessibilityBridge final {
       stellar::engine::AnnouncementControl control =
           stellar::engine::AnnouncementControl::Custom,
       std::optional<bool> checked = std::nullopt,
-      std::optional<stellar::engine::AnnouncementValue> value = std::nullopt);
+      std::optional<stellar::engine::AnnouncementValue> value = std::nullopt,
+      std::optional<bool> expanded = std::nullopt);
   // Subclassed window-procedure sink installed while attached — platform
   // plumbing for the WM_GETOBJECT answer, not a general event API.
   std::intptr_t handle_window_message(std::uintptr_t hwnd, unsigned message,
@@ -70,6 +71,12 @@ class NativeAccessibilityBridge final {
   // set_focused_text to whichever surface owns the focused edit.
   void queue_text_set(std::string text);
   [[nodiscard]] std::optional<std::string> take_text_set();
+  // Expand/collapse slice: ExpandCollapse calls on a tree-node focus
+  // fragment queue the requested state (latest wins) for the owner to
+  // route through set_focused_expanded to whichever surface owns the
+  // focused expandable row.
+  void queue_expansion(bool expand) noexcept;
+  [[nodiscard]] std::optional<bool> take_expansion_set() noexcept;
 
  private:
   void *hwnd_{};
@@ -80,6 +87,8 @@ class NativeAccessibilityBridge final {
   std::atomic<bool> range_set_pending_{};
   std::mutex text_set_mutex_;
   std::optional<std::string> pending_text_set_;
+  std::atomic<bool> pending_expansion_{};
+  std::atomic<bool> expansion_pending_{};
 };
 
 } // namespace stellar::native_client

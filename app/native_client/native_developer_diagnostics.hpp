@@ -75,6 +75,35 @@ public:
     if(hit==51){event_search_=std::move(text);return true;}
     return false;
   }
+  // Expanded state of the ringed entity-tree node — null when focus sits
+  // on a leaf, a non-row control, or outside the entities view.
+  [[nodiscard]] std::optional<bool> focused_expanded(int w,int h)const{
+    if(!visible_||!entities_)return std::nullopt;
+    const auto node=ringed_entity_node(layout(w,h));
+    return node&&!node->children.empty()?std::optional<bool>{node->expanded}:std::nullopt;
+  }
+  // Applies a platform expand/collapse request to the ringed entity node
+  // — false when the focus sits on a non-expandable control.
+  bool set_focused_expanded(bool expand,int w,int h){
+    if(!visible_||!entities_)return false;
+    const auto l=layout(w,h);
+    const auto node=ringed_entity_node(l);
+    if(!node||node->children.empty())return false;
+    const std::string keep=node->id;
+    if(node->expanded!=expand)set_entity_expanded(*node,expand);
+    // Collapsing rebuilds the flattened rows — re-resolve the ring onto
+    // the toggled node so focus does not silently land on a neighbor.
+    const auto targets=focusables(l);
+    for(std::size_t i=0;i<targets.size();++i){
+      const int row=targets[i].hit-100;
+      if(targets[i].hit>=100&&row<static_cast<int>(entity_flat_.size())&&
+         entity_flat_[static_cast<std::size_t>(row)].first->id==keep){
+        ring_=static_cast<int>(i);
+        break;
+      }
+    }
+    return true;
+  }
   bool handle(const InputEvent &e,int w,int h,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     if(!visible_)return false;const auto l=layout(w,h);pointer_=e.position;
     if(dropdown_.visible()){
@@ -480,6 +509,16 @@ private:
     const auto &state=phase_table_.sort_state();
     phase_table_.sort_by(ids[col],!(state&&state->first==ids[col]&&state->second));
     list_view_.scroll_offset=0;
+  }
+  // Ringed entity row's tree node — null when the ring sits on a
+  // non-row control or outside the entities view.
+  const stellar::engine::TreeModel::Node *ringed_entity_node(const Layout &l)const{
+    const auto targets=focusables(l);
+    if(ring_<0||ring_>=static_cast<int>(targets.size()))return nullptr;
+    const int hit=targets[static_cast<std::size_t>(ring_)].hit;
+    const int row=hit-100;
+    if(hit<100||row>=static_cast<int>(entity_flat_.size()))return nullptr;
+    return entity_flat_[static_cast<std::size_t>(row)].first;
   }
   void activate_entity_row(int row){
     if(row<0||row>=static_cast<int>(entity_flat_.size()))return;

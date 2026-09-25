@@ -351,6 +351,79 @@ int main() try {
           "read-only SetValue queued text for the owner");
   seed_value->Release();
   seed_fragment->Release();
+  // A tree-node focus carrying expanded state exposes the expand/collapse
+  // pattern: the state reads back and Expand()/Collapse() queue the
+  // requested direction for the owner to route through
+  // set_focused_expanded.
+  (void)bridge.focus_changed(
+      "Planets", std::nullopt, std::nullopt,
+      stellar::engine::AnnouncementControl::Group, std::nullopt,
+      std::nullopt, true);
+  IUIAutomationElement* tree_fragment = find_fragment(element);
+  require(tree_fragment != nullptr,
+          "focus fragment was not exposed for the tree-node announcement");
+  IUIAutomationExpandCollapsePattern* expand_collapse{};
+  require(SUCCEEDED(tree_fragment->GetCurrentPattern(
+              UIA_ExpandCollapsePatternId,
+              reinterpret_cast<IUnknown**>(&expand_collapse))) &&
+              expand_collapse,
+          "expanded node did not expose the expand/collapse pattern");
+  ExpandCollapseState expand_state{};
+  require(SUCCEEDED(expand_collapse->get_CurrentExpandCollapseState(
+              &expand_state)) &&
+              expand_state == ExpandCollapseState_Expanded,
+          "expand/collapse pattern did not report the announced state");
+  require(!bridge.take_expansion_set().has_value(),
+          "expansion queue was not empty before Collapse");
+  require(SUCCEEDED(expand_collapse->Collapse()),
+          "UIA Collapse call failed");
+  const auto queued_expansion = bridge.take_expansion_set();
+  require(queued_expansion.has_value() && !*queued_expansion,
+          "UIA Collapse did not queue the collapsed request");
+  require(!bridge.take_expansion_set().has_value(),
+          "drained expansion request was not cleared");
+  expand_collapse->Release();
+  tree_fragment->Release();
+  // A collapsed announcement flips the reported state and Expand()
+  // queues the opposite direction.
+  (void)bridge.focus_changed(
+      "Stations", std::nullopt, std::nullopt,
+      stellar::engine::AnnouncementControl::Group, std::nullopt,
+      std::nullopt, false);
+  IUIAutomationElement* collapsed_fragment = find_fragment(element);
+  require(collapsed_fragment != nullptr,
+          "focus fragment was not exposed for the collapsed node");
+  IUIAutomationExpandCollapsePattern* collapsed_pattern{};
+  require(SUCCEEDED(collapsed_fragment->GetCurrentPattern(
+              UIA_ExpandCollapsePatternId,
+              reinterpret_cast<IUnknown**>(&collapsed_pattern))) &&
+              collapsed_pattern,
+          "collapsed node lost the expand/collapse pattern");
+  require(SUCCEEDED(collapsed_pattern->get_CurrentExpandCollapseState(
+              &expand_state)) &&
+              expand_state == ExpandCollapseState_Collapsed,
+          "collapsed node did not report Collapsed state");
+  require(SUCCEEDED(collapsed_pattern->Expand()),
+          "UIA Expand call failed");
+  const auto queued_expand = bridge.take_expansion_set();
+  require(queued_expand.has_value() && *queued_expand,
+          "UIA Expand did not queue the expand request");
+  collapsed_pattern->Release();
+  collapsed_fragment->Release();
+  // A leaf row carries no expanded state — the pattern retires rather
+  // than reporting a stale node.
+  (void)bridge.focus_changed("Kestrel", std::nullopt, std::nullopt,
+                             stellar::engine::AnnouncementControl::Custom);
+  IUIAutomationElement* leaf_fragment = find_fragment(element);
+  require(leaf_fragment != nullptr,
+          "focus fragment was not exposed for the leaf row");
+  IUIAutomationExpandCollapsePattern* leaf_pattern{};
+  require(SUCCEEDED(leaf_fragment->GetCurrentPattern(
+              UIA_ExpandCollapsePatternId,
+              reinterpret_cast<IUnknown**>(&leaf_pattern))) &&
+              leaf_pattern == nullptr,
+          "leaf row kept the expand/collapse pattern");
+  leaf_fragment->Release();
   // An empty focus label is the ring-release signal — the fragment must
   // stop claiming keyboard focus so AT stops tracking a stale control.
   (void)bridge.focus_changed("");

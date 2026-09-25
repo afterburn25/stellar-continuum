@@ -117,6 +117,10 @@ struct AccessibilityAnnouncement {
   // Current text of a focused Edit — platform bridges expose it as the
   // value pattern so AT hears the typed content, not just the label.
   std::optional<AnnouncementValue> value;
+  // Expanded state of a focused tree node — platform bridges expose it as
+  // the expand/collapse pattern so AT knows a row has children and can
+  // expand or collapse it. nullopt on non-expandable controls.
+  std::optional<bool> expanded;
   std::uint64_t sequence{};
 };
 
@@ -136,10 +140,11 @@ public:
                       AnnouncementControl control = AnnouncementControl::Custom,
                       std::optional<bool> checked = std::nullopt,
                       std::optional<AnnouncementValue> value = std::nullopt,
+                      std::optional<bool> expanded = std::nullopt,
                       AnnouncementPriority priority = AnnouncementPriority::Polite) {
     announce(std::move(text), priority, AnnouncementKind::Focus,
              std::move(bounds), std::move(range), control, checked,
-             std::move(value));
+             std::move(value), expanded);
   }
   // Oldest pending announcement, or nullopt when drained.
   [[nodiscard]] std::optional<AccessibilityAnnouncement> take();
@@ -156,7 +161,8 @@ private:
                 std::optional<AnnouncementRange> range,
                 AnnouncementControl control,
                 std::optional<bool> checked = std::nullopt,
-                std::optional<AnnouncementValue> value = std::nullopt);
+                std::optional<AnnouncementValue> value = std::nullopt,
+                std::optional<bool> expanded = std::nullopt);
   std::deque<AccessibilityAnnouncement> pending_;
   std::size_t capacity_;
   std::uint64_t sequence_{};

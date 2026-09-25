@@ -95,6 +95,7 @@ void keyboard_focus(){
   require(!key(kF5).captured,"unrelated key was captured");
   // Search activation enters edit mode; the field owns keys until commit.
   (void)key(kTab);(void)key(kDown);require(n.focus()==1,"ring did not reach search");
+  require(!n.focused_expanded(1920,1080).has_value(),"search field reported an expandable state");
   require(key(kReturn).captured&&n.wants_text_input(),"Return on search did not enter edit mode");
   require(key(kDown).captured&&n.focus()==1,"editing search leaked a key to the ring");
   require(key(kTab).captured&&!n.wants_text_input(),"Tab did not commit out of search editing");
@@ -107,6 +108,17 @@ void keyboard_focus(){
   Preferences persisted;n.set_persist([&](const Preferences& v){persisted=v;return true;});
   command=key(kReturn);
   require(command.captured&&n.preferences().collapsed[0]&&persisted.collapsed[0]&&n.focus()==2,"Return on a header did not toggle collapse or lost the ring");
+  // Expand/collapse pattern route: headers report their effective state
+  // and accept programmatic direction through the persisted path; leaf
+  // rows and non-list controls report no state and refuse writes.
+  const auto expanded=n.focused_expanded(1920,1080);
+  require(expanded.has_value()&&!*expanded,"collapsed header did not report its expandable state");
+  require(n.set_focused_expanded(true,1920,1080)&&!n.preferences().collapsed[0]&&!persisted.collapsed[0]&&n.focus()==2,"programmatic expand did not reopen the category or lost the ring");
+  require(n.focused_expanded(1920,1080)==std::optional<bool>{true},"re-expanded header did not report its state");
+  require(n.set_focused_expanded(false,1920,1080)&&n.preferences().collapsed[0]&&persisted.collapsed[0],"programmatic collapse did not persist");
+  (void)key(kEnd);
+  require(!n.focused_expanded(1920,1080).has_value(),"leaf row reported an expandable state");
+  require(!n.set_focused_expanded(true,1920,1080),"leaf row accepted an expansion request");
   // The ring renders over the focused rect.
   DrawList draw;n.render(draw,1920,1080,{});
   const auto* ring=std::get_if<StrokedRectangle>(&draw.overlay.back());

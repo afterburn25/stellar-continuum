@@ -170,6 +170,30 @@ bool Navigator::set_focused_text(std::string text,int w,int h){
   search_=std::move(text);
   return true;
 }
+std::optional<bool> Navigator::focused_expanded(int w,int h)const{
+  if(focus_<0||preferences_.hidden)return std::nullopt;
+  const auto targets=focusables(Layout::make(w,h));
+  if(focus_>=static_cast<int>(targets.size()))return std::nullopt;
+  const auto entry=targets[static_cast<std::size_t>(focus_)].entry;
+  if(!entry)return std::nullopt;
+  const auto&e=entries_[*entry];
+  if(e.row)return std::nullopt;
+  // Effective expansion — a search or temporary reveal keeps a collapsed
+  // category open, matching what rebuild() projects.
+  return !preferences_.collapsed[static_cast<std::size_t>(e.category)]||
+         !folded(search_).empty()||
+         (temporary_reveal_&&temporary_reveal_->category==e.category);
+}
+bool Navigator::set_focused_expanded(bool expand,int w,int h){
+  if(!focused_expanded(w,h).has_value())return false;
+  const auto targets=focusables(Layout::make(w,h));
+  const auto&e=entries_[*targets[static_cast<std::size_t>(focus_)].entry];
+  auto p=preferences_;p.collapsed[static_cast<std::size_t>(e.category)]=!expand;
+  if(p.collapsed==preferences_.collapsed)return true;
+  temporary_reveal_.reset();
+  commit_preferences(std::move(p));
+  return true;
+}
 void Navigator::commit_preferences(Preferences next){if(persist_&&!persist_(next)){error_=tr("ASSETS_PREFS_FAIL","Could not save navigator preferences.");return;}preferences_=next;error_.clear();pressed_.reset();rebuild();}
 Command Navigator::handle(const InputEvent& e,int w,int h){
   const auto l=Layout::make(w,h);pointer_=e.position;Command out;out.generation=view_.generation;out.observer=view_.observer;

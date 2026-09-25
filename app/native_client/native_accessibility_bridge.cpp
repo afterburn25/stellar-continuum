@@ -140,6 +140,7 @@ class FocusFragment final : public ProviderBase,
                             public IInvokeProvider,
                             public IToggleProvider,
                             public IValueProvider,
+                            public IExpandCollapseProvider,
                             public IRawElementProviderFragment {
  public:
   FocusFragment(WindowProvider *root, HWND host,
@@ -149,13 +150,15 @@ class FocusFragment final : public ProviderBase,
   void set_label(std::wstring label, std::optional<RECT> rect,
                  std::optional<FragmentRange> range, long control_type,
                  std::optional<bool> checked,
-                 std::optional<FragmentValue> value) {
+                 std::optional<FragmentValue> value,
+                 std::optional<bool> expanded) {
     label_ = std::move(label);
     rect_ = rect;
     range_ = range;
     control_type_ = control_type;
     checked_ = checked;
     value_ = std::move(value);
+    expanded_ = expanded;
     // Only controls the ring can activate answer Invoke — sliders adjust
     // through their (read-only) range and groups are containers.
     invocable_ = control_type == UIA_ButtonControlTypeId ||
@@ -170,6 +173,7 @@ class FocusFragment final : public ProviderBase,
     invocable_ = false;
     toggleable_ = false;
     checked_.reset();
+    expanded_.reset();
     range_.reset();
     value_.reset();
     control_type_ = UIA_CustomControlTypeId;
@@ -215,6 +219,12 @@ class FocusFragment final : public ProviderBase,
       AddRef();
       return S_OK;
     }
+    if (iid == IID_IExpandCollapseProvider && expanded_) {
+      if (!out) return E_POINTER;
+      *out = static_cast<IExpandCollapseProvider *>(this);
+      AddRef();
+      return S_OK;
+    }
     return ProviderBase::QueryInterface(iid, out);
   }
 
@@ -233,6 +243,9 @@ class FocusFragment final : public ProviderBase,
       AddRef();
     } else if (pattern == UIA_ValuePatternId && value_) {
       *out = static_cast<IValueProvider *>(this);
+      AddRef();
+    } else if (pattern == UIA_ExpandCollapsePatternId && expanded_) {
+      *out = static_cast<IExpandCollapseProvider *>(this);
       AddRef();
     }
     return S_OK;
@@ -316,6 +329,29 @@ class FocusFragment final : public ProviderBase,
     *out = SysAllocStringLen(value_ ? value_->text.data() : L"",
                              value_ ? static_cast<UINT>(value_->text.size()) : 0);
     return *out ? S_OK : E_OUTOFMEMORY;
+  }
+
+  // Expand/collapse pattern on tree rows: Expand/Collapse queue the
+  // requested state for the owner, which routes it through
+  // set_focused_expanded to whichever surface owns the focused node — the
+  // reported state refreshes with the next focus announcement.
+  HRESULT STDMETHODCALLTYPE Expand() noexcept override {
+    if (!expanded_ || !bridge_) return E_FAIL;
+    bridge_->queue_expansion(true);
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE Collapse() noexcept override {
+    if (!expanded_ || !bridge_) return E_FAIL;
+    bridge_->queue_expansion(false);
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE get_ExpandCollapseState(
+      ExpandCollapseState *out) noexcept override {
+    if (!out) return E_POINTER;
+    *out = !expanded_ ? ExpandCollapseState_LeafNode
+                      : *expanded_ ? ExpandCollapseState_Expanded
+                                   : ExpandCollapseState_Collapsed;
+    return S_OK;
   }
 
   HRESULT STDMETHODCALLTYPE GetPropertyValue(PROPERTYID id,
@@ -405,6 +441,7 @@ class FocusFragment final : public ProviderBase,
   std::optional<FragmentRange> range_;
   std::optional<FragmentValue> value_;
   std::optional<bool> checked_;
+  std::optional<bool> expanded_;
   long control_type_{UIA_CustomControlTypeId};
   bool focused_{};
   bool invocable_{};
@@ -425,9 +462,10 @@ class WindowProvider final : public ProviderBase,
   void set_focus_label(std::wstring label, std::optional<RECT> rect,
                        std::optional<FragmentRange> range, long control_type,
                        std::optional<bool> checked,
-                       std::optional<FragmentValue> value) {
+                       std::optional<FragmentValue> value,
+                       std::optional<bool> expanded) {
     focus_->set_label(std::move(label), std::move(rect), std::move(range),
-                      control_type, checked, std::move(value));
+                      control_type, checked, std::move(value), expanded);
     focused_ = true;
   }
   // The ring released — the fragment stops claiming focus and GetFocus
@@ -656,7 +694,8 @@ bool NativeAccessibilityBridge::focus_changed(
     std::optional<stellar::engine::AnnouncementRange> range,
     stellar::engine::AnnouncementControl control,
     std::optional<bool> checked,
-    std::optional<stellar::engine::AnnouncementValue> value) {
+    std::optional<stellar::engine::AnnouncementValue> value,
+    std::optional<bool> expanded) {
   auto *provider = static_cast<WindowProvider *>(provider_);
   if (!provider) return false;
   std::wstring name = wide(label);
@@ -698,7 +737,7 @@ bool NativeAccessibilityBridge::focus_changed(
     fragment_value = FragmentValue{wide(value->text), value->writable};
   provider->set_focus_label(std::move(name), rect, fragment_range,
                             uia_control_type(control), checked,
-                            std::move(fragment_value));
+                            std::move(fragment_value), expanded);
   if (!UiaClientsAreListening()) return false;
   return SUCCEEDED(UiaRaiseAutomationEvent(
       static_cast<IRawElementProviderSimple *>(provider->focus_fragment()),
@@ -731,7 +770,7 @@ bool NativeAccessibilityBridge::focus_changed(
     std::string_view, std::optional<stellar::engine::AnnouncementBounds>,
     std::optional<stellar::engine::AnnouncementRange>,
     stellar::engine::AnnouncementControl, std::optional<bool>,
-    std::optional<stellar::engine::AnnouncementValue>) {
+    std::optional<stellar::engine::AnnouncementValue>, std::optional<bool>) {
   return false;
 }
 std::intptr_t NativeAccessibilityBridge::handle_window_message(std::uintptr_t,
@@ -774,6 +813,17 @@ void NativeAccessibilityBridge::queue_text_set(std::string text) {
 std::optional<std::string> NativeAccessibilityBridge::take_text_set() {
   const std::lock_guard lock{text_set_mutex_};
   return std::exchange(pending_text_set_, std::nullopt);
+}
+
+void NativeAccessibilityBridge::queue_expansion(bool expand) noexcept {
+  pending_expansion_.store(expand, std::memory_order_relaxed);
+  expansion_pending_.store(true, std::memory_order_release);
+}
+
+std::optional<bool> NativeAccessibilityBridge::take_expansion_set() noexcept {
+  if (!expansion_pending_.exchange(false, std::memory_order_acquire))
+    return std::nullopt;
+  return pending_expansion_.load(std::memory_order_relaxed);
 }
 
 } // namespace stellar::native_client

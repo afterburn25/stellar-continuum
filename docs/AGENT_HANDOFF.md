@@ -1228,7 +1228,14 @@ compares range/checked/value so only real changes queue.
 text and accept `set_focused_text` (typed-path byte cap, code-point
 boundary truncation, refilter), and the setup seed field reports
 read-only — its value flows through the SeedEdited intent, not direct
-writes. Open: AT-SPI/non-Windows backends and a full fragment tree.
+writes. `IExpandCollapseProvider` covers tree nodes: announcements carry
+an optional `expanded` state, the two expandable surfaces report it via
+`focused_expanded` (controlled-assets category headers — effective
+state, reveal-aware — and the diagnostics entity tree), and
+`Expand()`/`Collapse()` queue a direction the owner routes through
+`set_focused_expanded`; collapsing re-resolves the ring onto the toggled
+node so focus does not land on a neighbor. Open: AT-SPI/non-Windows
+backends and a full fragment tree.
 Per-control focus geometry (row 26): `AccessibilityAnnouncement` now
 carries optional `AnnouncementBounds` and every focus-bearing surface
 exposes `focused_bounds(...)` mirroring its `focused_label` — settings

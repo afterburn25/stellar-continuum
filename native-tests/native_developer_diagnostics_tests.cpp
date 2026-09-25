@@ -195,6 +195,19 @@ int main(int argc,char **argv)try{
         key(kLeft);check(selected(draw())==expanded_view[pi].first,"Left on a child row did not jump to its parent.");
         key(kSpace);check(selected(draw())==collapsed_text,"Space did not toggle the selected parent row.");
         key(kReturn);check(selected(draw())==expanded_view[pi].first,"Return did not re-expand the selected row.");
+        // Expand/collapse pattern route: a ringed entity row reports its
+        // node state and accepts programmatic direction; the ring
+        // re-resolves onto the toggled node after the flatten rebuild so
+        // focus does not land on a neighbor.
+        {
+          bool ringed=false;
+          for(int i=0;i<64&&!ringed;++i){key(9u);ringed=window.focused_expanded(w,h).has_value();}
+          check(ringed,"Tab did not ring an expandable entity row.");
+          const bool expanded_state=*window.focused_expanded(w,h);
+          check(window.set_focused_expanded(!expanded_state,w,h)&&window.focused_expanded(w,h).has_value()&&*window.focused_expanded(w,h)==!expanded_state,"Programmatic expand/collapse did not flip the ringed entity row.");
+          check(window.set_focused_expanded(expanded_state,w,h)&&*window.focused_expanded(w,h)==expanded_state,"Programmatic expand/collapse did not restore the ringed entity row.");
+          key(0x4000001bu);// Escape releases the ring for the pointer cases.
+        }
         // The selection feeds a detail pane — the projected entity's
         // tag fields list beside the rows.
         const auto tag_line=[&](std::string_view row_text){
