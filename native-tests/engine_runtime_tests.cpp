@@ -1247,6 +1247,44 @@ int main() {
     }
   }
 
+  // A journaled gamepad event reaches the same mapper: dpad-right
+  // (SDL_GamepadButton 14) binds move_right in the built-in context.
+  {
+    const auto sub = root / "input-player-pad";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[{"name":"player","x":100,"y":200}]})";
+    }
+    ReplayRecorder journal;
+    // GamepadPressed=12 / GamepadReleased=13; gamepad_button field 11.
+    journal.record(1, "input", "12,0,0,0,0,0,0,0,0,0,0,14,0,0,0,");
+    journal.record(5, "input", "13,0,0,0,0,0,0,0,0,0,0,14,0,0,0,");
+    const auto journal_path = sub / "pad_journal.json";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 8;
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    std::vector<float> xs;
+    host.on_update = [&](World &world, float) {
+      const auto player = host.player();
+      if (player)
+        if (const auto *t = world.get<Transform2D>(*player))
+          xs.push_back(t->x);
+    };
+    check(host.run() == 0, "pad-input replay exits cleanly");
+    check(xs.size() == 8, "the player resolves every frame");
+    if (xs.size() == 8) {
+      check(xs[4] > xs[0], "held dpad-right advances the player");
+      check(xs[7] == xs[5],
+            "releasing dpad-right stops the player");
+    }
+  }
+
   // --input-map stacks a project context over the built-in "game" one:
   // an exclusive rebind of move_right to 'e' disables the default 'd'.
   {
