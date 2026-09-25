@@ -180,6 +180,12 @@ struct AtmosphereShell {
   float r{0.45f}, g{0.62f}, b{1.f};
   float strength{1.f}, power{3.f}, night_floor{0.05f};
 };
+// Distance culling for a 3D entity: the renderer drops the instance once
+// the camera is farther than `range` world units from its bounding-sphere
+// surface. Only attached when the document authors a limit (> 0).
+struct VisibleRange {
+  float range{0.f};
+};
 // Host-owned fly-camera state for 3D scene mode, carried on a lazily
 // resolved world entity so F5/F9 snapshots restore the camera too (the
 // document seeds it only on scene load).

@@ -681,6 +681,7 @@ int main() {
         turret.atmo_r = 0.2f;
         turret.atmo_g = 0.5f;
         turret.atmo_b = 0.8f;
+        turret.visible_range = 400.f;
         doc.entities.push_back(turret);
         const auto spawned = spawn_scene3d(world3, doc);
         check(spawned.size() == 2, "spawn_scene3d creates all entities");
@@ -721,6 +722,11 @@ int main() {
         check(world3.get<MaterialPbr>(ship_e) == nullptr &&
                   world3.get<AtmosphereShell>(ship_e) == nullptr,
               "defaults do not attach material extensions");
+        const auto *vr = world3.get<VisibleRange>(turret_e);
+        check(vr != nullptr && vr->range == 400.f,
+              "spawn_scene3d visible-range component");
+        check(world3.get<VisibleRange>(ship_e) == nullptr,
+              "unset range does not attach a component");
         check(world3.get<Lifetime>(turret_e)->remaining == 3.f,
               "spawn_scene3d lifetime");
         const auto *pt = world3.get<Parent3D>(turret_e);
@@ -767,6 +773,9 @@ int main() {
             const auto *ra = restored.get<AtmosphereShell>(*re_turret);
             check(ra != nullptr && ra->strength == 2.f && ra->power == 4.f,
                   "atmosphere codec round-trips");
+            const auto *rv = restored.get<VisibleRange>(*re_turret);
+            check(rv != nullptr && rv->range == 400.f,
+                  "visiblerange codec round-trips");
         }
         if (re_turret) {
             resolve_hierarchy3d(restored);
@@ -790,7 +799,8 @@ int main() {
                   out.entities[1].environment_strength == 0.6f &&
                   out.entities[1].uv_tile_x == 3.f &&
                   out.entities[1].atmo_strength == 2.f &&
-                  out.entities[1].atmo_b == 0.8f,
+                  out.entities[1].atmo_b == 0.8f &&
+                  out.entities[1].visible_range == 400.f,
               "scene3d_from_world exports material extensions");
 
         // Geometry: box primitive topology + OBJ parse/malformed reject.

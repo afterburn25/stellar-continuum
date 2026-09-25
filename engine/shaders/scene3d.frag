@@ -48,6 +48,11 @@ struct Material {
 layout(set=2,binding=10,std430) readonly buffer Materials {
     Material materials[];
 };
+// Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
+// 2 albedo, 3 normals, 4 roughness, 5 metallic, 6 emissive, 7 lighting.
+layout(set=3,binding=0) uniform ViewParams {
+    vec4 debug_mode;
+} view_params;
 // Per-invocation material copy — populated from the instance-indexed buffer
 // at the top of main so helper functions keep their shared access.
 Material material;
@@ -254,6 +259,7 @@ void main() {
             if(entry>0.0||dot(p,p)<material.effect_sphere.w*material.effect_sphere.w)texel.a*=1.0-blocked;
         }
     }
+    vec3 raw_albedo=texel.rgb; // debug Albedo view: sampled surface, pre-tint
     texel*=material.tint;
     if(material.view_options.w>0.5) texel.rgb=linear_color(texel.rgb);
     float combined_sunlight=sunlight;
@@ -277,6 +283,10 @@ void main() {
         }
     }
     float diffuse_scale=pbr_active?1.0-metallic:1.0;
+    // Debug Roughness/Metallic views report the factors actually in play.
+    float dbg_roughness=pbr_active?pbr_roughness
+        :(material.surface_response.x>0.5?clamp(properties.r,0.0,1.0)
+        :(material.optics.x>=1.0?clamp(material.optics.y,0.0,1.0):0.55));
     vec3 light_color=material.illumination.rgb*material.illumination.a;
     vec3 result=texel.rgb*diffuse_scale*(material.parameters.x+material.parameters.y*sunlight*cloud_shadow*visibility*light_color);
     if(material.surface_response.x>0.5||pbr_active) {
@@ -394,11 +404,15 @@ void main() {
     }
     // Emissive overlay — tinted map radiance, optionally gated to the body's
     // unlit hemisphere for colony/city lights that fade across the terminator.
+    // emissive_part also feeds the Emissive debug view (and is excluded from
+    // LightingOnly's albedo division so glow stays readable).
+    vec3 emissive_part=vec3(0);
     if(pbr_active&&material.pbr_values.z>0.0){
         float gate=1.0;
         if(material.pbr_options.z>0.0)
             gate=mix(1.0,1.0-smoothstep(-0.1,0.3,incidence),material.pbr_options.z);
-        result+=texture(emissive_map,uv).rgb*material.emissive_tint.rgb*material.pbr_values.z*gate;
+        emissive_part+=texture(emissive_map,uv).rgb*material.emissive_tint.rgb*material.pbr_values.z*gate;
+        result+=emissive_part;
     }
     // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
     // nightside floor, tied to the star's actual color.
@@ -406,10 +420,25 @@ void main() {
         vec3 Ng=normalize(view_normal);
         float limb=pow(clamp(1.0-abs(dot(Ng,V)),0.0,1.0),material.atmo_shape.x);
         float day=max(material.atmo_shape.y,smoothstep(-0.25,0.3,dot(Ng,material.light_direction.xyz)));
-        result+=material.atmo_options.rgb*material.atmo_options.w*limb*day*light_color;
+        vec3 rim=material.atmo_options.rgb*material.atmo_options.w*limb*day*light_color;
+        emissive_part+=rim;result+=rim;
     }
     // Preserve legacy diffuse materials and premultiplied composition.
     if(alpha<0.001) discard;
+    int debug=int(view_params.debug_mode.x+0.5);
+    if(debug>0){
+        vec3 shown;
+        if(debug==1) shown=texel.rgb;                              // Unlit
+        else if(debug==2) shown=raw_albedo;                        // Albedo
+        else if(debug==3) shown=N*0.5+0.5;                         // Normals
+        else if(debug==4) shown=vec3(dbg_roughness);               // Roughness
+        else if(debug==5) shown=vec3(metallic);                    // Metallic
+        else if(debug==6) shown=emissive_part;                     // Emissive
+        else shown=(result-emissive_part)/max(texel.rgb,vec3(.001));// Lighting
+        shown=max(shown,vec3(0));
+        if(material.view_options.w>0.5) shown=display_color(shown);
+        color=vec4(shown*alpha,alpha);return;
+    }
     if(material.view_options.w>0.5) result=display_color(result);
     color=vec4(result*alpha,alpha);
 }

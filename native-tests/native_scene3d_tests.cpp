@@ -108,6 +108,14 @@ int main()try{
   rejects([&]{std::vector<PointLight3D> too_many(maximum_scene3d_point_lights+1);(void)Scene3D::create(camera,{instance},{0,0,1},too_many);});
   rejects([&]{PointLight3D l;l.position={std::numeric_limits<double>::infinity(),0,0};(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.intensity=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  // Distance culling: visible_range bounds the camera-to-surface distance;
+  // 0 leaves the instance visible at any range.
+  {auto ranged=instance;ranged.position={};ranged.visible_range=4;
+   check(prepare_instance3d(camera,ranged,1).visible,"Instance inside its visible range was culled");
+   ranged.visible_range=1.5f;check(!prepare_instance3d(camera,ranged,1).visible,"Instance beyond its visible range stayed visible");
+   ranged.visible_range=0;check(prepare_instance3d(camera,ranged,1).visible,"Zero visible range culled the instance");
+   rejects([&]{auto i=instance;i.visible_range=-1;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.visible_range=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
   for(int field=0;field<8;++field){auto invalid=receiver;auto& s=*invalid.material.shadow;
     if(field==0)s.scale=0;if(field==1)s.position.x=std::numeric_limits<double>::infinity();
     if(field==2)s.rotation={0,0,0,0};if(field==3)s.radii.y=0;

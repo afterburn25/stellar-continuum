@@ -448,6 +448,7 @@ std::string Scene3dDocument::to_json() const {
                             {"strength", e.atmo_strength},
                             {"power", e.atmo_power},
                             {"nightFloor", e.atmo_night}};
+    if (e.visible_range != 0.f) item["range"] = e.visible_range;
     items.push_back(std::move(item));
   }
   doc["camera"] = {{"pos", {cam_x, cam_y, cam_z}},
@@ -475,14 +476,15 @@ std::string Scene3dDocument::to_json() const {
   }
   if (exposure != 1.f || bloom != 0.f || bloom_threshold != 1.f ||
       contrast != 1.f || saturation != 1.f || sharpen != 0.f ||
-      quality != "high")
+      quality != "high" || debug_view != "lit")
     doc["render"] = {{"exposure", exposure},
                      {"bloom", bloom},
                      {"bloomThreshold", bloom_threshold},
                      {"contrast", contrast},
                      {"saturation", saturation},
                      {"sharpen", sharpen},
-                     {"quality", quality}};
+                     {"quality", quality},
+                     {"debug", debug_view}};
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
   if (gravity != 0.0f) doc["gravity"] = gravity;
@@ -589,6 +591,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         e.atmo_power = at.value("power", 3.0f);
         e.atmo_night = at.value("nightFloor", 0.05f);
       }
+      e.visible_range = item.value("range", 0.0f);
+      if (!(e.visible_range >= 0.f))
+        return fail("range must be non-negative");
       scene.entities.push_back(std::move(e));
     }
     if (doc.contains("camera")) {
@@ -662,6 +667,13 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       if (scene.quality != "low" && scene.quality != "medium" &&
           scene.quality != "high" && scene.quality != "ultra")
         return fail("render quality must be low|medium|high|ultra");
+      scene.debug_view = r.value("debug", std::string{"lit"});
+      if (scene.debug_view != "lit" && scene.debug_view != "unlit" &&
+          scene.debug_view != "albedo" && scene.debug_view != "normals" &&
+          scene.debug_view != "roughness" && scene.debug_view != "metallic" &&
+          scene.debug_view != "emissive" && scene.debug_view != "lighting")
+        return fail("render debug must be lit|unlit|albedo|normals|roughness"
+                    "|metallic|emissive|lighting");
     }
     if (doc.contains("background")) {
       const auto &bg = doc.at("background");

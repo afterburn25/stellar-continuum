@@ -75,20 +75,27 @@ same document headless-tested.
    wavelength-weighted scattering, no day/night limb behavior.
 7. **Planet features** — cloud shadow+offset exists but no independent
    cloud albedo layer, no night-lights emissive, no terminator softening.
-8. **Quality tiers** — none; every view pays full cost (cubic
-   magnification, volume ray march, aniso) or nothing.
+8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
+   sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes tint/texture/opacity/double_sided
    only; no material/lighting/post controls, no preview debug modes.
 10. **Fleet scale** — `maximum_scene3d_instances=4096`, CPU-side uniform
     fill per instance, no LOD selection or impostors. Instancing is real
-    but bounded by per-frame CPU record build.
+    but bounded by per-frame CPU record build. `visible_range` distance
+    culling landed (phase 16) — it is a visibility cutoff, not LOD.
 
 ## Top wins (ordered)
 
-Status 2026-09-25: items 1–4 and the document/editor/quality-tier parts
-of 5–6 are landed and GPU-verified; preview debug-view modes and the
-remaining per-effect quality gates (cubic magnification, emission-
-volume steps) are still open. See `docs/VISUAL_ENGINE_HANDOFF.md`.
+Status 2026-09-25: items 1–6 are landed and GPU-verified, including the
+preview debug views and the per-effect quality gates (Low disables
+aniso + cubic magnification and caps emission-volume marching at 16
+steps, Medium at 32; bloom Medium+, sharpen High+, MSAA Ultra).
+Per-instance `visible_range` distance culling is landed: culled
+instances skip both the draw and their TextureStreamer residency demand.
+Also fixed: streamer registrations keyed by `RgbaImage*` are now
+liveness-verified (`weak_ptr` owner), closing a stale-TextureId reuse
+bug that intermittently skipped mip-tail promotions. See
+`docs/VISUAL_ENGINE_HANDOFF.md`.
 
 1. **PBR material block**: metallic + scalar/map roughness driving the
    existing GGX, emissive map × tint × strength with optional

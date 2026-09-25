@@ -313,7 +313,7 @@ struct Shell {
       hit3_emis{}, hit3_emit{}, hit3_night{}, hit3_env{},
       hit3_envstr{}, hit3_cutout{}, hit3_tile{}, hit3_atmo{},
       hit3_atmotint{}, hit3_exposure{}, hit3_bloom{}, hit3_grade{},
-      hit3_quality{}, hit3_plights{};
+      hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -1960,6 +1960,17 @@ void commit_scene3_field(Shell &shell) {
     doc.point_lights = std::move(parsed);
     return ok("point lights updated");
   }
+  case 39: { // debug shading override
+    const auto &d = shell.scene3_buffer;
+    if (d != "lit" && d != "unlit" && d != "albedo" && d != "normals" &&
+        d != "roughness" && d != "metallic" && d != "emissive" &&
+        d != "lighting")
+      return fail("use lit|unlit|albedo|normals|roughness|metallic|"
+                  "emissive|lighting");
+    commit();
+    doc.debug_view = d;
+    return ok("debug view updated");
+  }
   default:
     break;
   }
@@ -2072,6 +2083,11 @@ void commit_scene3_field(Shell &shell) {
             next.atmo_r = a; next.atmo_g = b; next.atmo_b = c;
           } else valid = false;
           break;
+  case 51:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 1e12f) { next.visible_range = a; valid = true; }
+          break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2114,7 +2130,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
             shell.hit3_cutout = shell.hit3_tile = shell.hit3_atmo =
                 shell.hit3_atmotint = shell.hit3_exposure =
                     shell.hit3_bloom = shell.hit3_grade =
-                        shell.hit3_quality = shell.hit3_plights = {};
+                        shell.hit3_quality = shell.hit3_plights =
+                            shell.hit3_debug = shell.hit3_range = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2249,6 +2266,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         inst.material.atmosphere =
             Atmosphere3D{{e.atmo_r, e.atmo_g, e.atmo_b}, e.atmo_strength,
                          e.atmo_power, e.atmo_night};
+      inst.visible_range = e.visible_range;
       inst.material.light_intensity = doc.light_intensity;
       inst.material.linear_light = true;
       // Selected entity highlight: a bright grazing-angle shell marks
@@ -2289,6 +2307,15 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
           : doc.quality == "medium" ? RenderQuality3D::Medium
           : doc.quality == "ultra"  ? RenderQuality3D::Ultra
                                     : RenderQuality3D::High;
+      view.options.debug_view =
+          doc.debug_view == "unlit"     ? DebugView3D::Unlit
+          : doc.debug_view == "albedo"  ? DebugView3D::Albedo
+          : doc.debug_view == "normals" ? DebugView3D::Normals
+          : doc.debug_view == "roughness" ? DebugView3D::Roughness
+          : doc.debug_view == "metallic"  ? DebugView3D::Metallic
+          : doc.debug_view == "emissive"  ? DebugView3D::Emissive
+          : doc.debug_view == "lighting"  ? DebugView3D::LightingOnly
+                                        : DebugView3D::Lit;
       out.overlay.push_back(std::move(view));
     }
   }
@@ -2464,6 +2491,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                      std::to_string(entity->atmo_b)
                : "",
         ed(50), "rim color r,g,b 0..1");
+  field(shell.hit3_range, "visRange",
+        entity ? std::to_string(entity->visible_range) : "", ed(51),
+        "distance cull, world units - 0 always");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -2489,6 +2519,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
           return v;
         }(),
         ed(38), "x,y,z,r,g,b,intensity,range; ... - max 4, empty clears");
+  field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
+        "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting");
 }
 
 std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
@@ -6459,6 +6491,10 @@ int main(int argc, char **argv) {
               edit3(37, doc.quality);
             else if (shell.hit3_plights.contains(event.position))
               edit3(38, "");
+            else if (shell.hit3_debug.contains(event.position))
+              edit3(39, doc.debug_view);
+            else if (shell.hit3_range.contains(event.position) && se)
+              edit3(51, std::to_string(se->visible_range));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

@@ -419,6 +419,7 @@ int main() {
     cube.atmo_r = 0.3f;
     cube.atmo_g = 0.5f;
     cube.atmo_b = 0.9f;
+    cube.visible_range = 250.f;
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -469,6 +470,7 @@ int main() {
     scene.saturation = 0.9f;
     scene.sharpen = 0.3f;
     scene.quality = "ultra";
+    scene.debug_view = "normals";
     const auto reparsed =
         engine::Scene3dDocument::from_json(scene.to_json());
     check(reparsed.has_value(), "scene3d json round-trips");
@@ -526,8 +528,9 @@ int main() {
                 rc.uv_tile_x == 2.f && rc.uv_tile_y == 4.f &&
                 rc.atmo_strength == 1.5f && rc.atmo_power == 2.5f &&
                 rc.atmo_night == 0.1f && rc.atmo_r == 0.3f &&
-                rc.atmo_g == 0.5f && rc.atmo_b == 0.9f,
-            "scene3d pbr/atmosphere fields round-trip");
+                rc.atmo_g == 0.5f && rc.atmo_b == 0.9f &&
+                rc.visible_range == 250.f,
+            "scene3d pbr/atmosphere/cull fields round-trip");
       check(reparsed->point_lights.size() == 1 &&
                 reparsed->point_lights[0].x == 1.f &&
                 reparsed->point_lights[0].z == -1.f &&
@@ -538,7 +541,8 @@ int main() {
       check(reparsed->exposure == 1.25f && reparsed->bloom == 0.6f &&
                 reparsed->bloom_threshold == 0.8f &&
                 reparsed->contrast == 1.1f && reparsed->saturation == 0.9f &&
-                reparsed->sharpen == 0.3f && reparsed->quality == "ultra",
+                reparsed->sharpen == 0.3f && reparsed->quality == "ultra" &&
+                reparsed->debug_view == "normals",
             "scene3d render options round-trip");
       check(reparsed->entities[1].metallic == 0.f &&
                 reparsed->entities[1].emissive_strength == 0.f &&
@@ -584,6 +588,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"pointLights":[{},{},{},{},{}]})")
               .has_value(),
           "scene3d over-budget point lights rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"debug":"wireframe"}})")
+              .has_value(),
+          "scene3d unknown debug view rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"range":-5}]})")
+              .has_value(),
+          "scene3d negative visible range rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"uvTile":[2]}]})")
               .has_value(),

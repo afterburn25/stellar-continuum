@@ -90,6 +90,15 @@ struct Scene3DStatistics;
 // Quality policy for a 3D view: gates expensive sampling (bloom taps,
 // sharpen, MSAA). Low must remain correct, just cheaper.
 enum class RenderQuality3D { Low, Medium, High, Ultra };
+// Diagnostic shading for editor/QA views. Lit is the production path;
+// the rest isolate one channel for material and lighting review:
+// Unlit = tinted surface without illumination, Albedo = sampled surface
+// before tint, Normals = view-space normal *0.5+0.5, Roughness/Metallic
+// show the active GGX factors, Emissive = emissive + atmosphere
+// contribution only, LightingOnly = shading with the albedo divided out.
+enum class DebugView3D {
+  Lit, Unlit, Albedo, Normals, Roughness, Metallic, Emissive, LightingOnly
+};
 // Per-view post-processing, all in linear HDR space before the tonemap
 // resolve. Exposure multiplies incoming radiance; bloom reads the HDR mip
 // chain above its soft threshold; sharpen is an unsharp mask amount.
@@ -101,6 +110,7 @@ struct RenderOptions3D {
   float contrast{1.f};   // 0..2 about mid gray
   float saturation{1.f}; // 0..2
   float sharpen{0.f};    // 0..1 unsharp amount
+  DebugView3D debug_view{DebugView3D::Lit};
 };
 // A depth-tested 3D viewport composites at this exact place in either layer.
 // Its geometry stays in 3D; only this destination uses drawable pixels.

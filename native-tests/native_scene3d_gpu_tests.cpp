@@ -530,6 +530,46 @@ int main(int argc,char** argv)try{
     check(channel(*msaa,160,160,0)>200,"Ultra tier MSAA resolve produced a blank frame");
     std::cout<<"post_gpu=exposure_bloom_quality_tiers_msaa_passed\n";
   }
+  {
+    // Debug shading views isolate single channels for material review —
+    // assertions use channel ordering so they hold on HDR and UNORM paths.
+    const auto debug_view=[&](const MeshInstance3D& i,DebugView3D mode,const char* name){
+      DrawList list;RenderOptions3D o;o.debug_view=mode;
+      list.world.emplace_back(Scene3DView{Scene3D::create(camera,{i}),{0,0,320,320},o});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    auto plate=b;plate.mesh=quad(0,0);plate.material.tint={255,255,255,255};
+    plate.material.ambient=.15f;plate.material.diffuse=.85f;plate.material.light_intensity=.5f;
+    const auto lit_frame=debug_view(plate,DebugView3D::Lit,"debug-lit.png");
+    const auto unlit_frame=debug_view(plate,DebugView3D::Unlit,"debug-unlit.png");
+    check(channel(*unlit_frame,160,160,1)>channel(*lit_frame,160,160,1),
+        "Unlit debug view stayed under lighting");
+    const auto normals_frame=debug_view(plate,DebugView3D::Normals,"debug-normals.png");
+    check(channel(*normals_frame,160,160,2)>channel(*normals_frame,160,160,0),
+        "Normals view did not encode the view-space normal");
+    auto metal_plate=plate;metal_plate.material.pbr=PbrSurface3D{};
+    metal_plate.material.pbr->metallic=1;metal_plate.material.pbr->roughness=.25f;
+    const auto metal_view=debug_view(metal_plate,DebugView3D::Metallic,"debug-metallic.png");
+    const auto rough_view=debug_view(metal_plate,DebugView3D::Roughness,"debug-roughness.png");
+    check(channel(*metal_view,160,160,0)>channel(*rough_view,160,160,0)+60,
+        "Metallic/Roughness views did not report the GGX factors");
+    check(std::abs(int(channel(*rough_view,160,160,0))-int(channel(*rough_view,160,160,1)))<=4,
+        "Roughness view is not grayscale");
+    auto glow_plate=plate;glow_plate.material.pbr=PbrSurface3D{};
+    glow_plate.material.pbr->emissive_strength=2;glow_plate.material.pbr->emissive_tint={0,1,0};
+    const auto emissive_view=debug_view(glow_plate,DebugView3D::Emissive,"debug-emissive.png");
+    check(channel(*emissive_view,160,160,1)>channel(*emissive_view,160,160,0)+40,
+        "Emissive view did not isolate the emitted channel");
+    const auto lighting_view=debug_view(plate,DebugView3D::LightingOnly,"debug-lighting.png");
+    check(channel(*lighting_view,160,160,0)>40,
+        "Lighting-only view lost the scene illumination");
+    // Distance culling: beyond visible_range the instance submits nothing.
+    auto far=plate;far.visible_range=1.f;
+    const auto culled_before=window.scene3d_statistics().culled_instances;
+    const auto culled_frame=debug_view(far,DebugView3D::Lit,"debug-culled.png");
+    check(window.scene3d_statistics().culled_instances==culled_before+1&&channel(*culled_frame,160,160,0)==5,
+        "visible_range did not cull the distant instance");
+    std::cout<<"debug_views_gpu=channels_distance_cull_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");

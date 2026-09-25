@@ -1147,6 +1147,17 @@ int RuntimeHost::run() {
         : doc.quality == "medium" ? native_map::RenderQuality3D::Medium
         : doc.quality == "ultra"  ? native_map::RenderQuality3D::Ultra
                                   : native_map::RenderQuality3D::High;
+    impl.render3.debug_view =
+        doc.debug_view == "unlit"     ? native_map::DebugView3D::Unlit
+        : doc.debug_view == "albedo"  ? native_map::DebugView3D::Albedo
+        : doc.debug_view == "normals" ? native_map::DebugView3D::Normals
+        : doc.debug_view == "roughness"
+            ? native_map::DebugView3D::Roughness
+        : doc.debug_view == "metallic"  ? native_map::DebugView3D::Metallic
+        : doc.debug_view == "emissive"  ? native_map::DebugView3D::Emissive
+        : doc.debug_view == "lighting"
+            ? native_map::DebugView3D::LightingOnly
+                                      : native_map::DebugView3D::Lit;
     impl.gravity3 = doc.gravity;
     impl.ground_y3 = doc.ground_y;
     impl.bounds3 = doc.bounds;
@@ -2510,6 +2521,8 @@ int RuntimeHost::run() {
           inst.material.atmosphere =
               native_map::Atmosphere3D{{at->r, at->g, at->b}, at->strength,
                                        at->power, at->night_floor};
+        if (const auto *vr = world.get<VisibleRange>(e))
+          inst.visible_range = vr->range;
         inst.material.light_intensity = impl.light3_intensity;
         inst.material.linear_light = true;
         instances.push_back(std::move(inst));

@@ -199,6 +199,10 @@ struct MeshInstance3D {
   Quaternion rotation;
   float scale{1.f}; // 1e-8..1e5 uniform scale keeps normals well-defined
   Material3D material;
+  // Distance culling: the instance drops out when the camera sits farther
+  // than this from the sphere surface — distant impostor/LOD hand-off and
+  // fleet-scale budget policy. 0 keeps the instance visible at any range.
+  float visible_range{};
 };
 class Scene3D final {
  public:

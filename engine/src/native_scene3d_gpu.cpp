@@ -94,8 +94,12 @@ struct Scene3DRenderer::Storage {
   // a camera-distance priority, and executes the streamer's load/evict list.
   engine::TextureStreamer streamer{maximum_scene3d_texture_cache_bytes};
   std::unordered_map<const RgbaImage*,engine::TextureId> stream_ids;
-  std::unordered_map<engine::TextureId,const RgbaImage*> stream_owners;
-  std::uint64_t stream_frame{};
+  // Owners are weak so an expired image does not lend its registration to a
+  // new RgbaImage that reuses its heap address: a stale hit would otherwise
+  // inherit the dead image's mip-byte desc and residency, corrupting both the
+  // streamer's accounting and the resident-tail granularity forever after.
+  std::unordered_map<engine::TextureId,std::weak_ptr<const RgbaImage>> stream_owners;
+  std::uint64_t stream_frame{},stream_registrations{};
   Scene3DStatistics stats;std::uint64_t serial{};std::size_t next_view{};bool hdr{},msaa_supported{};SDL_GPUTextureFormat scene_format{};
   SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};std::size_t vertex_capacity{64},fragment_capacity{64};
   Storage(SDL_GPUDevice* d,SDL_Renderer* r):device(d),renderer(r){}
@@ -127,7 +131,7 @@ struct Scene3DRenderer::Storage {
     const auto release=[&](SDL_GPUShader* value){SDL_ReleaseGPUShader(device,value);};
     msaa_supported=SDL_GPUTextureSupportsSampleCount(device,scene_format,SDL_GPU_SAMPLECOUNT_4)&&
       SDL_GPUTextureSupportsSampleCount(device,SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_SAMPLECOUNT_4);
-    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,0,10,1),release);
+    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,1,10,1),release);
     SDL_GPUVertexBufferDescription buffer{0,sizeof(Vertex3D),SDL_GPU_VERTEXINPUTRATE_VERTEX,0};
     const SDL_GPUVertexAttribute attributes[]{{0,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,position)},{1,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,normal)},{2,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,offsetof(Vertex3D,uv)}};
     for(int index=0;index<4;++index){
@@ -159,7 +163,7 @@ struct Scene3DRenderer::Storage {
       info.target_info.color_target_descriptions=&color;info.target_info.num_color_targets=1;
       tonemap_pipeline=SDL_CreateGPUGraphicsPipeline(device,&info);if(!tonemap_pipeline)throw gpu_error("3D tonemap pipeline creation failed");
     }
-    streamer.set_pinned(stream_id_for(*white),true);
+    streamer.set_pinned(stream_id_for(white),true);
   }
   std::shared_ptr<Geometry> geometry(std::shared_ptr<const Mesh3D> resource){
     if(auto it=meshes.find(resource.get());it!=meshes.end()){it->second->use=++serial;return it->second;}
@@ -174,28 +178,33 @@ struct Scene3DRenderer::Storage {
     from.offset=vb;to={result->indices,0,ib};SDL_UploadToGPUBuffer(copy,&from,&to,false);SDL_EndGPUCopyPass(copy);command.submit();
     meshes.emplace(result->owner.get(),result);stats.mesh_cache_bytes+=result->bytes();++stats.mesh_uploads;return result;
   }
-  engine::TextureId stream_id_for(const RgbaImage& image){
-    if(const auto it=stream_ids.find(&image);it!=stream_ids.end())return it->second;
-    engine::TextureDesc desc{};desc.name="tex:"+std::to_string(reinterpret_cast<std::uintptr_t>(&image));
-    if(!image.cooked_mips().empty()){
+  engine::TextureId stream_id_for(const std::shared_ptr<const RgbaImage>& image){
+    if(const auto it=stream_ids.find(image.get());it!=stream_ids.end()){
+      const auto owner_it=stream_owners.find(it->second);
+      if(owner_it!=stream_owners.end()&&owner_it->second.lock())return it->second;
+    }
+    // The name must stay unique per registration: the streamer dedups by name,
+    // and reusing a dead image's name would silently return its retired id.
+    engine::TextureDesc desc{};desc.name="tex:"+std::to_string(reinterpret_cast<std::uintptr_t>(image.get()))+"#"+std::to_string(++stream_registrations);
+    if(!image->cooked_mips().empty()){
       SDL_GPUTextureFormat format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-      switch(image.cooked_format()){
+      switch(image->cooked_format()){
         case TextureFormat::Bc7:format=SDL_GPU_TEXTUREFORMAT_BC7_RGBA_UNORM;break;
         case TextureFormat::Bc5:format=SDL_GPU_TEXTUREFORMAT_BC5_RG_UNORM;break;
         case TextureFormat::Bc4:format=SDL_GPU_TEXTUREFORMAT_BC4_R_UNORM;break;
         default:break;
       }
       if(SDL_GPUTextureSupportsFormat(device,format,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER))
-        for(const auto& m:image.cooked_mips())desc.mip_bytes.push_back(m.blocks.size());
+        for(const auto& m:image->cooked_mips())desc.mip_bytes.push_back(m.blocks.size());
       else
-        for(const auto& m:image.cooked_mips())desc.mip_bytes.push_back(static_cast<std::uint64_t>(m.width)*m.height*4);
-    }else if(!image.bc1_mips().empty()&&SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER))
-      for(const auto& m:image.bc1_mips())desc.mip_bytes.push_back(m.blocks.size());
+        for(const auto& m:image->cooked_mips())desc.mip_bytes.push_back(static_cast<std::uint64_t>(m.width)*m.height*4);
+    }else if(!image->bc1_mips().empty()&&SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_SAMPLER))
+      for(const auto& m:image->bc1_mips())desc.mip_bytes.push_back(m.blocks.size());
     else{
-      const auto levels=texture_mip_layout3d(&image).levels;
-      for(std::uint32_t i=0;i<levels;++i)desc.mip_bytes.push_back(static_cast<std::uint64_t>(std::max(1,image.width()>>i))*std::max(1,image.height()>>i)*4);
+      const auto levels=texture_mip_layout3d(image.get()).levels;
+      for(std::uint32_t i=0;i<levels;++i)desc.mip_bytes.push_back(static_cast<std::uint64_t>(std::max(1,image->width()>>i))*std::max(1,image->height()>>i)*4);
     }
-    const auto id=streamer.register_texture(std::move(desc));stream_ids.emplace(&image,id);stream_owners.emplace(id,&image);return id;
+    const auto id=streamer.register_texture(std::move(desc));stream_ids[image.get()]=id;stream_owners[id]=image;return id;
   }
   // advance_frame() yields the frame's residency changes: evictions apply
   // whole-texture (backend granularity); loads stay lazy — the first bind
@@ -207,7 +216,11 @@ struct Scene3DRenderer::Storage {
     for(const auto id:touched){
       const auto owner_it=stream_owners.find(id);
       if(owner_it==stream_owners.end())continue;
-      const auto it=textures.find(owner_it->second);if(it==textures.end())continue;
+      // An expired owner means the image is gone; its cache entry died with
+      // it (the Texture holds the owning shared_ptr), so nothing needs erasing.
+      const auto live=owner_it->second.lock();
+      if(!live)continue;
+      const auto it=textures.find(live.get());if(it==textures.end())continue;
       const auto finest=streamer.finest_resident_mip(id);
       // Any residency change invalidates the cached granularity — demotions
       // and promotions alike re-upload the new resident tail on next bind.
@@ -318,6 +331,11 @@ struct Scene3DRenderer::Storage {
     checked(SDL_SetTextureBlendMode(result->composite,SDL_BLENDMODE_BLEND_PREMULTIPLIED)&&SDL_SetTextureScaleMode(result->composite,SDL_SCALEMODE_LINEAR),"3D compositor setup failed");return result;
   }
   void render(const Scene3DView& view,Target& target){
+    // Per-view policy is resolved once: quality gates expensive sampling
+    // (aniso, cubic magnification, emission-volume steps) before uniform
+    // fill, and the post/debug uniforms feed the pass below.
+    const auto& opt=view.options;
+    const bool low_tier=opt.quality==RenderQuality3D::Low;
     struct Draw {const MeshInstance3D* instance;PreparedInstance3D transform;std::shared_ptr<Geometry> mesh;std::shared_ptr<Texture> image,optical,environment,normal,properties,cloud,shadow,next,emissive,mr;};
     std::vector<Draw> draws;draws.reserve(view.scene->instances().size());
     for(const auto& instance:view.scene->instances()){
@@ -348,7 +366,7 @@ struct Scene3DRenderer::Storage {
     for(std::size_t submission=0;submission<draws.size();++submission){
       const auto& d=draws[submission];
       const auto& tm=d.instance->material.texture_tiling;
-      const MaterialKey key{d.instance->material.double_sided,d.instance->material.anisotropic_texture,tm.x!=1.f||tm.y!=1.f,
+      const MaterialKey key{d.instance->material.double_sided,d.instance->material.anisotropic_texture&&!low_tier,tm.x!=1.f||tm.y!=1.f,
         d.image.get(),d.optical.get(),d.environment.get(),d.normal.get(),d.properties.get(),d.cloud.get(),d.shadow.get(),d.next.get(),d.emissive.get(),d.mr.get()};
       engine::DrawItem item{};item.material_id=material_ids.try_emplace(key,static_cast<std::uint32_t>(material_ids.size())).first->second;
       item.mesh_id=mesh_ids.try_emplace(d.mesh->owner.get(),static_cast<std::uint32_t>(mesh_ids.size())).first->second;
@@ -383,7 +401,7 @@ struct Scene3DRenderer::Storage {
         if(material.shadow&&l.intensity>0){const auto s=prepare_shadow3d(view.scene->camera(),*draw.instance,l.direction);fragment.additional_shadow[i]={s.light.x,s.light.y,s.light.z,0};}}
       fragment.surface_options[2]=material.rim_power;
       fragment.surface_options[3]=material.two_sided_diffuse?1.f:0.f;
-      fragment.texture_options[0]=material.cubic_magnification?1.f:0.f;
+      fragment.texture_options[0]=material.cubic_magnification&&!low_tier?1.f:0.f;
       if(material.shadow){const auto& s=*material.shadow;
         fragment.shadow_light={shadow.light.x,shadow.light.y,shadow.light.z,s.shape==AnalyticShadowShape3D::Ellipsoid?1.f:2.f};
         fragment.shadow_radii={s.radii.x,s.radii.y,s.radii.z,0};
@@ -391,7 +409,11 @@ struct Scene3DRenderer::Storage {
       if(material.surface_effect){const auto& e=*material.surface_effect;
         fragment.effect_options={1,e.blend,e.flow_phase,e.distortion};
         fragment.effect_sphere={e.view_sphere_center.x,e.view_sphere_center.y,e.view_sphere_center.z,e.sphere_radius};
-        fragment.volume_options={e.volume_depth,static_cast<float>(e.volume_steps),e.volume_density,e.volume_seed};
+        // Emission-volume ray marching scales with the quality tier: Low
+        // caps at 16 steps, Medium at 32; authored budgets apply above.
+        const int volume_steps=low_tier?std::min(e.volume_steps,16)
+            :opt.quality==RenderQuality3D::Medium?std::min(e.volume_steps,32):e.volume_steps;
+        fragment.volume_options={e.volume_depth,static_cast<float>(volume_steps),e.volume_density,e.volume_seed};
         if(e.volume_depth>0){
           // Model transforms use uniform scale and an orthonormal rotation.
           // Invert their camera-relative matrix once per draw, not per fragment.
@@ -455,7 +477,6 @@ struct Scene3DRenderer::Storage {
     // Resolve per-view quality policy once: Low keeps the tonemap-only path,
     // Medium adds mip bloom, High adds sharpen, Ultra renders MSAA when the
     // device supports it. Options are clamped, never trusted raw.
-    const auto& opt=view.options;
     const bool use_msaa=msaa_supported&&opt.quality==RenderQuality3D::Ultra;
     if(use_msaa&&!target.msaa_color){
       target.msaa_color=make_texture(device,target.width,target.height,scene_format,SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,1,SDL_GPU_SAMPLECOUNT_4);
@@ -477,6 +498,10 @@ struct Scene3DRenderer::Storage {
         else color.store_op=SDL_GPU_STOREOP_STORE;
         SDL_GPUDepthStencilTargetInfo depth{};depth.texture=use_msaa?target.msaa_depth:target.depth;depth.clear_depth=1;depth.load_op=SDL_GPU_LOADOP_CLEAR;depth.store_op=SDL_GPU_STOREOP_DONT_CARE;depth.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;depth.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
         auto* pass=SDL_BeginGPURenderPass(command.value,&color,1,&depth);if(!pass)throw gpu_error("3D render pass failed");
+        // View-level fragment uniform: the debug shading selector applies to
+        // every draw in the pass.
+        const std::array<float,4> view_params{static_cast<float>(opt.debug_view),0.f,0.f,0.f};
+        SDL_PushGPUFragmentUniformData(command.value,0,view_params.data(),static_cast<Uint32>(sizeof(view_params)));
         if(!sorted.empty()){
           SDL_BindGPUVertexStorageBuffers(pass,0,&vertex_buffer,1);SDL_BindGPUFragmentStorageBuffers(pass,0,&fragment_buffer,1);
           for(const auto& batch:batcher.batches()){
@@ -486,8 +511,9 @@ struct Scene3DRenderer::Storage {
             const SDL_GPUBufferBinding vertices{draw.mesh->vertices,0},indices{draw.mesh->indices,0};
             SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
             const bool tiled=material.texture_tiling.x!=1.f||material.texture_tiling.y!=1.f;
+            const bool aniso=material.anisotropic_texture&&!low_tier;
             const SDL_GPUTextureSamplerBinding sampled[]{
-              {draw.image->texture,tiled?(material.anisotropic_texture?repeat_aniso_sampler:repeat_sampler):(material.anisotropic_texture?detail_sampler:sampler)},
+              {draw.image->texture,tiled?(aniso?repeat_aniso_sampler:repeat_sampler):(aniso?detail_sampler:sampler)},
               {draw.optical->texture,sampler},{draw.environment->texture,environment_sampler},
               {draw.normal->texture,environment_sampler},{draw.properties->texture,environment_sampler},
               {draw.cloud->texture,environment_sampler},{draw.shadow->texture,sampler},{draw.next->texture,sampler},
@@ -536,7 +562,7 @@ void Scene3DRenderer::prepare(const DrawList& list){
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
   std::unordered_map<engine::TextureId,std::pair<float,std::uint32_t>> stream_demand;
   const auto stream_request=[&](const std::shared_ptr<const RgbaImage>& image,float priority,std::uint32_t desired_mip){
-    const auto id=s.stream_id_for(image?*image:*s.white);
+    const auto id=s.stream_id_for(image?image:s.white);
     const auto [it,inserted]=stream_demand.try_emplace(id,priority,desired_mip);
     if(!inserted){it->second.first=std::max(it->second.first,priority);it->second.second=std::min(it->second.second,desired_mip);}};
   std::size_t geometry_bytes=0,texture_bytes=0;
@@ -553,10 +579,12 @@ void Scene3DRenderer::prepare(const DrawList& list){
     const float focal=cam.projection==Projection3D::Orthographic?r.height/std::max(cam.orthographic_height,1e-6f)
       :r.height/std::max(2.f*std::tan(cam.vertical_fov_radians*.5f),1e-6f);
     for(const auto& instance:view->scene->instances()){
-      if(meshes.insert(instance.mesh.get()).second)geometry_bytes+=instance.mesh->byte_size()*2;
-      // Nearer instances win texture-budget contention.
+      // Distance-culled instances never submit — no residency demand either.
       const auto dx=instance.position.x-camera.x,dy=instance.position.y-camera.y,dz=instance.position.z-camera.z;
       const float dist=static_cast<float>(std::sqrt(dx*dx+dy*dy+dz*dz));
+      if(instance.visible_range>0.f&&dist>instance.visible_range+instance.scale*instance.mesh->bounding_radius())continue;
+      if(meshes.insert(instance.mesh.get()).second)geometry_bytes+=instance.mesh->byte_size()*2;
+      // Nearer instances win texture-budget contention.
       const float priority=1.f/(1.f+dist);
       const float footprint=2.f*instance.scale*instance.mesh->bounding_radius()*focal/(cam.projection==Projection3D::Orthographic?1.f:std::max(dist,1e-4f));
       const auto mip_for=[&](const std::shared_ptr<const RgbaImage>& image){
@@ -566,7 +594,9 @@ void Scene3DRenderer::prepare(const DrawList& list){
       if(textures.insert(image.get()).second)texture_bytes+=texture_mip_layout3d(image.get()).resident_bytes;
       // anisotropic_texture declares high-frequency content (polar/ring
       // maps): isotropic LOD erases it, so it keeps full-chain residency.
-      stream_request(image,priority,instance.material.anisotropic_texture?0u:mip_for(image));
+      // Low tier drops the promotion — the aniso sampler is gated off too.
+      const bool aniso=instance.material.anisotropic_texture&&view->options.quality!=RenderQuality3D::Low;
+      stream_request(image,priority,aniso?0u:mip_for(image));
       if(instance.material.dielectric){
         // The environment map is a view-independent equirect sampled at
         // reflected/refracted directions — surface footprint does not bound

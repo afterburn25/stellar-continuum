@@ -462,6 +462,10 @@ void register_scene_components(World &world) {
                     &AtmosphereShell::g, &AtmosphereShell::b,
                     &AtmosphereShell::strength, &AtmosphereShell::power,
                     &AtmosphereShell::night_floor>);
+  world.register_component<VisibleRange>(
+      "visiblerange",
+      encode_fields<VisibleRange, &VisibleRange::range>,
+      decode_fields<VisibleRange, &VisibleRange::range>);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -736,6 +740,8 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
                                         s.atmo_strength, s.atmo_power,
                                         s.atmo_night});
+    if (s.visible_range > 0.f)
+      world.add(entity, VisibleRange{s.visible_range});
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
@@ -821,6 +827,8 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.atmo_power = at->power;
       s.atmo_night = at->night_floor;
     }
+    if (const auto *vr = world.get<VisibleRange>(entity))
+      s.visible_range = vr->range;
     if (const auto *g = world.get<GravityScale>(entity))
       s.gravity_scale = g->value;
     s.solid = world.get<Solid>(entity) != nullptr;

@@ -122,6 +122,8 @@ void validate_instance(const MeshInstance3D& i){
      !bounded(m.texture_tiling.x,64)||m.texture_tiling.x<.01f||
      !bounded(m.texture_tiling.y,64)||m.texture_tiling.y<.01f)
     throw std::invalid_argument("3D alpha threshold and texture tiling must be finite and bounded.");
+  if(!bounded(i.visible_range,1e12)||i.visible_range<0)
+    throw std::invalid_argument("3D visible range must be finite and non-negative.");
 }
 }
 Quaternion rotation_axis_angle(Vec3 axis,float radians){
@@ -209,10 +211,14 @@ PreparedInstance3D prepare_instance3d(const Camera3D& camera,const MeshInstance3
   if(!bounded(aspect,1e4)||aspect<1e-4f)throw std::invalid_argument("3D camera aspect must be positive and bounded.");
   const Position3 delta{instance.position.x-camera.position.x,instance.position.y-camera.position.y,instance.position.z-camera.position.z};
   const double radius=instance.mesh->bounding_radius()*instance.scale;
+  const double distance=std::hypot(delta.x,delta.y,delta.z);
+  // Author distance culling rides the same path as the frustum reject:
+  // beyond visible_range the instance is invisible and draws no demand.
+  if(instance.visible_range>0.f&&distance>static_cast<double>(instance.visible_range)+radius)return {};
   // Reject astronomical offsets in double precision before narrowing.
   const double half_height=camera.projection==Projection3D::Perspective?
       camera.far_plane*std::tan(camera.vertical_fov_radians*.5):camera.orthographic_height*.5;
-  if(std::hypot(delta.x,delta.y,delta.z)>std::hypot(static_cast<double>(camera.far_plane),half_height,half_height*aspect)+radius)return {};
+  if(distance>std::hypot(static_cast<double>(camera.far_plane),half_height,half_height*aspect)+radius)return {};
   auto model=rotation_matrix(instance.rotation);
   for(int c=0;c<3;++c)for(int row=0;row<3;++row)model.values[c*4+row]*=instance.scale;
   model.values[12]=static_cast<float>(delta.x);model.values[13]=static_cast<float>(delta.y);model.values[14]=static_cast<float>(delta.z);

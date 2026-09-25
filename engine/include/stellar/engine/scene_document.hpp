@@ -197,6 +197,9 @@ struct Scene3dEntity {
   // strength 0 leaves the body's authored art untouched.
   float atmo_strength{0.f}, atmo_power{3.f}, atmo_night{0.05f};
   float atmo_r{0.45f}, atmo_g{0.62f}, atmo_b{1.f};
+  // Distance culling: hidden once the camera is farther than this many
+  // world units from the bounding-sphere surface. 0 = always visible.
+  float visible_range{0.f};
 };
 
 // An extra directional light — the material pipeline evaluates at most
@@ -244,6 +247,9 @@ struct Scene3dDocument {
   float contrast{1.f}, saturation{1.f}, sharpen{0.f};
   // Quality tier for expensive per-view effects: low|medium|high|ultra.
   std::string quality{"high"};
+  // Diagnostic shading override for the 3D view:
+  // lit|unlit|albedo|normals|roughness|metallic|emissive|lighting.
+  std::string debug_view{"lit"};
   // Background clear color.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward (-Y) acceleration in units/s²; 0 disables gravity.

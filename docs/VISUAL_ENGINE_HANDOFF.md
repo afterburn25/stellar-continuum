@@ -34,6 +34,19 @@ m.alpha_threshold = 0.5f;                   // [0,1], 0 = off (discard)
 m.texture_tiling = {2.f, 2.f};              // each in [0.01,64]
 ```
 
+Per-instance distance culling lives on `MeshInstance3D`:
+
+```cpp
+MeshInstance3D inst;
+inst.visible_range = 2500.f;  // world units; 0 = visible at any range
+```
+
+`prepare_instance3d` marks the instance invisible once the camera is
+farther than `visible_range` + the scaled bounding radius — the same
+reject path as the frustum test, so culled instances skip the draw call
+*and* their TextureStreamer residency demand. Validate: finite, ≥ 0,
+≤ 1e12; invalid values throw at `Scene3D::create`.
+
 - All PBR/atmosphere strengths default to 0 — absence of the optional
   blocks renders exactly as before (authored art untouched).
 - Metallic raises specular albedo tint and removes diffuse response;
@@ -67,36 +80,57 @@ view.options.bloom_threshold = 0.9f;
 view.options.contrast = 1.05f;
 view.options.saturation = 0.95f;
 view.options.sharpen = 0.25f;               // unsharp mask
+view.options.debug_view = DebugView3D::Normals;  // see table below
 ```
 
-Quality policy: Low = tonemap only (no bloom/sharpen/extra sampling);
-Medium = HDR mip bloom; High = sharpen; Ultra = 4x MSAA when the device
-supports it. Bloom composites over transparent background (halo spills
-past geometry); keep `bloom` ≤ ~0.5 and `sharpen` ≤ ~0.4 to stay inside
-the cinematic-but-readable house style.
+Quality policy: Low = tonemap only — bloom/sharpen off, anisotropic and
+cubic magnification sampling off, emission-volume ray-march capped at
+16 steps; Medium = HDR mip bloom, volumes capped at 32 steps; High =
+sharpen; Ultra = 4x MSAA when the device supports it. Bloom composites
+over transparent background (halo spills past geometry); keep `bloom`
+≤ ~0.5 and `sharpen` ≤ ~0.4 to stay inside the cinematic-but-readable
+house style.
+
+`DebugView3D` is a per-view diagnostic shading override — it reuses the
+production material path (not a second renderer), so it stays faithful:
+
+| Value | Output |
+| --- | --- |
+| `Lit` (default) | production shading |
+| `Unlit` | tinted surface texture, no illumination |
+| `Albedo` | sampled surface before tint |
+| `Normals` | view-space normal ×0.5+0.5 |
+| `Roughness` | active GGX roughness (PBR/response/optics scalar) |
+| `Metallic` | active metallic factor |
+| `Emissive` | emissive map × tint × strength + atmosphere rim |
+| `LightingOnly` | shading with albedo divided out |
 
 ## Authoring path — `Scene3dDocument`
 
 Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `emissive`, `emissive_strength`, `emissive_r/g/b`, `night_emissive`,
 `environment`, `environment_strength`, `alpha_cutout`, `uv_tile_x/y`,
-`atmo_strength/power/night/r/g/b`. Scene fields: `point_lights[]`
-(max 4), `exposure`, `bloom`, `bloom_threshold`, `contrast`,
-`saturation`, `sharpen`, `quality` ("low|medium|high|ultra").
+`atmo_strength/power/night/r/g/b`, `range` (per-entity
+`visible_range`). Scene fields: `point_lights[]` (max 4), `exposure`,
+`bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
+`quality` ("low|medium|high|ultra"), `debug` in the `render` block
+("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting").
+Negative `range` and unknown `debug`/`quality` strings are rejected.
 
 `spawn_scene3d` attaches `MaterialPbr`/`AtmosphereShell` components
-(binary codec round-trip), `scene3d_from_world` exports them back, and
-`RuntimeHost` maps them onto `Material3D`/`PointLight3D`/
-`Scene3DView::options`. Documents without the new keys load identically.
+(binary codec round-trip), a `VisibleRange` component when `range > 0`,
+`scene3d_from_world` exports them back, and `RuntimeHost` maps them onto
+`Material3D`/`PointLight3D`/`Scene3DView::options`. Documents without
+the new keys load identically.
 
 ## Editor controls — `stellar-engine.exe` Scene3D tool
 
 Entity rows: PBR map paths + metallic/roughness scalars, emissive
 path/tint/strength/night gate, environment path/strength, alpha cutout,
-UV tiling, atmosphere tint/strength/power/night floor. Scene rows:
-exposure, bloom + threshold, contrast/saturation/sharpen, quality tier,
-point lights (pos/color/intensity/range). The preview runs the real
-`Scene3D` + GPU path, so edits are WYSIWYG.
+UV tiling, atmosphere tint/strength/power/night floor, visible range.
+Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
+quality tier, debug view, point lights (pos/color/intensity/range).
+The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
 ## Performance notes
 
@@ -109,6 +143,11 @@ point lights (pos/color/intensity/range). The preview runs the real
   budgets.
 - Instance cap unchanged (`maximum_scene3d_instances`); per-instance
   CPU record build remains the submission bound.
+- `visible_range` culling runs before texture demand declaration —
+  culled instances submit nothing and hold no GPU residency.
+- Low tier skips aniso/cubic samplers entirely (linear clamp/repeat
+  samplers bound instead) and caps emission-volume marching at 16
+  steps (Medium: 32; authored `volume_steps` applies at High+).
 
 ## Known limitations
 
@@ -118,5 +157,9 @@ point lights (pos/color/intensity/range). The preview runs the real
   aerial perspective.
 - One shared equirect env map per material — no probe grid.
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
-- Editor preview lacks debug-view modes (Normals/Roughness-only etc.).
+- Debug views are developer tooling — no LOD/residency visualization
+  modes yet, and LightingOnly divides by sampled albedo so untextured
+  or near-black surfaces clip to black.
+- `visible_range` is distance culling, not geometric LOD — no
+  hierarchical LOD, impostors, or mesh decimation yet.
 - No indirect draw / GPU culling — CPU record build is the scale bound.
