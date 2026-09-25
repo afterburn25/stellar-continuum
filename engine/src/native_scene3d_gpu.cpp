@@ -503,6 +503,14 @@ struct Scene3DRenderer::Storage {
       if(material.surface_effect){const auto& e=*material.surface_effect;
         fragment.effect_options={1,e.blend,e.flow_phase,e.distortion};
         fragment.effect_sphere={e.view_sphere_center.x,e.view_sphere_center.y,e.view_sphere_center.z,e.sphere_radius};
+        // Authored occlusion sphere: centred on the instance origin in
+        // view space (the star its corona wraps). An explicit view-space
+        // sphere takes precedence.
+        if(e.sphere_radius==0.f&&e.occlude>0.f)
+          fragment.effect_sphere={draw.transform.model_view.values[12],
+                                  draw.transform.model_view.values[13],
+                                  draw.transform.model_view.values[14],
+                                  e.occlude*draw.instance->scale};
         // Emission-volume ray marching scales with the quality tier: Low
         // caps at 16 steps, Medium at 32; authored budgets apply above.
         const int volume_steps=low_tier?std::min(e.volume_steps,16)

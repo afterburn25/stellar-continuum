@@ -291,7 +291,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 - `SurfaceEffect3D`'s emission-volume march becomes authorable: the
   `volume` entity block (`{depth,density,seed,steps,scatter,flow,
-  distort,blend,image2}`) maps to a new `EmissionVolume` component
+  distort,blend,image2,occlude}`) maps to a new `EmissionVolume` component
   (tolerant codec reads legacy 20-byte and 28-byte payloads with
   zero-warp/no-blend defaults + spawn + world export), and
   `RuntimeHost`/editor preview attach the surface effect using the
@@ -306,8 +306,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   bounds (depth (0,.75], steps [8,64], scatter/blend [0,1], flow
   |f|≤1e4, distort [0,.1]), `engine_project` round-trip + rejects,
   `engine_world` codec/spawn/export, and GPU probes showing a
-  flow/distort re-pose and a blend=1 emission swap change the marched
-  pixels. Remaining: the camera-inside sphere stays C++-only.
+  flow/distort re-pose, a blend=1 emission swap, and an authored
+  `occlude` sphere (corona masking the volume centre) change the marched
+  pixels. Remaining: explicit view-space sphere placement stays
+  C++-only (`SurfaceEffect3D::view_sphere_center`/`sphere_radius` still
+  win when set).
 
 ## Scene3D directional shadow mapping (2026-09-25)
 

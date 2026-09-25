@@ -122,6 +122,12 @@ struct SurfaceEffect3D {
   std::shared_ptr<const RgbaImage> next_texture;
   float blend{},flow_phase{},distortion{};
   Vec3 view_sphere_center;float sphere_radius{};
+  // Authorable occlusion sphere: an opaque sphere of `occlude` object-
+  // space units centred on the instance origin — a corona volume stops
+  // shining through its own star. Evaluated per draw in view space;
+  // ignored when `sphere_radius` sets an explicit view-space sphere.
+  // [0,1e5]; 0 disables.
+  float occlude{};
   // Optional image-shaped emission volume. The closed proxy spans local
   // [-.5,.5] x [-.22,.78] x [-volume_depth,volume_depth]; the camera is outside.
   // Zero retains surface rendering. Integration uses local optical distance,

@@ -2589,6 +2589,7 @@ int RuntimeHost::run() {
           effect.flow_phase = vol->flow;
           effect.distortion = vol->distort;
           effect.blend = vol->blend;
+          effect.occlude = vol->occlude;
           // image2 overrides next_texture for the blend lane; an
           // unloadable path keeps the entity texture (blend no-ops).
           if (const auto alt = tex3d_of(vol->image2))

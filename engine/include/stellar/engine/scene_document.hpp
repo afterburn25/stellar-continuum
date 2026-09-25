@@ -260,6 +260,10 @@ struct Scene3dEntity {
   // texture alone). A missing/unloadable image2 leaves the primary.
   float volume_blend{0.f};
   std::string volume_image2;
+  // Optional occlusion sphere: opaque radius in object units centred on
+  // the entity origin — a corona stops shining through its star.
+  // [0,1e4]; 0 disables.
+  float volume_occlude{0.f};
   // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
   // coarsest-first. lod_meshes[i] draws once the projected bounding
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).

@@ -972,6 +972,16 @@ int main(int argc,char** argv)try{
     check(channel(*primary,160,120,0)>channel(*primary,160,120,2)&&
           channel(*seq,160,120,2)>channel(*seq,160,120,0),
         "Volume blend did not swap the emission image");
+    // Authored occlusion sphere: radius .15 centred on the instance
+    // origin punches a hole in the volume's lower-centre (the photosphere
+    // a corona wraps) while the outer limb stays lit.
+    plasma.material.surface_effect->blend=0;plasma.material.surface_effect->occlude=.15f;
+    const auto occluded=capture({plasma},"plasma-occlude.png");
+    int hole=0;
+    for(int y=140;y<172;++y)for(int x=150;x<170;++x)
+      if(channel(*primary,x,y,0)-channel(*occluded,x,y,0)>12)++hole;
+    check(hole>80,"Authored occlude sphere did not mask the volume centre");
+    check(channel(*occluded,120,90,0)>30,"Occlude sphere removed the whole volume");
     std::cout<<"volume_scatter_gpu=lit_limb_passed\n";
   }
   {

@@ -2221,12 +2221,18 @@ void commit_scene3_field(Shell &shell) {
           }
           const std::string img2 = n >= 0 && toks.size() > 8
               ? toks[8] : "";
+          float occ = 0.f;
+          if (n >= 0 && toks.size() > 9) {
+            try { occ = std::stof(toks[9]); }
+            catch (const std::exception &) { n = -1; }
+          }
           if (n >= 5 && v[0] >= 0.f && v[0] <= 0.75f && v[1] > 0.f &&
               v[1] <= 32.f && std::abs(v[2]) <= 1e4f && v[3] >= 8.f &&
               v[3] <= 64.f && v[4] >= 0.f && v[4] <= 1.f &&
               std::abs(v[5]) <= 1e4f && v[6] >= 0.f && v[6] <= 0.1f &&
               v[7] >= 0.f && v[7] <= 1.f &&
               (v[7] == 0.f || !img2.empty()) &&
+              occ >= 0.f && occ <= 1e4f &&
               (v[0] == 0.f || !next.texture.empty())) {
             next.volume_depth = v[0];
             next.volume_density = v[1];
@@ -2237,6 +2243,7 @@ void commit_scene3_field(Shell &shell) {
             next.volume_distort = v[6];
             next.volume_blend = v[7];
             next.volume_image2 = img2;
+            next.volume_occlude = occ;
             valid = true;
           }
           break; }
@@ -2508,6 +2515,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         effect.flow_phase = e.volume_flow;
         effect.distortion = e.volume_distort;
         effect.blend = e.volume_blend;
+        effect.occlude = e.volume_occlude;
         if (!e.volume_image2.empty())
           if (const auto alt = scene3_tex(shell, e.volume_image2))
             effect.next_texture = alt;
@@ -2830,12 +2838,14 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                   std::to_string(entity->volume_flow) + "," +
                   std::to_string(entity->volume_distort) + "," +
                   std::to_string(entity->volume_blend) +
-                  (entity->volume_image2.empty()
+                  (entity->volume_image2.empty() &&
+                           entity->volume_occlude == 0.f
                        ? ""
-                       : "," + entity->volume_image2)
+                       : "," + entity->volume_image2 + "," +
+                             std::to_string(entity->volume_occlude))
             : "",
         ed(65),
-        "depth,density,seed,steps,scatter[,flow,distort[,blend,image2]] - emission volume; 0 clears");
+        "depth,density,seed,steps,scatter[,flow,distort[,blend[,image2[,occlude]]]] - emission volume; 0 clears");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -6903,9 +6913,11 @@ int main(int argc, char **argv) {
                             std::to_string(se->volume_flow) + "," +
                             std::to_string(se->volume_distort) + "," +
                             std::to_string(se->volume_blend) +
-                            (se->volume_image2.empty()
+                            (se->volume_image2.empty() &&
+                                     se->volume_occlude == 0.f
                                  ? ""
-                                 : "," + se->volume_image2));
+                                 : "," + se->volume_image2 + "," +
+                                       std::to_string(se->volume_occlude)));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

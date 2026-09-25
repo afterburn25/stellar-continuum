@@ -484,6 +484,7 @@ std::string Scene3dDocument::to_json() const {
                         {"distort", e.volume_distort}};
     if (e.volume_blend != 0.f) item["volume"]["blend"] = e.volume_blend;
     if (!e.volume_image2.empty()) item["volume"]["image2"] = e.volume_image2;
+    if (e.volume_occlude != 0.f) item["volume"]["occlude"] = e.volume_occlude;
     if (!e.lod_meshes.empty()) {
       item["lods"] = e.lod_meshes;
       item["lodPixels"] = e.lod_pixels;
@@ -717,6 +718,7 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         e.volume_flow = vol.value("flow", 0.0f);
         e.volume_distort = vol.value("distort", 0.0f);
         e.volume_blend = vol.value("blend", 0.0f);
+        e.volume_occlude = vol.value("occlude", 0.0f);
         if (vol.contains("image2")) {
           if (!vol.at("image2").is_string())
             return fail("volume image2 must be a texture path");
@@ -729,7 +731,8 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
             !(e.volume_scatter >= 0.f && e.volume_scatter <= 1.f) ||
             !(std::abs(e.volume_flow) <= 1e4f) ||
             !(e.volume_distort >= 0.f && e.volume_distort <= 0.1f) ||
-            !(e.volume_blend >= 0.f && e.volume_blend <= 1.f))
+            !(e.volume_blend >= 0.f && e.volume_blend <= 1.f) ||
+            !(e.volume_occlude >= 0.f && e.volume_occlude <= 1e4f))
           return fail("volume fields out of range");
         if (e.volume_blend != 0.f && e.volume_image2.empty())
           return fail("volume blend requires an image2 texture");

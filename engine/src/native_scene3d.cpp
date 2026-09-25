@@ -98,7 +98,7 @@ void validate_instance(const MeshInstance3D& i){
      m.light_color.x>4||m.light_color.y>4||m.light_color.z>4||!bounded(m.light_intensity,16)||m.light_intensity<0||!bounded(m.rim_power,16)||m.rim_power<0)
     throw std::invalid_argument("3D light color, intensity and rim response must be bounded.");
   if(m.surface_effect){const auto& e=*m.surface_effect;
-    if(!e.next_texture||!bounded(e.blend,1)||e.blend<0||!bounded(e.flow_phase,1e6)||!bounded(e.distortion,.1)||e.distortion<0||!valid(e.view_sphere_center)||!bounded(e.sphere_radius,1e5)||e.sphere_radius<0)
+    if(!e.next_texture||!bounded(e.blend,1)||e.blend<0||!bounded(e.flow_phase,1e6)||!bounded(e.distortion,.1)||e.distortion<0||!valid(e.view_sphere_center)||!bounded(e.sphere_radius,1e5)||e.sphere_radius<0||!bounded(e.occlude,1e5)||e.occlude<0)
       throw std::invalid_argument("Invalid surface effect sequence or occlusion sphere");
     if(!bounded(e.volume_depth,.75)||e.volume_depth<0||!bounded(e.volume_density,32)||e.volume_density<=0||
        !bounded(e.volume_seed,1e4)||e.volume_steps<8||e.volume_steps>64||

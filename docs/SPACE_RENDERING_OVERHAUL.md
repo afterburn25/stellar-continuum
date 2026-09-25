@@ -101,7 +101,8 @@ same document headless-tested.
    `volume` block / `EmissionVolume` component (entity texture supplies
    the emission image; `flow`/`distort` re-pose the marched filaments and
    `image2`+`blend` mix a second authored image, so sibling nebulae don't
-   repeat). Remaining: the deck is
+   repeat; `occlude` masks the volume behind its own photosphere sphere).
+   Remaining: the deck is
    a texture-space composite — no volumetric cloud shells or cloud
    self-shadowing; banding is a static two-harmonic warp (`band_shear`
    + `band_waves` jets), not animated turbulence.

@@ -708,6 +708,7 @@ int main() {
         turret.volume_distort = 0.05f;
         turret.volume_blend = 0.4f;
         turret.volume_image2 = "maps/turret_glow.png";
+        turret.volume_occlude = 0.6f;
         turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
         turret.lod_pixels = 64.f;
         turret.lod_fade = 0.25f;
@@ -792,7 +793,8 @@ int main() {
         check(ev != nullptr && ev->depth == 0.3f && ev->density == 6.f &&
                   ev->seed == 2.f && ev->steps == 24 && ev->scatter == 0.5f &&
                   ev->flow == 1.5f && ev->distort == 0.05f &&
-                  ev->blend == 0.4f && ev->image2 == "maps/turret_glow.png",
+                  ev->blend == 0.4f && ev->image2 == "maps/turret_glow.png" &&
+                  ev->occlude == 0.6f,
               "spawn_scene3d emissionvolume component");
         check(world3.get<EmissionVolume>(ship_e) == nullptr,
               "no volume key does not attach a component");
@@ -874,7 +876,8 @@ int main() {
                       rev->density == 6.f && rev->steps == 24 &&
                       rev->scatter == 0.5f && rev->flow == 1.5f &&
                       rev->distort == 0.05f && rev->blend == 0.4f &&
-                      rev->image2 == "maps/turret_glow.png",
+                      rev->image2 == "maps/turret_glow.png" &&
+                      rev->occlude == 0.6f,
                   "emissionvolume codec round-trips");
         }
         if (re_turret) {
@@ -929,7 +932,8 @@ int main() {
                   out.entities[1].volume_flow == 1.5f &&
                   out.entities[1].volume_distort == 0.05f &&
                   out.entities[1].volume_blend == 0.4f &&
-                  out.entities[1].volume_image2 == "maps/turret_glow.png",
+                  out.entities[1].volume_image2 == "maps/turret_glow.png" &&
+                  out.entities[1].volume_occlude == 0.6f,
               "scene3d_from_world exports the emission volume");
         check(out.entities[1].lod_meshes.size() == 2 &&
                   out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&

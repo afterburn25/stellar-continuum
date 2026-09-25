@@ -447,6 +447,7 @@ int main() {
     cube.volume_distort = 0.05f;
     cube.volume_blend = 0.4f;
     cube.volume_image2 = "maps/nebula_b.png";
+    cube.volume_occlude = 0.6f;
     cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
     cube.lod_pixels = 48.f;
     cube.lod_fade = 0.3f;
@@ -589,7 +590,8 @@ int main() {
                 rc.volume_seed == 2.f && rc.volume_steps == 24 &&
                 rc.volume_scatter == 0.5f && rc.volume_flow == 1.5f &&
                 rc.volume_distort == 0.05f && rc.volume_blend == 0.4f &&
-                rc.volume_image2 == "maps/nebula_b.png",
+                rc.volume_image2 == "maps/nebula_b.png" &&
+                rc.volume_occlude == 0.6f,
             "scene3d emission-volume block round-trips");
       check(reparsed->point_lights.size() == 1 &&
                 reparsed->point_lights[0].x == 1.f &&
@@ -784,6 +786,10 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"image2":5}}]})")
               .has_value(),
           "scene3d volume non-string image2 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"occlude":-1}}]})")
+              .has_value(),
+          "scene3d volume negative occlude rejected");
     check(engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"density":8,"steps":48,"scatter":0.7}}]})")
               .has_value(),

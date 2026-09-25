@@ -231,6 +231,9 @@ struct EmissionVolume {
   // `blend` [0,1] mixes it against the entity texture (0 = primary only).
   float blend{0.f};
   std::string image2;
+  // Optional occlusion sphere centred on the entity origin, object units
+  // — a corona stops shining through its star. [0,1e4]; 0 disables.
+  float occlude{0.f};
 };
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
 // weighted to the day side with a nightside floor.
