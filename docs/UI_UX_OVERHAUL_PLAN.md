@@ -140,11 +140,10 @@ breaks navigation/AT flow, or presents wrong state)
    lanes, territory, fleet markers, selection halo and the planned-route
    green/amber halves; the zoom readout carries a band label
    (OVERVIEW / SECTOR / LOCAL) matching the label-density thresholds.
-   Phenomena iconography partially addressed: surveyed regions now carry
-   their designation + type name on the chart once the projected cloud is
-   large enough for legible text (screen-extent gated, FoW-safe via the
-   surveyed-region set), and the legend teaches the glyph. Still open:
-   strategic overlay toggles.
+   Phenomena iconography and strategic overlay toggles shipped: surveyed
+   regions carry designation labels once legible, and the legend's
+   lane/territory/phenomenon rows double as show/hide layer toggles
+   (FoW shroud and marker vocabulary always remain).
 4. ~~**Colony screen lacks an at-a-glance vitals summary.**~~ → DONE.
    Vitals strip + numeric alert chips render for owned colonies
    (observer-safe); chips now route to the first affected structure
@@ -259,6 +258,8 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | Fleet organization — two layers, both projection-only over authoritative state. The `native_fleet_workspace` Outliner (dev-inspection / embedded harness presentation) now renders a status-grouped list: `fleet_group`/`fleet_rows` project fleets into IN COMBAT → IN TRANSIT → ON MISSION → STATIONED with localized `FLEET_GROUP_*` caption headers (en+de) drawn through `section_header`; a single non-empty group renders header-free so flat geometry is preserved. Every consumer — focus ring, wheel scroll, keyboard snap, click dispatch, render, hover tooltip — iterates the same projected rows; `view_->own_fleets` order is never touched. The player-facing counterpart: `native_controlled_assets` rows gained an `urgency` rank and the FLEETS category now surfaces engaged → in-transit → on-mission → idle hulls ahead of creation-order sorting, matching the displayed activity labels. Tests cover group-header rendering, click dispatch beneath headers, End-key scroll-into-view for off-viewport rows, single-group flatness and assets urgency ordering; `--fleet-smoke` re-verified live (moving colony fleet now tops the FLEETS section). | 5d68bd72 |
 
 | 2026-09-25 | Phenomenon identification on the galaxy map: surveyed regions render a player-facing designation + type-name label once their projected extent is large enough for legible text (90–520px window — suppressed at overview clutter and at screen-filling zooms), drawn after the decal batches so labels sit above the clouds they name, and clipped to the screen. Gating reuses the authoritative `surveyed` set (systems partially surveyed or better / developer session), so unknown regions never disclose a name; unsurveyed artwork still renders untouched. The MAP LEGEND gained a "Surveyed phenomenon" row with a soft-glow glyph (en+de). Tests cover surveyed-label emission ("RC-1 · Reflection Nebula"), unsurveyed secrecy, and overview suppression; `--galaxy-art-smoke` captures verified the legend row and decluttered overview/regional bands. | ef368f49 |
+
+| 2026-09-25 | Strategic overlay toggles: the MAP LEGEND's lane / empire territory / surveyed phenomenon rows are now show/hide layer switches — each draws a checkbox at the row's right edge, dims glyph + label while off, and hover-highlights like the panel's other interactive rows. State is client-local (like the collapse toggle), click press/release matching reuses the shared `map_legend_row_bounds` geometry, and the three rows join the HUD focus ring after the legend toggle with localized AT labels (`HUD_MAP_LAYER_*`, en+de). Territory hiding uses a new `NativeTerritoryRenderStyle::draw_ownership` flag that suppresses fill/contours/claims/region labels while the unexplored-space fog shroud keeps rendering — FoW geometry is never toggleable. Phenomena hide also suppresses the map hover inspection for the hidden layer; lanes hide only the charted-lane lines (markers and knowledge vocabulary untouched). Territory tests assert ownership marks vanish while `fog_images` still emit; `--galaxy-art-smoke` re-verified (territory stats unchanged with all layers on). | d5eacf30 |
 
 ### Implementation notes
 
