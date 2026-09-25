@@ -1191,8 +1191,17 @@ name, Parent/FragmentRoot navigation, `GetFocus` on the window root)
 instead of a live-region notification; the UIA test walks the raw tree
 to the fragment and checks its name/type/focus (UIA splices the host
 HWND's native children into hostable providers — the test iterates
-siblings to find ours). Open: AT-SPI/non-Windows backends and UIA
-control patterns.
+siblings to find ours). Interactive AT landed its first pattern: the
+focus fragment answers `IInvokeProvider` for activatable controls
+(Button/CheckBox/Edit/Custom; sliders stay read-only range, groups
+stay containers). `Invoke()` arrives on a UIA worker thread, so it only
+bumps an atomic counter — `drain_activations()` runs once per frame in
+the campaign update loop and the startup entry loop, injecting a Return
+press+release through normal input dispatch (release-gated controls like
+the fleet outliner work unchanged). The bridge test drives a real UIA
+`Invoke` and asserts the queued count; a slider fragment reports no
+invoke pattern. Open: AT-SPI/non-Windows backends, writable range/
+toggle patterns, and a full fragment tree.
 Per-control focus geometry (row 26): `AccessibilityAnnouncement` now
 carries optional `AnnouncementBounds` and every focus-bearing surface
 exposes `focused_bounds(...)` mirroring its `focused_label` — settings
@@ -1402,8 +1411,11 @@ hysteresis, per-device state, reversal re-engages) that flows through
 the same gate+translation+repeater — a camera-bound axis keeps its
 gameplay meaning (`pad_axis_bound`), so stick nav only engages where the
 mapper cannot see gameplay anyway; the navigation smoke pins both halves
-(armed ring swallows map_pan_y; free play delivers it). Open: a deeper
-accessibility input layer.
+(armed ring swallows map_pan_y; free play delivers it). The first
+accessibility input layer also landed — the UIA bridge's focus fragment
+answers IInvokeProvider and queued activations drain as Return
+press+release through normal dispatch (see row 26). Open: writable
+range/toggle patterns and a full fragment tree.
 Memory census broadening (row 55): the client's per-update MemoryTracker reports now also cover the two remaining bounded app caches — `territory-overlay` reports `NativeTerritoryOverlay::cached_image_bytes()` against its 16 MiB bound, and `image-preparation` reports `ImagePreparationQueue::reserved_bytes()` against the 32 MiB reservation bound — beside the existing planet-materials/replay-recorder/audio-queues reporters. Both land in support-bundle memory.json automatically through the tracker registry; the shared map-smoke tail asserts all three client cache subsystems register, so a lost report fails every smoke.
 Keyboard scroll-follow (row 26): list-backed rings previously covered only the rendered window — rows past the viewport were keyboard-unreachable on surfaces without a search field. Two mechanisms now close it. Pixel-scrolled surfaces keep edge-clipped rows in the ring and snap them fully into view via the new engine `ScrollView::scroll_interval_into_view(interval_top, interval_bottom, viewport_top, viewport_bottom)` (the pixel counterpart of `VirtualizedList::ensure_visible`): notification feed action buttons (relaxed from full containment to clipped inclusion), chronicle cards/contact/tag chips, diplomacy contact rows + proposal/intelligence detail actions (two lanes), construction project + build-order rows (`ensure_visible` on their VirtualizedLists), fleet outliner rows, colony-roster rows (ensure_visible by display index), new-campaign species rows (clipped inclusion replaces center-containment), research guided cards (scroll) + tree graph (camera-pan snap on both axes), shipyard design cards (clipped inclusion) + order rows/buttons, startup save slots (`ensure_visible` on the decoded slot index), and the planetary screen hit registry (slot-grid and detail-action lanes via a `scroll_lane` tag on `Hit`). Fixed-slot surfaces with no partially-rendered rows — developer celestial index, planet-type index, empire monitor — edge-scroll instead: Up/Down on a boundary slot scrolls one row while the slot keeps focus and re-resolves to the revealed row; Tab/other keys leave the list. Activation dispatch, ordering and Escape layering are unchanged everywhere. Verified by the new planet-index ring scroll block in `native_developer_index` (Down past the rendered window reveals a never-rendered row; Up scrolls back) plus the 13-surface regression batch (roster/notifications/chronicle/diplomacy/construction/fleet/new-game/research/shipyard/startup/planetary/colony workspaces) — all green.
 Missions-panel list scrolling (row 26): the mission/settlement panel previously truncated both lists at the panel edge — mission cards and colony-site rows past the fold were unreachable by pointer AND keyboard. `NativeMissionView` now owns a `ScrollView` (shared across the two tabs, reset on open/tab switch): `mission_layout_for` takes a `scroll_offset` and exposes `list_viewport`; rows/cards are translated by -offset and every draw (fills, strokes, text via `Text::clip`, nav-button bands) clips to the viewport. The wheel scrolls inside the panel; pointer dispatch for row buttons is gated on `list_viewport.contains` so a click in the clipped band cannot hit a scrolled-away control. The ring keeps a clipped band (`MissionFocusTarget::unclipped` carries the full rect for snapping); because a row visible <13px exposes no button band, Home/End jump the scroll to the true list ends and Up/Down on the ring's list edge edge-scroll one row while the edge target stays focused. `NativeMissionView::scroll_offset()` is the test-facing readback. Pinned by `native_missions`: nine synthetic colony rows — ring size excludes clipped rows, wheel scrolls, Home/End traverse the true ends, Down edge-scrolls to `OpenColony` on the last row.

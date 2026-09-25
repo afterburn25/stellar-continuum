@@ -195,6 +195,13 @@ int main() try {
               read_only == TRUE,
           "range pattern did not report the slider's value/read-only flag");
   range_pattern->Release();
+  // Sliders stay non-invocable — adjustment is read-only range data.
+  IUIAutomationInvokePattern* slider_invoke{};
+  require(SUCCEEDED(child->GetCurrentPattern(
+              UIA_InvokePatternId,
+              reinterpret_cast<IUnknown**>(&slider_invoke))) &&
+              slider_invoke == nullptr,
+          "slider fragment exposed the invoke pattern");
   child->Release();
   // An explicit control kind maps to the matching UIA control type, and
   // dropping the range retires the pattern rather than leaving it stale.
@@ -214,6 +221,22 @@ int main() try {
               stale_range == nullptr,
           "focus fragment kept the range pattern on a non-slider control");
   child = button_fragment;
+  // The interactive slice: an activatable control exposes the Invoke
+  // pattern, and Invoke() queues a pending activation the owner drains
+  // into normal input dispatch (Return press+release).
+  IUIAutomationInvokePattern* invoke{};
+  require(SUCCEEDED(child->GetCurrentPattern(
+              UIA_InvokePatternId,
+              reinterpret_cast<IUnknown**>(&invoke))) && invoke,
+          "focus fragment did not expose the invoke pattern on a button");
+  require(bridge.drain_activations() == 0, "activation queue was not empty");
+  require(SUCCEEDED(invoke->Invoke()), "UIA Invoke call failed");
+  require(SUCCEEDED(invoke->Invoke()), "second UIA Invoke call failed");
+  require(bridge.drain_activations() == 2,
+          "UIA Invoke calls did not queue activations for the owner");
+  require(bridge.drain_activations() == 0,
+          "drained activations were not cleared");
+  invoke->Release();
   IUIAutomationElement* parent{};
   require(SUCCEEDED(walker->GetParentElement(child, &parent)) && parent,
           "focus fragment did not navigate to its root parent");
@@ -233,6 +256,12 @@ int main() try {
   require(SUCCEEDED(released_fragment->get_CurrentControlType(&child_type)) &&
               child_type == UIA_CustomControlTypeId,
           "focus fragment kept the button control type after release");
+  IUIAutomationInvokePattern* released_invoke{};
+  require(SUCCEEDED(released_fragment->GetCurrentPattern(
+              UIA_InvokePatternId,
+              reinterpret_cast<IUnknown**>(&released_invoke))) &&
+              released_invoke == nullptr,
+          "released fragment kept the invoke pattern");
   released_fragment->Release();
   child->Release();
   walker->Release();

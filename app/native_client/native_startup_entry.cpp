@@ -1,4 +1,5 @@
 #include "native_startup_entry.hpp"
+#include "native_accessibility_bridge.hpp"
 #include "native_audio_settings.hpp"
 #include "native_pad_input.hpp"
 #include "native_settings_hub.hpp"
@@ -458,6 +459,15 @@ StartupEntryResult run_native_startup_entry(Window &window,
           pad_nav_events.push_back(*nav);
     });
     std::vector<InputEvent> frame_events = pad_nav_events;
+    // Assistive-tech Invoke calls queue on the bridge off-thread; each
+    // drains as a Return press+release through normal dispatch.
+    if (config.accessibility_bridge)
+      for (auto n = config.accessibility_bridge->drain_activations(); n > 0; --n) {
+        InputEvent press{InputEventType::KeyPressed}; press.key = 13;
+        InputEvent release{InputEventType::KeyReleased}; release.key = 13;
+        frame_events.push_back(press);
+        frame_events.push_back(release);
+      }
     frame_events.insert(frame_events.end(), input.events.begin(), input.events.end());
     if (config.video_settings) config.video_settings->service(input.focused, input.renderable());
     if (input.quit_requested) {

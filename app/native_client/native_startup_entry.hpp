@@ -19,6 +19,7 @@ namespace stellar::native_audio { class NativeAudioSettings; }
 namespace stellar::native_general { class NativeGeneralSettings; }
 namespace stellar::native_settings { class NativeSettingsHub; }
 namespace stellar::native_audio { class NativeVoiceSettings; }
+namespace stellar::native_client { class NativeAccessibilityBridge; }
 namespace stellar::engine { class LocalizationTable; }
 namespace stellar::native_startup_ui {
 struct StartupAudioHooks {
@@ -42,6 +43,10 @@ struct StartupEntryConfig {
   // Optional live-region sink — focus-ring changes announce localized labels
   // here; the caption hook drains it into the voice-caption fallback.
   stellar::engine::AccessibilityAnnouncer *announcer{};
+  // Optional interactive-AT sink — queued UIA Invoke calls drain here as
+  // Return press+release events so assistive activation rides the same
+  // dispatch path as the keyboard.
+  stellar::native_client::NativeAccessibilityBridge *accessibility_bridge{};
   stellar::engine::DeveloperAccess *developer_access{};
   const stellar::engine::LocalizationTable *locale{};
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -45,11 +46,20 @@ class NativeAccessibilityBridge final {
   // plumbing for the WM_GETOBJECT answer, not a general event API.
   std::intptr_t handle_window_message(std::uintptr_t hwnd, unsigned message,
                                       std::uintptr_t wparam, std::intptr_t lparam);
+  // Interactive slice: the Windows focus fragment answers IInvokeProvider
+  // for activatable controls (button/checkbox/edit/custom — sliders and
+  // groups stay read-only). Invoke calls arrive on a UIA worker thread, so
+  // they only queue here; the owner drains once per frame and injects the
+  // equivalent Return press+release through normal input dispatch, so AT
+  // activation stays on the same path as a keyboard user.
+  void queue_activation() noexcept;
+  [[nodiscard]] unsigned drain_activations() noexcept;
 
  private:
   void *hwnd_{};
   void *provider_{};        // IRawElementProviderSimple*, owned by the bridge
   void *original_proc_{};   // previous WNDPROC
+  std::atomic<unsigned> pending_activations_{};
 };
 
 } // namespace stellar::native_client

@@ -120,10 +120,12 @@ long uia_control_type(
 
 class FocusFragment final : public ProviderBase,
                             public IRangeValueProvider,
+                            public IInvokeProvider,
                             public IRawElementProviderFragment {
  public:
-  FocusFragment(WindowProvider *root, HWND host) noexcept
-      : root_(root), host_(host) {}
+  FocusFragment(WindowProvider *root, HWND host,
+                std::atomic<unsigned> *activations) noexcept
+      : root_(root), host_(host), activations_(activations) {}
 
   void set_label(std::wstring label, std::optional<RECT> rect,
                  std::optional<FragmentRange> range, long control_type) {
@@ -131,10 +133,17 @@ class FocusFragment final : public ProviderBase,
     rect_ = rect;
     range_ = range;
     control_type_ = control_type;
+    // Only controls the ring can activate answer Invoke — sliders adjust
+    // through their (read-only) range and groups are containers.
+    invocable_ = control_type == UIA_ButtonControlTypeId ||
+                 control_type == UIA_CheckBoxControlTypeId ||
+                 control_type == UIA_EditControlTypeId ||
+                 control_type == UIA_CustomControlTypeId;
     focused_ = true;
   }
   void clear_focus() noexcept {
     focused_ = false;
+    invocable_ = false;
     range_.reset();
     control_type_ = UIA_CustomControlTypeId;
   }
@@ -161,6 +170,12 @@ class FocusFragment final : public ProviderBase,
       AddRef();
       return S_OK;
     }
+    if (iid == IID_IInvokeProvider && invocable_) {
+      if (!out) return E_POINTER;
+      *out = static_cast<IInvokeProvider *>(this);
+      AddRef();
+      return S_OK;
+    }
     return ProviderBase::QueryInterface(iid, out);
   }
 
@@ -171,7 +186,19 @@ class FocusFragment final : public ProviderBase,
     if (pattern == UIA_RangeValuePatternId && range_) {
       *out = static_cast<IRangeValueProvider *>(this);
       AddRef();
+    } else if (pattern == UIA_InvokePatternId && invocable_) {
+      *out = static_cast<IInvokeProvider *>(this);
+      AddRef();
     }
+    return S_OK;
+  }
+
+  // UIA calls Invoke on its own worker thread — the game loop owns input,
+  // so this only queues; the owner drains the count and injects a Return
+  // press+release through normal dispatch.
+  HRESULT STDMETHODCALLTYPE Invoke() noexcept override {
+    if (activations_)
+      activations_->fetch_add(1, std::memory_order_relaxed);
     return S_OK;
   }
 
@@ -231,6 +258,9 @@ class FocusFragment final : public ProviderBase,
     } else if (id == UIA_IsRangeValuePatternAvailablePropertyId) {
       out->vt = VT_BOOL;
       out->boolVal = range_ ? VARIANT_TRUE : VARIANT_FALSE;
+    } else if (id == UIA_IsInvokePatternAvailablePropertyId) {
+      out->vt = VT_BOOL;
+      out->boolVal = invocable_ ? VARIANT_TRUE : VARIANT_FALSE;
     } else if (id == UIA_IsControlElementPropertyId ||
                id == UIA_IsContentElementPropertyId) {
       out->vt = VT_BOOL;
@@ -283,11 +313,13 @@ class FocusFragment final : public ProviderBase,
   ~FocusFragment() override = default;
   WindowProvider *root_;
   HWND host_;
+  std::atomic<unsigned> *activations_;
   std::wstring label_;
   std::optional<RECT> rect_;
   std::optional<FragmentRange> range_;
   long control_type_{UIA_CustomControlTypeId};
   bool focused_{};
+  bool invocable_{};
 };
 
 // Fragment root answered for UiaRootObjectId: sources live-region
@@ -296,8 +328,8 @@ class WindowProvider final : public ProviderBase,
                              public IRawElementProviderFragment,
                              public IRawElementProviderFragmentRoot {
  public:
-  explicit WindowProvider(HWND hwnd) : host_(hwnd) {
-    focus_ = new FocusFragment(this, hwnd);
+  WindowProvider(HWND hwnd, std::atomic<unsigned> *activations) : host_(hwnd) {
+    focus_ = new FocusFragment(this, hwnd, activations);
   }
 
   FocusFragment *focus_fragment() noexcept { return focus_; }
@@ -475,7 +507,7 @@ bool NativeAccessibilityBridge::attach(void *native_window) {
   detach();
   auto *hwnd = static_cast<HWND>(native_window);
   if (!hwnd || !IsWindow(hwnd)) return false;
-  auto *provider = new WindowProvider(hwnd);
+  auto *provider = new WindowProvider(hwnd, &pending_activations_);
   SetPropW(hwnd, bridge_property, static_cast<HANDLE>(this));
   hwnd_ = hwnd;
   provider_ = provider;
@@ -614,3 +646,15 @@ std::intptr_t NativeAccessibilityBridge::handle_window_message(std::uintptr_t,
 } // namespace stellar::native_client
 
 #endif
+
+namespace stellar::native_client {
+
+void NativeAccessibilityBridge::queue_activation() noexcept {
+  pending_activations_.fetch_add(1, std::memory_order_relaxed);
+}
+
+unsigned NativeAccessibilityBridge::drain_activations() noexcept {
+  return pending_activations_.exchange(0, std::memory_order_relaxed);
+}
+
+} // namespace stellar::native_client
