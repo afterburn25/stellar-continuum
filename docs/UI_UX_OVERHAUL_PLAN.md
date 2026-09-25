@@ -154,10 +154,13 @@ breaks navigation/AT flow, or presents wrong state)
    FREIGHT CORRIDORS rows (origin↔destination, capacity/day, used/day summed
    from real flow allocations, transit days, enabled/bidirectional, and a
    derived Idle/Normal/Busy/Saturated/Disabled status). Links touching
-   sealed nodes are dropped rather than partially disclosed. Still open:
-   interstellar corridor representation beyond the home system — the
-   authoritative `CivilizationLogisticsCoverage` external-system status
-   would need projection + a wider surface design.
+   sealed nodes are dropped rather than partially disclosed. Interstellar
+   coverage now ships too: the supply view projects the canonical
+   `CivilizationLogisticsCoverage` — owned systems beyond home get
+   INTERSTELLAR COVERAGE rows (worst colony condition, colony count, local
+   capacity, support demand, import requirement, corridor flag) and the
+   section surfaces `unrepresented_interstellar_support_per_day` as an
+   amber demand-gap callout.
 6. ~~**Economy workspace is a flat undifferentiated list.**~~ → DONE.
    Section headers, metric tiles, tone colors, shared buttons and focus
    ring; verified via live capture (which caught a text-anchor defect the
@@ -272,6 +275,8 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | HUD hover hints: pointer resting on any HUD ring item (nav rail, pause/speed/notifications, zoom controls, legend toggle + its three layer rows, Switch view) renders a compact `theme::hint` with the same localized label the focus ring announces for that action — one vocabulary for pointer, keyboard and AT users. Gated off while the pause menu, settings, or quick-find modal is open. `--galaxy-art-smoke` re-verified clean (no hint when the pointer rests off-chrome). | cf52ea0e |
 
 | 2026-09-25 | Fleet composition in the detail card: `NativeOwnFleet` now projects `design_name` (resolved through `find_ship_design`), `cargo_materials`/`cargo_material_capacity`, `embarked_population_millions`, and `has_vessel_state`/`hull_integrity` from `tactical_vessel`. The detail block renders Design/Condition/Cargo/Embarked rows (`FLEET_STAT_*`, en+de) after the core telemetry — extras land last so cramped cards clip the least-critical rows first — and stat rows now clip to the details block so they can never spill into the route preview (the armed-fleet stack had silently overdrawn the rail gap before). `fleet_height` grows to 215s when the detail space can spare it (>300s), keeping the 720p behavior identical. Test covers all four composition rows; `--fleet-smoke` capture shows a colony ship reporting Design "Interstellar Colony" + Embarked 250.0M. | 675262f1 |
+
+| 2026-09-25 | Interstellar logistics coverage: the supply view's projector now returns the canonical `CivilizationLogisticsCoverage` (which embeds the home network) instead of `home_system_logistics` alone — `View` gains `external` rows (`ExternalRow{system, name, condition, colonies, local capacity, demand, import, corridor}`), `owned_system_count` and `support_gap_per_day`. Sealing is unchanged: external rows whose civilization or system record can't be verified are dropped, same rule as node/link endpoints. The workspace renders a third scroll section — INTERSTELLAR COVERAGE — with per-system rows and an amber "unrepresented interstellar demand" callout sourced from Core's gap flag. Tests cover canonical row parity, foreign/home exclusion, header/row/gap rendering and clip bounds; `--logistics-check` smoke verified live on a fixture with a Velari colony (row renders Critical). Also fixed a stale assertion in `native_startup_artwork`: it pinned the pre-theme accent literal `{122,230,190}` instead of `theme::color::success`. | 87b4a468 |
 
 ### Implementation notes
 
