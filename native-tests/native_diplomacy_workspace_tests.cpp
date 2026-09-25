@@ -1,5 +1,6 @@
 #include "native_diplomacy_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <array>
@@ -451,7 +452,8 @@ int main() try {
       keys.render(ring_draw, 1280, 720, nullptr);
       const auto *ring =
           std::get_if<StrokedRectangle>(&ring_draw.overlay.back());
-      require(ring && ring->color.r == 120 && ring->color.g == 197,
+      require(ring && ring->color.r == stellar::native_ui::color::focus.r &&
+                  ring->color.g == stellar::native_ui::color::focus.g,
               "Focused diplomacy control rendered no accent ring.");
       return ring->bounds;
     };
