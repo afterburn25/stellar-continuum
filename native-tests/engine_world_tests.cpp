@@ -250,6 +250,35 @@ int main() {
         pristine.add(p3, Name{"terra"});
         check(pristine.component_hashes() == again.component_hashes(),
               "section hashes are deterministic");
+
+        // Forward compatibility: a snapshot carrying a component the
+        // loading build does not register skips its blob cleanly instead
+        // of failing — the rest of the world restores intact.
+        World richer;
+        register_codecs(richer);
+        richer.register_component<Health>(
+            "health",
+            [](const Health& h) {
+                return std::vector<std::uint8_t>{
+                    static_cast<std::uint8_t>(h.points)};
+            },
+            [](const std::vector<std::uint8_t>& b) {
+                return Health{b.empty() ? 0 : b.front()};
+            });
+        const EntityId r1 = richer.create();
+        richer.add(r1, Position{7.0, 8.0});
+        richer.add(r1, Health{55});
+        const auto rich_bytes = richer.snapshot();
+        World lean;
+        register_codecs(lean);  // no "health" codec
+        lean.restore(rich_bytes);
+        const auto lean_entities = lean.entities();
+        check(lean_entities.size() == 1, "unknown-codec snapshot restores");
+        check(lean.has<Position>(lean_entities.front()) &&
+                  lean.get<Position>(lean_entities.front())->x == 7.0,
+              "known components restore around the skipped blob");
+        check(!lean.has<Health>(lean_entities.front()),
+              "the unregistered component is skipped");
     }
     // Scene components: spawn_scene builds the full component set,
     // find_entity_by_name resolves handles, and the file-backed snapshot
