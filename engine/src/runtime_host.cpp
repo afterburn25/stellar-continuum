@@ -1317,14 +1317,23 @@ int RuntimeHost::run() {
     if (!options.input_map.empty()) {
       const auto path = options.project_root / options.input_map;
       std::ifstream in(path);
-      if (in) {
+      if (!in) {
+        std::fprintf(stderr,
+                     "input-map: cannot open %s — defaults stay live\n",
+                     path.generic_string().c_str());
+      } else {
         const std::string text{std::istreambuf_iterator<char>(in),
                                std::istreambuf_iterator<char>()};
         // Loaded contexts stack on top of "game": non-exclusive ones fall
         // through to the defaults, exclusive ones take over.
-        if (impl.input.load_contexts(text))
+        if (impl.input.load_contexts(text)) {
           for (const auto &name : impl.input.context_names())
             if (name != "game") impl.input.push_context(name);
+        } else {
+          std::fprintf(stderr,
+                     "input-map: cannot parse %s — defaults stay live\n",
+                     path.generic_string().c_str());
+        }
       }
     }
   }

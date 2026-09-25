@@ -1259,6 +1259,45 @@ int main() {
             "the project binding 'e' drives move_right");
     }
   }
+  {
+    // A missing or malformed --input-map warns and keeps the built-in
+    // "game" context — the player still answers the default 'd'.
+    for (const auto *mode : {"missing", "malformed"}) {
+      const auto sub = root / (std::string{"input-map-"} + mode);
+      std::filesystem::create_directories(sub / "editor");
+      {
+        std::ofstream out(sub / "editor" / "scene.json");
+        out << R"({"entities":[{"name":"player","x":100,"y":200}]})";
+        if (std::string_view{mode} == "malformed") {
+          std::ofstream map(sub / "input-map.json");
+          map << "{not json";
+        }
+      }
+      ReplayRecorder journal;
+      journal.record(1, "input",
+                     "8,100,0,0,0,0,0,0,0,0,0,0,0,0,0,");  // 'd'
+      const auto journal_path = sub / "input_journal.json";
+      {
+        std::ofstream out(journal_path);
+        out << journal.serialize();
+      }
+      auto opts = headless_options(sub);
+      opts.frame_limit = 4;
+      opts.input_map = "input-map.json";
+      opts.replay_file = journal_path;
+      RuntimeHost host{opts};
+      float last_x = 0.f;
+      host.on_update = [&](World &world, float) {
+        const auto player = host.player();
+        if (player)
+          if (const auto *t = world.get<Transform2D>(*player))
+            last_x = t->x;
+      };
+      check(host.run() == 0, "input-map failure run exits cleanly");
+      check(last_x > 100.f,
+            "a missing/malformed input-map keeps the default bindings");
+    }
+  }
 
   // Lifetime ttl self-destructs in sim time, and a name-keyed parent
   // attachment keeps the child at its authored offset as the parent
