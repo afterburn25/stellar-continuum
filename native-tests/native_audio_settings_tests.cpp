@@ -186,6 +186,15 @@ void keyboard_focus_and_sliders(const fs::path& path) {
   // Return/Space on a slider adjusts nothing; Up/Down move the ring.
   require(press(kReturn) && settings.values().master == 0.f && settings.focused() == 0,
           "Return altered a focused slider");
+  // A platform range SetValue applies to the ringed slider and previews;
+  // off a slider it declines so the owner can route elsewhere.
+  const auto set_before = previews.size();
+  require(settings.set_focused_range(.4) && settings.values().master == .4f,
+          "set_focused_range did not apply to the focused master slider");
+  require(previews.size() == set_before + 1,
+          "set_focused_range did not preview the applied value");
+  require(settings.set_focused_range(7.) && settings.values().master == 1.f,
+          "set_focused_range did not clamp an out-of-range value");
   require(press(kTab) && settings.focused() == 1 && press(kUp) && settings.focused() == 0,
           "Up did not move focus back across sliders");
   // Off a slider, Left/Right navigate; activation dispatches like a click.
@@ -196,6 +205,8 @@ void keyboard_focus_and_sliders(const fs::path& path) {
   require(settings.focused_label() == "Unmute", "focused_label did not track the mute state");
   require(press(kRight) && settings.focused() == 4 && press(kLeft) && settings.focused() == 3,
           "arrows did not navigate the button row");
+  require(!settings.set_focused_range(.2),
+          "set_focused_range applied to a non-slider control");
   // Focus wraps to SAVE, activates it, and the panel closes.
   for (int i = 0; i < 3; ++i) (void)press(kTab);
   require(settings.focused() == 6 && settings.focused_label() == "Save",

@@ -275,6 +275,12 @@ void keyboard_focus_and_sliders(const fs::path& path) {
           "Right arrow did not restore the volume slider");
   require(press(kEnd) && settings.values().volume == 1.f,
           "End did not maximize the focused slider");
+  // A platform range SetValue applies to the ringed slider and clamps;
+  // off a slider it declines so the owner can route elsewhere.
+  require(settings.set_focused_range(.4) && settings.values().volume == .4f,
+          "set_focused_range did not apply to the focused volume slider");
+  require(settings.set_focused_range(-2.) && settings.values().volume == 0.f,
+          "set_focused_range did not clamp an out-of-range value");
   // Off a slider, arrows navigate the ring.
   require(press(kTab) && settings.focused() == 2 && press(kLeft) && settings.focused() == 1,
           "arrow keys did not move focus around sliders");
@@ -290,6 +296,8 @@ void keyboard_focus_and_sliders(const fs::path& path) {
               settings.focused_label() == "Save",
           "End did not reach SAVE");
   require(press(kTab) && settings.focused() == 0, "focus did not wrap to the first control");
+  require(!settings.set_focused_range(.2),
+          "set_focused_range applied to a non-slider control");
 }
 
 int main(int argc, char** argv) try {

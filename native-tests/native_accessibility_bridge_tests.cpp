@@ -188,12 +188,23 @@ int main() try {
   require(SUCCEEDED(pattern_hr) && range_pattern,
           "focus fragment did not expose the range pattern for a slider");
   double range_value{};
-  BOOL read_only = FALSE;
+  BOOL read_only = TRUE;
   require(SUCCEEDED(range_pattern->get_CurrentValue(&range_value)) &&
               std::abs(range_value - .64) < 1e-9 &&
               SUCCEEDED(range_pattern->get_CurrentIsReadOnly(&read_only)) &&
-              read_only == TRUE,
-          "range pattern did not report the slider's value/read-only flag");
+              read_only == FALSE,
+          "range pattern did not report the slider's value/writable flag");
+  // The writable slice: SetValue queues for the owner — latest wins — and
+  // drains once for routing to the surface owning the focused slider.
+  require(!bridge.take_range_set().has_value(),
+          "range-set queue was not empty before SetValue");
+  require(SUCCEEDED(range_pattern->SetValue(.3)),
+          "UIA SetValue call failed on the writable range");
+  const auto queued_set = bridge.take_range_set();
+  require(queued_set.has_value() && std::abs(*queued_set - .3) < 1e-9,
+          "UIA SetValue did not queue the requested value for the owner");
+  require(!bridge.take_range_set().has_value(),
+          "drained range-set value was not cleared");
   range_pattern->Release();
   // Sliders stay non-invocable — adjustment is read-only range data.
   IUIAutomationInvokePattern* slider_invoke{};

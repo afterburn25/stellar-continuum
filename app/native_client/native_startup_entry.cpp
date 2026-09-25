@@ -468,6 +468,14 @@ StartupEntryResult run_native_startup_entry(Window &window,
         frame_events.push_back(press);
         frame_events.push_back(release);
       }
+    // Queued RangeValue SetValue calls route to whichever visible settings
+    // panel owns the focused slider.
+    if (config.accessibility_bridge)
+      if (const auto set_value = config.accessibility_bridge->take_range_set())
+        (void)((config.audio_settings && config.audio_settings->visible() &&
+                config.audio_settings->set_focused_range(*set_value)) ||
+               (config.voice_settings && config.voice_settings->visible() &&
+                config.voice_settings->set_focused_range(*set_value)));
     frame_events.insert(frame_events.end(), input.events.begin(), input.events.end());
     if (config.video_settings) config.video_settings->service(input.focused, input.renderable());
     if (input.quit_requested) {

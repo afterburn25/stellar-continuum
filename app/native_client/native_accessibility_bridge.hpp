@@ -55,12 +55,21 @@ class NativeAccessibilityBridge final {
   // activation stays on the same path as a keyboard user.
   void queue_activation() noexcept;
   [[nodiscard]] unsigned drain_activations() noexcept;
+  // Writable range slice: RangeValue SetValue calls on the focus fragment
+  // arrive on the same UIA worker thread, so they only queue here — latest
+  // wins, since a slider only cares about its final value. The owner drains
+  // once per frame and routes the value to whichever visible surface owns
+  // the focused slider.
+  void queue_range_set(double value) noexcept;
+  [[nodiscard]] std::optional<double> take_range_set() noexcept;
 
  private:
   void *hwnd_{};
   void *provider_{};        // IRawElementProviderSimple*, owned by the bridge
   void *original_proc_{};   // previous WNDPROC
   std::atomic<unsigned> pending_activations_{};
+  std::atomic<double> pending_range_set_{};
+  std::atomic<bool> range_set_pending_{};
 };
 
 } // namespace stellar::native_client

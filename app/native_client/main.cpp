@@ -6445,6 +6445,16 @@ class NativeCampaign final {
         frame_events.push_back(press);
         frame_events.push_back(release);
       }
+    // RangeValue SetValue calls queue likewise — the value routes to
+    // whichever visible settings surface owns the focused slider, then a
+    // fresh focus announcement carries the applied position back to AT.
+    if(accessibility_bridge_)
+      if(const auto set_value=accessibility_bridge_->take_range_set()){
+        if(audio_settings_&&audio_settings_->visible()&&audio_settings_->set_focused_range(*set_value))
+          announcer_.announce_focus(audio_settings_->focused_label(),announcement_bounds(audio_settings_->focused_bounds(width,height)),audio_settings_->focused_range(),audio_settings_->focused_control(),audio_settings_->focused_toggle());
+        else if(voice_settings_&&voice_settings_->visible()&&voice_settings_->set_focused_range(*set_value))
+          announcer_.announce_focus(voice_settings_->focused_label(),announcement_bounds(voice_settings_->focused_bounds(width,height)),voice_settings_->focused_range(),voice_settings_->focused_control(),voice_settings_->focused_toggle());
+      }
     const std::vector<InputEvent> *frame_event_stream=&input.events;
     if(replay_&&!replay_->injected_events.empty()){
       frame_events.insert(frame_events.end(),replay_->injected_events.begin(),

@@ -298,6 +298,14 @@ stellar::engine::AnnouncementControl NativeAudioSettings::focused_control() cons
 std::optional<bool> NativeAudioSettings::focused_toggle() const {
   return focus_ == 3 ? std::optional<bool>{values_.muted} : std::nullopt;
 }
+bool NativeAudioSettings::set_focused_range(double value) {
+  require_owner();
+  if (focus_ < 0 || focus_ > 2) return false;
+  auto& gain = focus_ == 0 ? values_.master : focus_ == 1 ? values_.music : values_.effects;
+  gain = clamp_gain(static_cast<float>(value));
+  preview();
+  return true;
+}
 std::string NativeAudioSettings::tr(std::string_view key, std::string_view fallback) const {
   if (locale_ && locale_->contains(key)) return std::string(locale_->translate(key));
   return std::string(fallback);

@@ -365,6 +365,16 @@ std::optional<bool> NativeVoiceSettings::focused_toggle() const {
   default: return std::nullopt;
   }
 }
+bool NativeVoiceSettings::set_focused_range(double value) {
+  require_owner();
+  if (focus_ != 1 && focus_ != 4 && focus_ != 6) return false;
+  auto& target = focus_ == 1 ? values_.volume :
+                 focus_ == 4 ? values_.subtitle_background_opacity
+                             : values_.communication_filter;
+  target = clamp_unit(static_cast<float>(value));
+  preview();
+  return true;
+}
 void NativeVoiceSettings::activate_at(const VoiceSettingsLayout& layout, stellar::native_map::Point position) {
   if (layout.volume_track.contains(position)) {
     dragging_ = Dragged::Volume; set_from_track(dragging_, position, layout); return;

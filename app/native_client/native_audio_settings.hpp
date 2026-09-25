@@ -62,6 +62,9 @@ class NativeAudioSettings final {
   [[nodiscard]] stellar::engine::AnnouncementControl focused_control() const;
   // Checked state of the focused CheckBox — drives the UIA toggle pattern.
   [[nodiscard]] std::optional<bool> focused_toggle() const;
+  // Applies a platform range SetValue to the ringed slider — false when the
+  // focus sits on a non-slider control.
+  bool set_focused_range(double value);
   // While visible this consumes every event, including events outside the panel.
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;

@@ -75,6 +75,8 @@ struct AnnouncementBounds {
 // just the label text.
 struct AnnouncementRange {
   double minimum{}, maximum{1.}, value{};
+
+  bool operator==(const AnnouncementRange &) const = default;
 };
 
 // Semantic role of the control a Focus announcement names — platform

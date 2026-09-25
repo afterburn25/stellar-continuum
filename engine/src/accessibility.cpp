@@ -99,7 +99,8 @@ void AccessibilityAnnouncer::announce(std::string text,
   if (text.empty() && kind != AnnouncementKind::Focus)
     return;
   if (!pending_.empty() && pending_.back().text == text &&
-      pending_.back().priority == priority && pending_.back().kind == kind)
+      pending_.back().priority == priority && pending_.back().kind == kind &&
+      pending_.back().range == range && pending_.back().checked == checked)
     return;
   if (priority == AnnouncementPriority::Assertive) {
     std::erase_if(pending_, [](const AccessibilityAnnouncement &item) {

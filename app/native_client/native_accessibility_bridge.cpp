@@ -125,8 +125,8 @@ class FocusFragment final : public ProviderBase,
                             public IRawElementProviderFragment {
  public:
   FocusFragment(WindowProvider *root, HWND host,
-                std::atomic<unsigned> *activations) noexcept
-      : root_(root), host_(host), activations_(activations) {}
+                stellar::native_client::NativeAccessibilityBridge *bridge) noexcept
+      : root_(root), host_(host), bridge_(bridge) {}
 
   void set_label(std::wstring label, std::optional<RECT> rect,
                  std::optional<FragmentRange> range, long control_type,
@@ -212,8 +212,7 @@ class FocusFragment final : public ProviderBase,
   // so this only queues; the owner drains the count and injects a Return
   // press+release through normal dispatch.
   HRESULT STDMETHODCALLTYPE Invoke() noexcept override {
-    if (activations_)
-      activations_->fetch_add(1, std::memory_order_relaxed);
+    if (bridge_) bridge_->queue_activation();
     return S_OK;
   }
 
@@ -230,10 +229,13 @@ class FocusFragment final : public ProviderBase,
     return S_OK;
   }
 
-  // Read-only range pattern: AT learns the slider's position; adjustment
-  // stays on the app's own key/pointer contract (SetValue fails honestly).
-  HRESULT STDMETHODCALLTYPE SetValue(double) noexcept override {
-    return E_FAIL;
+  // Writable range pattern: SetValue queues for the owner, which routes
+  // the value to whichever visible surface owns the focused slider — the
+  // reported position refreshes with the next focus announcement.
+  HRESULT STDMETHODCALLTYPE SetValue(double value) noexcept override {
+    if (!range_ || !bridge_) return E_FAIL;
+    bridge_->queue_range_set(value);
+    return S_OK;
   }
   HRESULT STDMETHODCALLTYPE get_Value(double *out) noexcept override {
     if (!out) return E_POINTER;
@@ -242,7 +244,7 @@ class FocusFragment final : public ProviderBase,
   }
   HRESULT STDMETHODCALLTYPE get_IsReadOnly(BOOL *out) noexcept override {
     if (!out) return E_POINTER;
-    *out = TRUE;
+    *out = FALSE;
     return S_OK;
   }
   HRESULT STDMETHODCALLTYPE get_Maximum(double *out) noexcept override {
@@ -344,7 +346,7 @@ class FocusFragment final : public ProviderBase,
   ~FocusFragment() override = default;
   WindowProvider *root_;
   HWND host_;
-  std::atomic<unsigned> *activations_;
+  stellar::native_client::NativeAccessibilityBridge *bridge_;
   std::wstring label_;
   std::optional<RECT> rect_;
   std::optional<FragmentRange> range_;
@@ -361,8 +363,8 @@ class WindowProvider final : public ProviderBase,
                              public IRawElementProviderFragment,
                              public IRawElementProviderFragmentRoot {
  public:
-  WindowProvider(HWND hwnd, std::atomic<unsigned> *activations) : host_(hwnd) {
-    focus_ = new FocusFragment(this, hwnd, activations);
+  WindowProvider(HWND hwnd, stellar::native_client::NativeAccessibilityBridge *bridge) : host_(hwnd) {
+    focus_ = new FocusFragment(this, hwnd, bridge);
   }
 
   FocusFragment *focus_fragment() noexcept { return focus_; }
@@ -541,7 +543,7 @@ bool NativeAccessibilityBridge::attach(void *native_window) {
   detach();
   auto *hwnd = static_cast<HWND>(native_window);
   if (!hwnd || !IsWindow(hwnd)) return false;
-  auto *provider = new WindowProvider(hwnd, &pending_activations_);
+  auto *provider = new WindowProvider(hwnd, this);
   SetPropW(hwnd, bridge_property, static_cast<HANDLE>(this));
   hwnd_ = hwnd;
   provider_ = provider;
@@ -690,6 +692,17 @@ void NativeAccessibilityBridge::queue_activation() noexcept {
 
 unsigned NativeAccessibilityBridge::drain_activations() noexcept {
   return pending_activations_.exchange(0, std::memory_order_relaxed);
+}
+
+void NativeAccessibilityBridge::queue_range_set(double value) noexcept {
+  pending_range_set_.store(value, std::memory_order_relaxed);
+  range_set_pending_.store(true, std::memory_order_release);
+}
+
+std::optional<double> NativeAccessibilityBridge::take_range_set() noexcept {
+  if (!range_set_pending_.exchange(false, std::memory_order_acquire))
+    return std::nullopt;
+  return pending_range_set_.load(std::memory_order_relaxed);
 }
 
 } // namespace stellar::native_client
