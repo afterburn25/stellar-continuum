@@ -2,8 +2,10 @@
 #include "native_notifications.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
+#include <span>
 #include <utility>
 
 namespace stellar::native_notifications {
@@ -56,6 +58,18 @@ std::string resolve(const stellar::engine::LocalizationTable* locale,
 std::string category_label(const std::string& category,
                            const stellar::engine::LocalizationTable* locale) {
   return upper(resolve(locale, "NOTIFY_CATEGORY_" + upper(category), category));
+}
+
+// Keyed messages translate at display; `message` stays the English fallback.
+std::string display_message(const NativePlayerNotification& item,
+                            const stellar::engine::LocalizationTable* locale) {
+  if (item.message_key.empty()) return item.message;
+  if (locale && locale->contains(item.message_key)) {
+    const std::array<std::string, 1> args{item.message_arg};
+    return locale->format(item.message_key,
+                          std::span<const std::string>(args));
+  }
+  return item.message;
 }
 
 bool intersects(UiRect a, UiRect b) noexcept {
@@ -184,7 +198,7 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
                         measure_clip.width, std::nullopt, TextAlign::Left,
                         FontFace::Interface};
     const auto metadata_height = static_cast<float>(measure(text_measurer, metadata).height);
-    const Text message{{}, item.message, message_color, body_pixels, measure_clip.width, std::nullopt, TextAlign::Left, FontFace::Interface};
+    const Text message{{}, display_message(item, locale), message_color, body_pixels, measure_clip.width, std::nullopt, TextAlign::Left, FontFace::Interface};
     const float message_height = static_cast<float>(measure(text_measurer, message).height);
     const float action_height =
         (item.diplomatic_contact_id || item.system_id) ? 27.f * s : 0.f;
@@ -235,9 +249,13 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
 
 void NativeNotificationFeed::publish(std::string category, std::string date, std::string message,
                                      std::optional<int> contact,
-                                     std::optional<int> system_id) {
+                                     std::optional<int> system_id,
+                                     std::string message_key,
+                                     std::string message_arg) {
   if (category.empty() || date.empty() || message.empty()) return;
-  items_.push_back({next_sequence_++, std::move(category), std::move(date), std::move(message), contact, system_id});
+  items_.push_back({next_sequence_++, std::move(category), std::move(date),
+                    std::move(message), std::move(message_key),
+                    std::move(message_arg), contact, system_id});
   while (items_.size() > maximum_items) items_.pop_front();
 }
 
@@ -484,7 +502,7 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
     stellar::engine::ui_skin::surface(out,entry.bounds,s,false,layout.list_viewport);
     clipped_text(out, {entry.metadata_bounds.x, entry.metadata_bounds.y}, category_label(item.category, locale_) + "  " + item.date,
                  category_color(item.category), std::max(9, static_cast<int>(std::lround(11.f * s))), entry.metadata_bounds.width, layout.list_viewport);
-    clipped_text(out, {entry.message_bounds.x, entry.message_bounds.y}, item.message, message_color,
+    clipped_text(out, {entry.message_bounds.x, entry.message_bounds.y}, display_message(item, locale_), message_color,
                  std::max(11, static_cast<int>(std::lround(13.f * s))), entry.message_bounds.width, layout.list_viewport);
     if (entry.contact_button && contains_rect(layout.list_viewport, *entry.contact_button)) { stellar::engine::ui_skin::control(out,*entry.contact_button,entry.contact_button->contains(pointer_),false,true,s);
       const int action_pixels = std::max(9, static_cast<int>(std::lround(10.f * s)));

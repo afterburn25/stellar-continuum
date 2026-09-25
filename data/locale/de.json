@@ -1754,6 +1754,22 @@
     "MISSION_ESTIMATE_UNKNOWN": "Vermessungsdauer noch unbekannt; der erste Wissenschaftsdurchlauf ermittelt die Erkundungskomplexit\u00e4t",
     "MISSIONS_ETA_DAYS": "noch {0} Tage",
     "MISSIONS_ETA_READY": "Bereit f\u00fcr Befehle",
-    "MISSIONS_ETA_UNKNOWN": "ETA nicht verf\u00fcgbar"
+    "MISSIONS_ETA_UNKNOWN": "ETA nicht verf\u00fcgbar",
+    "NOTIFY_MSG_RESEARCH": "Forschungsbericht verf\u00fcgbar{0}",
+    "NOTIFY_MSG_CONSTRUCTION": "Bau abgeschlossen{0}",
+    "NOTIFY_MSG_SHIP": "Schiff fertiggestellt{0}",
+    "NOTIFY_MSG_SURVEY": "Vermessung abgeschlossen{0}",
+    "NOTIFY_MSG_CONTACT": "Kontakt entdeckt{0}",
+    "NOTIFY_MSG_SETTLEMENT": "Siedlung gegr\u00fcndet{0}",
+    "NOTIFY_MSG_COMBAT": "Kampfalarm{0}",
+    "NOTIFY_DIP_CONTACT": "Ein neuer diplomatischer Kontakt wurde hergestellt.",
+    "NOTIFY_DIP_CHANNEL": "Ein diplomatischer Kommunikationskanal ist jetzt verf\u00fcgbar.",
+    "NOTIFY_DIP_PROPOSAL_SENT": "Ein diplomatischer Vorschlag wurde gesendet.",
+    "NOTIFY_DIP_PROPOSAL_ACCEPTED": "Ein diplomatischer Vorschlag wurde angenommen.",
+    "NOTIFY_DIP_PROPOSAL_REJECTED": "Ein diplomatischer Vorschlag wurde abgelehnt.",
+    "NOTIFY_DIP_AGREEMENT_ACTIVE": "Ein diplomatisches Abkommen ist jetzt aktiv.",
+    "NOTIFY_DIP_AGREEMENT_ENDED": "Ein diplomatisches Abkommen ist beendet worden.",
+    "NOTIFY_DIP_WAR": "Eine Kriegserkl\u00e4rung wurde verzeichnet.",
+    "NOTIFY_DIP_SIGNAL": "Ein diplomatisches Signal eines nicht identifizierten Kontakts wurde empfangen."
   }
 }

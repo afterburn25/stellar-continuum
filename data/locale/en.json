@@ -1754,6 +1754,22 @@
     "MISSION_ESTIMATE_UNKNOWN": "survey duration is not yet known; the first science pass will establish reconnaissance-grade complexity",
     "MISSIONS_ETA_DAYS": "{0} days remaining",
     "MISSIONS_ETA_READY": "Ready for orders",
-    "MISSIONS_ETA_UNKNOWN": "ETA unavailable"
+    "MISSIONS_ETA_UNKNOWN": "ETA unavailable",
+    "NOTIFY_MSG_RESEARCH": "Research report available{0}",
+    "NOTIFY_MSG_CONSTRUCTION": "Construction complete{0}",
+    "NOTIFY_MSG_SHIP": "Ship complete{0}",
+    "NOTIFY_MSG_SURVEY": "Survey complete{0}",
+    "NOTIFY_MSG_CONTACT": "Contact detected{0}",
+    "NOTIFY_MSG_SETTLEMENT": "Settlement established{0}",
+    "NOTIFY_MSG_COMBAT": "Combat alert{0}",
+    "NOTIFY_DIP_CONTACT": "A new diplomatic contact has been established.",
+    "NOTIFY_DIP_CHANNEL": "A diplomatic communication channel is now available.",
+    "NOTIFY_DIP_PROPOSAL_SENT": "A diplomatic proposal has been sent.",
+    "NOTIFY_DIP_PROPOSAL_ACCEPTED": "A diplomatic proposal has been accepted.",
+    "NOTIFY_DIP_PROPOSAL_REJECTED": "A diplomatic proposal has been declined.",
+    "NOTIFY_DIP_AGREEMENT_ACTIVE": "A diplomatic agreement is now active.",
+    "NOTIFY_DIP_AGREEMENT_ENDED": "A diplomatic agreement has ended.",
+    "NOTIFY_DIP_WAR": "A declaration of war has been recorded.",
+    "NOTIFY_DIP_SIGNAL": "A diplomatic signal was received from an unidentified contact."
   }
 }

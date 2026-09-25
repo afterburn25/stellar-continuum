@@ -21,6 +21,9 @@ namespace stellar::native_notifications {
 struct NativePlayerNotification {
   std::int64_t sequence{};
   std::string category, date, message;
+  // Catalog key/format-arg for fixed publisher messages; empty keeps the
+  // composed `message` literal (core-emitted summaries stay English).
+  std::string message_key, message_arg;
   std::optional<int> diplomatic_contact_id;
   std::optional<int> system_id; // located events can navigate there
 };
@@ -31,7 +34,8 @@ class NativeNotificationFeed final {
 
   void publish(std::string category, std::string date, std::string message,
                std::optional<int> diplomatic_contact_id = std::nullopt,
-               std::optional<int> system_id = std::nullopt);
+               std::optional<int> system_id = std::nullopt,
+               std::string message_key = {}, std::string message_arg = {});
   [[nodiscard]] const std::deque<NativePlayerNotification>& items() const noexcept { return items_; }
   [[nodiscard]] std::int64_t latest_sequence() const noexcept { return next_sequence_ - 1; }
   [[nodiscard]] int unread_count(std::int64_t last_read) const noexcept;

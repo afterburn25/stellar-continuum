@@ -8370,7 +8370,7 @@ class NativeCampaign final {
   // on it — the settle order itself is issued from the destination system.
   void focus_mission_fleet(int fleet_id){
     const auto outcome=fleet_controller_.select(session_->frame(),session_->cache().generation,fleet_id);
-    if(!outcome.accepted){publish_notification("Fleet",observer_safe_fleet_message(outcome.message,observed_system_names()));return;}
+    if(!outcome.accepted){publish_notification("Fleet",observer_safe_fleet_message(outcome.message,observed_system_names(),locale_));return;}
     refresh_fleets(true);
     if(fleet_workspace_.view()){
       const auto fleet=std::ranges::find(fleet_workspace_.view()->own_fleets,fleet_id,&NativeOwnFleet::id);
@@ -8423,7 +8423,7 @@ class NativeCampaign final {
                                       session_->cache().generation);
     const auto names=observed_system_names();
     for(auto &fleet:view.own_fleets)
-      fleet.recovery_message=observer_safe_fleet_message(fleet.recovery_message,names);
+      fleet.recovery_message=observer_safe_fleet_message(fleet.recovery_message,names,locale_);
     if(pending_fleet_preview_){
       const auto selected=view.selected_fleet_id
                               ?std::ranges::find(view.own_fleets,
@@ -8477,7 +8477,7 @@ class NativeCampaign final {
     auto preview=fleet_controller_.preview_selected_route(
         session_->frame(),session_->cache().generation,*target);
     preview.message=observer_safe_fleet_message(preview.message,
-                                                observed_system_names());
+                                                observed_system_names(),locale_);
     preview.command_available=false;
     fleet_workspace_.set_preview(std::move(preview),
                                  system_display_name(*target));
@@ -8492,7 +8492,7 @@ class NativeCampaign final {
       auto outcome=fleet_controller_.issue_civilian_recovery(
           session_->frame(),*command.recovery_quote,command.recovery_action,
           command.confirm_abandon);
-      outcome.message=observer_safe_fleet_message(outcome.message,observed_system_names());
+      outcome.message=observer_safe_fleet_message(outcome.message,observed_system_names(),locale_);
       pending_fleet_preview_.reset();
       fleet_workspace_.clear_preview();
       fleet_workspace_.set_recovery_result(*command.recovery_quote,outcome);
@@ -8505,7 +8505,7 @@ class NativeCampaign final {
       if(!command.military_order_quote)return;
       const auto outcome=fleet_controller_.issue_selected_military_order(
           session_->frame(),*command.military_order_quote,command.military_order);
-      const auto message=observer_safe_fleet_message(outcome.message,observed_system_names());
+      const auto message=observer_safe_fleet_message(outcome.message,observed_system_names(),locale_);
       last_fleet_command_accepted_=outcome.accepted;
       if(outcome.accepted){
         pending_fleet_preview_.reset();fleet_workspace_.clear_preview();
@@ -8522,12 +8522,12 @@ class NativeCampaign final {
         camera_.center={outcome.position.x,outcome.position.y};
         if(audio_confirm_)audio_confirm_();
       }
-      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names()),outcome.accepted);
+      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names(),locale_),outcome.accepted);
       refresh_fleets(true);return;
     }
     if(command.kind==FleetWorkspaceCommandKind::Engage){
       const auto outcome=session_->frame().begin_tactical(command.fleet_id);
-      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names()),outcome.accepted);
+      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names(),locale_),outcome.accepted);
       if(outcome.accepted)publish_notification("Combat",outcome.message);
       refresh_fleets(true);return;
     }
@@ -8553,7 +8553,7 @@ class NativeCampaign final {
           command.target_system_id);
       pending_fleet_preview_=preview;
       preview.message=observer_safe_fleet_message(preview.message,
-                                                  observed_system_names());
+                                                  observed_system_names(),locale_);
       fleet_workspace_.set_preview(std::move(preview),
                                    system_display_name(command.target_system_id));
       return;
@@ -8565,7 +8565,8 @@ class NativeCampaign final {
       pending_fleet_preview_.reset();
       fleet_workspace_.clear_preview();
       fleet_workspace_.set_notice(observer_safe_fleet_message(
-                                      outcome.message,observed_system_names()),
+                                      outcome.message,observed_system_names(),
+                                      locale_),
                                   outcome.accepted);
       last_fleet_command_accepted_=outcome.accepted;
       refresh_fleets(true);

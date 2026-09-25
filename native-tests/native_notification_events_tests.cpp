@@ -26,7 +26,8 @@ void observer_and_activation(){
   publisher.harvest(feed,view);
   require(feed.items().size()==1&&feed.items().front().diplomatic_contact_id==2,
           "Known audience report lost its identified counterpart");
-  require(feed.items().front().message=="A diplomatic proposal has been sent.",
+  require(feed.items().front().message=="A diplomatic proposal has been sent."&&
+      feed.items().front().message_key=="NOTIFY_DIP_PROPOSAL_SENT",
           "Raw internal event text leaked into the player report");
   view.recent_events.push_back(view.recent_events.back());
   publisher.harvest(feed,view);
@@ -99,6 +100,8 @@ void bounded_categories(){
   publish_campaign_notifications(feed,summary,0.);
   require(feed.items().size()==2&&feed.items().front().date=="2050-03-21"&&
       feed.items().front().message=="Research report available (3)"&&
+      feed.items().front().message_key=="NOTIFY_MSG_RESEARCH"&&
+      feed.items().front().message_arg==" (3)"&&
       !feed.items().front().diplomatic_contact_id,
       "Coalesced observer summary was not retained as dated safe categories");
   for(int i=0;i<100;++i)publish_campaign_notifications(feed,summary,i);

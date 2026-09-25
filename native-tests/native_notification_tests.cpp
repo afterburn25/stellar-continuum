@@ -1,5 +1,7 @@
 #include "native_notifications.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -250,9 +252,33 @@ void keyboard_focus() {
 
 } // namespace
 
+void keyed_message_translation() {
+  NativeNotificationFeed feed;
+  feed.publish("Research", "2050-03-21", "Research report available (2)",
+               std::nullopt, std::nullopt, "NOTIFY_MSG_RESEARCH", " (2)");
+  stellar::engine::LocalizationTable locale{"en", "en"};
+  require(locale.load_json(
+              R"({"locale":"en","strings":{"NOTIFY_MSG_RESEARCH":"BERICHT{0}"}})"),
+          "the test catalog must parse");
+  NativeNotificationView view;
+  view.set_text_measurer(measured);
+  view.set_localization(&locale);
+  view.open(feed.latest_sequence());
+  DrawList draw;
+  view.render(draw, feed.items(), 720, 720);
+  bool translated = false;
+  for (const auto& command : draw.overlay)
+    if (const auto* text = std::get_if<Text>(&command);
+        text && text->value == "BERICHT (2)")
+      translated = true;
+  require(translated,
+          "keyed feed message did not resolve through the bound catalog");
+}
+
 int main() {
   try {
     bounded_feed_and_reachable_scroll();
+    keyed_message_translation();
     measured_wrapping_and_narrow_geometry();
     activation_owns_full_press_release_gesture();
     system_navigation_command();
