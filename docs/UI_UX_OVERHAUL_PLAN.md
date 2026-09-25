@@ -184,8 +184,11 @@ breaks navigation/AT flow, or presents wrong state)
    negotiation modal now lists all six terms with unavailable ones disabled
    (`ModalTerm::enabled` + `tip` carrying the authoritative political /
    access / agreements / communication status — no legality rules duplicated
-   in UI). Still open: general "what does this do" coverage beyond disabled
-   states.
+   in UI). HUD chrome (nav rail, pause/speed/notifications, zoom, legend
+   toggles, Switch view) now renders hover hints via `theme::hint` reusing
+   the exact localized labels the focus ring announces — pointer and
+   keyboard/AT share one vocabulary. Still open: incidental "what does
+   this do" coverage on non-action content (meters, status rows).
 2. ~~Notifications feed has no severity iconography or grouping~~ — severity
    axis and severity filtering shipped (see work log). Category-based
    grouping remains a possible future refinement.
@@ -221,8 +224,10 @@ breaks navigation/AT flow, or presents wrong state)
 2. ~~`zoom_text` shows a bare number; a zoom-band label ("OVERVIEW /
    SECTOR / LOCAL") would orient players.~~ → DONE with the legend work
    (the readout carries the matching band label).
-3. Selected-system card (bottom-left) is a fixed-size info block — verify
-   clipping at small viewports.
+3. ~~Selected-system card (bottom-left) is a fixed-size info block —
+   verify clipping at small viewports.~~ → VERIFIED: `inspection_bounds`
+   clamps height to `max(100, min(500s, bottom-top))` inside scaled
+   insets; cards render fully down to ~500px-high viewports.
 4. ~~Startup/main-menu uses its own palette~~ → DONE. Startup screens and
    the pause menu alias theme colors and use shared `button`/`focus_ring`;
    all hard-coded `{160,210,255}`/`{164,221,237}` focus rings across the
@@ -260,6 +265,8 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | Phenomenon identification on the galaxy map: surveyed regions render a player-facing designation + type-name label once their projected extent is large enough for legible text (90–520px window — suppressed at overview clutter and at screen-filling zooms), drawn after the decal batches so labels sit above the clouds they name, and clipped to the screen. Gating reuses the authoritative `surveyed` set (systems partially surveyed or better / developer session), so unknown regions never disclose a name; unsurveyed artwork still renders untouched. The MAP LEGEND gained a "Surveyed phenomenon" row with a soft-glow glyph (en+de). Tests cover surveyed-label emission ("RC-1 · Reflection Nebula"), unsurveyed secrecy, and overview suppression; `--galaxy-art-smoke` captures verified the legend row and decluttered overview/regional bands. | ef368f49 |
 
 | 2026-09-25 | Strategic overlay toggles: the MAP LEGEND's lane / empire territory / surveyed phenomenon rows are now show/hide layer switches — each draws a checkbox at the row's right edge, dims glyph + label while off, and hover-highlights like the panel's other interactive rows. State is client-local (like the collapse toggle), click press/release matching reuses the shared `map_legend_row_bounds` geometry, and the three rows join the HUD focus ring after the legend toggle with localized AT labels (`HUD_MAP_LAYER_*`, en+de). Territory hiding uses a new `NativeTerritoryRenderStyle::draw_ownership` flag that suppresses fill/contours/claims/region labels while the unexplored-space fog shroud keeps rendering — FoW geometry is never toggleable. Phenomena hide also suppresses the map hover inspection for the hidden layer; lanes hide only the charted-lane lines (markers and knowledge vocabulary untouched). Territory tests assert ownership marks vanish while `fog_images` still emit; `--galaxy-art-smoke` re-verified (territory stats unchanged with all layers on). | d5eacf30 |
+
+| 2026-09-25 | HUD hover hints: pointer resting on any HUD ring item (nav rail, pause/speed/notifications, zoom controls, legend toggle + its three layer rows, Switch view) renders a compact `theme::hint` with the same localized label the focus ring announces for that action — one vocabulary for pointer, keyboard and AT users. Gated off while the pause menu, settings, or quick-find modal is open. `--galaxy-art-smoke` re-verified clean (no hint when the pointer rests off-chrome). | cf52ea0e |
 
 ### Implementation notes
 
