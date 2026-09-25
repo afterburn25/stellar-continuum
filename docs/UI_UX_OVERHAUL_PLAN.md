@@ -302,6 +302,12 @@ breaks navigation/AT flow, or presents wrong state)
 
 ### Implementation notes
 
+- Branch scope audit: the only `engine/` file touched is
+  `engine/src/native_audio.cpp` (`939e23b6`, predating this overhaul) — a
+  compatibility bugfix where the stream decoder borrows the SDL-initialized
+  STA apartment instead of throwing `RPC_E_CHANGED_MODE`. No new engine
+  capability or API surface; flagged in the PR body for merge review.
+
 - Legend toggle state is client-local (`map_legend_collapsed_`); it is not
   persisted. `smoke_map_point_exposed` now excludes the legend bounds.
 - The legend panel shifts right together with the zoom readout when the
