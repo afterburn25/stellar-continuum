@@ -3097,6 +3097,18 @@ class NativeCampaign final {
     send(pad_down);send(pad_down_up);
     if(mission_view_.focus()<0)
       throw std::runtime_error("Pad dpad did not arm the missions focus ring.");
+    // Stick nav: the armed ring owns input, so a left-stick deflection
+    // navigates like dpad — the axis event is swallowed and map_pan_y
+    // (bound to the same axis) sees nothing.
+    InputEvent stick_down{InputEventType::GamepadAxis};
+    stick_down.gamepad_axis=1;stick_down.gamepad_axis_value=.9f;
+    InputEvent stick_neutral{InputEventType::GamepadAxis};stick_neutral.gamepad_axis=1;
+    send(stick_down);
+    if(mission_view_.focus()<0)
+      throw std::runtime_error("Stick deflection disarmed the missions ring.");
+    if(input_mapper_.axis("map_pan_y")>.5f)
+      throw std::runtime_error("UI-owned stick deflection still reached map_pan_y.");
+    send(stick_neutral);
     InputEvent pad_back{InputEventType::GamepadPressed};pad_back.gamepad_button=1;
     InputEvent pad_back_up{InputEventType::GamepadReleased};pad_back_up.gamepad_button=1;
     send(pad_back);send(pad_back_up);
@@ -3105,6 +3117,12 @@ class NativeCampaign final {
     send(pad_back);send(pad_back_up);
     if(mission_view_.visible()||menu_)
       throw std::runtime_error("Pad back did not close the missions board.");
+    // Axis bindings win in free play: the same left-stick deflection
+    // reaches map_pan_y — navigation never steals a gameplay axis.
+    send(stick_down);
+    if(input_mapper_.axis("map_pan_y")<.5f)
+      throw std::runtime_error("Free-play stick deflection did not reach map_pan_y.");
+    send(stick_neutral);
     // Bindings win: a pad button bound in GALAXY keeps its gameplay meaning
     // while an unarmed overlay is showing — it does not translate to nav.
     if(input_mapper_.rebind("toggle_pause",
@@ -5970,6 +5988,18 @@ class NativeCampaign final {
                (binding.device<0||device<0||binding.device==device))return true;
     return false;
   }
+  // Axis counterpart of pad_button_bound — a stick already bound to a
+  // camera axis keeps its gameplay meaning instead of driving nav.
+  [[nodiscard]] bool pad_axis_bound(std::uint8_t code,int device)const{
+    for(const char* context_name:{"GALAXY","GALAXY_PAD"})
+      if(const auto* context=input_mapper_.context(context_name))
+        for(const auto& action:context->actions)
+          for(const auto& binding:action.bindings)
+            if(binding.kind==stellar::engine::RawInputEvent::Kind::GamepadAxis&&
+               binding.code==code&&
+               (binding.device<0||device<0||binding.device==device))return true;
+    return false;
+  }
   // When a pad press cannot reach gameplay — a modal/overlay owns input —
   // it translates to navigation keys instead of going dead. While a
   // navigable surface is merely showing, unbound nav buttons translate too
@@ -5986,7 +6016,9 @@ class NativeCampaign final {
         shipyard_workspace_.confirmation_open()||
         construction_workspace_.confirmation_open()||fleet_workspace_.preview();
     if(gameplay_blocked)return true;
-    if(pad_button_bound(event.gamepad_button,event.gamepad_device))return false;
+    if(event.type==InputEventType::GamepadAxis
+           ?pad_axis_bound(event.gamepad_axis,event.gamepad_device)
+           :pad_button_bound(event.gamepad_button,event.gamepad_device))return false;
     return navigable_surface_visible();
   }
   // A surface carrying a focus ring is showing (armed or not) — pad nav
@@ -6396,7 +6428,7 @@ class NativeCampaign final {
     // ownership gate so a direction pressed in free play cannot leak
     // repeats into a surface opened while held (native_pad_input.hpp).
     // A focus drop can swallow the release — disarm on unfocused frames.
-    if(!input.focused)pad_nav_repeater_.clear();
+    if(!input.focused){pad_nav_repeater_.clear();pad_nav_stick_.clear(pad_nav_repeater_);}
     pad_nav_repeater_.update(static_cast<float>(std::max(0.,elapsed)),
         [&](const InputEvent &held){
           if(ui_owns_pad_input(held))
@@ -6414,10 +6446,20 @@ class NativeCampaign final {
     }
     for(const auto &raw_event:*frame_event_stream){
       pad_nav_repeater_.note(raw_event);
+      // A left-stick deflection engaging a direction synthesizes the dpad
+      // press — armed only when the ownership gate says UI owns the axis,
+      // so a camera-bound stick keeps its gameplay meaning.
+      const auto stick_press=
+          raw_event.type==InputEventType::GamepadAxis
+              ?pad_nav_stick_.note(raw_event,pad_nav_repeater_,
+                                   ui_owns_pad_input(raw_event))
+              :std::optional<InputEvent>{};
       // Pad presses are gameplay bindings in free play; while a UI surface
       // owns input they translate into the equivalent navigation key so
       // every focus ring answers the pad (native_pad_input.hpp).
       const InputEvent event=[&]{
+        if(stick_press)
+          if(auto nav=stellar::native_client::pad_navigation_event(*stick_press))return *nav;
         if(raw_event.type==InputEventType::GamepadPressed&&ui_owns_pad_input(raw_event))
           if(auto nav=stellar::native_client::pad_navigation_event(raw_event))return *nav;
         return raw_event;}();
@@ -9389,6 +9431,7 @@ class NativeCampaign final {
   stellar::native_general::NativeGeneralSettings* general_settings_{};
   stellar::native_settings::NativeSettingsHub* settings_hub_{};
   stellar::native_client::PadNavigationRepeater pad_nav_repeater_{};
+  stellar::native_client::PadStickNavigator pad_nav_stick_{};
   stellar::native_audio::NativeVoiceSettings* voice_settings_{};
   stellar::native_client::NativeAccessibilityBridge* accessibility_bridge_{};
   stellar::native_video_settings::NativeVideoController* video_settings_{};

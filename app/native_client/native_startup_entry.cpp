@@ -439,6 +439,7 @@ StartupEntryResult run_native_startup_entry(Window &window,
     window.draw(loading_draw, automation->loading_screenshot);
   }
   stellar::native_client::PadNavigationRepeater pad_nav_repeater;
+  stellar::native_client::PadStickNavigator pad_stick_nav;
   auto last_frame = std::chrono::steady_clock::now();
   for (;;) {
     if (config.audio.service) config.audio.service();
@@ -447,7 +448,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
     const auto frame_dt = std::chrono::duration<float>(frame_now - last_frame).count();
     last_frame = frame_now;
     std::vector<InputEvent> pad_nav_events;
-    if (!input.focused) pad_nav_repeater.clear();
+    if (!input.focused) {
+      pad_nav_repeater.clear();
+      pad_stick_nav.clear(pad_nav_repeater);
+    }
     pad_nav_repeater.update(frame_dt, [&](const InputEvent &held) {
       if (!(config.settings_hub && config.settings_hub->capturing()))
         if (auto nav = stellar::native_client::pad_navigation_event(held))
@@ -478,9 +482,16 @@ StartupEntryResult run_native_startup_entry(Window &window,
     if (!input.renderable()) {
       for (const auto &raw : frame_events) {
         pad_nav_repeater.note(raw);
+        const bool pad_nav_owned=
+            !(config.settings_hub&&config.settings_hub->capturing());
+        const auto stick_press=
+            raw.type==InputEventType::GamepadAxis
+                ?pad_stick_nav.note(raw,pad_nav_repeater,pad_nav_owned)
+                :std::optional<InputEvent>{};
         const InputEvent event=[&]{
-          if(raw.type==InputEventType::GamepadPressed&&
-             !(config.settings_hub&&config.settings_hub->capturing()))
+          if(stick_press)
+            if(auto nav=stellar::native_client::pad_navigation_event(*stick_press))return *nav;
+          if(raw.type==InputEventType::GamepadPressed&&pad_nav_owned)
             if(auto nav=stellar::native_client::pad_navigation_event(raw))return *nav;
           return raw;}();
         if (!route_settings(event,input.drawable_width,input.drawable_height)) {
@@ -498,12 +509,19 @@ StartupEntryResult run_native_startup_entry(Window &window,
     bool exit{};
     for (const auto &raw : frame_events) {
       pad_nav_repeater.note(raw);
+      const bool pad_nav_owned=
+          !(config.settings_hub&&config.settings_hub->capturing());
+      const auto stick_press=
+          raw.type==InputEventType::GamepadAxis
+              ?pad_stick_nav.note(raw,pad_nav_repeater,pad_nav_owned)
+              :std::optional<InputEvent>{};
       // Pad presses become navigation keys on the startup screens — no
       // gameplay context exists yet — except while a rebind capture in the
       // settings hub waits for the raw trigger.
       const InputEvent event=[&]{
-        if(raw.type==InputEventType::GamepadPressed&&
-           !(config.settings_hub&&config.settings_hub->capturing()))
+        if(stick_press)
+          if(auto nav=stellar::native_client::pad_navigation_event(*stick_press))return *nav;
+        if(raw.type==InputEventType::GamepadPressed&&pad_nav_owned)
           if(auto nav=stellar::native_client::pad_navigation_event(raw))return *nav;
         return raw;}();
       if(is_developer_shortcut(event)){

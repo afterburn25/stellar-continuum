@@ -92,4 +92,100 @@ private:
   Held held_[kDeviceSlots][4]{};
 };
 
+// Stick-driven UI navigation: a left-stick deflection past the engage
+// threshold behaves like the matching dpad direction — it emits a
+// synthesized GamepadPressed (so callers run their ownership gate and
+// pad_navigation_event translation exactly once) and feeds the repeater
+// so a held stick auto-repeats like a held dpad direction. Releasing
+// below the lower release threshold emits the synthetic release. The
+// hysteresis band keeps a stick resting near the edge from toggling.
+// Axes feed continuous values, so transitions — not magnitudes — drive
+// the state machine.
+class PadStickNavigator {
+public:
+  static constexpr float kEngageThreshold=.5f;
+  static constexpr float kReleaseThreshold=.25f;
+
+  // Returns the synthesized press once when the deflection engages a new
+  // direction AND `arm` is set; disarm bookkeeping is always forwarded to
+  // `repeater` so a direction held across an ownership change still
+  // clears. The caller passes its input-ownership verdict as `arm` — a
+  // camera-bound axis keeps its gameplay meaning (bindings win) and
+  // neither translates nor arms the repeater.
+  [[nodiscard]] std::optional<native_map::InputEvent> note(
+      const native_map::InputEvent &event, PadNavigationRepeater &repeater,
+      bool arm) noexcept {
+    using native_map::InputEventType;
+    if(event.type!=InputEventType::GamepadAxis)return std::nullopt;
+    const auto axis=axis_index(event.gamepad_axis);
+    if(axis<0)return std::nullopt;
+    auto &state=held_[device_slot(event.gamepad_device)][axis];
+    // Directions: stick left/right on axis 0 map to dpad 13/14, up/down on
+    // axis 1 map to 11/12 (SDL +Y is down).
+    const int direction=event.gamepad_axis_value>=kEngageThreshold?1:
+        event.gamepad_axis_value<=-kEngageThreshold?-1:
+        event.gamepad_axis_value<=kReleaseThreshold&&
+        event.gamepad_axis_value>=-kReleaseThreshold?0:state.direction;
+    if(direction==state.direction)return std::nullopt;
+    std::optional<native_map::InputEvent> engaged;
+    if(state.direction!=0)
+      repeater.note(synthetic(event,InputEventType::GamepadReleased,
+                              direction_button(axis,state.direction)));
+    state.direction=0;
+    if(direction!=0){
+      state.direction=direction;
+      const auto press=synthetic(event,InputEventType::GamepadPressed,
+                                 direction_button(axis,direction));
+      if(arm){
+        repeater.note(press);
+        engaged=press;
+      }
+    }
+    return engaged;
+  }
+
+  void clear(PadNavigationRepeater &repeater) noexcept {
+    for(int device=0;device<kDeviceSlots;++device)
+      for(int axis=0;axis<2;++axis){
+        auto &state=held_[device][axis];
+        if(state.direction!=0){
+          native_map::InputEvent release{};
+          release.type=native_map::InputEventType::GamepadReleased;
+          release.gamepad_button=direction_button(axis,state.direction);
+          release.gamepad_device=device>0?static_cast<std::uint8_t>(device-1):0;
+          repeater.note(release);
+          state.direction=0;
+        }
+      }
+  }
+
+private:
+  struct AxisState { int direction{}; };
+  static constexpr int kDeviceSlots=engine::kGamepadDeviceCount+1;
+  [[nodiscard]] static constexpr int device_slot(int device) noexcept {
+    if(device<0)return 0;
+    return device<kDeviceSlots-1?device+1:kDeviceSlots-1;
+  }
+  // Only the left stick navigates — the right stick stays on camera
+  // bindings (map_zoom lives on axis 3).
+  [[nodiscard]] static constexpr int axis_index(int axis) noexcept {
+    return axis>=0&&axis<=1?axis:-1;
+  }
+  [[nodiscard]] static constexpr std::uint8_t direction_button(
+      int axis,int direction) noexcept {
+    return static_cast<std::uint8_t>(
+        axis==0?(direction<0?13:14):(direction<0?11:12));
+  }
+  [[nodiscard]] static native_map::InputEvent synthetic(
+      const native_map::InputEvent &source,native_map::InputEventType type,
+      std::uint8_t button) noexcept {
+    native_map::InputEvent event{};
+    event.type=type;
+    event.gamepad_button=button;
+    event.gamepad_device=source.gamepad_device;
+    return event;
+  }
+  AxisState held_[kDeviceSlots][2]{};
+};
+
 } // namespace stellar::native_client

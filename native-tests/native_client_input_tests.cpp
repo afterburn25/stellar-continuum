@@ -122,5 +122,38 @@ int main(){
     collect(1.f);
     check(emitted.empty(),"cleared direction kept repeating");
   }
+  // PadStickNavigator: a left-stick deflection engages a synthetic dpad
+  // press — arming the repeater only while UI owns input — the hysteresis
+  // band holds the direction, reversal re-engages, and the right stick
+  // stays on camera duty.
+  {
+    using stellar::native_client::PadNavigationRepeater;
+    using stellar::native_client::PadStickNavigator;
+    PadNavigationRepeater repeater;PadStickNavigator stick;
+    auto axis=[](std::uint8_t code,float value,std::uint8_t device=0){InputEvent e{};e.type=InputEventType::GamepadAxis;e.gamepad_axis=code;e.gamepad_axis_value=value;e.gamepad_device=device;return e;};
+    std::vector<InputEvent> emitted;
+    const auto collect=[&](float dt){repeater.update(dt,[&](const InputEvent&e){emitted.push_back(e);});};
+    const auto engaged=stick.note(axis(1,.9f),repeater,true);
+    check(engaged&&engaged->type==InputEventType::GamepadPressed&&engaged->gamepad_button==12,
+        "left-stick down did not engage a dpad-down press");
+    collect(PadNavigationRepeater::kInitialDelay+.01f);
+    check(emitted.size()==1&&emitted.front().gamepad_button==12,
+        "held stick direction did not auto-repeat");
+    check(!stick.note(axis(1,.4f),repeater,true),"stick inside the hysteresis band re-engaged");
+    emitted.clear();
+    check(!stick.note(axis(1,.1f),repeater,true),"stick release produced a press");
+    collect(1.f);
+    check(emitted.empty(),"released stick direction kept repeating");
+    (void)stick.note(axis(1,.9f),repeater,true);
+    const auto reversed=stick.note(axis(1,-.9f),repeater,true);
+    check(reversed&&reversed->gamepad_button==11,"stick reversal did not engage the opposite direction");
+    (void)stick.note(axis(1,.05f),repeater,true); // release the armed direction
+    emitted.clear();
+    PadStickNavigator free_stick;
+    check(!free_stick.note(axis(0,.9f),repeater,false),"a UI-rejected stick engaged navigation");
+    collect(PadNavigationRepeater::kInitialDelay+.01f);
+    check(emitted.empty(),"a UI-rejected stick armed auto-repeat");
+    check(!stick.note(axis(3,.9f),repeater,true),"right stick engaged navigation");
+  }
   return failures==0?0:1;
 }
