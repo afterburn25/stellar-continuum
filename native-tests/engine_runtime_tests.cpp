@@ -381,6 +381,28 @@ int main() {
           "sim_time advances one fixed step per frame");
   }
 
+  // clamp_camera keeps the view inside the resolved world bounds: a
+  // 1000-wide world on a 640 viewport clamps cam_x to 360.
+  {
+    auto opts = headless_options(root);
+    opts.world_width = 1000.f;
+    opts.world_height = 900.f;
+    RuntimeHost host{opts};
+    host.clamp_camera = true;
+    host.on_update = [&](World &, float) {
+      host.set_camera(900.f, -200.f);
+    };
+    check(host.run() == 0, "clamped-camera run exits cleanly");
+    check(std::abs(host.camera_x() - 360.f) < 1e-4f &&
+              std::abs(host.camera_y() - 0.f) < 1e-4f,
+          "clamp_camera holds the view inside world bounds");
+    // Off: the same call passes through unclamped.
+    host.clamp_camera = false;
+    host.set_camera(900.f, -200.f);
+    check(std::abs(host.camera_x() - 900.f) < 1e-4f,
+          "clamp_camera disabled leaves the camera untouched");
+  }
+
   // request_quit ends the loop cleanly before --frames is exhausted.
   {
     RuntimeHost host{headless_options(root)};
@@ -465,6 +487,16 @@ int main() {
           host.tilemap_entity() == id && host.tilemap_entities().size() == 1;
       wrote = host.set_tile_at("runtime-ground", 5.f, 5.f, 7);
       read_back = host.tile_at("runtime-ground", 5.f, 5.f);
+      // Indexed overloads resolve the same cells through tilemap_index.
+      const auto idx = host.tilemap_index("runtime-ground");
+      check(idx.has_value() &&
+                host.tile_at(*idx, 5.f, 5.f) == 7 &&
+                host.set_tile_at(*idx, 5.f, 5.f, 9) &&
+                host.tile_at(*idx, 5.f, 5.f) == 9,
+            "indexed tile_at/set_tile_at match the name overloads");
+      check(host.tile_at(*idx, -50.f, -50.f) == -1 &&
+                !host.set_tile_at(*idx, -50.f, -50.f, 1),
+            "out-of-bounds cells read -1 and reject writes");
       check(host.tilemap_index("runtime-ground").has_value(),
             "tilemap_index resolves the runtime map by name");
       check(host.world().get<Tilemap>(id) != nullptr,
