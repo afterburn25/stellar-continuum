@@ -61,7 +61,8 @@ struct NotificationCardLayout {
 
 struct NotificationLayout {
   native_map::UiRect panel, header, close_button, chronicle_button,
-      filter_all, filter_important, empty_hint, list_viewport;
+      filter_all, filter_important, filter_category, empty_hint,
+      list_viewport;
   std::vector<native_map::UiRect> cards;
   std::vector<std::optional<native_map::UiRect>> contact_buttons;
   std::vector<NotificationCardLayout> entries;
@@ -111,6 +112,12 @@ class NativeNotificationView final {
   // Client-local severity filter: when set, the feed only presents Caution
   // and Alert items. The authoritative deque is never modified.
   [[nodiscard]] bool important_only() const noexcept { return important_only_; }
+  // Client-local topic filter: empty shows every category, otherwise the
+  // feed only presents cards whose category matches. Cycling follows a
+  // canonical order intersected with the categories actually published.
+  [[nodiscard]] const std::string& category_filter() const noexcept {
+    return category_filter_;
+  }
   // Localized label of the ringed control for screen-reader/live-region
   // consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label(
@@ -138,6 +145,7 @@ class NativeNotificationView final {
 
   bool visible_{};
   bool important_only_{};
+  std::string category_filter_{};
   mutable std::deque<NativePlayerNotification> filtered_{};
   std::int64_t last_read_{};
   stellar::engine::ScrollView scroll_{};
