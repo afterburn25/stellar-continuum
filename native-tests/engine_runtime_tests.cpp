@@ -234,6 +234,19 @@ int main() {
     check(std::abs(t->x - ex) < 1e-4f && std::abs(t->y - ey) < 1e-4f,
           "the dump captures the post-step tick-10 world state");
   }
+  {
+    // --replay/--replay-until through run(argc, argv): the value-taking
+    // scan must pair both flags for the dump to fire.
+    RuntimeHost host{headless_options(root)};
+    const auto rec = recording.generic_string();
+    const char *argv[] = {"game",   "--headless", "--frames", "8",
+                          "--replay", rec.c_str(), "--replay-until", "4"};
+    const int rc = host.run(8, const_cast<char **>(argv));
+    check(rc == 0, "argv --replay-until exits cleanly");
+    check(std::filesystem::exists(
+              root / "host.rec.until-4.stw"),
+          "argv --replay-until writes the dump");
+  }
   // control surface (request_quit, set_paused, sim_time, rng) — all only
   // reachable inside run(), so headless mode is what makes them testable.
   {
