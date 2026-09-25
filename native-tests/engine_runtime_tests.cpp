@@ -1065,6 +1065,36 @@ int main() {
           "malformed 2D/3D scene files keep the running scene");
   }
 
+  // --scene/--scene3d-file select a non-default document — the initial
+  // load honors the project-relative override in both modes.
+  {
+    const auto sub = root / "custom-scene";
+    std::filesystem::create_directories(sub / "custom");
+    {
+      std::ofstream out(sub / "custom" / "level.json");
+      out << R"({"entities":[{"name":"hero","x":5,"y":6}]})";
+      std::ofstream out3(sub / "custom" / "level3d.json");
+      out3 << R"({"entities":[{"name":"cube","pos":[1,2,3]}]})";
+    }
+    {
+      auto opts = headless_options(sub);
+      opts.scene_file = "custom/level.json";
+      RuntimeHost host{opts};
+      check(host.run() == 0, "custom scene_file run exits cleanly");
+      check(host.find_entity("hero").has_value(),
+            "--scene loads the custom 2D document");
+    }
+    {
+      auto opts = headless_options(sub);
+      opts.scene3d = true;
+      opts.scene3d_file = "custom/level3d.json";
+      RuntimeHost host{opts};
+      check(host.run() == 0, "custom scene3d_file run exits cleanly");
+      check(host.entities3d().size() == 1,
+            "--scene3d-file loads the custom 3D document");
+    }
+  }
+
   // Scene-authored animations: a clip's "x" track owns the entity's
   // Transform2D.x while playing, and a named event marker fires exactly
   // once when the playhead crosses it.
