@@ -184,6 +184,34 @@ int main(int argc,char** argv)try{
           "Return did not replay the Confirm dispatch");
     screen.complete("Done");
   }
+  {
+    // A deficit colony exposes the vitals strip plus issue chips that carry
+    // the real gap; activating a chip routes into the economy tab.
+    NativePlanetaryScreen screen;NativeColonyView view;
+    view.body_id=3;view.planet.details.emplace();view.solid_surface=true;
+    view.campaign_generation=1;view.colony_id=7;view.building_capacity=32;
+    view.surface_hub_level=2;view.body_display_name="Earth";
+    view.population_millions=9500;view.stability=.62;view.power_supply=10;
+    view.power_demand=40;view.food_reserve_days=5;view.employment_rate=.77;
+    view.workforce_demand_millions=120;view.workforce_available_millions=100;
+    screen.set_view(view);
+    const int w=1600,h=900;
+    DrawList draw;screen.render(draw,view,w,h);
+    const Text* chip=nullptr;bool vitals=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item)){
+      if(t->value=="POWER -30")chip=t;
+      vitals|=t->value=="POPULATION";
+    }
+    check(vitals,"Owned colony omitted the vitals strip");
+    check(chip,"Deficit colony did not expose a POWER issue chip");
+    (void)screen.handle({InputEventType::LeftPressed,chip->at},w,h);
+    (void)screen.handle({InputEventType::LeftReleased,chip->at},w,h);
+    draw={};screen.render(draw,view,w,h);
+    bool economy=false;
+    for(const auto& item:draw.overlay)
+      if(const auto* t=std::get_if<Text>(&item);t&&t->value=="PRODUCTION & REQUIREMENTS")economy=true;
+    check(economy,"Issue chip did not activate the economy tab");
+  }
   for (const auto [w,h] : std::array<std::pair<int,int>,2>{{{1280,720},{1920,1080}}}) {
     NativePlanetaryScreen developer; NativeColonyView v;
     v.campaign_generation=10;v.body_id=3;v.developer_inspection=true;v.foreign_settlement=true;

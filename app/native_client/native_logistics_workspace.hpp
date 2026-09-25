@@ -55,6 +55,7 @@ private:
   std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure_;
   bool visible_{}, owned_{};
   int focus_{-1};
+  stellar::native_map::Point pointer_{};
   mutable stellar::engine::ScrollView scroll_{};
   std::uint64_t measurer_revision_{};
   mutable CachedRows rows_;
