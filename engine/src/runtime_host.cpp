@@ -2345,9 +2345,12 @@ int RuntimeHost::run() {
     if (audio) audio->service();
 
     // World checkpoints: --record hashes the post-step world snapshot
-    // every 30 frames; --replay consumes each recorded checkpoint once
-    // the frame reaches its tick (a frozen minimized window keeps the
-    // world identical, so a late consume still verifies).
+    // every 30 frames plus one labeled section per component type, so a
+    // divergence report names the subsystem that drifted — the same
+    // section-localization contract the client's document checkpoints
+    // provide. --replay consumes each recorded checkpoint once the frame
+    // reaches its tick (a frozen minimized window keeps the world
+    // identical, so a late consume still verifies).
     if (impl.recorder && rendered % 30 == 0) {
       const auto bytes = world.snapshot();
       impl.recorder->checkpoint(
@@ -2355,16 +2358,39 @@ int RuntimeHost::run() {
           fnv1a64({reinterpret_cast<const char *>(bytes.data()),
                    bytes.size()}),
           "world");
+      for (const auto &[name, hash] : world.component_hashes())
+        impl.recorder->checkpoint(frame_tick, hash, "world:" + name);
     }
     if (impl.replaying) {
       const auto &cps = impl.replay.checkpoints();
+      std::vector<std::pair<std::string, std::uint64_t>> sections;
+      bool sections_computed = false;
       while (impl.replay_cp_cursor < cps.size() &&
              cps[impl.replay_cp_cursor].tick <= frame_tick) {
         const auto &cp = cps[impl.replay_cp_cursor++];
-        const auto bytes = world.snapshot();
-        const auto actual = fnv1a64(
-            {reinterpret_cast<const char *>(bytes.data()), bytes.size()});
-        if (actual != cp.hash) {
+        std::uint64_t actual{};
+        bool matched_section = true;
+        constexpr std::string_view prefix{"world:"};
+        if (cp.label.compare(0, prefix.size(), prefix) == 0) {
+          if (!sections_computed) {
+            sections = world.component_hashes();
+            sections_computed = true;
+          }
+          const auto name = cp.label.substr(prefix.size());
+          const auto it = std::ranges::find(sections, name,
+                                            &decltype(sections)::value_type::first);
+          if (it == sections.end()) {
+            actual = 0;
+            matched_section = false;
+          } else {
+            actual = it->second;
+          }
+        } else {
+          const auto bytes = world.snapshot();
+          actual = fnv1a64({reinterpret_cast<const char *>(bytes.data()),
+                            bytes.size()});
+        }
+        if (!matched_section || actual != cp.hash) {
           std::fprintf(stderr,
                        "replay_diverged={\"frame\":%llu,\"label\":\"%s\"}\n",
                        static_cast<unsigned long long>(cp.tick),

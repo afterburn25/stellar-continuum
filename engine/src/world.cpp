@@ -264,6 +264,39 @@ std::vector<std::uint8_t> World::snapshot() const {
     return writer.out;
 }
 
+std::vector<std::pair<std::string, std::uint64_t>> World::component_hashes()
+    const {
+    // Sorted codec names → deterministic section order matching the
+    // per-entity sorted encoding in snapshot().
+    std::vector<const Codec*> codecs;
+    codecs.reserve(codecs_.size());
+    for (const auto& [name, codec] : codecs_) codecs.push_back(&codec);
+    std::sort(codecs.begin(), codecs.end(),
+              [](const Codec* a, const Codec* b) { return a->name < b->name; });
+    const auto all = entities();
+    std::vector<std::pair<std::string, std::uint64_t>> sections;
+    for (const Codec* codec : codecs) {
+        // Section hash: FNV-1a over (entity index+generation, encoded
+        // bytes) for every entity carrying the component, in entity
+        // order — the same bytes snapshot() writes under this name.
+        Writer section;
+        bool present = false;
+        for (EntityId id : all) {
+            const void* component = codec->fetch(id);
+            if (!component) continue;
+            present = true;
+            section.u32(id.index);
+            section.u32(id.generation);
+            const auto bytes = codec->encode(component);
+            section.bytes(bytes.data(), bytes.size());
+        }
+        if (present)
+            sections.emplace_back(codec->name, fnv1a64(section.out.data(),
+                                                       section.out.size()));
+    }
+    return sections;
+}
+
 void World::restore(const std::vector<std::uint8_t>& bytes) {
     if (bytes.size() < 16) throw std::runtime_error("World snapshot too small");
     const auto checksum = fnv1a64(bytes.data(), bytes.size() - 8);

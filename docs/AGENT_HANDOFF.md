@@ -368,7 +368,9 @@ dumps), `--world-w/--world-h`, `--speed`, `--width/--height`,
 `--fullscreen`, `--input-map`, `--move-speed`, `--jump`, `--save`;
 P pauses, F12 screenshots to `<root>/screenshots/`. Input journaling:
 `--record`/`--replay` (frame-indexed input + world-hash checkpoints
-every 30 frames, `replay_verified`/`replay_diverged`), `--replay-info`
+every 30 frames — each also journals per-component `world:<type>`
+section hashes via `World::component_hashes()`, so `replay_diverged`
+names the subsystem that drifted — `replay_verified`/`replay_diverged`), `--replay-info`
 (headless inventory), `--replay-exit` (0 verified / 1 diverged),
 `--replay-until N` (canonical world-snapshot dump at journal tick N
 for divergence bisection), and

@@ -170,8 +170,26 @@ int main() {
     const std::string text{std::istreambuf_iterator<char>(in),
                            std::istreambuf_iterator<char>()};
     const auto parsed = ReplayRecorder::parse(text);
-    check(parsed && parsed->checkpoints().size() == 2,
+    // Two whole-world checkpoints (ticks 0 and 30) plus one labeled
+    // section per component type at each tick.
+    check(parsed && parsed->checkpoints().size() > 2,
           "headless recording journals world checkpoints");
+    if (parsed) {
+      const auto world_count =
+          std::ranges::count(parsed->checkpoints(), "world",
+                             &ReplayCheckpoint::label);
+      const auto section_count =
+          std::ranges::count_if(parsed->checkpoints(), [](const auto &cp) {
+            return cp.label.starts_with("world:");
+          });
+      check(world_count == 2 && section_count > 0,
+            "recording carries per-component checkpoint sections");
+      check(std::ranges::any_of(parsed->checkpoints(),
+                                [](const auto &cp) {
+                                  return cp.label == "world:transform";
+                                }),
+            "Transform2D gets its own checkpoint section");
+    }
   }
   {
     auto options = headless_options(root);
@@ -195,6 +213,26 @@ int main() {
     options.replay_exit = true;
     RuntimeHost host{options};
     check(host.run() == 1, "forged checkpoint diverges and exits nonzero");
+  }
+  {
+    // A forged per-component section diverges against the matching
+    // type's canonical hash — and a section naming a component type the
+    // world lacks diverges rather than silently passing.
+    for (const char *label : {"world:transform", "world:nonexistent"}) {
+      ReplayRecorder forged{ReplayHeader{}};
+      forged.checkpoint(0, 0xDEADBEEFull, label);
+      const auto bad = root / (std::string{"host-bad-"} +
+                               (label + 6) + ".rec");
+      std::ofstream out(bad, std::ios::binary);
+      out << forged.serialize();
+      out.close();
+      auto options = headless_options(root);
+      options.frame_limit = 0;
+      options.replay_file = bad;
+      options.replay_exit = true;
+      RuntimeHost host{options};
+      check(host.run() == 1, "forged section checkpoint diverges");
+    }
   }
   {
     // --replay-until N: dumps the canonical world snapshot when journal
