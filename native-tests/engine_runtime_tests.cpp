@@ -1395,6 +1395,23 @@ int main() {
     check(updates == 3, "--frames bounds the argv-driven run");
     check(host.viewport_width() == 320 && host.viewport_height() == 240,
           "--width/--height set the synthetic drawable");
+
+    // A trailing --scene3d (last argv slot) must still parse — the
+    // value-taking scan stops at i+1 < argc, so valueless flags are
+    // scanned separately.
+    const auto sub3d = root / "argv-3d";
+    std::filesystem::create_directories(sub3d / "editor");
+    {
+      std::ofstream out(sub3d / "editor" / "scene3d.json");
+      out << R"({"entities":[{"name":"crate","pos":[0,0,0]}]})";
+    }
+    RuntimeHost host3d{headless_options(sub3d)};
+    const char *argv3d[] = {"game", "--headless", "--frames", "2",
+                            "--scene3d"};
+    check(host3d.run(5, const_cast<char **>(argv3d)) == 0,
+          "trailing --scene3d run exits cleanly");
+    check(host3d.scene3d() && host3d.entities3d().size() == 1,
+          "trailing --scene3d flag enables the 3D mode");
   }
 
   // --snapshot-out writes a world snapshot at teardown that

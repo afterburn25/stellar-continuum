@@ -2687,6 +2687,8 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.headless = true;
     else if (std::string_view{argv[i]} == "--dump-bindings")
       impl_->options.dump_bindings = true;
+    else if (std::string_view{argv[i]} == "--scene3d")
+      impl_->options.scene3d = true;
   }
   for (int i = 1; i + 1 < argc; ++i) {
     const std::string_view arg{argv[i]};
@@ -2733,8 +2735,6 @@ int RuntimeHost::run(int argc, char **argv) {
           std::strtoull(argv[++i], nullptr, 10);
     else if (arg == "--replay-info")
       replay_info = argv[++i];
-    else if (arg == "--scene3d")
-      impl_->options.scene3d = true;
     else if (arg == "--scene3d-file")
       impl_->options.scene3d_file = argv[++i];
     else if (arg == "--fly-speed")
