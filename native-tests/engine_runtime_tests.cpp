@@ -1551,6 +1551,94 @@ int main() {
           "bounce:false stops dead at the level edge");
   }
 
+  // --world-w/--world-h bound the bounce independently of the window
+  // (640x480), and --move-speed scales the held-key player velocity.
+  {
+    const auto sub = root / "world-bounds";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[
+                   {"name":"player","x":40,"y":40},
+                   {"name":"bouncer","x":120,"y":120,"vx":400}]})";
+    }
+    ReplayRecorder journal;
+    journal.record(1, "input",
+                   "8,100,0,0,0,0,0,0,0,0,0,0,0,0,0,");  // 'd'
+    const auto journal_path = sub / "j.rec";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 12;
+    opts.world_width = 200.f;
+    opts.world_height = 160.f;
+    opts.player_move_speed = 600.f;
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    float player_x = 0.f, bouncer_dx = 0.f, bouncer_max_x = 0.f;
+    host.on_update = [&](World &world, float) {
+      if (const auto e = host.find_entity("player"))
+        if (const auto *t = world.get<Transform2D>(*e))
+          player_x = t->x;
+      if (const auto e = host.find_entity("bouncer")) {
+        if (const auto *t = world.get<Transform2D>(*e))
+          bouncer_max_x = std::max(bouncer_max_x, t->x);
+        if (const auto *v = world.get<Velocity2D>(*e))
+          bouncer_dx = v->dx;
+      }
+    };
+    check(host.run() == 0, "world-bounds run exits cleanly");
+    // 600 px/s at 60 Hz over the 10 held integrations lands at x=140;
+    // the default 320 px/s would only reach ~93.
+    check(player_x > 120.f, "--move-speed beats the default 320 px/s");
+    // The 32-wide bouncer reflects at x=168 (world_w - w), nowhere near
+    // the 640-wide window edge.
+    check(bouncer_max_x <= 170.f && bouncer_dx < 0.f,
+          "--world-w bounds the bounce, not the window");
+  }
+
+  // --jump scales the grounded jump impulse: gravity settles the player
+  // on the world floor, then a journaled 'w' launches it.
+  {
+    const auto sub = root / "jump";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"gravity":400,
+                 "entities":[{"name":"player","x":40,"y":100}]})";
+    }
+    ReplayRecorder journal;
+    journal.record(50, "input",
+                   "8,119,0,0,0,0,0,0,0,0,0,0,0,0,0,");  // 'w'
+    const auto journal_path = sub / "j.rec";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 75;
+    opts.world_height = 160.f;
+    opts.player_jump_impulse = 800.f;
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    int updates = 0;
+    float min_y = 1e9f;
+    host.on_update = [&](World &world, float) {
+      ++updates;
+      // Only measure after the player has settled on the floor
+      // (y=128); the jump must lift it well above that rest height.
+      if (updates <= 40) return;
+      if (const auto e = host.find_entity("player"))
+        if (const auto *t = world.get<Transform2D>(*e))
+          if (t->y < min_y) min_y = t->y;
+    };
+    check(host.run() == 0, "jump run exits cleanly");
+    check(min_y < 110.f,
+          "--jump launches the grounded player off the floor");
+  }
+
   // set_scene swaps the spawned set mid-run — level switching.
   {
     std::filesystem::create_directories(root / "editor", ec);
