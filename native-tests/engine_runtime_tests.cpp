@@ -1285,6 +1285,44 @@ int main() {
     }
   }
 
+  // Journaled stick deflection: a GamepadAxis event latches per
+  // (device, axis) — move_x on axis 0 holds until a zero event clears it.
+  {
+    const auto sub = root / "input-player-axis";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene.json");
+      out << R"({"entities":[{"name":"player","x":100,"y":200}]})";
+    }
+    ReplayRecorder journal;
+    // GamepadAxis=14; axis field 13, axis_value field 14.
+    journal.record(1, "input", "14,0,0,0,0,0,0,0,0,0,0,0,0,0,1,");
+    journal.record(5, "input", "14,0,0,0,0,0,0,0,0,0,0,0,0,0,0,");
+    const auto journal_path = sub / "axis_journal.json";
+    {
+      std::ofstream out(journal_path);
+      out << journal.serialize();
+    }
+    auto opts = headless_options(sub);
+    opts.frame_limit = 8;
+    opts.replay_file = journal_path;
+    RuntimeHost host{opts};
+    std::vector<float> xs;
+    host.on_update = [&](World &world, float) {
+      const auto player = host.player();
+      if (player)
+        if (const auto *t = world.get<Transform2D>(*player))
+          xs.push_back(t->x);
+    };
+    check(host.run() == 0, "axis-input replay exits cleanly");
+    check(xs.size() == 8, "the player resolves every frame");
+    if (xs.size() == 8) {
+      check(xs[4] > xs[0], "a latched stick deflection drives the player");
+      check(xs[7] == xs[5],
+            "the zeroed stick event stops the player");
+    }
+  }
+
   // --input-map stacks a project context over the built-in "game" one:
   // an exclusive rebind of move_right to 'e' disables the default 'd'.
   {
