@@ -1154,7 +1154,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   through `Scene3DView` under the 2D HUD.
 - **Save/performance impact:** 3D components are POD/string codecs in
   the same snapshot stream; meshes/textures cache per spec; contact scan
-  is O(n²) over the 3D set (small scene counts); rendering reuses the
+  runs through the Broadphase3D uniform grid + AABB reject before the
+  SAT narrow-phase; rendering reuses the
   existing bounded `Scene3D` submission path.
 - **Limitations:** collision is OBB over the mesh's local AABB (not
   per-triangle — a sphere mesh still collides as its box); solids are
@@ -1166,7 +1167,7 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   tab covers entity + document fields with a live preview/pick and
   authors up to two fill lights (direction + r,g,b,intensity fields map
   to `Scene3dDocument::lights` slots A/B, empty direction removes the
-  slot) but has no transform gizmos or emitter authoring UI; lighting is
+  slot) but has no transform gizmos or emitters-table editor (the entity `vfx` attach field is exposed); lighting is
   one key light + up to two directional fills per material; raycast is
   O(triangles) per surviving entity — sphere + local-AABB rejects cull
   most meshes, but there is no entity-level spatial partition, so a
