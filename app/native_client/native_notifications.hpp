@@ -61,7 +61,7 @@ struct NotificationCardLayout {
 
 struct NotificationLayout {
   native_map::UiRect panel, header, close_button, chronicle_button,
-      empty_hint, list_viewport;
+      filter_all, filter_important, empty_hint, list_viewport;
   std::vector<native_map::UiRect> cards;
   std::vector<std::optional<native_map::UiRect>> contact_buttons;
   std::vector<NotificationCardLayout> entries;
@@ -108,6 +108,9 @@ class NativeNotificationView final {
     return scroll_.scroll_offset;
   }
   [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Client-local severity filter: when set, the feed only presents Caution
+  // and Alert items. The authoritative deque is never modified.
+  [[nodiscard]] bool important_only() const noexcept { return important_only_; }
   // Localized label of the ringed control for screen-reader/live-region
   // consumers. Empty when nothing is focused.
   [[nodiscard]] std::string focused_label(
@@ -126,10 +129,16 @@ class NativeNotificationView final {
               int height) const;
 
  private:
-  enum class PressTarget { None, Close, Contact, Chronicle, System };
+  enum class PressTarget { None, Close, Contact, Chronicle, System, Filter };
   void cancel_press() noexcept;
+  // Filtered view of the feed (identity when `important_only_` is off).
+  // `filtered_` is a render cache only — callers keep owning the feed.
+  const std::deque<NativePlayerNotification>& visible_items(
+      const std::deque<NativePlayerNotification>& items) const;
 
   bool visible_{};
+  bool important_only_{};
+  mutable std::deque<NativePlayerNotification> filtered_{};
   std::int64_t last_read_{};
   stellar::engine::ScrollView scroll_{};
   int focus_{-1};

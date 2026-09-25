@@ -3748,8 +3748,11 @@ class NativeCampaign final {
     diplomacy_smoke_select(smoke_diplomacy_other_,width,height);
     const auto items=notifications_.items().size();
     const auto unread_before=notifications_.unread_count(notification_view_.last_read());
-    if(items!=(reload?0u:2u)||unread_before!=(reload?0:2))
-      throw std::runtime_error("Notifications replayed retained history or lost new agreement reports.");
+    if(items!=(reload?0u:2u)||unread_before!=(reload?0:2)){
+      std::string detail="Notifications replayed retained history or lost new agreement reports. items="+
+          std::to_string(items)+" unread="+std::to_string(unread_before)+" [";
+      for(const auto&item:notifications_.items())detail+=item.category+":"+item.date+":"+item.message+";";
+      throw std::runtime_error(detail+"]");}
     diplomacy_smoke_click(center(main_layout.notifications),width,height);
     const bool opened=notification_view_.visible();
     const auto unread_after=notifications_.unread_count(notification_view_.last_read());

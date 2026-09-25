@@ -117,6 +117,10 @@ void collect_focusables(const NotificationLayout& layout,
                  resolve(locale, "NOTIFY_OPEN_CHRONICLE", "Chronicle")});
   out.push_back({layout.close_button,
                  resolve(locale, "NOTIFY_CLOSE", "Close feed")});
+  out.push_back({layout.filter_all,
+                 resolve(locale, "NOTIFY_FILTER_ALL_LABEL", "All reports")});
+  out.push_back({layout.filter_important,
+                 resolve(locale, "NOTIFY_FILTER_IMPORTANT_LABEL", "Important only")});
   for (const auto& entry : layout.entries) {
     if (entry.contact_button)
       if (const auto clip = intersection(*entry.contact_button, layout.list_viewport);
@@ -181,6 +185,13 @@ NotificationLayout notification_layout_for(const std::deque<NativePlayerNotifica
   layout.chronicle_button = {layout.close_button.x - 88.f * s, layout.header.y,
                              82.f * s, 26.f * s};
   const float intro_height = 32.f * s;
+  // Severity filter chips sit in the intro strip, right-aligned.
+  const float chip_height = 22.f * s, chip_gap = 6.f * s;
+  const float chip_y = layout.header.y + layout.header.height + 5.f * s;
+  layout.filter_important = {layout.panel.x + layout.panel.width - pad - 104.f * s,
+                             chip_y, 104.f * s, chip_height};
+  layout.filter_all = {layout.filter_important.x - 56.f * s - chip_gap, chip_y,
+                       56.f * s, chip_height};
   layout.list_viewport = {layout.panel.x + pad, layout.header.y + layout.header.height + intro_height,
                           layout.panel.width - 2.f * pad,
                           std::max(1.f, layout.panel.y + layout.panel.height - pad -
@@ -266,6 +277,21 @@ int NativeNotificationFeed::unread_count(std::int64_t last_read) const noexcept 
       [last_read](const auto& item) { return item.sequence > last_read; }));
 }
 
+const std::deque<NativePlayerNotification>& NativeNotificationView::visible_items(
+    const std::deque<NativePlayerNotification>& items) const {
+  if (!important_only_) return items;
+  filtered_.assign(items.begin(), items.end());
+  filtered_.erase(std::remove_if(filtered_.begin(), filtered_.end(),
+                                 [](const NativePlayerNotification& item) {
+                                   return item.severity ==
+                                              NotificationSeverity::Info ||
+                                          item.severity ==
+                                              NotificationSeverity::Positive;
+                                 }),
+                  filtered_.end());
+  return filtered_;
+}
+
 void NativeNotificationView::cancel_press() noexcept {
   pointer_captured_ = false;
   press_target_ = PressTarget::None;
@@ -282,7 +308,7 @@ std::string NativeNotificationView::focused_label(
     const std::deque<NativePlayerNotification>& items, int width,
     int height) const {
   if (focus_ < 0 || !visible_) return {};
-  const auto layout = notification_layout_for(items, width, height, measure_,
+  const auto layout = notification_layout_for(visible_items(items), width, height, measure_,
                                               scroll_.scroll_offset, locale_);
   std::vector<FocusTarget> targets;
   collect_focusables(layout, locale_, targets);
@@ -294,7 +320,7 @@ std::optional<native_map::UiRect> NativeNotificationView::focused_bounds(
     const std::deque<NativePlayerNotification>& items, int width,
     int height) const {
   if (focus_ < 0 || !visible_) return std::nullopt;
-  const auto layout = notification_layout_for(items, width, height, measure_,
+  const auto layout = notification_layout_for(visible_items(items), width, height, measure_,
                                               scroll_.scroll_offset, locale_);
   std::vector<FocusTarget> targets;
   collect_focusables(layout, locale_, targets);
@@ -310,7 +336,8 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
   NotificationViewCommand command{};
   if (!visible_) return command;
   pointer_ = event.position;
-  auto layout = notification_layout_for(items, width, height, measure_, scroll_.scroll_offset, locale_);
+  const auto& feed = visible_items(items);
+  auto layout = notification_layout_for(feed, width, height, measure_, scroll_.scroll_offset, locale_);
   scroll_ = layout.scroll;
   if (event.type == native_map::InputEventType::EscapePressed) { close(); command.kind = NotificationViewCommandKind::Close; command.captured = true; return command; }
   if (event.type == native_map::InputEventType::PointerCancelled) { const bool captured = pointer_captured_; focus_ = -1; cancel_press(); command.captured = captured; return command; }
@@ -374,9 +401,10 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
       native_map::InputEvent release = press;
       release.type = native_map::InputEventType::LeftReleased;
       const int keep = focus_;
+      const bool keep_filter = important_only_;
       (void)handle(press, items, width, height);
       command = handle(release, items, width, height);
-      if (visible_) focus_ = keep;
+      if (visible_ && important_only_ == keep_filter) focus_ = keep;
       command.captured = true;
       return command;
     }
@@ -388,17 +416,24 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
     pointer_captured_ = true; press_origin_ = event.position; press_target_ = PressTarget::None; pressed_contact_id_.reset(); pressed_system_id_.reset(); pressed_bounds_.reset();
     if (layout.close_button.contains(event.position)) press_target_ = PressTarget::Close;
     else if (layout.chronicle_button.contains(event.position)) press_target_ = PressTarget::Chronicle;
+    else if (layout.filter_all.contains(event.position) ||
+             layout.filter_important.contains(event.position)) {
+      press_target_ = PressTarget::Filter;
+      pressed_bounds_ = layout.filter_all.contains(event.position)
+                            ? layout.filter_all
+                            : layout.filter_important;
+    }
     else for (std::size_t i = 0; i < layout.entries.size(); ++i) {
       const auto& entry = layout.entries[i];
       if (entry.contact_button && entry.contact_button->contains(event.position) &&
           contains_rect(layout.list_viewport, *entry.contact_button)) {
-        const auto& item = items[entry.item_index];
+        const auto& item = feed[entry.item_index];
         if (item.diplomatic_contact_id) { press_target_ = PressTarget::Contact; pressed_contact_id_ = item.diplomatic_contact_id; pressed_bounds_ = entry.contact_button; }
         break;
       }
       if (entry.system_button && entry.system_button->contains(event.position) &&
           contains_rect(layout.list_viewport, *entry.system_button)) {
-        const auto& item = items[entry.item_index];
+        const auto& item = feed[entry.item_index];
         if (item.system_id) { press_target_ = PressTarget::System; pressed_system_id_ = item.system_id; pressed_bounds_ = entry.system_button; }
         break;
       }
@@ -429,13 +464,18 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
   cancel_press();
   if (target == PressTarget::Close && layout.close_button.contains(event.position)) { close(); command.kind = NotificationViewCommandKind::Close; }
   else if (target == PressTarget::Chronicle && layout.chronicle_button.contains(event.position)) command.kind = NotificationViewCommandKind::OpenChronicle;
+  else if (target == PressTarget::Filter && pressed_bounds &&
+           pressed_bounds->contains(event.position)) {
+    const bool next = !same_rect(*pressed_bounds, layout.filter_all);
+    if (next != important_only_) { important_only_ = next; scroll_ = {}; focus_ = -1; }
+  }
   else if (target == PressTarget::Contact && contact && pressed_bounds &&
            pressed_bounds->contains(event.position)) {
     for (const auto& entry : layout.entries) {
       if (!entry.contact_button || !same_rect(*entry.contact_button, *pressed_bounds) ||
           !contains_rect(layout.list_viewport, *entry.contact_button))
         continue;
-      const auto& current = items[entry.item_index];
+      const auto& current = feed[entry.item_index];
       if (!current.diplomatic_contact_id || *current.diplomatic_contact_id != *contact)
         continue;
       close(); command.kind = NotificationViewCommandKind::OpenDiplomaticContact;
@@ -449,7 +489,7 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
       if (!entry.system_button || !same_rect(*entry.system_button, *pressed_bounds) ||
           !contains_rect(layout.list_viewport, *entry.system_button))
         continue;
-      const auto& current = items[entry.item_index];
+      const auto& current = feed[entry.item_index];
       if (!current.system_id || *current.system_id != *system)
         continue;
       close(); command.kind = NotificationViewCommandKind::OpenSystem;
@@ -463,7 +503,8 @@ NotificationViewCommand NativeNotificationView::handle(const native_map::InputEv
 void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayerNotification>& items,
                                     int width, int height) const {
   if (!visible_) return;
-  const auto layout = notification_layout_for(items, width, height, measure_, scroll_.scroll_offset, locale_);
+  const auto& feed = visible_items(items);
+  const auto layout = notification_layout_for(feed, width, height, measure_, scroll_.scroll_offset, locale_);
   const float s = layout.scale;
   stellar::engine::ui_skin::surface(out,layout.panel,s);
   const int title_pixels = std::max(13, static_cast<int>(std::lround(18.f * s)));
@@ -494,13 +535,22 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
                "X", muted_color, close_pixels, 0.f, layout.close_button, TextAlign::Center);
   clipped_text(out, {layout.list_viewport.x, layout.header.y + layout.header.height + 13.f * s},
                resolve(locale_, "NOTIFY_SUBTITLE", "Recent reports from your empire."), muted_color,
-               std::max(9, static_cast<int>(std::lround(11.f * s))), layout.list_viewport.width, layout.panel);
-  if (items.empty()) { clipped_text(out, {layout.empty_hint.x, layout.empty_hint.y}, resolve(locale_, "NOTIFY_EMPTY", "No major events yet."), muted_color,
+               std::max(9, static_cast<int>(std::lround(11.f * s))),
+               layout.filter_all.x - layout.list_viewport.x - 10.f * s, layout.panel);
+  const int chip_pixels = std::max(9, static_cast<int>(std::lround(10.f * s)));
+  native_ui::button(out, layout.filter_all,
+                    resolve(locale_, "NOTIFY_FILTER_ALL", "ALL"), pointer_,
+                    chip_pixels, native_ui::Tone::Neutral, !important_only_);
+  native_ui::button(out, layout.filter_important,
+                    resolve(locale_, "NOTIFY_FILTER_IMPORTANT", "IMPORTANT"),
+                    pointer_, chip_pixels, native_ui::Tone::Caution,
+                    important_only_);
+  if (feed.empty()) { clipped_text(out, {layout.empty_hint.x, layout.empty_hint.y}, resolve(locale_, important_only_ ? "NOTIFY_EMPTY_IMPORTANT" : "NOTIFY_EMPTY", important_only_ ? "No alerts or warnings yet." : "No major events yet."), muted_color,
       std::max(11, static_cast<int>(std::lround(13.f * s))), layout.empty_hint.width, layout.empty_hint); }
   else {
   for (std::size_t i = 0; i < layout.entries.size(); ++i) {
     const auto& entry = layout.entries[i]; if (!intersects(entry.bounds, layout.list_viewport)) continue;
-    const auto& item = items[entry.item_index];
+    const auto& item = feed[entry.item_index];
     stellar::engine::ui_skin::surface(out,entry.bounds,s,false,layout.list_viewport);
     // Severity is publisher-assigned and orthogonal to the colored category
     // label: an accent bar carries the tone, an "!" marker keeps Alert

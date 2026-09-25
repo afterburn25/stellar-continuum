@@ -199,9 +199,9 @@ void keyboard_focus() {
   require(view.focused_label(notifications.items(), 1280, 720) == "Close feed",
           "focused label did not name the close button");
   require(key(kLeft).captured && view.focus() == 0, "Left did not walk back");
-  require(key(kEnd).captured && view.focus() == 3, "End did not land on the last action");
-  require(key(kTab, true).captured && view.focus() == 2, "Shift+Tab did not step backwards");
-  require(key(kRight).captured && view.focus() == 3, "Right did not walk forward");
+  require(key(kEnd).captured && view.focus() == 5, "End did not land on the last action");
+  require(key(kTab, true).captured && view.focus() == 4, "Shift+Tab did not step backwards");
+  require(key(kRight).captured && view.focus() == 5, "Right did not walk forward");
   require(key(kHome).captured && view.focus() == 0, "Home did not return to the head");
   require(!key(kF5).captured, "unrelated key was captured");
   require(key(kTab).captured && view.focus() == 1, "Tab did not resume cycling after Home");
@@ -214,7 +214,7 @@ void keyboard_focus() {
   view.open(notifications.latest_sequence());
   key(kEnd);
   command = key(kUp); // entry 0's system button
-  require(command.captured && view.focus() == 2, "Up did not step back to the located card");
+  require(command.captured && view.focus() == 4, "Up did not step back to the located card");
   command = key(kSpace);
   require(command.kind == NotificationViewCommandKind::OpenSystem &&
               command.system_id == 9 && !view.visible(),
@@ -291,6 +291,105 @@ void severity_accent_treatment() {
   require(marker, "alert card did not mark its severity in text");
 }
 
+void severity_filter() {
+  // IMPORTANT keeps only Caution/Alert cards; the feed itself is untouched.
+  NativeNotificationFeed notifications;
+  notifications.publish("Combat", "Day 10", "Fleet engaged over Halcyon",
+                        std::nullopt, 9, {}, {}, NotificationSeverity::Alert);
+  notifications.publish("Research", "Day 11", "Discovery completed");
+  notifications.publish("Economy", "Day 12", "Trade lane blockaded",
+                        std::nullopt, std::nullopt, {}, {}, NotificationSeverity::Caution);
+  NativeNotificationView view;
+  view.set_text_measurer(measured);
+  view.open(notifications.latest_sequence());
+  const auto layout = notification_layout_for(notifications.items(), 1280, 720, measured);
+  require(!view.important_only() && layout.entries.size() == 3,
+          "severity filter armed before any input");
+  const Point chip = center(layout.filter_important);
+  auto command = view.handle({InputEventType::LeftPressed, chip}, notifications.items(), 1280, 720);
+  require(command.captured, "severity chip press was not captured");
+  command = view.handle({InputEventType::LeftReleased, chip}, notifications.items(), 1280, 720);
+  require(command.captured && command.kind == NotificationViewCommandKind::None &&
+              view.important_only(),
+          "severity chip release did not arm the filter");
+  require(notifications.items().size() == 3, "filtering mutated the authoritative feed");
+  // Rendered cards come from the filtered projection — newest first:
+  // Caution, then Alert. The info report is absent.
+  DrawList draw;
+  view.render(draw, notifications.items(), 1280, 720);
+  bool info_card = false, chip_caption = false;
+  int important_cards = 0;
+  for (const auto& primitive : draw.overlay)
+    if (const auto* text = std::get_if<Text>(&primitive)) {
+      if (text->value.find("Discovery completed") != std::string::npos) info_card = true;
+      if (text->value.find("Fleet engaged") != std::string::npos ||
+          text->value.find("Trade lane blockaded") != std::string::npos)
+        ++important_cards;
+      if (text->value == "IMPORTANT") chip_caption = true;
+    }
+  require(!info_card && important_cards == 2 && chip_caption,
+          "filtered render did not isolate the important cards");
+  // Scroll clamps to the filtered content height, not the full feed's.
+  for (int i = 0; i < 50; ++i)
+    (void)view.handle({InputEventType::Wheel, center(layout.panel), {}, -1.f},
+                      notifications.items(), 1280, 720);
+  std::deque<NativePlayerNotification> filtered;
+  for (const auto& item : notifications.items())
+    if (item.severity == NotificationSeverity::Alert ||
+        item.severity == NotificationSeverity::Caution)
+      filtered.push_back(item);
+  const auto filtered_layout =
+      notification_layout_for(filtered, 1280, 720, measured, 0.f);
+  require(filtered_layout.entries.size() == 2,
+          "filtered projection did not drop the info card");
+  require(std::abs(view.scroll_offset() - filtered_layout.scroll.max_scroll()) < .1f,
+          "filtered feed did not clamp scroll to its own extent");
+  // The filtered ring covers header controls, both chips, and the
+  // located alert card's system action — Return dispatches it.
+  const auto key = [&](std::uint32_t code, bool shift = false) {
+    InputEvent event{};
+    event.type = InputEventType::KeyPressed;
+    event.key = code;
+    event.shift = shift;
+    return view.handle(event, notifications.items(), 1280, 720);
+  };
+  constexpr std::uint32_t kTab = 9u, kReturn = 13u;
+  constexpr std::uint32_t kEnd = 0x4000004du;
+  command = key(kEnd);
+  require(command.captured && view.focus() == 4,
+          "filtered ring did not land on the alert card's action");
+  require(view.focused_label(notifications.items(), 1280, 720) == "View system",
+          "filtered ring labelled the wrong control");
+  command = key(kReturn);
+  require(command.kind == NotificationViewCommandKind::OpenSystem &&
+              command.system_id == 9 && !view.visible(),
+          "Return on a filtered action did not dispatch OpenSystem");
+  // ALL restores the full feed; the filter survives a panel reopen.
+  view.open(notifications.latest_sequence());
+  require(view.important_only(), "reopening dropped the session filter");
+  const Point all = center(layout.filter_all);
+  (void)view.handle({InputEventType::LeftPressed, all}, notifications.items(), 1280, 720);
+  (void)view.handle({InputEventType::LeftReleased, all}, notifications.items(), 1280, 720);
+  require(!view.important_only(), "ALL chip did not restore the full feed");
+  // With no important items the filtered feed explains itself.
+  NativeNotificationFeed quiet;
+  quiet.publish("Research", "Day 11", "Discovery completed");
+  view.open(quiet.latest_sequence());
+  (void)view.handle({InputEventType::LeftPressed, chip}, quiet.items(), 1280, 720);
+  (void)view.handle({InputEventType::LeftReleased, chip}, quiet.items(), 1280, 720);
+  require(view.important_only(), "filter did not arm on an all-info feed");
+  DrawList empty_draw;
+  view.render(empty_draw, quiet.items(), 1280, 720);
+  bool filtered_empty = false;
+  for (const auto& primitive : empty_draw.overlay)
+    if (const auto* text = std::get_if<Text>(&primitive);
+        text && text->value.find("No alerts or warnings yet") != std::string::npos)
+      filtered_empty = true;
+  require(filtered_empty, "filtered-empty feed did not render its own hint");
+  require(key(kTab).captured && view.focus() == 0,
+          "filtered-empty feed did not focus a header control");
+}
+
 } // namespace
 
 void keyed_message_translation() {
@@ -323,7 +422,9 @@ int main() {
     measured_wrapping_and_narrow_geometry();
     activation_owns_full_press_release_gesture();
     system_navigation_command();
+    keyboard_focus();
     severity_accent_treatment();
+    severity_filter();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;
