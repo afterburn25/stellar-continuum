@@ -123,10 +123,16 @@ self-luminous star discs from clipping flat. Screen-space mesh LOD
 chains are landed: `lod_meshes`/`lod_pixels` swap to coarser meshes by
 projected bounding diameter (halving per level), with the streamer
 demand and draw submission sharing `select_lod3d_level` so only the
-submitted level holds residency. Also
+submitted level holds residency. A fleet benchmark block in
+`native_scene3d_gpu` times a 1024-instance depth-sweep fleet over 60
+frames (`fleet3d` line: submission/wall means, draw calls, LOD picks —
+one instanced draw per level). Also
 fixed: streamer registrations keyed by `RgbaImage*` are now
 liveness-verified (`weak_ptr` owner), closing a stale-TextureId reuse
-bug that intermittently skipped mip-tail promotions. See
+bug that intermittently skipped mip-tail promotions; and the per-frame
+`Scene3DStatistics` counters (`draw_batches`, `submitted_instances`,
+`lod_instances`) now actually reset each `prepare()` — they were
+documented per-frame but accumulated. See
 `docs/VISUAL_ENGINE_HANDOFF.md`.
 
 1. **PBR material block**: metallic + scalar/map roughness driving the

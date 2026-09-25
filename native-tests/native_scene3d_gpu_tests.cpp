@@ -659,9 +659,8 @@ int main(int argc,char** argv)try{
     auto plain=fleet;plain.lod_meshes.clear();
     const auto sphere_ref=capture({plain},"lod-full.png");
     check(channel(*sphere_ref,198,160,0)>150,"Sphere LOD reference lost its silhouette");
-    const auto lod_before=window.scene3d_statistics().lod_instances;
     const auto proxied=capture({fleet},"lod-proxy.png");
-    check(window.scene3d_statistics().lod_instances==lod_before+1,"LOD pick did not substitute the proxy mesh");
+    check(window.scene3d_statistics().lod_instances==1,"LOD pick did not substitute the proxy mesh");
     check(channel(*proxied,198,160,0)==5,"LOD proxy kept the full mesh silhouette");
     check(channel(*proxied,160,160,0)>150,"LOD proxy did not render the quad mesh");
     auto wide=fleet;wide.scale=.5f;
@@ -693,6 +692,32 @@ int main(int argc,char** argv)try{
         "Band shear distorted the disc silhouette");
     std::cout<<"band_shear_gpu=equator_pole_antishear_passed\n";
   }
+  {
+    // Orbital beaming: a tilted emissive annulus dims its receding lane
+    // and brightens its approaching lane; face-on stays symmetric since
+    // the orbital velocity is perpendicular to the view direction.
+    Material3D glow;glow.ambient=1;glow.diffuse=0;glow.tint={180,180,190,255};
+    MeshInstance3D disc{annulus_mesh(.45f,1.f,192),{},{},.9f,glow};
+    disc.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto flat_disc=capture({disc},"beam-flat.png");
+    disc.material.orbital_beaming=.9f;
+    const auto beamed_disc=capture({disc},"beam-tilted.png");
+    const int left_flat=channel(*flat_disc,30,160,0),right_flat=channel(*flat_disc,290,160,0);
+    const int left_beam=channel(*beamed_disc,30,160,0),right_beam=channel(*beamed_disc,290,160,0);
+    check(left_flat>120&&right_flat>120,"Annulus probe pixels missed the lit disc");
+    check(right_beam<right_flat*3/4,"Orbital beaming did not dim the receding lane");
+    check(left_beam>left_flat*5/4,"Orbital beaming did not brighten the approaching lane");
+    // Face-on: velocities lie in the view plane, so the asymmetry is zero.
+    disc.rotation=rotation_axis_angle({1,0,0},1.570796327f);
+    const auto face_on=capture({disc},"beam-faceon.png");
+    const int fo_left=channel(*face_on,30,160,0),fo_right=channel(*face_on,290,160,0);
+    check(fo_left>120&&fo_right>120&&fo_left-fo_right<30&&fo_right-fo_left<30,
+        "Orbital beaming broke face-on symmetry");
+    disc.material.orbital_beaming=0;disc.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto disc_ref=capture({disc},"beam-off.png");
+    check(channel(*disc_ref,30,160,0)==left_flat,"Beaming=0 did not restore the flat disc");
+    std::cout<<"orbital_beam_gpu=tilt_asymmetry_faceon_symmetric_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");
@@ -706,6 +731,30 @@ int main(int argc,char** argv)try{
   for(int i=0;i<120;++i){FrameTiming timing;window.draw(orbit,std::nullopt,&timing);submission+=timing.submission_ms;}
   const auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-benchmark_start).count();
   std::cout<<"scene3d frames=120 cpu_submit_mean_ms="<<submission/120<<" frame_wall_mean_ms="<<elapsed/120<<" mesh_uploads="<<window.scene3d_statistics().mesh_uploads<<" gpu_driver="<<window.gpu_driver()<<'\n';
+  {
+    // Strategy-scale benchmark: a 1024-ship fleet spread over a depth sweep
+    // exercises the per-view LOD pick, instanced batching and submission
+    // cost. Rows step away from the camera so the near ranks keep the full
+    // hull while distant ranks swap to the quad proxy.
+    std::vector<MeshInstance3D> ships;ships.reserve(1024);
+    Material3D hull;hull.tint={200,200,210,255};hull.ambient=.3f;hull.diffuse=.7f;
+    const auto proxy=quad(0,0),hull_mesh=Mesh3D::uv_sphere(16,8);
+    for(int row=0;row<32;++row)for(int col=0;col<32;++col){
+      MeshInstance3D ship{hull_mesh,{},{},.5f,hull};
+      ship.position={(col-16)*2.5,(row-16)*1.4,-10.0-row*6.0};
+      ship.lod_pixels=8;ship.lod_meshes={proxy};
+      ships.push_back(std::move(ship));
+    }
+    DrawList armada;armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(ships)),{0,0,640,360}});
+    const auto fleet_start=std::chrono::steady_clock::now();double fleet_submit=0;
+    for(int i=0;i<60;++i){FrameTiming timing;window.draw(armada,std::nullopt,&timing);fleet_submit+=timing.submission_ms;}
+    const auto fleet_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-fleet_start).count();
+    const auto fleet_stats=window.scene3d_statistics();
+    check(fleet_stats.draw_calls==2,"Fleet did not collapse into one draw per LOD level");
+    check(fleet_stats.lod_instances>0&&fleet_stats.lod_instances<1024,"Fleet LOD pick did not partition by depth");
+    std::cout<<"fleet3d frames=60 instances=1024 cpu_submit_mean_ms="<<fleet_submit/60<<" frame_wall_mean_ms="<<fleet_wall/60
+      <<" draw_calls="<<fleet_stats.draw_calls<<" lod_instances="<<fleet_stats.lod_instances<<'\n';
+  }
   DrawList invalid;invalid.world.emplace_back(Scene3DView{Scene3D::create(camera,{a}),{0,0,8192,8192}});
   bool rejected=false;try{window.draw(invalid);}catch(const std::length_error&){rejected=true;}check(rejected,"Oversized 3D target was accepted");
   window.draw(stable);check(window.scene3d_statistics().target_bytes==320u*320u*(window.scene3d_statistics().hdr?16u:8u),"Target budget did not recover after rejection/resize");

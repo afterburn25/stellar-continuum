@@ -98,6 +98,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Tests:** `native_scene3d_gpu` — silhouette probe: a quad proxy
   exposes the swap (sphere pixels beyond the quad edge go background),
   `lod_instances` stat delta, above-threshold frames keep the full mesh;
+  `fleet3d` benchmark block — a 1024-ship depth-sweep fleet, 60 timed
+  frames reporting `cpu_submit_mean_ms`/`frame_wall_mean_ms` plus
+  `draw_calls`/`lod_instances` assertions (one instanced draw per LOD
+  level, depth-partitioned picks);
   `engine_scene3d` — level-pick policy + bound rejects;
   `engine_project` — `lods`/`lodPixels` round-trip + malformed
   rejections; `engine_world` — `MeshLods` spawn/codec/export

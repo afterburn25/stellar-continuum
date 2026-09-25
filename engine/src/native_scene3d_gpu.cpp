@@ -457,16 +457,17 @@ struct Scene3DRenderer::Storage {
         // caps at 16 steps, Medium at 32; authored budgets apply above.
         const int volume_steps=low_tier?std::min(e.volume_steps,16)
             :opt.quality==RenderQuality3D::Medium?std::min(e.volume_steps,32):e.volume_steps;
-        fragment.volume_options={e.volume_depth,static_cast<float>(volume_steps),e.volume_density,e.volume_seed};
-        if(e.volume_depth>0){
-          // Model transforms use uniform scale and an orthonormal rotation.
-          // Invert their camera-relative matrix once per draw, not per fragment.
-          const auto& from=draw.transform.model_view.values;auto& to=fragment.effect_from_view.values;
-          const float inverse_square=1.f/(draw.instance->scale*draw.instance->scale);
-          for(int column=0;column<3;++column)for(int row=0;row<3;++row)to[column*4+row]=from[row*4+column]*inverse_square;
-          for(int row=0;row<3;++row)to[12+row]=-(to[row]*from[12]+to[4+row]*from[13]+to[8+row]*from[14]);
-          to[15]=1;
-        }}
+        fragment.volume_options={e.volume_depth,static_cast<float>(volume_steps),e.volume_density,e.volume_seed};}
+      if((material.surface_effect&&material.surface_effect->volume_depth>0.f)||material.orbital_beaming!=0.f){
+        // Model transforms use uniform scale and an orthonormal rotation.
+        // Invert their camera-relative matrix once per draw, not per
+        // fragment — emission volumes and orbital beaming both consume it.
+        const auto& from=draw.transform.model_view.values;auto& to=fragment.effect_from_view.values;
+        const float inverse_square=1.f/(draw.instance->scale*draw.instance->scale);
+        for(int column=0;column<3;++column)for(int row=0;row<3;++row)to[column*4+row]=from[row*4+column]*inverse_square;
+        for(int row=0;row<3;++row)to[12+row]=-(to[row]*from[12]+to[4+row]*from[13]+to[8+row]*from[14]);
+        to[15]=1;
+      }
       if(material.surface_response){const auto& s=*material.surface_response;
         fragment.surface_response={1,s.normal_strength,s.relief*draw.instance->scale,s.cloud_shadow?s.cloud_opacity:0};
         fragment.surface_options[0]=s.cloud_offset.x;fragment.surface_options[1]=s.cloud_offset.y;
@@ -479,7 +480,7 @@ struct Scene3DRenderer::Storage {
         fragment.optics={d.index_of_refraction,d.roughness,d.transmission,d.thickness};
         fragment.absorption={d.absorption.x,d.absorption.y,d.absorption.z,d.environment_strength};fragment.view_options[1]=d.specular_strength;
         fragment.view_options[2]=d.surface_relief*draw.instance->scale;}
-      fragment.uv_options={material.texture_tiling.x,material.texture_tiling.y,0,0};
+      fragment.uv_options={material.texture_tiling.x,material.texture_tiling.y,material.orbital_beaming,0};
       fragment.pbr_options[3]=material.alpha_threshold;
       if(material.pbr){const auto& p=*material.pbr;
         fragment.pbr_options={1.f,p.metallic_roughness?1.f:0.f,p.night_emissive,material.alpha_threshold};
@@ -719,7 +720,7 @@ struct Scene3DRenderer::Storage {
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
 Scene3DRenderer::~Scene3DRenderer()=default;
 void Scene3DRenderer::prepare(const DrawList& list){
-  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=0;
+  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=0;
   for(const auto& c:list.world)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   for(const auto& c:list.overlay)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");
