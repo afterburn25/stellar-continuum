@@ -6842,6 +6842,7 @@ class NativeCampaign final {
                 else if(action==UiAction::Menu)toggle_menu();
                 else if(action==UiAction::SwitchView)activate_hud_switch(width,height);
                 else if(action==UiAction::Legend){map_legend_collapsed_=!map_legend_collapsed_;}
+                else if(action==UiAction::LayerLanes||action==UiAction::LayerTerritory||action==UiAction::LayerPhenomena)toggle_map_layer(action);
                 else route_navigation(action);
                 return true;
               }
@@ -6886,14 +6887,25 @@ class NativeCampaign final {
         if(map_legend_visible(width,height)){
           const auto legend=map_legend_bounds(width,height);
           const auto legend_toggle=map_legend_toggle_bounds(width,height);
-          if(event.type==InputEventType::PointerCancelled)map_legend_pressed_=false;
+          if(event.type==InputEventType::PointerCancelled){map_legend_pressed_=false;map_layer_pressed_=-1;}
+          if(event.type==InputEventType::LeftReleased&&map_layer_pressed_>=0){
+            const int row=map_layer_pressed_;map_layer_pressed_=-1;
+            if(const auto action=map_legend_row_action(row);action&&map_legend_row_bounds(row,width,height).contains(event.position)){toggle_map_layer(*action);if(audio_confirm_)audio_confirm_();}
+            gesture_.cancel();continue;
+          }
           if(event.type==InputEventType::LeftReleased&&map_legend_pressed_){
             map_legend_pressed_=false;
             if(legend_toggle.contains(event.position)){map_legend_collapsed_=!map_legend_collapsed_;if(audio_confirm_)audio_confirm_();}
             gesture_.cancel();continue;
           }
           if(legend.contains(event.position)){
-            if(event.type==InputEventType::LeftPressed&&layout.hit(event.position,false)==UiAction::None){map_legend_pressed_=legend_toggle.contains(event.position);gesture_.capture_for_ui();continue;}
+            if(event.type==InputEventType::LeftPressed&&layout.hit(event.position,false)==UiAction::None){
+              map_legend_pressed_=legend_toggle.contains(event.position);map_layer_pressed_=-1;
+              if(!map_legend_collapsed_)
+                for(int row=0;row<8;++row)
+                  if(map_legend_row_action(row)&&map_legend_row_bounds(row,width,height).contains(event.position)){map_layer_pressed_=row;break;}
+              gesture_.capture_for_ui();continue;
+            }
             if(event.type==InputEventType::LeftReleased)gesture_.cancel();
             gesture_.capture_for_ui();continue;
           }
@@ -7577,10 +7589,12 @@ class NativeCampaign final {
       if(!system_background_.ready()||!phenomena_.ready()){out={};out.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},tr("MAP_ENVIRONMENT_LOADING","Loading system environment…"),{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
     }else{
     galaxy_backdrop_.append(out,{cache.generation,width,height,camera_,fitted_pixels_per_world_,true});
-    phenomena_.append_map(out,camera_,width,height,phenomena_options(),surveyed_phenomena());
+    if(map_layer_phenomena_)
+      phenomena_.append_map(out,camera_,width,height,phenomena_options(),surveyed_phenomena());
+    // draw_ownership keeps the FoW shroud while hiding fills/contours/claims.
     last_territory_draw_=territory_overlay_.append(out,camera_,width,height,
-        static_cast<float>(fitted_pixels_per_world_), {false,world.developer_provenance&&world.developer_provenance->full_exploration});
-    for(const auto &edge:cache.lanes){ if(!known_.contains(edge.first_system_id)||!known_.contains(edge.second_system_id))continue; const auto a=cache.systems_by_id.find(edge.first_system_id),b=cache.systems_by_id.find(edge.second_system_id); if(a==cache.systems_by_id.end()||b==cache.systems_by_id.end())continue; const auto p1=camera_.project({a->second->position.x,a->second->position.y},width,height),p2=camera_.project({b->second->position.x,b->second->position.y},width,height); out.lines.push_back({p1,p2,lane}); }
+        static_cast<float>(fitted_pixels_per_world_), {false,world.developer_provenance&&world.developer_provenance->full_exploration,map_layer_territory_});
+    if(map_layer_lanes_)for(const auto &edge:cache.lanes){ if(!known_.contains(edge.first_system_id)||!known_.contains(edge.second_system_id))continue; const auto a=cache.systems_by_id.find(edge.first_system_id),b=cache.systems_by_id.find(edge.second_system_id); if(a==cache.systems_by_id.end()||b==cache.systems_by_id.end())continue; const auto p1=camera_.project({a->second->position.x,a->second->position.y},width,height),p2=camera_.project({b->second->position.x,b->second->position.y},width,height); out.lines.push_back({p1,p2,lane}); }
     galaxy_marker_begin=out.world.size();
     std::vector<NativeGalaxyLabelCandidate> label_candidates;
     std::vector<NativeGalaxyLabelObstacle> label_obstacles;
@@ -7686,7 +7700,8 @@ class NativeCampaign final {
       }
     }
 
-    if (const auto *projection = territory_overlay_.projection()) {
+    if (map_layer_territory_)
+      if (const auto *projection = territory_overlay_.projection()) {
       const float overview = native_territory_overview_blend(
           static_cast<float>(camera_.pixels_per_world) /
               NativeTerritoryOverlay::coordinate_scale,
@@ -7796,7 +7811,7 @@ class NativeCampaign final {
       fleet_workspace_.render(out,width,height,fleet_markers(width,height),&ship_art_,&overview_portrait_provider_);
     if(galaxy_marker_begin)
       promote_legacy_galaxy_foreground(out,*galaxy_marker_begin);
-    if(!menu_&&!system_workspace_.visible()&&!settings_visible()){
+    if(!menu_&&!system_workspace_.visible()&&!settings_visible()&&map_layer_phenomena_){
       const auto cursor=pinned_phenomenon_?camera_.project(*pinned_phenomenon_,width,height):pointer_;
       phenomena_.inspect(out,camera_,cursor,width,height,surveyed_phenomena(),developer_session(),pinned_phenomenon_.has_value());
     }
@@ -7965,6 +7980,26 @@ class NativeCampaign final {
               legend.width-42.f*s,row});
           row_y+=pitch;
         };
+        const auto faded=[&](Color color,bool on){
+          if(!on)color.a=static_cast<std::uint8_t>(color.a*.45);return color;};
+        // Toggle rows are legend entries and layer switches at once — the
+        // glyph still teaches the vocabulary while the checkbox carries
+        // the live show/hide state.
+        const auto toggle_label=[&](std::string value,UiAction action){
+          const UiRect row{legend.x,row_y,legend.width,pitch};
+          const bool on=map_layer_enabled(action);
+          if(row.contains(pointer_))fill(out,row,{28,52,66,255});
+          out.overlay.emplace_back(Text{{legend.x+34.f*s,row_y+3.f*s},
+              std::move(value),
+              on?Color{184,211,228,255}:Color{118,136,152,255},
+              label_pixels,legend.width-42.f*s,row});
+          const UiRect box{legend.x+legend.width-16.f*s,
+              row_y+(pitch-9.f*s)*.5f,9.f*s,9.f*s};
+          stroke(out,box,on?Color{111,225,255,210}:Color{90,112,128,200});
+          if(on)fill(out,{box.x+2.f*s,box.y+2.f*s,box.width-4.f*s,
+              box.height-4.f*s},{111,225,255,230});
+          row_y+=pitch;
+        };
         const auto glyph_box=[&](float edge){
           return UiRect{glyph_x-edge*.5f,row_y+(pitch-edge)*.5f-1.f*s,edge,edge};
         };
@@ -7973,23 +8008,23 @@ class NativeCampaign final {
         fill(out,glyph_box(7.f*s),{190,205,215,140});
         label(tr("MAP_LEGEND_UNCHARTED","Uncharted star"));
         const auto legend_lane=glyph_box(16.f*s);
-        fill(out,{legend_lane.x,legend_lane.y,4.f*s,4.f*s},{205,222,245,255});
-        fill(out,{legend_lane.x+legend_lane.width-4.f*s,legend_lane.y,4.f*s,4.f*s},{205,222,245,255});
-        out.overlay.emplace_back(Line{{legend_lane.x+4.f*s,legend_lane.y+2.f*s},{legend_lane.x+legend_lane.width-4.f*s,legend_lane.y+2.f*s},{49,74,108,230}});
-        label(tr("MAP_LEGEND_LANE","Charted lane"));
+        fill(out,{legend_lane.x,legend_lane.y,4.f*s,4.f*s},faded({205,222,245,255},map_layer_lanes_));
+        fill(out,{legend_lane.x+legend_lane.width-4.f*s,legend_lane.y,4.f*s,4.f*s},faded({205,222,245,255},map_layer_lanes_));
+        out.overlay.emplace_back(Line{{legend_lane.x+4.f*s,legend_lane.y+2.f*s},{legend_lane.x+legend_lane.width-4.f*s,legend_lane.y+2.f*s},faded({49,74,108,230},map_layer_lanes_)});
+        toggle_label(tr("MAP_LEGEND_LANE","Charted lane"),UiAction::LayerLanes);
         // Route previews draw green when the command is available and amber
         // when it is not — show both halves of the same vocabulary.
         const auto route=glyph_box(16.f*s);
         out.overlay.emplace_back(Line{{route.x,route.y+2.f*s},{route.x+route.width*.5f,route.y+2.f*s},{102,232,164,230}});
         out.overlay.emplace_back(Line{{route.x+route.width*.5f,route.y+2.f*s},{route.x+route.width,route.y+2.f*s},{255,190,112,230}});
         label(tr("MAP_LEGEND_ROUTE","Planned route"));
-        fill(out,glyph_box(13.f*s),territory);
-        label(tr("MAP_LEGEND_TERRITORY","Empire territory"));
+        fill(out,glyph_box(13.f*s),faded(territory,map_layer_territory_));
+        toggle_label(tr("MAP_LEGEND_TERRITORY","Empire territory"),UiAction::LayerTerritory);
         // Surveyed phenomena name themselves on the chart — a soft glow
         // glyph matches the halo the label floats over.
-        fill(out,glyph_box(13.f*s),{152,230,247,40});
-        fill(out,glyph_box(7.f*s),{152,230,247,130});
-        label(tr("MAP_LEGEND_PHENOMENON","Surveyed phenomenon"));
+        fill(out,glyph_box(13.f*s),faded({152,230,247,40},map_layer_phenomena_));
+        fill(out,glyph_box(7.f*s),faded({152,230,247,130},map_layer_phenomena_));
+        toggle_label(tr("MAP_LEGEND_PHENOMENON","Surveyed phenomenon"),UiAction::LayerPhenomena);
         fill(out,glyph_box(10.f*s),{102,232,164,55});
         fill(out,glyph_box(4.f*s),{102,232,164,255});
         label(tr("MAP_LEGEND_FLEET","Fleet"));
@@ -9141,8 +9176,13 @@ class NativeCampaign final {
     std::vector<std::pair<UiRect,UiAction>> items;
     for(const auto &item:layout.hud_actions())
       if(item.second!=UiAction::Notifications||notifications_available())items.push_back(item);
-    if(map_legend_visible(width,height))
+    if(map_legend_visible(width,height)){
       items.emplace_back(map_legend_toggle_bounds(width,height),UiAction::Legend);
+      if(!map_legend_collapsed_)
+        for(int row=0;row<8;++row)
+          if(const auto action=map_legend_row_action(row))
+            items.emplace_back(map_legend_row_bounds(row,width,height),*action);
+    }
     if(system_workspace_.visible()||selected_id_)
       items.emplace_back(CommandHudLayout::make(width,height).switch_view,UiAction::SwitchView);
     return items;
@@ -9173,6 +9213,9 @@ class NativeCampaign final {
       case UiAction::Missions:return tr("NAV_MISSIONS","Missions");
       case UiAction::SwitchView:return tr("HUD_SWITCH_VIEW","Switch view");
       case UiAction::Legend:return tr("HUD_MAP_LEGEND","Map legend");
+      case UiAction::LayerLanes:return tr("HUD_MAP_LAYER_LANES","Toggle charted lanes");
+      case UiAction::LayerTerritory:return tr("HUD_MAP_LAYER_TERRITORY","Toggle empire territory");
+      case UiAction::LayerPhenomena:return tr("HUD_MAP_LAYER_PHENOMENA","Toggle phenomena");
       default:return {};
     }
   }
@@ -9354,6 +9397,40 @@ class NativeCampaign final {
   [[nodiscard]] bool map_legend_visible(int width,int height) const {
     return map_hud_visible()&&!system_workspace_.visible()&&
         map_legend_toggle_bounds(width,height).width>=72.f;
+  }
+  // Legend rows double as layer toggles where the vocabulary is a
+  // show/hide layer — the shared row geometry feeds render, pointer hit
+  // testing and the focus ring identically.
+  [[nodiscard]] UiRect map_legend_row_bounds(int index,int width,int height)const{
+    const auto toggle=map_legend_toggle_bounds(width,height);
+    const auto legend=map_legend_bounds(width,height);
+    const auto scale=NativeUiLayout::for_viewport(width,height).scale;
+    return {legend.x,toggle.y+toggle.height+5.f*scale+index*17.f*scale,
+            legend.width,17.f*scale};
+  }
+  [[nodiscard]] static std::optional<UiAction> map_legend_row_action(int index){
+    switch(index){
+      case 2:return UiAction::LayerLanes;
+      case 4:return UiAction::LayerTerritory;
+      case 5:return UiAction::LayerPhenomena;
+      default:return std::nullopt;
+    }
+  }
+  [[nodiscard]] bool map_layer_enabled(UiAction action)const{
+    switch(action){
+      case UiAction::LayerLanes:return map_layer_lanes_;
+      case UiAction::LayerTerritory:return map_layer_territory_;
+      case UiAction::LayerPhenomena:return map_layer_phenomena_;
+      default:return true;
+    }
+  }
+  void toggle_map_layer(UiAction action){
+    switch(action){
+      case UiAction::LayerLanes:map_layer_lanes_=!map_layer_lanes_;break;
+      case UiAction::LayerTerritory:map_layer_territory_=!map_layer_territory_;break;
+      case UiAction::LayerPhenomena:map_layer_phenomena_=!map_layer_phenomena_;break;
+      default:break;
+    }
   }
   [[nodiscard]] static UiRect inspection_bounds(int width,int height) {
     const auto scale=NativeUiLayout::for_viewport(width,height).scale;
@@ -9560,6 +9637,10 @@ class NativeCampaign final {
   std::unordered_map<int,SystemBodyAppearance> hud_planet_appearances_;
   bool hud_switch_pressed_{};
   bool map_legend_collapsed_{};bool map_legend_pressed_{};
+  // Strategic overlay toggles — client-local like the legend collapse; the
+  // FoW shroud and marker vocabulary are never toggleable.
+  bool map_layer_lanes_{true},map_layer_territory_{true},map_layer_phenomena_{true};
+  int map_layer_pressed_{-1};
   std::optional<DrawList> smoke_colony_roster_capture_;
   std::optional<DrawList> smoke_missions_capture_;
   std::string smoke_colony_roster_evidence_;

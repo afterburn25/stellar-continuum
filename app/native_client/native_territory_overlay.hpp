@@ -24,6 +24,10 @@ struct NativeTerritoryDrawStats final {
 struct NativeTerritoryRenderStyle final {
   bool draw_labels{true};
   bool emphasize_overview{};
+  // The unexplored-space fog shroud is FoW geometry and always draws; only
+  // the ownership marks (fill, contours, region labels, claims) follow the
+  // player's territory toggle.
+  bool draw_ownership{true};
 };
 
 // Presentation cache mirroring Main.StrategicTerritory.cs: the projection and

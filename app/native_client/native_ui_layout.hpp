@@ -46,7 +46,10 @@ enum class UiAction {
   Menu,
   Missions,
   SwitchView,
-  Legend
+  Legend,
+  LayerLanes,
+  LayerTerritory,
+  LayerPhenomena
 };
 
 struct NativeUiLayout {
