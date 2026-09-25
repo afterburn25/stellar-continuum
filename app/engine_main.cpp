@@ -305,7 +305,7 @@ struct Shell {
       hit3_dup{}, hit3_name{}, hit3_mesh{}, hit3_pos{}, hit3_rot{},
       hit3_scale{}, hit3_vel{}, hit3_color{}, hit3_tex{},
       hit3_opacity{}, hit3_dbl{}, hit3_solid{}, hit3_gravs{},
-      hit3_ttl{}, hit3_data{}, hit3_parent{}, hit3_cam{},
+      hit3_ttl{}, hit3_data{}, hit3_parent{}, hit3_vfx{}, hit3_cam{},
       hit3_camrot{}, hit3_fov{}, hit3_lightdir{}, hit3_lightint{},
       hit3_grav{}, hit3_ground{}, hit3_bounds{}, hit3_bg{},
       hit3_music{}, hit3_filla_dir{}, hit3_filla_tint{},
@@ -1945,6 +1945,7 @@ void commit_scene3_field(Shell &shell) {
           next.ttl = std::max(0.f, a); valid = true; break;
   case 14: next.data = shell.scene3_buffer; valid = true; break;
   case 15: next.parent = shell.scene3_buffer; valid = true; break;
+  case 16: next.vfx = shell.scene3_buffer; valid = true; break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -1967,7 +1968,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                     shell.hit3_tex = shell.hit3_opacity = shell.hit3_dbl =
                         shell.hit3_solid = shell.hit3_gravs =
                             shell.hit3_ttl = shell.hit3_data =
-                                shell.hit3_parent = shell.hit3_cam =
+                                shell.hit3_parent = shell.hit3_vfx =
+                                    shell.hit3_cam =
                                     shell.hit3_camrot = shell.hit3_fov =
                                         shell.hit3_lightdir =
                                             shell.hit3_lightint =
@@ -2185,6 +2187,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         "freeform game data");
   field(shell.hit3_parent, "parent", entity ? entity->parent : "",
         ed(15), "entity name to follow");
+  field(shell.hit3_vfx, "vfx", entity ? entity->vfx : "", ed(16),
+        "named emitter attached on spawn");
   // Second column: document-level fields.
   fx = list_rect.x + col_w + 20 * s;
   fy = list_rect.y + list_rect.height + 16 * s;
@@ -6100,6 +6104,8 @@ int main(int argc, char **argv) {
               edit3(14, se->data);
             else if (shell.hit3_parent.contains(event.position) && se)
               edit3(15, se->parent);
+            else if (shell.hit3_vfx.contains(event.position) && se)
+              edit3(16, se->vfx);
             else if (shell.hit3_cam.contains(event.position))
               edit3(20, std::to_string((int)doc.cam_x) + "," +
                             std::to_string((int)doc.cam_y) + "," +

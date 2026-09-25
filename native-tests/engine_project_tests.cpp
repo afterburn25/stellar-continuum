@@ -398,6 +398,7 @@ int main() {
     cube.ttl = 12.f;
     cube.data = "loot:gold";
     cube.parent = "ship";
+    cube.vfx = "trail";
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -451,7 +452,7 @@ int main() {
                 rc.opacity == 0.75f && rc.double_sided &&
                 rc.gravity_scale == 0.5f && rc.solid &&
                 rc.ttl == 12.f && rc.data == "loot:gold" &&
-                rc.parent == "ship",
+                rc.parent == "ship" && rc.vfx == "trail",
             "scene3d entity fields round-trip");
       check(reparsed->cam_y == 2.f && reparsed->cam_z == 8.f &&
                 reparsed->cam_yaw_deg == 30.f &&
