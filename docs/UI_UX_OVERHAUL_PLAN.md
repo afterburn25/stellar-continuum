@@ -123,9 +123,9 @@ breaks navigation/AT flow, or presents wrong state)
    provides `metric_tile`, `badge`, `key_value`, `focus_ring`,
    `empty_state`, `tab`, `section_header` and `clipped`; planetary,
    economy, supply/logistics and fleet workspaces consume them and their
-   palettes alias the semantic colors. Shipyard, construction and
-   diplomacy are now migrated as well. Still open: research, missions,
-   startup chrome migrations.
+   palettes alias the semantic colors. Shipyard, construction,
+   diplomacy and research are now migrated as well. Still open:
+   missions and startup chrome migrations.
 2. ~~**No global quick-find / command palette**~~ → DONE for systems,
    colonies, fleets and identified contacts (see work log): Ctrl+K opens a
    modal palette built from FoW-filtered view models, with type badges,
