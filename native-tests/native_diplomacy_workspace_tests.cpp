@@ -316,6 +316,50 @@ int main() try {
   require(stale_confirm.kind != DiplomacyWorkspaceCommandKind::Action,
           "A dismissed stale modal still issued an action.");
 
+  // The negotiation modal lists every term; unavailable terms render disabled
+  // with the domain's authoritative status as the hover why, and clicking one
+  // is a captured no-op.
+  auto war_view = sample_view();
+  auto &war_sel = war_view.selected;
+  war_sel.can_declare_war = false; // at war
+  war_sel.can_offer_non_aggression = false;
+  war_sel.can_request_access = false;
+  war_sel.can_offer_ceasefire = true;
+  war_sel.can_offer_peace = true;
+  war_sel.political_status = "At war";
+  NativeDiplomacyWorkspace war_workspace;
+  war_workspace.open();
+  war_workspace.set_view(war_view);
+  (void)war_workspace.handle(
+      {InputEventType::LeftPressed, center(negotiate)}, 1280, 720);
+  require(war_workspace.modal_open(),
+          "At-war negotiation modal did not open.");
+  (void)war_workspace.handle({InputEventType::PointerMove,
+                              center({layout.modal_panel.x + 16.f * s,
+                                      layout.modal_panel.y + 74.f * s,
+                                      layout.modal_panel.width - 32.f * s,
+                                      36.f * s})},
+                             1280, 720);
+  DrawList terms_draw;
+  war_workspace.render(terms_draw, 1280, 720, nullptr);
+  require(has_text(terms_draw, "Non-aggression") &&
+              has_text(terms_draw, "Request transit access") &&
+              has_text(terms_draw, "Ceasefire") &&
+              has_text(terms_draw, "Peace") &&
+              has_text(terms_draw, "Grant transit access") &&
+              has_text(terms_draw, "Deny transit access"),
+          "Unavailable negotiation terms were hidden instead of disabled.");
+  const UiRect first_term_rect{layout.modal_panel.x + 16.f * s,
+                               layout.modal_panel.y + 74.f * s,
+                               layout.modal_panel.width - 32.f * s,
+                               36.f * s};
+  const auto disabled_term = war_workspace.handle(
+      {InputEventType::LeftPressed, center(first_term_rect)}, 1280, 720);
+  require(disabled_term.captured &&
+              disabled_term.kind == DiplomacyWorkspaceCommandKind::None &&
+              war_workspace.modal_open(),
+          "A disabled negotiation term dispatched a transition.");
+
   // Contact rows and proposal buttons cannot be activated through a clipped
   // edge after scrolling.
   auto crowded = sample_view();

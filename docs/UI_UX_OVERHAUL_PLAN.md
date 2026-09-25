@@ -177,9 +177,12 @@ breaks navigation/AT flow, or presents wrong state)
    hint was folded into a new compact `theme::hint` helper. The diplomacy
    action row is no longer hidden-when-illegal: all three actions render in
    fixed slots, disabled when unavailable, with the authoritative
-   communication/political status surfaced as the hover why. Still open:
-   per-proposal buttons inside the negotiation modal and general "what does
-   this do" coverage beyond disabled states.
+   communication/political status surfaced as the hover why, and the
+   negotiation modal now lists all six terms with unavailable ones disabled
+   (`ModalTerm::enabled` + `tip` carrying the authoritative political /
+   access / agreements / communication status — no legality rules duplicated
+   in UI). Still open: general "what does this do" coverage beyond disabled
+   states.
 2. ~~Notifications feed has no severity iconography or grouping~~ — severity
    axis and severity filtering shipped (see work log). Category-based
    grouping remains a possible future refinement.

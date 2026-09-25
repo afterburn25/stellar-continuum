@@ -487,12 +487,14 @@ NativeDiplomacyWorkspace::focusables(
     const DiplomacyWorkspaceLayout &layout) const {
   std::vector<FocusRect> out;
   if (modal_) {
-    if (modal_->negotiation)
+    if (modal_->negotiation) {
       for (std::size_t index = 0; index < modal_->terms.size(); ++index)
-        out.push_back({modal_term_button(layout, index),
-                       modal_->terms[index].first});
-    else
+        if (modal_->terms[index].enabled)
+          out.push_back({modal_term_button(layout, index),
+                         modal_->terms[index].label});
+    } else {
       out.push_back({modal_confirm_button(layout), modal_->confirm_label});
+    }
     out.push_back({modal_cancel_button(layout),
                    tr("SETTINGS_CANCEL", "Cancel")});
   } else {
@@ -714,13 +716,14 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         return {DiplomacyWorkspaceCommandKind::None, true};
       }
       for (std::size_t index = 0; index < modal.terms.size(); ++index) {
-        if (modal_term_button(layout, index).contains(event.position)) {
+        if (modal.terms[index].enabled &&
+            modal_term_button(layout, index).contains(event.position)) {
           auto next = ModalState{};
-          next.title = modal.terms[index].first;
+          next.title = modal.terms[index].label;
           next.description = trf("DIPLOMACY_COUNTERPART",
                                  {view_->selected.contact_name},
                                  "Counterpart: {0}");
-          next.action = modal.terms[index].second;
+          next.action = modal.terms[index].action;
           next.target_civilization_id = modal.target_civilization_id;
           next.campaign_generation = modal.campaign_generation;
           next.diplomacy_revision = modal.diplomacy_revision;
@@ -822,24 +825,36 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         modal.target_civilization_id = s.target_civilization_id;
         modal.campaign_generation = view_->campaign_generation;
         modal.diplomacy_revision = view_->diplomacy_revision;
-        const auto add = [&](const char *name,
-                             DiplomacyWorkspaceAction action, bool legal) {
-          if (legal) modal.terms.emplace_back(name, action);
+        // Every term stays listed — disabled rows keep the domain's
+        // authoritative status (`political`/`access`/`agreements`/
+        // `communication`) as the hover why, so a closed-off option still
+        // teaches what it needs. `!can_declare_war` is the authoritative
+        // at-war projection.
+        const auto add = [&](std::string name,
+                             DiplomacyWorkspaceAction action, bool legal,
+                             std::string tip) {
+          modal.terms.push_back(
+              {std::move(name), action, legal, std::move(tip)});
         };
-        add(tr("DIPLOMACY_TERM_NON_AGGRESSION", "Non-aggression").c_str(),
+        add(tr("DIPLOMACY_TERM_NON_AGGRESSION", "Non-aggression"),
             DiplomacyWorkspaceAction::propose_non_aggression,
-            s.can_offer_non_aggression);
-        add(tr("DIPLOMACY_TERM_REQUEST_ACCESS", "Request transit access")
-                .c_str(),
-            DiplomacyWorkspaceAction::request_access, s.can_request_access);
-        add(tr("DIPLOMACY_TERM_CEASEFIRE", "Ceasefire").c_str(),
-            DiplomacyWorkspaceAction::offer_ceasefire, s.can_offer_ceasefire);
-        add(tr("DIPLOMACY_TERM_PEACE", "Peace").c_str(),
-            DiplomacyWorkspaceAction::offer_peace, s.can_offer_peace);
-        add(tr("DIPLOMACY_TERM_GRANT_ACCESS", "Grant transit access").c_str(),
-            DiplomacyWorkspaceAction::grant_access, s.can_set_access);
-        add(tr("DIPLOMACY_TERM_DENY_ACCESS", "Deny transit access").c_str(),
-            DiplomacyWorkspaceAction::deny_access, s.can_set_access);
+            s.can_offer_non_aggression,
+            s.can_declare_war ? s.agreements_summary : s.political_status);
+        add(tr("DIPLOMACY_TERM_REQUEST_ACCESS", "Request transit access"),
+            DiplomacyWorkspaceAction::request_access, s.can_request_access,
+            s.access_summary);
+        add(tr("DIPLOMACY_TERM_CEASEFIRE", "Ceasefire"),
+            DiplomacyWorkspaceAction::offer_ceasefire, s.can_offer_ceasefire,
+            s.political_status);
+        add(tr("DIPLOMACY_TERM_PEACE", "Peace"),
+            DiplomacyWorkspaceAction::offer_peace, s.can_offer_peace,
+            s.political_status);
+        add(tr("DIPLOMACY_TERM_GRANT_ACCESS", "Grant transit access"),
+            DiplomacyWorkspaceAction::grant_access, s.can_set_access,
+            s.communication_status);
+        add(tr("DIPLOMACY_TERM_DENY_ACCESS", "Deny transit access"),
+            DiplomacyWorkspaceAction::deny_access, s.can_set_access,
+            s.communication_status);
         modal_ = std::move(modal);
         return {DiplomacyWorkspaceCommandKind::None, true};
       }
@@ -1428,9 +1443,13 @@ void NativeDiplomacyWorkspace::render(
          modal_->description, bright, layout.body_font_pixels);
     if (modal_->negotiation) {
       for (std::size_t index = 0; index < modal_->terms.size(); ++index) {
+        const auto &term = modal_->terms[index];
         const auto bounds = modal_term_button(layout, index);
-        theme::button(out, bounds, modal_->terms[index].first, pointer_,
-                      layout.body_font_pixels, theme::Tone::Diplomacy);
+        theme::button(out, bounds, term.label, pointer_,
+                      layout.body_font_pixels, theme::Tone::Diplomacy, false,
+                      term.enabled);
+        theme::hover_tooltip(out, bounds, pointer_, term.label, term.tip,
+                             width, height, s);
       }
     } else {
       theme::button(out, modal_confirm_button(layout), modal_->confirm_label,
