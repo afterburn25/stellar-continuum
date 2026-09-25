@@ -48,7 +48,12 @@ struct NativeAudioStats final {
   // Successful output-device rebuilds after a device-level failure.
   std::uint64_t device_recoveries{};
 };
-struct VoiceCaption final { std::string speaker, text; std::chrono::steady_clock::time_point expires_at{}; };
+struct VoiceCaption final {
+  std::string speaker, text;
+  std::chrono::steady_clock::time_point expires_at{};
+  // Catalog keys for fixed cue captions; empty keeps speaker/text literal.
+  std::string speaker_key, text_key;
+};
 
 // UI-owner-thread coordinator for asynchronous clip decoding and SDL output.
 class NativeAudioDirector final {

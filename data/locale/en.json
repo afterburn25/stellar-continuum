@@ -1770,6 +1770,10 @@
     "NOTIFY_DIP_AGREEMENT_ACTIVE": "A diplomatic agreement is now active.",
     "NOTIFY_DIP_AGREEMENT_ENDED": "A diplomatic agreement has ended.",
     "NOTIFY_DIP_WAR": "A declaration of war has been recorded.",
-    "NOTIFY_DIP_SIGNAL": "A diplomatic signal was received from an unidentified contact."
+    "NOTIFY_DIP_SIGNAL": "A diplomatic signal was received from an unidentified contact.",
+    "VOICE_SPEAKER_SCIENTIST": "CHIEF SCIENTIST",
+    "VOICE_CUE_RECON": "Long-range telemetry is incomplete. Dispatch a scout vessel to chart this system before approach.",
+    "VOICE_CUE_RESEARCH": "Our research team has a new report. Review the findings before selecting our next objective.",
+    "VOICE_CUE_SURVEY": "System survey complete. The updated observations are ready for your review."
   }
 }

@@ -397,9 +397,12 @@ void NativeAudioDirector::play_event(Cue cue) {
 
 void NativeAudioDirector::speak(VoiceCue cue) { require_owner(); admit_voice(cue,false); }
 void NativeAudioDirector::show_caption(VoiceCue cue) {
+  constexpr std::array<const char*,3> voice_text_keys{
+      "VOICE_CUE_RECON","VOICE_CUE_RESEARCH","VOICE_CUE_SURVEY"};
   const auto index=voice_index(cue);
   caption_=VoiceCaption{"CHIEF SCIENTIST",std::string(voice_text[index]),
-    std::chrono::steady_clock::now()+std::chrono::milliseconds{static_cast<int>((voice_seconds[index]+1.)*1000.)}};
+    std::chrono::steady_clock::now()+std::chrono::milliseconds{static_cast<int>((voice_seconds[index]+1.)*1000.)},
+    "VOICE_SPEAKER_SCIENTIST",voice_text_keys[index]};
 }
 void NativeAudioDirector::admit_voice(VoiceCue cue,bool replay) {
   const auto index=voice_index(cue);

@@ -7716,7 +7716,7 @@ class NativeCampaign final {
     if(notifications_available())chronicle_view_.render(out,width,height);
     stellar::native_audio::render_voice_caption(out,presentation_audio_,width,height,text_measurer_,
         general_settings_?general_settings_->saved().effective():stellar::engine::AccessibilitySettings{},
-        voice_playback_?&*voice_playback_:nullptr,announcement_caption());
+        voice_playback_?&*voice_playback_:nullptr,announcement_caption(),locale_);
     if(audio_settings_)audio_settings_->render(out,width,height);
     if(general_settings_)general_settings_->render(out,width,height);
     if(video_settings_)video_settings_->render(out,width,height);

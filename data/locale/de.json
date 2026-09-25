@@ -1770,6 +1770,10 @@
     "NOTIFY_DIP_AGREEMENT_ACTIVE": "Ein diplomatisches Abkommen ist jetzt aktiv.",
     "NOTIFY_DIP_AGREEMENT_ENDED": "Ein diplomatisches Abkommen ist beendet worden.",
     "NOTIFY_DIP_WAR": "Eine Kriegserkl\u00e4rung wurde verzeichnet.",
-    "NOTIFY_DIP_SIGNAL": "Ein diplomatisches Signal eines nicht identifizierten Kontakts wurde empfangen."
+    "NOTIFY_DIP_SIGNAL": "Ein diplomatisches Signal eines nicht identifizierten Kontakts wurde empfangen.",
+    "VOICE_SPEAKER_SCIENTIST": "LEITENDE WISSENSCHAFTLERIN",
+    "VOICE_CUE_RECON": "Die Langstreckentelemetrie ist unvollst\u00e4ndig. Entsenden Sie ein Aufkl\u00e4rungsschiff, um dieses System vor der Ann\u00e4herung zu kartieren.",
+    "VOICE_CUE_RESEARCH": "Unser Forschungsteam hat einen neuen Bericht. Pr\u00fcfen Sie die Ergebnisse, bevor Sie das n\u00e4chste Ziel w\u00e4hlen.",
+    "VOICE_CUE_SURVEY": "Systemvermessung abgeschlossen. Die aktualisierten Beobachtungen liegen zur Durchsicht bereit."
   }
 }

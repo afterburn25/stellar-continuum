@@ -2,6 +2,7 @@
 #include "native_audio_director.hpp"
 #include "native_voice_playback.hpp"
 #include <stellar/engine/accessibility.hpp>
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <algorithm>
 #include <cmath>
@@ -13,7 +14,8 @@ void render_voice_caption(stellar::native_map::DrawList& out, NativeAudioDirecto
                           int width,int height,Measure measure,
                           const stellar::engine::AccessibilitySettings& accessibility={},
                           const stellar::native_voice::NativeVoicePlayback* playback=nullptr,
-                          std::optional<VoiceCaption> ui_announcement=std::nullopt) {
+                          std::optional<VoiceCaption> ui_announcement=std::nullopt,
+                          const stellar::engine::LocalizationTable* locale=nullptr) {
   using namespace stellar::native_map;
   if(!audio||!accessibility.subtitles_enabled)return;
   std::optional<VoiceCaption> current;
@@ -27,7 +29,12 @@ void render_voice_caption(stellar::native_map::DrawList& out, NativeAudioDirecto
   const float scale=std::clamp(height/1080.f,.8f,2.5f);
   const int pixels=std::max(12,static_cast<int>(std::lround(preferences.subtitle_size*scale*accessibility.subtitle_scale)));
   const float content_width=std::min(900.f*scale,width-80.f*scale);
-  const auto value=(preferences.speaker_labels&&!current->speaker.empty()?current->speaker+"\n":"")+current->text;
+  const auto keyed=[&](const std::string& key,const std::string& fallback){
+    return !key.empty()&&locale&&locale->contains(key)
+               ?std::string(locale->translate(key)):fallback;};
+  const auto speaker=keyed(current->speaker_key,current->speaker);
+  const auto text=keyed(current->text_key,current->text);
+  const auto value=(preferences.speaker_labels&&!speaker.empty()?speaker+"\n":"")+text;
   const auto measured=measure(Text{{0,0},value,{239,248,255,255},pixels,content_width});
   const float panel_height=static_cast<float>(measured.height)+24.f*scale;
   const UiRect panel{(width-content_width)*.5f-16*scale,height-panel_height-64*scale,content_width+32*scale,panel_height};
