@@ -791,11 +791,15 @@ int main() {
     int events_seen = 0;
     bool demo_found = false;
     std::vector<Transform2D> positions;
+    std::vector<std::uint64_t> draws;
     host.on_event = [&](const stellar::native_map::InputEvent &) {
       ++events_seen;
     };
     host.on_update = [&](World &world, float) {
       ++updates;
+      // The rng stream snapshots with the world: post-restore draws must
+      // replay the same continuation the save's state would have made.
+      draws.push_back(host.rng().next_u64());
       const auto demo = host.find_entity("demo");
       if (demo) {
         demo_found = true;
@@ -822,6 +826,17 @@ int main() {
       check(positions[6].x == positions[2].x &&
                 positions[6].y == positions[2].y,
             "F9 restores the F5 snapshot exactly");
+    }
+    // The rng carrier restores with the snapshot: the stream position at
+    // save time was after update 2's draw, so updates 7-8 replay the
+    // values updates 3-4 produced — while update 6 (pre-restore) had
+    // already advanced past them.
+    check(draws.size() == 8, "every frame draws from the rng stream");
+    if (draws.size() == 8) {
+      check(draws[5] != draws[2],
+            "the rng stream advances between save and restore");
+      check(draws[6] == draws[2] && draws[7] == draws[3],
+            "F9 restores the rng stream position with the world");
     }
   }
 
