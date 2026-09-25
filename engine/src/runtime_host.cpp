@@ -641,7 +641,9 @@ int RuntimeHost::run() {
   const auto plan = registry.resolve();
 
   const auto exe_dir = executable_directory();
-  impl.time_scale = options.time_scale;
+  // Same clamp set_time_scale applies — a non-positive --speed would
+  // otherwise integrate entities backwards.
+  impl.time_scale = options.time_scale > 0.0 ? options.time_scale : 1.0;
   impl.content = std::make_unique<ContentResolver>(
       options.package_id, options.project_root, exe_dir);
   const std::size_t cooked_assets = impl.content->cooked_count();

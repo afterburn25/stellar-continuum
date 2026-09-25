@@ -862,6 +862,15 @@ int main() {
           "world bounds fall back to the viewport");
     check(std::abs(host.time_scale() - 2.5) < 1e-9,
           "set_time_scale round-trips");
+    // Non-positive scales clamp to 1.0 on both paths — a --speed 0 or
+    // negative would otherwise integrate entities backwards.
+    host.set_time_scale(0.0);
+    check(host.time_scale() == 1.0, "set_time_scale clamps non-positive");
+    auto bad_speed = headless_options(root);
+    bad_speed.time_scale = -3.0;
+    RuntimeHost clamped{bad_speed};
+    check(clamped.run() == 0 && clamped.time_scale() == 1.0,
+          "options time_scale clamps at run");
     // Set inside update 1 — after that step's sim_time accumulation —
     // so only steps 2-4 run scaled: dt * (1 + 3 * 2.5).
     check(std::abs(host.sim_time() - (1.0 / 60.0) * 8.5) < 1e-6,
