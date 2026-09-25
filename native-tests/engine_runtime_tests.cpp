@@ -646,6 +646,48 @@ int main() {
           "the exit pair matches the enter pair");
   }
 
+  // 3D ttl / parent / bounds: "spark" self-destructs when its Lifetime
+  // drains, "rider" follows its moving parent at the captured offset,
+  // and "bouncer" reflects off the XZ bounds wall.
+  {
+    const auto sub = root / "scene3d-misc";
+    std::filesystem::create_directories(sub / "editor");
+    {
+      std::ofstream out(sub / "editor" / "scene3d.json");
+      out << R"({"entities":[
+                   {"name":"carrier","mesh":"box","pos":[0,0,0],
+                    "vel":[1,0,0]},
+                   {"name":"rider","mesh":"box","pos":[0.5,0,0],
+                    "parent":"carrier"},
+                   {"name":"spark","mesh":"box","pos":[0,0,5],
+                    "ttl":0.05},
+                   {"name":"bouncer","mesh":"box","pos":[0,0,2],
+                    "vel":[0,0,4]}],
+                  "bounds":3.0})";
+    }
+    auto opts = headless_options(sub);
+    opts.scene3d = true;
+    opts.frame_limit = 30;
+    RuntimeHost host{opts};
+    check(host.run() == 0, "3D ttl/parent/bounds run exits cleanly");
+    float rider_x = -999.f, carrier_x = -999.f, bouncer_z = -999.f;
+    bool spark_alive = false;
+    for (const auto e : host.entities3d()) {
+      const auto *n = host.world().get<EntityName>(e);
+      const auto *t = host.world().get<Transform3D>(e);
+      if (!n || !t) continue;
+      if (n->value == "rider") rider_x = t->x;
+      if (n->value == "carrier") carrier_x = t->x;
+      if (n->value == "bouncer") bouncer_z = t->z;
+      if (n->value == "spark") spark_alive = true;
+    }
+    check(!spark_alive, "ttl destroys the 3D entity after its lifetime");
+    check(std::abs(rider_x - carrier_x - 0.5f) < 0.05f,
+          "the 3D child follows its parent at the captured offset");
+    check(bouncer_z > 0.0f && bouncer_z < 2.4f,
+          "the bouncer reflects off the bounds wall");
+  }
+
   // save_data/load_data round-trip named blobs under saves/data/ —
   // no run() needed, and key validation rejects path escapes.
   {
