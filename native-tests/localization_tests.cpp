@@ -312,6 +312,31 @@ int main() {
                       .c_str());
           }
       }
+
+      // The feed/chronicle resolve NOTIFY_CATEGORY_<UPPER(label)> for every
+      // label category_label() returns — a new prefix added without a
+      // catalog entry silently shows English in non-English locales.
+      if (const std::size_t fn =
+              src.find("category_label(std::string_view");
+          fn != std::string::npos) {
+        const std::size_t body_end = src.find("\n}", fn);
+        const std::string body = src.substr(fn, body_end - fn);
+        std::size_t cursor = 0;
+        while ((cursor = body.find("return \"", cursor)) !=
+               std::string::npos) {
+          const std::size_t q = body.find('"', cursor + 8);
+          const std::string label = body.substr(cursor + 8, q - cursor - 8);
+          cursor = q;
+          std::string key{"NOTIFY_CATEGORY_"};
+          for (const char ch : label)
+            key += static_cast<char>(
+                std::toupper(static_cast<unsigned char>(ch)));
+          check(catalog.contains(key),
+                (file.filename().string() + " maps a chronicle category to "
+                 "\"" + label + "\" with no catalog key " + key)
+                    .c_str());
+        }
+      }
     }
   }
 #endif
