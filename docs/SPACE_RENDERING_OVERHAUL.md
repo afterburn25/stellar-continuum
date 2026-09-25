@@ -95,7 +95,7 @@ same document headless-tested.
    `accretion_disc_material3d` + `accretion`/`AccretionDisc` generate a
    Shakura–Sunyaev radial disc for `annulus` meshes (black holes compose
    with a dark sphere), `forward_scatter`/`forwardScatter` adds a
-   single-lobe phase function (backlit dusty rings brighten, icy
+   Henyey–Greenstein phase function (backlit dusty rings brighten, icy
    opposition surges), and `SurfaceEffect3D::volume_scatter` makes
    emission volumes read star-lit; volumes are document-authored via the
    `volume` block / `EmissionVolume` component (entity texture supplies

@@ -48,7 +48,7 @@ m.band_shear = -0.2f;                       // [-0.5,0.5] latitude-weighted
 m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
                                             // asymmetry (accretion discs,
                                             // ring forward-scatter)
-m.forward_scatter = 0.6f;                   // [-1,1] phase function:
+m.forward_scatter = 0.6f;                   // [-1,1] HG phase asymmetry:
                                             // +backlit boost (dusty
                                             // rings), -opposition surge
 ```
@@ -377,7 +377,7 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - `volume_scatter` is a limb-gradient approximation — no real
   light-path extinction march inside the volume; volumes remain
   authored through the C++ API only.
-- `forward_scatter` is a single Henyey-Greenstein-style lobe — no
+- `forward_scatter` is a single Henyey-Greenstein lobe — no
   multi-term phase functions or wavelength-dependent scattering; it
   scales radiance only, not alpha.
 - One shared equirect env map per material — no probe grid.

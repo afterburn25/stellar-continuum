@@ -806,8 +806,9 @@ int main(int argc,char** argv)try{
     std::cout<<"accretion_disc_gpu=radial_beaming_passed\n";
   }
   {
-    // Scattering phase: the same ring sheet brightens when backlit
-    // (forward scatter) and dims face-lit for s>0.
+    // Henyey-Greenstein phase: the same ring sheet brightens when
+    // backlit (g>0 forward scatter) and dims face-lit — the lobe
+    // sharpens as |g| approaches 1, so g=.8 saturates the backlit side.
     MeshInstance3D ring{annulus_mesh(.45f,1.f,192),{},{},.9f,Material3D{}};
     ring.material.tint={190,190,200,255};ring.material.two_sided_diffuse=true;
     ring.material.ambient=.1f;ring.material.diffuse=.9f;

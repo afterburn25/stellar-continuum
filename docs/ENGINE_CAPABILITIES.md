@@ -268,17 +268,20 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ### Follow-up: `Material3D::forward_scatter` phase function
 
-- Single-lobe scattering phase `1 − s·(V̂·L̂)`, s in [-1,1]: positive
-  brightens a sheet when backlit (dusty-ring forward scatter — the E
-  ring look) and dims it face-lit; negative inverts to an opposition
-  surge for icy regolith. Complements `orbital_beaming` (velocity
+- Henyey–Greenstein single-scatter phase
+  `(1−g²)/(1+g²+2g·(V̂·L̂))^(3/2)`, g in [-1,1]: positive peaks a sheet
+  when backlit (dusty-ring forward scatter — the E-ring look) with a
+  lobe that sharpens as |g|→1; negative inverts to an opposition surge
+  for icy regolith. Unit-mean over directions, so sheet luminance is
+  preserved on average; |g| clamps to .95 in the shader so the
+  singular peak stays finite. Complements `orbital_beaming` (velocity
   asymmetry) — this term is the view/light phase, so a face-on ring
   still responds. Rides `atmo_shape.w` (the atmosphere branch reads
   only `.x/.y`). Authored via `forwardScatter` doc key +
   `MaterialSurface::forward_scatter`, runtime + editor `fwdScatter`
-  row. GPU probe measures the authored ×1.8 backlit boost and ×0.2
-  face-lit dim on a tilted annulus. Remaining: one lobe — no
-  Henyey-Greenstein g parameter or wavelength split; radiance only.
+  row. GPU probe measures the backlit boost and face-lit dim on a
+  tilted annulus. Remaining: single HG lobe — no wavelength split or
+  multi-term blends; radiance only.
 
 ### Follow-up: `EmissionVolume` document/component authoring
 

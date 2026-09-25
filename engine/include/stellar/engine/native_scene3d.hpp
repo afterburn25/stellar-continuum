@@ -215,12 +215,13 @@ struct Material3D {
   // edge-on discs peak. Accretion discs, ring forward-scatter. [-1,1];
   // negative spins retrograde; 0 disables.
   float orbital_beaming{};
-  // Single-lobe scattering phase: radiance scales by 1 − s·(V̂·L̂), so
-  // s > 0 brightens the sheet when it is backlit (dusty-ring forward
-  // scatter — Saturn E-ring look) and dims it face-lit; s < 0 inverts
-  // to an opposition backscatter surge (icy regolith). Mean-free across
-  // geometries — the sheet's total luminance is preserved on average.
-  // [-1,1]; 0 disables.
+  // Henyey–Greenstein single-scatter phase: radiance scales by
+  // (1−g²)/(1+g²+2g·(V̂·L̂))^(3/2), so g > 0 peaks the sheet when it is
+  // backlit (dusty-ring forward scatter — Saturn E-ring look) with a
+  // lobe that sharpens as |g|→1, and g < 0 inverts to an opposition
+  // backscatter surge (icy regolith). Unit-mean over directions — the
+  // sheet's total luminance is preserved on average; |g| clamps to .95
+  // in the shader so the singular peak stays finite. [-1,1]; 0 disables.
   float forward_scatter{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
