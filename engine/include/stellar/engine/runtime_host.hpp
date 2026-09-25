@@ -97,6 +97,11 @@ struct RuntimeHostOptions {
   // exit 0 after replay_verified, exit 1 as soon as a checkpoint
   // diverges. Without it a replay keeps running like a normal session.
   bool replay_exit{false};
+  // --replay-until N (requires --replay): dump the canonical world
+  // snapshot to "<replay>.until-N.stw" once journal tick N completes,
+  // then exit 0 — the artifact load_world_from_file can diff against a
+  // reference dump when bisecting where a replay diverges.
+  std::optional<std::uint64_t> replay_until;
   // --headless: run without a Window or audio device — for CI machines
   // with no display/GPU. The loop polls a synthetic input snapshot sized
   // to width/height, skips drawing, and steps the simulation once per

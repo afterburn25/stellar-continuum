@@ -92,7 +92,8 @@ int main() {
     // on_draw/on_status still fire headless — the DrawList is built and
     // handed to the game; only GPU submission is skipped.
     int draws = 0, statuses = 0;
-    host.on_draw = [&](native_map::DrawList &draw, float w, float h) {
+    host.on_draw = [&](stellar::native_map::DrawList &draw, float w,
+                       float h) {
       ++draws;
       check(w == 640.f && h == 480.f, "headless on_draw gets the drawable size");
       check(!draw.overlay.empty(), "the HUD overlay is built headless");
@@ -195,8 +196,38 @@ int main() {
     RuntimeHost host{options};
     check(host.run() == 1, "forged checkpoint diverges and exits nonzero");
   }
-
-  // Runtime spawn/destroy, camera transform, tilemap queries and the
+  {
+    // --replay-until N: dumps the canonical world snapshot when journal
+    // tick N completes, then exits 0 — the artifact for bisecting a
+    // divergent replay.
+    auto options = headless_options(root);
+    options.frame_limit = 0;
+    options.replay_file = recording;
+    options.replay_until = 10;
+    RuntimeHost host{options};
+    std::vector<std::pair<float, float>> positions;
+    host.on_update = [&](World &world, float) {
+      const auto *t =
+          world.get<Transform2D>(*find_entity_by_name(world, "demo"));
+      positions.emplace_back(t->x, t->y);
+    };
+    check(host.run() == 0, "--replay-until exits cleanly");
+    const auto dump =
+        std::filesystem::path(recording.generic_string() + ".until-10.stw");
+    check(std::filesystem::exists(dump), "--replay-until writes the dump");
+    // Frame tick 10 is the 11th step — the dump must carry exactly the
+    // post-step state observed at that update.
+    check(positions.size() == 11, "--replay-until stops after tick 10");
+    World restored;
+    register_scene_components(restored);
+    check(load_world_from_file(restored, dump),
+          "--replay-until dump loads");
+    const auto *t =
+        restored.get<Transform2D>(*find_entity_by_name(restored, "demo"));
+    check(std::abs(t->x - positions[10].first) < 1e-4f &&
+              std::abs(t->y - positions[10].second) < 1e-4f,
+          "the dump captures the tick-10 world state");
+  }
   // control surface (request_quit, set_paused, sim_time, rng) — all only
   // reachable inside run(), so headless mode is what makes them testable.
   {

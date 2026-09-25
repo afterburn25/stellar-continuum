@@ -706,6 +706,11 @@ int RuntimeHost::run() {
       }
     }
   }
+  if (options.replay_until && !impl.replaying) {
+    std::fprintf(stderr,
+                 "--replay-until requires --replay — ignored\n");
+    options.replay_until.reset();
+  }
   if (!options.record_file.empty()) {
     ReplayHeader header;
     header.seed = options.seed;
@@ -1345,6 +1350,7 @@ int RuntimeHost::run() {
   }
   float accumulator = 0.f;
   int rendered = 0;
+  bool replay_until_failed = false;
   auto last = std::chrono::steady_clock::now();
   auto scene_poll = last;
   // Resolve world bounds up front too so the jump handler works before the
@@ -2632,11 +2638,29 @@ int RuntimeHost::run() {
     // rendered frame, not only while a --frames budget is active, or
     // replayed commands and checkpoints stay pinned at tick 0.
     ++rendered;
+    // --replay-until: once journal tick N completes, dump the canonical
+    // world snapshot for offline divergence bisection and exit clean.
+    if (options.replay_until && frame_tick == *options.replay_until) {
+      const auto out = options.replay_file.generic_string() + ".until-" +
+                       std::to_string(frame_tick) + ".stw";
+      try {
+        save_world_to_file(world, out);
+        std::printf("replay-until: dumped world state at tick %llu to %s\n",
+                    static_cast<unsigned long long>(frame_tick),
+                    out.c_str());
+      } catch (const std::exception &e) {
+        std::fprintf(stderr, "replay-until: cannot write %s: %s\n",
+                     out.c_str(), e.what());
+        replay_until_failed = true;
+      }
+      break;
+    }
     if (options.frame_limit > 0 && rendered >= options.frame_limit)
       break;
   }
   RuntimeDiagnostics::context("runtime:teardown");
   if (!flush_recorder()) return 1;
+  if (replay_until_failed) return 1;
   if (impl.replaying && impl.replay_diverged) return 1;
   if (!options.snapshot_out.empty()) {
     try {
@@ -2704,6 +2728,9 @@ int RuntimeHost::run(int argc, char **argv) {
       impl_->options.record_file = argv[++i];
     else if (arg == "--replay")
       impl_->options.replay_file = argv[++i];
+    else if (arg == "--replay-until")
+      impl_->options.replay_until =
+          std::strtoull(argv[++i], nullptr, 10);
     else if (arg == "--replay-info")
       replay_info = argv[++i];
     else if (arg == "--scene3d")
