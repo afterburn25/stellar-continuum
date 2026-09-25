@@ -59,6 +59,8 @@ int main() {
     bool picked = false, picked_miss = false, picked_hidden = false;
     std::size_t rect_hits_hidden = 0;
     EntityId ghost_id{};
+    bool picked_layer = false, picked_parallax = false;
+    EntityId picked_top{}, hud_id{};
     host.on_update = [&](World &, float) {
       ++updates;
       // Capture on update 1 — the ghost spawned below would join later
@@ -94,6 +96,52 @@ int main() {
         rect_hits_hidden =
             host.entities_in_rect(500.f, 300.f, 60.f, 60.f).size();
       }
+      // Pick ordering: the highest layer wins; equal layers keep spawn
+      // (document) order, so the last-spawned of the top layer picks.
+      if (updates == 3) {
+        SceneEntity lo{};
+        lo.name = "pick-lo";
+        lo.x = 400.f;
+        lo.y = 200.f;
+        lo.w = 60.f;
+        lo.h = 60.f;
+        lo.layer = 1;
+        SceneEntity hi{};
+        hi.name = "pick-hi";
+        hi.x = 410.f;
+        hi.y = 210.f;
+        hi.w = 60.f;
+        hi.h = 60.f;
+        hi.layer = 5;
+        SceneEntity top{};
+        top.name = "pick-top";
+        top.x = 420.f;
+        top.y = 220.f;
+        top.w = 60.f;
+        top.h = 60.f;
+        top.layer = 5;
+        host.spawn_entity(lo);
+        host.spawn_entity(hi);
+        picked_top = host.spawn_entity(top);
+        picked_layer =
+            host.entity_at(455.f, 255.f).value_or(EntityId{}) == picked_top;
+      }
+      // Parallax 0 pins the entity to the screen: under a shifted camera
+      // it still picks at its authored position, while a normal entity
+      // there scrolls away.
+      if (updates == 4) {
+        host.set_camera(200.f, 0.f, 1.f);
+        SceneEntity hud{};
+        hud.name = "hud";
+        hud.x = 430.f;
+        hud.y = 300.f;
+        hud.w = 40.f;
+        hud.h = 40.f;
+        hud.parallax = 0.f;
+        hud_id = host.spawn_entity(hud);
+        picked_parallax =
+            host.entity_at(435.f, 305.f).value_or(EntityId{}) == hud_id;
+      }
     };
     // on_draw/on_status still fire headless — the DrawList is built and
     // handed to the game; only GPU submission is skipped.
@@ -118,6 +166,10 @@ int main() {
     check(picked_hidden, "entity_at skips Hidden entities");
     check(rect_hits_hidden == 1,
           "entities_in_rect includes Hidden entities");
+    check(picked_layer,
+          "entity_at prefers the higher layer, later order on ties");
+    check(picked_parallax,
+          "entity_at hit-tests the parallax-pinned drawn rect");
     check(draws == 4, "on_draw fires once per headless frame");
     check(statuses == 4, "on_status fires once per headless frame");
   }
