@@ -124,8 +124,9 @@ breaks navigation/AT flow, or presents wrong state)
    `empty_state`, `tab`, `section_header` and `clipped`; planetary,
    economy, supply/logistics and fleet workspaces consume them and their
    palettes alias the semantic colors. Shipyard, construction,
-   diplomacy, research, the colony roster and missions are now migrated
-   as well. Still open: startup chrome migration.
+   diplomacy, research, the colony roster, missions, and the startup /
+   pause chrome are now migrated as well, and every keyboard/pad focus
+   ring routes through the shared `focus_ring` helper.
 2. ~~**No global quick-find / command palette**~~ → DONE: Ctrl+K opens a
    modal palette built from FoW-filtered view models covering known
    systems, owned colonies, own fleets, identified contacts, active
@@ -186,7 +187,11 @@ breaks navigation/AT flow, or presents wrong state)
    SECTOR / LOCAL") would orient players.
 3. Selected-system card (bottom-left) is a fixed-size info block — verify
    clipping at small viewports.
-4. Startup/main-menu uses its own palette — cosmetic only.
+4. ~~Startup/main-menu uses its own palette~~ → DONE. Startup screens and
+   the pause menu alias theme colors and use shared `button`/`focus_ring`;
+   all hard-coded `{160,210,255}`/`{164,221,237}` focus rings across the
+   client now render through the shared helper (one ring color
+   everywhere).
 
 ## Work log
 
@@ -207,6 +212,7 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | Research workspace migrated onto the shared theme: palette aliases `theme::color`, outer surface uses `menu_panel`, domain tabs gain hover/active fills with a Science accent bar, the four view tabs use the shared `tab` underbar treatment, toolbar/sort/filter/queue buttons use the shared `button` (Cancel research keeps a danger keyline), the search field frames with a focus-colored keyline, RECOMMENDED badges and progress bars take the science tone, SELECTED TECHNOLOGY / ACTIVE RESEARCH are `section_header`s, and the focus ring is the shared helper. Scroll regions (graph, dashboard list, active strip) keep flat clipped fill/stroke so nothing escapes the viewport. Verified via `--research-smoke` Vulkan capture (active program, recommended cards, inspector, queue buttons all render). | 42c01435 |
 | 2026-09-25 | Quick-find extended to missions and workspaces: `EntryKind::Mission` indexes active mission fleets (`build_mission_board`, activating through `focus_mission_fleet`) and `EntryKind::Workspace` adds command rows for the eight navigation surfaces (Research/Economy/Logistics/Shipyard/Construction/Diplomacy/Missions/Planets) routing through the same open+refresh calls as the rail. Kind labels join the searchable text, badges take Science/Neutral tones, placeholder text now names missions/screens (en+de), and new tests cover kind matching, activation and badge rendering. Re-verified via `--quick-find-smoke` (16 entries, filtered query intact). | 47870e62 |
 | 2026-09-25 | Missions workspace migrated onto the shared theme: palette aliases `theme::color` (cyan accents → `selected`, gold → `economy`), outer surface uses `menu_panel`, the Missions/Colony Sites strip uses `tab` (active underbar), close/nav/View/Land/Collect controls use the shared `button` styling with hover/disabled states via a tracked pointer, SELECT SHIP ON MAP is a success-toned primary action, mission cards and colony rows use `surface`/`keyline`, the empty missions list renders the shared `empty_state`, and the focus ring is the shared helper. Fixed a pre-existing defect found by capture: the panel top ignored `native_workspace_top`, hiding the title and close button under the nav bar at 720p. The colony smoke now opens the missions board and stores a `-missions` capture. | bcf1677d |
+| 2026-09-25 | Startup chrome migrated onto the shared theme: `native_startup_workspace` palette constants alias `theme::color` (brand green → `success`, gold → `economy`, warning → `caution`), dialog surfaces use `menu_panel`, Development/ModeSelection/LoadSlots/Busy/Failure buttons use the shared `button` (LOAD SELECTED is a success-toned primary gated on a chosen slot), and the in-game pause menu's buttons/focus ring use `theme::button`/`focus_ring` with `text_primary`/`text_secondary` chrome. Focus-ring sweep: every remaining hard-coded ring — HUD controls, pause menu, startup, settings (general/audio/video/voice), inspection, chronicle, battle, colony freight confirm, galaxy creation, new-game setup, settlement confirm, small-body survey, planetary — now renders through `theme::focus_ring`. Verified via `--restart-exit-smoke` (entry screen) and `--smoke` (pause menu) captures; three tests updated to assert `color::focus`. | 7617f665 |
 | 2026-09-25 | Colony roster migrated onto the shared theme: palette constants alias `theme::color` (selection cyan → `selected`, warning amber → `caution`), the search field frames with a focus-colored keyline, REFRESH/close use the shared `button`, rows use `surface_secondary`/`surface_hover` with a `keyline_strong` hover outline, the scrollbar track uses `keyline`, and the focus ring is the shared helper. Empty-state sweep: the roster's bare "No owned colonies" now pairs with a localized next-action hint (`ROSTER_LIST_EMPTY_HINT` — the unavailable state stays hint-free), and the research tree's "No known research" gains `RESEARCH_NO_MATCH_HINT`; both render through the shared `empty_state`. Verified via `--colony-smoke` Vulkan capture (themed search/chrome/rows) and updated roster tests asserting theme constants instead of retired literals. | 7d9dd2d3 |
 
 ### Implementation notes
