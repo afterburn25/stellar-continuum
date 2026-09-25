@@ -3733,7 +3733,7 @@ class NativeCampaign final {
       <<",\"error\":"<<json_string(support_.error())<<"}\n";
   }
   void notification_smoke(int width,int height,bool reload,
-      const std::function<void(const DrawList&,bool)>& capture){
+      const std::function<void(const DrawList&,const wchar_t*)>& capture){
     const auto day=session_->frame().clock().simulation_days();
     const PlayerCampaignCaptureOptions options{day,STELLAR_GAME_VERSION,utc_timestamp()};
     const auto canonical=[&]{return encode_player_campaign_v17_json(
@@ -3758,9 +3758,28 @@ class NativeCampaign final {
     const auto unread_after=notifications_.unread_count(notification_view_.last_read());
     if(!opened||unread_after!=0)
       throw std::runtime_error("Events button did not open and acknowledge the retained feed.");
-    capture(scene(width,height),false);
+    capture(scene(width,height),L"-events");
     const auto layout=stellar::native_notifications::notification_layout_for(
         notifications_.items(),width,height,text_measurer_,notification_view_.scroll_offset());
+    // The events panel links out to the full chronicle — exercise the real
+    // open/Escape-close path and capture the chronicle surface too, then
+    // reopen the feed so the close/contact-link checks below still run.
+    diplomacy_smoke_click(center(layout.chronicle_button),width,height);
+    const bool chronicle_opened=
+        chronicle_view_.visible()&&!notification_view_.visible();
+    if(!chronicle_opened)
+      throw std::runtime_error("Events panel did not open the chronicle.");
+    capture(scene(width,height),L"-chronicle");
+    InputSnapshot chronicle_esc;
+    chronicle_esc.drawable_width=width;chronicle_esc.drawable_height=height;
+    chronicle_esc.events={{InputEventType::EscapePressed}};
+    if(!update(chronicle_esc,width,height,0.,false))
+      throw std::runtime_error("Chronicle Escape closed the campaign.");
+    if(chronicle_view_.visible())
+      throw std::runtime_error("Escape did not close the chronicle.");
+    diplomacy_smoke_click(center(main_layout.notifications),width,height);
+    if(!notification_view_.visible())
+      throw std::runtime_error("Events panel did not reopen after the chronicle.");
     int focused_target=-1;
     if(reload){
       diplomacy_smoke_click(center(layout.close_button),width,height);
@@ -3785,12 +3804,13 @@ class NativeCampaign final {
         session_->frame().clock().simulation_days()==day;
     if(!closed||!unchanged||!paused)
       throw std::runtime_error("Reading notifications changed the campaign or failed to dismiss the panel.");
-    capture(scene(width,height),true);
+    capture(scene(width,height),L"-events-contact");
     std::cout<<"notifications={\"mode\":\""<<(reload?"paused_reload":"progress")
       <<"\",\"opened\":"<<(opened?"true":"false")
       <<",\"closed\":"<<(closed?"true":"false")<<",\"items\":"<<items
       <<",\"unread_before\":"<<unread_before<<",\"unread_after\":"<<unread_after
       <<",\"focused_target\":"<<focused_target
+      <<",\"chronicle\":"<<(chronicle_opened?"true":"false")
       <<",\"canonical_unchanged\":"<<(unchanged?"true":"false")
       <<",\"paused\":"<<(paused?"true":"false")<<"}\n";
   }
@@ -7926,11 +7946,12 @@ class NativeCampaign final {
             session_->frame().clock().simulation_days()) + tr("HUD_TIME_RATE","  |  1x = 1 hour/sec"),
         {139, 174, 194, 255}, static_cast<int>(10.f * layout.scale),
         layout.day_text.width, layout.day_text});
-    // Map chrome yields to any modal surface — the HUD-visibility rule
-    // already covers workspaces, the roster, notifications, chronicle,
-    // missions, battle and settings while tolerating the inspection card
-    // and fleet detail panel (the readout shifts right for those).
-    if(map_hud_visible()){
+    // Map chrome yields to modal surfaces — the HUD rule covers
+    // workspaces, the roster, notifications, chronicle, missions, battle
+    // and settings while tolerating the inspection card and fleet detail
+    // panel (the readout shifts right for those). The system view keeps
+    // the HUD but has its own zoom badge, so it suppresses explicitly.
+    if(map_hud_visible()&&!system_workspace_.visible()){
       std::ostringstream zoom_factor;
       zoom_factor << std::fixed << std::setprecision(1)
                   << camera_.pixels_per_world / fitted_pixels_per_world_;
@@ -10639,9 +10660,8 @@ int main(int argc,char **argv){
               });
         if(options.diplomacy_smoke||options.diplomacy_reload_smoke){
           campaign.notification_smoke(window.drawable_width(),window.drawable_height(),
-              options.diplomacy_reload_smoke,[&](const DrawList& draw,bool contact){
-                window.draw(draw,sidecar_path(*options.smoke_screenshot,
-                    contact?L"-events-contact":L"-events"));
+              options.diplomacy_reload_smoke,[&](const DrawList& draw,const wchar_t* suffix){
+                window.draw(draw,sidecar_path(*options.smoke_screenshot,suffix));
               });
         }
         if(options.research_smoke){
