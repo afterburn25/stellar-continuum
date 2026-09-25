@@ -610,7 +610,7 @@ int main() {
     int exits = 0;
     EntityId mover{};
     host.on_collision_exit = [&](EntityId, EntityId) { ++exits; };
-    host.on_update = [&](World &world, float) {
+    host.on_update = [&](World &, float) {
       ++updates;
       if (updates == 1) {
         SceneEntity a{};
