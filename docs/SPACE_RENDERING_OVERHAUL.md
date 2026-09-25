@@ -27,7 +27,9 @@ This document is the phase-1 audit; landed work is tracked in
     liquid / ice / height), cloud map with animated UV offset whose alpha
     shadows the surface and whose RGB composites as a lit deck
     (`cloud_albedo`); any map subset binds. `Material3D::terminator_wrap`
-    adds wrap-diffuse terminator softening to every light type.
+    adds wrap-diffuse terminator softening to every light type, and
+    `Material3D::limb_darkening` applies linear N·V limb darkening to
+    self-luminous discs (the Sun's photosphere profile, u ~= 0.6).
   - `AnalyticShadow3D` — ellipsoid or annulus blocker of the directional
     light, annulus alpha-map with footprint integration (ring→planet and
     planet→ring shadows, bias-free by construction).
@@ -83,8 +85,10 @@ same document headless-tested.
    end-to-end (normal/properties/cloud maps, any subset; `surface` doc
    block + `MaterialSurface` component + editor rows), `cloud_albedo`
    composites the cloud map's RGB as a lit deck over surface emissive
-   and under the atmosphere rim, and `terminator_wrap` softens the
-   day/night edge across key/fill/point lights. Remaining: the deck is
+   and under the atmosphere rim, `terminator_wrap` softens the
+   day/night edge across key/fill/point lights, and `limb_darkening`
+   gives self-luminous bodies the photosphere's edge falloff.
+   Remaining: the deck is
    a texture-space composite — no volumetric cloud shells, cloud
    self-shadowing or gas-giant banding.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,

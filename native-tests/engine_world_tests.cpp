@@ -690,6 +690,7 @@ int main() {
         turret.cloud_offset_x = 0.1f;
         turret.cloud_offset_y = 0.2f;
         turret.terminator_wrap = 0.5f;
+        turret.limb_darkening = 0.6f;
         doc.entities.push_back(turret);
         const auto spawned = spawn_scene3d(world3, doc);
         check(spawned.size() == 2, "spawn_scene3d creates all entities");
@@ -742,7 +743,7 @@ int main() {
                   ms->normal_strength == 0.9f &&
                   ms->cloud_opacity == 0.7f && ms->cloud_albedo == 0.8f &&
                   ms->cloud_offset_x == 0.1f && ms->cloud_offset_y == 0.2f &&
-                  ms->terminator_wrap == 0.5f,
+                  ms->terminator_wrap == 0.5f && ms->limb_darkening == 0.6f,
               "spawn_scene3d materialsurface component");
         check(world3.get<MaterialSurface>(ship_e) == nullptr,
               "defaults do not attach a surface component");
@@ -800,6 +801,7 @@ int main() {
                       rms->normal_map == "maps/turret_n.png" &&
                       rms->cloud_albedo == 0.8f &&
                       rms->terminator_wrap == 0.5f &&
+                      rms->limb_darkening == 0.6f &&
                       rms->cloud_offset_y == 0.2f,
                   "materialsurface codec round-trips");
         }
@@ -834,7 +836,8 @@ int main() {
                   out.entities[1].cloud_opacity == 0.7f &&
                   out.entities[1].cloud_albedo == 0.8f &&
                   out.entities[1].cloud_offset_y == 0.2f &&
-                  out.entities[1].terminator_wrap == 0.5f,
+                  out.entities[1].terminator_wrap == 0.5f &&
+                  out.entities[1].limb_darkening == 0.6f,
               "scene3d_from_world exports surface response");
 
         // Geometry: box primitive topology + OBJ parse/malformed reject.

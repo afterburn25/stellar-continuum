@@ -210,6 +210,9 @@ struct Scene3dEntity {
   float cloud_albedo{0.f}, cloud_offset_x{0.f}, cloud_offset_y{0.f};
   // Wrap-diffuse terminator softening [0,1]; 0 keeps Lambert shading.
   float terminator_wrap{0.f};
+  // Linear limb darkening [0,1] for self-luminous discs (stars, hot
+  // bodies); 0 keeps a uniform disc.
+  float limb_darkening{0.f};
 };
 
 // An extra directional light — the material pipeline evaluates at most

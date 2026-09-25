@@ -430,6 +430,7 @@ int main() {
     cube.cloud_offset_x = 0.25f;
     cube.cloud_offset_y = -0.5f;
     cube.terminator_wrap = 0.4f;
+    cube.limb_darkening = 0.6f;
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -553,7 +554,7 @@ int main() {
                 rc.normal_strength == 0.8f && rc.relief == 0.01f &&
                 rc.cloud_opacity == 0.6f && rc.cloud_albedo == 0.7f &&
                 rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
-                rc.terminator_wrap == 0.4f,
+                rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f,
             "scene3d surface-response fields round-trip");
       check(reparsed->point_lights.size() == 1 &&
                 reparsed->point_lights[0].x == 1.f &&
@@ -652,6 +653,10 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"terminatorWrap":3}]})")
               .has_value(),
           "scene3d terminator wrap above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"limbDarken":1.5}]})")
+              .has_value(),
+          "scene3d limb darkening above one rejected");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

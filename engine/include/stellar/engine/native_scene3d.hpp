@@ -181,6 +181,13 @@ struct Material3D {
   // the day/night transition on thick-atmosphere or dusty bodies.
   // [0,1]; 0 keeps Lambert shading.
   float terminator_wrap{};
+  // Linear limb darkening for self-luminous bodies: outgoing radiance is
+  // scaled by 1 - u*(1 - N.V) — the Sun's photosphere reads measurably
+  // darker toward the disc edge (u ~= 0.6 for a G2V star), which keeps
+  // HDR emissive discs from looking like flat neon spheres. Applied to
+  // the body's emitted and reflected radiance; the additive atmosphere
+  // rim stays on top. [0,1]; 0 keeps a uniform disc.
+  float limb_darkening{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;

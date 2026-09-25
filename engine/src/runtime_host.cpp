@@ -2548,6 +2548,7 @@ int RuntimeHost::run() {
               response.cloud_shadow)
             inst.material.surface_response = response;
           inst.material.terminator_wrap = sf->terminator_wrap;
+          inst.material.limb_darkening = sf->limb_darkening;
         }
         if (const auto *at = world.get<AtmosphereShell>(e))
           inst.material.atmosphere =

@@ -115,6 +115,10 @@ int main()try{
   rejects([&]{auto i=instance;i.material.terminator_wrap=-.1f;(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.terminator_wrap=.6f;const auto wrapped=Scene3D::create(camera,{i});
    check(close(wrapped->instances()[0].material.terminator_wrap,.6f),"Terminator wrap did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.limb_darkening=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.limb_darkening=-.1f;(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.limb_darkening=.6f;const auto darkened=Scene3D::create(camera,{i});
+   check(close(darkened->instances()[0].material.limb_darkening,.6f),"Limb darkening did not survive scene creation");}
   {PointLight3D light;light.position={0,0,1};light.intensity=2;light.range=50;
    const auto lit=Scene3D::create(camera,{instance},{0,0,1},{light});
    check(lit->point_lights().size()==1,"Scene dropped its point light");}

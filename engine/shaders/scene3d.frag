@@ -44,7 +44,7 @@ struct Material {
     vec4 uv_options; // surface tiling x, y
     vec4 atmo_options; // tint rgb, strength
     vec4 atmo_shape; // rim power, nightside floor
-    vec4 response_options; // terminator wrap, cloud albedo, map flags (1 normal, 2 properties, 4 cloud), unused
+    vec4 response_options; // terminator wrap, cloud albedo, map flags (1 normal, 2 properties, 4 cloud), limb darkening
     vec4 point_position[4]; // view-space position, range (0 = unbounded)
     vec4 point_energy[4]; // rgb, intensity
 };
@@ -468,6 +468,14 @@ void main() {
         vec3 deck=cloud_layer.rgb*material.response_options.y*(material.parameters.x+material.parameters.y*sunlight*visibility*light_color);
         result=mix(result,deck,cover);
     }
+    // Linear limb darkening: emitted/reflected radiance falls toward the
+    // disc edge (Sun u ~= 0.6), so HDR photosphere discs keep a physical
+    // profile instead of clipping flat. The geometric normal decides the
+    // profile — normal-mapped detail is not limb darkening. The additive
+    // atmosphere rim below is exempt: it is a scattering shell, not the
+    // photosphere.
+    if(material.response_options.w>0.0)
+        result*=1.0-material.response_options.w*(1.0-clamp(dot(normalize(view_normal),V),0.0,1.0));
     // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
     // nightside floor, tied to the star's actual color.
     if(material.atmo_options.w>0.0){

@@ -180,11 +180,12 @@ struct MaterialPbr {
 // any subset binds (a cloud-only material needs no normal/properties
 // art). `cloud_albedo` composites the cloud map's RGB as a lit deck over
 // the surface; `terminator_wrap` softens the day/night edge through
-// wrap-diffuse lighting.
+// wrap-diffuse lighting; `limb_darkening` dims outgoing radiance toward
+// the disc edge for self-luminous bodies (Sun ~0.6).
 struct MaterialSurface {
   float normal_strength{0.35f}, relief{0.f}, cloud_opacity{0.f};
   float cloud_albedo{0.f}, cloud_offset_x{0.f}, cloud_offset_y{0.f};
-  float terminator_wrap{0.f};
+  float terminator_wrap{0.f}, limb_darkening{0.f};
   std::string normal_map, properties_map, cloud_map;
 };
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim

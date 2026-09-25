@@ -465,6 +465,7 @@ std::string Scene3dDocument::to_json() const {
                          {"cloudOffset", {e.cloud_offset_x, e.cloud_offset_y}}};
     }
     if (e.terminator_wrap != 0.f) item["terminatorWrap"] = e.terminator_wrap;
+    if (e.limb_darkening != 0.f) item["limbDarken"] = e.limb_darkening;
     items.push_back(std::move(item));
   }
   doc["camera"] = {{"pos", {cam_x, cam_y, cam_z}},
@@ -648,6 +649,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.terminator_wrap = item.value("terminatorWrap", 0.0f);
       if (!(e.terminator_wrap >= 0.f && e.terminator_wrap <= 1.f))
         return fail("terminatorWrap must be in [0,1]");
+      e.limb_darkening = item.value("limbDarken", 0.0f);
+      if (!(e.limb_darkening >= 0.f && e.limb_darkening <= 1.f))
+        return fail("limbDarken must be in [0,1]");
       scene.entities.push_back(std::move(e));
     }
     if (doc.contains("camera")) {

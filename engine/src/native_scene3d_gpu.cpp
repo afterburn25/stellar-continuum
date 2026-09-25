@@ -458,8 +458,8 @@ struct Scene3DRenderer::Storage {
         // Map presence flags gate the shader's per-map sampling so a
         // cloud-only or normal-only material needs no placeholder art.
         const float map_flags=(s.normal?1.f:0.f)+(s.properties?2.f:0.f)+(s.cloud_shadow?4.f:0.f);
-        fragment.response_options={material.terminator_wrap,s.cloud_shadow?s.cloud_albedo:0.f,map_flags,0.f};}
-      else fragment.response_options={material.terminator_wrap,0.f,0.f,0.f};
+        fragment.response_options={material.terminator_wrap,s.cloud_shadow?s.cloud_albedo:0.f,map_flags,material.limb_darkening};}
+      else fragment.response_options={material.terminator_wrap,0.f,0.f,material.limb_darkening};
       if(material.dielectric){const auto& d=*material.dielectric;
         fragment.optics={d.index_of_refraction,d.roughness,d.transmission,d.thickness};
         fragment.absorption={d.absorption.x,d.absorption.y,d.absorption.z,d.environment_strength};fragment.view_options[1]=d.specular_strength;

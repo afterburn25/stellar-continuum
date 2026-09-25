@@ -367,6 +367,19 @@ int main(int argc,char** argv)try{
     const auto lit_flat=capture({wrapped},"terminator-flat-lit.png");
     check(std::abs(channel(*lit_wrap,160,160,0)-channel(*lit_flat,160,160,0))<=2,"Wrap changed fully lit response");
   }
+  {
+    // Self-luminous disc: limb darkening keeps the centre and dims the
+    // edge — the photosphere profile that separates a star from a flat
+    // neon circle.
+    auto star=lit;star.mesh=Mesh3D::uv_sphere(64,32);star.scale=.85f;
+    star.material.tint={255,255,255,255};star.material.ambient=0;star.material.diffuse=0;
+    star.material.pbr=PbrSurface3D{};star.material.pbr->emissive_strength=.5f;
+    const auto uniform_disc=capture({star},"star-uniform.png");
+    star.material.limb_darkening=.6f;
+    const auto limb_disc=capture({star},"star-limb.png");
+    check(std::abs(channel(*limb_disc,160,160,0)-channel(*uniform_disc,160,160,0))<=4,"Limb darkening changed the disc centre");
+    check(channel(*limb_disc,275,160,0)+15<channel(*uniform_disc,275,160,0),"Limb darkening did not dim the disc edge");
+  }
   surface.cloud_opacity=0;surface.properties=RgbaImage::create(1,1,{50,255,0,128});
   const auto ocean=capture({response},"planet-ocean.png");
   check(channel(*ocean,160,160,0)>channel(*matte,160,160,0)+30,"Ocean roughness/specular mask is not evaluated");

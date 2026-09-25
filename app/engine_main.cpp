@@ -315,7 +315,7 @@ struct Shell {
       hit3_atmotint{}, hit3_exposure{}, hit3_bloom{}, hit3_grade{},
       hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{},
       hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
-      hit3_termwrap{};
+      hit3_termwrap{}, hit3_limbdark{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2154,6 +2154,11 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 0.f && a <= 1.f) { next.terminator_wrap = a; valid = true; }
           break;
+  case 57:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 1.f) { next.limb_darkening = a; valid = true; }
+          break;
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -2201,7 +2206,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                 shell.hit3_shadow = shell.hit3_surfmaps =
                                     shell.hit3_surfshape =
                                         shell.hit3_clouddeck =
-                                            shell.hit3_termwrap = {};
+                                            shell.hit3_termwrap =
+                                                shell.hit3_limbdark = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2350,6 +2356,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         inst.material.surface_response = response;
       }
       inst.material.terminator_wrap = e.terminator_wrap;
+      inst.material.limb_darkening = e.limb_darkening;
       if (e.atmo_strength != 0.f)
         inst.material.atmosphere =
             Atmosphere3D{{e.atmo_r, e.atmo_g, e.atmo_b}, e.atmo_strength,
@@ -2604,6 +2611,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_termwrap, "termWrap",
         entity ? std::to_string(entity->terminator_wrap) : "", ed(56),
         "wrap-diffuse 0..1 - 0 keeps Lambert");
+  field(shell.hit3_limbdark, "limbDark",
+        entity ? std::to_string(entity->limb_darkening) : "", ed(57),
+        "limb darkening 0..1 - sun ~0.6, stars/discs");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -6631,6 +6641,8 @@ int main(int argc, char **argv) {
                             std::to_string(se->cloud_offset_y));
             else if (shell.hit3_termwrap.contains(event.position) && se)
               edit3(56, std::to_string(se->terminator_wrap));
+            else if (shell.hit3_limbdark.contains(event.position) && se)
+              edit3(57, std::to_string(se->limb_darkening));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

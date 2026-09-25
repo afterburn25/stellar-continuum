@@ -42,6 +42,7 @@ m.surface_response->cloud_opacity = .6f;    // [0,1] surface shadow strength
 m.surface_response->cloud_albedo = .7f;     // [0,1] visible deck brightness
 m.surface_response->cloud_offset = {.1f,0}; // UV drift, each |≤2|
 m.terminator_wrap = 0.4f;                   // [0,1] wrap-diffuse softening
+m.limb_darkening = 0.6f;                    // [0,1] N.V radiance falloff
 ```
 
 Per-instance distance culling lives on `MeshInstance3D`:
@@ -73,6 +74,11 @@ reject path as the frustum test, so culled instances skip the draw call
 - `terminator_wrap` widens the diffuse lobe — `(N·L+w)/(1+w)` — applied
   identically to the key light, additional directionals and point
   lights; 0 is exact Lambert.
+- `limb_darkening` applies linear limb darkening `1 - u(1 - N·V)` to the
+  body's outgoing radiance — the Sun's photosphere profile (u ≈ 0.6) —
+  so HDR emissive star discs keep a physical edge instead of clipping
+  flat. Applied after the cloud deck; the additive atmosphere rim is
+  exempt. Uses the geometric normal, not normal-map detail.
 
 ## Scene lights — `PointLight3D`
 
@@ -161,7 +167,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `emissive`, `emissive_strength`, `emissive_r/g/b`, `night_emissive`,
 `environment`, `environment_strength`, `alpha_cutout`, `uv_tile_x/y`,
 `atmo_strength/power/night/r/g/b`, `range` (per-entity
-`visible_range`), `terminator_wrap`, and a `surface` block —
+`visible_range`), `terminator_wrap`, `limb_darkening`, and a `surface`
+block —
 `{normal, properties, cloud, normalStrength, relief, cloudOpacity,
 cloudAlbedo, cloudOffset:[x,y]}`; `surface` requires at least one map.
 Scene fields: `point_lights[]` (max 4), `exposure`,
@@ -186,7 +193,8 @@ Entity rows: PBR map paths + metallic/roughness scalars, emissive
 path/tint/strength/night gate, environment path/strength, alpha cutout,
 UV tiling, atmosphere tint/strength/power/night floor, visible range,
 surface maps (normal/properties/cloud), surface scalars (normal
-strength/relief), cloud deck (opacity/albedo/offset), terminator wrap.
+strength/relief), cloud deck (opacity/albedo/offset), terminator wrap,
+limb darkening.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range),
 shadow map (extent/distance/depth/strength/bias/resolution).
@@ -225,6 +233,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   aerial perspective.
 - The cloud deck is a texture-space composite — no volumetric cloud
   shells, self-shadowing or gas-giant banding yet.
+- Limb darkening is the single-coefficient linear law — no quadratic
+  two-term coefficients or wavelength-dependent profiles.
 - One shared equirect env map per material — no probe grid.
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
 - Debug views are developer tooling — no LOD/residency visualization
