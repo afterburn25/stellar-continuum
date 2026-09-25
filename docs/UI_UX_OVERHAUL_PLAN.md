@@ -181,9 +181,9 @@ breaks navigation/AT flow, or presents wrong state)
 
 | Date | Change | Commit |
 |---|---|---|
-| 2026-09-25 | Extended `native_ui_theme` with shared components: `focus_ring`, `metric_tile`, `badge`, `key_value`, `empty_state`, `tab`, plus a `clipped` rect-intersection helper — the Phase-2/3 vocabulary the audit found missing. | pending |
-| 2026-09-25 | Galaxy map: collapsible MAP LEGEND panel under the zoom readout (charted/uncharted star, lane, territory swatch, fleet marker, selection halo glyphs matching the live render vocabulary). Collapse toggle joins the HUD focus ring ahead of Switch view, announces "Map legend", and is reserved as a label-layout HUD obstacle; clicks inside the panel never become star selections. | pending |
-| 2026-09-25 | Colony command center: headline vitals strip (POPULATION / STABILITY / POWER net / FOOD days / EMPLOYED) between the hero block and the fact list, and a two-column issue-chip grid inside the alerts block — chips carry real magnitudes (POWER -99, LIFE SUPPORT 84%) and focus the economy tab on activation. All rows/chips gated on `!observer_only` so the survey-only surface stays leak-free. | pending |
+| 2026-09-25 | Extended `native_ui_theme` with shared components: `focus_ring`, `metric_tile`, `badge`, `key_value`, `empty_state`, `tab`, plus a `clipped` rect-intersection helper — the Phase-2/3 vocabulary the audit found missing. | 22ca3783 |
+| 2026-09-25 | Galaxy map: collapsible MAP LEGEND panel under the zoom readout (charted/uncharted star, lane, territory swatch, fleet marker, selection halo glyphs matching the live render vocabulary). Collapse toggle joins the HUD focus ring ahead of Switch view, announces "Map legend", and is reserved as a label-layout HUD obstacle; clicks inside the panel never become star selections. | 0b4d6604 |
+| 2026-09-25 | Colony command center: headline vitals strip (POPULATION / STABILITY / POWER net / FOOD days / EMPLOYED) between the hero block and the fact list, and a two-column issue-chip grid inside the alerts block — chips carry real magnitudes (POWER -99, LIFE SUPPORT 84%) and focus the economy tab on activation. All rows/chips gated on `!observer_only` so the survey-only surface stays leak-free. | 22ca3783 |
 
 ### Implementation notes
 
