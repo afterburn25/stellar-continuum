@@ -119,6 +119,11 @@ struct SurfaceEffect3D {
   // so changing zoom/instance scale does not change the plasma density.
   float volume_depth{},volume_density{5.f},volume_seed{};
   int volume_steps{32}; // 8..64 bounded front-to-back emission/absorption samples
+  // Directional single-scatter approximation: the volume limb facing the
+  // scene key light brightens while the far side dims, so a nebula reads
+  // star-lit rather than uniformly self-glowing. [0,1]; 0 keeps pure
+  // emission, 1 maps the limb gradient onto emission strength.
+  float volume_scatter{};
 };
 struct DirectionalLight3D { Vec3 direction{0,0,1},color{1,1,1};float intensity{}; };
 // Metallic-workflow surface response for ordinary materials. The optional

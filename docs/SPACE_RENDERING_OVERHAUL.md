@@ -172,6 +172,8 @@ documented per-frame but accumulated. See
 - Indirect draws / GPU culling: SDL_GPU does not yet expose
   `SDL_DrawGPUIndexedPrimitivesIndirect` paths here; CPU record build is
   the known bound. Not a blocker at strategy scale (4096 cap).
-- True atmospheric multi-scatter, volumetric nebulae, ray-traced
-  occlusion: out of scope for SDL_GPU forward renderer; approximations
-  land per-phase with quality budgets.
+- True atmospheric multi-scatter, ray-traced occlusion: out of scope
+  for the SDL_GPU forward renderer; approximations land per-phase with
+  quality budgets. Volumetric nebulae land as the existing bounded
+  emission-volume march plus `SurfaceEffect3D::volume_scatter` — a
+  directional limb gradient that makes the cloud read star-lit.

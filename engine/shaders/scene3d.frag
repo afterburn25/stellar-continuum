@@ -170,6 +170,11 @@ vec4 emission_volume(vec3 V) {
     float step_size=(exit_distance-entry)/float(steps);
     vec4 integrated=vec4(0);
     float phase=material.effect_options.z,seed=material.volume_options.w;
+    // Directional single-scatter (atmo_shape.z — atmospheres never reach
+    // this branch): the limb facing the key light brightens, the far side
+    // dims, so nebulae read star-lit instead of uniformly self-glowing.
+    float scatter=material.atmo_shape.z;
+    vec3 light_o=scatter>0.0?normalize(mat3(material.effect_from_view)*material.light_direction.xyz):vec3(0);
     for(int step=0;step<64;++step){
         if(step>=steps||integrated.a>.985) break;
         vec3 p=origin+direction*(entry+(float(step)+.5)*step_size);
@@ -195,6 +200,11 @@ vec4 emission_volume(vec3 V) {
         // Beer-Lambert integration is stable across quality levels and zoom.
         float alpha=1.0-exp(-density*material.volume_options.z*step_size);
         emission*=.85+.3*sqrt(max(density,0.0));
+        if(scatter>0.0){
+            // Limb gradient about the proxy centre: facing the light ≈1.
+            float facing=.5+.5*dot(normalize(p-vec3(0,.28,0)),light_o);
+            emission*=mix(1.0,.35+1.3*facing,scatter);
+        }
         integrated.rgb+=(1.0-integrated.a)*emission*alpha;
         integrated.a+=(1.0-integrated.a)*alpha;
     }

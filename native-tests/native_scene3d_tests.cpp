@@ -129,6 +129,14 @@ int main()try{
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.orbital_beaming=.8f;const auto beamed=Scene3D::create(camera,{i});
    check(close(beamed->instances()[0].material.orbital_beaming,.8f),"Orbital beaming did not survive scene creation");}
+  {const auto tex=RgbaImage::create(1,1,{255,255,255,255});
+   MeshInstance3D plasma;plasma.mesh=volume;plasma.material.transparent=true;plasma.material.texture=tex;
+   SurfaceEffect3D effect;effect.next_texture=tex;effect.volume_depth=.3f;
+   plasma.material.surface_effect=effect;
+   rejects([&]{auto i=plasma;i.material.surface_effect->volume_scatter=-.1f;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=plasma;i.material.surface_effect->volume_scatter=1.1f;(void)Scene3D::create(camera,{i});});
+   plasma.material.surface_effect->volume_scatter=.8f;
+   check(Scene3D::create(camera,{plasma})!=nullptr,"Legal volume scatter rejected");}
   rejects([&]{(void)star_photosphere3d(50);});
   rejects([&]{(void)star_photosphere3d(2e5);});
   rejects([&]{(void)star_photosphere3d(std::numeric_limits<double>::quiet_NaN());});

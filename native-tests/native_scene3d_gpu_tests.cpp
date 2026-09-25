@@ -849,6 +849,20 @@ int main(int argc,char** argv)try{
     plasma.material.surface_effect->view_sphere_center={0,0,-4};plasma.material.surface_effect->sphere_radius=1.8f;
     const auto hidden=capture({plasma},"plasma-volume-hidden.png");check(energy(*hidden)==0,"Volume shines through the foreground photosphere");
     check(channel(*edge,400,160,0)==5,"Volume escaped its viewport");
+    // Directional scatter: with light from view +x the volume's lit limb
+    // brightens while the far side dims — nebulae read star-lit.
+    plasma.rotation={};plasma.material.surface_effect->sphere_radius=0;
+    plasma.material.surface_effect->volume_steps=32;
+    const auto unlit=capture({plasma},"plasma-scatter-off.png");
+    plasma.material.surface_effect->volume_scatter=1.f;
+    DrawList lit_list;lit_list.world.emplace_back(Scene3DView{Scene3D::create(camera,{plasma},{1,0,0}),{0,0,320,320}});
+    window.draw(lit_list,folder/"plasma-scatter-lit.png");
+    const auto scatter_on=decode_rgba_image(folder/"plasma-scatter-lit.png");
+    const int lit_side=channel(*scatter_on,229,120,0),dark_side=channel(*scatter_on,90,120,0);
+    const int base_side=channel(*unlit,229,120,0),base_dark=channel(*unlit,90,120,0);
+    check(lit_side>dark_side*3&&lit_side>base_side*5/4&&dark_side<base_dark/2,
+        "Volume scatter did not brighten the light-facing limb");
+    std::cout<<"volume_scatter_gpu=lit_limb_passed\n";
   }
   {
     DrawList text;Text label{{320,175},"ALIGNED ARROW",{240,240,240,255},20,0,UiRect{260,60,120,240},TextAlign::Center,FontFace::Interface,90};text.world.emplace_back(label);

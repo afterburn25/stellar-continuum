@@ -100,6 +100,7 @@ void validate_instance(const MeshInstance3D& i){
       throw std::invalid_argument("Invalid surface effect sequence or occlusion sphere");
     if(!bounded(e.volume_depth,.75)||e.volume_depth<0||!bounded(e.volume_density,32)||e.volume_density<=0||
        !bounded(e.volume_seed,1e4)||e.volume_steps<8||e.volume_steps>64||
+       !bounded(e.volume_scatter,1)||e.volume_scatter<0||
        (e.volume_depth>0&&(!m.transparent||!m.texture)))
       throw std::invalid_argument("Invalid emission volume depth, density or integration budget");
   }

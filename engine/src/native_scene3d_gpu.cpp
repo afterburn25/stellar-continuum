@@ -457,7 +457,10 @@ struct Scene3DRenderer::Storage {
         // caps at 16 steps, Medium at 32; authored budgets apply above.
         const int volume_steps=low_tier?std::min(e.volume_steps,16)
             :opt.quality==RenderQuality3D::Medium?std::min(e.volume_steps,32):e.volume_steps;
-        fragment.volume_options={e.volume_depth,static_cast<float>(volume_steps),e.volume_density,e.volume_seed};}
+        fragment.volume_options={e.volume_depth,static_cast<float>(volume_steps),e.volume_density,e.volume_seed};
+        // Scatter rides atmo_shape.z — atmospheres never render inside
+        // the volume branch, so the lane is free for volume materials.
+        fragment.atmo_shape[2]=e.volume_scatter;}
       if((material.surface_effect&&material.surface_effect->volume_depth>0.f)||material.orbital_beaming!=0.f){
         // Model transforms use uniform scale and an orthonormal rotation.
         // Invert their camera-relative matrix once per draw, not per
@@ -493,7 +496,7 @@ struct Scene3DRenderer::Storage {
       if(material.band_shear!=0.f)fragment.emissive_tint[3]=material.band_shear;
       if(material.atmosphere){const auto& a=*material.atmosphere;
         fragment.atmo_options={a.tint.x,a.tint.y,a.tint.z,a.strength};
-        fragment.atmo_shape={a.power,a.night_floor,0.f,0.f};}
+        fragment.atmo_shape={a.power,a.night_floor,fragment.atmo_shape[2],0.f};}
       fragment.point_position=pl_position;fragment.point_energy=pl_energy;
     }
     // Directional shadow map: an authored ortho volume centres `distance`

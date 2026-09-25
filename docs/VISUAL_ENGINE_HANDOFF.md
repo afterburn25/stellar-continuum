@@ -95,6 +95,17 @@ key (or the `AccretionDisc` component); an authored `texture` still wins
 over the generated column. A black hole is an authoring composition —
 a dark sphere inside the annulus — not an engine concept.
 
+`SurfaceEffect3D::volume_scatter` [0,1] adds directional single-scatter
+to the emission-volume march: each sample's emission scales by a limb
+gradient `mix(1, .35+1.3·facing, scatter)` where `facing` measures the
+sample's proxy-center direction against the object-space key light —
+the star-lit side brightens ~1.65×, the far side dims to ~0.35, so
+nebulae read illuminated rather than uniformly self-glowing. It rides
+the `atmo_shape.z` lane: `main()` early-returns into `emission_volume`
+whenever `volume_depth > 0`, so atmosphere lanes are inert on volume
+materials and free to carry it. No document/component key yet — volume
+materials are authored through the C++ API today.
+
 Per-instance distance culling lives on `MeshInstance3D`:
 
 ```cpp
@@ -327,6 +338,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - `accretion_disc_material3d` is an azimuthally uniform thin-disc
   profile — no spiral fluctuations, no relativistic ray-bending; the
   annulus radii must be re-stated in the `annulus:i,o` mesh spec.
+- `volume_scatter` is a limb-gradient approximation — no real
+  light-path extinction march inside the volume; volumes remain
+  authored through the C++ API only.
 - One shared equirect env map per material — no probe grid.
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
 - Debug views are developer tooling — no LOD/residency visualization
