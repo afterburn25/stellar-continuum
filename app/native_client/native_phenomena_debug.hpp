@@ -32,6 +32,10 @@ public:
     const auto targets=focusables(layout(w,h));
     return ring_>=0&&ring_<static_cast<int>(targets.size())?targets[static_cast<std::size_t>(ring_)].control:stellar::engine::AnnouncementControl::Custom;
   }
+  [[nodiscard]] std::optional<bool> focused_toggle(int w,int h)const{
+    const auto targets=focusables(layout(w,h));
+    return ring_>=0&&ring_<static_cast<int>(targets.size())?targets[static_cast<std::size_t>(ring_)].checked:std::nullopt;
+  }
   bool handle(const InputEvent& e,int w,int h){
     if(!visible)return false;const auto l=layout(w,h);
     if(dropdown_.visible()){if(auto selected=dropdown_.handle(e,l.density,w,h))options.developer_percent=*selected==0?-1:(*selected-1)*25;return true;}
@@ -93,6 +97,7 @@ private:
     enum class Kind{Close,Density,Toggle,Navigate};
     UiRect rect;Kind kind{};int index{-1};std::string label;
     stellar::engine::AnnouncementControl control{stellar::engine::AnnouncementControl::Button};
+    std::optional<bool> checked;
   };
   std::vector<FocusTarget> focusables(const Layout& l)const{
     static const std::array<const char*,6> names{"Bounds","Types","Density","Overlap","Region bias","Filename"};
@@ -103,7 +108,8 @@ private:
     for(int i=0;i<3;++i)out.push_back({l.navigation[static_cast<std::size_t>(i)],FocusTarget::Kind::Navigate,i,
       std::array<const char*,3>{"Previous phenomenon","Next phenomenon","Go to phenomenon"}[static_cast<std::size_t>(i)]});
     for(int i=0;i<6;++i)out.push_back({l.toggles[static_cast<std::size_t>(i)],FocusTarget::Kind::Toggle,i,
-      std::string(names[static_cast<std::size_t>(i)])+(values[static_cast<std::size_t>(i)]?": on":": off"),stellar::engine::AnnouncementControl::CheckBox});
+      std::string(names[static_cast<std::size_t>(i)])+(values[static_cast<std::size_t>(i)]?": on":": off"),stellar::engine::AnnouncementControl::CheckBox,
+      values[static_cast<std::size_t>(i)]});
     std::ranges::sort(out,[](const FocusTarget&a,const FocusTarget&b){return a.rect.y==b.rect.y?a.rect.x<b.rect.x:a.rect.y<b.rect.y;});
     return out;
   }

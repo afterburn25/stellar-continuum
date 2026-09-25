@@ -241,6 +241,45 @@ int main() try {
   require(SUCCEEDED(walker->GetParentElement(child, &parent)) && parent,
           "focus fragment did not navigate to its root parent");
   parent->Release();
+  // CheckBox focus exposes the toggle pattern reporting the announced
+  // checked state; Toggle() queues an activation just like Invoke().
+  (void)bridge.focus_changed(
+      "Subtitles", stellar::engine::AnnouncementBounds{8.f, 9.f, 40.f, 16.f},
+      std::nullopt, stellar::engine::AnnouncementControl::CheckBox, true);
+  IUIAutomationElement* toggle_fragment = find_fragment(element);
+  require(toggle_fragment != nullptr,
+          "focus fragment was not exposed for the checkbox announcement");
+  IUIAutomationTogglePattern* toggle{};
+  require(SUCCEEDED(toggle_fragment->GetCurrentPattern(
+              UIA_TogglePatternId,
+              reinterpret_cast<IUnknown**>(&toggle))) && toggle,
+          "checkbox fragment did not expose the toggle pattern");
+  ToggleState toggle_state{};
+  require(SUCCEEDED(toggle->get_CurrentToggleState(&toggle_state)) &&
+              toggle_state == ToggleState_On,
+          "toggle pattern did not report the announced checked state");
+  require(SUCCEEDED(toggle->Toggle()), "UIA Toggle call failed");
+  require(bridge.drain_activations() == 1,
+          "UIA Toggle did not queue an activation for the owner");
+  toggle->Release();
+  // Without an announced state the checkbox reports Indeterminate.
+  (void)bridge.focus_changed(
+      "Unlabelled", std::nullopt, std::nullopt,
+      stellar::engine::AnnouncementControl::CheckBox);
+  IUIAutomationElement* unknown_toggle = find_fragment(element);
+  require(unknown_toggle != nullptr,
+          "focus fragment was not exposed for the stateless checkbox");
+  IUIAutomationTogglePattern* toggle2{};
+  require(SUCCEEDED(unknown_toggle->GetCurrentPattern(
+              UIA_TogglePatternId,
+              reinterpret_cast<IUnknown**>(&toggle2))) && toggle2,
+          "stateless checkbox lost the toggle pattern");
+  require(SUCCEEDED(toggle2->get_CurrentToggleState(&toggle_state)) &&
+              toggle_state == ToggleState_Indeterminate,
+          "stateless checkbox did not report Indeterminate");
+  toggle2->Release();
+  unknown_toggle->Release();
+  toggle_fragment->Release();
   // An empty focus label is the ring-release signal — the fragment must
   // stop claiming keyboard focus so AT stops tracking a stale control.
   (void)bridge.focus_changed("");

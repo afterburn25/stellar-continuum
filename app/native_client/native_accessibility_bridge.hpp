@@ -41,7 +41,8 @@ class NativeAccessibilityBridge final {
       std::optional<stellar::engine::AnnouncementBounds> bounds = std::nullopt,
       std::optional<stellar::engine::AnnouncementRange> range = std::nullopt,
       stellar::engine::AnnouncementControl control =
-          stellar::engine::AnnouncementControl::Custom);
+          stellar::engine::AnnouncementControl::Custom,
+      std::optional<bool> checked = std::nullopt);
   // Subclassed window-procedure sink installed while attached — platform
   // plumbing for the WM_GETOBJECT answer, not a general event API.
   std::intptr_t handle_window_message(std::uintptr_t hwnd, unsigned message,

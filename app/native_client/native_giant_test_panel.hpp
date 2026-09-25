@@ -58,6 +58,14 @@ class NativeGiantTestPanel {
   if(ring_<0||ring_>=20)return stellar::engine::AnnouncementControl::Custom;
   return ring_==4||ring_==16||ring_==17?stellar::engine::AnnouncementControl::CheckBox:stellar::engine::AnnouncementControl::Button;
  }
+ // Checked state of the focused CheckBox — AT reports on/off through the
+ // UIA toggle pattern rather than parsing the label text.
+ [[nodiscard]] std::optional<bool> focused_toggle(int,int)const{
+  if(ring_==4)return request_.rings;
+  if(ring_==16)return ring_shadow_;
+  if(ring_==17)return planet_shadow_;
+  return std::nullopt;
+ }
  void open(stellar::core::CampaignFrame& frame){visible_=true;ring_=-1;try{const auto& p=frame.runtime().world().campaign().developer_provenance;if(p&&p->giant_test)request_=p->giant_test->controls;apply(frame,request_);}catch(const std::exception& e){notice_=e.what();}}
  bool handle(const InputEvent& e,int w,int h,stellar::core::CampaignFrame& frame){
   if(!visible_)return false;pointer_=e.position;const auto l=layout(w,h);

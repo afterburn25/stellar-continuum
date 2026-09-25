@@ -97,6 +97,9 @@ struct AccessibilityAnnouncement {
   std::optional<AnnouncementBounds> bounds;
   std::optional<AnnouncementRange> range;
   AnnouncementControl control{AnnouncementControl::Custom};
+  // Checked state of a focused CheckBox — platform bridges expose it as a
+  // toggle pattern so AT reports on/off, not just the control name.
+  std::optional<bool> checked;
   std::uint64_t sequence{};
 };
 
@@ -114,9 +117,10 @@ public:
                       std::optional<AnnouncementBounds> bounds = std::nullopt,
                       std::optional<AnnouncementRange> range = std::nullopt,
                       AnnouncementControl control = AnnouncementControl::Custom,
+                      std::optional<bool> checked = std::nullopt,
                       AnnouncementPriority priority = AnnouncementPriority::Polite) {
     announce(std::move(text), priority, AnnouncementKind::Focus,
-             std::move(bounds), std::move(range), control);
+             std::move(bounds), std::move(range), control, checked);
   }
   // Oldest pending announcement, or nullopt when drained.
   [[nodiscard]] std::optional<AccessibilityAnnouncement> take();
@@ -131,7 +135,8 @@ private:
                 AnnouncementKind kind,
                 std::optional<AnnouncementBounds> bounds,
                 std::optional<AnnouncementRange> range,
-                AnnouncementControl control);
+                AnnouncementControl control,
+                std::optional<bool> checked = std::nullopt);
   std::deque<AccessibilityAnnouncement> pending_;
   std::size_t capacity_;
   std::uint64_t sequence_{};

@@ -1205,8 +1205,13 @@ the campaign update loop and the startup entry loop, injecting a Return
 press+release through normal input dispatch (release-gated controls like
 the fleet outliner work unchanged). The bridge test drives a real UIA
 `Invoke` and asserts the queued count; a slider fragment reports no
-invoke pattern. Open: AT-SPI/non-Windows backends, writable range/
-toggle patterns, and a full fragment tree.
+invoke pattern. `IToggleProvider` followed: `AccessibilityAnnouncement`
+carries an optional `checked`, the four CheckBox surfaces supply it via
+`focused_toggle()` (audio mute, five voice-settings toggles,
+phenomena-debug options, giant-panel ring/shadow toggles), the fragment
+reports On/Off/Indeterminate, and `Toggle()` queues the same
+activation. Open: AT-SPI/non-Windows backends, writable range patterns,
+and a full fragment tree.
 Per-control focus geometry (row 26): `AccessibilityAnnouncement` now
 carries optional `AnnouncementBounds` and every focus-bearing surface
 exposes `focused_bounds(...)` mirroring its `focused_label` — settings

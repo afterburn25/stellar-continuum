@@ -355,6 +355,16 @@ stellar::engine::AnnouncementControl NativeVoiceSettings::focused_control() cons
   default: return AnnouncementControl::Custom;
   }
 }
+std::optional<bool> NativeVoiceSettings::focused_toggle() const {
+  switch (focus_) {
+  case 0: return values_.enabled;
+  case 2: return values_.subtitles;
+  case 5: return values_.speaker_labels;
+  case 8: return values_.no_interruptions;
+  case 9: return values_.interface_announcements;
+  default: return std::nullopt;
+  }
+}
 void NativeVoiceSettings::activate_at(const VoiceSettingsLayout& layout, stellar::native_map::Point position) {
   if (layout.volume_track.contains(position)) {
     dragging_ = Dragged::Volume; set_from_track(dragging_, position, layout); return;

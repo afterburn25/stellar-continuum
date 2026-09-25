@@ -121,6 +121,7 @@ long uia_control_type(
 class FocusFragment final : public ProviderBase,
                             public IRangeValueProvider,
                             public IInvokeProvider,
+                            public IToggleProvider,
                             public IRawElementProviderFragment {
  public:
   FocusFragment(WindowProvider *root, HWND host,
@@ -128,22 +129,27 @@ class FocusFragment final : public ProviderBase,
       : root_(root), host_(host), activations_(activations) {}
 
   void set_label(std::wstring label, std::optional<RECT> rect,
-                 std::optional<FragmentRange> range, long control_type) {
+                 std::optional<FragmentRange> range, long control_type,
+                 std::optional<bool> checked) {
     label_ = std::move(label);
     rect_ = rect;
     range_ = range;
     control_type_ = control_type;
+    checked_ = checked;
     // Only controls the ring can activate answer Invoke — sliders adjust
     // through their (read-only) range and groups are containers.
     invocable_ = control_type == UIA_ButtonControlTypeId ||
                  control_type == UIA_CheckBoxControlTypeId ||
                  control_type == UIA_EditControlTypeId ||
                  control_type == UIA_CustomControlTypeId;
+    toggleable_ = control_type == UIA_CheckBoxControlTypeId;
     focused_ = true;
   }
   void clear_focus() noexcept {
     focused_ = false;
     invocable_ = false;
+    toggleable_ = false;
+    checked_.reset();
     range_.reset();
     control_type_ = UIA_CustomControlTypeId;
   }
@@ -176,6 +182,12 @@ class FocusFragment final : public ProviderBase,
       AddRef();
       return S_OK;
     }
+    if (iid == IID_IToggleProvider && toggleable_) {
+      if (!out) return E_POINTER;
+      *out = static_cast<IToggleProvider *>(this);
+      AddRef();
+      return S_OK;
+    }
     return ProviderBase::QueryInterface(iid, out);
   }
 
@@ -189,6 +201,9 @@ class FocusFragment final : public ProviderBase,
     } else if (pattern == UIA_InvokePatternId && invocable_) {
       *out = static_cast<IInvokeProvider *>(this);
       AddRef();
+    } else if (pattern == UIA_TogglePatternId && toggleable_) {
+      *out = static_cast<IToggleProvider *>(this);
+      AddRef();
     }
     return S_OK;
   }
@@ -199,6 +214,19 @@ class FocusFragment final : public ProviderBase,
   HRESULT STDMETHODCALLTYPE Invoke() noexcept override {
     if (activations_)
       activations_->fetch_add(1, std::memory_order_relaxed);
+    return S_OK;
+  }
+
+  // Toggling a checkbox is the same activation the ring performs on
+  // Return — queue it identically. The reported state refreshes with the
+  // next focus announcement carrying the control's new value.
+  HRESULT STDMETHODCALLTYPE Toggle() noexcept override {
+    return Invoke();
+  }
+  HRESULT STDMETHODCALLTYPE get_ToggleState(ToggleState *out) noexcept override {
+    if (!out) return E_POINTER;
+    *out = !checked_ ? ToggleState_Indeterminate
+                     : *checked_ ? ToggleState_On : ToggleState_Off;
     return S_OK;
   }
 
@@ -261,6 +289,9 @@ class FocusFragment final : public ProviderBase,
     } else if (id == UIA_IsInvokePatternAvailablePropertyId) {
       out->vt = VT_BOOL;
       out->boolVal = invocable_ ? VARIANT_TRUE : VARIANT_FALSE;
+    } else if (id == UIA_IsTogglePatternAvailablePropertyId) {
+      out->vt = VT_BOOL;
+      out->boolVal = toggleable_ ? VARIANT_TRUE : VARIANT_FALSE;
     } else if (id == UIA_IsControlElementPropertyId ||
                id == UIA_IsContentElementPropertyId) {
       out->vt = VT_BOOL;
@@ -317,9 +348,11 @@ class FocusFragment final : public ProviderBase,
   std::wstring label_;
   std::optional<RECT> rect_;
   std::optional<FragmentRange> range_;
+  std::optional<bool> checked_;
   long control_type_{UIA_CustomControlTypeId};
   bool focused_{};
   bool invocable_{};
+  bool toggleable_{};
 };
 
 // Fragment root answered for UiaRootObjectId: sources live-region
@@ -334,9 +367,10 @@ class WindowProvider final : public ProviderBase,
 
   FocusFragment *focus_fragment() noexcept { return focus_; }
   void set_focus_label(std::wstring label, std::optional<RECT> rect,
-                       std::optional<FragmentRange> range, long control_type) {
+                       std::optional<FragmentRange> range, long control_type,
+                       std::optional<bool> checked) {
     focus_->set_label(std::move(label), std::move(rect), std::move(range),
-                      control_type);
+                      control_type, checked);
     focused_ = true;
   }
   // The ring released — the fragment stops claiming focus and GetFocus
@@ -563,7 +597,8 @@ bool NativeAccessibilityBridge::focus_changed(
     std::string_view label,
     std::optional<stellar::engine::AnnouncementBounds> bounds,
     std::optional<stellar::engine::AnnouncementRange> range,
-    stellar::engine::AnnouncementControl control) {
+    stellar::engine::AnnouncementControl control,
+    std::optional<bool> checked) {
   auto *provider = static_cast<WindowProvider *>(provider_);
   if (!provider) return false;
   std::wstring name = wide(label);
@@ -601,7 +636,7 @@ bool NativeAccessibilityBridge::focus_changed(
   // The fragment reflects real focus state regardless of listeners; only the
   // event raise is gated on an assistive client being attached.
   provider->set_focus_label(std::move(name), rect, fragment_range,
-                            uia_control_type(control));
+                            uia_control_type(control), checked);
   if (!UiaClientsAreListening()) return false;
   return SUCCEEDED(UiaRaiseAutomationEvent(
       static_cast<IRawElementProviderSimple *>(provider->focus_fragment()),
@@ -633,7 +668,7 @@ bool NativeAccessibilityBridge::announce(std::string_view) { return false; }
 bool NativeAccessibilityBridge::focus_changed(
     std::string_view, std::optional<stellar::engine::AnnouncementBounds>,
     std::optional<stellar::engine::AnnouncementRange>,
-    stellar::engine::AnnouncementControl) {
+    stellar::engine::AnnouncementControl, std::optional<bool>) {
   return false;
 }
 std::intptr_t NativeAccessibilityBridge::handle_window_message(std::uintptr_t,

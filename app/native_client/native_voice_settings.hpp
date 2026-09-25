@@ -71,6 +71,8 @@ class NativeVoiceSettings final {
   focused_range() const;
   // Semantic role of the ringed control for platform control typing.
   [[nodiscard]] stellar::engine::AnnouncementControl focused_control() const;
+  // Checked state of the focused CheckBox — drives the UIA toggle pattern.
+  [[nodiscard]] std::optional<bool> focused_toggle() const;
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
   void cancel();
