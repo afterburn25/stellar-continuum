@@ -319,6 +319,14 @@ void menu_hover_feedback(){
     InputEvent rclick{};rclick.type=InputEventType::RightPressed;rclick.position=center(*row_bounds);
     require(hub.handle(rclick,w,h)&&mapper.bindings("quicksave")[0].device==0,
             "right-click did not pin the row's pad binding");
+    // Pin conflicts: a sibling holding the same trigger on the target pad
+    // (reachable via hand-edited JSON or a later rebind) fires alongside —
+    // the notice names it rather than stripping it.
+    mapper.rebind("toggle_pause",{stellar::engine::InputBinding{
+        stellar::engine::RawInputEvent::Kind::GamepadButton,7,1.f,{},1}});
+    require(dkey()&&mapper.bindings("quicksave")[0].device==1,"D did not pin to pad 2");
+    require(hub.take_notice()=="Pad device: controller 2 — also fires Toggle pause",
+            "pin conflict was not announced");
     // Axis rows: an axis context contributes Axis1D rows that capture a
     // stick deflection or wheel scroll — discrete keys are swallowed.
     require(mapper.load_contexts(R"json({"contexts":[{"name":"GALAXY_PAD","exclusive":false,"actions":[

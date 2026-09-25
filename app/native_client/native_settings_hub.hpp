@@ -353,6 +353,20 @@ private:
     const auto first=std::find_if(bound.begin(),bound.end(),pad);
     if(first==bound.end())return false;
     const int target=first->device>=stellar::engine::kGamepadDeviceCount-1?-1:first->device+1;
+    // Pad-level conflicts: a sibling action answering the same trigger on
+    // the target pad — or on any pad — now fires alongside. Pinning stays
+    // deliberate (nothing is stripped) but the notice names the conflict.
+    std::string conflicts;
+    if(target>=0)
+      for(const auto* other:rows){
+        if(other==rows[static_cast<std::size_t>(focus_)])continue;
+        const auto others=mapper_->bindings(other->name);
+        const auto clash=std::ranges::any_of(others,[&](const auto& b){
+          return pad(b)&&(b.device<0||b.device==target)&&
+                 std::ranges::any_of(bound,[&](const auto& ours){
+                   return pad(ours)&&ours.kind==b.kind&&ours.code==b.code;});});
+        if(clash){if(!conflicts.empty())conflicts+=", ";conflicts+=action_label(other->name);}
+      }
     for(auto& b:bound)if(pad(b))b.device=target;
     mapper_->rebind(rows[static_cast<std::size_t>(focus_)]->name,std::move(bound));
     std::string pad_label;
@@ -363,6 +377,8 @@ private:
     }
     notice_=target<0?tr("SETTINGS_CONTROLS_DEVICE_ANY","Pad device: any controller")
                    :trf("SETTINGS_CONTROLS_DEVICE_PINNED","Pad device: {0}",{std::move(pad_label)});
+    if(!conflicts.empty())
+      notice_+=trf("SETTINGS_CONTROLS_PIN_CONFLICT"," — also fires {0}",{std::move(conflicts)});
     if(persist_)persist_();
     return true;
   }

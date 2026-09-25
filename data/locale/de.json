@@ -1825,6 +1825,7 @@
     "SETTINGS_CONTROLS_DEVICE_ANY": "Controller: beliebiges Pad",
     "SETTINGS_CONTROLS_DEVICE_PINNED": "Pad: {0}",
     "SETTINGS_CONTROLS_DEVICE": "D / Rechtsklick — Pad-Eingabe einem Controller zuweisen",
-    "SETTINGS_CONTROLS_PAD_LABEL": "Controller {0}"
+    "SETTINGS_CONTROLS_PAD_LABEL": "Controller {0}",
+    "SETTINGS_CONTROLS_PIN_CONFLICT": " — löst außerdem {0} aus"
   }
 }
