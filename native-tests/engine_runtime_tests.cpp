@@ -469,6 +469,11 @@ int main() {
             "tilemap_index resolves the runtime map by name");
       check(host.world().get<Tilemap>(id) != nullptr,
             "spawn_tilemap returns a carrier with a Tilemap");
+      // Tilemap carriers are tracked separately — region queries and
+      // point picking never see them.
+      check(!std::ranges::contains(
+                host.entities_in_rect(-100.f, -100.f, 2000.f, 2000.f), id),
+            "tilemap carriers stay out of the tracked entity set");
       destroyed = host.destroy_tilemap(id);
       after_destroy = host.tilemap_count();
     };
