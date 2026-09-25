@@ -2550,6 +2550,7 @@ int RuntimeHost::run() {
           inst.material.terminator_wrap = sf->terminator_wrap;
           inst.material.limb_darkening = sf->limb_darkening;
           inst.material.band_shear = sf->band_shear;
+          inst.material.orbital_beaming = sf->orbital_beaming;
         }
         if (const auto *at = world.get<AtmosphereShell>(e))
           inst.material.atmosphere =

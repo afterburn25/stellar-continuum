@@ -189,6 +189,9 @@ struct MaterialSurface {
   // Latitude-weighted longitude shear of surface maps (differential
   // rotation / gas-giant banding), [-0.5,0.5] UV units.
   float band_shear{0.f};
+  // First-order orbital beaming about local +Y (accretion discs, ring
+  // forward-scatter), [-1,1]; negative spins retrograde.
+  float orbital_beaming{0.f};
   std::string normal_map, properties_map, cloud_map;
 };
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim

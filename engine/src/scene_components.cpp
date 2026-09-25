@@ -461,7 +461,7 @@ void register_scene_components(World &world) {
         for (const float f :
              {m.normal_strength, m.relief, m.cloud_opacity, m.cloud_albedo,
               m.cloud_offset_x, m.cloud_offset_y, m.terminator_wrap,
-              m.limb_darkening, m.band_shear})
+              m.limb_darkening, m.band_shear, m.orbital_beaming})
           put_f32(out, f);
         for (const std::string *s :
              {&m.normal_map, &m.properties_map, &m.cloud_map}) {
@@ -488,6 +488,7 @@ void register_scene_components(World &world) {
         m.terminator_wrap = f();
         m.limb_darkening = f();
         m.band_shear = f();
+        m.orbital_beaming = f();
         for (std::string *s :
              {&m.normal_map, &m.properties_map, &m.cloud_map}) {
           const std::uint32_t len = get_u32(b, at);
@@ -817,14 +818,15 @@ std::vector<EntityId> spawn_scene3d(World &world,
         s.relief != 0.f || s.cloud_opacity != 0.f || s.cloud_albedo != 0.f ||
         s.cloud_offset_x != 0.f || s.cloud_offset_y != 0.f ||
         s.terminator_wrap != 0.f || s.limb_darkening != 0.f ||
-        s.band_shear != 0.f)
+        s.band_shear != 0.f || s.orbital_beaming != 0.f)
       world.add(entity,
                 MaterialSurface{s.normal_strength, s.relief,
                                 s.cloud_opacity, s.cloud_albedo,
                                 s.cloud_offset_x, s.cloud_offset_y,
                                 s.terminator_wrap, s.limb_darkening,
-                                s.band_shear, s.normal_map,
-                                s.properties_map, s.cloud_map});
+                                s.band_shear, s.orbital_beaming,
+                                s.normal_map, s.properties_map,
+                                s.cloud_map});
     if (s.atmo_strength != 0.f)
       world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
                                         s.atmo_strength, s.atmo_power,
@@ -923,6 +925,7 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.terminator_wrap = sf->terminator_wrap;
       s.limb_darkening = sf->limb_darkening;
       s.band_shear = sf->band_shear;
+      s.orbital_beaming = sf->orbital_beaming;
     }
     if (const auto *at = world.get<AtmosphereShell>(entity)) {
       s.atmo_r = at->r;

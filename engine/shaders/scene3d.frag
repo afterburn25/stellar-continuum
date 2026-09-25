@@ -481,6 +481,22 @@ void main() {
     // photosphere.
     if(material.response_options.w>0.0)
         result*=1.0-material.response_options.w*(1.0-clamp(dot(normalize(view_normal),V),0.0,1.0));
+    // Orbital beaming: a first-order doppler asymmetry for material
+    // orbiting local +Y — radiance scales by 1 + s*(v.V) where v is the
+    // tangential velocity. Face-on discs stay symmetric (v ⟂ view);
+    // edge-on discs peak. The atmosphere rim below stays exempt — it is
+    // a scattering shell, not orbiting surface material.
+    if(material.uv_options.z!=0.0){
+        vec3 local=(material.effect_from_view*vec4(view_position,1.0)).xyz;
+        float orbit_r2=local.x*local.x+local.z*local.z;
+        if(orbit_r2>1e-8){
+            // v = w x r for w=+Y gives tangent ∝ (z,0,-x). effect_from_view
+            // stores the inverse model_view linear part, so its transpose
+            // carries object-space directions back into view space.
+            vec3 beam_v=transpose(mat3(material.effect_from_view))*vec3(local.z,0.0,-local.x);
+            result*=max(1.0+material.uv_options.z*dot(normalize(beam_v),V),0.0);
+        }
+    }
     // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
     // nightside floor, tied to the star's actual color.
     if(material.atmo_options.w>0.0){

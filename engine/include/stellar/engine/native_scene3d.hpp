@@ -194,6 +194,13 @@ struct Material3D {
   // zero-mean so net longitude registration is preserved. UV units,
   // [-0.5,0.5]; 0 keeps rectilinear sampling.
   float band_shear{};
+  // Orbital beaming: material orbiting local +Y gains a first-order
+  // doppler asymmetry — radiance scales by 1 + s·(v̂·V̂), so the
+  // approaching lane brightens while the receding lane dims. Face-on
+  // discs stay symmetric (velocity is perpendicular to the view);
+  // edge-on discs peak. Accretion discs, ring forward-scatter. [-1,1];
+  // negative spins retrograde; 0 disables.
+  float orbital_beaming{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;

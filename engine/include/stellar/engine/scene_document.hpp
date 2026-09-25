@@ -216,6 +216,9 @@ struct Scene3dEntity {
   // Gas-giant differential rotation: latitude-weighted longitude shear
   // of every surface map sample, UV units [-0.5,0.5]; 0 = rectilinear.
   float band_shear{0.f};
+  // First-order orbital beaming for material orbiting local +Y (accretion
+  // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
+  float orbital_beaming{0.f};
   // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
   // coarsest-first. lod_meshes[i] draws once the projected bounding
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).

@@ -45,6 +45,9 @@ m.terminator_wrap = 0.4f;                   // [0,1] wrap-diffuse softening
 m.limb_darkening = 0.6f;                    // [0,1] N.V radiance falloff
 m.band_shear = -0.2f;                       // [-0.5,0.5] latitude-weighted
                                             // longitude shear (giants)
+m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
+                                            // asymmetry (accretion discs,
+                                            // ring forward-scatter)
 ```
 
 `band_shear` is material-level, not tied to `surface_response`: every
@@ -53,6 +56,16 @@ equirect surface sample — albedo, normal, properties, cloud deck — shifts
 authored maps stay registered and net longitude is preserved; with a
 nonzero `cloud_offset` the deck additionally shears against the surface
 underneath it.
+
+`orbital_beaming` is also material-level: fragments recover their
+object-space position through the stored model-view inverse, take the
+tangential velocity about local +Y (`v ∝ (z,0,−x)`), and scale emitted
++reflected radiance by `1 + s·(v̂·V̂)`. A face-on disc stays symmetric —
+the orbital velocity is perpendicular to the view; edge-on peaks. The
+additive atmosphere rim stays exempt (it is a scattering shell, not
+orbiting material). Real lensing is out of scope for the forward path —
+this is the authored approximation that gives accretion discs their
+asymmetric bright side.
 
 Per-instance distance culling lives on `MeshInstance3D`:
 
@@ -280,6 +293,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   warp, not per-band zonal winds or animated turbulence.
 - Limb darkening is the single-coefficient linear law — no quadratic
   two-term coefficients or wavelength-dependent profiles.
+- `orbital_beaming` is a first-order brightness asymmetry — no doppler
+  color shift, gravitational redshift, or lensing.
 - One shared equirect env map per material — no probe grid.
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
 - Debug views are developer tooling — no LOD/residency visualization

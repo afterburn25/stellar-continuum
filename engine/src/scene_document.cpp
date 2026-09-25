@@ -467,6 +467,7 @@ std::string Scene3dDocument::to_json() const {
     if (e.terminator_wrap != 0.f) item["terminatorWrap"] = e.terminator_wrap;
     if (e.limb_darkening != 0.f) item["limbDarken"] = e.limb_darkening;
     if (e.band_shear != 0.f) item["bandShear"] = e.band_shear;
+    if (e.orbital_beaming != 0.f) item["orbitalBeam"] = e.orbital_beaming;
     if (!e.lod_meshes.empty()) {
       item["lods"] = e.lod_meshes;
       item["lodPixels"] = e.lod_pixels;
@@ -660,6 +661,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.band_shear = item.value("bandShear", 0.0f);
       if (!(e.band_shear >= -0.5f && e.band_shear <= 0.5f))
         return fail("bandShear must be in [-0.5,0.5]");
+      e.orbital_beaming = item.value("orbitalBeam", 0.0f);
+      if (!(e.orbital_beaming >= -1.f && e.orbital_beaming <= 1.f))
+        return fail("orbitalBeam must be in [-1,1]");
       if (item.contains("lods")) {
         const auto &lods = item.at("lods");
         if (!lods.is_array() || lods.size() > 8)

@@ -89,6 +89,8 @@ same document headless-tested.
    day/night edge across key/fill/point lights, and `limb_darkening`
    gives self-luminous bodies the photosphere's edge falloff.
    `band_shear` (latitude-weighted longitude warp, differential rotation)
+   and `orbital_beaming` (first-order doppler asymmetry about local +Y —
+   accretion discs get their approaching-lane brightening)
    landed on top. Remaining: the deck is
    a texture-space composite — no volumetric cloud shells or cloud
    self-shadowing; banding is a single cosine, not zonal winds.
