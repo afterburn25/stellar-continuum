@@ -191,8 +191,15 @@ breaks navigation/AT flow, or presents wrong state)
    next-action hint through the shared `empty_state` helper (shipyard,
    construction and missions already guided). Remaining bare states:
    minor lists that have no meaningful next action.
-4. Typography hierarchy varies per workspace (heading/body/small pixel
-   triples differ slightly everywhere); unify through theme tokens.
+4. Typography hierarchy varies per workspace — PARTIALLY DONE. New
+   `theme::type` ramp (title/body/small = 24/15/12, compact_body/
+   compact_small = 14/11) is the single vocabulary; construction, colony,
+   diplomacy (26→24) and economy (23→24) migrated to the canonical triple,
+   battle/fleet/inspection body+small to the compact ramp, and research's
+   title joined (its denser 16/14 tree text stays documented custom).
+   Deliberately untouched: settings dialogs (bigger reading sizes),
+   overview/map labels (different four-rung shape), and missions/research
+   body text where the tighter ramp is load-bearing for density.
 5. ~~System view + battle workspace need live visual review~~ → REVIEWED.
    `--system-smoke` and `--battle-smoke` captures inspected: system view
    inspector/orbits/controls are sound; battle feed events were bare text
