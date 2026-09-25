@@ -131,6 +131,25 @@ int main() try {
     require(confirm.kind==FleetWorkspaceCommandKind::Confirm,
         "Selected fleet command card lost canonical travel confirmation.");
   }
+  {
+    auto view = player_view(true);
+    auto& fleet = view.own_fleets.front();
+    fleet.design_name = "Pathfinder-class";
+    fleet.has_vessel_state = true;
+    fleet.hull_integrity = .62f;
+    fleet.cargo_material_capacity = 40.;
+    fleet.cargo_materials = 12.5;
+    fleet.embarked_population_millions = 2.5;
+    NativeFleetWorkspace workspace{FleetWorkspacePresentation::SelectedCommands};
+    workspace.set_view(std::move(view));
+    DrawList draw;
+    workspace.render(draw, 1280, 720, {});
+    require(has_text(draw, "Design") && has_text(draw, "Pathfinder-class") &&
+            has_text(draw, "Condition") && has_text(draw, "62%") &&
+            has_text(draw, "Cargo") && has_text(draw, "12.5 / 40.0") &&
+            has_text(draw, "Embarked") && has_text(draw, "2.5M"),
+        "Fleet composition rows did not surface design, condition or payload.");
+  }
   for (const auto [width, height] :
        std::array{std::pair{640, 360}, std::pair{1280, 720},
                   std::pair{1920, 1080}, std::pair{2560, 1440},

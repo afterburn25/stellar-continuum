@@ -8,6 +8,7 @@
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/industry_allocation.hpp>
+#include <stellar/core/ship_designs.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -242,6 +243,16 @@ NativeFleetMapView NativeFleetController::build(
     if (const auto status = status_by_id.find(fleet.id);
         status != status_by_id.end())
       item.combat_status = status->second;
+    if (fleet.design_id)
+      if (const auto *design = find_ship_design(*fleet.design_id))
+        item.design_name = design->name;
+    item.cargo_materials = fleet.cargo_materials;
+    item.cargo_material_capacity = fleet.cargo_material_capacity;
+    item.embarked_population_millions = fleet.embarked_population_millions;
+    if (fleet.tactical_vessel) {
+      item.has_vessel_state = true;
+      item.hull_integrity = fleet.tactical_vessel->hull_fraction;
+    }
     item.owner_civilization_id = fleet.civilization_id;
     item.foreign_inspection = fleet.civilization_id != player.player_id;
     const auto owner = std::ranges::find(player.world.civilizations, fleet.civilization_id, &Civilization::id);

@@ -164,9 +164,12 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
                         46.f * scale};
   const auto detail_y = list.y + list.height + 10.f * scale;
   const auto detail_space = std::max(0.f, feedback.y - detail_y - 6.f * scale);
-  // Keep seven telemetry lines plus the pinned order rail legible at 720p.
-  const auto fleet_height = std::min(180.f * scale,
-                                      std::max(0.f,detail_space - 78.f * scale));
+  // Composition rows let the telemetry stack reach eleven lines — the
+  // taller cap only applies when the route preview keeps its ~100s
+  // reserve; compact viewports keep the legacy seven-line budget.
+  const auto fleet_height = detail_space > 300.f * scale
+      ? std::min(215.f * scale, detail_space - 106.f * scale)
+      : std::min(180.f * scale, std::max(0.f,detail_space - 78.f * scale));
   const UiRect details{inner_x, detail_y, inner_width, fleet_height};
   const UiRect route{inner_x, detail_y + fleet_height + 6.f * scale,
                      inner_width,
@@ -889,6 +892,10 @@ void NativeFleetWorkspace::render(
     auto details_bounds = layout.details;
     if (armed_order || recovery_locate)
       details_bounds.height = std::max(0.f, details_bounds.height - 36.f * layout.scale);
+    // Clip rows against the whole details block so composition rows can
+    // never spill into the route preview, while the armed-fleet stack —
+    // which predates the clip — keeps rendering across the rail gap.
+    const UiRect details_clip = layout.details;
     if (ship_art) {
       const auto image = artwork(*fleet);
       const float side = std::min(details_bounds.height - 8.f * layout.scale,
@@ -921,9 +928,14 @@ void NativeFleetWorkspace::render(
       theme::key_value(out, {details_bounds.x, row_y, details_bounds.width,
                              row_height},
                        std::move(label), std::move(value),
-                       layout.small_font_pixels);
+                       layout.small_font_pixels, theme::Tone::Neutral,
+                       details_clip);
       row_y += row_height;
     };
+    // Core telemetry first; composition extras last so they are the first
+    // clipped when the card is cramped.
+    if (!fleet->design_name.empty())
+      stat(tr("FLEET_STAT_DESIGN", "Design"), fleet->design_name);
     stat(tr("FLEET_STAT_STRENGTH", "Strength"), number(fleet->combat_power));
     stat(tr("FLEET_STAT_FUEL", "Fuel"),
          number(fleet->fuel_remaining_light_years, 2) + " / " +
@@ -938,6 +950,16 @@ void NativeFleetWorkspace::render(
                   fleet->military_order_quote->current_order),
               military_order_name(
                   fleet->military_order_quote->current_order)));
+    if (fleet->has_vessel_state)
+      stat(tr("FLEET_STAT_CONDITION", "Condition"),
+           number(fleet->hull_integrity * 100., 0) + "%");
+    if (fleet->cargo_material_capacity > 0.)
+      stat(tr("FLEET_STAT_CARGO", "Cargo"),
+           number(fleet->cargo_materials, 1) + " / " +
+               number(fleet->cargo_material_capacity, 1));
+    if (fleet->embarked_population_millions > 0.)
+      stat(tr("FLEET_STAT_PASSENGERS", "Embarked"),
+           number(fleet->embarked_population_millions, 1) + "M");
     if (armed_order) {
       // The selected fleet's quote is retained until release, and becomes
       // invalid as soon as selection, observer, campaign, or order changes.
