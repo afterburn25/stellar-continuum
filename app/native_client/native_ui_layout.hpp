@@ -45,7 +45,8 @@ enum class UiAction {
   Explore,
   Menu,
   Missions,
-  SwitchView
+  SwitchView,
+  Legend
 };
 
 struct NativeUiLayout {

@@ -2632,6 +2632,7 @@ class NativeCampaign final {
         !fleet_workspace_.layout(width,height).panel.contains(point)&&
         !ui.navigation_bar.contains(point)&&!hud.resource_strip.contains(point)&&
         !hud.context.contains(point)&&
+        !(map_legend_visible(width,height)&&map_legend_bounds(width,height).contains(point))&&
         !(assets_.preferences().hidden?assets_layout.restore:assets_layout.panel).contains(point);
   }
   Point scroll_fleet_row_into_view(std::size_t index,int width,int height){
@@ -6769,6 +6770,7 @@ class NativeCampaign final {
                 else if(action==UiAction::Notifications){if(notifications_available())notification_view_.toggle(notifications_.latest_sequence());}
                 else if(action==UiAction::Menu)toggle_menu();
                 else if(action==UiAction::SwitchView)activate_hud_switch(width,height);
+                else if(action==UiAction::Legend){map_legend_collapsed_=!map_legend_collapsed_;}
                 else route_navigation(action);
                 return true;
               }
@@ -6807,6 +6809,23 @@ class NativeCampaign final {
         if(hud.resource_strip.contains(event.position)||hud.context.contains(event.position)){
           if(event.type==InputEventType::LeftPressed&&layout.hit(event.position,false)==UiAction::None){hud_switch_pressed_=hud.switch_view.contains(event.position);gesture_.capture_for_ui();continue;}
           if(event.type==InputEventType::Wheel||event.type==InputEventType::RightPressed||event.type==InputEventType::PointerMove){gesture_.capture_for_ui();continue;}
+        }
+        // The star-map legend swallows clicks inside its bounds so a press on
+        // the panel can never become a world selection underneath it.
+        if(map_legend_visible(width,height)){
+          const auto legend=map_legend_bounds(width,height);
+          const auto legend_toggle=map_legend_toggle_bounds(width,height);
+          if(event.type==InputEventType::PointerCancelled)map_legend_pressed_=false;
+          if(event.type==InputEventType::LeftReleased&&map_legend_pressed_){
+            map_legend_pressed_=false;
+            if(legend_toggle.contains(event.position)){map_legend_collapsed_=!map_legend_collapsed_;if(audio_confirm_)audio_confirm_();}
+            gesture_.cancel();continue;
+          }
+          if(legend.contains(event.position)){
+            if(event.type==InputEventType::LeftPressed&&layout.hit(event.position,false)==UiAction::None){map_legend_pressed_=legend_toggle.contains(event.position);gesture_.capture_for_ui();continue;}
+            if(event.type==InputEventType::LeftReleased)gesture_.cancel();
+            gesture_.capture_for_ui();continue;
+          }
         }
       }
       if(battle_workspace_.visible()&&!menu_){
@@ -7652,6 +7671,8 @@ class NativeCampaign final {
     reserve_hud(ui_layout.day_text);
     reserve_hud(ui_layout.status_text);
     reserve_hud(map_zoom_bounds(width,height));
+    if(map_legend_visible(width,height))
+      reserve_hud(map_legend_bounds(width,height));
     if (menu_) reserve_hud(ui_layout.menu_panel);
     if (selected_id_)
       reserve_hud({14.f, screen_height - 88.f, 320.f, 74.f});
@@ -7837,6 +7858,61 @@ class NativeCampaign final {
           trf("HUD_MAP_ZOOM", {zoom_factor.str()}, "Map zoom {0}x"),
           {184, 223, 239, 255}, layout.metric_font_pixels,
           zoom_bounds.width, zoom_bounds});
+    }
+    if(map_legend_visible(width,height)){
+      const auto legend=map_legend_bounds(width,height);
+      const auto toggle=map_legend_toggle_bounds(width,height);
+      const float s=layout.scale;
+      fill(out,legend,{5,18,26,222});
+      stroke(out,legend,{53,109,119,200});
+      const bool toggle_hover=toggle.contains(pointer_);
+      if(toggle_hover)fill(out,toggle,{28,52,66,255});
+      out.overlay.emplace_back(Text{
+          {toggle.x+8.f*s,toggle.y+5.f*s},
+          tr("MAP_LEGEND_TITLE","MAP LEGEND"),
+          toggle_hover?Color{238,244,255,255}:Color{139,174,194,255},
+          static_cast<int>(10.f*s),toggle.width-30.f*s,toggle});
+      out.overlay.emplace_back(Text{
+          {toggle.x+toggle.width-20.f*s,toggle.y+4.f*s},
+          map_legend_collapsed_?"+":"−",{238,244,255,255},
+          static_cast<int>(13.f*s),20.f*s,toggle,TextAlign::Center,
+          FontFace::Heading});
+      if(!map_legend_collapsed_){
+        const auto territory=native_territory_color(
+            world.player_civilization_id,world.player_civilization_id);
+        const int label_pixels=static_cast<int>(11.f*s);
+        const float pitch=17.f*s;
+        float row_y=toggle.y+toggle.height+5.f*s;
+        const float glyph_x=legend.x+16.f*s;
+        // Each row pairs a miniature of the real map glyph with its label so
+        // the overlay teaches the star chart vocabulary it uses.
+        const auto label=[&](std::string value){
+          const UiRect row{legend.x,row_y,legend.width,pitch};
+          out.overlay.emplace_back(Text{{legend.x+34.f*s,row_y+3.f*s},
+              std::move(value),{184,211,228,255},label_pixels,
+              legend.width-42.f*s,row});
+          row_y+=pitch;
+        };
+        const auto glyph_box=[&](float edge){
+          return UiRect{glyph_x-edge*.5f,row_y+(pitch-edge)*.5f-1.f*s,edge,edge};
+        };
+        fill(out,glyph_box(7.f*s),{255,240,196,255});
+        label(tr("MAP_LEGEND_CHARTED","Charted star"));
+        fill(out,glyph_box(7.f*s),{190,205,215,140});
+        label(tr("MAP_LEGEND_UNCHARTED","Uncharted star"));
+        const auto legend_lane=glyph_box(16.f*s);
+        fill(out,{legend_lane.x,legend_lane.y,4.f*s,4.f*s},{205,222,245,255});
+        fill(out,{legend_lane.x+legend_lane.width-4.f*s,legend_lane.y,4.f*s,4.f*s},{205,222,245,255});
+        out.overlay.emplace_back(Line{{legend_lane.x+4.f*s,legend_lane.y+2.f*s},{legend_lane.x+legend_lane.width-4.f*s,legend_lane.y+2.f*s},{49,74,108,230}});
+        label(tr("MAP_LEGEND_LANE","Charted lane"));
+        fill(out,glyph_box(13.f*s),territory);
+        label(tr("MAP_LEGEND_TERRITORY","Empire territory"));
+        fill(out,glyph_box(10.f*s),{102,232,164,55});
+        fill(out,glyph_box(4.f*s),{102,232,164,255});
+        label(tr("MAP_LEGEND_FLEET","Fleet"));
+        stroke(out,glyph_box(9.f*s),{111,225,255,230});
+        label(tr("MAP_LEGEND_SELECTED","Selection"));
+      }
     }
     if(inspection_visible())inspection_card_.render(out,inspection_bounds(width,height));
     const auto &notice = session_->notice();
@@ -8857,6 +8933,8 @@ class NativeCampaign final {
     std::vector<std::pair<UiRect,UiAction>> items;
     for(const auto &item:layout.hud_actions())
       if(item.second!=UiAction::Notifications||notifications_available())items.push_back(item);
+    if(map_legend_visible(width,height))
+      items.emplace_back(map_legend_toggle_bounds(width,height),UiAction::Legend);
     if(system_workspace_.visible()||selected_id_)
       items.emplace_back(CommandHudLayout::make(width,height).switch_view,UiAction::SwitchView);
     return items;
@@ -8886,6 +8964,7 @@ class NativeCampaign final {
       case UiAction::Explore:return tr("NAV_EXPLORE","Explore");
       case UiAction::Missions:return tr("NAV_MISSIONS","Missions");
       case UiAction::SwitchView:return tr("HUD_SWITCH_VIEW","Switch view");
+      case UiAction::Legend:return tr("HUD_MAP_LEGEND","Map legend");
       default:return {};
     }
   }
@@ -9046,6 +9125,27 @@ class NativeCampaign final {
     const float right=assets_.preferences().hidden?width-12.f*layout.scale:assets.panel.x-12.f*layout.scale;
     bounds.width=std::min(bounds.width,std::max(0.f,right-bounds.x));
     return bounds;
+  }
+  // Collapsible star-map legend anchored under the zoom readout. It inherits
+  // the readout's right-shift when the inspection or fleet panel claims the
+  // left edge, so it never overlaps those surfaces.
+  [[nodiscard]] UiRect map_legend_toggle_bounds(int width,int height) const {
+    const auto layout=NativeUiLayout::for_viewport(width,height);
+    const auto zoom=map_zoom_bounds(width,height);
+    return {zoom.x,zoom.y+zoom.height+6.f*layout.scale,
+            std::max(0.f,std::min(210.f*layout.scale,zoom.width)),
+            24.f*layout.scale};
+  }
+  [[nodiscard]] UiRect map_legend_bounds(int width,int height) const {
+    const auto toggle=map_legend_toggle_bounds(width,height);
+    if(map_legend_collapsed_)return toggle;
+    const auto scale=NativeUiLayout::for_viewport(width,height).scale;
+    return {toggle.x,toggle.y,toggle.width,
+            toggle.height+6.f*17.f*scale+8.f*scale};
+  }
+  [[nodiscard]] bool map_legend_visible(int width,int height) const {
+    return map_hud_visible()&&!system_workspace_.visible()&&
+        map_legend_toggle_bounds(width,height).width>=72.f;
   }
   [[nodiscard]] static UiRect inspection_bounds(int width,int height) {
     const auto scale=NativeUiLayout::for_viewport(width,height).scale;
@@ -9250,6 +9350,7 @@ class NativeCampaign final {
   std::shared_ptr<const RgbaImage> hud_galaxy_icon_,hud_system_icon_;
   std::unordered_map<int,SystemBodyAppearance> hud_planet_appearances_;
   bool hud_switch_pressed_{};
+  bool map_legend_collapsed_{};bool map_legend_pressed_{};
   std::optional<DrawList> smoke_colony_roster_capture_;
   std::string smoke_colony_roster_evidence_;
   std::optional<double> roster_day_;
