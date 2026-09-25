@@ -535,6 +535,49 @@ int main() try {
             "Pointer press did not clear the diplomacy ring.");
   }
 
+  // A contact with no legal actions still shows all three action slots as
+  // disabled; hover surfaces the authoritative status as the why, and clicks
+  // are captured without dispatching.
+  auto dark = sample_view();
+  auto &dsel = dark.selected;
+  dsel.has_visible_communication = false;
+  dsel.can_attempt_communication = false;
+  dsel.can_offer_non_aggression = false;
+  dsel.can_request_access = false;
+  dsel.can_offer_peace = false;
+  dsel.can_offer_ceasefire = false;
+  dsel.can_set_access = false;
+  dsel.can_declare_war = false;
+  dsel.communication_status = "Channel lost";
+  dsel.political_status = "At war";
+  NativeDiplomacyWorkspace disabled_actions;
+  disabled_actions.open();
+  disabled_actions.set_view(dark);
+  (void)disabled_actions.handle({InputEventType::PointerMove,
+                                 {negotiate.x + negotiate.width * .5f,
+                                  negotiate.y + negotiate.height * .5f}},
+                                1280, 720);
+  DrawList disabled_draw;
+  disabled_actions.render(disabled_draw, 1280, 720, nullptr);
+  require(has_text(disabled_draw, "Establish communication") &&
+              has_text(disabled_draw, "Negotiate") &&
+              has_text(disabled_draw, "Declare war"),
+          "Unavailable diplomacy actions were hidden instead of disabled.");
+  require(has_text(disabled_draw, "Channel lost"),
+          "A disabled diplomacy action did not explain its blocker.");
+  for (int index = 0; index < 3; ++index) {
+    const UiRect slot{layout.actions.x + 8.f * s,
+                      layout.actions.y + 8.f * s +
+                          static_cast<float>(index) * 36.f * s,
+                      layout.actions.width - 16.f * s, 30.f * s};
+    const auto hit = disabled_actions.handle(
+        {InputEventType::LeftPressed, center(slot)}, 1280, 720);
+    require(hit.captured &&
+                hit.kind == DiplomacyWorkspaceCommandKind::None &&
+                !disabled_actions.modal_open(),
+            "A disabled diplomacy action dispatched a command.");
+  }
+
   // The close control emits Close.
   const auto closed = workspace.handle(
       {InputEventType::LeftPressed, center(layout.close)}, 1280, 720);

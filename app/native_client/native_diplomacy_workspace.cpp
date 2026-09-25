@@ -254,7 +254,7 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   // strip below the columns at any viewport scale.
   const auto action_area_h =
       std::max(30.f * scale,
-               std::min(128.f * scale, meter_panel.height - 40.f * scale -
+               std::min(160.f * scale, meter_panel.height - 40.f * scale -
                                            meters.height - 6.f * scale));
   const UiRect actions{meter_panel.x,
                        meter_panel.y + meter_panel.height - action_area_h,
@@ -526,9 +526,11 @@ NativeDiplomacyWorkspace::focusables(
           tr("DIPLOMACY_DECLARE_WAR_ACTION", "Declare war")};
       std::size_t which = 0;
       for (const bool enabled : {transmission, negotiate, sel.can_declare_war}) {
-        if (!enabled) { ++which; continue; }
-        out.push_back({action_button(layout, action_index++),
-                       action_names[which++]});
+        if (enabled)
+          out.push_back({action_button(layout, action_index),
+                         action_names[which]});
+        ++which;
+        ++action_index;
       }
     }
     for (std::size_t index = 0; index < std::size(tab_labels); ++index)
@@ -794,24 +796,22 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
     const bool negotiate =
         s.can_offer_non_aggression || s.can_request_access ||
         s.can_offer_peace || s.can_offer_ceasefire || s.can_set_access;
-    if (transmission) {
-      if (action_hit(action_index)) {
-        if (s.has_visible_communication) {
-          set_notice(tr("DIPLOMACY_CHANNEL_OPEN",
-                        "Channel open. Select a proposal to begin negotiations."),
-                     true);
-          return {DiplomacyWorkspaceCommandKind::None, true};
-        }
-        DiplomacyWorkspaceCommand command{
-            DiplomacyWorkspaceCommandKind::Action, true};
-        command.action = DiplomacyWorkspaceAction::establish_communication;
-        command.target_civilization_id = s.target_civilization_id;
-        command.campaign_generation = view_->campaign_generation;
-        command.diplomacy_revision = view_->diplomacy_revision;
-        return command;
+    if (transmission && action_hit(action_index)) {
+      if (s.has_visible_communication) {
+        set_notice(tr("DIPLOMACY_CHANNEL_OPEN",
+                      "Channel open. Select a proposal to begin negotiations."),
+                   true);
+        return {DiplomacyWorkspaceCommandKind::None, true};
       }
-      ++action_index;
+      DiplomacyWorkspaceCommand command{
+          DiplomacyWorkspaceCommandKind::Action, true};
+      command.action = DiplomacyWorkspaceAction::establish_communication;
+      command.target_civilization_id = s.target_civilization_id;
+      command.campaign_generation = view_->campaign_generation;
+      command.diplomacy_revision = view_->diplomacy_revision;
+      return command;
     }
+    ++action_index;
     if (negotiate) {
       if (action_hit(action_index)) {
         ModalState modal;
@@ -843,8 +843,8 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         modal_ = std::move(modal);
         return {DiplomacyWorkspaceCommandKind::None, true};
       }
-      ++action_index;
     }
+    ++action_index;
     if (s.can_declare_war) {
       if (action_hit(action_index)) {
         ModalState modal;
@@ -863,7 +863,6 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         modal_ = std::move(modal);
         return {DiplomacyWorkspaceCommandKind::None, true};
       }
-      ++action_index;
     }
   }
 
@@ -1113,33 +1112,43 @@ void NativeDiplomacyWorkspace::render(
            meter_colors[index]);
   }
   std::size_t action_index = 0;
-  const auto draw_action = [&](const char *label, bool danger_button) {
+  const auto draw_action = [&](std::string label, bool enabled,
+                               std::string disabled_tip, bool danger_button) {
     const auto bounds = action_button(layout, action_index++);
     theme::button(out, bounds, label, pointer_, layout.body_font_pixels,
                   danger_button ? theme::Tone::Danger : theme::Tone::Diplomacy,
-                  danger_button);
-    if (danger_button) stroke(out, bounds, danger);
+                  danger_button && enabled, enabled);
+    if (danger_button && enabled) stroke(out, bounds, danger);
+    // Disabled actions stay visible with the authoritative status as the
+    // why — hiding illegal actions made the available set undiscoverable.
+    theme::hover_tooltip(out, bounds, pointer_, label, disabled_tip, width,
+                         height, s);
   };
   if (sel.present) {
-    if (sel.has_visible_communication || sel.can_attempt_communication)
-      draw_action(
-          sel.has_visible_communication
-              ? tr("DIPLOMACY_OPEN_TRANSMISSION", "Open transmission").c_str()
-              : tr("DIPLOMACY_ESTABLISH_COMMUNICATION",
-                   "Establish communication")
-                    .c_str(),
-          false);
-    if (sel.can_offer_non_aggression || sel.can_request_access ||
-        sel.can_offer_peace || sel.can_offer_ceasefire || sel.can_set_access)
-      draw_action(tr("DIPLOMACY_NEGOTIATE", "Negotiate").c_str(), false);
-    if (sel.can_declare_war)
-      draw_action(tr("DIPLOMACY_DECLARE_WAR_ACTION", "Declare war").c_str(),
-                  true);
-    if (!sel.has_visible_communication && !sel.can_attempt_communication)
-      text(out, {layout.actions.x + 8.f * s,
-                 layout.actions.y + static_cast<float>(action_index) * 36.f * s +
-                     8.f * s,
-                 layout.actions.width - 16.f * s, 60.f * s},
+    const bool transmission =
+        sel.has_visible_communication || sel.can_attempt_communication;
+    const bool negotiate =
+        sel.can_offer_non_aggression || sel.can_request_access ||
+        sel.can_offer_peace || sel.can_offer_ceasefire || sel.can_set_access;
+    draw_action(
+        sel.has_visible_communication
+            ? tr("DIPLOMACY_OPEN_TRANSMISSION", "Open transmission")
+            : tr("DIPLOMACY_ESTABLISH_COMMUNICATION",
+                 "Establish communication"),
+        transmission, sel.communication_status, false);
+    draw_action(tr("DIPLOMACY_NEGOTIATE", "Negotiate"), negotiate,
+                sel.communication_status, false);
+    draw_action(tr("DIPLOMACY_DECLARE_WAR_ACTION", "Declare war"),
+                sel.can_declare_war, sel.political_status, true);
+    // The discovery hint only renders where the three action slots leave room;
+    // at tight viewports the disabled buttons + tooltips carry the same why.
+    const auto hint_y = layout.actions.y + 3.f * 36.f * s + 4.f * s;
+    if (!transmission &&
+        hint_y + 2.f * layout.small_font_pixels <=
+            layout.actions.y + layout.actions.height)
+      text(out, {layout.actions.x + 8.f * s, hint_y,
+                 layout.actions.width - 16.f * s,
+                 layout.actions.y + layout.actions.height - hint_y},
            view_->contacts.empty()
                ? tr("DIPLOMACY_DISCOVERY_HINT",
                     "Discovery opens diplomatic options.")
