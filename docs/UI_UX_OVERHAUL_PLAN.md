@@ -202,9 +202,12 @@ breaks navigation/AT flow, or presents wrong state)
    hover explainers (`DIPLOMACY_TIP_*` / `ECONOMY_TIP_*`, en+de) through
    `theme::hover_tooltip`. Still open: a few minor status rows elsewhere
    could use the same treatment if captures flag them.
-2. ~~Notifications feed has no severity iconography or grouping~~ — severity
-   axis and severity filtering shipped (see work log). Category-based
-   grouping remains a possible future refinement.
+2. ~~Notifications feed has no severity iconography or grouping~~ — DONE.
+   Severity axis and severity filtering shipped earlier; topic filtering
+   now ships instead of hard grouping (a TOPIC chip cycles the canonical
+   category order intersected with the categories actually published —
+   grouping would have broken the newest-first chronology). Both filters
+   compose, share the focus ring and announce through AT labels.
 3. Empty/error states are inconsistent — PARTIALLY DONE. Colony roster
    and the research tree now pair the bare "No X" line with a localized
    next-action hint through the shared `empty_state` helper (shipyard,
@@ -288,6 +291,8 @@ breaks navigation/AT flow, or presents wrong state)
 | 2026-09-25 | "What does this do" tooltips on non-action content: the five diplomacy relationship meters each gain a hover explainer describing what the axis measures (`DIPLOMACY_TIP_*`), and `NativeEconomyCard` gained a `detail` field — projected localized explainers (`ECONOMY_TIP_*`) rendered through `theme::hover_tooltip` on each KPI tile, with the tile detail folded into the cache signature. Tests cover meter-tooltip text on hover and KPI-tile explainer rendering; `--economy-check` smoke re-verified canonical totals and priority save. | 00759a07 |
 
 | 2026-09-25 | Settings chrome unification: the general/audio/video/voice settings dialogs' literal palettes now alias `theme::color` tokens (`surface_opaque`, `surface_raised`, `surface_hover`, `keyline_strong`, `text_primary`, `text_secondary`, `text_muted`, `selected`, `success`, `caution`, `danger`, `economy`, `disabled`) while keeping the menu `ui_skin::control` geometry shared with the startup/menus. Translucent scrim veils stay literal (no token equivalent). Also fixed a stale assertion in `native_video_settings_smoke`: it pinned `choice_buttons.size() == 6` though the layout has carried 8 rows since the dropdown-settings commit — `--video-settings-check` now passes end-to-end (`opened/previewed/escape_reverted/kept/restored` all true) with captures. | 03fbddde |
+
+| 2026-09-25 | Notification topic filtering: `NativeNotificationView` gains `category_filter_` — a client-local category projection that composes with the severity filter and never touches the authoritative deque. A third intro-strip chip (`TOPIC: <label>`, `theme::button`) cycles the canonical category order intersected with categories actually present in the feed, so absent topics never occupy the cycle; the chip joins the `(y,x)` focus ring with the `NOTIFY_FILTER_CATEGORY_LABEL` AT label. The empty feed renders a topic-specific hint (`NOTIFY_EMPTY_TOPIC`), and the decorative subtitle now drops out entirely when it can't fit whole rather than clipping mid-word. Tests cover cycle order, wrap-around, feed isolation, composed severity+topic filtering, the empty hint, and chip focus/AT label; `--diplomacy-smoke` re-verified end-to-end on a pristine pending-proposal fixture (`items=2`, canonical unchanged) with the chip visible in the events-panel capture. | 74759b74 |
 
 ### Implementation notes
 
