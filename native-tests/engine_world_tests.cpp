@@ -662,6 +662,25 @@ int main() {
         turret.opacity = 0.5f;
         turret.ttl = 3.f;
         turret.parent = "ship";
+        turret.metallic = 1.f;
+        turret.roughness = 0.25f;
+        turret.emissive = "maps/glow.png";
+        turret.emissive_strength = 4.f;
+        turret.emissive_r = 1.f;
+        turret.emissive_g = 0.5f;
+        turret.emissive_b = 0.2f;
+        turret.night_emissive = 1.f;
+        turret.environment = "maps/env.png";
+        turret.environment_strength = 0.6f;
+        turret.metallic_roughness = "maps/mr.png";
+        turret.alpha_cutout = 0.4f;
+        turret.uv_tile_x = 3.f;
+        turret.uv_tile_y = 1.5f;
+        turret.atmo_strength = 2.f;
+        turret.atmo_power = 4.f;
+        turret.atmo_r = 0.2f;
+        turret.atmo_g = 0.5f;
+        turret.atmo_b = 0.8f;
         doc.entities.push_back(turret);
         const auto spawned = spawn_scene3d(world3, doc);
         check(spawned.size() == 2, "spawn_scene3d creates all entities");
@@ -684,6 +703,24 @@ int main() {
               "spawn_scene3d user data");
         check(world3.get<DoubleSided>(turret_e) != nullptr,
               "spawn_scene3d double-sided marker");
+        const auto *pbr = world3.get<MaterialPbr>(turret_e);
+        check(pbr != nullptr && pbr->metallic == 1.f &&
+                  pbr->roughness == 0.25f && pbr->emissive == "maps/glow.png" &&
+                  pbr->emissive_strength == 4.f && pbr->night_emissive == 1.f &&
+                  pbr->environment == "maps/env.png" &&
+                  pbr->environment_strength == 0.6f &&
+                  pbr->metallic_roughness == "maps/mr.png" &&
+                  pbr->alpha_cutout == 0.4f && pbr->uv_tile_x == 3.f &&
+                  pbr->uv_tile_y == 1.5f,
+              "spawn_scene3d materialpbr component");
+        const auto *shell = world3.get<AtmosphereShell>(turret_e);
+        check(shell != nullptr && shell->strength == 2.f &&
+                  shell->power == 4.f && shell->r == 0.2f &&
+                  shell->b == 0.8f,
+              "spawn_scene3d atmosphere component");
+        check(world3.get<MaterialPbr>(ship_e) == nullptr &&
+                  world3.get<AtmosphereShell>(ship_e) == nullptr,
+              "defaults do not attach material extensions");
         check(world3.get<Lifetime>(turret_e)->remaining == 3.f,
               "spawn_scene3d lifetime");
         const auto *pt = world3.get<Parent3D>(turret_e);
@@ -721,6 +758,17 @@ int main() {
                   restored.get<Parent3D>(*re_turret) != nullptr,
               "parent3d attachment survives restore");
         if (re_turret) {
+            const auto *rp = restored.get<MaterialPbr>(*re_turret);
+            check(rp != nullptr && rp->metallic == 1.f &&
+                      rp->emissive == "maps/glow.png" &&
+                      rp->environment == "maps/env.png" &&
+                      rp->uv_tile_x == 3.f && rp->alpha_cutout == 0.4f,
+                  "materialpbr codec round-trips");
+            const auto *ra = restored.get<AtmosphereShell>(*re_turret);
+            check(ra != nullptr && ra->strength == 2.f && ra->power == 4.f,
+                  "atmosphere codec round-trips");
+        }
+        if (re_turret) {
             resolve_hierarchy3d(restored);
             check(restored.get<Transform3D>(*re_turret)->x == 22.f,
                   "restored 3d child still follows");
@@ -737,6 +785,13 @@ int main() {
               "scene3d_from_world round-trips fields");
         check(out.entities[1].parent == "ship",
               "scene3d_from_world exports the parent link");
+        check(out.entities[1].metallic == 1.f &&
+                  out.entities[1].emissive == "maps/glow.png" &&
+                  out.entities[1].environment_strength == 0.6f &&
+                  out.entities[1].uv_tile_x == 3.f &&
+                  out.entities[1].atmo_strength == 2.f &&
+                  out.entities[1].atmo_b == 0.8f,
+              "scene3d_from_world exports material extensions");
 
         // Geometry: box primitive topology + OBJ parse/malformed reject.
         const auto box = stellar::native_map::box_mesh(2.f, 1.f, 1.f);

@@ -425,6 +425,29 @@ std::string Scene3dDocument::to_json() const {
     if (!e.data.empty()) item["data"] = e.data;
     if (!e.parent.empty()) item["parent"] = e.parent;
     if (!e.vfx.empty()) item["vfx"] = e.vfx;
+    if (e.metallic != 0.f) item["metallic"] = e.metallic;
+    if (e.roughness != 0.55f) item["roughness"] = e.roughness;
+    if (!e.metallic_roughness.empty())
+      item["metallicRoughness"] = e.metallic_roughness;
+    if (!e.emissive.empty()) item["emissive"] = e.emissive;
+    if (e.emissive_strength != 0.f)
+      item["emissiveStrength"] = e.emissive_strength;
+    if (e.emissive_r != 1.f || e.emissive_g != 1.f || e.emissive_b != 1.f)
+      item["emissiveTint"] = {e.emissive_r, e.emissive_g, e.emissive_b};
+    if (e.night_emissive != 0.f) item["nightEmissive"] = e.night_emissive;
+    if (!e.environment.empty()) item["environment"] = e.environment;
+    if (e.environment_strength != 0.f)
+      item["environmentStrength"] = e.environment_strength;
+    if (e.alpha_cutout != 0.f) item["alphaCutout"] = e.alpha_cutout;
+    if (e.uv_tile_x != 1.f || e.uv_tile_y != 1.f)
+      item["uvTile"] = {e.uv_tile_x, e.uv_tile_y};
+    if (e.atmo_strength != 0.f || e.atmo_power != 3.f ||
+        e.atmo_night != 0.05f || e.atmo_r != 0.45f || e.atmo_g != 0.62f ||
+        e.atmo_b != 1.f)
+      item["atmosphere"] = {{"tint", {e.atmo_r, e.atmo_g, e.atmo_b}},
+                            {"strength", e.atmo_strength},
+                            {"power", e.atmo_power},
+                            {"nightFloor", e.atmo_night}};
     items.push_back(std::move(item));
   }
   doc["camera"] = {{"pos", {cam_x, cam_y, cam_z}},
@@ -442,6 +465,24 @@ std::string Scene3dDocument::to_json() const {
                     {"color", {l.r, l.g, l.b}},
                     {"intensity", l.intensity}});
   }
+  if (!point_lights.empty()) {
+    auto &ls = doc["pointLights"] = nlohmann::json::array();
+    for (const auto &l : point_lights)
+      ls.push_back({{"pos", {l.x, l.y, l.z}},
+                    {"color", {l.r, l.g, l.b}},
+                    {"intensity", l.intensity},
+                    {"range", l.range}});
+  }
+  if (exposure != 1.f || bloom != 0.f || bloom_threshold != 1.f ||
+      contrast != 1.f || saturation != 1.f || sharpen != 0.f ||
+      quality != "high")
+    doc["render"] = {{"exposure", exposure},
+                     {"bloom", bloom},
+                     {"bloomThreshold", bloom_threshold},
+                     {"contrast", contrast},
+                     {"saturation", saturation},
+                     {"sharpen", sharpen},
+                     {"quality", quality}};
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
   if (gravity != 0.0f) doc["gravity"] = gravity;
@@ -517,6 +558,37 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.data = item.value("data", std::string{});
       e.parent = item.value("parent", std::string{});
       e.vfx = item.value("vfx", std::string{});
+      e.metallic = item.value("metallic", 0.0f);
+      e.roughness = item.value("roughness", 0.55f);
+      e.metallic_roughness =
+          item.value("metallicRoughness", std::string{});
+      e.emissive = item.value("emissive", std::string{});
+      e.emissive_strength = item.value("emissiveStrength", 0.0f);
+      if (item.contains("emissiveTint") &&
+          !vec3_of(item, "emissiveTint", e.emissive_r, e.emissive_g,
+                   e.emissive_b))
+        return std::nullopt;
+      e.night_emissive = item.value("nightEmissive", 0.0f);
+      e.environment = item.value("environment", std::string{});
+      e.environment_strength = item.value("environmentStrength", 0.0f);
+      e.alpha_cutout = item.value("alphaCutout", 0.0f);
+      if (item.contains("uvTile")) {
+        const auto &t = item.at("uvTile");
+        if (!t.is_array() || t.size() != 2)
+          return fail("uvTile must be [u,v]");
+        e.uv_tile_x = t[0].get<float>();
+        e.uv_tile_y = t[1].get<float>();
+      }
+      if (item.contains("atmosphere")) {
+        const auto &at = item.at("atmosphere");
+        if (!at.is_object()) return fail("atmosphere must be an object");
+        if (at.contains("tint") &&
+            !vec3_of(at, "tint", e.atmo_r, e.atmo_g, e.atmo_b))
+          return std::nullopt;
+        e.atmo_strength = at.value("strength", 0.0f);
+        e.atmo_power = at.value("power", 3.0f);
+        e.atmo_night = at.value("nightFloor", 0.05f);
+      }
       scene.entities.push_back(std::move(e));
     }
     if (doc.contains("camera")) {
@@ -559,6 +631,37 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         l.intensity = li.value("intensity", 0.5f);
         scene.lights.push_back(l);
       }
+    }
+    if (doc.contains("pointLights")) {
+      const auto &ls = doc.at("pointLights");
+      if (!ls.is_array()) return fail("pointLights must be an array");
+      if (ls.size() > 4) return fail("at most four point lights");
+      for (const auto &li : ls) {
+        if (!li.is_object())
+          return fail("pointLight entry is not an object");
+        Scene3dPointLight l;
+        if (li.contains("pos") && !vec3_of(li, "pos", l.x, l.y, l.z))
+          return std::nullopt;
+        if (li.contains("color") && !vec3_of(li, "color", l.r, l.g, l.b))
+          return std::nullopt;
+        l.intensity = li.value("intensity", 1.0f);
+        l.range = li.value("range", 0.0f);
+        scene.point_lights.push_back(l);
+      }
+    }
+    if (doc.contains("render")) {
+      const auto &r = doc.at("render");
+      if (!r.is_object()) return fail("render must be an object");
+      scene.exposure = r.value("exposure", 1.0f);
+      scene.bloom = r.value("bloom", 0.0f);
+      scene.bloom_threshold = r.value("bloomThreshold", 1.0f);
+      scene.contrast = r.value("contrast", 1.0f);
+      scene.saturation = r.value("saturation", 1.0f);
+      scene.sharpen = r.value("sharpen", 0.0f);
+      scene.quality = r.value("quality", std::string{"high"});
+      if (scene.quality != "low" && scene.quality != "medium" &&
+          scene.quality != "high" && scene.quality != "ultra")
+        return fail("render quality must be low|medium|high|ultra");
     }
     if (doc.contains("background")) {
       const auto &bg = doc.at("background");

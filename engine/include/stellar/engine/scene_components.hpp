@@ -161,6 +161,25 @@ struct TextureRef {
 struct DoubleSided {
   // Marker: render the mesh's back faces too (foliage, paper, debug).
 };
+// Metallic-workflow material for a 3D entity — the component counterpart
+// of the entity document's metallic/roughness/emissive/environment
+// fields. Map strings are content-relative paths the host resolves the
+// same way as TextureRef. Scalars at defaults keep the legacy diffuse
+// response; emission and IBL are strictly opt-in (strength 0).
+struct MaterialPbr {
+  float metallic{0.f}, roughness{0.55f};
+  float emissive_strength{0.f}, night_emissive{0.f},
+      environment_strength{0.f};
+  float emissive_r{1.f}, emissive_g{1.f}, emissive_b{1.f};
+  float alpha_cutout{0.f}, uv_tile_x{1.f}, uv_tile_y{1.f};
+  std::string metallic_roughness, emissive, environment;
+};
+// Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
+// weighted to the day side with a nightside floor.
+struct AtmosphereShell {
+  float r{0.45f}, g{0.62f}, b{1.f};
+  float strength{1.f}, power{3.f}, night_floor{0.05f};
+};
 // Host-owned fly-camera state for 3D scene mode, carried on a lazily
 // resolved world entity so F5/F9 snapshots restore the camera too (the
 // document seeds it only on scene load).

@@ -399,6 +399,26 @@ int main() {
     cube.data = "loot:gold";
     cube.parent = "ship";
     cube.vfx = "trail";
+    cube.metallic = 0.9f;
+    cube.roughness = 0.3f;
+    cube.metallic_roughness = "models/crate_mr.png";
+    cube.emissive = "models/crate_glow.png";
+    cube.emissive_strength = 2.5f;
+    cube.emissive_r = 1.f;
+    cube.emissive_g = 0.4f;
+    cube.emissive_b = 0.1f;
+    cube.night_emissive = 1.f;
+    cube.environment = "sky/nebula.png";
+    cube.environment_strength = 0.8f;
+    cube.alpha_cutout = 0.5f;
+    cube.uv_tile_x = 2.f;
+    cube.uv_tile_y = 4.f;
+    cube.atmo_strength = 1.5f;
+    cube.atmo_power = 2.5f;
+    cube.atmo_night = 0.1f;
+    cube.atmo_r = 0.3f;
+    cube.atmo_g = 0.5f;
+    cube.atmo_b = 0.9f;
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -436,6 +456,19 @@ int main() {
     fill.b = 1.0f;
     fill.intensity = 0.6f;
     scene.lights.push_back(fill);
+    engine::Scene3dPointLight lamp;
+    lamp.x = 1.f; lamp.y = 2.f; lamp.z = -1.f;
+    lamp.r = 0.2f; lamp.g = 1.f; lamp.b = 0.4f;
+    lamp.intensity = 3.f;
+    lamp.range = 12.f;
+    scene.point_lights.push_back(lamp);
+    scene.exposure = 1.25f;
+    scene.bloom = 0.6f;
+    scene.bloom_threshold = 0.8f;
+    scene.contrast = 1.1f;
+    scene.saturation = 0.9f;
+    scene.sharpen = 0.3f;
+    scene.quality = "ultra";
     const auto reparsed =
         engine::Scene3dDocument::from_json(scene.to_json());
     check(reparsed.has_value(), "scene3d json round-trips");
@@ -482,6 +515,36 @@ int main() {
                 reparsed->lights[0].b == 1.0f &&
                 reparsed->lights[0].intensity == 0.6f,
             "scene3d fill light round-trips");
+      check(rc.metallic == 0.9f && rc.roughness == 0.3f &&
+                rc.metallic_roughness == "models/crate_mr.png" &&
+                rc.emissive == "models/crate_glow.png" &&
+                rc.emissive_strength == 2.5f && rc.emissive_r == 1.f &&
+                rc.emissive_g == 0.4f && rc.emissive_b == 0.1f &&
+                rc.night_emissive == 1.f &&
+                rc.environment == "sky/nebula.png" &&
+                rc.environment_strength == 0.8f && rc.alpha_cutout == 0.5f &&
+                rc.uv_tile_x == 2.f && rc.uv_tile_y == 4.f &&
+                rc.atmo_strength == 1.5f && rc.atmo_power == 2.5f &&
+                rc.atmo_night == 0.1f && rc.atmo_r == 0.3f &&
+                rc.atmo_g == 0.5f && rc.atmo_b == 0.9f,
+            "scene3d pbr/atmosphere fields round-trip");
+      check(reparsed->point_lights.size() == 1 &&
+                reparsed->point_lights[0].x == 1.f &&
+                reparsed->point_lights[0].z == -1.f &&
+                reparsed->point_lights[0].g == 1.f &&
+                reparsed->point_lights[0].intensity == 3.f &&
+                reparsed->point_lights[0].range == 12.f,
+            "scene3d point lights round-trip");
+      check(reparsed->exposure == 1.25f && reparsed->bloom == 0.6f &&
+                reparsed->bloom_threshold == 0.8f &&
+                reparsed->contrast == 1.1f && reparsed->saturation == 0.9f &&
+                reparsed->sharpen == 0.3f && reparsed->quality == "ultra",
+            "scene3d render options round-trip");
+      check(reparsed->entities[1].metallic == 0.f &&
+                reparsed->entities[1].emissive_strength == 0.f &&
+                reparsed->entities[1].atmo_strength == 0.f &&
+                reparsed->entities[1].environment.empty(),
+            "unset material fields keep neutral defaults");
       const auto path = root / "editor" / "scene3d.json";
       scene.save(path);
       const auto loaded = engine::Scene3dDocument::load(path);
@@ -513,6 +576,18 @@ int main() {
     check(!engine::Scene3dDocument::load(root / "nonexistent3d.json")
               .has_value(),
           "scene3d missing file rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"quality":"extreme"}})")
+              .has_value(),
+          "scene3d unknown quality tier rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"pointLights":[{},{},{},{},{}]})")
+              .has_value(),
+          "scene3d over-budget point lights rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"uvTile":[2]}]})")
+              .has_value(),
+          "scene3d short uvTile rejected");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

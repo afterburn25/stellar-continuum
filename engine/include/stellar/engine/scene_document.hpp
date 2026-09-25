@@ -172,6 +172,31 @@ struct Scene3dEntity {
   // Named emitter from the document's `emitters` table, attached on
   // spawn — particles anchor to the entity's projected screen position.
   std::string vfx;
+  // Metallic-workflow material. All members are optional — a document that
+  // leaves them at defaults renders exactly the legacy diffuse path.
+  float metallic{0.f}, roughness{0.55f};
+  // Packed metallic/roughness map (glTF convention: G = roughness scale,
+  // B = metallic), content-relative.
+  std::string metallic_roughness;
+  // Emissive radiance map (colony lights, engine glow), content-relative.
+  std::string emissive;
+  // 0 disables emission; scales emissive map × emissive tint.
+  float emissive_strength{0.f};
+  float emissive_r{1.f}, emissive_g{1.f}, emissive_b{1.f};
+  // 0 = emit everywhere; 1 = emit only across the terminator (night side).
+  float night_emissive{0.f};
+  // Equirect radiance map feeding diffuse irradiance + specular
+  // environment response for this material, content-relative.
+  std::string environment;
+  float environment_strength{0.f}; // 0 disables IBL
+  // Alpha cutout: fragments below this discard (lattices, decals).
+  float alpha_cutout{0.f};
+  // Surface texture repeat, per axis; (1,1) disables tiling.
+  float uv_tile_x{1.f}, uv_tile_y{1.f};
+  // Single-scatter limb atmosphere: tinted rim weighted to the day side.
+  // strength 0 leaves the body's authored art untouched.
+  float atmo_strength{0.f}, atmo_power{3.f}, atmo_night{0.05f};
+  float atmo_r{0.45f}, atmo_g{0.62f}, atmo_b{1.f};
 };
 
 // An extra directional light — the material pipeline evaluates at most
@@ -180,6 +205,16 @@ struct Scene3dLight {
   float dir_x{0.f}, dir_y{0.f}, dir_z{1.f};
   float r{1.f}, g{1.f}, b{1.f};
   float intensity{0.5f};
+};
+
+// A world-space point light — station floods, engine glow, muzzle light.
+// The material pipeline evaluates at most four per scene; range 0 keeps
+// pure inverse-square falloff instead of a hard window.
+struct Scene3dPointLight {
+  float x{}, y{}, z{};
+  float r{1.f}, g{1.f}, b{1.f};
+  float intensity{1.f};
+  float range{0.f};
 };
 
 // A 3D scene: camera, key light, and mesh entities — the 3D counterpart of
@@ -199,6 +234,16 @@ struct Scene3dDocument {
   float light_intensity{1.0f};
   // Up to two additional world-space directional lights (fill/rim).
   std::vector<Scene3dLight> lights;
+  // World-space point lights; at most four reach the fragment pipeline.
+  std::vector<Scene3dPointLight> point_lights;
+  // Post-processing applied to the 3D view's HDR resolve. Exposure is a
+  // linear pre-tonemap multiplier (1 = neutral), bloom is an additive mip
+  // halo above its luminance threshold, contrast pivots about 0.18.
+  float exposure{1.f};
+  float bloom{0.f}, bloom_threshold{1.f};
+  float contrast{1.f}, saturation{1.f}, sharpen{0.f};
+  // Quality tier for expensive per-view effects: low|medium|high|ultra.
+  std::string quality{"high"};
   // Background clear color.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward (-Y) acceleration in units/s²; 0 disables gravity.

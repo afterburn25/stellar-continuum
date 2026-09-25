@@ -92,6 +92,22 @@ int main()try{
   const auto shadow_point=transform(relative.from_model,{0,1,0,1});
   check(close(shadow_point[0],2)&&close(shadow_point[1],-1)&&close(shadow_point[2],0),"Shadow lost blocker rotation, scale or double precision");
   check(close(relative.light.x,1)&&close(relative.light.y,0),"Shadow light did not transform from camera through world to blocker");
+  // New material blocks reject malformed input at scene validation.
+  rejects([&]{auto i=instance;i.material.alpha_threshold=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.alpha_threshold=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.texture_tiling={0.f,1.f};(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.texture_tiling={1.f,100.f};(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.pbr=PbrSurface3D{};i.material.pbr->metallic=2.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.pbr=PbrSurface3D{};i.material.pbr->roughness=0.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.pbr=PbrSurface3D{};i.material.pbr->night_emissive=2.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->power=.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->strength=-1.f;(void)Scene3D::create(camera,{i});});
+  {PointLight3D light;light.position={0,0,1};light.intensity=2;light.range=50;
+   const auto lit=Scene3D::create(camera,{instance},{0,0,1},{light});
+   check(lit->point_lights().size()==1,"Scene dropped its point light");}
+  rejects([&]{std::vector<PointLight3D> too_many(maximum_scene3d_point_lights+1);(void)Scene3D::create(camera,{instance},{0,0,1},too_many);});
+  rejects([&]{PointLight3D l;l.position={std::numeric_limits<double>::infinity(),0,0};(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D l;l.intensity=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   for(int field=0;field<8;++field){auto invalid=receiver;auto& s=*invalid.material.shadow;
     if(field==0)s.scale=0;if(field==1)s.position.x=std::numeric_limits<double>::infinity();
     if(field==2)s.rotation={0,0,0,0};if(field==3)s.radii.y=0;

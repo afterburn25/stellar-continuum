@@ -15,7 +15,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Window and platform | IMPLEMENTED BUT NEEDS POLISH | Engine `native_map_platform.cpp`, runtime paths/lease; App video controller | `native_client_platform`, `native_video_platform`, `native_video_controller` | Verified Windows x64 only; portable platform interface and device recovery need work |
 | Native input | IMPLEMENTED (rebinding) / PARTIALLY IMPLEMENTED (device policy) | Engine `native_map_platform.hpp` (keyboard/mouse/gamepad events), `input_actions.hpp` (`InputMapper`: stacked action contexts with exclusive fall-through, Button/Axis1D/Axis2D, chords, held gamepad-axis semantics, runtime `rebind()`, `bindings()` inspection, `save_contexts()` persisting the rebound map through the `load_contexts` schema — `RuntimeHost` feeds all normalized events through it, projects override via input-map JSON); App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `input_actions` (incl. rebind + save/load round-trip), `native_ui_layout` | In-app rebind UI landed: the settings hub Controls view lists every Button action of the GALAXY context (InputMapper::context/key_name/describe_bindings), activation captures the next non-modifier keypress, right-click or gamepad button as the primary binding (alternates survive, Ctrl/Shift/Alt fold into chord_keys, Escape/left-click cancel, a conflicting primary is stolen from its sibling action with a "reassigned from" notice), and the client persists the rebound map through save_contexts to galaxy-controls.json loaded over the defaults at startup. GamepadButton/MouseButton feeds are live in the client update loop under the same gameplay gate as keys (releases and axis state feed unconditionally so held bindings clear), and `--record`/`--replay` journals pad/mouse activations as `gamepad_button`/`mouse_button` commands so rebound sessions reproduce. Gamepad camera axes are live: the `GALAXY_PAD` context binds left-stick X/Y to `map_pan_x`/`map_pan_y` and right-stick Y to `map_zoom` (Axis1D over SDL axes 0/1/3, 0.18 dead zone, dt-scaled pan/zoom on the galaxy camera under the same surface gate as wheel input — the navigation smoke verifies stick pan/zoom end-to-end and that system view does not leak a galaxy-camera pan). Axis rebinding is live in the UI: the Controls view lists `GALAXY_PAD` Axis1D rows after the GALAXY buttons (a second context name on `set_input_mapper`), and capturing an axis row accepts a stick deflection past a 0.5 dead zone or a wheel scroll (discrete keys are swallowed — they cannot drive an axis); the same steal-on-conflict and persist path applies, and `load_user_bindings` injects the default pad context only when a saved map lacks it so user axis rebinds survive reload. Multi-pad is plumbed end-to-end: the platform opens up to four pads into stable slots, `InputEvent.gamepad_device`/`RawInputEvent.device` carry the slot, `InputBinding.device` pins a binding to one pad (`device` in the input-map JSON, omitted when unset), device-unset events stay wildcards so replayed recordings still match pinned bindings, and live stick values are keyed per (device, axis) — `input_actions` tests cover pin match/miss, wildcard matching, per-device axis sums and the save/load round-trip. Pad pinning is reachable in the UI: `kGamepadDeviceCount` names the shared slot bound, `describe_binding` renders a pin as `Pad N Btn/Axis M`, and a focused controls row cycles its gamepad-kind bindings through any→pad 1..4→any via D or right-click (`SETTINGS_CONTROLS_DEVICE*` announce/hint keys; the pin persists through the same `save_contexts` path). An accessibility input layer stays open; pin notices name the connected pad via `Window::gamepad_names()` (slot-number fallback) and flag a sibling action answering the same trigger on the target pad (`SETTINGS_CONTROLS_PIN_CONFLICT`). Pad UI navigation landed: `native_pad_input.hpp` translates dpad/south/east/start presses into arrow/Return/Escape events whenever a focus-ring surface owns input (`ui_owns_pad_input` mirrors the gameplay gate; rebind capture exempts itself) or when a navigable surface is merely showing and the pressed button is unbound — bindings win, so mapped gameplay pad actions still fire — giving every keyboard-navigable surface pad navigation without per-surface code; `native_client_input` covers the translation table and the navigation smoke exercises ring arming/back-out plus the bound-button policy. The startup entry loop applies the same translation unconditionally (no gameplay context exists pre-campaign; rebind capture stays exempt), so the entry/setup/settings screens are pad-drivable end-to-end. Held dpad directions auto-repeat as nav keys via `PadNavigationRepeater` (0.45 s initial delay, 0.09 s interval, per-device state, hitch-safe rescheduling, focus-loss disarm, emit-time ownership re-check) in both the campaign and startup loops. `PadStickNavigator` extends this to the left stick: a deflection past 0.5 synthesizes the matching dpad press through the same gate/translation/repeater (0.25 release hysteresis, reversal handling), and the bound-check is axis-aware — a camera-bound stick keeps panning in free play while a UI-owned one navigates (the smoke pins both halves). Still open: a deeper accessibility input layer |
 | 2D/UI renderer | IMPLEMENTED BUT NEEDS POLISH | Engine native map platform, UI skin and text fit | `native_text_measure`, `native_navigation_visual` | Shared helpers, but application-driven widgets/layout and no general UI scene framework |
-| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/OBB sim, GPU composite under 2D HUD); **HDR pipeline**: scenes render into RGBA16F targets and resolve through a fullscreen tonemap pass (`tonemap.vert/.frag` — C1-continuous knee+headroom curve preserving the SDR band, premultiply-aware) when `SDL_GPUTextureSupportsFormat` reports float color targets, with automatic UNORM fallback; `Scene3DStatistics::hdr` reports the active path | `engine_scene3d`, `native_scene3d_gpu` (incl. HDR-engaged pixel assertion + budget accounting), scale3d tests; `engine_project`/`engine_world` 3D doc+component coverage | Bounded CPU submission; SAT OBB collision over mesh local bounds (no per-triangle or rigid-body solver); instancing + DrawBatcher ordering + RenderGraph scheduling + TextureStreamer residency incl. partial mip tails wired (no indirect draw — per-batch pipeline/sampler binds keep draw_count=1) |
+| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/OBB sim, GPU composite under 2D HUD); **HDR pipeline**: scenes render into RGBA16F targets and resolve through a fullscreen tonemap pass (`tonemap.vert/.frag` — C1-continuous knee+headroom curve preserving the SDR band, premultiply-aware) when `SDL_GPUTextureSupportsFormat` reports float color targets, with automatic UNORM fallback; `Scene3DStatistics::hdr` reports the active path; **PBR + post**: per-material `PbrSurface3D` (metallic/roughness scalar+map, emissive map with nightside gate, equirect IBL for dielectric irradiance + specular), `Atmosphere3D` limb scattering, ≤4 `PointLight3D` windowed inverse-square lights, alpha cutout + UV tiling; per-view `RenderOptions3D` (quality tier Low/Medium/High/Ultra, exposure, mip-chain bloom, contrast/saturation/sharpen; Ultra = 4x MSAA when supported) — all authored through `Scene3dDocument` + components + editor controls | `engine_scene3d`, `native_scene3d_gpu` (incl. HDR-engaged pixel assertions, PBR/point-light/atmosphere/post probes + budget accounting), scale3d tests; `engine_project`/`engine_world`/`engine_runtime` 3D doc+component coverage | Bounded CPU submission; SAT OBB collision over mesh local bounds (no per-triangle or rigid-body solver); no general shadow mapping (analytic planet↔ring blockers only); point lights unshadowed and capped at 4; atmosphere is a limb approximation; instancing + DrawBatcher ordering + RenderGraph scheduling + TextureStreamer residency incl. partial mip tails wired (no indirect draw — per-batch pipeline/sampler binds keep draw_count=1) |
 | Mesh/geometry and culling | IMPLEMENTED BUT NEEDS POLISH | Engine solid/triangle meshes, billboard batch, scene bounds | scene/triangle/scale tests | Procedural geometry and conservative limits, not a general imported geometry cooker |
 | Lighting/materials | IMPLEMENTED BUT NEEDS POLISH | Engine scene material/fragment shader; spherical material preparation | `engine_spherical_material`, `native_scene3d_gpu`, `native_planet_materials` | Approximate illumination/response from artwork; no full physically calibrated renderer |
 | Canonical planet classification/art | IMPLEMENTED | Core `planet_appearance.hpp/.cpp`, taxonomy/art catalogs | `planet_appearance`, `native_planet_materials` | Scoped registry/generation contract; 66 definitions do not mean every subclass has admitted art |
@@ -61,6 +61,78 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Mods/accessibility/editor | IMPLEMENTED / PARTIALLY IMPLEMENTED foundations | Package system (`PackageRegistry`, `mods/` scan, `write_save_package_manifest`/`verify_save_package_manifest` save attestation), input/settings, Developer tools/import CLI, standalone editor | `package_platform` (incl. manifest attestation cases), editor + settings tests | Mod loading is content-only: namespaced package ids, priority-based overrides, semver dependency constraints and protected base namespaces resolve through `PackageRegistry::resolve`; world saves record the resolved load plan in a `<save>.packages.json` sidecar and `RuntimeHost` verifies it on F9/`load_world_from_file` restores — missing or version-mismatched packages log through `RuntimeDiagnostics` (report-only; loading proceeds). Executable plugins stay untrusted by design. Accessibility/editor remain partial — see the roadmap |
 
 ## Implementation records (newest first)
+
+## Scene3D PBR/post/lighting overhaul (2026-09-25)
+
+- **Purpose:** extend the generic Scene3D renderer from a directional-only
+  diffuse path into a physically plausible material/post/lighting stack
+  for space-strategy consumers — ship/station metals, emissive windows
+  and colony lights, environment response, atmosphere limbs, HDR
+  post-processing and quality tiers — without a game-specific renderer
+  and without touching authored art.
+- **Modules:** `engine/include/stellar/engine/native_scene3d.hpp`
+  (`PbrSurface3D`, `Atmosphere3D`, `PointLight3D`, `Material3D`
+  extensions), `engine/include/stellar/engine/native_map_platform.hpp`
+  (`RenderOptions3D` on `Scene3DView`), `engine/src/native_scene3d.cpp`
+  (validation/budgets), `engine/src/native_scene3d_gpu.cpp` (HDR mip
+  chain, MSAA, extra samplers, per-view options), shaders
+  `scene3d.frag`/`tonemap.frag` + regenerated
+  `src/generated/scene3d_shaders.hpp`, `scene_document.*`,
+  `scene_components.*`, `runtime_host.cpp`, `app/engine_main.cpp`.
+- **Public interfaces:** `Material3D::pbr` (scalar metallic/roughness
+  plus optional metallic-roughness map, emissive map × `emissive_tint` ×
+  `emissive_strength` with `night_emissive` nightside gate, equirect
+  `environment` map with `environment_strength` driving dielectric
+  diffuse irradiance + GGX specular response), `Material3D::atmosphere`
+  (wavelength-tinted `(1-N·V)^power` limb scattering, day-side weighting,
+  `night_floor`), `alpha_threshold` cutout, `texture_tiling`;
+  `Scene3D::create(...)` accepts up to
+  `maximum_scene3d_point_lights` = 4 `PointLight3D`s (position/color/
+  intensity/range, windowed inverse-square with hard cutoff — range 0 =
+  unbounded); `RenderOptions3D` per view — `quality` (Low/Medium/High/
+  Ultra), `exposure`, `bloom`/`bloom_threshold` (HDR mip-chain bloom
+  that lifts alpha so halos composite over background), `contrast`,
+  `saturation`, `sharpen`. Ultra requests 4x MSAA when the device
+  supports it; Low runs tonemap-only.
+- **Persistence:** `Scene3dDocument` gains per-entity material fields
+  (`metallic`, `roughness`, `metallic_roughness`, `emissive*`,
+  `environment*`, `alpha_cutout`, `uv_tile_*`, `atmo_*`), scene
+  `point_lights[]` and a `render` block; unknown quality tiers,
+  over-budget point lights and malformed arrays are rejected; unset
+  fields keep neutral defaults so existing documents load unchanged.
+  `MaterialPbr`/`AtmosphereShell` components snapshot/restore through
+  the world codec; `spawn_scene3d`/`scene3d_from_world` round-trip them;
+  `RuntimeHost` maps them onto `Material3D`, `PointLight3D` and
+  `Scene3DView::options`.
+- **Editor:** the engine-shell Scene3D tool exposes the new fields —
+  entity rows for PBR maps/scalars, emissive tint/strength/night gate,
+  environment, cutout, tiling, atmosphere tint/params; scene rows for
+  exposure, bloom, grading, quality tier and point-light entry
+  (pos/color/intensity/range); the preview renders through the same
+  `Scene3D` path as `RuntimeHost`.
+- **Tests:** `engine_scene3d` (validation rejects for out-of-range
+  metallic/roughness/emissive/environment/atmosphere/cutout/tiling and
+  point-light count/fields), `native_scene3d_gpu` (pixel probes:
+  emissive map masking, metallic specular tinting + off-axis diffuse
+  loss, alpha cutout, UV tiling, IBL response, point-light
+  color/falloff/range, atmospheric limb + day weighting, exposure,
+  bloom spread, Low-tier gating, MSAA), `engine_project` (document
+  round-trip + malformed rejection), `engine_world` (component spawn/
+  codec/export round-trip), `engine_runtime`.
+- **Save/performance impact:** +2 texture slots per material
+  (metallic-roughness, emissive) +1 shared environment sampler managed
+  by the same streamer/budgets; HDR mip chain adds ~33% of target bytes
+  only when bloom is on; MSAA 4x is Ultra-only and device-gated; PBR
+  environment/emissive/atmosphere fields are opt-in (zero-strength
+  defaults) so existing content renders identically.
+- **Limitations:** general shadow mapping (CSM/PCF) still absent —
+  analytic ellipsoid/annulus blockers remain the only shadow path;
+  point lights are capped at 4 and unshadowed; atmosphere is a limb
+  approximation (no multi-scatter); bloom mips are box-blitted (no
+  wide-kernel polish); environment IBL is a single shared equirect per
+  material, not probes; Low tier disables bloom/sharpen rather than
+  degrading them; editor preview has no debug-view modes
+  (Normals/Roughness-only) yet.
 
 ## Native missions panel integration (2026-09-24)
 

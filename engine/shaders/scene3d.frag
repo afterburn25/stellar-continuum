@@ -12,6 +12,8 @@ layout(set=2,binding=4) uniform sampler2D properties_map;
 layout(set=2,binding=5) uniform sampler2D cloud_map;
 layout(set=2,binding=6) uniform sampler2D shadow_map;
 layout(set=2,binding=7) uniform sampler2D sequence_map;
+layout(set=2,binding=8) uniform sampler2D emissive_map;
+layout(set=2,binding=9) uniform sampler2D metallic_roughness_map;
 struct Material {
     vec4 tint;
     vec4 light_direction;
@@ -34,8 +36,16 @@ struct Material {
     vec4 additional_illumination[2];
     vec4 additional_shadow[2];
     vec4 texture_options; // cubic magnification enabled
+    vec4 pbr_options; // enabled, packed map bound, night-emissive gate, alpha threshold
+    vec4 pbr_values; // metallic, roughness, emissive strength, environment strength
+    vec4 emissive_tint; // rgb, unused
+    vec4 uv_options; // surface tiling x, y
+    vec4 atmo_options; // tint rgb, strength
+    vec4 atmo_shape; // rim power, nightside floor
+    vec4 point_position[4]; // view-space position, range (0 = unbounded)
+    vec4 point_energy[4]; // rgb, intensity
 };
-layout(set=2,binding=8,std430) readonly buffer Materials {
+layout(set=2,binding=10,std430) readonly buffer Materials {
     Material materials[];
 };
 // Per-invocation material copy — populated from the instance-indexed buffer
@@ -85,6 +95,7 @@ vec3 environment(vec3 d,float roughness) {
         +radiance(d+spread*bitangent)+radiance(d-spread*bitangent))*0.125;
 }
 float fresnel(float cosine,float f0) {return f0+(1.0-f0)*pow(1.0-cosine,5.0);}
+vec3 fresnel3(float cosine,vec3 f0) {return f0+(vec3(1.0)-f0)*pow(1.0-cosine,5.0);}
 float direct_visibility(vec3 blocker_light) {
     if(material.shadow_light.w<0.5) return 1.0;
     vec3 P=shadow_position,L=blocker_light;
@@ -185,6 +196,9 @@ void main() {
         vec3 V=material.view_options.x>0.5?vec3(0,0,1):normalize(-view_position);
         color=emission_volume(V);return;
     }
+    // Surface UV tiling feeds every texture-space sample; repeat samplers on
+    // the bound maps make (1,1) identical to the untiled path.
+    vec2 uv=texture_uv*material.uv_options.xy;
     // Evaluate derivatives before per-pixel alpha rejection; annulus horizon
     // rejection above is arithmetic so neighbouring fragments remain coherent.
     float visibility=direct_visibility(material.shadow_light.xyz);
@@ -195,7 +209,7 @@ void main() {
     vec4 properties=vec4(1,0,0,0);
     float cloud_shadow=1.0;
     if(material.surface_response.x>0.5) {
-        properties=texture(properties_map,texture_uv);
+        properties=texture(properties_map,uv);
         vec3 dx=dFdx(view_position),dy=dFdy(view_position);
         vec2 du=dFdx(texture_uv),dv=dFdy(texture_uv);
         vec3 T=dx*dv.y-dy*du.y;
@@ -203,7 +217,7 @@ void main() {
         float det=du.x*dv.y-du.y*dv.x;
         if(abs(det)>1e-12&&length(T)>1e-10&&length(B)>1e-10) {
             T=normalize(T*sign(det));B=normalize(B*sign(det));
-            vec3 mapN=texture(normal_map,texture_uv).xyz*2.0-1.0;
+            vec3 mapN=texture(normal_map,uv).xyz*2.0-1.0;
             N=normalize(N+material.surface_response.y*(T*mapN.x+B*mapN.y));
         }
         vec3 rx=cross(dy,N),ry=cross(N,dx);
@@ -211,14 +225,14 @@ void main() {
         if(abs(d)>1e-15&&material.surface_response.z>0.0)
             N=normalize(abs(d)*N-material.surface_response.z*sign(d)*(dFdx(properties.a)*rx+dFdy(properties.a)*ry));
         // The sampler wraps longitude, preserving continuous pixel derivatives.
-        cloud_shadow=1.0-material.surface_response.w*texture(cloud_map,texture_uv+material.surface_options.xy).a;
+        cloud_shadow=1.0-material.surface_response.w*texture(cloud_map,uv+material.surface_options.xy).a;
     }
     float incidence=dot(N,material.light_direction.xyz);
     float sunlight=material.surface_options.w>0.5?abs(incidence):max(incidence,0.0);
-    vec2 sample_uv=texture_uv;
+    vec2 sample_uv=uv;
     if(material.effect_options.x>0.5){
         // Smooth bounded flow changes filament shape without wrapping the image.
-        float envelope=sin(PI*texture_uv.x)*sin(PI*texture_uv.y);
+        float envelope=sin(PI*uv.x)*sin(PI*uv.y);
         sample_uv+=material.effect_options.w*envelope*vec2(sin(texture_uv.y*19.0+material.effect_options.z),cos(texture_uv.x*13.0-material.effect_options.z*.7));
     }
     vec4 texel=surface_sample(surface_map,sample_uv);
@@ -246,24 +260,50 @@ void main() {
     for(int i=0;i<2;++i)if(material.additional_illumination[i].a>0.0)combined_sunlight=max(combined_sunlight,max(dot(N,material.additional_direction[i].xyz),0.0));
     float alpha=texel.a*material.parameters.z*clamp(1.0-combined_sunlight*material.parameters.w,0.0,1.0);
     if(material.surface_options.z>0.0) alpha*=pow(1.0-abs(dot(N,V)),material.surface_options.z);
+    // Alpha cutout rejects before lighting cost; surviving fragments keep
+    // their computed alpha (opaque and transparent cutouts both work).
+    if(material.pbr_options.w>0.0&&alpha<material.pbr_options.w)discard;
+    // Metallic-workflow factors: packed map (G roughness, B metallic) scales
+    // the scalar values when bound.
+    bool pbr_active=material.pbr_options.x>0.5;
+    float metallic=0.0,pbr_roughness=material.pbr_values.y;
+    if(pbr_active){
+        if(material.pbr_options.y>0.5){
+            vec3 mr=texture(metallic_roughness_map,uv).rgb;
+            metallic=clamp(mr.b,0.0,1.0);pbr_roughness=clamp(mr.g*pbr_roughness,0.04,1.0);
+        }else{
+            metallic=clamp(material.pbr_values.x,0.0,1.0);
+            pbr_roughness=clamp(pbr_roughness,0.04,1.0);
+        }
+    }
+    float diffuse_scale=pbr_active?1.0-metallic:1.0;
     vec3 light_color=material.illumination.rgb*material.illumination.a;
-    vec3 result=texel.rgb*(material.parameters.x+material.parameters.y*sunlight*cloud_shadow*visibility*light_color);
-    if(material.surface_response.x>0.5) {
+    vec3 result=texel.rgb*diffuse_scale*(material.parameters.x+material.parameters.y*sunlight*cloud_shadow*visibility*light_color);
+    if(material.surface_response.x>0.5||pbr_active) {
         vec3 sum=V+material.light_direction.xyz;
         vec3 H=length(sum)>0.0001?normalize(sum):N;
-        float roughness=clamp(properties.r,0.10,1.0);
+        float roughness=pbr_active?pbr_roughness:clamp(properties.r,0.10,1.0);
         float nv=max(dot(N,V),0.001),nh=max(dot(N,H),0.0);
         float a2=pow(roughness,4.0),den=nh*nh*(a2-1.0)+1.0;
         float D=a2/max(PI*den*den,0.00001),k=pow(roughness+1.0,2.0)/8.0;
         float G=(nv/(nv*(1.0-k)+k))*(sunlight/(sunlight*(1.0-k)+k));
-        float F=fresnel(max(dot(V,H),0.0),mix(.035,.020,properties.g));
-        float strength=.12+.88*max(properties.g,properties.b);
+        vec3 F=pbr_active?fresnel3(max(dot(V,H),0.0),mix(vec3(.04),texel.rgb,metallic))
+            :vec3(fresnel(max(dot(V,H),0.0),mix(.035,.020,properties.g)));
+        float strength=pbr_active?1.0:.12+.88*max(properties.g,properties.b);
         result+=light_color*cloud_shadow*visibility*strength*D*G*F/max(4.0*nv,.001);
+    }
+    if(pbr_active&&material.pbr_values.w>0.0){
+        // Diffuse irradiance + roughness-aware specular environment response.
+        float nv=max(dot(N,V),0.001);
+        vec3 f0=mix(vec3(.04),texel.rgb,metallic);
+        vec3 fresnel_env=f0+(max(vec3(1.0-pbr_roughness),f0)-f0)*pow(1.0-nv,5.0);
+        result+=material.pbr_values.w*(texel.rgb*(1.0-metallic)*environment(N,1.0)
+            +environment(reflect(-V,N),pbr_roughness)*fresnel_env);
     }
     if(material.optics.x>=1.0) {
         vec3 V=material.view_options.x>0.5?vec3(0,0,1):normalize(-view_position);
         if(!gl_FrontFacing) N=-N;
-        vec4 optical_texel=texture(optical_map,texture_uv);
+        vec4 optical_texel=texture(optical_map,uv);
         vec3 mask=optical_texel.rgb;
         vec3 dx=dFdx(view_position),dy=dFdy(view_position);
         vec3 rx=cross(dy,N),ry=cross(N,dx);
@@ -305,17 +345,68 @@ void main() {
         vec3 L=material.additional_direction[i].xyz;
         float nl=material.surface_options.w>0.5?abs(dot(N,L)):max(dot(N,L),0.0);
         vec3 energy=material.additional_illumination[i].rgb*material.additional_illumination[i].a*extra_visibility[i]*cloud_shadow;
-        result+=texel.rgb*material.parameters.y*nl*energy;
-        if(material.surface_response.x>0.5||material.optics.x>=1.0) {
+        result+=texel.rgb*diffuse_scale*material.parameters.y*nl*energy;
+        if(material.surface_response.x>0.5||material.optics.x>=1.0||pbr_active) {
             vec3 sum=V+L,H=length(sum)>0.0001?normalize(sum):N;
-            float roughness=clamp(material.optics.x>=1.0?material.optics.y:properties.r,.1,1.0);
+            float roughness=clamp(material.optics.x>=1.0?material.optics.y:(pbr_active?pbr_roughness:properties.r),.1,1.0);
             float nv=max(dot(N,V),.001),nh=max(dot(N,H),0.0),a2=pow(roughness,4.0);
             float den=nh*nh*(a2-1.0)+1.0,k=pow(roughness+1.0,2.0)/8.0;
             float D=a2/max(PI*den*den,.00001),G=nv/(nv*(1.0-k)+k)*nl/(nl*(1.0-k)+k);
-            float f0=material.optics.x>=1.0?pow((material.optics.x-1.0)/(material.optics.x+1.0),2.0):mix(.035,.020,properties.g);
-            float strength=material.optics.x>=1.0?material.view_options.y:.12+.88*max(properties.g,properties.b);
-            result+=energy*strength*D*G*fresnel(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            float strength=material.optics.x>=1.0?material.view_options.y:(pbr_active?1.0:.12+.88*max(properties.g,properties.b));
+            if(pbr_active&&material.optics.x<1.0){
+                vec3 f0=mix(vec3(.04),texel.rgb,metallic);
+                result+=energy*strength*D*G*fresnel3(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            }else{
+                float f0=material.optics.x>=1.0?pow((material.optics.x-1.0)/(material.optics.x+1.0),2.0):mix(.035,.020,properties.g);
+                result+=energy*strength*D*G*fresnel(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            }
         }
+    }
+    // Scene point lights: windowed inverse-square attenuation keeps distant
+    // receivers at zero cost and bounded brightness at contact range.
+    for(int i=0;i<4;++i){
+        if(material.point_energy[i].w<=0.0) continue;
+        vec3 to_light=material.point_position[i].xyz-view_position;
+        float d2=dot(to_light,to_light);
+        vec3 L=to_light*inversesqrt(max(d2,0.00000001));
+        float range=material.point_position[i].w;
+        float window=1.0;
+        if(range>0.0){float x=clamp(sqrt(d2)/range,0.0,1.0);window=pow(1.0-x*x*x*x,2.0);}
+        if(window<=0.0) continue;
+        vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
+        float nl=material.surface_options.w>0.5?abs(dot(N,L)):max(dot(N,L),0.0);
+        result+=texel.rgb*diffuse_scale*material.parameters.y*nl*energy;
+        if(material.surface_response.x>0.5||material.optics.x>=1.0||pbr_active){
+            vec3 sum=V+L,H=length(sum)>0.0001?normalize(sum):N;
+            float roughness=clamp(material.optics.x>=1.0?material.optics.y:(pbr_active?pbr_roughness:properties.r),.1,1.0);
+            float nv=max(dot(N,V),.001),nh=max(dot(N,H),0.0),a2=pow(roughness,4.0);
+            float den=nh*nh*(a2-1.0)+1.0,k=pow(roughness+1.0,2.0)/8.0;
+            float D=a2/max(PI*den*den,.00001),G=nv/(nv*(1.0-k)+k)*nl/(nl*(1.0-k)+k);
+            float strength=material.optics.x>=1.0?material.view_options.y:(pbr_active?1.0:.12+.88*max(properties.g,properties.b));
+            if(pbr_active&&material.optics.x<1.0){
+                vec3 f0=mix(vec3(.04),texel.rgb,metallic);
+                result+=energy*strength*D*G*fresnel3(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            }else{
+                float f0=material.optics.x>=1.0?pow((material.optics.x-1.0)/(material.optics.x+1.0),2.0):mix(.035,.020,properties.g);
+                result+=energy*strength*D*G*fresnel(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            }
+        }
+    }
+    // Emissive overlay — tinted map radiance, optionally gated to the body's
+    // unlit hemisphere for colony/city lights that fade across the terminator.
+    if(pbr_active&&material.pbr_values.z>0.0){
+        float gate=1.0;
+        if(material.pbr_options.z>0.0)
+            gate=mix(1.0,1.0-smoothstep(-0.1,0.3,incidence),material.pbr_options.z);
+        result+=texture(emissive_map,uv).rgb*material.emissive_tint.rgb*material.pbr_values.z*gate;
+    }
+    // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
+    // nightside floor, tied to the star's actual color.
+    if(material.atmo_options.w>0.0){
+        vec3 Ng=normalize(view_normal);
+        float limb=pow(clamp(1.0-abs(dot(Ng,V)),0.0,1.0),material.atmo_shape.x);
+        float day=max(material.atmo_shape.y,smoothstep(-0.25,0.3,dot(Ng,material.light_direction.xyz)));
+        result+=material.atmo_options.rgb*material.atmo_options.w*limb*day*light_color;
     }
     // Preserve legacy diffuse materials and premultiplied composition.
     if(alpha<0.001) discard;

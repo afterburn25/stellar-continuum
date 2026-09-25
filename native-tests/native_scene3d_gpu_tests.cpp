@@ -412,6 +412,124 @@ int main(int argc,char** argv)try{
   const auto rough=capture({ice},"optics-rough.png");
   check(channel(*polished,160,160,0)>60&&channel(*rough,160,160,0)<5,"GGX roughness did not broaden the sun highlight");
   std::cout<<"dielectric_gpu=fresnel_snell_absorption_frost_cache_passed\n";
+  {
+    // Metallic-workflow materials: emissive output independent of lighting,
+    // metallic kills diffuse and tints specular, cutout discards fragments,
+    // tiling repeats the surface, IBL feeds unlit surfaces.
+    auto flat=a;flat.mesh=quad(0,0);flat.material.tint={255,255,255,255};
+    flat.material.ambient=0;flat.material.diffuse=0;flat.material.light_intensity=0;
+    auto glow=flat;glow.material.pbr=PbrSurface3D{};
+    glow.material.pbr->emissive_strength=2;glow.material.pbr->emissive_tint={1,0,0};
+    const auto emissive=capture({glow},"pbr-emissive.png");
+    check(channel(*emissive,160,160,0)>200&&channel(*emissive,160,160,1)<10,
+        "Emissive material did not glow without incident light");
+    std::vector<std::uint8_t> glow_pixels(64*64*4,255);
+    for(int y=0;y<64;++y)for(int x=0;x<64;++x){const auto at=(y*64+x)*4;glow_pixels[at]=0;glow_pixels[at+1]=x<32?255:0;glow_pixels[at+2]=0;}
+    glow.material.pbr->emissive_tint={1,1,1};
+    glow.material.pbr->emissive=RgbaImage::create(64,64,std::move(glow_pixels));
+    const auto masked=capture({glow},"pbr-emissive-map.png");
+    check(channel(*masked,80,160,1)>200&&channel(*masked,240,160,1)<10,
+        "Emissive map did not mask the emitted radiance");
+    auto metal=flat;metal.material.diffuse=1;metal.material.light_direction=Vec3{0,0,1};
+    metal.material.light_intensity=1;metal.material.tint={200,60,40,255};
+    metal.material.pbr=PbrSurface3D{};metal.material.pbr->metallic=1;metal.material.pbr->roughness=.4f;
+    const auto metal_frame=capture({metal},"pbr-metal.png");
+    check(channel(*metal_frame,160,160,0)>channel(*metal_frame,160,160,1)+40,
+        "Metallic specular was not tinted by the surface albedo");
+    // Off the specular lobe a conductor loses all diffuse response — an
+    // off-axis normal keeps only the residual lobe energy.
+    auto off_axis_verts=quad(0,0)->vertices();for(auto& v:off_axis_verts)v.normal={.6f,0,.8f};
+    const auto off_axis_mesh=Mesh3D::create(off_axis_verts,{0,1,2,0,2,3});
+    auto off_axis=metal;off_axis.mesh=off_axis_mesh;
+    const auto metal_off=capture({off_axis},"pbr-metal-offaxis.png");
+    auto dielectric_off=off_axis;dielectric_off.material.pbr->metallic=0;
+    const auto dielectric_frame=capture({dielectric_off},"pbr-dielectric-offaxis.png");
+    check(channel(*metal_off,160,160,0)+80<channel(*dielectric_frame,160,160,0),
+        "Metallic surface kept dielectric-level diffuse response off the specular lobe");
+    auto cutout=flat;cutout.material.tint={255,255,255,255};cutout.material.ambient=1;cutout.material.diffuse=0;
+    std::vector<std::uint8_t> mask_pixels(64*4,255);
+    for(int x=0;x<64;++x)mask_pixels[x*4+3]=x<32?0:255;
+    cutout.material.texture=RgbaImage::create(64,1,std::move(mask_pixels));cutout.material.alpha_threshold=.5f;
+    const auto cut=capture({cutout},"pbr-cutout.png");
+    check(channel(*cut,80,160,0)==5&&channel(*cut,240,160,0)>200,
+        "Alpha cutout failed to discard sub-threshold fragments");
+    auto tiled=cutout;tiled.material.alpha_threshold=0;tiled.material.texture_tiling={2.f,1.f};
+    const auto tile=capture({tiled},"pbr-tiling.png");
+    check(channel(*tile,100,160,0)>200&&channel(*tile,168,160,0)==5&&channel(*tile,240,160,0)>200,
+        "UV tiling did not repeat the surface texture");
+    auto enviro=flat;enviro.material.ambient=0;enviro.material.diffuse=0;enviro.material.light_intensity=0;
+    enviro.material.pbr=PbrSurface3D{};enviro.material.pbr->environment_strength=.8f;
+    enviro.material.pbr->environment=RgbaImage::create(1,1,{0,255,0,255});
+    const auto ibl=capture({enviro},"pbr-ibl.png");
+    check(channel(*ibl,160,160,1)>40&&channel(*ibl,160,160,0)<30,
+        "Environment irradiance did not light an unlit PBR surface");
+    std::cout<<"pbr_gpu=emissive_metallic_cutout_tiling_ibl_passed\n";
+  }
+  {
+    // Scene point lights: windowed inverse-square falloff in view space.
+    auto plate=b;plate.material.tint={255,255,255,255};plate.material.ambient=0;plate.material.diffuse=1;
+    plate.material.light_intensity=0;plate.mesh=quad(0,0);
+    PointLight3D lamp;lamp.position={0,0,2.5};lamp.color={0,1,0};lamp.intensity=4;lamp.range=5;
+    DrawList lamps;lamps.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate},{0,0,1},{lamp}),{0,0,320,320}});
+    window.draw(lamps,folder/"point-light.png");const auto lit_point=decode_rgba_image(folder/"point-light.png");
+    check(channel(*lit_point,160,160,1)>100&&channel(*lit_point,160,160,0)<20,
+        "Point light did not illuminate the receiver with its color");
+    lamp.range=.2f;
+    DrawList dim;dim.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate},{0,0,1},{lamp}),{0,0,320,320}});
+    window.draw(dim,folder/"point-light-range.png");const auto dimmed=decode_rgba_image(folder/"point-light-range.png");
+    check(channel(*dimmed,160,160,1)<20,"Range window did not attenuate the point light");
+    std::cout<<"point_lights_gpu=falloff_color_range_passed\n";
+  }
+  {
+    // Atmosphere limb scattering: a tinted shell brightens the silhouette
+    // edge above the bare surface and fades to the night floor.
+    auto planet=a;planet.mesh=Mesh3D::uv_sphere(96,48);planet.scale=.85f;
+    planet.material.tint={120,120,120,255};planet.material.ambient=.05f;planet.material.diffuse=.9f;
+    planet.material.light_direction=Vec3{0,0,1};
+    const auto bare=capture({planet},"atmo-bare.png");
+    planet.material.atmosphere=Atmosphere3D{};planet.material.atmosphere->strength=3;planet.material.atmosphere->power=2.5f;
+    const auto limb=capture({planet},"atmo-limb.png");
+    check(channel(*limb,280,160,2)>channel(*bare,280,160,2)+12&&channel(*limb,280,160,2)>channel(*limb,280,160,0),
+        "Atmosphere did not brighten the limb with its tint");
+    std::cout<<"atmosphere_gpu=limb_tint_dayweight_passed\n";
+  }
+  if(window.scene3d_statistics().hdr){
+    // Post stack: exposure brightens, bloom spreads super-threshold light,
+    // Low tier skips bloom/sharpen, Ultra runs the MSAA resolve path.
+    // Exposure uses a mid-tone emitter (HDR 1.0 already sits at the tonemap
+    // knee), bloom and MSAA use a super-threshold one.
+    auto bright=a;bright.mesh=quad(0,0);bright.material.tint={255,255,255,255};
+    bright.material.ambient=0;bright.material.diffuse=0;bright.material.light_intensity=0;
+    bright.material.pbr=PbrSurface3D{};bright.material.pbr->emissive_strength=.4f;
+    auto hot=bright;hot.material.pbr->emissive_strength=3;
+    const auto options_view=[&](const MeshInstance3D& i,RenderOptions3D o,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{i}),{0,0,320,320},o});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto neutral=options_view(bright,{},"post-neutral.png");
+    RenderOptions3D exposed;exposed.exposure=2;
+    const auto exposed_frame=options_view(bright,exposed,"post-exposure.png");
+    check(channel(*exposed_frame,160,160,0)>channel(*neutral,160,160,0)+15,
+        "Exposure did not brighten the HDR image");
+    RenderOptions3D bloomed;bloomed.bloom_strength=1;bloomed.bloom_threshold=.1f;
+    const auto bloom_frame=options_view(hot,bloomed,"post-bloom.png");
+    const auto hot_neutral=options_view(hot,{},"post-bloom-off.png");
+    check(channel(*bloom_frame,14,160,0)>channel(*hot_neutral,14,160,0)+8,
+        "Bloom did not spread super-threshold light beyond the surface");
+    RenderOptions3D low=bloomed;low.quality=RenderQuality3D::Low;
+    const auto low_frame=options_view(hot,low,"post-low.png");
+    check(channel(*low_frame,14,160,0)<channel(*bloom_frame,14,160,0),
+        "Low quality tier still paid for bloom taps");
+    auto colored=bright;colored.material.pbr->emissive_tint={1,0,0};
+    RenderOptions3D graded;graded.exposure=1;graded.contrast=1.5f;graded.saturation=0;
+    const auto gray=options_view(colored,graded,"post-graded.png");
+    check(std::abs(int(channel(*gray,160,160,0))-int(channel(*gray,160,160,1)))<=3&&
+          std::abs(int(channel(*gray,160,160,1))-int(channel(*gray,160,160,2)))<=3,
+        "Zero saturation did not neutralize the channel spread");
+    RenderOptions3D ultra;ultra.quality=RenderQuality3D::Ultra;
+    const auto msaa=options_view(hot,ultra,"post-ultra-msaa.png");
+    check(channel(*msaa,160,160,0)>200,"Ultra tier MSAA resolve produced a blank frame");
+    std::cout<<"post_gpu=exposure_bloom_quality_tiers_msaa_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");

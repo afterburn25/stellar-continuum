@@ -404,6 +404,64 @@ void register_scene_components(World &world) {
       "doublesided",
       [](const DoubleSided &) { return std::vector<std::uint8_t>{1}; },
       [](const std::vector<std::uint8_t> &) { return DoubleSided{}; });
+  // Scalars first (fixed-size head), then the three map paths as
+  // length-prefixed strings — decode tolerates a truncated tail.
+  world.register_component<MaterialPbr>(
+      "materialpbr",
+      [](const MaterialPbr &m) {
+        std::vector<std::uint8_t> out;
+        for (const float f :
+             {m.metallic, m.roughness, m.emissive_strength,
+              m.night_emissive, m.environment_strength, m.emissive_r,
+              m.emissive_g, m.emissive_b, m.alpha_cutout, m.uv_tile_x,
+              m.uv_tile_y})
+          put_f32(out, f);
+        for (const std::string *s :
+             {&m.metallic_roughness, &m.emissive, &m.environment}) {
+          put_u32(out, static_cast<std::uint32_t>(s->size()));
+          out.insert(out.end(), s->begin(), s->end());
+        }
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        MaterialPbr m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        m.metallic = f();
+        m.roughness = f();
+        m.emissive_strength = f();
+        m.night_emissive = f();
+        m.environment_strength = f();
+        m.emissive_r = f();
+        m.emissive_g = f();
+        m.emissive_b = f();
+        m.alpha_cutout = f();
+        m.uv_tile_x = f();
+        m.uv_tile_y = f();
+        for (std::string *s :
+             {&m.metallic_roughness, &m.emissive, &m.environment}) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) break;
+          s->assign(reinterpret_cast<const char *>(b.data() + at), len);
+          at += len;
+        }
+        return m;
+      });
+  world.register_component<AtmosphereShell>(
+      "atmosphere",
+      encode_fields<AtmosphereShell, &AtmosphereShell::r,
+                    &AtmosphereShell::g, &AtmosphereShell::b,
+                    &AtmosphereShell::strength, &AtmosphereShell::power,
+                    &AtmosphereShell::night_floor>,
+      decode_fields<AtmosphereShell, &AtmosphereShell::r,
+                    &AtmosphereShell::g, &AtmosphereShell::b,
+                    &AtmosphereShell::strength, &AtmosphereShell::power,
+                    &AtmosphereShell::night_floor>);
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -660,6 +718,24 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, Opacity{s.opacity * (s.a / 255.f)});
     if (!s.texture.empty()) world.add(entity, TextureRef{s.texture});
     if (s.double_sided) world.add(entity, DoubleSided{});
+    // Material extension components ride the entity's snapshot stream —
+    // they are only attached when the document opts into them.
+    if (s.metallic != 0.f || s.roughness != 0.55f ||
+        !s.metallic_roughness.empty() || !s.emissive.empty() ||
+        s.emissive_strength != 0.f || s.night_emissive != 0.f ||
+        !s.environment.empty() || s.environment_strength != 0.f ||
+        s.alpha_cutout != 0.f || s.uv_tile_x != 1.f || s.uv_tile_y != 1.f)
+      world.add(entity,
+                MaterialPbr{s.metallic, s.roughness, s.emissive_strength,
+                            s.night_emissive, s.environment_strength,
+                            s.emissive_r, s.emissive_g, s.emissive_b,
+                            s.alpha_cutout, s.uv_tile_x, s.uv_tile_y,
+                            s.metallic_roughness, s.emissive,
+                            s.environment});
+    if (s.atmo_strength != 0.f)
+      world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
+                                        s.atmo_strength, s.atmo_power,
+                                        s.atmo_night});
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
@@ -721,6 +797,30 @@ Scene3dDocument scene3d_from_world(const World &world) {
     if (const auto *tx = world.get<TextureRef>(entity))
       s.texture = tx->value;
     s.double_sided = world.get<DoubleSided>(entity) != nullptr;
+    if (const auto *p = world.get<MaterialPbr>(entity)) {
+      s.metallic = p->metallic;
+      s.roughness = p->roughness;
+      s.emissive_strength = p->emissive_strength;
+      s.night_emissive = p->night_emissive;
+      s.environment_strength = p->environment_strength;
+      s.emissive_r = p->emissive_r;
+      s.emissive_g = p->emissive_g;
+      s.emissive_b = p->emissive_b;
+      s.alpha_cutout = p->alpha_cutout;
+      s.uv_tile_x = p->uv_tile_x;
+      s.uv_tile_y = p->uv_tile_y;
+      s.metallic_roughness = p->metallic_roughness;
+      s.emissive = p->emissive;
+      s.environment = p->environment;
+    }
+    if (const auto *at = world.get<AtmosphereShell>(entity)) {
+      s.atmo_r = at->r;
+      s.atmo_g = at->g;
+      s.atmo_b = at->b;
+      s.atmo_strength = at->strength;
+      s.atmo_power = at->power;
+      s.atmo_night = at->night_floor;
+    }
     if (const auto *g = world.get<GravityScale>(entity))
       s.gravity_scale = g->value;
     s.solid = world.get<Solid>(entity) != nullptr;

@@ -115,6 +115,43 @@ struct SurfaceEffect3D {
   int volume_steps{32}; // 8..64 bounded front-to-back emission/absorption samples
 };
 struct DirectionalLight3D { Vec3 direction{0,0,1},color{1,1,1};float intensity{}; };
+// Metallic-workflow surface response for ordinary materials. The optional
+// packed map follows the glTF convention (G = roughness scale, B = metallic)
+// and modulates the scalar factors; without it the scalars apply directly.
+// The emissive map modulates emissive_tint and can be gated to the body's
+// unlit hemisphere for colony/city lights or engine glow. `environment` is a
+// world-fixed equirect radiance map supplying diffuse irradiance and
+// roughness-aware specular reflection to this material.
+struct PbrSurface3D {
+  std::shared_ptr<const RgbaImage> metallic_roughness;
+  std::shared_ptr<const RgbaImage> emissive;
+  std::shared_ptr<const RgbaImage> environment;
+  float metallic{},roughness{.55f};
+  Vec3 emissive_tint{1,1,1};
+  // 0 = no emission; the emissive map (or white when unbound) modulates
+  // emissive_tint. Materials must opt in — emission is never implicit.
+  float emissive_strength{};
+  // 0 = emit everywhere; 1 = emissive appears only across the terminator.
+  float night_emissive{};
+  // 0 = no environment response; materials opt in to IBL explicitly.
+  float environment_strength{};
+};
+// A scene-level point light evaluated per fragment in view space with
+// windowed inverse-square attenuation. `range` 0 keeps pure falloff.
+struct PointLight3D {
+  Position3 position;
+  Vec3 color{1,1,1};
+  float intensity{1.f};
+  float range{};
+};
+inline constexpr std::size_t maximum_scene3d_point_lights=4;
+// Single-scatter limb approximation: a wavelength-tinted shell driven by
+// (1 - N.V)^power, weighted to the day side with a nightside floor. It
+// enhances authored body art rather than replacing it.
+struct Atmosphere3D {
+  Vec3 tint{.45f,.62f,1.f};
+  float strength{1.f},power{3.f},night_floor{.05f};
+};
 struct Material3D {
   std::shared_ptr<const RgbaImage> texture;
   Color tint{255,255,255,255};
@@ -144,6 +181,17 @@ struct Material3D {
   // Source-limited Catmull-Rom reconstruction during magnification only.
   // Minification keeps the usual mip/anisotropic anti-aliasing path.
   bool cubic_magnification{};
+  // Metallic-workflow response: scalar or packed-map metallic/roughness GGX,
+  // emissive overlay with an optional night-side gate, and IBL environment
+  // response for this material.
+  std::optional<PbrSurface3D> pbr;
+  // Wavelength-tinted limb scattering shell for planets, moons and giants.
+  std::optional<Atmosphere3D> atmosphere;
+  // Alpha cutout: fragments below the threshold discard instead of sorting
+  // into the transparent batch (antennae, lattices, decals).
+  float alpha_threshold{};
+  // Surface texture UV multiplier — repeat sampling when != (1,1).
+  Point texture_tiling{1.f,1.f};
 };
 struct MeshInstance3D {
   std::shared_ptr<const Mesh3D> mesh;
@@ -155,14 +203,18 @@ struct MeshInstance3D {
 class Scene3D final {
  public:
   [[nodiscard]] static std::shared_ptr<const Scene3D> create(
-      Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light_direction={.42f,.2f,.87f});
+      Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light_direction={.42f,.2f,.87f},
+      std::vector<PointLight3D> point_lights={});
   [[nodiscard]] const auto& camera()const noexcept{return camera_;}
   [[nodiscard]] const auto& instances()const noexcept{return instances_;}
   [[nodiscard]] Vec3 light_direction()const noexcept{return light_;} // camera space
+  // World-space point lights (station floods, engine glow); at most
+  // maximum_scene3d_point_lights are evaluated.
+  [[nodiscard]] const auto& point_lights()const noexcept{return point_lights_;}
  private:
-  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light)
-      :camera_(camera),instances_(std::move(instances)),light_(light){}
-  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;
+  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights)
+      :camera_(camera),instances_(std::move(instances)),light_(light),point_lights_(std::move(point_lights)){}
+  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;std::vector<PointLight3D> point_lights_;
 };
 struct PreparedInstance3D { Matrix4 model_view,model_view_projection;float camera_depth{};bool visible{}; };
 // Conservative sphere/frustum test, camera-relative matrices; no GPU required.
@@ -173,6 +225,9 @@ struct PreparedShadow3D { Matrix4 from_model;Vec3 light; };
 [[nodiscard]] PreparedShadow3D prepare_shadow3d(const Camera3D&,const MeshInstance3D&,Vec3 light);
 struct Scene3DStatistics {
   std::uint64_t mesh_uploads{},texture_uploads{},draw_calls{},culled_instances{};
+  // Instanced batches submitted this frame — diverges from draw_calls only
+  // in counting (they are equal), kept for fleet-scale batching audits.
+  std::uint64_t draw_batches{},submitted_instances{};
   std::size_t mesh_cache_entries{},mesh_cache_bytes{},texture_cache_entries{},texture_cache_bytes{},target_bytes{};
   // Binds served by the pinned fallback because the TextureStreamer denied
   // residency under the frame's byte budget (budget-pressure pop-in count).

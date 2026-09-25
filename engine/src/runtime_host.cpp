@@ -232,6 +232,8 @@ struct RuntimeHost::Impl {
   float light3_intensity = 1.f;
   // Up to two extra world-space directional lights from the document.
   std::vector<Scene3dLight> lights3;
+  std::vector<Scene3dPointLight> point_lights3;
+  native_map::RenderOptions3D render3;
   float gravity3 = 0.f, ground_y3 = 0.f, bounds3 = 0.f;
   bool look_held = false; // right-button mouse-look
   // Input journaling: --record fills `recorder` with frame-indexed input
@@ -1133,6 +1135,18 @@ int RuntimeHost::run() {
     impl.light3 = {doc.light_x, doc.light_y, doc.light_z};
     impl.light3_intensity = doc.light_intensity;
     impl.lights3 = doc.lights;
+    impl.point_lights3 = doc.point_lights;
+    impl.render3.exposure = doc.exposure;
+    impl.render3.bloom_strength = doc.bloom;
+    impl.render3.bloom_threshold = doc.bloom_threshold;
+    impl.render3.contrast = doc.contrast;
+    impl.render3.saturation = doc.saturation;
+    impl.render3.sharpen = doc.sharpen;
+    impl.render3.quality =
+        doc.quality == "low"      ? native_map::RenderQuality3D::Low
+        : doc.quality == "medium" ? native_map::RenderQuality3D::Medium
+        : doc.quality == "ultra"  ? native_map::RenderQuality3D::Ultra
+                                  : native_map::RenderQuality3D::High;
     impl.gravity3 = doc.gravity;
     impl.ground_y3 = doc.ground_y;
     impl.bounds3 = doc.bounds;
@@ -1145,6 +1159,11 @@ int RuntimeHost::run() {
       if (mr) mesh_of(mr->spec);
       const auto *tr = world.get<TextureRef>(impl.entities3d[i]);
       if (tr) tex3d_of(tr->value);
+      if (const auto *pbr = world.get<MaterialPbr>(impl.entities3d[i])) {
+        tex3d_of(pbr->metallic_roughness);
+        tex3d_of(pbr->emissive);
+        tex3d_of(pbr->environment);
+      }
       if (on_spawn3d && i < doc.entities.size())
         on_spawn3d(world, impl.entities3d[i], doc.entities[i]);
       attach_vfx(impl.entities3d[i]);
@@ -2471,6 +2490,26 @@ int RuntimeHost::run() {
         inst.material.texture = tex ? tex3d_of(tex->value) : nullptr;
         inst.material.double_sided =
             world.get<DoubleSided>(e) != nullptr;
+        if (const auto *pbr = world.get<MaterialPbr>(e)) {
+          native_map::PbrSurface3D surface;
+          surface.metallic = pbr->metallic;
+          surface.roughness = pbr->roughness;
+          surface.emissive_strength = pbr->emissive_strength;
+          surface.night_emissive = pbr->night_emissive;
+          surface.environment_strength = pbr->environment_strength;
+          surface.emissive_tint = {pbr->emissive_r, pbr->emissive_g,
+                                   pbr->emissive_b};
+          surface.metallic_roughness = tex3d_of(pbr->metallic_roughness);
+          surface.emissive = tex3d_of(pbr->emissive);
+          surface.environment = tex3d_of(pbr->environment);
+          inst.material.pbr = surface;
+          inst.material.alpha_threshold = pbr->alpha_cutout;
+          inst.material.texture_tiling = {pbr->uv_tile_x, pbr->uv_tile_y};
+        }
+        if (const auto *at = world.get<AtmosphereShell>(e))
+          inst.material.atmosphere =
+              native_map::Atmosphere3D{{at->r, at->g, at->b}, at->strength,
+                                       at->power, at->night_floor};
         inst.material.light_intensity = impl.light3_intensity;
         inst.material.linear_light = true;
         instances.push_back(std::move(inst));
@@ -2489,11 +2528,18 @@ int RuntimeHost::run() {
               rotate_vec(inv, {l.dir_x, l.dir_y, l.dir_z}),
               {l.r, l.g, l.b}, l.intensity};
         }
-      if (auto scene =
-              Scene3D::create(cam, std::move(instances), light_cam))
-        draw.overlay.insert(
-            draw.overlay.begin() + 1,
-            Scene3DView{std::move(scene), {0, 0, w, h}});
+      std::vector<PointLight3D> point_lights;
+      point_lights.reserve(impl.point_lights3.size());
+      for (const auto &l : impl.point_lights3)
+        point_lights.push_back(PointLight3D{{l.x, l.y, l.z},
+                                            {l.r, l.g, l.b},
+                                            l.intensity, l.range});
+      if (auto scene = Scene3D::create(cam, std::move(instances),
+                                       light_cam, std::move(point_lights))) {
+        Scene3DView view{std::move(scene), {0, 0, w, h}};
+        view.options = impl.render3;
+        draw.overlay.insert(draw.overlay.begin() + 1, std::move(view));
+      }
     }
     // Draw in layer order (stable — same-layer entities keep spawn order).
     std::vector<std::size_t> order(impl.entities.size());

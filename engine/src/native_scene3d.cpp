@@ -105,6 +105,23 @@ void validate_instance(const MeshInstance3D& i){
        !bounded(d.specular_strength,16)||d.specular_strength<0||!bounded(d.surface_relief,.1)||d.surface_relief<0)
       throw std::invalid_argument("3D dielectric requires an environment and bounded optical properties.");
   }
+  if(m.pbr){const auto& p=*m.pbr;
+    if(!bounded(p.metallic,1)||p.metallic<0||!bounded(p.roughness,1)||p.roughness<.04f||
+       !bounded(p.emissive_strength,64)||p.emissive_strength<0||!bounded(p.night_emissive,1)||p.night_emissive<0||
+       !bounded(p.environment_strength,16)||p.environment_strength<0||!valid(p.emissive_tint)||
+       p.emissive_tint.x<0||p.emissive_tint.y<0||p.emissive_tint.z<0)
+      throw std::invalid_argument("3D PBR surface requires bounded metallic, roughness, emissive and environment parameters.");
+  }
+  if(m.atmosphere){const auto& a=*m.atmosphere;
+    if(!bounded(a.strength,16)||a.strength<0||!bounded(a.power,16)||a.power<.5f||
+       !bounded(a.night_floor,1)||a.night_floor<0||!valid(a.tint)||
+       a.tint.x<0||a.tint.y<0||a.tint.z<0)
+      throw std::invalid_argument("3D atmosphere requires bounded strength, power, floor and tint.");
+  }
+  if(!bounded(m.alpha_threshold,1)||m.alpha_threshold<0||
+     !bounded(m.texture_tiling.x,64)||m.texture_tiling.x<.01f||
+     !bounded(m.texture_tiling.y,64)||m.texture_tiling.y<.01f)
+    throw std::invalid_argument("3D alpha threshold and texture tiling must be finite and bounded.");
 }
 }
 Quaternion rotation_axis_angle(Vec3 axis,float radians){
@@ -155,9 +172,15 @@ std::shared_ptr<const Mesh3D> Mesh3D::uv_sphere(int columns,int rows){
   }
   return create(std::move(vertices),std::move(indices));
 }
-std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light){
+std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights){
   validate_camera(camera);camera.orientation=normalized(camera.orientation);light=normalized(light);
   if(instances.size()>maximum_scene3d_instances)throw std::length_error("3D scene exceeds its instance budget.");
+  if(point_lights.size()>maximum_scene3d_point_lights)throw std::length_error("3D scene exceeds its point light budget.");
+  for(const auto& l:point_lights)
+    if(!valid(l.position)||!valid(l.color)||l.color.x<0||l.color.y<0||l.color.z<0||
+       l.color.x>4||l.color.y>4||l.color.z>4||!bounded(l.intensity,1e4)||l.intensity<0||
+       !bounded(l.range,1e6)||l.range<0)
+      throw std::invalid_argument("3D point light requires a bounded position, color, intensity and range.");
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
   std::size_t geometry=0,images=0;
   for(auto& i:instances){
@@ -174,10 +197,12 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
       if(textures.insert(image.get()).second)images+=texture_mip_layout3d(image.get()).resident_bytes;}
     if(i.material.shadow&&i.material.shadow->opacity_map){const auto& image=i.material.shadow->opacity_map;
       if(textures.insert(image.get()).second)images+=texture_mip_layout3d(image.get()).resident_bytes;}
+    if(i.material.pbr)for(const auto& image:{i.material.pbr->metallic_roughness,i.material.pbr->emissive,i.material.pbr->environment})
+      if(textures.insert(image.get()).second)images+=texture_mip_layout3d(image.get()).resident_bytes;
   }
   if(geometry>maximum_mesh3d_cache_bytes||images>maximum_scene3d_texture_cache_bytes||meshes.size()>maximum_scene3d_resource_entries||textures.size()>maximum_scene3d_resource_entries)
     throw std::length_error("3D scene exceeds its resident resource budget.");
-  return std::shared_ptr<const Scene3D>(new Scene3D(camera,std::move(instances),light));
+  return std::shared_ptr<const Scene3D>(new Scene3D(camera,std::move(instances),light,std::move(point_lights)));
 }
 PreparedInstance3D prepare_instance3d(const Camera3D& camera,const MeshInstance3D& instance,float aspect){
   validate_camera(camera);validate_instance(instance);
