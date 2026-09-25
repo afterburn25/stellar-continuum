@@ -1821,6 +1821,9 @@
     "SUPPLY_CLOSE": "Versorgungsnetz schlie\u00dfen",
     "SETTINGS_ACTION_MAP_PAN_X": "Karte horizontal schwenken",
     "SETTINGS_ACTION_MAP_PAN_Y": "Karte vertikal schwenken",
-    "SETTINGS_ACTION_MAP_ZOOM": "Karte zoomen"
+    "SETTINGS_ACTION_MAP_ZOOM": "Karte zoomen",
+    "SETTINGS_CONTROLS_DEVICE_ANY": "Controller: beliebiges Pad",
+    "SETTINGS_CONTROLS_DEVICE_PINNED": "Controller: Pad {0}",
+    "SETTINGS_CONTROLS_DEVICE": "D / Rechtsklick — Pad-Eingabe einem Controller zuweisen"
   }
 }

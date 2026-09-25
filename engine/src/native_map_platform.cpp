@@ -1,4 +1,5 @@
 #include <stellar/engine/asset_registry.hpp>
+#include <stellar/engine/input_actions.hpp>
 #include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/native_triangle_mesh.hpp>
@@ -188,7 +189,8 @@ struct Window::Storage {
   SDL_Texture* scene_target{};
   // Up to four simultaneous pads; a slot index rides on each emitted
   // InputEvent so bindings can pin a device (unset = any pad).
-  std::array<SDL_Gamepad*,4> gamepads{};std::array<SDL_JoystickID,4> gamepad_ids{};
+  std::array<SDL_Gamepad*,engine::kGamepadDeviceCount> gamepads{};
+  std::array<SDL_JoystickID,engine::kGamepadDeviceCount> gamepad_ids{};
   [[nodiscard]] int gamepad_slot(SDL_JoystickID which)const{
     for(int i=0;i<static_cast<int>(gamepad_ids.size());++i)
       if(gamepads[static_cast<std::size_t>(i)]&&gamepad_ids[static_cast<std::size_t>(i)]==which)return i;

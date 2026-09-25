@@ -8,6 +8,7 @@
 #include <cctype>
 #include <cmath>
 #include <functional>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -168,6 +169,20 @@ public:
         hover_feedback_.cue(focus_target());return true;
       }
       if((e.key==kReturn||e.key==kSpace)&&focus_>=0){activate_focus();return true;}
+      // D cycles the pad pin on the focused row's gamepad bindings.
+      if(controls_&&e.key=='d'){if(cycle_device_pin())hover_feedback_.cue(focus_target());return true;}
+    }
+    // Right-click on a controls row does the same for pointer users — it
+    // only becomes a capturable trigger while capture is active.
+    if(e.type==InputEventType::RightPressed&&controls_){
+      const auto rects=control_row_rects(l);
+      for(std::size_t i=0;i<rects.size();++i)
+        if(rects[i].contains(e.position)){
+          focus_=static_cast<int>(i);
+          if(cycle_device_pin())hover_feedback_.cue(focus_target());
+          break;
+        }
+      return true;
     }
     if(e.type==InputEventType::LeftPressed){
       focus_=-1;
@@ -213,6 +228,16 @@ public:
         if(hint_y+22.f*s<l.back.y-26.f*s)
           text(out,{l.categories[0].x,hint_y,l.categories[0].width,22.f*s},
                tr("SETTINGS_CONTROLS_PAD","Left stick — pan the map · right stick — zoom"),static_cast<int>(13*s),muted);
+        // Pad-pin hint — only relevant once a row actually binds pad input.
+        const bool any_pad=std::ranges::any_of(rows,[&](const auto* row){
+          const auto bound=mapper_->bindings(row->name);
+          return std::ranges::any_of(bound,[](const stellar::engine::InputBinding& b){
+            return b.kind==stellar::engine::RawInputEvent::Kind::GamepadButton||
+                   b.kind==stellar::engine::RawInputEvent::Kind::GamepadAxis;});});
+        const float pin_y=hint_y+22.f*s;
+        if(any_pad&&pin_y+22.f*s<l.back.y-26.f*s)
+          text(out,{l.categories[0].x,pin_y,l.categories[0].width,22.f*s},
+               tr("SETTINGS_CONTROLS_DEVICE","D / right-click — pin a pad binding to one controller"),static_cast<int>(13*s),muted);
         if(!notice_.empty())
           text(out,{l.categories[0].x,l.back.y-26.f*s,l.categories[0].width,22.f*s},notice_,static_cast<int>(14*s),muted);
       }
@@ -227,6 +252,17 @@ private:
   [[nodiscard]] std::string tr(std::string_view key,std::string_view fallback)const{
     if(locale_&&locale_->contains(key))return std::string(locale_->translate(key));
     return std::string(fallback);
+  }
+  [[nodiscard]] std::string trf(std::string_view key,std::string_view fallback,std::initializer_list<std::string> args)const{
+    if(locale_&&locale_->contains(key))
+      return locale_->format(key,std::vector<std::string>(args));
+    std::string out{fallback};
+    int index=0;
+    for(const auto& arg:args){
+      const std::string needle="{"+std::to_string(index++)+"}";
+      if(const auto at=out.find(needle);at!=std::string::npos)out.replace(at,needle.size(),arg);
+    }
+    return out;
   }
   // Button actions of the configured context plus Axis1D actions of the
   // axis context — the rebindable rows. Empty without a mapper (the
@@ -297,6 +333,29 @@ private:
     if(bound.empty())bound.push_back(primary);else bound.front()=primary;
     mapper_->rebind(rows[static_cast<std::size_t>(capture_)]->name,std::move(bound));
     if(persist_)persist_();
+  }
+  // Advances the device pin on the focused row's gamepad-kind bindings —
+  // any pad → pad 1..kGamepadDeviceCount → any — so a multi-pad user can
+  // dedicate a binding to one controller. Keyboard/mouse bindings keep
+  // their device unset (it is meaningless for them). No-op when the row
+  // binds no pad input; returns whether a pin moved.
+  bool cycle_device_pin(){
+    const auto rows=control_actions();
+    if(!mapper_||focus_<0||focus_>=static_cast<int>(rows.size()))return false;
+    auto bound=mapper_->bindings(rows[static_cast<std::size_t>(focus_)]->name);
+    const auto pad=[](const stellar::engine::InputBinding& b){
+      return b.kind==stellar::engine::RawInputEvent::Kind::GamepadButton||
+             b.kind==stellar::engine::RawInputEvent::Kind::GamepadAxis;};
+    const auto first=std::find_if(bound.begin(),bound.end(),pad);
+    if(first==bound.end())return false;
+    const int target=first->device>=stellar::engine::kGamepadDeviceCount-1?-1:first->device+1;
+    for(auto& b:bound)if(pad(b))b.device=target;
+    mapper_->rebind(rows[static_cast<std::size_t>(focus_)]->name,std::move(bound));
+    notice_=target<0?tr("SETTINGS_CONTROLS_DEVICE_ANY","Pad device: any controller")
+                   :trf("SETTINGS_CONTROLS_DEVICE_PINNED","Pad device: controller {0}",
+                        {std::to_string(target+1)});
+    if(persist_)persist_();
+    return true;
   }
   void activate_focus(){
     if(controls_){

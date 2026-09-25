@@ -284,6 +284,38 @@ void menu_hover_feedback(){
     require(mapper.bindings("quicksave")[0].kind==stellar::engine::RawInputEvent::Kind::GamepadButton&&
             mapper.bindings("quicksave")[0].code==7,"pad button did not capture");
     require(hub.focused_label()=="Quicksave: Pad 7","label did not describe the pad binding");
+    // Device pinning: D on the focused row cycles the pad slot on the
+    // row's gamepad-kind bindings (any → pad 1..4 → any), persists, and
+    // announces through the notice channel. Non-pad rows are unaffected.
+    const auto pad_row=mapper.bindings("quicksave");
+    require(pad_row[0].device<0,"captured pad binding was not a wildcard");
+    const int persists_before_pin=persists;
+    auto dkey=[&]{
+      InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key='d';
+      return hub.handle(ev,w,h);};
+    require(dkey()&&mapper.bindings("quicksave")[0].device==0,"D did not pin the binding to pad 1");
+    require(hub.focused_label()=="Quicksave: Pad 1 Btn 7","label did not show the pinned pad");
+    require(hub.take_notice()=="Pad device: controller 1","pin notice missing");
+    require(persists==persists_before_pin+1,"pin did not persist");
+    for(int slot=1;slot<4;++slot)require(dkey()&&mapper.bindings("quicksave")[0].device==slot,
+            "D did not advance the pad pin");
+    require(dkey()&&mapper.bindings("quicksave")[0].device<0,"pin did not wrap back to any-pad");
+    require(hub.take_notice()=="Pad device: any controller","any-pad notice missing");
+    // A key-only row has no pad binding — D is a no-op (no persist/notice).
+    hub.close();hub.open();
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    (void)key(kTab); // row 0: toggle_pause binds keys only
+    require(dkey()&&mapper.bindings("toggle_pause")[0].device<0&&persists==persists_before_pin+5,
+            "D moved a pin on a key-only row");
+    require(hub.take_notice().empty(),"key-only row raised a pin notice");
+    // Right-click on a row cycles the pin for pointer users (outside
+    // capture, where RightPressed is a capturable trigger).
+    (void)key(kTab); // quicksave row
+    const auto row_bounds=hub.focused_bounds(w,h);
+    require(row_bounds.has_value(),"focused row had no bounds");
+    InputEvent rclick{};rclick.type=InputEventType::RightPressed;rclick.position=center(*row_bounds);
+    require(hub.handle(rclick,w,h)&&mapper.bindings("quicksave")[0].device==0,
+            "right-click did not pin the row's pad binding");
     // Axis rows: an axis context contributes Axis1D rows that capture a
     // stick deflection or wheel scroll — discrete keys are swallowed.
     require(mapper.load_contexts(R"json({"contexts":[{"name":"GALAXY_PAD","exclusive":false,"actions":[

@@ -297,6 +297,20 @@ int main() {
               reloaded_devices.bindings("pad1_stick")[0].device == 1 &&
               reloaded_devices.bindings("any_fire")[0].device < 0,
           "device pin survived the save/load round-trip");
+    // describe_binding surfaces the pin so a rebind UI can show which
+    // controller a binding answers; unpinned bindings keep the legacy
+    // "Pad N"/"Axis N" summaries.
+    InputBinding pinned_desc{RawInputEvent::Kind::GamepadButton, 7};
+    pinned_desc.device = 2;
+    check(describe_binding(pinned_desc) == "Pad 3 Btn 7",
+          "describe_binding did not show the device pin");
+    InputBinding wild_desc{RawInputEvent::Kind::GamepadButton, 7};
+    check(describe_binding(wild_desc) == "Pad 7",
+          "unpinned describe_binding changed");
+    InputBinding pinned_axis{RawInputEvent::Kind::GamepadAxis, 0};
+    pinned_axis.device = 0;
+    check(describe_binding(pinned_axis) == "Pad 1 Axis 0",
+          "describe_binding did not show the axis pin");
   }
 
   if (failures == 0)

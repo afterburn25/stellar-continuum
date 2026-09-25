@@ -456,10 +456,16 @@ std::string describe_binding(const InputBinding &binding) {
     trigger = "Wheel";
     break;
   case RawInputEvent::Kind::GamepadButton:
-    trigger = "Pad " + std::to_string(binding.code);
+    trigger = binding.device >= 0
+                  ? "Pad " + std::to_string(binding.device + 1) + " Btn " +
+                        std::to_string(binding.code)
+                  : "Pad " + std::to_string(binding.code);
     break;
   case RawInputEvent::Kind::GamepadAxis:
-    trigger = "Axis " + std::to_string(binding.code);
+    trigger = binding.device >= 0
+                  ? "Pad " + std::to_string(binding.device + 1) + " Axis " +
+                        std::to_string(binding.code)
+                  : "Axis " + std::to_string(binding.code);
     break;
   case RawInputEvent::Kind::MouseMotion:
     trigger = "Mouse Motion";

@@ -1821,6 +1821,9 @@
     "SUPPLY_CLOSE": "Close supply network",
     "SETTINGS_ACTION_MAP_PAN_X": "Map pan X",
     "SETTINGS_ACTION_MAP_PAN_Y": "Map pan Y",
-    "SETTINGS_ACTION_MAP_ZOOM": "Map zoom"
+    "SETTINGS_ACTION_MAP_ZOOM": "Map zoom",
+    "SETTINGS_CONTROLS_DEVICE_ANY": "Pad device: any controller",
+    "SETTINGS_CONTROLS_DEVICE_PINNED": "Pad device: controller {0}",
+    "SETTINGS_CONTROLS_DEVICE": "D / right-click — pin a pad binding to one controller"
   }
 }

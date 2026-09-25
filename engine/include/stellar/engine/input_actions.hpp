@@ -42,6 +42,10 @@ struct RawInputEvent {
   int device{-1};
 };
 
+// Simultaneous pad slots the platform assigns (0..kGamepadDeviceCount-1);
+// the shared bound for InputBinding::device pins and rebind-UI pickers.
+inline constexpr int kGamepadDeviceCount = 4;
+
 struct InputBinding {
   RawInputEvent::Kind kind{};
   int code{};
