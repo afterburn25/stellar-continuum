@@ -296,6 +296,8 @@ breaks navigation/AT flow, or presents wrong state)
 
 | 2026-09-25 | Command-HUD context-plate clearance: the bottom-center narrator plate (`CommandHudLayout::context`, `h - 66s`) rendered on top of content that anchored to the panel bottom — construction's START/QUEUE buttons underlapped it at 720p and the feedback hint clipped mid-line. Both bottom-anchored strips now cap their rows at `context.y - gap`: construction's action row (which pulls `feedback`/`costs` up with it) and diplomacy's full-width feedback rail (shrinking `detail_rows`, which legitimately scrolls). The responsive layout test now asserts the context plate never overlaps the construction action/feedback rects at any probed resolution; the diplomacy intelligence test scrolls to reach the now-deeper unresolved card. Fleet/missions panels verified clear (edge-anchored or bottoming above the plate). `--construction-smoke` re-verified at 1280x720. | f781963e |
 
+| 2026-09-25 | Zoom readout yields to modals: the map's "Map zoom N.Nx · BAND" readout gated on a hand-rolled workspace list that missed the colony roster, notifications, chronicle, missions, battle and settings — at 720p it rendered squeezed against the roster panel's left edge. The gate now delegates to `map_hud_visible()`, which encodes the full modal-suppression set while still tolerating the inspection card and fleet detail panel (the readout shifts right for those, unchanged). `--colony-smoke` re-verified: roster and missions captures render without stray map chrome. | ac304186 |
+
 ### Implementation notes
 
 - Legend toggle state is client-local (`map_legend_collapsed_`); it is not
