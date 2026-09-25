@@ -942,6 +942,16 @@ int main(int argc,char** argv)try{
     const int base_side=channel(*unlit,229,120,0),base_dark=channel(*unlit,90,120,0);
     check(lit_side>dark_side*3&&lit_side>base_side*5/4&&dark_side<base_dark/2,
         "Volume scatter did not brighten the light-facing limb");
+    // Filament warp: a flow/distort re-pose must change the volume's
+    // pixels without changing its footprint — the authored variety knobs.
+    plasma.material.surface_effect->volume_scatter=0;
+    const auto still=capture({plasma},"plasma-flow-off.png");
+    plasma.material.surface_effect->flow_phase=2.5f;plasma.material.surface_effect->distortion=.08f;
+    const auto warped=capture({plasma},"plasma-flow-on.png");
+    int warped_px=0;
+    for(int y=30;y<200;++y)for(int x=80;x<245;++x)
+      if(std::abs(channel(*still,x,y,0)-channel(*warped,x,y,0))>8)++warped_px;
+    check(warped_px>500,"Flow/distort did not re-pose the volume filaments");
     std::cout<<"volume_scatter_gpu=lit_limb_passed\n";
   }
   {

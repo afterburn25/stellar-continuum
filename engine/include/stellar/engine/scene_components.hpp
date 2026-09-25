@@ -221,6 +221,9 @@ struct AccretionDisc {
 struct EmissionVolume {
   float depth{0.f}, density{5.f}, seed{0.f}, scatter{0.f};
   int steps{32};
+  // Filament warp: `flow` re-poses the phase field (nebula variety),
+  // `distort` [0,.1] is the secondary warp amplitude.
+  float flow{0.f}, distort{0.f};
 };
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
 // weighted to the day side with a nightside floor.

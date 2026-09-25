@@ -99,10 +99,10 @@ same document headless-tested.
    opposition surges), and `SurfaceEffect3D::volume_scatter` makes
    emission volumes read star-lit; volumes are document-authored via the
    `volume` block / `EmissionVolume` component (entity texture supplies
-   the emission image). Remaining: the deck is
+   the emission image; `flow`/`distort` re-pose the marched filaments so
+   sibling nebulae don't repeat). Remaining: the deck is
    a texture-space composite — no volumetric cloud shells or cloud
-   self-shadowing; banding is a single cosine, not zonal winds; the
-   phase term is one lobe, no HG g-parameter.
+   self-shadowing; banding is a single cosine, not zonal winds.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes every material field (PBR, surface

@@ -442,6 +442,8 @@ int main() {
     cube.volume_seed = 2.f;
     cube.volume_steps = 24;
     cube.volume_scatter = 0.5f;
+    cube.volume_flow = 1.5f;
+    cube.volume_distort = 0.05f;
     cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
     cube.lod_pixels = 48.f;
     cube.lod_fade = 0.3f;
@@ -581,7 +583,8 @@ int main() {
             "scene3d mesh LOD chain round-trips");
       check(rc.volume_depth == 0.3f && rc.volume_density == 6.f &&
                 rc.volume_seed == 2.f && rc.volume_steps == 24 &&
-                rc.volume_scatter == 0.5f,
+                rc.volume_scatter == 0.5f && rc.volume_flow == 1.5f &&
+                rc.volume_distort == 0.05f,
             "scene3d emission-volume block round-trips");
       check(reparsed->point_lights.size() == 1 &&
                 reparsed->point_lights[0].x == 1.f &&
@@ -748,6 +751,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"steps":4}}]})")
               .has_value(),
           "scene3d volume steps below 8 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"distort":0.5}}]})")
+              .has_value(),
+          "scene3d volume distort above 0.1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"flow":2e5}}]})")
+              .has_value(),
+          "scene3d volume flow above bound rejected");
     check(engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"density":8,"steps":48,"scatter":0.7}}]})")
               .has_value(),

@@ -545,14 +545,53 @@ void register_scene_components(World &world) {
       decode_fields<AccretionDisc, &AccretionDisc::inner,
                     &AccretionDisc::outer, &AccretionDisc::kelvin,
                     &AccretionDisc::beaming>);
+  // f32 depth/density/seed/scatter + i32 steps + f32 flow/distort —
+  // decode tolerates the legacy 20-byte payload so older saves keep
+  // their authored volume with the zero-warp defaults they had.
   world.register_component<EmissionVolume>(
       "emissionvolume",
-      encode_fields<EmissionVolume, &EmissionVolume::depth,
-                    &EmissionVolume::density, &EmissionVolume::seed,
-                    &EmissionVolume::scatter, &EmissionVolume::steps>,
-      decode_fields<EmissionVolume, &EmissionVolume::depth,
-                    &EmissionVolume::density, &EmissionVolume::seed,
-                    &EmissionVolume::scatter, &EmissionVolume::steps>);
+      [](const EmissionVolume &v) {
+        std::vector<std::uint8_t> out;
+        put_f32(out, v.depth);
+        put_f32(out, v.density);
+        put_f32(out, v.seed);
+        put_f32(out, v.scatter);
+        put_u32(out, static_cast<std::uint32_t>(v.steps));
+        put_f32(out, v.flow);
+        put_f32(out, v.distort);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        EmissionVolume v;
+        std::size_t at = 0;
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.depth, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.density, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.seed, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.scatter, &bits, 4);
+        }
+        if (b.size() - at >= 4)
+          v.steps = static_cast<int>(get_u32(b, at));
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.flow, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.distort, &bits, 4);
+        }
+        return v;
+      });
   // u32 count + length-prefixed spec strings + f32 switch size — decode
   // tolerates a truncated tail like MaterialSurface.
   world.register_component<MeshLods>(
@@ -891,7 +930,8 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity,
                 EmissionVolume{s.volume_depth, s.volume_density,
                                s.volume_seed, s.volume_scatter,
-                               s.volume_steps});
+                               s.volume_steps, s.volume_flow,
+                               s.volume_distort});
     if (!s.lod_meshes.empty())
       world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels, s.lod_fade});
     world.add(entity, GravityScale{s.gravity_scale});
@@ -1012,6 +1052,8 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.volume_seed = ev->seed;
       s.volume_scatter = ev->scatter;
       s.volume_steps = ev->steps;
+      s.volume_flow = ev->flow;
+      s.volume_distort = ev->distort;
     }
     if (const auto *ml = world.get<MeshLods>(entity)) {
       s.lod_meshes = ml->specs;

@@ -2583,6 +2583,8 @@ int RuntimeHost::run() {
           effect.volume_seed = vol->seed;
           effect.volume_steps = vol->steps;
           effect.volume_scatter = vol->scatter;
+          effect.flow_phase = vol->flow;
+          effect.distortion = vol->distort;
           inst.material.surface_effect = effect;
           inst.material.transparent = true;
         }

@@ -286,16 +286,22 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 ### Follow-up: `EmissionVolume` document/component authoring
 
 - `SurfaceEffect3D`'s emission-volume march becomes authorable: the
-  `volume` entity block (`{depth,density,seed,steps,scatter}`) maps to
-  a new `EmissionVolume` component (codec + spawn + world export), and
-  `RuntimeHost`/editor preview attach the surface effect using the
-  entity's own texture as the emission image — transparency is enabled
-  automatically, and a `volume` block without a `texture` fails parse.
-  Nebulae/star-lit plasma clouds are now document-authored instead of
+  `volume` entity block (`{depth,density,seed,steps,scatter,flow,
+  distort}`) maps to a new `EmissionVolume` component (tolerant codec
+  reads the legacy 20-byte payload with `flow=distort=0` defaults +
+  spawn + world export), and `RuntimeHost`/editor preview attach the
+  surface effect using the entity's own texture as the emission image —
+  transparency is enabled automatically, and a `volume` block without a
+  `texture` fails parse. `flow`/`distort` drive the shader's filament
+  phase and UV warp lanes so sibling volumes stop sharing a silhouette —
+  nebulae/star-lit plasma clouds are document-authored instead of
   C++-only. Validated: doc bounds (depth (0,.75], steps [8,64], scatter
-  [0,1]), `engine_project` round-trip + rejects, `engine_world`
-  codec/spawn/export. Remaining: flow/blend/distortion params and the
-  camera-inside sphere stay C++-only; one emission image per entity.
+  [0,1], flow |f|≤1e4, distort [0,.1]), `engine_project` round-trip +
+  rejects, `engine_world` codec/spawn/export, and a GPU probe showing a
+  flow/distort re-pose changes the marched pixels. Remaining: `blend`
+  and the camera-inside sphere stay C++-only (blend is a no-op while
+  `next_texture` shares the entity image); one emission image per
+  entity.
 
 ## Scene3D directional shadow mapping (2026-09-25)
 

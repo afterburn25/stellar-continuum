@@ -703,6 +703,8 @@ int main() {
         turret.volume_seed = 2.f;
         turret.volume_steps = 24;
         turret.volume_scatter = 0.5f;
+        turret.volume_flow = 1.5f;
+        turret.volume_distort = 0.05f;
         turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
         turret.lod_pixels = 64.f;
         turret.lod_fade = 0.25f;
@@ -785,7 +787,8 @@ int main() {
               "no accretion key does not attach a component");
         const auto *ev = world3.get<EmissionVolume>(turret_e);
         check(ev != nullptr && ev->depth == 0.3f && ev->density == 6.f &&
-                  ev->seed == 2.f && ev->steps == 24 && ev->scatter == 0.5f,
+                  ev->seed == 2.f && ev->steps == 24 && ev->scatter == 0.5f &&
+                  ev->flow == 1.5f && ev->distort == 0.05f,
               "spawn_scene3d emissionvolume component");
         check(world3.get<EmissionVolume>(ship_e) == nullptr,
               "no volume key does not attach a component");
@@ -864,7 +867,8 @@ int main() {
             const auto *rev = restored.get<EmissionVolume>(*re_turret);
             check(rev != nullptr && rev->depth == 0.3f &&
                       rev->density == 6.f && rev->steps == 24 &&
-                      rev->scatter == 0.5f,
+                      rev->scatter == 0.5f && rev->flow == 1.5f &&
+                      rev->distort == 0.05f,
                   "emissionvolume codec round-trips");
         }
         if (re_turret) {
@@ -914,7 +918,9 @@ int main() {
                   out.entities[1].volume_density == 6.f &&
                   out.entities[1].volume_seed == 2.f &&
                   out.entities[1].volume_steps == 24 &&
-                  out.entities[1].volume_scatter == 0.5f,
+                  out.entities[1].volume_scatter == 0.5f &&
+                  out.entities[1].volume_flow == 1.5f &&
+                  out.entities[1].volume_distort == 0.05f,
               "scene3d_from_world exports the emission volume");
         check(out.entities[1].lod_meshes.size() == 2 &&
                   out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&

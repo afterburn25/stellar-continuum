@@ -107,10 +107,13 @@ nebulae read illuminated rather than uniformly self-glowing. It rides
 the `atmo_shape.z` lane: `main()` early-returns into `emission_volume`
 whenever `volume_depth > 0`, so atmosphere lanes are inert on volume
 materials and free to carry it. Authored scenes use the `volume` entity
-block (`{depth,density,seed,steps,scatter}`) or the `EmissionVolume`
-component; the entity's own `texture` supplies the emission image and
-the material turns transparent automatically — a `volume` block without
-a texture is rejected at parse and dropped at runtime.
+block (`{depth,density,seed,steps,scatter,flow,distort}` — `flow` is
+the filament animation phase in radians and `distort` the spatial warp
+amplitude [0,.1], both re-posing the ray-marched filaments so sibling
+nebulae stop sharing a silhouette) or the `EmissionVolume` component;
+the entity's own `texture` supplies the emission image and the material
+turns transparent automatically — a `volume` block without a texture is
+rejected at parse and dropped at runtime.
 
 Per-instance distance culling lives on `MeshInstance3D`:
 

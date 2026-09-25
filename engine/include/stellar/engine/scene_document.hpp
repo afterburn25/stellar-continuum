@@ -248,6 +248,10 @@ struct Scene3dEntity {
   float volume_depth{0.f}, volume_density{5.f}, volume_seed{0.f};
   int volume_steps{32};
   float volume_scatter{0.f};
+  // Filament shape controls: `flow` is a bounded phase offset that
+  // re-poses the warp field (variety between otherwise identical
+  // nebulae), `distort` [0,.1] is the secondary warp amplitude.
+  float volume_flow{0.f}, volume_distort{0.f};
   // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
   // coarsest-first. lod_meshes[i] draws once the projected bounding
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).
