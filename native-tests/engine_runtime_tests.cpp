@@ -676,6 +676,8 @@ int main() {
     RuntimeHost host{headless_options(root)};
     int updates = 0;
     VfxInstanceId instance = invalid_vfx_instance;
+    VfxInstanceId attached_instance = invalid_vfx_instance;
+    EntityId anchor{};
     std::size_t particles = 0, particles_late = 0;
     host.on_update = [&](World &, float) {
       ++updates;
@@ -686,11 +688,22 @@ int main() {
         def.particle_lifetime_seconds = 1.0f;
         host.vfx().define(std::move(def));
         instance = host.spawn_emitter("test-emitter", 300.f, 300.f);
+        SceneEntity a{};
+        a.name = "anchor";
+        a.x = 350.f;
+        a.y = 350.f;
+        anchor = host.spawn_entity(a);
+        attached_instance =
+            host.spawn_emitter("test-emitter", 0.f, 0.f, anchor);
       }
       if (updates == 3)
         particles = host.vfx().particles(instance).size();
-      if (updates == 4)
+      if (updates == 4) {
         particles_late = host.vfx().particles(instance).size();
+        // Destroying the anchor stops its emitter on the next step —
+        // dead entities cannot keep attached emitters alive.
+        host.destroy_entity(anchor);
+      }
     };
     check(host.run() == 0, "vfx run exits cleanly");
     check(instance != invalid_vfx_instance,
@@ -698,6 +711,10 @@ int main() {
     check(host.vfx().alive(instance), "the emitter stays alive");
     check(particles > 0 && particles_late > particles,
           "particles accumulate in sim time");
+    check(attached_instance != invalid_vfx_instance,
+          "attached spawn_emitter returns a live instance");
+    check(!host.vfx().alive(attached_instance),
+          "destroying the anchor stops the attached emitter");
   }
 
   // spawn_entity3d + the 3D region queries track a separate entity set.
