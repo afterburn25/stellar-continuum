@@ -1818,6 +1818,9 @@
     "SETTINGS_VOICE_INTERFACE_ANNOUNCEMENTS": "Speak interface announcements",
     "SETUP_ANCIENTS_LABEL": "Ancient empires: {0}",
     "SETUP_RIVALS_LABEL": "Rival empires: {0}",
-    "SUPPLY_CLOSE": "Close supply network"
+    "SUPPLY_CLOSE": "Close supply network",
+    "SETTINGS_ACTION_MAP_PAN_X": "Map pan X",
+    "SETTINGS_ACTION_MAP_PAN_Y": "Map pan Y",
+    "SETTINGS_ACTION_MAP_ZOOM": "Map zoom"
   }
 }

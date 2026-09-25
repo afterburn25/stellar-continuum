@@ -1818,6 +1818,9 @@
     "SETTINGS_VOICE_INTERFACE_ANNOUNCEMENTS": "Interface-Ansagen vorlesen",
     "SETUP_ANCIENTS_LABEL": "Uralte Imperien: {0}",
     "SETUP_RIVALS_LABEL": "Rivalisierende Imperien: {0}",
-    "SUPPLY_CLOSE": "Versorgungsnetz schlie\u00dfen"
+    "SUPPLY_CLOSE": "Versorgungsnetz schlie\u00dfen",
+    "SETTINGS_ACTION_MAP_PAN_X": "Karte horizontal schwenken",
+    "SETTINGS_ACTION_MAP_PAN_Y": "Karte vertikal schwenken",
+    "SETTINGS_ACTION_MAP_ZOOM": "Karte zoomen"
   }
 }

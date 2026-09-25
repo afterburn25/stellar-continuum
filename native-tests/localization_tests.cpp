@@ -282,6 +282,37 @@ int main() {
       }
     }
     check(references > 1500, "audit scanned source key references");
+
+    // Derived-key audit: the controls-rebind view builds
+    // SETTINGS_ACTION_<UPPER(name)> from every InputMapper action declared
+    // in the embedded context JSON — an un-cataloged action renders raw
+    // English in every non-English locale.
+    for (const auto &file : sources) {
+      const std::string src = slurp(file);
+      std::size_t at = 0;
+      while ((at = src.find("R\"json(", at)) != std::string::npos) {
+        const std::size_t close = src.find(")json\"", at + 7);
+        const std::string blob = src.substr(
+            at + 7, close == std::string::npos ? close : close - at - 7);
+        at = close == std::string::npos ? src.size() : close;
+        const auto doc = nlohmann::json::parse(blob, nullptr, false);
+        if (doc.is_discarded() || !doc.contains("contexts")) continue;
+        for (const auto &context : doc["contexts"])
+          for (const auto &action : context.value(
+                   "actions", nlohmann::json::array())) {
+            const auto name = action.value("name", std::string{});
+            if (name.empty()) continue;
+            std::string key{"SETTINGS_ACTION_"};
+            for (const char ch : name)
+              key += static_cast<char>(
+                  std::toupper(static_cast<unsigned char>(ch)));
+            check(catalog.contains(key),
+                  (file.filename().string() + " declares input action \"" +
+                   name + "\" with no catalog key " + key)
+                      .c_str());
+          }
+      }
+    }
   }
 #endif
 
