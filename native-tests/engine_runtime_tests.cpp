@@ -57,6 +57,7 @@ int main() {
     int updates = 0;
     std::size_t rect_hits = 0, radius_hits = 0, far_hits = 0;
     bool picked = false, picked_miss = false, picked_hidden = false;
+    std::size_t rect_hits_hidden = 0;
     EntityId ghost_id{};
     host.on_update = [&](World &, float) {
       ++updates;
@@ -79,15 +80,20 @@ int main() {
         picked_miss = !host.entity_at(5.f, 5.f).has_value();
         SceneEntity ghost{};
         ghost.name = "ghost";
-        ghost.x = 700.f;
-        ghost.y = 700.f;
+        ghost.x = 500.f;
+        ghost.y = 300.f;
         ghost.w = 60.f;
         ghost.h = 60.f;
         ghost.visible = false;
         ghost_id = host.spawn_entity(ghost);
       }
-      if (updates == 2)
-        picked_hidden = !host.entity_at(710.f, 710.f).has_value();
+      if (updates == 2) {
+        picked_hidden = !host.entity_at(510.f, 310.f).has_value();
+        // Region queries DO include Hidden entities — selection boxes and
+        // AoE must see them; only point picking skips them.
+        rect_hits_hidden =
+            host.entities_in_rect(500.f, 300.f, 60.f, 60.f).size();
+      }
     };
     // on_draw/on_status still fire headless — the DrawList is built and
     // handed to the game; only GPU submission is skipped.
@@ -110,6 +116,8 @@ int main() {
     check(picked, "entity_at hits the demo rect");
     check(picked_miss, "entity_at misses empty space");
     check(picked_hidden, "entity_at skips Hidden entities");
+    check(rect_hits_hidden == 1,
+          "entities_in_rect includes Hidden entities");
     check(draws == 4, "on_draw fires once per headless frame");
     check(statuses == 4, "on_status fires once per headless frame");
   }
