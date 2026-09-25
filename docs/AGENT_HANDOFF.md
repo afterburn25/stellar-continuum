@@ -392,7 +392,12 @@ button + latched-axis replay through the real mapper, --world-w/
 projected anchors), snapshot parity, run(argc, argv)
 flag parsing (incl. --replay/--replay-until/--replay-info and a trailing
 --scene3d), the replay contract, and fail-fast exits on missing/corrupt
-journals; the Projects tool's TEST passes
+journals; pick semantics (entity_at layer ordering + spawn-order ties,
+parallax-pinned hit-testing, Hidden-skip vs region-query inclusion,
+tilemap-carrier exclusion), clamp_camera against resolved world bounds,
+indexed tile_at/set_tile_at overloads, on_collision_exit on
+member-destroy, and attached-emitter lifetime (anchor destroy stops the
+instance); the Projects tool's TEST passes
 `--headless` by default). Headless limits: `audio()` must not be called (no audio
 device) — `on_draw`/`on_status` still fire with a fully built
 DrawList that is simply never submitted to a GPU.
