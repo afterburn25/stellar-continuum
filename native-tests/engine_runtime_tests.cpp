@@ -893,6 +893,8 @@ int main() {
       out << R"({"entities":[{"name":"kept","x":10,"y":10}]})";
       std::ofstream bad(sub / "editor" / "broken.json");
       bad << "{not json";
+      std::ofstream bad3(sub / "editor" / "broken3d.json");
+      bad3 << "{not json";
     }
     auto opts = headless_options(sub);
     opts.frame_limit = 6;
@@ -904,15 +906,19 @@ int main() {
       if (updates == 2) host.set_scene("editor/nonexistent.json");
       if (updates == 3)
         kept_after_missing = host.find_entity("kept").has_value();
-      if (updates == 4) host.set_scene("editor/broken.json");
+      if (updates == 4) {
+        host.set_scene("editor/broken.json");
+        host.set_scene3d("editor/broken3d.json");
+      }
       if (updates == 5)
-        kept_after_broken = host.find_entity("kept").has_value();
+        kept_after_broken = host.find_entity("kept").has_value() &&
+                            host.entities3d().empty();
     };
     check(host.run() == 0, "bad-switch run exits cleanly");
     check(kept_after_missing,
           "a missing scene file keeps the running scene");
     check(kept_after_broken,
-          "a malformed scene file keeps the running scene");
+          "malformed 2D/3D scene files keep the running scene");
   }
 
   // Scene-authored animations: a clip's "x" track owns the entity's
