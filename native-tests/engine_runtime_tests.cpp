@@ -783,6 +783,10 @@ int main() {
           "world bounds fall back to the viewport");
     check(std::abs(host.time_scale() - 2.5) < 1e-9,
           "set_time_scale round-trips");
+    // Set inside update 1 — after that step's sim_time accumulation —
+    // so only steps 2-4 run scaled: dt * (1 + 3 * 2.5).
+    check(std::abs(host.sim_time() - (1.0 / 60.0) * 8.5) < 1e-6,
+          "time_scale scales sim_time accumulation");
     check(std::abs(host.camera3d_x() - 1.0) < 1e-9 &&
               std::abs(host.camera3d_y() - 2.0) < 1e-9 &&
               std::abs(host.camera3d_z() - 3.0) < 1e-9 &&
@@ -863,12 +867,11 @@ int main() {
       ++updates;
       if (updates == 1) {
         saw_alpha = host.find_entity("alpha").has_value();
+        // Cross the 500ms scene-poll boundary before rewriting, so the
+        // new file stamp can't share the initial load's tick.
+        std::this_thread::sleep_for(std::chrono::milliseconds(600));
         std::ofstream out(scene_path);
         out << R"({"entities":[{"name":"beta","x":20,"y":20}]})";
-        out.close();
-        // Cross the 500ms scene-poll boundary so the next frame
-        // observes the new file stamp.
-        std::this_thread::sleep_for(std::chrono::milliseconds(600));
       }
       if (updates >= 2) saw_beta = host.find_entity("beta").has_value();
     };
