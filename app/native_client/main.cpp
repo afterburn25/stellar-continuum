@@ -2546,9 +2546,17 @@ class NativeCampaign final {
     std::ostringstream proof;proof<<"{\"player_id\":"<<target.player_civilization_id<<",\"colony_id\":"<<target.colony_id
       <<",\"rows\":"<<row_count<<",\"opened\":true,\"selected\":true,\"readonly\":true,\"exclusive\":true,\"scrolled\":true}";
     smoke_colony_roster_evidence_=proof.str();
+    // Missions chrome capture: open the board through its rail affordance,
+    // keep the frame for review, then close it to restore state.
+    click(center(ui.missions));
+    if(!mission_view_.visible())throw std::runtime_error("Missions rail button did not open the board for capture.");
+    smoke_missions_capture_=scene(width,height);
+    route({{InputEventType::EscapePressed}});
+    if(mission_view_.visible())throw std::runtime_error("Missions board did not close after its capture.");
   }
-  void capture_colony_roster_smoke(const std::function<void(const DrawList&)>& draw)const{
-    if(smoke_colony_roster_capture_)draw(*smoke_colony_roster_capture_);
+  void capture_colony_roster_smoke(const std::function<void(const DrawList&,const wchar_t*)>& draw)const{
+    if(smoke_colony_roster_capture_)draw(*smoke_colony_roster_capture_,L"-colony-roster");
+    if(smoke_missions_capture_)draw(*smoke_missions_capture_,L"-missions");
     if(!smoke_colony_roster_evidence_.empty())std::cout<<"colony_roster="<<smoke_colony_roster_evidence_<<'\n';
   }
   void prepare_outpost_freight_smoke(int width,int height,bool reload){
@@ -9551,6 +9559,7 @@ class NativeCampaign final {
   bool hud_switch_pressed_{};
   bool map_legend_collapsed_{};bool map_legend_pressed_{};
   std::optional<DrawList> smoke_colony_roster_capture_;
+  std::optional<DrawList> smoke_missions_capture_;
   std::string smoke_colony_roster_evidence_;
   std::optional<double> roster_day_;
   double roster_refresh_elapsed_{};
@@ -10478,7 +10487,7 @@ int main(int argc,char **argv){
             [&](const DrawList& draw,const wchar_t* suffix){window.draw(draw,suffix?std::optional<std::filesystem::path>{sidecar_path(*options.smoke_screenshot,suffix)}:std::nullopt);});
         if(options.colony_smoke||options.colony_reload_smoke){
           if(options.planetary_smoke)campaign.capture_planetary_smoke([&](const DrawList& draw,int i){const auto suffix=L"-planetary-"+std::to_wstring(i);window.draw(draw,sidecar_path(*options.smoke_screenshot,suffix.c_str()));});
-          campaign.capture_colony_roster_smoke([&](const DrawList& draw){window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-colony-roster"));});
+          campaign.capture_colony_roster_smoke([&](const DrawList& draw,const wchar_t* suffix){window.draw(draw,sidecar_path(*options.smoke_screenshot,suffix));});
           campaign.capture_outpost_freight_smoke([&](const DrawList& draw){window.draw(draw,sidecar_path(*options.smoke_screenshot,L"-freight-review"));});
         }
 
