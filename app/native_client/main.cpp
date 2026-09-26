@@ -2240,17 +2240,23 @@ class NativeCampaign final {
       render(draw,suffix);
     };
     system_workspace_.close();camera_.center={home->position.x,home->position.y};
-    const Point middle{width*.5f,height*.5f};
+    // The star projects to screen centre, which HUD surfaces can cover at
+    // minimum resolutions — slide the camera until the point is clickable.
+    const Point middle=expose_smoke_map_point(home->position.x,home->position.y,width,height);
     route({{InputEventType::Wheel,middle,{},1000.f}});
     const auto art=stellar::native_stellar::observed_stellar_artwork(SystemSurveyLevel::fully_surveyed,home->stellar_object,home->primary);
     if(!art)throw std::runtime_error("Home star has no observed artwork");
     capture(L"-star-map-close",middle,galaxy_star_core_radius(camera_.pixels_per_world/fitted_pixels_per_world_,height)*art->scale);
     route({{InputEventType::LeftPressed,middle,{},0,{},2},{InputEventType::LeftReleased,middle}});
     if(system_workspace_.system_id()!=home->id)throw std::runtime_error("Close stellar artwork did not enter the home system");
-    const auto* viewport=system_workspace_.viewport();
-    const Point star{viewport->center_x,viewport->center_y};
-    const auto wheel=std::log(160.f/star_screen_radius(viewport->scale))/std::log(1.16f);
-    route({{InputEventType::Wheel,star,{},wheel}});
+    // star_screen_radius bottoms out at 4 px, so a single wheel step computed
+    // from it cannot traverse the full zoom range at small viewports — iterate
+    // until the artwork detail radius is actually reached.
+    for(int i=0;i<48&&star_screen_radius(system_workspace_.viewport()->scale)<160.f;++i){
+      const auto& v=*system_workspace_.viewport();
+      route({{InputEventType::Wheel,{v.center_x,v.center_y},{},20.f}});
+    }
+    const Point star{system_workspace_.viewport()->center_x,system_workspace_.viewport()->center_y};
     capture(L"-star-system-close",star,star_screen_radius(system_workspace_.viewport()->scale,art->scale));
     route({{InputEventType::Wheel,star,{},1000.f}});
     capture(L"-star-system-maximum",star,star_screen_radius(system_workspace_.viewport()->scale,art->scale));
