@@ -2355,13 +2355,22 @@ class NativeCampaign final {
     smoke_system_back_=!system_workspace_.visible();
     smoke_system_gesture_cleared_=camera_.center.x==map_center_before_back.x&&camera_.center.y==map_center_before_back.y;
     if(!smoke_system_reset_||!smoke_system_back_||!smoke_system_gesture_cleared_)throw std::runtime_error("System smoke Back/Reset or galaxy gesture ownership failed.");
-    if(!update(enter,width,height,0.,false)||!system_workspace_.visible())throw std::runtime_error("System smoke could not re-enter Sol after Back.");
+    const auto reentry=expose_smoke_map_point(found->second->position.x,found->second->position.y,width,height);
+    InputSnapshot reenter;reenter.drawable_width=width;reenter.drawable_height=height;reenter.pointer=reentry;
+    reenter.events={{InputEventType::LeftPressed,reentry,{},0,{},2},{InputEventType::LeftReleased,reentry}};
+    if(!update(reenter,width,height,0.,false)||!system_workspace_.visible())throw std::runtime_error("System smoke could not re-enter Sol after Back.");
     const auto earth=std::ranges::find(spatial.bodies,earth_body_id,&SystemSpatialBodyMarker::body_id);
     if(earth==spatial.bodies.end()||!system_workspace_.viewport())throw std::runtime_error("System smoke lacks projected Earth.");
     const auto earth_point=system_workspace_.viewport()->world_to_screen(earth->offset_x,earth->offset_y);
     InputSnapshot select_input;select_input.drawable_width=width;select_input.drawable_height=height;select_input.pointer={earth_point.x,earth_point.y};select_input.events={{InputEventType::LeftPressed,select_input.pointer},{InputEventType::LeftReleased,select_input.pointer}};(void)update(select_input,width,height,0.,false);
     if(system_workspace_.selected_body_id()!=earth_body_id)throw std::runtime_error("System smoke could not select Earth.");
-    smoke_system_hit_=true;const auto before=*system_workspace_.viewport();InputSnapshot zoom;zoom.drawable_width=width;zoom.drawable_height=height;zoom.pointer={420,320};zoom.events={{InputEventType::Wheel,zoom.pointer,{},1}};(void)update(zoom,width,height,0.,false);const auto zoomed=*system_workspace_.viewport();smoke_system_zoomed_=zoomed.scale>before.scale;InputSnapshot move;move.drawable_width=width;move.drawable_height=height;move.pointer={392,318};move.events={{InputEventType::LeftPressed,{360,300}},{InputEventType::PointerMove,{392,318},{32,18}},{InputEventType::LeftReleased,{392,318}}};(void)update(move,width,height,0.,false);const auto after=*system_workspace_.viewport();smoke_system_panned_=after.center_x!=zoomed.center_x||after.center_y!=zoomed.center_y;
+    smoke_system_hit_=true;const auto before=*system_workspace_.viewport();
+    const Point zoom_point{system_layout.world_field.x+system_layout.world_field.width*.62f,
+                           system_layout.world_field.y+system_layout.world_field.height*.42f};
+    const Point pan_start{system_layout.world_field.x+system_layout.world_field.width*.5f,
+                          system_layout.world_field.y+system_layout.world_field.height*.42f};
+    const Point pan_end{pan_start.x+32,pan_start.y+18};
+    InputSnapshot zoom;zoom.drawable_width=width;zoom.drawable_height=height;zoom.pointer=zoom_point;zoom.events={{InputEventType::Wheel,zoom_point,{},1}};(void)update(zoom,width,height,0.,false);const auto zoomed=*system_workspace_.viewport();smoke_system_zoomed_=zoomed.scale>before.scale;InputSnapshot move;move.drawable_width=width;move.drawable_height=height;move.pointer=pan_end;move.events={{InputEventType::LeftPressed,pan_start},{InputEventType::PointerMove,pan_end,{32,18}},{InputEventType::LeftReleased,pan_end}};(void)update(move,width,height,0.,false);const auto after=*system_workspace_.viewport();smoke_system_panned_=after.center_x!=zoomed.center_x||after.center_y!=zoomed.center_y;
     if(!smoke_system_zoomed_||!smoke_system_panned_)throw std::runtime_error("System smoke did not preserve zoom and pan input.");
     const auto focus_scale=system_workspace_.viewport()->scale;
     click({system_layout.focus_action.x+system_layout.focus_action.width*.5f,
@@ -2377,29 +2386,43 @@ class NativeCampaign final {
       throw std::runtime_error("Body inspection smoke requires an open system view; it was closed during validation.");
     const auto layout=SystemWorkspaceLayout::for_viewport(width,height);
     const auto before=*system_workspace_.viewport();
+    const auto pointer=Point{layout.inspector.x+layout.inspector.width*.5f,
+                             layout.inspector.y+layout.inspector.height*.5f};
     const auto wheel=[&](float amount){
       InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
-      input.pointer={layout.inspector.x+30.f,layout.inspector.y+220.f};
-      input.events={{InputEventType::Wheel,input.pointer,{},amount}};
+      input.pointer=pointer;
+      input.events={{InputEventType::Wheel,pointer,{},amount}};
       (void)update(input,width,height,0.,false);
     };
-    const auto contains=[&](const DrawList& draw,std::string_view value){
-      return std::ranges::any_of(draw.overlay,[&](const auto& item){
+    std::set<std::string> seen;
+    const auto collect=[&](const DrawList& draw){
+      for(const auto& item:draw.overlay){
         const auto* text=std::get_if<Text>(&item);
-        return text&&text->value==value&&text->clip&&
+        if(text&&text->clip&&
           text->clip->x>=layout.inspector.x&&text->clip->y>=layout.inspector.y&&
           text->clip->x+text->clip->width<=layout.inspector.x+layout.inspector.width&&
-          text->clip->y+text->clip->height<=layout.focus_action.y;
-      });
+          text->clip->y+text->clip->height<=layout.focus_action.y)
+          seen.insert(text->value);
+      }
     };
     wheel(10000.f);
-    const auto initial=scene(width,height);
-    const bool physical=contains(initial,"Physical")&&contains(initial,"6,371 km")&&
-      contains(initial,"9.81 m/s²")&&contains(initial,"SURVEY COMPLETE");
+    collect(scene(width,height));
+    // Short panels cannot show every section at once, so sweep the scroll range
+    // in sub-viewport steps and require every fact to be reachable rather than
+    // simultaneously visible.
+    float last_scroll=-1.f;
+    for(int i=0;i<256&&system_workspace_.inspection_scroll()!=last_scroll;++i){
+      last_scroll=system_workspace_.inspection_scroll();
+      wheel(-0.5f);
+      collect(scene(width,height));
+    }
     wheel(-10000.f);
     const auto end=scene(width,height);
-    const bool environment=contains(end,"Environment")&&contains(end,"Oxygen / nitrogen")&&
-      contains(end,"Satellites & signals")&&contains(end,"Known moons");
+    collect(end);
+    const bool physical=seen.count("Physical")&&seen.count("6,371 km")&&
+      seen.count("9.81 m/s²")&&seen.count("SURVEY COMPLETE");
+    const bool environment=seen.count("Environment")&&seen.count("Oxygen / nitrogen")&&
+      seen.count("Satellites & signals")&&seen.count("Known moons");
     const float end_scroll=system_workspace_.inspection_scroll();
     wheel(-10000.f);
     const bool bounded=system_workspace_.inspection_scroll()==end_scroll;
@@ -2654,6 +2677,7 @@ class NativeCampaign final {
         !ui.navigation_bar.contains(point)&&!hud.resource_strip.contains(point)&&
         !hud.context.contains(point)&&
         !(map_legend_visible(width,height)&&map_legend_bounds(width,height).contains(point))&&
+        !(inspection_visible()&&inspection_bounds(width,height).contains(point))&&
         !(assets_.preferences().hidden?assets_layout.restore:assets_layout.panel).contains(point);
   }
   // Replays can only click a map point no HUD surface swallows. The legend is
