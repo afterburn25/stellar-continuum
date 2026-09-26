@@ -2686,6 +2686,20 @@ class NativeCampaign final {
         !(inspection_visible()&&inspection_bounds(width,height).contains(point))&&
         !(assets_.preferences().hidden?assets_layout.restore:assets_layout.panel).contains(point);
   }
+  // Replays can only drag between map points no HUD surface swallows; at
+  // compact viewports fixed-pixel drags can start inside the fleet command
+  // card or other overlays, so scan for a start where both ends stay clear.
+  std::optional<std::pair<Point,Point>> exposed_drag_points(
+      float dx,float dy,int width,int height)const{
+    for(float fx=.12f;fx<=.88f;fx+=.08f)
+      for(float fy=.2f;fy<=.85f;fy+=.08f){
+        const Point start{static_cast<float>(width)*fx,static_cast<float>(height)*fy};
+        const Point end{start.x+dx,start.y+dy};
+        if(smoke_map_point_exposed(start,width,height)&&smoke_map_point_exposed(end,width,height))
+          return std::pair{start,end};
+      }
+    return std::nullopt;
+  }
   // Replays can only click a map point no HUD surface swallows. The legend is
   // the one collapsible HUD panel; collapse it when it covers the target,
   // then shift the camera so the point slides right into clear map.
@@ -4589,8 +4603,10 @@ class NativeCampaign final {
     click(center(layout.civilian_locate));
     if (!last_fleet_command_accepted_)
       throw std::runtime_error("First exploration Locate input was rejected.");
-    Point zoom_anchor{static_cast<float>(width) * .5f,
-                      static_cast<float>(height) * .5f};
+    // At compact viewports screen centre can sit under the selection card or
+    // other HUD surfaces that swallow the wheel; anchor on an exposed point.
+    Point zoom_anchor =
+        expose_smoke_map_point(camera_.center.x, camera_.center.y, width, height);
     const auto before_zoom = camera_.pixels_per_world;
     for (int index = 0; index < 96 && camera_.pixels_per_world < 70.; ++index)
       route({{InputEventType::Wheel, zoom_anchor, {}, 1.f}});
@@ -4598,14 +4614,13 @@ class NativeCampaign final {
         camera_.pixels_per_world < 70. || system_workspace_.visible())
       throw std::runtime_error(
           "First exploration map zoom remained captured after Locate.");
-    const Point drag_start{static_cast<float>(width) * .34f,
-                           static_cast<float>(height) * .72f};
-    const Point drag_delta{40.f, -24.f};
-    const Point drag_end{drag_start.x + drag_delta.x,
-                         drag_start.y + drag_delta.y};
-    route({{InputEventType::LeftPressed, drag_start},
-           {InputEventType::PointerMove, drag_end, drag_delta},
-           {InputEventType::LeftReleased, drag_end}});
+    const auto drag = exposed_drag_points(40.f, -24.f, width, height);
+    if (!drag)
+      throw std::runtime_error(
+          "First exploration could not find an exposed map drag gesture.");
+    route({{InputEventType::LeftPressed, drag->first},
+           {InputEventType::PointerMove, drag->second, {40.f, -24.f}},
+           {InputEventType::LeftReleased, drag->second}});
 
     if (mode == Options::FirstExplorationMode::Depart) {
       std::vector<int> neighbors;
@@ -5495,8 +5510,8 @@ class NativeCampaign final {
     click(center(layout.civilian_locate));
     if (!last_fleet_command_accepted_)
       throw std::runtime_error("First survey Locate input was rejected.");
-    Point zoom_anchor{static_cast<float>(width) * .5f,
-                      static_cast<float>(height) * .5f};
+    Point zoom_anchor =
+        expose_smoke_map_point(camera_.center.x, camera_.center.y, width, height);
     const auto before_zoom = camera_.pixels_per_world;
     for (int index = 0; index < 96 && camera_.pixels_per_world < 70.; ++index)
       route({{InputEventType::Wheel, zoom_anchor, {}, 1.f}});
@@ -5504,14 +5519,13 @@ class NativeCampaign final {
         camera_.pixels_per_world < 70. || system_workspace_.visible())
       throw std::runtime_error(
           "First survey map zoom remained captured after Locate.");
-    const Point drag_start{static_cast<float>(width) * .34f,
-                           static_cast<float>(height) * .72f};
-    const Point drag_delta{40.f, -24.f};
-    const Point drag_end{drag_start.x + drag_delta.x,
-                         drag_start.y + drag_delta.y};
-    route({{InputEventType::LeftPressed, drag_start},
-           {InputEventType::PointerMove, drag_end, drag_delta},
-           {InputEventType::LeftReleased, drag_end}});
+    const auto drag = exposed_drag_points(40.f, -24.f, width, height);
+    if (!drag)
+      throw std::runtime_error(
+          "First survey could not find an exposed map drag gesture.");
+    route({{InputEventType::LeftPressed, drag->first},
+           {InputEventType::PointerMove, drag->second, {40.f, -24.f}},
+           {InputEventType::LeftReleased, drag->second}});
 
     first_survey_before_days_ = frame.clock().simulation_days();
     first_survey_revision_before_ = initial_science.mission_order_revision;
@@ -5731,15 +5745,28 @@ class NativeCampaign final {
     if (marker == spatial.bodies.end())
       throw std::runtime_error(
           "First survey target planet is absent from the spatial snapshot.");
-    const auto screen = system_workspace_.viewport()->world_to_screen(
-        marker->offset_x, marker->offset_y);
-    const Point body_point{screen.x, screen.y};
-    if (!system_layout.world_field.contains(body_point) ||
-        system_workspace_.viewport()->hit_body(spatial, screen.x, screen.y) !=
+    auto body_point=[&]{
+      const auto screen=system_workspace_.viewport()->world_to_screen(
+          marker->offset_x,marker->offset_y);
+      return Point{screen.x,screen.y};};
+    // A parked fleet can occlude a body at compact zoom; a player zooms in to
+    // separate them, so the smoke does the same before clicking.
+    for(int guard=0;guard<24;++guard){
+      const auto probe=body_point();
+      const bool occluded=system_workspace_.travel_snapshot()&&
+          !stellar::native_system_travel::hit_local_fleets(
+              system_workspace_.travel_snapshot()->fleets,spatial,
+              *system_workspace_.viewport(),probe).empty();
+      if(!occluded)break;
+      route({{InputEventType::Wheel,probe,{},1.f}});
+    }
+    const auto body_target=body_point();
+    if (!system_layout.world_field.contains(body_target) ||
+        system_workspace_.viewport()->hit_body(spatial, body_target.x, body_target.y) !=
             first_survey_body_id_)
       throw std::runtime_error(
           "First survey target planet is not independently hittable.");
-    click(body_point);
+    click(body_target);
     if (system_workspace_.selected_body_id() != first_survey_body_id_)
       throw std::runtime_error(
           "First survey could not select the target planet through UI input.");
