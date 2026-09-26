@@ -941,7 +941,7 @@
     "SYSTEM_SURFACE_TEMP": "Surface  {0} K",
     "SYSTEM_LUMINOSITY": "Luminosity  {0} x Sol",
     "SYSTEM_SAFE_APPROACH": "Safe approach  {0} km",
-    "SYSTEM_HZ": "Temperate zone  {0} - {1} million km",
+    "SYSTEM_HZ": "Temperate zone  {0} - {1} M km",
     "SYSTEM_JETS_DANGER": "DANGER: directional high-energy jets",
     "SYSTEM_HABITABILITY_LIMIT": "Severe radiation or short stellar lifetime limits habitability.",
     "SYSTEM_ORBIT_AB": "A+B orbit: {0} years",

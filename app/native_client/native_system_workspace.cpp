@@ -22,6 +22,16 @@ void overlay_fill(DrawList&o,UiRect b,Color c){o.overlay.emplace_back(FilledRect
 void overlay_stroke(DrawList&o,UiRect b,Color c){o.overlay.emplace_back(StrokedRectangle{b,c});}
 void overlay_text(DrawList&o,float x,float y,std::string value,Color c,int size=15,float wrap=0,std::optional<UiRect> clip=std::nullopt){o.overlay.emplace_back(Text{{x,y},std::move(value),c,size,wrap,clip});}
 std::string number(double value,int precision=2){std::ostringstream out;out<<std::fixed<<std::setprecision(precision)<<value;return out.str();}
+// Compact kilometres: below a million print the integer; beyond it use the
+// body-inspection scientific convention so a wide value never orphans its
+// unit onto a second wrapped line in the inspector panel.
+std::string compact_km(double kilometres){
+  if(kilometres<1'000'000.)return number(kilometres,0);
+  const auto exponent=static_cast<int>(std::floor(std::log10(kilometres)));
+  constexpr std::string_view sup[]={"⁰","¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹"};
+  std::string superscript;for(const char digit:std::to_string(exponent))superscript+=sup[digit-'0'];
+  return number(kilometres/std::pow(10.,exponent),3)+" × 10"+superscript;
+}
 std::string translate(const stellar::engine::LocalizationTable *locale,
                       std::string_view key, std::string_view fallback) {
   if (locale && locale->contains(key))
@@ -321,11 +331,11 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
   overlay_fill(out,panel,{6,18,33,242});overlay_stroke(out,panel,border);float y=panel.y+14;const auto add=[&](std::string value,Color color,int size=14,float step=20){const Text label{{panel.x+14,y},std::move(value),color,size,panel.width-28,panel};const auto measured=text_measurer_?text_measurer_(label):TextExtent{0,size+6};out.overlay.emplace_back(label);y+=std::max(step,static_cast<float>(measured.height)+4.f);};if(!selected_body())add(tr("SYSTEM_INSPECTOR","SYSTEM INSPECTOR"),text,18,31);const auto*fleet=selected_fleet();if(inspector_focus_!=InspectorFocus::body&&fleet){add(fleet->foreign_inspection?tr("SYSTEM_FLEET_DEV","DEVELOPER FLEET INSPECTION"):tr("SYSTEM_FLEET_OWNED","OWNED LOCAL FLEET"),muted,13,21);add(fleet->name,text,17,26);add(trf("SYSTEM_FLEET_STATE",{fleet_role(fleet->role),fleet->moving?tr("SYSTEM_STATE_MOVING","Moving"):fleet->held?tr("SYSTEM_STATE_HOLDING","Holding"):tr("SYSTEM_STATE_LOCAL","Local")},"{0}  {1}"),text,14,24);if(settlement_status_&&settlement_status_->fleet_id==fleet->fleet_id){add(settlement_status_->status,{102,232,164,255},13,21);if(settlement_status_->destination_body_id)add(trf("SYSTEM_ESTABLISHMENT",{number(settlement_status_->settlement_days_completed,1),number(settlement_status_->establishment_days,0)},"Establishment  {0} / {1} days"),text,13,20);}}else if(selected_body()){body_inspection_.render(out,panel,layout.focus_action.y);}else {
     if(snapshot_->stellar_object){const auto& p=*snapshot_->stellar_object;const auto& d=stellar::core::stellar_object_definition(p.type);
       add(d.name,text,16,26);
-      add(trf("SYSTEM_RADIUS",{number(p.radius_solar*695700.,0)},"Radius  {0} km"),text,13,20);
+      add(trf("SYSTEM_RADIUS",{compact_km(p.radius_solar*695700.)},"Radius  {0} km"),text,13,20);
       add(trf("SYSTEM_SURFACE_TEMP",{number(p.effective_temperature_kelvin,0)},"Surface  {0} K"),text,13,20);
       add(trf("SYSTEM_LUMINOSITY",{number(p.luminosity_solar,4)},"Luminosity  {0} x Sol"),text,13,20);
-      add(trf("SYSTEM_SAFE_APPROACH",{number(p.safe_approach_au*stellar::core::astronomical_unit_km,0)},"Safe approach  {0} km"),{241,182,98,255},13,20);
-      if(p.luminosity_solar>0)add(trf("SYSTEM_HZ",{number(p.inner_hz_au*stellar::core::astronomical_unit_km/1000000.,1),number(p.outer_hz_au*stellar::core::astronomical_unit_km/1000000.,1)},"Temperate zone  {0} - {1} million km"),muted,13,20);
+      add(trf("SYSTEM_SAFE_APPROACH",{compact_km(p.safe_approach_au*stellar::core::astronomical_unit_km)},"Safe approach  {0} km"),{241,182,98,255},13,20);
+      if(p.luminosity_solar>0)add(trf("SYSTEM_HZ",{number(p.inner_hz_au*stellar::core::astronomical_unit_km/1000000.,1),number(p.outer_hz_au*stellar::core::astronomical_unit_km/1000000.,1)},"Temperate zone  {0} - {1} M km"),muted,13,20);
       if(p.jet_half_angle_radians>0)add(tr("SYSTEM_JETS_DANGER","DANGER: directional high-energy jets"),{241,139,98,255},13,20);
       if(p.habitability_modifier<.2)add(tr("SYSTEM_HABITABILITY_LIMIT","Severe radiation or short stellar lifetime limits habitability."),muted,13,20);
     }
