@@ -996,6 +996,10 @@ struct Scene3DRenderer::Storage {
     post.b={std::clamp(std::isfinite(opt.saturation)?opt.saturation:1.f,0.f,2.f),
       opt.quality>=RenderQuality3D::High?std::clamp(std::isfinite(opt.sharpen)?opt.sharpen:0.f,0.f,1.f):0.f,
       std::clamp(std::isfinite(opt.vignette)?opt.vignette:0.f,0.f,1.f),0.f};
+    // Disabled shadow passes never reach their resize branch — release a
+    // stale map so target memory and bytes() stop charging it.
+    if(shadow_res==0&&target.shadow){SDL_ReleaseGPUTexture(device,target.shadow);target.shadow=nullptr;target.shadow_size=0;}
+    if(spot_res==0&&target.spot_shadow){SDL_ReleaseGPUTexture(device,target.spot_shadow);target.spot_shadow=nullptr;target.spot_shadow_size=0;}
     for(const auto& name:order){
       if(name=="shadow"){
         if(target.shadow_size!=static_cast<int>(shadow_res)){
