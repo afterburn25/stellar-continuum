@@ -131,6 +131,25 @@ int main() try {
     require(confirm.kind==FleetWorkspaceCommandKind::Confirm,
         "Selected fleet command card lost canonical travel confirmation.");
   }
+  {
+    auto view = player_view(true);
+    auto& fleet = view.own_fleets.front();
+    fleet.design_name = "Pathfinder-class";
+    fleet.has_vessel_state = true;
+    fleet.hull_integrity = .62f;
+    fleet.cargo_material_capacity = 40.;
+    fleet.cargo_materials = 12.5;
+    fleet.embarked_population_millions = 2.5;
+    NativeFleetWorkspace workspace{FleetWorkspacePresentation::SelectedCommands};
+    workspace.set_view(std::move(view));
+    DrawList draw;
+    workspace.render(draw, 1280, 720, {});
+    require(has_text(draw, "Design") && has_text(draw, "Pathfinder-class") &&
+            has_text(draw, "Condition") && has_text(draw, "62%") &&
+            has_text(draw, "Cargo") && has_text(draw, "12.5 / 40.0") &&
+            has_text(draw, "Embarked") && has_text(draw, "2.5M"),
+        "Fleet composition rows did not surface design, condition or payload.");
+  }
   for (const auto [width, height] :
        std::array{std::pair{640, 360}, std::pair{1280, 720},
                   std::pair{1920, 1080}, std::pair{2560, 1440},
@@ -169,6 +188,56 @@ int main() try {
   require(has_text(empty_draw, "No active player fleets") &&
               empty_draw.circles.empty(),
           "Fresh prewarp fleet state invented a vessel or hid its empty state.");
+
+  {
+    // Status grouping: a fleet in transit lands in the urgent group ahead of
+    // stationed fleets, headers render, and row dispatch still resolves the
+    // correct authoritative fleet beneath each header.
+    NativeFleetWorkspace grouped;
+    auto grouped_view = player_view();
+    grouped_view.own_fleets.back().destination_system_id = 77;
+    grouped.set_view(std::move(grouped_view));
+    constexpr int gw = 1920, gh = 1080;
+    DrawList grouped_draw;
+    grouped.render(grouped_draw, gw, gh, {});
+    require(has_text(grouped_draw, "IN TRANSIT  ·  1") &&
+                has_text(grouped_draw, "STATIONED  ·  1"),
+            "Grouped outliner omitted the status group headers.");
+    const auto gl = FleetWorkspaceLayout::for_viewport(gw, gh);
+    const float gs = gl.scale;
+    // The IN TRANSIT group comes first: header (24) then the colony row (45).
+    const UiRect transit_row{gl.list.x, gl.list.y + 24.f * gs, gl.list.width,
+                             41.f * gs};
+    const auto pick = grouped.handle(
+        {InputEventType::LeftPressed, center(transit_row)}, gw, gh, {},
+        std::nullopt);
+    require(pick.kind == FleetWorkspaceCommandKind::Select &&
+                pick.fleet_id == 12,
+            "Grouped outliner dispatched the wrong fleet row.");
+    // The stationed scout sits below the second header — beyond the list
+    // viewport. Keyboard focus snaps it into view, then the same projected
+    // row must dispatch the scout.
+    InputEvent end{InputEventType::KeyPressed};
+    end.key = 0x4000004du;
+    require(grouped.handle(end, gw, gh, {}, std::nullopt).captured,
+            "End key was not captured by the grouped outliner.");
+    const auto focused = grouped.focused_bounds(gl);
+    require(focused && gl.list.contains(center(*focused)),
+            "End did not snap the scrolled scout row into the outliner.");
+    const auto snapped = grouped.handle(
+        {InputEventType::LeftPressed, center(*focused)}, gw, gh, {},
+        std::nullopt);
+    require(snapped.kind == FleetWorkspaceCommandKind::Select &&
+                snapped.fleet_id == 10,
+            "Scrolled grouped row dispatched the wrong fleet.");
+    // A single-group list renders no headers — unchanged flat geometry.
+    NativeFleetWorkspace flat;
+    flat.set_view(player_view());
+    DrawList flat_draw;
+    flat.render(flat_draw, gw, gh, {});
+    require(!has_text(flat_draw, "STATIONED  ·"),
+            "Single-group outliner rendered a noise header.");
+  }
 
   NativeFleetWorkspace workspace;
   workspace.set_view(player_view());
@@ -212,9 +281,12 @@ int main() try {
   DrawList blocked_draw;
   workspace.render(blocked_draw, 1280, 720, markers);
   require(has_text(blocked_draw, "ISS Wayfinder") &&
-              has_text(blocked_draw, "Strength 7.2") &&
-              has_text(blocked_draw, "Fuel 18.75 / 40.00 ly") &&
-              has_text(blocked_draw, "Range 24.00 ly") &&
+              has_text(blocked_draw, "Strength") &&
+              has_text(blocked_draw, "7.2") &&
+              has_text(blocked_draw, "Fuel") &&
+              has_text(blocked_draw, "18.75 / 40.00 ly") &&
+              has_text(blocked_draw, "Range") &&
+              has_text(blocked_draw, "24.00 ly") &&
               has_text(blocked_draw, "Destination Unknown system") &&
               has_text(blocked_draw, "Insufficient operational range") &&
               !has_text(blocked_draw, "CONFIRM TRAVEL") &&
@@ -383,7 +455,7 @@ int main() try {
     strategic.render(tactical_draw,1280,720,{});
     require(has_text(tactical_draw,"HOLD")&&has_text(tactical_draw,"DEFEND")&&
                 has_text(tactical_draw,"RETREAT")&&has_text(tactical_draw,"LOCATE")&&
-                has_text(tactical_draw,"Order Hold"),
+                has_text(tactical_draw,"Order")&&has_text(tactical_draw,"Hold"),
             "Eligible armed fleet did not show strategic choices and Locate.");
     strategic.set_notice("Persistent command result.",true);
     (void)strategic.handle({InputEventType::PointerMove,center(layout.order_hold)},1280,720,{},std::nullopt);

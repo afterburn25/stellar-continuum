@@ -1,4 +1,5 @@
 #include "native_inspection.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/core/campaign_observation.hpp>
 
 #include <stellar/core/fleet_reach.hpp>
@@ -18,6 +19,17 @@ namespace {
 using namespace stellar::core;
 using namespace stellar::native_map;
 std::string number(double value, int digits = 1) { std::ostringstream out; out << std::fixed << std::setprecision(digits) << value; return out.str(); }
+// Compact kilometres: below a million print the integer; beyond it use the
+// body-inspection scientific convention so a wide value never orphans its
+// "km" unit onto a second wrapped line in the inspector's fact column.
+std::string compact_km(double kilometres) {
+  if (kilometres < 1'000'000.) return number(kilometres, 0);
+  const auto exponent = static_cast<int>(std::floor(std::log10(kilometres)));
+  constexpr std::string_view sup[] = {"⁰","¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹"};
+  std::string superscript;
+  for (const char digit : std::to_string(exponent)) superscript += sup[digit - '0'];
+  return number(kilometres / std::pow(10., exponent), 3) + " × 10" + superscript;
+}
 void text(DrawList& out, UiRect box, std::string value, Color color, int font) {
   out.overlay.emplace_back(Text{{box.x, box.y}, std::move(value), color, font, box.width, box});
 }
@@ -93,8 +105,8 @@ ContentLayout content_layout(const SystemInspection& value, UiRect bounds,
   ContentLayout layout;
   layout.scale = scale_for(bounds);
   layout.clip = SystemInspectionCard::body_bounds(bounds);
-  layout.body_font = std::max(11, static_cast<int>(14 * layout.scale));
-  layout.small_font = std::max(9, static_cast<int>(11 * layout.scale));
+  layout.body_font = std::max(11, stellar::native_ui::type::compact_body(layout.scale));
+  layout.small_font = std::max(9, stellar::native_ui::type::compact_small(layout.scale));
   const float s = layout.scale;
   float y = 8.f * s;
   const auto add_block = [&](std::string text_value, float x, float width,
@@ -203,9 +215,9 @@ SystemInspection build_system_inspection(const FreshCampaignState& state, int se
   result.facts.push_back({tr("INSPECTION_PRIMARY_STAR","PRIMARY STAR"), system->stellar_object?stellar_object_definition(system->stellar_object->type).name:tr(star_key(system->primary),star_label(system->primary)), true});
   if(system->stellar_object){
     const auto& p=*system->stellar_object;
-    result.facts.push_back({tr("INSPECTION_RADIUS","STELLAR RADIUS"),number(p.radius_solar*695700.,0)+" km",true});
+    result.facts.push_back({tr("INSPECTION_RADIUS","STELLAR RADIUS"),compact_km(p.radius_solar*695700.)+" km",true});
     result.facts.push_back({tr("INSPECTION_LUMINOSITY","LUMINOSITY"),number(p.luminosity_solar,4)+" x Sol",true});
-    result.facts.push_back({tr("INSPECTION_SAFE_APPROACH","SAFE APPROACH"),number(p.safe_approach_au*astronomical_unit_km,0)+" km",false});
+    result.facts.push_back({tr("INSPECTION_SAFE_APPROACH","SAFE APPROACH"),compact_km(p.safe_approach_au*astronomical_unit_km)+" km",false});
     if(p.hooks.is_rare_discovery)result.facts.push_back({tr("INSPECTION_DISCOVERY","DISCOVERY"),p.hooks.rarity_tier,true});
     if(p.jet_half_angle_radians>0)result.facts.push_back({tr("INSPECTION_HAZARD","STELLAR HAZARD"),tr("INSPECTION_HAZARD_JETS","Directional high-energy jets"),false});
   }
@@ -320,16 +332,15 @@ void SystemInspectionCard::render(DrawList& out, UiRect bounds) const {
     out.overlay.emplace_back(Text{{row.x,row.y},item.value,item.color,item.font,
                                   row.width,*clipped});
   }
-  if(const auto thumb=scroll_.thumb(layout.clip.height,18.f*scale);thumb.size>0.f){
+  {
     const float indicator_width=3.f*scale;
     const float indicator_x=layout.clip.x+layout.clip.width-indicator_width;
-    out.overlay.emplace_back(FilledRectangle{{indicator_x,layout.clip.y,
-        indicator_width,layout.clip.height},{25,49,64,210}});
-    out.overlay.emplace_back(FilledRectangle{{indicator_x,layout.clip.y+thumb.offset,
-        indicator_width,thumb.size},{105,213,244,230}});
+    stellar::native_ui::scrollbar(
+        out, {indicator_x, layout.clip.y, indicator_width, layout.clip.height},
+        scroll_, 18.f*scale);
   }
   const auto close=close_bounds(bounds);
   text(out,close,"X",{235,244,255,255},small);
-  if(focus_>=0)out.overlay.emplace_back(StrokedRectangle{close,{164,221,237,255}});
+  if(focus_>=0)stellar::native_ui::focus_ring(out,close);
 }
 } // namespace stellar::native_inspection

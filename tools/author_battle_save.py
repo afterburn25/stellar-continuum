@@ -1,4 +1,4 @@
-import json, copy, sys
+import json, copy, sys, os, glob
 
 d = json.load(open('native-tests/fixtures/player-campaign-json.json'))
 row = [r for r in d['Rows'] if r.get('Name') == 'valid-current17'][0]
@@ -30,6 +30,18 @@ picket['Id'] = 8
 picket['Name'] = 'Vask Picket'
 picket['CurrentSystemId'] = 1
 gal['Fleets'].append(picket)
+
+# The battle-art binder only draws the human patrol_corvette hull; fleet 0
+# becomes the replay's owned corvette so exactly one sprite is bound. The
+# design's role is Military, so the fleet role must match (reference
+# validation rejects role-incompatible designs) — and its combat profile
+# must match too, or readiness reports the armed design as unarmed.
+gal['Fleets'][0]['DesignId'] = 'patrol_corvette'
+gal['Fleets'][0]['Role'] = 3
+gal['Fleets'][0]['Combat']['ProfileId'] = 'patrol_corvette_mk1'
+gal['Fleets'][0]['Combat']['Shields'] = 35.0
+gal['Fleets'][0]['Combat']['Armor'] = 45.0
+gal['Fleets'][0]['Combat']['Hull'] = 95.0
 
 pt = lambda x, y: {"X": x, "Y": y, "Vector": {}, "IsFinite": True}
 loadout = {"MassPerShip": 100, "Acceleration": 18, "MaximumSpeed": 120,
@@ -80,21 +92,28 @@ def formation(fid, civ, fleet_id, tf_id, name, x, y, hx, hy, shape,
             "HullDamageRemainder": 0.0, "Loadout": copy.deepcopy(loadout),
             "Cohorts": [], "ImportantVessels": vessels}
 
-gal['ActiveCombatEncounter'] = {
+if '--no-encounter' in sys.argv:
+    # Armed-fleet-only mode: the military-order smoke wants an owned armed
+    # fleet that is NOT mid-engagement (engaged fleets are managed through
+    # the battle view, not the ordinary outliner row).
+    gal.pop('ActiveCombatEncounter', None)
+else:
+    gal['ActiveCombatEncounter'] = {
     "SystemId": 0, "StartedDay": src['SimulationDays'],
     "Battle": {
         "BattleId": "0a0b0c0d-0000-4011-8000-1234567890ab",
         "Seed": 4616471093031469151, "Tick": 0, "SimulatedSeconds": 0.0,
         "PendingSeconds": 0.0, "NextEventSequence": 1, "NextSalvoId": 1,
         "Formations": [
-            # Fleet 0 cannot be an important vessel (id 0 is invalid); bind it
-            # through a matching warp_scout cohort instead.
-            {**formation(1, 0, 1, 1, "Home Guard", -420.0, -120.0, 1.0, 0.0, 2,
-                         [vessel(1, "Pioneer One", True)]),
-             "InitialShipCount": 2,
-             "Cohorts": [{"Id": 11, "DesignId": "warp_scout",
-                          "InitialCount": 1, "ActiveCount": 1,
-                          "Experience": 0.5}]},
+            # Fleet 0 is the player's patrol corvette: its tactical vessel uses
+            # the native zero-fleet 2^32 mapping so the battle-art binder finds
+            # exactly one owned hull. Pioneer One stays a colony_ship cohort —
+            # unsupported designs keep their tactical markers.
+            {**formation(1, 0, 0, 1, "Home Guard", -420.0, -120.0, 1.0, 0.0, 2,
+                         [{**vessel(1 << 32, "Pathfinder Corvette", True),
+                           "DesignId": "patrol_corvette"},
+                          vessel(1, "Pioneer One")]),
+             "InitialShipCount": 2},
             formation(2, 3, 6, 6, "Vask Vanguard", 420.0, 120.0, -1.0, 0.0, 0,
                       [vessel(6, "Vask Dominion Scout", True),
                        vessel(7, "Vask Dominion Pioneer")]),
@@ -113,6 +132,11 @@ gal['ActiveCombatEncounter'] = {
     "EngagedFormationPairs": [{"FirstFormationId": 1, "SecondFormationId": 2}],
     "LastObservedEventSequence": 0, "Reconciled": False}
 
-out = sys.argv[1]
+out = next(a for a in sys.argv[1:] if not a.startswith('--'))
 json.dump(src, open(out, 'w'), ensure_ascii=False)
+# Hand-authored output is not engine-written: drop stale save sidecars
+# (.integrity FNV-1a64 checksum + rolling .bak history) or the loader treats
+# the fixture as corrupt and silently recovers the previous autosave instead.
+for sidecar in glob.glob(out + '.bak*') + glob.glob(out + '.integrity*'):
+    os.remove(sidecar)
 print('authored', out)

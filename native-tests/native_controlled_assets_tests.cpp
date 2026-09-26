@@ -26,8 +26,14 @@ void projection(){
   require(!v.rows.back().progress,"Idle yard displayed fake progress");
   stellar::native_shipyard::NativeShipyardOrder order;order.active=true;order.design_name="Scout";order.progress_fraction=.42;yard.orders.push_back(order);v=project();require(v.rows.back().progress==.42,"Construction progress not live");
   world.colonies.front().stability=.1;world.fleets.front().transit_phase=FleetTransitPhase::InterstellarWarp;v=project();require(v.rows.front().severity==2&&v.rows[2].activity.find("Moving")!=std::string::npos,"Live alert/order lost");
-  world.colonies.front().civilization_id=8;v=project();require(v.rows.size()==3&&v.rows.front().key.category==Category::Outposts,"Lost ownership retained");
-  yard.orbital_shipyard_complete=false;v=project();require(v.rows.size()==2,"Unbuilt yard exposed");
+  // Urgency ordering inside Fleets: an in-transit fleet surfaces ahead of
+  // an idle hull even when the idle fleet carries the lower canonical id.
+  FleetState idle;idle.id=5;idle.civilization_id=3;idle.current_system_id=0;world.fleets.push_back(idle);
+  stellar::native_fleet::NativeOwnFleet idle_view;idle_view.id=5;idle_view.name="Idle";idle_view.current_system_id=0;fleets.own_fleets.push_back(idle_view);
+  v=project();std::vector<int> fleet_ids;for(const auto& r:v.rows)if(r.key.category==Category::Fleets)fleet_ids.push_back(r.key.id);
+  require(fleet_ids==std::vector<int>({12,5}),"Fleet list did not surface the in-transit fleet ahead of idle hulls");
+  world.colonies.front().civilization_id=8;v=project();require(v.rows.size()==4&&v.rows.front().key.category==Category::Outposts,"Lost ownership retained");
+  yard.orbital_shipyard_complete=false;v=project();require(v.rows.size()==3,"Unbuilt yard exposed");
   fleets.campaign_generation=8;require(project().rows.empty(),"Mixed generation accepted");
 }
 void interactions(){

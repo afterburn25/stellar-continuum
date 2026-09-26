@@ -149,6 +149,21 @@ private:
     // row's translated, unclipped rect so keyboard focus can snap the list.
     std::optional<stellar::native_map::UiRect> unclipped;
   };
+  // Outliner display order: fleets grouped by status (in combat → in
+  // transit → on mission → stationed), urgent first, projection order kept
+  // inside a group. Header rows carry a localized "NAME · count" caption and
+  // appear only when at least two status groups are non-empty.
+  struct FleetListRow {
+    std::size_t fleet_index{};   // into view_->own_fleets (header: unused)
+    bool header{};
+    std::string caption;
+    float top{};                 // un-scrolled offset inside the list
+    float height{};              // row pitch / header pitch
+  };
+  [[nodiscard]] std::vector<FleetListRow>
+  fleet_rows(const FleetWorkspaceLayout &) const;
+  [[nodiscard]] float
+  fleet_content_height(const FleetWorkspaceLayout &) const;
   [[nodiscard]] std::vector<FocusRect>
   focusables(const FleetWorkspaceLayout &) const;
   FleetWorkspacePresentation presentation_;
@@ -174,7 +189,9 @@ private:
   std::string return_warning_;
   bool notice_accepted_{};
   stellar::native_map::Point pointer_{};
-  stellar::engine::ScrollView list_scroll_{};
+  // Render-time geometry sync keeps the scrollbar thumb honest — mutable so
+  // the const render path can re-clamp without lying about state changes.
+  mutable stellar::engine::ScrollView list_scroll_{};
   PressTarget pressed_action_{PressTarget::None};
   stellar::native_map::UiRect pressed_bounds_{};
   std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> pressed_military_quote_;

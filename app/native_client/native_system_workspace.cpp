@@ -22,6 +22,16 @@ void overlay_fill(DrawList&o,UiRect b,Color c){o.overlay.emplace_back(FilledRect
 void overlay_stroke(DrawList&o,UiRect b,Color c){o.overlay.emplace_back(StrokedRectangle{b,c});}
 void overlay_text(DrawList&o,float x,float y,std::string value,Color c,int size=15,float wrap=0,std::optional<UiRect> clip=std::nullopt){o.overlay.emplace_back(Text{{x,y},std::move(value),c,size,wrap,clip});}
 std::string number(double value,int precision=2){std::ostringstream out;out<<std::fixed<<std::setprecision(precision)<<value;return out.str();}
+// Compact kilometres: below a million print the integer; beyond it use the
+// body-inspection scientific convention so a wide value never orphans its
+// unit onto a second wrapped line in the inspector panel.
+std::string compact_km(double kilometres){
+  if(kilometres<1'000'000.)return number(kilometres,0);
+  const auto exponent=static_cast<int>(std::floor(std::log10(kilometres)));
+  constexpr std::string_view sup[]={"⁰","¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹"};
+  std::string superscript;for(const char digit:std::to_string(exponent))superscript+=sup[digit-'0'];
+  return number(kilometres/std::pow(10.,exponent),3)+" × 10"+superscript;
+}
 std::string translate(const stellar::engine::LocalizationTable *locale,
                       std::string_view key, std::string_view fallback) {
   if (locale && locale->contains(key))
@@ -56,15 +66,21 @@ SystemSpatialViewport workspace_fit(const SystemSpatialSnapshot&spatial,int widt
   const auto layout=SystemWorkspaceLayout::for_viewport(width,height);const auto&world=layout.world_field;const auto inset=std::min(12.f,std::min(world.width,world.height)*.05f);const UiRect field{world.x+inset,world.y+inset,world.width-2.f*inset,world.height-2.f*inset};const auto center_x=field.x+field.width*.5f,center_y=field.y+field.height*.5f;
   const auto text_extent=[&](const std::string&value){const Text label{{},value,text,15};const auto measured=measure?measure(label):TextExtent{static_cast<int>(value.size()*7u),19};if(measured.width<0||measured.height<0)throw std::runtime_error("Renderer returned invalid system label bounds.");return measured;};
   std::map<int,TextExtent> label_extents;for(const auto&body:spatial.bodies)label_extents.emplace(body.body_id,text_extent(body.label));
-  const auto fit_center=[&](float scale)->std::optional<Point>{
+  const auto fit_center=[&](float scale,bool with_lanes)->std::optional<Point>{
     const SystemSpatialViewport view{center_x,center_y,scale};float minimum_x=field.x,maximum_x=field.x+field.width,minimum_y=field.y,maximum_y=field.y+field.height;
     const auto reserve=[&](UiRect bounds){const auto left=bounds.x-center_x,right=left+bounds.width,top=bounds.y-center_y,bottom=top+bounds.height;minimum_x=std::max(minimum_x,field.x-left);maximum_x=std::min(maximum_x,field.x+field.width-right);minimum_y=std::max(minimum_y,field.y-top);maximum_y=std::min(maximum_y,field.y+field.height-bottom);};
     const auto boundary=std::max(local_orbital_boundary_radius(spatial,view),star_screen_radius(scale)*1.75f);reserve({center_x-boundary,center_y-boundary,2.f*boundary,2.f*boundary});
     for(const auto&body:spatial.bodies){if(!view.is_body_visible(spatial,body))continue;const auto point=view.world_to_screen(body.offset_x,body.offset_y);const auto radius=view.body_radius(body)*planet_ring_extent(body.sol_texture_key.value_or(""))+4.f;reserve({point.x-radius,point.y-radius,2.f*radius,2.f*radius});const auto measured=label_extents.at(body.body_id);reserve({point.x-static_cast<float>(measured.width)*.5f,point.y+radius+5.f,static_cast<float>(measured.width),static_cast<float>(measured.height)});}
-    if(travel)for(const auto&geometry:layout_local_lanes(spatial,view,travel->lanes,lane_metrics))reserve(geometry.bounds);
+    if(travel&&with_lanes)for(const auto&geometry:layout_local_lanes(spatial,view,{},travel->lanes,lane_metrics))reserve(geometry.bounds);
     if(minimum_x>maximum_x||minimum_y>maximum_y)return std::nullopt;return Point{std::clamp(center_x,minimum_x,maximum_x),std::clamp(center_y,minimum_y,maximum_y)};
   };
-  float low=std::min(.001f,.0001f*std::min(field.width,field.height)/std::max(1.f,spatial.design_radius)),high=1.15f;for(int iteration=0;iteration<24;++iteration){const auto candidate=(low+high)*.5f;if(fit_center(candidate))low=candidate;else high=candidate;}const auto center=fit_center(low).value_or(Point{center_x,center_y});return {center.x,center.y,low};
+  const auto initial_low=std::min(.001f,.0001f*std::min(field.width,field.height)/std::max(1.f,spatial.design_radius));
+  const auto search=[&](bool with_lanes){float low=initial_low,high=1.15f;for(int iteration=0;iteration<24;++iteration){const auto candidate=(low+high)*.5f;if(fit_center(candidate,with_lanes))low=candidate;else high=candidate;}return std::pair{low,fit_center(low,with_lanes).value_or(Point{center_x,center_y})};};
+  // Lane arrows use fixed pixel offsets that a compact field cannot contain at
+  // any zoom; fit the chart alone in that case and let the field clamp pull
+  // the arrows inside world_field where input can still reach them.
+  auto fitted=search(true);if(!fit_center(fitted.first,true))fitted=search(false);
+  return {fitted.second.x,fitted.second.y,fitted.first};
 }
 double presentation_seconds(){return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();}
 } // namespace
@@ -173,7 +189,7 @@ const NativeSystemTravelSnapshot *NativeSystemWorkspace::travel_snapshot()const 
 std::size_t NativeSystemWorkspace::visible_body_count()const noexcept{if(!spatial_||!viewport_)return 0;return static_cast<std::size_t>(std::ranges::count_if(spatial_->bodies,[&](const auto&body){return viewport_->is_body_visible(*spatial_,body);}));}
 void NativeSystemWorkspace::resize(int width,int height){if(!snapshot_||!spatial_||!viewport_||width<=0||height<=0||width==width_&&height==height_)return;const auto old_fit=workspace_fit(*spatial_,width_,height_,text_measurer_,travel_,lane_metrics_);const auto next_fit=workspace_fit(*spatial_,width,height,text_measurer_,travel_,lane_metrics_);viewport_->center_x+=next_fit.center_x-old_fit.center_x;viewport_->center_y+=next_fit.center_y-old_fit.center_y;width_=width;height_=height;zoom_reference_scale_=next_fit.scale;viewport_->scale=std::max(viewport_->scale,zoom_reference_scale_*.05f);update_camera_tracking();}
 void NativeSystemWorkspace::reset_fit(int width,int height){tracked_body_id_.reset();small_body_focus_=false;if(!spatial_)return;width_=width;height_=height;viewport_=workspace_fit(*spatial_,width,height,text_measurer_,travel_,lane_metrics_);zoom_reference_scale_=viewport_->scale;pending_initial_travel_fit_=false;}
-std::vector<NativeLocalLaneGeometry> NativeSystemWorkspace::lane_geometry()const{if(!travel_||!spatial_||!viewport_)return {};return layout_local_lanes(*spatial_,*viewport_,travel_->lanes,lane_metrics_);}
+std::vector<NativeLocalLaneGeometry> NativeSystemWorkspace::lane_geometry()const{if(!travel_||!spatial_||!viewport_)return {};const auto world=SystemWorkspaceLayout::for_viewport(width_,height_).world_field;const auto inset=std::min(12.f,std::min(world.width,world.height)*.05f);const UiRect field{world.x+inset,world.y+inset,world.width-2.f*inset,world.height-2.f*inset};return layout_local_lanes(*spatial_,*viewport_,field,travel_->lanes,lane_metrics_);}
 std::vector<int> NativeSystemWorkspace::fleet_hits(Point point)const{if(!travel_||!spatial_||!viewport_)return {};return hit_local_fleets(travel_->fleets,*spatial_,*viewport_,point);}
 SystemWorkspaceCommand NativeSystemWorkspace::handle(const InputEvent&e,int width,int height){if(!visible())return {};pointer_=e.position;
 const bool resized=width!=width_||height!=height_;resize(width,height);
@@ -321,11 +337,11 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
   overlay_fill(out,panel,{6,18,33,242});overlay_stroke(out,panel,border);float y=panel.y+14;const auto add=[&](std::string value,Color color,int size=14,float step=20){const Text label{{panel.x+14,y},std::move(value),color,size,panel.width-28,panel};const auto measured=text_measurer_?text_measurer_(label):TextExtent{0,size+6};out.overlay.emplace_back(label);y+=std::max(step,static_cast<float>(measured.height)+4.f);};if(!selected_body())add(tr("SYSTEM_INSPECTOR","SYSTEM INSPECTOR"),text,18,31);const auto*fleet=selected_fleet();if(inspector_focus_!=InspectorFocus::body&&fleet){add(fleet->foreign_inspection?tr("SYSTEM_FLEET_DEV","DEVELOPER FLEET INSPECTION"):tr("SYSTEM_FLEET_OWNED","OWNED LOCAL FLEET"),muted,13,21);add(fleet->name,text,17,26);add(trf("SYSTEM_FLEET_STATE",{fleet_role(fleet->role),fleet->moving?tr("SYSTEM_STATE_MOVING","Moving"):fleet->held?tr("SYSTEM_STATE_HOLDING","Holding"):tr("SYSTEM_STATE_LOCAL","Local")},"{0}  {1}"),text,14,24);if(settlement_status_&&settlement_status_->fleet_id==fleet->fleet_id){add(settlement_status_->status,{102,232,164,255},13,21);if(settlement_status_->destination_body_id)add(trf("SYSTEM_ESTABLISHMENT",{number(settlement_status_->settlement_days_completed,1),number(settlement_status_->establishment_days,0)},"Establishment  {0} / {1} days"),text,13,20);}}else if(selected_body()){body_inspection_.render(out,panel,layout.focus_action.y);}else {
     if(snapshot_->stellar_object){const auto& p=*snapshot_->stellar_object;const auto& d=stellar::core::stellar_object_definition(p.type);
       add(d.name,text,16,26);
-      add(trf("SYSTEM_RADIUS",{number(p.radius_solar*695700.,0)},"Radius  {0} km"),text,13,20);
+      add(trf("SYSTEM_RADIUS",{compact_km(p.radius_solar*695700.)},"Radius  {0} km"),text,13,20);
       add(trf("SYSTEM_SURFACE_TEMP",{number(p.effective_temperature_kelvin,0)},"Surface  {0} K"),text,13,20);
       add(trf("SYSTEM_LUMINOSITY",{number(p.luminosity_solar,4)},"Luminosity  {0} x Sol"),text,13,20);
-      add(trf("SYSTEM_SAFE_APPROACH",{number(p.safe_approach_au*stellar::core::astronomical_unit_km,0)},"Safe approach  {0} km"),{241,182,98,255},13,20);
-      if(p.luminosity_solar>0)add(trf("SYSTEM_HZ",{number(p.inner_hz_au*stellar::core::astronomical_unit_km/1000000.,1),number(p.outer_hz_au*stellar::core::astronomical_unit_km/1000000.,1)},"Temperate zone  {0} - {1} million km"),muted,13,20);
+      add(trf("SYSTEM_SAFE_APPROACH",{compact_km(p.safe_approach_au*stellar::core::astronomical_unit_km)},"Safe approach  {0} km"),{241,182,98,255},13,20);
+      if(p.luminosity_solar>0)add(trf("SYSTEM_HZ",{number(p.inner_hz_au*stellar::core::astronomical_unit_km/1000000.,1),number(p.outer_hz_au*stellar::core::astronomical_unit_km/1000000.,1)},"Temperate zone  {0} - {1} M km"),muted,13,20);
       if(p.jet_half_angle_radians>0)add(tr("SYSTEM_JETS_DANGER","DANGER: directional high-energy jets"),{241,139,98,255},13,20);
       if(p.habitability_modifier<.2)add(tr("SYSTEM_HABITABILITY_LIMIT","Severe radiation or short stellar lifetime limits habitability."),muted,13,20);
     }
@@ -343,7 +359,21 @@ if(colony_body_id_&&selected_body_id_==colony_body_id_){overlay_fill(out,layout.
 overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});
 overlay_stroke(out,layout.colony_action,{102,232,164,255});
 overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,tr("SYSTEM_VIEW_SHIPYARD","VIEW SHIPYARD"),text,14,layout.colony_action.width-20,layout.colony_action);
-}else if(!notice_.empty()){const UiRect notice_bounds=selected_body()?layout.colony_action:UiRect{panel.x+12,panel.y+panel.height-88,panel.width-24,74};overlay_fill(out,notice_bounds,{35,25,16,235});overlay_stroke(out,notice_bounds,{139,92,42,255});overlay_text(out,notice_bounds.x+8,notice_bounds.y+8,notice_,{245,183,93,250},13,notice_bounds.width-16,notice_bounds);}}
+}else if(!notice_.empty()){const UiRect notice_base=selected_body()?layout.colony_action:UiRect{panel.x+12,panel.y+panel.height-88,panel.width-24,74};
+// Order results wrap to several lines — grow the banner upward to fit the
+// measured text rather than clipping mid-line.
+float notice_height=notice_base.height;
+if(text_measurer_){const auto measured=text_measurer_(Text{{},notice_,{245,183,93,250},13,notice_base.width-16.f});if(measured.height>0)notice_height=std::max(notice_base.height,static_cast<float>(measured.height)+18.f);}
+notice_height=std::min(notice_height,notice_base.y+notice_base.height-(panel.y+8.f));
+// The command HUD's context plate owns the bottom-center strip — lift the
+// banner above it where the inspector's x-range reaches under the plate.
+auto notice_bottom=notice_base.y+notice_base.height;
+const auto plate=CommandHudLayout::make(width_,height_).context;
+if(notice_base.x<plate.x+plate.width&&notice_base.x+notice_base.width>plate.x)
+  notice_bottom=std::min(notice_bottom,plate.y-4.f);
+const auto notice_top=std::max(panel.y+8.f,notice_bottom-notice_height);
+const UiRect notice_bounds{notice_base.x,notice_top,notice_base.width,notice_bottom-notice_top};
+overlay_fill(out,notice_bounds,{35,25,16,235});overlay_stroke(out,notice_bounds,{139,92,42,255});overlay_text(out,notice_bounds.x+8,notice_bounds.y+8,notice_,{245,183,93,250},13,notice_bounds.width-16,notice_bounds);}}
 void NativeSystemWorkspace::sync_body_inspection(){
   if(!snapshot_||!selected_body_id_){preparation_.reset();preparation_pressed_=false;body_inspection_.clear();return;}
   auto inspection=build_body_inspection(*snapshot_,*selected_body_id_,locale_);

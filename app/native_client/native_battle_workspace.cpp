@@ -1,5 +1,7 @@
 #include "native_battle_workspace.hpp"
 
+#include "native_ui_theme.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -301,8 +303,8 @@ BattleWorkspaceLayout BattleWorkspaceLayout::for_viewport(const int width,
   BattleWorkspaceLayout layout;
   layout.scale = scale;
   layout.title_font_pixels = static_cast<int>(17.f * scale);
-  layout.body_font_pixels = static_cast<int>(14.f * scale);
-  layout.small_font_pixels = static_cast<int>(11.f * scale);
+  layout.body_font_pixels = stellar::native_ui::type::compact_body(scale);
+  layout.small_font_pixels = stellar::native_ui::type::compact_small(scale);
   layout.surface = {0.f, 0.f, w, h};
   layout.top_row = {margin, margin, w - margin * 2.f, 40.f * scale};
   auto x = layout.top_row.x;
@@ -1349,18 +1351,43 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
          text_secondary, layout.body_font_pixels);
   }
 
-  // Recent combat events feed (observer-filtered snapshot tail).
+  // Recent combat events feed (observer-filtered snapshot tail). Severity is
+  // derived from the already-exposed actor/target ids: losses to the observer
+  // read danger, losses inflicted read success, disruption reads caution.
   {
+    const auto event_color=[&](const auto &event){
+      if(!event.details_known)return unknown;
+      using EventType=stellar::core::MassiveCombatEventType;
+      const bool own_actor=event.actor_civilization_id==observer_civilization_id_;
+      const bool own_target=event.target_civilization_id==observer_civilization_id_;
+      switch(event.type){
+        case EventType::Damage:case EventType::FormationDestroyed:
+          return own_target?danger:own_actor?success:caution;
+        case EventType::MissileIntercepted:case EventType::Escaped:
+        case EventType::Surrendered:case EventType::WarpBlocked:
+          return caution;
+        case EventType::WarpSpooling:
+          return own_actor?caution:unknown;
+        default:return text_secondary;
+      }
+    };
     int lines = 0;
     for (auto it = snapshot_->events.rbegin();
          it != snapshot_->events.rend() && lines < 4; ++it, ++lines) {
       const auto row_height = 42.f * layout.scale;
       const auto y = layout.event_feed.y + static_cast<float>(lines) * row_height;
-      clipped_text(out, {layout.event_feed.x, y},
+      // Translucent card + severity accent bar keep event text legible over
+      // the starfield — same severity vocabulary as notification cards.
+      const UiRect card{layout.event_feed.x, y, layout.event_feed.width,
+                        row_height - 4.f * layout.scale};
+      fill(out, card, {7, 19, 31, 170});
+      fill(out, {card.x, card.y, 2.5f * layout.scale, card.height},
+           event_color(*it));
+      clipped_text(out, {card.x + 7.f * layout.scale, y},
                    it->details_known ? it->message : tr("BATTLE_INTERCEPT","Signal intercept."),
-                   it->details_known ? text_secondary : unknown,
-                   layout.small_font_pixels, layout.event_feed.width,
-                   {layout.event_feed.x, y, layout.event_feed.width, row_height - 4.f * layout.scale});
+                   event_color(*it),
+                   layout.small_font_pixels,
+                   card.width - 7.f * layout.scale, card);
     }
   }
 
@@ -1424,8 +1451,8 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
   if (focus_ >= 0) {
     const auto items = focusables(layout);
     if (focus_ < static_cast<int>(items.size()))
-      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
-             {160, 210, 255, 255});
+      stellar::native_ui::focus_ring(
+          out, items[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 } // namespace stellar::native_battle_ui

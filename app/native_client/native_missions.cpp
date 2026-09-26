@@ -1,4 +1,7 @@
 #include "native_missions.hpp"
+#include "native_ui_layout.hpp"
+#include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 #include <algorithm>
 #include <cmath>
 #include <ranges>
@@ -834,9 +837,14 @@ MissionLayout mission_layout_for(const NativeMissionBoard &board,
   layout.heading_font_pixels = std::max(14, static_cast<int>(18.f * scale));
   layout.body_font_pixels = std::max(10, static_cast<int>(13.f * scale));
   layout.small_font_pixels = std::max(9, static_cast<int>(11.f * scale));
-  layout.panel = {std::max(112.f * scale, sw - 470.f * scale), 78.f * scale,
+  // Anchor below the shared workspace top so the header never slips under
+  // the navigation bar at small viewports.
+  const auto panel_top =
+      std::max(78.f * scale,
+               native_map::native_workspace_top(width, height));
+  layout.panel = {std::max(112.f * scale, sw - 470.f * scale), panel_top,
                   std::min(450.f * scale, sw - 128.f * scale),
-                  std::min(560.f * scale, sh - 210.f * scale)};
+                  std::min(560.f * scale, sh - panel_top - 24.f * scale)};
   const auto pad = 12.f * scale;
   layout.header = {layout.panel.x + pad, layout.panel.y + pad,
                    layout.panel.width - pad * 2.f, 30.f * scale};
@@ -1023,6 +1031,8 @@ MissionViewCommand NativeMissionView::handle(
   MissionViewCommand command;
   if (!visible_)
     return command;
+  if (event.type == native_map::InputEventType::PointerMove)
+    pointer_ = event.position;
   const auto selection =
       colony_site_selection(fleets, fleet_index_, site_index_, locale_);
   const auto layout =
@@ -1275,68 +1285,42 @@ void NativeMissionView::render(
       mission_layout_for(board, selection, colonies.size(), width, height,
                          show_sites_, scroll_.scroll_offset);
   const auto scale = layout.scale;
-  const auto muted = Color{122, 154, 192, 255};
-  const auto body = Color{190, 212, 236, 255};
-  const auto accent = Color{154, 225, 255, 255};
-  const auto gold = Color{232, 199, 102, 255};
-  out.overlay.emplace_back(FilledRectangle{layout.panel, {10, 17, 31, 242}});
-  out.overlay.emplace_back(
-      StrokedRectangle{layout.panel, {72, 101, 145, 255}});
+  namespace theme = stellar::native_ui;
+  const auto muted = theme::color::text_muted;
+  const auto body = theme::color::text_primary;
+  const auto accent = theme::color::selected;
+  const auto gold = theme::color::economy;
+  native_ui_style::menu_panel(out, layout.panel);
   out.overlay.emplace_back(Text{{layout.header.x, layout.header.y},
                                 mt(locale_, "MISSIONS_TITLE",
                                    "MISSIONS & SETTLEMENT"),
-                                Color{233, 242, 252, 255},
+                                theme::color::text_primary,
                                 layout.heading_font_pixels});
-  out.overlay.emplace_back(FilledRectangle{layout.close_button,
-                                           {30, 41, 62, 220}});
-  out.overlay.emplace_back(
-      StrokedRectangle{layout.close_button, {96, 125, 168, 255}});
-  out.overlay.emplace_back(Text{
-      {layout.close_button.x + 8.f * scale,
-       layout.close_button.y + 4.f * scale},
-      "x", Color{212, 226, 244, 255}, layout.body_font_pixels});
-  const auto tab_fill = [](bool active) {
-    return active ? Color{24, 76, 71, 255} : Color{13, 51, 52, 255};
-  };
-  out.overlay.emplace_back(
-      FilledRectangle{layout.missions_tab, tab_fill(!show_sites_)});
-  out.overlay.emplace_back(
-      StrokedRectangle{layout.missions_tab, {96, 125, 168, 255}});
-  out.overlay.emplace_back(Text{{layout.missions_tab.x + 8.f * scale,
-                                 layout.missions_tab.y + 5.f * scale},
-                                mt(locale_, "MISSIONS_TAB_MISSIONS",
-                                   "Missions"),
-                                body, layout.body_font_pixels});
-  out.overlay.emplace_back(
-      FilledRectangle{layout.sites_tab, tab_fill(show_sites_)});
-  out.overlay.emplace_back(
-      StrokedRectangle{layout.sites_tab, {96, 125, 168, 255}});
-  out.overlay.emplace_back(Text{{layout.sites_tab.x + 8.f * scale,
-                                 layout.sites_tab.y + 5.f * scale},
-                                mt(locale_, "MISSIONS_TAB_SITES",
-                                   "Colony Sites"),
-                                body, layout.body_font_pixels});
+  theme::button(out, layout.close_button, "X", pointer_,
+                layout.body_font_pixels);
+  theme::tab(out, layout.missions_tab,
+             mt(locale_, "MISSIONS_TAB_MISSIONS", "Missions"), pointer_,
+             layout.body_font_pixels, !show_sites_);
+  theme::tab(out, layout.sites_tab,
+             mt(locale_, "MISSIONS_TAB_SITES", "Colony Sites"), pointer_,
+             layout.body_font_pixels, show_sites_);
   const auto draw_focus_ring = [&] {
     if (focus_ < 0) return;
     const auto targets =
         mission_focus_targets(layout, selection, show_sites_, colonies, locale_);
     if (focus_ < static_cast<int>(targets.size()))
-      out.overlay.emplace_back(
-          StrokedRectangle{targets[static_cast<std::size_t>(focus_)].bounds,
-                           {160, 210, 255, 255}});
+      theme::focus_ring(out,
+                        targets[static_cast<std::size_t>(focus_)].bounds);
   };
 
   if (!show_sites_) {
     if (board.missions.empty()) {
-      out.overlay.emplace_back(Text{{layout.empty_hint.x, layout.empty_hint.y},
-                                    mt(locale_, "MISSIONS_EMPTY",
-                                       "No active mission fleets."),
-                                    body, layout.body_font_pixels});
-      out.overlay.emplace_back(Text{
-          {layout.empty_hint.x, layout.empty_hint.y + 18.f * scale},
+      theme::empty_state(
+          out, layout.list_viewport,
+          mt(locale_, "MISSIONS_EMPTY", "No active mission fleets."),
           mt(locale_, "MISSIONS_EMPTY_HINT",
              "Commission scout, science, or colony ships to begin."),
-          muted, layout.small_font_pixels});
+          layout.body_font_pixels);
       draw_focus_ring();
       return;
     }
@@ -1346,8 +1330,10 @@ void NativeMissionView::render(
       const auto &rect = layout.cards[i];
       const auto visible = clip_rect(rect, layout.list_viewport);
       if (!visible) continue;
-      out.overlay.emplace_back(FilledRectangle{*visible, {17, 27, 47, 240}});
-      out.overlay.emplace_back(StrokedRectangle{*visible, {59, 83, 118, 255}});
+      out.overlay.emplace_back(
+          FilledRectangle{*visible, theme::color::surface});
+      out.overlay.emplace_back(
+          StrokedRectangle{*visible, theme::color::keyline});
       const auto pad = 10.f * scale;
       auto line = rect.y + 8.f * scale;
       out.overlay.emplace_back(Text{{rect.x + pad, line}, card.fleet_name,
@@ -1398,20 +1384,24 @@ void NativeMissionView::render(
   }
 
   // Colony Sites tab.
-  const auto nav_fill = Color{13, 51, 52, 255};
   const auto nav = [&](const UiRect &rect, std::string_view label,
                        bool enabled,
                        std::optional<UiRect> clip = std::nullopt) {
     const auto band =
         clip ? clip_rect(rect, *clip) : std::optional<UiRect>{rect};
     if (!band) return;
-    out.overlay.emplace_back(FilledRectangle{*band, nav_fill});
+    const bool hovered = enabled && rect.contains(pointer_);
+    out.overlay.emplace_back(FilledRectangle{
+        *band, !enabled ? theme::color::surface
+                        : hovered ? theme::color::surface_hover
+                                  : theme::color::surface_secondary});
     out.overlay.emplace_back(
-        StrokedRectangle{*band, enabled ? Color{96, 125, 168, 255}
-                                        : Color{45, 60, 82, 255}});
+        StrokedRectangle{*band, enabled ? theme::color::keyline_strong
+                                        : theme::color::keyline});
     out.overlay.emplace_back(
         Text{{rect.x + 8.f * scale, rect.y + 5.f * scale}, std::string(label),
-             enabled ? body : muted, layout.small_font_pixels, 0.f, clip});
+             enabled ? body : theme::color::disabled,
+             layout.small_font_pixels, 0.f, clip});
   };
   nav(layout.previous_fleet, mt(locale_, "MISSIONS_BTN_PREV_SHIP", "< Ship"),
       selection.fleet_index > 0);
@@ -1425,22 +1415,13 @@ void NativeMissionView::render(
                                 selection.details, body,
                                 layout.small_font_pixels,
                                 layout.details.width});
-  out.overlay.emplace_back(
-      FilledRectangle{layout.select_ship,
-                      selection.fleet_id ? Color{24, 76, 71, 255}
-                                         : Color{24, 32, 46, 255}});
-  out.overlay.emplace_back(
-      StrokedRectangle{layout.select_ship,
-                       selection.fleet_id ? Color{102, 232, 164, 255}
-                                          : Color{45, 60, 82, 255}});
-  out.overlay.emplace_back(
-      Text{{layout.select_ship.x + 10.f * scale,
-            layout.select_ship.y + 8.f * scale},
-           selection.fleet_id
-               ? mt(locale_, "MISSIONS_SELECT_SHIP", "SELECT SHIP ON MAP")
-               : mt(locale_, "MISSIONS_NO_SHIP", "NO COLONY SHIP"),
-           selection.fleet_id ? Color{233, 242, 252, 255} : muted,
-           layout.body_font_pixels});
+  theme::button(out, layout.select_ship,
+                selection.fleet_id
+                    ? mt(locale_, "MISSIONS_SELECT_SHIP", "SELECT SHIP ON MAP")
+                    : mt(locale_, "MISSIONS_NO_SHIP", "NO COLONY SHIP"),
+                pointer_, layout.body_font_pixels, theme::Tone::Success,
+                selection.fleet_id.has_value(),
+                selection.fleet_id.has_value());
   if (!selection.status.empty() && selection.site_count > 0)
     out.overlay.emplace_back(
         Text{{layout.action_status.x, layout.action_status.y},
@@ -1460,29 +1441,23 @@ void NativeMissionView::render(
     const auto &rect = layout.colony_rows[i];
     const auto visible = clip_rect(rect, layout.list_viewport);
     if (!visible) continue;
-    out.overlay.emplace_back(FilledRectangle{*visible, {17, 27, 47, 240}});
-    out.overlay.emplace_back(StrokedRectangle{*visible, {59, 83, 118, 255}});
+    out.overlay.emplace_back(
+        FilledRectangle{*visible, theme::color::surface});
+    out.overlay.emplace_back(
+        StrokedRectangle{*visible, theme::color::keyline});
     out.overlay.emplace_back(
         Text{{rect.x + 10.f * scale, rect.y + 6.f * scale},
              row.name + "  /  " + row.planet_name + ", " + row.system_name,
-             Color{233, 242, 252, 255}, layout.body_font_pixels, 0.f,
+             theme::color::text_primary, layout.body_font_pixels, 0.f,
              layout.list_viewport});
     out.overlay.emplace_back(
         Text{{rect.x + 10.f * scale, rect.y + 24.f * scale},
              fixed(row.population_millions, 0, 1) + "M population",
              gold, layout.small_font_pixels, 0.f, layout.list_viewport});
     const auto &button = layout.colony_view_buttons[i];
-    const auto button_visible = clip_rect(button, layout.list_viewport);
-    if (button_visible) {
-      out.overlay.emplace_back(
-          FilledRectangle{*button_visible, {13, 51, 52, 255}});
-      out.overlay.emplace_back(
-          StrokedRectangle{*button_visible, {96, 125, 168, 255}});
-      out.overlay.emplace_back(
-          Text{{button.x + 10.f * scale, button.y + 6.f * scale},
-               mt(locale_, "MISSIONS_VIEW", "View"), body,
-               layout.small_font_pixels, 0.f, layout.list_viewport});
-    }
+    if (clip_rect(button, layout.list_viewport))
+      nav(button, mt(locale_, "MISSIONS_VIEW", "View"), true,
+          layout.list_viewport);
     nav(layout.colony_land_buttons[i], mt(locale_, "MISSIONS_LAND", "Land"),
         row.can_land, layout.list_viewport);
     if (row.is_resource_outpost)

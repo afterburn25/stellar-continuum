@@ -228,12 +228,18 @@ NativeEconomyView build_economy_view(
     view.player_civilization_id = player;
     view.message = tr_at(locale, "ECONOMY_VIEW_READY",
         "Live civilian revenue and operating commitments.");
-    view.cards = {{{tr_at(locale, "ECONOMY_CARD_RESERVES", "RESERVES"), amount(currency, context.economy.credits)},
-                   {tr_at(locale, "ECONOMY_CARD_NET", "NET / DAY"), rate(currency, flow.net_credits_per_day), flow.net_credits_per_day < 0.},
-                   {tr_at(locale, "ECONOMY_CARD_INCOME", "INCOME / DAY"), rate(currency, flow.gross_income_per_day)},
-                   {tr_at(locale, "ECONOMY_CARD_COSTS", "COSTS / DAY"), rate(currency, -flow.operating_costs_per_day), true},
-                   {tr_at(locale, "ECONOMY_CARD_MATERIALS", "MATERIALS IN STORAGE"), grouped(context.economy.industry) + " / " + grouped(capacity)},
-                   {tr_at(locale, "ECONOMY_CARD_RATE", "MATERIALS / DAY"), material_rate(context.economy.last_industry_per_second)}}};
+    view.cards = {{{tr_at(locale, "ECONOMY_CARD_RESERVES", "RESERVES"), amount(currency, context.economy.credits),
+                    tr_at(locale, "ECONOMY_TIP_RESERVES", "Credits in the treasury. Construction and ship orders draw on reserves.")},
+                   {tr_at(locale, "ECONOMY_CARD_NET", "NET / DAY"), rate(currency, flow.net_credits_per_day),
+                    tr_at(locale, "ECONOMY_TIP_NET", "Income minus operating costs per day. Negative values drain reserves."), flow.net_credits_per_day < 0.},
+                   {tr_at(locale, "ECONOMY_CARD_INCOME", "INCOME / DAY"), rate(currency, flow.gross_income_per_day),
+                    tr_at(locale, "ECONOMY_TIP_INCOME", "Gross civilian revenue collected each day.")},
+                   {tr_at(locale, "ECONOMY_CARD_COSTS", "COSTS / DAY"), rate(currency, -flow.operating_costs_per_day),
+                    tr_at(locale, "ECONOMY_TIP_COSTS", "Daily operating commitments: research, operations and upkeep."), true},
+                   {tr_at(locale, "ECONOMY_CARD_MATERIALS", "MATERIALS IN STORAGE"), grouped(context.economy.industry) + " / " + grouped(capacity),
+                    tr_at(locale, "ECONOMY_TIP_MATERIALS", "Stockpiled industrial materials against storage capacity.")},
+                   {tr_at(locale, "ECONOMY_CARD_RATE", "MATERIALS / DAY"), material_rate(context.economy.last_industry_per_second),
+                    tr_at(locale, "ECONOMY_TIP_RATE", "Daily materials produced by the current industry allocation.")}}};
     const auto health = assess_treasury(context.economy.credits, flow.net_credits_per_day,
                                         context.economy.operating_arrears);
     view.treasury_healthy = health.state == TreasuryHealthState::Surplus;

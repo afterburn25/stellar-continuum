@@ -3,6 +3,7 @@
 
 #include "native_ui_layout.hpp"
 #include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -15,8 +16,10 @@
 namespace stellar::native_colony_roster {
 using namespace stellar::native_map;
 namespace {
-constexpr Color ink{228, 240, 250, 255}, muted{161, 187, 210, 255},
-    cyan{108, 218, 234, 255}, amber{255, 194, 106, 255};
+namespace theme = stellar::native_ui;
+constexpr Color ink = theme::color::text_primary,
+    muted = theme::color::text_secondary,
+    cyan = theme::color::selected, amber = theme::color::caution;
 
 View unavailable(std::uint64_t generation, int player, std::string message) {
   return {generation, player, {}, std::move(message), false};
@@ -670,10 +673,11 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
            : tr("ROSTER_TITLE_OWNED", "OWNED COLONIES"),
        std::max(15, static_cast<int>(23.f * layout.scale)),
        ink, p);
-  out.overlay.emplace_back(FilledRectangle{layout.search, {3, 13, 22, 245}});
+  out.overlay.emplace_back(
+      FilledRectangle{layout.search, theme::color::surface_secondary});
   out.overlay.emplace_back(StrokedRectangle{
       layout.search,
-      search_focused_ ? cyan : Color{54, 111, 140, 255}});
+      search_focused_ ? theme::color::focus : theme::color::keyline_strong});
   text(out,
        {layout.search.x + 8.f * layout.scale, layout.search.y + 5.f * layout.scale,
         layout.search.width - 16.f * layout.scale, 20.f * layout.scale},
@@ -681,20 +685,9 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
            ? tr("ROSTER_SEARCH", "Search colonies…")
            : search_,
        font, search_.empty() ? muted : ink, layout.search);
-  stellar::native_ui_style::panel(out, layout.refresh,
-                                  layout.refresh.contains(pointer_), false);
-  text(out,
-       {layout.refresh.x + 8.f * layout.scale,
-        layout.refresh.y + 5.f * layout.scale,
-        layout.refresh.width - 16.f * layout.scale, 20.f * layout.scale},
-       tr("ROSTER_REFRESH", "REFRESH"), font, cyan, layout.refresh);
-  stellar::native_ui_style::panel(out, layout.close,
-                                  layout.close.contains(pointer_), false);
-  text(out,
-       {layout.close.x + 8.f * layout.scale,
-        layout.close.y + 4.f * layout.scale, 16.f * layout.scale,
-        21.f * layout.scale},
-       "X", font, ink, layout.close);
+  theme::button(out, layout.refresh, tr("ROSTER_REFRESH", "REFRESH"),
+                pointer_, font);
+  theme::button(out, layout.close, "X", pointer_, font);
   text(out,
        {p.x + 16.f * layout.scale, p.y + 46.f * layout.scale,
         p.width - 32.f * layout.scale, 22.f * layout.scale},
@@ -749,10 +742,12 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
     const auto &row =
         view_.rows[static_cast<std::size_t>(display_order_[i])];
     const bool hover = layout.list.contains(pointer_) && box.contains(pointer_);
-    out.overlay.emplace_back(FilledRectangle{
-        visible, hover ? Color{16, 57, 76, 248} : Color{11, 29, 46, 246}});
+    out.overlay.emplace_back(
+        FilledRectangle{visible, hover ? theme::color::surface_hover
+                                       : theme::color::surface_secondary});
     if (hover)
-      out.overlay.emplace_back(StrokedRectangle{visible, {82, 155, 194, 230}});
+      out.overlay.emplace_back(
+          StrokedRectangle{visible, theme::color::keyline_strong});
     const Point glyph{box.x + 15.f * layout.scale, box.y + 17.f * layout.scale};
     const float radius = 5.f * layout.scale;
     if (glyph.y - radius >= layout.list.y &&
@@ -809,34 +804,29 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
     }
   }
   if (view_.rows.empty())
-    text(out,
-         {layout.list.x + 8.f * layout.scale,
-          layout.list.y + 12.f * layout.scale,
-          layout.list.width - 16.f * layout.scale, 40.f * layout.scale},
-         view_.available ? tr("ROSTER_LIST_EMPTY", "No owned colonies.")
-                         : tr("ROSTER_LIST_UNAVAILABLE", "Roster unavailable."),
-         font,
-         muted, layout.list);
+    theme::empty_state(
+        out, layout.list,
+        view_.available ? tr("ROSTER_LIST_EMPTY", "No owned colonies.")
+                        : tr("ROSTER_LIST_UNAVAILABLE", "Roster unavailable."),
+        view_.available
+            ? tr("ROSTER_LIST_EMPTY_HINT",
+                 "Settle a surveyed world — colony ships appear under Missions.")
+            : std::string{},
+        font);
   if (maximum > 0) {
-    const float thumb =
-        std::max(24.f * layout.scale, layout.list.height * layout.list.height /
-                                          (maximum + layout.list.height));
-    const float y =
-        layout.list.y + (layout.list.height - thumb) * list_.scroll_offset / maximum;
-    out.overlay.emplace_back(
-        FilledRectangle{{layout.list.x + layout.list.width + 5.f * layout.scale,
-                         layout.list.y, 3.f * layout.scale, layout.list.height},
-                        {29, 61, 78, 255}});
-    out.overlay.emplace_back(
-        FilledRectangle{{layout.list.x + layout.list.width + 5.f * layout.scale,
-                         y, 3.f * layout.scale, thumb},
-                        cyan});
+    const stellar::engine::ScrollView proxy{
+        maximum + layout.list.height, layout.list.height,
+        list_.scroll_offset};
+    theme::scrollbar(out,
+                     {layout.list.x + layout.list.width + 5.f * layout.scale,
+                      layout.list.y, 3.f * layout.scale, layout.list.height},
+                     proxy, 24.f * layout.scale);
   }
   if (focus_ >= 0) {
     const auto rects = focusables(layout);
     if (focus_ < static_cast<int>(rects.size()))
-      out.overlay.emplace_back(StrokedRectangle{
-          rects[static_cast<std::size_t>(focus_)].bounds, cyan});
+      theme::focus_ring(out,
+                        rects[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 } // namespace stellar::native_colony_roster

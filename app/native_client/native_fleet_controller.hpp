@@ -112,6 +112,13 @@ struct NativeOwnFleet {
   std::optional<NativeScoutReconnaissanceStatus> reconnaissance;
   std::optional<NativeScienceSurveyStatus> science_survey;
   std::string recovery_message;
+  // Composition the detail block surfaces — resolved design name, live
+  // payload, and the vessel's structural condition after combat.
+  std::string design_name;
+  double cargo_materials{},cargo_material_capacity{};
+  double embarked_population_millions{};
+  bool has_vessel_state{};
+  float hull_integrity{1.f};
   bool foreign_inspection{};
   int owner_civilization_id{};
   std::string owner_name;

@@ -35,24 +35,24 @@ convention and lower priority — classify during the audit):
 
 | # | Screen / surface | Status | Severity found | Notes |
 |---|---|---|---|---|
-| 1 | Startup / main menu / new game / galaxy selection | ☐ | | |
-| 2 | Galaxy map (all zoom bands) | ☐ | | highest-priority visual screen |
-| 3 | System view | ☐ | | |
-| 4 | Planet view / colony command center | ☐ | | |
-| 5 | Economy workspace | ☐ | | |
-| 6 | Logistics workspace | ☐ | | |
-| 7 | Research workspace (adaptive research) | ☐ | | |
-| 8 | Diplomacy | ☐ | | observer-safe data only |
-| 9 | Fleets / battle groups | ☐ | | |
-| 10 | Battle presentation | ☐ | | |
-| 11 | Shipyard / construction queues | ☐ | | |
-| 12 | Missions | ☐ | | newly live; keep scrolling/focus |
-| 13 | Notifications | ☐ | | |
-| 14 | Chronicle | ☐ | | privacy filtering preserved |
-| 15 | Controlled assets navigator | ☐ | | reference surface — search/collapse/reveal already polished |
-| 16 | Settings (hub, general, audio, video, voice, controls) | ☐ | | |
-| 17 | Pause menu / session chrome | ☐ | | |
-| 18 | Developer surfaces (diagnostics, indices, giant panel) | ☐ | | classify; dev-only by convention |
+| 1 | Startup / main menu / new game / galaxy selection | ☑ | LOW | `native_startup_workspace`, `native_new_game_workspace`, `native_startup_session`, `native_startup_entry`. Own palette + helpers; loading tips localized; seeded-art cover. Consistent enough to defer. |
+| 2 | Galaxy map (all zoom bands) | ☑ | HIGH | Zoom-gated labels (>2× relative zoom), collision-aware label layout with HUD obstacles, compact markers >10k systems, territory labels at overview blend, fleet route effects + preview, phenomena inspect — all already present. Gaps: **no map legend** (star-class palette, fleet marker, lane, territory color, route-preview green/amber are unexplained), no zoom-band indicator, no strategic overlay toggles. Highest-priority visual screen. |
+| 3 | System view | ☑ | MEDIUM | `native_system_workspace` + `native_system_view`: bodies, orbits, small bodies, lanes with metrics, travel snapshot, shipyard marker, settlement prep, body inspection panel, small-body AT ring. Rich; mainly needs visual polish review via captures. |
+| 4 | Planet view / colony command center | ☑ | HIGH | `NativePlanetaryScreen` inside `native_colony_workspace`: globe + layers, facts column, alert strip, 5 action buttons, 4 tabs, slots grid, per-site management, queue, confirmation modals, full hit-registry AT ring. Gaps: no at-a-glance vitals (population/stability/power/food/employment scattered across a scrollable fact list + two tabs); alert strip is bare text tokens ("POWER DEFICIT.") with no magnitudes or per-facility impact; economy tab is dense wrapped text. Phase 8 "major problems obvious" unmet. |
+| 5 | Economy workspace | ☑ | HIGH | `native_economy_workspace`: flat scrollable row list — 2×3 card tiles, treasury health, 3 industry-priority buttons, income/cost rows, guidance. Own palette/helpers; section headings render as plain rows; no grouping chrome, no "what changed/why/where" affordance, no shortage/stockpile breakdown beyond rows the view emits. |
+| 6 | Logistics workspace | ☑ | HIGH | `native_logistics_workspace` (`SupplyWorkspace`): home-system scope only — 4 metric tiles (available/demand/delivered/shortfall) + per-node table (location/status/offered/demand/delivered). `corridor_count` is a subtitle number; no route list, no origin→destination, no congestion/transit, no navigation to affected colony/system. Needs a view-model extension before richer presentation is possible (authoritative scope is `HomeSystemLogisticsNetwork`). |
+| 7 | Research workspace (adaptive research) | ☑ | MEDIUM | `native_research_workspace`: 6 modes (Guided/Tree/Recent/Favorites/Completed/Queue), search, filter, sort, inspector, bookmarks, dropdowns, why-explanations, per-mode AT focus. Deep; Phase 11 largely satisfied by Guided mode. Audit residual: card density/readability at small scales. |
+| 8 | Diplomacy | ☑ | MEDIUM | `native_diplomacy_workspace`: contact list + stage + meters + action row + 5 tabs (agreements/proposals/history/intelligence/overview), negotiation modal, FocusSystem navigation, contact filter. Strong; verify discoverability of the contact-filter control and tab labels via captures. |
+| 9 | Fleets / battle groups | ☑ | HIGH | `native_fleet_workspace` outliner + detail + orders (hold/defend/retreat), locate, engage, route preview, recovery confirm, ship-art rows, empire-overview detail when nothing selected. No battle-group layer in `NativeOwnFleet` — fleets are flat rows; per-fleet ships/strength breakdown not surfaced. ~~Flat list will not scale to many fleets; no grouping by role/location.~~ **Shipped:** the outliner renders status-grouped rows (in combat → in transit → on mission → stationed, localized headers) and Controlled Assets sorts the FLEETS section urgent-first; battle-group/per-ship breakdown remains open. |
+| 10 | Battle presentation | ☑ | MEDIUM | `native_battle_workspace` + `native_battle_art`/`native_battle_sprites`: tactical field, ship targets, environment backdrop. Needs visual capture review for hierarchy (forces summary vs field). |
+| 11 | Shipyard / construction queues | ☑ | MEDIUM | `native_shipyard_workspace`, `native_construction_workspace` + controllers: queues exist with progress; verify blocked-reason surfacing and unavailable-item treatment in captures. |
+| 12 | Missions | ☑ | LOW | `native_missions` (`NativeMissionView`): missions/sites tabs, cards, fleet pagers, land/collect, FocusFleet/OpenColony routing, focus ring over actionable controls only. Newly live — polish pass, keep scroll/focus contract. |
+| 13 | Notifications | ☑ | MEDIUM | `native_notifications`: bounded feed (32), category/date/message, VIEW SYSTEM + diplomatic-contact actions, unread badge, chronicle hand-off, scroll. Gaps: no severity iconography or grouping; transient feed vs retained feed is subtle. |
+| 14 | Chronicle | ☑ | LOW | `native_chronicle`: observer-safe `HistoryQuery` projection, domain filter, significance floor, actor filter, time-window paging, tag chips, header search, system/DIP navigation. Reference-quality surface. |
+| 15 | Controlled assets navigator | ☑ | LOW | `native_controlled_assets`: TreeModel categories, search, persisted collapse prefs, manage actions, tooltips, full UIA incl. `focused_expanded`. Reference surface — reuse its patterns. |
+| 16 | Settings (hub, general, audio, video, voice, controls) | ☑ | LOW | `native_settings_hub` + per-domain settings: controls view has full rebind UI (capture/conflict-steal/chords/persist). Audit residual: visual consistency with workspace chrome. |
+| 17 | Pause menu / session chrome | ☑ | LOW | `NativeUiLayout` menu panel + brand/nav bar + context plate (`native_command_hud`). Consistent; context plate is a strong "where am I" anchor. |
+| 18 | Developer surfaces (diagnostics, indices, giant panel) | ☑ | LOW | Dev-only by convention; English-only allowed. No player-facing requirements. |
 
 ## Design system inventory (Phase 2)
 
@@ -68,19 +68,39 @@ tabs · action/icon buttons · toggles · inputs/search · list/table rows · se
 hovered / disabled / warning / critical / positive states · tooltips · dialogs /
 confirmations · status badges · progress meters.
 
-## Known starting hypotheses (verify with live captures — Phase 30)
+## Audit findings (verified against source — 2026-09-24)
 
-- No global quick-find exists; search is per-surface only (chronicle, roster, assets,
-  research, shipyard, diagnostics, celestial index, seed). Phase 5 designs the shared
-  overlay and must respect knowledge/FoW filtering.
-- Contextual navigation exists in places (notification feed action buttons, assets
-  manage actions, missions OpenColony) but is inconsistent across surfaces — Phase 24
-  inventory: which notices know their target but don't link it.
-- Galaxy map label/marker density at each zoom band needs measurement; no evidence yet
-  that labels cull by zoom.
-- Tooltip coverage is uneven (assets rows carry tooltips; many chrome controls do not).
-- Several surfaces predate the `focused_expanded`/`focused_value` AT metadata — any
-  layout change must keep the focus-accessor family honest.
+Hypotheses verified/refuted during the audit:
+
+- **Confirmed:** no global quick-find exists; search is per-surface only
+  (chronicle, colony roster, controlled assets, research, shipyard, diagnostics,
+  celestial index, seed). Phase 5's shared overlay must respect knowledge/FoW and
+  reuse the existing focused_value Edit contract.
+- **Confirmed:** contextual navigation exists in places (notification feed VIEW
+  SYSTEM / contact actions, controlled-assets manage actions, missions
+  FocusFleet/OpenColony, chronicle system/DIP entries) but is inconsistent —
+  supply rows, fleet route failures and economy notices know their targets but
+  do not link them.
+- **Refuted:** galaxy map labels *do* cull by zoom — `relative_zoom > 2` gates
+  system names, compact markers engage above 10k systems below zoom 16, and
+  `layout_native_galaxy_labels` resolves collisions against star + HUD
+  obstacles with priority ordering. The real gap is a **legend** and
+  zoom-band signalling, not label spam.
+- **Confirmed:** tooltip coverage is uneven (assets rows and HUD buttons carry
+  tooltips; most workspace controls do not explain themselves or their
+  disabled state).
+- **Confirmed:** per-workspace style drift is the dominant consistency issue —
+  `native_ui_theme` (palette + panel/section_header/button/progress/tooltip)
+  is nearly unused; every workspace redefines `ink`/`muted`/`accent` with
+  slightly different values and re-implements `fill`/`label`/`scrollbar`/
+  focus-ring drawing (the focus color `{160,210,255,255}` is hand-duplicated
+  in ≥5 surfaces).
+- **Confirmed:** several surfaces predate or partially implement the
+  `focused_expanded`/`focused_value`/`focused_range` AT family — any layout
+  change must keep the focus-accessor contract honest (verified list in the
+  session prompt's Row-26 note: `native_accessibility_bridge`,
+  `native_controlled_assets`, `native_developer_diagnostics`,
+  `economy_animation`, `stellar_startup_ui`, per-surface tests).
 
 ## Execution order
 
@@ -90,26 +110,268 @@ confirmations · status badges · progress meters.
 4. Colony/planetary command center summary.
 5. Remaining phases per the mission spec, smallest-blast-radius first.
 
-## Ranked issues (fill during audit)
+## Ranked issues
 
 ### CRITICAL
 
-(none yet)
+(none found — no screen blocks task completion, hides required information,
+breaks navigation/AT flow, or presents wrong state)
 
 ### HIGH
 
-(none yet)
+1. ~~**No adopted shared design language.**~~ → DONE. The theme now
+   provides `metric_tile`, `badge`, `key_value`, `focus_ring`,
+   `empty_state`, `tab`, `section_header` and `clipped`; planetary,
+   economy, supply/logistics and fleet workspaces consume them and their
+   palettes alias the semantic colors. Shipyard, construction,
+   diplomacy, research, the colony roster, missions, and the startup /
+   pause chrome are now migrated as well, and every keyboard/pad focus
+   ring routes through the shared `focus_ring` helper. The settings
+   dialogs (general, audio, video, voice) now alias the same semantic
+   palette for their surfaces, tracks, keylines and text while keeping
+   the menu `ui_skin` control geometry.
+2. ~~**No global quick-find / command palette**~~ → DONE: Ctrl+K opens a
+   modal palette built from FoW-filtered view models covering known
+   systems, owned colonies, own fleets, identified contacts, active
+   mission fleets, and workspace command rows (Research/Economy/
+   Logistics/Shipyard/Construction/Diplomacy/Missions/Planets) that route
+   through the same open+refresh calls as the navigation rail. Type
+   badges, context labels, kind-label matching, arrow/Enter/Escape
+   navigation and the shared Edit-focus AT contract.
+3. ~~**Galaxy map has no legend or overlay vocabulary.**~~ → DONE for the
+   render vocabulary: collapsible legend explains charted/uncharted stars,
+   lanes, territory, fleet markers, selection halo and the planned-route
+   green/amber halves; the zoom readout carries a band label
+   (OVERVIEW / SECTOR / LOCAL) matching the label-density thresholds.
+   Phenomena iconography and strategic overlay toggles shipped: surveyed
+   regions carry designation labels once legible, and the legend's
+   lane/territory/phenomenon rows double as show/hide layer toggles
+   (FoW shroud and marker vocabulary always remain).
+4. ~~**Colony screen lacks an at-a-glance vitals summary.**~~ → DONE.
+   Vitals strip + numeric alert chips render for owned colonies
+   (observer-safe); chips now route to the first affected structure
+   (structures tab, site selected) when the deficit maps to facilities —
+   else the economy tab — and hover lists the affected structures by name.
+5. ~~**Logistics workspace is home-system-scoped only.**~~ → DONE within the
+   canonical scope: the view now projects the authoritative link graph as
+   FREIGHT CORRIDORS rows (origin↔destination, capacity/day, used/day summed
+   from real flow allocations, transit days, enabled/bidirectional, and a
+   derived Idle/Normal/Busy/Saturated/Disabled status). Links touching
+   sealed nodes are dropped rather than partially disclosed. Interstellar
+   coverage now ships too: the supply view projects the canonical
+   `CivilizationLogisticsCoverage` — owned systems beyond home get
+   INTERSTELLAR COVERAGE rows (worst colony condition, colony count, local
+   capacity, support demand, import requirement, corridor flag) and the
+   section surfaces `unrepresented_interstellar_support_per_day` as an
+   amber demand-gap callout.
+6. ~~**Economy workspace is a flat undifferentiated list.**~~ → DONE.
+   Section headers, metric tiles, tone colors, shared buttons and focus
+   ring; verified via live capture (which caught a text-anchor defect the
+   tests missed).
+7. ~~**Fleet list is flat.**~~ → DONE for display organization: the
+   outliner renders a status-grouped projection (IN COMBAT → IN TRANSIT →
+   ON MISSION → STATIONED) shared by click/focus/scroll/render/tooltip
+   paths, and Controlled Assets sorts the FLEETS section urgent-first.
+   Per-fleet composition now surfaces too: `NativeOwnFleet` projects the
+   resolved design name, cargo fill, embarked population, and tactical
+   vessel condition, rendered as trailing stat rows. Fleets are single
+   vessels in the model — a true battle-group layer would need a
+   fleet-composition change in core, out of client scope.
 
 ### MEDIUM
 
-(none yet)
+1. Tooltip coverage is uneven — PARTIALLY DONE. Disabled action buttons now
+   explain themselves at the point of interaction: `theme::hover_tooltip`
+   renders the authoritative blocker (shipyard `batch_blocker`/
+   `cancellation_blocker`, construction `start`/`queue` messages, planetary
+   hub/building lock reasons and affordability/capacity/surface gates) when
+   the pointer rests on an unavailable control, and the HUD rail's hand-rolled
+   hint was folded into a new compact `theme::hint` helper. The diplomacy
+   action row is no longer hidden-when-illegal: all three actions render in
+   fixed slots, disabled when unavailable, with the authoritative
+   communication/political status surfaced as the hover why, and the
+   negotiation modal now lists all six terms with unavailable ones disabled
+   (`ModalTerm::enabled` + `tip` carrying the authoritative political /
+   access / agreements / communication status — no legality rules duplicated
+   in UI). HUD chrome (nav rail, pause/speed/notifications, zoom, legend
+   toggles, Switch view) now renders hover hints via `theme::hint` reusing
+   the exact localized labels the focus ring announces — pointer and
+   keyboard/AT share one vocabulary. Non-action content now explains
+   itself too: diplomacy relationship meters (TRUST/RESPECT/FEAR/
+   HOSTILITY/COOPERATION) and the six economy KPI tiles carry localized
+   hover explainers (`DIPLOMACY_TIP_*` / `ECONOMY_TIP_*`, en+de) through
+   `theme::hover_tooltip`. Still open: a few minor status rows elsewhere
+   could use the same treatment if captures flag them.
+2. ~~Notifications feed has no severity iconography or grouping~~ — DONE.
+   Severity axis and severity filtering shipped earlier; topic filtering
+   now ships instead of hard grouping (a TOPIC chip cycles the canonical
+   category order intersected with the categories actually published —
+   grouping would have broken the newest-first chronology). Both filters
+   compose, share the focus ring and announce through AT labels.
+3. Empty/error states are inconsistent — PARTIALLY DONE. Colony roster
+   and the research tree now pair the bare "No X" line with a localized
+   next-action hint through the shared `empty_state` helper (shipyard,
+   construction and missions already guided). Remaining bare states:
+   minor lists that have no meaningful next action.
+4. Typography hierarchy varies per workspace — PARTIALLY DONE. New
+   `theme::type` ramp (title/body/small = 24/15/12, compact_body/
+   compact_small = 14/11) is the single vocabulary; construction, colony,
+   diplomacy (26→24) and economy (23→24) migrated to the canonical triple,
+   battle/fleet/inspection body+small to the compact ramp, and research's
+   title joined (its denser 16/14 tree text stays documented custom).
+   Deliberately untouched: settings dialogs (bigger reading sizes),
+   overview/map labels (different four-rung shape), and missions/research
+   body text where the tighter ramp is load-bearing for density.
+5. ~~System view + battle workspace need live visual review~~ → REVIEWED.
+   `--system-smoke` and `--battle-smoke` captures inspected: system view
+   inspector/orbits/controls are sound; battle feed events were bare text
+   on the starfield — they now render as translucent cards with severity
+   accent bars matching the notification-card vocabulary.
 
 ### LOW
 
-(none yet)
+1. ~~Scrollbar width/track styling differs per workspace.~~ → DONE: new
+   `theme::scrollbar` (faint keyline rail + `selected` thumb) replaces the
+   per-surface hand-rolled thumbs in body inspector, chronicle, controlled
+   assets, economy, system inspection, logistics, new-game species
+   details, notifications, research inspector + guided dashboard, and the
+   planetary facts/queue rails. The fleet outliner list gained a scrollbar
+   for the first time (render-path `sync` keeps the thumb honest).
+2. ~~`zoom_text` shows a bare number; a zoom-band label ("OVERVIEW /
+   SECTOR / LOCAL") would orient players.~~ → DONE with the legend work
+   (the readout carries the matching band label).
+3. ~~Selected-system card (bottom-left) is a fixed-size info block —
+   verify clipping at small viewports.~~ → VERIFIED: `inspection_bounds`
+   clamps height to `max(100, min(500s, bottom-top))` inside scaled
+   insets; cards render fully down to ~500px-high viewports.
+4. ~~Startup/main-menu uses its own palette~~ → DONE. Startup screens and
+   the pause menu alias theme colors and use shared `button`/`focus_ring`;
+   all hard-coded `{160,210,255}`/`{164,221,237}` focus rings across the
+   client now render through the shared helper (one ring color
+   everywhere).
 
 ## Work log
 
 | Date | Change | Commit |
 |---|---|---|
-| | | |
+| 2026-09-25 | Extended `native_ui_theme` with shared components: `focus_ring`, `metric_tile`, `badge`, `key_value`, `empty_state`, `tab`, plus a `clipped` rect-intersection helper — the Phase-2/3 vocabulary the audit found missing. | 22ca3783 |
+| 2026-09-25 | Galaxy map: collapsible MAP LEGEND panel under the zoom readout (charted/uncharted star, lane, territory swatch, fleet marker, selection halo glyphs matching the live render vocabulary). Collapse toggle joins the HUD focus ring ahead of Switch view, announces "Map legend", and is reserved as a label-layout HUD obstacle; clicks inside the panel never become star selections. | 0b4d6604 |
+| 2026-09-25 | Colony command center: headline vitals strip (POPULATION / STABILITY / POWER net / FOOD days / EMPLOYED) between the hero block and the fact list, and a two-column issue-chip grid inside the alerts block — chips carry real magnitudes (POWER -99, LIFE SUPPORT 84%) and focus the economy tab on activation. All rows/chips gated on `!observer_only` so the survey-only surface stays leak-free. | 22ca3783 |
+| 2026-09-25 | Economy workspace migrated onto the shared theme: KPI cards now use `metric_tile`, section rows use `section_header` (INCOME / OPERATING COSTS now read as headers, not data), buttons use the shared `button` with hover/active/disabled states, palette constants alias the semantic theme colors, and the focus ring uses the shared helper. Zoom readout gained a band label (OVERVIEW / SECTOR / LOCAL) matching the label-density thresholds, and the legend gained a Planned route row (green/amber halves matching the preview colors). Visual capture review caught and fixed a text-anchor defect: centered/right-aligned helpers anchored on the rect's left edge instead of its midpoint/right edge. | f14cf11f |
+| 2026-09-25 | Supply/logistics workspace migrated onto the shared theme (themed chrome, hover-aware buttons via a tracked pointer, `metric_tile` KPI cards with a caution-toned shortfall, column-header rule, shared `focus_ring`/`empty_state`, theme scrollbar colors). Battle review found the event feed read as one flat tone — it now severity-tones from observer-visible actor/target ids (own losses danger, inflicted losses success, disruptions caution). System view reviewed: inspector/labels/orbits already structurally sound. Planetary test now covers the deficit path (vitals strip + POWER chip → economy tab). | 0281c063 |
+| 2026-09-25 | Fleet workspace migrated onto the shared theme: legacy `ui_skin`/`menu_style` bevel chrome replaced by shared `panel`/`button`/`focus_ring`/`progress`, palette constants alias theme colors, and the fleet detail block is no longer one text blob — it renders as a heading + identity line + `key_value` stat rows (Strength / Fuel / Range / Speed / Order). FLEET_DETAILS/FLEET_ORDER_SUFFIX superseded by FLEET_STAT_* keys in en/de. | 88777eab |
+| 2026-09-25 | Logistics freight corridors: `native_logistics::View` gained `LinkRow` projection over the canonical `HomeSystemLogisticsNetwork` links (endpoints sealed-checked, capacity/transit/enabled/bidirectional verbatim, usage summed from real `daily_flow.allocations` route membership, localized Idle/Normal/Busy/Saturated/Disabled status). The workspace appends a FREIGHT CORRIDORS section with its own column captions inside the scroll body; cached rows key on nodes+links. | 8355226d |
+| 2026-09-25 | Notification severity axis: `NotificationSeverity` (Info/Positive/Caution/Alert) on `NativePlayerNotification`, assigned by every publisher — campaign feedback (combat→Alert, contact→Caution, completions→Positive), chronicle seeding (`war.*`→Alert), diplomatic events (war→Alert, rejected/terminated→Caution, accepted/activated/contact→Positive), and rejected player commands→Caution. Cards render a tone accent bar plus a color-independent "!" marker on Alerts; category hue is preserved. Verified via `--diplomacy-smoke` capture and new test coverage for feed retention, per-publisher mapping, and accent rendering. | 2d3e6cb3 |
+| 2026-09-25 | Shipyard workspace migrated onto the shared theme: palette constants alias `theme::color`, the shared `button` helper replaces the hand-rolled panel+text chrome (categories/search/sort/filter/qty/favorite/action all get real hover/active/disabled states — the build action now visibly disables instead of just re-tinting), design cards and order rows use themed fills/keylines with a selection accent bar, BUILD ORDERS uses `section_header`, empty surfaces use `empty_state` with a next-action hint (SHIPYARD_EMPTY_HINT / SHIPYARD_NO_ORDERS_HINT, en+de), and the focus ring uses the shared helper. Verified via `--shipyard-smoke` capture. | d337de8f |
+| 2026-09-25 | Construction workspace migrated onto the shared theme: palette aliases `theme::color`, section panels use `panel` + `section_header` (KNOWN PROJECTS / PROJECT DETAILS / CONSTRUCTION STATUS now read as headers with rules), actions use the shared `button` with real disabled state and a construction-tone accent, selected rows carry a selection accent bar, empty lists use `empty_state` with localized hints (CONSTRUCTION_NO_PROJECTS_HINT / CONSTRUCTION_NO_ACTIVE_HINT, en+de), focus ring is the shared helper. Verified via `--construction-smoke` capture; the thin-track containment test now scopes to the orders panel since section-header rules are also thin rects. | d3661410 |
+| 2026-09-25 | Diplomacy workspace migrated onto the shared theme: palette constants alias `theme::color` (relations teal → `diplomacy`, status gold → `economy`, hostility red → `danger`), surfaces use `menu_panel`/keylined regions, filter chips and action buttons use the shared `button` with hover/active states (Declare war keeps a danger keyline + accent bar), the tab strip uses `tab` (active underbar), relationship meters draw on `canvas` tracks with semantic tones, modal negotiation/confirm/cancel buttons use `button` with danger tone on destructive confirms, CONTACT DIRECTORY / RELATIONSHIP use `section_header`, and the focus ring is the shared helper (test now asserts `color::focus` instead of the retired local accent). Verified via `--diplomacy-smoke` capture (progress mode, proposal accepted, notifications read). | 15e21b1d |
+| 2026-09-25 | Global quick-find palette (Ctrl+K): modal searchable overlay indexing known systems, owned colonies, own fleets and identified contacts — all sourced from FoW-filtered authoritative view models so uncharted names never leak. Results render type badges + context labels; field opens focused (AT `Edit`), arrows move into results, Enter activates, Escape/outside-click closes; `set_focused_text`/`focused_value` integrate the existing AT text contract. Activation routes through existing paths: map re-center + inspect for systems, `open_overview_colony`, `focus_mission_fleet`, and diplomacy open + `select_contact_civilization`. New `native_quick_find` test target covers filtering, navigation, activation, capture and AT; `--quick-find-smoke` verified on Vulkan (opened/8 entries/4 matches/1 highlighted, save ok). Shipyards and missions remain unindexed — follow-up. | f43bcc62 |
+| 2026-09-25 | Research workspace migrated onto the shared theme: palette aliases `theme::color`, outer surface uses `menu_panel`, domain tabs gain hover/active fills with a Science accent bar, the four view tabs use the shared `tab` underbar treatment, toolbar/sort/filter/queue buttons use the shared `button` (Cancel research keeps a danger keyline), the search field frames with a focus-colored keyline, RECOMMENDED badges and progress bars take the science tone, SELECTED TECHNOLOGY / ACTIVE RESEARCH are `section_header`s, and the focus ring is the shared helper. Scroll regions (graph, dashboard list, active strip) keep flat clipped fill/stroke so nothing escapes the viewport. Verified via `--research-smoke` Vulkan capture (active program, recommended cards, inspector, queue buttons all render). | 42c01435 |
+| 2026-09-25 | Quick-find extended to missions and workspaces: `EntryKind::Mission` indexes active mission fleets (`build_mission_board`, activating through `focus_mission_fleet`) and `EntryKind::Workspace` adds command rows for the eight navigation surfaces (Research/Economy/Logistics/Shipyard/Construction/Diplomacy/Missions/Planets) routing through the same open+refresh calls as the rail. Kind labels join the searchable text, badges take Science/Neutral tones, placeholder text now names missions/screens (en+de), and new tests cover kind matching, activation and badge rendering. Re-verified via `--quick-find-smoke` (16 entries, filtered query intact). | 47870e62 |
+| 2026-09-25 | Missions workspace migrated onto the shared theme: palette aliases `theme::color` (cyan accents → `selected`, gold → `economy`), outer surface uses `menu_panel`, the Missions/Colony Sites strip uses `tab` (active underbar), close/nav/View/Land/Collect controls use the shared `button` styling with hover/disabled states via a tracked pointer, SELECT SHIP ON MAP is a success-toned primary action, mission cards and colony rows use `surface`/`keyline`, the empty missions list renders the shared `empty_state`, and the focus ring is the shared helper. Fixed a pre-existing defect found by capture: the panel top ignored `native_workspace_top`, hiding the title and close button under the nav bar at 720p. The colony smoke now opens the missions board and stores a `-missions` capture. | bcf1677d |
+| 2026-09-25 | Startup chrome migrated onto the shared theme: `native_startup_workspace` palette constants alias `theme::color` (brand green → `success`, gold → `economy`, warning → `caution`), dialog surfaces use `menu_panel`, Development/ModeSelection/LoadSlots/Busy/Failure buttons use the shared `button` (LOAD SELECTED is a success-toned primary gated on a chosen slot), and the in-game pause menu's buttons/focus ring use `theme::button`/`focus_ring` with `text_primary`/`text_secondary` chrome. Focus-ring sweep: every remaining hard-coded ring — HUD controls, pause menu, startup, settings (general/audio/video/voice), inspection, chronicle, battle, colony freight confirm, galaxy creation, new-game setup, settlement confirm, small-body survey, planetary — now renders through `theme::focus_ring`. Verified via `--restart-exit-smoke` (entry screen) and `--smoke` (pause menu) captures; three tests updated to assert `color::focus`. | 7617f665 |
+| 2026-09-25 | Colony roster migrated onto the shared theme: palette constants alias `theme::color` (selection cyan → `selected`, warning amber → `caution`), the search field frames with a focus-colored keyline, REFRESH/close use the shared `button`, rows use `surface_secondary`/`surface_hover` with a `keyline_strong` hover outline, the scrollbar track uses `keyline`, and the focus ring is the shared helper. Empty-state sweep: the roster's bare "No owned colonies" now pairs with a localized next-action hint (`ROSTER_LIST_EMPTY_HINT` — the unavailable state stays hint-free), and the research tree's "No known research" gains `RESEARCH_NO_MATCH_HINT`; both render through the shared `empty_state`. Verified via `--colony-smoke` Vulkan capture (themed search/chrome/rows) and updated roster tests asserting theme constants instead of retired literals. | 7d9dd2d3 |
+| 2026-09-25 | Notification severity filtering: ALL / IMPORTANT chips in the feed intro strip (shared `button`, caution tone on IMPORTANT) keep the session filter — IMPORTANT projects the feed down to Caution/Alert items through a view-local projection (`visible_items`; the authoritative deque is never touched). Filtering joins the focus ring (chips ring after CHRONICLE/X with localized AT labels `NOTIFY_FILTER_*_LABEL`), resets scroll and ring on toggle, clamps wheel scroll to the filtered extent, and a filtered-empty feed renders its own hint (`NOTIFY_EMPTY_IMPORTANT`). New `severity_filter` test covers chip activation, feed immutability, filtered rendering, scroll bounds, ring order, Return-activation of a filtered card action, reopen persistence and the filtered-empty state; the previously dead `keyboard_focus` test was wired into `main` with corrected ring indices. Smoke note: an earlier run tripped the `--diplomacy-smoke` feed-count gate with `items=8` against saves that prior smoke runs had autosaved in place; re-authoring the save from the canonical Rows fixture restored `items=2` and the gate now passes end-to-end. The gate also reports the offending items in its failure text. | 31d1f30e |
+| 2026-09-25 | Why-disabled tooltips at the point of interaction: new `theme::hint` (compact single-line, measurer-aware) and `theme::hover_tooltip` (gates the shared `tooltip` on hover + non-empty body). Shipyard's disabled BUILD/CANCEL button surfaces `batch_blocker()`/`cancellation_blocker`; construction START/QUEUE surface the authoritative `start`/`queue` action messages; the planetary command-center button surfaces `hub_upgrade_lock_reason` (with localized affordability/requirements fallbacks); and the structures-tab action rows (Begin construction, Upgrade, Repair) surface their real gates — observer/surface/capacity/authorization/condition — via new `PLANET_TIP_*` keys in en+de. The HUD rail's hand-rolled hint block migrated onto `theme::hint`. Tests cover exact-match tooltip text per surface. | 07cc79b1 |
+| 2026-09-25 | Alert-chip navigation + affected-facility detail: colony issue chips now activate into the structures tab with the first affected site selected (dark POWER structures, unstaffed buildings, non-operational essential services, efficiency-degraded buildings under underfunding), falling back to the economy tab for colony-wide deficits; hovering a chip lists up to four affected structure names via `hover_tooltip` (`PLANET_CHIP_AFFECTED`, `PLANET_CHIP_MORE`, `PLANET_TIP_COLONYWIDE`, `PLANET_TIP_HUB` in en+de). NO COMMAND CENTER routes to the structures tab. Planetary test covers both the hover detail and site selection. | adb306e7 |
+| 2026-09-25 | Diplomacy actions are discoverable when illegal: the relations action row no longer hides unavailable actions — Open/Establish transmission, Negotiate, and Declare war render in three fixed slots with the shared disabled button state, and hovering a disabled action surfaces the authoritative `communication_status`/`political_status` as the why (no legality rules duplicated in UI). Render, click dispatch, and the focus ring enumerate the same fixed slots; disabled slots capture clicks as no-ops and stay out of the ring. The action area cap grew 128→160 to hold three rows + the discovery hint, which itself now only renders where it does not overlap the tab strip. Verified via `--diplomacy-smoke` end-to-end (`items=2`, proposal accepted, unknown contact redacted) — the unknown-contact capture shows all three slots disabled without the old empty panel. Tests cover disabled render, tooltip text, and captured no-op clicks. | e015e209 |
+| 2026-09-25 | Negotiation modal keeps illegal terms visible: `ModalState::terms` became `ModalTerm{label, action, enabled, tip}` — all six terms render in fixed slots (42s pitch), unavailable ones draw disabled via the shared button and surface the domain's authoritative status on hover (`agreements_summary`/`access_summary`/`political_status`/`communication_status`, no legality rules in UI). Click dispatch, render, and the (y,x)-sorted focus ring share fixed indices; disabled terms capture clicks as no-ops. Also fixed a dangling-`else` in modal focusables that only the new disabled rows could expose. Tests cover all-six render, captured no-op clicks on disabled terms, and the at-war fixture. | f46fd46c |
+| 2026-09-25 | Fleet organization — two layers, both projection-only over authoritative state. The `native_fleet_workspace` Outliner (dev-inspection / embedded harness presentation) now renders a status-grouped list: `fleet_group`/`fleet_rows` project fleets into IN COMBAT → IN TRANSIT → ON MISSION → STATIONED with localized `FLEET_GROUP_*` caption headers (en+de) drawn through `section_header`; a single non-empty group renders header-free so flat geometry is preserved. Every consumer — focus ring, wheel scroll, keyboard snap, click dispatch, render, hover tooltip — iterates the same projected rows; `view_->own_fleets` order is never touched. The player-facing counterpart: `native_controlled_assets` rows gained an `urgency` rank and the FLEETS category now surfaces engaged → in-transit → on-mission → idle hulls ahead of creation-order sorting, matching the displayed activity labels. Tests cover group-header rendering, click dispatch beneath headers, End-key scroll-into-view for off-viewport rows, single-group flatness and assets urgency ordering; `--fleet-smoke` re-verified live (moving colony fleet now tops the FLEETS section). | 5d68bd72 |
+
+| 2026-09-25 | Phenomenon identification on the galaxy map: surveyed regions render a player-facing designation + type-name label once their projected extent is large enough for legible text (90–520px window — suppressed at overview clutter and at screen-filling zooms), drawn after the decal batches so labels sit above the clouds they name, and clipped to the screen. Gating reuses the authoritative `surveyed` set (systems partially surveyed or better / developer session), so unknown regions never disclose a name; unsurveyed artwork still renders untouched. The MAP LEGEND gained a "Surveyed phenomenon" row with a soft-glow glyph (en+de). Tests cover surveyed-label emission ("RC-1 · Reflection Nebula"), unsurveyed secrecy, and overview suppression; `--galaxy-art-smoke` captures verified the legend row and decluttered overview/regional bands. | ef368f49 |
+
+| 2026-09-25 | Strategic overlay toggles: the MAP LEGEND's lane / empire territory / surveyed phenomenon rows are now show/hide layer switches — each draws a checkbox at the row's right edge, dims glyph + label while off, and hover-highlights like the panel's other interactive rows. State is client-local (like the collapse toggle), click press/release matching reuses the shared `map_legend_row_bounds` geometry, and the three rows join the HUD focus ring after the legend toggle with localized AT labels (`HUD_MAP_LAYER_*`, en+de). Territory hiding uses a new `NativeTerritoryRenderStyle::draw_ownership` flag that suppresses fill/contours/claims/region labels while the unexplored-space fog shroud keeps rendering — FoW geometry is never toggleable. Phenomena hide also suppresses the map hover inspection for the hidden layer; lanes hide only the charted-lane lines (markers and knowledge vocabulary untouched). Territory tests assert ownership marks vanish while `fog_images` still emit; `--galaxy-art-smoke` re-verified (territory stats unchanged with all layers on). | d5eacf30 |
+
+| 2026-09-25 | HUD hover hints: pointer resting on any HUD ring item (nav rail, pause/speed/notifications, zoom controls, legend toggle + its three layer rows, Switch view) renders a compact `theme::hint` with the same localized label the focus ring announces for that action — one vocabulary for pointer, keyboard and AT users. Gated off while the pause menu, settings, or quick-find modal is open. `--galaxy-art-smoke` re-verified clean (no hint when the pointer rests off-chrome). | cf52ea0e |
+
+| 2026-09-25 | Fleet composition in the detail card: `NativeOwnFleet` now projects `design_name` (resolved through `find_ship_design`), `cargo_materials`/`cargo_material_capacity`, `embarked_population_millions`, and `has_vessel_state`/`hull_integrity` from `tactical_vessel`. The detail block renders Design/Condition/Cargo/Embarked rows (`FLEET_STAT_*`, en+de) after the core telemetry — extras land last so cramped cards clip the least-critical rows first — and stat rows now clip to the details block so they can never spill into the route preview (the armed-fleet stack had silently overdrawn the rail gap before). `fleet_height` grows to 215s when the detail space can spare it (>300s), keeping the 720p behavior identical. Test covers all four composition rows; `--fleet-smoke` capture shows a colony ship reporting Design "Interstellar Colony" + Embarked 250.0M. | 675262f1 |
+
+| 2026-09-25 | Interstellar logistics coverage: the supply view's projector now returns the canonical `CivilizationLogisticsCoverage` (which embeds the home network) instead of `home_system_logistics` alone — `View` gains `external` rows (`ExternalRow{system, name, condition, colonies, local capacity, demand, import, corridor}`), `owned_system_count` and `support_gap_per_day`. Sealing is unchanged: external rows whose civilization or system record can't be verified are dropped, same rule as node/link endpoints. The workspace renders a third scroll section — INTERSTELLAR COVERAGE — with per-system rows and an amber "unrepresented interstellar demand" callout sourced from Core's gap flag. Tests cover canonical row parity, foreign/home exclusion, header/row/gap rendering and clip bounds; `--logistics-check` smoke verified live on a fixture with a Velari colony (row renders Critical). Also fixed a stale assertion in `native_startup_artwork`: it pinned the pre-theme accent literal `{122,230,190}` instead of `theme::color::success`. | 87b4a468 |
+
+| 2026-09-25 | "What does this do" tooltips on non-action content: the five diplomacy relationship meters each gain a hover explainer describing what the axis measures (`DIPLOMACY_TIP_*`), and `NativeEconomyCard` gained a `detail` field — projected localized explainers (`ECONOMY_TIP_*`) rendered through `theme::hover_tooltip` on each KPI tile, with the tile detail folded into the cache signature. Tests cover meter-tooltip text on hover and KPI-tile explainer rendering; `--economy-check` smoke re-verified canonical totals and priority save. | 00759a07 |
+
+| 2026-09-25 | Settings chrome unification: the general/audio/video/voice settings dialogs' literal palettes now alias `theme::color` tokens (`surface_opaque`, `surface_raised`, `surface_hover`, `keyline_strong`, `text_primary`, `text_secondary`, `text_muted`, `selected`, `success`, `caution`, `danger`, `economy`, `disabled`) while keeping the menu `ui_skin::control` geometry shared with the startup/menus. Translucent scrim veils stay literal (no token equivalent). Also fixed a stale assertion in `native_video_settings_smoke`: it pinned `choice_buttons.size() == 6` though the layout has carried 8 rows since the dropdown-settings commit — `--video-settings-check` now passes end-to-end (`opened/previewed/escape_reverted/kept/restored` all true) with captures. | 03fbddde |
+
+| 2026-09-25 | Notification topic filtering: `NativeNotificationView` gains `category_filter_` — a client-local category projection that composes with the severity filter and never touches the authoritative deque. A third intro-strip chip (`TOPIC: <label>`, `theme::button`) cycles the canonical category order intersected with categories actually present in the feed, so absent topics never occupy the cycle; the chip joins the `(y,x)` focus ring with the `NOTIFY_FILTER_CATEGORY_LABEL` AT label. The empty feed renders a topic-specific hint (`NOTIFY_EMPTY_TOPIC`), and the decorative subtitle now drops out entirely when it can't fit whole rather than clipping mid-word. Tests cover cycle order, wrap-around, feed isolation, composed severity+topic filtering, the empty hint, and chip focus/AT label; `--diplomacy-smoke` re-verified end-to-end on a pristine pending-proposal fixture (`items=2`, canonical unchanged) with the chip visible in the events-panel capture. | 74759b74 |
+
+| 2026-09-25 | Command-HUD context-plate clearance: the bottom-center narrator plate (`CommandHudLayout::context`, `h - 66s`) rendered on top of content that anchored to the panel bottom — construction's START/QUEUE buttons underlapped it at 720p and the feedback hint clipped mid-line. Both bottom-anchored strips now cap their rows at `context.y - gap`: construction's action row (which pulls `feedback`/`costs` up with it) and diplomacy's full-width feedback rail (shrinking `detail_rows`, which legitimately scrolls). The responsive layout test now asserts the context plate never overlaps the construction action/feedback rects at any probed resolution; the diplomacy intelligence test scrolls to reach the now-deeper unresolved card. Fleet/missions panels verified clear (edge-anchored or bottoming above the plate). `--construction-smoke` re-verified at 1280x720. | f781963e |
+
+| 2026-09-25 | Zoom readout yields to modals: the map's "Map zoom N.Nx · BAND" readout gated on a hand-rolled workspace list that missed the colony roster, notifications, chronicle, missions, battle and settings — at 720p it rendered squeezed against the roster panel's left edge. The gate now delegates to `map_hud_visible()`, which encodes the full modal-suppression set while still tolerating the inspection card and fleet detail panel (the readout shifts right for those, unchanged). `--colony-smoke` re-verified: roster and missions captures render without stray map chrome. | ac304186 |
+
+| 2026-09-25 | Settlement-workspace capture review (`--settlement-smoke` on an authored funded-colony-ship fixture, 720p) surfaced two system-view defects, both fixed: the global map zoom readout duplicated the system view's own `SYSTEM_ZOOM` badge under the SYS header (the gate delegates to `map_hud_visible()` — which correctly keeps the resource strip/nav rail in system view — plus an explicit `system_workspace_` exclusion), and the order-result banner was a fixed 74px box that clipped multi-line settlement orders mid-line. The banner now measures its wrapped text, grows upward, clamps inside the inspector panel, and lifts above the command-HUD context plate when their x-ranges meet. New system-workspace test asserts the full notice renders, its grown bounds stay inside the inspector at four resolutions, cover the measured text height, and never overlap the context plate. The notification smoke also gained a chronicle detour — real click on the panel's chronicle link, `-chronicle` sidecar capture, Escape-close, events-panel reopen — closing the last uncaptured player surface. | b4f517d1, 061651e1 |
+
+| 2026-09-25 | Smoke-harness ordering fix: the missions-board capture added to `prepare_colony_roster_smoke` clicked the rail's Missions button, which routes through `route_navigation` — it unconditionally closes `colony_workspace_` — so the subsequent `--planetary-smoke` step always failed with "Planetary screen is not visible." The missions capture now runs as `prepare_missions_board_smoke` at the end of the colony-smoke block, after the planetary/outpost-freight proofs; evidence and `-missions` sidecar unchanged. `--planetary-smoke` verified end-to-end at 720p on the colony fixture (`review_readonly`, `cancel_readonly`, `modal_isolated`, `slot_reserved`) and `--planetary-reload-smoke` confirms the reserved slot survives save/reload. | — |
+| 2026-09-25 | Full earned progression chain verified end-to-end on this branch — fresh progression → first ships → first exploration (depart/paused/resume) → first survey (depart/paused/resume) → settlement preparation → earned settlement runner → settlement completion/founded — and it surfaced two real smoke-harness defects the legend feature exposed or predated. First, map click sites that only guarded `layout.panel` could land under the new MAP LEGEND (which correctly swallows all gestures in its bounds, including `RightPressed`); a shared `expose_smoke_map_point` helper now collapses the legend and shifts the camera until the target clears every HUD surface, applied to all eight map-entry/right-click sites (galaxy-art zoom + entry, system, colony, system-travel, settlement, first-exploration ×3, first-survey ×2). Second, a pre-existing unit mismatch: first-exploration, first-survey, and settlement-completion passed `step_days` (sim days) to `frame.advance(real_seconds)` — correct only when `days_per_second` is 1, but native sessions run at 1/24, so each step advanced 1/1536 day and the smoke never got far enough to notice on this fixture. All three now convert via `step_days / clock().days_per_second()` matching the fresh-progression idiom. Verified: `--first-exploration-smoke` depart (`input_orders:1`, revision 0→1, preview read-only, phases 0→1→2, save roundtrip), paused reload at 1080p, resume to reconnaissance completion (survey level 2, 553 steps later in survey resume reaching level 3 `facts_visible:true`), `--first-survey-*` all three modes, `--settlement-preparation-smoke` on the real fully-surveyed world (costs/shipyard/unsuitable-site read-only), the earned-settlement runner completing a real paid colony (5 survey pairs → paid build → exact quote auth 120 → established), and `--settlement-completion-smoke` + `--settlement-founded-smoke` on its canonical checkpoints (vessel consumed, colony opened, payload read-only). | — |
+| 2026-09-25 | Remaining smoke-path sweep closed every unexercised flag: `--eruption-smoke` (developer campaign, forced Sol eruption — map↔system record continuity, live progress/variant/stage preserved), `--audio-check` + `--audio-settings-check` on a fresh campaign (assets loaded, music started, settings open/preview/mute/cancel-restore/save/reopen round-trip), `--voice-check` on system-travel (played, unknown-target denied, overlap prevented, queue bounded), `--developer-smoke` + `--smoke-full-exploration` + `--smoke-galaxy-card 3` (250 systems fully surveyed, galactic core discovered, 0 unexplored fog texels beyond margins), and `--campaign-profile --profile-frames 240` on the developed 24-fleet fixture at 1080p (steady state: update mean 1.53 ms, frame p95 18.1 ms — the overhaul adds no measurable frame cost). The full-exploration run needed `--developer-smoke` because the setup checkbox only exists in developer mode; a parse-time guard now rejects the bare flag with a clear message instead of a mid-run failure. | — |
+| 2026-09-25 | System-inspector numeric formatting: SAFE APPROACH (and STELLAR RADIUS for giant stars) previously printed raw digits (`23653500 km`), which wrapped and orphaned the `km` unit in the 270 px fact column; both now use a `compact_km` helper matching the body-inspection scientific convention (`2.365 × 10⁷ km`). TEMPERATE ZONE's `million km` phrasing was also too wide for the column — now `M km` in the `SYSTEM_HZ` fallback and `en.json` (`de.json` already used the compact `Mio. km`). Verified live in the eruption-smoke system-view capture. | — |
+| 2026-09-25 | Replay tooling exercised end-to-end: `--record` on a system-smoke session captured 23 pointer commands + 42 section checkpoints at tick 10 with a verified expected sidecar (`--replay-info`: `expected_verified:true`); `--replay --replay-until 10` then dumped the canonical document and leaf-diffed it identical to the recorded expectation. That run surfaced a pre-existing base defect — the `--replay-until` capture passed an empty `saved_at_utc`, which `validate_encoded_datetime` rejects, so the bisect flag could never have completed since it was added; it now stamps `utc_timestamp()` like every other capture site (the field is stripped before hashing regardless). Full `--replay` on a smoke recording correctly refuses to verify: smoke-triggered saves are not input-reproducible, and the stall guard reports that honestly (menu smoke's internal pointer-journal test already covers the command path). | — |
+| 2026-09-25 | Minimum-resolution (`640x360`) system smoke surfaced two harness defects and one real product defect. Harness: `smoke_map_point_exposed` did not account for the map inspection card, so after Back the still-selected Sol projected under the card and re-entry was swallowed — the helper now rejects card bounds and the re-entry re-exposes Sol's world point instead of reusing the stale screen point; the zoom/pan step also used fixed `{420,320}`/`{360,300}` coordinates that land on the bottom context plate at 360 px height — both now derive from `world_field`, and the inspector wheel point moved to the panel center. Product defect: `BodyInspectionPanel::layout` reserved a fixed `50 + name + 25 px` header before the scroll region, so below ~104 px of usable panel the fact list clipped to a zero-height viewport (no scrolling, all facts invisible). The panel now has a compact-header mode: under `name + 123 px` of usable height it drops the name banner (still shown in the "Following Earth" tracker) while keeping the heading and SURVEY status, giving the fact list a scrollable viewport. Verified `--system-smoke` at 640x360 (`scroll_end:573`, all facts reachable, bounded, camera-isolated) and unchanged at 1280x720; `native_body_inspection_panel` gained a short-panel sweep regression test. | — |
+| 2026-09-25 | Minimum-resolution galaxy-art smoke: the home star projected to screen centre is covered by HUD surfaces at 640x360 (legend/inspection card), so the zoom wheel was swallowed and the star stayed at distant LOD — the smoke now anchors on `expose_smoke_map_point`. In the system view, `star_screen_radius` floors at 4 px, so the single wheel step computed from it could not traverse the zoom range at a 360 px viewport (radius stayed ~4 px while the check expected the close-art path); the smoke now iterates bounded wheel steps until the detail radius is actually reached. Verified `--galaxy-art-smoke` at 640x360 and 1280x720 — `map_detail`, `system_detail`, `maximum_zoom_detail` all true, supplied artwork replaces distance markers at both tiers; menu smoke also green at 640x360. | — |
+| 2026-09-25 | Minimum-resolution workspace layouts: two more workspaces collapsed at 640x360 because their scale floors at .8 while fixed-height stacks exceed the canvas. `PlanetaryLayout::make` produced a negative-height details/slots column (tabs sat below the command row) — `s` now adapts to the available workspace height (`(height-top)/692` floor .4) so every column keeps a usable viewport; `verify_layout` gains a 640x360 sweep plus compact-mode geometry/hit checks in `native_planetary_screen` tests. `ResearchWorkspaceLayout::for_viewport` left the inspector details clip at 1 px (section + hero art + name + progress ≈ 335 s between the 124 s top offset and 148 s bottom stack) — `s` adapts the same way and a `compact` flag skips the hero artwork; verified `--research-smoke` at 640x360 on a fresh campaign (inspector scroll, cancel, restart) and unchanged at 720p; `verify_layout` sweeps 640x360 and asserts the compact flag boundary. Colony, fleet, shipyard, construction, economy, logistics and inspection smokes were already green at 640x360 unchanged. | — |
+| 2026-09-25 | Minimum-resolution diplomacy + system travel: `DiplomacyWorkspaceLayout` reserved `inner_h*.56` for the contact/stage columns, which at 640x360 left `detail_rows` a ~16 px sliver (the context-plate clearance shrinks the bottom further) — the column stack is now bounded by the usable height above the command-HUD context plate with a guaranteed `158 s` detail minimum (floor `60 s`), so accepted agreements stay reachable; the smoke's detail-row check accepts a clipped-but-visible slice and its control sweep scrolls both directions so a target above the viewport is re-reached. On `travel.json`'s authored fixture, stale retained `EventHistory` reseeded six notification items (expected two) — the fixture was filtered locally; production notification behavior unchanged. `--diplomacy-smoke` + `--diplomacy-reload-smoke` green at 640x360. | — |
+| 2026-09-25 | Minimum-resolution system-travel lane arrows: `layout_local_lanes` placed gate arrows at fixed pixel offsets from the viewport center with no knowledge of `world_field` — at 640x360 the up-bearing lane projected above the field (y 58 vs field top 117), so it was culled by `local_lane_visible` and any click there was swallowed by the workspace's field gate — invisible and unreachable. The layout function now takes the chart field and pulls each overflowing arrow inward along its own bearing until its bounds sit inside (4 px margin, best-effort when bounds exceed the field); `hit_local_lane`/`center` semantics are preserved because every translated point/bounds moves together. `workspace_fit` gained a two-phase search: the primary pass still reserves unclamped lane bounds so standard resolutions keep arrows outside the orbital boundary exactly as before; when lane bounds cannot fit at any zoom the fallback fits the chart alone and the field clamp keeps the arrows reachable (previously the search collapsed to the ~1e-4 scale floor, rendering the whole system sub-pixel). The smoke's return leg also re-exposes the origin system with `expose_smoke_map_point` because lane navigation recentres the camera. Verified `--system-travel-smoke` and `--system-travel-reload-smoke` at 640x360 (all observer-gating, selection, canonical/rendered movement, pause invariants) and unchanged at 1280x720; `native_system_travel` gained a 16-direction compact-field clamp regression sweep and `native_system_workspace` still passes. The research cancel/restart fixture gap found here was resolved in the next entry. | — |
+| 2026-09-25 | Research cancel/restart smoke fixture precondition: `--research-smoke` on `--load` skipped the start action (`execute_action=!options.load`), so the cancel legs required the fixture to ship an already-active program — `insp.json` carries a startable card but zero active projects, leaving the cancel split-button unrendered and the click falling to Select. The setup now inspects authoritative project state and starts the selected actionable card (e.g. `atmospheric_modeling`) via the real command path whenever no active program exists, on load or fresh; cancel + restart legs then exercise the real cancel/restart intents and assert work preservation. Verified: `--research-smoke` on `insp.json` at 1280x720 (`research_cancel_preserved_work`/`research_restart_preserved_work` true) and fresh campaigns at 1280x720 + 640x360 unchanged. | — |
+| 2026-09-25 | Minimum-resolution new-campaign setup: the same clamped-scale defect hit the sandbox setup flow -- `GalaxyChoiceLayout` floored at .65 while the population page stacks 520s of fixed offsets above `summary` (negative clip at 640x360, throwing on the text-bounds guard mid-automation), and `NativeNewGameLayout` floored at .8 while header + footer need ~490s beyond the 90 px content floor (species/details overlapping the mode and generation rows). Both layouts now keep their existing floor while it is feasible and only adapt downward when the fixed stack cannot fit (`(h-64)/560` and `(h-90)/490` respectively, .45 floor), so 720p+ geometry is byte-identical. `--new-game-smoke` verified at 640x360 (full menu -> galaxy -> population -> species -> seed -> create flow) and unchanged at 1280x720; `responsive_layout` and `galaxy_flow` test sweeps now include 640x360. Shipyard, construction and menu smokes were already green at 640x360 unchanged. | — |
+| 2026-09-25 | Minimum-resolution first-exploration/first-survey paused browsing: three HUD-capture defects in the browse harness. The fixed `{w*.34, h*.72}` map drag pressed inside the fleet command card at 640x360 — the press landed on `recovery_right` and issued a real `ReturnToBase` order, mutating the byte-strict paused payload (`ReturnToBaseRequested: false->true`); a new `exposed_drag_points` helper scans for a start where both press and release sit on exposed map, used by both smokes. The zoom anchor at screen centre sat under the selection card and swallowed the wheel — both smokes now anchor via `expose_smoke_map_point`. And at compact zoom the parked survey fleet's 15 px hit radius occluded the target planet marker — the survey smoke now zooms until `hit_local_fleets` reports the body point clear, mirroring what a player does. Verified `--first-exploration-paused-smoke` and `--first-survey-paused-smoke` at 640x360 (strict full-payload equality, `input_orders:0`) and unchanged at 1280x720; resume mode unchanged (its fixture requires a partial-warp save). | — |
+
+### Implementation notes
+
+- Settlement smoke fixtures: `tools/author_settlement_save.py` grafts the
+  smoke preconditions (idle populated colony vessel + full survey of the
+  target system) onto any v17 save — following `author_battle_save.py`.
+  Run `--settlement-smoke` on the output first; its autosave leaves an
+  active mission, so the same file then satisfies
+  `--settlement-reload-smoke`. Verified on the fleet fixture at 720p:
+  ordered flow (`accepted`, `cancel_no_charge`) and `paused_reload`
+  (mission revision 2 survives save/reload). The script's `--travel` mode
+  authors `--system-travel-smoke` fixtures instead — partial-survey of one
+  lane neighbor (known_label beside "????" lanes) plus relocating
+  co-located idle player fleets so the anchored marker click selects the
+  transiting vessel. Verified live: navigation, selection, canonical and
+  rendered movement, paused stability, and observer-gated lane denial all
+  pass at 720p.
+- Battle smoke fixtures: `tools/author_battle_save.py` now authors the
+  corvette binding the tactical-art replay requires — fleet 0 becomes a
+  Military-role `patrol_corvette` (its tactical vessel uses the zero-fleet
+  2^32 identity mapping in formation 1's important vessels), Pioneer One
+  stays an unsupported colony_ship marker, and ship accounting conserves
+  (bound = important + cohorts). Verified: `--battle-smoke` at 720p and
+  `--battle-reload-smoke` at 1080p both pass (1 sprite, hostile picket
+  hidden, order accepted, canonical payload unchanged, save roundtrip).
+- Branch scope audit: the only `engine/` file touched is
+  `engine/src/native_audio.cpp` (`939e23b6`, predating this overhaul) — a
+  compatibility bugfix where the stream decoder borrows the SDL-initialized
+  STA apartment instead of throwing `RPC_E_CHANGED_MODE`. No new engine
+  capability or API surface; flagged in the PR body for merge review.
+- Developed-campaign verification fixture: `stellar_native_fresh_progression_tests
+  <research-dir> <catalog> --profile-save <abs-path>` (seed 115501 recipe)
+  produces a real paid 24-fleet / 3-owned-colony campaign (day 10154) with no
+  grafted state — used to re-verify fleet outliner grouping, the supply
+  workspace's shortfall rows, economy KPIs, and the roster/planetary surfaces
+  at 720p and 1080p. Output save is local tooling only, not committed.
+- Notification reload contract corrected: the feed is transient while
+  `EventHistory` persists, so `seed_chronicle_notifications` intentionally
+  reseeds the panel on load — the old `items==0` reload expectation
+  predated seeding. `notification_smoke` now expects an exact 1:1 projection
+  of observer-visible retained events (shared `chronicle_seed_min_significance`
+  / `chronicle_seed_max_entries` constants), all unread, no duplicates.
+  Diplomacy fresh (2 new reports) and paused reload (6 seeded) both pass.
+- Hand-authored save fixtures must not keep engine sidecars: a stale
+  `.integrity` checksum or `.bak` makes the loader treat the edited JSON as
+  corrupt and silently recover the backup. `tools/author_battle_save.py` and
+  `tools/author_settlement_save.py` now delete `.bak*`/`.integrity*` siblings
+  after writing; `author_battle_save.py --no-encounter` produces the
+  armed-fleet variant the military-order smoke needs (engaged fleets are
+  managed through the battle view, not the outliner row).
+
+- Legend toggle state is client-local (`map_legend_collapsed_`); it is not
+  persisted. `smoke_map_point_exposed` now excludes the legend bounds.
+- The legend panel shifts right together with the zoom readout when the
+  inspection card or fleet panel claims the left edge (shared
+  `map_zoom_bounds` origin).
+- Vitals/alerts consume `NativeColonyView` fields only — no simulation
+  changes, no new engine capability required.
+- New localization keys added to `en.json` + `de.json`:
+  `HUD_MAP_LEGEND`, `MAP_LEGEND_*` (7), `PLANET_VITAL_*` (6),
+  `PLANET_CHIP_*` (5), `PLANET_ALERT_NONE_SHORT`,
+  `RESEARCH_NO_MATCH_HINT`, `ROSTER_LIST_EMPTY_HINT`.

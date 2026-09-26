@@ -18,7 +18,7 @@ bool intersects(UiRect a,UiRect b) { return a.x<b.x+b.width&&a.x+a.width>b.x&&a.
 TextExtent measure(const Text& value) { const auto columns=std::max(1,static_cast<int>(value.wrap_width/7.f)); const auto lines=std::max(1,(static_cast<int>(value.value.size())+columns-1)/columns); return {columns*7,lines*(value.font_pixel_size+4)}; }
 NativeEconomyView view() {
   NativeEconomyView value; value.state=EconomyState::Ready; value.campaign_generation=7;value.revision=3;value.treasury_healthy=true;
-  value.cards={{{"RESERVES","¤ 145,000"},{"NET / DAY","+230 / DAY"},{"INCOME / DAY","+700 / DAY"},{"COSTS / DAY","-470 / DAY",true},{"MATERIALS IN STORAGE","4,000 / 8,000"},{"MATERIALS / DAY","+20 / DAY"}}};
+  value.cards={{{"RESERVES","¤ 145,000","Reserves explainer."},{"NET / DAY","+230 / DAY"},{"INCOME / DAY","+700 / DAY"},{"COSTS / DAY","-470 / DAY","",true},{"MATERIALS IN STORAGE","4,000 / 8,000"},{"MATERIALS / DAY","+20 / DAY"}}};
   value.treasury_status="SURPLUS · Current income covers operating commitments.";
   value.priority_status="Current choice: Balanced. A long UTF-8 explanation: 施設の優先順位 must wrap and remain reachable.";
   value.income_rows={{"COLONY ECONOMY","+500"},{"SURFACE TRADE","+200"}};
@@ -56,4 +56,5 @@ void keyboard_focus() {
   require(command.kind==EconomyCommandKind::Close&&!workspace.visible(),"Return on close did not dismiss the panel");
   workspace.open();require(workspace.focus()<0,"reopened panel kept a stale focus index");
 }
-int main() { try { layout_is_responsive();every_flow_row_is_drawn();rows_scroll_and_are_clipped();controls_are_pinned_and_cache_is_bounded();gestures_do_not_leak_or_activate_stale_buttons();failure_is_actionable_without_stale_data();keyboard_focus(); } catch(const std::exception& error) { std::cerr<<error.what()<<'\n';return 1;} }
+void kpi_tiles_explain_themselves_on_hover() { NativeEconomyWorkspace workspace;workspace.set_text_measurer(measure);workspace.open();const auto v=view();const auto l=EconomyLayout::for_viewport(1280,720);(void)workspace.handle({InputEventType::PointerMove,{l.body.x+30.f*l.scale,l.body.y+20.f*l.scale}},v,1280,720);DrawList draw;workspace.render(draw,v,1280,720);bool tip{};for(const auto& item:draw.overlay)if(const auto*t=std::get_if<Text>(&item);t&&t->value=="Reserves explainer.")tip=true;require(tip,"hovering a KPI tile did not render its explainer"); }
+int main() { try { layout_is_responsive();every_flow_row_is_drawn();rows_scroll_and_are_clipped();controls_are_pinned_and_cache_is_bounded();gestures_do_not_leak_or_activate_stale_buttons();failure_is_actionable_without_stale_data();keyboard_focus();kpi_tiles_explain_themselves_on_hover(); } catch(const std::exception& error) { std::cerr<<error.what()<<'\n';return 1;} }

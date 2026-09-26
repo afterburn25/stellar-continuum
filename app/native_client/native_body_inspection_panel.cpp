@@ -1,4 +1,5 @@
 #include "native_body_inspection_panel.hpp"
+#include "native_ui_theme.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -33,8 +34,15 @@ void BodyInspectionPanel::layout(UiRect panel,float footer_top) const {
     return std::max(1.f,std::ceil(static_cast<float>(value.size())/std::max(1.f,width/(font*.6f))))*(font+5.f);
   };
   const float width=std::max(1.f,panel.width-32.f);
+  const float avail=std::max(1.f,footer_top-panel.y-8.f);
   name_height_=std::min(height(value_->name,width,17),std::max(24.f,footer_top-panel.y-200.f));
-  const float body_top=panel.y+50.f+name_height_+25.f;
+  // At very short heights the fixed header would consume the entire panel;
+  // drop the name banner (the body list keeps the status line) so the
+  // scrollable facts retain a usable viewport.
+  compact_header_=avail<name_height_+123.f;
+  if(compact_header_)name_height_=0.f;
+  status_inset_=compact_header_?44.f:50.f;
+  const float body_top=panel.y+status_inset_+name_height_+25.f;
   body_={panel.x+14.f,body_top,width,std::max(0.f,footer_top-8.f-body_top)};
   float y=0.f;
   for(const auto& section:value_->sections){
@@ -60,17 +68,17 @@ void BodyInspectionPanel::render(DrawList& out,UiRect panel,float footer_top) co
   if(!value_)return;layout(panel,footer_top);
   const auto heading=locale_&&locale_->contains("SYSTEM_INSPECTOR")?std::string(locale_->translate("SYSTEM_INSPECTOR")):std::string("SYSTEM INSPECTOR");
   draw_text(out,{panel.x+14.f,panel.y+14.f,panel.width-28.f,28.f},heading,ink,18,panel);
-  draw_text(out,{panel.x+14.f,panel.y+47.f,panel.width-32.f,name_height_},value_->name,ink,17,panel);
-  draw_text(out,{panel.x+14.f,panel.y+50.f+name_height_,panel.width-28.f,20.f},value_->survey_status,
+  if(!compact_header_)
+    draw_text(out,{panel.x+14.f,panel.y+47.f,panel.width-32.f,name_height_},value_->name,ink,17,panel);
+  draw_text(out,{panel.x+14.f,panel.y+status_inset_+name_height_,panel.width-28.f,20.f},value_->survey_status,
             value_->confirmed?Color{109,229,174,255}:Color{248,195,109,255},12,panel);
   for(const auto& item:items_){
     const int font=item.heading?12:item.x==0.f?12:14;
     draw_text(out,{body_.x+item.x,body_.y+item.y-scroll_.scroll_offset,item.width,item.height},item.text,
               item.heading?cyan:item.x==0.f?muted:ink,font,body_);
   }
-  if(const auto thumb=scroll_.thumb(body_.height,24.f);thumb.size>0.f){
-    out.overlay.emplace_back(FilledRectangle{{panel.x+panel.width-8.f,body_.y,2.f,body_.height},{29,59,75,255}});
-    out.overlay.emplace_back(FilledRectangle{{panel.x+panel.width-8.f,body_.y+thumb.offset,2.f,thumb.size},cyan});
-  }
+  stellar::native_ui::scrollbar(
+      out, {panel.x + panel.width - 8.f, body_.y, 2.f, body_.height}, scroll_,
+      24.f);
 }
 }

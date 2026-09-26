@@ -48,6 +48,11 @@ void publish_campaign_notifications(NativeNotificationFeed& feed,
       "NOTIFY_MSG_RESEARCH","NOTIFY_MSG_CONSTRUCTION","NOTIFY_MSG_SHIP",
       "NOTIFY_MSG_SURVEY","NOTIFY_MSG_CONTACT","NOTIFY_MSG_SETTLEMENT",
       "NOTIFY_MSG_COMBAT"};
+  constexpr std::array<NotificationSeverity,7> severities{
+      NotificationSeverity::Info,NotificationSeverity::Positive,
+      NotificationSeverity::Positive,NotificationSeverity::Positive,
+      NotificationSeverity::Caution,NotificationSeverity::Positive,
+      NotificationSeverity::Alert};
   static_assert(categories.size()==native_campaign_feedback::feedback_kind_count);
   const auto date=native_campaign::format_campaign_date(day);
   for(std::size_t index=0;index<categories.size();++index){
@@ -57,7 +62,8 @@ void publish_campaign_notifications(NativeNotificationFeed& feed,
     if(count>1)suffix=" ("+std::to_string(count)+")";
     auto message=std::string(messages[index])+suffix;
     feed.publish(categories[index],date,std::move(message),
-                 std::nullopt,std::nullopt,keys[index],std::move(suffix));
+                 std::nullopt,std::nullopt,keys[index],std::move(suffix),
+                 severities[index]);
   }
 }
 
@@ -67,10 +73,9 @@ void seed_chronicle_notifications(NativeNotificationFeed& feed,
   // Report floor: the category vocabulary assigns high-volume trivia
   // (war.damage_applied 0.1, signature/system detections <=0.3,
   // survey_started 0.2) below it — the feed is for reports, not noise.
-  constexpr double report_significance=0.35;
   const auto events=history.feed(
       static_cast<std::uint64_t>(observer_civilization_id),
-      -std::numeric_limits<double>::infinity(),report_significance);
+      -std::numeric_limits<double>::infinity(),chronicle_seed_min_significance);
   const auto begin=events.size()>max_entries?events.end()-max_entries
                                            :events.begin();
   const auto observer=static_cast<std::uint64_t>(observer_civilization_id);
@@ -95,7 +100,9 @@ void seed_chronicle_notifications(NativeNotificationFeed& feed,
         foreign?std::optional<int>(static_cast<int>(foreign)):std::nullopt;
     feed.publish(label?std::string(label):event->category,
         native_campaign::format_campaign_date(event->at_day),
-        event->summary,counterpart,system);
+        event->summary,counterpart,system,{},{},
+        event->category.starts_with("war.")?NotificationSeverity::Alert
+            :NotificationSeverity::Info);
   }
 }
 
@@ -130,12 +137,20 @@ void NativeDiplomaticNotifications::harvest(NativeNotificationFeed& feed,
       if(event.primary_civilization_id==observer_)counterpart=event.secondary_civilization_id;
       else if(event.secondary_civilization_id==observer_)counterpart=event.primary_civilization_id;
     }
+    using enum core::DiplomaticEventKind;
+    const auto severity=
+        event.kind==war_declared?NotificationSeverity::Alert
+        :event.kind==proposal_rejected||event.kind==agreement_terminated
+            ?NotificationSeverity::Caution
+        :event.kind==proposal_accepted||event.kind==agreement_activated||
+             event.kind==contact_established?NotificationSeverity::Positive
+        :NotificationSeverity::Info;
     feed.publish("Diplomacy",native_campaign::format_campaign_date(
         static_cast<double>(event.tick)/1000.),
         names_visible?message:"A diplomatic signal was received from an unidentified contact.",
         counterpart,std::nullopt,
         names_visible?std::string(diplomatic_message_key(event.kind))
-                     :std::string("NOTIFY_DIP_SIGNAL"));
+                     :std::string("NOTIFY_DIP_SIGNAL"),{},severity);
   }
   // At most Core's 256 retained events; old IDs cannot accumulate indefinitely.
   seen_=std::move(retained);

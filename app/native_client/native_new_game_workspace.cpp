@@ -1,5 +1,6 @@
 #include "native_new_game_workspace.hpp"
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/core/stellar_population_profiles.hpp>
 #include <stellar/engine/localization.hpp>
 
@@ -115,7 +116,12 @@ species_presentation(std::string_view id) noexcept {
 
 NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
                                                        int height) noexcept {
-  const float scale = std::clamp(static_cast<float>(height) / 1080.f, .8f, 2.5f);
+  // The fixed header + footer stack needs ~490s of height beyond the 90 px
+  // content floor; adapt the scale on short viewports instead of letting the
+  // species/details region overlap the mode and generation rows.
+  float scale = std::clamp(static_cast<float>(height) / 1080.f, .8f, 2.5f);
+  if(490.f * scale + 90.f > height)
+    scale = std::clamp((height - 90.f) / 490.f, .45f, scale);
   const float margin = 18.f * scale;
   const float available_width = std::max(1.f, static_cast<float>(width) - 2 * margin);
   const float available_height = std::max(1.f, std::min(820.f * scale, static_cast<float>(height) - 2 * margin));
@@ -918,13 +924,10 @@ void NativeNewGameWorkspace::render(
               number(species->metabolic_demand, 2)},
              "Lifespan  {0} years · Metabolic demand  {1}x Terran baseline"));
     const float maximum_scroll = detail_scroll_.max_scroll();
-    if (const auto thumb = detail_scroll_.thumb(facts_clip.height, 22.f * s);
-        thumb.size > 0.f) {
+    {
       const UiRect track{facts_clip.x + facts_clip.width - 3.f * s,
                          facts_clip.y, 2.f * s, facts_clip.height};
-      fill(out, track, {91, 151, 205, 80});
-      fill(out, {track.x, track.y + thumb.offset, track.width, thumb.size},
-           accent);
+      stellar::native_ui::scrollbar(out, track, detail_scroll_, 22.f * s);
       if (detail_scroll_.scroll_offset + .5f < maximum_scroll) {
         const UiRect fade{facts_clip.x, facts_clip.y + facts_clip.height - 24.f * s,
                           facts_clip.width - 6.f * s, 24.f * s};
@@ -1019,8 +1022,8 @@ void NativeNewGameWorkspace::render(
   for(const auto r:choice_bounds)text(out,{r.x+r.width-24*s,r.y+(r.height-layout.small_font)*.5f,20*s,24*s},"▼",accent,layout.small_font,TextAlign::Center);
   const auto focus_items = configuration_focusables(measured);
   if (focus_ >= 0 && focus_ < static_cast<int>(focus_items.size()))
-    stroke(out, focus_items[static_cast<std::size_t>(focus_)].rect,
-           {160, 210, 255, 255});
+    stellar::native_ui::focus_ring(
+        out, focus_items[static_cast<std::size_t>(focus_)].rect);
   if(dropdown_.visible())dropdown_.render(out,choice_bounds[dropdown_.id()],width,height,layout.body_font);
 }
 

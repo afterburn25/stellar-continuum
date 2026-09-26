@@ -92,6 +92,7 @@ struct NativeLocalLaneGeometry {
 [[nodiscard]] std::vector<NativeLocalLaneGeometry> layout_local_lanes(
     const stellar::native_system::SystemSpatialSnapshot&,
     const stellar::native_system::SystemSpatialViewport&,
+    stellar::native_map::UiRect field,
     std::span<const NativeLocalLaneMarker>,
     std::span<const NativeLaneLabelMetrics>);
 [[nodiscard]] bool hit_local_lane(const NativeLocalLaneGeometry&,

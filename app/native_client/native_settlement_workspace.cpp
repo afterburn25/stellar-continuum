@@ -1,6 +1,7 @@
 #include <stellar/engine/native_ui_skin.hpp>
 #include "native_campaign_calendar.hpp"
 #include "native_settlement_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/core/colonization_runtime.hpp>
 
@@ -168,6 +169,6 @@ void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
   label(out,{x,y,content_w,55.f*layout.scale},p.message,p.accepted?good:bad,layout.small_font);
   stellar::engine::ui_skin::control(out,layout.cancel,layout.cancel.contains(pointer_),false,true,layout.scale);label(out,layout.cancel,tr("SETTLE_CANCEL","CANCEL"),text_color,layout.body_font,TextAlign::Center);
   const auto can_confirm=p.accepted;stellar::engine::ui_skin::control(out,layout.confirm,layout.confirm.contains(pointer_),true,can_confirm,layout.scale);label(out,layout.confirm,tr("SETTLE_CONFIRM","CONFIRM MISSION"),can_confirm?text_color:muted,layout.body_font,TextAlign::Center);
-  if(focus_>=0)stroke(out,focus_==0?layout.cancel:layout.confirm,{160,210,255,255});
+  if(focus_>=0)stellar::native_ui::focus_ring(out,focus_==0?layout.cancel:layout.confirm);
 }
 } // namespace stellar::native_colony_ui

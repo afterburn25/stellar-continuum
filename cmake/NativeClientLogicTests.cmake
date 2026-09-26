@@ -271,6 +271,16 @@ if(MSVC)
   target_compile_options(stellar_native_diplomacy_workspace_tests PRIVATE /WX)
 endif()
 
+add_executable(stellar_native_quick_find_tests
+  native-tests/native_quick_find_tests.cpp
+  app/native_client/native_quick_find.cpp)
+target_include_directories(stellar_native_quick_find_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_quick_find_tests PRIVATE stellar_core)
+add_test(NAME native_quick_find COMMAND stellar_native_quick_find_tests)
+if(MSVC)
+  target_compile_options(stellar_native_quick_find_tests PRIVATE /WX)
+endif()
+
 add_executable(stellar_native_fresh_progression_tests
   native-tests/native_fresh_progression_tests.cpp
   app/native_client/native_research_controller.cpp

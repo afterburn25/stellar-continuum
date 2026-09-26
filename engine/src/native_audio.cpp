@@ -64,14 +64,22 @@ class ComApartment final {
   explicit ComApartment(const std::filesystem::path& path) : path_(path) {
     result_ = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (result_ == RPC_E_CHANGED_MODE) {
-      throw hresult_error("CoInitializeEx", result_, path_);
+      // The thread already belongs to a different apartment — SDL
+      // STA-initializes the main thread, and stream decoding binds lazily
+      // on whichever thread first calls read(). Synchronous SourceReader
+      // use is apartment-agnostic, so borrow the existing apartment; a
+      // failed CoInitializeEx added no reference and must not be balanced
+      // by CoUninitialize here.
+    } else {
+      require_hresult(result_, "CoInitializeEx", path_);
+      initialized_ = true;
     }
-    require_hresult(result_, "CoInitializeEx", path_);
-    initialized_ = true;
     const auto media_result = MFStartup(MF_VERSION, MFSTARTUP_LITE);
     if (FAILED(media_result)) {
-      CoUninitialize();
-      initialized_ = false;
+      if (initialized_) {
+        CoUninitialize();
+        initialized_ = false;
+      }
       throw hresult_error("MFStartup", media_result, path_);
     }
     media_started_ = true;

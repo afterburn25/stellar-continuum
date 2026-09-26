@@ -1,5 +1,6 @@
 #include "native_system_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 #include <algorithm>
 #include <cstdint>
 #include <iomanip>
@@ -146,7 +147,7 @@ void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int 
   const auto ring=[&]{
     if(small_body_ring_<0)return;
     const auto t=small_body_ring_targets(width,height);
-    if(small_body_ring_<static_cast<int>(t.size()))out.overlay.emplace_back(StrokedRectangle{t[static_cast<std::size_t>(small_body_ring_)].first,{164,221,237,255}});
+    if(small_body_ring_<static_cast<int>(t.size()))stellar::native_ui::focus_ring(out,t[static_cast<std::size_t>(small_body_ring_)].first);
   };
   if(!small_body_panel_){ring();return;}
   out.overlay.emplace_back(FilledRectangle{l.panel,{5,17,28,252}});out.overlay.emplace_back(StrokedRectangle{l.panel,{77,151,178,255}});

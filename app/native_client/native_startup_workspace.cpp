@@ -1,5 +1,6 @@
 #include "native_startup_workspace.hpp"
-#include "native_menu_style.hpp"
+#include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/engine/localization.hpp>
 
 #include <algorithm>
@@ -14,12 +15,18 @@
 namespace stellar::native_startup_ui {
 namespace {
 using namespace stellar::native_map;
-constexpr Color background{3,9,18,255},panel{8,20,36,252},raised{12,31,54,250};
-constexpr Color hover{24,61,94,252},selected{23,67,102,255};
-constexpr Color border{91,151,205,235},bright{235,244,255,255};
-constexpr Color muted{154,181,211,240},accent{122,230,190,255};
-constexpr Color gold{241,195,105,255};
-constexpr Color warning{255,190,112,255};
+namespace theme = stellar::native_ui;
+constexpr Color background = theme::color::canvas,
+    panel = theme::color::surface_opaque,
+    raised = theme::color::surface_raised;
+constexpr Color hover = theme::color::surface_hover,
+    selected = theme::color::surface_raised;
+constexpr Color border = theme::color::keyline_strong,
+    bright = theme::color::text_primary;
+constexpr Color muted = theme::color::text_secondary,
+    accent = theme::color::success;
+constexpr Color gold = theme::color::economy;
+constexpr Color warning = theme::color::caution;
 constexpr std::array<std::string_view,5> loading_tips{
   "Tip: Space pauses or resumes time.",
   "Tip: Use the navigation rail to open research, construction, fleets, and relations.",
@@ -247,12 +254,12 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
     if(focus_<0)return;
     const auto fs=collect_focusables(l,width,height);
     if(focus_<static_cast<int>(fs.size()))
-      out.overlay.emplace_back(StrokedRectangle{fs[static_cast<std::size_t>(focus_)].rect,{160,210,255,255}});
+      theme::focus_ring(out,fs[static_cast<std::size_t>(focus_)].rect);
   };
   if(backdrop){const auto destination=startup_artwork_destination(backdrop->width(),backdrop->height(),width,height);out.overlay.emplace_back(Image{std::move(backdrop),destination,std::nullopt,{255,255,255,255},UiRect{0,0,static_cast<float>(width),static_cast<float>(height)}});}else fill(out,{0,0,static_cast<float>(width),static_cast<float>(height)},background);
   if(backdrop_only)return;
   if(screen_!=StartupScreen::Busy&&screen_!=StartupScreen::Entry){
-    native_menu_style::panel(out,l.panel,s);
+    native_ui_style::menu_panel(out,l.panel);
     if(screen_!=StartupScreen::ModeSelection)text(out,{l.panel.x+22*s,l.panel.y+22*s,l.panel.width-170*s,34*s},"STELLAR CONTINUUM",bright,l.heading_font,TextAlign::Left,FontFace::Heading);
   }
   if(screen_==StartupScreen::Entry){
@@ -282,8 +289,8 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
     text(out,{l.panel.x+22*s,l.panel.y+116*s,l.panel.width-44*s,126*s},build_label_+"\n"+diagnostics_,bright,l.body_font);
     text(out,{l.panel.x+22*s,l.panel.y+266*s,l.panel.width-44*s,116*s},
       tr("STARTUP_DEV_HELP","F12 captures the screen. Export diagnostics from the pause menu.\n\nOpen the Developer Game launcher, then choose New Game > Sandbox. The footer shows DEV MODE. Saves stay separate.\n\nManual launch: --dev-game enters developer mode directly. Ctrl+Shift+F12 toggles mode only in a --devtools launch."),muted,l.small_font);
-    native_menu_style::button(out,l.primary,tr("STARTUP_COPY_SYSINFO","Copy system info"),l.small_font,l.primary.contains(pointer_),true,s);
-    native_menu_style::button(out,l.back,tr("SETTINGS_BACK","Back"),l.body_font,l.back.contains(pointer_),true,s);
+    theme::button(out,l.primary,tr("STARTUP_COPY_SYSINFO","Copy system info"),pointer_,l.small_font);
+    theme::button(out,l.back,tr("SETTINGS_BACK","Back"),pointer_,l.body_font);
     focus_ring();return;
   }
   if(screen_==StartupScreen::ModeSelection){
@@ -299,14 +306,14 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
       fill(out,card,enabled&&card.contains(pointer_)?hover:raised);
       const UiRect art{card.x+6*s,card.y+6*s,card.width-12*s,card.height*.56f};
       if(image){
-        const Color tint=enabled?bright:Color{150,150,150,255};
+        const Color tint=enabled?bright:theme::color::disabled;
         out.overlay.emplace_back(Image{image,cover_artwork(*image,art),
                                        std::nullopt,tint,art});
       }
       stroke(out,card,enabled?accent:muted);
       if(!enabled){
         const UiRect unavailable{card.x+card.width*.5f-66*s,card.y+card.height*.28f,132*s,32*s};
-        fill(out,unavailable,{8,20,36,230});stroke(out,unavailable,gold);
+        fill(out,unavailable,panel);stroke(out,unavailable,gold);
         text(out,unavailable,tr("STARTUP_COMING_SOON","COMING SOON"),gold,l.small_font,TextAlign::Center);
       }
       text(out,{card.x+10*s,card.y+card.height-94*s,card.width-20*s,24*s},
@@ -318,13 +325,12 @@ void NativeStartupWorkspace::render(DrawList&out,int width,int height,const Text
     };
     render_card(l.story_campaign,tr("STARTUP_STORY_TITLE","STORY CAMPAIGN"),tr("STARTUP_STORY_DESC","A guided narrative with authored characters, conflicts and discoveries."),false,story_art);
     render_card(l.sandbox_campaign,tr("STARTUP_SANDBOX_TITLE","SANDBOX"),tr("STARTUP_SANDBOX_DESC","Set the galaxy scale, rivals, ancient empires, and your people."),true,sandbox_art);
-    fill(out,l.back,raised);stroke(out,l.back,border);
-    text(out,l.back,tr("STARTUP_BACK","BACK"),bright,l.body_font,TextAlign::Center);
+    theme::button(out,l.back,tr("STARTUP_BACK","BACK"),pointer_,l.body_font);
     focus_ring();return;
   }
-  if(screen_==StartupScreen::LoadSlots){text(out,{l.panel.x+22*s,l.panel.y+70*s,l.panel.width-44*s,28*s},tr("STARTUP_SELECT_SAVE","SELECT A SAVED CAMPAIGN"),bright,l.body_font);if(!slots_.error.empty())text(out,l.list,slots_.error,warning,l.body_font);else if(slots_.slots.empty())text(out,l.list,tr("STARTUP_NO_SAVES","No saved campaigns are available."),muted,l.body_font);else{const float pitch=46.f*s;load_scroll_.sync_rows(slots_.slots.size(),pitch,l.list.height);for(std::size_t i=0;i<slots_.slots.size();++i){UiRect row{l.list.x,l.list.y+i*pitch-load_scroll_.scroll_offset,l.list.width,pitch-4*s};const auto visible=intersect(row,l.list);if(visible.width<=0||visible.height<=0)continue;fill(out,visible,selected_slot_==i?selected:raised);stroke(out,visible,selected_slot_==i?accent:border);UiRect label{row.x+10*s,row.y+11*s,row.width-20*s,row.height-12*s};const auto clip=intersect(label,l.list);if(clip.width>0&&clip.height>0)out.overlay.emplace_back(Text{{label.x,label.y},slots_.slots[i].filename,bright,l.body_font,label.width,clip,TextAlign::Left,FontFace::Interface});}}fill(out,l.back,raised);stroke(out,l.back,border);text(out,l.back,tr("STARTUP_BACK","BACK"),bright,l.body_font,TextAlign::Center);fill(out,l.primary,selected_slot_?selected:raised);stroke(out,l.primary,selected_slot_?accent:muted);text(out,l.primary,tr("STARTUP_LOAD_SELECTED","LOAD SELECTED"),selected_slot_?bright:muted,l.body_font,TextAlign::Center);focus_ring();return;}
-  if(screen_==StartupScreen::Busy){const auto status=busy_status(width,height,s),cancel=busy_cancel(width,height,s);fill(out,status,{5,14,27,210});stroke(out,status,border);text(out,{status.x+18*s,status.y+12*s,status.width-36*s,26*s},operation_.status,bright,l.body_font,TextAlign::Center);if(operation_.determinate_progress){UiRect track{status.x+50*s,status.y+50*s,status.width-100*s,12*s};fill(out,track,raised);fill(out,{track.x,track.y,track.width*static_cast<float>(std::clamp(*operation_.determinate_progress,0.,1.)),track.height},accent);}else {const UiRect track{status.x+50*s,status.y+50*s,status.width-100*s,12*s};fill(out,track,raised);const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();const float cycle=static_cast<float>(std::fmod(seconds,2.4)/2.4);const float travel=cycle<.5f?cycle*2.f:2.f-cycle*2.f;const float segment=track.width*.22f;fill(out,{track.x+(track.width-segment)*travel,track.y,segment,track.height},accent);}text(out,{status.x+20*s,status.y+82*s,status.width-40*s,34*s},loading_tip_,muted,l.small_font,TextAlign::Center);fill(out,cancel,{8,20,36,220});stroke(out,cancel,border);text(out,cancel,tr(operation_.worker_running?"SETTINGS_CANCEL":"STARTUP_BACK",operation_.worker_running?"CANCEL":"BACK"),bright,l.body_font,TextAlign::Center);focus_ring();return;}
-  text(out,{l.panel.x+22*s,l.panel.y+70*s,l.panel.width-44*s,28*s},tr("STARTUP_FAILED","STARTUP COULD NOT COMPLETE"),warning,l.body_font,TextAlign::Center);text(out,l.status,failure_,warning,l.body_font,TextAlign::Center);fill(out,l.back,raised);stroke(out,l.back,border);text(out,l.back,tr("STARTUP_BACK","BACK"),bright,l.body_font,TextAlign::Center);
+  if(screen_==StartupScreen::LoadSlots){text(out,{l.panel.x+22*s,l.panel.y+70*s,l.panel.width-44*s,28*s},tr("STARTUP_SELECT_SAVE","SELECT A SAVED CAMPAIGN"),bright,l.body_font);if(!slots_.error.empty())text(out,l.list,slots_.error,warning,l.body_font);else if(slots_.slots.empty())text(out,l.list,tr("STARTUP_NO_SAVES","No saved campaigns are available."),muted,l.body_font);else{const float pitch=46.f*s;load_scroll_.sync_rows(slots_.slots.size(),pitch,l.list.height);for(std::size_t i=0;i<slots_.slots.size();++i){UiRect row{l.list.x,l.list.y+i*pitch-load_scroll_.scroll_offset,l.list.width,pitch-4*s};const auto visible=intersect(row,l.list);if(visible.width<=0||visible.height<=0)continue;fill(out,visible,selected_slot_==i?selected:raised);stroke(out,visible,selected_slot_==i?accent:border);UiRect label{row.x+10*s,row.y+11*s,row.width-20*s,row.height-12*s};const auto clip=intersect(label,l.list);if(clip.width>0&&clip.height>0)out.overlay.emplace_back(Text{{label.x,label.y},slots_.slots[i].filename,bright,l.body_font,label.width,clip,TextAlign::Left,FontFace::Interface});}}theme::button(out,l.back,tr("STARTUP_BACK","BACK"),pointer_,l.body_font);theme::button(out,l.primary,tr("STARTUP_LOAD_SELECTED","LOAD SELECTED"),pointer_,l.body_font,theme::Tone::Success,selected_slot_.has_value(),selected_slot_.has_value());focus_ring();return;}
+  if(screen_==StartupScreen::Busy){const auto status=busy_status(width,height,s),cancel=busy_cancel(width,height,s);fill(out,status,panel);stroke(out,status,border);text(out,{status.x+18*s,status.y+12*s,status.width-36*s,26*s},operation_.status,bright,l.body_font,TextAlign::Center);if(operation_.determinate_progress){UiRect track{status.x+50*s,status.y+50*s,status.width-100*s,12*s};fill(out,track,raised);fill(out,{track.x,track.y,track.width*static_cast<float>(std::clamp(*operation_.determinate_progress,0.,1.)),track.height},accent);}else {const UiRect track{status.x+50*s,status.y+50*s,status.width-100*s,12*s};fill(out,track,raised);const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();const float cycle=static_cast<float>(std::fmod(seconds,2.4)/2.4);const float travel=cycle<.5f?cycle*2.f:2.f-cycle*2.f;const float segment=track.width*.22f;fill(out,{track.x+(track.width-segment)*travel,track.y,segment,track.height},accent);}text(out,{status.x+20*s,status.y+82*s,status.width-40*s,34*s},loading_tip_,muted,l.small_font,TextAlign::Center);theme::button(out,cancel,tr(operation_.worker_running?"SETTINGS_CANCEL":"STARTUP_BACK",operation_.worker_running?"CANCEL":"BACK"),pointer_,l.body_font);focus_ring();return;}
+  text(out,{l.panel.x+22*s,l.panel.y+70*s,l.panel.width-44*s,28*s},tr("STARTUP_FAILED","STARTUP COULD NOT COMPLETE"),warning,l.body_font,TextAlign::Center);text(out,l.status,failure_,warning,l.body_font,TextAlign::Center);theme::button(out,l.back,tr("STARTUP_BACK","BACK"),pointer_,l.body_font);
   focus_ring();
 }
 } // namespace stellar::native_startup_ui

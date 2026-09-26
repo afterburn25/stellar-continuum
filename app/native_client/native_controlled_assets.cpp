@@ -1,6 +1,7 @@
 #include "native_controlled_assets.hpp"
 #include "native_menu_style.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -60,6 +61,13 @@ View build(const stellar::core::FreshCampaignState& world,const stellar::native_
     else if(f.reconnaissance&&!f.reconnaissance->completed&&!f.reconnaissance->held)order=resolve(locale,"ASSETS_ORDER_EXPLORING","Exploring");
     else if(source.combat){switch(source.combat->order){case MilitaryOrderType::Defend:order=resolve(locale,"ASSETS_ORDER_DEFENDING","Defending");break;case MilitaryOrderType::Attack:order=resolve(locale,"ASSETS_ORDER_ATTACKING","Attacking");break;default:break;}}
     r.activity+=order;r.tooltip=resolved(locale,"ASSETS_TIP_FLEET",{f.name,r.detail,r.activity,std::to_string(static_cast<int>(std::lround(f.combat_power)))},"{0}\n{1}\n{2}\nFleet power: {3}");
+    // Urgency orders the fleet list — most demanding first — matching the
+    // fleet workspace outliner's status groups: engaged, in transit, on
+    // mission, stationed. The displayed activity text follows the same
+    // predicates, so rank and label never disagree.
+    if(source.combat&&(source.combat->retreat_started||source.combat->target_fleet_id))r.urgency=0;
+    else if(source.transit_phase!=FleetTransitPhase::None||source.destination_system_id)r.urgency=1;
+    else if(source.return_to_base_requested||source.hold_requested||source.freight_target_outpost_id||source.settlement_body_id||(f.science_survey&&!f.science_survey->completed&&!f.science_survey->held)||(f.reconnaissance&&!f.reconnaissance->completed&&!f.reconnaissance->held)||(source.combat&&source.combat->order!=MilitaryOrderType::Hold))r.urgency=2;
     if(source.return_to_base_failure_reason){r.severity=1;r.tooltip+=resolve(locale,"ASSETS_WARN_ROUTE","\nReturn route needs attention.");}
     result.rows.push_back(std::move(r));
   }
@@ -71,7 +79,7 @@ View build(const stellar::core::FreshCampaignState& world,const stellar::native_
     r.tooltip=resolved(locale,"ASSETS_TIP_YARD",{r.name,r.activity,r.detail},"{0}\n{1}\n{2}\nClick to focus; double-click or › for Ship Construction.");result.rows.push_back(std::move(r));
   }
   for(auto& r:result.rows)r.search=folded(r.name+" "+r.detail+" "+r.activity+" "+system_name(r.system_id));
-  std::ranges::stable_sort(result.rows,[](const Row& a,const Row& b){if(a.key.category!=b.key.category)return a.key.category<b.key.category;return a.key.id<b.key.id;});
+  std::ranges::stable_sort(result.rows,[](const Row& a,const Row& b){if(a.key.category!=b.key.category)return a.key.category<b.key.category;if(a.key.category==Category::Fleets&&a.urgency!=b.urgency)return a.urgency<b.urgency;return a.key.id<b.key.id;});
   return result;
 }
 Layout Layout::make(int width,int height){
@@ -320,7 +328,7 @@ void Navigator::render(DrawList& out,int w,int h,const Art& art){
     if(hovered)tooltip=std::pair{&row,r};
   }
   if(entries_.empty())label(out,{l.list.x+10*s,l.list.y+18*s,l.list.width-20*s,150*s},view_.rows.empty()?tr("ASSETS_EMPTY","No controlled assets.\n\nExplore the galaxy or establish a colony to begin expanding your civilization."):tr("ASSETS_EMPTY_SEARCH","No assets match your search."),muted,normal,l.list);
-  if(const auto thumb=scroll_.thumb(l.list.height,24*s);thumb.size>0){out.overlay.emplace_back(FilledRectangle{{l.list.x+l.list.width-2*s,l.list.y+thumb.offset,2*s,thumb.size},{72,158,192,255}});}
+  stellar::native_ui::scrollbar(out,{l.list.x+l.list.width-2*s,l.list.y,2*s,l.list.height},scroll_,24*s);
   if(tooltip){const UiRect box{l.panel.x-300*s-8*s,std::clamp(tooltip->second.y,80*s,h-174*s),300*s,158*s};native_menu_style::panel(out,box,s);label(out,{box.x+12*s,box.y+12*s,box.width-24*s,box.height-24*s},tooltip->first->tooltip,ink,small,box);}
   if(!error_.empty())label(out,{l.panel.x+10*s,l.panel.y+l.panel.height-22*s,l.panel.width-20*s,22*s},error_,amber,small,l.panel);
   if(focus_>=0){const auto targets=focusables(l);if(focus_<static_cast<int>(targets.size()))out.overlay.emplace_back(StrokedRectangle{targets[static_cast<std::size_t>(focus_)].bounds,cyan});}

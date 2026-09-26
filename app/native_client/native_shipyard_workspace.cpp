@@ -2,6 +2,7 @@
 #include "native_shipyard_workspace.hpp"
 #include "native_ui_layout.hpp"
 #include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
 #include <array>
@@ -20,17 +21,15 @@ namespace {
 using namespace stellar::native_map;
 using namespace stellar::native_shipyard;
 
-constexpr Color panel{7, 17, 32, 252};
-constexpr Color inset{5, 14, 27, 250};
-constexpr Color row{12, 31, 54, 248};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{19, 73, 68, 252};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color good{102, 232, 164, 255};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color warning{255, 190, 112, 255};
-constexpr Color failure{255, 133, 123, 255};
+namespace theme = stellar::native_ui;
+constexpr Color inset = theme::color::canvas;
+constexpr Color row = theme::color::surface_secondary;
+constexpr Color selected = theme::color::surface_raised;
+constexpr Color good = theme::color::success;
+constexpr Color bright = theme::color::text_primary;
+constexpr Color muted = theme::color::text_secondary;
+constexpr Color warning = theme::color::caution;
+constexpr Color failure = theme::color::danger;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});

@@ -1,5 +1,6 @@
 #include "native_video_settings.hpp"
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/engine/atomic_file_write.hpp>
 
@@ -27,14 +28,15 @@ namespace {
 using namespace stellar::native_map;
 
 // Reference palette (VisualPalette / MainMenuLayer).
-constexpr Color panel{9, 20, 37, 250};
-constexpr Color button{14, 34, 58, 245};
-constexpr Color hover{26, 64, 98, 250};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color text_primary{235, 244, 255, 255};
-constexpr Color text_muted{151, 180, 207, 245};
-constexpr Color text_error{239, 172, 146, 255};
-constexpr Color gold{230, 190, 105, 255};
+// Settings chrome aliases the shared theme palette.
+constexpr Color panel = stellar::native_ui::color::surface_opaque;
+constexpr Color button = stellar::native_ui::color::surface_raised;
+constexpr Color hover = stellar::native_ui::color::surface_hover;
+constexpr Color border = stellar::native_ui::color::keyline_strong;
+constexpr Color text_primary = stellar::native_ui::color::text_primary;
+constexpr Color text_muted = stellar::native_ui::color::text_secondary;
+constexpr Color text_error = stellar::native_ui::color::danger;
+constexpr Color gold = stellar::native_ui::color::economy;
 
 constexpr std::size_t maximum_settings_bytes = 64u * 1024u;
 constexpr std::array<std::string_view, 8> choice_names = {"DISPLAY", "RESOLUTION", "V-SYNC",
@@ -600,7 +602,7 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
        tr("SETTINGS_VIDEO_HINT",
           "Detected display modes and graphics controls for this computer."),
        text_muted, layout.small_font_pixels);
-  text(out,layout.adapter,adapter_label_,{112,223,238,255},layout.small_font_pixels);
+  text(out,layout.adapter,adapter_label_,stellar::native_ui::color::selected,layout.small_font_pixels);
   const auto draw_button = [&](UiRect bounds, std::string caption, bool enabled = true, float inset = 0.f) {
     stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),false,enabled,layout.scale);
     text(out, {bounds.x + inset, bounds.y + bounds.height * .5f - layout.body_font_pixels * .55f,
@@ -668,8 +670,7 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
     std::array<Focusable, 11> focusables{};
     const int count = collect_focusables(layout, focusables);
     if (focus_ < count)
-      out.overlay.emplace_back(stellar::native_map::StrokedRectangle{
-          focusables[focus_].rect, {160, 210, 255, 255}});
+      stellar::native_ui::focus_ring(out, focusables[focus_].rect);
   }
 }
 

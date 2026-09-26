@@ -2,9 +2,11 @@
 
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/accessibility.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
@@ -52,6 +54,28 @@ inline constexpr Color diplomacy{95, 210, 192, 255};
 inline constexpr Color military{255, 119, 110, 255};
 inline constexpr Color shadow{0, 4, 9, 168};
 }
+
+// Canonical type ramp in unscaled pixels: one vocabulary for workspace
+// chrome so the heading/body/small hierarchy reads identically on every
+// surface. Dense tabular surfaces (fleet/battle/inspection) use the compact
+// body/small rungs instead of inventing their own.
+namespace type {
+[[nodiscard]] inline int title(float scale) noexcept {
+  return static_cast<int>(std::lround(24.f * scale));
+}
+[[nodiscard]] inline int body(float scale) noexcept {
+  return static_cast<int>(std::lround(15.f * scale));
+}
+[[nodiscard]] inline int small(float scale) noexcept {
+  return static_cast<int>(std::lround(12.f * scale));
+}
+[[nodiscard]] inline int compact_body(float scale) noexcept {
+  return static_cast<int>(std::lround(14.f * scale));
+}
+[[nodiscard]] inline int compact_small(float scale) noexcept {
+  return static_cast<int>(std::lround(11.f * scale));
+}
+} // namespace type
 
 // Global high-contrast pass over a finished DrawList: snaps low-luminance
 // text to the primary ink so every surface gains readability without
@@ -158,16 +182,33 @@ inline void panel(DrawList &out, UiRect bounds, Tone tone = Tone::Neutral,
   fill(out, {bounds.x, bounds.y, 3.f, bounds.height}, accent(tone));
 }
 
+// Rectangle intersection shared by the clipped helpers below.
+[[nodiscard]] inline std::optional<UiRect> clipped(UiRect a, UiRect b) {
+  const float x = std::max(a.x, b.x), y = std::max(a.y, b.y);
+  const float r = std::min(a.x + a.width, b.x + b.width),
+              bottom = std::min(a.y + a.height, b.y + b.height);
+  if (r <= x || bottom <= y) return std::nullopt;
+  return UiRect{x, y, r - x, bottom - y};
+}
+
 inline void section_header(DrawList &out, UiRect bounds, std::string title,
                            int pixels, Tone tone = Tone::Neutral,
-                           std::string value = {}) {
+                           std::string value = {},
+                           std::optional<UiRect> clip = std::nullopt) {
+  const auto visible =
+      clip ? clipped(bounds, *clip) : std::optional<UiRect>{bounds};
+  if (!visible) return;
   text(out, {bounds.x, bounds.y}, std::move(title), accent(tone), pixels,
-       bounds.width, TextAlign::Left, FontFace::Heading);
+       bounds.width, TextAlign::Left, FontFace::Heading, visible);
   if (!value.empty())
-    text(out, {bounds.x, bounds.y}, std::move(value), color::text_secondary,
-         pixels, bounds.width, TextAlign::Right);
-  fill(out, {bounds.x, bounds.y + static_cast<float>(pixels) + 5.f,
-             bounds.width, 1.f}, color::keyline);
+    text(out, {bounds.x + bounds.width, bounds.y}, std::move(value),
+         color::text_secondary, pixels, bounds.width, TextAlign::Right,
+         FontFace::Interface, visible);
+  if (const auto rule = clipped(
+          {bounds.x, bounds.y + static_cast<float>(pixels) + 5.f, bounds.width,
+           1.f},
+          *visible))
+    fill(out, *rule, color::keyline);
 }
 
 inline void button(DrawList &out, UiRect bounds, std::string caption,
@@ -181,9 +222,12 @@ inline void button(DrawList &out, UiRect bounds, std::string caption,
                                                     : color::keyline_strong)
                               : color::keyline);
   if (active) fill(out, {bounds.x, bounds.y, 3.f, bounds.height}, accent(tone));
-  text(out, {bounds.x, bounds.y + (bounds.height - pixels) * .5f - 1.f},
+  // Center anchors on at.x — the caption centers on the button's midpoint and
+  // clips to the button if it overflows.
+  text(out, {bounds.x + bounds.width * .5f,
+             bounds.y + (bounds.height - pixels) * .5f - 1.f},
        std::move(caption), enabled ? color::text_primary : color::disabled,
-       pixels, bounds.width, TextAlign::Center, FontFace::Heading, bounds);
+       pixels, 0.f, TextAlign::Center, FontFace::Heading, bounds);
 }
 
 inline void progress(DrawList &out, UiRect bounds, double ratio,
@@ -192,6 +236,102 @@ inline void progress(DrawList &out, UiRect bounds, double ratio,
   const auto width = bounds.width * static_cast<float>(std::clamp(ratio, 0., 1.));
   if (width > 0.f) fill(out, {bounds.x, bounds.y, width, bounds.height}, accent(tone));
   stroke(out, bounds, color::keyline);
+}
+
+// One keyboard/pad focus indicator — replaces the per-workspace hardcoded
+// {160,210,255,255} stroked rects so the ring is identical on every surface.
+inline void focus_ring(DrawList &out, UiRect bounds) {
+  stroke(out, bounds, color::focus);
+}
+
+// Scannable statistic: muted micro-label over a larger tone-colored value.
+// The primary Phase-3 hierarchy element for headline numbers.
+inline void metric_tile(DrawList &out, UiRect bounds, std::string label,
+                        std::string value, int label_pixels, int value_pixels,
+                        Tone tone = Tone::Neutral, bool filled = true,
+                        std::optional<UiRect> clip = std::nullopt) {
+  const auto visible =
+      clip ? clipped(bounds, *clip) : std::optional<UiRect>{bounds};
+  if (!visible) return;
+  if (filled) {
+    fill(out, *visible, color::surface_secondary);
+    // The keyline only draws when the tile is fully inside its scroll region —
+    // a clipped stroke reads as a stray edge at the viewport boundary.
+    if (!clip || (visible->x == bounds.x && visible->y == bounds.y &&
+                  visible->width == bounds.width &&
+                  visible->height == bounds.height))
+      stroke(out, bounds, color::keyline);
+  }
+  const float pad = std::max(4.f, bounds.width * .06f);
+  text(out, {bounds.x + pad, bounds.y + 5.f}, std::move(label),
+       color::text_muted, label_pixels, bounds.width - 2.f * pad,
+       TextAlign::Left, FontFace::Heading, visible);
+  text(out, {bounds.x + pad, bounds.y + bounds.height * .5f - 1.f},
+       std::move(value),
+       tone == Tone::Neutral ? color::text_primary : accent(tone),
+       value_pixels, bounds.width - 2.f * pad, TextAlign::Left,
+       FontFace::Heading, visible);
+}
+
+// Compact status pill: tone-colored keyline + centered caps label.
+inline void badge(DrawList &out, UiRect bounds, std::string label, int pixels,
+                  Tone tone = Tone::Neutral) {
+  fill(out, bounds, color::surface_secondary);
+  stroke(out, bounds, accent(tone));
+  text(out, {bounds.x + bounds.width * .5f,
+             bounds.y + (bounds.height - pixels) * .5f - 1.f},
+       std::move(label), accent(tone), pixels, 0.f, TextAlign::Center,
+       FontFace::Heading, bounds);
+}
+
+// Label left / value right row — the standard fact line.
+inline void key_value(DrawList &out, UiRect bounds, std::string label,
+                      std::string value, int pixels,
+                      Tone tone = Tone::Neutral,
+                      std::optional<UiRect> clip = std::nullopt) {
+  const auto visible =
+      clip ? clipped(bounds, *clip) : std::optional<UiRect>{bounds};
+  if (!visible || visible->width <= 0.f || visible->height <= 0.f) return;
+  text(out, {bounds.x, bounds.y}, std::move(label), color::text_secondary,
+       pixels, bounds.width * .48f, TextAlign::Left, FontFace::Interface,
+       visible);
+  text(out, {bounds.x + bounds.width, bounds.y}, std::move(value),
+       tone == Tone::Neutral ? color::text_primary : accent(tone), pixels,
+       bounds.width * .52f, TextAlign::Right, FontFace::Interface, visible);
+}
+
+// Empty/error surface: centered muted message with an optional accent hint
+// line underneath for the player's next action.
+inline void empty_state(DrawList &out, UiRect bounds, std::string title,
+                        std::string hint, int pixels) {
+  text(out, {bounds.x + bounds.width * .5f, bounds.y + bounds.height * .38f},
+       std::move(title), color::text_secondary, pixels, bounds.width - 16.f,
+       TextAlign::Center, FontFace::Heading, bounds);
+  if (!hint.empty())
+    text(out, {bounds.x + bounds.width * .5f, bounds.y + bounds.height * .38f +
+                                               pixels * 1.6f},
+         std::move(hint), color::text_muted, std::max(9, pixels - 3),
+         bounds.width - 16.f, TextAlign::Center, FontFace::Interface, bounds);
+}
+
+// Single tab inside a strip — caller owns the strip frame; active tabs get a
+// tone underbar and primary text, inactive tabs stay muted.
+inline void tab(DrawList &out, UiRect bounds, std::string caption,
+                Point pointer, int pixels, bool active,
+                bool enabled = true) {
+  const bool hovered = enabled && bounds.contains(pointer);
+  if (active || hovered)
+    fill(out, bounds, active ? color::surface_raised : color::surface_hover);
+  if (active)
+    fill(out, {bounds.x, bounds.y + bounds.height - 2.f, bounds.width, 2.f},
+         color::selected);
+  text(out, {bounds.x + bounds.width * .5f,
+             bounds.y + (bounds.height - pixels) * .5f - 1.f},
+       std::move(caption),
+       !enabled ? color::disabled
+                : active ? color::text_primary
+                         : hovered ? color::text_primary : color::text_secondary,
+       pixels, bounds.width, TextAlign::Center, FontFace::Heading, bounds);
 }
 
 inline void tooltip(DrawList &out, Point anchor, std::string title,
@@ -212,6 +352,60 @@ inline void tooltip(DrawList &out, Point anchor, std::string title,
   text(out, {x + 12.f * scale, y + 31.f * scale}, std::move(body),
        color::text_secondary, static_cast<int>(12.f * scale),
        width - 24.f * scale);
+}
+
+// Compact single-line hint for icon rails and tight controls: auto-sizes to
+// the measured text when a measurer is supplied, else estimates by pixel
+// width. Clamped inside the viewport like `tooltip`.
+inline void hint(DrawList &out, Point anchor, std::string caption,
+                 int viewport_width, int viewport_height, int pixels,
+                 float scale = 1.f,
+                 const std::function<native_map::TextExtent(const Text &)>
+                     &measure = {}) {
+  const Text probe{{}, caption, color::text_primary, pixels};
+  const auto extent = measure ? measure(probe)
+                              : native_map::TextExtent{
+                                    static_cast<int>(caption.size() * pixels *
+                                                     .55f),
+                                    pixels + 4};
+  const float width =
+      static_cast<float>(extent.width) + 14.f * scale,
+      height = static_cast<float>(extent.height) + 10.f * scale;
+  const float x = std::clamp(
+      anchor.x, 8.f,
+      std::max(8.f, static_cast<float>(viewport_width) - width - 8.f));
+  const float y = std::clamp(
+      anchor.y, 8.f,
+      std::max(8.f, static_cast<float>(viewport_height) - height - 8.f));
+  const UiRect bounds{x, y, std::max(1.f, width), std::max(1.f, height)};
+  fill(out, bounds, color::surface_opaque);
+  stroke(out, bounds, color::keyline_strong);
+  text(out, {x + 7.f * scale, y + 5.f * scale}, std::move(caption),
+       color::text_primary, pixels, width - 14.f * scale, TextAlign::Left,
+       FontFace::Interface, bounds);
+}
+
+// The shared "why is this unavailable" pattern: renders `tooltip` beside the
+// pointer only while `bounds` is hovered and `body` carries a reason.
+inline void hover_tooltip(DrawList &out, UiRect bounds, Point pointer,
+                          std::string title, std::string body,
+                          int viewport_width, int viewport_height,
+                          float scale = 1.f, Tone tone = Tone::Caution) {
+  if (body.empty() || !bounds.contains(pointer)) return;
+  tooltip(out, {pointer.x + 14.f * scale, pointer.y + 20.f * scale},
+          std::move(title), std::move(body), viewport_width, viewport_height,
+          scale, tone);
+}
+
+// Shared scrollbar: faint rail + selected-tone thumb inside `rail`. Draws
+// nothing while the content fits the viewport — one treatment everywhere.
+inline void scrollbar(DrawList &out, UiRect rail,
+                      const engine::ScrollView &scroll, float min_thumb_px) {
+  const auto thumb = scroll.thumb(rail.height, min_thumb_px);
+  if (thumb.size <= 0.f) return;
+  fill(out, rail, {color::keyline.r, color::keyline.g, color::keyline.b, 90});
+  fill(out, {rail.x, rail.y + thumb.offset, rail.width, thumb.size},
+       color::selected);
 }
 
 }

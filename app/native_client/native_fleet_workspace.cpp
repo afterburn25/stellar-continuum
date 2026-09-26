@@ -2,9 +2,9 @@
 #include "native_fleet_workspace.hpp"
 #include "native_ui_layout.hpp"
 #include "native_ui_theme.hpp"
-#include "native_menu_style.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iomanip>
 #include <memory>
@@ -16,16 +16,16 @@ namespace stellar::native_fleet_ui {
 namespace {
 using namespace stellar::native_fleet;
 using namespace stellar::native_map;
+namespace theme = stellar::native_ui;
 
-constexpr Color row_color{12, 31, 54, 248};
-constexpr Color hover_color{24, 61, 94, 252};
-constexpr Color selected_color{19, 73, 68, 252};
-constexpr Color border_color{91, 151, 205, 235};
-constexpr Color own_color{102, 232, 164, 255};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color warning{255, 190, 112, 255};
-constexpr Color failure{255, 133, 123, 255};
+constexpr Color row_color = theme::color::surface_secondary;
+constexpr Color hover_color = theme::color::surface_hover;
+constexpr Color selected_color = theme::color::surface_raised;
+constexpr Color own_color = theme::color::success;
+constexpr Color bright = theme::color::text_primary;
+constexpr Color muted = theme::color::text_secondary;
+constexpr Color warning = theme::color::caution;
+constexpr Color failure = theme::color::danger;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
@@ -50,6 +50,21 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color,
   std::ostringstream out;
   out << std::fixed << std::setprecision(precision) << value;
   return out.str();
+}
+
+// Status group in display order — most urgent first. A fleet belongs to the
+// first group whose predicate it satisfies.
+[[nodiscard]] int fleet_group(const NativeOwnFleet &fleet) {
+  if (fleet.combat_status && fleet.combat_status->has_assigned_attack_target)
+    return 0;
+  if (fleet.destination_system_id ||
+      fleet.transit_phase != stellar::core::FleetTransitPhase::None)
+    return 1;
+  if ((fleet.reconnaissance && !fleet.reconnaissance->completed) ||
+      (fleet.science_survey && !fleet.science_survey->completed) ||
+      fleet.recovery)
+    return 2;
+  return 3;
 }
 
 [[nodiscard]] std::string visible_message(std::string value) {
@@ -149,9 +164,12 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
                         46.f * scale};
   const auto detail_y = list.y + list.height + 10.f * scale;
   const auto detail_space = std::max(0.f, feedback.y - detail_y - 6.f * scale);
-  // Keep seven telemetry lines plus the pinned order rail legible at 720p.
-  const auto fleet_height = std::min(180.f * scale,
-                                      std::max(0.f,detail_space - 78.f * scale));
+  // Composition rows let the telemetry stack reach eleven lines — the
+  // taller cap only applies when the route preview keeps its ~100s
+  // reserve; compact viewports keep the legacy seven-line budget.
+  const auto fleet_height = detail_space > 300.f * scale
+      ? std::min(215.f * scale, detail_space - 106.f * scale)
+      : std::min(180.f * scale, std::max(0.f,detail_space - 78.f * scale));
   const UiRect details{inner_x, detail_y, inner_width, fleet_height};
   const UiRect route{inner_x, detail_y + fleet_height + 6.f * scale,
                      inner_width,
@@ -175,8 +193,8 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
   const UiRect civilian_locate{details.x, details_action_y,details.width,details_action_height};
   return {scale,
           static_cast<int>(std::lround(15.f * scale)),
-          static_cast<int>(std::lround(14.f * scale)),
-          static_cast<int>(std::lround(11.f * scale)),
+          theme::type::compact_body(scale),
+          theme::type::compact_small(scale),
           panel,
           heading,
           list,
@@ -364,18 +382,61 @@ void NativeFleetWorkspace::set_recovery_result(
   set_notice(outcome.message, outcome.accepted || outcome.requires_confirmation);
 }
 
+std::vector<NativeFleetWorkspace::FleetListRow>
+NativeFleetWorkspace::fleet_rows(const FleetWorkspaceLayout &layout) const {
+  std::vector<FleetListRow> rows;
+  if (!view_ || view_->own_fleets.empty()) return rows;
+  const float s = layout.scale;
+  std::array<std::vector<std::size_t>, 4> groups;
+  for (std::size_t i = 0; i < view_->own_fleets.size(); ++i)
+    groups[static_cast<std::size_t>(fleet_group(view_->own_fleets[i]))]
+        .push_back(i);
+  int nonempty = 0;
+  for (const auto &group : groups) nonempty += !group.empty();
+  const bool grouped = nonempty > 1;
+  static const std::array<const char *, 4> keys = {
+      "FLEET_GROUP_ENGAGED", "FLEET_GROUP_TRANSIT", "FLEET_GROUP_MISSION",
+      "FLEET_GROUP_STATIONED"};
+  static const std::array<const char *, 4> names = {
+      "IN COMBAT", "IN TRANSIT", "ON MISSION", "STATIONED"};
+  float top = 0.f;
+  for (std::size_t group = 0; group < groups.size(); ++group) {
+    if (groups[group].empty()) continue;
+    if (grouped) {
+      rows.push_back({0, true,
+                      trf(keys[group],
+                          {std::to_string(groups[group].size())},
+                          std::string(names[group]) + "  ·  {0}"),
+                      top, 24.f * s});
+      top += 24.f * s;
+    }
+    for (const auto index : groups[group]) {
+      rows.push_back({index, false, {}, top, 45.f * s});
+      top += 45.f * s;
+    }
+  }
+  return rows;
+}
+
+float NativeFleetWorkspace::fleet_content_height(
+    const FleetWorkspaceLayout &layout) const {
+  const auto rows = fleet_rows(layout);
+  return rows.empty() ? 0.f : rows.back().top + rows.back().height;
+}
+
 std::vector<NativeFleetWorkspace::FocusRect> NativeFleetWorkspace::focusables(
     const FleetWorkspaceLayout &layout) const {
   std::vector<FocusRect> out;
   const auto *fleet = selected_fleet();
   if (view_ && presentation_ == FleetWorkspacePresentation::Outliner)
-    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
-      const UiRect row{layout.list.x,
-                       layout.list.y - list_scroll_.scroll_offset +
-                           static_cast<float>(index) * 45.f * layout.scale,
-                       layout.list.width, 41.f * layout.scale};
-      if (const auto clipped = intersection(row, layout.list))
-        out.push_back({*clipped, view_->own_fleets[index].name, row});
+    for (const auto &row : fleet_rows(layout)) {
+      if (row.header) continue;
+      const UiRect rect{layout.list.x,
+                        layout.list.y - list_scroll_.scroll_offset + row.top,
+                        layout.list.width, row.height - 4.f * layout.scale};
+      if (const auto clipped = intersection(rect, layout.list))
+        out.push_back(
+            {*clipped, view_->own_fleets[row.fleet_index].name, rect});
     }
   if (overview_ && !selected_fleet_id()) {
     const UiRect content{layout.details.x, layout.details.y,
@@ -494,9 +555,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
   }
   if (event.type == InputEventType::Wheel &&
       presentation_ == FleetWorkspacePresentation::Outliner && layout.list.contains(event.position)) {
-    const auto count = view_ ? view_->own_fleets.size() : 0;
-    const auto content = static_cast<float>(count) * 45.f * layout.scale;
-    list_scroll_.sync(content, layout.list.height);
+    list_scroll_.sync(fleet_content_height(layout), layout.list.height);
     list_scroll_.scroll_by(-event.wheel_y * 36.f * layout.scale);
     return {FleetWorkspaceCommandKind::None, true};
   }
@@ -526,8 +585,7 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
       if (focus_ < 0 || focus_ >= count) return;
       const auto &target = items[static_cast<std::size_t>(focus_)];
       if (!target.unclipped) return;
-      const auto rows = view_ ? view_->own_fleets.size() : 0;
-      list_scroll_.sync(static_cast<float>(rows) * 45.f * layout.scale,
+      list_scroll_.sync(fleet_content_height(layout),
                         layout.list.height);
       list_scroll_.scroll_interval_into_view(
           target.unclipped->y, target.unclipped->y + target.unclipped->height,
@@ -635,15 +693,16 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
         layout.engage.contains(event.position))
       return {FleetWorkspaceCommandKind::Engage,true,fleet->id};
     if (view_ && presentation_ == FleetWorkspacePresentation::Outliner) {
-      for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
-        const UiRect row{layout.list.x,
-                         layout.list.y - list_scroll_.scroll_offset +
-                             static_cast<float>(index) * 45.f * layout.scale,
-                         layout.list.width, 41.f * layout.scale};
-        const auto clipped = intersection(row, layout.list);
+      for (const auto &row : fleet_rows(layout)) {
+        if (row.header) continue;
+        const UiRect rect{layout.list.x,
+                          layout.list.y - list_scroll_.scroll_offset +
+                              row.top,
+                          layout.list.width, row.height - 4.f * layout.scale};
+        const auto clipped = intersection(rect, layout.list);
         if (clipped && clipped->contains(event.position))
           return {FleetWorkspaceCommandKind::Select, true,
-                  view_->own_fleets[index].id};
+                  view_->own_fleets[row.fleet_index].id};
       }
     }
     // EmpireOverviewPanel colony buttons (empire mode — no fleet selected).
@@ -703,12 +762,13 @@ void NativeFleetWorkspace::render(
   }
 
   if (!panel_bounds(width, height)) return;
-  stellar::native_menu_style::panel(out, layout.panel, layout.scale);
+  theme::panel(out, layout.panel);
   const bool outliner = presentation_ == FleetWorkspacePresentation::Outliner;
   text(out, layout.heading, tr(outliner ? (view_&&view_->developer_inspection?"FLEET_ALL":"FLEET_PLAYER") : (selected_fleet()&&selected_fleet()->foreign_inspection?"FLEET_INSPECTION":"FLEET_COMMAND"), outliner ? (view_&&view_->developer_inspection?"ALL FLEETS":"PLAYER FLEETS") : (selected_fleet()&&selected_fleet()->foreign_inspection?"FLEET INSPECTION":"FLEET COMMAND")), bright,
        layout.title_font_pixels, FontFace::Heading);
   if (outliner) {
-  stellar::engine::ui_skin::surface(out,layout.list,layout.scale);
+  theme::fill(out,layout.list,theme::color::surface);
+  theme::stroke(out,layout.list,theme::color::keyline);
   if (!view_ || view_->own_fleets.empty()) {
     text(out,
          {layout.list.x + 10.f * layout.scale,
@@ -720,14 +780,23 @@ void NativeFleetWorkspace::render(
             "travel orders."),
          muted, layout.body_font_pixels);
   } else {
-    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
-      const auto &fleet = view_->own_fleets[index];
+    for (const auto &entry : fleet_rows(layout)) {
       const UiRect row{layout.list.x,
                        layout.list.y - list_scroll_.scroll_offset +
-                           static_cast<float>(index) * 45.f * layout.scale,
-                       layout.list.width, 41.f * layout.scale};
+                           entry.top,
+                       layout.list.width,
+                       entry.height - (entry.header ? 0.f : 4.f * layout.scale)};
       const auto clipped = intersection(row, layout.list);
       if (!clipped) continue;
+      if (entry.header) {
+        theme::section_header(
+            out, {row.x + 8.f * layout.scale, row.y + 2.f * layout.scale,
+                  row.width - 16.f * layout.scale, row.height - 4.f * layout.scale},
+            entry.caption, layout.small_font_pixels, theme::Tone::Neutral,
+            {}, layout.list);
+        continue;
+      }
+      const auto &fleet = view_->own_fleets[entry.fleet_index];
       const auto selected = view_->selected_fleet_id == fleet.id;
       fill(out, *clipped,
            selected ? selected_color
@@ -772,15 +841,18 @@ void NativeFleetWorkspace::render(
             muted, layout.small_font_pixels,
             text_width, *role_clip});
     }
+    list_scroll_.sync(fleet_content_height(layout), layout.list.height);
+    theme::scrollbar(out,
+                     {layout.list.x + layout.list.width - 2.f * layout.scale,
+                      layout.list.y, 2.f * layout.scale, layout.list.height},
+                     list_scroll_, 20.f * layout.scale);
   }
 
   }
   const auto *fleet = selected_fleet();
   if(!view_||view_->own_fleets.empty())return;
   const auto action_button = [&](UiRect bounds,std::string label) {
-    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),false,true,layout.scale);
-    text(out,{bounds.x,bounds.y+bounds.height*.3f,bounds.width,bounds.height*.7f},
-         label,bright,layout.small_font_pixels,FontFace::Interface,TextAlign::Center);
+    theme::button(out,bounds,std::move(label),pointer_,layout.small_font_pixels);
   };
   if (!fleet) {
     // Reference EmpireOverviewPanel empire mode: the selected-system home
@@ -813,25 +885,6 @@ void NativeFleetWorkspace::render(
              return_warning_,
          warning, layout.body_font_pixels);
   } else {
-    std::string details = trf(
-        "FLEET_DETAILS",
-        {fleet->name, tr(role_key(fleet->role), role_name(fleet->role)),
-         tr(transit_key(fleet->transit_phase),
-            transit_name(fleet->transit_phase)),
-         number(fleet->combat_power),
-         number(fleet->fuel_remaining_light_years, 2),
-         number(fleet->fuel_capacity_light_years, 2),
-         number(fleet->maximum_leg_range_light_years, 2),
-         number(fleet->strategic_speed, 2)},
-        "{0}\n{1}  |  {2}\nStrength {3}\nFuel {4} / {5} ly\nRange {6} "
-        "ly\nSpeed {7} ly/day");
-    if (fleet->military_order_quote)
-      details += trf("FLEET_ORDER_SUFFIX",
-                     {tr(military_order_key(
-                          fleet->military_order_quote->current_order),
-                      military_order_name(
-                          fleet->military_order_quote->current_order))},
-                     "\nOrder {0}");
     const bool armed_order = !preview_ && !pending_return_ &&
         fleet->military_order_quote.has_value();
     const bool recovery_locate = !preview_ && !pending_return_ &&
@@ -839,6 +892,10 @@ void NativeFleetWorkspace::render(
     auto details_bounds = layout.details;
     if (armed_order || recovery_locate)
       details_bounds.height = std::max(0.f, details_bounds.height - 36.f * layout.scale);
+    // Clip rows against the whole details block so composition rows can
+    // never spill into the route preview, while the armed-fleet stack —
+    // which predates the clip — keeps rendering across the rail gap.
+    const UiRect details_clip = layout.details;
     if (ship_art) {
       const auto image = artwork(*fleet);
       const float side = std::min(details_bounds.height - 8.f * layout.scale,
@@ -854,7 +911,55 @@ void NativeFleetWorkspace::render(
         if (!outliner) ++last_ship_art_rows_;
       }
     }
-    text(out, details_bounds, details, bright, layout.small_font_pixels);
+    // Name + identity line, then scannable stat rows instead of one text blob.
+    const float row_height = std::max(16.f * layout.scale,
+        static_cast<float>(layout.small_font_pixels) + 6.f * layout.scale);
+    float row_y = details_bounds.y;
+    text(out, {details_bounds.x, row_y, details_bounds.width, row_height},
+         fleet->name, bright, layout.body_font_pixels, FontFace::Heading);
+    row_y += row_height + 2.f * layout.scale;
+    text(out, {details_bounds.x, row_y, details_bounds.width, row_height},
+         tr(role_key(fleet->role), role_name(fleet->role)) + "  |  " +
+             tr(transit_key(fleet->transit_phase),
+                transit_name(fleet->transit_phase)),
+         muted, layout.small_font_pixels);
+    row_y += row_height + 4.f * layout.scale;
+    const auto stat = [&](std::string label, std::string value) {
+      theme::key_value(out, {details_bounds.x, row_y, details_bounds.width,
+                             row_height},
+                       std::move(label), std::move(value),
+                       layout.small_font_pixels, theme::Tone::Neutral,
+                       details_clip);
+      row_y += row_height;
+    };
+    // Core telemetry first; composition extras last so they are the first
+    // clipped when the card is cramped.
+    if (!fleet->design_name.empty())
+      stat(tr("FLEET_STAT_DESIGN", "Design"), fleet->design_name);
+    stat(tr("FLEET_STAT_STRENGTH", "Strength"), number(fleet->combat_power));
+    stat(tr("FLEET_STAT_FUEL", "Fuel"),
+         number(fleet->fuel_remaining_light_years, 2) + " / " +
+             number(fleet->fuel_capacity_light_years, 2) + " ly");
+    stat(tr("FLEET_STAT_RANGE", "Range"),
+         number(fleet->maximum_leg_range_light_years, 2) + " ly");
+    stat(tr("FLEET_STAT_SPEED", "Speed"),
+         number(fleet->strategic_speed, 2) + " ly/day");
+    if (fleet->military_order_quote)
+      stat(tr("FLEET_STAT_ORDER", "Order"),
+           tr(military_order_key(
+                  fleet->military_order_quote->current_order),
+              military_order_name(
+                  fleet->military_order_quote->current_order)));
+    if (fleet->has_vessel_state)
+      stat(tr("FLEET_STAT_CONDITION", "Condition"),
+           number(fleet->hull_integrity * 100., 0) + "%");
+    if (fleet->cargo_material_capacity > 0.)
+      stat(tr("FLEET_STAT_CARGO", "Cargo"),
+           number(fleet->cargo_materials, 1) + " / " +
+               number(fleet->cargo_material_capacity, 1));
+    if (fleet->embarked_population_millions > 0.)
+      stat(tr("FLEET_STAT_PASSENGERS", "Embarked"),
+           number(fleet->embarked_population_millions, 1) + "M");
     if (armed_order) {
       // The selected fleet's quote is retained until release, and becomes
       // invalid as soon as selection, observer, campaign, or order changes.
@@ -910,11 +1015,9 @@ void NativeFleetWorkspace::render(
         const UiRect bar{layout.route.x, layout.route.y + layout.route.height -
                              7.f * layout.scale,
                          layout.route.width, 4.f * layout.scale};
-        fill(out, bar, row_color);
-        fill(out, {bar.x, bar.y, bar.width * static_cast<float>(progress),
-                   bar.height},
-             reconnaissance.held ? muted : own_color);
-        stroke(out, bar, border_color);
+        theme::progress(out, bar, progress,
+                        reconnaissance.held ? theme::Tone::Unknown
+                                            : theme::Tone::Success);
       }
     } else if (fleet->science_survey) {
       const auto &survey = *fleet->science_survey;
@@ -932,10 +1035,9 @@ void NativeFleetWorkspace::render(
         const UiRect bar{layout.route.x, layout.route.y + layout.route.height -
                              7.f * layout.scale,
                          layout.route.width, 4.f * layout.scale};
-        fill(out, bar, row_color);
-        fill(out, {bar.x, bar.y, bar.width * static_cast<float>(survey.progress),
-                   bar.height}, survey.held ? muted : own_color);
-        stroke(out, bar, border_color);
+        theme::progress(out, bar, survey.progress,
+                        survey.held ? theme::Tone::Unknown
+                                    : theme::Tone::Success);
       }
     } else {
       route = fleet->foreign_inspection
@@ -997,16 +1099,13 @@ void NativeFleetWorkspace::render(
     for (const bool left : {true, false}) {
       const auto bounds = left ? layout.recovery_left : layout.recovery_right;
       const bool enabled = left || pending_return_ || !queued;
-      stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),pending_return_&&left,enabled,layout.scale);
       const auto label = pending_return_ ? (left ? tr("FLEET_CONFIRM_RETURN","CONFIRM RETURN") : tr("SETTINGS_CANCEL","CANCEL"))
           : left ? tr(selected->recovery->hold_requested ? "FLEET_RESUME" : "FLEET_HOLD",
                       selected->recovery->hold_requested ? "RESUME" : "HOLD")
                  : tr(queued ? "FLEET_RETURN_QUEUED" : "FLEET_RETURN_BASE",
                       queued ? "RETURN QUEUED" : "RETURN TO BASE");
-      text(out, {bounds.x, bounds.y + 10.f * layout.scale, bounds.width,
-                 bounds.height - 10.f * layout.scale}, label,
-           enabled ? bright : muted, layout.small_font_pixels, FontFace::Interface,
-           TextAlign::Center);
+      theme::button(out, bounds, label, pointer_, layout.small_font_pixels,
+                    theme::Tone::Selected, pending_return_ && left, enabled);
     }
   }
   const bool engage=!preview_&&!pending_return_&&selected&&!selected->foreign_inspection&&selected->role==stellar::core::FleetRole::Military&&
@@ -1015,13 +1114,8 @@ void NativeFleetWorkspace::render(
   const bool locate_on_rail=!preview_&&!pending_return_&&selected&&selected->locate&&
       !selected->recovery&&!selected->military_order_quote;
   if (preview_ && preview_->command_available) {
-    stellar::engine::ui_skin::control(out,layout.confirm,layout.confirm.contains(pointer_),true,true,layout.scale);
-    text(out, {layout.confirm.x + 6.f * layout.scale,
-               layout.confirm.y + 9.f * layout.scale,
-               layout.confirm.width - 12.f * layout.scale,
-               layout.confirm.height - 12.f * layout.scale},
-         tr("FLEET_CONFIRM_TRAVEL", "CONFIRM TRAVEL"), bright,
-         layout.body_font_pixels, FontFace::Interface, TextAlign::Center);
+    theme::button(out, layout.confirm, tr("FLEET_CONFIRM_TRAVEL", "CONFIRM TRAVEL"),
+                  pointer_, layout.body_font_pixels, theme::Tone::Success, true);
   } else if (selected && selected->military_order_quote && !preview_ && !pending_return_) {
     action_button(layout.military_locate,tr("FLEET_LOCATE","LOCATE"));
     if (engage) action_button(layout.engage,tr("FLEET_ENGAGE","ENGAGE HOSTILES"));
@@ -1031,12 +1125,13 @@ void NativeFleetWorkspace::render(
     action_button(layout.engage,tr("FLEET_ENGAGE","ENGAGE HOSTILES"));
   }
   if (view_)
-    for (std::size_t index = 0; index < view_->own_fleets.size(); ++index) {
-      const auto &candidate = view_->own_fleets[index];
+    for (const auto &entry : fleet_rows(layout)) {
+      if (entry.header) continue;
+      const auto &candidate = view_->own_fleets[entry.fleet_index];
       const UiRect row{layout.list.x,
                        layout.list.y - list_scroll_.scroll_offset +
-                           static_cast<float>(index) * 45.f * layout.scale,
-                       layout.list.width, 41.f * layout.scale};
+                           entry.top,
+                       layout.list.width, entry.height - 4.f * layout.scale};
       if (!layout.list.contains(pointer_) || !row.contains(pointer_)) continue;
       native_ui::tooltip(
           out, {layout.panel.x - 330.f * layout.scale, row.y}, candidate.name,
@@ -1051,8 +1146,7 @@ void NativeFleetWorkspace::render(
   if (focus_ >= 0) {
     const auto items = focusables(layout);
     if (focus_ < static_cast<int>(items.size()))
-      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
-             {160, 210, 255, 255});
+      theme::focus_ring(out, items[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 

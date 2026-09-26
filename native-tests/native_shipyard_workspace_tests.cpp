@@ -314,6 +314,14 @@ int run_tests() {
   REQUIRE(batch.handle({InputEventType::LeftPressed,center(layout.action)},1920,1080).kind==ShipyardWorkspaceCommandKind::None);
   DrawList blocked;batch.render(blocked,1920,1080);
   REQUIRE(std::ranges::any_of(blocked.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value.contains("Not enough reserved population.");}));
+  // The readiness line embeds the blocker inside a multi-line string; an
+  // exact-match Text proves the hover tooltip rendered the reason alone.
+  (void)batch.handle({InputEventType::PointerMove,{4.f,4.f}},1920,1080);
+  DrawList unhovered;batch.render(unhovered,1920,1080);
+  REQUIRE(std::ranges::none_of(unhovered.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value=="Not enough reserved population.";}));
+  (void)batch.handle({InputEventType::PointerMove,center(layout.action)},1920,1080);
+  DrawList tip;batch.render(tip,1920,1080);
+  REQUIRE(std::ranges::any_of(tip.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value=="Not enough reserved population.";}));
   (void)batch.handle({InputEventType::LeftPressed,center(layout.search)},1920,1080);REQUIRE(batch.wants_text_input());
   InputEvent typing{InputEventType::TextEntered};typing.text="nonexistent";(void)batch.handle(typing,1920,1080);
   REQUIRE(!batch.design_bounds("scout",1920,1080));

@@ -3,6 +3,7 @@
 #include "native_colony_controller.hpp"
 #include "native_surface_construction_controller.hpp"
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 #include "native_ui_layout.hpp"
 #include "native_planet_globe.hpp"
 #include <stellar/engine/accessibility.hpp>
@@ -24,12 +25,20 @@ enum class PlanetaryAction {None, Back, Build, Upgrade, Repair, Enable, Priority
 struct PlanetaryCommand { PlanetaryAction action{}; int slot{-1}, building_id{}; std::string type; bool value{}; };
 struct PlanetaryLayout {
   float s{};int font{},small{},heading{};UiRect screen,back,save,hero,portrait,metrics,left,command,facts,slots,right,queue,tabs,details,notice,modal,confirm,cancel;
-  UiRect globe,layers,actions,view_modes,alerts,region_art;
+  UiRect globe,layers,actions,view_modes,alerts,region_art,vitals;
   static PlanetaryLayout make(int width,int height){
-    PlanetaryLayout l;l.s=std::clamp(height/1080.f,.8f,2.f);const float s=l.s,g=10*s;
-    l.font=std::max(13,static_cast<int>(16*s));l.small=std::max(12,static_cast<int>(14*s));l.heading=static_cast<int>(24*s);
+    PlanetaryLayout l;
     const auto chrome=NativeUiLayout::for_viewport(width,height);
     const float x=native_navigation_content_left*chrome.scale,y=native_workspace_top(width,height);
+    // Below ~660 px of drawable height the fixed column stacks (574 s of
+    // bottom-anchored left blocks, 374 s + details of right blocks on top of
+    // the 118 s bottom strip) no longer fit — shrink the whole layout so the
+    // details/slots list keeps a usable scroll viewport instead of collapsing
+    // to a negative-height region.
+    l.s=std::min(std::clamp(height/1080.f,.8f,2.f),
+                 std::max(.4f,(height-y)/692.f));
+    const float s=l.s,g=10*s;
+    l.font=std::max(13,static_cast<int>(16*s));l.small=std::max(12,static_cast<int>(14*s));l.heading=static_cast<int>(24*s);
     l.screen={x,y,width-x-10*s,height-y-8*s};
     const float bottom=height-118*s,pw=std::clamp(l.screen.width*.21f,260*s,336*s);
     l.left={x,y,pw,bottom-y};l.right={width-pw-10*s,y,pw,bottom-y};
@@ -37,8 +46,13 @@ struct PlanetaryLayout {
     l.hero={x+12*s,y+38*s,pw-24*s,98*s};l.portrait={x+12*s,y+40*s,82*s,82*s};
     l.back={x+10*s,y+5*s,pw-20*s,28*s};
     l.layers={x+12*s,bottom-194*s,pw-24*s,178*s};
-    l.alerts={x+12*s,l.layers.y-70*s,pw-24*s,60*s};
-    l.facts={x+12*s,y+166*s,pw-24*s,l.alerts.y-y-178*s};
+    // The alerts block grew to hold a title, a two-column issue-chip grid and
+    // the review button; its bottom edge stays glued to the layers strip.
+    l.alerts={x+12*s,l.layers.y-136*s,pw-24*s,126*s};
+    // The owned-colony vitals strip sits between the hero block and the
+    // fact list so the headline numbers are visible without scrolling.
+    l.vitals={x+12*s,y+166*s,pw-24*s,58*s};
+    l.facts={x+12*s,y+232*s,pw-24*s,std::max(0.f,l.alerts.y-y-244*s)};
     l.region_art={l.right.x+12*s,y+76*s,pw-24*s,132*s};
     l.command={l.right.x+12*s,bottom-102*s,pw-24*s,32*s};
     l.queue={l.right.x+12*s,bottom-64*s,pw-24*s,54*s};
@@ -154,7 +168,7 @@ class NativePlanetaryScreen {
   }
   void render(DrawList& out,const NativeColonyView& v,int width,int height)const{
     using namespace stellar::native_menu_style;
-    const auto l=PlanetaryLayout::make(width,height);const float s=l.s;hits_.clear();
+    const auto l=PlanetaryLayout::make(width,height);const float s=l.s;hits_.clear();chip_tips_.clear();
     out.overlay.emplace_back(FilledRectangle{l.screen,{2,9,16,255}});
     // Seeded starfield belongs to this planet view, with no background galaxies.
     for(int i=0;i<170;++i){const float x=l.globe.x+std::fmod(i*73.79f+v.body_id*.07f,std::max(1.f,l.globe.width)),y=l.globe.y+std::fmod(i*131.31f,std::max(1.f,l.globe.height));out.overlay.emplace_back(FilledRectangle{{x,y,i%17==0?2.f:1.f,1.f},{145,185,221,static_cast<std::uint8_t>(60+i%130)}});}
@@ -166,6 +180,23 @@ class NativePlanetaryScreen {
     label(out,{l.hero.x+94*s,l.hero.y+42*s,l.hero.width-94*s,22*s},classification(v),l.small,cyan);
     label(out,{l.hero.x+94*s,l.hero.y+66*s,l.hero.width-94*s,22*s},world_class(v),l.small,ink);
     label(out,{l.hero.x,l.hero.y+92*s,l.hero.width,28*s},v.natural_habitability?trf("PLANET_HABITABILITY",{number(*v.natural_habitability*100,0)},"HABITABILITY  {0}%"):tr("PLANET_HABITABILITY_UNKNOWN","HABITABILITY  UNKNOWN"),l.font,v.natural_habitability&&*v.natural_habitability>.6?Color{113,233,158,255}:gold);
+    if(!v.observer_only){
+      // Headline vitals — the five numbers a colony operator scans first.
+      const double power_net=v.power_supply+v.storage_discharge_per_day-v.power_demand;
+      const bool workers_short=v.workforce_demand_millions>v.workforce_available_millions;
+      const float vgap=6*s,vw=(l.vitals.width-4.f*vgap)/5.f;
+      int vi=0;
+      const auto vital=[&](std::string label,std::string value,native_ui::Tone tone){
+        native_ui::metric_tile(out,{l.vitals.x+vi*(vw+vgap),l.vitals.y,vw,l.vitals.height},
+            std::move(label),std::move(value),std::max(9,l.small-3),l.small,tone);
+        ++vi;
+      };
+      vital(tr("PLANET_VITAL_POPULATION","POPULATION"),population(v.population_millions),native_ui::Tone::Neutral);
+      vital(tr("PLANET_VITAL_STABILITY","STABILITY"),trf("PLANET_UNIT_PERCENT",{number(v.stability*100,0)},"{0}%"),v.stability<.5?native_ui::Tone::Danger:v.stability<.8?native_ui::Tone::Caution:native_ui::Tone::Neutral);
+      vital(tr("PLANET_VITAL_POWER","POWER"),(power_net>0?"+":"")+number(power_net,0),power_net<0?native_ui::Tone::Danger:native_ui::Tone::Success);
+      vital(tr("PLANET_VITAL_FOOD","FOOD"),trf("PLANET_VITAL_DAYS",{number(v.food_reserve_days,0)},"{0} d"),v.food_reserve_days<7?native_ui::Tone::Danger:v.food_reserve_days<21?native_ui::Tone::Caution:native_ui::Tone::Neutral);
+      vital(tr("PLANET_VITAL_EMPLOYED","EMPLOYED"),trf("PLANET_UNIT_PERCENT",{number(v.employment_rate*100,0)},"{0}%"),workers_short?native_ui::Tone::Danger:native_ui::Tone::Neutral);
+    }
     float fy=l.facts.y-fact_scroll_.scroll_offset;
     const auto fact=[&](std::string title,std::string value,Color color=ink){
       const float rh=std::max(28*s,static_cast<float>(l.small+8));
@@ -182,7 +213,47 @@ class NativePlanetaryScreen {
     else fact(tr("PLANET_FACT_ENVIRONMENT","Environment"),tr("PLANET_UNSURVEYED","Unsurveyed"),gold);
     if(!v.observer_only){fact(tr("PLANET_FACT_POPULATION","Population"),population(v.population_millions),cyan);fact(tr("PLANET_FACT_SPECIES","Species"),v.population_species_name);fact(tr("PLANET_FACT_STABILITY","Stability"),trf("PLANET_UNIT_PERCENT",{number(v.stability*100,0)},"{0}%"));fact(tr("PLANET_FACT_INFRASTRUCTURE","Infrastructure"),trf("PLANET_UNIT_PERCENT",{number(v.infrastructure*100,0)},"{0}%"));fact(tr("PLANET_FACT_COMMAND","Command Center"),trf("PLANET_LEVEL",{std::to_string(v.surface_hub_level)},"Level {0}"));fact(tr("PLANET_FACT_DEVELOPMENT","Development"),v.specialization_name);}
     fact_height_=fy-l.facts.y+fact_scroll_.scroll_offset;fact_scroll_.sync(fact_height_,l.facts.height);scrollbar(out,l.facts,fact_scroll_);
-    if(!v.observer_only){const bool critical=v.sustenance_support_ratio<1||v.operating_funding<.999;label(out,{l.alerts.x,l.alerts.y,l.alerts.width,22*s},critical?tr("PLANET_ALERTS_TITLE","!  COLONY ALERTS"):tr("PLANET_STATUS_TITLE","COLONY STATUS"),l.small,critical?bad:cyan);button(out,{l.alerts.x,l.alerts.y+24*s,l.alerts.width,30*s},critical?tr("PLANET_REVIEW_CRITICAL","Review critical needs"):tr("PLANET_REVIEW_STATUS","Review colony conditions"),{},l);hits_.back().tab=0;}
+    if(!v.observer_only){
+      const double power_gap=v.power_demand-v.power_supply-v.storage_discharge_per_day;
+      const double workers_gap=v.workforce_demand_millions-v.workforce_available_millions;
+      const bool critical=v.surface_hub_level==0||power_gap>0||workers_gap>1e-9||v.sustenance_support_ratio<1||v.operating_funding<.999;
+      label(out,{l.alerts.x,l.alerts.y,l.alerts.width,20*s},critical?tr("PLANET_ALERTS_TITLE","!  COLONY ALERTS"):tr("PLANET_STATUS_TITLE","COLONY STATUS"),l.small,critical?bad:cyan);
+      if(critical){
+        // One chip per live issue. When the deficit maps to facilities the
+        // chip selects the first affected structure; otherwise it focuses the
+        // economy tab. Hovering a chip lists the affected structures.
+        const float cw=(l.alerts.width-6*s)/2.f,ch=20*s,cg=4*s;
+        int ci=0;
+        const auto chip=[&](std::string text,native_ui::Tone tone,int target_tab,int target_slot,std::string detail){
+          const UiRect r{l.alerts.x+(ci%2)*(cw+6*s),l.alerts.y+22*s+(ci/2)*(ch+cg),cw,ch};
+          native_ui::badge(out,r,text,std::max(9,l.small-2),tone);
+          hits_.push_back({r,static_cast<int>(hits_.size()),{},true,target_slot,target_tab,-1,std::move(text),{},0});
+          if(!detail.empty())chip_tips_.push_back({r,std::move(detail)});
+          ++ci;
+        };
+        // First affected site (slot index) plus up to four names for the
+        // hover detail; colony-wide deficits return {-1,""}.
+        const auto affected=[&](auto&& pred){
+          int first=-1,total=0,shown=0;std::string names;
+          for(const auto& site:v.construction_sites){
+            if(!pred(site))continue;
+            if(first<0)first=site.slot_index;++total;
+            if(shown<4){if(shown++)names+="  ·  ";names+=site.name;}
+          }
+          if(total>shown)names+=trf("PLANET_CHIP_MORE",{std::to_string(total-shown)},"  +{0} more");
+          return std::pair{first,std::move(names)};
+        };
+        const auto colony_wide=tr("PLANET_TIP_COLONYWIDE","Colony-wide deficit — no single structure is flagged.");
+        if(v.surface_hub_level==0)chip(tr("PLANET_CHIP_HUB","NO COMMAND CENTER"),native_ui::Tone::Danger,1,-1,tr("PLANET_TIP_HUB","Build a Command Center to unlock colony operations."));
+        if(power_gap>0){const auto[slot,names]=affected([](const NativeSurfaceSite& b){return b.complete&&!b.powered;});chip(trf("PLANET_CHIP_POWER",{number(power_gap,0)},"POWER -{0}"),native_ui::Tone::Danger,slot<0?0:-1,slot,names.empty()?colony_wide:names);}
+        if(workers_gap>1e-9){const auto[slot,names]=affected([](const NativeSurfaceSite& b){return b.complete&&b.enabled&&!b.staffed;});chip(trf("PLANET_CHIP_WORKERS",{population(workers_gap)},"WORKERS -{0}"),native_ui::Tone::Danger,slot<0?0:-1,slot,names.empty()?colony_wide:names);}
+        if(v.sustenance_support_ratio<1){const auto[slot,names]=affected([](const NativeSurfaceSite& b){return b.essential_service&&b.complete&&(!b.enabled||!b.powered||!b.staffed);});chip(trf("PLANET_CHIP_LIFE",{number(v.sustenance_support_ratio*100,0)},"LIFE SUPPORT {0}%"),native_ui::Tone::Danger,slot<0?0:-1,slot,names.empty()?colony_wide:names);}
+        if(v.operating_funding<.999){const auto[slot,names]=affected([](const NativeSurfaceSite& b){return b.complete&&b.enabled&&b.efficiency<.999;});chip(trf("PLANET_CHIP_FUNDING",{number(v.operating_funding*100,0)},"FUNDING {0}%"),native_ui::Tone::Danger,slot<0?0:-1,slot,names.empty()?colony_wide:names);}
+      }else{
+        label(out,{l.alerts.x,l.alerts.y+22*s,l.alerts.width,18*s},tr("PLANET_ALERT_NONE_SHORT","No critical needs"),l.small,muted);
+      }
+      button(out,{l.alerts.x,l.alerts.y+l.alerts.height-32*s,l.alerts.width,30*s},critical?tr("PLANET_REVIEW_CRITICAL","Review critical needs"):tr("PLANET_REVIEW_STATUS","Review colony conditions"),{},l);hits_.back().tab=0;
+    }
     label(out,{l.layers.x,l.layers.y,l.layers.width,23*s},tr("PLANET_LAYERS_TITLE","PLANETARY MAP LAYERS"),l.small,cyan);
     const std::array<const char*,5> layer_keys={"PLANET_LAYER_PROVINCES","PLANET_LAYER_INFRA","PLANET_LAYER_POWER","PLANET_LAYER_RESOURCES","PLANET_LAYER_MILITARY"};
     const std::array<const char*,5> layer_names={"Geographic provinces","Infrastructure","Operational power","Resources · unavailable","Military · unavailable"};
@@ -196,9 +267,12 @@ class NativePlanetaryScreen {
     for(int i=0;i<5;++i){UiRect r{l.actions.x+i*aw,l.actions.y,aw-8*s,l.actions.height};button(out,r,actions[i],{},l,i<3&&(i==2||!v.observer_only),{},action_art_?action_art_(i):Picture{},descriptions[i]);hits_.back().tab=i==0?1:i==1?0:3;}
     button(out,l.save,tr("PLANET_SAVE","Save"),{PlanetaryAction::Save},l);
     label(out,l.notice,notice_.empty()?(v.foreign_settlement?trf("PLANET_NOTICE_FOREIGN",{v.owner_name},"Developer inspection · {0} · Live statistics"):v.observer_only?(v.developer_inspection?tr("PLANET_NOTICE_UNSETTLED","Unsettled world · No colony population or structures."):tr("PLANET_NOTICE_SURVEY","Survey information only. Colony actions require an owned settlement.")):alerts(v)):notice_,l.small,notice_.empty()?muted:cyan);
-    if(!modal())if(const auto hovered=globe_.hit(pointer_,l.globe)){const auto& region=globe_.regions()[*hovered];const float tw=std::min(235*s,l.globe.width),th=68*s;UiRect tip{std::clamp(pointer_.x+14*s,l.globe.x,l.globe.x+l.globe.width-tw),std::clamp(pointer_.y+18*s,l.globe.y,l.globe.y+l.globe.height-th),tw,th};panel(out,tip,s);label(out,{tip.x+10*s,tip.y+8*s,tw-20*s,24*s},region.name,l.small,cyan);label(out,{tip.x+10*s,tip.y+34*s,tw-20*s,25*s},region.terrain,l.small,ink);}
+    if(!modal()){
+      for(const auto&[chip_rect,chip_detail]:chip_tips_)
+        native_ui::hover_tooltip(out,chip_rect,pointer_,tr("PLANET_CHIP_AFFECTED","Affected structures"),chip_detail,static_cast<int>(l.screen.x+l.screen.width),static_cast<int>(l.screen.y+l.screen.height),s);
+      if(const auto hovered=globe_.hit(pointer_,l.globe)){const auto& region=globe_.regions()[*hovered];const float tw=std::min(235*s,l.globe.width),th=68*s;UiRect tip{std::clamp(pointer_.x+14*s,l.globe.x,l.globe.x+l.globe.width-tw),std::clamp(pointer_.y+18*s,l.globe.y,l.globe.y+l.globe.height-th),tw,th};panel(out,tip,s);label(out,{tip.x+10*s,tip.y+8*s,tw-20*s,24*s},region.name,l.small,cyan);label(out,{tip.x+10*s,tip.y+34*s,tw-20*s,25*s},region.terrain,l.small,ink);}}
     if(modal())render_confirmation(out,l);
-    if(focus_>=0){const auto items=ring();if(focus_<static_cast<int>(items.size()))out.overlay.emplace_back(StrokedRectangle{hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])].rect,{160,210,255,255}});}
+    if(focus_>=0){const auto items=ring();if(focus_<static_cast<int>(items.size()))stellar::native_ui::focus_ring(out,hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])].rect);}
   }
 
  private:
@@ -249,7 +323,7 @@ class NativePlanetaryScreen {
   mutable NativePlanetGlobe globe_;int layer_{0};
   Art art_;std::function<Picture(int)> action_art_;Picture portrait_;std::function<TextExtent(const Text&)> measure_;
   std::pair<std::uint64_t,int> identity_{};int selected_{-1},tab_{2},focus_{-1};mutable stellar::engine::ScrollView fact_scroll_{},detail_scroll_{},slot_scroll_{},queue_scroll_{};
-  mutable float fact_height_{},detail_height_{},slot_height_{},queue_height_{};mutable std::vector<Hit> hits_;std::optional<Hit> pressed_;Point pointer_{};std::string notice_;
+  mutable float fact_height_{},detail_height_{},slot_height_{},queue_height_{};mutable std::vector<Hit> hits_;mutable std::vector<std::pair<UiRect,std::string>> chip_tips_;std::optional<Hit> pressed_;Point pointer_{};std::string notice_;
   std::variant<std::monostate,NativeSurfacePlacementQuote,NativeSurfaceManagementQuote,NativeSurfaceRemovalQuote> pending_;
   static std::string number(double n,int precision=1){std::ostringstream o;o<<std::fixed<<std::setprecision(precision)<<n;return o.str();}
   static std::string signed_number(double n){return (n>0?"+":"")+number(n,2);}
@@ -279,7 +353,7 @@ class NativePlanetaryScreen {
     if(!subtitle.empty())label(out,{r.x+pad,r.y+40*l.s,r.width-pad-8*l.s,24*l.s},std::move(subtitle),l.small,stellar::native_menu_style::muted,visible);
     hits_.push_back({visible,static_cast<int>(hits_.size()),std::move(command),enabled,-1,-1,-1,std::move(title_copy),scroll_lane>0?std::optional<UiRect>{r}:std::nullopt,scroll_lane});
   }
-  static void scrollbar(DrawList& out,UiRect r,const stellar::engine::ScrollView& scroll){const auto thumb=scroll.thumb(r.height,14.f);if(thumb.size<=0)return;out.overlay.emplace_back(FilledRectangle{{r.x+r.width-3,r.y+thumb.offset,3,thumb.size},{105,157,178,210}});}
+  static void scrollbar(DrawList& out,UiRect r,const stellar::engine::ScrollView& scroll){stellar::native_ui::scrollbar(out,{r.x+r.width-3,r.y,3.f,r.height},scroll,14.f);}
   static int art_index(std::string_view type){const auto family=stellar::core::surface_functional_family(type);if(family=="power_generator")return 0;if(family=="science_lab")return 1;if(family=="fabricator")return 2;if(family=="trade_hub")return 3;if(family=="habitat_complex")return 4;if(family=="controlled_agriculture")return 5;if(family=="water_reclamation")return 6;if(family=="grid_battery")return 7;return 8;}
   void building_art(DrawList& out,std::string_view type,UiRect r,UiRect clip)const{if(!art_)return;auto image=art_(true);if(!image)return;const int i=art_index(type);const float w=image->width()/3.f,h=image->height()/3.f;out.overlay.emplace_back(Image{image,r,UiRect{(i%3)*w,(i/3)*h,w,h},{255,255,255,255},clip});}
   std::string state(const NativeSurfaceSite& b)const{return !b.complete?trf("PLANET_STATE_BUILDING",{number(b.progress_fraction*100,0)},"Building {0}%"):b.upgrade_days_remaining>0?tr("PLANET_STATE_UPGRADING","Upgrading"):!b.enabled?tr("PLANET_STATE_DISABLED","Disabled"):b.condition<=.15?tr("PLANET_STATE_REPAIRS","Repairs required"):!b.powered?tr("PLANET_STATE_POWER","Power needed"):!b.staffed?tr("PLANET_STATE_WORKERS","Workers needed"):tr("PLANET_STATE_OPERATIONAL","Operational");}
@@ -321,6 +395,11 @@ class NativePlanetaryScreen {
       out.overlay.emplace_back(Image{portrait_,{l.region_art.x+(l.region_art.width-side)*.5f,l.region_art.y+4*s,side,side},{},{255,255,255,255},l.region_art});
     }
     button(out,l.command,v.foreign_settlement?tr("PLANET_CMD_INSPECT","Developer inspection"):v.observer_only?tr("PLANET_CMD_NONE","No owned settlement"):v.hub_upgrade_days_remaining>0?tr("PLANET_CMD_PROGRESS","Command Center in progress"):v.surface_hub_level==0?tr("PLANET_CMD_BUILD","Build Command Center"):tr("PLANET_CMD_UPGRADE","Upgrade Command Center"),{PlanetaryAction::CommandCenter},l,!v.observer_only&&!v.foreign_settlement&&v.hub_upgrade_available&&v.can_afford_hub_upgrade);
+    if(!v.observer_only&&!v.foreign_settlement&&v.hub_upgrade_days_remaining<=0&&!(v.hub_upgrade_available&&v.can_afford_hub_upgrade)){
+      std::string reason=v.hub_upgrade_lock_reason;
+      if(reason.empty())reason=v.hub_upgrade_available?tr("PLANET_TIP_INSUFFICIENT","Insufficient authorization in the treasury."):tr("PLANET_TIP_UNAVAILABLE","Upgrade requirements are not met yet.");
+      native_ui::hover_tooltip(out,l.command,pointer_,tr("PLANET_CMD_UNAVAILABLE","Command Center unavailable"),reason,static_cast<int>(l.screen.x+l.screen.width),static_cast<int>(l.screen.y+l.screen.height),l.s);
+    }
     float qy=l.queue.y-queue_scroll_.scroll_offset;int queued=0;
     if(v.hub_upgrade_days_remaining>0){qy+=wrapped(out,{l.queue.x,qy,l.queue.width,0},l.queue,trf("PLANET_QUEUE_HUB",{stellar::native_campaign::format_campaign_duration(v.hub_upgrade_days_remaining)},"Command Center · {0}*"),l.small,gold);++queued;}
     for(const auto& b:v.construction_sites)if(!b.complete||b.upgrade_days_remaining>0){qy+=wrapped(out,{l.queue.x,qy,l.queue.width,0},l.queue,!b.complete?trf("PLANET_QUEUE_PROGRESS",{b.name,number(b.progress_fraction*100,0)},"{0} · {1}%"):trf("PLANET_QUEUE_UPGRADE",{b.name,number(b.upgrade_days_remaining,1)},"{0} · {1} days*"),l.small,ink);++queued;}
@@ -332,7 +411,7 @@ class NativePlanetaryScreen {
     for(int i=0;i<4;++i){UiRect r{l.tabs.x+i*l.tabs.width*.25f,l.tabs.y,l.tabs.width*.25f,l.tabs.height};button(out,r,captions[i],{},l,!v.observer_only||i>=2);hits_.back().tab=i;if(tab_==i)out.overlay.emplace_back(FilledRectangle{{r.x,r.y+r.height-2*s,r.width,2*s},cyan});}
     if(tab_==1&&selected_<0&&!v.observer_only){render_slots(out,v,l);return;}
     float y=l.details.y-detail_scroll_.scroll_offset;const auto write=[&](std::string value,Color color=ink,int size=0){y+=wrapped(out,{l.details.x,y,l.details.width-7*s,0},l.details,std::move(value),size?size:l.small,color)+7*s;};
-    const auto action=[&](std::string title,PlanetaryCommand cmd,bool enabled=true){button(out,{l.details.x,y,l.details.width-7*s,36*s},std::move(title),cmd,l,enabled&&(!v.foreign_settlement||cmd.action==PlanetaryAction::None),l.details,{},std::string{},3);y+=44*s;};
+    const auto action=[&](std::string title,PlanetaryCommand cmd,bool enabled=true,std::string reason={}){const UiRect r{l.details.x,y,l.details.width-7*s,36*s};const bool active=enabled&&(!v.foreign_settlement||cmd.action==PlanetaryAction::None);button(out,r,title,cmd,l,active,l.details,{},std::string{},3);if(!active)native_ui::hover_tooltip(out,intersection(r,l.details),pointer_,title,std::move(reason),static_cast<int>(l.screen.x+l.screen.width),static_cast<int>(l.screen.y+l.screen.height),l.s);y+=44*s;};
     if(tab_==2){
       write(region?tr("PLANET_OVERVIEW_REGION","REGION OVERVIEW"):tr("PLANET_OVERVIEW_WORLD","WORLD OVERVIEW"),cyan,l.font);
       if(region){write(region->terrain);write(tr("PLANET_REGION_DESC","Geographic survey province. Population and deposits are currently recorded at planetary level."),muted);}
@@ -386,12 +465,12 @@ class NativePlanetaryScreen {
           y+=wrapped(out,{tx,y,tw,0},l.details,trf("PLANET_OPTION_COST",{option.formatted_authorization,number(option.industry_cost,0)},"{0}\n{1} materials"),l.small,ink);
           y=std::max(y,top+70*s)+10*s;
           write(option.description);write(trf("PLANET_OPTION_POWER",{number(option.power_supply,1),number(option.power_demand,1),population(option.workforce_required_millions)},"Power +{0} / -{1} · Workers {2}"),muted);
-          action(tr("PLANET_BEGIN","Begin construction"),{PlanetaryAction::Build,selected_,0,option.type_id},!v.observer_only&&v.solid_surface&&selected_<v.building_capacity&&v.treasury_budget_units+.0001>=option.authorization_budget_units);
+          action(tr("PLANET_BEGIN","Begin construction"),{PlanetaryAction::Build,selected_,0,option.type_id},!v.observer_only&&v.solid_surface&&selected_<v.building_capacity&&v.treasury_budget_units+.0001>=option.authorization_budget_units,v.observer_only?tr("PLANET_TIP_OBSERVER","Survey data only — colony actions require an owned settlement."):!v.solid_surface?tr("PLANET_TIP_SURFACE","This world has no solid surface for construction."):selected_>=v.building_capacity?tr("PLANET_TIP_CAPACITY","All construction sites are occupied."):tr("PLANET_TIP_INSUFFICIENT","Insufficient authorization in the treasury."));
           y+=10*s;
         }
       }else {const auto& b=*it;building_art(out,b.type_id,{l.details.x,y,l.details.width-7*s,110*s},l.details);y+=120*s;write(b.name,gold,l.heading);write(state(b),cyan);write(trf("PLANET_CONDITION",{number(b.condition*100,0),number(b.efficiency*100,0),b.powered?tr("PLANET_POWERED","Powered"):tr("PLANET_POWER_OFF","Power unavailable"),b.staffed?tr("PLANET_STAFFED","Staffed"):tr("PLANET_STAFF_NEEDED","Workers needed")},"Condition {0}% · Efficiency {1}%\n{2} · {3}"));if(!b.complete)write(trf("PLANET_MATERIALS_LEFT",{b.construction_stage,number(b.remaining_construction_materials,1)},"{0}\n{1} materials remaining"));if(b.upgrade_days_remaining>0)write(trf("PLANET_DAYS_LEFT",{number(b.upgrade_days_remaining,1)},"{0} days remaining at full funding"));
-        if(b.can_upgrade){write(trf("PLANET_UPGRADE_COST",{b.upgrade_name,v.currency.format(b.upgrade_credit_budget_units),number(b.upgrade_industry_cost,0),b.upgrade_lock_reason},"Upgrade: {0}\n{1} + {2} materials\n{3}"));action(tr("PLANET_UPGRADE_ACTION","Upgrade building"),{PlanetaryAction::Upgrade,selected_,b.building_id},b.can_afford_upgrade&&b.upgrade_lock_reason.empty());}
-        if(b.complete){action(b.enabled?tr("PLANET_DISABLE","Disable building"):tr("PLANET_ENABLE","Enable building"),{PlanetaryAction::Enable,selected_,b.building_id,{},!b.enabled});action(b.prioritized?tr("PLANET_PRIORITY_NORMAL","Use normal priority"):tr("PLANET_PRIORITIZE","Prioritize operations"),{PlanetaryAction::Priority,selected_,b.building_id,{},!b.prioritized});action(trf("PLANET_REPAIR",{number(b.repair_industry_cost,1)},"Repair · {0} materials"),{PlanetaryAction::Repair,selected_,b.building_id},b.can_afford_repair&&b.condition<.999999);}
+        if(b.can_upgrade){write(trf("PLANET_UPGRADE_COST",{b.upgrade_name,v.currency.format(b.upgrade_credit_budget_units),number(b.upgrade_industry_cost,0),b.upgrade_lock_reason},"Upgrade: {0}\n{1} + {2} materials\n{3}"));action(tr("PLANET_UPGRADE_ACTION","Upgrade building"),{PlanetaryAction::Upgrade,selected_,b.building_id},b.can_afford_upgrade&&b.upgrade_lock_reason.empty(),b.upgrade_lock_reason.empty()?tr("PLANET_TIP_INSUFFICIENT","Insufficient authorization in the treasury."):b.upgrade_lock_reason);}
+        if(b.complete){action(b.enabled?tr("PLANET_DISABLE","Disable building"):tr("PLANET_ENABLE","Enable building"),{PlanetaryAction::Enable,selected_,b.building_id,{},!b.enabled});action(b.prioritized?tr("PLANET_PRIORITY_NORMAL","Use normal priority"):tr("PLANET_PRIORITIZE","Prioritize operations"),{PlanetaryAction::Priority,selected_,b.building_id,{},!b.prioritized});action(trf("PLANET_REPAIR",{number(b.repair_industry_cost,1)},"Repair · {0} materials"),{PlanetaryAction::Repair,selected_,b.building_id},b.can_afford_repair&&b.condition<.999999,b.condition>=.999999?tr("PLANET_TIP_REPAIR_FULL","This structure is already at full condition."):tr("PLANET_TIP_INSUFFICIENT","Insufficient authorization in the treasury."));}
         action(b.complete?tr("PLANET_DEMOLISH","Demolish building…"):tr("PLANET_CANCEL_CONSTRUCTION","Cancel construction…"),{PlanetaryAction::Remove,selected_,b.building_id});
       }
     }

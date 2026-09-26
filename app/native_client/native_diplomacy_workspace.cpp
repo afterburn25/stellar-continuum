@@ -1,6 +1,7 @@
-#include <stellar/engine/native_ui_skin.hpp>
 #include "native_diplomacy_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,23 +13,28 @@ namespace {
 using namespace stellar::native_diplomacy;
 using namespace stellar::native_map;
 
-constexpr Color panel{7, 17, 32, 252};
-constexpr Color inset{5, 14, 27, 250};
-constexpr Color row{12, 31, 54, 248};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{19, 73, 68, 252};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color accent{120, 197, 165, 255};
-constexpr Color gold{217, 182, 119, 255};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color danger{243, 153, 130, 255};
+namespace theme = stellar::native_ui;
+constexpr Color panel = theme::color::surface_opaque;
+constexpr Color inset = theme::color::surface;
+constexpr Color row = theme::color::surface_secondary;
+constexpr Color hover = theme::color::surface_hover;
+constexpr Color selected = theme::color::surface_raised;
+constexpr Color border = theme::color::keyline_strong;
+constexpr Color accent = theme::color::diplomacy;
+constexpr Color gold = theme::color::economy;
+constexpr Color bright = theme::color::text_primary;
+constexpr Color muted = theme::color::text_secondary;
+constexpr Color danger = theme::color::danger;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
 }
 void stroke(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(StrokedRectangle{bounds, color});
+}
+void region(DrawList &out, UiRect bounds) {
+  fill(out, bounds, theme::color::surface);
+  stroke(out, bounds, theme::color::keyline);
 }
 void text(DrawList &out, UiRect bounds, std::string value, Color color,
           int pixels, TextAlign align = TextAlign::Left) {
@@ -225,7 +231,17 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   const auto right_w = std::clamp(inner_w * .24f, 244.f * scale, 330.f * scale);
   const auto center_w =
       std::max(240.f * scale, inner_w - left_w - right_w - gap * 2.f);
-  const auto columns_h = inner_h * .56f;
+  // The feedback rail lifts clear of the command HUD's context plate, so the
+  // column stack must fit the space above it — not the full inner height.
+  // Guarantee the detail list a usable scroll viewport at short viewports.
+  const auto usable_columns_h =
+      std::min(inner_y + inner_h,
+               CommandHudLayout::make(width, height).context.y -
+                   6.f * scale) -
+      inner_y;
+  const auto columns_h = std::max(
+      60.f * scale,
+      std::min(inner_h * .56f, usable_columns_h - 158.f * scale));
   const UiRect contact_panel{inner_x, inner_y, left_w, columns_h};
   const UiRect stage{contact_panel.x + contact_panel.width + gap, inner_y,
                      center_w, columns_h};
@@ -248,7 +264,7 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   // strip below the columns at any viewport scale.
   const auto action_area_h =
       std::max(30.f * scale,
-               std::min(128.f * scale, meter_panel.height - 40.f * scale -
+               std::min(160.f * scale, meter_panel.height - 40.f * scale -
                                            meters.height - 6.f * scale));
   const UiRect actions{meter_panel.x,
                        meter_panel.y + meter_panel.height - action_area_h,
@@ -257,8 +273,12 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   const UiRect tabs{inner_x, tabs_y, inner_w, 34.f * scale};
   const auto detail_y = tabs.y + tabs.height + gap;
   const auto feedback_h = 34.f * scale;
-  const UiRect feedback{inner_x, inner_y + inner_h - feedback_h, inner_w,
-                        feedback_h};
+  // The command HUD's context plate owns the bottom-center strip — keep the
+  // feedback rail clear of it instead of underlapping.
+  const auto context_top = CommandHudLayout::make(width, height).context.y;
+  const auto feedback_y =
+      std::min(inner_y + inner_h, context_top - 6.f * scale) - feedback_h;
+  const UiRect feedback{inner_x, feedback_y, inner_w, feedback_h};
   const UiRect detail_rows{inner_x, detail_y, inner_w,
                            std::max(30.f * scale,
                                     feedback.y - detail_y - 6.f * scale)};
@@ -267,9 +287,9 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   const UiRect modal_panel{(w - modal_w) * .5f, (h - modal_h) * .5f, modal_w,
                            modal_h};
   return {scale,
-          static_cast<int>(std::lround(26.f * scale)),
-          static_cast<int>(std::lround(15.f * scale)),
-          static_cast<int>(std::lround(12.f * scale)),
+          theme::type::title(scale),
+          theme::type::body(scale),
+          theme::type::small(scale),
           surface,
           {inner_x, surface.y + 14.f * scale, surface.width * .5f,
            32.f * scale},
@@ -481,12 +501,14 @@ NativeDiplomacyWorkspace::focusables(
     const DiplomacyWorkspaceLayout &layout) const {
   std::vector<FocusRect> out;
   if (modal_) {
-    if (modal_->negotiation)
+    if (modal_->negotiation) {
       for (std::size_t index = 0; index < modal_->terms.size(); ++index)
-        out.push_back({modal_term_button(layout, index),
-                       modal_->terms[index].first});
-    else
+        if (modal_->terms[index].enabled)
+          out.push_back({modal_term_button(layout, index),
+                         modal_->terms[index].label});
+    } else {
       out.push_back({modal_confirm_button(layout), modal_->confirm_label});
+    }
     out.push_back({modal_cancel_button(layout),
                    tr("SETTINGS_CANCEL", "Cancel")});
   } else {
@@ -520,9 +542,11 @@ NativeDiplomacyWorkspace::focusables(
           tr("DIPLOMACY_DECLARE_WAR_ACTION", "Declare war")};
       std::size_t which = 0;
       for (const bool enabled : {transmission, negotiate, sel.can_declare_war}) {
-        if (!enabled) { ++which; continue; }
-        out.push_back({action_button(layout, action_index++),
-                       action_names[which++]});
+        if (enabled)
+          out.push_back({action_button(layout, action_index),
+                         action_names[which]});
+        ++which;
+        ++action_index;
       }
     }
     for (std::size_t index = 0; index < std::size(tab_labels); ++index)
@@ -706,13 +730,14 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         return {DiplomacyWorkspaceCommandKind::None, true};
       }
       for (std::size_t index = 0; index < modal.terms.size(); ++index) {
-        if (modal_term_button(layout, index).contains(event.position)) {
+        if (modal.terms[index].enabled &&
+            modal_term_button(layout, index).contains(event.position)) {
           auto next = ModalState{};
-          next.title = modal.terms[index].first;
+          next.title = modal.terms[index].label;
           next.description = trf("DIPLOMACY_COUNTERPART",
                                  {view_->selected.contact_name},
                                  "Counterpart: {0}");
-          next.action = modal.terms[index].second;
+          next.action = modal.terms[index].action;
           next.target_civilization_id = modal.target_civilization_id;
           next.campaign_generation = modal.campaign_generation;
           next.diplomacy_revision = modal.diplomacy_revision;
@@ -788,24 +813,22 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
     const bool negotiate =
         s.can_offer_non_aggression || s.can_request_access ||
         s.can_offer_peace || s.can_offer_ceasefire || s.can_set_access;
-    if (transmission) {
-      if (action_hit(action_index)) {
-        if (s.has_visible_communication) {
-          set_notice(tr("DIPLOMACY_CHANNEL_OPEN",
-                        "Channel open. Select a proposal to begin negotiations."),
-                     true);
-          return {DiplomacyWorkspaceCommandKind::None, true};
-        }
-        DiplomacyWorkspaceCommand command{
-            DiplomacyWorkspaceCommandKind::Action, true};
-        command.action = DiplomacyWorkspaceAction::establish_communication;
-        command.target_civilization_id = s.target_civilization_id;
-        command.campaign_generation = view_->campaign_generation;
-        command.diplomacy_revision = view_->diplomacy_revision;
-        return command;
+    if (transmission && action_hit(action_index)) {
+      if (s.has_visible_communication) {
+        set_notice(tr("DIPLOMACY_CHANNEL_OPEN",
+                      "Channel open. Select a proposal to begin negotiations."),
+                   true);
+        return {DiplomacyWorkspaceCommandKind::None, true};
       }
-      ++action_index;
+      DiplomacyWorkspaceCommand command{
+          DiplomacyWorkspaceCommandKind::Action, true};
+      command.action = DiplomacyWorkspaceAction::establish_communication;
+      command.target_civilization_id = s.target_civilization_id;
+      command.campaign_generation = view_->campaign_generation;
+      command.diplomacy_revision = view_->diplomacy_revision;
+      return command;
     }
+    ++action_index;
     if (negotiate) {
       if (action_hit(action_index)) {
         ModalState modal;
@@ -816,29 +839,41 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         modal.target_civilization_id = s.target_civilization_id;
         modal.campaign_generation = view_->campaign_generation;
         modal.diplomacy_revision = view_->diplomacy_revision;
-        const auto add = [&](const char *name,
-                             DiplomacyWorkspaceAction action, bool legal) {
-          if (legal) modal.terms.emplace_back(name, action);
+        // Every term stays listed — disabled rows keep the domain's
+        // authoritative status (`political`/`access`/`agreements`/
+        // `communication`) as the hover why, so a closed-off option still
+        // teaches what it needs. `!can_declare_war` is the authoritative
+        // at-war projection.
+        const auto add = [&](std::string name,
+                             DiplomacyWorkspaceAction action, bool legal,
+                             std::string tip) {
+          modal.terms.push_back(
+              {std::move(name), action, legal, std::move(tip)});
         };
-        add(tr("DIPLOMACY_TERM_NON_AGGRESSION", "Non-aggression").c_str(),
+        add(tr("DIPLOMACY_TERM_NON_AGGRESSION", "Non-aggression"),
             DiplomacyWorkspaceAction::propose_non_aggression,
-            s.can_offer_non_aggression);
-        add(tr("DIPLOMACY_TERM_REQUEST_ACCESS", "Request transit access")
-                .c_str(),
-            DiplomacyWorkspaceAction::request_access, s.can_request_access);
-        add(tr("DIPLOMACY_TERM_CEASEFIRE", "Ceasefire").c_str(),
-            DiplomacyWorkspaceAction::offer_ceasefire, s.can_offer_ceasefire);
-        add(tr("DIPLOMACY_TERM_PEACE", "Peace").c_str(),
-            DiplomacyWorkspaceAction::offer_peace, s.can_offer_peace);
-        add(tr("DIPLOMACY_TERM_GRANT_ACCESS", "Grant transit access").c_str(),
-            DiplomacyWorkspaceAction::grant_access, s.can_set_access);
-        add(tr("DIPLOMACY_TERM_DENY_ACCESS", "Deny transit access").c_str(),
-            DiplomacyWorkspaceAction::deny_access, s.can_set_access);
+            s.can_offer_non_aggression,
+            s.can_declare_war ? s.agreements_summary : s.political_status);
+        add(tr("DIPLOMACY_TERM_REQUEST_ACCESS", "Request transit access"),
+            DiplomacyWorkspaceAction::request_access, s.can_request_access,
+            s.access_summary);
+        add(tr("DIPLOMACY_TERM_CEASEFIRE", "Ceasefire"),
+            DiplomacyWorkspaceAction::offer_ceasefire, s.can_offer_ceasefire,
+            s.political_status);
+        add(tr("DIPLOMACY_TERM_PEACE", "Peace"),
+            DiplomacyWorkspaceAction::offer_peace, s.can_offer_peace,
+            s.political_status);
+        add(tr("DIPLOMACY_TERM_GRANT_ACCESS", "Grant transit access"),
+            DiplomacyWorkspaceAction::grant_access, s.can_set_access,
+            s.communication_status);
+        add(tr("DIPLOMACY_TERM_DENY_ACCESS", "Deny transit access"),
+            DiplomacyWorkspaceAction::deny_access, s.can_set_access,
+            s.communication_status);
         modal_ = std::move(modal);
         return {DiplomacyWorkspaceCommandKind::None, true};
       }
-      ++action_index;
     }
+    ++action_index;
     if (s.can_declare_war) {
       if (action_hit(action_index)) {
         ModalState modal;
@@ -857,7 +892,6 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         modal_ = std::move(modal);
         return {DiplomacyWorkspaceCommandKind::None, true};
       }
-      ++action_index;
     }
   }
 
@@ -912,30 +946,30 @@ void NativeDiplomacyWorkspace::render(
   if (!visible_ || !view_) return;
   const auto layout = DiplomacyWorkspaceLayout::for_viewport(width, height);
   const auto s = layout.scale;
-  stellar::engine::ui_skin::surface(out,layout.surface,layout.scale);
+  stellar::native_ui_style::menu_panel(out, layout.surface);
   text(out, layout.title, tr("DIPLOMACY_TITLE", "RELATIONS"), bright,
        layout.title_font_pixels);
   text(out, layout.date, view_->date, muted, layout.body_font_pixels,
        TextAlign::Right);
-  stellar::engine::ui_skin::control(out,layout.close,layout.close.contains(pointer_),false,true,layout.scale);
-  text(out, layout.close, tr("DIPLOMACY_RETURN", "RETURN"), bright,
-       layout.small_font_pixels, TextAlign::Center);
+  theme::button(out, layout.close, tr("DIPLOMACY_RETURN", "RETURN"), pointer_,
+                layout.small_font_pixels);
 
   // Contact directory
-  stellar::engine::ui_skin::surface(out,layout.contact_panel,s);
-  text(out,
-       {layout.contact_panel.x + 8.f * s, layout.contact_panel.y + 8.f * s,
-        layout.contact_panel.width - 16.f * s, 22.f * s},
-       tr("DIPLOMACY_CONTACT_DIRECTORY", "CONTACT DIRECTORY"), accent,
-       layout.small_font_pixels);
+  region(out, layout.contact_panel);
+  theme::section_header(out,
+                        {layout.contact_panel.x + 8.f * s,
+                         layout.contact_panel.y + 8.f * s,
+                         layout.contact_panel.width - 16.f * s, 22.f * s},
+                        tr("DIPLOMACY_CONTACT_DIRECTORY", "CONTACT DIRECTORY"),
+                        layout.small_font_pixels, theme::Tone::Diplomacy);
   for (std::size_t index = 0; index < std::size(filter_labels); ++index) {
     const auto bounds = filter_button(layout, index);
     const bool active = filter_ == filter_labels[index].first;
-    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),active,true,s);
-    text(out, bounds, tr(filter_keys[index], filter_labels[index].second),
-         active ? bright : muted, layout.small_font_pixels, TextAlign::Center);
+    theme::button(out, bounds, tr(filter_keys[index], filter_labels[index].second),
+                  pointer_, layout.small_font_pixels, theme::Tone::Neutral,
+                  active);
   }
-  stellar::engine::ui_skin::surface(out,layout.contact_rows,s);
+  region(out, layout.contact_rows);
   const auto rows = filtered_contacts();
   if (rows.empty()) {
     text(out, layout.contact_rows,
@@ -956,7 +990,11 @@ void NativeDiplomacyWorkspace::render(
     const bool chosen = contact.source_index == selected_contact_index_;
     const auto clip = intersection(bounds, layout.contact_rows);
     if (!clip) continue;
-    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),chosen,true,s,layout.contact_rows);
+    fill(out, *clip,
+         chosen ? selected : bounds.contains(pointer_) ? hover : row);
+    if (chosen)
+      fill(out, {clip->x, clip->y, 3.f * s, clip->height},
+           theme::color::selected);
     const auto clipped_text = [&](float y, std::string value, Color color,
                                   int pixels) {
       out.overlay.emplace_back(Text{{bounds.x + 8.f * s, y}, std::move(value),
@@ -979,7 +1017,7 @@ void NativeDiplomacyWorkspace::render(
 
   const auto &sel = view_->selected;
   // Transmission stage: portrait for identified contacts, signal arcs otherwise.
-  stellar::engine::ui_skin::surface(out,layout.stage,s);
+  region(out, layout.stage);
   text(out,
        {layout.stage.x + 10.f * s, layout.stage.y + 6.f * s,
         layout.stage.width - 20.f * s, 20.f * s},
@@ -1063,25 +1101,39 @@ void NativeDiplomacyWorkspace::render(
        muted, layout.body_font_pixels);
 
   // Relationship meters and actions.
-  stellar::engine::ui_skin::surface(out,layout.meter_panel,s);
-  text(out,
-       {layout.meter_panel.x + 8.f * s, layout.meter_panel.y + 8.f * s,
-        layout.meter_panel.width - 16.f * s, 20.f * s},
-       tr("DIPLOMACY_RELATIONSHIP", "RELATIONSHIP"), accent,
-       layout.small_font_pixels);
+  region(out, layout.meter_panel);
+  theme::section_header(out,
+                        {layout.meter_panel.x + 8.f * s,
+                         layout.meter_panel.y + 8.f * s,
+                         layout.meter_panel.width - 16.f * s, 20.f * s},
+                        tr("DIPLOMACY_RELATIONSHIP", "RELATIONSHIP"),
+                        layout.small_font_pixels, theme::Tone::Diplomacy);
   const std::pair<std::string, std::optional<double>> meter_rows[] = {
       {tr("DIPLOMACY_TRUST", "TRUST"), sel.trust},
       {tr("DIPLOMACY_RESPECT", "RESPECT"), sel.respect},
       {tr("DIPLOMACY_FEAR", "FEAR"), sel.fear},
       {tr("DIPLOMACY_HOSTILITY", "HOSTILITY"), sel.hostility},
       {tr("DIPLOMACY_COOPERATION", "COOPERATION"), sel.cooperation}};
-  const Color meter_colors[] = {{120, 197, 165, 255}, {119, 185, 211, 255},
-                                {217, 182, 119, 255}, {214, 124, 114, 255},
-                                {167, 150, 206, 255}};
+  const char *meter_tip_keys[] = {"DIPLOMACY_TIP_TRUST", "DIPLOMACY_TIP_RESPECT",
+                                  "DIPLOMACY_TIP_FEAR", "DIPLOMACY_TIP_HOSTILITY",
+                                  "DIPLOMACY_TIP_COOPERATION"};
+  const char *meter_tip_fallbacks[] = {
+      "How reliably this contact honors its agreements.",
+      "How much weight this contact gives our power and competence.",
+      "How threatened this contact feels by us.",
+      "How openly hostile this contact is toward us.",
+      "How willing this contact is to work with us right now."};
+  const Color meter_colors[] = {theme::color::diplomacy, theme::color::selected,
+                                theme::color::economy, theme::color::danger,
+                                theme::color::science};
   for (std::size_t index = 0; index < 5; ++index) {
     const auto y = layout.meters.y + static_cast<float>(index) * 30.f * s;
+    const UiRect row_bounds{layout.meters.x, y, layout.meters.width, 28.f * s};
     text(out, {layout.meters.x, y, layout.meters.width * .62f, 18.f * s},
          meter_rows[index].first, muted, layout.small_font_pixels);
+    theme::hover_tooltip(out, row_bounds, pointer_, meter_rows[index].first,
+                         tr(meter_tip_keys[index], meter_tip_fallbacks[index]),
+                         width, height, s, theme::Tone::Neutral);
     const auto &value = meter_rows[index].second;
     text(out,
          {layout.meters.x + layout.meters.width * .62f, y,
@@ -1094,7 +1146,7 @@ void NativeDiplomacyWorkspace::render(
          TextAlign::Right);
     const UiRect bar{layout.meters.x, y + 20.f * s, layout.meters.width,
                      8.f * s};
-    fill(out, bar, {24, 39, 51, 255});
+    fill(out, bar, theme::color::canvas);
     if (value)
       fill(out, {bar.x, bar.y,
                  bar.width * static_cast<float>(std::clamp(*value, 0., 1.)),
@@ -1102,33 +1154,43 @@ void NativeDiplomacyWorkspace::render(
            meter_colors[index]);
   }
   std::size_t action_index = 0;
-  const auto draw_action = [&](const char *label, bool danger_button) {
+  const auto draw_action = [&](std::string label, bool enabled,
+                               std::string disabled_tip, bool danger_button) {
     const auto bounds = action_button(layout, action_index++);
-    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),false,true,s);
-    if(danger_button)stellar::engine::ui_skin::rim(out,bounds,danger,{96,38,32,240},1.f,4*s);
-    text(out, bounds, label, danger_button ? danger : bright,
-         layout.body_font_pixels, TextAlign::Center);
+    theme::button(out, bounds, label, pointer_, layout.body_font_pixels,
+                  danger_button ? theme::Tone::Danger : theme::Tone::Diplomacy,
+                  danger_button && enabled, enabled);
+    if (danger_button && enabled) stroke(out, bounds, danger);
+    // Disabled actions stay visible with the authoritative status as the
+    // why — hiding illegal actions made the available set undiscoverable.
+    theme::hover_tooltip(out, bounds, pointer_, label, disabled_tip, width,
+                         height, s);
   };
   if (sel.present) {
-    if (sel.has_visible_communication || sel.can_attempt_communication)
-      draw_action(
-          sel.has_visible_communication
-              ? tr("DIPLOMACY_OPEN_TRANSMISSION", "Open transmission").c_str()
-              : tr("DIPLOMACY_ESTABLISH_COMMUNICATION",
-                   "Establish communication")
-                    .c_str(),
-          false);
-    if (sel.can_offer_non_aggression || sel.can_request_access ||
-        sel.can_offer_peace || sel.can_offer_ceasefire || sel.can_set_access)
-      draw_action(tr("DIPLOMACY_NEGOTIATE", "Negotiate").c_str(), false);
-    if (sel.can_declare_war)
-      draw_action(tr("DIPLOMACY_DECLARE_WAR_ACTION", "Declare war").c_str(),
-                  true);
-    if (!sel.has_visible_communication && !sel.can_attempt_communication)
-      text(out, {layout.actions.x + 8.f * s,
-                 layout.actions.y + static_cast<float>(action_index) * 36.f * s +
-                     8.f * s,
-                 layout.actions.width - 16.f * s, 60.f * s},
+    const bool transmission =
+        sel.has_visible_communication || sel.can_attempt_communication;
+    const bool negotiate =
+        sel.can_offer_non_aggression || sel.can_request_access ||
+        sel.can_offer_peace || sel.can_offer_ceasefire || sel.can_set_access;
+    draw_action(
+        sel.has_visible_communication
+            ? tr("DIPLOMACY_OPEN_TRANSMISSION", "Open transmission")
+            : tr("DIPLOMACY_ESTABLISH_COMMUNICATION",
+                 "Establish communication"),
+        transmission, sel.communication_status, false);
+    draw_action(tr("DIPLOMACY_NEGOTIATE", "Negotiate"), negotiate,
+                sel.communication_status, false);
+    draw_action(tr("DIPLOMACY_DECLARE_WAR_ACTION", "Declare war"),
+                sel.can_declare_war, sel.political_status, true);
+    // The discovery hint only renders where the three action slots leave room;
+    // at tight viewports the disabled buttons + tooltips carry the same why.
+    const auto hint_y = layout.actions.y + 3.f * 36.f * s + 4.f * s;
+    if (!transmission &&
+        hint_y + 2.f * layout.small_font_pixels <=
+            layout.actions.y + layout.actions.height)
+      text(out, {layout.actions.x + 8.f * s, hint_y,
+                 layout.actions.width - 16.f * s,
+                 layout.actions.y + layout.actions.height - hint_y},
            view_->contacts.empty()
                ? tr("DIPLOMACY_DISCOVERY_HINT",
                     "Discovery opens diplomatic options.")
@@ -1142,13 +1204,12 @@ void NativeDiplomacyWorkspace::render(
   for (std::size_t index = 0; index < std::size(tab_labels); ++index) {
     const auto bounds = tab_button(layout, index);
     const bool active = tab_ == tab_labels[index].first;
-    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),active,true,s);
-    text(out, bounds, tr(tab_keys[index], tab_labels[index].second),
-         active ? accent : bright, layout.small_font_pixels, TextAlign::Center);
+    theme::tab(out, bounds, tr(tab_keys[index], tab_labels[index].second),
+               pointer_, layout.small_font_pixels, active);
   }
 
   // Detail region.
-  stellar::engine::ui_skin::surface(out,layout.detail_rows,s);
+  region(out, layout.detail_rows);
   const auto card = [&](std::size_t index, float card_h) {
     const auto top = layout.detail_rows.y + 8.f * s +
                      static_cast<float>(index) * (card_h + 8.f * s) -
@@ -1397,7 +1458,7 @@ void NativeDiplomacyWorkspace::render(
          {0, 0, 0, 199});
     fill(out, layout.modal_panel, panel);
     stroke(out, layout.modal_panel,
-           modal_->danger ? danger : border);
+           modal_->danger ? danger : theme::color::keyline_strong);
     text(out,
          {layout.modal_panel.x + 16.f * s, layout.modal_panel.y + 14.f * s,
           layout.modal_panel.width - 32.f * s, 30.f * s},
@@ -1409,30 +1470,32 @@ void NativeDiplomacyWorkspace::render(
          modal_->description, bright, layout.body_font_pixels);
     if (modal_->negotiation) {
       for (std::size_t index = 0; index < modal_->terms.size(); ++index) {
+        const auto &term = modal_->terms[index];
         const auto bounds = modal_term_button(layout, index);
-        fill(out, bounds, bounds.contains(pointer_) ? hover : row);
-        stroke(out, bounds, border);
-        text(out, bounds, modal_->terms[index].first, bright,
-             layout.body_font_pixels, TextAlign::Center);
+        theme::button(out, bounds, term.label, pointer_,
+                      layout.body_font_pixels, theme::Tone::Diplomacy, false,
+                      term.enabled);
+        theme::hover_tooltip(out, bounds, pointer_, term.label, term.tip,
+                             width, height, s);
       }
     } else {
-      const auto bounds = modal_confirm_button(layout);
-      fill(out, bounds, bounds.contains(pointer_) ? hover : row);
-      stroke(out, bounds, modal_->danger ? danger : accent);
-      text(out, bounds, modal_->confirm_label,
-           modal_->danger ? danger : bright, layout.body_font_pixels,
-           TextAlign::Center);
+      theme::button(out, modal_confirm_button(layout), modal_->confirm_label,
+                    pointer_, layout.body_font_pixels,
+                    modal_->danger ? theme::Tone::Danger
+                                   : theme::Tone::Diplomacy,
+                    true);
+      if (modal_->danger)
+        stroke(out, modal_confirm_button(layout), danger);
     }
-    const auto cancel = modal_cancel_button(layout);
-    fill(out, cancel, cancel.contains(pointer_) ? hover : row);
-    stroke(out, cancel, border);
-    text(out, cancel, tr("SETTINGS_CANCEL", "Cancel"), muted,
-         layout.body_font_pixels, TextAlign::Center);
+    theme::button(out, modal_cancel_button(layout),
+                  tr("SETTINGS_CANCEL", "Cancel"), pointer_,
+                  layout.body_font_pixels);
   }
   if (focus_ >= 0) {
     const auto rects = focusables(layout);
     if (focus_ < static_cast<int>(rects.size()))
-      stroke(out, rects[static_cast<std::size_t>(focus_)].bounds, accent);
+      theme::focus_ring(out,
+                        rects[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 

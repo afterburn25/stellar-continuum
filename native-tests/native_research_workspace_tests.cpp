@@ -336,9 +336,13 @@ int main() try {
   cancellation_controls();
   keyboard_focus_traversal();
   for (const auto [width, height] :
-       std::array{std::pair{1280, 720}, std::pair{1920, 1080},
-                  std::pair{2560, 1440}, std::pair{3840, 2160}})
+       std::array{std::pair{640, 360}, std::pair{1280, 720},
+                  std::pair{1920, 1080}, std::pair{2560, 1440},
+                  std::pair{3840, 2160}})
     verify_layout(width, height);
+  require(ResearchWorkspaceLayout::for_viewport(640, 360, 18).compact &&
+              !ResearchWorkspaceLayout::for_viewport(1280, 720, 18).compact,
+          "Compact research layout flag misfires.");
 
   {
     auto real_tabs = sample_window();
