@@ -15,7 +15,11 @@ constexpr std::array population_descriptions{
  "Very little current star formation. Older, long-lived stars and remnants dominate."};
 }
 GalaxyChoiceLayout GalaxyChoiceLayout::for_viewport(int width,int height) noexcept {
-  const float s=std::clamp(height/1080.f,.65f,2.f),pw=std::min(1520*s,width-48*s),ph=std::min(942*s,height-40*s);
+  // Summary needs 520s of stack above it plus a usable height; adapt the scale
+  // floor on short viewports instead of letting the rect collapse negative.
+  float s=std::clamp(height/1080.f,.65f,2.f);
+  if(560.f*s+64.f>height)s=std::clamp((height-64.f)/560.f,.45f,s);
+  const float pw=std::min(1520*s,width-48*s),ph=std::min(942*s,height-40*s);
   GalaxyChoiceLayout l;l.scale=s;l.panel={(width-pw)*.5f,(height-ph)*.5f,pw,ph};
   const float x=l.panel.x+28*s,y=l.panel.y+24*s,w=pw-56*s;
   l.heading={x,y,w,54*s};l.back={x,l.panel.y+ph-64*s,124*s,40*s};l.next={x+w-170*s,l.back.y,170*s,40*s};

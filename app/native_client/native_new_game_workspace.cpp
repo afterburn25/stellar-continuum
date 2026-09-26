@@ -116,7 +116,12 @@ species_presentation(std::string_view id) noexcept {
 
 NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
                                                        int height) noexcept {
-  const float scale = std::clamp(static_cast<float>(height) / 1080.f, .8f, 2.5f);
+  // The fixed header + footer stack needs ~490s of height beyond the 90 px
+  // content floor; adapt the scale on short viewports instead of letting the
+  // species/details region overlap the mode and generation rows.
+  float scale = std::clamp(static_cast<float>(height) / 1080.f, .8f, 2.5f);
+  if(490.f * scale + 90.f > height)
+    scale = std::clamp((height - 90.f) / 490.f, .45f, scale);
   const float margin = 18.f * scale;
   const float available_width = std::max(1.f, static_cast<float>(width) - 2 * margin);
   const float available_height = std::max(1.f, std::min(820.f * scale, static_cast<float>(height) - 2 * margin));

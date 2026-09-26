@@ -45,7 +45,7 @@ NativeNewCampaignSetupView setup(){
 }
 
 void responsive_layout(){
-  for(const auto [w,h]:{std::pair{1280,720},{1920,1080},{2560,1440},{3840,2160},{1280,1080}}){
+  for(const auto [w,h]:{std::pair{1280,720},{1920,1080},{2560,1440},{3840,2160},{1280,1080},{640,360}}){
     NativeNewGameWorkspace workspace;workspace.set_view(setup());const auto measured=workspace.measure_layout(w,h,measure);const auto&l=measured.base;
     for(const auto r:{l.heading,l.cancel,l.mode_story,l.mode_sandbox,l.species,l.details,l.size_group,l.seed_input,l.randomize_seed,l.restore_defaults,l.create})require(contains(l.panel,r),"setup control escaped its panel");
     require(l.mode_story.x+l.mode_story.width<=l.mode_sandbox.x,"campaign mode cards overlap");
@@ -66,7 +66,7 @@ void presentations(){
 }
 void galaxy_flow(){
   using namespace stellar::core;
-  for(const auto [width,height]:{std::pair{1280,720},{1920,1080},{2560,1440},{3440,1440},{3840,2160}}){
+  for(const auto [width,height]:{std::pair{1280,720},{1920,1080},{2560,1440},{3440,1440},{3840,2160},{640,360}}){
     NativeNewGameWorkspace w;w.set_view(setup());w.begin_sandbox();
     const auto l=GalaxyChoiceLayout::for_viewport(width,height);
     const auto click=[&](UiRect r){return w.handle({InputEventType::LeftPressed,center(r)},width,height,measure);};
