@@ -161,6 +161,131 @@ struct TextureRef {
 struct DoubleSided {
   // Marker: render the mesh's back faces too (foliage, paper, debug).
 };
+// Metallic-workflow material for a 3D entity — the component counterpart
+// of the entity document's metallic/roughness/emissive/environment
+// fields. Map strings are content-relative paths the host resolves the
+// same way as TextureRef. Scalars at defaults keep the legacy diffuse
+// response; emission and IBL are strictly opt-in (strength 0).
+struct MaterialPbr {
+  float metallic{0.f}, roughness{0.55f};
+  float emissive_strength{0.f}, night_emissive{0.f},
+      environment_strength{0.f};
+  float emissive_r{1.f}, emissive_g{1.f}, emissive_b{1.f};
+  float alpha_cutout{0.f}, uv_tile_x{1.f}, uv_tile_y{1.f};
+  std::string metallic_roughness, emissive, environment;
+};
+// Opaque surface response for a 3D body — the component counterpart of
+// the entity document's `surface` block plus `terminatorWrap`. Map
+// strings are content-relative paths the host resolves like TextureRef;
+// any subset binds (a cloud-only material needs no normal/properties
+// art). `cloud_albedo` composites the cloud map's RGB as a lit deck over
+// the surface; `terminator_wrap` softens the day/night edge through
+// wrap-diffuse lighting; `limb_darkening` dims outgoing radiance toward
+// the disc edge for self-luminous bodies (Sun ~0.6).
+struct MaterialSurface {
+  float normal_strength{0.35f}, relief{0.f}, cloud_opacity{0.f};
+  float cloud_albedo{0.f}, cloud_offset_x{0.f}, cloud_offset_y{0.f};
+  float terminator_wrap{0.f}, limb_darkening{0.f};
+  // Latitude-weighted longitude shear of surface maps (differential
+  // rotation / gas-giant banding), [-0.5,0.5] UV units.
+  float band_shear{0.f};
+  // First-order orbital beaming about local +Y (accretion discs, ring
+  // forward-scatter), [-1,1]; negative spins retrograde.
+  float orbital_beaming{0.f};
+  // Henyey–Greenstein scattering phase: positive brightens the backlit
+  // sheet (dusty rings), negative boosts opposition (icy). [-1,1];
+  // 0 disables.
+  float forward_scatter{0.f};
+  // Zonal-wind harmonic strength [0,1] layered on `band_shear` for
+  // alternating mid-latitude jets.
+  float band_waves{0.f};
+  std::string normal_map, properties_map, cloud_map;
+  // Cloud-deck altitude in object units [0,.1]: view parallax, displaced
+  // ground shadows and deck self-shading. 0 keeps a texture-space deck.
+  float cloud_height{0.f};
+  // Zonal drift rate in UV longitude per second [-0.25,0.25] — scrolls
+  // the deck slowly for super-rotating giants. 0 keeps the static warp.
+  float band_drift{0.f};
+  // Warp-evolution phase rate in rad/s [-8,8] — a propagating
+  // mid-latitude wave at half the shear amplitude reshapes the jet
+  // profile over time. 0 freezes the warp; no effect without shear.
+  float band_turbulence{0.f};
+  // Quadratic limb-darkening coefficient [0,1] — the two-term law's
+  // squared edge falloff; 0 keeps the linear profile.
+  float limb_darkening_q{0.f};
+};
+// Spectral-class star photosphere — the component counterpart of the
+// entity document's `starKelvin` key. The runtime maps it through
+// `star_photosphere3d`: blackbody disc tint + temperature-graded limb
+// darkening + self-consistent light color. Attached only when authored.
+struct StarPhotosphere {
+  double kelvin{0.0};
+};
+// Accretion-disc material preset — the component counterpart of the
+// entity document's `accretion` key. The runtime maps it through
+// `accretion_disc_material3d`: Shakura–Sunyaev radial blackbody
+// texture + orbital beaming on an `annulus` mesh at matching radii.
+struct AccretionDisc {
+  float inner{0.f}, outer{0.f}, kelvin{0.f}, beaming{0.85f};
+};
+// Image-shaped emission volume (nebula, plasma plume, accretion glow) —
+// the component counterpart of the entity document's `volume` block.
+// The entity's own texture supplies the emission image; `depth`
+// (0,0.75] enables the front-to-back march inside the closed proxy,
+// `steps` bounds the integration budget [8,64], and `scatter` [0,1] is
+// the directional star-lit limb term. Attached only when authored.
+struct EmissionVolume {
+  float depth{0.f}, density{5.f}, seed{0.f}, scatter{0.f};
+  int steps{32};
+  // Filament warp: `flow` re-poses the phase field (nebula variety),
+  // `distort` [0,.1] is the secondary warp amplitude.
+  float flow{0.f}, distort{0.f};
+  // Optional second emission image: `image2` names another texture,
+  // `blend` [0,1] mixes it against the entity texture (0 = primary only).
+  float blend{0.f};
+  std::string image2;
+  // Optional occlusion sphere centred on the entity origin, object units
+  // — a corona stops shining through its star. [0,1e4]; 0 disables.
+  float occlude{0.f};
+  // Phase drift rate — the filament warp advances by flow_rate·time per
+  // frame so nebulae churn instead of freezing. [-64,64]; 0 static.
+  float flow_rate{0.f};
+};
+// Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
+// weighted to the day side with a nightside floor.
+struct AtmosphereShell {
+  float r{0.45f}, g{0.62f}, b{1.f};
+  float strength{1.f}, power{3.f}, night_floor{0.05f};
+};
+// Distance culling for a 3D entity: the renderer drops the instance once
+// the camera is farther than `range` world units from its bounding-sphere
+// surface. `fade` is the screen-door fade-out width ahead of that edge as
+// a fraction of `range` [0,0.5] — 0 keeps the hard cut. Only attached
+// when the document authors a limit (> 0).
+struct VisibleRange {
+  float range{0.f};
+  float fade{0.f};
+};
+// Screen-space mesh LOD chain for a 3D entity — the component
+// counterpart of the entity document's `lods`/`lodPixels` keys. Specs
+// resolve through the same path as MeshRef; `specs[i]` substitutes for
+// the full mesh once the projected bounding diameter drops below
+// pixels/2^i. Attached only when the document authors levels.
+struct MeshLods {
+  std::vector<std::string> specs;
+  float pixels{32.f};
+  // Screen-door transition width above each threshold [0,0.5];
+  // 0 keeps the hard switch.
+  float fade{.15f};
+  // Named group proxy — the component counterpart of the entity
+  // document's `lodGroup`/`lodProxy`/`lodProxyPixels` keys. Members of
+  // a named group collapse into a single `proxy` draw (a mesh spec
+  // resolved like `specs`) once the merged bounding sphere projects
+  // below `group_pixels`.
+  std::string group;
+  std::string proxy;
+  float group_pixels{0.f};
+};
 // Host-owned fly-camera state for 3D scene mode, carried on a lazily
 // resolved world entity so F5/F9 snapshots restore the camera too (the
 // document seeds it only on scene load).

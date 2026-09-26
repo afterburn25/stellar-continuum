@@ -404,6 +404,288 @@ void register_scene_components(World &world) {
       "doublesided",
       [](const DoubleSided &) { return std::vector<std::uint8_t>{1}; },
       [](const std::vector<std::uint8_t> &) { return DoubleSided{}; });
+  // Scalars first (fixed-size head), then the three map paths as
+  // length-prefixed strings — decode tolerates a truncated tail.
+  world.register_component<MaterialPbr>(
+      "materialpbr",
+      [](const MaterialPbr &m) {
+        std::vector<std::uint8_t> out;
+        for (const float f :
+             {m.metallic, m.roughness, m.emissive_strength,
+              m.night_emissive, m.environment_strength, m.emissive_r,
+              m.emissive_g, m.emissive_b, m.alpha_cutout, m.uv_tile_x,
+              m.uv_tile_y})
+          put_f32(out, f);
+        for (const std::string *s :
+             {&m.metallic_roughness, &m.emissive, &m.environment}) {
+          put_u32(out, static_cast<std::uint32_t>(s->size()));
+          out.insert(out.end(), s->begin(), s->end());
+        }
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        MaterialPbr m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        m.metallic = f();
+        m.roughness = f();
+        m.emissive_strength = f();
+        m.night_emissive = f();
+        m.environment_strength = f();
+        m.emissive_r = f();
+        m.emissive_g = f();
+        m.emissive_b = f();
+        m.alpha_cutout = f();
+        m.uv_tile_x = f();
+        m.uv_tile_y = f();
+        for (std::string *s :
+             {&m.metallic_roughness, &m.emissive, &m.environment}) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) break;
+          s->assign(reinterpret_cast<const char *>(b.data() + at), len);
+          at += len;
+        }
+        return m;
+      });
+  // Same layout convention as MaterialPbr: fixed-size float head, then
+  // length-prefixed map paths — decode tolerates a truncated tail.
+  world.register_component<MaterialSurface>(
+      "materialsurface",
+      [](const MaterialSurface &m) {
+        std::vector<std::uint8_t> out;
+        for (const float f :
+             {m.normal_strength, m.relief, m.cloud_opacity, m.cloud_albedo,
+              m.cloud_offset_x, m.cloud_offset_y, m.terminator_wrap,
+              m.limb_darkening, m.band_shear, m.orbital_beaming,
+              m.forward_scatter, m.band_waves})
+          put_f32(out, f);
+        for (const std::string *s :
+             {&m.normal_map, &m.properties_map, &m.cloud_map}) {
+          put_u32(out, static_cast<std::uint32_t>(s->size()));
+          out.insert(out.end(), s->begin(), s->end());
+        }
+        // cloud_height/band_drift tail the payload so pre-field saves
+        // still decode (a mid-list float would eat the first string's
+        // length prefix).
+        put_f32(out, m.cloud_height);
+        put_f32(out, m.band_drift);
+        put_f32(out, m.band_turbulence);
+        put_f32(out, m.limb_darkening_q);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        MaterialSurface m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        m.normal_strength = f();
+        m.relief = f();
+        m.cloud_opacity = f();
+        m.cloud_albedo = f();
+        m.cloud_offset_x = f();
+        m.cloud_offset_y = f();
+        m.terminator_wrap = f();
+        m.limb_darkening = f();
+        m.band_shear = f();
+        m.orbital_beaming = f();
+        m.forward_scatter = f();
+        m.band_waves = f();
+        for (std::string *s :
+             {&m.normal_map, &m.properties_map, &m.cloud_map}) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) break;
+          s->assign(reinterpret_cast<const char *>(b.data() + at), len);
+          at += len;
+        }
+        if (b.size() - at >= 4) m.cloud_height = f();
+        if (b.size() - at >= 4) m.band_drift = f();
+        if (b.size() - at >= 4) m.band_turbulence = f();
+        if (b.size() - at >= 4) m.limb_darkening_q = f();
+        return m;
+      });
+  world.register_component<AtmosphereShell>(
+      "atmosphere",
+      encode_fields<AtmosphereShell, &AtmosphereShell::r,
+                    &AtmosphereShell::g, &AtmosphereShell::b,
+                    &AtmosphereShell::strength, &AtmosphereShell::power,
+                    &AtmosphereShell::night_floor>,
+      decode_fields<AtmosphereShell, &AtmosphereShell::r,
+                    &AtmosphereShell::g, &AtmosphereShell::b,
+                    &AtmosphereShell::strength, &AtmosphereShell::power,
+                    &AtmosphereShell::night_floor>);
+  // f32 range + f32 fade — decode tolerates the legacy 4-byte payload so
+  // older saves keep their authored range and the hard cut they had.
+  world.register_component<VisibleRange>(
+      "visiblerange",
+      [](const VisibleRange &v) {
+        std::vector<std::uint8_t> out;
+        put_f32(out, v.range);
+        put_f32(out, v.fade);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        VisibleRange v;
+        std::size_t at = 0;
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.range, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.fade, &bits, 4);
+        }
+        return v;
+      });
+  world.register_component<StarPhotosphere>(
+      "starphotosphere",
+      encode_fields<StarPhotosphere, &StarPhotosphere::kelvin>,
+      decode_fields<StarPhotosphere, &StarPhotosphere::kelvin>);
+  world.register_component<AccretionDisc>(
+      "accretiondisc",
+      encode_fields<AccretionDisc, &AccretionDisc::inner,
+                    &AccretionDisc::outer, &AccretionDisc::kelvin,
+                    &AccretionDisc::beaming>,
+      decode_fields<AccretionDisc, &AccretionDisc::inner,
+                    &AccretionDisc::outer, &AccretionDisc::kelvin,
+                    &AccretionDisc::beaming>);
+  // f32 depth/density/seed/scatter + i32 steps + f32 flow/distort —
+  // decode tolerates the legacy 20-byte payload so older saves keep
+  // their authored volume with the zero-warp defaults they had.
+  world.register_component<EmissionVolume>(
+      "emissionvolume",
+      [](const EmissionVolume &v) {
+        std::vector<std::uint8_t> out;
+        put_f32(out, v.depth);
+        put_f32(out, v.density);
+        put_f32(out, v.seed);
+        put_f32(out, v.scatter);
+        put_u32(out, static_cast<std::uint32_t>(v.steps));
+        put_f32(out, v.flow);
+        put_f32(out, v.distort);
+        put_f32(out, v.blend);
+        put_u32(out, static_cast<std::uint32_t>(v.image2.size()));
+        out.insert(out.end(), v.image2.begin(), v.image2.end());
+        put_f32(out, v.occlude);
+        put_f32(out, v.flow_rate);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        EmissionVolume v;
+        std::size_t at = 0;
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.depth, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.density, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.seed, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.scatter, &bits, 4);
+        }
+        if (b.size() - at >= 4)
+          v.steps = static_cast<int>(get_u32(b, at));
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.flow, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.distort, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.blend, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len <= b.size() - at) {
+            v.image2.assign(reinterpret_cast<const char *>(b.data() + at),
+                            len);
+            at += len;
+          }
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.occlude, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.flow_rate, &bits, 4);
+        }
+        return v;
+      });
+  // u32 count + length-prefixed spec strings + f32 switch size — decode
+  // tolerates a truncated tail like MaterialSurface.
+  world.register_component<MeshLods>(
+      "meshlods",
+      [](const MeshLods &m) {
+        std::vector<std::uint8_t> out;
+        put_u32(out, static_cast<std::uint32_t>(m.specs.size()));
+        for (const auto &s : m.specs) {
+          put_u32(out, static_cast<std::uint32_t>(s.size()));
+          out.insert(out.end(), s.begin(), s.end());
+        }
+        put_f32(out, m.pixels);
+        put_f32(out, m.fade);
+        // Appended fields decode as empty/0 on pre-group payloads.
+        put_u32(out, static_cast<std::uint32_t>(m.group.size()));
+        out.insert(out.end(), m.group.begin(), m.group.end());
+        put_u32(out, static_cast<std::uint32_t>(m.proxy.size()));
+        out.insert(out.end(), m.proxy.begin(), m.proxy.end());
+        put_f32(out, m.group_pixels);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        MeshLods m;
+        std::size_t at = 0;
+        const std::uint32_t count = get_u32(b, at);
+        for (std::uint32_t i = 0; i < count && i < 8; ++i) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) break;
+          m.specs.emplace_back(reinterpret_cast<const char *>(b.data() + at),
+                               len);
+          at += len;
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&m.pixels, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&m.fade, &bits, 4);
+        }
+        const auto read_string = [&b, &at](std::string &out) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) {
+            at = b.size();
+            return;
+          }
+          out.assign(reinterpret_cast<const char *>(b.data() + at), len);
+          at += len;
+        };
+        read_string(m.group);
+        read_string(m.proxy);
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&m.group_pixels, &bits, 4);
+        }
+        return m;
+      });
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -660,6 +942,65 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, Opacity{s.opacity * (s.a / 255.f)});
     if (!s.texture.empty()) world.add(entity, TextureRef{s.texture});
     if (s.double_sided) world.add(entity, DoubleSided{});
+    // Material extension components ride the entity's snapshot stream —
+    // they are only attached when the document opts into them.
+    if (s.metallic != 0.f || s.roughness != 0.55f ||
+        !s.metallic_roughness.empty() || !s.emissive.empty() ||
+        s.emissive_strength != 0.f || s.night_emissive != 0.f ||
+        !s.environment.empty() || s.environment_strength != 0.f ||
+        s.alpha_cutout != 0.f || s.uv_tile_x != 1.f || s.uv_tile_y != 1.f)
+      world.add(entity,
+                MaterialPbr{s.metallic, s.roughness, s.emissive_strength,
+                            s.night_emissive, s.environment_strength,
+                            s.emissive_r, s.emissive_g, s.emissive_b,
+                            s.alpha_cutout, s.uv_tile_x, s.uv_tile_y,
+                            s.metallic_roughness, s.emissive,
+                            s.environment});
+    if (!s.normal_map.empty() || !s.properties_map.empty() ||
+        !s.cloud_map.empty() || s.normal_strength != 0.35f ||
+        s.relief != 0.f || s.cloud_opacity != 0.f || s.cloud_albedo != 0.f ||
+        s.cloud_offset_x != 0.f || s.cloud_offset_y != 0.f ||
+        s.terminator_wrap != 0.f || s.limb_darkening != 0.f ||
+        s.band_shear != 0.f || s.orbital_beaming != 0.f ||
+        s.forward_scatter != 0.f || s.band_waves != 0.f ||
+        s.cloud_height != 0.f || s.band_drift != 0.f ||
+        s.band_turbulence != 0.f || s.limb_darkening_q != 0.f)
+      world.add(entity,
+                MaterialSurface{s.normal_strength, s.relief,
+                                s.cloud_opacity, s.cloud_albedo,
+                                s.cloud_offset_x, s.cloud_offset_y,
+                                s.terminator_wrap, s.limb_darkening,
+                                s.band_shear, s.orbital_beaming,
+                                s.forward_scatter, s.band_waves,
+                                s.normal_map, s.properties_map,
+                                s.cloud_map, s.cloud_height,
+                                s.band_drift, s.band_turbulence,
+                                s.limb_darkening_q});
+    if (s.atmo_strength != 0.f)
+      world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
+                                        s.atmo_strength, s.atmo_power,
+                                        s.atmo_night});
+    if (s.visible_range > 0.f)
+      world.add(entity, VisibleRange{s.visible_range, s.visible_fade});
+    if (s.star_kelvin >= 100.0)
+      world.add(entity, StarPhotosphere{s.star_kelvin});
+    if (s.accretion[2] >= 100.f)
+      world.add(entity, AccretionDisc{s.accretion[0], s.accretion[1],
+                                      s.accretion[2], s.accretion[3]});
+    // The volume's emission image is the entity texture — without one
+    // the component would export a `volume` block that fails to parse.
+    if (s.volume_depth > 0.f && !s.texture.empty())
+      world.add(entity,
+                EmissionVolume{s.volume_depth, s.volume_density,
+                               s.volume_seed, s.volume_scatter,
+                               s.volume_steps, s.volume_flow,
+                               s.volume_distort, s.volume_blend,
+                               s.volume_image2, s.volume_occlude,
+                               s.volume_flow_rate});
+    if (!s.lod_meshes.empty() || !s.lod_group.empty())
+      world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels, s.lod_fade,
+                                 s.lod_group, s.lod_proxy,
+                                 s.lod_proxy_pixels});
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
@@ -721,6 +1062,83 @@ Scene3dDocument scene3d_from_world(const World &world) {
     if (const auto *tx = world.get<TextureRef>(entity))
       s.texture = tx->value;
     s.double_sided = world.get<DoubleSided>(entity) != nullptr;
+    if (const auto *p = world.get<MaterialPbr>(entity)) {
+      s.metallic = p->metallic;
+      s.roughness = p->roughness;
+      s.emissive_strength = p->emissive_strength;
+      s.night_emissive = p->night_emissive;
+      s.environment_strength = p->environment_strength;
+      s.emissive_r = p->emissive_r;
+      s.emissive_g = p->emissive_g;
+      s.emissive_b = p->emissive_b;
+      s.alpha_cutout = p->alpha_cutout;
+      s.uv_tile_x = p->uv_tile_x;
+      s.uv_tile_y = p->uv_tile_y;
+      s.metallic_roughness = p->metallic_roughness;
+      s.emissive = p->emissive;
+      s.environment = p->environment;
+    }
+    if (const auto *sf = world.get<MaterialSurface>(entity)) {
+      s.normal_map = sf->normal_map;
+      s.properties_map = sf->properties_map;
+      s.cloud_map = sf->cloud_map;
+      s.normal_strength = sf->normal_strength;
+      s.relief = sf->relief;
+      s.cloud_opacity = sf->cloud_opacity;
+      s.cloud_albedo = sf->cloud_albedo;
+      s.cloud_offset_x = sf->cloud_offset_x;
+      s.cloud_offset_y = sf->cloud_offset_y;
+      s.terminator_wrap = sf->terminator_wrap;
+      s.limb_darkening = sf->limb_darkening;
+      s.band_shear = sf->band_shear;
+      s.orbital_beaming = sf->orbital_beaming;
+      s.forward_scatter = sf->forward_scatter;
+      s.band_waves = sf->band_waves;
+      s.cloud_height = sf->cloud_height;
+      s.band_drift = sf->band_drift;
+      s.band_turbulence = sf->band_turbulence;
+      s.limb_darkening_q = sf->limb_darkening_q;
+    }
+    if (const auto *at = world.get<AtmosphereShell>(entity)) {
+      s.atmo_r = at->r;
+      s.atmo_g = at->g;
+      s.atmo_b = at->b;
+      s.atmo_strength = at->strength;
+      s.atmo_power = at->power;
+      s.atmo_night = at->night_floor;
+    }
+    if (const auto *vr = world.get<VisibleRange>(entity)) {
+      s.visible_range = vr->range;
+      s.visible_fade = vr->fade;
+    }
+    if (const auto *sp = world.get<StarPhotosphere>(entity))
+      s.star_kelvin = sp->kelvin;
+    if (const auto *ad = world.get<AccretionDisc>(entity))
+      s.accretion = {ad->inner, ad->outer, ad->kelvin, ad->beaming};
+    // An orphan volume (no TextureRef) would emit a `volume` block the
+    // parser rejects — skip it rather than write an unloadable document.
+    if (const auto *ev = world.get<EmissionVolume>(entity);
+        ev && !s.texture.empty()) {
+      s.volume_depth = ev->depth;
+      s.volume_density = ev->density;
+      s.volume_seed = ev->seed;
+      s.volume_scatter = ev->scatter;
+      s.volume_steps = ev->steps;
+      s.volume_flow = ev->flow;
+      s.volume_distort = ev->distort;
+      s.volume_blend = ev->blend;
+      s.volume_image2 = ev->image2;
+      s.volume_occlude = ev->occlude;
+      s.volume_flow_rate = ev->flow_rate;
+    }
+    if (const auto *ml = world.get<MeshLods>(entity)) {
+      s.lod_meshes = ml->specs;
+      s.lod_pixels = ml->pixels;
+      s.lod_fade = ml->fade;
+      s.lod_group = ml->group;
+      s.lod_proxy = ml->proxy;
+      s.lod_proxy_pixels = ml->group_pixels;
+    }
     if (const auto *g = world.get<GravityScale>(entity))
       s.gravity_scale = g->value;
     s.solid = world.get<Solid>(entity) != nullptr;

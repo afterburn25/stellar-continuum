@@ -232,6 +232,10 @@ struct RuntimeHost::Impl {
   float light3_intensity = 1.f;
   // Up to two extra world-space directional lights from the document.
   std::vector<Scene3dLight> lights3;
+  std::vector<Scene3dPointLight> point_lights3;
+  native_map::RenderOptions3D render3;
+  std::optional<native_map::ShadowMap3D> shadow3;
+  std::shared_ptr<const RgbaImage> environment3;
   float gravity3 = 0.f, ground_y3 = 0.f, bounds3 = 0.f;
   bool look_held = false; // right-button mouse-look
   // Input journaling: --record fills `recorder` with frame-indexed input
@@ -1133,6 +1137,44 @@ int RuntimeHost::run() {
     impl.light3 = {doc.light_x, doc.light_y, doc.light_z};
     impl.light3_intensity = doc.light_intensity;
     impl.lights3 = doc.lights;
+    impl.point_lights3 = doc.point_lights;
+    impl.render3.exposure = doc.exposure;
+    impl.render3.bloom_strength = doc.bloom;
+    impl.render3.bloom_threshold = doc.bloom_threshold;
+    impl.render3.contrast = doc.contrast;
+    impl.render3.saturation = doc.saturation;
+    impl.render3.sharpen = doc.sharpen;
+    impl.render3.vignette = doc.vignette;
+    impl.render3.quality =
+        doc.quality == "low"      ? native_map::RenderQuality3D::Low
+        : doc.quality == "medium" ? native_map::RenderQuality3D::Medium
+        : doc.quality == "ultra"  ? native_map::RenderQuality3D::Ultra
+                                  : native_map::RenderQuality3D::High;
+    impl.render3.debug_view =
+        doc.debug_view == "unlit"     ? native_map::DebugView3D::Unlit
+        : doc.debug_view == "albedo"  ? native_map::DebugView3D::Albedo
+        : doc.debug_view == "normals" ? native_map::DebugView3D::Normals
+        : doc.debug_view == "roughness"
+            ? native_map::DebugView3D::Roughness
+        : doc.debug_view == "metallic"  ? native_map::DebugView3D::Metallic
+        : doc.debug_view == "emissive"  ? native_map::DebugView3D::Emissive
+        : doc.debug_view == "lighting"
+            ? native_map::DebugView3D::LightingOnly
+        : doc.debug_view == "lod"       ? native_map::DebugView3D::Lod
+        : doc.debug_view == "residency" ? native_map::DebugView3D::Residency
+                                      : native_map::DebugView3D::Lit;
+    if (doc.shadow_extent > 0.f) {
+      native_map::ShadowMap3D map{};
+      map.extent = doc.shadow_extent;
+      map.distance = doc.shadow_distance;
+      map.depth = doc.shadow_depth;
+      map.strength = doc.shadow_strength;
+      map.bias = doc.shadow_bias;
+      map.resolution = doc.shadow_resolution;
+      impl.shadow3 = map;
+    } else
+      impl.shadow3.reset();
+    impl.environment3 = tex3d_of(doc.environment);
     impl.gravity3 = doc.gravity;
     impl.ground_y3 = doc.ground_y;
     impl.bounds3 = doc.bounds;
@@ -1145,6 +1187,18 @@ int RuntimeHost::run() {
       if (mr) mesh_of(mr->spec);
       const auto *tr = world.get<TextureRef>(impl.entities3d[i]);
       if (tr) tex3d_of(tr->value);
+      if (const auto *pbr = world.get<MaterialPbr>(impl.entities3d[i])) {
+        tex3d_of(pbr->metallic_roughness);
+        tex3d_of(pbr->emissive);
+        tex3d_of(pbr->environment);
+      }
+      if (const auto *sf = world.get<MaterialSurface>(impl.entities3d[i])) {
+        tex3d_of(sf->normal_map);
+        tex3d_of(sf->properties_map);
+        tex3d_of(sf->cloud_map);
+      }
+      if (const auto *vol = world.get<EmissionVolume>(impl.entities3d[i]))
+        tex3d_of(vol->image2);
       if (on_spawn3d && i < doc.entities.size())
         on_spawn3d(world, impl.entities3d[i], doc.entities[i]);
       attach_vfx(impl.entities3d[i]);
@@ -1517,6 +1571,9 @@ int RuntimeHost::run() {
     const auto now = std::chrono::steady_clock::now();
     const float dt = std::chrono::duration<float>(now - last).count();
     last = now;
+    // Scene time drives animated material terms (band drift, volume
+    // flow) — scaled like the simulation clock so --speed slows both.
+    impl.render3.time += dt * static_cast<float>(impl.time_scale);
     if (now - scene_poll > std::chrono::milliseconds(500)) {
       scene_poll = now;
       reload_scene();
@@ -2464,13 +2521,113 @@ int RuntimeHost::run() {
         const auto *tint = world.get<Tint>(e);
         const auto *op = world.get<Opacity>(e);
         const auto *tex = world.get<TextureRef>(e);
-        inst.material.tint = tint ? Color{tint->r, tint->g, tint->b, 255}
-                                : Color{255, 255, 255, 255};
+        // Spectral-class preset seeds the material; authored components
+        // below still override individual fields.
+        if (const auto *sp = world.get<StarPhotosphere>(e);
+            sp && sp->kelvin >= 100.0)
+          inst.material = star_photosphere3d(sp->kelvin);
+        // Accretion-disc preset seeds a generated radial texture +
+        // response; authored components below still override fields.
+        if (const auto *ad = world.get<AccretionDisc>(e);
+            ad && ad->inner > 0.f && ad->outer > ad->inner &&
+            ad->kelvin >= 100.f && ad->kelvin <= 100000.f &&
+            std::abs(ad->beaming) <= 1.f)
+          inst.material = accretion_disc_material3d(
+              ad->inner, ad->outer, ad->kelvin, ad->beaming);
+        if (tint)
+          inst.material.tint = Color{tint->r, tint->g, tint->b, 255};
         inst.material.opacity = op ? op->value : 1.f;
         inst.material.transparent = inst.material.opacity < 1.f;
-        inst.material.texture = tex ? tex3d_of(tex->value) : nullptr;
+        // A missing TextureRef keeps a preset-generated texture.
+        if (tex) inst.material.texture = tex3d_of(tex->value);
         inst.material.double_sided =
             world.get<DoubleSided>(e) != nullptr;
+        if (const auto *pbr = world.get<MaterialPbr>(e)) {
+          native_map::PbrSurface3D surface;
+          surface.metallic = pbr->metallic;
+          surface.roughness = pbr->roughness;
+          surface.emissive_strength = pbr->emissive_strength;
+          surface.night_emissive = pbr->night_emissive;
+          surface.environment_strength = pbr->environment_strength;
+          surface.emissive_tint = {pbr->emissive_r, pbr->emissive_g,
+                                   pbr->emissive_b};
+          surface.metallic_roughness = tex3d_of(pbr->metallic_roughness);
+          surface.emissive = tex3d_of(pbr->emissive);
+          surface.environment = tex3d_of(pbr->environment);
+          inst.material.pbr = surface;
+          inst.material.alpha_threshold = pbr->alpha_cutout;
+          inst.material.texture_tiling = {pbr->uv_tile_x, pbr->uv_tile_y};
+        }
+        if (const auto *sf = world.get<MaterialSurface>(e)) {
+          native_map::SurfaceResponse3D response;
+          response.normal = tex3d_of(sf->normal_map);
+          response.properties = tex3d_of(sf->properties_map);
+          response.cloud_shadow = tex3d_of(sf->cloud_map);
+          response.normal_strength = sf->normal_strength;
+          response.relief = sf->relief;
+          response.cloud_opacity = sf->cloud_opacity;
+          response.cloud_albedo = sf->cloud_albedo;
+          response.cloud_height = sf->cloud_height;
+          response.cloud_offset = {sf->cloud_offset_x, sf->cloud_offset_y};
+          if (response.normal || response.properties ||
+              response.cloud_shadow)
+            inst.material.surface_response = response;
+          inst.material.terminator_wrap = sf->terminator_wrap;
+          inst.material.limb_darkening = sf->limb_darkening;
+          inst.material.limb_darkening_q = sf->limb_darkening_q;
+          inst.material.band_shear = sf->band_shear;
+          inst.material.band_waves = sf->band_waves;
+          inst.material.band_drift = sf->band_drift;
+          inst.material.band_turbulence = sf->band_turbulence;
+          inst.material.orbital_beaming = sf->orbital_beaming;
+          inst.material.forward_scatter = sf->forward_scatter;
+        }
+        if (const auto *at = world.get<AtmosphereShell>(e))
+          inst.material.atmosphere =
+              native_map::Atmosphere3D{{at->r, at->g, at->b}, at->strength,
+                                       at->power, at->night_floor};
+        // Emission volume: the entity's own texture is the emission
+        // image and the volume branch requires transparency — a missing
+        // texture drops the component rather than failing the instance.
+        if (const auto *vol = world.get<EmissionVolume>(e);
+            vol && inst.material.texture) {
+          native_map::SurfaceEffect3D effect;
+          effect.next_texture = inst.material.texture;
+          effect.volume_depth = vol->depth;
+          effect.volume_density = vol->density;
+          effect.volume_seed = vol->seed;
+          effect.volume_steps = vol->steps;
+          effect.volume_scatter = vol->scatter;
+          effect.flow_phase = vol->flow;
+          effect.distortion = vol->distort;
+          effect.blend = vol->blend;
+          effect.occlude = vol->occlude;
+          effect.flow_rate = vol->flow_rate;
+          // image2 overrides next_texture for the blend lane; an
+          // unloadable path keeps the entity texture (blend no-ops).
+          if (const auto alt = tex3d_of(vol->image2))
+            effect.next_texture = alt;
+          inst.material.surface_effect = effect;
+          inst.material.transparent = true;
+        }
+        if (const auto *vr = world.get<VisibleRange>(e)) {
+          inst.visible_range = vr->range;
+          inst.visible_fade = vr->fade;
+        }
+        if (const auto *ml = world.get<MeshLods>(e)) {
+          inst.lod_pixels = ml->pixels;
+          inst.lod_fade = ml->fade;
+          // Unresolvable specs drop that level — the authored mesh and
+          // any levels that did resolve still render.
+          for (const auto &spec : ml->specs)
+            if (auto lod_mesh = mesh_of(spec)) inst.lod_meshes.push_back(lod_mesh);
+          if (inst.lod_meshes.empty()) inst.lod_pixels = 32.f;
+          inst.lod_group = ml->group;
+          inst.lod_group_pixels = ml->group_pixels;
+          // An unresolvable proxy spec drops the collapse, not the group.
+          if (auto proxy = mesh_of(ml->proxy))
+            inst.lod_group_proxy = std::move(proxy);
+        }
         inst.material.light_intensity = impl.light3_intensity;
         inst.material.linear_light = true;
         instances.push_back(std::move(inst));
@@ -2489,11 +2646,22 @@ int RuntimeHost::run() {
               rotate_vec(inv, {l.dir_x, l.dir_y, l.dir_z}),
               {l.r, l.g, l.b}, l.intensity};
         }
-      if (auto scene =
-              Scene3D::create(cam, std::move(instances), light_cam))
-        draw.overlay.insert(
-            draw.overlay.begin() + 1,
-            Scene3DView{std::move(scene), {0, 0, w, h}});
+      std::vector<PointLight3D> point_lights;
+      point_lights.reserve(impl.point_lights3.size());
+      for (const auto &l : impl.point_lights3)
+        point_lights.push_back(PointLight3D{{l.x, l.y, l.z},
+                                            {l.r, l.g, l.b},
+                                            l.intensity, l.range,
+                                            {l.spot_x, l.spot_y, l.spot_z},
+                                            l.spot_inner, l.spot_outer,
+                                            l.cast_shadow});
+      if (auto scene = Scene3D::create(cam, std::move(instances),
+                                       light_cam, std::move(point_lights),
+                                       impl.shadow3, impl.environment3)) {
+        Scene3DView view{std::move(scene), {0, 0, w, h}};
+        view.options = impl.render3;
+        draw.overlay.insert(draw.overlay.begin() + 1, std::move(view));
+      }
     }
     // Draw in layer order (stable — same-layer entities keep spawn order).
     std::vector<std::size_t> order(impl.entities.size());

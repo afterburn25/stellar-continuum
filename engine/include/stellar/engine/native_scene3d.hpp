@@ -47,9 +47,18 @@ class Mesh3D final {
   [[nodiscard]] static std::shared_ptr<const Mesh3D> create(
       std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices);
   [[nodiscard]] static std::shared_ptr<const Mesh3D> uv_sphere(int columns=128,int rows=64);
+  // A camera-facing quad (width × height, centred at origin, normal +Z,
+  // full uv range). Cards drop their view-space rotation at draw time,
+  // so they work as the last LOD level of a mesh chain (impostor) or as
+  // a primary marker/sprite mesh. Use the `card:w,h` mesh spec to
+  // author one from a scene document.
+  [[nodiscard]] static std::shared_ptr<const Mesh3D> billboard_card(float width=1.f,float height=1.f);
   [[nodiscard]] const auto& vertices()const noexcept{return vertices_;}
   [[nodiscard]] const auto& indices()const noexcept{return indices_;}
   [[nodiscard]] float bounding_radius()const noexcept{return radius_;}
+  // Cards draw camera-facing: the renderer collapses their view-space
+  // rotation to uniform scale, keeping position, scale and depth.
+  [[nodiscard]] bool billboard()const noexcept{return billboard_;}
   // Local-space axis-aligned bounds — collision and ground resting use
   // these (scaled by instance scale) instead of the bounding sphere so
   // boxes collide as boxes.
@@ -57,10 +66,10 @@ class Mesh3D final {
   [[nodiscard]] Vec3 bounds_max()const noexcept{return bounds_max_;}
   [[nodiscard]] std::size_t byte_size()const noexcept{return vertices_.size()*sizeof(Vertex3D)+indices_.size()*sizeof(std::uint32_t);}
  private:
-  Mesh3D(std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices,float radius,Vec3 bounds_min,Vec3 bounds_max)
-      :vertices_(std::move(vertices)),indices_(std::move(indices)),radius_(radius),bounds_min_(bounds_min),bounds_max_(bounds_max){}
+  Mesh3D(std::vector<Vertex3D> vertices,std::vector<std::uint32_t> indices,float radius,Vec3 bounds_min,Vec3 bounds_max,bool billboard=false)
+      :vertices_(std::move(vertices)),indices_(std::move(indices)),radius_(radius),bounds_min_(bounds_min),bounds_max_(bounds_max),billboard_(billboard){}
   std::vector<Vertex3D> vertices_;std::vector<std::uint32_t> indices_;float radius_{};
-  Vec3 bounds_min_{},bounds_max_{};
+  Vec3 bounds_min_{},bounds_max_{};bool billboard_{};
 };
 enum class Projection3D { Perspective,Orthographic };
 struct Camera3D {
@@ -83,10 +92,20 @@ struct Dielectric3D {
   float surface_relief{}; // height as a fraction of the instance scale
 };
 // Optional opaque surface response. Packed properties are roughness, liquid,
-// ice, height. Maps are immutable and count against the shared texture budget.
+// ice, height. Any subset of the maps may be bound — a cloud-only material
+// needs no normal/properties art. The cloud map's alpha both shadows the
+// surface below (cloud_opacity) and can composite its RGB as a visible deck
+// (cloud_albedo), lit like the surface it occludes.
+// Maps are immutable and count against the shared texture budget.
 struct SurfaceResponse3D {
   std::shared_ptr<const RgbaImage> normal,properties,cloud_shadow;
   float normal_strength{.35f},relief{},cloud_opacity{};
+  // [0,1] visible cloud-deck strength; 0 keeps the map shadow-only.
+  float cloud_albedo{};
+  // Deck altitude in object units [0,.1]: raises the cloud layer off the
+  // surface for view parallax, displaced ground shadows and deck
+  // self-shadowing toward the key light. 0 keeps the texture-space deck.
+  float cloud_height{};
   Point cloud_offset{};
 };
 enum class AnalyticShadowShape3D { Ellipsoid,Annulus };
@@ -106,15 +125,78 @@ struct AnalyticShadow3D {
 struct SurfaceEffect3D {
   std::shared_ptr<const RgbaImage> next_texture;
   float blend{},flow_phase{},distortion{};
+  // Marched-filament churn rate: the volume's flow phase advances by
+  // flow_rate·time each frame so nebulae slowly re-pose instead of
+  // sitting frozen. [-64,64]; 0 keeps the static authored phase.
+  float flow_rate{};
   Vec3 view_sphere_center;float sphere_radius{};
+  // Authorable occlusion sphere: an opaque sphere of `occlude` object-
+  // space units centred on the instance origin — a corona volume stops
+  // shining through its own star. Evaluated per draw in view space;
+  // ignored when `sphere_radius` sets an explicit view-space sphere.
+  // [0,1e5]; 0 disables.
+  float occlude{};
   // Optional image-shaped emission volume. The closed proxy spans local
   // [-.5,.5] x [-.22,.78] x [-volume_depth,volume_depth]; the camera is outside.
   // Zero retains surface rendering. Integration uses local optical distance,
   // so changing zoom/instance scale does not change the plasma density.
   float volume_depth{},volume_density{5.f},volume_seed{};
   int volume_steps{32}; // 8..64 bounded front-to-back emission/absorption samples
+  // Directional single-scatter approximation: the volume limb facing the
+  // scene key light brightens while the far side dims, so a nebula reads
+  // star-lit rather than uniformly self-glowing. [0,1]; 0 keeps pure
+  // emission, 1 maps the limb gradient onto emission strength.
+  float volume_scatter{};
 };
 struct DirectionalLight3D { Vec3 direction{0,0,1},color{1,1,1};float intensity{}; };
+// Metallic-workflow surface response for ordinary materials. The optional
+// packed map follows the glTF convention (G = roughness scale, B = metallic)
+// and modulates the scalar factors; without it the scalars apply directly.
+// The emissive map modulates emissive_tint and can be gated to the body's
+// unlit hemisphere for colony/city lights or engine glow. `environment` is a
+// world-fixed equirect radiance map supplying diffuse irradiance and
+// roughness-aware specular reflection to this material.
+struct PbrSurface3D {
+  std::shared_ptr<const RgbaImage> metallic_roughness;
+  std::shared_ptr<const RgbaImage> emissive;
+  std::shared_ptr<const RgbaImage> environment;
+  float metallic{},roughness{.55f};
+  Vec3 emissive_tint{1,1,1};
+  // 0 = no emission; the emissive map (or white when unbound) modulates
+  // emissive_tint. Materials must opt in — emission is never implicit.
+  float emissive_strength{};
+  // 0 = emit everywhere; 1 = emissive appears only across the terminator.
+  float night_emissive{};
+  // 0 = no environment response; materials opt in to IBL explicitly.
+  float environment_strength{};
+};
+// A scene-level point light evaluated per fragment in view space with
+// windowed inverse-square attenuation. `range` 0 keeps pure falloff.
+// A nonzero `spot_direction` turns it into a spot: `spot_inner` is the
+// full-intensity cone's cosine, `spot_outer` the zero-intensity edge;
+// radiance fades smoothly between them (inner > outer required).
+struct PointLight3D {
+  Position3 position;
+  Vec3 color{1,1,1};
+  float intensity{1.f};
+  float range{};
+  Vec3 spot_direction{0,0,0};
+  float spot_inner{1.f};
+  float spot_outer{1.f};
+  // Shadowed spot: renders the scene's casters once from the light's
+  // perspective into its own depth map (cone frustum, range-bounded).
+  // Spot-only — omni shadows would need a cube map; at most one
+  // shadowed spot light per scene keeps the pass bounded.
+  bool casts_shadow{false};
+};
+inline constexpr std::size_t maximum_scene3d_point_lights=4;
+// Single-scatter limb approximation: a wavelength-tinted shell driven by
+// (1 - N.V)^power, weighted to the day side with a nightside floor. It
+// enhances authored body art rather than replacing it.
+struct Atmosphere3D {
+  Vec3 tint{.45f,.62f,1.f};
+  float strength{1.f},power{3.f},night_floor{.05f};
+};
 struct Material3D {
   std::shared_ptr<const RgbaImage> texture;
   Color tint{255,255,255,255};
@@ -133,6 +215,61 @@ struct Material3D {
   std::optional<AnalyticShadow3D> shadow;
   // Thin particulate sheets can receive diffuse light from either normal side.
   bool two_sided_diffuse{};
+  // Wrap-diffuse terminator: sunlight = max((N.L + w)/(1 + w), 0) instead of
+  // max(N.L, 0), applied to key, additional and point lights alike. Softens
+  // the day/night transition on thick-atmosphere or dusty bodies.
+  // [0,1]; 0 keeps Lambert shading.
+  float terminator_wrap{};
+  // Linear limb darkening for self-luminous bodies: outgoing radiance is
+  // scaled by 1 - u*(1 - N.V) — the Sun's photosphere reads measurably
+  // darker toward the disc edge (u ~= 0.6 for a G2V star), which keeps
+  // HDR emissive discs from looking like flat neon spheres. Applied to
+  // the body's emitted and reflected radiance; the additive atmosphere
+  // rim stays on top. [0,1]; 0 keeps a uniform disc.
+  float limb_darkening{};
+  // Quadratic limb-darkening coefficient: the standard two-term law
+  // 1 - u(1-μ) - q(1-μ)² from transit photometry — the squared term
+  // steepens the falloff at the very edge without touching mid-disc.
+  // [0,1]; 0 keeps the single-coefficient linear profile.
+  float limb_darkening_q{};
+  // Differential rotation for banded bodies (gas giants): a latitude-
+  // weighted longitude shear `u += s·cos(2πv)` applied to every equirect
+  // surface sample — authored bands bow symmetrically equator vs poles,
+  // zero-mean so net longitude registration is preserved. UV units,
+  // [-0.5,0.5]; 0 keeps rectilinear sampling.
+  float band_shear{};
+  // Zonal-wind harmonic for banded bodies: adds a third spatial cosine
+  // to the shear profile, `u += s·(cos(2πv) + w·cos(6πv))` — w = 0 keeps
+  // the single pole-vs-equator profile, w → 1 gives Jupiter-style
+  // alternating mid-latitude jets. Still zero-mean (registration kept)
+  // and hemispherically symmetric. [0,1].
+  float band_waves{};
+  // Zonal drift for banded bodies: scrolls the equirect longitude by
+  // drift·time (super-rotating cloud deck sliding over a fixed limb),
+  // UV units per second, [-0.25,0.25]; 0 keeps the static warp.
+  float band_drift{};
+  // Turbulent evolution for banded bodies: the shear warp gains a
+  // propagating mid-latitude wave cos(4πv + t·rate) at half the shear
+  // amplitude, so the jet profile slowly reshapes instead of staying
+  // a fixed two-harmonic profile — still zero-mean and equator-
+  // symmetric, so map registration is kept. Phase rate in rad/s,
+  // [-8,8]; 0 freezes the warp. Only applies when band_shear != 0.
+  float band_turbulence{};
+  // Orbital beaming: material orbiting local +Y gains a first-order
+  // doppler asymmetry — radiance scales by 1 + s·(v̂·V̂), so the
+  // approaching lane brightens while the receding lane dims. Face-on
+  // discs stay symmetric (velocity is perpendicular to the view);
+  // edge-on discs peak. Accretion discs, ring forward-scatter. [-1,1];
+  // negative spins retrograde; 0 disables.
+  float orbital_beaming{};
+  // Henyey–Greenstein single-scatter phase: radiance scales by
+  // (1−g²)/(1+g²+2g·(V̂·L̂))^(3/2), so g > 0 peaks the sheet when it is
+  // backlit (dusty-ring forward scatter — Saturn E-ring look) with a
+  // lobe that sharpens as |g|→1, and g < 0 inverts to an opposition
+  // backscatter surge (icy regolith). Unit-mean over directions — the
+  // sheet's total luminance is preserved on average; |g| clamps to .95
+  // in the shader so the singular peak stays finite. [-1,1]; 0 disables.
+  float forward_scatter{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;
@@ -144,35 +281,161 @@ struct Material3D {
   // Source-limited Catmull-Rom reconstruction during magnification only.
   // Minification keeps the usual mip/anisotropic anti-aliasing path.
   bool cubic_magnification{};
+  // Metallic-workflow response: scalar or packed-map metallic/roughness GGX,
+  // emissive overlay with an optional night-side gate, and IBL environment
+  // response for this material.
+  std::optional<PbrSurface3D> pbr;
+  // Wavelength-tinted limb scattering shell for planets, moons and giants.
+  std::optional<Atmosphere3D> atmosphere;
+  // Alpha cutout: fragments below the threshold discard instead of sorting
+  // into the transparent batch (antennae, lattices, decals).
+  float alpha_threshold{};
+  // Surface texture UV multiplier — repeat sampling when != (1,1).
+  Point texture_tiling{1.f,1.f};
 };
+// Spectral-class star photosphere preset: blackbody disc tint (sRGB
+// encoded, decoded back to linear by `linear_light`), emissive-dominant
+// response (ambient bypasses light_color so the disc shows the true
+// Planckian color), the body's own blackbody as its material
+// `light_color`, and a temperature-graded linear limb coefficient —
+// convective cool stars darken more; the monotone falloff clamps to the
+// observed [0.2,0.95] envelope. Throws on kelvin outside [100,100000].
+[[nodiscard]] Material3D star_photosphere3d(double kelvin);
+// Accretion disc material for an `annulus_mesh(inner,outer)` — a
+// Shakura–Sunyaev radial profile generated into the surface texture:
+// T(r) = T_inner·(r/inner)^(−3/4) mapped through the blackbody curve,
+// with emitted flux ∝ T⁴ so the inner edge burns hot while the outer
+// rim cools and dims. Double-sided, emissive-dominant (ambient
+// bypasses light_color), and `orbital_beaming` applies the first-order
+// doppler asymmetry — the approaching lane reads brighter, which is the
+// signature look of a relativistic disc. beaming in [-1,1].
+[[nodiscard]] Material3D accretion_disc_material3d(
+    float inner_radius, float outer_radius, double kelvin,
+    float beaming = .85f);
 struct MeshInstance3D {
   std::shared_ptr<const Mesh3D> mesh;
   Position3 position;
   Quaternion rotation;
   float scale{1.f}; // 1e-8..1e5 uniform scale keeps normals well-defined
   Material3D material;
+  // Distance culling: the instance drops out when the camera sits farther
+  // than this from the sphere surface — distant impostor/LOD hand-off and
+  // fleet-scale budget policy. 0 keeps the instance visible at any range.
+  float visible_range{};
+  // Screen-door fade-out width ahead of the range cull, as a fraction of
+  // visible_range [0,0.5]. Inside the band the draw keeps a shrinking
+  // share of its pixels through the same deterministic per-pixel mask as
+  // the LOD crossfade — no alpha blending, no extra submission. The fade
+  // completes exactly at the existing range+radius cull edge, so the
+  // authored disappearance distance is unchanged. 0 keeps the hard cut.
+  float visible_fade{.15f};
+  // Optional screen-space LOD chain: lod_meshes[i] substitutes for `mesh`
+  // once the projected bounding-sphere diameter drops below
+  // lod_pixels/2^i pixels in the view being drawn — a 64px cruiser can
+  // fall back to a 32px proxy mesh without an authored distance table.
+  // Selection is per-view; shadow casters always take the full mesh since
+  // the shadow volume is camera-independent. At most 8 levels.
+  std::vector<std::shared_ptr<const Mesh3D>> lod_meshes;
+  float lod_pixels{32.f};
+  // Screen-door transition width above each LOD threshold, as a
+  // fraction of that threshold [0,0.5]. Inside the band the view
+  // submits both neighbouring levels with complementary keep
+  // probabilities — the fragment shader discards a deterministic
+  // per-pixel pattern, so opaque geometry crossfades without alpha
+  // blending or a second pass. 0 keeps the hard switch.
+  float lod_fade{.15f};
+  // Named group proxy: when the merged view-space bounding sphere of
+  // the group's contributing members projects below lod_group_pixels,
+  // they collapse into one view-aligned lod_group_proxy draw placed at
+  // the merged centre, scaled to cover it, and shaded with the
+  // representative member's material — a fleet/cluster impostor for
+  // extreme zoom-out. The representative's lod_fade widens the collapse
+  // into a screen-door transition band (members thin 1-p, proxy keeps
+  // the complementary p); lod_fade=0 or Low tier keeps the hard switch.
+  // Empty group or null proxy disables.
+  std::string lod_group;
+  std::shared_ptr<const Mesh3D> lod_group_proxy;
+  float lod_group_pixels{0.f};
+};
+// Directional shadow map for the scene key light. Instead of fitting the
+// camera frustum, the ortho coverage box centres `distance` world units
+// along the camera forward axis — the authored extent picks how much of a
+// strategy scene is shadowed, and receivers outside it stay lit. Rendered
+// as a depth-only pass at `resolution` (0 = per-tier default); Low tier
+// skips it entirely. Analytic blockers and point lights are unaffected.
+struct ShadowMap3D {
+  float extent{64.f};    // half-extent of the ortho box, world units
+  float distance{64.f};  // box centre distance along camera forward
+  float depth{256.f};    // light-axis depth of the shadow volume
+  float strength{1.f};   // 0..1 darkness applied to the key light
+  float bias{0.0005f};   // receiver-side depth bias in shadow-NDC units
+  std::uint32_t resolution{0}; // 0 = tier default (1024/2048/4096)
 };
 class Scene3D final {
  public:
   [[nodiscard]] static std::shared_ptr<const Scene3D> create(
-      Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light_direction={.42f,.2f,.87f});
+      Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light_direction={.42f,.2f,.87f},
+      std::vector<PointLight3D> point_lights={},std::optional<ShadowMap3D> shadow_map=std::nullopt,
+      std::shared_ptr<const RgbaImage> environment={});
   [[nodiscard]] const auto& camera()const noexcept{return camera_;}
   [[nodiscard]] const auto& instances()const noexcept{return instances_;}
   [[nodiscard]] Vec3 light_direction()const noexcept{return light_;} // camera space
+  // World-space point lights (station floods, engine glow); at most
+  // maximum_scene3d_point_lights are evaluated.
+  [[nodiscard]] const auto& point_lights()const noexcept{return point_lights_;}
+  [[nodiscard]] const auto& shadow_map()const noexcept{return shadow_map_;}
+  // Scene-level environment probe: fills the equirect IBL slot for
+  // PBR materials that opt in with environment_strength but author no
+  // map of their own (a system view's shared starfield). Dielectrics
+  // are unaffected — validation already requires their authored map.
+  [[nodiscard]] const auto& environment()const noexcept{return environment_;}
  private:
-  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light)
-      :camera_(camera),instances_(std::move(instances)),light_(light){}
-  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;
+  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map,std::shared_ptr<const RgbaImage> environment)
+      :camera_(camera),instances_(std::move(instances)),light_(light),point_lights_(std::move(point_lights)),shadow_map_(std::move(shadow_map)),environment_(std::move(environment)){}
+  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;std::vector<PointLight3D> point_lights_;std::optional<ShadowMap3D> shadow_map_;std::shared_ptr<const RgbaImage> environment_;
 };
 struct PreparedInstance3D { Matrix4 model_view,model_view_projection;float camera_depth{};bool visible{}; };
 // Conservative sphere/frustum test, camera-relative matrices; no GPU required.
 [[nodiscard]] PreparedInstance3D prepare_instance3d(const Camera3D&,const MeshInstance3D&,float aspect);
+// Screen-space LOD level for a projected bounding-sphere diameter in
+// pixels: 0 keeps the full mesh, i>0 selects lod_meshes[i-1]. Pure
+// policy shared by the texture-streamer demand and the draw submission
+// so both agree which level is resident this frame.
+[[nodiscard]] std::size_t select_lod3d_level(const MeshInstance3D&,float projected_diameter_px)noexcept;
+// Coarse-level share of the screen-door transition, [0,1). Returns 0
+// outside the band and when no coarser level exists; p > 0 means the
+// view should also draw lod_meshes[level] with keep probability p while
+// the selected level keeps 1-p. Shared by the draw submission and the
+// streamer demand so both charge the same resident levels.
+[[nodiscard]] float lod3d_fade_share(const MeshInstance3D&,float projected_diameter_px)noexcept;
+// The camera's clip-space projection — the same matrix prepare_instance3d
+// composes into model_view_projection. The GPU backend rebuilds an MVP
+// with it when a billboard mesh collapses the view-space rotation.
+[[nodiscard]] Matrix4 projection3d_matrix(const Camera3D&,float aspect)noexcept;
 struct PreparedShadow3D { Matrix4 from_model;Vec3 light; };
 // Light is the resolved camera-space direction. Local geometry stays precise
 // even when both blocker and receiver are at astronomical world coordinates.
 [[nodiscard]] PreparedShadow3D prepare_shadow3d(const Camera3D&,const MeshInstance3D&,Vec3 light);
 struct Scene3DStatistics {
   std::uint64_t mesh_uploads{},texture_uploads{},draw_calls{},culled_instances{};
+  // Instanced batches submitted this frame — diverges from draw_calls only
+  // in counting (they are equal), kept for fleet-scale batching audits.
+  std::uint64_t draw_batches{},submitted_instances{};
+  // Instances written to the directional shadow map this frame (post
+  // volume/visible_range culling) — the shadow-pass workload audit counter.
+  std::uint64_t shadow_casters{};
+  // Instances drawn below LOD level 0 this frame — the screen-space LOD
+  // workload audit counter for fleet-scale scenes.
+  std::uint64_t lod_instances{};
+  // Instances inside a screen-door LOD transition band this frame —
+  // each submits a second draw with a complementary keep probability.
+  std::uint64_t lod_fades{};
+  // Instances drawing inside the visible-range fade band this frame —
+  // single thinned draws, no paired submission.
+  std::uint64_t visible_fades{};
+  // Group members replaced by a merged proxy draw this frame — the
+  // fleet/cluster-impostor workload audit counter.
+  std::uint64_t lod_groups{};
   std::size_t mesh_cache_entries{},mesh_cache_bytes{},texture_cache_entries{},texture_cache_bytes{},target_bytes{};
   // Binds served by the pinned fallback because the TextureStreamer denied
   // residency under the frame's byte budget (budget-pressure pop-in count).

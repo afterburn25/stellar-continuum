@@ -399,6 +399,66 @@ int main() {
     cube.data = "loot:gold";
     cube.parent = "ship";
     cube.vfx = "trail";
+    cube.metallic = 0.9f;
+    cube.roughness = 0.3f;
+    cube.metallic_roughness = "models/crate_mr.png";
+    cube.emissive = "models/crate_glow.png";
+    cube.emissive_strength = 2.5f;
+    cube.emissive_r = 1.f;
+    cube.emissive_g = 0.4f;
+    cube.emissive_b = 0.1f;
+    cube.night_emissive = 1.f;
+    cube.environment = "sky/nebula.png";
+    cube.environment_strength = 0.8f;
+    cube.alpha_cutout = 0.5f;
+    cube.uv_tile_x = 2.f;
+    cube.uv_tile_y = 4.f;
+    cube.atmo_strength = 1.5f;
+    cube.atmo_power = 2.5f;
+    cube.atmo_night = 0.1f;
+    cube.atmo_r = 0.3f;
+    cube.atmo_g = 0.5f;
+    cube.atmo_b = 0.9f;
+    cube.visible_range = 250.f;
+    cube.visible_fade = .1f;
+    cube.normal_map = "maps/crate_n.png";
+    cube.properties_map = "maps/crate_p.png";
+    cube.cloud_map = "maps/crate_clouds.png";
+    cube.normal_strength = 0.8f;
+    cube.relief = 0.01f;
+    cube.cloud_opacity = 0.6f;
+    cube.cloud_albedo = 0.7f;
+    cube.cloud_height = 0.04f;
+    cube.cloud_offset_x = 0.25f;
+    cube.cloud_offset_y = -0.5f;
+    cube.terminator_wrap = 0.4f;
+    cube.limb_darkening = 0.6f;
+    cube.limb_darkening_q = 0.35f;
+    cube.band_shear = -0.25f;
+    cube.band_waves = 0.6f;
+    cube.band_drift = 0.08f;
+    cube.band_turbulence = 1.25f;
+    cube.orbital_beaming = 0.7f;
+    cube.star_kelvin = 3200.0;
+    cube.accretion = {0.4f, 1.f, 9000.f, 0.8f};
+    cube.forward_scatter = 0.5f;
+    cube.volume_depth = 0.3f;
+    cube.volume_density = 6.f;
+    cube.volume_seed = 2.f;
+    cube.volume_steps = 24;
+    cube.volume_scatter = 0.5f;
+    cube.volume_flow = 1.5f;
+    cube.volume_distort = 0.05f;
+    cube.volume_blend = 0.4f;
+    cube.volume_image2 = "maps/nebula_b.png";
+    cube.volume_occlude = 0.6f;
+    cube.volume_flow_rate = 0.4f;
+    cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
+    cube.lod_pixels = 48.f;
+    cube.lod_fade = 0.3f;
+    cube.lod_group = "fleet";
+    cube.lod_proxy = "card:4,4";
+    cube.lod_proxy_pixels = 24.f;
     scene.entities.push_back(cube);
     engine::Scene3dEntity ship;
     ship.name = "ship";
@@ -436,6 +496,29 @@ int main() {
     fill.b = 1.0f;
     fill.intensity = 0.6f;
     scene.lights.push_back(fill);
+    engine::Scene3dPointLight lamp;
+    lamp.x = 1.f; lamp.y = 2.f; lamp.z = -1.f;
+    lamp.r = 0.2f; lamp.g = 1.f; lamp.b = 0.4f;
+    lamp.intensity = 3.f;
+    lamp.range = 12.f;
+    lamp.spot_x = 0.f; lamp.spot_y = 0.f; lamp.spot_z = -1.f;
+    lamp.spot_inner = 0.97f; lamp.spot_outer = 0.9f;
+    scene.point_lights.push_back(lamp);
+    scene.exposure = 1.25f;
+    scene.bloom = 0.6f;
+    scene.bloom_threshold = 0.8f;
+    scene.contrast = 1.1f;
+    scene.saturation = 0.9f;
+    scene.sharpen = 0.3f;
+    scene.vignette = 0.4f;
+    scene.quality = "ultra";
+    scene.debug_view = "normals";
+    scene.shadow_extent = 32.f;
+    scene.shadow_distance = 48.f;
+    scene.shadow_depth = 128.f;
+    scene.shadow_strength = 0.7f;
+    scene.shadow_bias = 0.001f;
+    scene.shadow_resolution = 2048;
     const auto reparsed =
         engine::Scene3dDocument::from_json(scene.to_json());
     check(reparsed.has_value(), "scene3d json round-trips");
@@ -482,6 +565,77 @@ int main() {
                 reparsed->lights[0].b == 1.0f &&
                 reparsed->lights[0].intensity == 0.6f,
             "scene3d fill light round-trips");
+      check(rc.metallic == 0.9f && rc.roughness == 0.3f &&
+                rc.metallic_roughness == "models/crate_mr.png" &&
+                rc.emissive == "models/crate_glow.png" &&
+                rc.emissive_strength == 2.5f && rc.emissive_r == 1.f &&
+                rc.emissive_g == 0.4f && rc.emissive_b == 0.1f &&
+                rc.night_emissive == 1.f &&
+                rc.environment == "sky/nebula.png" &&
+                rc.environment_strength == 0.8f && rc.alpha_cutout == 0.5f &&
+                rc.uv_tile_x == 2.f && rc.uv_tile_y == 4.f &&
+                rc.atmo_strength == 1.5f && rc.atmo_power == 2.5f &&
+                rc.atmo_night == 0.1f && rc.atmo_r == 0.3f &&
+                rc.atmo_g == 0.5f && rc.atmo_b == 0.9f &&
+                rc.visible_range == 250.f && rc.visible_fade == .1f,
+            "scene3d pbr/atmosphere/cull fields round-trip");
+      check(rc.normal_map == "maps/crate_n.png" &&
+                rc.properties_map == "maps/crate_p.png" &&
+                rc.cloud_map == "maps/crate_clouds.png" &&
+                rc.normal_strength == 0.8f && rc.relief == 0.01f &&
+                rc.cloud_opacity == 0.6f && rc.cloud_albedo == 0.7f &&
+                rc.cloud_height == 0.04f &&
+                rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
+                rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f &&
+                rc.limb_darkening_q == 0.35f &&
+                rc.band_shear == -0.25f && rc.band_waves == 0.6f &&
+                rc.band_drift == 0.08f && rc.band_turbulence == 1.25f &&
+                rc.orbital_beaming == 0.7f &&
+                rc.star_kelvin == 3200.0 && rc.accretion[0] == 0.4f &&
+                rc.accretion[1] == 1.f && rc.accretion[2] == 9000.f &&
+                rc.accretion[3] == 0.8f && rc.forward_scatter == 0.5f,
+            "scene3d surface-response fields round-trip");
+      check(rc.lod_meshes.size() == 2 &&
+                rc.lod_meshes[0] == "models/crate_mid.obj" &&
+                rc.lod_meshes[1] == "models/crate_low.obj" &&
+                rc.lod_pixels == 48.f && rc.lod_fade == 0.3f,
+            "scene3d mesh LOD chain round-trips");
+      check(rc.lod_group == "fleet" && rc.lod_proxy == "card:4,4" &&
+                rc.lod_proxy_pixels == 24.f,
+            "scene3d group proxy fields round-trip");
+      check(rc.volume_depth == 0.3f && rc.volume_density == 6.f &&
+                rc.volume_seed == 2.f && rc.volume_steps == 24 &&
+                rc.volume_scatter == 0.5f && rc.volume_flow == 1.5f &&
+                rc.volume_distort == 0.05f && rc.volume_blend == 0.4f &&
+                rc.volume_image2 == "maps/nebula_b.png" &&
+                rc.volume_occlude == 0.6f && rc.volume_flow_rate == 0.4f,
+            "scene3d emission-volume block round-trips");
+      check(reparsed->point_lights.size() == 1 &&
+                reparsed->point_lights[0].x == 1.f &&
+                reparsed->point_lights[0].z == -1.f &&
+                reparsed->point_lights[0].g == 1.f &&
+                reparsed->point_lights[0].intensity == 3.f &&
+                reparsed->point_lights[0].range == 12.f &&
+                reparsed->point_lights[0].spot_z == -1.f &&
+                reparsed->point_lights[0].spot_inner == 0.97f &&
+                reparsed->point_lights[0].spot_outer == 0.9f,
+            "scene3d point lights round-trip");
+      check(reparsed->exposure == 1.25f && reparsed->bloom == 0.6f &&
+                reparsed->bloom_threshold == 0.8f &&
+                reparsed->contrast == 1.1f && reparsed->saturation == 0.9f &&
+                reparsed->sharpen == 0.3f && reparsed->vignette == 0.4f &&
+                reparsed->quality == "ultra" &&
+                reparsed->debug_view == "normals",
+            "scene3d render options round-trip");
+      check(reparsed->shadow_extent == 32.f && reparsed->shadow_distance == 48.f &&
+                reparsed->shadow_depth == 128.f && reparsed->shadow_strength == 0.7f &&
+                reparsed->shadow_bias == 0.001f && reparsed->shadow_resolution == 2048,
+            "scene3d shadow map settings round-trip");
+      check(reparsed->entities[1].metallic == 0.f &&
+                reparsed->entities[1].emissive_strength == 0.f &&
+                reparsed->entities[1].atmo_strength == 0.f &&
+                reparsed->entities[1].environment.empty(),
+            "unset material fields keep neutral defaults");
       const auto path = root / "editor" / "scene3d.json";
       scene.save(path);
       const auto loaded = engine::Scene3dDocument::load(path);
@@ -513,6 +667,229 @@ int main() {
     check(!engine::Scene3dDocument::load(root / "nonexistent3d.json")
               .has_value(),
           "scene3d missing file rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"quality":"extreme"}})")
+              .has_value(),
+          "scene3d unknown quality tier rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"depth":0}}})")
+              .has_value(),
+          "scene3d nonpositive shadow depth rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"strength":2}}})")
+              .has_value(),
+          "scene3d shadow strength above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"resolution":16}}})")
+              .has_value(),
+          "scene3d undersized shadow resolution rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.9,"spotOuter":0.95}]})")
+              .has_value(),
+          "scene3d spot cone with outer>inner rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":1.5}]})")
+              .has_value(),
+          "scene3d spot inner above 1 rejected");
+    check(engine::Scene3dDocument::from_json(
+              R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.97,"spotOuter":0.9}]})")
+              .has_value(),
+          "scene3d valid spot cone rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[],"pointLights":[{"castShadow":true}]})")
+              .has_value(),
+          "scene3d omni castShadow rejected");
+    if (auto shadowed = engine::Scene3dDocument::from_json(
+            R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.97,"spotOuter":0.9,"castShadow":true}]})")) {
+      check(shadowed->point_lights.size() == 1 &&
+                shadowed->point_lights[0].cast_shadow,
+            "scene3d dropped a valid shadowed spot");
+      check(shadowed->to_json().find("castShadow") != std::string::npos,
+            "scene3d did not round-trip castShadow");
+    } else {
+      check(false, "scene3d shadowed spot light rejected");
+    }
+    if (auto probed = engine::Scene3dDocument::from_json(
+            R"({"entities":[],"environment":"visual/starfield-equirect.png"})")) {
+      check(probed->environment == "visual/starfield-equirect.png",
+            "scene3d dropped its environment probe path");
+      check(probed->to_json().find("environment") != std::string::npos,
+            "scene3d did not round-trip the environment key");
+    } else {
+      check(false, "scene3d environment probe rejected");
+    }
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"pointLights":[{},{},{},{},{}]})")
+              .has_value(),
+          "scene3d over-budget point lights rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"debug":"wireframe"}})")
+              .has_value(),
+          "scene3d unknown debug view rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"range":-5}]})")
+              .has_value(),
+          "scene3d negative visible range rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"range":250,"visibleFade":0.7}]})")
+              .has_value(),
+          "scene3d visibleFade above 0.5 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"range":250,"visibleFade":-0.1}]})")
+              .has_value(),
+          "scene3d visibleFade below zero rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"uvTile":[2]}]})")
+              .has_value(),
+          "scene3d short uvTile rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"surface":{"cloudOpacity":0.5}}]})")
+              .has_value(),
+          "scene3d surface without maps rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"surface":{"cloud":"c.png","cloudAlbedo":2}}]})")
+              .has_value(),
+          "scene3d cloud albedo above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"surface":{"cloud":"c.png","cloudHeight":0.5}}]})")
+              .has_value(),
+          "scene3d cloud height above bound rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"terminatorWrap":3}]})")
+              .has_value(),
+          "scene3d terminator wrap above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"limbDarken":1.5}]})")
+              .has_value(),
+          "scene3d limb darkening above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"limbDarkenQ":1.5}]})")
+              .has_value(),
+          "scene3d quadratic limb darkening above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"limbDarkenQ":-0.1}]})")
+              .has_value(),
+          "scene3d quadratic limb darkening below zero rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lods":"a,b"}]})")
+              .has_value(),
+          "scene3d non-array lods rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lods":["a","b"],"lodPixels":0}]})")
+              .has_value(),
+          "scene3d lodPixels below range rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lodFade":0.7}]})")
+              .has_value(),
+          "scene3d lodFade above 0.5 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lodFade":-0.1}]})")
+              .has_value(),
+          "scene3d lodFade below zero rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lodGroup":"f","lodProxyPixels":0}]})")
+              .has_value(),
+          "scene3d lodProxyPixels below range rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"lodGroup":"f","lodProxyPixels":8192}]})")
+              .has_value(),
+          "scene3d lodProxyPixels above range rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandShear":0.9}]})")
+              .has_value(),
+          "scene3d band shear above 0.5 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandWaves":1.2}]})")
+              .has_value(),
+          "scene3d band waves above 1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandWaves":-0.1}]})")
+              .has_value(),
+          "scene3d band waves below 0 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandDrift":0.3}]})")
+              .has_value(),
+          "scene3d band drift above 0.25 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandDrift":-0.3}]})")
+              .has_value(),
+          "scene3d band drift below -0.25 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandTurbulence":9}]})")
+              .has_value(),
+          "scene3d band turbulence above 8 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandTurbulence":-9}]})")
+              .has_value(),
+          "scene3d band turbulence below -8 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"orbitalBeam":-1.2}]})")
+              .has_value(),
+          "scene3d orbital beaming below -1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"starKelvin":80}]})")
+              .has_value(),
+          "scene3d star kelvin below 100 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.5,0.2,8000,0.8]}]})")
+              .has_value(),
+          "scene3d accretion with inverted radii rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,1.5]}]})")
+              .has_value(),
+          "scene3d accretion beaming above 1 rejected");
+    check(engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8]}]})")
+              .has_value(),
+          "scene3d accretion preset rejected a legal disc");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"forwardScatter":1.4}]})")
+              .has_value(),
+          "scene3d forward scatter above 1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.9}}]})")
+              .has_value(),
+          "scene3d volume depth above 0.75 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"volume":{"depth":0.3}}]})")
+              .has_value(),
+          "scene3d volume without an emission texture rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"steps":4}}]})")
+              .has_value(),
+          "scene3d volume steps below 8 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"distort":0.5}}]})")
+              .has_value(),
+          "scene3d volume distort above 0.1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"flow":2e5}}]})")
+              .has_value(),
+          "scene3d volume flow above bound rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"flowRate":80}}]})")
+              .has_value(),
+          "scene3d volume flowRate above bound rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"blend":1.2,"image2":"a.png"}}]})")
+              .has_value(),
+          "scene3d volume blend above 1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"blend":0.5}}]})")
+              .has_value(),
+          "scene3d volume blend without image2 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"image2":5}}]})")
+              .has_value(),
+          "scene3d volume non-string image2 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"occlude":-1}}]})")
+              .has_value(),
+          "scene3d volume negative occlude rejected");
+    check(engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"density":8,"steps":48,"scatter":0.7}}]})")
+              .has_value(),
+          "scene3d volume rejected a legal nebula block");
   }
 
   if (failures == 0) std::cout << "engine_project tests passed\n";

@@ -87,9 +87,44 @@ struct Image {
 };
 class Scene3D;
 struct Scene3DStatistics;
+// Quality policy for a 3D view: gates expensive sampling (bloom taps,
+// sharpen, MSAA). Low must remain correct, just cheaper.
+enum class RenderQuality3D { Low, Medium, High, Ultra };
+// Diagnostic shading for editor/QA views. Lit is the production path;
+// the rest isolate one channel for material and lighting review:
+// Unlit = tinted surface without illumination, Albedo = sampled surface
+// before tint, Normals = view-space normal *0.5+0.5, Roughness/Metallic
+// show the active GGX factors, Emissive = emissive + atmosphere
+// contribution only, LightingOnly = shading with the albedo divided out,
+// Lod = per-draw LOD class tint (gray full mesh, level ramp, magenta
+// group proxy; screen-door bands show their dithered partition),
+// Residency = per-draw texture-residency tint (green full mip 0,
+// lime/amber/orange/red deeper resident tails, magenta pinned fallback).
+enum class DebugView3D {
+  Lit, Unlit, Albedo, Normals, Roughness, Metallic, Emissive, LightingOnly,
+  Lod, Residency
+};
+// Per-view post-processing, all in linear HDR space before the tonemap
+// resolve. Exposure multiplies incoming radiance; bloom reads the HDR mip
+// chain above its soft threshold; sharpen is an unsharp mask amount.
+struct RenderOptions3D {
+  RenderQuality3D quality{RenderQuality3D::High};
+  float exposure{1.f};
+  float bloom_strength{0.f};
+  float bloom_threshold{1.f};
+  float contrast{1.f};   // 0..2 about mid gray
+  float saturation{1.f}; // 0..2
+  float sharpen{0.f};    // 0..1 unsharp amount
+  float vignette{0.f};   // 0..1 post-tonemap corner darkening
+  DebugView3D debug_view{DebugView3D::Lit};
+  // Scene seconds for animated material terms (band_drift, volume
+  // flow_rate); the driving host accumulates it per frame. 0 keeps
+  // every animated term at its authored phase — deterministic captures.
+  float time{0.f};
+};
 // A depth-tested 3D viewport composites at this exact place in either layer.
 // Its geometry stays in 3D; only this destination uses drawable pixels.
-struct Scene3DView { std::shared_ptr<const Scene3D> scene;UiRect destination; };
+struct Scene3DView { std::shared_ptr<const Scene3D> scene;UiRect destination;RenderOptions3D options; };
 using WorldCommand=std::variant<Line,Circle,Text,Image,TriangleMesh,Scene3DView>;
 using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image,TriangleMesh,Scene3DView>;
 // A completed scene is immutable at this boundary. Coordinates are drawable

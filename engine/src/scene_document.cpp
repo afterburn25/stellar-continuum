@@ -4,6 +4,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cmath>
 #include <fstream>
 #include <iterator>
 #include <span>
@@ -425,6 +426,82 @@ std::string Scene3dDocument::to_json() const {
     if (!e.data.empty()) item["data"] = e.data;
     if (!e.parent.empty()) item["parent"] = e.parent;
     if (!e.vfx.empty()) item["vfx"] = e.vfx;
+    if (e.metallic != 0.f) item["metallic"] = e.metallic;
+    if (e.roughness != 0.55f) item["roughness"] = e.roughness;
+    if (!e.metallic_roughness.empty())
+      item["metallicRoughness"] = e.metallic_roughness;
+    if (!e.emissive.empty()) item["emissive"] = e.emissive;
+    if (e.emissive_strength != 0.f)
+      item["emissiveStrength"] = e.emissive_strength;
+    if (e.emissive_r != 1.f || e.emissive_g != 1.f || e.emissive_b != 1.f)
+      item["emissiveTint"] = {e.emissive_r, e.emissive_g, e.emissive_b};
+    if (e.night_emissive != 0.f) item["nightEmissive"] = e.night_emissive;
+    if (!e.environment.empty()) item["environment"] = e.environment;
+    if (e.environment_strength != 0.f)
+      item["environmentStrength"] = e.environment_strength;
+    if (e.alpha_cutout != 0.f) item["alphaCutout"] = e.alpha_cutout;
+    if (e.uv_tile_x != 1.f || e.uv_tile_y != 1.f)
+      item["uvTile"] = {e.uv_tile_x, e.uv_tile_y};
+    if (e.atmo_strength != 0.f || e.atmo_power != 3.f ||
+        e.atmo_night != 0.05f || e.atmo_r != 0.45f || e.atmo_g != 0.62f ||
+        e.atmo_b != 1.f)
+      item["atmosphere"] = {{"tint", {e.atmo_r, e.atmo_g, e.atmo_b}},
+                            {"strength", e.atmo_strength},
+                            {"power", e.atmo_power},
+                            {"nightFloor", e.atmo_night}};
+    if (e.visible_range != 0.f) item["range"] = e.visible_range;
+    if (e.visible_fade != .15f) item["visibleFade"] = e.visible_fade;
+    if (!e.normal_map.empty() || !e.properties_map.empty() ||
+        !e.cloud_map.empty() || e.normal_strength != 0.35f ||
+        e.relief != 0.f || e.cloud_opacity != 0.f ||
+        e.cloud_albedo != 0.f || e.cloud_offset_x != 0.f ||
+        e.cloud_offset_y != 0.f || e.cloud_height != 0.f) {
+      item["surface"] = {{"normal", e.normal_map},
+                         {"properties", e.properties_map},
+                         {"cloud", e.cloud_map},
+                         {"normalStrength", e.normal_strength},
+                         {"relief", e.relief},
+                         {"cloudOpacity", e.cloud_opacity},
+                         {"cloudAlbedo", e.cloud_albedo},
+                         {"cloudHeight", e.cloud_height},
+                         {"cloudOffset", {e.cloud_offset_x, e.cloud_offset_y}}};
+    }
+    if (e.terminator_wrap != 0.f) item["terminatorWrap"] = e.terminator_wrap;
+    if (e.limb_darkening != 0.f) item["limbDarken"] = e.limb_darkening;
+    if (e.limb_darkening_q != 0.f) item["limbDarkenQ"] = e.limb_darkening_q;
+    if (e.band_shear != 0.f) item["bandShear"] = e.band_shear;
+    if (e.band_waves != 0.f) item["bandWaves"] = e.band_waves;
+    if (e.band_drift != 0.f) item["bandDrift"] = e.band_drift;
+    if (e.band_turbulence != 0.f)
+      item["bandTurbulence"] = e.band_turbulence;
+    if (e.orbital_beaming != 0.f) item["orbitalBeam"] = e.orbital_beaming;
+    if (e.forward_scatter != 0.f)
+      item["forwardScatter"] = e.forward_scatter;
+    if (e.star_kelvin != 0.0) item["starKelvin"] = e.star_kelvin;
+    if (e.accretion[2] != 0.f) item["accretion"] = e.accretion;
+    if (e.volume_depth != 0.f)
+      item["volume"] = {{"depth", e.volume_depth},
+                        {"density", e.volume_density},
+                        {"seed", e.volume_seed},
+                        {"steps", e.volume_steps},
+                        {"scatter", e.volume_scatter},
+                        {"flow", e.volume_flow},
+                        {"distort", e.volume_distort}};
+    if (e.volume_blend != 0.f) item["volume"]["blend"] = e.volume_blend;
+    if (!e.volume_image2.empty()) item["volume"]["image2"] = e.volume_image2;
+    if (e.volume_occlude != 0.f) item["volume"]["occlude"] = e.volume_occlude;
+    if (e.volume_flow_rate != 0.f)
+      item["volume"]["flowRate"] = e.volume_flow_rate;
+    if (!e.lod_meshes.empty()) {
+      item["lods"] = e.lod_meshes;
+      item["lodPixels"] = e.lod_pixels;
+    }
+    if (e.lod_fade != .15f) item["lodFade"] = e.lod_fade;
+    if (!e.lod_group.empty()) {
+      item["lodGroup"] = e.lod_group;
+      if (!e.lod_proxy.empty()) item["lodProxy"] = e.lod_proxy;
+      if (e.lod_proxy_pixels != 16.f) item["lodProxyPixels"] = e.lod_proxy_pixels;
+    }
     items.push_back(std::move(item));
   }
   doc["camera"] = {{"pos", {cam_x, cam_y, cam_z}},
@@ -442,8 +519,44 @@ std::string Scene3dDocument::to_json() const {
                     {"color", {l.r, l.g, l.b}},
                     {"intensity", l.intensity}});
   }
+  if (!point_lights.empty()) {
+    auto &ls = doc["pointLights"] = nlohmann::json::array();
+    for (const auto &l : point_lights) {
+      nlohmann::json li = {{"pos", {l.x, l.y, l.z}},
+                           {"color", {l.r, l.g, l.b}},
+                           {"intensity", l.intensity},
+                           {"range", l.range}};
+      if (l.spot_x != 0.f || l.spot_y != 0.f || l.spot_z != 0.f) {
+        li["spotDir"] = {l.spot_x, l.spot_y, l.spot_z};
+        li["spotInner"] = l.spot_inner;
+        li["spotOuter"] = l.spot_outer;
+      }
+      if (l.cast_shadow) li["castShadow"] = true;
+      ls.push_back(std::move(li));
+    }
+  }
+  if (exposure != 1.f || bloom != 0.f || bloom_threshold != 1.f ||
+      contrast != 1.f || saturation != 1.f || sharpen != 0.f ||
+      vignette != 0.f || quality != "high" || debug_view != "lit")
+    doc["render"] = {{"exposure", exposure},
+                     {"bloom", bloom},
+                     {"bloomThreshold", bloom_threshold},
+                     {"contrast", contrast},
+                     {"saturation", saturation},
+                     {"sharpen", sharpen},
+                     {"vignette", vignette},
+                     {"quality", quality},
+                     {"debug", debug_view}};
+  if (shadow_extent > 0.f)
+    doc["render"]["shadow"] = {{"extent", shadow_extent},
+                               {"distance", shadow_distance},
+                               {"depth", shadow_depth},
+                               {"strength", shadow_strength},
+                               {"bias", shadow_bias},
+                               {"resolution", shadow_resolution}};
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
+  if (!environment.empty()) doc["environment"] = environment;
   if (gravity != 0.0f) doc["gravity"] = gravity;
   if (ground_y != 0.0f) doc["groundY"] = ground_y;
   if (bounds != 0.0f) doc["bounds"] = bounds;
@@ -517,6 +630,175 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.data = item.value("data", std::string{});
       e.parent = item.value("parent", std::string{});
       e.vfx = item.value("vfx", std::string{});
+      e.metallic = item.value("metallic", 0.0f);
+      e.roughness = item.value("roughness", 0.55f);
+      e.metallic_roughness =
+          item.value("metallicRoughness", std::string{});
+      e.emissive = item.value("emissive", std::string{});
+      e.emissive_strength = item.value("emissiveStrength", 0.0f);
+      if (item.contains("emissiveTint") &&
+          !vec3_of(item, "emissiveTint", e.emissive_r, e.emissive_g,
+                   e.emissive_b))
+        return std::nullopt;
+      e.night_emissive = item.value("nightEmissive", 0.0f);
+      e.environment = item.value("environment", std::string{});
+      e.environment_strength = item.value("environmentStrength", 0.0f);
+      e.alpha_cutout = item.value("alphaCutout", 0.0f);
+      if (item.contains("uvTile")) {
+        const auto &t = item.at("uvTile");
+        if (!t.is_array() || t.size() != 2)
+          return fail("uvTile must be [u,v]");
+        e.uv_tile_x = t[0].get<float>();
+        e.uv_tile_y = t[1].get<float>();
+      }
+      if (item.contains("atmosphere")) {
+        const auto &at = item.at("atmosphere");
+        if (!at.is_object()) return fail("atmosphere must be an object");
+        if (at.contains("tint") &&
+            !vec3_of(at, "tint", e.atmo_r, e.atmo_g, e.atmo_b))
+          return std::nullopt;
+        e.atmo_strength = at.value("strength", 0.0f);
+        e.atmo_power = at.value("power", 3.0f);
+        e.atmo_night = at.value("nightFloor", 0.05f);
+      }
+      e.visible_range = item.value("range", 0.0f);
+      if (!(e.visible_range >= 0.f))
+        return fail("range must be non-negative");
+      e.visible_fade = item.value("visibleFade", 0.15f);
+      if (!(e.visible_fade >= 0.f && e.visible_fade <= 0.5f))
+        return fail("visibleFade must be in [0,0.5]");
+      if (item.contains("surface")) {
+        const auto &sf = item.at("surface");
+        if (!sf.is_object()) return fail("surface must be an object");
+        e.normal_map = sf.value("normal", std::string{});
+        e.properties_map = sf.value("properties", std::string{});
+        e.cloud_map = sf.value("cloud", std::string{});
+        e.normal_strength = sf.value("normalStrength", 0.35f);
+        e.relief = sf.value("relief", 0.0f);
+        e.cloud_opacity = sf.value("cloudOpacity", 0.0f);
+        e.cloud_albedo = sf.value("cloudAlbedo", 0.0f);
+        e.cloud_height = sf.value("cloudHeight", 0.0f);
+        if (sf.contains("cloudOffset")) {
+          const auto &o = sf.at("cloudOffset");
+          if (!o.is_array() || o.size() != 2)
+            return fail("cloudOffset must be [x,y]");
+          e.cloud_offset_x = o[0].get<float>();
+          e.cloud_offset_y = o[1].get<float>();
+        }
+        if (e.normal_map.empty() && e.properties_map.empty() &&
+            e.cloud_map.empty())
+          return fail("surface requires at least one map");
+        if (!(e.normal_strength >= 0.f && e.normal_strength <= 2.f) ||
+            !(e.relief >= 0.f && e.relief <= 0.02f) ||
+            !(e.cloud_opacity >= 0.f && e.cloud_opacity <= 1.f) ||
+            !(e.cloud_albedo >= 0.f && e.cloud_albedo <= 1.f) ||
+            !(e.cloud_height >= 0.f && e.cloud_height <= 0.1f) ||
+            !(std::abs(e.cloud_offset_x) <= 2.f &&
+              std::abs(e.cloud_offset_y) <= 2.f))
+          return fail("surface fields out of range");
+      }
+      e.terminator_wrap = item.value("terminatorWrap", 0.0f);
+      if (!(e.terminator_wrap >= 0.f && e.terminator_wrap <= 1.f))
+        return fail("terminatorWrap must be in [0,1]");
+      e.limb_darkening = item.value("limbDarken", 0.0f);
+      if (!(e.limb_darkening >= 0.f && e.limb_darkening <= 1.f))
+        return fail("limbDarken must be in [0,1]");
+      e.limb_darkening_q = item.value("limbDarkenQ", 0.0f);
+      if (!(e.limb_darkening_q >= 0.f && e.limb_darkening_q <= 1.f))
+        return fail("limbDarkenQ must be in [0,1]");
+      e.band_shear = item.value("bandShear", 0.0f);
+      if (!(e.band_shear >= -0.5f && e.band_shear <= 0.5f))
+        return fail("bandShear must be in [-0.5,0.5]");
+      e.band_waves = item.value("bandWaves", 0.0f);
+      if (!(e.band_waves >= 0.f && e.band_waves <= 1.f))
+        return fail("bandWaves must be in [0,1]");
+      e.band_drift = item.value("bandDrift", 0.0f);
+      if (!(e.band_drift >= -0.25f && e.band_drift <= 0.25f))
+        return fail("bandDrift must be in [-0.25,0.25]");
+      e.band_turbulence = item.value("bandTurbulence", 0.0f);
+      if (!(e.band_turbulence >= -8.f && e.band_turbulence <= 8.f))
+        return fail("bandTurbulence must be in [-8,8]");
+      e.orbital_beaming = item.value("orbitalBeam", 0.0f);
+      if (!(e.orbital_beaming >= -1.f && e.orbital_beaming <= 1.f))
+        return fail("orbitalBeam must be in [-1,1]");
+      e.forward_scatter = item.value("forwardScatter", 0.0f);
+      if (!(e.forward_scatter >= -1.f && e.forward_scatter <= 1.f))
+        return fail("forwardScatter must be in [-1,1]");
+      e.star_kelvin = item.value("starKelvin", 0.0);
+      if (!(e.star_kelvin == 0.0 ||
+            (e.star_kelvin >= 100.0 && e.star_kelvin <= 100000.0)))
+        return fail("starKelvin must be in [100,100000]");
+      if (item.contains("accretion")) {
+        const auto &ac = item.at("accretion");
+        if (!ac.is_array() || ac.size() != 4)
+          return fail("accretion must be [inner,outer,kelvin,beaming]");
+        for (int i = 0; i < 4; ++i) e.accretion[i] = ac[i].get<float>();
+        if (!(e.accretion[0] > 0.f && e.accretion[1] > e.accretion[0]))
+          return fail("accretion radii must satisfy 0<inner<outer");
+        if (!(e.accretion[2] >= 100.f && e.accretion[2] <= 100000.f))
+          return fail("accretion kelvin must be in [100,100000]");
+        if (!(std::abs(e.accretion[3]) <= 1.f))
+          return fail("accretion beaming must be in [-1,1]");
+      }
+      if (item.contains("volume")) {
+        const auto &vol = item.at("volume");
+        if (!vol.is_object()) return fail("volume must be an object");
+        e.volume_depth = vol.value("depth", 0.0f);
+        e.volume_density = vol.value("density", 5.0f);
+        e.volume_seed = vol.value("seed", 0.0f);
+        e.volume_steps = vol.value("steps", 32);
+        e.volume_scatter = vol.value("scatter", 0.0f);
+        e.volume_flow = vol.value("flow", 0.0f);
+        e.volume_distort = vol.value("distort", 0.0f);
+        e.volume_blend = vol.value("blend", 0.0f);
+        e.volume_occlude = vol.value("occlude", 0.0f);
+        e.volume_flow_rate = vol.value("flowRate", 0.0f);
+        if (vol.contains("image2")) {
+          if (!vol.at("image2").is_string())
+            return fail("volume image2 must be a texture path");
+          e.volume_image2 = vol.at("image2").get<std::string>();
+        }
+        if (!(e.volume_depth > 0.f && e.volume_depth <= 0.75f) ||
+            !(e.volume_density > 0.f && e.volume_density <= 32.f) ||
+            !(std::abs(e.volume_seed) <= 1e4f) ||
+            !(e.volume_steps >= 8 && e.volume_steps <= 64) ||
+            !(e.volume_scatter >= 0.f && e.volume_scatter <= 1.f) ||
+            !(std::abs(e.volume_flow) <= 1e4f) ||
+            !(e.volume_distort >= 0.f && e.volume_distort <= 0.1f) ||
+            !(e.volume_blend >= 0.f && e.volume_blend <= 1.f) ||
+            !(e.volume_occlude >= 0.f && e.volume_occlude <= 1e4f) ||
+            !(std::abs(e.volume_flow_rate) <= 64.f))
+          return fail("volume fields out of range");
+        if (e.volume_blend != 0.f && e.volume_image2.empty())
+          return fail("volume blend requires an image2 texture");
+        if (e.texture.empty())
+          return fail("volume requires a texture for the emission image");
+      }
+      if (item.contains("lods")) {
+        const auto &lods = item.at("lods");
+        if (!lods.is_array() || lods.size() > 8)
+          return fail("lods must be an array of at most 8 mesh specs");
+        for (const auto &spec : lods) {
+          if (!spec.is_string() || spec.get<std::string>().size() > 256)
+            return fail("lods entries must be bounded mesh spec strings");
+          e.lod_meshes.push_back(spec.get<std::string>());
+        }
+        e.lod_pixels = item.value("lodPixels", 32.0f);
+        if (!(e.lod_pixels >= 1.f && e.lod_pixels <= 4096.f))
+          return fail("lodPixels must be in [1,4096]");
+      }
+      e.lod_fade = item.value("lodFade", 0.15f);
+      if (!(e.lod_fade >= 0.f && e.lod_fade <= 0.5f))
+        return fail("lodFade must be in [0,0.5]");
+      e.lod_group = item.value("lodGroup", "");
+      if (e.lod_group.size() > 64)
+        return fail("lodGroup must be a bounded group name");
+      e.lod_proxy = item.value("lodProxy", "");
+      if (e.lod_proxy.size() > 256)
+        return fail("lodProxy must be a bounded mesh spec string");
+      e.lod_proxy_pixels = item.value("lodProxyPixels", 16.0f);
+      if (!(e.lod_proxy_pixels >= 1.f && e.lod_proxy_pixels <= 4096.f))
+        return fail("lodProxyPixels must be in [1,4096]");
       scene.entities.push_back(std::move(e));
     }
     if (doc.contains("camera")) {
@@ -560,6 +842,80 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         scene.lights.push_back(l);
       }
     }
+    if (doc.contains("pointLights")) {
+      const auto &ls = doc.at("pointLights");
+      if (!ls.is_array()) return fail("pointLights must be an array");
+      if (ls.size() > 4) return fail("at most four point lights");
+      for (const auto &li : ls) {
+        if (!li.is_object())
+          return fail("pointLight entry is not an object");
+        Scene3dPointLight l;
+        if (li.contains("pos") && !vec3_of(li, "pos", l.x, l.y, l.z))
+          return std::nullopt;
+        if (li.contains("color") && !vec3_of(li, "color", l.r, l.g, l.b))
+          return std::nullopt;
+        l.intensity = li.value("intensity", 1.0f);
+        l.range = li.value("range", 0.0f);
+        if (li.contains("spotDir") &&
+            !vec3_of(li, "spotDir", l.spot_x, l.spot_y, l.spot_z))
+          return std::nullopt;
+        l.spot_inner = li.value("spotInner", 1.0f);
+        l.spot_outer = li.value("spotOuter", 1.0f);
+        const double sd2 = static_cast<double>(l.spot_x) * l.spot_x +
+                           static_cast<double>(l.spot_y) * l.spot_y +
+                           static_cast<double>(l.spot_z) * l.spot_z;
+        if (!std::isfinite(sd2) || !std::isfinite(l.spot_inner) ||
+            !std::isfinite(l.spot_outer) ||
+            (sd2 > 0 && (l.spot_inner <= l.spot_outer || l.spot_inner <= 0.f ||
+                         l.spot_inner > 1.f || l.spot_outer < 0.f ||
+                         l.spot_outer >= 1.f)))
+          return fail("spot cones need 0<=spotOuter<spotInner<=1 cosines");
+        l.cast_shadow = li.value("castShadow", false);
+        if (l.cast_shadow && sd2 == 0)
+          return fail("castShadow requires a nonzero spotDir");
+        scene.point_lights.push_back(l);
+      }
+    }
+    if (doc.contains("render")) {
+      const auto &r = doc.at("render");
+      if (!r.is_object()) return fail("render must be an object");
+      scene.exposure = r.value("exposure", 1.0f);
+      scene.bloom = r.value("bloom", 0.0f);
+      scene.bloom_threshold = r.value("bloomThreshold", 1.0f);
+      scene.contrast = r.value("contrast", 1.0f);
+      scene.saturation = r.value("saturation", 1.0f);
+      scene.sharpen = r.value("sharpen", 0.0f);
+      scene.vignette = r.value("vignette", 0.0f);
+      scene.quality = r.value("quality", std::string{"high"});
+      if (scene.quality != "low" && scene.quality != "medium" &&
+          scene.quality != "high" && scene.quality != "ultra")
+        return fail("render quality must be low|medium|high|ultra");
+      scene.debug_view = r.value("debug", std::string{"lit"});
+      if (scene.debug_view != "lit" && scene.debug_view != "unlit" &&
+          scene.debug_view != "albedo" && scene.debug_view != "normals" &&
+          scene.debug_view != "roughness" && scene.debug_view != "metallic" &&
+          scene.debug_view != "emissive" && scene.debug_view != "lighting" &&
+          scene.debug_view != "lod" && scene.debug_view != "residency")
+        return fail("render debug must be lit|unlit|albedo|normals|roughness"
+                    "|metallic|emissive|lighting|lod|residency");
+      if (r.contains("shadow")) {
+        const auto &s = r.at("shadow");
+        if (!s.is_object()) return fail("render shadow must be an object");
+        scene.shadow_extent = s.value("extent", 0.0f);
+        scene.shadow_distance = s.value("distance", 64.0f);
+        scene.shadow_depth = s.value("depth", 256.0f);
+        scene.shadow_strength = s.value("strength", 1.0f);
+        scene.shadow_bias = s.value("bias", 0.0005f);
+        scene.shadow_resolution = s.value("resolution", 0u);
+        if (scene.shadow_extent < 0.f || scene.shadow_distance < 0.f ||
+            scene.shadow_depth <= 0.f || scene.shadow_strength < 0.f ||
+            scene.shadow_strength > 1.f || scene.shadow_bias < 0.f ||
+            scene.shadow_bias > 0.1f ||
+            (scene.shadow_resolution != 0u &&
+             (scene.shadow_resolution < 64u || scene.shadow_resolution > 8192u)))
+          return fail("render shadow fields out of range");
+      }
+    }
     if (doc.contains("background")) {
       const auto &bg = doc.at("background");
       if (!bg.is_array() || bg.size() != 3)
@@ -568,6 +924,7 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       scene.bg_g = bg[1].get<std::uint8_t>();
       scene.bg_b = bg[2].get<std::uint8_t>();
     }
+    scene.environment = doc.value("environment", std::string{});
     scene.gravity = doc.value("gravity", 0.0f);
     scene.ground_y = doc.value("groundY", 0.0f);
     scene.bounds = doc.value("bounds", 0.0f);

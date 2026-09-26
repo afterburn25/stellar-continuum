@@ -12,6 +12,11 @@ layout(set=2,binding=4) uniform sampler2D properties_map;
 layout(set=2,binding=5) uniform sampler2D cloud_map;
 layout(set=2,binding=6) uniform sampler2D shadow_map;
 layout(set=2,binding=7) uniform sampler2D sequence_map;
+layout(set=2,binding=8) uniform sampler2D emissive_map;
+layout(set=2,binding=9) uniform sampler2D metallic_roughness_map;
+// Key-light depth map — a depth-only ortho pass ahead of the scene pass.
+layout(set=2,binding=10) uniform sampler2D shadow_depth_map;
+layout(set=2,binding=11) uniform sampler2D spot_shadow_map;
 struct Material {
     vec4 tint;
     vec4 light_direction;
@@ -33,11 +38,58 @@ struct Material {
     vec4 additional_direction[2];
     vec4 additional_illumination[2];
     vec4 additional_shadow[2];
-    vec4 texture_options; // cubic magnification enabled
+    vec4 texture_options; // cubic magnification enabled, zonal waves, cloud deck height, debug class (lod/residency)
+    vec4 pbr_options; // enabled, packed map bound, night-emissive gate, alpha threshold
+    vec4 pbr_values; // metallic, roughness, emissive strength, environment strength
+    vec4 emissive_tint; // rgb, band shear (latitude-weighted u shift)
+    vec4 uv_options; // surface tiling x, y
+    vec4 atmo_options; // tint rgb, strength
+    vec4 atmo_shape; // rim power, nightside floor, volume scatter, HG scatter asymmetry
+    vec4 response_options; // terminator wrap, cloud albedo, map flags (1 normal, 2 properties, 4 cloud), limb darkening
+    vec4 point_position[4]; // view-space position, range (0 = unbounded)
+    vec4 point_energy[4]; // rgb, intensity
+    vec4 point_cone[4]; // view-space spot dir (zero = omni), inner cos
+    vec4 point_outer; // per-light outer cos edge
+    vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
 };
-layout(set=2,binding=8,std430) readonly buffer Materials {
+layout(set=2,binding=12,std430) readonly buffer Materials {
     Material materials[];
 };
+// Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
+// 2 albedo, 3 normals, 4 roughness, 5 metallic, 6 emissive, 7 lighting,
+// 8 lod class / 9 residency class tint (texture_options.w).
+// debug_mode.y is the view's scene time driving animated material terms.
+layout(set=3,binding=0) uniform ViewParams {
+    vec4 debug_mode;
+    // view → shadow-map clip space, then texel size / strength / bias /
+    // enabled in shadow_options
+    mat4 shadow_from_view;
+    vec4 shadow_options;
+    // view → spot-cone shadow clip space for the (at most one) shadowed
+    // spot light; spot_options = texel size (>0 enabled), PCF radius in
+    // texels, shadowed point-light index, range-scaled depth bias
+    mat4 spot_from_view;
+    vec4 spot_options;
+} view_params;
+
+// Shared shadow-map visibility: project clip → NDC, reject fragments
+// outside the map (they stay lit — coverage is an authored policy), then
+// step-compare depth with the fixed 8-tap kernel when a radius is set.
+float map_lit(sampler2D map,vec4 clip,float texel,float radius_texels,float bias) {
+    vec3 ndc=clip.xyz/max(clip.w,1e-9);
+    vec2 suv=ndc.xy*0.5+0.5;
+    if(clip.w<=0.0||suv.x<0.0||suv.x>1.0||suv.y<0.0||suv.y>1.0||ndc.z<0.0||ndc.z>1.0)return 1.0;
+    float radius=radius_texels*texel;
+    if(radius>0.0) {
+        vec2 taps[8]=vec2[](vec2(-1.0,-1.0),vec2(1.0,-1.0),vec2(-1.0,1.0),vec2(1.0,1.0),
+                            vec2(-0.4,0.0),vec2(0.4,0.0),vec2(0.0,-0.4),vec2(0.0,0.4));
+        float lit=0.0;
+        for(int t=0;t<8;++t)
+            lit+=step(ndc.z-bias,texture(map,suv+taps[t]*radius).r);
+        return lit*0.125;
+    }
+    return step(ndc.z-bias,texture(map,suv).r);
+}
 // Per-invocation material copy — populated from the instance-indexed buffer
 // at the top of main so helper functions keep their shared access.
 Material material;
@@ -85,6 +137,7 @@ vec3 environment(vec3 d,float roughness) {
         +radiance(d+spread*bitangent)+radiance(d-spread*bitangent))*0.125;
 }
 float fresnel(float cosine,float f0) {return f0+(1.0-f0)*pow(1.0-cosine,5.0);}
+vec3 fresnel3(float cosine,vec3 f0) {return f0+(vec3(1.0)-f0)*pow(1.0-cosine,5.0);}
 float direct_visibility(vec3 blocker_light) {
     if(material.shadow_light.w<0.5) return 1.0;
     vec3 P=shadow_position,L=blocker_light;
@@ -116,18 +169,37 @@ float direct_visibility(vec3 blocker_light) {
     }
     return 1.0-material.shadow_options.z*blocked;
 }
+// Maps a view-space displacement to the UV shift producing the same
+// on-screen move (least squares through the pixel's tangent frame).
+// Raises the cloud deck: view parallax vs the surface and displaced
+// shadowing. Degenerate edge-on pixels return zero.
+vec2 uv_shift_for(vec3 dp,vec2 uv){
+    vec3 px=dFdx(view_position),py=dFdy(view_position);
+    vec2 ux=dFdx(uv),uy=dFdy(uv);
+    float aa=dot(px,px),ab=dot(px,py),bb=dot(py,py),det=aa*bb-ab*ab;
+    if(det<1e-20)return vec2(0);
+    vec2 s=vec2(dot(px,dp),dot(py,dp));
+    vec2 scr=vec2(bb*s.x-ab*s.y,-ab*s.x+aa*s.y)/det;
+    return ux*scr.x+uy*scr.y;
+}
 vec3 linear_color(vec3 c) {return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c));}
 vec3 display_color(vec3 c) {c=max(c,vec3(0));return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}
 vec4 emission_volume(vec3 V) {
     // Integrate the interior of a closed proxy, exactly once per camera ray.
     // All density/flow lives in object space: it has parallax and cannot turn
     // into a camera-facing card as the stellar attachment rotates to the limb.
-    vec3 origin=(material.effect_from_view*vec4(view_position,1)).xyz;
+    // Bit 7 of the packed step count marks a camera-inside-proxy draw:
+    // the march then starts at the camera (the view-space origin) rather
+    // than the exit-wall fragment, whose backface is what rasterized.
+    const bool inside_volume=material.volume_options.y>64.0;
+    const vec3 ray_view=!inside_volume?view_position:
+        material.view_options.x>0.5?vec3(view_position.xy,0):vec3(0);
+    vec3 origin=(material.effect_from_view*vec4(ray_view,1)).xyz;
     vec3 direction=mat3(material.effect_from_view)*(-V);
     float scale=1.0/length(direction);direction=normalize(direction);
     float footprint=max(length(dFdx(origin)),length(dFdy(origin)));
     float mip=max(0.0,log2(max(footprint*float(textureSize(surface_map,0).x),1.0)));
-    if(dot(normalize(view_normal),V)<=0.0) discard;
+    if(!inside_volume&&dot(normalize(view_normal),V)<=0.0) discard;
     vec3 lower=vec3(-.5,-.22,-material.volume_options.x),upper=vec3(.5,.78,material.volume_options.x);
     // Signed epsilon keeps parallel rays finite on proxy edges.
     vec3 safe_direction=mix(vec3(-1),vec3(1),greaterThanEqual(direction,vec3(0)))*max(abs(direction),vec3(.000001));
@@ -138,15 +210,22 @@ vec4 emission_volume(vec3 V) {
     // Stop at the near photosphere, retaining foreground plasma and extensions
     // beyond the stellar limb. This clips the whole ray, not just proxy faces.
     if(material.effect_sphere.w>0.0){
-        vec3 p=view_position-material.effect_sphere.xyz;
+        vec3 p=ray_view-material.effect_sphere.xyz;
         float b=dot(p,V),d=b*b-dot(p,p)+material.effect_sphere.w*material.effect_sphere.w;
         if(d>0.0&&b+sqrt(d)>0.0) exit_distance=min(exit_distance,max(0.0,(b-sqrt(d))/scale));
     }
     if(exit_distance<=entry) discard;
-    int steps=int(material.volume_options.y);
+    int steps=int(material.volume_options.y)-(inside_volume?128:0);
     float step_size=(exit_distance-entry)/float(steps);
     vec4 integrated=vec4(0);
-    float phase=material.effect_options.z,seed=material.volume_options.w;
+    // flow_rate churns the filament field over scene time — nebulae
+    // slowly re-pose instead of freezing at their authored phase.
+    float phase=material.effect_options.z+view_params.debug_mode.y*material.anim_options.y,seed=material.volume_options.w;
+    // Directional single-scatter (atmo_shape.z — atmospheres never reach
+    // this branch): the limb facing the key light brightens, the far side
+    // dims, so nebulae read star-lit instead of uniformly self-glowing.
+    float scatter=material.atmo_shape.z;
+    vec3 light_o=scatter>0.0?normalize(mat3(material.effect_from_view)*material.light_direction.xyz):vec3(0);
     for(int step=0;step<64;++step){
         if(step>=steps||integrated.a>.985) break;
         vec3 p=origin+direction*(entry+(float(step)+.5)*step_size);
@@ -172,6 +251,11 @@ vec4 emission_volume(vec3 V) {
         // Beer-Lambert integration is stable across quality levels and zoom.
         float alpha=1.0-exp(-density*material.volume_options.z*step_size);
         emission*=.85+.3*sqrt(max(density,0.0));
+        if(scatter>0.0){
+            // Limb gradient about the proxy centre: facing the light ≈1.
+            float facing=.5+.5*dot(normalize(p-vec3(0,.28,0)),light_o);
+            emission*=mix(1.0,.35+1.3*facing,scatter);
+        }
         integrated.rgb+=(1.0-integrated.a)*emission*alpha;
         integrated.a+=(1.0-integrated.a)*alpha;
     }
@@ -181,44 +265,125 @@ vec4 emission_volume(vec3 V) {
 }
 void main() {
     material=materials[instance_index];
+    // Screen-door LOD transition: uv_options.w is a signed keep mask —
+    // positive keeps the ign<w fraction, negative keeps ign>=1+w. The
+    // paired draw carries the complement (selected level +1-p, coarser
+    // -p), so each fragment position resolves to exactly one level:
+    // opaque crossfade with no blending and no depth interaction.
+    // Interleaved gradient noise is stable per pixel while the camera
+    // holds still; 1.0 (default) always keeps.
+    const float keep=material.uv_options.w;
+    if(keep<1.0){
+        const vec2 fc=floor(gl_FragCoord.xy);
+        const float ign=fract(52.9829189*fract(fc.x*0.06711056+fc.y*0.00583715));
+        if(keep>=0.0?ign>=keep:ign<1.0+keep)discard;
+    }
     if(material.volume_options.x>0.0){
         vec3 V=material.view_options.x>0.5?vec3(0,0,1):normalize(-view_position);
         color=emission_volume(V);return;
     }
+    // Surface UV tiling feeds every texture-space sample; repeat samplers on
+    // the bound maps make (1,1) identical to the untiled path.
+    vec2 uv=texture_uv*material.uv_options.xy;
+    // Differential rotation (gas-giant banding): a latitude-weighted
+    // longitude shear bows authored bands — the cos(2πv) base is
+    // equator-symmetric and zero-mean, so maps stay registered and net
+    // longitude is kept. band_waves mixes in cos(6πv) for alternating
+    // mid-latitude jets (Jupiter-style); it is zero-mean and equator-
+    // symmetric too, so both properties survive the mix.
+    if(material.emissive_tint.w!=0.0)
+        uv.x+=material.emissive_tint.w*(cos(2.0*PI*texture_uv.y)+material.texture_options.y*cos(6.0*PI*texture_uv.y));
+    // Evolving warp: a mid-latitude wave propagating through the shear at
+    // half its amplitude slowly reshapes the jet profile (anim_options.z
+    // is a rad/s phase rate). cos(4πv+·) is zero-mean and equator-
+    // symmetric, so the registration invariants survive.
+    if(material.anim_options.z!=0.0)
+        uv.x+=material.emissive_tint.w*0.5*cos(4.0*PI*texture_uv.y+view_params.debug_mode.y*material.anim_options.z);
+    // Zonal drift: scene time scrolls equirect longitude — a slowly
+    // super-rotating cloud deck sliding over a fixed lit limb.
+    if(material.anim_options.x!=0.0) uv.x+=view_params.debug_mode.y*material.anim_options.x;
     // Evaluate derivatives before per-pixel alpha rejection; annulus horizon
     // rejection above is arithmetic so neighbouring fragments remain coherent.
     float visibility=direct_visibility(material.shadow_light.xyz);
+    // Directional shadow map: receivers project into the key light's ortho
+    // box. Coverage is an authored strategy-scale policy — fragments outside
+    // the box stay lit instead of smearing. Fixed 8-tap kernel keeps PCF
+    // cheap; the radius (in texels) and strength come from the quality tier.
+    if(view_params.shadow_options.x>0.0) {
+        vec4 clip=view_params.shadow_from_view*vec4(view_position,1.0);
+        float lit=map_lit(shadow_depth_map,clip,view_params.shadow_options.x,
+                          view_params.shadow_options.y,view_params.shadow_options.w);
+        visibility*=mix(1.0,lit,view_params.shadow_options.z);
+    }
     float extra_visibility[2];
     for(int i=0;i<2;++i)extra_visibility[i]=material.additional_illumination[i].a>0.0?direct_visibility(material.additional_shadow[i].xyz):1.0;
     vec3 N=normalize(view_normal);
     vec3 V=material.view_options.x>0.5?vec3(0,0,1):normalize(-view_position);
     vec4 properties=vec4(1,0,0,0);
-    float cloud_shadow=1.0;
+    float cloud_shadow=1.0,deck_shade=1.0;
+    vec4 cloud_layer=vec4(0);
     if(material.surface_response.x>0.5) {
-        properties=texture(properties_map,texture_uv);
+        float map_flags=material.response_options.z;
+        bool has_normal=mod(map_flags,2.0)>0.5;
+        bool has_properties=mod(floor(map_flags/2.0),2.0)>0.5;
+        bool has_cloud=mod(floor(map_flags/4.0),2.0)>0.5;
+        if(has_properties)
+            properties=texture(properties_map,uv);
         vec3 dx=dFdx(view_position),dy=dFdy(view_position);
         vec2 du=dFdx(texture_uv),dv=dFdy(texture_uv);
         vec3 T=dx*dv.y-dy*du.y;
         vec3 B=dy*du.x-dx*dv.x;
         float det=du.x*dv.y-du.y*dv.x;
-        if(abs(det)>1e-12&&length(T)>1e-10&&length(B)>1e-10) {
+        if(has_normal&&abs(det)>1e-12&&length(T)>1e-10&&length(B)>1e-10) {
             T=normalize(T*sign(det));B=normalize(B*sign(det));
-            vec3 mapN=texture(normal_map,texture_uv).xyz*2.0-1.0;
+            vec3 mapN=texture(normal_map,uv).xyz*2.0-1.0;
             N=normalize(N+material.surface_response.y*(T*mapN.x+B*mapN.y));
         }
         vec3 rx=cross(dy,N),ry=cross(N,dx);
         float d=dot(dx,rx);
-        if(abs(d)>1e-15&&material.surface_response.z>0.0)
+        if(has_properties&&abs(d)>1e-15&&material.surface_response.z>0.0)
             N=normalize(abs(d)*N-material.surface_response.z*sign(d)*(dFdx(properties.a)*rx+dFdy(properties.a)*ry));
         // The sampler wraps longitude, preserving continuous pixel derivatives.
-        cloud_shadow=1.0-material.surface_response.w*texture(cloud_map,texture_uv+material.surface_options.xy).a;
+        if(has_cloud) {
+            vec2 cloud_uv=uv+material.surface_options.xy;
+            float deck_h=material.texture_options.z;
+            if(deck_h>0.0){
+                // Raised deck: the visible texel shifts toward the camera
+                // (normal displacement projected through the tangent
+                // frame), so limb clouds peek past the silhouette.
+                vec3 Nv=normalize(view_normal);
+                vec2 dshift=uv_shift_for(deck_h*Nv,uv);
+                // The sunward caster sits h*tan(zenith) along the
+                // tangential light component; the cap keeps grazing
+                // angles from running off the map.
+                vec3 Ld=material.light_direction.xyz;
+                vec3 Lt=Ld-Nv*dot(Ld,Nv);
+                vec3 caster=Lt*min(deck_h/max(dot(Ld,Nv),.15),deck_h*4.0);
+                vec2 sshift=uv_shift_for(caster,uv);
+                cloud_layer=texture(cloud_map,cloud_uv-dshift);
+                cloud_shadow=1.0-material.surface_response.w
+                    *texture(cloud_map,cloud_uv+sshift).a;
+                // Sun-facing deck tops stay lit; lee neighbours shade.
+                // |Lt|^2 = sin^2(zenith) gates it — an overhead sun does
+                // not self-shadow a single-altitude deck.
+                deck_shade=1.0-material.surface_response.w*.6
+                    *clamp(dot(Lt,Lt),0.0,1.0)
+                    *texture(cloud_map,cloud_uv-dshift+sshift).a;
+            }else{
+                cloud_layer=texture(cloud_map,cloud_uv);
+                cloud_shadow=1.0-material.surface_response.w*cloud_layer.a;
+            }
+        }
     }
     float incidence=dot(N,material.light_direction.xyz);
-    float sunlight=material.surface_options.w>0.5?abs(incidence):max(incidence,0.0);
-    vec2 sample_uv=texture_uv;
+    // Wrap-diffuse terminator: (N.L + w)/(1 + w) softens the day/night edge
+    // without touching the fully lit or fully dark poles; 0 keeps Lambert.
+    float terminator_wrap=material.response_options.x;
+    float sunlight=material.surface_options.w>0.5?abs(incidence):clamp((incidence+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);
+    vec2 sample_uv=uv;
     if(material.effect_options.x>0.5){
         // Smooth bounded flow changes filament shape without wrapping the image.
-        float envelope=sin(PI*texture_uv.x)*sin(PI*texture_uv.y);
+        float envelope=sin(PI*uv.x)*sin(PI*uv.y);
         sample_uv+=material.effect_options.w*envelope*vec2(sin(texture_uv.y*19.0+material.effect_options.z),cos(texture_uv.x*13.0-material.effect_options.z*.7));
     }
     vec4 texel=surface_sample(surface_map,sample_uv);
@@ -240,30 +405,61 @@ void main() {
             if(entry>0.0||dot(p,p)<material.effect_sphere.w*material.effect_sphere.w)texel.a*=1.0-blocked;
         }
     }
+    vec3 raw_albedo=texel.rgb; // debug Albedo view: sampled surface, pre-tint
     texel*=material.tint;
     if(material.view_options.w>0.5) texel.rgb=linear_color(texel.rgb);
     float combined_sunlight=sunlight;
     for(int i=0;i<2;++i)if(material.additional_illumination[i].a>0.0)combined_sunlight=max(combined_sunlight,max(dot(N,material.additional_direction[i].xyz),0.0));
     float alpha=texel.a*material.parameters.z*clamp(1.0-combined_sunlight*material.parameters.w,0.0,1.0);
     if(material.surface_options.z>0.0) alpha*=pow(1.0-abs(dot(N,V)),material.surface_options.z);
+    // Alpha cutout rejects before lighting cost; surviving fragments keep
+    // their computed alpha (opaque and transparent cutouts both work).
+    if(material.pbr_options.w>0.0&&alpha<material.pbr_options.w)discard;
+    // Metallic-workflow factors: packed map (G roughness, B metallic) scales
+    // the scalar values when bound.
+    bool pbr_active=material.pbr_options.x>0.5;
+    float metallic=0.0,pbr_roughness=material.pbr_values.y;
+    if(pbr_active){
+        if(material.pbr_options.y>0.5){
+            vec3 mr=texture(metallic_roughness_map,uv).rgb;
+            metallic=clamp(mr.b,0.0,1.0);pbr_roughness=clamp(mr.g*pbr_roughness,0.04,1.0);
+        }else{
+            metallic=clamp(material.pbr_values.x,0.0,1.0);
+            pbr_roughness=clamp(pbr_roughness,0.04,1.0);
+        }
+    }
+    float diffuse_scale=pbr_active?1.0-metallic:1.0;
+    // Debug Roughness/Metallic views report the factors actually in play.
+    float dbg_roughness=pbr_active?pbr_roughness
+        :(material.surface_response.x>0.5?clamp(properties.r,0.0,1.0)
+        :(material.optics.x>=1.0?clamp(material.optics.y,0.0,1.0):0.55));
     vec3 light_color=material.illumination.rgb*material.illumination.a;
-    vec3 result=texel.rgb*(material.parameters.x+material.parameters.y*sunlight*cloud_shadow*visibility*light_color);
-    if(material.surface_response.x>0.5) {
+    vec3 result=texel.rgb*diffuse_scale*(material.parameters.x+material.parameters.y*sunlight*cloud_shadow*visibility*light_color);
+    if(material.surface_response.x>0.5||pbr_active) {
         vec3 sum=V+material.light_direction.xyz;
         vec3 H=length(sum)>0.0001?normalize(sum):N;
-        float roughness=clamp(properties.r,0.10,1.0);
+        float roughness=pbr_active?pbr_roughness:clamp(properties.r,0.10,1.0);
         float nv=max(dot(N,V),0.001),nh=max(dot(N,H),0.0);
         float a2=pow(roughness,4.0),den=nh*nh*(a2-1.0)+1.0;
         float D=a2/max(PI*den*den,0.00001),k=pow(roughness+1.0,2.0)/8.0;
         float G=(nv/(nv*(1.0-k)+k))*(sunlight/(sunlight*(1.0-k)+k));
-        float F=fresnel(max(dot(V,H),0.0),mix(.035,.020,properties.g));
-        float strength=.12+.88*max(properties.g,properties.b);
+        vec3 F=pbr_active?fresnel3(max(dot(V,H),0.0),mix(vec3(.04),texel.rgb,metallic))
+            :vec3(fresnel(max(dot(V,H),0.0),mix(.035,.020,properties.g)));
+        float strength=pbr_active?1.0:.12+.88*max(properties.g,properties.b);
         result+=light_color*cloud_shadow*visibility*strength*D*G*F/max(4.0*nv,.001);
+    }
+    if(pbr_active&&material.pbr_values.w>0.0){
+        // Diffuse irradiance + roughness-aware specular environment response.
+        float nv=max(dot(N,V),0.001);
+        vec3 f0=mix(vec3(.04),texel.rgb,metallic);
+        vec3 fresnel_env=f0+(max(vec3(1.0-pbr_roughness),f0)-f0)*pow(1.0-nv,5.0);
+        result+=material.pbr_values.w*(texel.rgb*(1.0-metallic)*environment(N,1.0)
+            +environment(reflect(-V,N),pbr_roughness)*fresnel_env);
     }
     if(material.optics.x>=1.0) {
         vec3 V=material.view_options.x>0.5?vec3(0,0,1):normalize(-view_position);
         if(!gl_FrontFacing) N=-N;
-        vec4 optical_texel=texture(optical_map,texture_uv);
+        vec4 optical_texel=texture(optical_map,uv);
         vec3 mask=optical_texel.rgb;
         vec3 dx=dFdx(view_position),dy=dFdy(view_position);
         vec3 rx=cross(dy,N),ry=cross(N,dx);
@@ -303,22 +499,182 @@ void main() {
     for(int i=0;i<2;++i) {
         if(material.additional_illumination[i].a<=0.0) continue;
         vec3 L=material.additional_direction[i].xyz;
-        float nl=material.surface_options.w>0.5?abs(dot(N,L)):max(dot(N,L),0.0);
+        float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);
         vec3 energy=material.additional_illumination[i].rgb*material.additional_illumination[i].a*extra_visibility[i]*cloud_shadow;
-        result+=texel.rgb*material.parameters.y*nl*energy;
-        if(material.surface_response.x>0.5||material.optics.x>=1.0) {
+        result+=texel.rgb*diffuse_scale*material.parameters.y*nl*energy;
+        if(material.surface_response.x>0.5||material.optics.x>=1.0||pbr_active) {
             vec3 sum=V+L,H=length(sum)>0.0001?normalize(sum):N;
-            float roughness=clamp(material.optics.x>=1.0?material.optics.y:properties.r,.1,1.0);
+            float roughness=clamp(material.optics.x>=1.0?material.optics.y:(pbr_active?pbr_roughness:properties.r),.1,1.0);
             float nv=max(dot(N,V),.001),nh=max(dot(N,H),0.0),a2=pow(roughness,4.0);
             float den=nh*nh*(a2-1.0)+1.0,k=pow(roughness+1.0,2.0)/8.0;
             float D=a2/max(PI*den*den,.00001),G=nv/(nv*(1.0-k)+k)*nl/(nl*(1.0-k)+k);
-            float f0=material.optics.x>=1.0?pow((material.optics.x-1.0)/(material.optics.x+1.0),2.0):mix(.035,.020,properties.g);
-            float strength=material.optics.x>=1.0?material.view_options.y:.12+.88*max(properties.g,properties.b);
-            result+=energy*strength*D*G*fresnel(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            float strength=material.optics.x>=1.0?material.view_options.y:(pbr_active?1.0:.12+.88*max(properties.g,properties.b));
+            if(pbr_active&&material.optics.x<1.0){
+                vec3 f0=mix(vec3(.04),texel.rgb,metallic);
+                result+=energy*strength*D*G*fresnel3(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            }else{
+                float f0=material.optics.x>=1.0?pow((material.optics.x-1.0)/(material.optics.x+1.0),2.0):mix(.035,.020,properties.g);
+                result+=energy*strength*D*G*fresnel(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            }
         }
+    }
+    // Scene point lights: windowed inverse-square attenuation keeps distant
+    // receivers at zero cost and bounded brightness at contact range.
+    for(int i=0;i<4;++i){
+        if(material.point_energy[i].w<=0.0) continue;
+        vec3 to_light=material.point_position[i].xyz-view_position;
+        float d2=dot(to_light,to_light);
+        vec3 L=to_light*inversesqrt(max(d2,0.00000001));
+        float range=material.point_position[i].w;
+        float window=1.0;
+        if(range>0.0){float x=clamp(sqrt(d2)/range,0.0,1.0);window=pow(1.0-x*x*x*x,2.0);}
+        // Spot cone: a nonzero view-space direction gates the light to
+        // receivers inside its cone, fading smoothly from the inner cos
+        // edge (full radiance) to the outer cos edge (zero). A zero
+        // direction keeps the legacy omni falloff.
+        vec4 cone=material.point_cone[i];
+        if(dot(cone.xyz,cone.xyz)>0.0)
+            window*=smoothstep(material.point_outer[i],cone.w,
+                               dot(-L,normalize(cone.xyz)));
+        // Shadowed spot (at most one per scene): receivers inside the
+        // cone project into the light's own depth map; fragments past
+        // the clamped map fov stay lit, which only matters inside the
+        // narrow band between the map edge and the outer cone.
+        if(view_params.spot_options.x>0.0&&int(view_params.spot_options.z+0.5)==i)
+            window*=map_lit(spot_shadow_map,view_params.spot_from_view*vec4(view_position,1.0),
+                            view_params.spot_options.x,view_params.spot_options.y,
+                            view_params.spot_options.w);
+        if(window<=0.0) continue;
+        vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
+        float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);
+        result+=texel.rgb*diffuse_scale*material.parameters.y*nl*energy;
+        if(material.surface_response.x>0.5||material.optics.x>=1.0||pbr_active){
+            vec3 sum=V+L,H=length(sum)>0.0001?normalize(sum):N;
+            float roughness=clamp(material.optics.x>=1.0?material.optics.y:(pbr_active?pbr_roughness:properties.r),.1,1.0);
+            float nv=max(dot(N,V),.001),nh=max(dot(N,H),0.0),a2=pow(roughness,4.0);
+            float den=nh*nh*(a2-1.0)+1.0,k=pow(roughness+1.0,2.0)/8.0;
+            float D=a2/max(PI*den*den,.00001),G=nv/(nv*(1.0-k)+k)*nl/(nl*(1.0-k)+k);
+            float strength=material.optics.x>=1.0?material.view_options.y:(pbr_active?1.0:.12+.88*max(properties.g,properties.b));
+            if(pbr_active&&material.optics.x<1.0){
+                vec3 f0=mix(vec3(.04),texel.rgb,metallic);
+                result+=energy*strength*D*G*fresnel3(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            }else{
+                float f0=material.optics.x>=1.0?pow((material.optics.x-1.0)/(material.optics.x+1.0),2.0):mix(.035,.020,properties.g);
+                result+=energy*strength*D*G*fresnel(max(dot(V,H),0.0),f0)/max(4.0*nv,.001);
+            }
+        }
+    }
+    // Emissive overlay — tinted map radiance, optionally gated to the body's
+    // unlit hemisphere for colony/city lights that fade across the terminator.
+    // emissive_part also feeds the Emissive debug view (and is excluded from
+    // LightingOnly's albedo division so glow stays readable).
+    vec3 emissive_part=vec3(0);
+    if(pbr_active&&material.pbr_values.z>0.0){
+        float gate=1.0;
+        if(material.pbr_options.z>0.0)
+            gate=mix(1.0,1.0-smoothstep(-0.1,0.3,incidence),material.pbr_options.z);
+        emissive_part+=texture(emissive_map,uv).rgb*material.emissive_tint.rgb*material.pbr_values.z*gate;
+        result+=emissive_part;
+    }
+    // Visible cloud deck: the cloud map's RGB composites over the lit
+    // surface — including surface emissive, which a cloud cover occludes —
+    // lit by the same wrapped sunlight. Coverage scales with the same
+    // opacity that drives the deck's surface shadow; albedo scales deck
+    // brightness so a zero albedo leaves the layer shadow-only.
+    if(material.response_options.y>0.0&&material.surface_response.w>0.0) {
+        float cover=clamp(cloud_layer.a*material.surface_response.w,0.0,1.0);
+        vec3 deck=cloud_layer.rgb*material.response_options.y*(material.parameters.x+material.parameters.y*sunlight*deck_shade*visibility*light_color);
+        result=mix(result,deck,cover);
+    }
+    // Limb darkening: emitted/reflected radiance falls toward the disc
+    // edge (Sun u ~= 0.6), so HDR photosphere discs keep a physical
+    // profile instead of clipping flat. anim_options.w adds the standard
+    // quadratic term q·(1-μ)² (transit-photometry two-parameter law),
+    // steepening the very edge while mid-disc stays untouched; the
+    // product clamps at zero so aggressive coefficients never invert.
+    // The geometric normal decides the profile — normal-mapped detail
+    // is not limb darkening. The additive atmosphere rim below is
+    // exempt: it is a scattering shell, not the photosphere.
+    if(material.response_options.w>0.0||material.anim_options.w>0.0){
+        float limb_mu=clamp(dot(normalize(view_normal),V),0.0,1.0);
+        result*=max(1.0-material.response_options.w*(1.0-limb_mu)-material.anim_options.w*(1.0-limb_mu)*(1.0-limb_mu),0.0);}
+    // Orbital beaming: a first-order doppler asymmetry for material
+    // orbiting local +Y — radiance scales by 1 + s*(v.V) where v is the
+    // tangential velocity. Face-on discs stay symmetric (v ⟂ view);
+    // edge-on discs peak. The atmosphere rim below stays exempt — it is
+    // a scattering shell, not orbiting surface material.
+    if(material.uv_options.z!=0.0){
+        vec3 local=(material.effect_from_view*vec4(view_position,1.0)).xyz;
+        float orbit_r2=local.x*local.x+local.z*local.z;
+        if(orbit_r2>1e-8){
+            // v = w x r for w=+Y gives tangent ∝ (z,0,-x). effect_from_view
+            // stores the inverse model_view linear part, so its transpose
+            // carries object-space directions back into view space.
+            vec3 beam_v=transpose(mat3(material.effect_from_view))*vec3(local.z,0.0,-local.x);
+            result*=max(1.0+material.uv_options.z*dot(normalize(beam_v),V),0.0);
+        }
+    }
+    // Henyey–Greenstein single-scatter phase (atmo_shape.w = asymmetry g):
+    // p = (1-g^2)/(1+g^2-2g*cos)^(3/2) with cos = -(V.L) — g>0 peaks the
+    // sheet when it is backlit (dusty-ring forward scatter, Saturn E-ring
+    // look) with a lobe that sharpens as |g|->1, and g<0 inverts to an
+    // opposition backscatter surge (icy regolith). Unit-mean over
+    // directions, so the sheet's luminance is preserved on average; |g|
+    // clamps at .95 so the singular peak stays finite. Radiance-only —
+    // the atmosphere rim and alpha stay untouched.
+    if(material.atmo_shape.w!=0.0){
+        const float hg=clamp(material.atmo_shape.w,-.95,.95);
+        const float den=max(1.0+hg*hg+2.0*hg*dot(V,material.light_direction.xyz),1e-4);
+        result*=(1.0-hg*hg)*pow(den,-1.5);
+    }
+    // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
+    // nightside floor, tied to the star's actual color.
+    if(material.atmo_options.w>0.0){
+        vec3 Ng=normalize(view_normal);
+        float limb=pow(clamp(1.0-abs(dot(Ng,V)),0.0,1.0),material.atmo_shape.x);
+        float day=max(material.atmo_shape.y,smoothstep(-0.25,0.3,dot(Ng,material.light_direction.xyz)));
+        vec3 rim=material.atmo_options.rgb*material.atmo_options.w*limb*day*light_color;
+        emissive_part+=rim;result+=rim;
     }
     // Preserve legacy diffuse materials and premultiplied composition.
     if(alpha<0.001) discard;
+    int debug=int(view_params.debug_mode.x+0.5);
+    if(debug>0){
+        vec3 shown;
+        if(debug==1) shown=texel.rgb;                              // Unlit
+        else if(debug==2) shown=raw_albedo;                        // Albedo
+        else if(debug==3) shown=N*0.5+0.5;                         // Normals
+        else if(debug==4) shown=vec3(dbg_roughness);               // Roughness
+        else if(debug==5) shown=vec3(metallic);                    // Metallic
+        else if(debug==6) shown=emissive_part;                     // Emissive
+        else if(debug==8){ // LOD classes: gray full mesh, level ramp, magenta group proxy
+            float cls=material.texture_options.w;
+            shown=cls>9.5?vec3(1,.15,1)
+                :cls<.5?vec3(.45)
+                :cls<1.5?vec3(.15,.45,1)
+                :cls<2.5?vec3(.1,.85,.35)
+                :cls<3.5?vec3(1,.85,.1)
+                :vec3(1,.3,.1);
+            // In-transition draws (|keep| in (0,1) — screen-door band)
+            // lift toward white so a dual submission reads differently
+            // from a hard pick; the dither partition stays visible.
+            float keep=material.uv_options.w;
+            if(keep!=0.0&&abs(keep)<1.0) shown=mix(shown,vec3(1),.35);
+        }
+        else if(debug==9){ // Residency: green full mip, warm ramp by base mip, magenta fallback
+            float cls=material.texture_options.w;
+            shown=cls>8.5?vec3(1,.1,1)
+                :cls<.5?vec3(.15,.75,.3)
+                :cls<1.5?vec3(.55,.85,.15)
+                :cls<2.5?vec3(.95,.7,.1)
+                :cls<3.5?vec3(1,.4,.05)
+                :vec3(1,.15,.1);
+        }
+        else shown=(result-emissive_part)/max(texel.rgb,vec3(.001));// Lighting
+        shown=max(shown,vec3(0));
+        if(material.view_options.w>0.5) shown=display_color(shown);
+        color=vec4(shown*alpha,alpha);return;
+    }
     if(material.view_options.w>0.5) result=display_color(result);
     color=vec4(result*alpha,alpha);
 }

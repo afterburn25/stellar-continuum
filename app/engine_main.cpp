@@ -306,10 +306,21 @@ struct Shell {
       hit3_scale{}, hit3_vel{}, hit3_color{}, hit3_tex{},
       hit3_opacity{}, hit3_dbl{}, hit3_solid{}, hit3_gravs{},
       hit3_ttl{}, hit3_data{}, hit3_parent{}, hit3_vfx{}, hit3_cam{},
-      hit3_camrot{}, hit3_fov{}, hit3_lightdir{}, hit3_lightint{},
+      hit3_camrot{}, hit3_fov{}, hit3_clip{}, hit3_lightdir{}, hit3_lightint{},
       hit3_grav{}, hit3_ground{}, hit3_bounds{}, hit3_bg{},
       hit3_music{}, hit3_filla_dir{}, hit3_filla_tint{},
-      hit3_fillb_dir{}, hit3_fillb_tint{};
+      hit3_fillb_dir{}, hit3_fillb_tint{}, hit3_pbr{}, hit3_mr{},
+      hit3_emis{}, hit3_emit{}, hit3_night{}, hit3_env{},
+      hit3_envstr{}, hit3_cutout{}, hit3_tile{}, hit3_atmo{},
+      hit3_atmotint{}, hit3_exposure{}, hit3_bloom{}, hit3_grade{},
+      hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{},
+      hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
+      hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
+      hit3_bandshear{}, hit3_bandwaves{}, hit3_banddrift{},
+      hit3_orbitbeam{},
+      hit3_starkelvin{}, hit3_accretion{}, hit3_fwdscatter{},
+      hit3_scnenv{},
+      hit3_volume{}, hit3_lodfade{}, hit3_visfade{}, hit3_lodgroup{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -1796,6 +1807,19 @@ void commit_scene3_field(Shell &shell) {
     commit();
     doc.fov_deg = std::clamp(a, 10.f, 140.f);
     return ok("camera fov updated");
+  case 71: // camera clip planes near,far
+    if (!parse_pair(shell.scene3_buffer, a, b))
+      return fail("use \"near,far\" - e.g. 0.05,5000");
+    if (!(a > 0.f) || !(b > a + 1e-3f) || !(b <= 1e7f))
+      return fail("need 0 < near < far <= 1e7");
+    commit();
+    doc.near_plane = a; doc.far_plane = b;
+    return ok("camera clip planes updated");
+  case 72: // scene environment probe (content-relative equirect path; empty clears)
+    commit();
+    doc.environment = shell.scene3_buffer;
+    return ok(doc.environment.empty() ? "scene environment cleared"
+                                      : "scene environment updated");
   case 23: // key light direction
     if (!parse_triple(shell.scene3_buffer, a, b, c))
       return fail("use \"x,y,z\"");
@@ -1890,6 +1914,130 @@ void commit_scene3_field(Shell &shell) {
     doc.lights[slot].intensity = std::max(0.f, intensity);
     return ok("fill light tint updated");
   }
+  // View post-processing — applied to the 3D viewport's HDR resolve.
+  case 34: // exposure
+    try {
+      a = std::stof(shell.scene3_buffer);
+    } catch (const std::exception &) {
+      return fail("use a number like 1.0");
+    }
+    if (!(a > 0.f)) return fail("exposure must be positive");
+    commit();
+    doc.exposure = a;
+    return ok("exposure updated");
+  case 35: // bloom strength,threshold
+    if (!parse_pair(shell.scene3_buffer, a, b))
+      return fail("use \"strength,threshold\" like 0.6,1.0");
+    commit();
+    doc.bloom = std::clamp(a, 0.f, 8.f);
+    doc.bloom_threshold = std::clamp(b, 0.f, 8.f);
+    return ok("bloom updated");
+  case 36: { // contrast,saturation,sharpen[,vignette]
+    float v = 0.f;
+    const auto &text = shell.scene3_buffer;
+    const bool four = parse_quad(text, a, b, c, v);
+    if (!four && !parse_triple(text, a, b, c))
+      return fail("use \"contrast,saturation,sharpen[,vignette]\" like 1.1,1,0.3,0.4");
+    commit();
+    doc.contrast = std::clamp(a, 0.f, 2.f);
+    doc.saturation = std::clamp(b, 0.f, 2.f);
+    doc.sharpen = std::clamp(c, 0.f, 1.f);
+    doc.vignette = four ? std::clamp(v, 0.f, 1.f) : 0.f;
+    return ok("grading updated"); }
+  case 37: { // quality tier
+    const auto &q = shell.scene3_buffer;
+    if (q != "low" && q != "medium" && q != "high" && q != "ultra")
+      return fail("use low|medium|high|ultra");
+    commit();
+    doc.quality = q;
+    return ok("quality tier updated");
+  }
+  case 38: { // point lights: "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer]; ..."
+    std::vector<engine::Scene3dPointLight> parsed;
+    if (!shell.scene3_buffer.empty()) {
+      std::istringstream entries(shell.scene3_buffer);
+      std::string entry;
+      while (std::getline(entries, entry, ';')) {
+        std::istringstream values(entry);
+        std::string token;
+        float v[14];
+        int n = 0;
+        while (n < 14 && std::getline(values, token, ',')) {
+          try {
+            v[n++] = std::stof(token);
+          } catch (const std::exception &) {
+            return fail("use \"x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow]]; ...\"");
+          }
+        }
+        if (n != 8 && n != 13 && n != 14)
+          return fail("each point light needs x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow]]");
+        engine::Scene3dPointLight l;
+        l.x = v[0]; l.y = v[1]; l.z = v[2];
+        l.r = v[3]; l.g = v[4]; l.b = v[5];
+        l.intensity = std::max(0.f, v[6]);
+        l.range = std::max(0.f, v[7]);
+        if (n >= 13) {
+          l.spot_x = v[8]; l.spot_y = v[9]; l.spot_z = v[10];
+          l.spot_inner = v[11]; l.spot_outer = v[12];
+          const double sd2 = static_cast<double>(l.spot_x) * l.spot_x +
+                             static_cast<double>(l.spot_y) * l.spot_y +
+                             static_cast<double>(l.spot_z) * l.spot_z;
+          if (sd2 <= 0 || l.spot_inner <= l.spot_outer ||
+              l.spot_inner <= 0.f || l.spot_inner > 1.f ||
+              l.spot_outer < 0.f || l.spot_outer >= 1.f)
+            return fail("spot cones need a nonzero direction and 0<=outer<inner<=1");
+          if (n == 14) l.cast_shadow = v[13] != 0.f;
+        }
+        parsed.push_back(l);
+      }
+    }
+    if (parsed.size() > 4) return fail("at most four point lights");
+    commit();
+    doc.point_lights = std::move(parsed);
+    return ok("point lights updated");
+  }
+  case 39: { // debug shading override
+    const auto &d = shell.scene3_buffer;
+    if (d != "lit" && d != "unlit" && d != "albedo" && d != "normals" &&
+        d != "roughness" && d != "metallic" && d != "emissive" &&
+        d != "lighting" && d != "lod" && d != "residency")
+      return fail("use lit|unlit|albedo|normals|roughness|metallic|"
+                  "emissive|lighting|lod|residency");
+    commit();
+    doc.debug_view = d;
+    return ok("debug view updated");
+  }
+  case 52: { // key-light shadow map: "extent,dist,depth[,strength,bias[,res]]"
+    if (shell.scene3_buffer.empty()) { // empty clears
+      commit();
+      doc.shadow_extent = 0.f;
+      return ok("shadow map disabled");
+    }
+    float v[6]{};
+    {
+      std::istringstream values(shell.scene3_buffer);
+      std::string token;
+      int n = 0;
+      while (n < 6 && std::getline(values, token, ',')) {
+        try {
+          v[n++] = std::stof(token);
+        } catch (const std::exception &) {
+          return fail("use extent,distance,depth[,strength,bias[,resolution]]");
+        }
+      }
+      if (n < 3)
+        return fail("use extent,distance,depth[,strength,bias[,resolution]]");
+      commit();
+      doc.shadow_extent = v[0];
+      doc.shadow_distance = v[1];
+      doc.shadow_depth = v[2];
+      doc.shadow_strength = n > 3 ? v[3] : 1.f;
+      doc.shadow_bias = n > 4 ? v[4] : .0005f;
+      doc.shadow_resolution =
+          n > 5 ? static_cast<std::uint32_t>(std::max(0.f, v[5])) : 0u;
+    }
+    return ok("shadow map updated");
+  }
   default:
     break;
   }
@@ -1946,6 +2094,283 @@ void commit_scene3_field(Shell &shell) {
   case 14: next.data = shell.scene3_buffer; valid = true; break;
   case 15: next.parent = shell.scene3_buffer; valid = true; break;
   case 16: next.vfx = shell.scene3_buffer; valid = true; break;
+  // Metallic-workflow material extensions — every field lands on the
+  // entity's MaterialPbr/AtmosphereShell components and renders in the
+  // preview immediately.
+  case 40:
+          valid = parse_pair(shell.scene3_buffer, a, b);
+          if (valid) {
+            next.metallic = std::clamp(a, 0.f, 1.f);
+            next.roughness = std::clamp(b, 0.04f, 1.f);
+          }
+          break;
+  case 41: next.metallic_roughness = shell.scene3_buffer; valid = true;
+           break;
+  case 42: next.emissive = shell.scene3_buffer; valid = true; break;
+  case 43: {
+           float strength;
+           valid = parse_quad(shell.scene3_buffer, strength, a, b, c);
+           if (valid) {
+             next.emissive_strength = std::max(0.f, strength);
+             next.emissive_r = a; next.emissive_g = b; next.emissive_b = c;
+           }
+           break; }
+  case 44:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          next.night_emissive = std::clamp(a, 0.f, 1.f); valid = true;
+          break;
+  case 45: next.environment = shell.scene3_buffer; valid = true; break;
+  case 46:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          next.environment_strength = std::clamp(a, 0.f, 16.f);
+          valid = true; break;
+  case 47:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          next.alpha_cutout = std::clamp(a, 0.f, 1.f); valid = true; break;
+  case 48:
+          valid = parse_pair(shell.scene3_buffer, a, b);
+          if (valid && a >= .01f && a <= 64.f && b >= .01f && b <= 64.f) {
+            next.uv_tile_x = a; next.uv_tile_y = b;
+          } else valid = false;
+          break;
+  case 49:
+          valid = parse_triple(shell.scene3_buffer, a, b, c);
+          if (valid) {
+            next.atmo_strength = std::clamp(a, 0.f, 16.f);
+            next.atmo_power = std::clamp(b, .5f, 16.f);
+            next.atmo_night = std::clamp(c, 0.f, 1.f);
+          }
+          break;
+  case 50:
+          valid = parse_triple(shell.scene3_buffer, a, b, c);
+          if (valid && a >= 0.f && b >= 0.f && c >= 0.f) {
+            next.atmo_r = a; next.atmo_g = b; next.atmo_b = c;
+          } else valid = false;
+          break;
+  case 51:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 1e12f) { next.visible_range = a; valid = true; }
+          break;
+  case 53: { // surface maps: "normal,properties,cloud" (empty allowed)
+          std::istringstream maps(shell.scene3_buffer);
+          std::string first, second, third;
+          if (std::getline(maps, first, ',') &&
+              std::getline(maps, second, ',') &&
+              std::getline(maps, third)) {
+            next.normal_map = first;
+            next.properties_map = second;
+            next.cloud_map = third;
+            valid = true;
+          }
+          break; }
+  case 54:
+          valid = parse_pair(shell.scene3_buffer, a, b);
+          if (valid && a >= 0.f && a <= 2.f && b >= 0.f && b <= .02f) {
+            next.normal_strength = a; next.relief = b;
+          } else valid = false;
+          break;
+  case 55: {
+          float albedo;
+          // Optional 5th field: cloud-deck height (object units, [0,.1]).
+          float height = 0.f;
+          std::string_view text = shell.scene3_buffer;
+          const auto c4 = [&] {
+            auto p = text.find(',');
+            for (int i = 0; i < 3 && p != std::string_view::npos; ++i)
+              p = text.find(',', p + 1);
+            return p;
+          }();
+          if (c4 != std::string_view::npos) {
+            try {
+              height = std::stof(std::string(text.substr(c4 + 1)));
+            } catch (const std::exception &) {
+              valid = false;
+              break;
+            }
+            text = text.substr(0, c4);
+          }
+          valid = parse_quad(text, a, albedo, b, c);
+          if (valid && a >= 0.f && a <= 1.f && albedo >= 0.f &&
+              albedo <= 1.f && b >= -2.f && b <= 2.f && c >= -2.f &&
+              c <= 2.f && height >= 0.f && height <= 0.1f) {
+            next.cloud_opacity = a; next.cloud_albedo = albedo;
+            next.cloud_offset_x = b; next.cloud_offset_y = c;
+            next.cloud_height = height;
+          } else valid = false;
+          break; }
+  case 56:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 1.f) { next.terminator_wrap = a; valid = true; }
+          break;
+  case 57: {
+          std::string part;
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> parts;
+          while (std::getline(csv, part, ',')) parts.push_back(part);
+          if (parts.size() >= 1 && parts.size() <= 2) {
+            try { a = std::stof(parts[0]); valid = a >= 0.f && a <= 1.f; }
+            catch (const std::exception &) { break; }
+            if (!valid) break;
+            next.limb_darkening = a;
+            if (parts.size() == 2) {
+              try { a = std::stof(parts[1]); }
+              catch (const std::exception &) { valid = false; break; }
+              if (!(a >= 0.f && a <= 1.f)) { valid = false; break; }
+              next.limb_darkening_q = a;
+            }
+          }
+          break; }
+  case 58: {
+          next.lod_meshes.clear();
+          std::string spec;
+          std::istringstream csv(shell.scene3_buffer);
+          bool oversize = false;
+          while (std::getline(csv, spec, ',')) {
+            if (spec.size() > 256) { oversize = true; break; }
+            if (!spec.empty()) next.lod_meshes.push_back(spec);
+          }
+          valid = !oversize && next.lod_meshes.size() <= 8;
+          break; }
+  case 59:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 1.f && a <= 4096.f) { next.lod_pixels = a; valid = true; }
+          break;
+  case 60:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= -0.5f && a <= 0.5f) { next.band_shear = a; valid = true; }
+          break;
+  case 61:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= -1.f && a <= 1.f) { next.orbital_beaming = a; valid = true; }
+          break;
+  case 62:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 100.f && a <= 100000.f) { next.star_kelvin = a; valid = true; }
+          break;
+  case 63: {
+          float inner, outer, kelvin, beam;
+          valid = parse_quad(shell.scene3_buffer, inner, outer, kelvin,
+                             beam);
+          if (valid && inner > 0.f && outer > inner &&
+              kelvin >= 100.f && kelvin <= 100000.f &&
+              beam >= -1.f && beam <= 1.f)
+            next.accretion = {inner, outer, kelvin, beam};
+          else valid = false;
+          break; }
+  case 64:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= -1.f && a <= 1.f) { next.forward_scatter = a; valid = true; }
+          break;
+  case 65: {
+          float v[8]{};
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> toks;
+          std::string tok;
+          while (std::getline(csv, tok, ',')) toks.push_back(tok);
+          int n = 0;
+          for (; n < 8 && n < (int)toks.size(); ++n) {
+            try { v[n] = std::stof(toks[n]); }
+            catch (const std::exception &) { n = -1; break; }
+          }
+          const std::string img2 = n >= 0 && toks.size() > 8
+              ? toks[8] : "";
+          float occ = 0.f, rate = 0.f;
+          if (n >= 0 && toks.size() > 9) {
+            try { occ = std::stof(toks[9]); }
+            catch (const std::exception &) { n = -1; }
+          }
+          if (n >= 0 && toks.size() > 10) {
+            try { rate = std::stof(toks[10]); }
+            catch (const std::exception &) { n = -1; }
+          }
+          if (n >= 5 && v[0] >= 0.f && v[0] <= 0.75f && v[1] > 0.f &&
+              v[1] <= 32.f && std::abs(v[2]) <= 1e4f && v[3] >= 8.f &&
+              v[3] <= 64.f && v[4] >= 0.f && v[4] <= 1.f &&
+              std::abs(v[5]) <= 1e4f && v[6] >= 0.f && v[6] <= 0.1f &&
+              v[7] >= 0.f && v[7] <= 1.f &&
+              (v[7] == 0.f || !img2.empty()) &&
+              occ >= 0.f && occ <= 1e4f && std::abs(rate) <= 64.f &&
+              (v[0] == 0.f || !next.texture.empty())) {
+            next.volume_depth = v[0];
+            next.volume_density = v[1];
+            next.volume_seed = v[2];
+            next.volume_steps = static_cast<int>(v[3]);
+            next.volume_scatter = v[4];
+            next.volume_flow = v[5];
+            next.volume_distort = v[6];
+            next.volume_blend = v[7];
+            next.volume_image2 = img2;
+            next.volume_occlude = occ;
+            next.volume_flow_rate = rate;
+            valid = true;
+          }
+          break; }
+  case 70: {
+          std::string part;
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> parts;
+          while (std::getline(csv, part, ',')) parts.push_back(part);
+          if (parts.size() >= 1 && parts.size() <= 2) {
+            try { a = std::stof(parts[0]); valid = a >= -0.25f && a <= 0.25f; }
+            catch (const std::exception &) { break; }
+            if (!valid) break;
+            next.band_drift = a;
+            if (parts.size() == 2) {
+              try { a = std::stof(parts[1]); }
+              catch (const std::exception &) { valid = false; break; }
+              if (!(a >= -8.f && a <= 8.f)) { valid = false; break; }
+              next.band_turbulence = a;
+            }
+          }
+          break; }
+  case 66:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 0.5f) { next.lod_fade = a; valid = true; }
+          break;
+  case 67:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 0.5f) { next.visible_fade = a; valid = true; }
+          break;
+  case 68:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= 0.f && a <= 1.f) { next.band_waves = a; valid = true; }
+          break;
+  case 69: {
+          next.lod_group.clear(); next.lod_proxy.clear();
+          next.lod_proxy_pixels = 16.f;
+          if (shell.scene3_buffer.empty()) { valid = true; break; }
+          std::string part;
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> parts;
+          while (std::getline(csv, part, ';')) parts.push_back(part);
+          if (parts.size() >= 1 && parts.size() <= 3) {
+            valid = parts[0].size() <= 64;
+            next.lod_group = parts[0];
+            if (valid && parts.size() >= 2) {
+              valid = parts[1].size() <= 256;
+              next.lod_proxy = parts[1];
+            }
+            if (valid && parts.size() >= 3) {
+              try { a = std::stof(parts[2]); }
+              catch (const std::exception &) { valid = false; break; }
+              valid = a >= 1.f && a <= 4096.f;
+              next.lod_proxy_pixels = a;
+            }
+          }
+          break; }
   default: break;
   }
   if (!valid) return fail("check the field hint");
@@ -1971,6 +2396,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                 shell.hit3_parent = shell.hit3_vfx =
                                     shell.hit3_cam =
                                     shell.hit3_camrot = shell.hit3_fov =
+                                        shell.hit3_clip =
                                         shell.hit3_lightdir =
                                             shell.hit3_lightint =
                                                 shell.hit3_grav =
@@ -1983,6 +2409,32 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                                             shell.hit3_fillb_dir =
                                                                                 shell.hit3_fillb_tint =
                                                                     {};
+    shell.hit3_pbr = shell.hit3_mr = shell.hit3_emis = shell.hit3_emit =
+        shell.hit3_night = shell.hit3_env = shell.hit3_envstr =
+            shell.hit3_cutout = shell.hit3_tile = shell.hit3_atmo =
+                shell.hit3_atmotint = shell.hit3_exposure =
+                    shell.hit3_bloom = shell.hit3_grade =
+                        shell.hit3_quality = shell.hit3_plights =
+                            shell.hit3_debug = shell.hit3_range =
+                                shell.hit3_shadow = shell.hit3_surfmaps =
+                                    shell.hit3_surfshape =
+                                        shell.hit3_clouddeck =
+                                            shell.hit3_termwrap =
+                                                shell.hit3_limbdark =
+                                                    shell.hit3_lods =
+                                                        shell.hit3_lodpixels =
+                                                            shell.hit3_bandshear =
+                                                                shell.hit3_bandwaves =
+                                                                    shell.hit3_orbitbeam =
+                                                                    shell.hit3_starkelvin =
+                                                                        shell.hit3_accretion =
+                                                                            shell.hit3_fwdscatter =
+                                                                                shell.hit3_volume =
+                                                                                    shell.hit3_lodfade =
+                                                                                        shell.hit3_visfade =
+                                                                                            shell.hit3_lodgroup =
+                                                                                                shell.hit3_banddrift =
+                                                                                                    shell.hit3_scnenv = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2089,6 +2541,123 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       if (!e.texture.empty())
         inst.material.texture = scene3_tex(shell, e.texture);
       inst.material.double_sided = e.double_sided;
+      // Spectral-class preset: seeds tint/ambient/limb; explicit fields
+      // (limbDarken below, texture, atmosphere) still override.
+      if (e.star_kelvin >= 100.0) {
+        const auto star = star_photosphere3d(e.star_kelvin);
+        inst.material.tint = star.tint;
+        inst.material.ambient = star.ambient;
+        inst.material.diffuse = star.diffuse;
+        inst.material.light_color = star.light_color;
+        inst.material.linear_light = star.linear_light;
+        inst.material.limb_darkening = star.limb_darkening;
+      inst.material.limb_darkening_q = star.limb_darkening_q;
+      }
+      // Accretion-disc preset: generated radial texture (unless an
+      // authored texture wins) + emissive-dominant response + beaming.
+      if (e.accretion[2] >= 100.f && e.accretion[0] > 0.f &&
+          e.accretion[1] > e.accretion[0] &&
+          std::abs(e.accretion[3]) <= 1.f) {
+        const auto disc = accretion_disc_material3d(
+            e.accretion[0], e.accretion[1], e.accretion[2], e.accretion[3]);
+        if (e.texture.empty()) inst.material.texture = disc.texture;
+        inst.material.ambient = disc.ambient;
+        inst.material.diffuse = disc.diffuse;
+        inst.material.light_color = disc.light_color;
+        inst.material.linear_light = disc.linear_light;
+        inst.material.double_sided = disc.double_sided;
+        inst.material.orbital_beaming = disc.orbital_beaming;
+        inst.material.anisotropic_texture = disc.anisotropic_texture;
+      }
+      // The same fields the runtime maps through MaterialPbr/AtmosphereShell.
+      if (e.metallic != 0.f || e.roughness != 0.55f ||
+          !e.metallic_roughness.empty() || !e.emissive.empty() ||
+          e.emissive_strength != 0.f || e.night_emissive != 0.f ||
+          !e.environment.empty() || e.environment_strength != 0.f ||
+          e.alpha_cutout != 0.f || e.uv_tile_x != 1.f ||
+          e.uv_tile_y != 1.f) {
+        PbrSurface3D surface;
+        surface.metallic = e.metallic;
+        surface.roughness = e.roughness;
+        surface.emissive_strength = e.emissive_strength;
+        surface.night_emissive = e.night_emissive;
+        surface.environment_strength = e.environment_strength;
+        surface.emissive_tint = {e.emissive_r, e.emissive_g, e.emissive_b};
+        if (!e.metallic_roughness.empty())
+          surface.metallic_roughness = scene3_tex(shell, e.metallic_roughness);
+        if (!e.emissive.empty())
+          surface.emissive = scene3_tex(shell, e.emissive);
+        if (!e.environment.empty())
+          surface.environment = scene3_tex(shell, e.environment);
+        inst.material.pbr = surface;
+        inst.material.alpha_threshold = e.alpha_cutout;
+        inst.material.texture_tiling = {e.uv_tile_x, e.uv_tile_y};
+      }
+      // The same fields the runtime maps through MaterialSurface.
+      if (!e.normal_map.empty() || !e.properties_map.empty() ||
+          !e.cloud_map.empty()) {
+        SurfaceResponse3D response;
+        if (!e.normal_map.empty())
+          response.normal = scene3_tex(shell, e.normal_map);
+        if (!e.properties_map.empty())
+          response.properties = scene3_tex(shell, e.properties_map);
+        if (!e.cloud_map.empty())
+          response.cloud_shadow = scene3_tex(shell, e.cloud_map);
+        response.normal_strength = e.normal_strength;
+        response.relief = e.relief;
+        response.cloud_opacity = e.cloud_opacity;
+        response.cloud_albedo = e.cloud_albedo;
+        response.cloud_height = e.cloud_height;
+        response.cloud_offset = {e.cloud_offset_x, e.cloud_offset_y};
+        inst.material.surface_response = response;
+      }
+      inst.material.terminator_wrap = e.terminator_wrap;
+      inst.material.limb_darkening = e.limb_darkening;
+      inst.material.limb_darkening_q = e.limb_darkening_q;
+      inst.material.band_shear = e.band_shear;
+      inst.material.band_waves = e.band_waves;
+      inst.material.band_drift = e.band_drift;
+      inst.material.band_turbulence = e.band_turbulence;
+      inst.material.orbital_beaming = e.orbital_beaming;
+      inst.material.forward_scatter = e.forward_scatter;
+      // Emission volume: the entity texture is the emission image and
+      // the volume branch requires transparency (mirrors runtime host).
+      if (e.volume_depth > 0.f && inst.material.texture) {
+        SurfaceEffect3D effect;
+        effect.next_texture = inst.material.texture;
+        effect.volume_depth = e.volume_depth;
+        effect.volume_density = e.volume_density;
+        effect.volume_seed = e.volume_seed;
+        effect.volume_steps = e.volume_steps;
+        effect.volume_scatter = e.volume_scatter;
+        effect.flow_phase = e.volume_flow;
+        effect.distortion = e.volume_distort;
+        effect.blend = e.volume_blend;
+        effect.occlude = e.volume_occlude;
+        effect.flow_rate = e.volume_flow_rate;
+        if (!e.volume_image2.empty())
+          if (const auto alt = scene3_tex(shell, e.volume_image2))
+            effect.next_texture = alt;
+        inst.material.surface_effect = effect;
+        inst.material.transparent = true;
+      }
+      if (e.atmo_strength != 0.f)
+        inst.material.atmosphere =
+            Atmosphere3D{{e.atmo_r, e.atmo_g, e.atmo_b}, e.atmo_strength,
+                         e.atmo_power, e.atmo_night};
+      inst.visible_range = e.visible_range;
+      inst.visible_fade = e.visible_fade;
+      inst.lod_pixels = e.lod_pixels;
+      inst.lod_fade = e.lod_fade;
+      for (const auto &spec : e.lod_meshes)
+        if (auto lod_mesh = scene3_mesh(shell, spec))
+          inst.lod_meshes.push_back(std::move(lod_mesh));
+      if (inst.lod_meshes.empty()) inst.lod_pixels = 32.f;
+      inst.lod_group = e.lod_group;
+      inst.lod_group_pixels = e.lod_proxy_pixels;
+      // An unresolvable proxy spec drops the collapse, not the group.
+      if (auto proxy_mesh = scene3_mesh(shell, e.lod_proxy))
+        inst.lod_group_proxy = std::move(proxy_mesh);
       inst.material.light_intensity = doc.light_intensity;
       inst.material.linear_light = true;
       // Selected entity highlight: a bright grazing-angle shell marks
@@ -2109,9 +2678,60 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
             rotate_vec(inv, {l.dir_x, l.dir_y, l.dir_z}),
             {l.r, l.g, l.b}, l.intensity};
       }
-    if (auto scene =
-            Scene3D::create(cam, std::move(instances), light_cam))
-      out.overlay.push_back(Scene3DView{std::move(scene), pv});
+    std::vector<PointLight3D> point_lights;
+    point_lights.reserve(doc.point_lights.size());
+    for (const auto &l : doc.point_lights)
+      point_lights.push_back(PointLight3D{{l.x, l.y, l.z},
+                                          {l.r, l.g, l.b},
+                                          l.intensity, l.range,
+                                          {l.spot_x, l.spot_y, l.spot_z},
+                                          l.spot_inner, l.spot_outer,
+                                          l.cast_shadow});
+    std::optional<ShadowMap3D> shadow_map;
+    if (doc.shadow_extent > 0.f)
+      shadow_map = ShadowMap3D{doc.shadow_extent, doc.shadow_distance,
+                               doc.shadow_depth, doc.shadow_strength,
+                               doc.shadow_bias, doc.shadow_resolution};
+    if (auto scene = Scene3D::create(cam, std::move(instances), light_cam,
+                                     std::move(point_lights), shadow_map,
+                                     doc.environment.empty()
+                                         ? nullptr
+                                         : scene3_tex(shell, doc.environment))) {
+      Scene3DView view{std::move(scene), pv};
+      view.options.exposure = doc.exposure;
+      view.options.bloom_strength = doc.bloom;
+      view.options.bloom_threshold = doc.bloom_threshold;
+      view.options.contrast = doc.contrast;
+      view.options.saturation = doc.saturation;
+      view.options.sharpen = doc.sharpen;
+      view.options.vignette = doc.vignette;
+      view.options.quality =
+          doc.quality == "low"      ? RenderQuality3D::Low
+          : doc.quality == "medium" ? RenderQuality3D::Medium
+          : doc.quality == "ultra"  ? RenderQuality3D::Ultra
+                                    : RenderQuality3D::High;
+      view.options.debug_view =
+          doc.debug_view == "unlit"     ? DebugView3D::Unlit
+          : doc.debug_view == "albedo"  ? DebugView3D::Albedo
+          : doc.debug_view == "normals" ? DebugView3D::Normals
+          : doc.debug_view == "roughness" ? DebugView3D::Roughness
+          : doc.debug_view == "metallic"  ? DebugView3D::Metallic
+          : doc.debug_view == "emissive"  ? DebugView3D::Emissive
+          : doc.debug_view == "lighting"  ? DebugView3D::LightingOnly
+          : doc.debug_view == "lod"       ? DebugView3D::Lod
+          : doc.debug_view == "residency" ? DebugView3D::Residency
+                                        : DebugView3D::Lit;
+      // Preview clock — animated material terms (bandDrift, volume
+      // flowRate) need a nonzero scene time to show their motion.
+      static float preview_time = 0.f;
+      static std::chrono::steady_clock::time_point preview_last{};
+      const auto now = std::chrono::steady_clock::now();
+      if (preview_last.time_since_epoch().count() > 0)
+        preview_time += std::chrono::duration<float>(now - preview_last).count();
+      preview_last = now;
+      view.options.time = preview_time;
+      out.overlay.push_back(std::move(view));
+    }
   }
   out.overlay.push_back(StrokedRectangle{pv, panel_edge});
   out.overlay.push_back(
@@ -2200,6 +2820,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         ed(21), "degrees - or drag RMB in preview");
   field(shell.hit3_fov, "cam fov", std::to_string(doc.fov_deg), ed(22),
         "10..140 - or wheel in preview");
+  field(shell.hit3_clip, "clipPlanes",
+        std::to_string(doc.near_plane) + "," + std::to_string(doc.far_plane),
+        ed(71), "near,far - depth range");
   field(shell.hit3_lightdir, "light dir",
         fmt3(doc.light_x, doc.light_y, doc.light_z), ed(23),
         "world-space direction");
@@ -2237,6 +2860,204 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         "x,y,z - empty removes slot");
   field(shell.hit3_fillb_tint, "fillB tint", fill_tint(1), ed(33),
         "r,g,b,intensity 0..1");
+  // Third column under the preview: the PBR/material extensions and the
+  // view's post-processing controls.
+  fx = pv.x;
+  fy = list_rect.y + list_rect.height + 16 * s;
+  const auto fmt_pair = [](float a, float b) {
+    return std::to_string(a) + "," + std::to_string(b);
+  };
+  field(shell.hit3_pbr, "metal,rough",
+        entity ? fmt_pair(entity->metallic, entity->roughness) : "",
+        ed(40), "0..1 - hull metalness / gloss");
+  field(shell.hit3_mr, "mrMap",
+        entity ? entity->metallic_roughness : "", ed(41),
+        "packed G=rough B=metal map (empty = scalars)");
+  field(shell.hit3_emis, "emisMap", entity ? entity->emissive : "",
+        ed(42), "night lights / engine glow map");
+  field(shell.hit3_emit, "emit s,r,g,b",
+        entity ? std::to_string(entity->emissive_strength) + "," +
+                     std::to_string(entity->emissive_r) + "," +
+                     std::to_string(entity->emissive_g) + "," +
+                     std::to_string(entity->emissive_b)
+               : "",
+        ed(43), "0 disables emission");
+  field(shell.hit3_night, "nightEmis",
+        entity ? std::to_string(entity->night_emissive) : "", ed(44),
+        "0..1 - 1 emits only past terminator");
+  field(shell.hit3_env, "envMap", entity ? entity->environment : "",
+        ed(45), "equirect radiance for IBL");
+  field(shell.hit3_envstr, "envStr",
+        entity ? std::to_string(entity->environment_strength) : "",
+        ed(46), "0..16 - 0 disables IBL");
+  field(shell.hit3_cutout, "cutout",
+        entity ? std::to_string(entity->alpha_cutout) : "", ed(47),
+        "0..1 alpha discard threshold");
+  field(shell.hit3_tile, "uvTile",
+        entity ? fmt_pair(entity->uv_tile_x, entity->uv_tile_y) : "",
+        ed(48), "u,v repeat - 1,1 disables");
+  field(shell.hit3_atmo, "atmo s,p,floor",
+        entity ? std::to_string(entity->atmo_strength) + "," +
+                     std::to_string(entity->atmo_power) + "," +
+                     std::to_string(entity->atmo_night)
+               : "",
+        ed(49), "limb scatter - strength 0 off");
+  field(shell.hit3_atmotint, "atmoTint",
+        entity ? std::to_string(entity->atmo_r) + "," +
+                     std::to_string(entity->atmo_g) + "," +
+                     std::to_string(entity->atmo_b)
+               : "",
+        ed(50), "rim color r,g,b 0..1");
+  field(shell.hit3_range, "visRange",
+        entity ? std::to_string(entity->visible_range) : "", ed(51),
+        "distance cull, world units - 0 always");
+  field(shell.hit3_visfade, "visFade",
+        entity ? std::to_string(entity->visible_fade) : "", ed(67),
+        "screen-door fade width 0..0.5 x range - 0 = hard cut");
+  field(shell.hit3_surfmaps, "surfMaps",
+        entity ? entity->normal_map + "," + entity->properties_map + "," +
+                     entity->cloud_map
+               : "",
+        ed(53), "normal,properties,cloud paths - any subset");
+  field(shell.hit3_surfshape, "surfShape",
+        entity ? fmt_pair(entity->normal_strength, entity->relief) : "",
+        ed(54), "normal strength 0..2, relief 0..0.02");
+  field(shell.hit3_clouddeck, "cloudDeck",
+        entity ? std::to_string(entity->cloud_opacity) + "," +
+                     std::to_string(entity->cloud_albedo) + "," +
+                     fmt_pair(entity->cloud_offset_x, entity->cloud_offset_y) +
+                     (entity->cloud_height != 0.f
+                          ? "," + std::to_string(entity->cloud_height)
+                          : "")
+               : "",
+        ed(55), "shadow opacity, deck albedo 0..1, uv offset[, height 0..0.1]");
+  field(shell.hit3_termwrap, "termWrap",
+        entity ? std::to_string(entity->terminator_wrap) : "", ed(56),
+        "wrap-diffuse 0..1 - 0 keeps Lambert");
+  field(shell.hit3_limbdark, "limbDark",
+        entity ? std::to_string(entity->limb_darkening) + "," +
+                     std::to_string(entity->limb_darkening_q)
+               : "",
+        ed(57),
+        "limb darkening u 0..1[, quadratic q 0..1] - sun ~0.6");
+  field(shell.hit3_lods, "meshLods",
+        entity ? [&] {
+          std::string v;
+          for (const auto &s : entity->lod_meshes) {
+            if (!v.empty()) v += ",";
+            v += s;
+          }
+          return v;
+        }()
+               : "",
+        ed(58), "csv mesh specs, coarser per level - max 8");
+  field(shell.hit3_lodpixels, "lodPixels",
+        entity ? std::to_string(entity->lod_pixels) : "", ed(59),
+        "px diameter for LOD 0->1 - halves per level 1..4096");
+  field(shell.hit3_lodfade, "lodFade",
+        entity ? std::to_string(entity->lod_fade) : "", ed(66),
+        "screen-door crossfade width 0..0.5 - 0 = hard switch");
+  field(shell.hit3_lodgroup, "lodGroup",
+        entity && !entity->lod_group.empty()
+            ? entity->lod_group + ";" + entity->lod_proxy + ";" +
+                  std::to_string(entity->lod_proxy_pixels)
+            : "", ed(69),
+        "name;proxy spec;px - group collapses to one proxy draw");
+  field(shell.hit3_bandshear, "bandShear",
+        entity ? std::to_string(entity->band_shear) : "", ed(60),
+        "latitude uv shear -0.5..0.5 - gas-giant banding");
+  field(shell.hit3_bandwaves, "bandWaves",
+        entity ? std::to_string(entity->band_waves) : "", ed(68),
+        "zonal jet harmonic 0..1 - layered on bandShear");
+  field(shell.hit3_banddrift, "bandDrift",
+        entity ? std::to_string(entity->band_drift) + "," +
+                     std::to_string(entity->band_turbulence)
+               : "",
+        ed(70),
+        "drift uv/s -0.25..0.25[,turbulence rad/s -8..8]");
+  field(shell.hit3_orbitbeam, "orbitalBeam",
+        entity ? std::to_string(entity->orbital_beaming) : "", ed(61),
+        "approaching-lane brightening -1..1 - accretion discs");
+  field(shell.hit3_starkelvin, "starKelvin",
+        entity ? std::to_string(static_cast<long long>(entity->star_kelvin)) : "", ed(62),
+        "photosphere kelvin 100..100000 - blackbody tint + limb");
+  field(shell.hit3_accretion, "accretion",
+        entity ? std::to_string(entity->accretion[0]) + "," +
+                     std::to_string(entity->accretion[1]) + "," +
+                     std::to_string(entity->accretion[2]) + "," +
+                     std::to_string(entity->accretion[3])
+               : "",
+        ed(63), "inner,outer,kelvin,beaming - annulus disc preset");
+  field(shell.hit3_fwdscatter, "fwdScatter",
+        entity ? std::to_string(entity->forward_scatter) : "", ed(64),
+        "backlit brightening -1..1 - dusty rings, icy opposition");
+  field(shell.hit3_volume, "volume",
+        entity && entity->volume_depth > 0.f
+            ? std::to_string(entity->volume_depth) + "," +
+                  std::to_string(entity->volume_density) + "," +
+                  std::to_string(entity->volume_seed) + "," +
+                  std::to_string(entity->volume_steps) + "," +
+                  std::to_string(entity->volume_scatter) + "," +
+                  std::to_string(entity->volume_flow) + "," +
+                  std::to_string(entity->volume_distort) + "," +
+                  std::to_string(entity->volume_blend) +
+                  (entity->volume_image2.empty() &&
+                           entity->volume_occlude == 0.f &&
+                           entity->volume_flow_rate == 0.f
+                       ? ""
+                       : "," + entity->volume_image2 + "," +
+                             std::to_string(entity->volume_occlude) +
+                             (entity->volume_flow_rate == 0.f
+                                  ? ""
+                                  : "," + std::to_string(
+                                        entity->volume_flow_rate)))
+            : "",
+        ed(65),
+        "depth,density,seed,steps,scatter[,flow,distort[,blend[,image2[,occlude[,flowRate]]]]] - emission volume; 0 clears");
+  field(shell.hit3_exposure, "exposure",
+        std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
+  field(shell.hit3_bloom, "bloom s,t",
+        fmt_pair(doc.bloom, doc.bloom_threshold), ed(35),
+        "strength,threshold - 0 off");
+  field(shell.hit3_grade, "c,s,sharp,vig",
+        std::to_string(doc.contrast) + "," + std::to_string(doc.saturation) +
+            "," + std::to_string(doc.sharpen) + "," +
+            std::to_string(doc.vignette),
+        ed(36), "contrast,saturation,sharpen[,vignette]");
+  field(shell.hit3_quality, "quality", doc.quality, ed(37),
+        "low|medium|high|ultra");
+  field(shell.hit3_plights, "pointLights",
+        [&] {
+          std::string v;
+          for (const auto &l : doc.point_lights) {
+            if (!v.empty()) v += "; ";
+            v += std::to_string(l.x) + "," + std::to_string(l.y) + "," +
+                 std::to_string(l.z) + "," + std::to_string(l.r) + "," +
+                 std::to_string(l.g) + "," + std::to_string(l.b) + "," +
+                 std::to_string(l.intensity) + "," +
+                 std::to_string(l.range);
+            if (l.spot_x != 0.f || l.spot_y != 0.f || l.spot_z != 0.f) {
+              v += "," + std::to_string(l.spot_x) + "," +
+                   std::to_string(l.spot_y) + "," + std::to_string(l.spot_z) +
+                   "," + std::to_string(l.spot_inner) + "," +
+                   std::to_string(l.spot_outer);
+              if (l.cast_shadow) v += ",1";
+            }
+          }
+          return v;
+        }(),
+        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow]]; ... - max 4, empty clears");
+  field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
+        "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency");
+  field(shell.hit3_shadow, "shadowMap",
+        doc.shadow_extent > 0.f
+            ? std::to_string(doc.shadow_extent) + "," +
+                  std::to_string(doc.shadow_distance) + "," +
+                  std::to_string(doc.shadow_depth)
+            : "",
+        ed(52), "extent,dist,depth[,strength,bias[,res]] - empty disables");
+  field(shell.hit3_scnenv, "environment", doc.environment, ed(72),
+        "equirect path - shared IBL probe; empty disables");
 }
 
 std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
@@ -6115,6 +6936,9 @@ int main(int argc, char **argv) {
                             std::to_string((int)doc.cam_pitch_deg));
             else if (shell.hit3_fov.contains(event.position))
               edit3(22, std::to_string((int)doc.fov_deg));
+            else if (shell.hit3_clip.contains(event.position))
+              edit3(71, std::to_string(doc.near_plane) + "," +
+                            std::to_string(doc.far_plane));
             else if (shell.hit3_lightdir.contains(event.position))
               edit3(23, std::to_string(doc.light_x) + "," +
                             std::to_string(doc.light_y) + "," +
@@ -6163,6 +6987,136 @@ int main(int argc, char **argv) {
                               std::to_string(doc.lights[1].g) + "," +
                               std::to_string(doc.lights[1].b) + "," +
                               std::to_string(doc.lights[1].intensity));
+            else if (shell.hit3_pbr.contains(event.position) && se)
+              edit3(40, std::to_string(se->metallic) + "," +
+                            std::to_string(se->roughness));
+            else if (shell.hit3_mr.contains(event.position) && se)
+              edit3(41, se->metallic_roughness);
+            else if (shell.hit3_emis.contains(event.position) && se)
+              edit3(42, se->emissive);
+            else if (shell.hit3_emit.contains(event.position) && se)
+              edit3(43, std::to_string(se->emissive_strength) + "," +
+                            std::to_string(se->emissive_r) + "," +
+                            std::to_string(se->emissive_g) + "," +
+                            std::to_string(se->emissive_b));
+            else if (shell.hit3_night.contains(event.position) && se)
+              edit3(44, std::to_string(se->night_emissive));
+            else if (shell.hit3_env.contains(event.position) && se)
+              edit3(45, se->environment);
+            else if (shell.hit3_envstr.contains(event.position) && se)
+              edit3(46, std::to_string(se->environment_strength));
+            else if (shell.hit3_cutout.contains(event.position) && se)
+              edit3(47, std::to_string(se->alpha_cutout));
+            else if (shell.hit3_tile.contains(event.position) && se)
+              edit3(48, std::to_string(se->uv_tile_x) + "," +
+                            std::to_string(se->uv_tile_y));
+            else if (shell.hit3_atmo.contains(event.position) && se)
+              edit3(49, std::to_string(se->atmo_strength) + "," +
+                            std::to_string(se->atmo_power) + "," +
+                            std::to_string(se->atmo_night));
+            else if (shell.hit3_atmotint.contains(event.position) && se)
+              edit3(50, std::to_string(se->atmo_r) + "," +
+                            std::to_string(se->atmo_g) + "," +
+                            std::to_string(se->atmo_b));
+            else if (shell.hit3_exposure.contains(event.position))
+              edit3(34, std::to_string(doc.exposure));
+            else if (shell.hit3_bloom.contains(event.position))
+              edit3(35, std::to_string(doc.bloom) + "," +
+                            std::to_string(doc.bloom_threshold));
+            else if (shell.hit3_grade.contains(event.position))
+              edit3(36, std::to_string(doc.contrast) + "," +
+                            std::to_string(doc.saturation) + "," +
+                            std::to_string(doc.sharpen) + "," +
+                            std::to_string(doc.vignette));
+            else if (shell.hit3_quality.contains(event.position))
+              edit3(37, doc.quality);
+            else if (shell.hit3_plights.contains(event.position))
+              edit3(38, "");
+            else if (shell.hit3_debug.contains(event.position))
+              edit3(39, doc.debug_view);
+            else if (shell.hit3_shadow.contains(event.position))
+              edit3(52, doc.shadow_extent > 0.f
+                            ? std::to_string(doc.shadow_extent) + "," +
+                                  std::to_string(doc.shadow_distance) + "," +
+                                  std::to_string(doc.shadow_depth)
+                            : "");
+            else if (shell.hit3_scnenv.contains(event.position))
+              edit3(72, doc.environment);
+            else if (shell.hit3_range.contains(event.position) && se)
+              edit3(51, std::to_string(se->visible_range));
+            else if (shell.hit3_visfade.contains(event.position) && se)
+              edit3(67, std::to_string(se->visible_fade));
+            else if (shell.hit3_surfmaps.contains(event.position) && se)
+              edit3(53, se->normal_map + "," + se->properties_map + "," +
+                            se->cloud_map);
+            else if (shell.hit3_surfshape.contains(event.position) && se)
+              edit3(54, std::to_string(se->normal_strength) + "," +
+                            std::to_string(se->relief));
+            else if (shell.hit3_clouddeck.contains(event.position) && se)
+              edit3(55, std::to_string(se->cloud_opacity) + "," +
+                            std::to_string(se->cloud_albedo) + "," +
+                            std::to_string(se->cloud_offset_x) + "," +
+                            std::to_string(se->cloud_offset_y) +
+                            (se->cloud_height != 0.f
+                                 ? "," + std::to_string(se->cloud_height)
+                                 : ""));
+            else if (shell.hit3_termwrap.contains(event.position) && se)
+              edit3(56, std::to_string(se->terminator_wrap));
+            else if (shell.hit3_limbdark.contains(event.position) && se)
+              edit3(57, std::to_string(se->limb_darkening) + "," +
+                            std::to_string(se->limb_darkening_q));
+            else if (shell.hit3_lods.contains(event.position) && se) {
+              std::string v;
+              for (const auto &spec : se->lod_meshes) {
+                if (!v.empty()) v += ",";
+                v += spec;
+              }
+              edit3(58, v);
+            }
+            else if (shell.hit3_lodpixels.contains(event.position) && se)
+              edit3(59, std::to_string(se->lod_pixels));
+            else if (shell.hit3_lodfade.contains(event.position) && se)
+              edit3(66, std::to_string(se->lod_fade));
+            else if (shell.hit3_lodgroup.contains(event.position) && se)
+              edit3(69, se->lod_group + ";" + se->lod_proxy + ";" +
+                            std::to_string(se->lod_proxy_pixels));
+            else if (shell.hit3_bandshear.contains(event.position) && se)
+              edit3(60, std::to_string(se->band_shear));
+            else if (shell.hit3_bandwaves.contains(event.position) && se)
+              edit3(68, std::to_string(se->band_waves));
+            else if (shell.hit3_banddrift.contains(event.position) && se)
+              edit3(70, std::to_string(se->band_drift) + "," +
+                            std::to_string(se->band_turbulence));
+            else if (shell.hit3_orbitbeam.contains(event.position) && se)
+              edit3(61, std::to_string(se->orbital_beaming));
+            else if (shell.hit3_starkelvin.contains(event.position) && se)
+              edit3(62, std::to_string(static_cast<long long>(se->star_kelvin)));
+            else if (shell.hit3_accretion.contains(event.position) && se)
+              edit3(63, std::to_string(se->accretion[0]) + "," +
+                            std::to_string(se->accretion[1]) + "," +
+                            std::to_string(se->accretion[2]) + "," +
+                            std::to_string(se->accretion[3]));
+            else if (shell.hit3_fwdscatter.contains(event.position) && se)
+              edit3(64, std::to_string(se->forward_scatter));
+            else if (shell.hit3_volume.contains(event.position) && se)
+              edit3(65, std::to_string(se->volume_depth) + "," +
+                            std::to_string(se->volume_density) + "," +
+                            std::to_string(se->volume_seed) + "," +
+                            std::to_string(se->volume_steps) + "," +
+                            std::to_string(se->volume_scatter) + "," +
+                            std::to_string(se->volume_flow) + "," +
+                            std::to_string(se->volume_distort) + "," +
+                            std::to_string(se->volume_blend) +
+                            (se->volume_image2.empty() &&
+                                     se->volume_occlude == 0.f &&
+                                     se->volume_flow_rate == 0.f
+                                 ? ""
+                                 : "," + se->volume_image2 + "," +
+                                       std::to_string(se->volume_occlude) +
+                                       (se->volume_flow_rate == 0.f
+                                            ? ""
+                                            : "," + std::to_string(
+                                                  se->volume_flow_rate))));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

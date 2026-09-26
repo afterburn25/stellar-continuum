@@ -662,6 +662,64 @@ int main() {
         turret.opacity = 0.5f;
         turret.ttl = 3.f;
         turret.parent = "ship";
+        turret.metallic = 1.f;
+        turret.roughness = 0.25f;
+        turret.emissive = "maps/glow.png";
+        turret.emissive_strength = 4.f;
+        turret.emissive_r = 1.f;
+        turret.emissive_g = 0.5f;
+        turret.emissive_b = 0.2f;
+        turret.night_emissive = 1.f;
+        turret.environment = "maps/env.png";
+        turret.environment_strength = 0.6f;
+        turret.metallic_roughness = "maps/mr.png";
+        turret.alpha_cutout = 0.4f;
+        turret.uv_tile_x = 3.f;
+        turret.uv_tile_y = 1.5f;
+        turret.atmo_strength = 2.f;
+        turret.atmo_power = 4.f;
+        turret.atmo_r = 0.2f;
+        turret.atmo_g = 0.5f;
+        turret.atmo_b = 0.8f;
+        turret.visible_range = 400.f;
+        turret.visible_fade = .2f;
+        turret.normal_map = "maps/turret_n.png";
+        turret.cloud_map = "maps/turret_clouds.png";
+        turret.normal_strength = 0.9f;
+        turret.cloud_opacity = 0.7f;
+        turret.cloud_albedo = 0.8f;
+        turret.cloud_height = 0.05f;
+        turret.cloud_offset_x = 0.1f;
+        turret.cloud_offset_y = 0.2f;
+        turret.terminator_wrap = 0.5f;
+        turret.limb_darkening = 0.6f;
+        turret.limb_darkening_q = 0.3f;
+        turret.band_shear = -0.3f;
+        turret.band_waves = 0.7f;
+        turret.band_drift = 0.12f;
+        turret.band_turbulence = 1.4f;
+        turret.orbital_beaming = 0.65f;
+        turret.star_kelvin = 5800.0;
+        turret.accretion = {0.3f, 1.f, 12000.f, -0.6f};
+        turret.forward_scatter = 0.4f;
+        turret.texture = "maps/turret.png";
+        turret.volume_depth = 0.3f;
+        turret.volume_density = 6.f;
+        turret.volume_seed = 2.f;
+        turret.volume_steps = 24;
+        turret.volume_scatter = 0.5f;
+        turret.volume_flow = 1.5f;
+        turret.volume_distort = 0.05f;
+        turret.volume_blend = 0.4f;
+        turret.volume_image2 = "maps/turret_glow.png";
+        turret.volume_occlude = 0.6f;
+        turret.volume_flow_rate = 0.4f;
+        turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
+        turret.lod_pixels = 64.f;
+        turret.lod_fade = 0.25f;
+        turret.lod_group = "fleet";
+        turret.lod_proxy = "card:4,4";
+        turret.lod_proxy_pixels = 24.f;
         doc.entities.push_back(turret);
         const auto spawned = spawn_scene3d(world3, doc);
         check(spawned.size() == 2, "spawn_scene3d creates all entities");
@@ -684,6 +742,75 @@ int main() {
               "spawn_scene3d user data");
         check(world3.get<DoubleSided>(turret_e) != nullptr,
               "spawn_scene3d double-sided marker");
+        const auto *pbr = world3.get<MaterialPbr>(turret_e);
+        check(pbr != nullptr && pbr->metallic == 1.f &&
+                  pbr->roughness == 0.25f && pbr->emissive == "maps/glow.png" &&
+                  pbr->emissive_strength == 4.f && pbr->night_emissive == 1.f &&
+                  pbr->environment == "maps/env.png" &&
+                  pbr->environment_strength == 0.6f &&
+                  pbr->metallic_roughness == "maps/mr.png" &&
+                  pbr->alpha_cutout == 0.4f && pbr->uv_tile_x == 3.f &&
+                  pbr->uv_tile_y == 1.5f,
+              "spawn_scene3d materialpbr component");
+        const auto *shell = world3.get<AtmosphereShell>(turret_e);
+        check(shell != nullptr && shell->strength == 2.f &&
+                  shell->power == 4.f && shell->r == 0.2f &&
+                  shell->b == 0.8f,
+              "spawn_scene3d atmosphere component");
+        check(world3.get<MaterialPbr>(ship_e) == nullptr &&
+                  world3.get<AtmosphereShell>(ship_e) == nullptr,
+              "defaults do not attach material extensions");
+        const auto *vr = world3.get<VisibleRange>(turret_e);
+        check(vr != nullptr && vr->range == 400.f && vr->fade == .2f,
+              "spawn_scene3d visible-range component");
+        check(world3.get<VisibleRange>(ship_e) == nullptr,
+              "unset range does not attach a component");
+        const auto *ms = world3.get<MaterialSurface>(turret_e);
+        check(ms != nullptr && ms->normal_map == "maps/turret_n.png" &&
+                  ms->properties_map.empty() &&
+                  ms->cloud_map == "maps/turret_clouds.png" &&
+                  ms->normal_strength == 0.9f &&
+                  ms->cloud_opacity == 0.7f && ms->cloud_albedo == 0.8f &&
+                  ms->cloud_height == 0.05f &&
+                  ms->cloud_offset_x == 0.1f && ms->cloud_offset_y == 0.2f &&
+                  ms->terminator_wrap == 0.5f && ms->limb_darkening == 0.6f &&
+                  ms->limb_darkening_q == 0.3f &&
+                  ms->band_shear == -0.3f && ms->orbital_beaming == 0.65f &&
+                  ms->forward_scatter == 0.4f && ms->band_waves == 0.7f &&
+                  ms->band_drift == 0.12f && ms->band_turbulence == 1.4f,
+              "spawn_scene3d materialsurface component");
+        check(world3.get<MaterialSurface>(ship_e) == nullptr,
+              "defaults do not attach a surface component");
+        const auto *ml = world3.get<MeshLods>(turret_e);
+        check(ml != nullptr && ml->specs.size() == 2 &&
+                  ml->specs[0] == "models/turret_mid.obj" &&
+                  ml->specs[1] == "models/turret_low.obj" &&
+                  ml->pixels == 64.f && ml->fade == 0.25f &&
+                  ml->group == "fleet" && ml->proxy == "card:4,4" &&
+                  ml->group_pixels == 24.f,
+              "spawn_scene3d meshlods component");
+        check(world3.get<MeshLods>(ship_e) == nullptr,
+              "no LOD chain does not attach a component");
+        const auto *sp = world3.get<StarPhotosphere>(turret_e);
+        check(sp != nullptr && sp->kelvin == 5800.0,
+              "spawn_scene3d starphotosphere component");
+        check(world3.get<StarPhotosphere>(ship_e) == nullptr,
+              "no starKelvin does not attach a component");
+        const auto *ad = world3.get<AccretionDisc>(turret_e);
+        check(ad != nullptr && ad->inner == 0.3f && ad->outer == 1.f &&
+                  ad->kelvin == 12000.f && ad->beaming == -0.6f,
+              "spawn_scene3d accretiondisc component");
+        check(world3.get<AccretionDisc>(ship_e) == nullptr,
+              "no accretion key does not attach a component");
+        const auto *ev = world3.get<EmissionVolume>(turret_e);
+        check(ev != nullptr && ev->depth == 0.3f && ev->density == 6.f &&
+                  ev->seed == 2.f && ev->steps == 24 && ev->scatter == 0.5f &&
+                  ev->flow == 1.5f && ev->distort == 0.05f &&
+                  ev->blend == 0.4f && ev->image2 == "maps/turret_glow.png" &&
+                  ev->occlude == 0.6f && ev->flow_rate == 0.4f,
+              "spawn_scene3d emissionvolume component");
+        check(world3.get<EmissionVolume>(ship_e) == nullptr,
+              "no volume key does not attach a component");
         check(world3.get<Lifetime>(turret_e)->remaining == 3.f,
               "spawn_scene3d lifetime");
         const auto *pt = world3.get<Parent3D>(turret_e);
@@ -721,6 +848,58 @@ int main() {
                   restored.get<Parent3D>(*re_turret) != nullptr,
               "parent3d attachment survives restore");
         if (re_turret) {
+            const auto *rp = restored.get<MaterialPbr>(*re_turret);
+            check(rp != nullptr && rp->metallic == 1.f &&
+                      rp->emissive == "maps/glow.png" &&
+                      rp->environment == "maps/env.png" &&
+                      rp->uv_tile_x == 3.f && rp->alpha_cutout == 0.4f,
+                  "materialpbr codec round-trips");
+            const auto *ra = restored.get<AtmosphereShell>(*re_turret);
+            check(ra != nullptr && ra->strength == 2.f && ra->power == 4.f,
+                  "atmosphere codec round-trips");
+            const auto *rv = restored.get<VisibleRange>(*re_turret);
+            check(rv != nullptr && rv->range == 400.f && rv->fade == .2f,
+                  "visiblerange codec round-trips");
+            const auto *rms = restored.get<MaterialSurface>(*re_turret);
+            check(rms != nullptr && rms->cloud_map == "maps/turret_clouds.png" &&
+                      rms->normal_map == "maps/turret_n.png" &&
+                      rms->cloud_albedo == 0.8f &&
+                      rms->cloud_height == 0.05f &&
+                      rms->terminator_wrap == 0.5f &&
+                      rms->limb_darkening == 0.6f &&
+                      rms->limb_darkening_q == 0.3f &&
+                      rms->band_shear == -0.3f &&
+                      rms->orbital_beaming == 0.65f &&
+                      rms->forward_scatter == 0.4f &&
+                      rms->band_waves == 0.7f &&
+                      rms->band_drift == 0.12f &&
+                      rms->band_turbulence == 1.4f &&
+                      rms->cloud_offset_y == 0.2f,
+                  "materialsurface codec round-trips");
+            const auto *rml = restored.get<MeshLods>(*re_turret);
+            check(rml != nullptr && rml->specs.size() == 2 &&
+                      rml->specs[1] == "models/turret_low.obj" &&
+                      rml->pixels == 64.f && rml->fade == 0.25f &&
+                      rml->group == "fleet" && rml->proxy == "card:4,4" &&
+                      rml->group_pixels == 24.f,
+                  "meshlods codec round-trips");
+            const auto *rsp = restored.get<StarPhotosphere>(*re_turret);
+            check(rsp != nullptr && rsp->kelvin == 5800.0,
+                  "starphotosphere codec round-trips");
+            const auto *rad = restored.get<AccretionDisc>(*re_turret);
+            check(rad != nullptr && rad->inner == 0.3f &&
+                      rad->kelvin == 12000.f && rad->beaming == -0.6f,
+                  "accretiondisc codec round-trips");
+            const auto *rev = restored.get<EmissionVolume>(*re_turret);
+            check(rev != nullptr && rev->depth == 0.3f &&
+                      rev->density == 6.f && rev->steps == 24 &&
+                      rev->scatter == 0.5f && rev->flow == 1.5f &&
+                      rev->distort == 0.05f && rev->blend == 0.4f &&
+                      rev->image2 == "maps/turret_glow.png" &&
+                      rev->occlude == 0.6f && rev->flow_rate == 0.4f,
+                  "emissionvolume codec round-trips");
+        }
+        if (re_turret) {
             resolve_hierarchy3d(restored);
             check(restored.get<Transform3D>(*re_turret)->x == 22.f,
                   "restored 3d child still follows");
@@ -737,6 +916,57 @@ int main() {
               "scene3d_from_world round-trips fields");
         check(out.entities[1].parent == "ship",
               "scene3d_from_world exports the parent link");
+        check(out.entities[1].metallic == 1.f &&
+                  out.entities[1].emissive == "maps/glow.png" &&
+                  out.entities[1].environment_strength == 0.6f &&
+                  out.entities[1].uv_tile_x == 3.f &&
+                  out.entities[1].atmo_strength == 2.f &&
+                  out.entities[1].atmo_b == 0.8f &&
+                  out.entities[1].visible_range == 400.f &&
+                  out.entities[1].visible_fade == .2f,
+              "scene3d_from_world exports material extensions");
+        check(out.entities[1].normal_map == "maps/turret_n.png" &&
+                  out.entities[1].cloud_map == "maps/turret_clouds.png" &&
+                  out.entities[1].normal_strength == 0.9f &&
+                  out.entities[1].cloud_opacity == 0.7f &&
+                  out.entities[1].cloud_albedo == 0.8f &&
+                  out.entities[1].cloud_height == 0.05f &&
+                  out.entities[1].cloud_offset_y == 0.2f &&
+                  out.entities[1].terminator_wrap == 0.5f &&
+                  out.entities[1].limb_darkening == 0.6f &&
+                  out.entities[1].limb_darkening_q == 0.3f &&
+                  out.entities[1].band_shear == -0.3f &&
+                  out.entities[1].orbital_beaming == 0.65f &&
+                  out.entities[1].star_kelvin == 5800.0 &&
+                  out.entities[1].accretion[0] == 0.3f &&
+                  out.entities[1].accretion[2] == 12000.f &&
+                  out.entities[1].accretion[3] == -0.6f &&
+                  out.entities[1].forward_scatter == 0.4f &&
+                  out.entities[1].band_waves == 0.7f &&
+                  out.entities[1].band_drift == 0.12f &&
+                  out.entities[1].band_turbulence == 1.4f,
+              "scene3d_from_world exports surface response");
+        check(out.entities[1].texture == "maps/turret.png" &&
+                  out.entities[1].volume_depth == 0.3f &&
+                  out.entities[1].volume_density == 6.f &&
+                  out.entities[1].volume_seed == 2.f &&
+                  out.entities[1].volume_steps == 24 &&
+                  out.entities[1].volume_scatter == 0.5f &&
+                  out.entities[1].volume_flow == 1.5f &&
+                  out.entities[1].volume_distort == 0.05f &&
+                  out.entities[1].volume_blend == 0.4f &&
+                  out.entities[1].volume_image2 == "maps/turret_glow.png" &&
+                  out.entities[1].volume_occlude == 0.6f &&
+                  out.entities[1].volume_flow_rate == 0.4f,
+              "scene3d_from_world exports the emission volume");
+        check(out.entities[1].lod_meshes.size() == 2 &&
+                  out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&
+                  out.entities[1].lod_pixels == 64.f &&
+                  out.entities[1].lod_fade == 0.25f &&
+                  out.entities[1].lod_group == "fleet" &&
+                  out.entities[1].lod_proxy == "card:4,4" &&
+                  out.entities[1].lod_proxy_pixels == 24.f,
+              "scene3d_from_world exports the LOD chain and group");
 
         // Geometry: box primitive topology + OBJ parse/malformed reject.
         const auto box = stellar::native_map::box_mesh(2.f, 1.f, 1.f);
@@ -763,6 +993,10 @@ int main() {
         check(resolve_mesh_spec("box", nullptr) != nullptr &&
                   resolve_mesh_spec("bogus", nullptr) == nullptr,
               "resolve_mesh_spec primitives and rejection");
+        const auto card = resolve_mesh_spec("card:2,1", nullptr);
+        check(card != nullptr && card->billboard() &&
+                  card->bounds_max().x == 1.f,
+              "resolve_mesh_spec card spec did not build a billboard");
         // Ray straight down over the ship: box:2,1,1 scaled 2, yaw 90 —
         // top face sits at y = 5 + 0.5*2 = 6 → distance 4 from y=10.
         const auto down = raycast_world3d(restored, entities3d(restored),

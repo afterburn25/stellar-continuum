@@ -27,6 +27,26 @@ Vec3 blackbody_light_color(double kelvin,double reference_kelvin){
   const double peak=*std::max_element(bands.begin(),bands.end());
   return {static_cast<float>(bands[0]/peak),static_cast<float>(bands[1]/peak),static_cast<float>(bands[2]/peak)};
 }
+Material3D star_photosphere3d(double kelvin){
+  const auto color=blackbody_light_color(kelvin); // also bounds-checks
+  const auto encode=[](float linear){
+    linear=std::clamp(linear,0.f,1.f);
+    const float srgb=linear<=0.0031308f?12.92f*linear:1.055f*std::pow(linear,1.f/2.4f)-0.055f;
+    return static_cast<std::uint8_t>(std::lround(srgb*255.f));
+  };
+  Material3D m;
+  m.tint={encode(color.x),encode(color.y),encode(color.z),255};
+  // Self-luminous: the ambient term bypasses light_color, so the disc
+  // shows the true Planckian tint instead of a squared blackbody.
+  m.ambient=1.f;m.diffuse=0.f;
+  m.light_color=color; // the photosphere is its scene's key light
+  m.linear_light=true; // sRGB bytes decode back to the linear blackbody
+  // Linear limb coefficient falls with temperature — convective
+  // envelopes darken more (Sun ~0.64 at 5778 K, M dwarfs ~0.85,
+  // O stars ~0.3). Clamped to the observed [0.2,0.95] envelope.
+  m.limb_darkening=std::clamp(static_cast<float>(2.762-0.55*std::log10(kelvin)),.2f,.95f);
+  return m;
+}
 namespace {
 bool bounded(double x,double limit){return std::isfinite(x)&&std::abs(x)<=limit;}
 bool valid(Vec3 v){return bounded(v.x,1e6)&&bounded(v.y,1e6)&&bounded(v.z,1e6);}
@@ -62,24 +82,38 @@ void validate_instance(const MeshInstance3D& i){
     throw std::invalid_argument("3D instance requires a mesh and finite bounded transform.");
   (void)normalized(i.rotation);const auto& m=i.material;
   if(!bounded(m.ambient,1)||m.ambient<0||!bounded(m.diffuse,1)||m.diffuse<0||
-     !bounded(m.opacity,1)||m.opacity<0||!bounded(m.dark_side_strength,16)||m.dark_side_strength<0)
+     !bounded(m.opacity,1)||m.opacity<0||!bounded(m.dark_side_strength,16)||m.dark_side_strength<0||
+     !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0||!bounded(m.limb_darkening_q,1)||m.limb_darkening_q<0||
+     !bounded(m.band_shear,.5f)||!bounded(m.band_waves,1.f)||m.band_waves<0||
+     !bounded(m.band_drift,.25f)||!bounded(m.band_turbulence,8.f)||
+     !bounded(m.orbital_beaming,1.f)||!bounded(m.forward_scatter,1.f))
     throw std::invalid_argument("3D material lighting and opacity must be finite and bounded.");
+  if(i.lod_meshes.size()>8||!bounded(i.lod_pixels,4096)||i.lod_pixels<1.f||
+     !bounded(i.lod_fade,.5f)||i.lod_fade<0.f)
+    throw std::invalid_argument("3D instance LOD chains allow at most 8 levels with a 1..4096px switch and a [0,.5] fade.");
+  for(const auto& lod:i.lod_meshes)
+    if(!lod)throw std::invalid_argument("3D instance LOD meshes must not be null.");
+  if(!i.lod_group.empty()){
+    if(!i.lod_group_proxy||!bounded(i.lod_group_pixels,4096)||i.lod_group_pixels<1.f)
+      throw std::invalid_argument("3D grouped instances require a proxy mesh and a 1..4096px collapse size.");
+  }
   if(m.light_direction)(void)normalized(*m.light_direction);
   for(const auto& l:m.additional_lights){(void)normalized(l.direction);if(!valid(l.color)||l.color.x<0||l.color.y<0||l.color.z<0||l.color.x>4||l.color.y>4||l.color.z>4||!bounded(l.intensity,16)||l.intensity<0)throw std::invalid_argument("Invalid additional light");}
   if(!valid(m.light_color)||m.light_color.x<0||m.light_color.y<0||m.light_color.z<0||
      m.light_color.x>4||m.light_color.y>4||m.light_color.z>4||!bounded(m.light_intensity,16)||m.light_intensity<0||!bounded(m.rim_power,16)||m.rim_power<0)
     throw std::invalid_argument("3D light color, intensity and rim response must be bounded.");
   if(m.surface_effect){const auto& e=*m.surface_effect;
-    if(!e.next_texture||!bounded(e.blend,1)||e.blend<0||!bounded(e.flow_phase,1e6)||!bounded(e.distortion,.1)||e.distortion<0||!valid(e.view_sphere_center)||!bounded(e.sphere_radius,1e5)||e.sphere_radius<0)
+    if(!e.next_texture||!bounded(e.blend,1)||e.blend<0||!bounded(e.flow_phase,1e6)||!bounded(e.flow_rate,64)||!bounded(e.distortion,.1)||e.distortion<0||!valid(e.view_sphere_center)||!bounded(e.sphere_radius,1e5)||e.sphere_radius<0||!bounded(e.occlude,1e5)||e.occlude<0)
       throw std::invalid_argument("Invalid surface effect sequence or occlusion sphere");
     if(!bounded(e.volume_depth,.75)||e.volume_depth<0||!bounded(e.volume_density,32)||e.volume_density<=0||
        !bounded(e.volume_seed,1e4)||e.volume_steps<8||e.volume_steps>64||
+       !bounded(e.volume_scatter,1)||e.volume_scatter<0||
        (e.volume_depth>0&&(!m.transparent||!m.texture)))
       throw std::invalid_argument("Invalid emission volume depth, density or integration budget");
   }
   if(m.surface_response){const auto& s=*m.surface_response;
-    if(!s.properties||!s.normal||!bounded(s.normal_strength,2)||s.normal_strength<0||!bounded(s.relief,.02)||s.relief<0||!bounded(s.cloud_opacity,1)||s.cloud_opacity<0||!bounded(s.cloud_offset.x,2)||!bounded(s.cloud_offset.y,2))
-      throw std::invalid_argument("3D surface response requires normal/properties maps and bounded parameters.");
+    if((!s.properties&&!s.normal&&!s.cloud_shadow)||!bounded(s.normal_strength,2)||s.normal_strength<0||!bounded(s.relief,.02)||s.relief<0||!bounded(s.cloud_opacity,1)||s.cloud_opacity<0||!bounded(s.cloud_albedo,1)||s.cloud_albedo<0||!bounded(s.cloud_offset.x,2)||!bounded(s.cloud_offset.y,2)||!bounded(s.cloud_height,.1)||s.cloud_height<0)
+      throw std::invalid_argument("3D surface response requires at least one map and bounded parameters.");
   }
   if(m.shadow){const auto& s=*m.shadow;
     if(!valid(s.position)||!bounded(s.scale,1e5)||s.scale<1e-8f||
@@ -105,6 +139,26 @@ void validate_instance(const MeshInstance3D& i){
        !bounded(d.specular_strength,16)||d.specular_strength<0||!bounded(d.surface_relief,.1)||d.surface_relief<0)
       throw std::invalid_argument("3D dielectric requires an environment and bounded optical properties.");
   }
+  if(m.pbr){const auto& p=*m.pbr;
+    if(!bounded(p.metallic,1)||p.metallic<0||!bounded(p.roughness,1)||p.roughness<.04f||
+       !bounded(p.emissive_strength,64)||p.emissive_strength<0||!bounded(p.night_emissive,1)||p.night_emissive<0||
+       !bounded(p.environment_strength,16)||p.environment_strength<0||!valid(p.emissive_tint)||
+       p.emissive_tint.x<0||p.emissive_tint.y<0||p.emissive_tint.z<0)
+      throw std::invalid_argument("3D PBR surface requires bounded metallic, roughness, emissive and environment parameters.");
+  }
+  if(m.atmosphere){const auto& a=*m.atmosphere;
+    if(!bounded(a.strength,16)||a.strength<0||!bounded(a.power,16)||a.power<.5f||
+       !bounded(a.night_floor,1)||a.night_floor<0||!valid(a.tint)||
+       a.tint.x<0||a.tint.y<0||a.tint.z<0)
+      throw std::invalid_argument("3D atmosphere requires bounded strength, power, floor and tint.");
+  }
+  if(!bounded(m.alpha_threshold,1)||m.alpha_threshold<0||
+     !bounded(m.texture_tiling.x,64)||m.texture_tiling.x<.01f||
+     !bounded(m.texture_tiling.y,64)||m.texture_tiling.y<.01f)
+    throw std::invalid_argument("3D alpha threshold and texture tiling must be finite and bounded.");
+  if(!bounded(i.visible_range,1e12)||i.visible_range<0||
+     !bounded(i.visible_fade,.5f)||i.visible_fade<0.f)
+    throw std::invalid_argument("3D visible range must be finite and non-negative with a [0,.5] fade.");
 }
 }
 Quaternion rotation_axis_angle(Vec3 axis,float radians){
@@ -138,6 +192,16 @@ std::shared_ptr<const Mesh3D> Mesh3D::create(std::vector<Vertex3D> vertices,std:
   for(auto i:indices)if(i>=vertices.size())throw std::invalid_argument("3D mesh index is outside its vertex array.");
   return std::shared_ptr<const Mesh3D>(new Mesh3D(std::move(vertices),std::move(indices),radius,bounds_min,bounds_max));
 }
+std::shared_ptr<const Mesh3D> Mesh3D::billboard_card(float width,float height){
+  if(!bounded(width,1e4)||width<1e-6f||!bounded(height,1e4)||height<1e-6f)
+    throw std::invalid_argument("3D billboard card requires positive bounded dimensions.");
+  const float hw=width*.5f,hh=height*.5f;
+  const Vec3 n{0,0,1};
+  std::vector<Vertex3D> vertices{{{-hw,-hh,0},n,{0,1}},{{hw,-hh,0},n,{1,1}},{{hw,hh,0},n,{1,0}},{{-hw,hh,0},n,{0,0}}};
+  const float radius=std::hypot(hw,hh);
+  const Vec3 lo{-hw,-hh,0},hi{hw,hh,0};
+  return std::shared_ptr<const Mesh3D>(new Mesh3D(std::move(vertices),{0,1,2,0,2,3},radius,lo,hi,true));
+}
 std::shared_ptr<const Mesh3D> Mesh3D::uv_sphere(int columns,int rows){
   if(columns<3||rows<2||columns>512||rows>256)throw std::invalid_argument("3D sphere tessellation is out of range.");
   std::vector<Vertex3D> vertices;std::vector<std::uint32_t> indices;
@@ -155,9 +219,35 @@ std::shared_ptr<const Mesh3D> Mesh3D::uv_sphere(int columns,int rows){
   }
   return create(std::move(vertices),std::move(indices));
 }
-std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light){
+std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map,std::shared_ptr<const RgbaImage> environment){
   validate_camera(camera);camera.orientation=normalized(camera.orientation);light=normalized(light);
+  if(shadow_map){
+    const auto& s=*shadow_map;
+    if(!bounded(s.extent,1e9)||s.extent<=0||!bounded(s.distance,1e12)||s.distance<0||
+       !bounded(s.depth,1e9)||s.depth<=0||!bounded(s.strength,1)||s.strength<0||
+       !bounded(s.bias,.1)||s.bias<0||(s.resolution&&(s.resolution<64||s.resolution>8192)))
+      throw std::invalid_argument("3D shadow map requires positive extent/depth, bounded distance, strength, bias and resolution.");
+  }
   if(instances.size()>maximum_scene3d_instances)throw std::length_error("3D scene exceeds its instance budget.");
+  if(point_lights.size()>maximum_scene3d_point_lights)throw std::length_error("3D scene exceeds its point light budget.");
+  for(const auto& l:point_lights)
+    if(!valid(l.position)||!valid(l.color)||l.color.x<0||l.color.y<0||l.color.z<0||
+       l.color.x>4||l.color.y>4||l.color.z>4||!bounded(l.intensity,1e4)||l.intensity<0||
+       !bounded(l.range,1e6)||l.range<0)
+      throw std::invalid_argument("3D point light requires a bounded position, color, intensity and range.");
+  std::size_t shadowed_spots=0;
+  for(const auto& l:point_lights){
+    const double d2=l.spot_direction.x*l.spot_direction.x+l.spot_direction.y*l.spot_direction.y+l.spot_direction.z*l.spot_direction.z;
+    if(!std::isfinite(d2)||!std::isfinite(l.spot_inner)||!std::isfinite(l.spot_outer)||
+       (d2>0&&(l.spot_inner<=l.spot_outer||l.spot_inner<=0||l.spot_inner>1||
+               l.spot_outer<0||l.spot_outer>=1)))
+      throw std::invalid_argument("3D spot light requires a finite direction and 0<=outer<inner<=1 cosines.");
+    if(l.casts_shadow){
+      if(d2==0)throw std::invalid_argument("3D omni point light cannot cast a shadow map - spot direction required.");
+      ++shadowed_spots;
+    }
+  }
+  if(shadowed_spots>1)throw std::invalid_argument("3D scene allows at most one shadowed spot light.");
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
   std::size_t geometry=0,images=0;
   for(auto& i:instances){
@@ -174,37 +264,68 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
       if(textures.insert(image.get()).second)images+=texture_mip_layout3d(image.get()).resident_bytes;}
     if(i.material.shadow&&i.material.shadow->opacity_map){const auto& image=i.material.shadow->opacity_map;
       if(textures.insert(image.get()).second)images+=texture_mip_layout3d(image.get()).resident_bytes;}
+    if(i.material.pbr)for(const auto& image:{i.material.pbr->metallic_roughness,i.material.pbr->emissive,i.material.pbr->environment})
+      if(textures.insert(image.get()).second)images+=texture_mip_layout3d(image.get()).resident_bytes;
   }
+  if(environment&&textures.insert(environment.get()).second)images+=texture_mip_layout3d(environment.get()).resident_bytes;
   if(geometry>maximum_mesh3d_cache_bytes||images>maximum_scene3d_texture_cache_bytes||meshes.size()>maximum_scene3d_resource_entries||textures.size()>maximum_scene3d_resource_entries)
     throw std::length_error("3D scene exceeds its resident resource budget.");
-  return std::shared_ptr<const Scene3D>(new Scene3D(camera,std::move(instances),light));
+  return std::shared_ptr<const Scene3D>(new Scene3D(camera,std::move(instances),light,std::move(point_lights),std::move(shadow_map),std::move(environment)));
 }
 PreparedInstance3D prepare_instance3d(const Camera3D& camera,const MeshInstance3D& instance,float aspect){
   validate_camera(camera);validate_instance(instance);
   if(!bounded(aspect,1e4)||aspect<1e-4f)throw std::invalid_argument("3D camera aspect must be positive and bounded.");
   const Position3 delta{instance.position.x-camera.position.x,instance.position.y-camera.position.y,instance.position.z-camera.position.z};
   const double radius=instance.mesh->bounding_radius()*instance.scale;
+  const double distance=std::hypot(delta.x,delta.y,delta.z);
+  // Author distance culling rides the same path as the frustum reject:
+  // beyond visible_range the instance is invisible and draws no demand.
+  if(instance.visible_range>0.f&&distance>static_cast<double>(instance.visible_range)+radius)return {};
   // Reject astronomical offsets in double precision before narrowing.
   const double half_height=camera.projection==Projection3D::Perspective?
       camera.far_plane*std::tan(camera.vertical_fov_radians*.5):camera.orthographic_height*.5;
-  if(std::hypot(delta.x,delta.y,delta.z)>std::hypot(static_cast<double>(camera.far_plane),half_height,half_height*aspect)+radius)return {};
+  if(distance>std::hypot(static_cast<double>(camera.far_plane),half_height,half_height*aspect)+radius)return {};
   auto model=rotation_matrix(instance.rotation);
   for(int c=0;c<3;++c)for(int row=0;row<3;++row)model.values[c*4+row]*=instance.scale;
   model.values[12]=static_cast<float>(delta.x);model.values[13]=static_cast<float>(delta.y);model.values[14]=static_cast<float>(delta.z);
   const auto q=normalized(camera.orientation);const auto view=rotation_matrix({-q.x,-q.y,-q.z,q.w});
   PreparedInstance3D result;result.model_view=multiply(view,model);
   const float x=result.model_view.values[12],y=result.model_view.values[13],z=-result.model_view.values[14];result.camera_depth=z;
-  Matrix4 p;const float n=camera.near_plane,f=camera.far_plane;
+  const float n=camera.near_plane,f=camera.far_plane;
   if(camera.projection==Projection3D::Perspective){
     const float ty=std::tan(camera.vertical_fov_radians*.5f),tx=ty*aspect;
     result.visible=z+radius>=n&&z-radius<=f&&std::abs(x)<=z*tx+radius*std::sqrt(1+tx*tx)&&std::abs(y)<=z*ty+radius*std::sqrt(1+ty*ty);
-    p.values={1/tx,0,0,0,0,1/ty,0,0,0,0,f/(n-f),-1,0,0,n*f/(n-f),0};
   }else{
     const float hy=camera.orthographic_height*.5f,hx=hy*aspect;
     result.visible=z+radius>=n&&z-radius<=f&&std::abs(x)<=hx+radius&&std::abs(y)<=hy+radius;
+  }
+  result.model_view_projection=multiply(projection3d_matrix(camera,aspect),result.model_view);return result;
+}
+Matrix4 projection3d_matrix(const Camera3D& camera,float aspect)noexcept{
+  Matrix4 p;const float n=camera.near_plane,f=camera.far_plane;
+  if(camera.projection==Projection3D::Perspective){
+    const float ty=std::tan(camera.vertical_fov_radians*.5f),tx=ty*aspect;
+    p.values={1/tx,0,0,0,0,1/ty,0,0,0,0,f/(n-f),-1,0,0,n*f/(n-f),0};
+  }else{
+    const float hy=camera.orthographic_height*.5f,hx=hy*aspect;
     p.values={1/hx,0,0,0,0,1/hy,0,0,0,0,1/(n-f),0,0,0,n/(n-f),1};
   }
-  result.model_view_projection=multiply(p,result.model_view);return result;
+  return p;
+}
+std::size_t select_lod3d_level(const MeshInstance3D& instance,float projected_diameter_px)noexcept{
+  std::size_t level=0;float threshold=instance.lod_pixels;
+  while(level<instance.lod_meshes.size()&&projected_diameter_px<threshold){++level;threshold*=.5f;}
+  return level;
+}
+float lod3d_fade_share(const MeshInstance3D& instance,float projected_diameter_px)noexcept{
+  const std::size_t level=select_lod3d_level(instance,projected_diameter_px);
+  // The boundary to the next-coarser level sits at lod_pixels/2^level;
+  // the band is the lod_fade fraction immediately above it.
+  const float threshold=instance.lod_pixels/std::exp2(static_cast<float>(level));
+  const float top=threshold*(1.f+instance.lod_fade);
+  if(instance.lod_fade<=0.f||level>=instance.lod_meshes.size()||
+     projected_diameter_px<threshold||projected_diameter_px>=top)return 0.f;
+  return std::min((top-projected_diameter_px)/(threshold*instance.lod_fade),1.f);
 }
 PreparedShadow3D prepare_shadow3d(const Camera3D& camera,const MeshInstance3D& instance,Vec3 light){
   validate_camera(camera);validate_instance(instance);light=normalized(light);

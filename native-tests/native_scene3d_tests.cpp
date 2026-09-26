@@ -92,6 +92,198 @@ int main()try{
   const auto shadow_point=transform(relative.from_model,{0,1,0,1});
   check(close(shadow_point[0],2)&&close(shadow_point[1],-1)&&close(shadow_point[2],0),"Shadow lost blocker rotation, scale or double precision");
   check(close(relative.light.x,1)&&close(relative.light.y,0),"Shadow light did not transform from camera through world to blocker");
+  // New material blocks reject malformed input at scene validation.
+  rejects([&]{auto i=instance;i.material.alpha_threshold=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.alpha_threshold=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.texture_tiling={0.f,1.f};(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.texture_tiling={1.f,100.f};(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.pbr=PbrSurface3D{};i.material.pbr->metallic=2.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.pbr=PbrSurface3D{};i.material.pbr->roughness=0.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.pbr=PbrSurface3D{};i.material.pbr->night_emissive=2.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->power=.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->strength=-1.f;(void)Scene3D::create(camera,{i});});
+  // Surface response accepts any subset of maps — a cloud-only material is
+  // legal — but still requires at least one and bounds every scalar.
+  {auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});
+   const auto clouded=Scene3D::create(camera,{i});check(clouded->instances()[0].material.surface_response.has_value(),"Cloud-only surface response was rejected");}
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->normal=RgbaImage::create(1,1,{128,128,255,255});i.material.surface_response->normal_strength=2.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_opacity=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_albedo=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_height=.2f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});i.material.surface_response->cloud_height=-.01f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->properties=RgbaImage::create(1,1,{255,0,0,128});i.material.surface_response->cloud_offset={2.5f,0};(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.terminator_wrap=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.terminator_wrap=-.1f;(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.terminator_wrap=.6f;const auto wrapped=Scene3D::create(camera,{i});
+   check(close(wrapped->instances()[0].material.terminator_wrap,.6f),"Terminator wrap did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.limb_darkening=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.limb_darkening=-.1f;(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.limb_darkening=.6f;const auto darkened=Scene3D::create(camera,{i});
+   check(close(darkened->instances()[0].material.limb_darkening,.6f),"Limb darkening did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.limb_darkening_q=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.limb_darkening_q=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.limb_darkening_q=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.limb_darkening_q=.4f;const auto quad=Scene3D::create(camera,{i});
+   check(close(quad->instances()[0].material.limb_darkening_q,.4f),"Quadratic limb coefficient did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.band_shear=.6f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_shear=-.6f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_shear=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.band_shear=-.25f;const auto sheared=Scene3D::create(camera,{i});
+   check(close(sheared->instances()[0].material.band_shear,-.25f),"Band shear did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.band_waves=1.2f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_waves=-.1f;(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.band_shear=.2f;i.material.band_waves=.8f;const auto waved=Scene3D::create(camera,{i});
+   check(close(waved->instances()[0].material.band_waves,.8f),"Band waves did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.band_drift=.3f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_drift=-.3f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_drift=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.band_drift=.1f;const auto drifted=Scene3D::create(camera,{i});
+   check(close(drifted->instances()[0].material.band_drift,.1f),"Band drift did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.band_turbulence=9.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_turbulence=-9.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_turbulence=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.band_turbulence=1.5f;const auto turbed=Scene3D::create(camera,{i});
+   check(close(turbed->instances()[0].material.band_turbulence,1.5f),"Band turbulence did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.orbital_beaming=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.orbital_beaming=-1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.orbital_beaming=.8f;const auto beamed=Scene3D::create(camera,{i});
+   check(close(beamed->instances()[0].material.orbital_beaming,.8f),"Orbital beaming did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.forward_scatter=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.forward_scatter=-.6f;const auto phased=Scene3D::create(camera,{i});
+   check(close(phased->instances()[0].material.forward_scatter,-.6f),"Forward scatter did not survive scene creation");}
+  {const auto tex=RgbaImage::create(1,1,{255,255,255,255});
+   MeshInstance3D plasma;plasma.mesh=volume;plasma.material.transparent=true;plasma.material.texture=tex;
+   SurfaceEffect3D effect;effect.next_texture=tex;effect.volume_depth=.3f;
+   plasma.material.surface_effect=effect;
+   rejects([&]{auto i=plasma;i.material.surface_effect->volume_scatter=-.1f;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=plasma;i.material.surface_effect->volume_scatter=1.1f;(void)Scene3D::create(camera,{i});});
+   plasma.material.surface_effect->volume_scatter=.8f;
+   rejects([&]{auto i=plasma;i.material.surface_effect->flow_rate=70.f;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=plasma;i.material.surface_effect->flow_rate=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+   plasma.material.surface_effect->flow_rate=.5f;
+   check(Scene3D::create(camera,{plasma})!=nullptr,"Legal volume scatter rejected");}
+  rejects([&]{(void)star_photosphere3d(50);});
+  rejects([&]{(void)star_photosphere3d(2e5);});
+  rejects([&]{(void)star_photosphere3d(std::numeric_limits<double>::quiet_NaN());});
+  {const auto sun=star_photosphere3d(5778);
+   check(sun.ambient==1.f&&sun.diffuse==0.f&&sun.linear_light,"Star preset is not emissive-dominant");
+   check(sun.limb_darkening>.6f&&sun.limb_darkening<.75f,"Solar limb coefficient off the observed envelope");
+   check(sun.tint.r>=sun.tint.b,"Solar tint should not be blue");
+   const auto dwarf=star_photosphere3d(3200);
+   check(dwarf.tint.r>dwarf.tint.b&&dwarf.limb_darkening>sun.limb_darkening,"Cool star lost its red tint or stronger limb darkening");
+   const auto ostar=star_photosphere3d(30000);
+   check(ostar.tint.b>ostar.tint.r&&ostar.limb_darkening<sun.limb_darkening,"Hot star lost its blue tint or weaker limb darkening");}
+  rejects([&]{(void)accretion_disc_material3d(0,1,8000);});
+  rejects([&]{(void)accretion_disc_material3d(2,1,8000);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1,50);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1,8000,2.f);});
+  {const auto disc=accretion_disc_material3d(0.5f,1.f,8000);
+   check(disc.texture&&disc.texture->width()==256&&disc.texture->height()==1,
+       "Accretion disc did not generate its radial texture");
+   check(disc.ambient==1.f&&disc.diffuse==0.f&&disc.linear_light,
+       "Accretion disc is not emissive-dominant");
+   check(disc.double_sided&&disc.orbital_beaming>.5f&&disc.anisotropic_texture,
+       "Accretion disc lost its sheet/beaming/minification settings");
+   const auto &px=disc.texture->pixels();
+   const auto lum=[&](int u){return px[u*4]*3+px[u*4+1]*4+px[u*4+2];};
+   check(lum(4)>lum(250)*2,"Shakura-Sunyaev profile lost its inner-edge luminance");
+   check(px[250*4+2]<px[4*4+2]&&px[250*4+0]>px[250*4+2],
+       "Accretion outer rim did not cool redward of the inner edge");
+   const auto repeat=accretion_disc_material3d(0.5f,1.f,8000);
+   check(repeat.texture->pixels()==disc.texture->pixels(),"Accretion texture is not deterministic");}
+  {PointLight3D light;light.position={0,0,1};light.intensity=2;light.range=50;
+   const auto lit=Scene3D::create(camera,{instance},{0,0,1},{light});
+   check(lit->point_lights().size()==1,"Scene dropped its point light");}
+  rejects([&]{std::vector<PointLight3D> too_many(maximum_scene3d_point_lights+1);(void)Scene3D::create(camera,{instance},{0,0,1},too_many);});
+  rejects([&]{PointLight3D l;l.position={std::numeric_limits<double>::infinity(),0,0};(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D l;l.intensity=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  {PointLight3D l;l.position={0,0,1};l.spot_direction={0,0,-1};l.spot_inner=.97f;l.spot_outer=.9f;
+   const auto spotted=Scene3D::create(camera,{instance},{0,0,1},{l});
+   check(spotted->point_lights().size()==1&&close(spotted->point_lights()[0].spot_inner,.97f),
+       "Scene dropped a valid spot light");}
+  rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_inner=.9f;l.spot_outer=.95f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_inner=1.f;l.spot_outer=1.f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_outer=-.1f;l.spot_inner=.5f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D l;l.spot_inner=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  // Spot shadows: spot-only, at most one shadowed spot per scene.
+  {PointLight3D l;l.position={0,0,1};l.spot_direction={0,0,-1};l.spot_inner=.97f;l.spot_outer=.9f;l.casts_shadow=true;
+   const auto shadowed=Scene3D::create(camera,{instance},{0,0,1},{l});
+   check(shadowed->point_lights().size()==1&&shadowed->point_lights()[0].casts_shadow,
+       "Scene dropped a valid shadowed spot light");}
+  rejects([&]{PointLight3D l;l.casts_shadow=true;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D a,b;a.spot_direction={0,0,-1};b.spot_direction={1,0,0};a.casts_shadow=b.casts_shadow=true;
+              (void)Scene3D::create(camera,{instance},{0,0,1},{a,b});});
+  // Directional shadow map settings validate bounds; a valid map round-trips.
+  {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;
+   const auto mapped=Scene3D::create(camera,{instance},{0,0,1},{},config);
+   check(mapped->shadow_map()&&mapped->shadow_map()->extent==4&&mapped->shadow_map()->resolution==512,"Scene dropped its shadow map settings");}
+  {// Scene environment probe: an optional shared IBL map that fills
+   // materials which opt in via environment_strength without their own.
+   const auto env=RgbaImage::create(1,1,{0,128,255,255});
+   const auto probed=Scene3D::create(camera,{instance},{0,0,1},{},{},env);
+   check(probed->environment()==env,"Scene dropped its environment probe");
+   const auto unprobed=Scene3D::create(camera,{instance});
+   check(!unprobed->environment(),"Scene invented an environment probe");}
+  rejects([&]{ShadowMap3D s;s.extent=0;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.depth=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.strength=1.5f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.bias=-.001f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.distance=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.resolution=32;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  // Distance culling: visible_range bounds the camera-to-surface distance;
+  // 0 leaves the instance visible at any range.
+  {auto ranged=instance;ranged.position={};ranged.visible_range=4;
+   check(prepare_instance3d(camera,ranged,1).visible,"Instance inside its visible range was culled");
+   ranged.visible_range=1.5f;check(!prepare_instance3d(camera,ranged,1).visible,"Instance beyond its visible range stayed visible");
+   ranged.visible_range=0;check(prepare_instance3d(camera,ranged,1).visible,"Zero visible range culled the instance");
+   rejects([&]{auto i=instance;i.visible_range=-1;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.visible_range=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.visible_fade=.6f;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.visible_fade=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
+  // Screen-space LOD: the level is a pure function of projected diameter
+  // — each chain step halves the switch threshold.
+  {auto loded=instance;loded.lod_meshes={sphere,sphere};
+   check(select_lod3d_level(loded,64)==0,"Full-size instance picked a LOD mesh");
+   check(select_lod3d_level(loded,31)==1,"First LOD level did not engage at the switch size");
+   check(select_lod3d_level(loded,15)==2,"Second LOD level did not halve the switch size");
+   check(select_lod3d_level(loded,1)==2,"LOD selection ran past the end of the chain");
+   const auto flat=instance;check(select_lod3d_level(flat,1)==0,"Empty LOD chain picked a level");
+   rejects([&]{auto i=instance;i.lod_meshes.assign(9,sphere);(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_meshes={nullptr};(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_meshes={sphere};i.lod_pixels=0;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_meshes={sphere};i.lod_pixels=8192;(void)Scene3D::create(camera,{i});});
+   const auto lscene=Scene3D::create(camera,{loded});
+   check(lscene->instances()[0].lod_meshes.size()==2,"Scene dropped its LOD chain");}
+  // Screen-door LOD fade: the coarser level's share ramps 0->1 across the
+  // band immediately above each switch threshold; 0 disables it outright.
+  {auto fading=instance;fading.lod_meshes={sphere,sphere};fading.lod_pixels=100;fading.lod_fade=.2f;
+   check(lod3d_fade_share(fading,140)==0.f,"LOD fade leaked above the transition band");
+   check(std::abs(lod3d_fade_share(fading,110)-.5f)<1e-6f,"LOD fade midpoint share was not .5");
+   check(lod3d_fade_share(fading,100)==1.f,"LOD fade did not reach the full coarse share at the switch");
+   check(lod3d_fade_share(fading,90)==0.f,"LOD fade engaged below the switch threshold");
+   check(std::abs(lod3d_fade_share(fading,55)-.5f)<1e-6f,"LOD fade did not scale to the second-level band");
+   auto off=fading;off.lod_fade=0;
+   check(lod3d_fade_share(off,110)==0.f,"Zero fade width still produced a share");
+   rejects([&]{auto i=instance;i.lod_fade=.6f;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_fade=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
+  // Group proxy LOD: a grouped instance needs a resolved proxy mesh and
+  // a bounded collapse size; ungrouped instances keep the feature off.
+  {auto grouped=instance;grouped.lod_group="fleet";grouped.lod_group_proxy=sphere;grouped.lod_group_pixels=24;
+   check(Scene3D::create(camera,{grouped})->instances()[0].lod_group=="fleet","Scene dropped the LOD group");
+   rejects([&]{auto i=instance;i.lod_group="fleet";(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_group="fleet";i.lod_group_proxy=sphere;i.lod_group_pixels=0;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=instance;i.lod_group="fleet";i.lod_group_proxy=sphere;i.lod_group_pixels=8192;(void)Scene3D::create(camera,{i});});}
+  // Billboard cards: a camera-facing quad for LOD impostors and sprite
+  // markers — the renderer drops its view-space rotation at draw time.
+  {const auto card=Mesh3D::billboard_card(2.f,1.f);
+   check(card->billboard()&&!sphere->billboard(),"Billboard flag did not distinguish the card mesh");
+   check(std::abs(card->bounding_radius()-std::hypot(1.f,.5f))<1e-5f,"Billboard card bounds did not match its dimensions");
+   check(card->vertices().size()==4&&card->indices().size()==6,"Billboard card is not a single quad");
+   rejects([]{(void)Mesh3D::billboard_card(0,1);});
+   rejects([]{(void)Mesh3D::billboard_card(1,std::numeric_limits<float>::quiet_NaN());});}
   for(int field=0;field<8;++field){auto invalid=receiver;auto& s=*invalid.material.shadow;
     if(field==0)s.scale=0;if(field==1)s.position.x=std::numeric_limits<double>::infinity();
     if(field==2)s.rotation={0,0,0,0};if(field==3)s.radii.y=0;
