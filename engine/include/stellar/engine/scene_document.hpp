@@ -353,7 +353,8 @@ struct Scene3dDocument {
   // halo above its luminance threshold, contrast pivots about 0.18.
   float exposure{1.f};
   float bloom{0.f}, bloom_threshold{1.f};
-  float contrast{1.f}, saturation{1.f}, sharpen{0.f};
+  // vignette is a post-tonemap corner darkening (0 = off, 1 = full).
+  float contrast{1.f}, saturation{1.f}, sharpen{0.f}, vignette{0.f};
   // Quality tier for expensive per-view effects: low|medium|high|ultra.
   std::string quality{"high"};
   // Diagnostic shading override for the 3D view:

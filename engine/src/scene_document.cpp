@@ -537,13 +537,14 @@ std::string Scene3dDocument::to_json() const {
   }
   if (exposure != 1.f || bloom != 0.f || bloom_threshold != 1.f ||
       contrast != 1.f || saturation != 1.f || sharpen != 0.f ||
-      quality != "high" || debug_view != "lit")
+      vignette != 0.f || quality != "high" || debug_view != "lit")
     doc["render"] = {{"exposure", exposure},
                      {"bloom", bloom},
                      {"bloomThreshold", bloom_threshold},
                      {"contrast", contrast},
                      {"saturation", saturation},
                      {"sharpen", sharpen},
+                     {"vignette", vignette},
                      {"quality", quality},
                      {"debug", debug_view}};
   if (shadow_extent > 0.f)
@@ -884,6 +885,7 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       scene.contrast = r.value("contrast", 1.0f);
       scene.saturation = r.value("saturation", 1.0f);
       scene.sharpen = r.value("sharpen", 0.0f);
+      scene.vignette = r.value("vignette", 0.0f);
       scene.quality = r.value("quality", std::string{"high"});
       if (scene.quality != "low" && scene.quality != "medium" &&
           scene.quality != "high" && scene.quality != "ultra")

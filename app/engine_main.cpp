@@ -1932,14 +1932,18 @@ void commit_scene3_field(Shell &shell) {
     doc.bloom = std::clamp(a, 0.f, 8.f);
     doc.bloom_threshold = std::clamp(b, 0.f, 8.f);
     return ok("bloom updated");
-  case 36: // contrast,saturation,sharpen
-    if (!parse_triple(shell.scene3_buffer, a, b, c))
-      return fail("use \"contrast,saturation,sharpen\" like 1.1,1,0.3");
+  case 36: { // contrast,saturation,sharpen[,vignette]
+    float v = 0.f;
+    const auto &text = shell.scene3_buffer;
+    const bool four = parse_quad(text, a, b, c, v);
+    if (!four && !parse_triple(text, a, b, c))
+      return fail("use \"contrast,saturation,sharpen[,vignette]\" like 1.1,1,0.3,0.4");
     commit();
     doc.contrast = std::clamp(a, 0.f, 2.f);
     doc.saturation = std::clamp(b, 0.f, 2.f);
     doc.sharpen = std::clamp(c, 0.f, 1.f);
-    return ok("grading updated");
+    doc.vignette = four ? std::clamp(v, 0.f, 1.f) : 0.f;
+    return ok("grading updated"); }
   case 37: { // quality tier
     const auto &q = shell.scene3_buffer;
     if (q != "low" && q != "medium" && q != "high" && q != "ultra")
@@ -2700,6 +2704,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       view.options.contrast = doc.contrast;
       view.options.saturation = doc.saturation;
       view.options.sharpen = doc.sharpen;
+      view.options.vignette = doc.vignette;
       view.options.quality =
           doc.quality == "low"      ? RenderQuality3D::Low
           : doc.quality == "medium" ? RenderQuality3D::Medium
@@ -3014,10 +3019,11 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_bloom, "bloom s,t",
         fmt_pair(doc.bloom, doc.bloom_threshold), ed(35),
         "strength,threshold - 0 off");
-  field(shell.hit3_grade, "c,s,sharp",
+  field(shell.hit3_grade, "c,s,sharp,vig",
         std::to_string(doc.contrast) + "," + std::to_string(doc.saturation) +
-            "," + std::to_string(doc.sharpen),
-        ed(36), "contrast,saturation,sharpen");
+            "," + std::to_string(doc.sharpen) + "," +
+            std::to_string(doc.vignette),
+        ed(36), "contrast,saturation,sharpen[,vignette]");
   field(shell.hit3_quality, "quality", doc.quality, ed(37),
         "low|medium|high|ultra");
   field(shell.hit3_plights, "pointLights",
@@ -7020,7 +7026,8 @@ int main(int argc, char **argv) {
             else if (shell.hit3_grade.contains(event.position))
               edit3(36, std::to_string(doc.contrast) + "," +
                             std::to_string(doc.saturation) + "," +
-                            std::to_string(doc.sharpen));
+                            std::to_string(doc.sharpen) + "," +
+                            std::to_string(doc.vignette));
             else if (shell.hit3_quality.contains(event.position))
               edit3(37, doc.quality);
             else if (shell.hit3_plights.contains(event.position))

@@ -1144,6 +1144,7 @@ int RuntimeHost::run() {
     impl.render3.contrast = doc.contrast;
     impl.render3.saturation = doc.saturation;
     impl.render3.sharpen = doc.sharpen;
+    impl.render3.vignette = doc.vignette;
     impl.render3.quality =
         doc.quality == "low"      ? native_map::RenderQuality3D::Low
         : doc.quality == "medium" ? native_map::RenderQuality3D::Medium

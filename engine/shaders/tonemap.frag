@@ -9,7 +9,7 @@ layout(set=2,binding=0) uniform sampler2D hdr_source;
 // filling these, so the shader never branches on quality itself.
 layout(set=3,binding=0) uniform PostUniform {
     vec4 a; // exposure, bloom strength, bloom threshold, contrast
-    vec4 b; // saturation, sharpen, unused, unused
+    vec4 b; // saturation, sharpen, vignette, unused
 } post;
 layout(location=0) out vec4 color;
 const float KNEE=0.9;
@@ -60,5 +60,12 @@ void main() {
     // Bloom is added light: lifting alpha by its luminance keeps halos visible
     // where the scene was transparent, instead of being killed by premultiply.
     alpha=clamp(alpha+dot(emit,vec3(0.2126,0.7152,0.0722)),0.0,1.0);
-    color=vec4(tonemap(max(c,vec3(0.0)))*alpha,alpha);
+    vec3 resolved=tonemap(max(c,vec3(0.0)));
+    // Vignette darkens post-tonemap display values so the corner falloff is
+    // perceptually uniform instead of compressing through the knee.
+    if(post.b.z>0.0){
+        vec2 p=texture_uv-vec2(0.5);
+        resolved*=1.0-post.b.z*smoothstep(0.2,1.0,dot(p,p)*2.0);
+    }
+    color=vec4(resolved*alpha,alpha);
 }

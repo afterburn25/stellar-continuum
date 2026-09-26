@@ -510,6 +510,7 @@ int main() {
     scene.contrast = 1.1f;
     scene.saturation = 0.9f;
     scene.sharpen = 0.3f;
+    scene.vignette = 0.4f;
     scene.quality = "ultra";
     scene.debug_view = "normals";
     scene.shadow_extent = 32.f;
@@ -622,7 +623,8 @@ int main() {
       check(reparsed->exposure == 1.25f && reparsed->bloom == 0.6f &&
                 reparsed->bloom_threshold == 0.8f &&
                 reparsed->contrast == 1.1f && reparsed->saturation == 0.9f &&
-                reparsed->sharpen == 0.3f && reparsed->quality == "ultra" &&
+                reparsed->sharpen == 0.3f && reparsed->vignette == 0.4f &&
+                reparsed->quality == "ultra" &&
                 reparsed->debug_view == "normals",
             "scene3d render options round-trip");
       check(reparsed->shadow_extent == 32.f && reparsed->shadow_distance == 48.f &&

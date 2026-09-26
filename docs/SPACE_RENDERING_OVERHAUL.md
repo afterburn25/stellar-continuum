@@ -97,8 +97,10 @@ same document headless-tested.
    probe is a static authored equirect, not a captured/baked probe.
 5. **Post** — landed: HDR tonemap plus per-view `exposure`,
    mip-chain `bloom` (soft threshold), `contrast`/`saturation` grading,
-   unsharp `sharpen`, and 4x MSAA at Ultra when supported. Remaining:
-   no TAA/temporal resolve, no vignette/chromatic-aberration grading.
+   unsharp `sharpen`, post-tonemap `vignette` (corner falloff on the
+   display value, all tiers), and 4x MSAA at Ultra when supported.
+   Remaining: no TAA/temporal resolve, no chromatic-aberration grading
+   (kept out — an effect with no gameplay value).
 6. **Atmosphere** — landed: authorable limb shell (`atmosphere` block /
    `AtmosphereShell` component — color, strength, power, `night_floor`
    day/night limb response). Remaining: still a screen-space limb

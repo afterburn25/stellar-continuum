@@ -115,6 +115,7 @@ struct RenderOptions3D {
   float contrast{1.f};   // 0..2 about mid gray
   float saturation{1.f}; // 0..2
   float sharpen{0.f};    // 0..1 unsharp amount
+  float vignette{0.f};   // 0..1 post-tonemap corner darkening
   DebugView3D debug_view{DebugView3D::Lit};
   // Scene seconds for animated material terms (band_drift, volume
   // flow_rate); the driving host accumulates it per frame. 0 keeps

@@ -691,7 +691,19 @@ int main(int argc,char** argv)try{
     RenderOptions3D ultra;ultra.quality=RenderQuality3D::Ultra;
     const auto msaa=options_view(hot,ultra,"post-ultra-msaa.png");
     check(channel(*msaa,160,160,0)>200,"Ultra tier MSAA resolve produced a blank frame");
-    std::cout<<"post_gpu=exposure_bloom_quality_tiers_msaa_passed\n";
+    // Vignette: a frame-filling quad so the corner falloff lands on the
+    // surface — post-tonemap, so the center keeps its resolved value.
+    auto framed=bright;framed.scale=4;
+    const auto vig_off=options_view(framed,{},"post-vignette-off.png");
+    RenderOptions3D vigned;vigned.vignette=1;
+    const auto vig_on=options_view(framed,vigned,"post-vignette.png");
+    check(channel(*vig_on,4,4,0)+20<channel(*vig_on,160,160,0),
+        "Vignette did not darken the frame corner");
+    check(channel(*vig_off,4,4,0)>channel(*vig_on,4,4,0)+15,
+        "Vignette corner was already dark without the option");
+    check(std::abs(int(channel(*vig_on,160,160,0))-int(channel(*vig_off,160,160,0)))<=4,
+        "Vignette shifted the frame center");
+    std::cout<<"post_gpu=exposure_bloom_quality_tiers_msaa_vignette_passed\n";
   }
   {
     // Debug shading views isolate single channels for material review —

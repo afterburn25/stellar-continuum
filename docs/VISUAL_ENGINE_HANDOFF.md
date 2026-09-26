@@ -329,6 +329,7 @@ view.options.bloom_threshold = 0.9f;
 view.options.contrast = 1.05f;
 view.options.saturation = 0.95f;
 view.options.sharpen = 0.25f;               // unsharp mask
+view.options.vignette = 0.3f;               // post-tonemap corner falloff
 view.options.debug_view = DebugView3D::Normals;  // see table below
 ```
 
@@ -382,6 +383,7 @@ Scene fields: `point_lights[]` (max 4), `environment` (content-relative
 equirect path — a shared IBL probe that fills entities with
 `environmentStrength` set but no `environment` map of their own),
 `exposure`, `bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
+`vignette` (0..1 post-tonemap corner falloff, all tiers),
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
 ("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency"), and
 `render.shadow` — `{extent, distance, depth, strength, bias,
@@ -442,10 +444,11 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
 ## Known limitations
 
-- `ShadowMap3D` is a single ortho cascade for the key light only —
-  no CSM splits, no point-light or spot shadows; receivers
-  outside the authored box stay lit (by design) so extreme zoom-outs
-  need a larger `extent`.
+- `ShadowMap3D` is a single ortho cascade for the key light plus one
+  `casts_shadow` spot cone per scene — no CSM splits, no omni
+  point-light shadows; receivers outside the authored box (or outside
+  the spot map's cone frustum) stay lit (by design) so extreme
+  zoom-outs need a larger `extent`.
 - Analytic ellipsoid/annulus blockers remain the ring↔planet shadow
   path and are evaluated independently of the map.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or
@@ -456,8 +459,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   per-layer thickness; `band_drift` scrolls and `band_turbulence`
   reshapes the warp over scene time, while volume
   `flow_rate` re-poses filaments without evolving their shape.
-- Limb darkening is the single-coefficient linear law — no quadratic
-  two-term coefficients or wavelength-dependent profiles.
+- Limb darkening is the two-term linear+quadratic transit law
+  (`limb_darkening`/`limb_darkening_q`) — no three-term/nonlinear
+  coefficients or wavelength-dependent profiles.
 - `orbital_beaming` is a first-order brightness asymmetry — no doppler
   color shift, gravitational redshift, or lensing.
 - `accretion_disc_material3d` is an azimuthally uniform thin-disc
@@ -468,7 +472,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - `forward_scatter` is a single Henyey-Greenstein lobe — no
   multi-term phase functions or wavelength-dependent scattering; it
   scales radiance only, not alpha.
-- One shared equirect env map per material — no probe grid.
+- One shared equirect env map per material, or the scene-level
+  `environment` probe for opt-in PBR materials with no authored map —
+  no probe grid, no captured/baked probes.
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
 - Debug views are developer tooling — `Lod` tints the submitted
   level/proxy class and `Residency` the bound mip state; LightingOnly
@@ -478,10 +484,10 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   chain; `lodGroup` collapse shades the proxy with the representative
   member's material (groups should share materials, and members still
   pay CPU prepare work). Shadow casters share the lit pass's screen-
-  space pick — a chained instance casts its selected level and a
-  collapsed group casts one light-facing proxy from the representative
-  (the fade band's screen-door mask doesn't apply to the depth pass,
-  and a fading-out instance keeps casting until the cull edge).
+  space pick and keep terms — a chained instance casts its selected
+  level with the same signed screen-door mask, a collapsed group casts
+  one light-facing proxy from the representative, and a fading-out
+  instance's silhouette thins in lockstep until the cull edge.
   Impostor
   cards (`Mesh3D::billboard_card`, `card:w,h`
   spec) face the camera but carry no baked view-dependent shading — the

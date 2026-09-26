@@ -994,7 +994,8 @@ struct Scene3DRenderer::Storage {
       std::clamp(std::isfinite(opt.bloom_threshold)?opt.bloom_threshold:1.f,0.f,8.f),
       std::clamp(std::isfinite(opt.contrast)?opt.contrast:1.f,0.f,2.f)};
     post.b={std::clamp(std::isfinite(opt.saturation)?opt.saturation:1.f,0.f,2.f),
-      opt.quality>=RenderQuality3D::High?std::clamp(std::isfinite(opt.sharpen)?opt.sharpen:0.f,0.f,1.f):0.f,0.f,0.f};
+      opt.quality>=RenderQuality3D::High?std::clamp(std::isfinite(opt.sharpen)?opt.sharpen:0.f,0.f,1.f):0.f,
+      std::clamp(std::isfinite(opt.vignette)?opt.vignette:0.f,0.f,1.f),0.f};
     for(const auto& name:order){
       if(name=="shadow"){
         if(target.shadow_size!=static_cast<int>(shadow_res)){
