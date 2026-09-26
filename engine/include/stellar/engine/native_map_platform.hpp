@@ -95,9 +95,12 @@ enum class RenderQuality3D { Low, Medium, High, Ultra };
 // Unlit = tinted surface without illumination, Albedo = sampled surface
 // before tint, Normals = view-space normal *0.5+0.5, Roughness/Metallic
 // show the active GGX factors, Emissive = emissive + atmosphere
-// contribution only, LightingOnly = shading with the albedo divided out.
+// contribution only, LightingOnly = shading with the albedo divided out,
+// Lod = per-draw LOD class tint (gray full mesh, level ramp, magenta
+// group proxy; screen-door bands show their dithered partition).
 enum class DebugView3D {
-  Lit, Unlit, Albedo, Normals, Roughness, Metallic, Emissive, LightingOnly
+  Lit, Unlit, Albedo, Normals, Roughness, Metallic, Emissive, LightingOnly,
+  Lod
 };
 // Per-view post-processing, all in linear HDR space before the tonemap
 // resolve. Exposure multiplies incoming radiance; bloom reads the HDR mip

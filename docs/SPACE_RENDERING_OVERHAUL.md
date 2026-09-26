@@ -132,7 +132,10 @@ same document headless-tested.
     `lod_groups`. The representative's `lod_fade` widens the collapse
     into a screen-door band (members thin `1-p`, proxy keeps `p`); the
     proxy shades with the representative member's material, so groups
-    should share materials.
+    should share materials. `DebugView3D::Lod` (`render.debug = lod`)
+    tints each submitted draw by class — gray full mesh, a
+    blue→green→yellow→orange ramp for chain levels, magenta group
+    proxy — for visual threshold tuning.
 
 ## Top wins (ordered)
 

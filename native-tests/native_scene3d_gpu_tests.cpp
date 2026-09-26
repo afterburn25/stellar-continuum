@@ -789,6 +789,18 @@ int main(int argc,char** argv)try{
     int band_lit=0;
     for(int y=60;y<260;++y)for(int x=60;x<260;++x)band_lit+=channel(*banded,x,y,0)>100;
     check(band_lit>6424&&band_lit<18496,"Group fade band did not partition members and proxy");
+    // Lod debug view: the collapsed proxy tints magenta (class 10); a
+    // chain-substituted quad tints level-1 blue instead.
+    RenderOptions3D lod_view;lod_view.debug_view=DebugView3D::Lod;
+    {DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{left,right}),{0,0,320,320},lod_view});
+     window.draw(list,folder/"lod-group-debug.png");const auto dbg=decode_rgba_image(folder/"lod-group-debug.png");
+     check(channel(*dbg,160,160,0)>200&&channel(*dbg,160,160,2)>200&&channel(*dbg,160,160,1)<120,
+         "Lod view did not mark the group proxy magenta");}
+    {auto loded=a;loded.mesh=Mesh3D::uv_sphere(64,32);loded.scale=.25f;loded.lod_pixels=100;loded.lod_meshes={quad(0,0)};
+     DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{loded}),{0,0,320,320},lod_view});
+     window.draw(list,folder/"lod-level-debug.png");const auto dbg=decode_rgba_image(folder/"lod-level-debug.png");
+     check(channel(*dbg,160,160,2)>150&&channel(*dbg,160,160,0)<160,
+         "Lod view did not tint the chain proxy by level");}
     std::cout<<"lod_group_gpu=merged_proxy_collapse_passed\n";
   }
   {

@@ -199,7 +199,9 @@ members, and emission volumes are excluded (a marched volume cannot
 collapse into a surface proxy). The representative's `lod_fade`
 widens the collapse into a screen-door band — members thin by `1-p`
 while the proxy keeps the complementary `p`; `lod_fade=0` or Low tier
-keeps the hard switch.
+keeps the hard switch. `DebugView3D::Lod` (`render.debug = lod`, class
+carried on `texture_options.w`) tints each submitted draw for visual
+threshold tuning — gray full mesh, a level ramp, magenta group proxy.
 
 A fleet-scale benchmark runs inside `native_scene3d_gpu`: a 1024-ship
 grid spread over a depth sweep submits 60 timed frames and reports
@@ -310,6 +312,7 @@ production material path (not a second renderer), so it stays faithful:
 | `Metallic` | active metallic factor |
 | `Emissive` | emissive map × tint × strength + atmosphere rim |
 | `LightingOnly` | shading with albedo divided out |
+| `Lod` | per-draw LOD class — gray full mesh, blue→green→yellow→orange for chain levels 1–4+, magenta group proxy; transition bands show their dithered member/proxy partition |
 
 ## Authoring path — `Scene3dDocument`
 
@@ -334,7 +337,7 @@ are rejected.
 Scene fields: `point_lights[]` (max 4), `exposure`,
 `bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
-("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting"), and
+("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod"), and
 `render.shadow` — `{extent, distance, depth, strength, bias,
 resolution}`; `extent ≤ 0` (or the key absent) disables the map.
 Negative `range` and unknown `debug`/`quality` strings are rejected, as

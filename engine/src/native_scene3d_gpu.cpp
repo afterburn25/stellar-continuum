@@ -370,7 +370,10 @@ struct Scene3DRenderer::Storage {
       float lod_keep{1.f};
       // Camera inside an emission volume's proxy: rasterize both faces
       // and lift the shader's front-face gate so the interior marches.
-      bool inside_volume{false};};
+      bool inside_volume{false};
+      // DebugView3D::Lod tint class on texture_options.w: 0 full mesh,
+      // 1..8 chain level, 10 group proxy.
+      float lod_class{0.f};};
     std::vector<Draw> draws;draws.reserve(view.scene->instances().size());
     // Screen-space LOD uses the same px-per-world-unit convention as the
     // streamer footprint so both agree on which level is submitted.
@@ -510,7 +513,8 @@ struct Scene3DRenderer::Storage {
             instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
             instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
             pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
-            pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),keep});};
+            pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),keep});
+          draws.back().lod_class=10.f;};
         if(g.collapse){++stats.lod_groups;if(g.rep==&instance)emit_proxy(1.f);continue;}
         if(g.share>0.f){group_keep=1.f-g.share;
           if(g.rep==&instance){++stats.lod_fades;emit_proxy(-g.share);}}
@@ -525,6 +529,7 @@ struct Scene3DRenderer::Storage {
         pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
         (fading?1.f-lod_share:range_keep)*group_keep});
       draws.back().inside_volume=inside_volume;
+      draws.back().lod_class=static_cast<float>(lod_level);
       if(fading)draws.push_back({&instance,facing(instance.lod_meshes[lod_level]),geometry(instance.lod_meshes[lod_level]),surface,
         optical?texture(optical->surface):surface,
         optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
@@ -534,7 +539,7 @@ struct Scene3DRenderer::Storage {
         pbr&&pbr->emissive?texture(pbr->emissive):texture(white),
         pbr&&pbr->metallic_roughness?texture(pbr->metallic_roughness):texture(white),
         -lod_share*group_keep}); // negative = keep the high mask (complement of 1-p)
-      if(fading)draws.back().inside_volume=inside_volume;
+      if(fading){draws.back().inside_volume=inside_volume;draws.back().lod_class=static_cast<float>(lod_level+1);}
     }
     // Engine DrawBatcher owns submission ordering/batching: opaque groups by
     // (material,mesh), transparent stays back-to-front. A material_id interns
@@ -583,6 +588,7 @@ struct Scene3DRenderer::Storage {
       fragment.surface_options[2]=material.rim_power;
       fragment.surface_options[3]=material.two_sided_diffuse?1.f:0.f;
       fragment.texture_options[0]=material.cubic_magnification&&!low_tier?1.f:0.f;
+      fragment.texture_options[3]=draw.lod_class;
       if(material.shadow){const auto& s=*material.shadow;
         fragment.shadow_light={shadow.light.x,shadow.light.y,shadow.light.z,s.shape==AnalyticShadowShape3D::Ellipsoid?1.f:2.f};
         fragment.shadow_radii={s.radii.x,s.radii.y,s.radii.z,0};

@@ -430,8 +430,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `VisibleRange` component, `render.debug`), `runtime_host.cpp`,
   `app/engine_main.cpp`.
 - **Public interfaces:** `DebugView3D` — Lit (default), Unlit, Albedo,
-  Normals, Roughness, Metallic, Emissive, LightingOnly — applies per
-  view inside the production fragment path. `visible_range` = world-unit
+  Normals, Roughness, Metallic, Emissive, LightingOnly, Lod — applies
+  per view inside the production fragment path. `Lod` tints each draw by
+  its submitted LOD class (gray full mesh, blue→green→yellow→orange
+  ramp for chain levels 1–4+, magenta group proxy) so `lodPixels`/
+  `lodGroup` thresholds and transitions can be tuned visually; a
+  screen-door band shows its dithered member/proxy partition.
+  `visible_range` = world-unit
   camera distance beyond which the instance culls (bounding-sphere
   surface distance; 0 = unlimited; validated finite ≥ 0 ≤ 1e12).
   `visible_fade` [0,.5] = fraction of `range` ahead of the cull edge over
@@ -447,12 +452,16 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   rejected) plus `visibleFade` [0,.5] map to the `VisibleRange` world
   component — its codec carries a trailing f32 fade that legacy 4-byte
   payloads decode as 0 (the hard cut they were authored with);
-  `render.debug` validates against the eight mode names.
+  `render.debug` validates against the nine mode names (`lod` maps to
+  `DebugView3D::Lod` — the class travels on the per-draw
+  `texture_options.w` lane).
 - **Editor:** Scene3D tool gains `debugView` (scene), `visRange` and
   `visFade` (entity) rows driving the real preview path.
 - **Tests:** `engine_scene3d` (range validation + `prepare_instance3d`
   cull), `native_scene3d_gpu` (debug-view pixel probes per channel,
-  culled-instance accounting), `engine_project` (document round-trip +
+  culled-instance accounting, Lod view: a collapsed group proxy covers
+  its merged footprint in magenta while a chain-substituted mesh tints
+  by level), `engine_project` (document round-trip +
   malformed rejection), `engine_world` (`VisibleRange` spawn/codec/
   export round-trip), `engine_runtime`; range-fade census probe — a
   sphere halfway through the band lights ~1/2 its pixels (798/1600)
@@ -462,8 +471,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   image's address no longer inherits the stale `TextureId` (wrong mip
   desc/residency → missing promotions, the intermittent
   "Footprint growth did not promote the resident mip tail" failure).
-- **Limitations:** debug views are per-view diagnostics only — no LOD/
-  residency visualization yet; `visible_range` is distance culling, not
+- **Limitations:** debug views are per-view diagnostics only — no
+  residency/streaming visualization yet; `visible_range` is distance culling, not
   geometric LOD/impostors; LightingOnly divides by sampled albedo so
   untextured surfaces clip to black.
 

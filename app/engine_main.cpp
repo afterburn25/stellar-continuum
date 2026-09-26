@@ -1969,9 +1969,9 @@ void commit_scene3_field(Shell &shell) {
     const auto &d = shell.scene3_buffer;
     if (d != "lit" && d != "unlit" && d != "albedo" && d != "normals" &&
         d != "roughness" && d != "metallic" && d != "emissive" &&
-        d != "lighting")
+        d != "lighting" && d != "lod")
       return fail("use lit|unlit|albedo|normals|roughness|metallic|"
-                  "emissive|lighting");
+                  "emissive|lighting|lod");
     commit();
     doc.debug_view = d;
     return ok("debug view updated");
@@ -2636,6 +2636,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
           : doc.debug_view == "metallic"  ? DebugView3D::Metallic
           : doc.debug_view == "emissive"  ? DebugView3D::Emissive
           : doc.debug_view == "lighting"  ? DebugView3D::LightingOnly
+          : doc.debug_view == "lod"       ? DebugView3D::Lod
                                         : DebugView3D::Lit;
       out.overlay.push_back(std::move(view));
     }
