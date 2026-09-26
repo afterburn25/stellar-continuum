@@ -428,6 +428,18 @@ int main(int argc,char** argv)try{
     const auto limb_disc=capture({star},"star-limb.png");
     check(std::abs(channel(*limb_disc,160,160,0)-channel(*uniform_disc,160,160,0))<=4,"Limb darkening changed the disc centre");
     check(channel(*limb_disc,275,160,0)+15<channel(*uniform_disc,275,160,0),"Limb darkening did not dim the disc edge");
+    // Quadratic coefficient: the squared term steepens the falloff only
+    // at the very edge — the centre is untouched, mid-disc barely moves,
+    // and the extreme limb darkens beyond the linear profile.
+    star.material.limb_darkening_q=.5f;
+    const auto quad_disc=capture({star},"star-limb-quad.png");
+    check(std::abs(channel(*quad_disc,160,160,0)-channel(*limb_disc,160,160,0))<=4,
+        "Quadratic limb darkening changed the disc centre");
+    check(std::abs(channel(*quad_disc,220,160,0)-channel(*limb_disc,220,160,0))<20,
+        "Quadratic limb darkening disturbed mid-disc");
+    check(channel(*quad_disc,275,160,0)+8<channel(*limb_disc,275,160,0),
+        "Quadratic limb darkening did not deepen the extreme edge");
+    std::cout<<"limb_darkening_gpu=linear_quadratic_edge_passed\n";
   }
   surface.cloud_opacity=0;surface.properties=RgbaImage::create(1,1,{50,255,0,128});
   const auto ocean=capture({response},"planet-ocean.png");

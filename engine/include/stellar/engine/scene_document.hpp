@@ -222,6 +222,9 @@ struct Scene3dEntity {
   // Linear limb darkening [0,1] for self-luminous discs (stars, hot
   // bodies); 0 keeps a uniform disc.
   float limb_darkening{0.f};
+  // Quadratic limb-darkening coefficient [0,1] — steepens the edge
+  // falloff (two-term transit-photometry law); 0 keeps linear.
+  float limb_darkening_q{0.f};
   // Gas-giant differential rotation: latitude-weighted longitude shear
   // of every surface map sample, UV units [-0.5,0.5]; 0 = rectilinear.
   float band_shear{0.f};

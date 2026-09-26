@@ -83,7 +83,7 @@ void validate_instance(const MeshInstance3D& i){
   (void)normalized(i.rotation);const auto& m=i.material;
   if(!bounded(m.ambient,1)||m.ambient<0||!bounded(m.diffuse,1)||m.diffuse<0||
      !bounded(m.opacity,1)||m.opacity<0||!bounded(m.dark_side_strength,16)||m.dark_side_strength<0||
-     !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0||
+     !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0||!bounded(m.limb_darkening_q,1)||m.limb_darkening_q<0||
      !bounded(m.band_shear,.5f)||!bounded(m.band_waves,1.f)||m.band_waves<0||
      !bounded(m.band_drift,.25f)||!bounded(m.band_turbulence,8.f)||
      !bounded(m.orbital_beaming,1.f)||!bounded(m.forward_scatter,1.f))

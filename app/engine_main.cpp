@@ -2196,11 +2196,24 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 0.f && a <= 1.f) { next.terminator_wrap = a; valid = true; }
           break;
-  case 57:
-          try { a = std::stof(shell.scene3_buffer); }
-          catch (const std::exception &) { break; }
-          if (a >= 0.f && a <= 1.f) { next.limb_darkening = a; valid = true; }
-          break;
+  case 57: {
+          std::string part;
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> parts;
+          while (std::getline(csv, part, ',')) parts.push_back(part);
+          if (parts.size() >= 1 && parts.size() <= 2) {
+            try { a = std::stof(parts[0]); valid = a >= 0.f && a <= 1.f; }
+            catch (const std::exception &) { break; }
+            if (!valid) break;
+            next.limb_darkening = a;
+            if (parts.size() == 2) {
+              try { a = std::stof(parts[1]); }
+              catch (const std::exception &) { valid = false; break; }
+              if (!(a >= 0.f && a <= 1.f)) { valid = false; break; }
+              next.limb_darkening_q = a;
+            }
+          }
+          break; }
   case 58: {
           next.lod_meshes.clear();
           std::string spec;
@@ -2526,6 +2539,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         inst.material.light_color = star.light_color;
         inst.material.linear_light = star.linear_light;
         inst.material.limb_darkening = star.limb_darkening;
+      inst.material.limb_darkening_q = star.limb_darkening_q;
       }
       // Accretion-disc preset: generated radial texture (unless an
       // authored texture wins) + emissive-dominant response + beaming.
@@ -2587,6 +2601,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       }
       inst.material.terminator_wrap = e.terminator_wrap;
       inst.material.limb_darkening = e.limb_darkening;
+      inst.material.limb_darkening_q = e.limb_darkening_q;
       inst.material.band_shear = e.band_shear;
       inst.material.band_waves = e.band_waves;
       inst.material.band_drift = e.band_drift;
@@ -2903,8 +2918,11 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->terminator_wrap) : "", ed(56),
         "wrap-diffuse 0..1 - 0 keeps Lambert");
   field(shell.hit3_limbdark, "limbDark",
-        entity ? std::to_string(entity->limb_darkening) : "", ed(57),
-        "limb darkening 0..1 - sun ~0.6, stars/discs");
+        entity ? std::to_string(entity->limb_darkening) + "," +
+                     std::to_string(entity->limb_darkening_q)
+               : "",
+        ed(57),
+        "limb darkening u 0..1[, quadratic q 0..1] - sun ~0.6");
   field(shell.hit3_lods, "meshLods",
         entity ? [&] {
           std::string v;
@@ -7020,7 +7038,8 @@ int main(int argc, char **argv) {
             else if (shell.hit3_termwrap.contains(event.position) && se)
               edit3(56, std::to_string(se->terminator_wrap));
             else if (shell.hit3_limbdark.contains(event.position) && se)
-              edit3(57, std::to_string(se->limb_darkening));
+              edit3(57, std::to_string(se->limb_darkening) + "," +
+                            std::to_string(se->limb_darkening_q));
             else if (shell.hit3_lods.contains(event.position) && se) {
               std::string v;
               for (const auto &spec : se->lod_meshes) {

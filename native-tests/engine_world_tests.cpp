@@ -693,6 +693,7 @@ int main() {
         turret.cloud_offset_y = 0.2f;
         turret.terminator_wrap = 0.5f;
         turret.limb_darkening = 0.6f;
+        turret.limb_darkening_q = 0.3f;
         turret.band_shear = -0.3f;
         turret.band_waves = 0.7f;
         turret.band_drift = 0.12f;
@@ -773,6 +774,7 @@ int main() {
                   ms->cloud_height == 0.05f &&
                   ms->cloud_offset_x == 0.1f && ms->cloud_offset_y == 0.2f &&
                   ms->terminator_wrap == 0.5f && ms->limb_darkening == 0.6f &&
+                  ms->limb_darkening_q == 0.3f &&
                   ms->band_shear == -0.3f && ms->orbital_beaming == 0.65f &&
                   ms->forward_scatter == 0.4f && ms->band_waves == 0.7f &&
                   ms->band_drift == 0.12f && ms->band_turbulence == 1.4f,
@@ -865,6 +867,7 @@ int main() {
                       rms->cloud_height == 0.05f &&
                       rms->terminator_wrap == 0.5f &&
                       rms->limb_darkening == 0.6f &&
+                      rms->limb_darkening_q == 0.3f &&
                       rms->band_shear == -0.3f &&
                       rms->orbital_beaming == 0.65f &&
                       rms->forward_scatter == 0.4f &&
@@ -931,6 +934,7 @@ int main() {
                   out.entities[1].cloud_offset_y == 0.2f &&
                   out.entities[1].terminator_wrap == 0.5f &&
                   out.entities[1].limb_darkening == 0.6f &&
+                  out.entities[1].limb_darkening_q == 0.3f &&
                   out.entities[1].band_shear == -0.3f &&
                   out.entities[1].orbital_beaming == 0.65f &&
                   out.entities[1].star_kelvin == 5800.0 &&

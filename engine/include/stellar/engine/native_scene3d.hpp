@@ -222,6 +222,11 @@ struct Material3D {
   // the body's emitted and reflected radiance; the additive atmosphere
   // rim stays on top. [0,1]; 0 keeps a uniform disc.
   float limb_darkening{};
+  // Quadratic limb-darkening coefficient: the standard two-term law
+  // 1 - u(1-μ) - q(1-μ)² from transit photometry — the squared term
+  // steepens the falloff at the very edge without touching mid-disc.
+  // [0,1]; 0 keeps the single-coefficient linear profile.
+  float limb_darkening_q{};
   // Differential rotation for banded bodies (gas giants): a latitude-
   // weighted longitude shear `u += s·cos(2πv)` applied to every equirect
   // surface sample — authored bands bow symmetrically equator vs poles,

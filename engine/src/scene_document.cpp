@@ -468,6 +468,7 @@ std::string Scene3dDocument::to_json() const {
     }
     if (e.terminator_wrap != 0.f) item["terminatorWrap"] = e.terminator_wrap;
     if (e.limb_darkening != 0.f) item["limbDarken"] = e.limb_darkening;
+    if (e.limb_darkening_q != 0.f) item["limbDarkenQ"] = e.limb_darkening_q;
     if (e.band_shear != 0.f) item["bandShear"] = e.band_shear;
     if (e.band_waves != 0.f) item["bandWaves"] = e.band_waves;
     if (e.band_drift != 0.f) item["bandDrift"] = e.band_drift;
@@ -699,6 +700,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.limb_darkening = item.value("limbDarken", 0.0f);
       if (!(e.limb_darkening >= 0.f && e.limb_darkening <= 1.f))
         return fail("limbDarken must be in [0,1]");
+      e.limb_darkening_q = item.value("limbDarkenQ", 0.0f);
+      if (!(e.limb_darkening_q >= 0.f && e.limb_darkening_q <= 1.f))
+        return fail("limbDarkenQ must be in [0,1]");
       e.band_shear = item.value("bandShear", 0.0f);
       if (!(e.band_shear >= -0.5f && e.band_shear <= 0.5f))
         return fail("bandShear must be in [-0.5,0.5]");

@@ -44,6 +44,7 @@ m.surface_response->cloud_height = .04f;    // [0,.1] deck altitude — parallax
 m.surface_response->cloud_offset = {.1f,0}; // UV drift, each |≤2|
 m.terminator_wrap = 0.4f;                   // [0,1] wrap-diffuse softening
 m.limb_darkening = 0.6f;                    // [0,1] N.V radiance falloff
+m.limb_darkening_q = 0.2f;                  // [0,1] quadratic edge term
 m.band_shear = -0.2f;                       // [-0.5,0.5] latitude-weighted
                                             // longitude shear (giants)
 m.band_waves = 0.7f;                        // [0,1] zonal-jet harmonic
@@ -243,9 +244,11 @@ draw per LOD level — the number to watch as the renderer evolves.
 - `terminator_wrap` widens the diffuse lobe — `(N·L+w)/(1+w)` — applied
   identically to the key light, additional directionals and point
   lights; 0 is exact Lambert.
-- `limb_darkening` applies linear limb darkening `1 - u(1 - N·V)` to the
-  body's outgoing radiance — the Sun's photosphere profile (u ≈ 0.6) —
-  so HDR emissive star discs keep a physical edge instead of clipping
+- `limb_darkening` applies limb darkening `1 - u(1 - N·V) -
+  q(1 - N·V)²` to the body's outgoing radiance — `limb_darkening_q`
+  [0,1] adds the standard quadratic transit-law term that steepens the
+  very edge (Sun ≈ u 0.6); the product clamps at zero. So HDR emissive
+  star discs keep a physical edge instead of clipping
   flat. Applied after the cloud deck; the additive atmosphere rim is
   exempt. Uses the geometric normal, not normal-map detail.
 
@@ -354,7 +357,7 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `environment`, `environment_strength`, `alpha_cutout`, `uv_tile_x/y`,
 `atmo_strength/power/night/r/g/b`, `range` (per-entity
 `visible_range`) with `visibleFade` ([0,.5] dithered fade-out),
-`terminator_wrap`, `limb_darkening`, `bandShear`
+`terminator_wrap`, `limb_darkening`/`limbDarkenQ`, `bandShear`
 ([-0.5,0.5]) with `bandWaves` ([0,1] jet harmonic) and
 `bandDrift` ([-0.25,0.25] uv/s scroll) and `bandTurbulence`
 ([-8,8] rad/s evolving warp),

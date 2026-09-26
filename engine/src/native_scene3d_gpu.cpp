@@ -605,7 +605,7 @@ struct Scene3DRenderer::Storage {
       // Animated terms: band drift scrolls equirect longitude, volume
       // flow rate advances the filament phase — both scaled by the
       // view's scene time on debug_mode.y.
-      fragment.anim_options={material.band_drift,material.surface_effect?material.surface_effect->flow_rate:0.f,material.band_turbulence,0};
+      fragment.anim_options={material.band_drift,material.surface_effect?material.surface_effect->flow_rate:0.f,material.band_turbulence,material.limb_darkening_q};
       if(material.shadow){const auto& s=*material.shadow;
         fragment.shadow_light={shadow.light.x,shadow.light.y,shadow.light.z,s.shape==AnalyticShadowShape3D::Ellipsoid?1.f:2.f};
         fragment.shadow_radii={s.radii.x,s.radii.y,s.radii.z,0};

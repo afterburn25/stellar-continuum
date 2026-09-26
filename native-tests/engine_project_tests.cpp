@@ -433,6 +433,7 @@ int main() {
     cube.cloud_offset_y = -0.5f;
     cube.terminator_wrap = 0.4f;
     cube.limb_darkening = 0.6f;
+    cube.limb_darkening_q = 0.35f;
     cube.band_shear = -0.25f;
     cube.band_waves = 0.6f;
     cube.band_drift = 0.08f;
@@ -585,6 +586,7 @@ int main() {
                 rc.cloud_height == 0.04f &&
                 rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
                 rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f &&
+                rc.limb_darkening_q == 0.35f &&
                 rc.band_shear == -0.25f && rc.band_waves == 0.6f &&
                 rc.band_drift == 0.08f && rc.band_turbulence == 1.25f &&
                 rc.orbital_beaming == 0.7f &&
@@ -735,6 +737,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"limbDarken":1.5}]})")
               .has_value(),
           "scene3d limb darkening above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"limbDarkenQ":1.5}]})")
+              .has_value(),
+          "scene3d quadratic limb darkening above one rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"limbDarkenQ":-0.1}]})")
+              .has_value(),
+          "scene3d quadratic limb darkening below zero rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"lods":"a,b"}]})")
               .has_value(),

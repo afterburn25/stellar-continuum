@@ -49,7 +49,7 @@ struct Material {
     vec4 point_energy[4]; // rgb, intensity
     vec4 point_cone[4]; // view-space spot dir (zero = omni), inner cos
     vec4 point_outer; // per-light outer cos edge
-    vec4 anim_options; // band drift (uv/s), volume flow rate, unused
+    vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
 };
 layout(set=2,binding=11,std430) readonly buffer Materials {
     Material materials[];
@@ -568,14 +568,18 @@ void main() {
         vec3 deck=cloud_layer.rgb*material.response_options.y*(material.parameters.x+material.parameters.y*sunlight*deck_shade*visibility*light_color);
         result=mix(result,deck,cover);
     }
-    // Linear limb darkening: emitted/reflected radiance falls toward the
-    // disc edge (Sun u ~= 0.6), so HDR photosphere discs keep a physical
-    // profile instead of clipping flat. The geometric normal decides the
-    // profile — normal-mapped detail is not limb darkening. The additive
-    // atmosphere rim below is exempt: it is a scattering shell, not the
-    // photosphere.
-    if(material.response_options.w>0.0)
-        result*=1.0-material.response_options.w*(1.0-clamp(dot(normalize(view_normal),V),0.0,1.0));
+    // Limb darkening: emitted/reflected radiance falls toward the disc
+    // edge (Sun u ~= 0.6), so HDR photosphere discs keep a physical
+    // profile instead of clipping flat. anim_options.w adds the standard
+    // quadratic term q·(1-μ)² (transit-photometry two-parameter law),
+    // steepening the very edge while mid-disc stays untouched; the
+    // product clamps at zero so aggressive coefficients never invert.
+    // The geometric normal decides the profile — normal-mapped detail
+    // is not limb darkening. The additive atmosphere rim below is
+    // exempt: it is a scattering shell, not the photosphere.
+    if(material.response_options.w>0.0||material.anim_options.w>0.0){
+        float limb_mu=clamp(dot(normalize(view_normal),V),0.0,1.0);
+        result*=max(1.0-material.response_options.w*(1.0-limb_mu)-material.anim_options.w*(1.0-limb_mu)*(1.0-limb_mu),0.0);}
     // Orbital beaming: a first-order doppler asymmetry for material
     // orbiting local +Y — radiance scales by 1 + s*(v.V) where v is the
     // tangential velocity. Face-on discs stay symmetric (v ⟂ view);

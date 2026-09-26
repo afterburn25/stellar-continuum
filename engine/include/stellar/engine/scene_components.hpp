@@ -210,6 +210,9 @@ struct MaterialSurface {
   // mid-latitude wave at half the shear amplitude reshapes the jet
   // profile over time. 0 freezes the warp; no effect without shear.
   float band_turbulence{0.f};
+  // Quadratic limb-darkening coefficient [0,1] — the two-term law's
+  // squared edge falloff; 0 keeps the linear profile.
+  float limb_darkening_q{0.f};
 };
 // Spectral-class star photosphere — the component counterpart of the
 // entity document's `starKelvin` key. The runtime maps it through
