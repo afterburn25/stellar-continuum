@@ -24,7 +24,7 @@ int main(int argc,char** argv)try{
     const std::array lanes{NativeLocalLaneMarker{.destination_system_id=i,.direction=direction}};
     const std::array metrics{NativeLaneLabelMetrics{i,static_cast<float>(extent.width),static_cast<float>(extent.height)}};
     SystemSpatialSnapshot spatial{.design_radius=20};
-    const auto geometry=layout_local_lanes(spatial,{0,0,1},lanes,metrics).front();
+    const auto geometry=layout_local_lanes(spatial,{0,0,1},{-10000,-10000,20000,20000},lanes,metrics).front();
     const Point base{(geometry.base_a.x+geometry.base_b.x)*.5f,(geometry.base_a.y+geometry.base_b.y)*.5f};
     const auto move=[&](Point p){return Point{p.x-base.x+center.x,p.y-base.y+center.y};};
     const Color color{142,220,166,255};

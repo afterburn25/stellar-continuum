@@ -66,15 +66,21 @@ SystemSpatialViewport workspace_fit(const SystemSpatialSnapshot&spatial,int widt
   const auto layout=SystemWorkspaceLayout::for_viewport(width,height);const auto&world=layout.world_field;const auto inset=std::min(12.f,std::min(world.width,world.height)*.05f);const UiRect field{world.x+inset,world.y+inset,world.width-2.f*inset,world.height-2.f*inset};const auto center_x=field.x+field.width*.5f,center_y=field.y+field.height*.5f;
   const auto text_extent=[&](const std::string&value){const Text label{{},value,text,15};const auto measured=measure?measure(label):TextExtent{static_cast<int>(value.size()*7u),19};if(measured.width<0||measured.height<0)throw std::runtime_error("Renderer returned invalid system label bounds.");return measured;};
   std::map<int,TextExtent> label_extents;for(const auto&body:spatial.bodies)label_extents.emplace(body.body_id,text_extent(body.label));
-  const auto fit_center=[&](float scale)->std::optional<Point>{
+  const auto fit_center=[&](float scale,bool with_lanes)->std::optional<Point>{
     const SystemSpatialViewport view{center_x,center_y,scale};float minimum_x=field.x,maximum_x=field.x+field.width,minimum_y=field.y,maximum_y=field.y+field.height;
     const auto reserve=[&](UiRect bounds){const auto left=bounds.x-center_x,right=left+bounds.width,top=bounds.y-center_y,bottom=top+bounds.height;minimum_x=std::max(minimum_x,field.x-left);maximum_x=std::min(maximum_x,field.x+field.width-right);minimum_y=std::max(minimum_y,field.y-top);maximum_y=std::min(maximum_y,field.y+field.height-bottom);};
     const auto boundary=std::max(local_orbital_boundary_radius(spatial,view),star_screen_radius(scale)*1.75f);reserve({center_x-boundary,center_y-boundary,2.f*boundary,2.f*boundary});
     for(const auto&body:spatial.bodies){if(!view.is_body_visible(spatial,body))continue;const auto point=view.world_to_screen(body.offset_x,body.offset_y);const auto radius=view.body_radius(body)*planet_ring_extent(body.sol_texture_key.value_or(""))+4.f;reserve({point.x-radius,point.y-radius,2.f*radius,2.f*radius});const auto measured=label_extents.at(body.body_id);reserve({point.x-static_cast<float>(measured.width)*.5f,point.y+radius+5.f,static_cast<float>(measured.width),static_cast<float>(measured.height)});}
-    if(travel)for(const auto&geometry:layout_local_lanes(spatial,view,travel->lanes,lane_metrics))reserve(geometry.bounds);
+    if(travel&&with_lanes)for(const auto&geometry:layout_local_lanes(spatial,view,{},travel->lanes,lane_metrics))reserve(geometry.bounds);
     if(minimum_x>maximum_x||minimum_y>maximum_y)return std::nullopt;return Point{std::clamp(center_x,minimum_x,maximum_x),std::clamp(center_y,minimum_y,maximum_y)};
   };
-  float low=std::min(.001f,.0001f*std::min(field.width,field.height)/std::max(1.f,spatial.design_radius)),high=1.15f;for(int iteration=0;iteration<24;++iteration){const auto candidate=(low+high)*.5f;if(fit_center(candidate))low=candidate;else high=candidate;}const auto center=fit_center(low).value_or(Point{center_x,center_y});return {center.x,center.y,low};
+  const auto initial_low=std::min(.001f,.0001f*std::min(field.width,field.height)/std::max(1.f,spatial.design_radius));
+  const auto search=[&](bool with_lanes){float low=initial_low,high=1.15f;for(int iteration=0;iteration<24;++iteration){const auto candidate=(low+high)*.5f;if(fit_center(candidate,with_lanes))low=candidate;else high=candidate;}return std::pair{low,fit_center(low,with_lanes).value_or(Point{center_x,center_y})};};
+  // Lane arrows use fixed pixel offsets that a compact field cannot contain at
+  // any zoom; fit the chart alone in that case and let the field clamp pull
+  // the arrows inside world_field where input can still reach them.
+  auto fitted=search(true);if(!fit_center(fitted.first,true))fitted=search(false);
+  return {fitted.second.x,fitted.second.y,fitted.first};
 }
 double presentation_seconds(){return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();}
 } // namespace
@@ -183,7 +189,7 @@ const NativeSystemTravelSnapshot *NativeSystemWorkspace::travel_snapshot()const 
 std::size_t NativeSystemWorkspace::visible_body_count()const noexcept{if(!spatial_||!viewport_)return 0;return static_cast<std::size_t>(std::ranges::count_if(spatial_->bodies,[&](const auto&body){return viewport_->is_body_visible(*spatial_,body);}));}
 void NativeSystemWorkspace::resize(int width,int height){if(!snapshot_||!spatial_||!viewport_||width<=0||height<=0||width==width_&&height==height_)return;const auto old_fit=workspace_fit(*spatial_,width_,height_,text_measurer_,travel_,lane_metrics_);const auto next_fit=workspace_fit(*spatial_,width,height,text_measurer_,travel_,lane_metrics_);viewport_->center_x+=next_fit.center_x-old_fit.center_x;viewport_->center_y+=next_fit.center_y-old_fit.center_y;width_=width;height_=height;zoom_reference_scale_=next_fit.scale;viewport_->scale=std::max(viewport_->scale,zoom_reference_scale_*.05f);update_camera_tracking();}
 void NativeSystemWorkspace::reset_fit(int width,int height){tracked_body_id_.reset();small_body_focus_=false;if(!spatial_)return;width_=width;height_=height;viewport_=workspace_fit(*spatial_,width,height,text_measurer_,travel_,lane_metrics_);zoom_reference_scale_=viewport_->scale;pending_initial_travel_fit_=false;}
-std::vector<NativeLocalLaneGeometry> NativeSystemWorkspace::lane_geometry()const{if(!travel_||!spatial_||!viewport_)return {};return layout_local_lanes(*spatial_,*viewport_,travel_->lanes,lane_metrics_);}
+std::vector<NativeLocalLaneGeometry> NativeSystemWorkspace::lane_geometry()const{if(!travel_||!spatial_||!viewport_)return {};const auto world=SystemWorkspaceLayout::for_viewport(width_,height_).world_field;const auto inset=std::min(12.f,std::min(world.width,world.height)*.05f);const UiRect field{world.x+inset,world.y+inset,world.width-2.f*inset,world.height-2.f*inset};return layout_local_lanes(*spatial_,*viewport_,field,travel_->lanes,lane_metrics_);}
 std::vector<int> NativeSystemWorkspace::fleet_hits(Point point)const{if(!travel_||!spatial_||!viewport_)return {};return hit_local_fleets(travel_->fleets,*spatial_,*viewport_,point);}
 SystemWorkspaceCommand NativeSystemWorkspace::handle(const InputEvent&e,int width,int height){if(!visible())return {};pointer_=e.position;
 const bool resized=width!=width_||height!=height_;resize(width,height);

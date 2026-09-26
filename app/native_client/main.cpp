@@ -2663,7 +2663,7 @@ class NativeCampaign final {
     const auto click=[&](Point point){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("System travel smoke input closed the campaign.");};
     const auto *initial_travel=system_workspace_.travel_snapshot();if(!initial_travel)throw std::runtime_error("System travel smoke did not receive an observer-safe local travel view.");std::unordered_set<int> connected;for(const auto&lane:session_->frame().runtime().world().lanes().build())if(lane.connects(*smoke_system_travel_system_id_))connected.insert(lane.other(*smoke_system_travel_system_id_));smoke_system_travel_lane_count_=initial_travel->lanes.size();smoke_system_travel_lanes_connected_=smoke_system_travel_lane_count_==connected.size()&&std::ranges::all_of(initial_travel->lanes,[&](const auto&lane){return connected.contains(lane.destination_system_id);});if(!smoke_system_travel_lanes_connected_)throw std::runtime_error("System travel smoke destinations did not match the canonical connected set.");
     const auto known_lane=std::ranges::find_if(initial_travel->lanes,[](const auto&lane){return lane.known_label.has_value();}),unknown_lane=std::ranges::find_if(initial_travel->lanes,[](const auto&lane){return !lane.known_label.has_value();});if(known_lane==initial_travel->lanes.end()||unknown_lane==initial_travel->lanes.end())throw std::runtime_error("System travel smoke requires one authored known neighbor and one unknown neighbor.");const auto known_id=known_lane->destination_system_id,unknown_id=unknown_lane->destination_system_id;const auto geometry=system_workspace_.lane_geometry();const auto known_geometry=std::ranges::find(geometry,known_id,&NativeLocalLaneGeometry::destination_system_id),unknown_geometry=std::ranges::find(geometry,unknown_id,&NativeLocalLaneGeometry::destination_system_id);if(known_geometry==geometry.end()||unknown_geometry==geometry.end())throw std::runtime_error("System travel smoke could not place its connected lane arrows.");
-    const auto unknown_level=world.knowledge.system_survey_level(world.player_civilization_id,unknown_id);click(unknown_geometry->center);smoke_system_travel_unknown_denied_=system_workspace_.system_id()==smoke_system_travel_system_id_&&system_workspace_.notice().find("Telemetry unavailable")!=std::string::npos;smoke_system_travel_knowledge_unchanged_=world.knowledge.system_survey_level(world.player_civilization_id,unknown_id)==unknown_level;click(known_geometry->center);smoke_system_travel_known_opened_=system_workspace_.system_id()==known_id;if(!smoke_system_travel_known_opened_)throw std::runtime_error("System travel smoke known lane did not open its observer-gated destination.");const auto destination_layout=SystemWorkspaceLayout::for_viewport(width,height);click(center(destination_layout.back));if(system_workspace_.visible()||!update(enter,width,height,0.,false)||system_workspace_.system_id()!=smoke_system_travel_system_id_)throw std::runtime_error("System travel smoke could not return to its local system after known-lane navigation.");
+    const auto unknown_level=world.knowledge.system_survey_level(world.player_civilization_id,unknown_id);click(unknown_geometry->center);smoke_system_travel_unknown_denied_=system_workspace_.system_id()==smoke_system_travel_system_id_&&system_workspace_.notice().find("Telemetry unavailable")!=std::string::npos;smoke_system_travel_knowledge_unchanged_=world.knowledge.system_survey_level(world.player_civilization_id,unknown_id)==unknown_level;click(known_geometry->center);smoke_system_travel_known_opened_=system_workspace_.system_id()==known_id;if(!smoke_system_travel_known_opened_)throw std::runtime_error("System travel smoke known lane did not open its observer-gated destination.");const auto destination_layout=SystemWorkspaceLayout::for_viewport(width,height);click(center(destination_layout.back));const auto return_point=expose_smoke_map_point(system->second->position.x,system->second->position.y,width,height);InputSnapshot reenter;reenter.drawable_width=width;reenter.drawable_height=height;reenter.pointer=return_point;reenter.events={{InputEventType::LeftPressed,return_point,{},0,{},2},{InputEventType::LeftReleased,return_point}};if(system_workspace_.visible()||!update(reenter,width,height,0.,false)||system_workspace_.system_id()!=smoke_system_travel_system_id_)throw std::runtime_error("System travel smoke could not return to its local system after known-lane navigation.");
     const auto *before_snapshot=system_workspace_.travel_snapshot();if(!before_snapshot)throw std::runtime_error("System travel smoke did not receive an observer-safe local travel view.");const auto before_marker=std::ranges::find(before_snapshot->fleets,fleet->id,&NativeLocalFleetMarker::fleet_id);if(before_marker==before_snapshot->fleets.end())throw std::runtime_error("System travel smoke did not render the local player fleet.");const auto spatial=project_system(*system_workspace_.snapshot());const auto before_screen=local_fleet_anchor(*before_marker,spatial,*system_workspace_.viewport());const auto before_canonical=fleet->local_transit_position;
     InputSnapshot select;select.drawable_width=width;select.drawable_height=height;select.pointer=before_screen;select.events={{InputEventType::LeftPressed,before_screen},{InputEventType::LeftReleased,before_screen}};(void)update(select,width,height,0.,false);smoke_system_travel_selected_=fleet_controller_.selection()==std::optional<int>{fleet->id};
     smoke_system_travel_reload_=paused_reload;
@@ -3472,13 +3472,30 @@ class NativeCampaign final {
     if(!update(input,width,height,0.,false))throw std::runtime_error("Diplomacy smoke input closed the campaign.");
   }
   void diplomacy_smoke_text(const std::string&value,UiRect region,int width,int height){
-    DrawList draw;diplomacy_workspace_.render(draw,width,height,&diplomacy_portrait_provider_);
-    for(const auto&item:draw.overlay){
-      const auto*label=std::get_if<Text>(&item);
-      if(label&&label->value==value&&label->clip&&region.contains(label->at)){
-        const auto point=center(*label->clip);
-        if(region.contains(point)){diplomacy_smoke_click(point,width,height);return;}
+    const auto find=[&]{
+      DrawList draw;diplomacy_workspace_.render(draw,width,height,&diplomacy_portrait_provider_);
+      for(const auto&item:draw.overlay){
+        const auto*label=std::get_if<Text>(&item);
+        // Click the visible slice of the label's row so partially-clipped
+        // entries at a scroll viewport edge still count as reachable.
+        if(label&&label->value==value&&label->clip){
+          const auto& c=*label->clip;
+          const float vx=std::max(c.x,region.x),vy=std::max(c.y,region.y);
+          const float vw=std::min(c.x+c.width,region.x+region.width)-vx;
+          const float vh=std::min(c.y+c.height,region.y+region.height)-vy;
+          if(vw>=8.f&&vh>=4.f){diplomacy_smoke_click({vx+vw*.5f,vy+vh*.5f},width,height);return true;}
+        }
       }
+      return false;
+    };
+    // The region may already be scrolled past the target from an earlier
+    // lookup — sweep down, then back up, so every scroll position is covered.
+    for(const float direction:{-1.f,1.f})for(int step=0;step<40;++step){
+      if(find())return;
+      InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+      input.pointer=center(region);
+      input.events={{InputEventType::Wheel,input.pointer,{},direction}};
+      if(!update(input,width,height,0.,false))throw std::runtime_error("Diplomacy smoke input closed the campaign.");
     }
     throw std::runtime_error("Diplomacy smoke cannot locate visible control: "+value);
   }
@@ -3568,7 +3585,7 @@ class NativeCampaign final {
     scroll.pointer=center(layout.detail_rows);scroll.events={{InputEventType::Wheel,scroll.pointer,{},-10.f}};
     if(!update(scroll,width,height,0.,false))throw std::runtime_error("Diplomacy agreement scrolling closed the campaign.");
     DrawList draw;diplomacy_workspace_.render(draw,width,height,&diplomacy_portrait_provider_);
-    if(!std::ranges::any_of(draw.overlay,[&](const auto&item){const auto*label=std::get_if<Text>(&item);return label&&label->value=="Research Exchange"&&label->clip&&layout.detail_rows.contains(label->at);}))
+    if(!std::ranges::any_of(draw.overlay,[&](const auto&item){const auto*label=std::get_if<Text>(&item);if(!label||label->value!="Research Exchange"||!label->clip)return false;const auto&c=*label->clip;const auto&r=layout.detail_rows;return std::min(c.y+c.height,r.y+r.height)-std::max(c.y,r.y)>=4.f&&std::min(c.x+c.width,r.x+r.width)-std::max(c.x,r.x)>=8.f;}))
       throw std::runtime_error("Accepted research agreement is not visible after scrolling.");
     if(!std::ranges::any_of(draw.overlay,[&](const auto&item){const auto*image=std::get_if<Image>(&item);return image&&image->resource&&image->resource->width()==2172&&image->resource->height()==724&&layout.stage.contains(center(image->destination));}))
       throw std::runtime_error("Native diplomacy did not render the reviewed transmission artwork.");

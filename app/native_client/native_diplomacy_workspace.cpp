@@ -231,7 +231,17 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   const auto right_w = std::clamp(inner_w * .24f, 244.f * scale, 330.f * scale);
   const auto center_w =
       std::max(240.f * scale, inner_w - left_w - right_w - gap * 2.f);
-  const auto columns_h = inner_h * .56f;
+  // The feedback rail lifts clear of the command HUD's context plate, so the
+  // column stack must fit the space above it — not the full inner height.
+  // Guarantee the detail list a usable scroll viewport at short viewports.
+  const auto usable_columns_h =
+      std::min(inner_y + inner_h,
+               CommandHudLayout::make(width, height).context.y -
+                   6.f * scale) -
+      inner_y;
+  const auto columns_h = std::max(
+      60.f * scale,
+      std::min(inner_h * .56f, usable_columns_h - 158.f * scale));
   const UiRect contact_panel{inner_x, inner_y, left_w, columns_h};
   const UiRect stage{contact_panel.x + contact_panel.width + gap, inner_y,
                      center_w, columns_h};
