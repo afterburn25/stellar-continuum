@@ -316,7 +316,8 @@ struct Shell {
       hit3_quality{}, hit3_plights{}, hit3_debug{}, hit3_range{},
       hit3_shadow{}, hit3_surfmaps{}, hit3_surfshape{}, hit3_clouddeck{},
       hit3_termwrap{}, hit3_limbdark{}, hit3_lods{}, hit3_lodpixels{},
-      hit3_bandshear{}, hit3_bandwaves{}, hit3_orbitbeam{},
+      hit3_bandshear{}, hit3_bandwaves{}, hit3_banddrift{},
+      hit3_orbitbeam{},
       hit3_starkelvin{}, hit3_accretion{}, hit3_fwdscatter{},
       hit3_volume{}, hit3_lodfade{}, hit3_visfade{}, hit3_lodgroup{};
 
@@ -2240,9 +2241,13 @@ void commit_scene3_field(Shell &shell) {
           }
           const std::string img2 = n >= 0 && toks.size() > 8
               ? toks[8] : "";
-          float occ = 0.f;
+          float occ = 0.f, rate = 0.f;
           if (n >= 0 && toks.size() > 9) {
             try { occ = std::stof(toks[9]); }
+            catch (const std::exception &) { n = -1; }
+          }
+          if (n >= 0 && toks.size() > 10) {
+            try { rate = std::stof(toks[10]); }
             catch (const std::exception &) { n = -1; }
           }
           if (n >= 5 && v[0] >= 0.f && v[0] <= 0.75f && v[1] > 0.f &&
@@ -2251,7 +2256,7 @@ void commit_scene3_field(Shell &shell) {
               std::abs(v[5]) <= 1e4f && v[6] >= 0.f && v[6] <= 0.1f &&
               v[7] >= 0.f && v[7] <= 1.f &&
               (v[7] == 0.f || !img2.empty()) &&
-              occ >= 0.f && occ <= 1e4f &&
+              occ >= 0.f && occ <= 1e4f && std::abs(rate) <= 64.f &&
               (v[0] == 0.f || !next.texture.empty())) {
             next.volume_depth = v[0];
             next.volume_density = v[1];
@@ -2263,9 +2268,15 @@ void commit_scene3_field(Shell &shell) {
             next.volume_blend = v[7];
             next.volume_image2 = img2;
             next.volume_occlude = occ;
+            next.volume_flow_rate = rate;
             valid = true;
           }
           break; }
+  case 70:
+          try { a = std::stof(shell.scene3_buffer); }
+          catch (const std::exception &) { break; }
+          if (a >= -0.25f && a <= 0.25f) { next.band_drift = a; valid = true; }
+          break;
   case 66:
           try { a = std::stof(shell.scene3_buffer); }
           catch (const std::exception &) { break; }
@@ -2364,7 +2375,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                                                 shell.hit3_volume =
                                                                                     shell.hit3_lodfade =
                                                                                         shell.hit3_visfade =
-                                                                                            shell.hit3_lodgroup = {};
+                                                                                            shell.hit3_lodgroup =
+                                                                                                shell.hit3_banddrift = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2544,6 +2556,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       inst.material.limb_darkening = e.limb_darkening;
       inst.material.band_shear = e.band_shear;
       inst.material.band_waves = e.band_waves;
+      inst.material.band_drift = e.band_drift;
       inst.material.orbital_beaming = e.orbital_beaming;
       inst.material.forward_scatter = e.forward_scatter;
       // Emission volume: the entity texture is the emission image and
@@ -2560,6 +2573,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         effect.distortion = e.volume_distort;
         effect.blend = e.volume_blend;
         effect.occlude = e.volume_occlude;
+        effect.flow_rate = e.volume_flow_rate;
         if (!e.volume_image2.empty())
           if (const auto alt = scene3_tex(shell, e.volume_image2))
             effect.next_texture = alt;
@@ -2639,6 +2653,15 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
           : doc.debug_view == "lod"       ? DebugView3D::Lod
           : doc.debug_view == "residency" ? DebugView3D::Residency
                                         : DebugView3D::Lit;
+      // Preview clock — animated material terms (bandDrift, volume
+      // flowRate) need a nonzero scene time to show their motion.
+      static float preview_time = 0.f;
+      static std::chrono::steady_clock::time_point preview_last{};
+      const auto now = std::chrono::steady_clock::now();
+      if (preview_last.time_since_epoch().count() > 0)
+        preview_time += std::chrono::duration<float>(now - preview_last).count();
+      preview_last = now;
+      view.options.time = preview_time;
       out.overlay.push_back(std::move(view));
     }
   }
@@ -2872,6 +2895,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_bandwaves, "bandWaves",
         entity ? std::to_string(entity->band_waves) : "", ed(68),
         "zonal jet harmonic 0..1 - layered on bandShear");
+  field(shell.hit3_banddrift, "bandDrift",
+        entity ? std::to_string(entity->band_drift) : "", ed(70),
+        "uv/s scroll -0.25..0.25 - super-rotating deck drift");
   field(shell.hit3_orbitbeam, "orbitalBeam",
         entity ? std::to_string(entity->orbital_beaming) : "", ed(61),
         "approaching-lane brightening -1..1 - accretion discs");
@@ -2899,13 +2925,18 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                   std::to_string(entity->volume_distort) + "," +
                   std::to_string(entity->volume_blend) +
                   (entity->volume_image2.empty() &&
-                           entity->volume_occlude == 0.f
+                           entity->volume_occlude == 0.f &&
+                           entity->volume_flow_rate == 0.f
                        ? ""
                        : "," + entity->volume_image2 + "," +
-                             std::to_string(entity->volume_occlude))
+                             std::to_string(entity->volume_occlude) +
+                             (entity->volume_flow_rate == 0.f
+                                  ? ""
+                                  : "," + std::to_string(
+                                        entity->volume_flow_rate)))
             : "",
         ed(65),
-        "depth,density,seed,steps,scatter[,flow,distort[,blend[,image2[,occlude]]]] - emission volume; 0 clears");
+        "depth,density,seed,steps,scatter[,flow,distort[,blend[,image2[,occlude[,flowRate]]]]] - emission volume; 0 clears");
   field(shell.hit3_exposure, "exposure",
         std::to_string(doc.exposure), ed(34), "linear HDR multiplier");
   field(shell.hit3_bloom, "bloom s,t",
@@ -6959,6 +6990,8 @@ int main(int argc, char **argv) {
               edit3(60, std::to_string(se->band_shear));
             else if (shell.hit3_bandwaves.contains(event.position) && se)
               edit3(68, std::to_string(se->band_waves));
+            else if (shell.hit3_banddrift.contains(event.position) && se)
+              edit3(70, std::to_string(se->band_drift));
             else if (shell.hit3_orbitbeam.contains(event.position) && se)
               edit3(61, std::to_string(se->orbital_beaming));
             else if (shell.hit3_starkelvin.contains(event.position) && se)
@@ -6980,10 +7013,15 @@ int main(int argc, char **argv) {
                             std::to_string(se->volume_distort) + "," +
                             std::to_string(se->volume_blend) +
                             (se->volume_image2.empty() &&
-                                     se->volume_occlude == 0.f
+                                     se->volume_occlude == 0.f &&
+                                     se->volume_flow_rate == 0.f
                                  ? ""
                                  : "," + se->volume_image2 + "," +
-                                       std::to_string(se->volume_occlude)));
+                                       std::to_string(se->volume_occlude) +
+                                       (se->volume_flow_rate == 0.f
+                                            ? ""
+                                            : "," + std::to_string(
+                                                  se->volume_flow_rate))));
             else if (shell.scene3_rows.contains(event.position)) {
               const auto row = static_cast<std::size_t>(std::max(
                   0.f, std::floor((event.position.y -

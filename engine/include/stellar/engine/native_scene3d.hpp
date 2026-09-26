@@ -125,6 +125,10 @@ struct AnalyticShadow3D {
 struct SurfaceEffect3D {
   std::shared_ptr<const RgbaImage> next_texture;
   float blend{},flow_phase{},distortion{};
+  // Marched-filament churn rate: the volume's flow phase advances by
+  // flow_rate·time each frame so nebulae slowly re-pose instead of
+  // sitting frozen. [-64,64]; 0 keeps the static authored phase.
+  float flow_rate{};
   Vec3 view_sphere_center;float sphere_radius{};
   // Authorable occlusion sphere: an opaque sphere of `occlude` object-
   // space units centred on the instance origin — a corona volume stops
@@ -224,6 +228,10 @@ struct Material3D {
   // alternating mid-latitude jets. Still zero-mean (registration kept)
   // and hemispherically symmetric. [0,1].
   float band_waves{};
+  // Zonal drift for banded bodies: scrolls the equirect longitude by
+  // drift·time (super-rotating cloud deck sliding over a fixed limb),
+  // UV units per second, [-0.25,0.25]; 0 keeps the static warp.
+  float band_drift{};
   // Orbital beaming: material orbiting local +Y gains a first-order
   // doppler asymmetry — radiance scales by 1 + s·(v̂·V̂), so the
   // approaching lane brightens while the receding lane dims. Face-on

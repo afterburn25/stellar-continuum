@@ -116,6 +116,10 @@ struct RenderOptions3D {
   float saturation{1.f}; // 0..2
   float sharpen{0.f};    // 0..1 unsharp amount
   DebugView3D debug_view{DebugView3D::Lit};
+  // Scene seconds for animated material terms (band_drift, volume
+  // flow_rate); the driving host accumulates it per frame. 0 keeps
+  // every animated term at its authored phase — deterministic captures.
+  float time{0.f};
 };
 // A depth-tested 3D viewport composites at this exact place in either layer.
 // Its geometry stays in 3D; only this destination uses drawable pixels.

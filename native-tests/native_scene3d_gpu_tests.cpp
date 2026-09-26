@@ -854,6 +854,24 @@ int main(int argc,char** argv)try{
       if(std::abs(channel(*sheared_bands,x,y,0)-channel(*waved_bands,x,y,0))>8)++wave_px;
     check(wave_px>300,"Band waves did not reshape the shear profile");
     check(channel(*waved_bands,10,160,0)==5,"Band waves distorted the disc silhouette");
+    // Band drift: scene time scrolls the deck longitude — at t=0 the
+    // frame is identical, at t=5 a .25-u shift swaps the two stripe
+    // halves across the whole disc while the silhouette stays put.
+    giant.material.band_drift=.05f;
+    auto timed=[&](float t,const char* name){
+      DrawList list;RenderOptions3D o;o.time=t;
+      list.world.emplace_back(Scene3DView{Scene3D::create(camera,{giant}),{0,0,320,320},o});
+      list.overlay.emplace_back(FilledRectangle{{20,20,30,30},{40,50,240,255}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto drift_t0=timed(0.f,"bands-drift-t0.png");
+    const auto drift_t5=timed(5.f,"bands-drift-t5.png");
+    int drift_px=0,still_same=0;
+    for(int y=30;y<330;++y)for(int x=40;x<280;++x){
+      if(std::abs(channel(*drift_t0,x,y,0)-channel(*drift_t5,x,y,0))>8)++drift_px;
+      if(std::abs(channel(*drift_t0,x,y,0)-channel(*waved_bands,x,y,0))>8)++still_same;}
+    check(still_same==0,"Band drift changed the frame at time zero");
+    check(drift_px>3000,"Band drift did not scroll the deck over scene time");
+    check(channel(*drift_t5,10,160,0)==5,"Band drift distorted the disc silhouette");
     std::cout<<"band_shear_gpu=equator_pole_antishear_passed\n";
   }
   {
@@ -1076,6 +1094,21 @@ int main(int argc,char** argv)try{
       if(channel(*primary,x,y,0)-channel(*occluded,x,y,0)>12)++hole;
     check(hole>80,"Authored occlude sphere did not mask the volume centre");
     check(channel(*occluded,120,90,0)>30,"Occlude sphere removed the whole volume");
+    // Flow rate: scene time advances the filament phase — at t=0 the
+    // frame matches the static capture, at t=6 the marched folds have
+    // re-posed without changing the footprint.
+    plasma.material.surface_effect->occlude=0;plasma.material.surface_effect->flow_rate=.6f;
+    auto vol_timed=[&](float t,const char* name){
+      DrawList list;RenderOptions3D o;o.time=t;
+      list.world.emplace_back(Scene3DView{Scene3D::create(camera,{plasma}),{0,0,320,320},o});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto vol_t0=vol_timed(0.f,"plasma-flow-t0.png");
+    const auto vol_t6=vol_timed(6.f,"plasma-flow-t6.png");
+    int flow_px=0;
+    for(int y=30;y<200;++y)for(int x=80;x<245;++x)
+      if(std::abs(channel(*vol_t0,x,y,0)-channel(*vol_t6,x,y,0))>8)++flow_px;
+    check(flow_px>300,"Volume flow rate did not churn the filaments over time");
+    plasma.material.surface_effect->flow_rate=0;
     // Camera inside the proxy: the volume marches its interior instead
     // of popping out — backfaces of the exit wall carry the ray from the
     // camera rather than the fragment.

@@ -47,6 +47,7 @@ struct Material {
     vec4 response_options; // terminator wrap, cloud albedo, map flags (1 normal, 2 properties, 4 cloud), limb darkening
     vec4 point_position[4]; // view-space position, range (0 = unbounded)
     vec4 point_energy[4]; // rgb, intensity
+    vec4 anim_options; // band drift (uv/s), volume flow rate, unused
 };
 layout(set=2,binding=11,std430) readonly buffer Materials {
     Material materials[];
@@ -54,6 +55,7 @@ layout(set=2,binding=11,std430) readonly buffer Materials {
 // Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
 // 2 albedo, 3 normals, 4 roughness, 5 metallic, 6 emissive, 7 lighting,
 // 8 lod class / 9 residency class tint (texture_options.w).
+// debug_mode.y is the view's scene time driving animated material terms.
 layout(set=3,binding=0) uniform ViewParams {
     vec4 debug_mode;
     // view → shadow-map clip space, then texel size / strength / bias /
@@ -189,7 +191,9 @@ vec4 emission_volume(vec3 V) {
     int steps=int(material.volume_options.y)-(inside_volume?128:0);
     float step_size=(exit_distance-entry)/float(steps);
     vec4 integrated=vec4(0);
-    float phase=material.effect_options.z,seed=material.volume_options.w;
+    // flow_rate churns the filament field over scene time — nebulae
+    // slowly re-pose instead of freezing at their authored phase.
+    float phase=material.effect_options.z+view_params.debug_mode.y*material.anim_options.y,seed=material.volume_options.w;
     // Directional single-scatter (atmo_shape.z — atmospheres never reach
     // this branch): the limb facing the key light brightens, the far side
     // dims, so nebulae read star-lit instead of uniformly self-glowing.
@@ -262,6 +266,9 @@ void main() {
     // symmetric too, so both properties survive the mix.
     if(material.emissive_tint.w!=0.0)
         uv.x+=material.emissive_tint.w*(cos(2.0*PI*texture_uv.y)+material.texture_options.y*cos(6.0*PI*texture_uv.y));
+    // Zonal drift: scene time scrolls equirect longitude — a slowly
+    // super-rotating cloud deck sliding over a fixed lit limb.
+    if(material.anim_options.x!=0.0) uv.x+=view_params.debug_mode.y*material.anim_options.x;
     // Evaluate derivatives before per-pixel alpha rejection; annulus horizon
     // rejection above is arithmetic so neighbouring fragments remain coherent.
     float visibility=direct_visibility(material.shadow_light.xyz);

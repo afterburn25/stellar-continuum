@@ -130,6 +130,11 @@ int main()try{
   rejects([&]{auto i=instance;i.material.band_waves=-.1f;(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.band_shear=.2f;i.material.band_waves=.8f;const auto waved=Scene3D::create(camera,{i});
    check(close(waved->instances()[0].material.band_waves,.8f),"Band waves did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.band_drift=.3f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_drift=-.3f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_drift=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.band_drift=.1f;const auto drifted=Scene3D::create(camera,{i});
+   check(close(drifted->instances()[0].material.band_drift,.1f),"Band drift did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.orbital_beaming=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=-1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
@@ -146,6 +151,9 @@ int main()try{
    rejects([&]{auto i=plasma;i.material.surface_effect->volume_scatter=-.1f;(void)Scene3D::create(camera,{i});});
    rejects([&]{auto i=plasma;i.material.surface_effect->volume_scatter=1.1f;(void)Scene3D::create(camera,{i});});
    plasma.material.surface_effect->volume_scatter=.8f;
+   rejects([&]{auto i=plasma;i.material.surface_effect->flow_rate=70.f;(void)Scene3D::create(camera,{i});});
+   rejects([&]{auto i=plasma;i.material.surface_effect->flow_rate=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+   plasma.material.surface_effect->flow_rate=.5f;
    check(Scene3D::create(camera,{plasma})!=nullptr,"Legal volume scatter rejected");}
   rejects([&]{(void)star_photosphere3d(50);});
   rejects([&]{(void)star_photosphere3d(2e5);});

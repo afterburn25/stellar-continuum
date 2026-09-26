@@ -203,6 +203,9 @@ struct MaterialSurface {
   // Cloud-deck altitude in object units [0,.1]: view parallax, displaced
   // ground shadows and deck self-shading. 0 keeps a texture-space deck.
   float cloud_height{0.f};
+  // Zonal drift rate in UV longitude per second [-0.25,0.25] — scrolls
+  // the deck slowly for super-rotating giants. 0 keeps the static warp.
+  float band_drift{0.f};
 };
 // Spectral-class star photosphere — the component counterpart of the
 // entity document's `starKelvin` key. The runtime maps it through
@@ -237,6 +240,9 @@ struct EmissionVolume {
   // Optional occlusion sphere centred on the entity origin, object units
   // — a corona stops shining through its star. [0,1e4]; 0 disables.
   float occlude{0.f};
+  // Phase drift rate — the filament warp advances by flow_rate·time per
+  // frame so nebulae churn instead of freezing. [-64,64]; 0 static.
+  float flow_rate{0.f};
 };
 // Limb-scatter atmosphere shell on a 3D body — tinted (1-N.V)^power rim
 // weighted to the day side with a nightside floor.

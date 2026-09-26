@@ -435,6 +435,7 @@ int main() {
     cube.limb_darkening = 0.6f;
     cube.band_shear = -0.25f;
     cube.band_waves = 0.6f;
+    cube.band_drift = 0.08f;
     cube.orbital_beaming = 0.7f;
     cube.star_kelvin = 3200.0;
     cube.accretion = {0.4f, 1.f, 9000.f, 0.8f};
@@ -449,6 +450,7 @@ int main() {
     cube.volume_blend = 0.4f;
     cube.volume_image2 = "maps/nebula_b.png";
     cube.volume_occlude = 0.6f;
+    cube.volume_flow_rate = 0.4f;
     cube.lod_meshes = {"models/crate_mid.obj", "models/crate_low.obj"};
     cube.lod_pixels = 48.f;
     cube.lod_fade = 0.3f;
@@ -581,6 +583,7 @@ int main() {
                 rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
                 rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f &&
                 rc.band_shear == -0.25f && rc.band_waves == 0.6f &&
+                rc.band_drift == 0.08f &&
                 rc.orbital_beaming == 0.7f &&
                 rc.star_kelvin == 3200.0 && rc.accretion[0] == 0.4f &&
                 rc.accretion[1] == 1.f && rc.accretion[2] == 9000.f &&
@@ -599,7 +602,7 @@ int main() {
                 rc.volume_scatter == 0.5f && rc.volume_flow == 1.5f &&
                 rc.volume_distort == 0.05f && rc.volume_blend == 0.4f &&
                 rc.volume_image2 == "maps/nebula_b.png" &&
-                rc.volume_occlude == 0.6f,
+                rc.volume_occlude == 0.6f && rc.volume_flow_rate == 0.4f,
             "scene3d emission-volume block round-trips");
       check(reparsed->point_lights.size() == 1 &&
                 reparsed->point_lights[0].x == 1.f &&
@@ -751,6 +754,14 @@ int main() {
               .has_value(),
           "scene3d band waves below 0 rejected");
     check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandDrift":0.3}]})")
+              .has_value(),
+          "scene3d band drift above 0.25 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandDrift":-0.3}]})")
+              .has_value(),
+          "scene3d band drift below -0.25 rejected");
+    check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"orbitalBeam":-1.2}]})")
               .has_value(),
           "scene3d orbital beaming below -1 rejected");
@@ -794,6 +805,10 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"flow":2e5}}]})")
               .has_value(),
           "scene3d volume flow above bound rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"flowRate":80}}]})")
+              .has_value(),
+          "scene3d volume flowRate above bound rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.3,"blend":1.2,"image2":"a.png"}}]})")
               .has_value(),

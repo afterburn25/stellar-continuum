@@ -228,6 +228,9 @@ struct Scene3dEntity {
   // Zonal-wind harmonic strength [0,1]: mixes a third spatial cosine into
   // `band_shear`'s profile for alternating mid-latitude jets.
   float band_waves{0.f};
+  // Zonal drift rate in UV longitude per second [-0.25,0.25] — scrolls
+  // the deck slowly for super-rotating giants. 0 keeps the static warp.
+  float band_drift{0.f};
   // First-order orbital beaming for material orbiting local +Y (accretion
   // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
@@ -268,6 +271,9 @@ struct Scene3dEntity {
   // the entity origin — a corona stops shining through its star.
   // [0,1e4]; 0 disables.
   float volume_occlude{0.f};
+  // Phase drift rate for the filament warp — the volume re-poses slowly
+  // over scene time instead of freezing. [-64,64]; 0 keeps it static.
+  float volume_flow_rate{0.f};
   // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
   // coarsest-first. lod_meshes[i] draws once the projected bounding
   // diameter drops below lod_pixels/2^i pixels (at most 8 levels).

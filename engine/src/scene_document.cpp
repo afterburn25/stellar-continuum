@@ -470,6 +470,7 @@ std::string Scene3dDocument::to_json() const {
     if (e.limb_darkening != 0.f) item["limbDarken"] = e.limb_darkening;
     if (e.band_shear != 0.f) item["bandShear"] = e.band_shear;
     if (e.band_waves != 0.f) item["bandWaves"] = e.band_waves;
+    if (e.band_drift != 0.f) item["bandDrift"] = e.band_drift;
     if (e.orbital_beaming != 0.f) item["orbitalBeam"] = e.orbital_beaming;
     if (e.forward_scatter != 0.f)
       item["forwardScatter"] = e.forward_scatter;
@@ -486,6 +487,8 @@ std::string Scene3dDocument::to_json() const {
     if (e.volume_blend != 0.f) item["volume"]["blend"] = e.volume_blend;
     if (!e.volume_image2.empty()) item["volume"]["image2"] = e.volume_image2;
     if (e.volume_occlude != 0.f) item["volume"]["occlude"] = e.volume_occlude;
+    if (e.volume_flow_rate != 0.f)
+      item["volume"]["flowRate"] = e.volume_flow_rate;
     if (!e.lod_meshes.empty()) {
       item["lods"] = e.lod_meshes;
       item["lodPixels"] = e.lod_pixels;
@@ -693,6 +696,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.band_waves = item.value("bandWaves", 0.0f);
       if (!(e.band_waves >= 0.f && e.band_waves <= 1.f))
         return fail("bandWaves must be in [0,1]");
+      e.band_drift = item.value("bandDrift", 0.0f);
+      if (!(e.band_drift >= -0.25f && e.band_drift <= 0.25f))
+        return fail("bandDrift must be in [-0.25,0.25]");
       e.orbital_beaming = item.value("orbitalBeam", 0.0f);
       if (!(e.orbital_beaming >= -1.f && e.orbital_beaming <= 1.f))
         return fail("orbitalBeam must be in [-1,1]");
@@ -727,6 +733,7 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         e.volume_distort = vol.value("distort", 0.0f);
         e.volume_blend = vol.value("blend", 0.0f);
         e.volume_occlude = vol.value("occlude", 0.0f);
+        e.volume_flow_rate = vol.value("flowRate", 0.0f);
         if (vol.contains("image2")) {
           if (!vol.at("image2").is_string())
             return fail("volume image2 must be a texture path");
@@ -740,7 +747,8 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
             !(std::abs(e.volume_flow) <= 1e4f) ||
             !(e.volume_distort >= 0.f && e.volume_distort <= 0.1f) ||
             !(e.volume_blend >= 0.f && e.volume_blend <= 1.f) ||
-            !(e.volume_occlude >= 0.f && e.volume_occlude <= 1e4f))
+            !(e.volume_occlude >= 0.f && e.volume_occlude <= 1e4f) ||
+            !(std::abs(e.volume_flow_rate) <= 64.f))
           return fail("volume fields out of range");
         if (e.volume_blend != 0.f && e.volume_image2.empty())
           return fail("volume blend requires an image2 texture");

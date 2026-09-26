@@ -111,10 +111,12 @@ same document headless-tested.
    h·tan(zenith), and zenith-gates deck self-shading; volumes also
    march correctly with the camera inside the proxy (double-sided
    raster + camera-origin entry, so nebula fly-throughs don't pop).
-   Remaining: the deck is
+   `RenderOptions3D::time` (host-accumulated, determinism-safe)
+   animates two authored rates: `bandDrift` scrolls deck longitude
+   and `volume.flowRate` churns the filament phase. Remaining: the deck is
    still a bounded parallax composite — no volumetric cloud shells or
-   per-layer thickness; banding is a static two-harmonic warp
-   (`band_shear` + `band_waves` jets), not animated turbulence.
+   per-layer thickness; banding drifts but its warp shape stays a
+   fixed two-harmonic profile, not evolving turbulence.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes every material field (PBR, surface

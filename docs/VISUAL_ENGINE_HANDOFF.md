@@ -48,6 +48,8 @@ m.band_shear = -0.2f;                       // [-0.5,0.5] latitude-weighted
                                             // longitude shear (giants)
 m.band_waves = 0.7f;                        // [0,1] zonal-jet harmonic
                                             // layered on band_shear
+m.band_drift = 0.08f;                       // [-0.25,0.25] uv/s deck
+                                            // scroll over scene time
 m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
                                             // asymmetry (accretion discs,
                                             // ring forward-scatter)
@@ -76,7 +78,14 @@ nonzero `cloud_offset` the deck additionally shears against the surface
 underneath it. `band_waves` [0,1] layers a `cos(6πv)` harmonic on top —
 w = 0 is the single-cosine pole-vs-equator profile, w → 1 adds
 Jupiter-style alternating mid-latitude jets; the mix stays zero-mean
-and equator-symmetric.
+and equator-symmetric. `band_drift` [-0.25,0.25] scrolls the whole
+warp in longitude at uv/s under `Scene3DView::options.time` — a
+super-rotating deck sliding over a fixed lit limb; the same view time
+advances `SurfaceEffect3D::flow_rate` [-64,64], churning emission-volume
+filaments. Hosts accumulate `options.time` per frame (the runtime uses
+`dt·time_scale`); at 0 every term sits at its authored phase, so
+captures and save determinism are unaffected — animation is
+render-side only.
 
 `orbital_beaming` is also material-level: fragments recover their
 object-space position through the stored model-view inverse, take the
@@ -323,10 +332,11 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `atmo_strength/power/night/r/g/b`, `range` (per-entity
 `visible_range`) with `visibleFade` ([0,.5] dithered fade-out),
 `terminator_wrap`, `limb_darkening`, `bandShear`
-([-0.5,0.5]) with `bandWaves` ([0,1] jet harmonic),
+([-0.5,0.5]) with `bandWaves` ([0,1] jet harmonic) and
+`bandDrift` ([-0.25,0.25] uv/s scroll),
 `orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
-(`{depth,density,seed,steps,scatter,flow,distort,blend,image2,occlude}`
+(`{depth,density,seed,steps,scatter,flow,distort,blend,image2,occlude,flowRate}`
 — requires a `texture`), `lods` (array of
 mesh specs, ≤ 8) with `lodPixels`, and a `surface`
 block —
@@ -405,8 +415,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - The cloud deck is a texture-space composite with a bounded altitude
   term (`cloud_height` gives limb parallax, sun-displaced ground shadows
   and zenith-gated self-shading) — still no volumetric shell or
-  per-layer thickness; `band_shear`+`band_waves` are static
-  two-harmonic longitude warps, not animated turbulence.
+  per-layer thickness; `band_drift` scrolls the deck over scene time
+  but the warp stays a fixed two-harmonic profile, and volume
+  `flow_rate` re-poses filaments without evolving their shape.
 - Limb darkening is the single-coefficient linear law — no quadratic
   two-term coefficients or wavelength-dependent profiles.
 - `orbital_beaming` is a first-order brightness asymmetry — no doppler

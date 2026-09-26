@@ -249,7 +249,33 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   probes assert antisymmetric equator/pole displacement plus a
   harmonic-reshaped profile on a striped sphere; `engine_scene3d`
   bounds, `engine_project`/`engine_world` round-trips. Remaining:
-  two harmonics only — no animated turbulence.
+  the warp shape is fixed — two harmonics, no turbulence evolution.
+
+### Follow-up: `RenderOptions3D::time` render-time animation (same change set's successor)
+
+- A per-view scene-time scalar (`RenderOptions3D::time`, carried on
+  the free `ViewUniform::debug_mode.y`) drives two authored visual-only
+  rates through a new `anim_options` material lane: `band_drift`
+  [-0.25,0.25] scrolls equirect longitude at uv/s (super-rotating
+  decks slide over a fixed lit limb; the sampler's REPEAT wrap makes
+  the unbounded scroll safe), and `SurfaceEffect3D::flow_rate`
+  [-64,64] advances the volume march's filament phase so nebulae
+  churn instead of freezing. `RuntimeHost` accumulates
+  `time += dt·time_scale` per frame (so `--speed` slows animation
+  with the simulation clock) and the engine-shell preview keeps its
+  own accumulator; **default 0 keeps every capture deterministic** —
+  animation is purely visual, never read by the simulation or saves.
+  Authored via `bandDrift` / `volume.flowRate` doc keys,
+  `MaterialSurface::band_drift` / `EmissionVolume::flow_rate`
+  components, runtime + editor `bandDrift` row and the volume CSV's
+  11th field. GPU probes assert time-zero frames are pixel-identical
+  to static captures and nonzero time shifts >3000 band pixels /
+  re-poses >300 filament pixels while silhouettes stay fixed;
+  `engine_scene3d` bounds, `engine_project`/`engine_world`
+  round-trips including legacy-payload codec tails. Remaining: drift
+  is a rigid longitude scroll — no latitude-dependent rate, no
+  turbulence; volume churn is phase-only (the authored warp shape
+  persists).
 
 ### Follow-up: `Material3D::orbital_beaming` (same change set's successor)
 

@@ -695,6 +695,7 @@ int main() {
         turret.limb_darkening = 0.6f;
         turret.band_shear = -0.3f;
         turret.band_waves = 0.7f;
+        turret.band_drift = 0.12f;
         turret.orbital_beaming = 0.65f;
         turret.star_kelvin = 5800.0;
         turret.accretion = {0.3f, 1.f, 12000.f, -0.6f};
@@ -710,6 +711,7 @@ int main() {
         turret.volume_blend = 0.4f;
         turret.volume_image2 = "maps/turret_glow.png";
         turret.volume_occlude = 0.6f;
+        turret.volume_flow_rate = 0.4f;
         turret.lod_meshes = {"models/turret_mid.obj", "models/turret_low.obj"};
         turret.lod_pixels = 64.f;
         turret.lod_fade = 0.25f;
@@ -771,7 +773,8 @@ int main() {
                   ms->cloud_offset_x == 0.1f && ms->cloud_offset_y == 0.2f &&
                   ms->terminator_wrap == 0.5f && ms->limb_darkening == 0.6f &&
                   ms->band_shear == -0.3f && ms->orbital_beaming == 0.65f &&
-                  ms->forward_scatter == 0.4f && ms->band_waves == 0.7f,
+                  ms->forward_scatter == 0.4f && ms->band_waves == 0.7f &&
+                  ms->band_drift == 0.12f,
               "spawn_scene3d materialsurface component");
         check(world3.get<MaterialSurface>(ship_e) == nullptr,
               "defaults do not attach a surface component");
@@ -801,7 +804,7 @@ int main() {
                   ev->seed == 2.f && ev->steps == 24 && ev->scatter == 0.5f &&
                   ev->flow == 1.5f && ev->distort == 0.05f &&
                   ev->blend == 0.4f && ev->image2 == "maps/turret_glow.png" &&
-                  ev->occlude == 0.6f,
+                  ev->occlude == 0.6f && ev->flow_rate == 0.4f,
               "spawn_scene3d emissionvolume component");
         check(world3.get<EmissionVolume>(ship_e) == nullptr,
               "no volume key does not attach a component");
@@ -865,6 +868,7 @@ int main() {
                       rms->orbital_beaming == 0.65f &&
                       rms->forward_scatter == 0.4f &&
                       rms->band_waves == 0.7f &&
+                      rms->band_drift == 0.12f &&
                       rms->cloud_offset_y == 0.2f,
                   "materialsurface codec round-trips");
             const auto *rml = restored.get<MeshLods>(*re_turret);
@@ -887,7 +891,7 @@ int main() {
                       rev->scatter == 0.5f && rev->flow == 1.5f &&
                       rev->distort == 0.05f && rev->blend == 0.4f &&
                       rev->image2 == "maps/turret_glow.png" &&
-                      rev->occlude == 0.6f,
+                      rev->occlude == 0.6f && rev->flow_rate == 0.4f,
                   "emissionvolume codec round-trips");
         }
         if (re_turret) {
@@ -932,7 +936,8 @@ int main() {
                   out.entities[1].accretion[2] == 12000.f &&
                   out.entities[1].accretion[3] == -0.6f &&
                   out.entities[1].forward_scatter == 0.4f &&
-                  out.entities[1].band_waves == 0.7f,
+                  out.entities[1].band_waves == 0.7f &&
+                  out.entities[1].band_drift == 0.12f,
               "scene3d_from_world exports surface response");
         check(out.entities[1].texture == "maps/turret.png" &&
                   out.entities[1].volume_depth == 0.3f &&
@@ -944,7 +949,8 @@ int main() {
                   out.entities[1].volume_distort == 0.05f &&
                   out.entities[1].volume_blend == 0.4f &&
                   out.entities[1].volume_image2 == "maps/turret_glow.png" &&
-                  out.entities[1].volume_occlude == 0.6f,
+                  out.entities[1].volume_occlude == 0.6f &&
+                  out.entities[1].volume_flow_rate == 0.4f,
               "scene3d_from_world exports the emission volume");
         check(out.entities[1].lod_meshes.size() == 2 &&
                   out.entities[1].lod_meshes[0] == "models/turret_mid.obj" &&

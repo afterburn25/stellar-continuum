@@ -78,13 +78,13 @@ template<class Map> void evict(Map& cache,std::size_t& bytes,std::size_t incomin
   }
 }
 struct VertexUniform {Matrix4 mvp,model_view,shadow_from_model;};
-struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy;};
+struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy;std::array<float,4> anim_options;};
 struct PostUniform {std::array<float,4> a,b;};
 // View-wide fragment uniform: debug selector, then the key light's
 // view→shadow-clip transform and {texel size (>0 enables), PCF radius in
 // texels, strength, bias} for the directional shadow map.
 struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==672&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==96);
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==688&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==96);
 // Column-major rotation for a unit quaternion — same convention as
 // rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
 Matrix4 rotation_from(Quaternion q){
@@ -597,6 +597,10 @@ struct Scene3DRenderer::Storage {
         fragment.texture_options[3]=(want&&draw.image->owner.get()!=want.get())?9.f
           :static_cast<float>(draw.image->base_mip);
       }else fragment.texture_options[3]=draw.lod_class;
+      // Animated terms: band drift scrolls equirect longitude, volume
+      // flow rate advances the filament phase — both scaled by the
+      // view's scene time on debug_mode.y.
+      fragment.anim_options={material.band_drift,material.surface_effect?material.surface_effect->flow_rate:0.f,0,0};
       if(material.shadow){const auto& s=*material.shadow;
         fragment.shadow_light={shadow.light.x,shadow.light.y,shadow.light.z,s.shape==AnalyticShadowShape3D::Ellipsoid?1.f:2.f};
         fragment.shadow_radii={s.radii.x,s.radii.y,s.radii.z,0};
@@ -674,7 +678,7 @@ struct Scene3DRenderer::Storage {
     // is double-precision so far-field system coordinates stay stable.
     const auto& shadow_settings=view.scene->shadow_map();
     const bool use_shadow=shadow_supported&&!low_tier&&shadow_settings.has_value()&&shadow_settings->strength>0.f;
-    Uint32 shadow_res=0;ViewUniform view_uniform{};view_uniform.debug_mode[0]=static_cast<float>(opt.debug_view);
+    Uint32 shadow_res=0;ViewUniform view_uniform{};view_uniform.debug_mode[0]=static_cast<float>(opt.debug_view);view_uniform.debug_mode[1]=opt.time;
     std::vector<std::shared_ptr<Geometry>> caster_geometry;std::vector<Matrix4> shadow_transforms;
     engine::DrawBatcher shadow_batcher;
     if(use_shadow){

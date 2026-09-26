@@ -1568,6 +1568,9 @@ int RuntimeHost::run() {
     const auto now = std::chrono::steady_clock::now();
     const float dt = std::chrono::duration<float>(now - last).count();
     last = now;
+    // Scene time drives animated material terms (band drift, volume
+    // flow) — scaled like the simulation clock so --speed slows both.
+    impl.render3.time += dt * static_cast<float>(impl.time_scale);
     if (now - scene_poll > std::chrono::milliseconds(500)) {
       scene_poll = now;
       reload_scene();
@@ -2570,6 +2573,7 @@ int RuntimeHost::run() {
           inst.material.limb_darkening = sf->limb_darkening;
           inst.material.band_shear = sf->band_shear;
           inst.material.band_waves = sf->band_waves;
+          inst.material.band_drift = sf->band_drift;
           inst.material.orbital_beaming = sf->orbital_beaming;
           inst.material.forward_scatter = sf->forward_scatter;
         }
@@ -2593,6 +2597,7 @@ int RuntimeHost::run() {
           effect.distortion = vol->distort;
           effect.blend = vol->blend;
           effect.occlude = vol->occlude;
+          effect.flow_rate = vol->flow_rate;
           // image2 overrides next_texture for the blend lane; an
           // unloadable path keeps the entity texture (blend no-ops).
           if (const auto alt = tex3d_of(vol->image2))

@@ -469,9 +469,11 @@ void register_scene_components(World &world) {
           put_u32(out, static_cast<std::uint32_t>(s->size()));
           out.insert(out.end(), s->begin(), s->end());
         }
-        // cloud_height tails the payload so pre-field saves still decode
-        // (a mid-list float would eat the first string's length prefix).
+        // cloud_height/band_drift tail the payload so pre-field saves
+        // still decode (a mid-list float would eat the first string's
+        // length prefix).
         put_f32(out, m.cloud_height);
+        put_f32(out, m.band_drift);
         return out;
       },
       [](const std::vector<std::uint8_t> &b) {
@@ -503,6 +505,7 @@ void register_scene_components(World &world) {
           at += len;
         }
         if (b.size() - at >= 4) m.cloud_height = f();
+        if (b.size() - at >= 4) m.band_drift = f();
         return m;
       });
   world.register_component<AtmosphereShell>(
@@ -568,6 +571,7 @@ void register_scene_components(World &world) {
         put_u32(out, static_cast<std::uint32_t>(v.image2.size()));
         out.insert(out.end(), v.image2.begin(), v.image2.end());
         put_f32(out, v.occlude);
+        put_f32(out, v.flow_rate);
         return out;
       },
       [](const std::vector<std::uint8_t> &b) {
@@ -614,6 +618,10 @@ void register_scene_components(World &world) {
         if (b.size() - at >= 4) {
           const std::uint32_t bits = get_u32(b, at);
           std::memcpy(&v.occlude, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.flow_rate, &bits, 4);
         }
         return v;
       });
@@ -951,7 +959,7 @@ std::vector<EntityId> spawn_scene3d(World &world,
         s.terminator_wrap != 0.f || s.limb_darkening != 0.f ||
         s.band_shear != 0.f || s.orbital_beaming != 0.f ||
         s.forward_scatter != 0.f || s.band_waves != 0.f ||
-        s.cloud_height != 0.f)
+        s.cloud_height != 0.f || s.band_drift != 0.f)
       world.add(entity,
                 MaterialSurface{s.normal_strength, s.relief,
                                 s.cloud_opacity, s.cloud_albedo,
@@ -960,7 +968,8 @@ std::vector<EntityId> spawn_scene3d(World &world,
                                 s.band_shear, s.orbital_beaming,
                                 s.forward_scatter, s.band_waves,
                                 s.normal_map, s.properties_map,
-                                s.cloud_map, s.cloud_height});
+                                s.cloud_map, s.cloud_height,
+                                s.band_drift});
     if (s.atmo_strength != 0.f)
       world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
                                         s.atmo_strength, s.atmo_power,
@@ -980,7 +989,8 @@ std::vector<EntityId> spawn_scene3d(World &world,
                                s.volume_seed, s.volume_scatter,
                                s.volume_steps, s.volume_flow,
                                s.volume_distort, s.volume_blend,
-                               s.volume_image2, s.volume_occlude});
+                               s.volume_image2, s.volume_occlude,
+                               s.volume_flow_rate});
     if (!s.lod_meshes.empty() || !s.lod_group.empty())
       world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels, s.lod_fade,
                                  s.lod_group, s.lod_proxy,
@@ -1079,6 +1089,7 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.forward_scatter = sf->forward_scatter;
       s.band_waves = sf->band_waves;
       s.cloud_height = sf->cloud_height;
+      s.band_drift = sf->band_drift;
     }
     if (const auto *at = world.get<AtmosphereShell>(entity)) {
       s.atmo_r = at->r;
@@ -1110,6 +1121,7 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.volume_blend = ev->blend;
       s.volume_image2 = ev->image2;
       s.volume_occlude = ev->occlude;
+      s.volume_flow_rate = ev->flow_rate;
     }
     if (const auto *ml = world.get<MeshLods>(entity)) {
       s.lod_meshes = ml->specs;
