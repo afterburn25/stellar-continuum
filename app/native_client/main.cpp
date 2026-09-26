@@ -5104,8 +5104,31 @@ class NativeCampaign final {
       const auto spatial = project_system(*system_workspace_.snapshot());
       const auto marker = std::ranges::find(spatial.bodies, body_id, &SystemSpatialBodyMarker::body_id);
       if (marker == spatial.bodies.end()) throw std::runtime_error("Settlement body is not visible.");
-      const auto at = system_workspace_.viewport()->world_to_screen(marker->offset_x, marker->offset_y);
-      click({at.x, at.y});
+      auto body_screen=[&]{
+        const auto s=system_workspace_.viewport()->world_to_screen(marker->offset_x,marker->offset_y);
+        return Point{s.x,s.y};};
+      // At compact zoom the body can be sub-pixel (hit_body skips invisible
+      // markers) or occluded by a parked fleet; zoom in until it is hittable.
+      for(int guard=0;guard<24;++guard){
+        const auto probe=body_screen();
+        const auto hit=system_workspace_.viewport()->hit_body(spatial,probe.x,probe.y);
+        const bool lane_occluded=std::ranges::any_of(
+            system_workspace_.lane_geometry(),
+            [&](const auto&g){return stellar::native_system_travel::hit_local_lane(g,probe);});
+        const bool occluded=lane_occluded||(system_workspace_.travel_snapshot()&&
+            !stellar::native_system_travel::hit_local_fleets(
+                system_workspace_.travel_snapshot()->fleets,spatial,
+                *system_workspace_.viewport(),probe).empty());
+        if(hit==body_id&&!occluded)break;
+        // Zooming at the probe pins the body in place, which can never slide
+        // it out from under a lane arrow; anchor at the field centre instead
+        // so the marker drifts radially while magnifying.
+        const auto&wf=SystemWorkspaceLayout::for_viewport(width,height).world_field;
+        const Point anchor=lane_occluded?Point{wf.x+wf.width*.5f,wf.y+wf.height*.5f}:probe;
+        route({{InputEventType::Wheel,anchor,{},1.f}});
+      }
+      const auto at=body_screen();
+      click(at);
       if (system_workspace_.selected_body_id() != body_id)
         throw std::runtime_error("Settlement body click missed its target.");
     };
