@@ -886,7 +886,13 @@ int main(int argc,char** argv)try{
     check(channel(*cutout,150,160,0)<channel(*open,150,160,0)/2,"Cutout caster's opaque half stopped writing the shadow map");
     check(channel(*occluded,188,160,0)<channel(*open,188,160,0)/2,"Baseline solid shadow was already open at the cutout probe");
     check(channel(*cutout,188,160,0)>100,"Cutout caster wrote a solid silhouette through its transparent half");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_passed\n";
+    // Shadows debug view isolates the key-light occlusion term as
+    // grayscale: umbra texels go dark while lit receivers stay bright.
+    RenderOptions3D shadowdbg;shadowdbg.debug_view=DebugView3D::Shadows;
+    const auto dbg=shadow_view({receiver,occluder},shadowdbg,"shadow-debug.png");
+    check(channel(*dbg,176,160,0)<40&&channel(*dbg,60,160,0)>200,
+        "Shadows debug view did not isolate the occlusion term");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks

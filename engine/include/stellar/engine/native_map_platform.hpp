@@ -99,10 +99,12 @@ enum class RenderQuality3D { Low, Medium, High, Ultra };
 // Lod = per-draw LOD class tint (gray full mesh, level ramp, magenta
 // group proxy; screen-door bands show their dithered partition),
 // Residency = per-draw texture-residency tint (green full mip 0,
-// lime/amber/orange/red deeper resident tails, magenta pinned fallback).
+// lime/amber/orange/red deeper resident tails, magenta pinned fallback),
+// Shadows = key-light occlusion term only (analytic blocker × shadow map
+// visibility as a grayscale — umbra extent and bias tuning).
 enum class DebugView3D {
   Lit, Unlit, Albedo, Normals, Roughness, Metallic, Emissive, LightingOnly,
-  Lod, Residency
+  Lod, Residency, Shadows
 };
 // Per-view post-processing, all in linear HDR space before the tonemap
 // resolve. Exposure multiplies incoming radiance; bloom reads the HDR mip

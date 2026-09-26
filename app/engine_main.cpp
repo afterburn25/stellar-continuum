@@ -2003,9 +2003,9 @@ void commit_scene3_field(Shell &shell) {
     const auto &d = shell.scene3_buffer;
     if (d != "lit" && d != "unlit" && d != "albedo" && d != "normals" &&
         d != "roughness" && d != "metallic" && d != "emissive" &&
-        d != "lighting" && d != "lod" && d != "residency")
+        d != "lighting" && d != "lod" && d != "residency" && d != "shadows")
       return fail("use lit|unlit|albedo|normals|roughness|metallic|"
-                  "emissive|lighting|lod|residency");
+                  "emissive|lighting|lod|residency|shadows");
     commit();
     doc.debug_view = d;
     return ok("debug view updated");
@@ -2724,6 +2724,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
           : doc.debug_view == "lighting"  ? DebugView3D::LightingOnly
           : doc.debug_view == "lod"       ? DebugView3D::Lod
           : doc.debug_view == "residency" ? DebugView3D::Residency
+          : doc.debug_view == "shadows"   ? DebugView3D::Shadows
                                         : DebugView3D::Lit;
       // Preview clock — animated material terms (bandDrift, volume
       // flowRate) need a nonzero scene time to show their motion.
@@ -3056,7 +3057,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         }(),
         ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength]]]; ... - max 4, empty clears");
   field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
-        "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency");
+        "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows");
   field(shell.hit3_shadow, "shadowMap",
         doc.shadow_extent > 0.f
             ? std::to_string(doc.shadow_extent) + "," +

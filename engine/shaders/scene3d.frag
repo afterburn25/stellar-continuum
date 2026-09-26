@@ -672,6 +672,7 @@ void main() {
                 :cls<3.5?vec3(1,.4,.05)
                 :vec3(1,.15,.1);
         }
+        else if(debug==10) shown=vec3(visibility);                 // Shadows: key-light occlusion term
         else shown=(result-emissive_part)/max(texel.rgb,vec3(.001));// Lighting
         shown=max(shown,vec3(0));
         if(material.view_options.w>0.5) shown=display_color(shown);

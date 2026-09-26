@@ -362,6 +362,7 @@ production material path (not a second renderer), so it stays faithful:
 | `LightingOnly` | shading with albedo divided out |
 | `Lod` | per-draw LOD class — gray full mesh, blue→green→yellow→orange for chain levels 1–4+, magenta group proxy; transition bands show their dithered member/proxy partition |
 | `Residency` | per-draw surface-texture residency — green mip-0 resident, lime/amber/orange/red deeper tails, magenta pinned fallback |
+| `Shadows` | key-light occlusion term as grayscale — analytic blocker × shadow-map visibility; umbra extent, bias and coverage tuning |
 
 ## Authoring path — `Scene3dDocument`
 
@@ -391,7 +392,7 @@ equirect path — a shared IBL probe that fills entities with
 `exposure`, `bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
 `vignette` (0..1 post-tonemap corner falloff, all tiers),
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
-("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency"), and
+("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows"), and
 `render.shadow` — `{extent, distance, depth, strength, bias,
 resolution}`; `extent ≤ 0` (or the key absent) disables the map.
 Negative `range` and unknown `debug`/`quality` strings are rejected, as
@@ -503,3 +504,7 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   sharply); inside a `visible_fade` band the LOD pair degrades to the
   selected level's single thinned draw.
 - No indirect draw / GPU culling — CPU record build is the scale bound.
+  SDL3 exposes `SDL_DrawGPUIndexedPrimitivesIndirect`, but it only
+  merges same-state batches; per-batch texture/pipeline binds are the
+  actual blocker, so the enabler would be a bindless surface set, not
+  the draw call itself.

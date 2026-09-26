@@ -250,9 +250,11 @@ documented per-frame but accumulated. See
   authored mid-zoom strategy scenes and one `casts_shadow` spot cone
   carries a depth map; omni point lights and analytic blockers still
   cover point sources and planet↔ring. Documented limitation.
-- Indirect draws / GPU culling: SDL_GPU does not yet expose
-  `SDL_DrawGPUIndexedPrimitivesIndirect` paths here; CPU record build is
-  the known bound. Not a blocker at strategy scale (4096 cap).
+- Indirect draws / GPU culling: vendored SDL3 exposes
+  `SDL_DrawGPUIndexedPrimitivesIndirect`, but it only merges batches
+  sharing bound state — the renderer's per-batch sampler/pipeline binds
+  (and no bindless texture set) keep draws CPU-submitted. Not a blocker
+  at strategy scale (4096 cap).
 - True atmospheric multi-scatter, ray-traced occlusion: out of scope
   for the SDL_GPU forward renderer; approximations land per-phase with
   quality budgets. Volumetric nebulae land as the existing bounded
