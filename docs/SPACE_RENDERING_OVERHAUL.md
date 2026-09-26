@@ -162,7 +162,12 @@ entity and `visible_fades` counts thinned draws.
 Directional shadow mapping is landed: `ShadowMap3D` ortho coverage ahead
 of the camera, depth-only `scene3d_shadow` pass through the RenderGraph,
 8-tap PCF at High/Ultra, tier-scaled resolution, Low-tier skip,
-`shadow_casters` workload counter. Planet surface detail is landed:
+`shadow_casters` workload counter. Casters share the lit pass's LOD
+pick — chain levels, the merged-sphere group proxy, `visible_range`
+culling — and each `ShadowCast` carries the same signed keep mask, so
+chain bands, group-collapse bands and range fades screen-door the
+depth writes too (in-band transitions submit the complementary
+partner casters; Low tier keeps the hard switch). Planet surface detail is landed:
 `SurfaceResponse3D` is reachable from authored documents/components
 (any map subset), `cloud_albedo` turns the cloud map into a lit deck,
 and `terminator_wrap` applies wrap-diffuse to all light types.

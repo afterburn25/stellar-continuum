@@ -679,7 +679,12 @@ struct Scene3DRenderer::Storage {
     const auto& shadow_settings=view.scene->shadow_map();
     const bool use_shadow=shadow_supported&&!low_tier&&shadow_settings.has_value()&&shadow_settings->strength>0.f;
     Uint32 shadow_res=0;ViewUniform view_uniform{};view_uniform.debug_mode[0]=static_cast<float>(opt.debug_view);view_uniform.debug_mode[1]=opt.time;
-    std::vector<std::shared_ptr<Geometry>> caster_geometry;std::vector<Matrix4> shadow_transforms;
+    // Shadow casters carry a signed keep probability matching the lit
+    // pass's screen-door mask so LOD/range/group transitions thin the
+    // silhouette instead of popping it; std430 stride is 80 bytes.
+    struct alignas(16) ShadowCast{Matrix4 light_mvp;float keep;float pad[3];};
+    static_assert(sizeof(ShadowCast)==80,"std430 shadow caster stride");
+    std::vector<std::shared_ptr<Geometry>> caster_geometry;std::vector<ShadowCast> shadow_transforms;
     engine::DrawBatcher shadow_batcher;
     if(use_shadow){
       const auto& s=*shadow_settings;const auto& cam=view.scene->camera();
@@ -719,32 +724,56 @@ struct Scene3DRenderer::Storage {
         const double px=instance.position.x-cam.position.x,py=instance.position.y-cam.position.y,pz=instance.position.z-cam.position.z;
         const double cam_dist=std::sqrt(px*px+py*py+pz*pz);
         if(instance.visible_range>0.f&&cam_dist>static_cast<double>(instance.visible_range)+radius)continue;
+        // Same keep terms the lit pass computes: the shadow silhouette
+        // crossfades in lockstep with the draw that casts it. The sign
+        // convention partitions texels — negative keeps the complement.
+        float range_keep=1.f;
+        if(instance.visible_range>0.f&&instance.visible_fade>0.f){
+          const double edge=static_cast<double>(instance.visible_range)+radius;
+          range_keep=std::clamp(static_cast<float>((edge-cam_dist)/(instance.visible_fade*instance.visible_range)),0.f,1.f);
+        }
+        if(range_keep<=0.f)continue;
         // Collapsed groups share one caster: the representative submits
         // its proxy scaled to the merged sphere, identity-rotated so a
         // card faces the light like it faces the camera in the lit pass.
-        if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->collapse){
-          const GroupBounds&g=*git->second;
-          if(g.rep!=&instance)continue;
+        const auto emit_proxy=[&](const GroupBounds&g,float keep){
           const double lx=from_view.values[0]*g.x+from_view.values[4]*g.y+from_view.values[8]*g.z+from_view.values[12];
           const double ly=from_view.values[1]*g.x+from_view.values[5]*g.y+from_view.values[9]*g.z+from_view.values[13];
           const double lz=from_view.values[2]*g.x+from_view.values[6]*g.y+from_view.values[10]*g.z+from_view.values[14];
-          if(std::abs(lx)>extent+g.r||std::abs(ly)>extent+g.r||lz>g.r||lz<-depth-g.r)continue;
+          if(std::abs(lx)>extent+g.r||std::abs(ly)>extent+g.r||lz>g.r||lz<-depth-g.r)return;
           const double ps=g.r/std::max(static_cast<double>(instance.lod_group_proxy->bounding_radius()),1e-9);
           Matrix4 light_model{};
           for(int c=0;c<3;++c)light_model.values[c*4+c]=static_cast<float>(ps);
           light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);light_model.values[15]=1.f;
           caster_geometry.push_back(geometry(instance.lod_group_proxy));
-          shadow_transforms.push_back(multiply(light_projection,light_model));
+          shadow_transforms.push_back({multiply(light_projection,light_model),keep});
+        };
+        if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->collapse){
+          const GroupBounds&g=*git->second;
+          if(g.rep!=&instance)continue;
+          emit_proxy(g,1.f);
           continue;
         }
+        // Inside a collapse band members thin by 1-p while the rep
+        // additionally submits the proxy on the complementary share —
+        // the same partition the lit pass screen-doors.
+        float group_keep=1.f;
+        if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->share>0.f){
+          const GroupBounds&g=*git->second;
+          group_keep=1.f-g.share;
+          if(g.rep==&instance)emit_proxy(g,-g.share);
+        }
         // Screen-space LOD: casters submit the level the lit pass picks
-        // instead of always paying the full mesh's vertex cost.
+        // instead of always paying the full mesh's vertex cost, plus the
+        // next-coarser partner on its complementary share inside a band.
         std::shared_ptr<const Mesh3D> caster_mesh=instance.mesh;
+        std::size_t lvl=0;float lod_share=0.f;
         if(!instance.lod_meshes.empty()){
           const float diameter=2.f*instance.scale*static_cast<float>(instance.mesh->bounding_radius())*lod_focal/
             (lod_camera.projection==Projection3D::Orthographic?1.f:static_cast<float>(std::max(cam_dist,1e-4)));
-          const std::size_t lvl=select_lod3d_level(instance,diameter);
+          lvl=select_lod3d_level(instance,diameter);
           if(lvl>0)caster_mesh=instance.lod_meshes[lvl-1];
+          lod_share=lod3d_fade_share(instance,diameter);
         }
         const double dx=instance.position.x-ex,dy=instance.position.y-ey,dz=instance.position.z-ez;
         const double lx=xx*dx+xy*dy+xz*dz,ly=yx*dx+yy*dy+yz*dz,lz=zx*dx+zy*dy+zz*dz;
@@ -753,8 +782,15 @@ struct Scene3DRenderer::Storage {
         for(int c=0;c<3;++c)for(int r=0;r<3;++r)model.values[c*4+r]*=instance.scale;
         Matrix4 light_model=multiply(light_rotation,model);
         light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);
+        const bool fading=lod_share>0.f&&lvl<instance.lod_meshes.size()&&range_keep>=1.f;
         caster_geometry.push_back(geometry(caster_mesh));
-        shadow_transforms.push_back(multiply(light_projection,light_model));
+        shadow_transforms.push_back({multiply(light_projection,light_model),
+          (fading?1.f-lod_share:range_keep)*group_keep});
+        if(fading){
+          caster_geometry.push_back(geometry(instance.lod_meshes[lvl]));
+          shadow_transforms.push_back({multiply(light_projection,light_model),
+            -lod_share*group_keep});
+        }
       }
       // Same instancing convention as the scene pass: batch by mesh, then
       // reorder transforms/geometry to sorted order so gl_InstanceIndex maps.
@@ -768,7 +804,7 @@ struct Scene3DRenderer::Storage {
       shadow_batcher.build();
       {
         const auto& shadow_sorted=shadow_batcher.sorted_items();
-        std::vector<Matrix4> ordered(shadow_sorted.size());
+        std::vector<ShadowCast> ordered(shadow_sorted.size());
         std::vector<std::shared_ptr<Geometry>> ordered_geometry(shadow_sorted.size());
         for(std::size_t slot=0;slot<shadow_sorted.size();++slot){
           ordered[slot]=shadow_transforms[shadow_sorted[slot].instance_index];
@@ -793,7 +829,7 @@ struct Scene3DRenderer::Storage {
     std::vector<std::string> order;std::vector<engine::RenderGraphDiagnostic> diagnostics;
     if(!graph.compile(&order,&diagnostics))throw std::runtime_error("3D render graph compile failed: "+(diagnostics.empty()?std::string("unknown"):diagnostics.front().message));
     Command command(device);
-    const auto shadow_bytes=static_cast<Uint32>(shadow_transforms.size()*sizeof(Matrix4));
+    const auto shadow_bytes=static_cast<Uint32>(shadow_transforms.size()*sizeof(ShadowCast));
     if(!sorted.empty()||shadow_bytes){
       const auto vertex_bytes=static_cast<Uint32>(vertex_data.size()*sizeof(VertexUniform)),fragment_bytes=static_cast<Uint32>(fragment_data.size()*sizeof(FragmentUniform));
       if(!vertex_buffer||!fragment_buffer||vertex_capacity<vertex_data.size()||fragment_capacity<fragment_data.size()){
@@ -808,7 +844,7 @@ struct Scene3DRenderer::Storage {
       if(shadow_bytes&&(!shadow_buffer||shadow_capacity<shadow_transforms.size())){
         if(shadow_buffer)SDL_ReleaseGPUBuffer(device,shadow_buffer);
         shadow_capacity=std::max<std::size_t>(shadow_transforms.size(),shadow_capacity*2);
-        SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(shadow_capacity*sizeof(Matrix4));
+        SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(shadow_capacity*sizeof(ShadowCast));
         shadow_buffer=SDL_CreateGPUBuffer(device,&info);if(!shadow_buffer)throw gpu_error("3D shadow transform buffer creation failed");
       }
       Transfer transfer(device,vertex_bytes+fragment_bytes+shadow_bytes);auto* memory=static_cast<std::byte*>(transfer.map());

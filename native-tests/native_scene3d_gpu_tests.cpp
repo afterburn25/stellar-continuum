@@ -716,7 +716,54 @@ int main(int argc,char** argv)try{
     check(window.scene3d_statistics().shadow_casters==2,"Collapsed group did not share one proxy caster");
     check(channel(*grouped,176,160,0)<channel(*open,176,160,0)/2,"Group proxy caster did not shadow the receiver");
     check(channel(*grouped,40,160,0)>100,"Group proxy shadow spilled far beyond the merged sphere");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_passed\n";
+    // Transition bands thin the shadow silhouette with the same signed
+    // screen-door keep mask the lit pass uses: a mid-band chain instance
+    // submits both levels on complementary shares, so the region only
+    // the full mesh covers darkens ~its share instead of popping between
+    // the two hard picks. The steeper key light displaces the shadow
+    // clear of the caster's own screen footprint so the map's dither is
+    // measured directly, not through the occluder's lit draw.
+    const auto shade_census=[&](const RgbaImage&img,int x0,int x1,int y0,int y1){
+      int shaded=0;const int threshold=channel(*open,(x0+x1)/2,(y0+y1)/2,0)/2;
+      for(int y=y0;y<y1;++y)for(int x=x0;x<x1;++x)if(channel(img,x,y,0)<threshold)++shaded;
+      return shaded;};
+    const Vec3 steep_light{1.4f,0,.7f};
+    const auto steep_view=[&](std::vector<MeshInstance3D> objects,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),steep_light,{},shadow),{0,0,320,320}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    Material3D steep_mat=diffuse;steep_mat.light_direction=steep_light;
+    MeshInstance3D steep_receiver{quad(0,0),{},{},1,steep_mat};
+    auto steep_occluder=occluder;steep_occluder.material=steep_mat;
+    auto steep_chained=chained;steep_chained.material=steep_mat;
+    auto steep_banded=chained;steep_banded.material=steep_mat;steep_banded.lod_pixels=110;steep_banded.lod_fade=.25f; // d~122px sits mid-band
+    const auto steep_open=steep_view({steep_receiver},"shadow-steep-open.png");
+    const auto steep_full=steep_view({steep_receiver,steep_occluder},"shadow-steep-full.png");
+    const auto steep_small=steep_view({steep_receiver,steep_chained},"shadow-steep-small.png");
+    const auto steep_band=steep_view({steep_receiver,steep_banded},"shadow-steep-band.png");
+    check(window.scene3d_statistics().shadow_casters==3,"LOD band did not submit both transition partners as casters");
+    // Locate the displaced shadow horizontally inside the receiver band,
+    // then census the whole footprint: the dithered union must sit
+    // strictly between the two hard picks.
+    int sx0=320,sx1=0;for(int x=0;x<320;++x){bool hit=false;for(int y=130;y<200;y+=2)hit|=channel(*steep_full,x,y,0)<90;if(hit){sx0=std::min(sx0,x);sx1=x;}}
+    check(sx1>sx0+10,"Steep-light reference did not displace a measurable shadow");
+    const int full_c=shade_census(*steep_full,sx0-2,sx1+3,140,185),small_c=shade_census(*steep_small,sx0-2,sx1+3,140,185);
+    const int band_c=shade_census(*steep_band,sx0-2,sx1+3,140,185);
+    check(full_c>small_c&&band_c>small_c&&band_c<full_c,"Shadow silhouette did not screen-door inside the LOD band");
+    // Group collapse bands partition casters the same way: members keep
+    // 1-p, the rep submits the proxy on the complementary p.
+    auto b1=m1,b2=m2,b3=m3;
+    for(auto* m:{&b1,&b2,&b3}){m->lod_group_pixels=120;m->lod_fade=.4f;} // merged d~154px sits mid-band
+    auto u1=m1,u2=m2,u3=m3;
+    for(auto* m:{&u1,&u2,&u3}){m->lod_group.clear();m->lod_group_proxy.reset();}
+    const auto ungrouped=shadow_view({receiver,u1,u2,u3},{},"shadow-group-off.png");
+    const auto banded_group=shadow_view({receiver,b1,b2,b3},{},"shadow-group-band.png");
+    check(window.scene3d_statistics().shadow_casters==5,"Group band did not keep member casters plus the proxy share");
+    // Members sit at y=0 so only the merged-sphere proxy reaches the
+    // strip above their shadow band — dithered coverage lands between.
+    const int proxy_edge_full=shade_census(*grouped,150,200,104,116),proxy_edge_none=shade_census(*ungrouped,150,200,104,116);
+    const int proxy_edge_band=shade_census(*banded_group,150,200,104,116);
+    check(proxy_edge_full>proxy_edge_none&&proxy_edge_band>proxy_edge_none&&proxy_edge_band<proxy_edge_full,"Group collapse band did not partition the proxy shadow");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks

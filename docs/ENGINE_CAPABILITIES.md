@@ -166,9 +166,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   are flat quads (no baked view-dependent shading); the crossfade is a
   per-pixel dither (stable while the camera holds still; reads as fine
   noise on stills when a coarse proxy diverges sharply); shadow
-  silhouettes switch with the caster's LOD pick — the depth pass has
-  no dithered transition, so a distant caster's shadow can pop its
-  shape once per threshold crossing.
+  casters carry the same signed keep mask through the depth pass, so
+  silhouettes dither in lockstep with the lit draw (each in-band level
+  adds one shadow submission — banded group members keep their own
+  casters while the representative adds the proxy's complementary
+  share).
 
 ## Scene3D surface detail — cloud decks and terminator wrap (2026-09-25)
 

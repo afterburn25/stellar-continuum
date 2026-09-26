@@ -8,8 +8,8 @@
     "engine/shaders/scene3d.frag": "85bc5a49da335e733521ebdab7aa349be57ad980cf998a0d28632068ebf2fbea",
     "engine/shaders/tonemap.vert": "2be2745c671496f0136b2d403ab88fdc78f5cdc697aeac0261bb95f5d4d44e24",
     "engine/shaders/tonemap.frag": "c462a7469849a7e5ff66095276e9bcf3df80f7a5a79d096fb4dad04634bf80da",
-    "engine/shaders/scene3d_shadow.vert": "24e1aa244dccb80a28a9e70a97ccc09ca756bff6a74f6d9b11e1e3d028039c54",
-    "engine/shaders/scene3d_shadow.frag": "3da5719f920fd1110d46cd2c02f6990ee69d15cd87ce2db107b17eae34338bf3",
-    "engine/src/generated/scene3d_shaders.hpp": "6a77f4f46830621e55f5c29873c341f5318a689b77f2d93d5e6c10b133800947"
+    "engine/shaders/scene3d_shadow.vert": "cd2a06ac57f33044dc568850f30ca065ff296b854d29a4c247ce62c6382d0e13",
+    "engine/shaders/scene3d_shadow.frag": "da3fb8d659f5e98b213616bc9ec8d5ef5808cdf3bee95c30295d654645c341de",
+    "engine/src/generated/scene3d_shaders.hpp": "b31300ebc736bc19e4058fabfcbb835f12e108e607eacd7912df5446c72ddc7c"
   }
 }

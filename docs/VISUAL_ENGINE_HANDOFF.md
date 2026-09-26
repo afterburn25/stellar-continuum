@@ -282,6 +282,12 @@ shadow.resolution = 0;      // 0 = tier default (Medium 1024 / High 2048 / Ultra
   `visible_range`-culled and non-casting volumes are excluded.
   `Scene3DStatistics::shadow_casters` reports the per-frame caster
   workload.
+- Casters submit the same screen-space LOD the lit pass picks (chain
+  levels, one merged-sphere proxy per collapsed group) and carry the
+  signed screen-door keep mask — `ShadowCast{mat4,keep}` in the
+  transform SSBO — so LOD bands, collapse bands and `visibleFade`
+  dither the silhouette instead of popping it; in-band transitions
+  submit each transition partner on its complementary share.
 - Shadow darkness scales the key light only — ambient, point lights,
   emissive and the analytic `AnalyticShadow3D` blockers are independent.
 - `bias` is a receiver-side constant in NDC space; the rasterizer
