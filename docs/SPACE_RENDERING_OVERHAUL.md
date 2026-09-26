@@ -87,10 +87,15 @@ same document headless-tested.
    irradiance plus roughness-aware specular environment response;
    `Dielectric3D` transmits/reflects the same map. Remaining: the env
    sample is an authored per-material map, not a per-scene probe.
-5. **Post** — tonemap only; no exposure, bloom, contrast/saturation
-   grading, sharpen, or AA (pipelines are all SAMPLECOUNT_1).
-6. **Atmosphere** — only the flat `rim_power` alpha shell; no
-   wavelength-weighted scattering, no day/night limb behavior.
+5. **Post** — landed: HDR tonemap plus per-view `exposure`,
+   mip-chain `bloom` (soft threshold), `contrast`/`saturation` grading,
+   unsharp `sharpen`, and 4x MSAA at Ultra when supported. Remaining:
+   no TAA/temporal resolve, no vignette/chromatic-aberration grading.
+6. **Atmosphere** — landed: authorable limb shell (`atmosphere` block /
+   `AtmosphereShell` component — color, strength, power, `night_floor`
+   day/night limb response). Remaining: still a screen-space limb
+   approximation — no wavelength-weighted scattering or volumetric
+   transmission.
 7. **Planet features** — landed: `SurfaceResponse3D` is authorable
    end-to-end (normal/properties/cloud maps, any subset; `surface` doc
    block + `MaterialSurface` component + editor rows), `cloud_albedo`
