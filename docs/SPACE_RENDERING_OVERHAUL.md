@@ -126,7 +126,8 @@ same document headless-tested.
    maps, atmosphere, limb/beaming/shear/scatter, presets, volume, LODs),
    render options, camera (pos/yaw/pitch/fov + RMB/wheel preview), key +
    fill lights, point lights, shadow map, and preview debug modes.
-   Remaining: `emitters` and near/far clip planes have no rows.
+   Remaining: `emitters` have no rows (a 15-field spec is a poor fit
+   for the single-line CSV editor).
 10. **Fleet scale** — `maximum_scene3d_instances=4096`, CPU-side uniform
     fill per instance. Instancing is real but bounded by per-frame CPU
     record build. `visible_range` distance culling landed (phase 16) and

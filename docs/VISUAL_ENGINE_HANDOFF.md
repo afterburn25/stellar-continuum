@@ -288,6 +288,9 @@ shadow.resolution = 0;      // 0 = tier default (Medium 1024 / High 2048 / Ultra
   transform SSBO — so LOD bands, collapse bands and `visibleFade`
   dither the silhouette instead of popping it; in-band transitions
   submit each transition partner on its complementary share.
+  Billboard `card:` casters ignore authored rotation and face the
+  light the way they face the camera, so an impostor never shadows
+  as an edge-on line.
 - Shadow darkness scales the key light only — ambient, point lights,
   emissive and the analytic `AnalyticShadow3D` blockers are independent.
 - `bias` is a receiver-side constant in NDC space; the rasterizer

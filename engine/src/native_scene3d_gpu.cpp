@@ -778,19 +778,25 @@ struct Scene3DRenderer::Storage {
         const double dx=instance.position.x-ex,dy=instance.position.y-ey,dz=instance.position.z-ez;
         const double lx=xx*dx+xy*dy+xz*dz,ly=yx*dx+yy*dy+yz*dz,lz=zx*dx+zy*dy+zz*dz;
         if(std::abs(lx)>extent+radius||std::abs(ly)>extent+radius||lz>radius||lz<-depth-radius)continue;
-        Matrix4 model=rotation_from(instance.rotation);
-        for(int c=0;c<3;++c)for(int r=0;r<3;++r)model.values[c*4+r]*=instance.scale;
-        Matrix4 light_model=multiply(light_rotation,model);
-        light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);
+        // A billboard caster faces the light the way it faces the camera
+        // in the lit pass — the identity-rotation collapse the group
+        // proxy uses; authored rotation would make a card edge-on.
+        const auto emit_caster=[&](const std::shared_ptr<const Mesh3D>& mesh,float keep){
+          Matrix4 light_model{};
+          if(mesh->billboard()){
+            for(int c=0;c<3;++c)light_model.values[c*4+c]=instance.scale;
+          }else{
+            Matrix4 model=rotation_from(instance.rotation);
+            for(int c=0;c<3;++c)for(int r=0;r<3;++r)model.values[c*4+r]*=instance.scale;
+            light_model=multiply(light_rotation,model);
+          }
+          light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);light_model.values[15]=1.f;
+          caster_geometry.push_back(geometry(mesh));
+          shadow_transforms.push_back({multiply(light_projection,light_model),keep});
+        };
         const bool fading=lod_share>0.f&&lvl<instance.lod_meshes.size()&&range_keep>=1.f;
-        caster_geometry.push_back(geometry(caster_mesh));
-        shadow_transforms.push_back({multiply(light_projection,light_model),
-          (fading?1.f-lod_share:range_keep)*group_keep});
-        if(fading){
-          caster_geometry.push_back(geometry(instance.lod_meshes[lvl]));
-          shadow_transforms.push_back({multiply(light_projection,light_model),
-            -lod_share*group_keep});
-        }
+        emit_caster(caster_mesh,(fading?1.f-lod_share:range_keep)*group_keep);
+        if(fading)emit_caster(instance.lod_meshes[lvl],-lod_share*group_keep);
       }
       // Same instancing convention as the scene pass: batch by mesh, then
       // reorder transforms/geometry to sorted order so gl_InstanceIndex maps.

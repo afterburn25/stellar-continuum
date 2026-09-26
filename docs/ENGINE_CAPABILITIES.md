@@ -100,6 +100,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   the camera, so a tiny-on-screen caster's shadow only carries
   low-poly silhouette where its texels are already coarse) and a
   collapsed group casts one light-facing proxy from the representative.
+  Each caster carries the lit pass's signed screen-door keep mask into
+  the depth pass, so banded transitions thin the shadow in lockstep;
+  `card:` impostor casters face the light like the proxy does.
   Low tier and `lod_fade=0` keep the hard
   switch (single draw, zero fade cost). A `visible_fade` band degrades a
   fading pair to the selected level's single thinned draw — which level
@@ -421,7 +424,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   while off-camera casters still write the map; casters share the lit
   pass's screen-space LOD pick (a chained instance submits its selected
   level; a collapsed `lodGroup` submits one light-facing proxy scaled
-  to the merged sphere from the representative member); casters batch
+  to the merged sphere from the representative member); billboard card
+  casters collapse rotation to face the light; casters batch
   through `DrawBatcher` with the same instancing convention as the
   scene pass.
 - **Persistence:** `render.shadow` document block round-trips; extent

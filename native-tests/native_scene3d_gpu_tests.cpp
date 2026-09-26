@@ -763,7 +763,15 @@ int main(int argc,char** argv)try{
     const int proxy_edge_full=shade_census(*grouped,150,200,104,116),proxy_edge_none=shade_census(*ungrouped,150,200,104,116);
     const int proxy_edge_band=shade_census(*banded_group,150,200,104,116);
     check(proxy_edge_full>proxy_edge_none&&proxy_edge_band>proxy_edge_none&&proxy_edge_band<proxy_edge_full,"Group collapse band did not partition the proxy shadow");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_passed\n";
+    // Billboard casters face the light like the proxy card: rotated into
+    // the horizontal plane (truly edge-on to a y=0 star) the impostor
+    // still writes its card footprint instead of a zero-area line.
+    auto card_caster=occluder;card_caster.mesh=Mesh3D::billboard_card(1.8f,1.8f);
+    card_caster.rotation=rotation_axis_angle({1,0,0},1.570796327f);
+    const auto card_shadow=shadow_view({receiver,card_caster},{},"shadow-card.png");
+    check(channel(*card_shadow,176,160,0)<channel(*open,176,160,0)/2,"Billboard caster stayed edge-on to the light");
+    check(channel(*card_shadow,40,160,0)>100,"Card-facing shadow spread beyond its silhouette");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks
