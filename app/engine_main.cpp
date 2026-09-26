@@ -2963,7 +2963,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         }(),
         ed(38), "x,y,z,r,g,b,intensity,range; ... - max 4, empty clears");
   field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
-        "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting");
+        "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency");
   field(shell.hit3_shadow, "shadowMap",
         doc.shadow_extent > 0.f
             ? std::to_string(doc.shadow_extent) + "," +

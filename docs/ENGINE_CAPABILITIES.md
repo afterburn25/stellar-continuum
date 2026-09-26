@@ -95,9 +95,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   blending and no z-fighting.
 - **Policies:** selection is per-view screen space — identical footprint
   convention as the texture streamer (px-per-world-unit × bounding
-  diameter / distance). Shadow casters always take the full mesh: the
-  shadow volume is camera-independent, so a near receiver's shadow must
-  not degrade with camera zoom. Low tier and `lod_fade=0` keep the hard
+  diameter / distance). Shadow casters share the lit pass's pick — a
+  chained instance casts its selected level (the shadow volume tracks
+  the camera, so a tiny-on-screen caster's shadow only carries
+  low-poly silhouette where its texels are already coarse) and a
+  collapsed group casts one light-facing proxy from the representative.
+  Low tier and `lod_fade=0` keep the hard
   switch (single draw, zero fade cost). A `visible_fade` band degrades a
   fading pair to the selected level's single thinned draw — which level
   shows stops mattering while the whole object dithers out.
@@ -162,8 +165,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   uniform-record load, not the per-instance iteration); impostor cards
   are flat quads (no baked view-dependent shading); the crossfade is a
   per-pixel dither (stable while the camera holds still; reads as fine
-  noise on stills when a coarse proxy diverges sharply); casters stay
-  full-res.
+  noise on stills when a coarse proxy diverges sharply); shadow
+  silhouettes switch with the caster's LOD pick — the depth pass has
+  no dithered transition, so a distant caster's shadow can pop its
+  shape once per threshold crossing.
 
 ## Scene3D surface detail — cloud decks and terminator wrap (2026-09-25)
 
@@ -411,8 +416,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Policies:** Low tier skips the pass entirely; `transparent` blends
   never cast; `visible_range`-culled instances don't cast (identical
   rule to the camera draw); light-space AABB culls off-volume casters
-  while off-camera casters still write the map; casters batch through
-  `DrawBatcher` with the same instancing convention as the scene pass.
+  while off-camera casters still write the map; casters share the lit
+  pass's screen-space LOD pick (a chained instance submits its selected
+  level; a collapsed `lodGroup` submits one light-facing proxy scaled
+  to the merged sphere from the representative member); casters batch
+  through `DrawBatcher` with the same instancing convention as the
+  scene pass.
 - **Persistence:** `render.shadow` document block round-trips; extent
   ≤ 0 disables. Rejects nonpositive `depth`, `strength` outside [0,1],
   `bias` outside [0,0.1], `resolution` outside [64,8192].
@@ -422,8 +431,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   block with pixel probes (open vs blocked receiver, moved blocker
   relocates the shadow, Low-tier skip, PCF tap delta, out-of-range
   caster culling) + `shadow-open/blocked/reference/moved/low/pcf/
-  culled` captures; `engine_project` document round-trip + rejection
-  coverage.
+  culled` captures; LOD probes (annulus chain substitute writes a ring
+  shadow with a hole where the full quad was solid; a collapsed group
+  shares one proxy caster — `shadow_casters` drops N+1→2 — and still
+  shadows the receiver) + `shadow-lod/group` captures;
+  `engine_project` document round-trip + rejection coverage.
 - **Infrastructure fix bundled:** SDL fragment-set resource order —
   the materials SSBO moved to binding 11 because set 2 requires
   sampled textures (including the new `shadow_depth_map` at binding

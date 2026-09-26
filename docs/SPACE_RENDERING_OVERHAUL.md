@@ -72,11 +72,14 @@ same document headless-tested.
 1. **PBR materials** — no metallic response, no scalar roughness, no
    emissive map (only dark-side alpha masking), no alpha cutout, no UV
    tiling, no metallic-roughness map. Ships/stations cannot express metal.
-2. **Lighting** — directional only, ≤3 per material, no point/spot lights,
-   no distance attenuation (engine glow, station floods impossible).
+2. **Lighting** — landed: key + up to two fill/rim directionals and ≤4
+   windowed point lights per scene (`lights[]`, `pointLights`). Spots
+   remain unsupported.
 3. **Shadows** — landed: key-light directional shadow map (authored
    ortho volume centred ahead of the camera, depth pass + 8-tap PCF,
-   tier-scaled resolution, Low skips). Remaining: no CSM splits for
+   tier-scaled resolution, Low skips; casters share the lit pass's
+   screen-space LOD pick and collapsed groups cast one light-facing
+   proxy). Remaining: no CSM splits for
    extreme zoom ranges, point lights stay unshadowed; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — environment map reachable only through `Dielectric3D`;
@@ -121,8 +124,9 @@ same document headless-tested.
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes every material field (PBR, surface
    maps, atmosphere, limb/beaming/shear/scatter, presets, volume, LODs),
-   render options, and preview debug modes. Remaining: no live lighting
-   or per-camera authoring inside the tool.
+   render options, camera (pos/yaw/pitch/fov + RMB/wheel preview), key +
+   fill lights, point lights, shadow map, and preview debug modes.
+   Remaining: `emitters` and near/far clip planes have no rows.
 10. **Fleet scale** — `maximum_scene3d_instances=4096`, CPU-side uniform
     fill per instance. Instancing is real but bounded by per-frame CPU
     record build. `visible_range` distance culling landed (phase 16) and

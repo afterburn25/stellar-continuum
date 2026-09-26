@@ -697,6 +697,25 @@ int main(int argc,char** argv)try{
     auto ranged=occluder;ranged.visible_range=1.f;
     const auto culled_caster=shadow_view({receiver,ranged},{},"shadow-culled.png");
     check(channel(*culled_caster,176,160,0)>100,"Distance-culled caster still wrote the shadow map");
+    // Shadow-pass LOD: casters submit the level the lit pass picks. A
+    // level-1 substitute quad one third the full quad's extent writes a
+    // measurably smaller shadow — the centre stays occluded while the
+    // region only the full quad covered reopens.
+    const auto small_quad=Mesh3D::create({{{-.3f,-.3f,0},{0,0,1},{0,0}},{{.3f,-.3f,0},{0,0,1},{1,0}},{{.3f,.3f,0},{0,0,1},{1,1}},{{-.3f,.3f,0},{0,0,1},{0,1}}},{0,1,2,0,2,3});
+    auto chained=occluder;chained.lod_meshes={small_quad};chained.lod_pixels=4096;
+    const auto chained_shadow=shadow_view({receiver,chained},{},"shadow-lod.png");
+    check(window.scene3d_statistics().lod_instances==1,"Shadow test's lit pass did not pick the chain level");
+    check(channel(*chained_shadow,176,160,0)<channel(*open,176,160,0)/2,"LOD substitute caster did not write the shadow map");
+    check(channel(*chained_shadow,212,160,0)>100,"LOD caster still wrote the full mesh's footprint");
+    // Collapsed groups share one caster: the representative's proxy,
+    // scaled to the merged sphere and facing the light.
+    auto m1=occluder,m2=occluder,m3=occluder;
+    m1.position={.4f,0,.4f};m2.position={.5f,0,.4f};m3.position={.6f,0,.4f};
+    for(auto* m:{&m1,&m2,&m3}){m->lod_group="wing";m->lod_group_proxy=quad(0,0);m->lod_group_pixels=4096;}
+    const auto grouped=shadow_view({receiver,m1,m2,m3},{},"shadow-group.png");
+    check(window.scene3d_statistics().shadow_casters==2,"Collapsed group did not share one proxy caster");
+    check(channel(*grouped,176,160,0)<channel(*open,176,160,0)/2,"Group proxy caster did not shadow the receiver");
+    check(channel(*grouped,40,160,0)>100,"Group proxy shadow spilled far beyond the merged sphere");
     std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_passed\n";
   }
   {

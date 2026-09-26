@@ -426,22 +426,25 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   profile — no spiral fluctuations, no relativistic ray-bending; the
   annulus radii must be re-stated in the `annulus:i,o` mesh spec.
 - `volume_scatter` is a limb-gradient approximation — no real
-  light-path extinction march inside the volume; volumes remain
-  authored through the C++ API only.
+  light-path extinction march inside the volume.
 - `forward_scatter` is a single Henyey-Greenstein lobe — no
   multi-term phase functions or wavelength-dependent scattering; it
   scales radiance only, not alpha.
 - One shared equirect env map per material — no probe grid.
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
-- Debug views are developer tooling — no LOD/residency visualization
-  modes yet, and LightingOnly divides by sampled albedo so untextured
-  or near-black surfaces clip to black.
+- Debug views are developer tooling — `Lod` tints the submitted
+  level/proxy class and `Residency` the bound mip state; LightingOnly
+  divides by sampled albedo so untextured or near-black surfaces clip
+  to black.
 - `visible_range` is distance culling and `lod_meshes` a flat halving
   chain; `lodGroup` collapse shades the proxy with the representative
   member's material (groups should share materials, and members still
-  pay CPU prepare work), and shadow casters always take
-  the full mesh (a fading-out instance keeps casting until the cull
-  edge — the screen-door mask only applies to the lit draw). Impostor
+  pay CPU prepare work). Shadow casters share the lit pass's screen-
+  space pick — a chained instance casts its selected level and a
+  collapsed group casts one light-facing proxy from the representative
+  (the fade band's screen-door mask doesn't apply to the depth pass,
+  and a fading-out instance keeps casting until the cull edge).
+  Impostor
   cards (`Mesh3D::billboard_card`, `card:w,h`
   spec) face the camera but carry no baked view-dependent shading — the
   impostor image is whatever texture the instance maps onto it. The

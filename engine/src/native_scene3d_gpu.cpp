@@ -717,7 +717,35 @@ struct Scene3DRenderer::Storage {
         if(instance.material.transparent)continue;
         const double radius=static_cast<double>(instance.mesh->bounding_radius())*instance.scale;
         const double px=instance.position.x-cam.position.x,py=instance.position.y-cam.position.y,pz=instance.position.z-cam.position.z;
-        if(instance.visible_range>0.f&&std::sqrt(px*px+py*py+pz*pz)>static_cast<double>(instance.visible_range)+radius)continue;
+        const double cam_dist=std::sqrt(px*px+py*py+pz*pz);
+        if(instance.visible_range>0.f&&cam_dist>static_cast<double>(instance.visible_range)+radius)continue;
+        // Collapsed groups share one caster: the representative submits
+        // its proxy scaled to the merged sphere, identity-rotated so a
+        // card faces the light like it faces the camera in the lit pass.
+        if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->collapse){
+          const GroupBounds&g=*git->second;
+          if(g.rep!=&instance)continue;
+          const double lx=from_view.values[0]*g.x+from_view.values[4]*g.y+from_view.values[8]*g.z+from_view.values[12];
+          const double ly=from_view.values[1]*g.x+from_view.values[5]*g.y+from_view.values[9]*g.z+from_view.values[13];
+          const double lz=from_view.values[2]*g.x+from_view.values[6]*g.y+from_view.values[10]*g.z+from_view.values[14];
+          if(std::abs(lx)>extent+g.r||std::abs(ly)>extent+g.r||lz>g.r||lz<-depth-g.r)continue;
+          const double ps=g.r/std::max(static_cast<double>(instance.lod_group_proxy->bounding_radius()),1e-9);
+          Matrix4 light_model{};
+          for(int c=0;c<3;++c)light_model.values[c*4+c]=static_cast<float>(ps);
+          light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);light_model.values[15]=1.f;
+          caster_geometry.push_back(geometry(instance.lod_group_proxy));
+          shadow_transforms.push_back(multiply(light_projection,light_model));
+          continue;
+        }
+        // Screen-space LOD: casters submit the level the lit pass picks
+        // instead of always paying the full mesh's vertex cost.
+        std::shared_ptr<const Mesh3D> caster_mesh=instance.mesh;
+        if(!instance.lod_meshes.empty()){
+          const float diameter=2.f*instance.scale*static_cast<float>(instance.mesh->bounding_radius())*lod_focal/
+            (lod_camera.projection==Projection3D::Orthographic?1.f:static_cast<float>(std::max(cam_dist,1e-4)));
+          const std::size_t lvl=select_lod3d_level(instance,diameter);
+          if(lvl>0)caster_mesh=instance.lod_meshes[lvl-1];
+        }
         const double dx=instance.position.x-ex,dy=instance.position.y-ey,dz=instance.position.z-ez;
         const double lx=xx*dx+xy*dy+xz*dz,ly=yx*dx+yy*dy+yz*dz,lz=zx*dx+zy*dy+zz*dz;
         if(std::abs(lx)>extent+radius||std::abs(ly)>extent+radius||lz>radius||lz<-depth-radius)continue;
@@ -725,7 +753,7 @@ struct Scene3DRenderer::Storage {
         for(int c=0;c<3;++c)for(int r=0;r<3;++r)model.values[c*4+r]*=instance.scale;
         Matrix4 light_model=multiply(light_rotation,model);
         light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);
-        caster_geometry.push_back(geometry(instance.mesh));
+        caster_geometry.push_back(geometry(caster_mesh));
         shadow_transforms.push_back(multiply(light_projection,light_model));
       }
       // Same instancing convention as the scene pass: batch by mesh, then
