@@ -53,6 +53,10 @@ This document is the phase-1 audit; landed work is tracked in
 - `engine::TextureStreamer` residency: per-mip byte budgets, screen-footprint
   mip demand, partial mip-tail residency, pinned white fallback; cooked
   BC4/BC5/BC7 upload paths, BC1 mips, CPU box-downsampled RGBA tails.
+  `DebugView3D::Residency` (`render.debug = residency`) tints each draw
+  by its surface texture's resident base mip — green full chain,
+  lime→amber→orange→red deeper tails, magenta pinned fallback — so
+  budget pressure is visible per object.
 - `Scene3DStatistics`: uploads, draw calls, culled instances, cache bytes,
   streamed fallback/partial/evicted counters, MemoryTracker attribution.
 

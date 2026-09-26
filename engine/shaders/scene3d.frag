@@ -37,7 +37,7 @@ struct Material {
     vec4 additional_direction[2];
     vec4 additional_illumination[2];
     vec4 additional_shadow[2];
-    vec4 texture_options; // cubic magnification enabled, zonal waves, cloud deck height, lod class
+    vec4 texture_options; // cubic magnification enabled, zonal waves, cloud deck height, debug class (lod/residency)
     vec4 pbr_options; // enabled, packed map bound, night-emissive gate, alpha threshold
     vec4 pbr_values; // metallic, roughness, emissive strength, environment strength
     vec4 emissive_tint; // rgb, band shear (latitude-weighted u shift)
@@ -53,7 +53,7 @@ layout(set=2,binding=11,std430) readonly buffer Materials {
 };
 // Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
 // 2 albedo, 3 normals, 4 roughness, 5 metallic, 6 emissive, 7 lighting,
-// 8 lod class tint (texture_options.w).
+// 8 lod class / 9 residency class tint (texture_options.w).
 layout(set=3,binding=0) uniform ViewParams {
     vec4 debug_mode;
     // view → shadow-map clip space, then texel size / strength / bias /
@@ -610,6 +610,15 @@ void main() {
                 :cls<2.5?vec3(.1,.85,.35)
                 :cls<3.5?vec3(1,.85,.1)
                 :vec3(1,.3,.1);
+        }
+        else if(debug==9){ // Residency: green full mip, warm ramp by base mip, magenta fallback
+            float cls=material.texture_options.w;
+            shown=cls>8.5?vec3(1,.1,1)
+                :cls<.5?vec3(.15,.75,.3)
+                :cls<1.5?vec3(.55,.85,.15)
+                :cls<2.5?vec3(.95,.7,.1)
+                :cls<3.5?vec3(1,.4,.05)
+                :vec3(1,.15,.1);
         }
         else shown=(result-emissive_part)/max(texel.rgb,vec3(.001));// Lighting
         shown=max(shown,vec3(0));

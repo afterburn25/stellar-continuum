@@ -588,7 +588,15 @@ struct Scene3DRenderer::Storage {
       fragment.surface_options[2]=material.rim_power;
       fragment.surface_options[3]=material.two_sided_diffuse?1.f:0.f;
       fragment.texture_options[0]=material.cubic_magnification&&!low_tier?1.f:0.f;
-      fragment.texture_options[3]=draw.lod_class;
+      // texture_options.w is the debug-class lane: Lod view reads the
+      // submitted LOD class, Residency reads the surface texture's
+      // resident base mip — 9 when an authored image fell back to the
+      // pinned white texture (owner mismatch) rather than its own tail.
+      if(opt.debug_view==DebugView3D::Residency){
+        const auto& want=draw.instance->material.texture;
+        fragment.texture_options[3]=(want&&draw.image->owner.get()!=want.get())?9.f
+          :static_cast<float>(draw.image->base_mip);
+      }else fragment.texture_options[3]=draw.lod_class;
       if(material.shadow){const auto& s=*material.shadow;
         fragment.shadow_light={shadow.light.x,shadow.light.y,shadow.light.z,s.shape==AnalyticShadowShape3D::Ellipsoid?1.f:2.f};
         fragment.shadow_radii={s.radii.x,s.radii.y,s.radii.z,0};

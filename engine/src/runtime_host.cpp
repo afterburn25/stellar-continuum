@@ -1159,6 +1159,7 @@ int RuntimeHost::run() {
         : doc.debug_view == "lighting"
             ? native_map::DebugView3D::LightingOnly
         : doc.debug_view == "lod"       ? native_map::DebugView3D::Lod
+        : doc.debug_view == "residency" ? native_map::DebugView3D::Residency
                                       : native_map::DebugView3D::Lit;
     if (doc.shadow_extent > 0.f) {
       native_map::ShadowMap3D map{};

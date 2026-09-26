@@ -313,6 +313,7 @@ production material path (not a second renderer), so it stays faithful:
 | `Emissive` | emissive map × tint × strength + atmosphere rim |
 | `LightingOnly` | shading with albedo divided out |
 | `Lod` | per-draw LOD class — gray full mesh, blue→green→yellow→orange for chain levels 1–4+, magenta group proxy; transition bands show their dithered member/proxy partition |
+| `Residency` | per-draw surface-texture residency — green mip-0 resident, lime/amber/orange/red deeper tails, magenta pinned fallback |
 
 ## Authoring path — `Scene3dDocument`
 
@@ -337,7 +338,7 @@ are rejected.
 Scene fields: `point_lights[]` (max 4), `exposure`,
 `bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
-("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod"), and
+("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency"), and
 `render.shadow` — `{extent, distance, depth, strength, bias,
 resolution}`; `extent ≤ 0` (or the key absent) disables the map.
 Negative `range` and unknown `debug`/`quality` strings are rejected, as

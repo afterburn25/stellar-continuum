@@ -178,7 +178,26 @@ int main(int argc,char** argv)try{
     window.set_scene3d_texture_budget(0);
     (void)capture({dark},"stream-denied.png");
     check(window.scene3d_statistics().streamed_fallbacks>stream_base,"Fully denied texture did not fall back to the pinned texture");
+    // Residency debug view: a denied bind tints magenta (pinned fallback),
+    // a partial tail reads warm by base mip, and a fully resident texture
+    // reads green. The quad sits left of centre — sample inside it.
+    RenderOptions3D res_view;res_view.debug_view=DebugView3D::Residency;
+    auto res_capture=[&](const MeshInstance3D& m,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{m}),{0,0,320,320},res_view});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    {const auto fb=res_capture(dark,"residency-fallback.png");
+     check(channel(*fb,72,160,0)>200&&channel(*fb,72,160,2)>200&&channel(*fb,72,160,1)<140,
+         "Residency view did not mark the denied bind as fallback");}
+    window.set_scene3d_texture_budget(100000u);
+    {const auto tail=res_capture(dark,"residency-partial.png");
+     check(channel(*tail,72,160,0)>200&&channel(*tail,72,160,1)>50&&channel(*tail,72,160,1)<200&&channel(*tail,72,160,2)<120,
+         "Residency view did not mark the partial tail warm");}
     window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
+    // The 2x2 texture is upsampled at this footprint, so its demanded
+    // tail starts at mip 0 — the resident-bind green case.
+    {const auto full=res_capture(textured,"residency-full.png");
+     check(channel(*full,160,160,1)>140&&channel(*full,160,160,0)<160&&channel(*full,160,160,2)<160,
+         "Residency view did not mark the resident bind green");}
   }
   {
     std::vector<std::uint8_t> checks(1024u*1024u*4u,255);

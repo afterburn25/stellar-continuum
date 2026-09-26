@@ -850,9 +850,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
           scene.debug_view != "albedo" && scene.debug_view != "normals" &&
           scene.debug_view != "roughness" && scene.debug_view != "metallic" &&
           scene.debug_view != "emissive" && scene.debug_view != "lighting" &&
-          scene.debug_view != "lod")
+          scene.debug_view != "lod" && scene.debug_view != "residency")
         return fail("render debug must be lit|unlit|albedo|normals|roughness"
-                    "|metallic|emissive|lighting|lod");
+                    "|metallic|emissive|lighting|lod|residency");
       if (r.contains("shadow")) {
         const auto &s = r.at("shadow");
         if (!s.is_object()) return fail("render shadow must be an object");
