@@ -839,6 +839,20 @@ int main(int argc,char** argv)try{
      window.draw(list,folder/"lod-level-debug.png");const auto dbg=decode_rgba_image(folder/"lod-level-debug.png");
      check(channel(*dbg,160,160,2)>150&&channel(*dbg,160,160,0)<160,
          "Lod view did not tint the chain proxy by level");}
+    // Transition marker: inside the screen-door band (|keep| in (0,1))
+    // the class tint lifts toward white — banded members and the proxy
+    // share read lifted while a hard pick stays flat.
+    {DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{band_left,band_right}),{0,0,320,320},lod_view});
+     window.draw(list,folder/"lod-group-fade-debug.png");const auto dbg=decode_rgba_image(folder/"lod-group-fade-debug.png");
+     int lifted_proxy=0,flat_proxy=0,lifted_member=0;
+     for(int y=40;y<280;++y)for(int x=40;x<280;++x){
+       const int cr=channel(*dbg,x,y,0),cg=channel(*dbg,x,y,1),cb=channel(*dbg,x,y,2);
+       if(cr>230&&cb>230&&cg>50)++lifted_proxy;      // magenta lifted: (1,.45,1)
+       if(cr>230&&cb>230&&cg<=50)++flat_proxy;       // hard-pick magenta: (1,.15,1)
+       if(cr>140&&cr<210&&std::abs(cr-cg)<25&&std::abs(cr-cb)<25)++lifted_member;} // gray lifted ~.64
+     check(lifted_proxy>200,"Lod view did not lift the banded proxy share");
+     check(lifted_member>200,"Lod view did not lift the banded member share");
+     check(flat_proxy==0,"Lod view showed a hard pick inside the transition band");}
     std::cout<<"lod_group_gpu=merged_proxy_collapse_passed\n";
   }
   {

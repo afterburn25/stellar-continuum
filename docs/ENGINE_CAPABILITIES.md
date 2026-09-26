@@ -474,7 +474,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   yellow→orange ramp for chain levels 1–4+, magenta group proxy) so
   `lodPixels`/`lodGroup` thresholds and transitions can be tuned
   visually; a screen-door band shows its dithered member/proxy
-  partition. `Residency` tints by the surface texture's resident base
+  partition with both shares lifted toward white, so an
+  in-transition draw reads differently from a hard LOD pick. `Residency` tints by the surface texture's resident base
   mip (green full chain, lime→amber→orange→red deeper tails, magenta
   pinned fallback when a bind is denied outright) so streamer budget
   pressure is visible per object. Both share the `texture_options.w`
@@ -504,8 +505,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   cull), `native_scene3d_gpu` (debug-view pixel probes per channel,
   culled-instance accounting, Lod view: a collapsed group proxy covers
   its merged footprint in magenta while a chain-substituted mesh tints
-  by level; Residency view: denied bind magenta, mip-3 tail orange,
-  mip-0 green), `engine_project` (document round-trip +
+  by level; a banded collapse shows the white-lifted transition tint on
+  both the member and proxy shares; Residency view: denied bind
+  magenta, mip-3 tail orange, mip-0 green), `engine_project` (document round-trip +
   malformed rejection), `engine_world` (`VisibleRange` spawn/codec/
   export round-trip), `engine_runtime`; range-fade census probe — a
   sphere halfway through the band lights ~1/2 its pixels (798/1600)

@@ -617,6 +617,11 @@ void main() {
                 :cls<2.5?vec3(.1,.85,.35)
                 :cls<3.5?vec3(1,.85,.1)
                 :vec3(1,.3,.1);
+            // In-transition draws (|keep| in (0,1) — screen-door band)
+            // lift toward white so a dual submission reads differently
+            // from a hard pick; the dither partition stays visible.
+            float keep=material.uv_options.w;
+            if(keep!=0.0&&abs(keep)<1.0) shown=mix(shown,vec3(1),.35);
         }
         else if(debug==9){ // Residency: green full mip, warm ramp by base mip, magenta fallback
             float cls=material.texture_options.w;

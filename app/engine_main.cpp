@@ -306,7 +306,7 @@ struct Shell {
       hit3_scale{}, hit3_vel{}, hit3_color{}, hit3_tex{},
       hit3_opacity{}, hit3_dbl{}, hit3_solid{}, hit3_gravs{},
       hit3_ttl{}, hit3_data{}, hit3_parent{}, hit3_vfx{}, hit3_cam{},
-      hit3_camrot{}, hit3_fov{}, hit3_lightdir{}, hit3_lightint{},
+      hit3_camrot{}, hit3_fov{}, hit3_clip{}, hit3_lightdir{}, hit3_lightint{},
       hit3_grav{}, hit3_ground{}, hit3_bounds{}, hit3_bg{},
       hit3_music{}, hit3_filla_dir{}, hit3_filla_tint{},
       hit3_fillb_dir{}, hit3_fillb_tint{}, hit3_pbr{}, hit3_mr{},
@@ -1806,6 +1806,14 @@ void commit_scene3_field(Shell &shell) {
     commit();
     doc.fov_deg = std::clamp(a, 10.f, 140.f);
     return ok("camera fov updated");
+  case 71: // camera clip planes near,far
+    if (!parse_pair(shell.scene3_buffer, a, b))
+      return fail("use \"near,far\" - e.g. 0.05,5000");
+    if (!(a > 0.f) || !(b > a + 1e-3f) || !(b <= 1e7f))
+      return fail("need 0 < near < far <= 1e7");
+    commit();
+    doc.near_plane = a; doc.far_plane = b;
+    return ok("camera clip planes updated");
   case 23: // key light direction
     if (!parse_triple(shell.scene3_buffer, a, b, c))
       return fail("use \"x,y,z\"");
@@ -2340,6 +2348,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                 shell.hit3_parent = shell.hit3_vfx =
                                     shell.hit3_cam =
                                     shell.hit3_camrot = shell.hit3_fov =
+                                        shell.hit3_clip =
                                         shell.hit3_lightdir =
                                             shell.hit3_lightint =
                                                 shell.hit3_grav =
@@ -2752,6 +2761,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         ed(21), "degrees - or drag RMB in preview");
   field(shell.hit3_fov, "cam fov", std::to_string(doc.fov_deg), ed(22),
         "10..140 - or wheel in preview");
+  field(shell.hit3_clip, "clipPlanes",
+        std::to_string(doc.near_plane) + "," + std::to_string(doc.far_plane),
+        ed(71), "near,far - depth range");
   field(shell.hit3_lightdir, "light dir",
         fmt3(doc.light_x, doc.light_y, doc.light_z), ed(23),
         "world-space direction");
@@ -6849,6 +6861,9 @@ int main(int argc, char **argv) {
                             std::to_string((int)doc.cam_pitch_deg));
             else if (shell.hit3_fov.contains(event.position))
               edit3(22, std::to_string((int)doc.fov_deg));
+            else if (shell.hit3_clip.contains(event.position))
+              edit3(71, std::to_string(doc.near_plane) + "," +
+                            std::to_string(doc.far_plane));
             else if (shell.hit3_lightdir.contains(event.position))
               edit3(23, std::to_string(doc.light_x) + "," +
                             std::to_string(doc.light_y) + "," +

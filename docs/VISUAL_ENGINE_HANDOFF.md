@@ -210,7 +210,9 @@ widens the collapse into a screen-door band — members thin by `1-p`
 while the proxy keeps the complementary `p`; `lod_fade=0` or Low tier
 keeps the hard switch. `DebugView3D::Lod` (`render.debug = lod`, class
 carried on `texture_options.w`) tints each submitted draw for visual
-threshold tuning — gray full mesh, a level ramp, magenta group proxy.
+threshold tuning — gray full mesh, a level ramp, magenta group proxy;
+draws inside a screen-door band (`|keep|<1`) lift toward white so an
+in-transition partition reads differently from a hard pick.
 
 A fleet-scale benchmark runs inside `native_scene3d_gpu`: a 1024-ship
 grid spread over a depth sweep submits 60 timed frames and reports
