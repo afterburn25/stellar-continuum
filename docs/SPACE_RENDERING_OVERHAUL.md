@@ -73,7 +73,9 @@ same document headless-tested.
    emissive map (only dark-side alpha masking), no alpha cutout, no UV
    tiling, no metallic-roughness map. Ships/stations cannot express metal.
 2. **Lighting** — landed: key + up to two fill/rim directionals and ≤4
-   windowed point lights per scene (`lights[]`, `pointLights`). Spots
+   windowed point lights per scene (`lights[]`, `pointLights`), each
+   optionally gated to a smooth spot cone (`spotDir`/`spotInner`/
+   `spotOuter` on the entry — zero direction stays omni). Spot shadows
    remain unsupported.
 3. **Shadows** — landed: key-light directional shadow map (authored
    ortho volume centred ahead of the camera, depth pass + 8-tap PCF,

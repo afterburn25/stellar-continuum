@@ -520,11 +520,18 @@ std::string Scene3dDocument::to_json() const {
   }
   if (!point_lights.empty()) {
     auto &ls = doc["pointLights"] = nlohmann::json::array();
-    for (const auto &l : point_lights)
-      ls.push_back({{"pos", {l.x, l.y, l.z}},
-                    {"color", {l.r, l.g, l.b}},
-                    {"intensity", l.intensity},
-                    {"range", l.range}});
+    for (const auto &l : point_lights) {
+      nlohmann::json li = {{"pos", {l.x, l.y, l.z}},
+                           {"color", {l.r, l.g, l.b}},
+                           {"intensity", l.intensity},
+                           {"range", l.range}};
+      if (l.spot_x != 0.f || l.spot_y != 0.f || l.spot_z != 0.f) {
+        li["spotDir"] = {l.spot_x, l.spot_y, l.spot_z};
+        li["spotInner"] = l.spot_inner;
+        li["spotOuter"] = l.spot_outer;
+      }
+      ls.push_back(std::move(li));
+    }
   }
   if (exposure != 1.f || bloom != 0.f || bloom_threshold != 1.f ||
       contrast != 1.f || saturation != 1.f || sharpen != 0.f ||
@@ -842,6 +849,20 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
           return std::nullopt;
         l.intensity = li.value("intensity", 1.0f);
         l.range = li.value("range", 0.0f);
+        if (li.contains("spotDir") &&
+            !vec3_of(li, "spotDir", l.spot_x, l.spot_y, l.spot_z))
+          return std::nullopt;
+        l.spot_inner = li.value("spotInner", 1.0f);
+        l.spot_outer = li.value("spotOuter", 1.0f);
+        const double sd2 = static_cast<double>(l.spot_x) * l.spot_x +
+                           static_cast<double>(l.spot_y) * l.spot_y +
+                           static_cast<double>(l.spot_z) * l.spot_z;
+        if (!std::isfinite(sd2) || !std::isfinite(l.spot_inner) ||
+            !std::isfinite(l.spot_outer) ||
+            (sd2 > 0 && (l.spot_inner <= l.spot_outer || l.spot_inner <= 0.f ||
+                         l.spot_inner > 1.f || l.spot_outer < 0.f ||
+                         l.spot_outer >= 1.f)))
+          return fail("spot cones need 0<=spotOuter<spotInner<=1 cosines");
         scene.point_lights.push_back(l);
       }
     }

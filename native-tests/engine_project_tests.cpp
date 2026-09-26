@@ -500,6 +500,8 @@ int main() {
     lamp.r = 0.2f; lamp.g = 1.f; lamp.b = 0.4f;
     lamp.intensity = 3.f;
     lamp.range = 12.f;
+    lamp.spot_x = 0.f; lamp.spot_y = 0.f; lamp.spot_z = -1.f;
+    lamp.spot_inner = 0.97f; lamp.spot_outer = 0.9f;
     scene.point_lights.push_back(lamp);
     scene.exposure = 1.25f;
     scene.bloom = 0.6f;
@@ -610,7 +612,10 @@ int main() {
                 reparsed->point_lights[0].z == -1.f &&
                 reparsed->point_lights[0].g == 1.f &&
                 reparsed->point_lights[0].intensity == 3.f &&
-                reparsed->point_lights[0].range == 12.f,
+                reparsed->point_lights[0].range == 12.f &&
+                reparsed->point_lights[0].spot_z == -1.f &&
+                reparsed->point_lights[0].spot_inner == 0.97f &&
+                reparsed->point_lights[0].spot_outer == 0.9f,
             "scene3d point lights round-trip");
       check(reparsed->exposure == 1.25f && reparsed->bloom == 0.6f &&
                 reparsed->bloom_threshold == 0.8f &&
@@ -674,6 +679,18 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"resolution":16}}})")
               .has_value(),
           "scene3d undersized shadow resolution rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.9,"spotOuter":0.95}]})")
+              .has_value(),
+          "scene3d spot cone with outer>inner rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":1.5}]})")
+              .has_value(),
+          "scene3d spot inner above 1 rejected");
+    check(engine::Scene3dDocument::from_json(
+              R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.97,"spotOuter":0.9}]})")
+              .has_value(),
+          "scene3d valid spot cone rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"pointLights":[{},{},{},{},{}]})")
               .has_value(),

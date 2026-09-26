@@ -172,11 +172,17 @@ struct PbrSurface3D {
 };
 // A scene-level point light evaluated per fragment in view space with
 // windowed inverse-square attenuation. `range` 0 keeps pure falloff.
+// A nonzero `spot_direction` turns it into a spot: `spot_inner` is the
+// full-intensity cone's cosine, `spot_outer` the zero-intensity edge;
+// radiance fades smoothly between them (inner > outer required).
 struct PointLight3D {
   Position3 position;
   Vec3 color{1,1,1};
   float intensity{1.f};
   float range{};
+  Vec3 spot_direction{0,0,0};
+  float spot_inner{1.f};
+  float spot_outer{1.f};
 };
 inline constexpr std::size_t maximum_scene3d_point_lights=4;
 // Single-scatter limb approximation: a wavelength-tinted shell driven by

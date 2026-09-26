@@ -78,13 +78,13 @@ template<class Map> void evict(Map& cache,std::size_t& bytes,std::size_t incomin
   }
 }
 struct VertexUniform {Matrix4 mvp,model_view,shadow_from_model;};
-struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy;std::array<float,4> anim_options;};
+struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy,point_cone;std::array<float,4> point_outer;std::array<float,4> anim_options;};
 struct PostUniform {std::array<float,4> a,b;};
 // View-wide fragment uniform: debug selector, then the key light's
 // view→shadow-clip transform and {texel size (>0 enables), PCF radius in
 // texels, strength, bias} for the directional shadow map.
 struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==688&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==96);
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==96);
 // Column-major rotation for a unit quaternion — same convention as
 // rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
 Matrix4 rotation_from(Quaternion q){
@@ -563,14 +563,19 @@ struct Scene3DRenderer::Storage {
     std::vector<VertexUniform> vertex_data(sorted.size());std::vector<FragmentUniform> fragment_data(sorted.size());
     // World-space point lights become view-space once per view; every
     // material record carries the same four slots so instanced draws share.
-    std::array<std::array<float,4>,4> pl_position{},pl_energy{};
+    std::array<std::array<float,4>,4> pl_position{},pl_energy{},pl_cone{};
+    std::array<float,4> pl_outer{};
     {
       const auto& cam=view.scene->camera();
       const Quaternion inv{-cam.orientation.x,-cam.orientation.y,-cam.orientation.z,cam.orientation.w};
       for(std::size_t i=0;i<view.scene->point_lights().size()&&i<4;++i){
         const auto& l=view.scene->point_lights()[i];
         const Vec3 v=rotate_vec(inv,{static_cast<float>(l.position.x-cam.position.x),static_cast<float>(l.position.y-cam.position.y),static_cast<float>(l.position.z-cam.position.z)});
-        pl_position[i]={v.x,v.y,v.z,l.range};pl_energy[i]={l.color.x,l.color.y,l.color.z,l.intensity};}
+        pl_position[i]={v.x,v.y,v.z,l.range};pl_energy[i]={l.color.x,l.color.y,l.color.z,l.intensity};
+        // Spot cones rotate into view space with no translation; a zero
+        // direction leaves the slot omni.
+        const Vec3 d=rotate_vec(inv,l.spot_direction);
+        pl_cone[i]={d.x,d.y,d.z,l.spot_inner};pl_outer[i]=l.spot_outer;}
     }
     for(std::size_t slot=0;slot<sorted.size();++slot){
       const auto& draw=draws[sorted[slot].instance_index];
@@ -670,6 +675,7 @@ struct Scene3DRenderer::Storage {
         fragment.atmo_options={a.tint.x,a.tint.y,a.tint.z,a.strength};
         fragment.atmo_shape={a.power,a.night_floor,fragment.atmo_shape[2],fragment.atmo_shape[3]};}
       fragment.point_position=pl_position;fragment.point_energy=pl_energy;
+      fragment.point_cone=pl_cone;fragment.point_outer=pl_outer;
     }
     // Directional shadow map: an authored ortho volume centres `distance`
     // along camera forward, so strategy scenes pick shadowed coverage

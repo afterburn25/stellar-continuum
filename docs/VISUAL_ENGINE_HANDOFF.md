@@ -260,8 +260,14 @@ auto scene = Scene3D::create(camera, instances, key_light, point_lights,
 - Fields: `position` (world), `color`, `intensity` [0,64],
   `range` ≥ 0 — finite range uses a smooth windowed inverse-square with
   hard cutoff; `range == 0` means unbounded inverse-square.
-- Point lights are independent of the key/fill directional lights and
-  are unshadowed.
+- Spot cone: a nonzero `spot_direction` (world space) gates the light
+  to a cone — `spot_inner` is the full-intensity cosine, `spot_outer`
+  the zero edge, so the penumbra fades smoothly between them
+  (0 ≤ outer < inner ≤ 1). `spot_direction = (0,0,0)` keeps the light
+  omni. Document keys: `spotDir`/`spotInner`/`spotOuter` on
+  `pointLights[]` entries.
+- Point lights (and spot cones) are independent of the key/fill
+  directional lights and are unshadowed.
 
 ## Directional shadows — `ShadowMap3D`
 
@@ -393,7 +399,8 @@ preset, accretion disc preset (inner,outer,kelvin,beaming csv),
 forward-scatter phase, mesh LOD chain (csv specs), LOD switch size and
 LOD fade width.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
-quality tier, debug view, point lights (pos/color/intensity/range),
+quality tier, debug view, point lights (pos/color/intensity/range +
+optional spot dir/inner/outer),
 shadow map (extent/distance/depth/strength/bias/resolution).
 The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
@@ -423,7 +430,7 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 ## Known limitations
 
 - `ShadowMap3D` is a single ortho cascade for the key light only —
-  no CSM splits, no point-light shadows, no spot lights; receivers
+  no CSM splits, no point-light or spot shadows; receivers
   outside the authored box stay lit (by design) so extreme zoom-outs
   need a larger `extent`.
 - Analytic ellipsoid/annulus blockers remain the ring↔planet shadow

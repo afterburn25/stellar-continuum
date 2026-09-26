@@ -47,6 +47,8 @@ struct Material {
     vec4 response_options; // terminator wrap, cloud albedo, map flags (1 normal, 2 properties, 4 cloud), limb darkening
     vec4 point_position[4]; // view-space position, range (0 = unbounded)
     vec4 point_energy[4]; // rgb, intensity
+    vec4 point_cone[4]; // view-space spot dir (zero = omni), inner cos
+    vec4 point_outer; // per-light outer cos edge
     vec4 anim_options; // band drift (uv/s), volume flow rate, unused
 };
 layout(set=2,binding=11,std430) readonly buffer Materials {
@@ -516,6 +518,14 @@ void main() {
         float range=material.point_position[i].w;
         float window=1.0;
         if(range>0.0){float x=clamp(sqrt(d2)/range,0.0,1.0);window=pow(1.0-x*x*x*x,2.0);}
+        // Spot cone: a nonzero view-space direction gates the light to
+        // receivers inside its cone, fading smoothly from the inner cos
+        // edge (full radiance) to the outer cos edge (zero). A zero
+        // direction keeps the legacy omni falloff.
+        vec4 cone=material.point_cone[i];
+        if(dot(cone.xyz,cone.xyz)>0.0)
+            window*=smoothstep(material.point_outer[i],cone.w,
+                               dot(-L,normalize(cone.xyz)));
         if(window<=0.0) continue;
         vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
         float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);

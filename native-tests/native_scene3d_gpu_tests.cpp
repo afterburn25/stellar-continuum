@@ -565,7 +565,27 @@ int main(int argc,char** argv)try{
     DrawList dim;dim.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate},{0,0,1},{lamp}),{0,0,320,320}});
     window.draw(dim,folder/"point-light-range.png");const auto dimmed=decode_rgba_image(folder/"point-light-range.png");
     check(channel(*dimmed,160,160,1)<20,"Range window did not attenuate the point light");
-    std::cout<<"point_lights_gpu=falloff_color_range_passed\n";
+    // Spot cone: aimed at the plate with a tight cone the centre stays
+    // lit while the corners (≈27° off-axis, outside the ~8° outer edge)
+    // go dark; swung away it lights nothing, and a zero direction
+    // restores the omni footprint.
+    lamp.range=5;lamp.spot_direction={0,0,-1};lamp.spot_inner=.997f;lamp.spot_outer=.99f;
+    auto spot=[&](const char* name){
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate},{0,0,1},{lamp}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto spot_on=spot("point-light-spot.png");
+    check(channel(*spot_on,160,160,1)>100,"Spot cone did not light its axis");
+    check(channel(*spot_on,60,60,1)<20&&channel(*spot_on,60,60,1)<channel(*lit_point,60,60,1)/4,
+        "Spot cone leaked radiance outside its outer edge");
+    lamp.spot_direction={0,0,1};
+    const auto spot_away=spot("point-light-spot-away.png");
+    check(channel(*spot_away,160,160,1)<20,"Spot cone lit fragments behind its edge");
+    lamp.spot_direction={0,0,0};
+    const auto spot_omni=spot("point-light-spot-omni.png");
+    check(std::abs(channel(*spot_omni,160,160,1)-channel(*lit_point,160,160,1))<=4&&
+          std::abs(channel(*spot_omni,60,60,1)-channel(*lit_point,60,60,1))<=4,
+        "Zero spot direction did not restore the omni point light");
+    std::cout<<"point_lights_gpu=falloff_color_range_spot_passed\n";
   }
   {
     // Atmosphere limb scattering: a tinted shell brightens the silhouette

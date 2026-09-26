@@ -2647,7 +2647,9 @@ int RuntimeHost::run() {
       for (const auto &l : impl.point_lights3)
         point_lights.push_back(PointLight3D{{l.x, l.y, l.z},
                                             {l.r, l.g, l.b},
-                                            l.intensity, l.range});
+                                            l.intensity, l.range,
+                                            {l.spot_x, l.spot_y, l.spot_z},
+                                            l.spot_inner, l.spot_outer});
       if (auto scene = Scene3D::create(cam, std::move(instances),
                                        light_cam, std::move(point_lights),
                                        impl.shadow3)) {

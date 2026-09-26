@@ -312,6 +312,11 @@ struct Scene3dPointLight {
   float r{1.f}, g{1.f}, b{1.f};
   float intensity{1.f};
   float range{0.f};
+  // Optional spot cone — direction defaults to zero (omni); cosines
+  // give the full-intensity inner cone and zero-intensity outer edge.
+  float spot_x{}, spot_y{}, spot_z{};
+  float spot_inner{1.f};
+  float spot_outer{1.f};
 };
 
 // A 3D scene: camera, key light, and mesh entities — the 3D counterpart of

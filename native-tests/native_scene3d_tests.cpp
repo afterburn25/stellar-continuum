@@ -195,6 +195,14 @@ int main()try{
   rejects([&]{std::vector<PointLight3D> too_many(maximum_scene3d_point_lights+1);(void)Scene3D::create(camera,{instance},{0,0,1},too_many);});
   rejects([&]{PointLight3D l;l.position={std::numeric_limits<double>::infinity(),0,0};(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.intensity=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  {PointLight3D l;l.position={0,0,1};l.spot_direction={0,0,-1};l.spot_inner=.97f;l.spot_outer=.9f;
+   const auto spotted=Scene3D::create(camera,{instance},{0,0,1},{l});
+   check(spotted->point_lights().size()==1&&close(spotted->point_lights()[0].spot_inner,.97f),
+       "Scene dropped a valid spot light");}
+  rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_inner=.9f;l.spot_outer=.95f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_inner=1.f;l.spot_outer=1.f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_outer=-.1f;l.spot_inner=.5f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D l;l.spot_inner=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   // Directional shadow map settings validate bounds; a valid map round-trips.
   {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;
    const auto mapped=Scene3D::create(camera,{instance},{0,0,1},{},config);
