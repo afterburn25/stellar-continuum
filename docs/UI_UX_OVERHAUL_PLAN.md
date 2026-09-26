@@ -319,6 +319,14 @@ breaks navigation/AT flow, or presents wrong state)
   transiting vessel. Verified live: navigation, selection, canonical and
   rendered movement, paused stability, and observer-gated lane denial all
   pass at 720p.
+- Battle smoke fixtures: `tools/author_battle_save.py` now authors the
+  corvette binding the tactical-art replay requires — fleet 0 becomes a
+  Military-role `patrol_corvette` (its tactical vessel uses the zero-fleet
+  2^32 identity mapping in formation 1's important vessels), Pioneer One
+  stays an unsupported colony_ship marker, and ship accounting conserves
+  (bound = important + cohorts). Verified: `--battle-smoke` at 720p and
+  `--battle-reload-smoke` at 1080p both pass (1 sprite, hostile picket
+  hidden, order accepted, canonical payload unchanged, save roundtrip).
 - Branch scope audit: the only `engine/` file touched is
   `engine/src/native_audio.cpp` (`939e23b6`, predating this overhaul) — a
   compatibility bugfix where the stream decoder borrows the SDL-initialized
