@@ -960,6 +960,25 @@ int main(int argc,char** argv)try{
     check(still_same==0,"Band drift changed the frame at time zero");
     check(drift_px>3000,"Band drift did not scroll the deck over scene time");
     check(channel(*drift_t5,10,160,0)==5,"Band drift distorted the disc silhouette");
+    // Turbulence: a propagating cos(4πv) wave at half the shear
+    // amplitude reshapes the warp — the t=0 frame already differs from
+    // the static profile and keeps evolving over scene time while the
+    // silhouette stays put.
+    giant.material.band_drift=0;giant.material.band_turbulence=1.5f;
+    const auto turb_t0=timed(0.f,"bands-turb-t0.png");
+    const auto turb_t4=timed(4.f,"bands-turb-t4.png");
+    int turb_static=0,turb_drift=0;
+    for(int y=30;y<330;++y)for(int x=40;x<280;++x){
+      if(std::abs(channel(*turb_t0,x,y,0)-channel(*waved_bands,x,y,0))>8)++turb_static;
+      if(std::abs(channel(*turb_t4,x,y,0)-channel(*turb_t0,x,y,0))>8)++turb_drift;}
+    check(turb_static>200,"Band turbulence left the static warp unchanged");
+    check(turb_drift>200,"Band turbulence did not evolve the warp over scene time");
+    check(channel(*turb_t4,10,160,0)==5,"Band turbulence distorted the disc silhouette");
+    giant.material.band_turbulence=0;
+    const auto turb_off=timed(0.f,"bands-turb-off.png");
+    check(channel(*turb_off,10,160,0)==5&&
+          std::abs(channel(*turb_off,160,160,0)-channel(*waved_bands,160,160,0))<=8,
+        "Band turbulence=0 did not restore the static warp");
     std::cout<<"band_shear_gpu=equator_pole_antishear_passed\n";
   }
   {

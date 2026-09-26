@@ -206,6 +206,10 @@ struct MaterialSurface {
   // Zonal drift rate in UV longitude per second [-0.25,0.25] — scrolls
   // the deck slowly for super-rotating giants. 0 keeps the static warp.
   float band_drift{0.f};
+  // Warp-evolution phase rate in rad/s [-8,8] — a propagating
+  // mid-latitude wave at half the shear amplitude reshapes the jet
+  // profile over time. 0 freezes the warp; no effect without shear.
+  float band_turbulence{0.f};
 };
 // Spectral-class star photosphere — the component counterpart of the
 // entity document's `starKelvin` key. The runtime maps it through

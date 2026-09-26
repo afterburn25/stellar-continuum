@@ -82,8 +82,11 @@ same document headless-tested.
    proxy). Remaining: no CSM splits for
    extreme zoom ranges, point lights stay unshadowed; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
-4. **IBL** — environment map reachable only through `Dielectric3D`;
-   ordinary materials get no diffuse irradiance or specular environment.
+4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an
+   equirect map on any PBR material and `pbr_values.w` scales diffuse
+   irradiance plus roughness-aware specular environment response;
+   `Dielectric3D` transmits/reflects the same map. Remaining: the env
+   sample is an authored per-material map, not a per-scene probe.
 5. **Post** — tonemap only; no exposure, bloom, contrast/saturation
    grading, sharpen, or AA (pipelines are all SAMPLECOUNT_1).
 6. **Atmosphere** — only the flat `rim_power` alpha shell; no
@@ -115,11 +118,13 @@ same document headless-tested.
    march correctly with the camera inside the proxy (double-sided
    raster + camera-origin entry, so nebula fly-throughs don't pop).
    `RenderOptions3D::time` (host-accumulated, determinism-safe)
-   animates two authored rates: `bandDrift` scrolls deck longitude
-   and `volume.flowRate` churns the filament phase. Remaining: the deck is
+   animates three authored rates: `bandDrift` scrolls deck longitude,
+   `volume.flowRate` churns the filament phase, and `bandTurbulence`
+   evolves the warp — a propagating cos(4πv) wave at half the shear
+   amplitude reshapes the jets over time (zero-mean, equator-symmetric).
+   Remaining: the deck is
    still a bounded parallax composite — no volumetric cloud shells or
-   per-layer thickness; banding drifts but its warp shape stays a
-   fixed two-harmonic profile, not evolving turbulence.
+   per-layer thickness.
 8. **Quality tiers** — landed: Low/Medium/High/Ultra gate bloom,
    sharpen, MSAA, aniso, cubic magnification and emission-volume steps.
 9. **Editor** — scene3d tool exposes every material field (PBR, surface

@@ -232,6 +232,13 @@ struct Material3D {
   // drift·time (super-rotating cloud deck sliding over a fixed limb),
   // UV units per second, [-0.25,0.25]; 0 keeps the static warp.
   float band_drift{};
+  // Turbulent evolution for banded bodies: the shear warp gains a
+  // propagating mid-latitude wave cos(4πv + t·rate) at half the shear
+  // amplitude, so the jet profile slowly reshapes instead of staying
+  // a fixed two-harmonic profile — still zero-mean and equator-
+  // symmetric, so map registration is kept. Phase rate in rad/s,
+  // [-8,8]; 0 freezes the warp. Only applies when band_shear != 0.
+  float band_turbulence{};
   // Orbital beaming: material orbiting local +Y gains a first-order
   // doppler asymmetry — radiance scales by 1 + s·(v̂·V̂), so the
   // approaching lane brightens while the receding lane dims. Face-on

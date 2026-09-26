@@ -2574,6 +2574,7 @@ int RuntimeHost::run() {
           inst.material.band_shear = sf->band_shear;
           inst.material.band_waves = sf->band_waves;
           inst.material.band_drift = sf->band_drift;
+          inst.material.band_turbulence = sf->band_turbulence;
           inst.material.orbital_beaming = sf->orbital_beaming;
           inst.material.forward_scatter = sf->forward_scatter;
         }

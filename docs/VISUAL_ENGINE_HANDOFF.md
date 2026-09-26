@@ -50,6 +50,8 @@ m.band_waves = 0.7f;                        // [0,1] zonal-jet harmonic
                                             // layered on band_shear
 m.band_drift = 0.08f;                       // [-0.25,0.25] uv/s deck
                                             // scroll over scene time
+m.band_turbulence = 1.2f;                   // [-8,8] rad/s evolving
+                                            // warp (needs band_shear)
 m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
                                             // asymmetry (accretion discs,
                                             // ring forward-scatter)
@@ -80,7 +82,11 @@ w = 0 is the single-cosine pole-vs-equator profile, w → 1 adds
 Jupiter-style alternating mid-latitude jets; the mix stays zero-mean
 and equator-symmetric. `band_drift` [-0.25,0.25] scrolls the whole
 warp in longitude at uv/s under `Scene3DView::options.time` — a
-super-rotating deck sliding over a fixed lit limb; the same view time
+super-rotating deck sliding over a fixed lit limb. `band_turbulence`
+[-8,8] rad/s adds a propagating `cos(4πv + t·rate)` wave at half the
+shear amplitude, so the jet profile reshapes over time; it needs
+`band_shear` (the term scales with it) and keeps the zero-mean,
+equator-symmetric invariants. The same view time
 advances `SurfaceEffect3D::flow_rate` [-64,64], churning emission-volume
 filaments. Hosts accumulate `options.time` per frame (the runtime uses
 `dt·time_scale`); at 0 every term sits at its authored phase, so
@@ -344,7 +350,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `visible_range`) with `visibleFade` ([0,.5] dithered fade-out),
 `terminator_wrap`, `limb_darkening`, `bandShear`
 ([-0.5,0.5]) with `bandWaves` ([0,1] jet harmonic) and
-`bandDrift` ([-0.25,0.25] uv/s scroll),
+`bandDrift` ([-0.25,0.25] uv/s scroll) and `bandTurbulence`
+([-8,8] rad/s evolving warp),
 `orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
 (`{depth,density,seed,steps,scatter,flow,distort,blend,image2,occlude,flowRate}`
@@ -426,8 +433,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - The cloud deck is a texture-space composite with a bounded altitude
   term (`cloud_height` gives limb parallax, sun-displaced ground shadows
   and zenith-gated self-shading) — still no volumetric shell or
-  per-layer thickness; `band_drift` scrolls the deck over scene time
-  but the warp stays a fixed two-harmonic profile, and volume
+  per-layer thickness; `band_drift` scrolls and `band_turbulence`
+  reshapes the warp over scene time, while volume
   `flow_rate` re-poses filaments without evolving their shape.
 - Limb darkening is the single-coefficient linear law — no quadratic
   two-term coefficients or wavelength-dependent profiles.

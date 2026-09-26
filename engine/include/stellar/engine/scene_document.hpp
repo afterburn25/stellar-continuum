@@ -231,6 +231,10 @@ struct Scene3dEntity {
   // Zonal drift rate in UV longitude per second [-0.25,0.25] — scrolls
   // the deck slowly for super-rotating giants. 0 keeps the static warp.
   float band_drift{0.f};
+  // Warp-evolution phase rate in rad/s [-8,8] — propagating mid-latitude
+  // wave at half the shear amplitude; 0 freezes the warp, no effect
+  // without bandShear.
+  float band_turbulence{0.f};
   // First-order orbital beaming for material orbiting local +Y (accretion
   // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};

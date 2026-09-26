@@ -266,6 +266,12 @@ void main() {
     // symmetric too, so both properties survive the mix.
     if(material.emissive_tint.w!=0.0)
         uv.x+=material.emissive_tint.w*(cos(2.0*PI*texture_uv.y)+material.texture_options.y*cos(6.0*PI*texture_uv.y));
+    // Evolving warp: a mid-latitude wave propagating through the shear at
+    // half its amplitude slowly reshapes the jet profile (anim_options.z
+    // is a rad/s phase rate). cos(4πv+·) is zero-mean and equator-
+    // symmetric, so the registration invariants survive.
+    if(material.anim_options.z!=0.0)
+        uv.x+=material.emissive_tint.w*0.5*cos(4.0*PI*texture_uv.y+view_params.debug_mode.y*material.anim_options.z);
     // Zonal drift: scene time scrolls equirect longitude — a slowly
     // super-rotating cloud deck sliding over a fixed lit limb.
     if(material.anim_options.x!=0.0) uv.x+=view_params.debug_mode.y*material.anim_options.x;

@@ -135,6 +135,11 @@ int main()try{
   rejects([&]{auto i=instance;i.material.band_drift=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.band_drift=.1f;const auto drifted=Scene3D::create(camera,{i});
    check(close(drifted->instances()[0].material.band_drift,.1f),"Band drift did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.band_turbulence=9.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_turbulence=-9.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.band_turbulence=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.band_turbulence=1.5f;const auto turbed=Scene3D::create(camera,{i});
+   check(close(turbed->instances()[0].material.band_turbulence,1.5f),"Band turbulence did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.orbital_beaming=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=-1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});

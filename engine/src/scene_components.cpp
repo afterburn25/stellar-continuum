@@ -474,6 +474,7 @@ void register_scene_components(World &world) {
         // length prefix).
         put_f32(out, m.cloud_height);
         put_f32(out, m.band_drift);
+        put_f32(out, m.band_turbulence);
         return out;
       },
       [](const std::vector<std::uint8_t> &b) {
@@ -506,6 +507,7 @@ void register_scene_components(World &world) {
         }
         if (b.size() - at >= 4) m.cloud_height = f();
         if (b.size() - at >= 4) m.band_drift = f();
+        if (b.size() - at >= 4) m.band_turbulence = f();
         return m;
       });
   world.register_component<AtmosphereShell>(
@@ -959,7 +961,8 @@ std::vector<EntityId> spawn_scene3d(World &world,
         s.terminator_wrap != 0.f || s.limb_darkening != 0.f ||
         s.band_shear != 0.f || s.orbital_beaming != 0.f ||
         s.forward_scatter != 0.f || s.band_waves != 0.f ||
-        s.cloud_height != 0.f || s.band_drift != 0.f)
+        s.cloud_height != 0.f || s.band_drift != 0.f ||
+        s.band_turbulence != 0.f)
       world.add(entity,
                 MaterialSurface{s.normal_strength, s.relief,
                                 s.cloud_opacity, s.cloud_albedo,
@@ -969,7 +972,7 @@ std::vector<EntityId> spawn_scene3d(World &world,
                                 s.forward_scatter, s.band_waves,
                                 s.normal_map, s.properties_map,
                                 s.cloud_map, s.cloud_height,
-                                s.band_drift});
+                                s.band_drift, s.band_turbulence});
     if (s.atmo_strength != 0.f)
       world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
                                         s.atmo_strength, s.atmo_power,
@@ -1090,6 +1093,7 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.band_waves = sf->band_waves;
       s.cloud_height = sf->cloud_height;
       s.band_drift = sf->band_drift;
+      s.band_turbulence = sf->band_turbulence;
     }
     if (const auto *at = world.get<AtmosphereShell>(entity)) {
       s.atmo_r = at->r;
