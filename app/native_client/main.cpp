@@ -6498,7 +6498,8 @@ class NativeCampaign final {
       }else{
       const auto stop=*replay_->stop_at_tick;
       const PlayerCampaignCaptureOptions capture_options{
-          session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,""};
+          session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,
+          utc_timestamp()};
       auto document=encode_player_campaign_v17_document(
           capture_player_campaign_v17(session_->frame().runtime(),
                                       capture_options));
