@@ -123,6 +123,32 @@ int main(int argc,char** argv)try{
     check(screen.handle({InputEventType::LeftReleased,slot},w,h).action==PlanetaryAction::None,"Changing planet left stale hit targets");
   }
   {
+    // Minimum-drawable compact mode: at 640x360 the fixed column stacks
+    // shrink (s < .8) rather than collapse — the details/slots list keeps a
+    // usable scroll viewport, no right-column block overlaps another, and the
+    // slot rows still emit clipped text the pointer can reach.
+    const int w=640,h=360;const auto l=PlanetaryLayout::make(w,h);
+    for(const auto& r:{l.left,l.right,l.slots,l.details,l.tabs,l.command,l.queue,l.modal,l.confirm,l.cancel})
+      check(r.width>0&&r.height>0&&r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h,"Compact planetary panel out of bounds");
+    check(l.details.height>40,"Compact details column has no scroll viewport");
+    check(l.tabs.y+l.tabs.height<=l.details.y&&l.details.y+l.details.height<=l.command.y&&l.command.y+l.command.height<=l.queue.y,"Compact right column overlaps itself");
+    check(l.vitals.y+l.vitals.height<=l.alerts.y,"Compact vitals strip overlaps the alerts block");
+    const auto in=[](const UiRect& r){return Point{r.x+r.width*.5f,r.y+r.height*.5f};};
+    check(l.modal.contains(in(l.confirm))&&l.modal.contains(in(l.cancel)),"Compact modal lost its review buttons");
+    NativePlanetaryScreen screen;NativeColonyView view;
+    view.body_id=3;view.planet.details.emplace();view.solid_surface=true;
+    view.campaign_generation=1;view.colony_id=7;view.building_capacity=32;
+    view.surface_hub_level=2;view.body_display_name="Earth";
+    screen.set_view(view);DrawList draw;screen.render(draw,view,w,h);
+    const Point slots_tab{l.tabs.x+l.tabs.width*.375f,l.tabs.y+l.tabs.height*.5f};
+    (void)screen.handle({InputEventType::LeftPressed,slots_tab},w,h);
+    (void)screen.handle({InputEventType::LeftReleased,slots_tab},w,h);
+    draw={};screen.render(draw,view,w,h);
+    bool slot_listed=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item);t&&t->value=="Available slot")slot_listed=true;
+    check(slot_listed,"Compact layout hides the available building slot");
+  }
+  {
     // Keyboard-focus contract: the ring walks the render-registered hit
     // registry in (y,x) order, Escape releases it before Back, pointer
     // presses reset it, Return/Space replays the same dispatch a matched

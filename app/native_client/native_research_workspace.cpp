@@ -273,9 +273,18 @@ void erase_last_utf8(std::string &value) {
 ResearchWorkspaceLayout
 ResearchWorkspaceLayout::for_viewport(int width, int height,
                                       std::size_t tab_count) {
-  ResearchWorkspaceLayout l;const float s=std::clamp(height/1080.f,.8f,2.f),g=10*s;
-  l.scale=s;l.title_font_pixels=theme::type::title(s);l.body_font_pixels=std::max(13,static_cast<int>(16*s));l.small_font_pixels=std::max(12,static_cast<int>(14*s));
-  const auto chrome=NativeUiLayout::for_viewport(width,height);const float x=native_navigation_content_left*chrome.scale,top=native_workspace_top(width,height),right=width-12*s;
+  ResearchWorkspaceLayout l;
+  const auto chrome=NativeUiLayout::for_viewport(width,height);
+  const float top=native_workspace_top(width,height);
+  // Below ~660 px of drawable height the fixed inspector stack (124 s top
+  // offset + ~176 s compact header + 148 s bottom controls) leaves no room
+  // for the details list — shrink the layout so the scroll viewport stays
+  // usable.
+  const float s=std::min(std::clamp(height/1080.f,.8f,2.f),
+                         std::max(.45f,(height-top-60.f)/462.f));
+  const float g=10*s;
+  l.scale=s;l.compact=s<.8f;l.title_font_pixels=theme::type::title(s);l.body_font_pixels=std::max(13,static_cast<int>(16*s));l.small_font_pixels=std::max(12,static_cast<int>(14*s));
+  const float x=native_navigation_content_left*chrome.scale,right=width-12*s;
   l.surface={x,top,right-x,height-top-10*s};l.title={x,top,350*s,32*s};l.labs={x,top+36*s,right-x-115*s,25*s};
   l.close={right-80*s,top,80*s,34*s};
   const float body=top+124*s,sidebar_width=195*s,inspector_width=350*s;
@@ -1108,8 +1117,8 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
     dropdown_.render(out,dropdown_.id()==1?layout.filter:dropdown_.id()==2?layout.sort:layout.toolbar,width,height,layout.small_font_pixels);
     return;
   }
-  const float art_height=150.f*layout.scale;
-  if(artwork_resolver_)if(const auto image=artwork_resolver_(node->id,true)){
+  const float art_height=layout.compact?0.f:150.f*layout.scale;
+  if(!layout.compact&&artwork_resolver_)if(const auto image=artwork_resolver_(node->id,true)){
     const UiRect hero{inspector_x,inspector_y,inspector_width,art_height};
     out.overlay.emplace_back(Image{image,hero,research_art_source(*image,hero),{255,255,255,255},layout.inspector});
   }

@@ -27,10 +27,18 @@ struct PlanetaryLayout {
   float s{};int font{},small{},heading{};UiRect screen,back,save,hero,portrait,metrics,left,command,facts,slots,right,queue,tabs,details,notice,modal,confirm,cancel;
   UiRect globe,layers,actions,view_modes,alerts,region_art,vitals;
   static PlanetaryLayout make(int width,int height){
-    PlanetaryLayout l;l.s=std::clamp(height/1080.f,.8f,2.f);const float s=l.s,g=10*s;
-    l.font=std::max(13,static_cast<int>(16*s));l.small=std::max(12,static_cast<int>(14*s));l.heading=static_cast<int>(24*s);
+    PlanetaryLayout l;
     const auto chrome=NativeUiLayout::for_viewport(width,height);
     const float x=native_navigation_content_left*chrome.scale,y=native_workspace_top(width,height);
+    // Below ~660 px of drawable height the fixed column stacks (574 s of
+    // bottom-anchored left blocks, 374 s + details of right blocks on top of
+    // the 118 s bottom strip) no longer fit — shrink the whole layout so the
+    // details/slots list keeps a usable scroll viewport instead of collapsing
+    // to a negative-height region.
+    l.s=std::min(std::clamp(height/1080.f,.8f,2.f),
+                 std::max(.4f,(height-y)/692.f));
+    const float s=l.s,g=10*s;
+    l.font=std::max(13,static_cast<int>(16*s));l.small=std::max(12,static_cast<int>(14*s));l.heading=static_cast<int>(24*s);
     l.screen={x,y,width-x-10*s,height-y-8*s};
     const float bottom=height-118*s,pw=std::clamp(l.screen.width*.21f,260*s,336*s);
     l.left={x,y,pw,bottom-y};l.right={width-pw-10*s,y,pw,bottom-y};
