@@ -68,6 +68,9 @@ void scale_and_virtualization(){
     require(thumbnails<25&&draw.overlay.size()<300,"Offscreen assets rendered eagerly");require(std::chrono::steady_clock::now()-start<std::chrono::milliseconds(200),"Large roster rendering too slow");
     n.set_selection(Key{Category::Fleets,1499});draw={};n.render(draw,size.first,size.second,{});require(n.row_bounds({Category::Fleets,1499},size.first,size.second).has_value(),"Selected asset not scrolled into view");
     (void)n.handle({InputEventType::Wheel,center(l.list),{},10000},size.first,size.second);require(n.scroll_offset()==0,"Scroll did not return to top");
+    // A repeated external reveal of the same key must still scroll the row
+    // back into view — otherwise focus-follow callers lose it off-screen.
+    n.set_selection(Key{Category::Fleets,1499});draw={};n.render(draw,size.first,size.second,{});require(n.row_bounds({Category::Fleets,1499},size.first,size.second).has_value(),"Already-selected asset not re-revealed");
   }
 }
 }

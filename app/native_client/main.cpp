@@ -2702,16 +2702,31 @@ class NativeCampaign final {
   }
   // Replays can only click a map point no HUD surface swallows. The legend is
   // the one collapsible HUD panel; collapse it when it covers the target,
-  // then shift the camera so the point slides right into clear map.
+  // then pan the camera so the point lands on a clear spot. At compact
+  // viewports HUD surfaces can flank both sides, so scan for the exposed
+  // screen position nearest the current projection and place it there.
   Point expose_smoke_map_point(double world_x,double world_y,int width,int height){
     auto point=camera_.project({world_x,world_y},width,height);
-    if(!smoke_map_point_exposed(point,width,height))
-      map_legend_collapsed_=true;
-    for(int guard=0;guard<8&&!smoke_map_point_exposed(point,width,height);++guard){
-      camera_.center.x-=static_cast<double>(width)*.12/camera_.pixels_per_world;
-      point=camera_.project({world_x,world_y},width,height);
-    }
-    return point;
+    if(smoke_map_point_exposed(point,width,height))
+      return point;
+    map_legend_collapsed_=true;
+    if(smoke_map_point_exposed(point,width,height))
+      return point;
+    Point best{};
+    float best_distance=std::numeric_limits<float>::max();
+    for(float fy=.15f;fy<=.85f;fy+=.05f)
+      for(float fx=.1f;fx<=.9f;fx+=.05f){
+        const Point candidate{static_cast<float>(width)*fx,static_cast<float>(height)*fy};
+        if(!smoke_map_point_exposed(candidate,width,height))continue;
+        const float dx=candidate.x-point.x,dy=candidate.y-point.y;
+        const float distance=dx*dx+dy*dy;
+        if(distance<best_distance){best_distance=distance;best=candidate;}
+      }
+    if(best_distance==std::numeric_limits<float>::max())
+      return point;
+    camera_.center.x=world_x-(static_cast<double>(best.x)-static_cast<double>(width)*.5)/camera_.pixels_per_world;
+    camera_.center.y=world_y-(static_cast<double>(best.y)-static_cast<double>(height)*.5)/camera_.pixels_per_world;
+    return best;
   }
   Point scroll_fleet_row_into_view(std::size_t index,int width,int height){
     const auto count=fleet_workspace_.view()?fleet_workspace_.view()->own_fleets.size():0;
@@ -5274,14 +5289,34 @@ class NativeCampaign final {
                                           &SystemSpatialBodyMarker::body_id);
     if (marker == spatial.bodies.end())
       throw std::runtime_error("Ilyra absent from the observed system.");
-    const auto point = system_workspace_.viewport()->world_to_screen(
-        marker->offset_x, marker->offset_y);
     const auto layout = SystemWorkspaceLayout::for_viewport(width, height);
-    if (!layout.world_field.contains({point.x, point.y}) ||
+    auto body_point=[&]{
+      const auto s=system_workspace_.viewport()->world_to_screen(marker->offset_x,marker->offset_y);
+      return Point{s.x,s.y};};
+    // At compact zoom a parked fleet or a clamped lane arrow can cover the
+    // body; zoom until the marker is hittable and clear, anchoring at the
+    // field centre while a lane occludes so the body drifts free.
+    for(int guard=0;guard<24;++guard){
+      const auto probe=body_point();
+      const auto hit=system_workspace_.viewport()->hit_body(spatial,probe.x,probe.y);
+      const bool lane_occluded=std::ranges::any_of(
+          system_workspace_.lane_geometry(),
+          [&](const auto&g){return stellar::native_system_travel::hit_local_lane(g,probe);});
+      const bool occluded=lane_occluded||(system_workspace_.travel_snapshot()&&
+          !stellar::native_system_travel::hit_local_fleets(
+              system_workspace_.travel_snapshot()->fleets,spatial,
+              *system_workspace_.viewport(),probe).empty());
+      if(hit==1001&&!occluded&&layout.world_field.contains(probe))break;
+      const Point anchor=lane_occluded?Point{layout.world_field.x+layout.world_field.width*.5f,
+          layout.world_field.y+layout.world_field.height*.5f}:probe;
+      route({{InputEventType::Wheel,anchor,{},1.f}});
+    }
+    const auto point=body_point();
+    if (!layout.world_field.contains(point) ||
         system_workspace_.viewport()->hit_body(spatial, point.x, point.y) !=
             1001)
       throw std::runtime_error("Ilyra is not independently clickable.");
-    click({point.x,point.y});
+    click(point);
     if(system_workspace_.selected_body_id()!=1001||!system_workspace_.settlement_preparation())
       throw std::runtime_error("Planet click did not publish settlement preparation.");
     wait_art();stable();capture("assessment");

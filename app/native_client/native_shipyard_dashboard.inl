@@ -194,7 +194,7 @@ ShipyardWorkspaceCommand NativeShipyardWorkspace::handle(const InputEvent& e,int
     return {};
   }
   if(e.type==InputEventType::Wheel){
-    if(l.designs.contains(e.position)){const auto designs=filtered_designs();const float content=designs.empty()?0:card(designs.size()-1,l).y-design_scroll_.scroll_offset-l.designs.y+268*s;design_scroll_.sync(content,l.designs.height);design_scroll_.scroll_by(-e.wheel_y*66*s);}
+    if(l.designs.contains(e.position)){const auto designs=filtered_designs();const int columns=std::clamp(static_cast<int>(l.designs.width/(214*s)),2,4);const float rows=static_cast<float>((designs.size()+columns-1)/columns);design_scroll_.sync(rows*268*s,l.designs.height);design_scroll_.scroll_by(-e.wheel_y*66*s);}
     else if(l.orders.contains(e.position)){order_scroll_.sync(30*s+(view_?view_->orders.size():0)*64*s,l.orders.height);order_scroll_.scroll_by(-e.wheel_y*50*s);}
     else if(l.design_details.contains(e.position))detail_scroll_.scroll_by(-e.wheel_y*48*s);
     return {ShipyardWorkspaceCommandKind::None,l.surface.contains(e.position)};

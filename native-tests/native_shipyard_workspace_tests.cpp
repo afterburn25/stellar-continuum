@@ -293,8 +293,35 @@ void stale_cancellation_quote_clears_when_its_revision_changes() {
 
 } // namespace
 
+void compact_designs_scroll_reaches_last_card() {
+  // At minimum resolution the designs viewport is a fraction of a card tall;
+  // every card must still be scroll-reachable — a content-height formula that
+  // double-counts the current offset strands the tail rows.
+  NativeShipyardWorkspace workspace;
+  workspace.open();
+  auto many = view();
+  many.available_designs.clear();
+  for (int i = 0; i < 9; ++i)
+    many.available_designs.push_back(design("design-" + std::to_string(i)));
+  workspace.set_view(many);
+  const auto layout = ShipyardWorkspaceLayout::for_viewport(640, 360);
+  REQUIRE(layout.designs.height < 260.f * layout.scale);
+  const auto wheel_at = center(layout.designs);
+  for (int n = 0; n < 100 && !workspace.design_bounds("design-8", 640, 360); ++n)
+    (void)workspace.handle({InputEventType::Wheel, wheel_at, {}, -1.f}, 640, 360);
+  REQUIRE(workspace.design_bounds("design-8", 640, 360).has_value());
+  // Same contract at the reference size.
+  workspace.open();
+  workspace.set_view(many);
+  const auto wide = ShipyardWorkspaceLayout::for_viewport(1920, 1080);
+  for (int n = 0; n < 100 && !workspace.design_bounds("design-8", 1920, 1080); ++n)
+    (void)workspace.handle({InputEventType::Wheel, center(wide.designs), {}, -1.f}, 1920, 1080);
+  REQUIRE(workspace.design_bounds("design-8", 1920, 1080).has_value());
+}
+
 int run_tests() {
   layout_is_contained_and_action_stays_visible();
+  compact_designs_scroll_reaches_last_card();
   start_and_cancel_use_real_mouse_hit_bounds();
   campaign_replacement_discards_old_order_context();
   empty_and_locked_states_render_without_invented_items();

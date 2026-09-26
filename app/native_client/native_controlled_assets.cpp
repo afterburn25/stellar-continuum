@@ -104,7 +104,12 @@ void Navigator::set_view(View value){
   // Cancel only if the visible targets moved, disappeared or changed identity.
   if(pressed_&&before!=targets())pressed_.reset();
 }
-void Navigator::set_selection(std::optional<Key> key,bool external){if(key==selected_)return;selected_=key;temporary_reveal_=external?key:std::nullopt;reveal_selection_=external&&key.has_value();rebuild();}
+void Navigator::set_selection(std::optional<Key> key,bool external){
+  // An external reveal request must still scroll the row into view even when
+  // it is already selected — a collapsed category or scrolled-away row is
+  // otherwise unreachable for focus-follow callers.
+  if(key==selected_){if(external&&key){temporary_reveal_=key;reveal_selection_=true;rebuild();}return;}
+  selected_=key;temporary_reveal_=external?key:std::nullopt;reveal_selection_=external&&key.has_value();rebuild();}
 void Navigator::rebuild(){
   counts_.fill(0);matches_.fill(0);const auto query=folded(search_);
   for(const auto& r:view_.rows){const auto c=static_cast<std::size_t>(r.key.category);++counts_[c];if(query.empty()||r.search.find(query)!=std::string::npos)++matches_[c];}
