@@ -2817,7 +2817,15 @@ class NativeCampaign final {
            main_layout.research.y+main_layout.research.height*.5f});
     if(!research_workspace_.visible()||!research_workspace_.window())
       throw std::runtime_error("Research smoke could not open the workspace.");
-    if(execute_action){
+    // The cancel/restart legs need an active program. A loaded fixture may
+    // legitimately carry none, so start one rather than requiring the fixture
+    // to ship pre-authorized research.
+    const auto has_active_program=[&]{
+      const auto &state=session_->frame().runtime().research().get_civilization(
+          session_->frame().runtime().world().campaign().player_civilization_id);
+      return !state.active_projects().empty();
+    };
+    if(execute_action||!has_active_program()){
       const auto card=research_workspace_.first_actionable_card(width,height);
       if(!card)throw std::runtime_error("Research smoke found no visible affordable program.");
       click({card->x+card->width*.5f,card->y+card->height*.5f});
@@ -2827,16 +2835,18 @@ class NativeCampaign final {
              workspace_layout.action.y+workspace_layout.action.height*.5f});
       if(!last_research_command_accepted_)
         throw std::runtime_error("Research smoke canonical action was rejected.");
-      const auto refreshed_layout=NativeUiLayout::for_viewport(width,height);
-      if(session_->frame().clock().speed()==StrategicSpeed::Paused)
-        click({refreshed_layout.pause.x+refreshed_layout.pause.width*.5f,
-               refreshed_layout.pause.y+refreshed_layout.pause.height*.5f});
-      // T/R keyboard parity evidence: candidate cycling and the one-key start
-      // must both surface a status notice. Only exercised on the mutating
-      // launch so the paused-reload payload comparison stays clean.
-      smoke_shortcut_=send_key('t',width,height)&&
-                      send_key('r',width,height)&&
-                      shortcut_status_reported();
+      if(execute_action){
+        const auto refreshed_layout=NativeUiLayout::for_viewport(width,height);
+        if(session_->frame().clock().speed()==StrategicSpeed::Paused)
+          click({refreshed_layout.pause.x+refreshed_layout.pause.width*.5f,
+                 refreshed_layout.pause.y+refreshed_layout.pause.height*.5f});
+        // T/R keyboard parity evidence: candidate cycling and the one-key start
+        // must both surface a status notice. Only exercised on the mutating
+        // launch so the paused-reload payload comparison stays clean.
+        smoke_shortcut_=send_key('t',width,height)&&
+                        send_key('r',width,height)&&
+                        shortcut_status_reported();
+      }
     }
     smoke_research_node_=research_workspace_.selected_id();
   }
