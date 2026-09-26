@@ -752,8 +752,12 @@ struct Scene3DRenderer::Storage {
           for(int c=0;c<3;++c)light_model.values[c*4+c]=static_cast<float>(ps);
           light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);light_model.values[15]=1.f;
           geo.push_back(geometry(instance.lod_group_proxy));
+          // The lit pass's cutout tests texel.a*opacity<threshold, so the
+          // depth mask pre-divides opacity out — a low-opacity cutout
+          // casts the same smaller silhouette it renders.
           xf.push_back({multiply(light_projection,light_model),keep,
-              instance.material.alpha_threshold,instance.material.texture_tiling.x,instance.material.texture_tiling.y});
+              instance.material.alpha_threshold/std::max(instance.material.opacity,1e-6f),
+              instance.material.texture_tiling.x,instance.material.texture_tiling.y});
           insts.push_back(&instance);
         };
         if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->collapse){
@@ -801,7 +805,8 @@ struct Scene3DRenderer::Storage {
           light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);light_model.values[15]=1.f;
           geo.push_back(geometry(mesh));
           xf.push_back({multiply(light_projection,light_model),keep,
-              instance.material.alpha_threshold,instance.material.texture_tiling.x,instance.material.texture_tiling.y});
+              instance.material.alpha_threshold/std::max(instance.material.opacity,1e-6f),
+              instance.material.texture_tiling.x,instance.material.texture_tiling.y});
           insts.push_back(&instance);
         };
         const bool fading=lod_share>0.f&&lvl<instance.lod_meshes.size()&&range_keep>=1.f;
