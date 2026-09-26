@@ -373,6 +373,11 @@ struct ShadowMap3D {
   float strength{1.f};   // 0..1 darkness applied to the key light
   float bias{0.0005f};   // receiver-side depth bias in shadow-NDC units
   std::uint32_t resolution{0}; // 0 = tier default (1024/2048/4096)
+  // Optional far cascade: a second, wider ortho tier sharing the same
+  // centre and depth so coverage keeps working at extreme zoom-out
+  // (the near tier stays crisp around `extent`; receivers past its
+  // window sample the coarse tier instead of snapping lit). 0 disables.
+  float cascade_extent{0.f}; // far-tier half-extent, must exceed extent
 };
 class Scene3D final {
  public:

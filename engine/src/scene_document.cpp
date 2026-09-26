@@ -548,13 +548,15 @@ std::string Scene3dDocument::to_json() const {
                      {"vignette", vignette},
                      {"quality", quality},
                      {"debug", debug_view}};
-  if (shadow_extent > 0.f)
+  if (shadow_extent > 0.f) {
     doc["render"]["shadow"] = {{"extent", shadow_extent},
                                {"distance", shadow_distance},
                                {"depth", shadow_depth},
                                {"strength", shadow_strength},
                                {"bias", shadow_bias},
                                {"resolution", shadow_resolution}};
+    if (shadow_cascade > 0.f) doc["render"]["shadow"]["cascade"] = shadow_cascade;
+  }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
   if (!environment.empty()) doc["environment"] = environment;
@@ -913,10 +915,12 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         scene.shadow_strength = s.value("strength", 1.0f);
         scene.shadow_bias = s.value("bias", 0.0005f);
         scene.shadow_resolution = s.value("resolution", 0u);
+        scene.shadow_cascade = s.value("cascade", 0.0f);
         if (scene.shadow_extent < 0.f || scene.shadow_distance < 0.f ||
             scene.shadow_depth <= 0.f || scene.shadow_strength < 0.f ||
             scene.shadow_strength > 1.f || scene.shadow_bias < 0.f ||
-            scene.shadow_bias > 0.1f ||
+            scene.shadow_bias > 0.1f || scene.shadow_cascade < 0.f ||
+            (scene.shadow_cascade > 0.f && scene.shadow_cascade <= scene.shadow_extent) ||
             (scene.shadow_resolution != 0u &&
              (scene.shadow_resolution < 64u || scene.shadow_resolution > 8192u)))
           return fail("render shadow fields out of range");

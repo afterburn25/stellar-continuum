@@ -365,9 +365,12 @@ struct Scene3dDocument {
   // Key-light directional shadow map: an ortho coverage volume centred
   // shadow_distance units along camera forward. shadow_extent<=0 disables;
   // resolution 0 picks the quality-tier default (1024/2048/4096).
+  // shadow_cascade>0 adds a second, wider ortho tier (world half-extent,
+  // must exceed shadow_extent) so coverage survives extreme zoom-out.
   float shadow_extent{0.f}, shadow_distance{64.f}, shadow_depth{256.f};
   float shadow_strength{1.f}, shadow_bias{0.0005f};
   std::uint32_t shadow_resolution{0};
+  float shadow_cascade{0.f};
   // Background clear color.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward (-Y) acceleration in units/s²; 0 disables gravity.

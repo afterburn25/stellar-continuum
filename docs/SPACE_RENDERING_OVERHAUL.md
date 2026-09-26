@@ -85,9 +85,11 @@ same document headless-tested.
    proxy) plus one shadowed spot light (`casts_shadow` on a coned
    `PointLight3D`, cone frustum to `range`, same caster policy);
    `alpha_threshold` casters mask the depth pass per texel, so cutout
-   meshes cast perforated silhouettes rather than full quads.
-   Remaining: no CSM splits for
-   extreme zoom ranges, omni point lights stay unshadowed; analytic
+   meshes cast perforated silhouettes rather than full quads, and an
+   optional `cascade` far tier (a wider ortho box sharing centre/depth,
+   near→far crossfade over the inner window's outer margin) keeps
+   coverage at extreme zoom-out. Remaining: cascade count is fixed at
+   one far tier, omni point lights stay unshadowed; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an
    equirect map on any PBR material and `pbr_values.w` scales diffuse
@@ -245,11 +247,12 @@ documented per-frame but accumulated. See
 
 ## Explicitly deferred / blockers
 
-- Cascaded shadow maps (CSM splits for extreme zoom ranges) and omni
-  point-light shadows: the single `ShadowMap3D` ortho volume covers
-  authored mid-zoom strategy scenes and one `casts_shadow` spot cone
-  carries a depth map; omni point lights and analytic blockers still
-  cover point sources and planet↔ring. Documented limitation.
+- Deeper cascaded shadow maps and omni point-light shadows: the
+  `ShadowMap3D` ortho volume plus its optional `cascade` far tier covers
+  authored strategy scenes at two zoom bands (a 3+ cascade chain is the
+  remaining split work), and one `casts_shadow` spot cone carries a
+  depth map; omni point lights and analytic blockers still cover point
+  sources and planet↔ring. Documented limitation.
 - Indirect draws / GPU culling: vendored SDL3 exposes
   `SDL_DrawGPUIndexedPrimitivesIndirect`, but it only merges batches
   sharing bound state — the renderer's per-batch sampler/pipeline binds

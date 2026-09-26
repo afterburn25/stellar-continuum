@@ -892,7 +892,21 @@ int main(int argc,char** argv)try{
     const auto dbg=shadow_view({receiver,occluder},shadowdbg,"shadow-debug.png");
     check(channel(*dbg,176,160,0)<40&&channel(*dbg,60,160,0)>200,
         "Shadows debug view did not isolate the occlusion term");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_passed\n";
+    // Far cascade: a wider ortho tier sharing the directional box keeps
+    // coverage past the near window's extent. Shrinking the near extent
+    // below the shadow footprint means only the cascade can carry the
+    // umbra — single-tier leaves that receiver fragment lit.
+    auto narrow=shadow;narrow.extent=.3f;
+    const auto narrow_view=[&](std::vector<MeshInstance3D> objects,float cascade,const char* name){
+      auto tier=narrow;tier.cascade_extent=cascade;
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},tier),{0,0,320,320}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto near_only=narrow_view({receiver,occluder},0,"shadow-near-only.png");
+    const auto cascaded=narrow_view({receiver,occluder},4,"shadow-cascade.png");
+    check(channel(*near_only,176,160,0)>100,"Near window covered a fragment outside its extent");
+    check(channel(*cascaded,176,160,0)<channel(*open,176,160,0)/2,"Far cascade did not carry the out-of-window shadow");
+    check(channel(*cascaded,60,160,0)>100,"Far cascade darkened a fragment inside the empty near window");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks

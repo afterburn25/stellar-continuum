@@ -220,9 +220,9 @@ int main()try{
               (void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.shadow_strength=-.1f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   // Directional shadow map settings validate bounds; a valid map round-trips.
-  {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;
+  {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;config.cascade_extent=16;
    const auto mapped=Scene3D::create(camera,{instance},{0,0,1},{},config);
-   check(mapped->shadow_map()&&mapped->shadow_map()->extent==4&&mapped->shadow_map()->resolution==512,"Scene dropped its shadow map settings");}
+   check(mapped->shadow_map()&&mapped->shadow_map()->extent==4&&mapped->shadow_map()->resolution==512&&mapped->shadow_map()->cascade_extent==16,"Scene dropped its shadow map settings");}
   {// Scene environment probe: an optional shared IBL map that fills
    // materials which opt in via environment_strength without their own.
    const auto env=RgbaImage::create(1,1,{0,128,255,255});
@@ -236,6 +236,9 @@ int main()try{
   rejects([&]{ShadowMap3D s;s.bias=-.001f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.distance=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.resolution=32;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.cascade_extent=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.cascade_extent=4;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.cascade_extent=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   // Distance culling: visible_range bounds the camera-to-surface distance;
   // 0 leaves the instance visible at any range.
   {auto ranged=instance;ranged.position={};ranged.visible_range=4;

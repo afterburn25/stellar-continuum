@@ -519,6 +519,7 @@ int main() {
     scene.shadow_strength = 0.7f;
     scene.shadow_bias = 0.001f;
     scene.shadow_resolution = 2048;
+    scene.shadow_cascade = 96.f;
     const auto reparsed =
         engine::Scene3dDocument::from_json(scene.to_json());
     check(reparsed.has_value(), "scene3d json round-trips");
@@ -629,7 +630,8 @@ int main() {
             "scene3d render options round-trip");
       check(reparsed->shadow_extent == 32.f && reparsed->shadow_distance == 48.f &&
                 reparsed->shadow_depth == 128.f && reparsed->shadow_strength == 0.7f &&
-                reparsed->shadow_bias == 0.001f && reparsed->shadow_resolution == 2048,
+                reparsed->shadow_bias == 0.001f && reparsed->shadow_resolution == 2048 &&
+                reparsed->shadow_cascade == 96.f,
             "scene3d shadow map settings round-trip");
       check(reparsed->entities[1].metallic == 0.f &&
                 reparsed->entities[1].emissive_strength == 0.f &&
@@ -683,6 +685,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"resolution":16}}})")
               .has_value(),
           "scene3d undersized shadow resolution rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"cascade":-1}}})")
+              .has_value(),
+          "scene3d negative shadow cascade rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"cascade":3}}})")
+              .has_value(),
+          "scene3d cascade inside near extent rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.9,"spotOuter":0.95}]})")
               .has_value(),

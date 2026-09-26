@@ -290,13 +290,19 @@ shadow.depth = 256.f;       // light-axis depth of the shadow volume
 shadow.strength = 1.f;      // [0,1] darkness applied to the key light
 shadow.bias = 0.0005f;      // receiver-side depth bias, shadow-NDC units
 shadow.resolution = 0;      // 0 = tier default (Medium 1024 / High 2048 / Ultra 4096)
+shadow.cascade_extent = 0;  // 0 disables; >extent adds a wider far tier
 ```
 
 - Strategy-scale fitting: instead of covering the camera frustum, the
   ortho box centres `distance` units along the camera forward axis, so
   the authored `extent` picks how much of the scene is shadowed —
   receivers outside the box stay lit. The light direction and camera
-  orientation both track the scene's key light each frame.
+  orientation both track the scene's key light each frame. An optional
+  `cascade_extent` (> `extent`; document key `cascade` in
+  `render.shadow`) adds a second, coarser ortho tier sharing the same
+  centre/depth — the fragment shader crossfades near→far over the inner
+  window's outer margin, so extreme zoom-out keeps coverage instead of
+  stepping to lit at the near boundary.
 - Rendered as a depth-only pass (`scene3d_shadow.vert/.frag`) before the
   scene pass through the RenderGraph; the scene fragment shader applies
   a fixed 8-tap PCF kernel at High (1-texel radius) and Ultra (1.5),
@@ -451,11 +457,11 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
 ## Known limitations
 
-- `ShadowMap3D` is a single ortho cascade for the key light plus one
-  `casts_shadow` spot cone per scene — no CSM splits, no omni
-  point-light shadows; receivers outside the authored box (or outside
-  the spot map's cone frustum) stay lit (by design) so extreme
-  zoom-outs need a larger `extent`.
+- `ShadowMap3D` is an authored ortho box for the key light (plus an
+  optional wider `cascade` far tier — two bands, not a full CSM split
+  chain) and one `casts_shadow` spot cone per scene — no omni
+  point-light shadows; receivers outside the authored boxes (or outside
+  the spot map's cone frustum) stay lit (by design).
 - Analytic ellipsoid/annulus blockers remain the ring↔planet shadow
   path and are evaluated independently of the map.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or

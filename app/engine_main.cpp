@@ -2010,26 +2010,27 @@ void commit_scene3_field(Shell &shell) {
     doc.debug_view = d;
     return ok("debug view updated");
   }
-  case 52: { // key-light shadow map: "extent,dist,depth[,strength,bias[,res]]"
+  case 52: { // key-light shadow map: "extent,dist,depth[,strength,bias[,res[,cascade]]]"
     if (shell.scene3_buffer.empty()) { // empty clears
       commit();
       doc.shadow_extent = 0.f;
+      doc.shadow_cascade = 0.f;
       return ok("shadow map disabled");
     }
-    float v[6]{};
+    float v[7]{};
     {
       std::istringstream values(shell.scene3_buffer);
       std::string token;
       int n = 0;
-      while (n < 6 && std::getline(values, token, ',')) {
+      while (n < 7 && std::getline(values, token, ',')) {
         try {
           v[n++] = std::stof(token);
         } catch (const std::exception &) {
-          return fail("use extent,distance,depth[,strength,bias[,resolution]]");
+          return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade]]]");
         }
       }
       if (n < 3)
-        return fail("use extent,distance,depth[,strength,bias[,resolution]]");
+        return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade]]]");
       commit();
       doc.shadow_extent = v[0];
       doc.shadow_distance = v[1];
@@ -2038,6 +2039,7 @@ void commit_scene3_field(Shell &shell) {
       doc.shadow_bias = n > 4 ? v[4] : .0005f;
       doc.shadow_resolution =
           n > 5 ? static_cast<std::uint32_t>(std::max(0.f, v[5])) : 0u;
+      doc.shadow_cascade = n > 6 ? v[6] : 0.f;
     }
     return ok("shadow map updated");
   }
@@ -2695,7 +2697,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
     if (doc.shadow_extent > 0.f)
       shadow_map = ShadowMap3D{doc.shadow_extent, doc.shadow_distance,
                                doc.shadow_depth, doc.shadow_strength,
-                               doc.shadow_bias, doc.shadow_resolution};
+                               doc.shadow_bias, doc.shadow_resolution,
+                               doc.shadow_cascade};
     if (auto scene = Scene3D::create(cam, std::move(instances), light_cam,
                                      std::move(point_lights), shadow_map,
                                      doc.environment.empty()
@@ -3064,7 +3067,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                   std::to_string(doc.shadow_distance) + "," +
                   std::to_string(doc.shadow_depth)
             : "",
-        ed(52), "extent,dist,depth[,strength,bias[,res]] - empty disables");
+        ed(52), "extent,dist,depth[,strength,bias[,res[,cascade]]] - empty disables");
   field(shell.hit3_scnenv, "environment", doc.environment, ed(72),
         "equirect path - shared IBL probe; empty disables");
 }
