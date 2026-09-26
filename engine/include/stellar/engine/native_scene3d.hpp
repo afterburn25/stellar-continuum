@@ -188,6 +188,9 @@ struct PointLight3D {
   // Spot-only — omni shadows would need a cube map; at most one
   // shadowed spot light per scene keeps the pass bounded.
   bool casts_shadow{false};
+  // [0,1] umbra darkness when casts_shadow is set — 1 is a full cut,
+  // lower values leave residual light like ShadowMap3D::strength.
+  float shadow_strength{1.f};
 };
 inline constexpr std::size_t maximum_scene3d_point_lights=4;
 // Single-scatter limb approximation: a wavelength-tinted shell driven by

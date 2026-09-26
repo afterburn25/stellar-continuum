@@ -938,6 +938,9 @@ struct Scene3DRenderer::Storage {
         // geometric term already.
         view_uniform.spot_options={1.f/static_cast<float>(spot_res),radius_texels,
             static_cast<float>(spot_index),1.5f/static_cast<float>(spot_res)};
+        // debug_mode.z carries the spot's umbra strength (the two spare
+        // debug lanes are the only free per-view uniform channels).
+        view_uniform.debug_mode[2]=view.scene->point_lights()[spot_index].shadow_strength;
         collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,light_projection,from_view,cone_volume,
             spot_geometry,spot_transforms,spot_textures,spot_batcher);
       }

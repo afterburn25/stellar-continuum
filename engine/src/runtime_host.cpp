@@ -2654,7 +2654,7 @@ int RuntimeHost::run() {
                                             l.intensity, l.range,
                                             {l.spot_x, l.spot_y, l.spot_z},
                                             l.spot_inner, l.spot_outer,
-                                            l.cast_shadow});
+                                            l.cast_shadow, l.shadow_strength});
       if (auto scene = Scene3D::create(cam, std::move(instances),
                                        light_cam, std::move(point_lights),
                                        impl.shadow3, impl.environment3)) {

@@ -501,16 +501,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `scene3d.frag` (`spot_shadow_map` sampler at `set=2,binding=11` —
   SDL_GPU packs fragment samplers densely, so the materials SSBO
   moved to binding 12 — plus `spot_from_view`/`spot_options` in the
-  view uniform), `scene_document.*` (`castShadow` key),
-  `runtime_host.cpp`, `app/engine_main.cpp` (`pointLights` row's
-  14th CSV field).
+  view uniform), `scene_document.*` (`castShadow`/`shadowStrength`
+  keys), `runtime_host.cpp`, `app/engine_main.cpp` (`pointLights`
+  row's 14th/15th CSV fields).
 - **Public interface:** set `casts_shadow` on a `PointLight3D` with a
   nonzero `spot_direction`; `Scene3D::create` rejects an omni caster
-  and a second shadowed spot. The cone frustum spans the authored
-  outer cone (clamped to ~150 degrees map fov) out to `range`.
+  and a second shadowed spot. `shadow_strength` [0,1] blends the umbra
+  like `ShadowMap3D::strength` (1 = full cut). The cone frustum spans
+  the authored outer cone (clamped to ~150 degrees map fov) out to
+  `range`.
 - **Shader contract:** `spot_options` carries {texel, PCF radius,
-  light index, bias}; the point-light loop applies the sampled
-  visibility only to the flagged light's window — other lights and
+  light index, bias} and `debug_mode.z` carries the spot's
+  `shadow_strength`; the point-light loop blends the sampled
+  visibility into the flagged light's window only — other lights and
   omni spots are untouched.
 - **Policies:** identical caster rules to the directional pass —
   no transparent casters, `visible_range` culls, shared LOD pick,
@@ -522,16 +525,18 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   alpha-cutout casters share the directional pass's texel masking
   (the shared `collect_casters` feeds both).
 - **Persistence:** `castShadow` document key round-trips; rejected
-  without `spotDir`.
-- **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed spot
-  captures (`point-light-spot-noshadow/shadow.png`) with a lit-cone
-  umbra census plus right-of-umbra lit check; `engine_scene3d`
-  rejects omni/second-caster configs; `engine_project` parses,
-  round-trips and rejects `castShadow`.
+  without `spotDir`. `shadowStrength` round-trips and rejects
+  outside [0,1].
+- **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed vs
+  half-strength spot captures (`point-light-spot-noshadow/shadow/
+  softshadow.png`) with a lit-cone umbra census, right-of-umbra lit
+  check and a ~half-latency umbra texel probe; `engine_scene3d`
+  rejects omni/second-caster configs plus out-of-range
+  `shadow_strength`; `engine_project` parses, round-trips and rejects
+  `castShadow`/`shadowStrength`.
 - **Limitations:** one shadowed spot per scene (the second depth map
   is per-view, not per-light); omni point lights stay unshadowed (a
-  cube/paraboloid path is a separate feature); spot strength is
-  fixed at full cut — the umbra is binary under the cone window.
+  cube/paraboloid path is a separate feature).
 
 ## Scene3D scene-level environment probe (2026-10-07)
 

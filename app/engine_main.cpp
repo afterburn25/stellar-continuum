@@ -1952,7 +1952,7 @@ void commit_scene3_field(Shell &shell) {
     doc.quality = q;
     return ok("quality tier updated");
   }
-  case 38: { // point lights: "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer]; ..."
+  case 38: { // point lights: "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength]]]; ..."
     std::vector<engine::Scene3dPointLight> parsed;
     if (!shell.scene3_buffer.empty()) {
       std::istringstream entries(shell.scene3_buffer);
@@ -1960,17 +1960,17 @@ void commit_scene3_field(Shell &shell) {
       while (std::getline(entries, entry, ';')) {
         std::istringstream values(entry);
         std::string token;
-        float v[14];
+        float v[15];
         int n = 0;
-        while (n < 14 && std::getline(values, token, ',')) {
+        while (n < 15 && std::getline(values, token, ',')) {
           try {
             v[n++] = std::stof(token);
           } catch (const std::exception &) {
-            return fail("use \"x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow]]; ...\"");
+            return fail("use \"x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength]]]; ...\"");
           }
         }
-        if (n != 8 && n != 13 && n != 14)
-          return fail("each point light needs x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow]]");
+        if (n != 8 && n != 13 && n != 14 && n != 15)
+          return fail("each point light needs x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength]]]");
         engine::Scene3dPointLight l;
         l.x = v[0]; l.y = v[1]; l.z = v[2];
         l.r = v[3]; l.g = v[4]; l.b = v[5];
@@ -1986,7 +1986,10 @@ void commit_scene3_field(Shell &shell) {
               l.spot_inner <= 0.f || l.spot_inner > 1.f ||
               l.spot_outer < 0.f || l.spot_outer >= 1.f)
             return fail("spot cones need a nonzero direction and 0<=outer<inner<=1");
-          if (n == 14) l.cast_shadow = v[13] != 0.f;
+          if (n >= 14) l.cast_shadow = v[13] != 0.f;
+          if (n >= 15) l.shadow_strength = v[14];
+          if (l.shadow_strength < 0.f || l.shadow_strength > 1.f)
+            return fail("spot shadow strength must be in [0,1]");
         }
         parsed.push_back(l);
       }
@@ -2686,7 +2689,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                           l.intensity, l.range,
                                           {l.spot_x, l.spot_y, l.spot_z},
                                           l.spot_inner, l.spot_outer,
-                                          l.cast_shadow});
+                                          l.cast_shadow,
+                                          l.shadow_strength});
     std::optional<ShadowMap3D> shadow_map;
     if (doc.shadow_extent > 0.f)
       shadow_map = ShadowMap3D{doc.shadow_extent, doc.shadow_distance,
@@ -3041,12 +3045,16 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                    std::to_string(l.spot_y) + "," + std::to_string(l.spot_z) +
                    "," + std::to_string(l.spot_inner) + "," +
                    std::to_string(l.spot_outer);
-              if (l.cast_shadow) v += ",1";
+              if (l.cast_shadow) {
+                v += ",1";
+                if (l.shadow_strength < 1.f)
+                  v += "," + std::to_string(l.shadow_strength);
+              }
             }
           }
           return v;
         }(),
-        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow]]; ... - max 4, empty clears");
+        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength]]]; ... - max 4, empty clears");
   field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
         "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency");
   field(shell.hit3_shadow, "shadowMap",

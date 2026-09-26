@@ -58,7 +58,8 @@ layout(set=2,binding=12,std430) readonly buffer Materials {
 // Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
 // 2 albedo, 3 normals, 4 roughness, 5 metallic, 6 emissive, 7 lighting,
 // 8 lod class / 9 residency class tint (texture_options.w).
-// debug_mode.y is the view's scene time driving animated material terms.
+// debug_mode.y is the view's scene time driving animated material terms;
+// debug_mode.z is the shadowed spot light's authored umbra strength.
 layout(set=3,binding=0) uniform ViewParams {
     vec4 debug_mode;
     // view → shadow-map clip space, then texel size / strength / bias /
@@ -541,9 +542,10 @@ void main() {
         // the clamped map fov stay lit, which only matters inside the
         // narrow band between the map edge and the outer cone.
         if(view_params.spot_options.x>0.0&&int(view_params.spot_options.z+0.5)==i)
-            window*=map_lit(spot_shadow_map,view_params.spot_from_view*vec4(view_position,1.0),
+            // debug_mode.z = the spot's authored umbra strength; 1 = full cut.
+            window*=mix(1.0,map_lit(spot_shadow_map,view_params.spot_from_view*vec4(view_position,1.0),
                             view_params.spot_options.x,view_params.spot_options.y,
-                            view_params.spot_options.w);
+                            view_params.spot_options.w),view_params.debug_mode.z);
         if(window<=0.0) continue;
         vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
         float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);

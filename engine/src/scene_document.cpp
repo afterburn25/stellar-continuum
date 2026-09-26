@@ -532,6 +532,7 @@ std::string Scene3dDocument::to_json() const {
         li["spotOuter"] = l.spot_outer;
       }
       if (l.cast_shadow) li["castShadow"] = true;
+      if (l.shadow_strength < 1.f) li["shadowStrength"] = l.shadow_strength;
       ls.push_back(std::move(li));
     }
   }
@@ -873,6 +874,10 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         l.cast_shadow = li.value("castShadow", false);
         if (l.cast_shadow && sd2 == 0)
           return fail("castShadow requires a nonzero spotDir");
+        l.shadow_strength = li.value("shadowStrength", 1.f);
+        if (!std::isfinite(l.shadow_strength) || l.shadow_strength < 0.f ||
+            l.shadow_strength > 1.f)
+          return fail("shadowStrength must be in [0,1]");
         scene.point_lights.push_back(l);
       }
     }

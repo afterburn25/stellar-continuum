@@ -216,6 +216,9 @@ int main()try{
   rejects([&]{PointLight3D l;l.casts_shadow=true;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D a,b;a.spot_direction={0,0,-1};b.spot_direction={1,0,0};a.casts_shadow=b.casts_shadow=true;
               (void)Scene3D::create(camera,{instance},{0,0,1},{a,b});});
+  rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_inner=.97f;l.spot_outer=.9f;l.casts_shadow=true;l.shadow_strength=1.5f;
+              (void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  rejects([&]{PointLight3D l;l.shadow_strength=-.1f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   // Directional shadow map settings validate bounds; a valid map round-trips.
   {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;
    const auto mapped=Scene3D::create(camera,{instance},{0,0,1},{},config);

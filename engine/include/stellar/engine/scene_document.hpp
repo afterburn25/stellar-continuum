@@ -323,6 +323,8 @@ struct Scene3dPointLight {
   // Shadowed spot cone (at most one per scene): renders casters into a
   // cone-frustum depth map from the light's position. Requires spotDir.
   bool cast_shadow{false};
+  // [0,1] umbra darkness when castShadow is set (1 = full cut).
+  float shadow_strength{1.f};
 };
 
 // A 3D scene: camera, key light, and mesh entities — the 3D counterpart of

@@ -246,6 +246,8 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
       if(d2==0)throw std::invalid_argument("3D omni point light cannot cast a shadow map - spot direction required.");
       ++shadowed_spots;
     }
+    if(!std::isfinite(l.shadow_strength)||l.shadow_strength<0.f||l.shadow_strength>1.f)
+      throw std::invalid_argument("3D spot shadow_strength must be in [0,1].");
   }
   if(shadowed_spots>1)throw std::invalid_argument("3D scene allows at most one shadowed spot light.");
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;

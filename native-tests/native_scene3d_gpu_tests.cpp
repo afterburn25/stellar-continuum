@@ -641,7 +641,21 @@ int main(int argc,char** argv)try{
     check(census(*spot_shadowed,165,195)<census(*spot_shadowed,120,155)-10&&
           channel(*spot_shadowed,185,160,1)>channel(*spot_unshadowed,185,160,1)/2,
         "Spot shadow extinguished the whole cone instead of the umbra");
-    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_passed\n";
+    // shadow_strength blends the map like ShadowMap3D::strength: a half-
+    // strength umbra darkens but never reaches the full cut's floor. Find
+    // a texel the full cut blacked out (lit unshadowed), then check the
+    // softened render lands near half its lit value.
+    lamp.shadow_strength=.5f;
+    const auto spot_soft=spot_cast("point-light-spot-softshadow.png");
+    int bx=-1,by=0;
+    for(int y=140;y<190&&bx<0;++y)for(int x=120;x<155;++x)
+      if(channel(*spot_shadowed,x,y,1)<10&&channel(*spot_unshadowed,x,y,1)>80){bx=x;by=y;break;}
+    check(bx>0,"Full-cut spot umbra had no blacked-out texel to soften");
+    const int us=channel(*spot_unshadowed,bx,by,1),fu=channel(*spot_shadowed,bx,by,1),so=channel(*spot_soft,bx,by,1);
+    check(so>fu+15&&so>us*0.35&&so<us*0.7,
+        "shadow_strength did not soften the spot umbra between full cut and lit");
+    lamp.shadow_strength=1.f;
+    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_passed\n";
   }
   {
     // Atmosphere limb scattering: a tinted shell brightens the silhouette
