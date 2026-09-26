@@ -16,6 +16,7 @@ layout(set=2,binding=8) uniform sampler2D emissive_map;
 layout(set=2,binding=9) uniform sampler2D metallic_roughness_map;
 // Key-light depth map — a depth-only ortho pass ahead of the scene pass.
 layout(set=2,binding=10) uniform sampler2D shadow_depth_map;
+layout(set=2,binding=11) uniform sampler2D spot_shadow_map;
 struct Material {
     vec4 tint;
     vec4 light_direction;
@@ -51,7 +52,7 @@ struct Material {
     vec4 point_outer; // per-light outer cos edge
     vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
 };
-layout(set=2,binding=11,std430) readonly buffer Materials {
+layout(set=2,binding=12,std430) readonly buffer Materials {
     Material materials[];
 };
 // Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
@@ -64,7 +65,31 @@ layout(set=3,binding=0) uniform ViewParams {
     // enabled in shadow_options
     mat4 shadow_from_view;
     vec4 shadow_options;
+    // view → spot-cone shadow clip space for the (at most one) shadowed
+    // spot light; spot_options = texel size (>0 enabled), PCF radius in
+    // texels, shadowed point-light index, range-scaled depth bias
+    mat4 spot_from_view;
+    vec4 spot_options;
 } view_params;
+
+// Shared shadow-map visibility: project clip → NDC, reject fragments
+// outside the map (they stay lit — coverage is an authored policy), then
+// step-compare depth with the fixed 8-tap kernel when a radius is set.
+float map_lit(sampler2D map,vec4 clip,float texel,float radius_texels,float bias) {
+    vec3 ndc=clip.xyz/max(clip.w,1e-9);
+    vec2 suv=ndc.xy*0.5+0.5;
+    if(clip.w<=0.0||suv.x<0.0||suv.x>1.0||suv.y<0.0||suv.y>1.0||ndc.z<0.0||ndc.z>1.0)return 1.0;
+    float radius=radius_texels*texel;
+    if(radius>0.0) {
+        vec2 taps[8]=vec2[](vec2(-1.0,-1.0),vec2(1.0,-1.0),vec2(-1.0,1.0),vec2(1.0,1.0),
+                            vec2(-0.4,0.0),vec2(0.4,0.0),vec2(0.0,-0.4),vec2(0.0,0.4));
+        float lit=0.0;
+        for(int t=0;t<8;++t)
+            lit+=step(ndc.z-bias,texture(map,suv+taps[t]*radius).r);
+        return lit*0.125;
+    }
+    return step(ndc.z-bias,texture(map,suv).r);
+}
 // Per-invocation material copy — populated from the instance-indexed buffer
 // at the top of main so helper functions keep their shared access.
 Material material;
@@ -286,24 +311,9 @@ void main() {
     // cheap; the radius (in texels) and strength come from the quality tier.
     if(view_params.shadow_options.x>0.0) {
         vec4 clip=view_params.shadow_from_view*vec4(view_position,1.0);
-        vec3 ndc=clip.xyz/max(clip.w,1e-9);
-        vec2 suv=ndc.xy*0.5+0.5;
-        if(clip.w>0.0&&suv.x>=0.0&&suv.x<=1.0&&suv.y>=0.0&&suv.y<=1.0&&ndc.z>=0.0&&ndc.z<=1.0) {
-            float texel=view_params.shadow_options.x;
-            float radius=view_params.shadow_options.y*texel;
-            float bias=view_params.shadow_options.w;
-            float lit;
-            if(radius>0.0) {
-                vec2 taps[8]=vec2[](vec2(-1.0,-1.0),vec2(1.0,-1.0),vec2(-1.0,1.0),vec2(1.0,1.0),
-                                    vec2(-0.4,0.0),vec2(0.4,0.0),vec2(0.0,-0.4),vec2(0.0,0.4));
-                lit=0.0;
-                for(int i=0;i<8;++i)
-                    lit+=step(ndc.z-bias,texture(shadow_depth_map,suv+taps[i]*radius).r);
-                lit*=0.125;
-            } else
-                lit=step(ndc.z-bias,texture(shadow_depth_map,suv).r);
-            visibility*=mix(1.0,lit,view_params.shadow_options.z);
-        }
+        float lit=map_lit(shadow_depth_map,clip,view_params.shadow_options.x,
+                          view_params.shadow_options.y,view_params.shadow_options.w);
+        visibility*=mix(1.0,lit,view_params.shadow_options.z);
     }
     float extra_visibility[2];
     for(int i=0;i<2;++i)extra_visibility[i]=material.additional_illumination[i].a>0.0?direct_visibility(material.additional_shadow[i].xyz):1.0;
@@ -526,6 +536,14 @@ void main() {
         if(dot(cone.xyz,cone.xyz)>0.0)
             window*=smoothstep(material.point_outer[i],cone.w,
                                dot(-L,normalize(cone.xyz)));
+        // Shadowed spot (at most one per scene): receivers inside the
+        // cone project into the light's own depth map; fragments past
+        // the clamped map fov stay lit, which only matters inside the
+        // narrow band between the map edge and the outer cone.
+        if(view_params.spot_options.x>0.0&&int(view_params.spot_options.z+0.5)==i)
+            window*=map_lit(spot_shadow_map,view_params.spot_from_view*vec4(view_position,1.0),
+                            view_params.spot_options.x,view_params.spot_options.y,
+                            view_params.spot_options.w);
         if(window<=0.0) continue;
         vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
         float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);

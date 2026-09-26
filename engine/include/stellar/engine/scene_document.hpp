@@ -320,6 +320,9 @@ struct Scene3dPointLight {
   float spot_x{}, spot_y{}, spot_z{};
   float spot_inner{1.f};
   float spot_outer{1.f};
+  // Shadowed spot cone (at most one per scene): renders casters into a
+  // cone-frustum depth map from the light's position. Requires spotDir.
+  bool cast_shadow{false};
 };
 
 // A 3D scene: camera, key light, and mesh entities — the 3D counterpart of

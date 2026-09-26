@@ -1950,17 +1950,17 @@ void commit_scene3_field(Shell &shell) {
       while (std::getline(entries, entry, ';')) {
         std::istringstream values(entry);
         std::string token;
-        float v[13];
+        float v[14];
         int n = 0;
-        while (n < 13 && std::getline(values, token, ',')) {
+        while (n < 14 && std::getline(values, token, ',')) {
           try {
             v[n++] = std::stof(token);
           } catch (const std::exception &) {
-            return fail("use \"x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer]; ...\"");
+            return fail("use \"x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow]]; ...\"");
           }
         }
-        if (n != 8 && n != 13)
-          return fail("each point light needs x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer]");
+        if (n != 8 && n != 13 && n != 14)
+          return fail("each point light needs x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow]]");
         engine::Scene3dPointLight l;
         l.x = v[0]; l.y = v[1]; l.z = v[2];
         l.r = v[3]; l.g = v[4]; l.b = v[5];
@@ -1976,6 +1976,7 @@ void commit_scene3_field(Shell &shell) {
               l.spot_inner <= 0.f || l.spot_inner > 1.f ||
               l.spot_outer < 0.f || l.spot_outer >= 1.f)
             return fail("spot cones need a nonzero direction and 0<=outer<inner<=1");
+          if (n == 14) l.cast_shadow = v[13] != 0.f;
         }
         parsed.push_back(l);
       }
@@ -2673,7 +2674,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                           {l.r, l.g, l.b},
                                           l.intensity, l.range,
                                           {l.spot_x, l.spot_y, l.spot_z},
-                                          l.spot_inner, l.spot_outer});
+                                          l.spot_inner, l.spot_outer,
+                                          l.cast_shadow});
     std::optional<ShadowMap3D> shadow_map;
     if (doc.shadow_extent > 0.f)
       shadow_map = ShadowMap3D{doc.shadow_extent, doc.shadow_distance,
@@ -3018,15 +3020,17 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                  std::to_string(l.g) + "," + std::to_string(l.b) + "," +
                  std::to_string(l.intensity) + "," +
                  std::to_string(l.range);
-            if (l.spot_x != 0.f || l.spot_y != 0.f || l.spot_z != 0.f)
+            if (l.spot_x != 0.f || l.spot_y != 0.f || l.spot_z != 0.f) {
               v += "," + std::to_string(l.spot_x) + "," +
                    std::to_string(l.spot_y) + "," + std::to_string(l.spot_z) +
                    "," + std::to_string(l.spot_inner) + "," +
                    std::to_string(l.spot_outer);
+              if (l.cast_shadow) v += ",1";
+            }
           }
           return v;
         }(),
-        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer]; ... - max 4, empty clears");
+        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow]]; ... - max 4, empty clears");
   field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
         "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency");
   field(shell.hit3_shadow, "shadowMap",

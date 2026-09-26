@@ -694,6 +694,20 @@ int main() {
               .has_value(),
           "scene3d valid spot cone rejected");
     check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[],"pointLights":[{"castShadow":true}]})")
+              .has_value(),
+          "scene3d omni castShadow rejected");
+    if (auto shadowed = engine::Scene3dDocument::from_json(
+            R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.97,"spotOuter":0.9,"castShadow":true}]})")) {
+      check(shadowed->point_lights.size() == 1 &&
+                shadowed->point_lights[0].cast_shadow,
+            "scene3d dropped a valid shadowed spot");
+      check(shadowed->to_json().find("castShadow") != std::string::npos,
+            "scene3d did not round-trip castShadow");
+    } else {
+      check(false, "scene3d shadowed spot light rejected");
+    }
+    check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"pointLights":[{},{},{},{},{}]})")
               .has_value(),
           "scene3d over-budget point lights rejected");

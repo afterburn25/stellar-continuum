@@ -597,7 +597,34 @@ int main(int argc,char** argv)try{
     check(std::abs(channel(*spot_omni,160,160,1)-channel(*lit_point,160,160,1))<=4&&
           std::abs(channel(*spot_omni,60,60,1)-channel(*lit_point,60,60,1))<=4,
         "Zero spot direction did not restore the omni point light");
-    std::cout<<"point_lights_gpu=falloff_color_range_spot_passed\n";
+    // Shadowed spot: an occluder inside the cone projects an umbra onto
+    // the plate's lit disc only when casts_shadow is set. The occluder
+    // is offset off-axis so its own lit shell sits beside the umbra.
+    MeshInstance3D occluder;occluder.mesh=Mesh3D::uv_sphere(16,8);
+    occluder.position={-.12f,0,1.6f};occluder.scale=.1f;
+    occluder.material.ambient=0;occluder.material.diffuse=.8f;
+    occluder.material.light_intensity=0;
+    lamp.spot_direction={0,0,-1};lamp.spot_inner=.999f;lamp.spot_outer=.985f;
+    lamp.casts_shadow=false;
+    auto spot_cast=[&](const char* name){
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder},{0,0,1},{lamp}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto spot_unshadowed=spot_cast("point-light-spot-noshadow.png");
+    lamp.casts_shadow=true;
+    const auto spot_shadowed=spot_cast("point-light-spot-shadow.png");
+    // Umbra lands left of centre (light ray through the off-axis occluder);
+    // census the darkest receiver texel in a left-hand strip vs right.
+    const auto census=[&](const RgbaImage& img,int x0,int x1){
+      int dark=0;for(int y=140;y<190;++y)for(int x=x0;x<x1;++x)
+        if(channel(img,x,y,1)<30)++dark;return dark;};
+    check(census(*spot_shadowed,120,155)>census(*spot_unshadowed,120,155)+20,
+        "Shadowed spot did not cut an umbra through the occluder");
+    // Non-vacuous: the cone's lit disc survives beside the umbra, so the
+    // darkening is occlusion rather than a dead spot light.
+    check(census(*spot_shadowed,165,195)<census(*spot_shadowed,120,155)-10&&
+          channel(*spot_shadowed,185,160,1)>channel(*spot_unshadowed,185,160,1)/2,
+        "Spot shadow extinguished the whole cone instead of the umbra");
+    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_passed\n";
   }
   {
     // Atmosphere limb scattering: a tinted shell brightens the silhouette

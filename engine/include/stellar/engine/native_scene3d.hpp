@@ -183,6 +183,11 @@ struct PointLight3D {
   Vec3 spot_direction{0,0,0};
   float spot_inner{1.f};
   float spot_outer{1.f};
+  // Shadowed spot: renders the scene's casters once from the light's
+  // perspective into its own depth map (cone frustum, range-bounded).
+  // Spot-only — omni shadows would need a cube map; at most one
+  // shadowed spot light per scene keeps the pass bounded.
+  bool casts_shadow{false};
 };
 inline constexpr std::size_t maximum_scene3d_point_lights=4;
 // Single-scatter limb approximation: a wavelength-tinted shell driven by

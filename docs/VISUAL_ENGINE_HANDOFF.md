@@ -269,8 +269,14 @@ auto scene = Scene3D::create(camera, instances, key_light, point_lights,
   (0 ≤ outer < inner ≤ 1). `spot_direction = (0,0,0)` keeps the light
   omni. Document keys: `spotDir`/`spotInner`/`spotOuter` on
   `pointLights[]` entries.
+- Spot shadow: `casts_shadow = true` (document key `castShadow`) gives
+  the cone a real depth map — casters render once from the light's
+  position through a cone frustum out to `range`, same caster policy
+  as the directional pass. Spot-only (`Scene3D::create` rejects an
+  omni caster) and capped at one shadowed spot per scene; Low tier
+  skips it like the directional map.
 - Point lights (and spot cones) are independent of the key/fill
-  directional lights and are unshadowed.
+  directional lights.
 
 ## Directional shadows — `ShadowMap3D`
 

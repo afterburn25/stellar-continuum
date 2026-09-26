@@ -61,10 +61,10 @@ struct Texture {
   std::size_t bytes()const{return owner->byte_size()+gpu_bytes;}
 };
 struct Target {
-  SDL_GPUDevice* device;SDL_GPUTexture* color{};SDL_GPUTexture* depth{};SDL_GPUTexture* hdr{};SDL_GPUTexture* msaa_color{};SDL_GPUTexture* msaa_depth{};SDL_GPUTexture* shadow{};SDL_Texture* composite{};int width{},height{};Uint32 hdr_levels{1};int shadow_size{};
+  SDL_GPUDevice* device;SDL_GPUTexture* color{};SDL_GPUTexture* depth{};SDL_GPUTexture* hdr{};SDL_GPUTexture* msaa_color{};SDL_GPUTexture* msaa_depth{};SDL_GPUTexture* shadow{};SDL_GPUTexture* spot_shadow{};SDL_Texture* composite{};int width{},height{};Uint32 hdr_levels{1};int shadow_size{},spot_shadow_size{};
   explicit Target(SDL_GPUDevice* d):device(d){}
-  ~Target(){if(composite)SDL_DestroyTexture(composite);if(shadow)SDL_ReleaseGPUTexture(device,shadow);if(msaa_depth)SDL_ReleaseGPUTexture(device,msaa_depth);if(msaa_color)SDL_ReleaseGPUTexture(device,msaa_color);if(hdr)SDL_ReleaseGPUTexture(device,hdr);if(depth)SDL_ReleaseGPUTexture(device,depth);if(color)SDL_ReleaseGPUTexture(device,color);}
-  std::size_t bytes()const{auto base=static_cast<std::size_t>(width)*height*(hdr?16u:8u);return base+(msaa_color?base*4+static_cast<std::size_t>(width)*height*16u:0)+static_cast<std::size_t>(shadow_size)*shadow_size*4;}
+  ~Target(){if(composite)SDL_DestroyTexture(composite);if(spot_shadow)SDL_ReleaseGPUTexture(device,spot_shadow);if(shadow)SDL_ReleaseGPUTexture(device,shadow);if(msaa_depth)SDL_ReleaseGPUTexture(device,msaa_depth);if(msaa_color)SDL_ReleaseGPUTexture(device,msaa_color);if(hdr)SDL_ReleaseGPUTexture(device,hdr);if(depth)SDL_ReleaseGPUTexture(device,depth);if(color)SDL_ReleaseGPUTexture(device,color);}
+  std::size_t bytes()const{auto base=static_cast<std::size_t>(width)*height*(hdr?16u:8u);return base+(msaa_color?base*4+static_cast<std::size_t>(width)*height*16u:0)+static_cast<std::size_t>(shadow_size)*shadow_size*4+static_cast<std::size_t>(spot_shadow_size)*spot_shadow_size*4;}
 };
 SDL_GPUTexture* make_texture(SDL_GPUDevice* d,int w,int h,SDL_GPUTextureFormat format,SDL_GPUTextureUsageFlags usage,Uint32 levels=1,SDL_GPUSampleCount samples=SDL_GPU_SAMPLECOUNT_1){
   SDL_GPUTextureCreateInfo info{};info.type=SDL_GPU_TEXTURETYPE_2D;info.format=format;info.usage=usage;
@@ -83,8 +83,8 @@ struct PostUniform {std::array<float,4> a,b;};
 // View-wide fragment uniform: debug selector, then the key light's
 // view→shadow-clip transform and {texel size (>0 enables), PCF radius in
 // texels, strength, bias} for the directional shadow map.
-struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==96);
+struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;Matrix4 spot_from_view;std::array<float,4> spot_options;};
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==176);
 // Column-major rotation for a unit quaternion — same convention as
 // rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
 Matrix4 rotation_from(Quaternion q){
@@ -113,9 +113,9 @@ struct Scene3DRenderer::Storage {
   std::unordered_map<engine::TextureId,std::weak_ptr<const RgbaImage>> stream_owners;
   std::uint64_t stream_frame{},stream_registrations{};
   Scene3DStatistics stats;std::uint64_t serial{};std::size_t next_view{};bool hdr{},msaa_supported{};SDL_GPUTextureFormat scene_format{};
-  SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};SDL_GPUBuffer* shadow_buffer{};std::size_t vertex_capacity{64},fragment_capacity{64},shadow_capacity{64};
+  SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};SDL_GPUBuffer* shadow_buffer{};SDL_GPUBuffer* spot_shadow_buffer{};std::size_t vertex_capacity{64},fragment_capacity{64},shadow_capacity{64},spot_shadow_capacity{64};
   Storage(SDL_GPUDevice* d,SDL_Renderer* r):device(d),renderer(r){}
-  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);for(auto* p:pipelines_ms4)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(shadow_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,shadow_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);if(shadow_buffer)SDL_ReleaseGPUBuffer(device,shadow_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);if(repeat_sampler)SDL_ReleaseGPUSampler(device,repeat_sampler);if(repeat_aniso_sampler)SDL_ReleaseGPUSampler(device,repeat_aniso_sampler);}
+  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);for(auto* p:pipelines_ms4)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(shadow_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,shadow_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);if(spot_shadow_buffer)SDL_ReleaseGPUBuffer(device,spot_shadow_buffer);if(shadow_buffer)SDL_ReleaseGPUBuffer(device,shadow_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);if(repeat_sampler)SDL_ReleaseGPUSampler(device,repeat_sampler);if(repeat_aniso_sampler)SDL_ReleaseGPUSampler(device,repeat_aniso_sampler);}
   void require_owner()const{if(std::this_thread::get_id()!=owner)throw std::logic_error("3D rendering must run on the window thread.");}
   void initialize(){
     SDL_GPUSamplerCreateInfo sampling{};sampling.min_filter=sampling.mag_filter=SDL_GPU_FILTER_LINEAR;
@@ -143,7 +143,7 @@ struct Scene3DRenderer::Storage {
     const auto release=[&](SDL_GPUShader* value){SDL_ReleaseGPUShader(device,value);};
     msaa_supported=SDL_GPUTextureSupportsSampleCount(device,scene_format,SDL_GPU_SAMPLECOUNT_4)&&
       SDL_GPUTextureSupportsSampleCount(device,SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_SAMPLECOUNT_4);
-    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,1,11,1),release);
+    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,1,12,1),release);
     SDL_GPUVertexBufferDescription buffer{0,sizeof(Vertex3D),SDL_GPU_VERTEXINPUTRATE_VERTEX,0};
     const SDL_GPUVertexAttribute attributes[]{{0,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,position)},{1,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,normal)},{2,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,offsetof(Vertex3D,uv)}};
     for(int index=0;index<4;++index){
@@ -691,39 +691,19 @@ struct Scene3DRenderer::Storage {
     struct alignas(16) ShadowCast{Matrix4 light_mvp;float keep;float pad[3];};
     static_assert(sizeof(ShadowCast)==80,"std430 shadow caster stride");
     std::vector<std::shared_ptr<Geometry>> caster_geometry;std::vector<ShadowCast> shadow_transforms;
-    engine::DrawBatcher shadow_batcher;
-    if(use_shadow){
-      const auto& s=*shadow_settings;const auto& cam=view.scene->camera();
-      shadow_res=s.resolution?std::min<Uint32>(s.resolution,8192)
-          :opt.quality==RenderQuality3D::Ultra?4096u:opt.quality==RenderQuality3D::High?2048u:1024u;
-      const Quaternion& cq=cam.orientation; // unit by Scene3D::create
-      const Vec3 lw=rotate_vec(cq,view.scene->light_direction());
-      const Vec3 fw=rotate_vec(cq,{0,0,-1});
-      const Vec3 uw=rotate_vec(cq,{0,1,0});
-      const double zx=lw.x,zy=lw.y,zz=lw.z; // light-space +Z toward the star
-      double xx=uw.y*zz-uw.z*zy,xy=uw.z*zx-uw.x*zz,xz=uw.x*zy-uw.y*zx;
-      const double xl=std::sqrt(xx*xx+xy*xy+xz*xz);
-      if(xl>1e-12){xx/=xl;xy/=xl;xz/=xl;}else{xx=1;xy=0;xz=0;}
-      const double yx=zy*xz-zz*xy,yy=zz*xx-zx*xz,yz=zx*xy-zy*xx; // z × x
-      const double fx=cam.position.x+static_cast<double>(fw.x)*s.distance,fy=cam.position.y+static_cast<double>(fw.y)*s.distance,fz=cam.position.z+static_cast<double>(fw.z)*s.distance;
-      const double ex=fx+zx*s.depth*.5,ey=fy+zy*s.depth*.5,ez=fz+zz*s.depth*.5;
-      const double extent=s.extent,depth=s.depth;
-      Matrix4 light_rotation{};light_rotation.values={{static_cast<float>(xx),static_cast<float>(yx),static_cast<float>(zx),0,
-        static_cast<float>(xy),static_cast<float>(yy),static_cast<float>(zy),0,
-        static_cast<float>(xz),static_cast<float>(yz),static_cast<float>(zz),0,0,0,0,1}};
-      Matrix4 light_projection{};light_projection.values={{1.f/s.extent,0,0,0,0,1.f/s.extent,0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
-      // world = R_cam·view + cam, so LV·world = R_l·R_cam·view + R_l·(cam-eye).
-      Matrix4 from_view=multiply(light_rotation,rotation_from(cq));
-      const double cx=cam.position.x-ex,cy=cam.position.y-ey,cz=cam.position.z-ez;
-      from_view.values[12]=static_cast<float>(xx*cx+xy*cy+xz*cz);
-      from_view.values[13]=static_cast<float>(yx*cx+yy*cy+yz*cz);
-      from_view.values[14]=static_cast<float>(zx*cx+zy*cy+zz*cz);
-      view_uniform.shadow_from_view=multiply(light_projection,from_view);
-      const float radius_texels=opt.quality==RenderQuality3D::Ultra?1.5f:opt.quality==RenderQuality3D::High?1.f:0.f;
-      view_uniform.shadow_options={1.f/static_cast<float>(shadow_res),radius_texels,s.strength,s.bias};
-      // Casters: transparent blends never occlude; visible_range culls cast
-      // shadows identically to the camera draw; the light-space box test is
-      // the only frustum cut — off-camera casters still write the map.
+    std::vector<std::shared_ptr<Geometry>> spot_geometry;std::vector<ShadowCast> spot_transforms;
+    engine::DrawBatcher shadow_batcher,spot_batcher;
+    const auto& cam=view.scene->camera();
+    // Shared caster collection: emits every non-transparent instance's
+    // light-facing submission (LOD pick, group proxy, range/LOD/group
+    // keep terms identical to the lit pass) into one shadow pass's
+    // transform+geometry lists, then batches and sorts them so
+    // gl_InstanceIndex maps. `in_volume` decides the light-space frustum
+    // cut (ortho box for the key light, cone for a shadowed spot).
+    const auto collect_casters=[&](double ex,double ey,double ez,
+        double xx,double xy,double xz,double yx,double yy,double yz,double zx,double zy,double zz,
+        const Matrix4& light_rotation,const Matrix4& light_projection,const Matrix4& view_to_light,const auto& in_volume,
+        std::vector<std::shared_ptr<Geometry>>& geo,std::vector<ShadowCast>& xf,engine::DrawBatcher& batcher){
       for(const auto& instance:view.scene->instances()){
         if(instance.material.transparent)continue;
         const double radius=static_cast<double>(instance.mesh->bounding_radius())*instance.scale;
@@ -743,16 +723,18 @@ struct Scene3DRenderer::Storage {
         // its proxy scaled to the merged sphere, identity-rotated so a
         // card faces the light like it faces the camera in the lit pass.
         const auto emit_proxy=[&](const GroupBounds&g,float keep){
-          const double lx=from_view.values[0]*g.x+from_view.values[4]*g.y+from_view.values[8]*g.z+from_view.values[12];
-          const double ly=from_view.values[1]*g.x+from_view.values[5]*g.y+from_view.values[9]*g.z+from_view.values[13];
-          const double lz=from_view.values[2]*g.x+from_view.values[6]*g.y+from_view.values[10]*g.z+from_view.values[14];
-          if(std::abs(lx)>extent+g.r||std::abs(ly)>extent+g.r||lz>g.r||lz<-depth-g.r)return;
+          // g is view-space (the merged sphere accumulates model_view
+          // translations) — map it through the pass's view→light transform.
+          const double lx=view_to_light.values[0]*g.x+view_to_light.values[4]*g.y+view_to_light.values[8]*g.z+view_to_light.values[12];
+          const double ly=view_to_light.values[1]*g.x+view_to_light.values[5]*g.y+view_to_light.values[9]*g.z+view_to_light.values[13];
+          const double lz=view_to_light.values[2]*g.x+view_to_light.values[6]*g.y+view_to_light.values[10]*g.z+view_to_light.values[14];
+          if(!in_volume(lx,ly,lz,g.r))return;
           const double ps=g.r/std::max(static_cast<double>(instance.lod_group_proxy->bounding_radius()),1e-9);
           Matrix4 light_model{};
           for(int c=0;c<3;++c)light_model.values[c*4+c]=static_cast<float>(ps);
           light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);light_model.values[15]=1.f;
-          caster_geometry.push_back(geometry(instance.lod_group_proxy));
-          shadow_transforms.push_back({multiply(light_projection,light_model),keep});
+          geo.push_back(geometry(instance.lod_group_proxy));
+          xf.push_back({multiply(light_projection,light_model),keep});
         };
         if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->collapse){
           const GroupBounds&g=*git->second;
@@ -783,7 +765,7 @@ struct Scene3DRenderer::Storage {
         }
         const double dx=instance.position.x-ex,dy=instance.position.y-ey,dz=instance.position.z-ez;
         const double lx=xx*dx+xy*dy+xz*dz,ly=yx*dx+yy*dy+yz*dz,lz=zx*dx+zy*dy+zz*dz;
-        if(std::abs(lx)>extent+radius||std::abs(ly)>extent+radius||lz>radius||lz<-depth-radius)continue;
+        if(!in_volume(lx,ly,lz,radius))continue;
         // A billboard caster faces the light the way it faces the camera
         // in the lit pass — the identity-rotation collapse the group
         // proxy uses; authored rotation would make a card edge-on.
@@ -797,8 +779,8 @@ struct Scene3DRenderer::Storage {
             light_model=multiply(light_rotation,model);
           }
           light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);light_model.values[15]=1.f;
-          caster_geometry.push_back(geometry(mesh));
-          shadow_transforms.push_back({multiply(light_projection,light_model),keep});
+          geo.push_back(geometry(mesh));
+          xf.push_back({multiply(light_projection,light_model),keep});
         };
         const bool fading=lod_share>0.f&&lvl<instance.lod_meshes.size()&&range_keep>=1.f;
         emit_caster(caster_mesh,(fading?1.f-lod_share:range_keep)*group_keep);
@@ -806,24 +788,124 @@ struct Scene3DRenderer::Storage {
       }
       // Same instancing convention as the scene pass: batch by mesh, then
       // reorder transforms/geometry to sorted order so gl_InstanceIndex maps.
-      shadow_batcher.begin_frame();
-      std::map<const Mesh3D*,std::uint32_t> shadow_mesh_ids;
-      for(std::size_t i=0;i<caster_geometry.size();++i){
-        const auto mesh_id=shadow_mesh_ids.try_emplace(caster_geometry[i]->owner.get(),static_cast<std::uint32_t>(shadow_mesh_ids.size())).first->second;
+      batcher.begin_frame();
+      std::map<const Mesh3D*,std::uint32_t> mesh_ids;
+      for(std::size_t i=0;i<geo.size();++i){
+        const auto mesh_id=mesh_ids.try_emplace(geo[i]->owner.get(),static_cast<std::uint32_t>(mesh_ids.size())).first->second;
         engine::DrawItem item{};item.mesh_id=mesh_id;item.material_id=mesh_id;item.instance_index=static_cast<std::uint32_t>(i);
-        shadow_batcher.submit(item);
+        batcher.submit(item);
       }
-      shadow_batcher.build();
+      batcher.build();
       {
-        const auto& shadow_sorted=shadow_batcher.sorted_items();
-        std::vector<ShadowCast> ordered(shadow_sorted.size());
-        std::vector<std::shared_ptr<Geometry>> ordered_geometry(shadow_sorted.size());
-        for(std::size_t slot=0;slot<shadow_sorted.size();++slot){
-          ordered[slot]=shadow_transforms[shadow_sorted[slot].instance_index];
-          ordered_geometry[slot]=std::move(caster_geometry[shadow_sorted[slot].instance_index]);
+        const auto& sorted_items=batcher.sorted_items();
+        std::vector<ShadowCast> ordered(sorted_items.size());
+        std::vector<std::shared_ptr<Geometry>> ordered_geometry(sorted_items.size());
+        for(std::size_t slot=0;slot<sorted_items.size();++slot){
+          ordered[slot]=xf[sorted_items[slot].instance_index];
+          ordered_geometry[slot]=std::move(geo[sorted_items[slot].instance_index]);
         }
-        shadow_transforms=std::move(ordered);caster_geometry=std::move(ordered_geometry);
-        stats.shadow_casters+=shadow_transforms.size();
+        xf=std::move(ordered);geo=std::move(ordered_geometry);
+        stats.shadow_casters+=xf.size();
+      }
+    };
+    if(use_shadow){
+      const auto& s=*shadow_settings;
+      shadow_res=s.resolution?std::min<Uint32>(s.resolution,8192)
+          :opt.quality==RenderQuality3D::Ultra?4096u:opt.quality==RenderQuality3D::High?2048u:1024u;
+      const Quaternion& cq=cam.orientation; // unit by Scene3D::create
+      const Vec3 lw=rotate_vec(cq,view.scene->light_direction());
+      const Vec3 fw=rotate_vec(cq,{0,0,-1});
+      const Vec3 uw=rotate_vec(cq,{0,1,0});
+      const double zx=lw.x,zy=lw.y,zz=lw.z; // light-space +Z toward the star
+      double xx=uw.y*zz-uw.z*zy,xy=uw.z*zx-uw.x*zz,xz=uw.x*zy-uw.y*zx;
+      const double xl=std::sqrt(xx*xx+xy*xy+xz*xz);
+      if(xl>1e-12){xx/=xl;xy/=xl;xz/=xl;}else{xx=1;xy=0;xz=0;}
+      const double yx=zy*xz-zz*xy,yy=zz*xx-zx*xz,yz=zx*xy-zy*xx; // z × x
+      const double fx=cam.position.x+static_cast<double>(fw.x)*s.distance,fy=cam.position.y+static_cast<double>(fw.y)*s.distance,fz=cam.position.z+static_cast<double>(fw.z)*s.distance;
+      const double ex=fx+zx*s.depth*.5,ey=fy+zy*s.depth*.5,ez=fz+zz*s.depth*.5;
+      const double extent=s.extent,depth=s.depth;
+      Matrix4 light_rotation{};light_rotation.values={{static_cast<float>(xx),static_cast<float>(yx),static_cast<float>(zx),0,
+        static_cast<float>(xy),static_cast<float>(yy),static_cast<float>(zy),0,
+        static_cast<float>(xz),static_cast<float>(yz),static_cast<float>(zz),0,0,0,0,1}};
+      Matrix4 light_projection{};light_projection.values={{1.f/s.extent,0,0,0,0,1.f/s.extent,0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
+      // world = R_cam·view + cam, so LV·world = R_l·R_cam·view + R_l·(cam-eye).
+      Matrix4 from_view=multiply(light_rotation,rotation_from(cq));
+      const double cx=cam.position.x-ex,cy=cam.position.y-ey,cz=cam.position.z-ez;
+      from_view.values[12]=static_cast<float>(xx*cx+xy*cy+xz*cz);
+      from_view.values[13]=static_cast<float>(yx*cx+yy*cy+yz*cz);
+      from_view.values[14]=static_cast<float>(zx*cx+zy*cy+zz*cz);
+      view_uniform.shadow_from_view=multiply(light_projection,from_view);
+      const float radius_texels=opt.quality==RenderQuality3D::Ultra?1.5f:opt.quality==RenderQuality3D::High?1.f:0.f;
+      view_uniform.shadow_options={1.f/static_cast<float>(shadow_res),radius_texels,s.strength,s.bias};
+      // Casters: transparent blends never occlude; visible_range culls cast
+      // shadows identically to the camera draw; the light-space box test is
+      // the only frustum cut — off-camera casters still write the map.
+      const auto box_volume=[&](double lx,double ly,double lz,double r){
+        return std::abs(lx)<=extent+r&&std::abs(ly)<=extent+r&&lz<=r&&lz>=-depth-r;};
+      collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,light_projection,from_view,box_volume,
+          caster_geometry,shadow_transforms,shadow_batcher);
+    }
+    // Shadowed spot light: at most one per scene (Scene3D::create rejects
+    // a second). The caster pass renders through the same depth pipeline
+    // with a perspective cone frustum centred on the spot direction —
+    // receivers outside the outer cone get zero radiance anyway, so the
+    // map's fov clamps at ~150 degrees without losing coverage.
+    int spot_index=-1;
+    for(std::size_t i=0;i<view.scene->point_lights().size();++i)
+      if(view.scene->point_lights()[i].casts_shadow){spot_index=static_cast<int>(i);break;}
+    Uint32 spot_res=0;
+    if(spot_index>=0&&shadow_supported&&!low_tier){
+      const auto& l=view.scene->point_lights()[spot_index];
+      if(l.intensity>0.f){
+        spot_res=opt.quality==RenderQuality3D::Ultra?2048u:opt.quality==RenderQuality3D::High?1024u:512u;
+        const double dl=std::sqrt(l.spot_direction.x*l.spot_direction.x+l.spot_direction.y*l.spot_direction.y+l.spot_direction.z*l.spot_direction.z);
+        const double zx=l.spot_direction.x/dl,zy=l.spot_direction.y/dl,zz=l.spot_direction.z/dl;
+        // Cone rolls are arbitrary — pick any stable orthonormal frame.
+        double ax=0.0,ay=1.0,az=0.0;
+        if(std::abs(zy)>.9){ax=1.0;ay=0.0;}
+        double xx=ay*zz-az*zy,xy=az*zx-ax*zz,xz=ax*zy-ay*zx;
+        const double xl=std::sqrt(xx*xx+xy*xy+xz*xz);xx/=xl;xy/=xl;xz/=xl;
+        const double yx=zy*xz-zz*xy,yy=zz*xx-zx*xz,yz=zx*xy-zy*xx; // z × x
+        const double ex=l.position.x,ey=l.position.y,ez=l.position.z;
+        const double far=l.range>0.f?static_cast<double>(l.range):4096.0;
+        const double near=std::max(0.01,far*0.0005);
+        // Cull volumes cover the clamped map fov, not the authored cone —
+        // the outer band is dark to receivers anyway (window==0 there).
+        // Spot space looks down +Z (the cone direction), so casters sit
+        // at positive lz between near and far.
+        const double cos_o=std::max(std::min(static_cast<double>(l.spot_outer),1.0),std::cos(150.0*0.017453292519943295));
+        const double tan_o=std::sqrt(1.0-cos_o*cos_o)/cos_o;
+        const auto cone_volume=[&](double lx,double ly,double lz,double r){
+          if(lz<-r||lz>far+r)return false;
+          return std::sqrt(lx*lx+ly*ly)<=lz*tan_o+r/std::max(cos_o,.05);};
+        Matrix4 light_rotation{};light_rotation.values={{static_cast<float>(xx),static_cast<float>(yx),static_cast<float>(zx),0,
+          static_cast<float>(xy),static_cast<float>(yy),static_cast<float>(zy),0,
+          static_cast<float>(xz),static_cast<float>(yz),static_cast<float>(zz),0,0,0,0,1}};
+        // Perspective projection looking down +Z, NDC depth [0,1]:
+        // f = cot(fov/2) with the half-angle capped at 75 degrees.
+        const double focal=1.0/tan_o;
+        const double pn=far/(far-near),pq=-near*far/(far-near);
+        Matrix4 light_projection{};light_projection.values={{static_cast<float>(focal),0,0,0,
+          0,static_cast<float>(focal),0,0,
+          0,0,static_cast<float>(pn),1.f,
+          0,0,static_cast<float>(pq),0}};
+        // view→spot-clip for receivers: same R_l·R_cam + R_l·(cam-eye)
+        // pattern the directional map uses.
+        const Quaternion& cq=cam.orientation;
+        Matrix4 from_view=multiply(light_rotation,rotation_from(cq));
+        const double cx=cam.position.x-ex,cy=cam.position.y-ey,cz=cam.position.z-ez;
+        from_view.values[12]=static_cast<float>(xx*cx+xy*cy+xz*cz);
+        from_view.values[13]=static_cast<float>(yx*cx+yy*cy+yz*cz);
+        from_view.values[14]=static_cast<float>(zx*cx+zy*cy+zz*cz);
+        view_uniform.spot_from_view=multiply(light_projection,from_view);
+        const float radius_texels=opt.quality==RenderQuality3D::Ultra?1.5f:opt.quality==RenderQuality3D::High?1.f:0.f;
+        // Perspective depth compresses distant differences, so the bias
+        // stays texel-scaled — the rasterizer's slope bias covers the
+        // geometric term already.
+        view_uniform.spot_options={1.f/static_cast<float>(spot_res),radius_texels,
+            static_cast<float>(spot_index),1.5f/static_cast<float>(spot_res)};
+        collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,light_projection,from_view,cone_volume,
+            spot_geometry,spot_transforms,spot_batcher);
       }
     }
     // Pass scheduling goes through the engine RenderGraph: resources and
@@ -835,14 +917,20 @@ struct Scene3DRenderer::Storage {
     const auto color_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"color",res_w,res_h,"rgba8",true});
     const auto depth_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"depth",res_w,res_h,"d32",true});
     const auto shadow_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"shadow-depth",shadow_res,shadow_res,"d32",true});
+    const auto spot_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"spot-shadow-depth",spot_res,spot_res,"d32",true});
     graph.add_pass({"shadow",{},{shadow_target},{},"shadow",use_shadow});
-    graph.add_pass({"scene3d",{use_shadow?std::vector<engine::ResourceId>{shadow_target}:std::vector<engine::ResourceId>{}},{target.hdr?hdr_target:color_target,depth_target},{},"scene3d"});
+    graph.add_pass({"spot-shadow",{},{spot_target},{},"spot-shadow",spot_res>0});
+    std::vector<engine::ResourceId> scene_inputs;
+    if(use_shadow)scene_inputs.push_back(shadow_target);
+    if(spot_res>0)scene_inputs.push_back(spot_target);
+    graph.add_pass({"scene3d",scene_inputs,{target.hdr?hdr_target:color_target,depth_target},{},"scene3d"});
     graph.add_pass({"tonemap",{hdr_target},{color_target},{},"tonemap",target.hdr!=nullptr});
     std::vector<std::string> order;std::vector<engine::RenderGraphDiagnostic> diagnostics;
     if(!graph.compile(&order,&diagnostics))throw std::runtime_error("3D render graph compile failed: "+(diagnostics.empty()?std::string("unknown"):diagnostics.front().message));
     Command command(device);
     const auto shadow_bytes=static_cast<Uint32>(shadow_transforms.size()*sizeof(ShadowCast));
-    if(!sorted.empty()||shadow_bytes){
+    const auto spot_bytes=static_cast<Uint32>(spot_transforms.size()*sizeof(ShadowCast));
+    if(!sorted.empty()||shadow_bytes||spot_bytes){
       const auto vertex_bytes=static_cast<Uint32>(vertex_data.size()*sizeof(VertexUniform)),fragment_bytes=static_cast<Uint32>(fragment_data.size()*sizeof(FragmentUniform));
       if(!vertex_buffer||!fragment_buffer||vertex_capacity<vertex_data.size()||fragment_capacity<fragment_data.size()){
         if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);
@@ -859,16 +947,24 @@ struct Scene3DRenderer::Storage {
         SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(shadow_capacity*sizeof(ShadowCast));
         shadow_buffer=SDL_CreateGPUBuffer(device,&info);if(!shadow_buffer)throw gpu_error("3D shadow transform buffer creation failed");
       }
-      Transfer transfer(device,vertex_bytes+fragment_bytes+shadow_bytes);auto* memory=static_cast<std::byte*>(transfer.map());
+      if(spot_bytes&&(!spot_shadow_buffer||spot_shadow_capacity<spot_transforms.size())){
+        if(spot_shadow_buffer)SDL_ReleaseGPUBuffer(device,spot_shadow_buffer);
+        spot_shadow_capacity=std::max<std::size_t>(spot_transforms.size(),spot_shadow_capacity*2);
+        SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(spot_shadow_capacity*sizeof(ShadowCast));
+        spot_shadow_buffer=SDL_CreateGPUBuffer(device,&info);if(!spot_shadow_buffer)throw gpu_error("3D spot shadow transform buffer creation failed");
+      }
+      Transfer transfer(device,vertex_bytes+fragment_bytes+shadow_bytes+spot_bytes);auto* memory=static_cast<std::byte*>(transfer.map());
       if(vertex_bytes)std::memcpy(memory,vertex_data.data(),vertex_bytes);
       if(fragment_bytes)std::memcpy(memory+vertex_bytes,fragment_data.data(),fragment_bytes);
       if(shadow_bytes)std::memcpy(memory+vertex_bytes+fragment_bytes,shadow_transforms.data(),shadow_bytes);
+      if(spot_bytes)std::memcpy(memory+vertex_bytes+fragment_bytes+shadow_bytes,spot_transforms.data(),spot_bytes);
       SDL_UnmapGPUTransferBuffer(device,transfer.value);
       auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D instance upload copy pass failed");
       SDL_GPUTransferBufferLocation from{transfer.value,0};
       if(vertex_bytes){SDL_GPUBufferRegion to{vertex_buffer,0,vertex_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);}
       if(fragment_bytes){from.offset=vertex_bytes;SDL_GPUBufferRegion to{fragment_buffer,0,fragment_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);}
       if(shadow_bytes){from.offset=vertex_bytes+fragment_bytes;SDL_GPUBufferRegion to{shadow_buffer,0,shadow_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);}
+      if(spot_bytes){from.offset=vertex_bytes+fragment_bytes+shadow_bytes;SDL_GPUBufferRegion to{spot_shadow_buffer,0,spot_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);}
       SDL_EndGPUCopyPass(copy);
     }
     // Resolve per-view quality policy once: Low keeps the tonemap-only path,
@@ -907,6 +1003,25 @@ struct Scene3DRenderer::Storage {
           }
         }
         SDL_EndGPURenderPass(pass);
+      }else if(name=="spot-shadow"){
+        if(target.spot_shadow_size!=static_cast<int>(spot_res)){
+          if(target.spot_shadow)SDL_ReleaseGPUTexture(device,target.spot_shadow);
+          target.spot_shadow=make_texture(device,static_cast<int>(spot_res),static_cast<int>(spot_res),SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
+          target.spot_shadow_size=static_cast<int>(spot_res);
+        }
+        SDL_GPUDepthStencilTargetInfo map{};map.texture=target.spot_shadow;map.clear_depth=1;map.load_op=SDL_GPU_LOADOP_CLEAR;map.store_op=SDL_GPU_STOREOP_STORE;map.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;map.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
+        auto* pass=SDL_BeginGPURenderPass(command.value,nullptr,0,&map);if(!pass)throw gpu_error("3D spot shadow pass failed");
+        if(!spot_transforms.empty()){
+          SDL_BindGPUGraphicsPipeline(pass,shadow_pipeline);
+          SDL_BindGPUVertexStorageBuffers(pass,0,&spot_shadow_buffer,1);
+          for(const auto& batch:spot_batcher.batches()){
+            const auto& geo=*spot_geometry[batch.first_item];
+            const SDL_GPUBufferBinding vertices{geo.vertices,0},indices{geo.indices,0};
+            SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
+            SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(geo.owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
+          }
+        }
+        SDL_EndGPURenderPass(pass);
       }else if(name=="scene3d"){
         SDL_GPUColorTargetInfo color{};
         color.texture=use_msaa?target.msaa_color:(target.hdr?target.hdr:target.color);
@@ -934,8 +1049,9 @@ struct Scene3DRenderer::Storage {
               {draw.normal->texture,environment_sampler},{draw.properties->texture,environment_sampler},
               {draw.cloud->texture,environment_sampler},{draw.shadow->texture,sampler},{draw.next->texture,sampler},
               {draw.emissive->texture,tiled?repeat_sampler:sampler},{draw.mr->texture,tiled?repeat_sampler:sampler},
-              {use_shadow?target.shadow:texture(white)->texture,sampler}};
-            SDL_BindGPUFragmentSamplers(pass,0,sampled,11);
+              {use_shadow?target.shadow:texture(white)->texture,sampler},
+              {spot_res>0?target.spot_shadow:texture(white)->texture,sampler}};
+            SDL_BindGPUFragmentSamplers(pass,0,sampled,12);
             SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(draw.mesh->owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
           }
         }

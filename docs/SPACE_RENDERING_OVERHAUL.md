@@ -75,14 +75,17 @@ same document headless-tested.
 2. **Lighting** — landed: key + up to two fill/rim directionals and ≤4
    windowed point lights per scene (`lights[]`, `pointLights`), each
    optionally gated to a smooth spot cone (`spotDir`/`spotInner`/
-   `spotOuter` on the entry — zero direction stays omni). Spot shadows
-   remain unsupported.
+   `spotOuter` on the entry — zero direction stays omni). One spot per
+   scene can also cast (`castShadow`) through its own cone-frustum
+   depth map.
 3. **Shadows** — landed: key-light directional shadow map (authored
    ortho volume centred ahead of the camera, depth pass + 8-tap PCF,
    tier-scaled resolution, Low skips; casters share the lit pass's
    screen-space LOD pick and collapsed groups cast one light-facing
-   proxy). Remaining: no CSM splits for
-   extreme zoom ranges, point lights stay unshadowed; analytic
+   proxy) plus one shadowed spot light (`casts_shadow` on a coned
+   `PointLight3D`, cone frustum to `range`, same caster policy).
+   Remaining: no CSM splits for
+   extreme zoom ranges, omni point lights stay unshadowed; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an
    equirect map on any PBR material and `pbr_values.w` scales diffuse
@@ -235,10 +238,11 @@ documented per-frame but accumulated. See
 
 ## Explicitly deferred / blockers
 
-- Cascaded shadow maps (CSM splits for extreme zoom ranges) and
+- Cascaded shadow maps (CSM splits for extreme zoom ranges) and omni
   point-light shadows: the single `ShadowMap3D` ortho volume covers
-  authored mid-zoom strategy scenes; analytic blockers still cover
-  planet↔ring. Documented limitation.
+  authored mid-zoom strategy scenes and one `casts_shadow` spot cone
+  carries a depth map; omni point lights and analytic blockers still
+  cover point sources and planet↔ring. Documented limitation.
 - Indirect draws / GPU culling: SDL_GPU does not yet expose
   `SDL_DrawGPUIndexedPrimitivesIndirect` paths here; CPU record build is
   the known bound. Not a blocker at strategy scale (4096 cap).

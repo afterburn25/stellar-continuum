@@ -531,6 +531,7 @@ std::string Scene3dDocument::to_json() const {
         li["spotInner"] = l.spot_inner;
         li["spotOuter"] = l.spot_outer;
       }
+      if (l.cast_shadow) li["castShadow"] = true;
       ls.push_back(std::move(li));
     }
   }
@@ -867,6 +868,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
                          l.spot_inner > 1.f || l.spot_outer < 0.f ||
                          l.spot_outer >= 1.f)))
           return fail("spot cones need 0<=spotOuter<spotInner<=1 cosines");
+        l.cast_shadow = li.value("castShadow", false);
+        if (l.cast_shadow && sd2 == 0)
+          return fail("castShadow requires a nonzero spotDir");
         scene.point_lights.push_back(l);
       }
     }

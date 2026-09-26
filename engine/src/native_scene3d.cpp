@@ -235,13 +235,19 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
        l.color.x>4||l.color.y>4||l.color.z>4||!bounded(l.intensity,1e4)||l.intensity<0||
        !bounded(l.range,1e6)||l.range<0)
       throw std::invalid_argument("3D point light requires a bounded position, color, intensity and range.");
+  std::size_t shadowed_spots=0;
   for(const auto& l:point_lights){
     const double d2=l.spot_direction.x*l.spot_direction.x+l.spot_direction.y*l.spot_direction.y+l.spot_direction.z*l.spot_direction.z;
     if(!std::isfinite(d2)||!std::isfinite(l.spot_inner)||!std::isfinite(l.spot_outer)||
        (d2>0&&(l.spot_inner<=l.spot_outer||l.spot_inner<=0||l.spot_inner>1||
                l.spot_outer<0||l.spot_outer>=1)))
       throw std::invalid_argument("3D spot light requires a finite direction and 0<=outer<inner<=1 cosines.");
+    if(l.casts_shadow){
+      if(d2==0)throw std::invalid_argument("3D omni point light cannot cast a shadow map - spot direction required.");
+      ++shadowed_spots;
+    }
   }
+  if(shadowed_spots>1)throw std::invalid_argument("3D scene allows at most one shadowed spot light.");
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
   std::size_t geometry=0,images=0;
   for(auto& i:instances){
