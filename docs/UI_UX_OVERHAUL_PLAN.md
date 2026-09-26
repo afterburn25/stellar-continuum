@@ -323,6 +323,12 @@ breaks navigation/AT flow, or presents wrong state)
   compatibility bugfix where the stream decoder borrows the SDL-initialized
   STA apartment instead of throwing `RPC_E_CHANGED_MODE`. No new engine
   capability or API surface; flagged in the PR body for merge review.
+- Developed-campaign verification fixture: `stellar_native_fresh_progression_tests
+  <research-dir> <catalog> --profile-save <abs-path>` (seed 115501 recipe)
+  produces a real paid 24-fleet / 3-owned-colony campaign (day 10154) with no
+  grafted state — used to re-verify fleet outliner grouping, the supply
+  workspace's shortfall rows, economy KPIs, and the roster/planetary surfaces
+  at 720p and 1080p. Output save is local tooling only, not committed.
 
 - Legend toggle state is client-local (`map_legend_collapsed_`); it is not
   persisted. `smoke_map_point_exposed` now excludes the legend bounds.
