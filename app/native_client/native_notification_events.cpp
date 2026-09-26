@@ -73,10 +73,9 @@ void seed_chronicle_notifications(NativeNotificationFeed& feed,
   // Report floor: the category vocabulary assigns high-volume trivia
   // (war.damage_applied 0.1, signature/system detections <=0.3,
   // survey_started 0.2) below it — the feed is for reports, not noise.
-  constexpr double report_significance=0.35;
   const auto events=history.feed(
       static_cast<std::uint64_t>(observer_civilization_id),
-      -std::numeric_limits<double>::infinity(),report_significance);
+      -std::numeric_limits<double>::infinity(),chronicle_seed_min_significance);
   const auto begin=events.size()>max_entries?events.end()-max_entries
                                            :events.begin();
   const auto observer=static_cast<std::uint64_t>(observer_civilization_id);

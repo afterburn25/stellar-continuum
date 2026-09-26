@@ -29,7 +29,9 @@ on the anchored marker selects the transiting vessel unambiguously.
 """
 
 import argparse
+import glob
 import json
+import os
 
 _OTHER_SYSTEM_POSITION = (-154.1, 166.9)  # fleet fixture's system 11
 
@@ -114,6 +116,13 @@ def main() -> None:
         entry["Progress"] = 1.0
 
     json.dump(doc, open(args.dst, "w", encoding="utf-8"))
+    # Hand-authored output is not engine-written: drop stale save sidecars
+    # (.integrity FNV-1a64 checksum + rolling .bak history) or the loader
+    # treats the fixture as corrupt and silently recovers the previous
+    # autosave instead of the authored state.
+    for sidecar in glob.glob(args.dst + ".bak*") + glob.glob(
+            args.dst + ".integrity*"):
+        os.remove(sidecar)
     print(f"authored {args.dst}: fleet {args.fleet_id} idle, "
           f"system {args.system_id} fully surveyed")
 

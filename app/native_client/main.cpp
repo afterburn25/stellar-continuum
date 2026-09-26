@@ -3766,11 +3766,34 @@ class NativeCampaign final {
     diplomacy_smoke_select(smoke_diplomacy_other_,width,height);
     const auto items=notifications_.items().size();
     const auto unread_before=notifications_.unread_count(notification_view_.last_read());
-    if(items!=(reload?0u:2u)||unread_before!=(reload?0:2)){
+    // On reload the feed is re-seeded from the persisted chronicle
+    // (EventHistory survives save/load; the feed does not). The contract is
+    // an exact 1:1 projection — every retained report replayed once, none
+    // duplicated or lost — capped by the seed's entry limit.
+    std::size_t expected_items=2;
+    if(reload){
+      const auto& runtime=session_->frame().runtime();
+      const auto seeded=runtime.history().feed(
+          static_cast<std::uint64_t>(runtime.world().campaign().player_civilization_id),
+          -std::numeric_limits<double>::infinity(),
+          stellar::native_notifications::chronicle_seed_min_significance);
+      expected_items=std::min<std::size_t>(seeded.size(),
+          stellar::native_notifications::chronicle_seed_max_entries);
+    }
+    const std::size_t expected_unread=reload?expected_items:2;
+    if(items!=expected_items||unread_before!=expected_unread){
       std::string detail="Notifications replayed retained history or lost new agreement reports. items="+
-          std::to_string(items)+" unread="+std::to_string(unread_before)+" [";
+          std::to_string(items)+" unread="+std::to_string(unread_before)+" expected="+
+          std::to_string(expected_items)+" [";
       for(const auto&item:notifications_.items())detail+=item.category+":"+item.date+":"+item.message+";";
       throw std::runtime_error(detail+"]");}
+    if(reload){
+      std::unordered_set<std::string> distinct;
+      for(const auto&item:notifications_.items())
+        distinct.insert(item.category+"\x1f"+item.date+"\x1f"+item.message);
+      if(distinct.size()!=items)
+        throw std::runtime_error("Reloaded notifications contain duplicated reports.");
+    }
     diplomacy_smoke_click(center(main_layout.notifications),width,height);
     const bool opened=notification_view_.visible();
     const auto unread_after=notifications_.unread_count(notification_view_.last_read());

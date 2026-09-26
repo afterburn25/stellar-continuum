@@ -338,6 +338,20 @@ breaks navigation/AT flow, or presents wrong state)
   grafted state — used to re-verify fleet outliner grouping, the supply
   workspace's shortfall rows, economy KPIs, and the roster/planetary surfaces
   at 720p and 1080p. Output save is local tooling only, not committed.
+- Notification reload contract corrected: the feed is transient while
+  `EventHistory` persists, so `seed_chronicle_notifications` intentionally
+  reseeds the panel on load — the old `items==0` reload expectation
+  predated seeding. `notification_smoke` now expects an exact 1:1 projection
+  of observer-visible retained events (shared `chronicle_seed_min_significance`
+  / `chronicle_seed_max_entries` constants), all unread, no duplicates.
+  Diplomacy fresh (2 new reports) and paused reload (6 seeded) both pass.
+- Hand-authored save fixtures must not keep engine sidecars: a stale
+  `.integrity` checksum or `.bak` makes the loader treat the edited JSON as
+  corrupt and silently recover the backup. `tools/author_battle_save.py` and
+  `tools/author_settlement_save.py` now delete `.bak*`/`.integrity*` siblings
+  after writing; `author_battle_save.py --no-encounter` produces the
+  armed-fleet variant the military-order smoke needs (engaged fleets are
+  managed through the battle view, not the outliner row).
 
 - Legend toggle state is client-local (`map_legend_collapsed_`); it is not
   persisted. `smoke_map_point_exposed` now excludes the legend bounds.

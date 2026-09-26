@@ -1,4 +1,4 @@
-import json, copy, sys
+import json, copy, sys, os, glob
 
 d = json.load(open('native-tests/fixtures/player-campaign-json.json'))
 row = [r for r in d['Rows'] if r.get('Name') == 'valid-current17'][0]
@@ -34,9 +34,14 @@ gal['Fleets'].append(picket)
 # The battle-art binder only draws the human patrol_corvette hull; fleet 0
 # becomes the replay's owned corvette so exactly one sprite is bound. The
 # design's role is Military, so the fleet role must match (reference
-# validation rejects role-incompatible designs).
+# validation rejects role-incompatible designs) — and its combat profile
+# must match too, or readiness reports the armed design as unarmed.
 gal['Fleets'][0]['DesignId'] = 'patrol_corvette'
 gal['Fleets'][0]['Role'] = 3
+gal['Fleets'][0]['Combat']['ProfileId'] = 'patrol_corvette_mk1'
+gal['Fleets'][0]['Combat']['Shields'] = 35.0
+gal['Fleets'][0]['Combat']['Armor'] = 45.0
+gal['Fleets'][0]['Combat']['Hull'] = 95.0
 
 pt = lambda x, y: {"X": x, "Y": y, "Vector": {}, "IsFinite": True}
 loadout = {"MassPerShip": 100, "Acceleration": 18, "MaximumSpeed": 120,
@@ -87,7 +92,13 @@ def formation(fid, civ, fleet_id, tf_id, name, x, y, hx, hy, shape,
             "HullDamageRemainder": 0.0, "Loadout": copy.deepcopy(loadout),
             "Cohorts": [], "ImportantVessels": vessels}
 
-gal['ActiveCombatEncounter'] = {
+if '--no-encounter' in sys.argv:
+    # Armed-fleet-only mode: the military-order smoke wants an owned armed
+    # fleet that is NOT mid-engagement (engaged fleets are managed through
+    # the battle view, not the ordinary outliner row).
+    gal.pop('ActiveCombatEncounter', None)
+else:
+    gal['ActiveCombatEncounter'] = {
     "SystemId": 0, "StartedDay": src['SimulationDays'],
     "Battle": {
         "BattleId": "0a0b0c0d-0000-4011-8000-1234567890ab",
@@ -121,6 +132,11 @@ gal['ActiveCombatEncounter'] = {
     "EngagedFormationPairs": [{"FirstFormationId": 1, "SecondFormationId": 2}],
     "LastObservedEventSequence": 0, "Reconciled": False}
 
-out = sys.argv[1]
+out = next(a for a in sys.argv[1:] if not a.startswith('--'))
 json.dump(src, open(out, 'w'), ensure_ascii=False)
+# Hand-authored output is not engine-written: drop stale save sidecars
+# (.integrity FNV-1a64 checksum + rolling .bak history) or the loader treats
+# the fixture as corrupt and silently recovers the previous autosave instead.
+for sidecar in glob.glob(out + '.bak*') + glob.glob(out + '.integrity*'):
+    os.remove(sidecar)
 print('authored', out)
