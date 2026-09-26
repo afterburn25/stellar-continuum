@@ -174,6 +174,18 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   adds one shadow submission — banded group members keep their own
   casters while the representative adds the proxy's complementary
   share).
+- **Consumers:** `Scene3dDocument` entities, `MeshLods` components and
+  the editor Scene3D tool are the intended drivers. The game client's
+  chart views (`native_small_body_renderer`, `native_battle_sprites`,
+  `native_system_workspace`, `native_stellar_eruptions`) deliberately
+  do not populate these fields: they all run top-down orthographic
+  cameras where `visible_range` can't express zoom culling (the camera
+  distance is fixed — `orthographic_height` carries the zoom), and
+  each already clip-culls instances against the viewport with
+  `view.scale`-driven size thresholds of its own; no alternate LOD or
+  proxy mesh content exists in shipped game assets. `visible_fade`/
+  `lod_*` remain perspective-scene features — the native globe view is
+  a single-instance closeup where they are inapplicable.
 
 ## Scene3D surface detail — cloud decks and terminator wrap (2026-09-25)
 
