@@ -872,7 +872,7 @@ struct Scene3DRenderer::Storage {
       from_view.values[13]=static_cast<float>(yx*cx+yy*cy+yz*cz);
       from_view.values[14]=static_cast<float>(zx*cx+zy*cy+zz*cz);
       view_uniform.shadow_from_view=multiply(light_projection,from_view);
-      const float radius_texels=opt.quality==RenderQuality3D::Ultra?1.5f:opt.quality==RenderQuality3D::High?1.f:0.f;
+      const float radius_texels=(opt.quality==RenderQuality3D::Ultra?1.5f:opt.quality==RenderQuality3D::High?1.f:0.f)*s.softness;
       view_uniform.shadow_options={1.f/static_cast<float>(shadow_res),radius_texels,s.strength,s.bias};
       // Casters: transparent blends never occlude; visible_range culls cast
       // shadows identically to the camera draw; the light-space box test is
@@ -949,7 +949,7 @@ struct Scene3DRenderer::Storage {
         from_view.values[13]=static_cast<float>(yx*cx+yy*cy+yz*cz);
         from_view.values[14]=static_cast<float>(zx*cx+zy*cy+zz*cz);
         view_uniform.spot_from_view=multiply(light_projection,from_view);
-        const float radius_texels=opt.quality==RenderQuality3D::Ultra?1.5f:opt.quality==RenderQuality3D::High?1.f:0.f;
+        const float radius_texels=(opt.quality==RenderQuality3D::Ultra?1.5f:opt.quality==RenderQuality3D::High?1.f:0.f)*l.shadow_softness;
         // Perspective depth compresses distant differences, so the bias
         // stays texel-scaled — the rasterizer's slope bias covers the
         // geometric term already.

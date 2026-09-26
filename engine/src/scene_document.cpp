@@ -533,6 +533,7 @@ std::string Scene3dDocument::to_json() const {
       }
       if (l.cast_shadow) li["castShadow"] = true;
       if (l.shadow_strength < 1.f) li["shadowStrength"] = l.shadow_strength;
+      if (l.shadow_softness != 1.f) li["shadowSoftness"] = l.shadow_softness;
       ls.push_back(std::move(li));
     }
   }
@@ -556,6 +557,7 @@ std::string Scene3dDocument::to_json() const {
                                {"bias", shadow_bias},
                                {"resolution", shadow_resolution}};
     if (shadow_cascade > 0.f) doc["render"]["shadow"]["cascade"] = shadow_cascade;
+    if (shadow_softness != 1.f) doc["render"]["shadow"]["softness"] = shadow_softness;
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
@@ -880,6 +882,10 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         if (!std::isfinite(l.shadow_strength) || l.shadow_strength < 0.f ||
             l.shadow_strength > 1.f)
           return fail("shadowStrength must be in [0,1]");
+        l.shadow_softness = li.value("shadowSoftness", 1.f);
+        if (!std::isfinite(l.shadow_softness) || l.shadow_softness < 0.f ||
+            l.shadow_softness > 8.f)
+          return fail("shadowSoftness must be in [0,8]");
         scene.point_lights.push_back(l);
       }
     }
@@ -916,10 +922,12 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         scene.shadow_bias = s.value("bias", 0.0005f);
         scene.shadow_resolution = s.value("resolution", 0u);
         scene.shadow_cascade = s.value("cascade", 0.0f);
+        scene.shadow_softness = s.value("softness", 1.0f);
         if (scene.shadow_extent < 0.f || scene.shadow_distance < 0.f ||
             scene.shadow_depth <= 0.f || scene.shadow_strength < 0.f ||
             scene.shadow_strength > 1.f || scene.shadow_bias < 0.f ||
             scene.shadow_bias > 0.1f || scene.shadow_cascade < 0.f ||
+            scene.shadow_softness < 0.f || scene.shadow_softness > 8.f ||
             (scene.shadow_cascade > 0.f && scene.shadow_cascade <= scene.shadow_extent) ||
             (scene.shadow_resolution != 0u &&
              (scene.shadow_resolution < 64u || scene.shadow_resolution > 8192u)))

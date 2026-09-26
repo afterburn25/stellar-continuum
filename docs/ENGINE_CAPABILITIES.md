@@ -439,7 +439,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   range), `strength` [0,1], `bias` (NDC units), `resolution` (0 =
   tier default: Medium 1024 / High 2048 / Ultra 4096),
   `cascade_extent` (0 disables; a wider ortho tier sharing the same
-  centre/depth so coverage survives extreme zoom-out). Coverage is an
+  centre/depth so coverage survives extreme zoom-out), `softness`
+  ([0,8] penumbra multiplier on the tier PCF radius — 0 forces the
+  hard single-tap edge). Coverage is an
   authored policy: receivers outside both boxes stay lit; the box
   tracks the camera so mid-zoom strategy views keep stable texel
   density.
@@ -468,9 +470,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   cutout images split batches but share instanced draws).
 - **Persistence:** `render.shadow` document block round-trips; extent
   ≤ 0 disables. Rejects nonpositive `depth`, `strength` outside [0,1],
-  `bias` outside [0,0.1], `resolution` outside [64,8192], and a
-  `cascade` that is negative or inside `extent`.
-- **Editor:** Scene3D tool `shadow` row edits all seven fields against
+  `bias` outside [0,0.1], `resolution` outside [64,8192], a
+  `cascade` that is negative or inside `extent`, and `softness`
+  outside [0,8].
+- **Editor:** Scene3D tool `shadow` row edits all eight fields against
   the live preview.
 - **Tests:** `native_scene3d_gpu` — casters/bias/direction/tiers/range
   block with pixel probes (open vs blocked receiver, moved blocker
@@ -485,6 +488,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   probe (`shadow-near-only`/`shadow-cascade` — an umbra outside the
   near window stays lit single-tier and darkens through the far tier,
   while a lit receiver inside the empty near window keeps its value);
+  softness probe (`shadow-soft-0/4` — a zero multiplier collapses the
+  penumbra to a binary edge, 4× grows an 80-pixel blend band while the
+  umbra core keeps its full cut);
   `engine_project` document round-trip + rejection coverage.
 - **Infrastructure fix bundled:** SDL fragment-set resource order —
   the materials SSBO sits after the sampled textures (now binding 13)
@@ -508,18 +514,18 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `native_scene3d.cpp` (validation), `native_scene3d_gpu.cpp` (second
   depth target + RenderGraph pass sharing the `scene3d_shadow`
   pipeline and the lit pass's caster policy via a shared collection),
-  `scene3d.frag` (`spot_shadow_map` sampler at `set=2,binding=11` —
-  SDL_GPU packs fragment samplers densely, so the materials SSBO
-  moved to binding 12 — plus `spot_from_view`/`spot_options` in the
-  view uniform), `scene_document.*` (`castShadow`/`shadowStrength`
+  `scene3d.frag` (`spot_shadow_map` sampler at `set=2,binding=11`,
+  plus `spot_from_view`/`spot_options` in the view uniform),
+  `scene_document.*` (`castShadow`/`shadowStrength`/`shadowSoftness`
   keys), `runtime_host.cpp`, `app/engine_main.cpp` (`pointLights`
-  row's 14th/15th CSV fields).
+  row's 14th/15th/16th CSV fields).
 - **Public interface:** set `casts_shadow` on a `PointLight3D` with a
   nonzero `spot_direction`; `Scene3D::create` rejects an omni caster
   and a second shadowed spot. `shadow_strength` [0,1] blends the umbra
-  like `ShadowMap3D::strength` (1 = full cut). The cone frustum spans
-  the authored outer cone (clamped to ~150 degrees map fov) out to
-  `range`.
+  like `ShadowMap3D::strength` (1 = full cut); `shadow_softness` [0,8]
+  scales the PCF penumbra like `ShadowMap3D::softness`. The cone
+  frustum spans the authored outer cone (clamped to ~150 degrees map
+  fov) out to `range`.
 - **Shader contract:** `spot_options` carries {texel, PCF radius,
   light index, bias} and `debug_mode.z` carries the spot's
   `shadow_strength`; the point-light loop blends the sampled

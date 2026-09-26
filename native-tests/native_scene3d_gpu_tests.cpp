@@ -906,7 +906,21 @@ int main(int argc,char** argv)try{
     check(channel(*near_only,176,160,0)>100,"Near window covered a fragment outside its extent");
     check(channel(*cascaded,176,160,0)<channel(*open,176,160,0)/2,"Far cascade did not carry the out-of-window shadow");
     check(channel(*cascaded,60,160,0)>100,"Far cascade darkened a fragment inside the empty near window");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_passed\n";
+    // Authored softness scales the tier PCF radius: 0 collapses the edge
+    // to a binary tap while 4 widens the penumbra band measurably — the
+    // umbra core keeps its full cut either way.
+    const auto soft_view=[&](float softness,const char* name){
+      auto tier=shadow;tier.softness=softness;
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{receiver,occluder},light,{},tier),{0,0,320,320},high});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto hard_edge=soft_view(0.f,"shadow-soft-0.png");
+    const auto soft_edge=soft_view(4.f,"shadow-soft-4.png");
+    const auto penumbra=[&](const RgbaImage&img){
+      int n=0;for(int x=110;x<240;++x){const int v=channel(img,x,160,0);if(v>30&&v<150)++n;}return n;};
+    check(penumbra(*hard_edge)<=4,"A zero softness edge still produced a penumbra band");
+    check(penumbra(*soft_edge)>penumbra(*hard_edge)+16,"Softness did not widen the shadow penumbra");
+    check(channel(*soft_edge,176,160,0)<channel(*open,176,160,0)/2,"Softness broke the umbra's full cut");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks

@@ -1173,6 +1173,7 @@ int RuntimeHost::run() {
       map.bias = doc.shadow_bias;
       map.resolution = doc.shadow_resolution;
       map.cascade_extent = doc.shadow_cascade;
+      map.softness = doc.shadow_softness;
       impl.shadow3 = map;
     } else
       impl.shadow3.reset();
@@ -2656,7 +2657,8 @@ int RuntimeHost::run() {
                                             l.intensity, l.range,
                                             {l.spot_x, l.spot_y, l.spot_z},
                                             l.spot_inner, l.spot_outer,
-                                            l.cast_shadow, l.shadow_strength});
+                                            l.cast_shadow, l.shadow_strength,
+                                            l.shadow_softness});
       if (auto scene = Scene3D::create(cam, std::move(instances),
                                        light_cam, std::move(point_lights),
                                        impl.shadow3, impl.environment3)) {

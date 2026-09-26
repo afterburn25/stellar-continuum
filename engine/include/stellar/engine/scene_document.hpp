@@ -325,6 +325,9 @@ struct Scene3dPointLight {
   bool cast_shadow{false};
   // [0,1] umbra darkness when castShadow is set (1 = full cut).
   float shadow_strength{1.f};
+  // [0,8] PCF penumbra multiplier on the tier radius when castShadow
+  // is set (1 = tier default).
+  float shadow_softness{1.f};
 };
 
 // A 3D scene: camera, key light, and mesh entities — the 3D counterpart of
@@ -371,6 +374,8 @@ struct Scene3dDocument {
   float shadow_strength{1.f}, shadow_bias{0.0005f};
   std::uint32_t shadow_resolution{0};
   float shadow_cascade{0.f};
+  // [0,8] PCF penumbra multiplier on the tier radius (1 = default).
+  float shadow_softness{1.f};
   // Background clear color.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward (-Y) acceleration in units/s²; 0 disables gravity.

@@ -274,7 +274,9 @@ auto scene = Scene3D::create(camera, instances, key_light, point_lights,
   position through a cone frustum out to `range`, same caster policy
   as the directional pass. `shadow_strength` (document key
   `shadowStrength`, [0,1], default 1) blends the umbra like
-  `ShadowMap3D::strength`. Spot-only (`Scene3D::create` rejects an
+  `ShadowMap3D::strength`; `shadow_softness` (document key
+  `shadowSoftness`, [0,8], default 1) scales the PCF penumbra like
+  `ShadowMap3D::softness`. Spot-only (`Scene3D::create` rejects an
   omni caster) and capped at one shadowed spot per scene; Low tier
   skips it like the directional map.
 - Point lights (and spot cones) are independent of the key/fill
@@ -290,6 +292,8 @@ shadow.depth = 256.f;       // light-axis depth of the shadow volume
 shadow.strength = 1.f;      // [0,1] darkness applied to the key light
 shadow.bias = 0.0005f;      // receiver-side depth bias, shadow-NDC units
 shadow.resolution = 0;      // 0 = tier default (Medium 1024 / High 2048 / Ultra 4096)
+shadow.softness = 1.f;      // [0,8] PCF penumbra multiplier on the tier
+                            // radius (0 = hard single-tap edge)
 shadow.cascade_extent = 0;  // 0 disables; >extent adds a wider far tier
 ```
 
@@ -400,10 +404,11 @@ equirect path — a shared IBL probe that fills entities with
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
 ("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows"), and
 `render.shadow` — `{extent, distance, depth, strength, bias,
-resolution}`; `extent ≤ 0` (or the key absent) disables the map.
-Negative `range` and unknown `debug`/`quality` strings are rejected, as
-are nonpositive `depth`, `strength` outside [0,1], negative `bias`, and
-`resolution` outside [64,8192].
+resolution, cascade, softness}`; `extent ≤ 0` (or the key absent)
+disables the map. Negative `range` and unknown `debug`/`quality`
+strings are rejected, as are nonpositive `depth`, `strength` outside
+[0,1], negative `bias`, `resolution` outside [64,8192], `cascade`
+inside `extent`, and `softness` outside [0,8].
 
 `spawn_scene3d` attaches `MaterialPbr`/`AtmosphereShell`/`MaterialSurface`
 components (binary codec round-trips), a `VisibleRange` component when

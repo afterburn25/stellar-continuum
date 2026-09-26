@@ -1960,17 +1960,17 @@ void commit_scene3_field(Shell &shell) {
       while (std::getline(entries, entry, ';')) {
         std::istringstream values(entry);
         std::string token;
-        float v[15];
+        float v[16];
         int n = 0;
-        while (n < 15 && std::getline(values, token, ',')) {
+        while (n < 16 && std::getline(values, token, ',')) {
           try {
             v[n++] = std::stof(token);
           } catch (const std::exception &) {
-            return fail("use \"x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength]]]; ...\"");
+            return fail("use \"x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness]]]]; ...\"");
           }
         }
-        if (n != 8 && n != 13 && n != 14 && n != 15)
-          return fail("each point light needs x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength]]]");
+        if (n != 8 && n != 13 && n != 14 && n != 15 && n != 16)
+          return fail("each point light needs x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness]]]]");
         engine::Scene3dPointLight l;
         l.x = v[0]; l.y = v[1]; l.z = v[2];
         l.r = v[3]; l.g = v[4]; l.b = v[5];
@@ -1988,8 +1988,11 @@ void commit_scene3_field(Shell &shell) {
             return fail("spot cones need a nonzero direction and 0<=outer<inner<=1");
           if (n >= 14) l.cast_shadow = v[13] != 0.f;
           if (n >= 15) l.shadow_strength = v[14];
+          if (n >= 16) l.shadow_softness = v[15];
           if (l.shadow_strength < 0.f || l.shadow_strength > 1.f)
             return fail("spot shadow strength must be in [0,1]");
+          if (l.shadow_softness < 0.f || l.shadow_softness > 8.f)
+            return fail("spot shadow softness must be in [0,8]");
         }
         parsed.push_back(l);
       }
@@ -2017,20 +2020,20 @@ void commit_scene3_field(Shell &shell) {
       doc.shadow_cascade = 0.f;
       return ok("shadow map disabled");
     }
-    float v[7]{};
+    float v[8]{};
     {
       std::istringstream values(shell.scene3_buffer);
       std::string token;
       int n = 0;
-      while (n < 7 && std::getline(values, token, ',')) {
+      while (n < 8 && std::getline(values, token, ',')) {
         try {
           v[n++] = std::stof(token);
         } catch (const std::exception &) {
-          return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade]]]");
+          return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness]]]]");
         }
       }
       if (n < 3)
-        return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade]]]");
+        return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness]]]]");
       commit();
       doc.shadow_extent = v[0];
       doc.shadow_distance = v[1];
@@ -2040,6 +2043,7 @@ void commit_scene3_field(Shell &shell) {
       doc.shadow_resolution =
           n > 5 ? static_cast<std::uint32_t>(std::max(0.f, v[5])) : 0u;
       doc.shadow_cascade = n > 6 ? v[6] : 0.f;
+      doc.shadow_softness = n > 7 ? v[7] : 1.f;
     }
     return ok("shadow map updated");
   }
@@ -2384,6 +2388,21 @@ void commit_scene3_field(Shell &shell) {
   ok("entity updated");
 }
 
+// The shadow row carries up to eight fields; echoing them all keeps a
+// re-edit from silently dropping the authored strength/bias/cascade
+// values.
+std::string shadow_row_text(const engine::Scene3dDocument &doc) {
+  if (doc.shadow_extent <= 0.f) return {};
+  return std::to_string(doc.shadow_extent) + "," +
+         std::to_string(doc.shadow_distance) + "," +
+         std::to_string(doc.shadow_depth) + "," +
+         std::to_string(doc.shadow_strength) + "," +
+         std::to_string(doc.shadow_bias) + "," +
+         std::to_string(doc.shadow_resolution) + "," +
+         std::to_string(doc.shadow_cascade) + "," +
+         std::to_string(doc.shadow_softness);
+}
+
 void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   float x = body.x + 22 * s;
   float y = body.y + 18 * s;
@@ -2692,13 +2711,14 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                           {l.spot_x, l.spot_y, l.spot_z},
                                           l.spot_inner, l.spot_outer,
                                           l.cast_shadow,
-                                          l.shadow_strength});
+                                          l.shadow_strength,
+                                          l.shadow_softness});
     std::optional<ShadowMap3D> shadow_map;
     if (doc.shadow_extent > 0.f)
       shadow_map = ShadowMap3D{doc.shadow_extent, doc.shadow_distance,
                                doc.shadow_depth, doc.shadow_strength,
                                doc.shadow_bias, doc.shadow_resolution,
-                               doc.shadow_cascade};
+                               doc.shadow_softness, doc.shadow_cascade};
     if (auto scene = Scene3D::create(cam, std::move(instances), light_cam,
                                      std::move(point_lights), shadow_map,
                                      doc.environment.empty()
@@ -3051,23 +3071,20 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                    std::to_string(l.spot_outer);
               if (l.cast_shadow) {
                 v += ",1";
-                if (l.shadow_strength < 1.f)
+                if (l.shadow_strength < 1.f || l.shadow_softness != 1.f)
                   v += "," + std::to_string(l.shadow_strength);
+                if (l.shadow_softness != 1.f)
+                  v += "," + std::to_string(l.shadow_softness);
               }
             }
           }
           return v;
         }(),
-        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength]]]; ... - max 4, empty clears");
+        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness]]]]; ... - max 4, empty clears");
   field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
         "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows");
-  field(shell.hit3_shadow, "shadowMap",
-        doc.shadow_extent > 0.f
-            ? std::to_string(doc.shadow_extent) + "," +
-                  std::to_string(doc.shadow_distance) + "," +
-                  std::to_string(doc.shadow_depth)
-            : "",
-        ed(52), "extent,dist,depth[,strength,bias[,res[,cascade]]] - empty disables");
+  field(shell.hit3_shadow, "shadowMap", shadow_row_text(doc),
+        ed(52), "extent,dist,depth[,strength,bias[,res[,cascade[,softness]]]] - empty disables");
   field(shell.hit3_scnenv, "environment", doc.environment, ed(72),
         "equirect path - shared IBL probe; empty disables");
 }
@@ -7047,11 +7064,7 @@ int main(int argc, char **argv) {
             else if (shell.hit3_debug.contains(event.position))
               edit3(39, doc.debug_view);
             else if (shell.hit3_shadow.contains(event.position))
-              edit3(52, doc.shadow_extent > 0.f
-                            ? std::to_string(doc.shadow_extent) + "," +
-                                  std::to_string(doc.shadow_distance) + "," +
-                                  std::to_string(doc.shadow_depth)
-                            : "");
+              edit3(52, shadow_row_text(doc));
             else if (shell.hit3_scnenv.contains(event.position))
               edit3(72, doc.environment);
             else if (shell.hit3_range.contains(event.position) && se)

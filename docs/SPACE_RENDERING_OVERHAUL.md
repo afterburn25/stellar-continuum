@@ -85,10 +85,12 @@ same document headless-tested.
    proxy) plus one shadowed spot light (`casts_shadow` on a coned
    `PointLight3D`, cone frustum to `range`, same caster policy);
    `alpha_threshold` casters mask the depth pass per texel, so cutout
-   meshes cast perforated silhouettes rather than full quads, and an
+   meshes cast perforated silhouettes rather than full quads; an
    optional `cascade` far tier (a wider ortho box sharing centre/depth,
    near→far crossfade over the inner window's outer margin) keeps
-   coverage at extreme zoom-out. Remaining: cascade count is fixed at
+   coverage at extreme zoom-out; and `softness`/`shadowSoftness` scale
+   the tier PCF radius on both maps so authored penumbra width isn't
+   quality-locked. Remaining: cascade count is fixed at
    one far tier, omni point lights stay unshadowed; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an

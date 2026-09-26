@@ -227,8 +227,9 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
        !bounded(s.depth,1e9)||s.depth<=0||!bounded(s.strength,1)||s.strength<0||
        !bounded(s.bias,.1)||s.bias<0||(s.resolution&&(s.resolution<64||s.resolution>8192))||
        !bounded(s.cascade_extent,1e9)||s.cascade_extent<0||
-       (s.cascade_extent>0.f&&s.cascade_extent<=s.extent))
-      throw std::invalid_argument("3D shadow map requires positive extent/depth, bounded distance, strength, bias, resolution and a cascade extent exceeding the near extent.");
+       (s.cascade_extent>0.f&&s.cascade_extent<=s.extent)||
+       !bounded(s.softness,8)||s.softness<0)
+      throw std::invalid_argument("3D shadow map requires positive extent/depth, bounded distance, strength, bias, resolution, softness and a cascade extent exceeding the near extent.");
   }
   if(instances.size()>maximum_scene3d_instances)throw std::length_error("3D scene exceeds its instance budget.");
   if(point_lights.size()>maximum_scene3d_point_lights)throw std::length_error("3D scene exceeds its point light budget.");
@@ -250,6 +251,8 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
     }
     if(!std::isfinite(l.shadow_strength)||l.shadow_strength<0.f||l.shadow_strength>1.f)
       throw std::invalid_argument("3D spot shadow_strength must be in [0,1].");
+    if(!std::isfinite(l.shadow_softness)||l.shadow_softness<0.f||l.shadow_softness>8.f)
+      throw std::invalid_argument("3D spot shadow_softness must be in [0,8].");
   }
   if(shadowed_spots>1)throw std::invalid_argument("3D scene allows at most one shadowed spot light.");
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
