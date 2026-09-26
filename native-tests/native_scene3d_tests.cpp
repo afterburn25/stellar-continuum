@@ -220,6 +220,13 @@ int main()try{
   {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;
    const auto mapped=Scene3D::create(camera,{instance},{0,0,1},{},config);
    check(mapped->shadow_map()&&mapped->shadow_map()->extent==4&&mapped->shadow_map()->resolution==512,"Scene dropped its shadow map settings");}
+  {// Scene environment probe: an optional shared IBL map that fills
+   // materials which opt in via environment_strength without their own.
+   const auto env=RgbaImage::create(1,1,{0,128,255,255});
+   const auto probed=Scene3D::create(camera,{instance},{0,0,1},{},{},env);
+   check(probed->environment()==env,"Scene dropped its environment probe");
+   const auto unprobed=Scene3D::create(camera,{instance});
+   check(!unprobed->environment(),"Scene invented an environment probe");}
   rejects([&]{ShadowMap3D s;s.extent=0;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.depth=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.strength=1.5f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});

@@ -235,6 +235,7 @@ struct RuntimeHost::Impl {
   std::vector<Scene3dPointLight> point_lights3;
   native_map::RenderOptions3D render3;
   std::optional<native_map::ShadowMap3D> shadow3;
+  std::shared_ptr<const RgbaImage> environment3;
   float gravity3 = 0.f, ground_y3 = 0.f, bounds3 = 0.f;
   bool look_held = false; // right-button mouse-look
   // Input journaling: --record fills `recorder` with frame-indexed input
@@ -1172,6 +1173,7 @@ int RuntimeHost::run() {
       impl.shadow3 = map;
     } else
       impl.shadow3.reset();
+    impl.environment3 = tex3d_of(doc.environment);
     impl.gravity3 = doc.gravity;
     impl.ground_y3 = doc.ground_y;
     impl.bounds3 = doc.bounds;
@@ -2654,7 +2656,7 @@ int RuntimeHost::run() {
                                             l.cast_shadow});
       if (auto scene = Scene3D::create(cam, std::move(instances),
                                        light_cam, std::move(point_lights),
-                                       impl.shadow3)) {
+                                       impl.shadow3, impl.environment3)) {
         Scene3DView view{std::move(scene), {0, 0, w, h}};
         view.options = impl.render3;
         draw.overlay.insert(draw.overlay.begin() + 1, std::move(view));

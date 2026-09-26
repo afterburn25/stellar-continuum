@@ -562,7 +562,24 @@ int main(int argc,char** argv)try{
     const auto ibl=capture({enviro},"pbr-ibl.png");
     check(channel(*ibl,160,160,1)>40&&channel(*ibl,160,160,0)<30,
         "Environment irradiance did not light an unlit PBR surface");
-    std::cout<<"pbr_gpu=emissive_metallic_cutout_tiling_ibl_passed\n";
+    // Scene environment probe: a view-level equirect fills the IBL slot
+    // of materials that opted in (strength>0) but authored no map; an
+    // authored map still wins over the probe.
+    const auto probe_map=RgbaImage::create(1,1,{255,0,0,255});
+    auto probe_mat=enviro;probe_mat.material.pbr->environment.reset();
+    DrawList no_l;no_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{probe_mat}),{0,0,320,320}});
+    window.draw(no_l,folder/"pbr-ibl-none.png");const auto no_probe=decode_rgba_image(folder/"pbr-ibl-none.png");
+    DrawList scn_l;scn_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{probe_mat},{.42f,.2f,.87f},{},{},probe_map),{0,0,320,320}});
+    window.draw(scn_l,folder/"pbr-ibl-scene.png");const auto with_probe=decode_rgba_image(folder/"pbr-ibl-scene.png");
+    check(channel(*with_probe,160,160,0)>40&&channel(*with_probe,160,160,1)<30,
+        "Scene environment probe did not light an unlit PBR surface");
+    check(channel(*no_probe,160,160,0)<30&&channel(*no_probe,160,160,1)<30,
+        "PBR material lit with no environment map at all");
+    DrawList own_l;own_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{enviro},{.42f,.2f,.87f},{},{},probe_map),{0,0,320,320}});
+    window.draw(own_l,folder/"pbr-ibl-own.png");const auto own=decode_rgba_image(folder/"pbr-ibl-own.png");
+    check(channel(*own,160,160,1)>40&&channel(*own,160,160,0)<30,
+        "Authored environment map lost to the scene probe");
+    std::cout<<"pbr_gpu=emissive_metallic_cutout_tiling_ibl_probe_passed\n";
   }
   {
     // Scene point lights: windowed inverse-square falloff in view space.

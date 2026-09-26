@@ -707,6 +707,15 @@ int main() {
     } else {
       check(false, "scene3d shadowed spot light rejected");
     }
+    if (auto probed = engine::Scene3dDocument::from_json(
+            R"({"entities":[],"environment":"visual/starfield-equirect.png"})")) {
+      check(probed->environment == "visual/starfield-equirect.png",
+            "scene3d dropped its environment probe path");
+      check(probed->to_json().find("environment") != std::string::npos,
+            "scene3d did not round-trip the environment key");
+    } else {
+      check(false, "scene3d environment probe rejected");
+    }
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"pointLights":[{},{},{},{},{}]})")
               .has_value(),

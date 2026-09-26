@@ -378,8 +378,10 @@ cloudAlbedo, cloudHeight, cloudOffset:[x,y]}`; `surface` requires at
 least one map.
 Non-array `lods`, oversized chains, and `lodPixels` outside [1,4096]
 are rejected.
-Scene fields: `point_lights[]` (max 4), `exposure`,
-`bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
+Scene fields: `point_lights[]` (max 4), `environment` (content-relative
+equirect path — a shared IBL probe that fills entities with
+`environmentStrength` set but no `environment` map of their own),
+`exposure`, `bloom`, `bloom_threshold`, `contrast`, `saturation`, `sharpen`,
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
 ("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency"), and
 `render.shadow` — `{extent, distance, depth, strength, bias,
@@ -409,8 +411,10 @@ forward-scatter phase, mesh LOD chain (csv specs), LOD switch size and
 LOD fade width.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range +
-optional spot dir/inner/outer),
-shadow map (extent/distance/depth/strength/bias/resolution).
+optional spot dir/inner/outer/shadow flag),
+shadow map (extent/distance/depth/strength/bias/resolution), scene
+environment probe (equirect path — feeds `environmentStrength` opt-ins
+that author no own map).
 The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
 ## Performance notes

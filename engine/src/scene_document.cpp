@@ -555,6 +555,7 @@ std::string Scene3dDocument::to_json() const {
                                {"resolution", shadow_resolution}};
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
+  if (!environment.empty()) doc["environment"] = environment;
   if (gravity != 0.0f) doc["gravity"] = gravity;
   if (ground_y != 0.0f) doc["groundY"] = ground_y;
   if (bounds != 0.0f) doc["bounds"] = bounds;
@@ -921,6 +922,7 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       scene.bg_g = bg[1].get<std::uint8_t>();
       scene.bg_b = bg[2].get<std::uint8_t>();
     }
+    scene.environment = doc.value("environment", std::string{});
     scene.gravity = doc.value("gravity", 0.0f);
     scene.ground_y = doc.value("groundY", 0.0f);
     scene.bounds = doc.value("bounds", 0.0f);

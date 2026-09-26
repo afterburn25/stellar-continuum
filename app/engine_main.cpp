@@ -319,6 +319,7 @@ struct Shell {
       hit3_bandshear{}, hit3_bandwaves{}, hit3_banddrift{},
       hit3_orbitbeam{},
       hit3_starkelvin{}, hit3_accretion{}, hit3_fwdscatter{},
+      hit3_scnenv{},
       hit3_volume{}, hit3_lodfade{}, hit3_visfade{}, hit3_lodgroup{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
@@ -1814,6 +1815,11 @@ void commit_scene3_field(Shell &shell) {
     commit();
     doc.near_plane = a; doc.far_plane = b;
     return ok("camera clip planes updated");
+  case 72: // scene environment probe (content-relative equirect path; empty clears)
+    commit();
+    doc.environment = shell.scene3_buffer;
+    return ok(doc.environment.empty() ? "scene environment cleared"
+                                      : "scene environment updated");
   case 23: // key light direction
     if (!parse_triple(shell.scene3_buffer, a, b, c))
       return fail("use \"x,y,z\"");
@@ -1966,7 +1972,7 @@ void commit_scene3_field(Shell &shell) {
         l.r = v[3]; l.g = v[4]; l.b = v[5];
         l.intensity = std::max(0.f, v[6]);
         l.range = std::max(0.f, v[7]);
-        if (n == 13) {
+        if (n >= 13) {
           l.spot_x = v[8]; l.spot_y = v[9]; l.spot_z = v[10];
           l.spot_inner = v[11]; l.spot_outer = v[12];
           const double sd2 = static_cast<double>(l.spot_x) * l.spot_x +
@@ -2423,7 +2429,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                                                     shell.hit3_lodfade =
                                                                                         shell.hit3_visfade =
                                                                                             shell.hit3_lodgroup =
-                                                                                                shell.hit3_banddrift = {};
+                                                                                                shell.hit3_banddrift =
+                                                                                                    shell.hit3_scnenv = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2682,7 +2689,10 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                doc.shadow_depth, doc.shadow_strength,
                                doc.shadow_bias, doc.shadow_resolution};
     if (auto scene = Scene3D::create(cam, std::move(instances), light_cam,
-                                     std::move(point_lights), shadow_map)) {
+                                     std::move(point_lights), shadow_map,
+                                     doc.environment.empty()
+                                         ? nullptr
+                                         : scene3_tex(shell, doc.environment))) {
       Scene3DView view{std::move(scene), pv};
       view.options.exposure = doc.exposure;
       view.options.bloom_strength = doc.bloom;
@@ -3040,6 +3050,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                   std::to_string(doc.shadow_depth)
             : "",
         ed(52), "extent,dist,depth[,strength,bias[,res]] - empty disables");
+  field(shell.hit3_scnenv, "environment", doc.environment, ed(72),
+        "equirect path - shared IBL probe; empty disables");
 }
 
 std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
@@ -7021,6 +7033,8 @@ int main(int argc, char **argv) {
                                   std::to_string(doc.shadow_distance) + "," +
                                   std::to_string(doc.shadow_depth)
                             : "");
+            else if (shell.hit3_scnenv.contains(event.position))
+              edit3(72, doc.environment);
             else if (shell.hit3_range.contains(event.position) && se)
               edit3(51, std::to_string(se->visible_range));
             else if (shell.hit3_visfade.contains(event.position) && se)

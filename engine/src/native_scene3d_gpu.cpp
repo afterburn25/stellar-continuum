@@ -424,6 +424,10 @@ struct Scene3DRenderer::Storage {
         if(diameter<top)g.share=std::clamp((top-diameter)/(threshold*g.rep->lod_fade),0.f,1.f);
       }
     }
+    // Scene environment probe: a view-level equirect that fills the IBL
+    // slot for PBR materials which opted in (environment_strength > 0)
+    // but authored no map of their own — one shared starfield per scene.
+    const std::shared_ptr<Texture> scene_env=view.scene->environment()?texture(view.scene->environment()):nullptr;
     for(const auto& instance:view.scene->instances()){
       auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
       if(!prepared.visible){++stats.culled_instances;continue;}
@@ -469,6 +473,14 @@ struct Scene3DRenderer::Storage {
       const auto& pbr=instance.material.pbr;
       // Disabled optics reuse the existing texture binding, without an upload.
       auto surface=texture(instance.material.texture);
+      // Environment slot order: authored map, then the scene probe for
+      // PBR materials that opted in with environment_strength, else the
+      // surface placeholder the shader's zero-strength gate skips.
+      // Dielectrics always carry an authored map — validation requires it.
+      const auto env_map=[&]{
+        if(optical)return texture(optical->environment);
+        return pbr&&pbr->environment?texture(pbr->environment)
+          :(pbr&&pbr->environment_strength>0.f&&scene_env?scene_env:surface);};
       const auto& response=instance.material.surface_response;
       // Inside a screen-door transition band the view submits the same
       // material twice: the selected level keeps 1-p of its pixels, the
@@ -508,7 +520,7 @@ struct Scene3DRenderer::Storage {
           proxy_t.camera_depth=static_cast<float>(-g.z);proxy_t.visible=true;
           draws.push_back({&instance,proxy_t,geometry(proxy_mesh),surface,
             optical?texture(optical->surface):surface,
-            optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
+            env_map(),
             response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,
             instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
             instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
@@ -521,7 +533,7 @@ struct Scene3DRenderer::Storage {
       }
       draws.push_back({&instance,facing(drawn_mesh),geometry(drawn_mesh),surface,
         optical?texture(optical->surface):surface,
-        optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
+        env_map(),
         response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,
         instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
         instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
@@ -532,7 +544,7 @@ struct Scene3DRenderer::Storage {
       draws.back().lod_class=static_cast<float>(lod_level);
       if(fading)draws.push_back({&instance,facing(instance.lod_meshes[lod_level]),geometry(instance.lod_meshes[lod_level]),surface,
         optical?texture(optical->surface):surface,
-        optical?texture(optical->environment):(pbr&&pbr->environment?texture(pbr->environment):surface),
+        env_map(),
         response?texture(response->normal):surface,response?texture(response->properties):surface,response?texture(response->cloud_shadow):surface,
         instance.material.shadow&&instance.material.shadow->opacity_map?texture(instance.material.shadow->opacity_map):surface,
         instance.material.surface_effect?texture(instance.material.surface_effect->next_texture):surface,
@@ -662,9 +674,10 @@ struct Scene3DRenderer::Storage {
       fragment.pbr_options[3]=material.alpha_threshold;
       if(material.pbr){const auto& p=*material.pbr;
         fragment.pbr_options={1.f,p.metallic_roughness?1.f:0.f,p.night_emissive,material.alpha_threshold};
-        // The environment binding falls back to the surface texture when no
-        // map is bound; zeroing the strength keeps the shader off that path.
-        fragment.pbr_values={p.metallic,p.roughness,p.emissive_strength,p.environment?p.environment_strength:0.f};
+        // The environment binding falls back to the scene probe, then to
+        // the surface texture when neither map exists; zeroing the
+        // strength keeps the shader off that path.
+        fragment.pbr_values={p.metallic,p.roughness,p.emissive_strength,(p.environment||scene_env)?p.environment_strength:0.f};
         fragment.emissive_tint={p.emissive_tint.x,p.emissive_tint.y,p.emissive_tint.z,0.f};}
       // Band shear rides the spare emissive_tint.w lane — written after
       // the PBR block since that branch clears the channel. The zonal
@@ -1161,9 +1174,11 @@ void Scene3DRenderer::prepare(const DrawList& list){
         for(const auto& pbr_image:{p.metallic_roughness,p.emissive})
           {if(textures.insert(pbr_image.get()).second)texture_bytes+=texture_mip_layout3d(pbr_image.get()).resident_bytes;stream_request(pbr_image,priority,mip_for(pbr_image));}
         // Environment maps are direction-space lookups: like dielectric
-        // environments they keep full-chain residency.
-        if(p.environment){const auto& env=p.environment;
-          if(textures.insert(env.get()).second)texture_bytes+=texture_mip_layout3d(env.get()).resident_bytes;stream_request(env,priority,0u);}
+        // environments they keep full-chain residency. An unmapped PBR
+        // material that opted in (strength > 0) uses the scene probe.
+        auto env=p.environment;
+        if(!env&&p.environment_strength>0.f)env=view->scene->environment();
+        if(env){if(textures.insert(env.get()).second)texture_bytes+=texture_mip_layout3d(env.get()).resident_bytes;stream_request(env,priority,0u);}
       }
     }
   }

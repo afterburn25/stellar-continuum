@@ -344,6 +344,10 @@ struct Scene3dDocument {
   std::vector<Scene3dLight> lights;
   // World-space point lights; at most four reach the fragment pipeline.
   std::vector<Scene3dPointLight> point_lights;
+  // Scene-level equirect environment probe (content-relative path):
+  // fills the IBL slot for entities that set environmentStrength but
+  // author no environment map of their own.
+  std::string environment;
   // Post-processing applied to the 3D view's HDR resolve. Exposure is a
   // linear pre-tonemap multiplier (1 = neutral), bloom is an additive mip
   // halo above its luminance threshold, contrast pivots about 0.18.

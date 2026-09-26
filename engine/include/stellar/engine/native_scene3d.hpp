@@ -375,7 +375,8 @@ class Scene3D final {
  public:
   [[nodiscard]] static std::shared_ptr<const Scene3D> create(
       Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light_direction={.42f,.2f,.87f},
-      std::vector<PointLight3D> point_lights={},std::optional<ShadowMap3D> shadow_map=std::nullopt);
+      std::vector<PointLight3D> point_lights={},std::optional<ShadowMap3D> shadow_map=std::nullopt,
+      std::shared_ptr<const RgbaImage> environment={});
   [[nodiscard]] const auto& camera()const noexcept{return camera_;}
   [[nodiscard]] const auto& instances()const noexcept{return instances_;}
   [[nodiscard]] Vec3 light_direction()const noexcept{return light_;} // camera space
@@ -383,10 +384,15 @@ class Scene3D final {
   // maximum_scene3d_point_lights are evaluated.
   [[nodiscard]] const auto& point_lights()const noexcept{return point_lights_;}
   [[nodiscard]] const auto& shadow_map()const noexcept{return shadow_map_;}
+  // Scene-level environment probe: fills the equirect IBL slot for
+  // PBR materials that opt in with environment_strength but author no
+  // map of their own (a system view's shared starfield). Dielectrics
+  // are unaffected — validation already requires their authored map.
+  [[nodiscard]] const auto& environment()const noexcept{return environment_;}
  private:
-  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map)
-      :camera_(camera),instances_(std::move(instances)),light_(light),point_lights_(std::move(point_lights)),shadow_map_(std::move(shadow_map)){}
-  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;std::vector<PointLight3D> point_lights_;std::optional<ShadowMap3D> shadow_map_;
+  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map,std::shared_ptr<const RgbaImage> environment)
+      :camera_(camera),instances_(std::move(instances)),light_(light),point_lights_(std::move(point_lights)),shadow_map_(std::move(shadow_map)),environment_(std::move(environment)){}
+  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;std::vector<PointLight3D> point_lights_;std::optional<ShadowMap3D> shadow_map_;std::shared_ptr<const RgbaImage> environment_;
 };
 struct PreparedInstance3D { Matrix4 model_view,model_view_projection;float camera_depth{};bool visible{}; };
 // Conservative sphere/frustum test, camera-relative matrices; no GPU required.

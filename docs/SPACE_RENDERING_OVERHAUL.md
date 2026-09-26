@@ -90,8 +90,11 @@ same document headless-tested.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an
    equirect map on any PBR material and `pbr_values.w` scales diffuse
    irradiance plus roughness-aware specular environment response;
-   `Dielectric3D` transmits/reflects the same map. Remaining: the env
-   sample is an authored per-material map, not a per-scene probe.
+   `Dielectric3D` transmits/reflects the same map. A scene-level
+   `environment` probe (document key + `Scene3D::create` param) fills
+   the slot for materials that opt in via `environmentStrength` but
+   author no map — one shared starfield per scene. Remaining: the
+   probe is a static authored equirect, not a captured/baked probe.
 5. **Post** — landed: HDR tonemap plus per-view `exposure`,
    mip-chain `bloom` (soft threshold), `contrast`/`saturation` grading,
    unsharp `sharpen`, and 4x MSAA at Ultra when supported. Remaining:
