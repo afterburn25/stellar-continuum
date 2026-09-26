@@ -2113,7 +2113,7 @@ class NativeCampaign final {
     const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
     const auto sol=std::ranges::find(world.systems,player->home_system_id,&StellarSystem::id);
     if(sol==world.systems.end())throw std::runtime_error("Galaxy artwork smoke could not locate Sol in the catalog.");
-    const auto sol_anchor=camera_.project({sol->position.x,sol->position.y},width,height);
+    const auto sol_anchor=expose_smoke_map_point(sol->position.x,sol->position.y,width,height);
     const auto before=camera_.unproject(sol_anchor,width,height);
     for(int wheel=0;wheel<12;++wheel){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=sol_anchor;input.events={{InputEventType::Wheel,sol_anchor,{},1.f}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke wheel input closed the campaign.");}
     const auto after=camera_.unproject(sol_anchor,width,height);
@@ -2141,7 +2141,7 @@ class NativeCampaign final {
     const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
     const auto sol=std::ranges::find(world.systems,player->home_system_id,&StellarSystem::id);
     if(sol==world.systems.end())throw std::runtime_error("Galaxy artwork smoke could not locate Sol in the catalog.");
-    const auto anchor=camera_.project({sol->position.x,sol->position.y},width,height);
+    const auto anchor=expose_smoke_map_point(sol->position.x,sol->position.y,width,height);
     InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=anchor;input.events={{InputEventType::LeftPressed,anchor,{},0,{},2},{InputEventType::LeftReleased,anchor}};if(!update(input,width,height,0.,false))throw std::runtime_error("Galaxy artwork smoke system entry input closed the campaign.");
     if(!system_workspace_.visible())throw std::runtime_error("Galaxy artwork smoke double click did not open the observed system.");
     smoke_galaxy_system_entry_=true;
@@ -2325,7 +2325,7 @@ class NativeCampaign final {
     smoke_system_day_=session_->frame().clock().simulation_days();
     const auto found=session_->cache().systems_by_id.find(sol_system_id);
     if(found==session_->cache().systems_by_id.end())throw std::runtime_error("System smoke lacks Sol.");
-    const auto point=camera_.project({found->second->position.x,found->second->position.y},width,height);
+    const auto point=expose_smoke_map_point(found->second->position.x,found->second->position.y,width,height);
     InputSnapshot arm;arm.drawable_width=width;arm.drawable_height=height;arm.pointer={static_cast<float>(width)*.5f,static_cast<float>(height)-4.f};arm.events={{InputEventType::LeftPressed,arm.pointer}};(void)update(arm,width,height,0.,false);
     InputSnapshot enter;enter.drawable_width=width;enter.drawable_height=height;enter.pointer=point;
     enter.events={{InputEventType::LeftPressed,point,{},0,{},2},{InputEventType::LeftReleased,point}};
@@ -2425,7 +2425,7 @@ class NativeCampaign final {
     const auto system=session_->cache().systems_by_id.find(colony->system_id);
     if(system==session_->cache().systems_by_id.end())throw std::runtime_error("Colony smoke settlement system is absent from the campaign cache.");
     const auto click=[&](Point point,std::uint8_t count=1){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point,{},0,{},count},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Colony smoke input closed the campaign.");};
-    const auto system_point=camera_.project({system->second->position.x,system->second->position.y},width,height);
+    const auto system_point=expose_smoke_map_point(system->second->position.x,system->second->position.y,width,height);
     click(system_point,2);
     if(!system_workspace_.visible()||!system_workspace_.snapshot()||!system_workspace_.viewport())throw std::runtime_error("Colony smoke could not open its observer-safe system.");
     const auto spatial=project_system(*system_workspace_.snapshot());
@@ -2629,7 +2629,7 @@ class NativeCampaign final {
     smoke_system_travel_fleet_id_=fleet->id;smoke_system_travel_system_id_=*fleet->current_system_id;smoke_system_travel_destination_id_=fleet->destination_system_id;smoke_system_travel_mission_revision_=fleet->mission_order_revision;smoke_system_travel_before_x_=fleet->local_transit_position.x;smoke_system_travel_before_y_=fleet->local_transit_position.y;smoke_system_travel_before_day_=session_->frame().clock().simulation_days();
     if(session_->frame().clock().speed()!=StrategicSpeed::Paused)session_->frame().clock().set_speed(StrategicSpeed::Paused);
     const auto system=session_->cache().systems_by_id.find(*fleet->current_system_id);if(system==session_->cache().systems_by_id.end())throw std::runtime_error("System travel smoke fleet system is absent from the campaign cache.");
-    const auto system_point=camera_.project({system->second->position.x,system->second->position.y},width,height);InputSnapshot enter;enter.drawable_width=width;enter.drawable_height=height;enter.pointer=system_point;enter.events={{InputEventType::LeftPressed,system_point,{},0,{},2},{InputEventType::LeftReleased,system_point}};if(!update(enter,width,height,0.,false)||!system_workspace_.visible())throw std::runtime_error("System travel smoke mouse entry was denied.");
+    const auto system_point=expose_smoke_map_point(system->second->position.x,system->second->position.y,width,height);InputSnapshot enter;enter.drawable_width=width;enter.drawable_height=height;enter.pointer=system_point;enter.events={{InputEventType::LeftPressed,system_point,{},0,{},2},{InputEventType::LeftReleased,system_point}};if(!update(enter,width,height,0.,false)||!system_workspace_.visible())throw std::runtime_error("System travel smoke mouse entry was denied.");
     const auto click=[&](Point point){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("System travel smoke input closed the campaign.");};
     const auto *initial_travel=system_workspace_.travel_snapshot();if(!initial_travel)throw std::runtime_error("System travel smoke did not receive an observer-safe local travel view.");std::unordered_set<int> connected;for(const auto&lane:session_->frame().runtime().world().lanes().build())if(lane.connects(*smoke_system_travel_system_id_))connected.insert(lane.other(*smoke_system_travel_system_id_));smoke_system_travel_lane_count_=initial_travel->lanes.size();smoke_system_travel_lanes_connected_=smoke_system_travel_lane_count_==connected.size()&&std::ranges::all_of(initial_travel->lanes,[&](const auto&lane){return connected.contains(lane.destination_system_id);});if(!smoke_system_travel_lanes_connected_)throw std::runtime_error("System travel smoke destinations did not match the canonical connected set.");
     const auto known_lane=std::ranges::find_if(initial_travel->lanes,[](const auto&lane){return lane.known_label.has_value();}),unknown_lane=std::ranges::find_if(initial_travel->lanes,[](const auto&lane){return !lane.known_label.has_value();});if(known_lane==initial_travel->lanes.end()||unknown_lane==initial_travel->lanes.end())throw std::runtime_error("System travel smoke requires one authored known neighbor and one unknown neighbor.");const auto known_id=known_lane->destination_system_id,unknown_id=unknown_lane->destination_system_id;const auto geometry=system_workspace_.lane_geometry();const auto known_geometry=std::ranges::find(geometry,known_id,&NativeLocalLaneGeometry::destination_system_id),unknown_geometry=std::ranges::find(geometry,unknown_id,&NativeLocalLaneGeometry::destination_system_id);if(known_geometry==geometry.end()||unknown_geometry==geometry.end())throw std::runtime_error("System travel smoke could not place its connected lane arrows.");
@@ -2654,6 +2654,19 @@ class NativeCampaign final {
         !hud.context.contains(point)&&
         !(map_legend_visible(width,height)&&map_legend_bounds(width,height).contains(point))&&
         !(assets_.preferences().hidden?assets_layout.restore:assets_layout.panel).contains(point);
+  }
+  // Replays can only click a map point no HUD surface swallows. The legend is
+  // the one collapsible HUD panel; collapse it when it covers the target,
+  // then shift the camera so the point slides right into clear map.
+  Point expose_smoke_map_point(double world_x,double world_y,int width,int height){
+    auto point=camera_.project({world_x,world_y},width,height);
+    if(!smoke_map_point_exposed(point,width,height))
+      map_legend_collapsed_=true;
+    for(int guard=0;guard<8&&!smoke_map_point_exposed(point,width,height);++guard){
+      camera_.center.x-=static_cast<double>(width)*.12/camera_.pixels_per_world;
+      point=camera_.project({world_x,world_y},width,height);
+    }
+    return point;
   }
   Point scroll_fleet_row_into_view(std::size_t index,int width,int height){
     const auto count=fleet_workspace_.view()?fleet_workspace_.view()->own_fleets.size():0;
@@ -2709,13 +2722,11 @@ class NativeCampaign final {
     }
     const auto system=session_->cache().systems_by_id.find(*smoke_settlement_system_id_);
     if(system==session_->cache().systems_by_id.end())throw std::runtime_error("Settlement target system is absent from the campaign cache.");
-    // A legitimately earned viable world can be outside the initial home view.
-    // Center its chart marker before exercising the normal double-click path;
-    // never alter survey knowledge, vessel state or the settlement quote.
-    const auto target_point=camera_.project({system->second->position.x,system->second->position.y},width,height);
-    if(!smoke_map_point_exposed(target_point,width,height))
-      camera_.center={system->second->position.x-static_cast<double>(width)*.12/camera_.pixels_per_world,system->second->position.y};
-    click(camera_.project({system->second->position.x,system->second->position.y},width,height),InputEventType::LeftPressed,2);
+    // A legitimately earned viable world can be outside the initial home view
+    // or under HUD chrome. Expose its chart marker before exercising the
+    // normal double-click path; never alter survey knowledge, vessel state or
+    // the settlement quote.
+    click(expose_smoke_map_point(system->second->position.x,system->second->position.y,width,height),InputEventType::LeftPressed,2);
     if(!system_workspace_.snapshot()||!system_workspace_.viewport())throw std::runtime_error("Settlement smoke could not open the target system.");
     const auto spatial=project_system(*system_workspace_.snapshot());
     const auto body=std::ranges::find(spatial.bodies,*smoke_settlement_body_id_,&SystemSpatialBodyMarker::body_id);
@@ -4626,7 +4637,8 @@ class NativeCampaign final {
         throw std::runtime_error(
             "First exploration left Normal speed or accumulated backlog.");
       const auto before = frame.clock().simulation_days();
-      const auto result = frame.advance(step_days);
+      const auto result =
+          frame.advance(step_days / frame.clock().days_per_second());
       const auto after = frame.clock().simulation_days();
       if (result.route != CampaignFrameRoute::Strategic ||
           result.completed_substeps.size() != 1 ||
@@ -4650,11 +4662,9 @@ class NativeCampaign final {
         throw std::runtime_error(
             "First exploration target disappeared before preview.");
       const auto preview_before = captured(before_capture);
-      const auto target_point = camera_.project(
-          {system->position.x, system->position.y}, width, height);
-      if (layout.panel.contains(target_point) || target_point.x < 0.f ||
-          target_point.y < 0.f || target_point.x >= width ||
-          target_point.y >= height)
+      const auto target_point = expose_smoke_map_point(
+          system->position.x, system->position.y, width, height);
+      if (!smoke_map_point_exposed(target_point, width, height))
         throw std::runtime_error(
             "First exploration camera input did not expose the destination.");
       click(target_point, InputEventType::RightPressed);
@@ -4707,8 +4717,11 @@ class NativeCampaign final {
       if (system == world.systems.end())
         throw std::runtime_error(
             "First exploration paused browse lost its destination.");
-      click(camera_.project({system->position.x, system->position.y}, width,
-                            height));
+      const auto browse_point =
+          expose_smoke_map_point(system->position.x, system->position.y, width,
+                                 height);
+      if (smoke_map_point_exposed(browse_point, width, height))
+        click(browse_point);
       // Map hits can cycle overlapping own vessels. Keep the exact earned
       // scout selected for the final mission-status capture.
       click(scroll_fleet_row_into_view(scout_index,width,height));
@@ -4752,8 +4765,12 @@ class NativeCampaign final {
       if (target == world.systems.end())
         throw std::runtime_error(
             "First exploration surveyed destination disappeared.");
-      const auto target_point = camera_.project(
-          {target->position.x, target->position.y}, width, height);
+      const auto target_point =
+          expose_smoke_map_point(target->position.x, target->position.y, width,
+                                 height);
+      if (!smoke_map_point_exposed(target_point, width, height))
+        throw std::runtime_error(
+            "First exploration could not expose the surveyed destination.");
       route({{InputEventType::LeftPressed, target_point, {}, 0.f, {}, 2},
              {InputEventType::LeftReleased, target_point}});
       if (!system_workspace_.visible() ||
@@ -5010,7 +5027,8 @@ class NativeCampaign final {
         if (frame.clock().speed() != StrategicSpeed::Normal || frame.clock().backlog_days() != 0.)
           throw std::runtime_error("Settlement completion left Normal speed.");
         const auto before = frame.clock().simulation_days();
-        const auto result = frame.advance(step_days);
+        const auto result =
+            frame.advance(step_days / frame.clock().days_per_second());
         if (result.route != CampaignFrameRoute::Strategic || result.completed_substeps != std::vector<double>{step_days} ||
             frame.clock().simulation_days() - before != step_days || frame.clock().backlog_days() != 0.)
           throw std::runtime_error("Settlement completion left exact 1/64-day stepping.");
@@ -5491,7 +5509,8 @@ class NativeCampaign final {
         throw std::runtime_error(
             "First survey left Normal speed or accumulated backlog.");
       const auto before = frame.clock().simulation_days();
-      const auto result = frame.advance(step_days);
+      const auto result =
+          frame.advance(step_days / frame.clock().days_per_second());
       const auto after = frame.clock().simulation_days();
       if (result.route != CampaignFrameRoute::Strategic ||
           result.completed_substeps.size() != 1 ||
@@ -5513,15 +5532,12 @@ class NativeCampaign final {
         world.systems, first_survey_target_id_, &StellarSystem::id);
     if (target == world.systems.end())
       throw std::runtime_error("First survey target disappeared.");
-    const auto target_point = [&] {
-      return camera_.project({target->position.x, target->position.y}, width,
-                             height);
-    };
     if (mode == Options::FirstSurveyMode::Depart) {
       const auto preview_before = captured(before_capture);
-      const auto point = target_point();
-      if (layout.panel.contains(point) || point.x < 0.f || point.y < 0.f ||
-          point.x >= width || point.y >= height)
+      const auto point = expose_smoke_map_point(target->position.x,
+                                                target->position.y, width,
+                                                height);
+      if (!smoke_map_point_exposed(point, width, height))
         throw std::runtime_error(
             "First survey camera input did not expose the destination.");
       click(point, InputEventType::RightPressed);
@@ -5604,7 +5620,12 @@ class NativeCampaign final {
     refresh_fleets(true);
     select_science();
     click(center(layout.civilian_locate));
-    const auto point = target_point();
+    const auto point = expose_smoke_map_point(target->position.x,
+                                              target->position.y, width,
+                                              height);
+    if (!smoke_map_point_exposed(point, width, height))
+      throw std::runtime_error(
+          "First survey camera input did not expose the destination.");
     route({{InputEventType::LeftPressed, point, {}, 0.f, {}, 2},
            {InputEventType::LeftReleased, point}});
     if (!system_workspace_.visible() ||
