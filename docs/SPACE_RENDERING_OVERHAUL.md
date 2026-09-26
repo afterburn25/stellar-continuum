@@ -83,7 +83,9 @@ same document headless-tested.
    tier-scaled resolution, Low skips; casters share the lit pass's
    screen-space LOD pick and collapsed groups cast one light-facing
    proxy) plus one shadowed spot light (`casts_shadow` on a coned
-   `PointLight3D`, cone frustum to `range`, same caster policy).
+   `PointLight3D`, cone frustum to `range`, same caster policy);
+   `alpha_threshold` casters mask the depth pass per texel, so cutout
+   meshes cast perforated silhouettes rather than full quads.
    Remaining: no CSM splits for
    extreme zoom ranges, omni point lights stay unshadowed; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.

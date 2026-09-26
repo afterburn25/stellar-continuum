@@ -171,7 +171,7 @@ struct Scene3DRenderer::Storage {
     // receiver bias. Unculled rasterization keeps thin hulls casting.
     shadow_supported=SDL_GPUTextureSupportsFormat(device,SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_TEXTURETYPE_2D,SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
     if(shadow_supported){
-      std::unique_ptr<SDL_GPUShader,decltype(release)> shadow_vertex(shader(shaders::scene3d_shadow_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),shadow_fragment(shader(shaders::scene3d_shadow_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,0,0),release);
+      std::unique_ptr<SDL_GPUShader,decltype(release)> shadow_vertex(shader(shaders::scene3d_shadow_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),shadow_fragment(shader(shaders::scene3d_shadow_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,0,1),release);
       SDL_GPUGraphicsPipelineCreateInfo info{};info.vertex_shader=shadow_vertex.get();info.fragment_shader=shadow_fragment.get();
       info.vertex_input_state={&buffer,1,attributes,3};info.primitive_type=SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
       info.rasterizer_state.fill_mode=SDL_GPU_FILLMODE_FILL;info.rasterizer_state.cull_mode=SDL_GPU_CULLMODE_NONE;
@@ -701,10 +701,13 @@ struct Scene3DRenderer::Storage {
     // Shadow casters carry a signed keep probability matching the lit
     // pass's screen-door mask so LOD/range/group transitions thin the
     // silhouette instead of popping it; std430 stride is 80 bytes.
-    struct alignas(16) ShadowCast{Matrix4 light_mvp;float keep;float pad[3];};
+    // params: keep, alpha_threshold, tile_u, tile_v — the last three let the
+    // depth pass discard below the caster's own cutout threshold so holed
+    // textures don't cast solid silhouettes.
+    struct alignas(16) ShadowCast{Matrix4 light_mvp;float keep;float alpha_threshold;float tile_u;float tile_v;};
     static_assert(sizeof(ShadowCast)==80,"std430 shadow caster stride");
-    std::vector<std::shared_ptr<Geometry>> caster_geometry;std::vector<ShadowCast> shadow_transforms;
-    std::vector<std::shared_ptr<Geometry>> spot_geometry;std::vector<ShadowCast> spot_transforms;
+    std::vector<std::shared_ptr<Geometry>> caster_geometry;std::vector<ShadowCast> shadow_transforms;std::vector<std::shared_ptr<Texture>> caster_textures;
+    std::vector<std::shared_ptr<Geometry>> spot_geometry;std::vector<ShadowCast> spot_transforms;std::vector<std::shared_ptr<Texture>> spot_textures;
     engine::DrawBatcher shadow_batcher,spot_batcher;
     const auto& cam=view.scene->camera();
     // Shared caster collection: emits every non-transparent instance's
@@ -716,7 +719,9 @@ struct Scene3DRenderer::Storage {
     const auto collect_casters=[&](double ex,double ey,double ez,
         double xx,double xy,double xz,double yx,double yy,double yz,double zx,double zy,double zz,
         const Matrix4& light_rotation,const Matrix4& light_projection,const Matrix4& view_to_light,const auto& in_volume,
-        std::vector<std::shared_ptr<Geometry>>& geo,std::vector<ShadowCast>& xf,engine::DrawBatcher& batcher){
+        std::vector<std::shared_ptr<Geometry>>& geo,std::vector<ShadowCast>& xf,
+        std::vector<std::shared_ptr<Texture>>& tex_table,engine::DrawBatcher& batcher){
+      std::vector<const MeshInstance3D*> insts;
       for(const auto& instance:view.scene->instances()){
         if(instance.material.transparent)continue;
         const double radius=static_cast<double>(instance.mesh->bounding_radius())*instance.scale;
@@ -747,7 +752,9 @@ struct Scene3DRenderer::Storage {
           for(int c=0;c<3;++c)light_model.values[c*4+c]=static_cast<float>(ps);
           light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);light_model.values[15]=1.f;
           geo.push_back(geometry(instance.lod_group_proxy));
-          xf.push_back({multiply(light_projection,light_model),keep});
+          xf.push_back({multiply(light_projection,light_model),keep,
+              instance.material.alpha_threshold,instance.material.texture_tiling.x,instance.material.texture_tiling.y});
+          insts.push_back(&instance);
         };
         if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->collapse){
           const GroupBounds&g=*git->second;
@@ -793,7 +800,9 @@ struct Scene3DRenderer::Storage {
           }
           light_model.values[12]=static_cast<float>(lx);light_model.values[13]=static_cast<float>(ly);light_model.values[14]=static_cast<float>(lz);light_model.values[15]=1.f;
           geo.push_back(geometry(mesh));
-          xf.push_back({multiply(light_projection,light_model),keep});
+          xf.push_back({multiply(light_projection,light_model),keep,
+              instance.material.alpha_threshold,instance.material.texture_tiling.x,instance.material.texture_tiling.y});
+          insts.push_back(&instance);
         };
         const bool fading=lod_share>0.f&&lvl<instance.lod_meshes.size()&&range_keep>=1.f;
         emit_caster(caster_mesh,(fading?1.f-lod_share:range_keep)*group_keep);
@@ -801,11 +810,18 @@ struct Scene3DRenderer::Storage {
       }
       // Same instancing convention as the scene pass: batch by mesh, then
       // reorder transforms/geometry to sorted order so gl_InstanceIndex maps.
+      // material_id interns the caster's base texture — the depth pass binds
+      // it per batch so alpha_threshold cuts the silhouette's own texels.
       batcher.begin_frame();
       std::map<const Mesh3D*,std::uint32_t> mesh_ids;
+      std::map<const RgbaImage*,std::uint32_t> tex_ids;
+      tex_table.clear();
       for(std::size_t i=0;i<geo.size();++i){
         const auto mesh_id=mesh_ids.try_emplace(geo[i]->owner.get(),static_cast<std::uint32_t>(mesh_ids.size())).first->second;
-        engine::DrawItem item{};item.mesh_id=mesh_id;item.material_id=mesh_id;item.instance_index=static_cast<std::uint32_t>(i);
+        const auto* image=insts[i]->material.texture.get();
+        const auto tex_id=tex_ids.try_emplace(image,static_cast<std::uint32_t>(tex_ids.size())).first->second;
+        if(tex_table.size()<=tex_id)tex_table.push_back(texture(insts[i]->material.texture));
+        engine::DrawItem item{};item.mesh_id=mesh_id;item.material_id=tex_id;item.instance_index=static_cast<std::uint32_t>(i);
         batcher.submit(item);
       }
       batcher.build();
@@ -856,7 +872,7 @@ struct Scene3DRenderer::Storage {
       const auto box_volume=[&](double lx,double ly,double lz,double r){
         return std::abs(lx)<=extent+r&&std::abs(ly)<=extent+r&&lz<=r&&lz>=-depth-r;};
       collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,light_projection,from_view,box_volume,
-          caster_geometry,shadow_transforms,shadow_batcher);
+          caster_geometry,shadow_transforms,caster_textures,shadow_batcher);
     }
     // Shadowed spot light: at most one per scene (Scene3D::create rejects
     // a second). The caster pass renders through the same depth pipeline
@@ -918,7 +934,7 @@ struct Scene3DRenderer::Storage {
         view_uniform.spot_options={1.f/static_cast<float>(spot_res),radius_texels,
             static_cast<float>(spot_index),1.5f/static_cast<float>(spot_res)};
         collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,light_projection,from_view,cone_volume,
-            spot_geometry,spot_transforms,spot_batcher);
+            spot_geometry,spot_transforms,spot_textures,spot_batcher);
       }
     }
     // Pass scheduling goes through the engine RenderGraph: resources and
@@ -1015,6 +1031,9 @@ struct Scene3DRenderer::Storage {
           for(const auto& batch:shadow_batcher.batches()){
             // Geometry is already in sorted order, so first_item addresses it.
             const auto& geo=*caster_geometry[batch.first_item];
+            const auto& cast=shadow_transforms[batch.first_item];
+            const SDL_GPUTextureSamplerBinding sampled[]{{caster_textures[batch.material_id]->texture,(cast.tile_u!=1.f||cast.tile_v!=1.f)?repeat_sampler:sampler}};
+            SDL_BindGPUFragmentSamplers(pass,0,sampled,1);
             const SDL_GPUBufferBinding vertices{geo.vertices,0},indices{geo.indices,0};
             SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
             SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(geo.owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
@@ -1034,6 +1053,9 @@ struct Scene3DRenderer::Storage {
           SDL_BindGPUVertexStorageBuffers(pass,0,&spot_shadow_buffer,1);
           for(const auto& batch:spot_batcher.batches()){
             const auto& geo=*spot_geometry[batch.first_item];
+            const auto& cast=spot_transforms[batch.first_item];
+            const SDL_GPUTextureSamplerBinding sampled[]{{spot_textures[batch.material_id]->texture,(cast.tile_u!=1.f||cast.tile_v!=1.f)?repeat_sampler:sampler}};
+            SDL_BindGPUFragmentSamplers(pass,0,sampled,1);
             const SDL_GPUBufferBinding vertices{geo.vertices,0},indices{geo.indices,0};
             SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
             SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(geo.owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;

@@ -305,13 +305,17 @@ shadow.resolution = 0;      // 0 = tier default (Medium 1024 / High 2048 / Ultra
   workload.
 - Casters submit the same screen-space LOD the lit pass picks (chain
   levels, one merged-sphere proxy per collapsed group) and carry the
-  signed screen-door keep mask — `ShadowCast{mat4,keep}` in the
+  signed screen-door keep mask plus the material's alpha-cutout terms —
+  `ShadowCast{mat4,keep,alpha_threshold,tile_u,tile_v}` in the
   transform SSBO — so LOD bands, collapse bands and `visibleFade`
   dither the silhouette instead of popping it; in-band transitions
-  submit each transition partner on its complementary share.
-  Billboard `card:` casters ignore authored rotation and face the
-  light the way they face the camera, so an impostor never shadows
-  as an edge-on line.
+  submit each transition partner on its complementary share. Each
+  shadow batch also binds its casters' base texture, and the depth
+  fragment discards the texels the lit pass's `alpha_threshold` drops,
+  so a holed texture casts a perforated silhouette rather than its
+  full quad. Billboard `card:` casters ignore authored rotation and
+  face the light the way they face the camera, so an impostor never
+  shadows as an edge-on line.
 - Shadow darkness scales the key light only — ambient, point lights,
   emissive and the analytic `AnalyticShadow3D` blockers are independent.
 - `bias` is a receiver-side constant in NDC space; the rasterizer

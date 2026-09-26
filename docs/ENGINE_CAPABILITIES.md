@@ -452,9 +452,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   pass's screen-space LOD pick (a chained instance submits its selected
   level; a collapsed `lodGroup` submits one light-facing proxy scaled
   to the merged sphere from the representative member); billboard card
-  casters collapse rotation to face the light; casters batch
+  casters collapse rotation to face the light; `alpha_threshold`
+  casters bind their base texture per batch and the depth fragment
+  discards the same texels the lit pass drops (cutout parameter +
+  UV tiling ride the `ShadowCast` record), so a holed texture casts
+  a perforated silhouette instead of its full quad; casters batch
   through `DrawBatcher` with the same instancing convention as the
-  scene pass.
+  scene pass (material_id interns the caster texture, so distinct
+  cutout images split batches but share instanced draws).
 - **Persistence:** `render.shadow` document block round-trips; extent
   ≤ 0 disables. Rejects nonpositive `depth`, `strength` outside [0,1],
   `bias` outside [0,0.1], `resolution` outside [64,8192].
@@ -467,7 +472,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   culled` captures; LOD probes (annulus chain substitute writes a ring
   shadow with a hole where the full quad was solid; a collapsed group
   shares one proxy caster — `shadow_casters` drops N+1→2 — and still
-  shadows the receiver) + `shadow-lod/group` captures;
+  shadows the receiver) + `shadow-lod/group` captures; cutout probe
+  (`shadow-cutout` — a half-alpha-masked occluder keeps shading its
+  opaque side's footprint while the transparent half reopens);
   `engine_project` document round-trip + rejection coverage.
 - **Infrastructure fix bundled:** SDL fragment-set resource order —
   the materials SSBO moved to binding 11 because set 2 requires
@@ -511,7 +518,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   light, keep masks partition banded transitions. Low tier skips;
   tier-scaled resolution (512/1024/2048); bias is texel-scaled
   (perspective depth compresses distant differences, so a flat NDC
-  bias eats narrow umbras — slope bias handles the geometric term).
+  bias eats narrow umbras — slope bias handles the geometric term);
+  alpha-cutout casters share the directional pass's texel masking
+  (the shared `collect_casters` feeds both).
 - **Persistence:** `castShadow` document key round-trips; rejected
   without `spotDir`.
 - **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed spot

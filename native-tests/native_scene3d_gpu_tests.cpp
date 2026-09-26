@@ -859,7 +859,20 @@ int main(int argc,char** argv)try{
     const auto card_shadow=shadow_view({receiver,card_caster},{},"shadow-card.png");
     check(channel(*card_shadow,176,160,0)<channel(*open,176,160,0)/2,"Billboard caster stayed edge-on to the light");
     check(channel(*card_shadow,40,160,0)>100,"Card-facing shadow spread beyond its silhouette");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_passed\n";
+    // Alpha-cutout casters: the depth pass samples the caster's own base
+    // texture under its threshold, so a holed quad writes a perforated
+    // silhouette instead of its full footprint. The occluder's u<.5 half
+    // (world x<.5) shadows receiver pixels left of screen x~176; its
+    // transparent half reopens the footprint up to where the lit occluder
+    // itself covers the receiver (~197).
+    auto hole=occluder;
+    std::vector<std::uint8_t> mask(8*4);for(int i=0;i<8;++i)mask[i*4]=mask[i*4+1]=mask[i*4+2]=255,mask[i*4+3]=i<4?255:0;
+    hole.material.texture=RgbaImage::create(8,1,std::move(mask));hole.material.alpha_threshold=.5f;
+    const auto cutout=shadow_view({receiver,hole},{},"shadow-cutout.png");
+    check(channel(*cutout,150,160,0)<channel(*open,150,160,0)/2,"Cutout caster's opaque half stopped writing the shadow map");
+    check(channel(*occluded,188,160,0)<channel(*open,188,160,0)/2,"Baseline solid shadow was already open at the cutout probe");
+    check(channel(*cutout,188,160,0)>100,"Cutout caster wrote a solid silhouette through its transparent half");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks
