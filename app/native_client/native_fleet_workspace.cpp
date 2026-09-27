@@ -896,6 +896,14 @@ void NativeFleetWorkspace::render(
     // never spill into the route preview, while the armed-fleet stack —
     // which predates the clip — keeps rendering across the rail gap.
     const UiRect details_clip = layout.details;
+    // Recovery locate draws its action rail inside the details footer —
+    // keep stat rows from rendering underneath it. The armed-order stack
+    // intentionally spans the rail gap, so its clip stays untouched.
+    UiRect stat_clip = details_clip;
+    if (recovery_locate)
+      stat_clip.height =
+          std::max(0.f, details_bounds.y + details_bounds.height -
+                            details_clip.y);
     if (ship_art) {
       const auto image = artwork(*fleet);
       const float side = std::min(details_bounds.height - 8.f * layout.scale,
@@ -915,21 +923,26 @@ void NativeFleetWorkspace::render(
     const float row_height = std::max(16.f * layout.scale,
         static_cast<float>(layout.small_font_pixels) + 6.f * layout.scale);
     float row_y = details_bounds.y;
-    text(out, {details_bounds.x, row_y, details_bounds.width, row_height},
-         fleet->name, bright, layout.body_font_pixels, FontFace::Heading);
-    row_y += row_height + 2.f * layout.scale;
-    text(out, {details_bounds.x, row_y, details_bounds.width, row_height},
-         tr(role_key(fleet->role), role_name(fleet->role)) + "  |  " +
-             tr(transit_key(fleet->transit_phase),
-                transit_name(fleet->transit_phase)),
-         muted, layout.small_font_pixels);
-    row_y += row_height + 4.f * layout.scale;
+    // When the details block collapses under its action rail (compact
+    // viewports), skip the header rows entirely instead of letting them
+    // bleed underneath the buttons.
+    if (stat_clip.height > 0.f) {
+      text(out, {details_bounds.x, row_y, details_bounds.width, row_height},
+           fleet->name, bright, layout.body_font_pixels, FontFace::Heading);
+      row_y += row_height + 2.f * layout.scale;
+      text(out, {details_bounds.x, row_y, details_bounds.width, row_height},
+           tr(role_key(fleet->role), role_name(fleet->role)) + "  |  " +
+               tr(transit_key(fleet->transit_phase),
+                  transit_name(fleet->transit_phase)),
+           muted, layout.small_font_pixels);
+      row_y += row_height + 4.f * layout.scale;
+    }
     const auto stat = [&](std::string label, std::string value) {
       theme::key_value(out, {details_bounds.x, row_y, details_bounds.width,
                              row_height},
                        std::move(label), std::move(value),
                        layout.small_font_pixels, theme::Tone::Neutral,
-                       details_clip);
+                       stat_clip);
       row_y += row_height;
     };
     // Core telemetry first; composition extras last so they are the first
