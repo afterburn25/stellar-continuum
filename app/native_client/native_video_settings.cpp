@@ -67,19 +67,6 @@ void text(DrawList &out, UiRect bounds, std::string value, Color color, int pixe
   return index >= 0 && index < count ? index : 0;
 }
 
-[[nodiscard]] std::string_view display_name(const VideoDisplayMode value) {
-  return display_names[static_cast<std::size_t>(
-      enum_index(value, static_cast<int>(display_names.size())))];
-}
-[[nodiscard]] std::string_view vsync_name(const VideoVsync value) {
-  return vsync_names[static_cast<std::size_t>(
-      enum_index(value, static_cast<int>(vsync_names.size())))];
-}
-[[nodiscard]] std::string_view frame_cap_name(const VideoFrameCap value) {
-  return frame_cap_names[static_cast<std::size_t>(
-      enum_index(value, static_cast<int>(frame_cap_names.size())))];
-}
-
 [[nodiscard]] std::string_view display_key(const VideoDisplayMode value) {
   return value == VideoDisplayMode::Exclusive ? "Exclusive" :
          value == VideoDisplayMode::Windowed ? "Windowed" : "Borderless";
@@ -139,19 +126,6 @@ parse_frame_cap(std::string_view value) noexcept {
   if (found == node.end() || !found->is_number()) return 0.f;
   const auto value = found->get<double>();
   return std::isfinite(value) && value > 0. && value <= 1000. ? static_cast<float>(value) : 0.f;
-}
-[[nodiscard]] std::string resolution_name(const NativeVideoSettings &value,
-                                          std::string_view desktop) {
-  if (value.display == VideoDisplayMode::Borderless)
-    return "Desktop (" + std::string(desktop) + ")";
-  if (value.display == VideoDisplayMode::Windowed) {
-    if (value.width <= 0 || value.height <= 0) return "Default window size";
-    return std::to_string(value.width) + " x " + std::to_string(value.height);
-  }
-  if (value.width <= 0 || value.height <= 0 || !std::isfinite(value.refresh_hz) || value.refresh_hz <= 0.f)
-    return "Desktop default";
-  return std::to_string(value.width) + " x " + std::to_string(value.height) + " @ " +
-         std::to_string(static_cast<int>(std::lround(value.refresh_hz))) + " Hz";
 }
 } // namespace
 
@@ -267,8 +241,11 @@ VideoSettingsLayout::for_viewport(const int width, const int height) {
                     20.f * scale};
   auto row_y = layout.adapter.y + layout.adapter.height + 12.f * scale;
   const auto choice_height = 49.f * scale;
-  const auto label_width = std::min(200.f * scale, inner_width * .30f);
-  const auto choice_width = std::min(460.f * scale, inner_width * .68f);
+  const auto choice_width = std::min(460.f * scale, inner_width * .62f);
+  // Localized row labels ("KANTENGLÄTTUNG", "STERNFELD-QUALITÄT") are wider
+  // than the English names — take the room the choice button leaves.
+  const auto label_width = std::min(300.f * scale,
+                                  inner_width - choice_width - 8.f * scale);
   for (int index = 0; index < 8; ++index) {
     layout.choice_labels.push_back(
         {inner, row_y + 5.f * scale, label_width, 26.f * scale});
@@ -277,9 +254,14 @@ VideoSettingsLayout::for_viewport(const int width, const int height) {
     layout.choice_buttons.push_back(choice_rect);
     row_y += choice_height;
   }
-  layout.quality_hint={inner,row_y+6*scale,inner_width,42*scale};
-  layout.nvidia={inner,row_y+58*scale,inner_width,38*scale};
-  layout.error = {inner, row_y + 102.f * scale, inner_width, 30.f * scale};
+  // The hint wraps to three lines in some locales — size for the measured
+  // small font rather than a fixed scaled box so the last line survives.
+  layout.quality_hint={inner,row_y+6*scale,inner_width,
+                       static_cast<float>(layout.small_font_pixels)*3.6f};
+  layout.nvidia={inner,layout.quality_hint.y+layout.quality_hint.height+10.f*scale,
+                 inner_width,38*scale};
+  layout.error = {inner, layout.nvidia.y + layout.nvidia.height + 6.f * scale,
+                  inner_width, 30.f * scale};
   const auto actions_y = layout.panel.y + panel_height - 56.f * scale;
   const auto button_height = 38.f * scale;
   layout.apply = {inner + inner_width - 230.f * scale, actions_y,
@@ -366,20 +348,12 @@ std::string NativeVideoSettingsView::focused_label(int width, int height) const 
   default: break;
   }
   if (target < 0 || target >= 8) return {};
-  const std::array<std::string, 8> choice_values = {
-      std::string(display_name(values_.display)),
-      resolution_name(values_, actual_display_label_), std::string(vsync_name(values_.vsync)),
-      std::string(frame_cap_name(values_.frame_cap))+(values_.frame_cap==VideoFrameCap::Automatic?" · "+actual_display_label_:""),
-      values_.scene_samples==1?"Off":std::to_string(values_.scene_samples)+"x supersampling",
-      std::to_string(values_.scene_resolution_percent)+"%"+(values_.scene_resolution_percent==100?" · Native":" · Reduced"),
-      std::array<std::string,4>{"Low","Medium","High","Ultra"}[values_.starfield_quality],
-      std::array<std::string,3>{"Low","Normal","High"}[values_.starfield_density]};
   const std::array<std::string_view, 8> choice_keys = {
       "SETTINGS_VIDEO_DISPLAY", "SETTINGS_VIDEO_RESOLUTION", "SETTINGS_VIDEO_VSYNC",
       "SETTINGS_VIDEO_FRAME_CAP", "SETTINGS_VIDEO_SMOOTHING", "SETTINGS_VIDEO_SCENE_RES",
       "SETTINGS_VIDEO_STARFIELD_QUALITY", "SETTINGS_VIDEO_STARFIELD_DENSITY"};
   const auto index = static_cast<std::size_t>(target);
-  return tr(choice_keys[index], choice_names[index]) + ": " + choice_values[index];
+  return tr(choice_keys[index], choice_names[index]) + ": " + choice_value(index);
 }
 void NativeVideoSettingsView::set_display_choices(
     std::vector<VideoDisplayChoice> choices, std::string actual_display_label) {
@@ -395,7 +369,9 @@ void NativeVideoSettingsView::set_display_choices(
   windowed_choices_=display_choices_;
   windowed_choices_.erase(std::unique(windowed_choices_.begin(),windowed_choices_.end(),
     [](const auto& left,const auto& right){return left.width==right.width&&left.height==right.height;}),windowed_choices_.end());
-  actual_display_label_ = actual_display_label.empty() ? "Desktop default" : std::move(actual_display_label);
+  actual_display_label_ = actual_display_label.empty()
+                              ? tr("SETTINGS_VIDEO_RES_DESKTOP_DEFAULT", "Desktop default")
+                              : std::move(actual_display_label);
   reconcile_resolution();
 }
 void NativeVideoSettingsView::set_windowed_choices(std::vector<VideoDisplayChoice> choices){
@@ -433,23 +409,24 @@ void NativeVideoSettingsView::reconcile_resolution() noexcept {
 void NativeVideoSettingsView::open_choice(int index) {
   std::vector<std::string> options;
   int selected{};
-  if(index==0){for(const auto name:display_names)options.emplace_back(name);selected=static_cast<int>(values_.display);}
+  if(index==0){for(int i=0;i<3;++i)options.push_back(display_label(static_cast<VideoDisplayMode>(i)));selected=static_cast<int>(values_.display);}
   else if(index==1){
     if(values_.display==VideoDisplayMode::Borderless)return;
     const bool windowed=values_.display==VideoDisplayMode::Windowed;
-    options.emplace_back(windowed?"Default window size":"Desktop default");
+    options.emplace_back(windowed?tr("SETTINGS_VIDEO_RES_DEFAULT_WINDOW","Default window size")
+                                :tr("SETTINGS_VIDEO_RES_DESKTOP_DEFAULT","Desktop default"));
     const auto& choices=windowed?windowed_choices_:display_choices_;
     for(const auto& choice:choices){
       auto value=values_;value.width=choice.width;value.height=choice.height;value.refresh_hz=choice.refresh_hz;
-      options.push_back(resolution_name(value,actual_display_label_));
+      options.push_back(resolution_label(value));
       if(values_.width==choice.width&&values_.height==choice.height&&(windowed||values_.refresh_hz==choice.refresh_hz))selected=static_cast<int>(options.size())-1;
     }
-  }else if(index==2){for(const auto name:vsync_names)options.emplace_back(name);selected=static_cast<int>(values_.vsync);}
-  else if(index==3){for(const auto name:frame_cap_names)options.emplace_back(name);selected=static_cast<int>(values_.frame_cap);}
-  else if(index==4){options={"Off","2x supersampling","4x supersampling"};selected=values_.scene_samples==1?0:values_.scene_samples==2?1:2;}
-  else if(index==5){options={"50% · Reduced","75% · Reduced","100% · Native"};selected=(values_.scene_resolution_percent-50)/25;}
-  else if(index==6){options={"Low","Medium","High","Ultra"};selected=values_.starfield_quality;}
-  else if(index==7){options={"Low","Normal","High"};selected=values_.starfield_density;}
+  }else if(index==2){for(int i=0;i<3;++i)options.push_back(vsync_label(static_cast<VideoVsync>(i)));selected=static_cast<int>(values_.vsync);}
+  else if(index==3){for(int i=0;i<5;++i)options.push_back(frame_cap_label(static_cast<VideoFrameCap>(i)));selected=static_cast<int>(values_.frame_cap);}
+  else if(index==4){options={samples_label(1),samples_label(2),samples_label(4)};selected=values_.scene_samples==1?0:values_.scene_samples==2?1:2;}
+  else if(index==5){options={scene_res_label(50),scene_res_label(75),scene_res_label(100)};selected=(values_.scene_resolution_percent-50)/25;}
+  else if(index==6){for(int i=0;i<4;++i)options.push_back(quality_label(i));selected=values_.starfield_quality;}
+  else if(index==7){for(int i=0;i<3;++i)options.push_back(density_label(i));selected=values_.starfield_density;}
   dropdown_.open(index,std::move(options),selected);
 }
 
@@ -588,6 +565,84 @@ std::string NativeVideoSettingsView::trf(std::string_view key,
   return out;
 }
 
+std::string NativeVideoSettingsView::display_label(VideoDisplayMode value) const {
+  constexpr std::array<std::string_view, 3> keys{"SETTINGS_VIDEO_OPT_BORDERLESS",
+      "SETTINGS_VIDEO_OPT_EXCLUSIVE", "SETTINGS_VIDEO_OPT_WINDOWED"};
+  const auto index = static_cast<std::size_t>(enum_index(value, 3));
+  return tr(keys[index], display_names[index]);
+}
+std::string NativeVideoSettingsView::vsync_label(VideoVsync value) const {
+  constexpr std::array<std::string_view, 3> keys{"SETTINGS_VIDEO_OPT_OFF",
+      "SETTINGS_VIDEO_OPT_ON", "SETTINGS_VIDEO_OPT_ADAPTIVE"};
+  const auto index = static_cast<std::size_t>(enum_index(value, 3));
+  return tr(keys[index], vsync_names[index]);
+}
+std::string NativeVideoSettingsView::frame_cap_label(VideoFrameCap value) const {
+  switch (enum_index(value, 5)) {
+  case 1: return trf("SETTINGS_VIDEO_FPS", "60", "{0} FPS");
+  case 2: return trf("SETTINGS_VIDEO_FPS", "120", "{0} FPS");
+  case 3: return trf("SETTINGS_VIDEO_FPS", "144", "{0} FPS");
+  case 4: return tr("SETTINGS_VIDEO_OPT_UNLIMITED", frame_cap_names[4]);
+  default: return tr("SETTINGS_VIDEO_OPT_AUTOMATIC", frame_cap_names[0]);
+  }
+}
+std::string NativeVideoSettingsView::quality_label(int value) const {
+  constexpr std::array<std::string_view, 4> keys{"SETTINGS_VIDEO_OPT_LOW",
+      "SETTINGS_VIDEO_OPT_MEDIUM", "SETTINGS_VIDEO_OPT_HIGH", "SETTINGS_VIDEO_OPT_ULTRA"};
+  constexpr std::array<std::string_view, 4> names{"Low", "Medium", "High", "Ultra"};
+  const auto index = static_cast<std::size_t>(std::clamp(value, 0, 3));
+  return tr(keys[index], names[index]);
+}
+std::string NativeVideoSettingsView::density_label(int value) const {
+  constexpr std::array<std::string_view, 3> keys{"SETTINGS_VIDEO_OPT_LOW",
+      "SETTINGS_VIDEO_OPT_NORMAL", "SETTINGS_VIDEO_OPT_HIGH"};
+  constexpr std::array<std::string_view, 3> names{"Low", "Normal", "High"};
+  const auto index = static_cast<std::size_t>(std::clamp(value, 0, 2));
+  return tr(keys[index], names[index]);
+}
+std::string NativeVideoSettingsView::samples_label(int samples) const {
+  return samples == 1
+             ? tr("SETTINGS_VIDEO_OPT_OFF", "Off")
+             : trf("SETTINGS_VIDEO_SUPERSAMPLING", std::to_string(samples),
+                   "{0}x supersampling");
+}
+std::string NativeVideoSettingsView::scene_res_label(int percent) const {
+  return trf(percent == 100 ? "SETTINGS_VIDEO_PCT_NATIVE"
+                            : "SETTINGS_VIDEO_PCT_REDUCED",
+             std::to_string(percent),
+             percent == 100 ? "{0}% · Native" : "{0}% · Reduced");
+}
+std::string NativeVideoSettingsView::resolution_label(
+    const NativeVideoSettings &value) const {
+  if (value.display == VideoDisplayMode::Borderless)
+    return trf("SETTINGS_VIDEO_RES_DESKTOP", actual_display_label_, "Desktop ({0})");
+  if (value.display == VideoDisplayMode::Windowed) {
+    if (value.width <= 0 || value.height <= 0)
+      return tr("SETTINGS_VIDEO_RES_DEFAULT_WINDOW", "Default window size");
+    return std::to_string(value.width) + " x " + std::to_string(value.height);
+  }
+  if (value.width <= 0 || value.height <= 0 || !std::isfinite(value.refresh_hz) ||
+      value.refresh_hz <= 0.f)
+    return tr("SETTINGS_VIDEO_RES_DESKTOP_DEFAULT", "Desktop default");
+  return std::to_string(value.width) + " x " + std::to_string(value.height) + " @ " +
+         std::to_string(static_cast<int>(std::lround(value.refresh_hz))) + " Hz";
+}
+std::string NativeVideoSettingsView::choice_value(std::size_t index) const {
+  switch (index) {
+  case 0: return display_label(values_.display);
+  case 1: return resolution_label(values_);
+  case 2: return vsync_label(values_.vsync);
+  case 3:
+    return frame_cap_label(values_.frame_cap) +
+           (values_.frame_cap == VideoFrameCap::Automatic ? " · " + actual_display_label_
+                                                          : std::string{});
+  case 4: return samples_label(values_.scene_samples);
+  case 5: return scene_res_label(values_.scene_resolution_percent);
+  case 6: return quality_label(values_.starfield_quality);
+  default: return density_label(values_.starfield_density);
+  }
+}
+
 void NativeVideoSettingsView::render(DrawList &out, const int width,
                                      const int height,
                                      const double rollback_remaining) const {
@@ -610,14 +665,6 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
          std::move(caption), enabled ? text_primary : text_muted, layout.body_font_pixels,
          TextAlign::Center);
   };
-  const std::array<std::string, 8> choice_values = {
-      std::string(display_name(values_.display)),
-      resolution_name(values_, actual_display_label_), std::string(vsync_name(values_.vsync)),
-      std::string(frame_cap_name(values_.frame_cap))+(values_.frame_cap==VideoFrameCap::Automatic?" · "+actual_display_label_:""),
-      values_.scene_samples==1?"Off":std::to_string(values_.scene_samples)+"x supersampling",
-      std::to_string(values_.scene_resolution_percent)+"%"+(values_.scene_resolution_percent==100?" · Native":" · Reduced"),
-      std::array<std::string,4>{"Low","Medium","High","Ultra"}[values_.starfield_quality],
-      std::array<std::string,3>{"Low","Normal","High"}[values_.starfield_density]};
   const std::array<std::string_view, 8> choice_keys = {
       "SETTINGS_VIDEO_DISPLAY", "SETTINGS_VIDEO_RESOLUTION", "SETTINGS_VIDEO_VSYNC",
       "SETTINGS_VIDEO_FRAME_CAP", "SETTINGS_VIDEO_SMOOTHING", "SETTINGS_VIDEO_SCENE_RES",
@@ -631,7 +678,7 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
                          ((values_.display == VideoDisplayMode::Exclusive && !display_choices_.empty()) ||
                           (values_.display == VideoDisplayMode::Windowed && !windowed_choices_.empty()));
     const auto bounds=layout.choice_buttons[index];
-    draw_button(bounds, choice_values[static_cast<std::size_t>(index)],enabled,enabled?22.f*layout.scale:0.f);
+    draw_button(bounds, choice_value(static_cast<std::size_t>(index)),enabled,enabled?22.f*layout.scale:0.f);
     if(enabled){
       const auto y=bounds.y+bounds.height*.5f-layout.small_font_pixels*.55f;
       text(out,{bounds.x+bounds.width-24.f*layout.scale,y,20.f*layout.scale,static_cast<float>(layout.small_font_pixels)*1.2f},

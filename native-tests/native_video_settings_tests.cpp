@@ -354,6 +354,53 @@ void keyboard_focus_traversal() {
           "Space on REVERT did not emit Revert");
 }
 
+void localized_choice_values() {
+  // Dropdown values and row announcements are display text — they resolve
+  // through the bound table while the persisted enum keys stay English.
+  stellar::engine::LocalizationTable german("de", "en");
+  std::string loc_error;
+  require(german.load_json(R"json({"locale":"de","strings":{
+      "SETTINGS_VIDEO_OPT_BORDERLESS":"Randloser Vollbildmodus",
+      "SETTINGS_VIDEO_OPT_ON":"Ein",
+      "SETTINGS_VIDEO_OPT_AUTOMATIC":"Automatisch",
+      "SETTINGS_VIDEO_OPT_OFF":"Aus",
+      "SETTINGS_VIDEO_OPT_HIGH":"Hoch",
+      "SETTINGS_VIDEO_OPT_NORMAL":"Normal",
+      "SETTINGS_VIDEO_RES_DESKTOP":"Desktop ({0})",
+      "SETTINGS_VIDEO_PCT_NATIVE":"{0}% \u00b7 Nativ",
+      "SETTINGS_VIDEO_DISPLAY":"ANZEIGE"
+    }})json",
+                            &loc_error),
+          loc_error);
+  constexpr int width = 1280, height = 720;
+  NativeVideoSettingsView view;
+  view.set_localization(&german);
+  view.open(NativeVideoSettings{});
+  view.set_display_choices({{2560, 1440, 60.f}}, "2560 x 1440 @ 60 Hz");
+  const auto has = [&](std::string_view needle) {
+    DrawList draw;
+    view.render(draw, width, height);
+    return std::ranges::any_of(draw.overlay, [&](const auto &item) {
+      const auto *label = std::get_if<Text>(&item);
+      return label && label->value == needle;
+    });
+  };
+  require(has("Randloser Vollbildmodus"), "display value did not localize");
+  require(has("Desktop (2560 x 1440 @ 60 Hz)"), "resolution value did not localize");
+  require(has("Ein"), "vsync value did not localize");
+  require(has("Automatisch · 2560 x 1440 @ 60 Hz"),
+          "frame cap value did not localize");
+  require(has("Aus"), "smoothing value did not localize");
+  require(has("100% \xC2\xB7 Nativ"), "scene resolution value did not localize");
+  require(has("Hoch") && has("Normal"), "starfield values did not localize");
+  InputEvent tab{};
+  tab.type = InputEventType::KeyPressed;
+  tab.key = 9u;
+  (void)view.handle(tab, width, height);
+  require(view.focused_label(width, height) == "ANZEIGE: Randloser Vollbildmodus",
+          "focused_label did not announce the localized value");
+}
+
 } // namespace
 
 int main() {
@@ -365,6 +412,7 @@ int main() {
     long_dropdown_navigation();
     apply_confirm_revert_flow();
     keyboard_focus_traversal();
+    localized_choice_values();
   } catch (const std::exception &error) {
     std::cerr << "native video settings tests failed: " << error.what() << '\n';
     return 1;
