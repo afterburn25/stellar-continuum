@@ -586,8 +586,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - One shared equirect env map per material, or the scene-level
   `environment` probe for opt-in PBR materials with no authored map;
   `environmentCapture` bakes six face views at an anchor into the slot
-  (first-frame snapshot — no refresh, no probe grid, no per-instance
-  probe selection).
+  (one bake per declared `probe_epoch` — doc loads and editor commits
+  rebake; no probe grid, no per-instance selection).
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
 - Debug views are developer tooling — `Lod` tints the submitted
   level/proxy class and `Residency` the bound mip state; LightingOnly

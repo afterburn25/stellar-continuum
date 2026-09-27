@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <thread>
 #include <tuple>
@@ -115,10 +116,31 @@ struct Scene3DRenderer::Storage {
   std::unordered_map<const RgbaImage*,std::shared_ptr<Texture>> textures;
   std::vector<std::unique_ptr<Target>> targets;std::vector<const Scene3DView*> views;
   std::shared_ptr<const RgbaImage> white=RgbaImage::create(1,1,{255,255,255,255});
-  // Captured environment probes, keyed by weak scene owner: the baked
-  // equirect outlives the cache key's address so a freed scene can
-  // never lend its probe to a different scene reusing the heap slot.
-  std::map<std::weak_ptr<const Scene3D>,std::shared_ptr<const RgbaImage>,std::owner_less<>> probe_cache;
+  // Captured environment probes. A view's probe_epoch selects the key:
+  // zero keys the bake to the scene instance (weak — a freed scene can
+  // never lend its probe to a different scene reusing the heap slot);
+  // nonzero keys to the caller's declared generation so hosts that
+  // rebuild Scene3D per frame bake one logical scene once. Anchor and
+  // resolution join the key so re-authoring capture params rebakes.
+  struct ProbeKey {
+    std::weak_ptr<const Scene3D> scene;std::uint64_t epoch{};Position3 anchor{};int res{};
+  };
+  struct ProbeKeyLess {
+    bool operator()(const ProbeKey&a,const ProbeKey&b)const{
+      if(a.epoch!=b.epoch)return a.epoch<b.epoch;
+      if(a.res!=b.res)return a.res<b.res;
+      if(a.anchor.x!=b.anchor.x)return a.anchor.x<b.anchor.x;
+      if(a.anchor.y!=b.anchor.y)return a.anchor.y<b.anchor.y;
+      if(a.anchor.z!=b.anchor.z)return a.anchor.z<b.anchor.z;
+      return std::owner_less<>()(a.scene,b.scene);
+    }
+  };
+  static ProbeKey probe_key(const Scene3DView&view){
+    const auto&cap=view.scene->environment_capture();
+    return {view.probe_epoch?std::weak_ptr<const Scene3D>{}:std::weak_ptr<const Scene3D>(view.scene),
+        view.probe_epoch,cap.anchor,cap.face_resolution};
+  }
+  std::map<ProbeKey,std::shared_ptr<const RgbaImage>,ProbeKeyLess> probe_cache;
   // Engine TextureStreamer owns the byte-budget residency decision; this
   // backend registers real per-mip sizes, declares each frame's demand with
   // a camera-distance priority, and executes the streamer's load/evict list.
@@ -447,7 +469,8 @@ struct Scene3DRenderer::Storage {
     // slot for PBR materials which opted in (environment_strength > 0)
     // but authored no map of their own — one shared starfield per scene.
     const std::shared_ptr<Texture> scene_env=[&]{
-      if(const auto it=probe_cache.find(std::weak_ptr<const Scene3D>(view.scene));it!=probe_cache.end())return texture(it->second);
+      if(view.scene->environment_capture().enabled)
+        if(const auto it=probe_cache.find(probe_key(view));it!=probe_cache.end())return texture(it->second);
       return view.scene->environment()?texture(view.scene->environment()):nullptr;}();
     for(const auto& instance:view.scene->instances()){
       auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
@@ -1471,7 +1494,7 @@ struct Scene3DRenderer::Storage {
   // Static by policy — the bake captures the layout the first prepared
   // frame sees; cache-lifetime upload accounting is preserved while
   // per-frame counters are restored so a bake never inflates them.
-  void bake_probe(const std::shared_ptr<const Scene3D>& scene,const RenderOptions3D& options){
+  void bake_probe(const std::shared_ptr<const Scene3D>& scene,const RenderOptions3D& options,const ProbeKey& key){
     const auto& cap=scene->environment_capture();
     const int res=cap.face_resolution;
     // Face orientations — identity looks -Z with +Y up; each quaternion
@@ -1571,7 +1594,7 @@ struct Scene3DRenderer::Storage {
     stats.texture_cache_bytes+=tex_bytes;stats.mesh_cache_bytes+=mesh_bytes;
     stats.texture_uploads+=tex_up;stats.mesh_uploads+=mesh_up;
     ++stats.probe_bakes;
-    probe_cache[std::weak_ptr<const Scene3D>(scene)]=RgbaImage::create(ew,eh,std::move(pixels));
+    probe_cache[key]=RgbaImage::create(ew,eh,std::move(pixels));
   }
 };
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
@@ -1583,13 +1606,23 @@ void Scene3DRenderer::prepare(const DrawList& list){
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");
   // Captured environment probes bake once per scene — ahead of the
   // demand pass so the baked equirect joins streamer residency, and
-  // ahead of the lit pass so opt-in materials bind it this frame.
+  // ahead of the lit pass so opt-in materials bind it this frame. A
+  // nonzero probe_epoch shares one bake across rebuilt scenes.
+  std::set<Storage::ProbeKey,Storage::ProbeKeyLess> demanded;
   for(const auto* view:s.views)
-    if(view->scene&&view->scene->environment_capture().enabled&&
-       !s.probe_cache.count(std::weak_ptr<const Scene3D>(view->scene)))
-      s.bake_probe(view->scene,view->options);
-  for(auto it=s.probe_cache.begin();it!=s.probe_cache.end();)
-    if(it->first.expired())it=s.probe_cache.erase(it);else++it;
+    if(view->scene&&view->scene->environment_capture().enabled){
+      const auto key=Storage::probe_key(*view);
+      demanded.insert(key);
+      if(!s.probe_cache.count(key))s.bake_probe(view->scene,view->options,key);
+    }
+  for(auto it=s.probe_cache.begin();it!=s.probe_cache.end();){
+    // Scene-keyed bakes die with their owner; epoch-keyed bakes die the
+    // first frame no view declares their generation — a replaced
+    // document's serial stops arriving, releasing the entry instead of
+    // accumulating one baked image per document load.
+    const bool stale=it->first.epoch?demanded.count(it->first)==0:it->first.scene.expired();
+    if(stale)it=s.probe_cache.erase(it);else++it;
+  }
   std::size_t total=0;
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
   std::unordered_map<engine::TextureId,std::pair<float,std::uint32_t>> stream_demand;
@@ -1666,8 +1699,9 @@ void Scene3DRenderer::prepare(const DrawList& list){
         // equirect.
         auto env=p.environment;
         if(!env&&p.environment_strength>0.f){
-          if(const auto it=s.probe_cache.find(std::weak_ptr<const Scene3D>(view->scene));it!=s.probe_cache.end())env=it->second;
-          else env=view->scene->environment();
+          if(view->scene->environment_capture().enabled)
+            if(const auto it=s.probe_cache.find(Storage::probe_key(*view));it!=s.probe_cache.end())env=it->second;
+          if(!env)env=view->scene->environment();
         }
         if(env){if(textures.insert(env.get()).second)texture_bytes+=texture_mip_layout3d(env.get()).resident_bytes;stream_request(env,priority,0u);}
       }

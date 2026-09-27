@@ -2807,6 +2807,10 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                          : scene3_tex(shell, doc.environment),
                                      probe)) {
       Scene3DView view{std::move(scene), pv};
+      // The preview rebuilds Scene3D per frame — the undo history's
+      // mutation serial keeps one logical document on one probe bake,
+      // and any committed edit (or doc load, via clear) rebakes.
+      view.probe_epoch = 1 + shell.scene3_history.revision();
       view.options.exposure = doc.exposure;
       view.options.bloom_strength = doc.bloom;
       view.options.bloom_threshold = doc.bloom_threshold;

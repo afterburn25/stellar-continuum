@@ -127,7 +127,13 @@ struct RenderOptions3D {
 };
 // A depth-tested 3D viewport composites at this exact place in either layer.
 // Its geometry stays in 3D; only this destination uses drawable pixels.
-struct Scene3DView { std::shared_ptr<const Scene3D> scene;UiRect destination;RenderOptions3D options; };
+struct Scene3DView { std::shared_ptr<const Scene3D> scene;UiRect destination;RenderOptions3D options;
+  // Captured environment probes cache by this caller-declared generation
+  // when nonzero: hosts that rebuild Scene3D per frame (runtime document
+  // loads, the editor preview) pass a stable serial so one logical scene
+  // bakes once — bump it when the probe content should refresh. Zero keys
+  // the bake to this scene instance (ad-hoc views).
+  std::uint64_t probe_epoch{}; };
 using WorldCommand=std::variant<Line,Circle,Text,Image,TriangleMesh,Scene3DView>;
 using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image,TriangleMesh,Scene3DView>;
 // A completed scene is immutable at this boundary. Coordinates are drawable

@@ -123,9 +123,10 @@ same document headless-tested.
    an authored anchor render through the full pipeline once per scene,
    resample into an equirect, and override the authored slot — opt-in
    materials reflect the local scene (sun disc, lit planets) rather
-   than only a starfield. Remaining: the bake is a static first-frame
-   snapshot — no refresh, no probe grid, no per-instance probe
-   selection.
+   than only a starfield. Remaining: the bake is a static snapshot per
+   caller-declared epoch (`Scene3DView::probe_epoch` — document loads
+   and editor edits bump it, rebuilding per frame does not); no probe
+   grid, no per-instance probe selection.
 5. **Post** — landed: HDR tonemap plus per-view `exposure`,
    mip-chain `bloom` (soft threshold), `contrast`/`saturation` grading,
    unsharp `sharpen`, post-tonemap `vignette` (corner falloff on the

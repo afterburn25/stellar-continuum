@@ -704,21 +704,28 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   reflective material authoring a fake map.
 - **Modules:** `native_scene3d.hpp` (`EnvironmentCapture3D` +
   `Scene3D::create` eighth parameter + `environment_capture()` +
-  `Scene3DStatistics::probe_bakes`), `native_scene3d_gpu.cpp`
-  (`Storage::bake_probe` + weak-scene-keyed `probe_cache`),
+  `Scene3DStatistics::probe_bakes`), `native_map_platform.hpp`
+  (`Scene3DView::probe_epoch`), `native_scene3d_gpu.cpp`
+  (`Storage::bake_probe` + epoch/weak-scene-keyed `probe_cache`),
+  `undo_history.hpp` (`revision()` mutation serial),
   `scene_document.*` (`probeCapture`/`probeAnchor`/`probeResolution`
-  keys), `runtime_host.cpp` (`Impl::probe3`), `app/engine_main.cpp`
-  (preview create + `probeCapture` scene row, editor case 75).
+  keys), `runtime_host.cpp` (`Impl::probe3` + `scene3_epoch`),
+  `app/engine_main.cpp` (preview create + `probeCapture` scene row,
+  editor case 75, epoch from `scene3_history.revision()`).
 - **Semantics:** when enabled the renderer renders six 90-degree face
   views at the anchor through the full pipeline (lights, shadows,
   emission volumes, authored env response on opt-in materials),
   downloads each face, CPU-resamples into the equirect layout
-  `radiance()` samples, and binds it as the scene env slot —
+  `environment()` samples, and binds it as the scene env slot —
   overriding the authored `environment` map for mapless opt-ins while
   authored maps still win. The authored key light is rotated through
-  world space so all faces light identically. The bake runs once per
-  scene's first prepared frame and is cached by a weak scene key, so
-  a freed scene's probe can never alias onto a new scene.
+  world space so all faces light identically. The bake caches once per
+  key: `probe_epoch == 0` keys on the scene instance (weak, so a freed
+  scene's probe can never alias), while a nonzero epoch keys on the
+  caller's declared generation — hosts that rebuild `Scene3D` per frame
+  pass a stable serial so one logical scene bakes once, and bumping it
+  (runtime document load, editor history commit/undo/redo/clear)
+  refreshes the probe.
 - **Validation:** `Scene3D::create` rejects non-finite anchors and
   face resolutions outside [16,512]; the document codec applies the
   same bound on parse.
@@ -734,17 +741,23 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Tests:** `native_scene3d_gpu` — a red ambient sphere behind the
   camera dominates the +Z face; a mapless opt-in quad reflects red
   with capture on but authored-map blue with capture off, and
-  `probe_bakes` advances exactly once (`pbr-probe-off/on.png`);
-  `engine_scene3d` rejects bad anchors/resolutions and round-trips
-  the struct; `engine_project` round-trips the document keys and
-  rejects out-of-range resolution.
-- **Limitations:** static first-frame snapshot — moving emitters and
-  camera-fit shadow chains keep their bake-time pose (no refresh
-  trigger yet); one probe per scene, no probe grid or per-instance
+  `probe_bakes` advances exactly once (`pbr-probe-off/on.png`); the
+  epoch probe rebuilds the scene thrice under one epoch and asserts a
+  single bake, then asserts a bumped epoch rebakes
+  (`pbr-epoch-*.png`); `engine_scene3d` rejects bad
+  anchors/resolutions and round-trips the struct; `engine_project`
+  round-trips the document keys and rejects out-of-range resolution;
+  `undo_history` asserts `revision()` is monotonic across
+  commit/undo/redo/clear.
+- **Limitations:** static snapshot per declared epoch — orbiting
+  emitters and camera-fit shadow chains keep their bake-time pose
+  until the caller bumps the epoch (no per-frame auto-refresh by
+  design); one probe per scene, no probe grid or per-instance
   selection; equirect output is bilinear-resampled (roughness response
   shares the authored path's box-mip prefilter, not a true GGX
-  convolution); the bake downloads six faces synchronously — first-frame
-  hitch scales with face_resolution.
+  convolution); each bake downloads six faces synchronously — a
+  hitch when an epoch flips, so editors should bump it per commit,
+  not per frame.
 
 ## Scene3D debug views, quality gates and distance culling (2026-09-25)
 

@@ -625,6 +625,33 @@ int main(int argc,char** argv)try{
       window.draw(cr_l,folder/"pbr-mip-crisp.png");const auto cr=decode_rgba_image(folder/"pbr-mip-crisp.png");
       check(channel(*cr,160,160,0)<40,"Mirror-sharp reflection lost the environment stripe");
     }
+    // Callers that rebuild Scene3D per frame declare a stable probe
+    // epoch: the bake caches per (epoch, anchor, res) instead of the
+    // scene instance — three rebuilt views bake once, and bumping the
+    // epoch forces a refresh.
+    {
+      auto epoch_mat=enviro;epoch_mat.material.pbr->environment.reset();
+      EnvironmentCapture3D cap_epoch;cap_epoch.enabled=true;cap_epoch.face_resolution=32;
+      const auto bakes_epoch=window.scene3d_statistics().probe_bakes;
+      const auto epoch_draw=[&](std::uint64_t e,const char* name){
+        DrawList l;l.world.emplace_back(Scene3DView{Scene3D::create(camera,{epoch_mat},{.42f,.2f,.87f},{},{},nullptr,cap_epoch),{0,0,320,320}});
+        std::get<Scene3DView>(l.world.back()).probe_epoch=e;
+        window.draw(l,folder/name);};
+      epoch_draw(11,"pbr-epoch-0.png");epoch_draw(11,"pbr-epoch-1.png");epoch_draw(11,"pbr-epoch-2.png");
+      check(window.scene3d_statistics().probe_bakes==bakes_epoch+1,
+          "Probe rebaked per rebuilt scene despite a stable epoch");
+      epoch_draw(12,"pbr-epoch-bump.png");
+      check(window.scene3d_statistics().probe_bakes==bakes_epoch+2,
+          "Probe epoch bump did not force a rebake");
+      // An epoch-keyed entry lives only while some view declares its
+      // generation: a probe-less frame releases it, so the same epoch
+      // bakes again on return rather than accumulating stale entries.
+      DrawList gap_l;gap_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{epoch_mat},{.42f,.2f,.87f},{},{},nullptr),{0,0,320,320}});
+      window.draw(gap_l,folder/"pbr-epoch-gap.png");
+      epoch_draw(12,"pbr-epoch-return.png");
+      check(window.scene3d_statistics().probe_bakes==bakes_epoch+3,
+          "Undeclared probe epoch did not release its baked entry");
+    }
     std::cout<<"pbr_gpu=emissive_metallic_cutout_tiling_ibl_probe_passed\n";
   }
   {

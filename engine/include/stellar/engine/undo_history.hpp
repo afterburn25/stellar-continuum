@@ -24,6 +24,11 @@ public:
   [[nodiscard]] bool can_redo() const noexcept { return !redo_.empty(); }
   [[nodiscard]] std::size_t undo_depth() const noexcept { return undo_.size(); }
   [[nodiscard]] std::size_t redo_depth() const noexcept { return redo_.size(); }
+  // Monotonic mutation serial: every commit, undo, redo and clear bumps
+  // it — including through clear(), so a replaced document can never
+  // collide with a prior generation. A cheap "content changed" key for
+  // callers caching derived state (editor preview environment probes).
+  [[nodiscard]] std::size_t revision() const noexcept { return revision_; }
 
   // Records `pre_mutation_state` as the state undo() restores. A new commit
   // invalidates the redo future.
@@ -31,12 +36,14 @@ public:
     undo_.push_back(pre_mutation_state);
     while (undo_.size() > capacity_) undo_.pop_front();
     redo_.clear();
+    ++revision_;
   }
 
   // Returns the newest committed state to restore, preserving `current` on
   // the redo stack. An empty stack returns nullopt and leaves both untouched.
   std::optional<T> undo(const T &current) {
     if (undo_.empty()) return std::nullopt;
+    ++revision_;
     redo_.push_back(current);
     T restored = std::move(undo_.back());
     undo_.pop_back();
@@ -47,6 +54,7 @@ public:
   // undo stack. An empty stack returns nullopt.
   std::optional<T> redo(const T &current) {
     if (redo_.empty()) return std::nullopt;
+    ++revision_;
     undo_.push_back(current);
     T restored = std::move(redo_.back());
     redo_.pop_back();
@@ -56,11 +64,13 @@ public:
   void clear() noexcept {
     undo_.clear();
     redo_.clear();
+    ++revision_;
   }
 
 private:
   std::size_t capacity_;
   std::deque<T> undo_, redo_;
+  std::size_t revision_{};
 };
 
 } // namespace stellar::engine

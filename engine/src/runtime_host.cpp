@@ -237,6 +237,10 @@ struct RuntimeHost::Impl {
   std::optional<native_map::ShadowMap3D> shadow3;
   std::shared_ptr<const RgbaImage> environment3;
   native_map::EnvironmentCapture3D probe3;
+  // Scene-generation serial for captured environment probes: the scene
+  // object rebuilds every frame, so each document load bumps this to
+  // give the probe cache a stable identity per loaded document.
+  std::uint64_t scene3_epoch = 0;
   float gravity3 = 0.f, ground_y3 = 0.f, bounds3 = 0.f;
   bool look_held = false; // right-button mouse-look
   // Input journaling: --record fills `recorder` with frame-indexed input
@@ -1184,6 +1188,7 @@ int RuntimeHost::run() {
     impl.probe3.enabled = doc.probe_capture;
     impl.probe3.anchor = {doc.probe_x, doc.probe_y, doc.probe_z};
     impl.probe3.face_resolution = doc.probe_resolution;
+    ++impl.scene3_epoch;
     impl.gravity3 = doc.gravity;
     impl.ground_y3 = doc.ground_y;
     impl.bounds3 = doc.bounds;
@@ -2673,6 +2678,7 @@ int RuntimeHost::run() {
                                        impl.shadow3, impl.environment3,
                                        impl.probe3)) {
         Scene3DView view{std::move(scene), {0, 0, w, h}};
+        view.probe_epoch = impl.scene3_epoch;
         view.options = impl.render3;
         draw.overlay.insert(draw.overlay.begin() + 1, std::move(view));
       }
