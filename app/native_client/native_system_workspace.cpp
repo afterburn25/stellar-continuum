@@ -95,7 +95,7 @@ SystemWorkspaceLayout SystemWorkspaceLayout::for_viewport(int width,int height) 
   const auto top=native_workspace_top(width,height);
   const UiRect controls{left,top,w-panel_width-left-28.f*s,36.f*s};
   const UiRect panel{left+8*s,top+58.f*s,panel_width,std::max(1.f,std::min(540.f*s,h-top-144.f*s))};
-  return {controls,{left+6*s,top+4*s,78*s,28*s},{left+90*s,top+4*s,98*s,28*s},panel,
+  return {controls,{left+6*s,top+4*s,112*s,28*s},{left+124*s,top+4*s,98*s,28*s},panel,
           {panel.x+10*s,panel.y+panel.height-44*s,panel.width-20*s,32*s},
           {left+panel_width+24*s,top+44*s,std::max(1.f,w-left-panel_width-384*s),std::max(1.f,h-top-116*s)},
           {panel.x+10*s,panel.y+panel.height-84*s,panel.width-20*s,32*s}};
@@ -342,7 +342,18 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
   artwork_ready_=artwork_ready_&&!celestial_appearance_.preparation_pending();
   render_small_body_panel(out,width,height);
   if(!artwork_ready_)overlay_text(out,field.x+18.f,field.y+12.f,tr("SYSTEM_PREPARING","Preparing system imagery..."),muted,14,field.width-36.f,field);
-  const auto ui_scale=NativeUiLayout::for_viewport(width,height).scale;overlay_fill(out,layout.controls_row,{5,15,28,238});overlay_stroke(out,layout.controls_row,border);overlay_fill(out,layout.back,{10,27,47,245});overlay_stroke(out,layout.back,border);overlay_text(out,layout.back.x+22.f*ui_scale,layout.back.y+6.f*ui_scale,tr("SYSTEM_BACK","BACK"),text,15);overlay_fill(out,layout.reset,{10,27,47,245});overlay_stroke(out,layout.reset,border);
+  const auto ui_scale=NativeUiLayout::for_viewport(width,height).scale;overlay_fill(out,layout.controls_row,{5,15,28,238});overlay_stroke(out,layout.controls_row,border);overlay_fill(out,layout.back,{10,27,47,245});overlay_stroke(out,layout.back,border);
+  {
+    // Same fit discipline as the reset button — long localized labels
+    // ("ZURÜCK") shrink before they may fall back to the compact key.
+    std::string back_label=tr("SYSTEM_BACK","BACK");
+    int back_size=15;const float back_budget=layout.back.width-24.f*ui_scale;
+    const auto back_width=[&](const std::string&value,int size){return text_measurer_?text_measurer_(Text{{},value,text,size,0,{}}).width:static_cast<int>(value.size())*7;};
+    while(back_size>8&&back_width(back_label,back_size)>static_cast<int>(back_budget))--back_size;
+    if(back_width(back_label,back_size)>static_cast<int>(back_budget)){back_label=tr("SYSTEM_BACK_COMPACT","BACK");back_size=15;while(back_size>8&&back_width(back_label,back_size)>static_cast<int>(back_budget))--back_size;}
+    overlay_text(out,layout.back.x+12.f*ui_scale,layout.back.y+6.f*ui_scale,back_label,text,back_size,0,layout.back);
+  }
+  overlay_fill(out,layout.reset,{10,27,47,245});overlay_stroke(out,layout.reset,border);
   {
     // Long localized labels ("SYSTEM EINPASSEN") cannot fit the compact
     // button even at the rasterizer floor — shrink first, then fall back
@@ -382,7 +393,38 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
   out.overlay.emplace_back(title);
   const float survey_x=std::min(title_x+static_cast<float>(title_extent.width)+18.f*ui_scale,row_right-badge_width-8.f*ui_scale);
   overlay_text(out,std::max(title_x,survey_x),layout.controls_row.y+11.f*ui_scale,survey_value,muted,survey_size,0,layout.controls_row);
-  overlay_fill(out,panel,{6,18,33,242});overlay_stroke(out,panel,border);float y=panel.y+14;const auto add=[&](std::string value,Color color,int size=14,float step=20){const Text label{{panel.x+14,y},std::move(value),color,size,panel.width-28,panel};const auto measured=text_measurer_?text_measurer_(label):TextExtent{0,size+6};out.overlay.emplace_back(label);y+=std::max(step,static_cast<float>(measured.height)+4.f);};if(!selected_body())add(tr("SYSTEM_INSPECTOR","SYSTEM INSPECTOR"),text,18,31);const auto*fleet=selected_fleet();if(inspector_focus_!=InspectorFocus::body&&fleet){add(fleet->foreign_inspection?tr("SYSTEM_FLEET_DEV","DEVELOPER FLEET INSPECTION"):tr("SYSTEM_FLEET_OWNED","OWNED LOCAL FLEET"),muted,13,21);add(fleet->name,text,17,26);add(trf("SYSTEM_FLEET_STATE",{fleet_role(fleet->role),fleet->moving?tr("SYSTEM_STATE_MOVING","Moving"):fleet->held?tr("SYSTEM_STATE_HOLDING","Holding"):tr("SYSTEM_STATE_LOCAL","Local")},"{0}  {1}"),text,14,24);if(settlement_status_&&settlement_status_->fleet_id==fleet->fleet_id){add(settlement_status_->status,{102,232,164,255},13,21);if(settlement_status_->destination_body_id)add(trf("SYSTEM_ESTABLISHMENT",{number(settlement_status_->settlement_days_completed,1),number(settlement_status_->establishment_days,0)},"Establishment  {0} / {1} days"),text,13,20);}}else if(selected_body()){body_inspection_.render(out,panel,layout.focus_action.y);}else {
+  // The inspector's bottom strip is claimed by the focus/colony action
+  // buttons or the order-result notice — reserve it before laying out
+  // rows so a compact row renders fully or not at all instead of drawing
+  // underneath the active element.
+  const bool colony_action_shown=
+      (colony_body_id_&&selected_body_id_==colony_body_id_)||
+      (preparation_&&selected_body());
+  const bool notice_shown=!notice_.empty()&&!colony_action_shown;
+  UiRect notice_bounds{};
+  float content_bottom=panel.y+panel.height;
+  if(selected_body())content_bottom=layout.focus_action.y-4.f;
+  if(colony_action_shown)
+    content_bottom=std::min(content_bottom,layout.colony_action.y-4.f);
+  if(notice_shown){
+    const UiRect notice_base=selected_body()?layout.colony_action:UiRect{panel.x+12,panel.y+panel.height-88,panel.width-24,74};
+    // Order results wrap to several lines — grow the banner upward to fit
+    // the measured text rather than clipping mid-line.
+    float notice_height=notice_base.height;
+    if(text_measurer_){const auto measured=text_measurer_(Text{{},notice_,{245,183,93,250},13,notice_base.width-16.f});if(measured.height>0)notice_height=std::max(notice_base.height,static_cast<float>(measured.height)+18.f);}
+    notice_height=std::min(notice_height,notice_base.y+notice_base.height-(panel.y+8.f));
+    // The command HUD's context plate owns the bottom-center strip — lift
+    // the banner above it where the inspector's x-range reaches under the
+    // plate.
+    auto notice_bottom=notice_base.y+notice_base.height;
+    const auto plate=CommandHudLayout::make(width_,height_).context;
+    if(notice_base.x<plate.x+plate.width&&notice_base.x+notice_base.width>plate.x)
+      notice_bottom=std::min(notice_bottom,plate.y-4.f);
+    const auto notice_top=std::max(panel.y+8.f,notice_bottom-notice_height);
+    notice_bounds={notice_base.x,notice_top,notice_base.width,notice_bottom-notice_top};
+    content_bottom=std::min(content_bottom,notice_bounds.y-4.f);
+  }
+  overlay_fill(out,panel,{6,18,33,242});overlay_stroke(out,panel,border);float y=panel.y+14;const UiRect row_clip{panel.x,panel.y,panel.width,std::max(0.f,content_bottom-panel.y)};const auto add=[&](std::string value,Color color,int size=14,float step=20){const Text label{{panel.x+14,y},std::move(value),color,size,panel.width-28,row_clip};const auto measured=text_measurer_?text_measurer_(label):TextExtent{0,size+6};const float need=measured.height>0?static_cast<float>(measured.height):static_cast<float>(size)+6.f;if(y+need>content_bottom)return;out.overlay.emplace_back(label);y+=std::max(step,need+4.f);};if(!selected_body())add(tr("SYSTEM_INSPECTOR","SYSTEM INSPECTOR"),text,18,31);const auto*fleet=selected_fleet();if(inspector_focus_!=InspectorFocus::body&&fleet){add(fleet->foreign_inspection?tr("SYSTEM_FLEET_DEV","DEVELOPER FLEET INSPECTION"):tr("SYSTEM_FLEET_OWNED","OWNED LOCAL FLEET"),muted,13,21);add(fleet->name,text,17,26);add(trf("SYSTEM_FLEET_STATE",{fleet_role(fleet->role),fleet->moving?tr("SYSTEM_STATE_MOVING","Moving"):fleet->held?tr("SYSTEM_STATE_HOLDING","Holding"):tr("SYSTEM_STATE_LOCAL","Local")},"{0}  {1}"),text,14,24);if(settlement_status_&&settlement_status_->fleet_id==fleet->fleet_id){add(settlement_status_->status,{102,232,164,255},13,21);if(settlement_status_->destination_body_id)add(trf("SYSTEM_ESTABLISHMENT",{number(settlement_status_->settlement_days_completed,1),number(settlement_status_->establishment_days,0)},"Establishment  {0} / {1} days"),text,13,20);}}else if(selected_body()){body_inspection_.render(out,panel,layout.focus_action.y);}else {
     if(snapshot_->stellar_object){const auto& p=*snapshot_->stellar_object;const auto& d=stellar::core::stellar_object_definition(p.type);
       add(d.name,text,16,26);
       add(trf("SYSTEM_RADIUS",{compact_km(p.radius_solar*695700.)},"Radius  {0} km"),text,13,20);
@@ -407,20 +449,7 @@ if(colony_body_id_&&selected_body_id_==colony_body_id_){overlay_fill(out,layout.
 overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});
 overlay_stroke(out,layout.colony_action,{102,232,164,255});
 overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,tr("SYSTEM_VIEW_SHIPYARD","VIEW SHIPYARD"),text,14,layout.colony_action.width-20,layout.colony_action);
-}else if(!notice_.empty()){const UiRect notice_base=selected_body()?layout.colony_action:UiRect{panel.x+12,panel.y+panel.height-88,panel.width-24,74};
-// Order results wrap to several lines — grow the banner upward to fit the
-// measured text rather than clipping mid-line.
-float notice_height=notice_base.height;
-if(text_measurer_){const auto measured=text_measurer_(Text{{},notice_,{245,183,93,250},13,notice_base.width-16.f});if(measured.height>0)notice_height=std::max(notice_base.height,static_cast<float>(measured.height)+18.f);}
-notice_height=std::min(notice_height,notice_base.y+notice_base.height-(panel.y+8.f));
-// The command HUD's context plate owns the bottom-center strip — lift the
-// banner above it where the inspector's x-range reaches under the plate.
-auto notice_bottom=notice_base.y+notice_base.height;
-const auto plate=CommandHudLayout::make(width_,height_).context;
-if(notice_base.x<plate.x+plate.width&&notice_base.x+notice_base.width>plate.x)
-  notice_bottom=std::min(notice_bottom,plate.y-4.f);
-const auto notice_top=std::max(panel.y+8.f,notice_bottom-notice_height);
-const UiRect notice_bounds{notice_base.x,notice_top,notice_base.width,notice_bottom-notice_top};
+}else if(notice_shown){
 overlay_fill(out,notice_bounds,{35,25,16,235});overlay_stroke(out,notice_bounds,{139,92,42,255});overlay_text(out,notice_bounds.x+8,notice_bounds.y+8,notice_,{245,183,93,250},13,notice_bounds.width-16,notice_bounds);}}
 void NativeSystemWorkspace::sync_body_inspection(){
   if(!snapshot_||!selected_body_id_){preparation_.reset();preparation_pressed_=false;body_inspection_.clear();return;}

@@ -980,6 +980,7 @@
     "SYSTEM_SHIPYARD": "Orbital Shipyard",
     "SYSTEM_PREPARING": "Preparing system imagery...",
     "SYSTEM_BACK": "BACK",
+    "SYSTEM_BACK_COMPACT": "BACK",
     "SYSTEM_FIT": "FIT SYSTEM",
     "SYSTEM_FIT_COMPACT": "FIT",
     "SYSTEM_SURVEY_FULL_COMPACT": "SURVEYED",

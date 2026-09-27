@@ -1145,6 +1145,7 @@
     "SYSTEM_SHIPYARD": "Orbitale Werft",
     "SYSTEM_PREPARING": "Systembilder werden vorbereitet...",
     "SYSTEM_BACK": "ZURÜCK",
+    "SYSTEM_BACK_COMPACT": "‹",
     "SYSTEM_FIT": "SYSTEM EINPASSEN",
     "SYSTEM_FIT_COMPACT": "ANPASSEN",
     "SYSTEM_SURVEY_FULL_COMPACT": "VERMESST",
