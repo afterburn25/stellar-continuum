@@ -3617,9 +3617,14 @@ class NativeCampaign final {
     diplomacy_smoke_select(other->contact_id,width,height);
     diplomacy_smoke_select(primary->contact_id,width,height);
     const auto layout=DiplomacyWorkspaceLayout::for_viewport(width,height);
+    // Smoke needles are UI chrome, so resolve them through the active locale
+    // table (the same path the workspace's tr() uses) rather than hardcoding
+    // English — non-English saves must run the same flow.
+    const auto smoke_tr=[&](std::string_view key,std::string_view fallback){
+      return locale_&&locale_->contains(key)?std::string(locale_->translate(key)):std::string(fallback);};
     if(!reload){
-      diplomacy_smoke_text("PROPOSALS",layout.tabs,width,height);
-      diplomacy_smoke_text("Accept",layout.detail_rows,width,height);
+      diplomacy_smoke_text(smoke_tr("DIPLOMACY_TAB_PROPOSALS","PROPOSALS"),layout.tabs,width,height);
+      diplomacy_smoke_text(smoke_tr("DIPLOMACY_ACCEPT","Accept"),layout.detail_rows,width,height);
     }
     const auto after=session_->frame().runtime().diplomacy().snapshot();
     const auto resolved=std::ranges::find(after.proposals,proposal->proposal_id,&DiplomaticProposalSnapshot::proposal_id);
@@ -3627,7 +3632,7 @@ class NativeCampaign final {
       throw std::runtime_error("Incoming diplomatic proposal was not accepted through player input.");
     if(!std::ranges::any_of(after.agreements,[&](const auto&a){return a.type==DiplomaticAgreementType::research_exchange&&a.status==DiplomaticAgreementStatus::active&&((a.civilization_a_id==observer&&a.civilization_b_id==target)||(a.civilization_a_id==target&&a.civilization_b_id==observer));}))
       throw std::runtime_error("Diplomatic acceptance did not activate the canonical agreement.");
-    diplomacy_smoke_text("AGREEMENTS",layout.tabs,width,height);
+    diplomacy_smoke_text(smoke_tr("DIPLOMACY_TAB_AGREEMENTS","AGREEMENTS"),layout.tabs,width,height);
     InputSnapshot scroll;scroll.drawable_width=width;scroll.drawable_height=height;
     scroll.pointer=center(layout.detail_rows);scroll.events={{InputEventType::Wheel,scroll.pointer,{},-10.f}};
     if(!update(scroll,width,height,0.,false))throw std::runtime_error("Diplomacy agreement scrolling closed the campaign.");
@@ -8121,9 +8126,20 @@ class NativeCampaign final {
     if(notifications_available()){
       panel(out,layout.notifications,layout.notifications.contains(pointer_),notification_view_.visible());
       const auto unread=notifications_.unread_count(notification_view_.last_read());
-      control_label(out,layout.notifications,trf("HUD_EVENTS",{std::to_string(unread)},"EVENTS {0}"),
+      const auto events_label=trf("HUD_EVENTS",{std::to_string(unread)},"EVENTS {0}");
+      // Longer translations (e.g. "EREIGNISSE 2") cannot fit the fixed-width
+      // chip even at the minimum control size — fall back to the bare unread
+      // count and let the hover hint carry the full wording.
+      const float chip_padding=std::max(6.f,8.f*layout.scale);
+      const Text probe{{},events_label,icon_color,10,0.f,std::nullopt,TextAlign::Center,FontFace::Interface};
+      const auto probe_extent=text_measurer_?text_measurer_(probe):TextExtent{static_cast<int>(events_label.size()*10.f*.58f),10};
+      const bool compact=probe_extent.width>layout.notifications.width-2.f*chip_padding;
+      control_label(out,layout.notifications,compact?std::to_string(unread):events_label,
           unread?Color{240,197,106,255}:Color{225,238,250,255},
           layout.control_font_pixels,layout.scale,text_measurer_);
+      if(compact&&layout.notifications.contains(pointer_))
+        stellar::native_ui::hint(out,{layout.notifications.x-6.f*layout.scale,layout.notifications.y+layout.notifications.height+4.f*layout.scale},
+            events_label,width,height,layout.metric_font_pixels,layout.scale,text_measurer_);
     }
     const auto draw_navigation=[&](UiRect bounds,UiAction action,bool active,std::string_view tip){
       const bool tab=bounds.width>bounds.height+4.f*layout.scale;
