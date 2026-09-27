@@ -1,5 +1,6 @@
 #include "native_chronicle.hpp"
 #include "native_campaign_calendar.hpp"
+#include "native_history_messages.hpp"
 #include "native_ui_theme.hpp"
 
 #include <stellar/engine/native_ui_skin.hpp>
@@ -371,7 +372,8 @@ const char *category_label(std::string_view category) noexcept {
 ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            int observer_civilization_id,
                            const ChronicleFilter &filter,
-                           std::size_t max_entries) {
+                           std::size_t max_entries,
+                           const stellar::engine::LocalizationTable *locale) {
   const auto observer =
       static_cast<std::uint64_t>(observer_civilization_id);
   // feed() == query() with these three fields — query() is the same
@@ -417,11 +419,13 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
         if (contact != 0 && contact != id) { contact = 0; break; }
         contact = id;
       }
-    snap.entries.push_back({event->id, event->location, contact,
-                            label ? std::string(label) : event->category,
-                            native_campaign::format_campaign_date(
-                                event->at_day),
-                            event->summary, event->tags});
+    snap.entries.push_back(
+        {event->id, event->location, contact,
+         label ? std::string(label) : event->category,
+         native_campaign::format_campaign_date(event->at_day),
+         native_history::localized_history_summary(locale, event->category,
+                                                   event->summary),
+         event->tags});
   }
   return snap;
 }
@@ -446,7 +450,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   search_.clear();
   search_focused_ = false;
   focus_ = -1;
-  snapshot_ = snapshot(history, observer_civilization_id);
+  snapshot_ = snapshot(history, observer_civilization_id, {}, 4000, locale_);
   cancel_press();
 }
 
@@ -483,7 +487,7 @@ void NativeChronicleView::refresh() {
     filter.since_day = -std::numeric_limits<double>::infinity();
   }
   filter.search = search_;
-  snapshot_ = snapshot(*history_, observer_, filter);
+  snapshot_ = snapshot(*history_, observer_, filter, 4000, locale_);
   scroll_ = {};
 }
 

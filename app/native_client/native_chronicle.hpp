@@ -83,10 +83,13 @@ struct ChronicleFilter {
 // a chronicle can hold 100k records; the view shows the newest slice
 // and reports the true total). Visibility is delegated entirely to
 // `EventHistory::query`'s observer projection (the same one `feed()`
-// wraps, plus the `before_day` axis) — never re-derived here.
+// wraps, plus the `before_day` axis) — never re-derived here. When
+// `locale` is set, entry summaries are recomposed through it after the
+// search/filter axes run on the authoritative English record.
 [[nodiscard]] ChronicleSnapshot
 snapshot(const engine::EventHistory &history, int observer_civilization_id,
-         const ChronicleFilter &filter = {}, std::size_t max_entries = 4000);
+         const ChronicleFilter &filter = {}, std::size_t max_entries = 4000,
+         const stellar::engine::LocalizationTable *locale = nullptr);
 
 class NativeChronicleView final {
 public:
