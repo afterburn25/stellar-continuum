@@ -227,6 +227,7 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
        !bounded(s.depth,1e9)||s.depth<=0||!bounded(s.strength,1)||s.strength<0||
        !bounded(s.bias,.1)||s.bias<0||(s.resolution&&(s.resolution<64||s.resolution>8192))||
        s.cascade_extents.size()>maximum_scene3d_shadow_cascades||
+       !bounded(s.normal_offset,8)||s.normal_offset<0||
        !bounded(s.softness,8)||s.softness<0)
       throw std::invalid_argument("3D shadow map requires positive extent/depth, bounded distance, strength, bias, resolution, softness and ordered cascade extents exceeding the near extent.");
     float prev=s.extent;

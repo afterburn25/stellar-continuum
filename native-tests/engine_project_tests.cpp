@@ -525,6 +525,7 @@ int main() {
     scene.shadow_resolution = 2048;
     scene.shadow_cascades = {96.f, 192.f};
     scene.shadow_softness = 2.5f;
+    scene.shadow_normal_offset = 1.5f;
     const auto reparsed =
         engine::Scene3dDocument::from_json(scene.to_json());
     check(reparsed.has_value(), "scene3d json round-trips");
@@ -638,7 +639,8 @@ int main() {
                 reparsed->shadow_depth == 128.f && reparsed->shadow_strength == 0.7f &&
                 reparsed->shadow_bias == 0.001f && reparsed->shadow_resolution == 2048 &&
                 reparsed->shadow_cascades == (std::vector<float>{96.f, 192.f}) &&
-                reparsed->shadow_softness == 2.5f,
+                reparsed->shadow_softness == 2.5f &&
+                reparsed->shadow_normal_offset == 1.5f,
             "scene3d shadow map settings round-trip");
       // The emitter mirrors legacy cascade/cascade2 scalars alongside the
       // cascades array, and a legacy document lacking the array parses
@@ -648,6 +650,8 @@ int main() {
                 emitted["render"]["shadow"]["cascade"] == 96.f &&
                 emitted["render"]["shadow"]["cascade2"] == 192.f,
             "scene3d cascades array lost its legacy scalar mirror");
+      check(emitted["render"]["shadow"]["normalOffset"] == 1.5f,
+            "scene3d shadow normalOffset did not serialize");
       auto legacy_json = emitted;
       legacy_json["render"]["shadow"].erase("cascades");
       const auto legacy_parsed =
@@ -727,6 +731,10 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"softness":9}}})")
               .has_value(),
           "scene3d shadow softness above eight rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3]}],"render":{"shadow":{"extent":4,"normalOffset":9}}})")
+              .has_value(),
+          "scene3d shadow normalOffset above eight rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.97,"spotOuter":0.9,"castShadow":true,"shadowSoftness":-1}]})")
               .has_value(),

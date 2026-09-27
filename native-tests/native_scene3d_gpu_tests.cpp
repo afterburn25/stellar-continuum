@@ -1101,7 +1101,24 @@ int main(int argc,char** argv)try{
     const auto unshadowed_receiver=shadow_view({blind,occluder},{},"shadow-noreceive.png");
     check(channel(*unshadowed_receiver,176,160,0)>100,"A receives_shadow=false receiver still showed the umbra");
     check(channel(*unshadowed_receiver,60,160,0)>100,"Receive opt-out brightened the wrong region");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_optout_receive_passed\n";
+    // Receiver-side normal offset: lifting the lookup along the +Z plate
+    // normal moves it obliquely in light space, so the projected umbra
+    // footprint *translates* on the receiver — a constant depth bias can
+    // never slide a footprint laterally, which makes the move a strict
+    // discriminator for the authored lift reaching the shader. Two
+    // texels at this coarse 64-res map shifts the edge visibly.
+    auto coarse=shadow;coarse.resolution=64;
+    const auto offset_view=[&](std::vector<MeshInstance3D> objects,float offset,const char* name){
+      auto m=coarse;m.normal_offset=offset;
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},m),{0,0,320,320}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto off_0=offset_view({receiver,occluder},0.f,"shadow-offset-0.png");
+    const auto off_2=offset_view({receiver,occluder},2.f,"shadow-offset-2.png");
+    const auto umbra_edge=[&](const RgbaImage&img){int lo=320,hi=0;for(int x=40;x<215;++x)if(channel(img,x,160,0)<channel(*open,x,160,0)/2){lo=std::min(lo,x);hi=x;}return lo+hi;};
+    check(std::abs(umbra_edge(*off_2)-umbra_edge(*off_0))>16,"normal_offset did not translate the receiver's depth lookup");
+    check(channel(*off_2,60,160,0)>100,"normal_offset darkened unoccluded receivers");
+    check(umbra_edge(*off_0)>0,"The coarse map lost the umbra before the offset probe");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_optout_receive_normaloffset_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks

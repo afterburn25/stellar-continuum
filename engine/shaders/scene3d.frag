@@ -70,6 +70,12 @@ layout(set=3,binding=0) uniform ViewParams {
     // enabled in shadow_options
     mat4 shadow_from_view;
     vec4 shadow_options;
+    // Authored receiver-side normal offset in world units (near map):
+    // the fragment lifts along its shading normal by this much before
+    // depth projection, so slope-scaled acne on angled surfaces clears
+    // without raising the constant bias. Cascade tiers carry their own
+    // texel-scaled value in cascade_options[t].z.
+    vec4 shadow_advanced;
     // view → spot-cone clip space per shadowed point light (index i matches
     // material.point_*[i]); the quadrant offset bakes into the transform so
     // each light writes its own depth-atlas cell. spot_options[i] = texel
@@ -83,7 +89,8 @@ layout(set=3,binding=0) uniform ViewParams {
     // volumes sharing the directional box's centre/depth so coverage
     // survives extreme zoom. Tiers are contiguous from index 0, each
     // writing layer t of the cascade depth-array. cascade_options[t] =
-    // texel size (>0 enabled), PCF radius in texels, -, bias.
+    // texel size (>0 enabled), PCF radius in texels, the tier's own
+    // texel-scaled normal-offset lift, bias.
     mat4 cascade_from_view[4];
     vec4 cascade_options[4];
     // Shadowed omni point lights (index i matches material.point_*[i]):
@@ -359,7 +366,12 @@ void main() {
     // the box stay lit instead of smearing. Fixed 8-tap kernel keeps PCF
     // cheap; the radius (in texels) and strength come from the quality tier.
     if(view_params.shadow_options.x>0.0) {
-        vec4 clip=view_params.shadow_from_view*vec4(view_position,1.0);
+        // Receiver-side normal offset: each tier lifts the shading
+        // point along the view-space normal by its own texel-scaled
+        // amount, so a surface angled to the light doesn't acne
+        // against its own depth footprint.
+        const vec3 shadow_n=normalize(view_normal);
+        vec4 clip=view_params.shadow_from_view*vec4(view_position+shadow_n*view_params.shadow_advanced.x,1.0);
         float lit;
         if(view_params.cascade_options[0].x>0.0) {
             // Cascade chain: fold the enabled tiers widest→narrowest —
@@ -375,7 +387,7 @@ void main() {
             float flit=1.0;bool seeded=false;
             for(int t=3;t>=0;--t) {
                 if(view_params.cascade_options[t].x<=0.0)continue;
-                vec4 fclip=view_params.cascade_from_view[t]*vec4(view_position,1.0);
+                vec4 fclip=view_params.cascade_from_view[t]*vec4(view_position+shadow_n*view_params.cascade_options[t].z,1.0);
                 const float tlit=map_lit_layer(shadow_cascade_map,float(t),fclip,
                     view_params.cascade_options[t].x,view_params.cascade_options[t].y,view_params.cascade_options[t].w);
                 if(!seeded){flit=tlit;seeded=true;continue;} // widest tier

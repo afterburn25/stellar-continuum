@@ -99,7 +99,10 @@ same document headless-tested.
    planet-scale through sector-scale receivers)
    keep coverage at extreme zoom-out; `softness`/`shadowSoftness` scale
    the tier PCF radius on both maps so authored penumbra width isn't
-   quality-locked; and per-instance `castsShadow`/`NoShadow` opts an
+   quality-locked; `normalOffset` lifts receivers along their shading
+   normal in map texels so slope-scaled acne on angled surfaces clears
+   without raising the constant bias; and per-instance
+   `castsShadow`/`NoShadow` opts an
    opaque mesh out of every depth pass (a collapsed group follows its
    representative) while `receivesShadow`/`NoShadowReceive` keeps the
    depth-map terms fully lit on a self-lit receiver. Remaining: the chain tops out at

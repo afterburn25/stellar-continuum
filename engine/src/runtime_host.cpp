@@ -1174,6 +1174,7 @@ int RuntimeHost::run() {
       map.resolution = doc.shadow_resolution;
       map.cascade_extents = doc.shadow_cascades;
       map.softness = doc.shadow_softness;
+      map.normal_offset = doc.shadow_normal_offset;
       impl.shadow3 = map;
     } else
       impl.shadow3.reset();

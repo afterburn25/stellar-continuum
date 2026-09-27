@@ -89,14 +89,16 @@ struct VertexUniform {Matrix4 mvp,model_view,shadow_from_model;};
 struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy,point_cone;std::array<float,4> point_outer;std::array<float,4> anim_options;};
 struct PostUniform {std::array<float,4> a,b;};
 // View-wide fragment uniform: debug selector, then the key light's
-// view→shadow-clip transform and {texel size (>0 enables), PCF radius in
-// texels, strength, bias} for the directional shadow map. The spot pair
-// covers the shadowed cone lights (one depth-atlas quadrant each — the
-// bounds lane clamps sampling so out-of-cone fragments can't sample a
-// neighbour quadrant), the far pair the optional wider cascade tier
-// sharing the directional box's centre/depth.
-struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;std::array<Matrix4,maximum_scene3d_shadow_cascades> cascade_from_view;std::array<std::array<float,4>,maximum_scene3d_shadow_cascades> cascade_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==928);
+// view→shadow-clip transform, {texel size (>0 enables), PCF radius in
+// texels, strength, bias}, and the world-units normal-offset lift for
+// the directional shadow map. The spot pair covers the shadowed cone
+// lights (one depth-atlas quadrant each — the bounds lane clamps
+// sampling so out-of-cone fragments can't sample a neighbour quadrant),
+// the cascade arrays the optional wider tiers sharing the directional
+// box's centre/depth (one depth-array layer each, options .z carrying
+// each tier's own texel-scaled lift), the omni pair the cube-atlas rows.
+struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<float,4> shadow_advanced;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;std::array<Matrix4,maximum_scene3d_shadow_cascades> cascade_from_view;std::array<std::array<float,4>,maximum_scene3d_shadow_cascades> cascade_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;};
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==944);
 // Column-major rotation for a unit quaternion — same convention as
 // rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
 Matrix4 rotation_from(Quaternion q){
@@ -944,6 +946,12 @@ struct Scene3DRenderer::Storage {
       view_uniform.shadow_from_view=multiply(light_projection,from_view);
       const float radius_texels=(opt.quality==RenderQuality3D::Ultra?1.5f:opt.quality==RenderQuality3D::High?1.f:0.f)*s.softness;
       view_uniform.shadow_options={1.f/static_cast<float>(shadow_res),radius_texels,s.strength,s.bias};
+      // Authored normal offset in near-map texels → world units: the
+      // receiver lifts along its shading normal by this much before
+      // depth projection so slope-scaled acne clears without raising
+      // the constant bias. Each cascade tier scales by its own
+      // world-per-texel (2*extent/res).
+      view_uniform.shadow_advanced={s.normal_offset*2.f*s.extent/static_cast<float>(shadow_res),0.f,0.f,0.f};
       // Casters: transparent blends never occlude; visible_range culls cast
       // shadows identically to the camera draw; the light-space box test is
       // the only frustum cut — off-camera casters still write the map.
@@ -960,7 +968,8 @@ struct Scene3DRenderer::Storage {
         const double tier_extent=s.cascade_extents[t];
         Matrix4 tier_projection{};tier_projection.values={{1.f/static_cast<float>(tier_extent),0,0,0,0,1.f/static_cast<float>(tier_extent),0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
         view_uniform.cascade_from_view[t]=multiply(tier_projection,from_view);
-        view_uniform.cascade_options[t]={1.f/static_cast<float>(shadow_res),radius_texels,0.f,s.bias};
+        view_uniform.cascade_options[t]={1.f/static_cast<float>(shadow_res),radius_texels,
+            s.normal_offset*2.f*static_cast<float>(tier_extent)/static_cast<float>(shadow_res),s.bias};
         const auto tier_volume=[&](double lx,double ly,double lz,double r){
           return std::abs(lx)<=tier_extent+r&&std::abs(ly)<=tier_extent+r&&lz<=r&&lz>=-depth-r;};
         std::uint64_t tier_casters=0;

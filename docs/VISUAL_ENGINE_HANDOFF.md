@@ -327,6 +327,9 @@ shadow.bias = 0.0005f;      // receiver-side depth bias, shadow-NDC units
 shadow.resolution = 0;      // 0 = tier default (Medium 1024 / High 2048 / Ultra 4096)
 shadow.softness = 1.f;      // [0,8] PCF penumbra multiplier on the tier
                             // radius (0 = hard single-tap edge)
+shadow.normal_offset = 0.f; // [0,8] receiver lift along its shading
+                            // normal in map texels — clears slope-scaled
+                            // acne a constant bias cannot; 0 disables
 shadow.cascade_extents = {}; // up to 4 wider far tiers; each must be
                              // strictly larger than the previous and
                              // than `extent` (orbit → system → sector)
@@ -454,14 +457,15 @@ equirect path — a shared IBL probe that fills entities with
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
 ("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows"), and
 `render.shadow` — `{extent, distance, depth, strength, bias,
-resolution, cascades, softness}`; `cascades` is an array of up to four
+resolution, cascades, softness, normalOffset}`; `cascades` is an array of up to four
 wider ortho extents (legacy `cascade`/`cascade2` scalar keys still
 parse and are emitted alongside the array); `extent ≤ 0` (or the key
 absent) disables the map. Negative `range` and unknown
 `debug`/`quality` strings are rejected, as are nonpositive `depth`,
 `strength` outside [0,1], negative `bias`, `resolution` outside
 [64,8192], any cascade extent not strictly past the previous tier, a
-cascade list over four entries, and `softness` outside [0,8].
+cascade list over four entries, `softness` outside [0,8], and
+`normalOffset` non-finite or outside [0,8].
 
 `spawn_scene3d` attaches `MaterialPbr`/`AtmosphereShell`/`MaterialSurface`
 components (binary codec round-trips), a `VisibleRange` component when
@@ -485,7 +489,7 @@ LOD fade width.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range +
 optional spot dir/inner/outer/shadow flag),
-shadow map (extent/distance/depth/strength/bias/resolution/cascade…cascade4/softness), scene
+shadow map (extent/distance/depth/strength/bias/resolution/cascade…cascade4/softness/normalOffset), scene
 environment probe (equirect path — feeds `environmentStrength` opt-ins
 that author no own map).
 The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.

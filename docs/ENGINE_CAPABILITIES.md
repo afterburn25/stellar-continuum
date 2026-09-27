@@ -445,13 +445,20 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   entries must be finite, strictly increasing and each past `extent`),
   `softness`
   ([0,8] penumbra multiplier on the tier PCF radius — 0 forces the
-  hard single-tap edge). Coverage is an
+  hard single-tap edge),
+  `normal_offset` ([0,8] receiver-side lift along the shading normal in
+  map texels — clears slope-scaled self-shadow acne on surfaces angled
+  to the light without raising the constant `bias`; each cascade tier
+  applies its own texel-scaled amount). Coverage is an
   authored policy: receivers outside every box stay lit; the box
   tracks the camera so mid-zoom strategy views keep stable texel
   density.
 - **Shader contract:** view-level fragment uniform carries the
   view→shadow-clip matrix plus {texel, PCF radius in texels, strength,
-  bias}; 8-tap kernel at High (1-texel) and Ultra (1.5), single tap at
+  bias} and the world-units normal-offset lift; the fragment adds
+  `normal × lift` to its view-space position before projecting into
+  every tier (cascade tiers carry their own texel-scaled value in
+  `cascade_options`). 8-tap kernel at High (1-texel) and Ultra (1.5), single tap at
   Medium. Per-tier matrix/options arrays (sized to the four-tier bound)
   feed the cascade tiers: every tier renders its caster list into its
   own layer of one shared depth-texture array, and the fragment folds
@@ -482,9 +489,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   nonpositive `depth`, `strength` outside [0,1],
   `bias` outside [0,0.1], `resolution` outside [64,8192], any cascade
   extent that is non-finite or not strictly past the previous tier, a
-  cascade list longer than four, and `softness` outside [0,8].
+  cascade list longer than four, `softness` outside [0,8], and
+  `normalOffset` non-finite or outside [0,8].
 - **Editor:** Scene3D tool `shadow` row edits all fields against
-  the live preview, trailing fields carrying up to four cascade tiers.
+  the live preview, trailing fields carrying up to four cascade tiers
+  then the normal-offset lift.
 - **Tests:** `native_scene3d_gpu` — casters/bias/direction/tiers/range
   block with pixel probes (open vs blocked receiver, moved blocker
   relocates the shadow, Low-tier skip, PCF tap delta, out-of-range

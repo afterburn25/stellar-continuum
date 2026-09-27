@@ -386,6 +386,10 @@ struct Scene3dDocument {
   std::vector<float> shadow_cascades;
   // [0,8] PCF penumbra multiplier on the tier radius (1 = default).
   float shadow_softness{1.f};
+  // [0,8] receiver-side normal offset in map texels: receivers lift
+  // along their shading normal before depth projection so slope-scaled
+  // acne clears without raising the constant bias. 0 disables.
+  float shadow_normal_offset{0.f};
   // Background clear color.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward (-Y) acceleration in units/s²; 0 disables gravity.

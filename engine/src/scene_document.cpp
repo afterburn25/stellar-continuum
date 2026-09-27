@@ -569,6 +569,8 @@ std::string Scene3dDocument::to_json() const {
       doc["render"]["shadow"]["cascades"] = shadow_cascades;
     }
     if (shadow_softness != 1.f) doc["render"]["shadow"]["softness"] = shadow_softness;
+    if (shadow_normal_offset != 0.f)
+      doc["render"]["shadow"]["normalOffset"] = shadow_normal_offset;
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
@@ -952,6 +954,7 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
           if (legacy_far2 != 0.0f) scene.shadow_cascades.push_back(legacy_far2);
         }
         scene.shadow_softness = s.value("softness", 1.0f);
+        scene.shadow_normal_offset = s.value("normalOffset", 0.0f);
         bool ordered = true;
         for (float prev = scene.shadow_extent; const float e : scene.shadow_cascades) {
           if (!std::isfinite(e) || e > 1e9f || e <= prev) ordered = false;
@@ -962,6 +965,8 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
             scene.shadow_strength > 1.f || scene.shadow_bias < 0.f ||
             scene.shadow_bias > 0.1f || !ordered ||
             scene.shadow_softness < 0.f || scene.shadow_softness > 8.f ||
+            !std::isfinite(scene.shadow_normal_offset) ||
+            scene.shadow_normal_offset < 0.f || scene.shadow_normal_offset > 8.f ||
             (scene.shadow_resolution != 0u &&
              (scene.shadow_resolution < 64u || scene.shadow_resolution > 8192u)))
           return fail("render shadow fields out of range");

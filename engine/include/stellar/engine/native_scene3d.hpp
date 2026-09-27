@@ -393,8 +393,14 @@ struct ShadowMap3D {
   std::uint32_t resolution{0}; // 0 = tier default (1024/2048/4096)
   // PCF penumbra width multiplier on the tier radius (0 = a hard
   // single-tap edge even at High/Ultra, larger values widen the
-  // 8-tap kernel's spread). Applies to both cascade tiers.
+  // 8-tap kernel's spread). Applies to every cascade tier.
   float softness{1.f};     // [0,8] — applied to every cascade tier
+  // Receiver-side normal offset in the map's own texels [0,8]: each
+  // fragment lifts along its shading normal by normal_offset × the
+  // tier's world-per-texel before depth projection, so slope-scaled
+  // acne on surfaces angled to the key light clears without raising
+  // the constant `bias` (which can't discriminate slope). 0 disables.
+  float normal_offset{0.f};
   // Optional far cascades: coarser ortho tiers sharing the same centre
   // and depth so coverage keeps working at extreme zoom-out (the near
   // tier stays crisp around `extent`; receivers past its window sample

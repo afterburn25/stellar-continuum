@@ -232,9 +232,9 @@ int main()try{
   rejects([&]{PointLight3D l;l.shadow_softness=-.1f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.shadow_softness=9.f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   // Directional shadow map settings validate bounds; a valid map round-trips.
-  {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;config.cascade_extents={16,48};config.softness=2.f;
+  {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;config.cascade_extents={16,48};config.softness=2.f;config.normal_offset=3.f;
    const auto mapped=Scene3D::create(camera,{instance},{0,0,1},{},config);
-   check(mapped->shadow_map()&&mapped->shadow_map()->extent==4&&mapped->shadow_map()->resolution==512&&mapped->shadow_map()->cascade_extents==(std::vector<float>{16,48})&&mapped->shadow_map()->softness==2.f,"Scene dropped its shadow map settings");}
+   check(mapped->shadow_map()&&mapped->shadow_map()->extent==4&&mapped->shadow_map()->resolution==512&&mapped->shadow_map()->cascade_extents==(std::vector<float>{16,48})&&mapped->shadow_map()->softness==2.f&&mapped->shadow_map()->normal_offset==3.f,"Scene dropped its shadow map settings");}
   {// Scene environment probe: an optional shared IBL map that fills
    // materials which opt in via environment_strength without their own.
    const auto env=RgbaImage::create(1,1,{0,128,255,255});
@@ -262,6 +262,10 @@ int main()try{
   check(Scene3D::create(camera,{instance},{0,0,1},{},[] {ShadowMap3D s;s.cascade_extents={128,256,512,1024};return s;}())!=nullptr,"Four cascade tiers rejected");
   rejects([&]{ShadowMap3D s;s.softness=-.5f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.softness=9.f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  // Receiver-side normal offset: authored in map texels, bounded [0,8].
+  rejects([&]{ShadowMap3D s;s.normal_offset=-.5f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.normal_offset=9.f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.normal_offset=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   // Distance culling: visible_range bounds the camera-to-surface distance;
   // 0 leaves the instance visible at any range.
   {auto ranged=instance;ranged.position={};ranged.visible_range=4;
