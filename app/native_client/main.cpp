@@ -5863,14 +5863,17 @@ class NativeCampaign final {
       throw std::runtime_error(
           "First survey could not select the target planet through UI input.");
     const auto inspection = build_body_inspection(*system_workspace_.snapshot(),
-                                                  first_survey_body_id_);
+                                                  first_survey_body_id_,
+                                                  locale_);
     if (!inspection)
       throw std::runtime_error(
           "First survey selected planet has no observer-safe inspection.");
     const auto physical = std::ranges::find(
-        inspection->sections, std::string{"Physical"}, &BodySection::heading);
+        inspection->sections, tr("BODY_SECTION_PHYSICAL", "Physical"),
+        &BodySection::heading);
     const auto environment =
-        std::ranges::find(inspection->sections, std::string{"Environment"},
+        std::ranges::find(inspection->sections,
+                          tr("BODY_SECTION_ENVIRONMENT", "Environment"),
                           &BodySection::heading);
     const bool fully_surveyed = system_workspace_.snapshot()->survey_level ==
                                 SystemSurveyLevel::fully_surveyed;
