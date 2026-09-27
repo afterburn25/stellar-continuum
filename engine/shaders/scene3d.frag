@@ -179,21 +179,19 @@ vec4 surface_sample(sampler2D image,vec2 uv) {
 vec3 world_direction(vec3 d) {
     return d+2.0*cross(material.camera_orientation.xyz,cross(material.camera_orientation.xyz,d)+material.camera_orientation.w*d);
 }
-vec3 radiance(vec3 d) {
+// Roughness reads the prefiltered mip chain: squared-roughness lod
+// stands in for the widened specular/diffuse lobe — a box-mip
+// approximation rather than a true GGX prefilter, but deterministic
+// and one tap instead of an undersampled wide cone. The cap keeps
+// two levels of directional variation so diffuse irradiance still
+// follows the normal (a probe's sun disc stays day-side); explicit
+// lod also sidesteps the longitude-seam derivative problem.
+vec3 environment(vec3 d,float roughness) {
     d=normalize(world_direction(d));
     vec2 uv=vec2(atan(d.x,d.z)/(2.0*PI)+0.5,acos(clamp(d.y,-1.0,1.0))/PI);
-    // atan jumps by a turn at the longitude seam; that is not a large pixel
-    // footprint. Keep the shortest wrapped derivatives for mip selection.
-    vec2 dx=dFdx(uv),dy=dFdy(uv);dx.x-=round(dx.x);dy.x-=round(dy.x);
-    return textureGrad(environment_map,uv,dx,dy).rgb;
-}
-// Deterministic cone filter: broad frost reflections without frame-to-frame noise.
-vec3 environment(vec3 d,float roughness) {
-    vec3 tangent=normalize(cross(abs(d.y)<0.95?vec3(0,1,0):vec3(1,0,0),d));
-    vec3 bitangent=cross(d,tangent);
-    float spread=roughness*roughness*0.8;
-    return (radiance(d)*4.0+ radiance(d+spread*tangent)+radiance(d-spread*tangent)
-        +radiance(d+spread*bitangent)+radiance(d-spread*bitangent))*0.125;
+    float levels=float(textureQueryLevels(environment_map));
+    float lod=min(roughness*roughness*(levels-1.0),max(levels-3.0,0.0));
+    return textureLod(environment_map,uv,lod).rgb;
 }
 float fresnel(float cosine,float f0) {return f0+(1.0-f0)*pow(1.0-cosine,5.0);}
 vec3 fresnel3(float cosine,vec3 f0) {return f0+(vec3(1.0)-f0)*pow(1.0-cosine,5.0);}

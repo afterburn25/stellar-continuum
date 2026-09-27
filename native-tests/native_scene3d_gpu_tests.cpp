@@ -603,6 +603,28 @@ int main(int argc,char** argv)try{
             channel(*on,160,160,0)>channel(*off,160,160,0)+40,
           "Captured probe did not reflect scene geometry the authored map lacks");
     }
+    // Roughness rides the prefiltered mip chain: a black stripe centred
+    // on the +Z reflection direction blurs into its white shoulders at
+    // roughness 1 — base-mip sampling returns stripe-black while the old
+    // five-tap cone leaked ~64; the mip level lands mid-gray. A crisp
+    // (roughness 0) copy stays stripe-black through the same map.
+    {
+      std::vector<std::uint8_t> stripe(64*32*4);
+      for(int y=0;y<32;++y)for(int x=0;x<64;++x){
+        const auto at=(static_cast<std::size_t>(y)*64+x)*4;
+        stripe[at]=stripe[at+1]=stripe[at+2]=(x>=27&&x<=37)?0:255;stripe[at+3]=255;}
+      const auto stripe_map=RgbaImage::create(64,32,std::move(stripe));
+      auto frosted=enviro;frosted.material.pbr->environment.reset();
+      frosted.material.pbr->metallic=1.f;frosted.material.pbr->roughness=1.f;
+      DrawList fr_l;fr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{frosted},{.42f,.2f,.87f},{},{},stripe_map),{0,0,320,320}});
+      window.draw(fr_l,folder/"pbr-mip-frost.png");const auto mip_frost=decode_rgba_image(folder/"pbr-mip-frost.png");
+      const int fr=channel(*mip_frost,160,160,0);
+      check(fr>60&&fr<190,"Roughness did not read the prefiltered environment mip");
+      auto crisp=frosted;crisp.material.pbr->roughness=.04f;
+      DrawList cr_l;cr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{crisp},{.42f,.2f,.87f},{},{},stripe_map),{0,0,320,320}});
+      window.draw(cr_l,folder/"pbr-mip-crisp.png");const auto cr=decode_rgba_image(folder/"pbr-mip-crisp.png");
+      check(channel(*cr,160,160,0)<40,"Mirror-sharp reflection lost the environment stripe");
+    }
     std::cout<<"pbr_gpu=emissive_metallic_cutout_tiling_ibl_probe_passed\n";
   }
   {

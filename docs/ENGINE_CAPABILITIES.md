@@ -741,9 +741,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Limitations:** static first-frame snapshot — moving emitters and
   camera-fit shadow chains keep their bake-time pose (no refresh
   trigger yet); one probe per scene, no probe grid or per-instance
-  selection; equirect output is bilinear-resampled, not mip
-  prefiltered (roughness response shares the authored path's cone
-  filter); the bake downloads six faces synchronously — first-frame
+  selection; equirect output is bilinear-resampled (roughness response
+  shares the authored path's box-mip prefilter, not a true GGX
+  convolution); the bake downloads six faces synchronously — first-frame
   hitch scales with face_resolution.
 
 ## Scene3D debug views, quality gates and distance culling (2026-09-25)
@@ -872,7 +872,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   plus optional metallic-roughness map, emissive map × `emissive_tint` ×
   `emissive_strength` with `night_emissive` nightside gate, equirect
   `environment` map with `environment_strength` driving dielectric
-  diffuse irradiance + GGX specular response), `Material3D::atmosphere`
+  diffuse irradiance + roughness-mapped mip-prefiltered specular
+  response), `Material3D::atmosphere`
   (wavelength-tinted `(1-N·V)^power` limb scattering, day-side weighting,
   `night_floor`), `alpha_threshold` cutout, `texture_tiling`;
   `Scene3D::create(...)` accepts up to
@@ -2940,7 +2941,7 @@ static portraits and the policy against added cloud layers remain unchanged.
   resource generation is deterministic; GPU submission stays on the owner thread.
 - **Performance:** no additional targets or passes; optical maps share the
   existing 128-entry/192 MiB texture budget, checked across all views before upload.
-  Optical pixels use bounded environment cone filtering; disabled materials skip it.
+  Optical pixels use the prefiltered environment mip chain (roughness-mapped lod); disabled materials skip it.
 - **Tests:** actual `native_scene3d_gpu` checks Fresnel, Snell bending, absorption,
   frost, GGX roughness, invalid optics and reuse; small-body tests cover real
   material integration, elongated forms and inclined chart-band alignment.

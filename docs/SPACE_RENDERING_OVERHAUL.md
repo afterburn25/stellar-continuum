@@ -22,7 +22,8 @@ This document is the phase-1 audit; landed work is tracked in
   `rim_power` grazing shell, `two_sided_diffuse`, `linear_light` sRGB decode,
   `anisotropic_texture`, `cubic_magnification`, and optional blocks:
   - `Dielectric3D` — IOR refraction/reflection against a world-fixed
-    equirect environment map, Beer-Lambert absorption, roughness cone filter.
+    equirect environment map, Beer-Lambert absorption, roughness-mapped
+    mip-prefiltered environment response.
   - `SurfaceResponse3D` — normal map + packed properties (roughness /
     liquid / ice / height), cloud map with animated UV offset whose alpha
     shadows the surface and whose RGB composites as a lit deck

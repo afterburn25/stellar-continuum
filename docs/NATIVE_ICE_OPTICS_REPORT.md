@@ -26,7 +26,8 @@ readout, with a Resume/Pause control connected to the existing simulation clock.
   Orthographic rays remain parallel; perspective rays use camera-space position.
 - An optional RGBA map controls roughness, transmission, thickness and height.
   Derivative surface relief changes illumination and glints without changing
-  geometry. A deterministic five-tap cone filter softens rough reflections.
+  geometry. Roughness reads the prefiltered environment mip chain, so
+  rough reflections soften without undersampling a wide cone.
   Longitude wraps while latitude clamps at the environment poles.
 - Optical resources share the immutable texture cache and are counted in both
   per-scene and combined-frame admission checks before GPU allocations. The
@@ -92,8 +93,9 @@ Resume/Pause motion checks, followed by developer field spawn and disk reload.
   one another; there are no multiple internal bounces, caustics, spectral
   dispersion or volumetric subsurface scattering.
 - The environment is a shared procedural space map, not a live capture of the
-  current star system. Roughness uses a bounded cone filter, not a full prefiltered
-  radiance convolution. Existing renderer color/exposure conventions remain.
+  current star system. Roughness samples the box-mip chain via a
+  squared-roughness lod — a prefiltered approximation, not a true GGX
+  convolution. Existing renderer color/exposure conventions remain.
 - The previous geometry LOD, 768-body cap, conservative picking and schematic
   planet/asteroid drawing-order limits remain. Developer fixed ticks can show
   stepped motion, and distant outer-belt orbits advance slowly at normal speed.
