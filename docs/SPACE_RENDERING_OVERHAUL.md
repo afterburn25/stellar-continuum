@@ -87,15 +87,16 @@ same document headless-tested.
    a quadrant per light up to the four-light budget, same caster policy);
    `alpha_threshold` casters mask the depth pass per texel, so cutout
    meshes cast perforated silhouettes rather than full quads; an
-   optional `cascade` far tier (a wider ortho box sharing centre/depth,
-   near→far crossfade over the inner window's outer margin) keeps
-   coverage at extreme zoom-out; `softness`/`shadowSoftness` scale
+   optional `cascade`/`cascade2` far tiers (wider ortho boxes sharing
+   centre/depth, crossfading over each inner window's outer margin —
+   three bands covering planet-scale through system-scale receivers)
+   keep coverage at extreme zoom-out; `softness`/`shadowSoftness` scale
    the tier PCF radius on both maps so authored penumbra width isn't
    quality-locked; and per-instance `castsShadow`/`NoShadow` opts an
    opaque mesh out of every depth pass (a collapsed group follows its
    representative) while `receivesShadow`/`NoShadowReceive` keeps the
-   depth-map terms fully lit on a self-lit receiver. Remaining: cascade count is fixed at
-   one far tier, omni point lights stay unshadowed; analytic
+   depth-map terms fully lit on a self-lit receiver. Remaining: the chain is fixed at
+   three bands, omni point lights stay unshadowed; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an
    equirect map on any PBR material and `pbr_values.w` scales diffuse
@@ -255,10 +256,11 @@ documented per-frame but accumulated. See
 
 ## Explicitly deferred / blockers
 
-- Deeper cascaded shadow maps and omni point-light shadows: the
-  `ShadowMap3D` ortho volume plus its optional `cascade` far tier covers
-  authored strategy scenes at two zoom bands (a 3+ cascade chain is the
-  remaining split work), and `casts_shadow` spot cones share a
+- Omni point-light shadows and arbitrary cascade splits: the
+  `ShadowMap3D` ortho volume plus its optional `cascade`/`cascade2`
+  far tiers covers authored strategy scenes at three zoom bands (an
+  arbitrary-length chain is the remaining split work), and
+  `casts_shadow` spot cones share a
   quadrant-atlas depth map (up to four); omni point lights and analytic
   blockers still cover point sources and planet↔ring. Documented
   limitation.

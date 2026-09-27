@@ -966,6 +966,18 @@ int main(int argc,char** argv)try{
     check(channel(*near_only,176,160,0)>100,"Near window covered a fragment outside its extent");
     check(channel(*cascaded,176,160,0)<channel(*open,176,160,0)/2,"Far cascade did not carry the out-of-window shadow");
     check(channel(*cascaded,60,160,0)>100,"Far cascade darkened a fragment inside the empty near window");
+    // Third tier: the umbra fragment sits at light-space x≈.78, so a mid
+    // cascade at .5 still misses it — only the cascade2 window (4) covers.
+    // The mid-only capture staying lit proves the chain didn't smear.
+    const auto mid_only=narrow_view({receiver,occluder},.5f,"shadow-cascade-mid.png");
+    const auto chain3=[&](std::vector<MeshInstance3D> objects,float c1,float c2,const char* name){
+      auto tier=narrow;tier.cascade_extent=c1;tier.cascade2_extent=c2;
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},tier),{0,0,320,320}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto tier3=chain3({receiver,occluder},.5f,4.f,"shadow-cascade2.png");
+    check(channel(*mid_only,176,160,0)>100,"Mid cascade covered a fragment outside its extent");
+    check(channel(*tier3,176,160,0)<channel(*open,176,160,0)/2,"The third cascade tier did not carry the shadow");
+    check(channel(*tier3,60,160,0)>100,"The third cascade tier darkened an unoccluded fragment");
     // Authored softness scales the tier PCF radius: 0 collapses the edge
     // to a binary tap while 4 widens the penumbra band measurably — the
     // umbra core keeps its full cut either way.

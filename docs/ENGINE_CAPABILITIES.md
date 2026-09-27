@@ -440,19 +440,22 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   range), `strength` [0,1], `bias` (NDC units), `resolution` (0 =
   tier default: Medium 1024 / High 2048 / Ultra 4096),
   `cascade_extent` (0 disables; a wider ortho tier sharing the same
-  centre/depth so coverage survives extreme zoom-out), `softness`
+  centre/depth so coverage survives extreme zoom-out),
+  `cascade2_extent` (0 disables; must exceed `cascade_extent` — the
+  coarsest tier for system-scale receivers), `softness`
   ([0,8] penumbra multiplier on the tier PCF radius — 0 forces the
   hard single-tap edge). Coverage is an
-  authored policy: receivers outside both boxes stay lit; the box
+  authored policy: receivers outside every box stay lit; the box
   tracks the camera so mid-zoom strategy views keep stable texel
   density.
 - **Shader contract:** view-level fragment uniform carries the
   view→shadow-clip matrix plus {texel, PCF radius in texels, strength,
   bias}; 8-tap kernel at High (1-texel) and Ultra (1.5), single tap at
-  Medium. A second matrix/options pair feeds the cascade tier: the
-  fragment samples the crisp near map inside its window, crossfades to
-  the coarse far map over the outer 10% margin, and reads the far map
-  alone past it. Depth-only pipeline shares the scene vertex layout
+  Medium. A second matrix/options pair feeds the cascade tier and a
+  third the `cascade2` tier: the fragment samples the crisp near map
+  inside its window, crossfades to each coarser map over its inner
+  window's outer 10% margin, and reads the coarsest map alone past
+  it. Depth-only pipeline shares the scene vertex layout
   and a transform SSBO; fragments outside the ortho box are exempt.
 - **Policies:** Low tier skips the pass entirely; `transparent` blends
   never cast; `visible_range`-culled instances don't cast (identical
@@ -472,8 +475,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Persistence:** `render.shadow` document block round-trips; extent
   ≤ 0 disables. Rejects nonpositive `depth`, `strength` outside [0,1],
   `bias` outside [0,0.1], `resolution` outside [64,8192], a
-  `cascade` that is negative or inside `extent`, and `softness`
-  outside [0,8].
+  `cascade` that is negative or inside `extent`, a `cascade2` that
+  is negative, missing its mid tier, or inside `cascade`, and
+  `softness` outside [0,8].
 - **Editor:** Scene3D tool `shadow` row edits all eight fields against
   the live preview.
 - **Tests:** `native_scene3d_gpu` — casters/bias/direction/tiers/range
@@ -489,6 +493,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   probe (`shadow-near-only`/`shadow-cascade` — an umbra outside the
   near window stays lit single-tier and darkens through the far tier,
   while a lit receiver inside the empty near window keeps its value);
+  three-tier probe (`shadow-cascade-mid`/`shadow-cascade2` — an umbra
+  between the mid and far2 windows stays lit at two tiers and darkens
+  only once `cascade2` covers it);
   softness probe (`shadow-soft-0/4` — a zero multiplier collapses the
   penumbra to a binary edge, 4× grows an 80-pixel blend band while the
   umbra core keeps its full cut); `fleet3d_shadow` benchmark — the
@@ -497,12 +504,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   unshadowed `fleet3d` baseline;
   `engine_project` document round-trip + rejection coverage.
 - **Infrastructure fix bundled:** SDL fragment-set resource order —
-  the materials SSBO sits after the sampled textures (now binding 13)
+  the materials SSBO sits after the sampled textures (now binding 14)
   because set 2 requires samplers to precede storage buffers; the
   earlier collision produced `VK_ERROR_DEVICE_LOST`.
-- **Limitations:** key-light only — the cascade is a single optional
-  far tier (no 3+ split chain), so extreme zoom ranges still pick a
-  two-band coverage policy; authored
+- **Limitations:** key-light only — the chain is fixed at three
+  bands (near + up to two far tiers, no arbitrary split count), so
+  extreme zoom ranges still pick an authored coverage policy; authored
   `bias` is a constant receiver-side NDC term (the rasterizer applies
   a fixed 1.5 slope bias at cast time — no authored slope term);
   analytic blockers remain the ring↔planet path; spot lights have a

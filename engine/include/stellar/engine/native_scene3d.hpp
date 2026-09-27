@@ -398,6 +398,9 @@ struct ShadowMap3D {
   // (the near tier stays crisp around `extent`; receivers past its
   // window sample the coarse tier instead of snapping lit). 0 disables.
   float cascade_extent{0.f}; // far-tier half-extent, must exceed extent
+  // Optional third tier: an even coarser window past cascade_extent for
+  // system-scale zoom-out. Requires cascade_extent>0 and must exceed it.
+  float cascade2_extent{0.f};
 };
 class Scene3D final {
  public:
@@ -453,6 +456,10 @@ struct Scene3DStatistics {
   // volume/visible_range culling) — the shadow-pass workload audit counter.
   // A configured far tier adds its own submissions to the same total.
   std::uint64_t shadow_casters{};
+  // Instances written to the optional far cascade tiers this frame —
+  // `shadow_casters - shadow_cascade_casters - shadow_cascade2_casters`
+  // recovers the near-window submissions.
+  std::uint64_t shadow_cascade_casters{},shadow_cascade2_casters{};
   // Instances written to the shared spot atlas this frame, summed across
   // every shadowed spot light's quadrant.
   std::uint64_t spot_shadow_casters{};

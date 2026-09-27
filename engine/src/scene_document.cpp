@@ -559,6 +559,7 @@ std::string Scene3dDocument::to_json() const {
                                {"bias", shadow_bias},
                                {"resolution", shadow_resolution}};
     if (shadow_cascade > 0.f) doc["render"]["shadow"]["cascade"] = shadow_cascade;
+    if (shadow_cascade2 > 0.f) doc["render"]["shadow"]["cascade2"] = shadow_cascade2;
     if (shadow_softness != 1.f) doc["render"]["shadow"]["softness"] = shadow_softness;
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
@@ -926,13 +927,17 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         scene.shadow_bias = s.value("bias", 0.0005f);
         scene.shadow_resolution = s.value("resolution", 0u);
         scene.shadow_cascade = s.value("cascade", 0.0f);
+        scene.shadow_cascade2 = s.value("cascade2", 0.0f);
         scene.shadow_softness = s.value("softness", 1.0f);
         if (scene.shadow_extent < 0.f || scene.shadow_distance < 0.f ||
             scene.shadow_depth <= 0.f || scene.shadow_strength < 0.f ||
             scene.shadow_strength > 1.f || scene.shadow_bias < 0.f ||
             scene.shadow_bias > 0.1f || scene.shadow_cascade < 0.f ||
+            scene.shadow_cascade2 < 0.f ||
             scene.shadow_softness < 0.f || scene.shadow_softness > 8.f ||
             (scene.shadow_cascade > 0.f && scene.shadow_cascade <= scene.shadow_extent) ||
+            (scene.shadow_cascade2 > 0.f &&
+             (scene.shadow_cascade <= 0.f || scene.shadow_cascade2 <= scene.shadow_cascade)) ||
             (scene.shadow_resolution != 0u &&
              (scene.shadow_resolution < 64u || scene.shadow_resolution > 8192u)))
           return fail("render shadow fields out of range");

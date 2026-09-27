@@ -15,10 +15,11 @@ layout(set=2,binding=7) uniform sampler2D sequence_map;
 layout(set=2,binding=8) uniform sampler2D emissive_map;
 layout(set=2,binding=9) uniform sampler2D metallic_roughness_map;
 // Key-light depth map — a depth-only ortho pass ahead of the scene pass,
-// plus its optional wider cascade tier and the shadowed spot cone's map.
+// plus its optional wider cascade tiers and the shadowed spot cone's map.
 layout(set=2,binding=10) uniform sampler2D shadow_depth_map;
 layout(set=2,binding=11) uniform sampler2D spot_shadow_map;
 layout(set=2,binding=12) uniform sampler2D shadow_far_map;
+layout(set=2,binding=13) uniform sampler2D shadow_far2_map;
 struct Material {
     vec4 tint;
     vec4 light_direction;
@@ -54,7 +55,7 @@ struct Material {
     vec4 point_outer; // per-light outer cos edge
     vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
 };
-layout(set=2,binding=13,std430) readonly buffer Materials {
+layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
 };
 // Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
@@ -81,6 +82,10 @@ layout(set=3,binding=0) uniform ViewParams {
     // far_options = texel size (>0 enabled), PCF radius in texels, -, bias
     mat4 far_from_view;
     vec4 far_options;
+    // Third, coarsest tier past far_options — same lanes. Enabled only
+    // when the scene authors a second cascade extent.
+    mat4 far2_from_view;
+    vec4 far2_options;
 } view_params;
 
 // Shared shadow-map visibility: project clip → NDC, reject fragments
@@ -330,17 +335,28 @@ void main() {
         vec4 clip=view_params.shadow_from_view*vec4(view_position,1.0);
         float lit;
         if(view_params.far_options.x>0.0) {
-            // Two-tier cascade: the crisp near window rules where it covers,
-            // crossfading into the coarse far tier across its outer margin
-            // so the texel-density seam doesn't read as a step. Receivers
-            // past both windows stay lit (authored coverage policy).
+            // Cascade chain: the crisp near window rules where it covers,
+            // crossfading into the coarser far tier across its outer margin
+            // so the texel-density seam doesn't read as a step; far1 does
+            // the same handoff into the optional far2 tier. Receivers past
+            // every window stay lit (authored coverage policy).
             vec3 ndc=clip.xyz/max(clip.w,1e-9);
             vec2 suv=ndc.xy*0.5+0.5;
             const float edge=2.0*max(abs(suv.x-0.5),abs(suv.y-0.5));
             const bool near_inside=clip.w>0.0&&edge<=1.0&&ndc.z>=0.0&&ndc.z<=1.0;
-            const float flit=map_lit(shadow_far_map,
-                view_params.far_from_view*vec4(view_position,1.0),
+            vec4 fclip=view_params.far_from_view*vec4(view_position,1.0);
+            float flit=map_lit(shadow_far_map,fclip,
                 view_params.far_options.x,view_params.far_options.y,view_params.far_options.w,vec4(0.0,0.0,1.0,1.0));
+            if(view_params.far2_options.x>0.0) {
+                vec3 fndc=fclip.xyz/max(fclip.w,1e-9);
+                vec2 fsuv=fndc.xy*0.5+0.5;
+                const float fedge=2.0*max(abs(fsuv.x-0.5),abs(fsuv.y-0.5));
+                const bool far_inside=fclip.w>0.0&&fedge<=1.0&&fndc.z>=0.0&&fndc.z<=1.0;
+                const float flit2=map_lit(shadow_far2_map,
+                    view_params.far2_from_view*vec4(view_position,1.0),
+                    view_params.far2_options.x,view_params.far2_options.y,view_params.far2_options.w,vec4(0.0,0.0,1.0,1.0));
+                flit=far_inside?mix(flit,flit2,smoothstep(0.9,1.0,fedge)):flit2;
+            }
             lit=near_inside
                 ?mix(map_lit(shadow_depth_map,clip,view_params.shadow_options.x,
                              view_params.shadow_options.y,view_params.shadow_options.w,vec4(0.0,0.0,1.0,1.0)),

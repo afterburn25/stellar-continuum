@@ -2013,27 +2013,28 @@ void commit_scene3_field(Shell &shell) {
     doc.debug_view = d;
     return ok("debug view updated");
   }
-  case 52: { // key-light shadow map: "extent,dist,depth[,strength,bias[,res[,cascade]]]"
+  case 52: { // key-light shadow map: "extent,dist,depth[,strength,bias[,res[,cascade[,softness[,cascade2]]]]]"
     if (shell.scene3_buffer.empty()) { // empty clears
       commit();
       doc.shadow_extent = 0.f;
       doc.shadow_cascade = 0.f;
+      doc.shadow_cascade2 = 0.f;
       return ok("shadow map disabled");
     }
-    float v[8]{};
+    float v[9]{};
     {
       std::istringstream values(shell.scene3_buffer);
       std::string token;
       int n = 0;
-      while (n < 8 && std::getline(values, token, ',')) {
+      while (n < 9 && std::getline(values, token, ',')) {
         try {
           v[n++] = std::stof(token);
         } catch (const std::exception &) {
-          return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness]]]]");
+          return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness[,cascade2]]]]]");
         }
       }
       if (n < 3)
-        return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness]]]]");
+        return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness[,cascade2]]]]]");
       commit();
       doc.shadow_extent = v[0];
       doc.shadow_distance = v[1];
@@ -2044,6 +2045,7 @@ void commit_scene3_field(Shell &shell) {
           n > 5 ? static_cast<std::uint32_t>(std::max(0.f, v[5])) : 0u;
       doc.shadow_cascade = n > 6 ? v[6] : 0.f;
       doc.shadow_softness = n > 7 ? v[7] : 1.f;
+      doc.shadow_cascade2 = n > 8 ? v[8] : 0.f;
     }
     return ok("shadow map updated");
   }
@@ -2400,7 +2402,7 @@ void commit_scene3_field(Shell &shell) {
   ok("entity updated");
 }
 
-// The shadow row carries up to eight fields; echoing them all keeps a
+// The shadow row carries up to nine fields; echoing them all keeps a
 // re-edit from silently dropping the authored strength/bias/cascade
 // values.
 std::string shadow_row_text(const engine::Scene3dDocument &doc) {
@@ -2412,7 +2414,8 @@ std::string shadow_row_text(const engine::Scene3dDocument &doc) {
          std::to_string(doc.shadow_bias) + "," +
          std::to_string(doc.shadow_resolution) + "," +
          std::to_string(doc.shadow_cascade) + "," +
-         std::to_string(doc.shadow_softness);
+         std::to_string(doc.shadow_softness) + "," +
+         std::to_string(doc.shadow_cascade2);
 }
 
 void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {

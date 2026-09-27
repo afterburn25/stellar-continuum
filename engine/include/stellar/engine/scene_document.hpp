@@ -377,11 +377,13 @@ struct Scene3dDocument {
   // shadow_distance units along camera forward. shadow_extent<=0 disables;
   // resolution 0 picks the quality-tier default (1024/2048/4096).
   // shadow_cascade>0 adds a second, wider ortho tier (world half-extent,
-  // must exceed shadow_extent) so coverage survives extreme zoom-out.
+  // must exceed shadow_extent) so coverage survives extreme zoom-out;
+  // shadow_cascade2>0 adds a third tier past it (must exceed
+  // shadow_cascade) for system-scale coverage.
   float shadow_extent{0.f}, shadow_distance{64.f}, shadow_depth{256.f};
   float shadow_strength{1.f}, shadow_bias{0.0005f};
   std::uint32_t shadow_resolution{0};
-  float shadow_cascade{0.f};
+  float shadow_cascade{0.f}, shadow_cascade2{0.f};
   // [0,8] PCF penumbra multiplier on the tier radius (1 = default).
   float shadow_softness{1.f};
   // Background clear color.
