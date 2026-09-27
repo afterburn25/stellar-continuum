@@ -1982,10 +1982,15 @@ void commit_scene3_field(Shell &shell) {
           const double sd2 = static_cast<double>(l.spot_x) * l.spot_x +
                              static_cast<double>(l.spot_y) * l.spot_y +
                              static_cast<double>(l.spot_z) * l.spot_z;
-          if (sd2 <= 0 || l.spot_inner <= l.spot_outer ||
-              l.spot_inner <= 0.f || l.spot_inner > 1.f ||
-              l.spot_outer < 0.f || l.spot_outer >= 1.f)
-            return fail("spot cones need a nonzero direction and 0<=outer<inner<=1");
+          // A zero direction with the 1,0 cone sentinel encodes an omni
+          // light so shadow flags can still be authored after it.
+          const bool omni = sd2 <= 0 && l.spot_inner == 1.f && l.spot_outer == 0.f;
+          if (!omni &&
+              (sd2 <= 0 || l.spot_inner <= l.spot_outer ||
+               l.spot_inner <= 0.f || l.spot_inner > 1.f ||
+               l.spot_outer < 0.f || l.spot_outer >= 1.f))
+            return fail("spot cones need a nonzero direction and 0<=outer<inner<=1 "
+                        "(0,0,0,1,0 keeps the light omni)");
           if (n >= 14) l.cast_shadow = v[13] != 0.f;
           if (n >= 15) l.shadow_strength = v[14];
           if (n >= 16) l.shadow_softness = v[15];
@@ -3101,11 +3106,19 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                 if (l.shadow_softness != 1.f)
                   v += "," + std::to_string(l.shadow_softness);
               }
+            } else if (l.cast_shadow) {
+              // The 0,0,0,1,0 sentinel keeps the omni light's shadow
+              // fields expressible in the row format.
+              v += ",0,0,0,1,0,1";
+              if (l.shadow_strength < 1.f || l.shadow_softness != 1.f)
+                v += "," + std::to_string(l.shadow_strength);
+              if (l.shadow_softness != 1.f)
+                v += "," + std::to_string(l.shadow_softness);
             }
           }
           return v;
         }(),
-        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness]]]]; ... - max 4, empty clears");
+        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness]]]]; 0,0,0,1,0 keeps omni; ... - max 4, empty clears");
   field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
         "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows");
   field(shell.hit3_shadow, "shadowMap", shadow_row_text(doc),

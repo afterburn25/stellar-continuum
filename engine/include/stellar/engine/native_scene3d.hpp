@@ -183,10 +183,11 @@ struct PointLight3D {
   Vec3 spot_direction{0,0,0};
   float spot_inner{1.f};
   float spot_outer{1.f};
-  // Shadowed spot: renders the scene's casters from the light's
-  // perspective into its quadrant of the shared depth atlas (cone
-  // frustum, range-bounded). Spot-only — omni shadows would need a
-  // cube map. Every shadowed spot gets a quadrant, up to the four
+  // Shadowed point light: a coned light renders the scene's casters
+  // through a perspective frustum into its quadrant of the shared
+  // spot atlas; an omni light renders six 90-degree cube-face views
+  // into its row of a shared cube atlas (view-locked faces, range-
+  // bounded). Every shadowed light gets a cell, up to the four
   // point-light slots.
   bool casts_shadow{false};
   // [0,1] umbra darkness when casts_shadow is set — 1 is a full cut,
@@ -463,6 +464,10 @@ struct Scene3DStatistics {
   // Instances written to the shared spot atlas this frame, summed across
   // every shadowed spot light's quadrant.
   std::uint64_t spot_shadow_casters{};
+  // Instances written to the shared omni cube atlas this frame, summed
+  // across every shadowed omni light's six face cells — one caster can
+  // submit to several faces of the same light.
+  std::uint64_t omni_shadow_casters{};
   // Instances drawn below LOD level 0 this frame — the screen-space LOD
   // workload audit counter for fleet-scale scenes.
   std::uint64_t lod_instances{};

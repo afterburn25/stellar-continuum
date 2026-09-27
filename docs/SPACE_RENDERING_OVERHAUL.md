@@ -77,14 +77,20 @@ same document headless-tested.
    optionally gated to a smooth spot cone (`spotDir`/`spotInner`/
    `spotOuter` on the entry — zero direction stays omni). Shadowed
    spots (`castShadow`) each cast through their own cone-frustum
-   projection into a quadrant of one shared depth atlas.
+   projection into a quadrant of one shared depth atlas; shadowed omni
+   lights cast through six 90-degree cube faces into a row of a shared
+   cube atlas (the receiver shader selects the face from the dominant
+   axis of the view-space offset — no per-face matrices).
 3. **Shadows** — landed: key-light directional shadow map (authored
    ortho volume centred ahead of the camera, depth pass + 8-tap PCF,
    tier-scaled resolution, Low skips; casters share the lit pass's
    screen-space LOD pick and collapsed groups cast one light-facing
    proxy) plus shadowed spot lights (`casts_shadow` on a coned
    `PointLight3D`, cone frustum to `range`, one shared depth atlas —
-   a quadrant per light up to the four-light budget, same caster policy);
+   a quadrant per light up to the four-light budget, same caster policy)
+   and shadowed omni lights (`casts_shadow` with no cone — six 90-degree
+   cube faces per light in a shared atlas row, dominant-axis face
+   selection in the receiver shader);
    `alpha_threshold` casters mask the depth pass per texel, so cutout
    meshes cast perforated silhouettes rather than full quads; an
    optional `cascade`/`cascade2` far tiers (wider ortho boxes sharing
@@ -96,7 +102,7 @@ same document headless-tested.
    opaque mesh out of every depth pass (a collapsed group follows its
    representative) while `receivesShadow`/`NoShadowReceive` keeps the
    depth-map terms fully lit on a self-lit receiver. Remaining: the chain is fixed at
-   three bands, omni point lights stay unshadowed; analytic
+   three bands; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an
    equirect map on any PBR material and `pbr_values.w` scales diffuse
@@ -258,13 +264,13 @@ documented per-frame but accumulated. See
 
 ## Explicitly deferred / blockers
 
-- Omni point-light shadows and arbitrary cascade splits: the
-  `ShadowMap3D` ortho volume plus its optional `cascade`/`cascade2`
-  far tiers covers authored strategy scenes at three zoom bands (an
-  arbitrary-length chain is the remaining split work), and
-  `casts_shadow` spot cones share a
-  quadrant-atlas depth map (up to four); omni point lights and analytic
-  blockers still cover point sources and planet↔ring. Documented
+- Arbitrary cascade splits: the `ShadowMap3D` ortho volume plus its
+  optional `cascade`/`cascade2` far tiers covers authored strategy
+  scenes at three zoom bands (an arbitrary-length chain is the
+  remaining split work), `casts_shadow` spot cones share a
+  quadrant-atlas depth map (up to four), and `casts_shadow` omni
+  lights share a cube-face atlas (six faces per light, up to four
+  rows); analytic blockers still cover planet↔ring. Documented
   limitation.
 - Indirect draws / GPU culling: vendored SDL3 exposes
   `SDL_DrawGPUIndexedPrimitivesIndirect`, but it only merges batches

@@ -15,11 +15,13 @@ layout(set=2,binding=7) uniform sampler2D sequence_map;
 layout(set=2,binding=8) uniform sampler2D emissive_map;
 layout(set=2,binding=9) uniform sampler2D metallic_roughness_map;
 // Key-light depth map — a depth-only ortho pass ahead of the scene pass,
-// plus its optional wider cascade tiers and the shadowed spot cone's map.
+// plus its optional wider cascade tiers, the shadowed spot cone's map and
+// the shared cube atlas the shadowed omni lights render their faces into.
 layout(set=2,binding=10) uniform sampler2D shadow_depth_map;
 layout(set=2,binding=11) uniform sampler2D spot_shadow_map;
 layout(set=2,binding=12) uniform sampler2D shadow_far_map;
 layout(set=2,binding=13) uniform sampler2D shadow_far2_map;
+layout(set=2,binding=14) uniform sampler2D omni_shadow_map;
 struct Material {
     vec4 tint;
     vec4 light_direction;
@@ -55,7 +57,7 @@ struct Material {
     vec4 point_outer; // per-light outer cos edge
     vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
 };
-layout(set=2,binding=14,std430) readonly buffer Materials {
+layout(set=2,binding=15,std430) readonly buffer Materials {
     Material materials[];
 };
 // Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
@@ -86,6 +88,16 @@ layout(set=3,binding=0) uniform ViewParams {
     // when the scene authors a second cascade extent.
     mat4 far2_from_view;
     vec4 far2_options;
+    // Shadowed omni point lights (index i matches material.point_*[i]):
+    // each light owns a row of six 90-degree cube faces in the shared
+    // cube atlas. omni_options[i] = atlas texel width (>0 enabled), PCF
+    // radius in cell texels, umbra strength, depth bias. omni_atlas[i] =
+    // the row's v span plus the face projection's pn/pq terms — the
+    // shader selects the face by the dominant axis of the view-space
+    // offset and rebuilds projective depth analytically, so no per-face
+    // matrices are needed.
+    vec4 omni_options[4];
+    vec4 omni_atlas[4];
 } view_params;
 
 // Shared shadow-map visibility: project clip → NDC, reject fragments
@@ -601,6 +613,46 @@ void main() {
                             view_params.spot_options[i].w,view_params.spot_bounds[i]),
                         view_params.spot_options[i].z*shadow_receive);
             window*=slit;spot_shadow_vis*=slit;}
+        // Shadowed omni light: the cube atlas row holds six 90-degree
+        // faces in +X,-X,+Y,-Y,+Z,-Z column order. The face comes from
+        // the dominant axis of the view-space offset and its projective
+        // depth rebuilds analytically (ndc_z = pn + pq/t), so no
+        // per-face matrices ride the uniform.
+        if(view_params.omni_options[i].x>0.0){
+            const vec3 dv=view_position-material.point_position[i].xyz;
+            const vec3 ad=abs(dv);vec2 fuv;float t;float col;
+            if(ad.x>=ad.y&&ad.x>=ad.z){
+                if(dv.x>0.0){col=0.0;fuv=vec2(-dv.z,dv.y);}else{col=1.0;fuv=vec2(dv.z,dv.y);}
+                t=ad.x;
+            }else if(ad.y>=ad.z){
+                if(dv.y>0.0){col=2.0;fuv=vec2(-dv.x,dv.z);}else{col=3.0;fuv=vec2(-dv.x,-dv.z);}
+                t=ad.y;
+            }else{
+                if(dv.z>0.0){col=4.0;fuv=vec2(dv.x,dv.y);}else{col=5.0;fuv=vec2(-dv.x,dv.y);}
+                t=ad.z;
+            }
+            fuv/=t;
+            const vec4 oat=view_params.omni_atlas[i];
+            const float ndc_z=oat.z+oat.w/t;
+            if(t>0.0&&ndc_z>=0.0&&ndc_z<=1.0){
+                const vec2 suv=vec2((col+fuv.x*0.5+0.5)/6.0,oat.x+(0.5-fuv.y*0.5)*(oat.y-oat.x));
+                const vec4 oopt=view_params.omni_options[i];
+                // Cell texels: the atlas packs 6 cells across
+                // 1/(row span) rows, so the v texel is the u texel
+                // scaled by six row heights.
+                const vec2 rt=oopt.y*vec2(oopt.x,oopt.x*6.0*(oat.y-oat.x));
+                float olit;
+                if(oopt.y>0.0){
+                    vec2 taps[8]=vec2[](vec2(-1.0,-1.0),vec2(1.0,-1.0),vec2(-1.0,1.0),vec2(1.0,1.0),
+                                        vec2(-0.4,0.0),vec2(0.4,0.0),vec2(0.0,-0.4),vec2(0.0,0.4));
+                    olit=0.0;
+                    for(int tt=0;tt<8;++tt)olit+=step(ndc_z-oopt.w,texture(omni_shadow_map,suv+taps[tt]*rt).r);
+                    olit*=0.125;
+                }else olit=step(ndc_z-oopt.w,texture(omni_shadow_map,suv).r);
+                const float ol=mix(1.0,olit,oopt.z*shadow_receive);
+                window*=ol;spot_shadow_vis*=ol;
+            }
+        }
         if(window<=0.0) continue;
         vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
         float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);

@@ -715,7 +715,46 @@ int main(int argc,char** argv)try{
      check(census(*shy_img,120,155)>census(*both_unshadowed,120,155)+20,
          "Lamp1's umbra broke when lamp2's occluder opted out");}
     lamp.casts_shadow=true;
-    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_debug_receive_passed\n";
+    // Shadowed omni light: the same off-axis occluder cuts an umbra
+    // through the omni footprint via the shared cube atlas — the
+    // receiver shader picks the face from the dominant axis of the
+    // view-space light offset and rebuilds its projective depth.
+    lamp.spot_direction={0,0,0};
+    auto omni_cast=[&](const char* name){
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder},{0,0,1},{lamp}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    lamp.casts_shadow=false;
+    const auto omni_unshadowed=omni_cast("point-light-omni-noshadow.png");
+    const auto omni_casters_off=window.scene3d_statistics().omni_shadow_casters;
+    lamp.casts_shadow=true;
+    const auto omni_shadowed=omni_cast("point-light-omni-shadow.png");
+    check(window.scene3d_statistics().omni_shadow_casters>omni_casters_off,
+        "Omni cube atlas recorded no caster submissions");
+    check(census(*omni_shadowed,120,155)>census(*omni_unshadowed,120,155)+20,
+        "Shadowed omni light did not cut an umbra through the occluder");
+    // Non-vacuous: the omni footprint keeps the rest of the plate lit —
+    // the darkening is occlusion, not a dead light or a mis-projected map.
+    check(channel(*omni_shadowed,272,160,1)>channel(*omni_unshadowed,272,160,1)/2,
+        "Omni shadow extinguished the whole footprint instead of the umbra");
+    // receives_shadow=false folds the omni map term to lit like every
+    // other depth-map term.
+    {auto blind=plate;blind.receives_shadow=false;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{blind,occluder},{0,0,1},{lamp}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-omni-noreceive.png");
+     const auto omni_blind=decode_rgba_image(folder/"point-light-omni-noreceive.png");
+     check(std::abs(census(*omni_blind,120,155)-census(*omni_unshadowed,120,155))<=6,
+         "receives_shadow=false receiver still showed the omni umbra");}
+    // A caster straddling a cube-face seam submits to both cells — the
+    // merged caster list per light carries one transform per face, so a
+    // 45-degree occluder records one more submission than the single-face
+    // occluder did.
+    MeshInstance3D seam=occluder;seam.position={.5f,0,2.f};seam.scale=.05f;
+    const auto one_face=window.scene3d_statistics().omni_shadow_casters;
+    {DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,seam},{0,0,1},{lamp}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-omni-seam.png");}
+    check(window.scene3d_statistics().omni_shadow_casters==one_face+1,
+        "Face-seam occluder did not reach multiple cube faces");
+    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_debug_receive_omni_passed\n";
   }
   {
     // Atmosphere limb scattering: a tinted shell brightens the silhouette

@@ -217,7 +217,13 @@ int main()try{
    PointLight3D m=l;m.spot_direction={1,0,0};
    const auto pair=Scene3D::create(camera,{instance},{0,0,1},{l,m});
    check(pair->point_lights().size()==2,"Scene dropped a second shadowed spot light");}
-  rejects([&]{PointLight3D l;l.casts_shadow=true;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
+  {// Omni shadows: a casts_shadow point light with no cone renders six
+   // cube faces into its row of the shared cube atlas.
+   PointLight3D o;o.position={0,0,1};o.casts_shadow=true;o.shadow_strength=.8f;
+   const auto omni=Scene3D::create(camera,{instance},{0,0,1},{o});
+   check(omni->point_lights().size()==1&&omni->point_lights()[0].casts_shadow&&
+         omni->point_lights()[0].spot_direction.x==0.f&&omni->point_lights()[0].shadow_strength==.8f,
+       "Scene dropped a valid shadowed omni light");}
   rejects([&]{PointLight3D l;l.casts_shadow=true;l.spot_direction={0,0,-1};l.spot_inner=1.f;l.spot_outer=1.f;
               (void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_inner=.97f;l.spot_outer=.9f;l.casts_shadow=true;l.shadow_strength=1.5f;

@@ -246,8 +246,6 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
        (d2>0&&(l.spot_inner<=l.spot_outer||l.spot_inner<=0||l.spot_inner>1||
                l.spot_outer<0||l.spot_outer>=1)))
       throw std::invalid_argument("3D spot light requires a finite direction and 0<=outer<inner<=1 cosines.");
-    if(l.casts_shadow&&d2==0)
-      throw std::invalid_argument("3D omni point light cannot cast a shadow map - spot direction required.");
     if(!std::isfinite(l.shadow_strength)||l.shadow_strength<0.f||l.shadow_strength>1.f)
       throw std::invalid_argument("3D spot shadow_strength must be in [0,1].");
     if(!std::isfinite(l.shadow_softness)||l.shadow_softness<0.f||l.shadow_softness>8.f)

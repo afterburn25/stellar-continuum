@@ -881,8 +881,6 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
                          l.spot_outer >= 1.f)))
           return fail("spot cones need 0<=spotOuter<spotInner<=1 cosines");
         l.cast_shadow = li.value("castShadow", false);
-        if (l.cast_shadow && sd2 == 0)
-          return fail("castShadow requires a nonzero spotDir");
         l.shadow_strength = li.value("shadowStrength", 1.f);
         if (!std::isfinite(l.shadow_strength) || l.shadow_strength < 0.f ||
             l.shadow_strength > 1.f)

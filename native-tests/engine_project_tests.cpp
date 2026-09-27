@@ -727,10 +727,16 @@ int main() {
               R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.97,"spotOuter":0.9}]})")
               .has_value(),
           "scene3d valid spot cone rejected");
-    check(!engine::Scene3dDocument::from_json(
-              R"({"entities":[],"pointLights":[{"castShadow":true}]})")
-              .has_value(),
-          "scene3d omni castShadow rejected");
+    if (auto omni = engine::Scene3dDocument::from_json(
+            R"({"entities":[],"pointLights":[{"castShadow":true,"shadowStrength":0.7}]})")) {
+      check(omni->point_lights.size() == 1 && omni->point_lights[0].cast_shadow &&
+                omni->point_lights[0].shadow_strength == 0.7f,
+            "scene3d omni castShadow rejected");
+      check(omni->to_json().find("castShadow") != std::string::npos,
+            "scene3d did not round-trip omni castShadow");
+    } else {
+      check(false, "scene3d shadowed omni light rejected");
+    }
     if (auto shadowed = engine::Scene3dDocument::from_json(
             R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.97,"spotOuter":0.9,"castShadow":true}]})")) {
       check(shadowed->point_lights.size() == 1 &&

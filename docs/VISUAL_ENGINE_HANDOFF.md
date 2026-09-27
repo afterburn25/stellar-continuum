@@ -295,17 +295,20 @@ auto scene = Scene3D::create(camera, instances, key_light, point_lights,
   (0 ≤ outer < inner ≤ 1). `spot_direction = (0,0,0)` keeps the light
   omni. Document keys: `spotDir`/`spotInner`/`spotOuter` on
   `pointLights[]` entries.
-- Spot shadow: `casts_shadow = true` (document key `castShadow`) gives
-  the cone a real depth map — casters render once from the light's
-  position through a cone frustum out to `range`, same caster policy
-  as the directional pass. `shadow_strength` (document key
+- Point-light shadows: `casts_shadow = true` (document key
+  `castShadow`) gives the light a real depth map — casters render once
+  from the light's position, same caster policy as the directional
+  pass. A coned light gets a quadrant of the shared spot atlas
+  (full-size for a single light, a quadrant each up to the four
+  point-light slots); an omni light gets a row of six 90-degree cube
+  faces in a shared cube atlas (one row per light, up to four),
+  range-bounded like the cone frustum. `shadow_strength` (document key
   `shadowStrength`, [0,1], default 1) blends the umbra like
   `ShadowMap3D::strength`; `shadow_softness` (document key
   `shadowSoftness`, [0,8], default 1) scales the PCF penumbra like
-  `ShadowMap3D::softness`. Spot-only (`Scene3D::create` rejects an
-  omni caster); every shadowed spot shares one depth atlas — full-size
-  for a single light, a quadrant each up to the four point-light
-  slots. Low tier skips it like the directional map.
+  `ShadowMap3D::softness`. Low tier skips both atlases like the
+  directional map. `Scene3DStatistics::spot_shadow_casters` /
+  `omni_shadow_casters` audit each atlas's submissions.
 - Point lights (and spot cones) are independent of the key/fill
   directional lights.
 
@@ -348,7 +351,9 @@ shadow.cascade2_extent = 0; // 0 disables; >cascade adds the coarsest tier
   caster workload (near box plus any far tiers);
   `shadow_cascade_casters`/`shadow_cascade2_casters` isolate each far
   tier's submissions (near = total minus both);
-  `spot_shadow_casters` reports the summed spot-atlas submissions.
+  `spot_shadow_casters`/`omni_shadow_casters` report the summed
+  spot-quadrant and omni-face submissions respectively (one omni
+  caster can submit to several faces of its light).
 - Casters submit the same screen-space LOD the lit pass picks (chain
   levels, one merged-sphere proxy per collapsed group) and carry the
   signed screen-door keep mask plus the material's alpha-cutout terms —
@@ -508,11 +513,12 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
 - `ShadowMap3D` is an authored ortho box for the key light (plus up
   to two optional wider `cascade`/`cascade2` far tiers — three bands,
-  not an arbitrary CSM split chain) and `casts_shadow` spot cones
-  sharing one depth atlas (a
-  quadrant per light, up to four) — no omni
-  point-light shadows; receivers outside the authored boxes (or outside
-  the spot map's cone frustum) stay lit (by design).
+  not an arbitrary CSM split chain), `casts_shadow` spot cones
+  sharing one depth atlas (a quadrant per light, up to four) and
+  `casts_shadow` omni lights sharing a cube-face atlas (six faces per
+  light, up to four rows, view-space-locked faces) — receivers outside
+  the authored boxes (or outside a light's frustum/range) stay lit
+  (by design).
 - Analytic ellipsoid/annulus blockers remain the ring↔planet shadow
   path and are evaluated independently of the map.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or
