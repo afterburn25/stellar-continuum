@@ -270,6 +270,10 @@ struct VisibleRange {
 // depth passes — the component counterpart of the entity document's
 // `castsShadow=false` key. Receiving is unaffected.
 struct NoShadow {};
+// Marker: depth-map shadows (key light + shadowed spot cells) stay
+// fully lit on the entity — the counterpart of `receivesShadow=false`.
+// Analytic blocker shadows are material-driven and still apply.
+struct NoShadowReceive {};
 // Screen-space mesh LOD chain for a 3D entity — the component
 // counterpart of the entity document's `lods`/`lodPixels` keys. Specs
 // resolve through the same path as MeshRef; `specs[i]` substitutes for

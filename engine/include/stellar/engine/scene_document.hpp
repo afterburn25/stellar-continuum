@@ -209,6 +209,10 @@ struct Scene3dEntity {
   // false keeps an opaque mesh out of the directional and spot depth
   // passes — backdrop shells and markers stay lit-only.
   bool casts_shadow{true};
+  // Shadow receiving opt-out (document key `receivesShadow`, default
+  // true): false keeps depth-map terms lit on this mesh — self-lit
+  // markers and backdrops ignore umbrae. Analytic blockers still apply.
+  bool receives_shadow{true};
   // Opaque surface response — content-relative maps; any subset binds.
   // The cloud map's alpha self-shadows the surface (cloud_opacity) and
   // its RGB can composite as a visible deck (cloud_albedo), drifted by

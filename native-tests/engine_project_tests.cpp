@@ -422,6 +422,7 @@ int main() {
     cube.visible_range = 250.f;
     cube.visible_fade = .1f;
     cube.casts_shadow = false;
+    cube.receives_shadow = false;
     cube.normal_map = "maps/crate_n.png";
     cube.properties_map = "maps/crate_p.png";
     cube.cloud_map = "maps/crate_clouds.png";
@@ -581,7 +582,7 @@ int main() {
                 rc.atmo_night == 0.1f && rc.atmo_r == 0.3f &&
                 rc.atmo_g == 0.5f && rc.atmo_b == 0.9f &&
                 rc.visible_range == 250.f && rc.visible_fade == .1f &&
-                rc.casts_shadow == false,
+                rc.casts_shadow == false && rc.receives_shadow == false,
             "scene3d pbr/atmosphere/cull fields round-trip");
       check(rc.normal_map == "maps/crate_n.png" &&
                 rc.properties_map == "maps/crate_p.png" &&
@@ -779,6 +780,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"castsShadow":false}]})")
               .has_value(),
           "scene3d castsShadow=false parses");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"receivesShadow":"no"}]})")
+              .has_value(),
+          "scene3d non-boolean receivesShadow rejected");
+    check(engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"receivesShadow":false}]})")
+              .has_value(),
+          "scene3d receivesShadow=false parses");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"uvTile":[2]}]})")
               .has_value(),

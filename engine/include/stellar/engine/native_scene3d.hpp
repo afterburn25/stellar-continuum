@@ -370,6 +370,11 @@ struct MeshInstance3D {
   // lod_group casts only when its representative member does (the proxy
   // stands in for the whole merged sphere).
   bool casts_shadow{true};
+  // Shadow receiving opt-out: false keeps the depth-map terms (key
+  // light and shadowed spots) fully lit on this instance — backdrops
+  // and self-lit markers that shouldn't show umbrae. Analytic
+  // ellipsoid/annulus blockers are a material property and still apply.
+  bool receives_shadow{true};
 };
 // Directional shadow map for the scene key light. Instead of fitting the
 // camera frustum, the ortho coverage box centres `distance` world units

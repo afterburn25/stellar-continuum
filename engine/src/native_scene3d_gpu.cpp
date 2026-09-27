@@ -626,6 +626,9 @@ struct Scene3DRenderer::Storage {
         fragment.shadow_light={shadow.light.x,shadow.light.y,shadow.light.z,s.shape==AnalyticShadowShape3D::Ellipsoid?1.f:2.f};
         fragment.shadow_radii={s.radii.x,s.radii.y,s.radii.z,0};
         fragment.shadow_options={s.inner_radius,s.outer_radius,s.opacity,s.opacity_map?1.f:0.f};}
+      // shadow_radii.w carries the per-instance receive opt-out (0 = the
+      // default receives-maps path; 1 keeps depth-map terms lit).
+      fragment.shadow_radii[3]=draw.instance->receives_shadow?0.f:1.f;
       if(material.surface_effect){const auto& e=*material.surface_effect;
         fragment.effect_options={1,e.blend,e.flow_phase,e.distortion};
         fragment.effect_sphere={e.view_sphere_center.x,e.view_sphere_center.y,e.view_sphere_center.z,e.sphere_radius};

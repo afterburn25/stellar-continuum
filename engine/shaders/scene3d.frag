@@ -319,6 +319,9 @@ void main() {
     // Evaluate derivatives before per-pixel alpha rejection; annulus horizon
     // rejection above is arithmetic so neighbouring fragments remain coherent.
     float visibility=direct_visibility(material.shadow_light.xyz);
+    // shadow_radii.w = per-instance receives_shadow opt-out: folds into the
+    // authored strength so a flagged receiver stays fully lit by depth maps.
+    const float shadow_receive=1.0-material.shadow_radii.w;
     // Directional shadow map: receivers project into the key light's ortho
     // box. Coverage is an authored strategy-scale policy — fragments outside
     // the box stay lit instead of smearing. Fixed 8-tap kernel keeps PCF
@@ -347,7 +350,7 @@ void main() {
             lit=map_lit(shadow_depth_map,clip,view_params.shadow_options.x,
                         view_params.shadow_options.y,view_params.shadow_options.w,vec4(0.0,0.0,1.0,1.0));
         }
-        visibility*=mix(1.0,lit,view_params.shadow_options.z);
+        visibility*=mix(1.0,lit,view_params.shadow_options.z*shadow_receive);
     }
     float extra_visibility[2];
     for(int i=0;i<2;++i)extra_visibility[i]=material.additional_illumination[i].a>0.0?direct_visibility(material.additional_shadow[i].xyz):1.0;
@@ -579,7 +582,7 @@ void main() {
             window*=mix(1.0,map_lit(spot_shadow_map,view_params.spot_from_view[i]*vec4(view_position,1.0),
                             view_params.spot_options[i].x,view_params.spot_options[i].y,
                             view_params.spot_options[i].w,view_params.spot_bounds[i]),
-                        view_params.spot_options[i].z);
+                        view_params.spot_options[i].z*shadow_receive);
         if(window<=0.0) continue;
         vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
         float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);

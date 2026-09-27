@@ -691,6 +691,9 @@ void register_scene_components(World &world) {
   world.register_component<NoShadow>(
       "noshadow", encode_marker,
       [](const std::vector<std::uint8_t> &) { return NoShadow{}; });
+  world.register_component<NoShadowReceive>(
+      "noshadowreceive", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return NoShadowReceive{}; });
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -988,6 +991,7 @@ std::vector<EntityId> spawn_scene3d(World &world,
     if (s.visible_range > 0.f)
       world.add(entity, VisibleRange{s.visible_range, s.visible_fade});
     if (!s.casts_shadow) world.add(entity, NoShadow{});
+    if (!s.receives_shadow) world.add(entity, NoShadowReceive{});
     if (s.star_kelvin >= 100.0)
       world.add(entity, StarPhotosphere{s.star_kelvin});
     if (s.accretion[2] >= 100.f)
@@ -1118,6 +1122,7 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.visible_fade = vr->fade;
     }
     if (world.get<NoShadow>(entity)) s.casts_shadow = false;
+    if (world.get<NoShadowReceive>(entity)) s.receives_shadow = false;
     if (const auto *sp = world.get<StarPhotosphere>(entity))
       s.star_kelvin = sp->kelvin;
     if (const auto *ad = world.get<AccretionDisc>(entity))

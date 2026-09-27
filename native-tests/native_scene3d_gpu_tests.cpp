@@ -956,7 +956,13 @@ int main(int argc,char** argv)try{
     const auto optout=shadow_view({receiver,shy},{},"shadow-optout.png");
     check(channel(*optout,176,160,0)>100,"A casts_shadow=false caster still wrote the depth pass");
     check(channel(*optout,60,160,0)>100,"Caster opt-out darkened the wrong receiver region");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_optout_passed\n";
+    // Receiving opt-out: receives_shadow=false keeps the depth-map term
+    // lit on this mesh even inside the umbra footprint.
+    auto blind=receiver;blind.receives_shadow=false;
+    const auto unshadowed_receiver=shadow_view({blind,occluder},{},"shadow-noreceive.png");
+    check(channel(*unshadowed_receiver,176,160,0)>100,"A receives_shadow=false receiver still showed the umbra");
+    check(channel(*unshadowed_receiver,60,160,0)>100,"Receive opt-out brightened the wrong region");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_optout_receive_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks

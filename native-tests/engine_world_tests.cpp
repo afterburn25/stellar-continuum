@@ -684,6 +684,7 @@ int main() {
         turret.visible_range = 400.f;
         turret.visible_fade = .2f;
         turret.casts_shadow = false;
+        turret.receives_shadow = false;
         turret.normal_map = "maps/turret_n.png";
         turret.cloud_map = "maps/turret_clouds.png";
         turret.normal_strength = 0.9f;
@@ -769,6 +770,9 @@ int main() {
         check(world3.get<NoShadow>(turret_e) != nullptr &&
                   world3.get<NoShadow>(ship_e) == nullptr,
               "castsShadow=false attaches the noshadow marker only");
+        check(world3.get<NoShadowReceive>(turret_e) != nullptr &&
+                  world3.get<NoShadowReceive>(ship_e) == nullptr,
+              "receivesShadow=false attaches the noreceive marker only");
         const auto *ms = world3.get<MaterialSurface>(turret_e);
         check(ms != nullptr && ms->normal_map == "maps/turret_n.png" &&
                   ms->properties_map.empty() &&
@@ -930,7 +934,8 @@ int main() {
                   out.entities[1].atmo_b == 0.8f &&
                   out.entities[1].visible_range == 400.f &&
                   out.entities[1].visible_fade == .2f &&
-                  out.entities[1].casts_shadow == false,
+                  out.entities[1].casts_shadow == false &&
+                  out.entities[1].receives_shadow == false,
               "scene3d_from_world exports material extensions");
         check(out.entities[1].normal_map == "maps/turret_n.png" &&
                   out.entities[1].cloud_map == "maps/turret_clouds.png" &&

@@ -154,6 +154,7 @@ MeshInstance3D inst;
 inst.visible_range = 2500.f;  // world units; 0 = visible at any range
 inst.visible_fade = .15f;     // [0,.5] fraction of range; 0 = hard cut
 inst.casts_shadow = true;     // false = stays out of the depth passes
+inst.receives_shadow = true;  // false = depth-map terms stay fully lit
 ```
 
 `casts_shadow` opts an opaque mesh out of the directional and spot
@@ -163,6 +164,13 @@ going transparent (receiving is unaffected). The document key is
 ECS side it maps to the `NoShadow` marker component. A collapsed LOD
 group casts only when its representative member opts in — the proxy
 stands in for the whole merged sphere.
+
+`receives_shadow` is the symmetric opt-out: `false` keeps the key-light
+and shadowed-spot depth-map terms fully lit on that instance alone —
+self-lit markers and UI shells ignore umbrae while still casting them.
+The document key is `receivesShadow` (same convention) mapping to the
+`NoShadowReceive` marker. Analytic ellipsoid/annulus blockers are a
+material property and still apply either way.
 
 `visible_fade` dithers the object out over the last fraction of the
 range through the same screen-door mask the LOD crossfade uses — the
@@ -341,7 +349,9 @@ shadow.cascade_extent = 0;  // 0 disables; >extent adds a wider far tier
   shadows as an edge-on line. `casts_shadow=false`
   (`MeshInstance3D` / entity `castsShadow` / `NoShadow` marker) keeps
   an opaque mesh out of every depth pass — a collapsed group casts
-  only when its representative opts in.
+  only when its representative opts in. `receives_shadow=false`
+  (`receivesShadow` / `NoShadowReceive`) keeps the depth-map terms
+  fully lit on that mesh alone.
 - Shadow darkness scales the key light only — ambient, point lights,
   emissive and the analytic `AnalyticShadow3D` blockers are independent.
 - `bias` is a receiver-side constant in NDC space; the rasterizer

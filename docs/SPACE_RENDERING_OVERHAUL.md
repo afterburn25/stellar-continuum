@@ -93,7 +93,8 @@ same document headless-tested.
    the tier PCF radius on both maps so authored penumbra width isn't
    quality-locked; and per-instance `castsShadow`/`NoShadow` opts an
    opaque mesh out of every depth pass (a collapsed group follows its
-   representative). Remaining: cascade count is fixed at
+   representative) while `receivesShadow`/`NoShadowReceive` keeps the
+   depth-map terms fully lit on a self-lit receiver. Remaining: cascade count is fixed at
    one far tier, omni point lights stay unshadowed; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an
