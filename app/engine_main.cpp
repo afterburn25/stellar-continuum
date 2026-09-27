@@ -1952,7 +1952,7 @@ void commit_scene3_field(Shell &shell) {
     doc.quality = q;
     return ok("quality tier updated");
   }
-  case 38: { // point lights: "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength]]]; ..."
+  case 38: { // point lights: "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness]]]]; ..."
     std::vector<engine::Scene3dPointLight> parsed;
     if (!shell.scene3_buffer.empty()) {
       std::istringstream entries(shell.scene3_buffer);

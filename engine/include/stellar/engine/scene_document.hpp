@@ -328,8 +328,8 @@ struct Scene3dPointLight {
   float spot_x{}, spot_y{}, spot_z{};
   float spot_inner{1.f};
   float spot_outer{1.f};
-  // Shadowed spot cone (at most one per scene): renders casters into a
-  // cone-frustum depth map from the light's position. Requires spotDir.
+  // Shadowed spot cone: renders casters from the light's position into
+  // its quadrant of the shared depth atlas. Requires spotDir.
   bool cast_shadow{false};
   // [0,1] umbra darkness when castShadow is set (1 = full cut).
   float shadow_strength{1.f};

@@ -183,11 +183,11 @@ struct PointLight3D {
   Vec3 spot_direction{0,0,0};
   float spot_inner{1.f};
   float spot_outer{1.f};
-  // Shadowed spot: renders the scene's casters once from the light's
-  // perspective into its own depth map (cone frustum, range-bounded).
-  // Spot-only — omni shadows would need a cube map. Every shadowed
-  // spot gets a quadrant of a shared depth atlas (up to the four
-  // point-light slots).
+  // Shadowed spot: renders the scene's casters from the light's
+  // perspective into its quadrant of the shared depth atlas (cone
+  // frustum, range-bounded). Spot-only — omni shadows would need a
+  // cube map. Every shadowed spot gets a quadrant, up to the four
+  // point-light slots.
   bool casts_shadow{false};
   // [0,1] umbra darkness when casts_shadow is set — 1 is a full cut,
   // lower values leave residual light like ShadowMap3D::strength.
