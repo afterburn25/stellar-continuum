@@ -1,4 +1,5 @@
 #include "native_colony_roster.hpp"
+#include "native_ui_layout.hpp"
 #include "native_ui_theme.hpp"
 
 #include <cmath>
@@ -107,7 +108,8 @@ void references_survey_and_numbers_are_bounded() {
 
 void responsive_scroll_and_press_gates() {
   for (const auto [width, height] :
-       {std::pair{1280, 720}, std::pair{1920, 1080}, std::pair{3840, 2160}}) {
+       {std::pair{640, 360}, std::pair{1280, 720}, std::pair{1920, 1080},
+        std::pair{3840, 2160}}) {
     RosterWorkspace workspace;
     workspace.set_view(build(world(40), 9));
     workspace.open();
@@ -115,6 +117,11 @@ void responsive_scroll_and_press_gates() {
     require(layout.panel.x >= 70.f * layout.scale && layout.list.height > 0 &&
                 layout.row_height > 0,
             "roster layout escaped navigation viewport");
+    require(layout.panel.y >=
+                stellar::native_map::native_workspace_top(width, height) -
+                    .01f &&
+                layout.panel.y + layout.panel.height <= height - .01f,
+            "roster panel clipped by the navigation bar or viewport edge");
     const auto first = workspace.row_button(0, width, height);
     require(layout.list.contains(center(first)),
             "first roster row was not in scroll list");

@@ -210,9 +210,15 @@ View build(const stellar::core::FreshCampaignState &campaign,
 
 RosterLayout RosterLayout::for_viewport(int width, int height) noexcept {
   const float s = NativeUiLayout::for_viewport(width, height).scale;
-  const float panel_width=std::min(920.f*s,static_cast<float>(width)-100.f*s);
-  const float panel_height=std::min(590.f*s,static_cast<float>(height)-108.f*s);
-  const UiRect panel{(width-panel_width)*.5f,(height-panel_height)*.5f+20.f*s,
+  const float panel_width=std::min(
+      {920.f*s,static_cast<float>(width)-100.f*s,
+       static_cast<float>(width)-2.f*(70.f*s+8.f*s)});
+  // Centered placement can push the panel under the navigation bar at short
+  // viewports (the title clipped at 640x360); keep it below the workspace top.
+  const float top_min=native_workspace_top(width,height)+4.f*s;
+  const float panel_height=std::min(590.f*s,static_cast<float>(height)-top_min-8.f*s);
+  const UiRect panel{(width-panel_width)*.5f,
+                     std::max(top_min,(height-panel_height)*.5f+20.f*s),
                      panel_width,panel_height};
   const float header = 124.f * s;
   return {panel,
