@@ -1118,7 +1118,29 @@ int main(int argc,char** argv)try{
     check(std::abs(umbra_edge(*off_2)-umbra_edge(*off_0))>16,"normal_offset did not translate the receiver's depth lookup");
     check(channel(*off_2,60,160,0)>100,"normal_offset darkened unoccluded receivers");
     check(umbra_edge(*off_0)>0,"The coarse map lost the umbra before the offset probe");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_optout_receive_normaloffset_passed\n";
+    // Camera-fitted coverage: with camera_fit the authored extent is a
+    // multiplier of the visible half-height, so the same authored chain
+    // covers different world spans at different zooms. Authored .5 → .5
+    // world of coverage at this ortho height (the .78-light-space umbra
+    // stays lit) and 1.0 world once the footprint doubles (the umbra
+    // lands inside). A fixed .5 extent stays lit at either zoom — only
+    // the fit flips coverage with the camera.
+    auto fitted=narrow;fitted.extent=.5f;fitted.camera_fit=true;
+    const auto fit_view=[&](Camera3D c,ShadowMap3D m,std::vector<MeshInstance3D> objects,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(c,std::move(objects),light,{},m),{0,0,320,320}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    auto zoomed=camera;zoomed.orthographic_height=4.f;
+    const auto fit_near=fit_view(camera,fitted,{receiver,occluder},"shadow-fit-near.png");
+    const auto fit_far=fit_view(zoomed,fitted,{receiver,occluder},"shadow-fit-far.png");
+    auto fixed=fitted;fixed.camera_fit=false;
+    const auto fixed_far=fit_view(zoomed,fixed,{receiver,occluder},"shadow-fit-fixed.png");
+    // The plate covers [120,200]² at both zooms and the umbra lands
+    // inside that window; background navy stays outside it.
+    const auto umbra_area=[&](const RgbaImage&img){int n=0;for(int y=120;y<200;++y)for(int x=120;x<200;++x)if(channel(img,x,y,0)<60)++n;return n;};
+    check(umbra_area(*fit_near)<8,"Camera-fitted .5 still covered the umbra at the base zoom");
+    check(umbra_area(*fit_far)>32,"Camera-fitted coverage did not track the doubled footprint");
+    check(umbra_area(*fixed_far)<8,"A fixed .5 extent covered the umbra at the wider zoom");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_optout_receive_normaloffset_camerafit_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks

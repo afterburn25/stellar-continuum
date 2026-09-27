@@ -409,6 +409,15 @@ struct ShadowMap3D {
   // maximum_scene3d_shadow_cascades tiers — the first is orbit-scale,
   // later ones system- to sector-scale.
   std::vector<float> cascade_extents;
+  // Camera-fitted coverage: when set, `extent` and `cascade_extents`
+  // become multipliers of the camera's visible half-height at the box
+  // centre instead of absolute world units — the whole tier chain
+  // tracks zoom, so texel density holds when zoomed in and coverage
+  // survives zooming out, while authored tier ratios stay meaningful.
+  // Orthographic cameras use `orthographic_height`/2; perspective uses
+  // `distance`·tan(fov/2) (the half-height of the view slice at the box
+  // centre). `distance`/`depth` remain authored world units.
+  bool camera_fit{false};
 };
 class Scene3D final {
  public:

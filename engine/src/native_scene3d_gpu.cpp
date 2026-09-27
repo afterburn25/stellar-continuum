@@ -932,11 +932,22 @@ struct Scene3DRenderer::Storage {
       const double yx=zy*xz-zz*xy,yy=zz*xx-zx*xz,yz=zx*xy-zy*xx; // z × x
       const double fx=cam.position.x+static_cast<double>(fw.x)*s.distance,fy=cam.position.y+static_cast<double>(fw.y)*s.distance,fz=cam.position.z+static_cast<double>(fw.z)*s.distance;
       const double ex=fx+zx*s.depth*.5,ey=fy+zy*s.depth*.5,ez=fz+zz*s.depth*.5;
-      const double extent=s.extent,depth=s.depth;
+      // Camera-fitted coverage (ShadowMap3D::camera_fit): authored
+      // extents become multipliers of the camera's visible half-height
+      // at the box centre — orthographic uses orthographic_height/2,
+      // perspective the frustum half-height at the authored distance
+      // slice. The whole tier chain tracks zoom while authored ratios
+      // (and the strictly-increasing validation) stay meaningful.
+      const double footprint_half=
+          cam.projection==Projection3D::Orthographic
+              ?static_cast<double>(cam.orthographic_height)*.5
+              :static_cast<double>(s.distance)*std::tan(static_cast<double>(cam.vertical_fov_radians)*.5);
+      const double fit_scale=s.camera_fit?std::max(footprint_half,1e-3):1.;
+      const double extent=s.extent*fit_scale,depth=s.depth;
       Matrix4 light_rotation{};light_rotation.values={{static_cast<float>(xx),static_cast<float>(yx),static_cast<float>(zx),0,
         static_cast<float>(xy),static_cast<float>(yy),static_cast<float>(zy),0,
         static_cast<float>(xz),static_cast<float>(yz),static_cast<float>(zz),0,0,0,0,1}};
-      Matrix4 light_projection{};light_projection.values={{1.f/s.extent,0,0,0,0,1.f/s.extent,0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
+      Matrix4 light_projection{};light_projection.values={{static_cast<float>(1./extent),0,0,0,0,static_cast<float>(1./extent),0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
       // world = R_cam·view + cam, so LV·world = R_l·R_cam·view + R_l·(cam-eye).
       Matrix4 from_view=multiply(light_rotation,rotation_from(cq));
       const double cx=cam.position.x-ex,cy=cam.position.y-ey,cz=cam.position.z-ez;
@@ -951,7 +962,7 @@ struct Scene3DRenderer::Storage {
       // depth projection so slope-scaled acne clears without raising
       // the constant bias. Each cascade tier scales by its own
       // world-per-texel (2*extent/res).
-      view_uniform.shadow_advanced={s.normal_offset*2.f*s.extent/static_cast<float>(shadow_res),0.f,0.f,0.f};
+      view_uniform.shadow_advanced={s.normal_offset*2.f*static_cast<float>(extent)/static_cast<float>(shadow_res),0.f,0.f,0.f};
       // Casters: transparent blends never occlude; visible_range culls cast
       // shadows identically to the camera draw; the light-space box test is
       // the only frustum cut — off-camera casters still write the map.
@@ -965,7 +976,7 @@ struct Scene3DRenderer::Storage {
       // snapping lit at extreme zoom. Tier index == depth-array layer.
       const auto cascade_tiers=std::min(s.cascade_extents.size(),maximum_scene3d_shadow_cascades);
       for(std::size_t t=0;t<cascade_tiers;++t){
-        const double tier_extent=s.cascade_extents[t];
+        const double tier_extent=s.cascade_extents[t]*fit_scale;
         Matrix4 tier_projection{};tier_projection.values={{1.f/static_cast<float>(tier_extent),0,0,0,0,1.f/static_cast<float>(tier_extent),0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
         view_uniform.cascade_from_view[t]=multiply(tier_projection,from_view);
         view_uniform.cascade_options[t]={1.f/static_cast<float>(shadow_res),radius_texels,

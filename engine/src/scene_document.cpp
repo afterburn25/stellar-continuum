@@ -571,6 +571,7 @@ std::string Scene3dDocument::to_json() const {
     if (shadow_softness != 1.f) doc["render"]["shadow"]["softness"] = shadow_softness;
     if (shadow_normal_offset != 0.f)
       doc["render"]["shadow"]["normalOffset"] = shadow_normal_offset;
+    if (shadow_fit) doc["render"]["shadow"]["fit"] = true;
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
@@ -955,6 +956,7 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         }
         scene.shadow_softness = s.value("softness", 1.0f);
         scene.shadow_normal_offset = s.value("normalOffset", 0.0f);
+        scene.shadow_fit = s.value("fit", false);
         bool ordered = true;
         for (float prev = scene.shadow_extent; const float e : scene.shadow_cascades) {
           if (!std::isfinite(e) || e > 1e9f || e <= prev) ordered = false;

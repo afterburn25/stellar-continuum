@@ -271,10 +271,13 @@ documented per-frame but accumulated. See
 
 ## Explicitly deferred / blockers
 
-- Camera-fitted CSM: the `ShadowMap3D` ortho volume plus its
-  `cascade_extents` far tiers (up to four, one depth-array layer each)
-  covers authored strategy scenes at up to five zoom bands — splits are
-  authored extents, not derived from the camera frustum;
+- Camera-fitted CSM: `ShadowMap3D::camera_fit` interprets `extent` and
+  every `cascade_extents` entry as multipliers of the camera's visible
+  half-height at the box centre, so the authored chain tracks zoom —
+  splits stay authored ratios rather than frustum-derived distances,
+  and `distance`/`depth` remain absolute world units. Remaining gap:
+  no per-tier frustum-slice fitting (the centre slice drives all
+  tiers);
   `casts_shadow` spot cones share a
   quadrant-atlas depth map (up to four), and `casts_shadow` omni
   lights share a cube-face atlas (six faces per light, up to four

@@ -526,6 +526,7 @@ int main() {
     scene.shadow_cascades = {96.f, 192.f};
     scene.shadow_softness = 2.5f;
     scene.shadow_normal_offset = 1.5f;
+    scene.shadow_fit = true;
     const auto reparsed =
         engine::Scene3dDocument::from_json(scene.to_json());
     check(reparsed.has_value(), "scene3d json round-trips");
@@ -640,7 +641,8 @@ int main() {
                 reparsed->shadow_bias == 0.001f && reparsed->shadow_resolution == 2048 &&
                 reparsed->shadow_cascades == (std::vector<float>{96.f, 192.f}) &&
                 reparsed->shadow_softness == 2.5f &&
-                reparsed->shadow_normal_offset == 1.5f,
+                reparsed->shadow_normal_offset == 1.5f &&
+                reparsed->shadow_fit,
             "scene3d shadow map settings round-trip");
       // The emitter mirrors legacy cascade/cascade2 scalars alongside the
       // cascades array, and a legacy document lacking the array parses
@@ -650,8 +652,9 @@ int main() {
                 emitted["render"]["shadow"]["cascade"] == 96.f &&
                 emitted["render"]["shadow"]["cascade2"] == 192.f,
             "scene3d cascades array lost its legacy scalar mirror");
-      check(emitted["render"]["shadow"]["normalOffset"] == 1.5f,
-            "scene3d shadow normalOffset did not serialize");
+      check(emitted["render"]["shadow"]["normalOffset"] == 1.5f &&
+                emitted["render"]["shadow"]["fit"] == true,
+            "scene3d shadow normalOffset/fit did not serialize");
       auto legacy_json = emitted;
       legacy_json["render"]["shadow"].erase("cascades");
       const auto legacy_parsed =

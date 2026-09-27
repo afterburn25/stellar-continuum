@@ -426,7 +426,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 - **Purpose:** give the generic renderer a real directional shadow path
   sized for strategy scenes — ship/station occlusion under a sun key
-  light — without a camera-frustum fit that swims at system scale.
+  light — with authored coverage that stays stable at system scale
+  (and an optional `camera_fit` mode that tracks zoom via footprint
+  multipliers instead of frustum-slice fitting).
 - **Modules:** `native_scene3d.hpp` (`ShadowMap3D`, `Scene3D::create`
   parameter, `Scene3DStatistics::shadow_casters`/`spot_shadow_casters`/`omni_shadow_casters`),
   `native_scene3d.cpp`
@@ -449,10 +451,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `normal_offset` ([0,8] receiver-side lift along the shading normal in
   map texels — clears slope-scaled self-shadow acne on surfaces angled
   to the light without raising the constant `bias`; each cascade tier
-  applies its own texel-scaled amount). Coverage is an
-  authored policy: receivers outside every box stay lit; the box
-  tracks the camera so mid-zoom strategy views keep stable texel
-  density.
+  applies its own texel-scaled amount),
+  `camera_fit` (reinterprets every authored extent as a multiplier of
+  the camera's visible half-height at the box centre —
+  `orthographic_height`/2 orthographic or `distance`·tan(fov/2)
+  perspective — so the chain tracks zoom with stable texel density).
+  Coverage is an authored policy: receivers outside every box stay lit;
+  the box tracks the camera so mid-zoom strategy views keep stable
+  texel density.
 - **Shader contract:** view-level fragment uniform carries the
   view→shadow-clip matrix plus {texel, PCF radius in texels, strength,
   bias} and the world-units normal-offset lift; the fragment adds
@@ -493,7 +499,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `normalOffset` non-finite or outside [0,8].
 - **Editor:** Scene3D tool `shadow` row edits all fields against
   the live preview, trailing fields carrying up to four cascade tiers
-  then the normal-offset lift.
+  then the normal-offset lift and camera-fit flag.
 - **Tests:** `native_scene3d_gpu` — casters/bias/direction/tiers/range
   block with pixel probes (open vs blocked receiver, moved blocker
   relocates the shadow, Low-tier skip, PCF tap delta, out-of-range

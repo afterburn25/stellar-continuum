@@ -333,12 +333,21 @@ shadow.normal_offset = 0.f; // [0,8] receiver lift along its shading
 shadow.cascade_extents = {}; // up to 4 wider far tiers; each must be
                              // strictly larger than the previous and
                              // than `extent` (orbit → system → sector)
+shadow.camera_fit = false;   // true: extents become multipliers of the
+                             // camera's visible half-height at the box
+                             // centre (tracks zoom; distance/depth stay
+                             // absolute world units)
 ```
 
 - Strategy-scale fitting: instead of covering the camera frustum, the
   ortho box centres `distance` units along the camera forward axis, so
   the authored `extent` picks how much of the scene is shadowed —
-  receivers outside the box stay lit. The light direction and camera
+  receivers outside the box stay lit. Setting `camera_fit` turns every
+  authored extent into a multiplier of the camera's visible
+  half-height at the box centre (`orthographic_height`/2 orthographic,
+  `distance`·tan(fov/2) perspective), so the same authored chain
+  tracks zoom: zoomed-in views get full texel density and zoomed-out
+  views keep coverage. `distance`/`depth` stay absolute world units. The light direction and camera
   orientation both track the scene's key light each frame. An optional
   `cascade_extents` (document key `cascades` in `render.shadow` —
   legacy `cascade`/`cascade2` scalars still parse and are emitted as a
@@ -457,9 +466,11 @@ equirect path — a shared IBL probe that fills entities with
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
 ("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows"), and
 `render.shadow` — `{extent, distance, depth, strength, bias,
-resolution, cascades, softness, normalOffset}`; `cascades` is an array of up to four
+resolution, cascades, softness, normalOffset, fit}`; `cascades` is an array of up to four
 wider ortho extents (legacy `cascade`/`cascade2` scalar keys still
-parse and are emitted alongside the array); `extent ≤ 0` (or the key
+parse and are emitted alongside the array), and `fit` makes every
+authored extent a multiplier of the camera's visible half-height at
+the box centre; `extent ≤ 0` (or the key
 absent) disables the map. Negative `range` and unknown
 `debug`/`quality` strings are rejected, as are nonpositive `depth`,
 `strength` outside [0,1], negative `bias`, `resolution` outside
@@ -489,7 +500,7 @@ LOD fade width.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range +
 optional spot dir/inner/outer/shadow flag),
-shadow map (extent/distance/depth/strength/bias/resolution/cascade…cascade4/softness/normalOffset), scene
+shadow map (extent/distance/depth/strength/bias/resolution/cascade…cascade4/softness/normalOffset/fit), scene
 environment probe (equirect path — feeds `environmentStrength` opt-ins
 that author no own map).
 The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
@@ -525,8 +536,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
 - `ShadowMap3D` is an authored ortho box for the key light (plus up
   to four optional wider `cascade_extents` far tiers sharing one
-  depth-array — five bands maximum, still an authored split list rather
-  than a camera-fitted CSM), `casts_shadow` spot cones
+  depth-array — five bands maximum; `camera_fit` scales the authored
+  extents by the camera footprint but there is no per-tier
+  frustum-slice split), `casts_shadow` spot cones
   sharing one depth atlas (a quadrant per light, up to four) and
   `casts_shadow` omni lights sharing a cube-face atlas (six faces per
   light, up to four rows, view-space-locked faces) — receivers outside

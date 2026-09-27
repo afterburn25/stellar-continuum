@@ -390,6 +390,10 @@ struct Scene3dDocument {
   // along their shading normal before depth projection so slope-scaled
   // acne clears without raising the constant bias. 0 disables.
   float shadow_normal_offset{0.f};
+  // When true the authored extents are multipliers of the camera's
+  // visible half-height at the box centre (ShadowMap3D::camera_fit),
+  // not absolute world units.
+  bool shadow_fit{false};
   // Background clear color.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward (-Y) acceleration in units/s²; 0 disables gravity.
