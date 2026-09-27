@@ -870,6 +870,8 @@ int main() {
                   "visiblerange codec round-trips");
             check(restored.get<NoShadow>(*re_turret) != nullptr,
                   "noshadow codec round-trips");
+            check(restored.get<NoShadowReceive>(*re_turret) != nullptr,
+                  "noshadowreceive codec round-trips");
             const auto *rms = restored.get<MaterialSurface>(*re_turret);
             check(rms != nullptr && rms->cloud_map == "maps/turret_clouds.png" &&
                       rms->normal_map == "maps/turret_n.png" &&

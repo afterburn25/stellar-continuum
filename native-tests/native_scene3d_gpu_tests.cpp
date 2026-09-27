@@ -704,6 +704,16 @@ int main(int argc,char** argv)try{
      check(std::abs(census(*blind_img,120,155)-census(*both_unshadowed,120,155))<=6&&
            std::abs(census(*blind_img,175,215)-census(*both_unshadowed,175,215))<=6,
          "receives_shadow=false receiver still showed spot umbrae");}
+    // casts_shadow=false on a spot occluder keeps it out of its light's
+    // quadrant — lamp2's umbra strip reopens while lamp1's stays closed.
+    {auto shy2=occluder2;shy2.casts_shadow=false;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder,shy2},{0,0,1},{lamp,lamp2}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-spot2-optout.png");
+     const auto shy_img=decode_rgba_image(folder/"point-light-spot2-optout.png");
+     check(std::abs(census(*shy_img,175,215)-census(*both_unshadowed,175,215))<=6,
+         "casts_shadow=false occluder still wrote lamp2's quadrant");
+     check(census(*shy_img,120,155)>census(*both_unshadowed,120,155)+20,
+         "Lamp1's umbra broke when lamp2's occluder opted out");}
     lamp.casts_shadow=true;
     std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_debug_receive_passed\n";
   }
