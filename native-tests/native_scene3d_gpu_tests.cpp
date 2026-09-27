@@ -1457,7 +1457,26 @@ int main(int argc,char** argv)try{
       std::cout<<"fleet3d_shadow_cascade frames=60 instances=1024 cpu_submit_mean_ms="<<cascade_submit/60<<" frame_wall_mean_ms="<<cascade_wall/60
         <<" draw_calls="<<cascade_stats.draw_calls<<" shadow_casters="<<cascade_stats.shadow_casters
         <<" cascade="<<cascade_stats.shadow_cascade_casters<<" cascade2="<<cascade_stats.shadow_cascade2_casters
-        <<" spot_shadow_casters="<<cascade_stats.spot_shadow_casters<<'\n';}}
+        <<" spot_shadow_casters="<<cascade_stats.spot_shadow_casters<<'\n';}
+     // Omni receipt: the same picket with its cone removed collects into
+     // every cube face the fleet spans — per-light caster work scales
+     // with covering faces (≤6), not a flat six like a naive cubemap.
+     {std::vector<MeshInstance3D> omni_ships;omni_ships.reserve(1024);
+      for(int row=0;row<32;++row)for(int col=0;col<32;++col){
+        MeshInstance3D ship{hull_mesh,{},{},.5f,hull};
+        ship.position={(col-16)*2.5,(row-16)*1.4,-10.0-row*6.0};
+        ship.lod_pixels=8;ship.lod_meshes={proxy};
+        omni_ships.push_back(std::move(ship));
+      }
+      auto omni_picket=picket;omni_picket.spot_direction={0,0,0};
+      DrawList omni_armada;omni_armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(omni_ships),{0,0,1},{omni_picket},armada_shadow),{0,0,640,360}});
+      const auto omni_start=std::chrono::steady_clock::now();double omni_submit=0;
+      for(int i=0;i<60;++i){FrameTiming timing;window.draw(omni_armada,std::nullopt,&timing);omni_submit+=timing.submission_ms;}
+      const auto omni_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-omni_start).count();
+      const auto omni_stats=window.scene3d_statistics();
+      check(omni_stats.omni_shadow_casters>0,"Shadowed fleet submitted no omni casters");
+      std::cout<<"fleet3d_shadow_omni frames=60 instances=1024 cpu_submit_mean_ms="<<omni_submit/60<<" frame_wall_mean_ms="<<omni_wall/60
+        <<" draw_calls="<<omni_stats.draw_calls<<" omni_shadow_casters="<<omni_stats.omni_shadow_casters<<'\n';}}
   }
   DrawList invalid;invalid.world.emplace_back(Scene3DView{Scene3D::create(camera,{a}),{0,0,8192,8192}});
   bool rejected=false;try{window.draw(invalid);}catch(const std::length_error&){rejected=true;}check(rejected,"Oversized 3D target was accepted");

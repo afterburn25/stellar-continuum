@@ -234,7 +234,10 @@ one instanced draw per level), and a shadowed variant (`fleet3d_shadow`)
 re-submits the same fleet through the directional box plus a spot-atlas
 cone so the depth-pass cost surfaces in the same receipt; a three-tier
 variant (`fleet3d_shadow_cascade`) adds both cascade windows so the
-per-tier caster overhead prints via the `cascade=`/`cascade2=` counters. Also
+per-tier caster overhead prints via the `cascade=`/`cascade2=` counters,
+and `fleet3d_shadow_omni` swaps the picket to a shadowed omni light —
+its `omni_shadow_casters` count showed ~1 face per fleet caster, so a
+shadowed omni costs like a spot at fleet scale, not a flat six. Also
 fixed: streamer registrations keyed by `RgbaImage*` are now
 liveness-verified (`weak_ptr` owner), closing a stale-TextureId reuse
 bug that intermittently skipped mip-tail promotions; and the per-frame

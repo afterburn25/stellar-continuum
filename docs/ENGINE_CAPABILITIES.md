@@ -503,7 +503,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   shadowed spot cone, printing timing + `shadow_casters` next to the
   unshadowed `fleet3d` baseline, and a `fleet3d_shadow_cascade` variant
   adding both far tiers so per-tier caster overhead prints separately
-  (`cascade=`/`cascade2=` counters);
+  (`cascade=`/`cascade2=` counters), plus a `fleet3d_shadow_omni`
+  variant showing omni caster work scales with covering faces (≈1 per
+  fleet caster for a near-planar fleet) rather than a flat six;
   `engine_project` document round-trip + rejection coverage.
 - **Infrastructure fix bundled:** SDL fragment-set resource order —
   the materials SSBO sits after the sampled textures (now binding 15)
