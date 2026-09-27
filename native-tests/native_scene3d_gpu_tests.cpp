@@ -695,8 +695,17 @@ int main(int argc,char** argv)try{
          "Shadows debug view did not darken inside either spot umbra");
      check(channel(*spot_dbg,272,160,0)>200,
          "Shadows debug view darkened a lit rim outside the spot umbrae");}
+    // receives_shadow=false on the receiver folds both spot map terms to
+    // lit — the plate keeps its lit census even inside both umbrae.
+    {auto blind=plate;blind.receives_shadow=false;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{blind,occluder,occluder2},{0,0,1},{lamp,lamp2}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-spot2-noreceive.png");
+     const auto blind_img=decode_rgba_image(folder/"point-light-spot2-noreceive.png");
+     check(std::abs(census(*blind_img,120,155)-census(*both_unshadowed,120,155))<=6&&
+           std::abs(census(*blind_img,175,215)-census(*both_unshadowed,175,215))<=6,
+         "receives_shadow=false receiver still showed spot umbrae");}
     lamp.casts_shadow=true;
-    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_debug_passed\n";
+    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_debug_receive_passed\n";
   }
   {
     // Atmosphere limb scattering: a tinted shell brightens the silhouette
