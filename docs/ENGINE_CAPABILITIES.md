@@ -886,7 +886,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `emissive_strength` with `night_emissive` nightside gate, equirect
   `environment` map with `environment_strength` driving dielectric
   diffuse irradiance + roughness-mapped mip-prefiltered specular
-  response), `Material3D::atmosphere`
+  response, split energy-conserving: the specular fresnel share is
+  subtracted from the diffuse irradiance term), `Material3D::atmosphere`
   (wavelength-tinted `(1-N·V)^power` limb scattering, day-side weighting,
   `night_floor`), `alpha_threshold` cutout, `texture_tiling`;
   `Scene3D::create(...)` accepts up to

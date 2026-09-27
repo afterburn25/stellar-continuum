@@ -625,6 +625,22 @@ int main(int argc,char** argv)try{
       window.draw(cr_l,folder/"pbr-mip-crisp.png");const auto cr=decode_rgba_image(folder/"pbr-mip-crisp.png");
       check(channel(*cr,160,160,0)<40,"Mirror-sharp reflection lost the environment stripe");
     }
+    // Energy-conserving split: the specular fresnel share comes out of
+    // diffuse irradiance — under a uniform environment a grazing
+    // dielectric reads the same as a face-on one. The unsplit sum
+    // double-counted the environment at grazing.
+    {
+      auto kf=enviro;kf.material.pbr->environment=RgbaImage::create(1,1,{140,140,140,255});
+      kf.material.pbr->environment_strength=1.f;kf.material.pbr->metallic=0;kf.material.pbr->roughness=.2f;
+      kf.scale=1.2f;
+      DrawList fl_l;fl_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{kf}),{0,0,320,320}});
+      window.draw(fl_l,folder/"pbr-env-flat.png");const auto fl=decode_rgba_image(folder/"pbr-env-flat.png");
+      kf.rotation=rotation_axis_angle({0,1,0},1.5f);
+      DrawList gr_l;gr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{kf}),{0,0,320,320}});
+      window.draw(gr_l,folder/"pbr-env-graze.png");const auto gr=decode_rgba_image(folder/"pbr-env-graze.png");
+      check(std::abs(channel(*gr,160,160,0)-channel(*fl,160,160,0))<20,
+          "Diffuse irradiance ignored the specular fresnel share (grazing over-counts the environment)");
+    }
     // Callers that rebuild Scene3D per frame declare a stable probe
     // epoch: the bake caches per (epoch, anchor, res) instead of the
     // scene instance — three rebuilt views bake once, and bumping the

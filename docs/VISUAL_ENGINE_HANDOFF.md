@@ -264,7 +264,9 @@ cone for a shadowed omni light so per-face caster scaling is visible
 - `night_emissive` gates emissive output to the nightside/terminator —
   colony lights, city windows, engine glow.
 - Environment map gives ordinary materials diffuse irradiance + GGX
-  specular (previously IBL existed only inside `Dielectric3D`).
+  specular (previously IBL existed only inside `Dielectric3D`); the
+  split is energy-conserving — kD=(1-F)(1-metallic) — so grazing
+  dielectrics can't double-count the environment.
 - `surface_response` accepts any subset of maps — presence flags gate
   shader sampling, so a cloud-only material needs no placeholder art.
   The cloud map's alpha shadows the surface at `cloud_opacity` and its

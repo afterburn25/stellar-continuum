@@ -556,11 +556,14 @@ void main() {
         result+=light_color*cloud_shadow*visibility*strength*D*G*F/max(4.0*nv,.001);
     }
     if(pbr_active&&material.pbr_values.w>0.0){
-        // Diffuse irradiance + roughness-aware specular environment response.
+        // Diffuse irradiance + roughness-aware specular environment
+        // response. The fresnel-weighted specular term comes out of the
+        // diffuse share — kD=(1-F)(1-metallic) — so a grazing dielectric
+        // mirrors its environment instead of double-counting it.
         float nv=max(dot(N,V),0.001);
         vec3 f0=mix(vec3(.04),texel.rgb,metallic);
         vec3 fresnel_env=f0+(max(vec3(1.0-pbr_roughness),f0)-f0)*pow(1.0-nv,5.0);
-        result+=material.pbr_values.w*(texel.rgb*(1.0-metallic)*environment(N,1.0)
+        result+=material.pbr_values.w*(texel.rgb*(1.0-metallic)*(vec3(1.0)-fresnel_env)*environment(N,1.0)
             +environment(reflect(-V,N),pbr_roughness)*fresnel_env);
     }
     if(material.optics.x>=1.0) {

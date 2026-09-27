@@ -114,7 +114,10 @@ same document headless-tested.
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an
    equirect map on any PBR material and `pbr_values.w` scales diffuse
-   irradiance plus roughness-aware specular environment response;
+   irradiance plus roughness-aware specular environment response — the
+   split is energy-conserving (the specular fresnel share comes out of
+   the diffuse term, so grazing dielectrics mirror rather than
+   double-count the environment);
    `Dielectric3D` transmits/reflects the same map. A scene-level
    `environment` probe (document key + `Scene3D::create` param) fills
    the slot for materials that opt in via `environmentStrength` but
