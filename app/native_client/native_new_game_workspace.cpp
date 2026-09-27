@@ -93,6 +93,17 @@ void erase_last_utf8(std::string &value) {
 }
 } // namespace
 
+namespace {
+[[nodiscard]] std::string_view species_biography_key(
+    std::string_view id) noexcept {
+  if (id == "terran_baseline") return "SETUP_SPECIES_BIO_TERRAN";
+  if (id == "pelagic_high_pressure") return "SETUP_SPECIES_BIO_PELAGIC";
+  if (id == "compact_high_gravity") return "SETUP_SPECIES_BIO_COMPACT";
+  if (id == "cryogenic_hydrocarbon") return "SETUP_SPECIES_BIO_CRYOGENIC";
+  return {};
+}
+} // namespace
+
 std::optional<NativeSpeciesPresentation>
 species_presentation(std::string_view id) noexcept {
   if (id == "terran_baseline")
@@ -339,7 +350,8 @@ NativeNewGameMeasuredLayout NativeNewGameWorkspace::measure_layout(
                                                layout.heading_font,
                                                identity_width);
     const float biography_height = presentation
-        ? measured_height(std::string(presentation->biography),
+        ? measured_height(tr(species_biography_key(option->id),
+                             presentation->biography),
                           layout.body_font, identity_width)
         : 0.f;
     result.details_header_height =
@@ -873,13 +885,15 @@ void NativeNewGameWorkspace::render(
                  layout.heading_font);
     float biography_height{};
     if (presentation) {
-      biography_height = measured_height(std::string(presentation->biography),
-                                          layout.body_font, identity_width);
+      const auto biography = tr(species_biography_key(species->id),
+                                presentation->biography);
+      biography_height = measured_height(biography, layout.body_font,
+                                          identity_width);
       clipped_text(out,
                    {identity_x,
                     clip.y + title_height + 8.f * s,
                     identity_width, biography_height},
-                   clip, std::string(presentation->biography), muted,
+                   clip, biography, muted,
                    layout.body_font);
     }
     const UiRect facts_clip{clip.x, clip.y + measured.details_header_height,

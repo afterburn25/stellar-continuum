@@ -1431,7 +1431,7 @@ class NativeCampaign final {
     };
     if(!colony_workspace_.view()||colony_workspace_.view()->observer_only||!colony_workspace_.view()->foreign_settlement||colony_workspace_.view()->population_millions!=foreign->population_millions)
       throw std::runtime_error("Foreign planetary screen lost live colony statistics.");
-    capture_planet(L"-alien-colony");click(find("Economy"));capture_planet(L"-alien-economy");
+    capture_planet(L"-alien-colony");click(find(tr("PLANET_TAB_ECONOMY","Economy")));capture_planet(L"-alien-economy");
     if(!enter_system(sol_system_id,width,height)||!system_workspace_.select_body(earth_body_id))throw std::runtime_error("Earth classification smoke navigation failed.");
     open_colony_from_system(earth_body_id);
     if(!colony_workspace_.view()||colony_workspace_.view()->planet.world_class!=PlanetaryWorldClass::Continental)throw std::runtime_error("Earth is missing Continental classification.");
@@ -1453,8 +1453,9 @@ class NativeCampaign final {
       route({{.type=InputEventType::LeftPressed,.position=focus,.click_count=2},{.type=InputEventType::LeftReleased,.position=focus}});
       if(!colony_workspace_.view()||colony_workspace_.view()->body_id!=body_id||colony_workspace_.view()->planet.sol_texture_key!=std::optional<std::string>{key})throw std::runtime_error("Planetary navigation changed authored identity.");
       const auto grid_scene=scene(width,height);
-      if(std::ranges::any_of(grid_scene.overlay,[](const auto& command){const auto* t=std::get_if<Text>(&command);return t&&t->value.starts_with("●  Geographic provinces");}))
-        click(find("●  Geographic provinces")); // Layer choice survives planet switching.
+      const auto provinces_layer="●  "+tr("PLANET_LAYER_PROVINCES","Geographic provinces");
+      if(std::ranges::any_of(grid_scene.overlay,[&](const auto& command){const auto* t=std::get_if<Text>(&command);return t&&t->value.starts_with(provinces_layer);}))
+        click(find(provinces_layer)); // Layer choice survives planet switching.
       capture_planet(label+L"-globe-front");
       const auto rendered=scene(width,height);
       // The globe binds the canonical material at its 2048 LOD; compare the
@@ -1490,13 +1491,16 @@ class NativeCampaign final {
     std::cout<<"multiple_stars=binary_and_triple_components_paths_and_artwork_submitted_passed\n";
     if(!enter_system(sol_system_id,width,height))throw std::runtime_error("Small-body smoke cannot enter Sol.");
     capture_planet(L"-belts-sol-overview");
-    click(find("BELTS & DEBRIS"));capture_planet(L"-belts-inspector");
-    click(find("Show orbital bands"));capture_planet(L"-belts-debug");
-    click(find("Focus body"));capture_planet(L"-belts-rock-close");
+    const auto belts_launcher=trf("SMALLBODY_LAUNCHER",{""},"BELTS & DEBRIS  {0}");
+    const auto belts_focus=tr("SMALLBODY_FOCUS","Focus body");
+    const auto belts_large=tr("SMALLBODY_NEXT_LARGE","Next large");
+    click(find(belts_launcher));capture_planet(L"-belts-inspector");
+    click(find(tr("SMALLBODY_DEBUG_SHOW","Show orbital bands / density debug")));capture_planet(L"-belts-debug");
+    click(find(belts_focus));capture_planet(L"-belts-rock-close");
     if(system_workspace_.small_body_statistics().solid_bodies==0)throw std::runtime_error("Asteroid close-up did not submit solid 3D geometry.");
-    click(find("BELTS & DEBRIS"));click(find("Next large"));click(find("Focus body"));capture_planet(L"-belts-rock-huge");
-    click(find("BELTS & DEBRIS"));click(find("Next field"));click(find("Focus body"));capture_planet(L"-belts-ice-close");
-    click(find("BELTS & DEBRIS"));click(find("Next large"));click(find("Focus body"));capture_planet(L"-belts-ice-huge");
+    click(find(belts_launcher));click(find(belts_large));click(find(belts_focus));capture_planet(L"-belts-rock-huge");
+    click(find(belts_launcher));click(find(tr("SMALLBODY_NEXT","Next field")));click(find(belts_focus));capture_planet(L"-belts-ice-close");
+    click(find(belts_launcher));click(find(belts_large));click(find(belts_focus));capture_planet(L"-belts-ice-huge");
     if(system_workspace_.small_body_statistics().solid_bodies==0)throw std::runtime_error("Ice close-up did not submit solid 3D geometry.");
     std::cout<<"small_body_solids=rock_ice_and_large_body_depth_tested_meshes_passed\n";
     const auto inspected=capture_developer_campaign_json(session_->frame().runtime(),{session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,"2050-03-21T00:00:00Z"});
@@ -1517,7 +1521,7 @@ class NativeCampaign final {
     const auto orbit_before=stellar::engine::analytic_orbit_position(reference.orbit,day_before-motion_field.epoch_days);
     const auto previous_developer_speed=session_->frame().runtime().world().campaign().developer_provenance->simulation.speed;
     session_->frame().set_developer_speed(1);
-    click(find("Paused / Resume"));
+    click(find(tr("SMALLBODY_MOTION_OFF","Paused / Resume")));
     InputSnapshot motion_input;motion_input.drawable_width=width;motion_input.drawable_height=height;
     for(int i=0;i<80;++i){if(!update(motion_input,width,height,.05,true))throw std::runtime_error("Motion replay exited.");
       system_workspace_.focus_small_body(width,height);
@@ -1528,7 +1532,7 @@ class NativeCampaign final {
        std::abs(ma.rotation.x-mb.rotation.x)+std::abs(ma.rotation.y-mb.rotation.y)+std::abs(ma.rotation.z-mb.rotation.z)+std::abs(ma.rotation.w-mb.rotation.w)<.02f||
        std::hypot(orbit_before[0]-orbit_after[0],orbit_before[1]-orbit_after[1])<1e-7)
       throw std::runtime_error("Resume did not advance the same asteroid's orbit and full-axis spin.");
-    click(find("Motion ON / Pause"));const auto paused_day=session_->frame().clock().simulation_days();
+    click(find(tr("SMALLBODY_MOTION_ON","Motion ON / Pause")));const auto paused_day=session_->frame().clock().simulation_days();
     (void)update(motion_input,width,height,1.,true);const auto paused_scene=solid_scene();
     if(session_->frame().clock().simulation_days()!=paused_day||paused_scene->instances().front().rotation.w!=mb.rotation.w)
       throw std::runtime_error("Pause did not freeze asteroid motion.");
@@ -1542,18 +1546,19 @@ class NativeCampaign final {
       const auto focused=system_workspace_.focused_small_body();
       if(focused&&focused->material>=stellar::core::SmallBodyMaterial::WaterIce)break;
       if(i>=64)throw std::runtime_error("Ice field has no large icy body to focus.");
-      click(find("BELTS & DEBRIS"));click(find("Next large"));click(find("Focus body"));}
+      click(find(belts_launcher));click(find(belts_large));click(find(belts_focus));}
     verify_belt_motion(L"-belts-motion-",true);
-    click(find("BELTS & DEBRIS"));click(find("Previous field"));click(find("Next large"));click(find("Focus body"));
+    click(find(belts_launcher));click(find(tr("SMALLBODY_PREV","Previous field")));click(find(belts_large));click(find(belts_focus));
     verify_belt_motion(L"-belts-rock-motion-",false);
     std::cout<<"rocky_body_motion=solid_rock_resume_orbit_tumble_pause_passed\n";
     std::cout<<"small_body_optics_motion=dielectrics_resume_orbit_tumble_pause_passed\n";
-    click(find("BELTS & DEBRIS"));
+    click(find(belts_launcher));
     const auto initial_fields=system_workspace_.snapshot()->small_body_fields.size();
-    for(const auto name:{"+ Asteroid belt","+ Ice belt","+ Debris disk","+ Cracked debris"})click(find(name));
+    const std::array spawn_labels{tr("SMALLBODY_SPAWN_BELT","+ Asteroid belt"),tr("SMALLBODY_SPAWN_ICE","+ Ice belt"),tr("SMALLBODY_SPAWN_DISK","+ Debris disk"),tr("SMALLBODY_SPAWN_CRACKED","+ Cracked debris")};
+    for(const auto &name:spawn_labels)click(find(name));
     if(system_workspace_.snapshot()->small_body_fields.size()!=initial_fields+4)throw std::runtime_error("Developer field spawn controls failed.");
     capture_planet(L"-belts-cracked-inspector");
-    click(find("Focus body"));capture_planet(L"-belts-cracked-close");
+    click(find(belts_focus));capture_planet(L"-belts-cracked-close");
     const auto field_save=capture_developer_campaign_json(session_->frame().runtime(),{session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,"2050-03-21T00:00:00Z"});
     if(field_save.find("SmallBodyFields")==std::string::npos||field_save.find("CrackedWorld")==std::string::npos)throw std::runtime_error("Spawned small bodies absent from saved payload.");
     session_->request_save();
