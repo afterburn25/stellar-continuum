@@ -171,6 +171,106 @@ ConstructionWorkspaceLayout ConstructionWorkspaceLayout::for_viewport(
           secondary};
 }
 
+std::string NativeConstructionWorkspace::localized_construction_message(
+    std::string_view message) const {
+  if (!locale_ || message.empty()) return std::string(message);
+  const auto divide = [](std::string_view text, std::string_view infix)
+      -> std::optional<std::pair<std::string_view, std::string_view>> {
+    const auto at = text.find(infix);
+    if (at == std::string::npos) return std::nullopt;
+    return std::pair{text.substr(0, at), text.substr(at + infix.size())};
+  };
+  const auto strip_prefix = [](std::string_view text, std::string_view prefix)
+      -> std::optional<std::string_view> {
+    if (!text.starts_with(prefix)) return std::nullopt;
+    return text.substr(prefix.size());
+  };
+  const auto strip_suffix = [](std::string_view text, std::string_view suffix)
+      -> std::optional<std::string_view> {
+    if (!text.ends_with(suffix)) return std::nullopt;
+    return text.substr(0, text.size() - suffix.size());
+  };
+  // "The queued construction head is blocked: {lock}. Cancel it or restore
+  //  its requirements first." / "{name} is locked: {lock}." / "requires {list}"
+  if (const auto rest =
+          strip_prefix(message, "The queued construction head is blocked: "))
+    if (const auto lock = strip_suffix(
+            *rest, ". Cancel it or restore its requirements first."))
+      return trf("CONSTRUCTION_HEAD_BLOCKED",
+                 {localized_construction_message(*lock)},
+                 "The queued construction head is blocked: {0}. Cancel it or "
+                 "restore its requirements first.");
+  if (const auto p = divide(message, " is locked: "))
+    if (const auto lock = strip_suffix(p->second, "."))
+      return trf("CONSTRUCTION_LOCKED",
+                 {std::string(p->first),
+                  localized_construction_message(*lock)},
+                 "{0} is locked: {1}.");
+  if (const auto list = strip_prefix(message, "requires "))
+    return trf("CONSTRUCTION_REQUIRES", {std::string(*list)}, "requires {0}");
+  // Order outcomes: "Queued {name}. Authorized for {cost}." /
+  // "Construction started: {name}. Authorized for {cost}." /
+  // "Cancelled {name}; refunded {cost}." variants.
+  if (const auto rest = strip_prefix(message, "Queued "))
+    if (const auto q = divide(*rest, ". Authorized for "))
+      if (const auto cost = strip_suffix(q->second, "."))
+        return trf("CONSTRUCTION_QUEUED_MSG",
+                   {std::string(q->first), std::string(*cost)},
+                   "Queued {0}. Authorized for {1}.");
+  if (const auto rest = strip_prefix(message, "Construction started: "))
+    if (const auto q = divide(*rest, ". Authorized for "))
+      if (const auto cost = strip_suffix(q->second, "."))
+        return trf("CONSTRUCTION_STARTED_MSG",
+                   {std::string(q->first), std::string(*cost)},
+                   "Construction started: {0}. Authorized for {1}.");
+  if (const auto rest = strip_prefix(message, "Cancelled queued "))
+    if (const auto q = divide(*rest, "; refunded "))
+      if (const auto cost = strip_suffix(q->second, "."))
+        return trf("CONSTRUCTION_CANCELLED_QUEUED",
+                   {std::string(q->first), std::string(*cost)},
+                   "Cancelled queued {0}; refunded {1}.");
+  if (const auto rest = strip_prefix(message, "Cancelled "))
+    if (const auto q = divide(*rest, "; refunded "))
+      if (const auto cost =
+              strip_suffix(q->second, ". Consumed materials are not refunded."))
+        return trf("CONSTRUCTION_CANCELLED_MSG",
+                   {std::string(q->first), std::string(*cost)},
+                   "Cancelled {0}; refunded {1}. Consumed materials are not "
+                   "refunded.");
+  // "{cost} is required to authorize {name}." / "{name} is already ..."
+  if (const auto p = divide(message, " is required to authorize "))
+    if (const auto name = strip_suffix(p->second, "."))
+      return trf("CONSTRUCTION_AUTH_REQUIRED",
+                 {std::string(p->first), std::string(*name)},
+                 "{0} is required to authorize {1}.");
+  if (const auto name = strip_suffix(message, " is already complete."))
+    return trf("CONSTRUCTION_ALREADY_COMPLETE", {std::string(*name)},
+               "{0} is already complete.");
+  if (const auto name =
+          strip_suffix(message, " is already active or queued."))
+    return trf("CONSTRUCTION_ALREADY_ACTIVE", {std::string(*name)},
+               "{0} is already active or queued.");
+  // Stable denial/notice literals from the core assessment paths.
+  static const std::pair<std::string_view, std::string_view> statics[] = {
+      {"Unknown civilization.", "CONSTRUCTION_DENY_CIV"},
+      {"A construction project is already in progress.",
+       "CONSTRUCTION_DENY_ACTIVE"},
+      {"A queued construction project is waiting to start.",
+       "CONSTRUCTION_QUEUE_WAITING"},
+      {"The construction queue is full (8 projects maximum).",
+       "CONSTRUCTION_QUEUE_FULL"},
+      {"Unknown construction project.", "CONSTRUCTION_DENY_UNKNOWN"},
+      {"Queued project is unavailable.", "CONSTRUCTION_QUEUE_UNAVAILABLE"},
+      {"Extreme stellar irradiation prevents construction at the home "
+       "settlement.",
+       "CONSTRUCTION_DENY_IRRADIATION"},
+      {"That project is not active or queued.",
+       "CONSTRUCTION_DENY_NOT_ACTIVE"}};
+  for (const auto &[literal, key] : statics)
+    if (message == literal) return tr(key, literal);
+  return std::string(message);
+}
+
 std::string NativeConstructionWorkspace::tr(
     std::string_view key, std::string_view fallback) const {
   if (locale_ && locale_->contains(key))
@@ -743,8 +843,8 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
         {project->formatted_credit_cost, number(project->industry_cost, 1),
          project->formatted_upkeep_rate, view_->formatted_treasury,
          number(view_->available_industry, 1),
-         stellar::native_campaign::format_campaign_duration(
-             project->minimum_days_remaining)},
+         stellar::native_campaign::format_campaign_duration_localized(
+             locale_, project->minimum_days_remaining)},
         "COST AND READINESS\nAuthorization {0}  |  Materials {1}\nUpkeep "
         "{2}  |  Treasury {3}\nAvailable industry {4}  |  Minimum remaining "
         "{5}");
@@ -753,16 +853,18 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                    {project->formatted_authorization,
                     project->formatted_cancellation_refund},
                    "\nAuthorized {0}  |  Refund now {1}");
-    if (project->queue_blocker) costs += "\n" + *project->queue_blocker;
+    if (project->queue_blocker)
+      costs += "\n" + localized_construction_message(*project->queue_blocker);
     text(out, layout.costs, std::move(costs), muted,
          layout.small_font_pixels);
   }
 
-  std::string feedback = notice_;
+  std::string feedback = localized_construction_message(notice_);
   if (feedback.empty() && project && !project->complete && !project->active &&
       !project->queued) {
     feedback = trf("CONSTRUCTION_START_QUEUE",
-                   {project->start.message, project->queue.message},
+                   {localized_construction_message(project->start.message),
+                    localized_construction_message(project->queue.message)},
                    "Start: {0}\nQueue: {1}");
   }
   if (!feedback.empty())
@@ -794,9 +896,11 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
              tr(project->start.will_queue ? "CONSTRUCTION_START_QUEUE_BTN"
                                           : "CONSTRUCTION_START_NOW",
                 project->start.will_queue ? "START / QUEUE" : "START NOW"),
-             project->start.enabled, project->start.message);
+             project->start.enabled,
+             localized_construction_message(project->start.message));
       action(layout.secondary_action, tr("CONSTRUCTION_QUEUE", "QUEUE"),
-             project->queue.enabled, project->queue.message);
+             project->queue.enabled,
+             localized_construction_message(project->queue.message));
     } else {
       action(layout.primary_action,
              tr("CONSTRUCTION_STATE_COMPLETED", "COMPLETED"), false);

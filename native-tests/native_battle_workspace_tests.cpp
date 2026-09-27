@@ -1,5 +1,7 @@
 #include "native_battle_workspace.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -902,6 +904,115 @@ void order_button_tips() {
           "Order explanation persisted after the pointer left the grid.");
 }
 
+void localized_battle_messages() {
+  // Combat feed/status prose is authored as stable English skeletons in
+  // core; the workspace recomposes known skeletons through the bound table
+  // and passes unrecognized text through unchanged.
+  stellar::engine::LocalizationTable german("de", "en");
+  std::string loc_error;
+  require(german.load_json(R"({"locale":"de","strings":{
+      "BATTLE_EVENT_DAMAGE":"{0} hat {1} Flächenschaden erlitten und {2} Schiffe verloren.",
+      "BATTLE_EVENT_ORDER_CHANGED":"{0}: {1}.",
+      "BATTLE_EVENT_WARP_BLOCKED":"Warp blockiert.",
+      "BATTLE_ACK_ORDER":"{0} bestätigt: {1}.",
+      "BATTLE_DENY_HOSTILE":"Kein aktives feindliches Ziel.",
+      "BATTLE_ORDER_HOLD":"halten"
+    }})",
+                            &loc_error),
+          loc_error);
+  const int width = 1280, height = 720;
+  auto snap = snapshot();
+  snap.events.clear();
+  const auto add = [&](std::string message) {
+    snap.events.push_back(
+        {.sequence = static_cast<std::int64_t>(snap.events.size() + 1),
+         .tick = 400,
+         .type = MassiveCombatEventType::Damage,
+         .actor_civilization_id = 1,
+         .actor_formation_id = 11,
+         .target_formation_id = 77,
+         .magnitude = 0,
+         .position = MassivePoint{},
+         .message = std::move(message),
+         .details_known = true});
+  };
+  add("Vanguard Fleet sustained 3 aggregate damage and lost 2 ships.");
+  add("Vanguard Fleet: Hold.");
+  add("Warp completion blocked by a hostile interdiction field.");
+  add("Unmapped core telemetry text.");
+  NativeBattleWorkspace workspace;
+  workspace.set_localization(&german);
+  workspace.open(snap, 1, width, height);
+  DrawList feed;
+  workspace.render(feed, width, height);
+  const auto has = [&](const auto &draw, std::string_view needle) {
+    return std::ranges::any_of(draw.overlay, [&](const auto &item) {
+      const auto *label = std::get_if<Text>(&item);
+      return label && label->value == needle;
+    });
+  };
+  require(has(feed, "Vanguard Fleet hat 3 Flächenschaden erlitten und 2 "
+                    "Schiffe verloren."),
+          "damage skeleton did not localize");
+  require(has(feed, "Vanguard Fleet: halten."),
+          "order-changed skeleton did not localize");
+  require(has(feed, "Warp blockiert."),
+          "warp-blocked skeleton did not localize");
+  require(has(feed, "Unmapped core telemetry text."),
+          "unmapped event text did not pass through");
+  workspace.set_status("Vanguard Fleet acknowledged Hold.");
+  DrawList ack;
+  workspace.render(ack, width, height);
+  require(has(ack, "Vanguard Fleet bestätigt: halten."),
+          "acknowledged status did not localize");
+  workspace.set_status(
+      "The requested target is not an active hostile formation.", true);
+  DrawList deny;
+  workspace.render(deny, width, height);
+  require(has(deny, "Kein aktives feindliches Ziel."),
+          "denial status did not localize");
+  // Without a table every skeleton stays the authored English literal.
+  NativeBattleWorkspace plain;
+  plain.open(snapshot(), 1, width, height);
+  plain.set_status("Vanguard Fleet acknowledged Hold.");
+  DrawList english;
+  plain.render(english, width, height);
+  require(has(english, "Vanguard Fleet acknowledged Hold."),
+          "no-table status did not stay English");
+}
+
+void wrapped_order_labels_stay_inside_buttons() {
+  // Localized order labels that exceed the button width word-wrap; the
+  // wrapped block must be vertically centered so its second line stays
+  // inside the button clip (the rasterizer clamps fonts at 8px, so
+  // shrinking cannot rescue two-word labels).
+  NativeBattleWorkspace workspace;
+  workspace.open(snapshot(), 1, 640, 360);
+  // Deterministic two-line wrapped extent, as the platform measurer reports.
+  workspace.set_text_measurer([](const Text &probe) {
+    return probe.wrap_width > 0.f ? TextExtent{90, 20} : TextExtent{90, 10};
+  });
+  DrawList draw;
+  workspace.render(draw, 640, 360);
+  const auto layout = BattleWorkspaceLayout::for_viewport(640, 360);
+  const auto &focus_rect = layout.order_buttons[3];
+  const auto label = std::ranges::find_if(
+      draw.overlay, [](const auto &item) {
+        const auto *text = std::get_if<Text>(&item);
+        return text && text->value == "Focus fire";
+      });
+  require(label != draw.overlay.end(), "order label was not emitted");
+  const auto &text = std::get<Text>(*label);
+  require(text.clip && text.clip->x == focus_rect.x &&
+              text.clip->y == focus_rect.y &&
+              text.clip->width == focus_rect.width &&
+              text.clip->height == focus_rect.height,
+          "order label lost its button clip");
+  require(text.at.y >= focus_rect.y &&
+              text.at.y + 20.f <= focus_rect.y + focus_rect.height,
+          "wrapped order label is not centered inside the button");
+}
+
 } // namespace
 
 int main() {
@@ -922,6 +1033,8 @@ int main() {
     spatial_orders_preserve_depth();
     fit_keeps_formations_clear_of_controls();
     order_button_tips();
+    localized_battle_messages();
+    wrapped_order_labels_stay_inside_buttons();
   } catch (const std::exception &error) {
     std::cerr << "native battle workspace tests failed: " << error.what()
               << '\n';

@@ -1,6 +1,8 @@
 #include "native_shipyard_workspace.hpp"
 #include "native_ui_layout.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <algorithm>
 #include <iostream>
 #include <ranges>
@@ -319,8 +321,62 @@ void compact_designs_scroll_reaches_last_card() {
   REQUIRE(workspace.design_bounds("design-8", 1920, 1080).has_value());
 }
 
+void localized_shipyard_messages() {
+  // Core shipbuilding outcomes/blockers are stable English literals; the
+  // workspace recomposes known skeletons through the bound locale table and
+  // passes unrecognized text through unchanged.
+  stellar::engine::LocalizationTable german("de", "en");
+  std::string loc_error;
+  REQUIRE(german.load_json(
+      R"({"locale":"de","strings":{
+        "SHIPYARD_DENY_QUEUE_FULL":"Die Werftwarteschlange ist voll (maximal 8 ausstehende Schiffe).",
+        "SHIPYARD_DESIGN_REQUIRES":"{0} erfordert {1}.",
+        "SHIPYARD_MSG_STARTED":"Schiffbau gestartet: {0}. Autorisiert für {1}.",
+        "SHIPYARD_UNAVAILABLE":"Bau nicht verfügbar."
+      }})",
+      &loc_error));
+  NativeShipyardWorkspace workspace;
+  workspace.set_localization(&german);
+  workspace.open();
+  auto locked = view();
+  locked.available_designs.front().can_start = false;
+  locked.available_designs.front().start_blocker =
+      "The shipyard queue is full (8 pending vessels maximum).";
+  workspace.set_view(locked);
+  const auto card = workspace.design_bounds("scout", 1280, 720);
+  REQUIRE(card.has_value());
+  (void)workspace.handle({InputEventType::LeftPressed, center(*card)},
+                         1280, 720);
+  const auto has = [](const DrawList &draw, std::string_view needle) {
+    return std::ranges::any_of(draw.overlay, [&](const auto &item) {
+      const auto *label = std::get_if<Text>(&item);
+      return label && label->value.contains(needle);
+    });
+  };
+  DrawList readiness;
+  workspace.render(readiness, 1280, 720);
+  REQUIRE(has(readiness, "Werftwarteschlange ist voll"));
+  workspace.set_notice(
+      "Ship construction started: Pathfinder Scout. Authorized for $300M SOL.",
+      true);
+  DrawList notice;
+  workspace.render(notice, 1280, 720);
+  REQUIRE(has(notice, "Schiffbau gestartet: Pathfinder Scout"));
+  workspace.set_notice("Prospector Colonizer requires Orbital Shipyard.",
+                       false);
+  DrawList requires_tip;
+  workspace.render(requires_tip, 1280, 720);
+  REQUIRE(has(requires_tip, "Prospector Colonizer erfordert Orbital "
+                            "Shipyard."));
+  workspace.set_notice("Unmapped core telemetry text.", false);
+  DrawList passthrough;
+  workspace.render(passthrough, 1280, 720);
+  REQUIRE(has(passthrough, "Unmapped core telemetry text."));
+}
+
 int run_tests() {
   layout_is_contained_and_action_stays_visible();
+  localized_shipyard_messages();
   compact_designs_scroll_reaches_last_card();
   start_and_cancel_use_real_mouse_hit_bounds();
   campaign_replacement_discards_old_order_context();

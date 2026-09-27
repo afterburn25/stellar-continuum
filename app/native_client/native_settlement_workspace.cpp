@@ -158,7 +158,7 @@ void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
     add(trf("SETTLE_ROUTE",{stellar::core::format_interstellar_metric_primary(p.candidate->reach.route_distance_light_years)},"Route distance  {0}"));
     if(p.candidate->reach.route_system_ids)add(trf("SETTLE_LANES",{std::to_string(p.candidate->reach.route_system_ids->size()>0?p.candidate->reach.route_system_ids->size()-1:0)},"Confirmed lane route  {0} hop(s)"));
     add(tr("SETTLE_ETA_UNKNOWN","Travel duration estimate unavailable"),muted,layout.small_font);
-    add(trf("SETTLE_ESTABLISH",{stellar::native_campaign::format_campaign_duration(establishment_days(p.kind))},"Establishment after arrival  {0}"));
+    add(trf("SETTLE_ESTABLISH",{stellar::native_campaign::format_campaign_duration_localized(locale_,establishment_days(p.kind))},"Establishment after arrival  {0}"));
     if(p.kind==NativeSettlementMissionKind::Colony){
       add(trf("SETTLE_HABITABILITY",{number(p.candidate->natural_habitability*100.,1),number(p.candidate->unprotected_operational_capacity*100.,1)},"Natural habitability  {0}%  |  Operational capacity  {1}%"));
     }else{

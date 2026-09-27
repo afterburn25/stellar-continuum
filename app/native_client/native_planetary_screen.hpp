@@ -459,7 +459,7 @@ class NativePlanetaryScreen {
       native_ui::hover_tooltip(out,l.command,pointer_,tr("PLANET_CMD_UNAVAILABLE","Command Center unavailable"),reason,static_cast<int>(l.screen.x+l.screen.width),static_cast<int>(l.screen.y+l.screen.height),l.s);
     }
     float qy=l.queue.y-queue_scroll_.scroll_offset;int queued=0;
-    if(v.hub_upgrade_days_remaining>0){qy+=wrapped(out,{l.queue.x,qy,l.queue.width,0},l.queue,trf("PLANET_QUEUE_HUB",{stellar::native_campaign::format_campaign_duration(v.hub_upgrade_days_remaining)},"Command Center · {0}*"),l.small,gold);++queued;}
+    if(v.hub_upgrade_days_remaining>0){qy+=wrapped(out,{l.queue.x,qy,l.queue.width,0},l.queue,trf("PLANET_QUEUE_HUB",{stellar::native_campaign::format_campaign_duration_localized(locale_,v.hub_upgrade_days_remaining)},"Command Center · {0}*"),l.small,gold);++queued;}
     for(const auto& b:v.construction_sites)if(!b.complete||b.upgrade_days_remaining>0){qy+=wrapped(out,{l.queue.x,qy,l.queue.width,0},l.queue,!b.complete?trf("PLANET_QUEUE_PROGRESS",{b.name,number(b.progress_fraction*100,0)},"{0} · {1}%"):trf("PLANET_QUEUE_UPGRADE",{b.name,number(b.upgrade_days_remaining,1)},"{0} · {1} days*"),l.small,ink);++queued;}
     if(queued==0)qy+=wrapped(out,{l.queue.x,qy,l.queue.width,0},l.queue,v.observer_only&&!v.developer_inspection?tr("PLANET_QUEUE_INTEL","Construction intelligence unavailable."):tr("PLANET_QUEUE_EMPTY","No construction scheduled."),l.small,muted);
     queue_height_=qy-l.queue.y+queue_scroll_.scroll_offset;queue_scroll_.sync(queue_height_,l.queue.height);scrollbar(out,l.queue,queue_scroll_);

@@ -1182,8 +1182,10 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
         "Estimated total {3}\nReserve to start {4}\n");
     value += std::isfinite(cost.estimated_years_at_full_funding)
                  ? trf("RESEARCH_FULL_FUNDING",
-                       {stellar::native_campaign::format_campaign_duration(
-                           cost.estimated_years_at_full_funding * 365.25)},
+                       {stellar::native_campaign::
+                            format_campaign_duration_localized(
+                                locale_,
+                                cost.estimated_years_at_full_funding * 365.25)},
                        "At full funding {0}")
                  : tr("RESEARCH_DURATION_UNAVAILABLE",
                       "Staffed duration unavailable");

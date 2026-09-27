@@ -72,6 +72,7 @@
 #include "native_research_controller.hpp"
 #include "native_research_workspace.hpp"
 #include "native_research_art.hpp"
+#include "native_shipbuilding_messages.hpp"
 #include "native_shipyard_controller.hpp"
 #include "native_shipyard_workspace.hpp"
 #include "native_system_view.hpp"
@@ -808,6 +809,7 @@ class NativeCampaign final {
     });
     research_workspace_.set_text_measurer(text_measurer_);
     shipyard_workspace_.set_text_measurer(text_measurer_);
+    battle_workspace_.set_text_measurer(text_measurer_);
     shipyard_workspace_.bind_preferences(session_->save_path().parent_path()/"shipyard-favorites.txt");
     research_workspace_.set_artwork_resolver([this](std::string_view id, bool portrait) {
       return research_art_.image(id, portrait);
@@ -3293,14 +3295,25 @@ class NativeCampaign final {
     const auto card_after=research_workspace_.card_bounds(selected,width,height);
     if(card_before.has_value()!=card_after.has_value()||(card_before&&(card_before->x!=card_after->x||card_before->y!=card_after->y)))
       throw std::runtime_error("Research inspector wheel moved the graph.");
+    // Detail-block headers localize; resolve each needle through the active
+    // table and compare its first line the way the workspace composes it.
+    const auto detail_head=[&](std::string_view key,std::string_view english){
+      std::string head=tr(key,english);
+      if(const auto cut=head.find('\n');cut!=std::string::npos)
+        head.resize(cut);
+      return head+='\n';
+    };
+    const std::array<std::string,5> detail_heads{
+        detail_head("RESEARCH_COST_TIME","COST & TIME"),
+        detail_head("RESEARCH_KNOWN_CAPABILITIES","KNOWN CAPABILITIES"),
+        detail_head("RESEARCH_REQUIREMENTS_STATUS","REQUIREMENTS / STATUS"),
+        detail_head("RESEARCH_PROGRAM_NOTICE","PROGRAM NOTICE"),
+        detail_head("RESEARCH_ACTION_STATUS","ACTION STATUS")};
     const Text *last_detail=nullptr;
     for(const auto&command:bottom.overlay){
       const auto*label=std::get_if<Text>(&command);
-      if(label&&(label->value.starts_with("COST & TIME\n")||
-                 label->value.starts_with("KNOWN CAPABILITIES\n")||
-                 label->value.starts_with("REQUIREMENTS / STATUS\n")||
-                 label->value.starts_with("PROGRAM NOTICE\n")||
-                 label->value.starts_with("ACTION STATUS\n")))
+      if(label&&std::ranges::any_of(detail_heads,[&](const std::string&head){
+           return label->value.starts_with(head);}))
         last_detail=label;
     }
     if(!last_detail||!last_detail->clip)
@@ -8443,12 +8456,15 @@ class NativeCampaign final {
     switch(command.kind){
     case BattleWorkspaceCommandKind::IssueOrder:{
       std::size_t accepted=0;
-      std::string message="Select a friendly formation before issuing an order.";
+      std::string message=tr("BATTLE_SELECT_FORMATION",
+          "Select a friendly formation before issuing an order.");
       for(const auto& order:command.orders){
         const auto result=frame.issue_tactical_order(order);
         accepted+=result.accepted?1u:0u;message=result.message;
       }
-      if(command.orders.size()>1)message="Orders accepted for "+std::to_string(accepted)+" of "+std::to_string(command.orders.size())+" formations.";
+      if(command.orders.size()>1)message=trf("BATTLE_ORDERS_ACCEPTED",
+          {std::to_string(accepted),std::to_string(command.orders.size())},
+          "Orders accepted for {0} of {1} formations.");
       last_battle_order_accepted_=accepted>0&&accepted==command.orders.size();
       battle_workspace_.set_status(message,!last_battle_order_accepted_);
       support_.record("combat",utc_timestamp()+" "+message);
@@ -8875,7 +8891,7 @@ class NativeCampaign final {
           session_->cache().generation,view->shipyard_revision,command.id);
     else return;
     last_shipyard_command_accepted_=outcome.accepted;
-    if(outcome.accepted)publish_notification("Ships",outcome.message);
+    if(outcome.accepted)publish_notification("Ships",stellar::native_shipbuilding::localized_message(locale_,outcome.message));
     refresh_shipyard(true);
     shipyard_workspace_.set_notice(outcome.message,outcome.accepted);
   }
@@ -8922,7 +8938,7 @@ class NativeCampaign final {
     else return;
     construction_workspace_.set_notice(outcome.message,outcome.accepted);
     last_construction_command_accepted_=outcome.accepted;
-    if(outcome.accepted)publish_notification("Construction",outcome.message);
+    if(outcome.accepted)publish_notification("Construction",construction_workspace_.localized_construction_message(outcome.message));
     refresh_construction(true);
   }
 

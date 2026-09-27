@@ -105,6 +105,9 @@ public:
       const stellar::engine::LocalizationTable *table) noexcept {
     locale_ = table;
   }
+  using TextMeasurer = std::function<stellar::native_map::TextExtent(
+      const stellar::native_map::Text &)>;
+  void set_text_measurer(TextMeasurer value) { measure_ = std::move(value); }
   // Replaces the prior frame's artwork hits. Targets remain valid only while
   // the viewport and camera exactly match the draw that supplied them.
   void set_ship_targets(std::vector<BattleShipTarget> targets, int width,
@@ -171,6 +174,10 @@ private:
   [[nodiscard]] std::string
   trf(std::string_view key, std::initializer_list<std::string> args,
       std::string_view fallback) const;
+  // Recomposes core-authored English combat event/acknowledgement skeletons
+  // through the locale table; unrecognized text passes through unchanged.
+  [[nodiscard]] std::string
+  localized_battle_message(std::string_view message) const;
 
   const stellar::engine::LocalizationTable *locale_{};
   std::optional<MassiveCombatSnapshot> snapshot_;
@@ -186,6 +193,7 @@ private:
   std::vector<BattleShipTarget> ship_targets_;
   int ship_targets_width_{};
   int ship_targets_height_{};
+  TextMeasurer measure_;
   std::uint64_t ship_targets_camera_revision_{};
   enum class Gesture { None, LeftField, RightField, Chrome };
   Gesture gesture_{Gesture::None};

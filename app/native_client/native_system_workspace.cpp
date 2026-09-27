@@ -1,4 +1,5 @@
 #include "native_campaign_calendar.hpp"
+#include "native_shipbuilding_messages.hpp"
 #include "native_system_workspace.hpp"
 #include "native_ui_layout.hpp"
 #include "native_planet_rings.hpp"
@@ -428,8 +429,8 @@ void NativeSystemWorkspace::sync_body_inspection(){
       inspection->sections.push_back({o.design_name,{
         {tr("SYSTEM_FACT_SHIP_COST","Ship cost"),o.formatted_ship_cost},{tr("SYSTEM_FACT_INDUSTRY","Industry"),trf("SYSTEM_OVER_CONSTRUCTION",{number(o.industry_cost,0)},"{0} over construction")},
         {tr("SYSTEM_FACT_POPULATION","Population"),trf("SYSTEM_POP_RESERVED",{number(o.population_reservation_millions,0)},"{0} million reserved")},
-        {tr("SYSTEM_FACT_BUILD_TIME","Build time"),trf("SYSTEM_MIN_PRODUCTION",{stellar::native_campaign::format_campaign_duration(o.minimum_build_days)},"{0} minimum at full production")},
-        {tr("SYSTEM_FACT_SHIPYARD","Shipyard"),o.shipbuilding_blocker.value_or(tr("SYSTEM_READY_TO_ORDER","Ready to order"))},
+        {tr("SYSTEM_FACT_BUILD_TIME","Build time"),trf("SYSTEM_MIN_PRODUCTION",{stellar::native_campaign::format_campaign_duration_localized(locale_,o.minimum_build_days)},"{0} minimum at full production")},
+        {tr("SYSTEM_FACT_SHIPYARD","Shipyard"),stellar::native_shipbuilding::localized_message(locale_,o.shipbuilding_blocker.value_or(tr("SYSTEM_READY_TO_ORDER","Ready to order")))},
         {tr("SYSTEM_FACT_EXPEDITION","Expedition"),trf("SYSTEM_EXPEDITION_COST",{o.formatted_expedition_cost},"{0} separately authorized")},
         {tr("SYSTEM_FACT_ESTABLISHMENT","Establishment"),trf("SYSTEM_WORK_DAYS",{number(o.establishment_days,0)},"{0} work days after arrival")}}});
     };

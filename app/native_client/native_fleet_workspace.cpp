@@ -982,8 +982,9 @@ void NativeFleetWorkspace::render(
                   "ROUTE PREVIEW\nDestination {0}\nDistance {1} ly\n{2}");
       if (preview_->estimated_transit_days)
         route += trf("FLEET_ETA_SUFFIX",
-                     {stellar::native_campaign::format_campaign_duration(
-                         *preview_->estimated_transit_days)},
+                     {stellar::native_campaign::
+                          format_campaign_duration_localized(
+                              locale_, *preview_->estimated_transit_days)},
                      "\nEstimated ETA {0}");
     } else if (fleet->destination_system_id) {
       route = trf("FLEET_TRAVEL_STATUS",

@@ -122,10 +122,13 @@ bool NativeShipyardWorkspace::set_focused_text(std::string text,const ShipyardWo
 }
 std::string NativeShipyardWorkspace::batch_blocker()const{
   const auto* d=selected_design();if(!d)return tr("SHIPYARD_SELECT_DESIGN","Select a ship design.");
+  const auto blocked=[&](const std::optional<std::string>& reason){
+    return stellar::native_shipbuilding::localized_message(
+        locale_,reason.value_or(tr("SHIPYARD_UNAVAILABLE","Construction unavailable.")));};
   const auto q=std::ranges::find(d->batch_quotes,quantity_,&stellar::core::ShipbuildingBatchAssessment::quantity);
-  if(q!=d->batch_quotes.end())return q->can_start?std::string{}:q->blocker.value_or(tr("SHIPYARD_UNAVAILABLE","Construction unavailable."));
+  if(q!=d->batch_quotes.end())return q->can_start?std::string{}:blocked(q->blocker);
   // Older projection clients retain their single-order contract.
-  if(quantity_==1)return d->can_start?std::string{}:d->start_blocker.value_or(tr("SHIPYARD_UNAVAILABLE","Construction unavailable."));
+  if(quantity_==1)return d->can_start?std::string{}:blocked(d->start_blocker);
   return tr("SHIPYARD_AWAIT_QUOTE","Waiting for construction quote.");
 }
 void NativeShipyardWorkspace::bind_preferences(std::filesystem::path path){
@@ -281,7 +284,7 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
     const double industry=q==d->batch_quotes.end()?d->industry_cost:q->industry_cost;
     readiness=trf(quantity_==1?"SHIPYARD_READINESS_ONE":"SHIPYARD_READINESS_MANY",{credit,number(industry,0),std::to_string(quantity_)},quantity_==1?"Authorization {0}\nIndustry {1} · {2} vessel\n":"Authorization {0}\nIndustry {1} · {2} vessels\n");
     const auto reason=batch_blocker();readiness+=reason.empty()?tr("SHIPYARD_READY","Ready to build."):reason;
-  }else if(o)readiness=trf("SHIPYARD_REFUND",{o->formatted_refund},"Refund if cancelled now  {0}")+"\n"+o->cancellation_blocker.value_or(tr("SHIPYARD_REFUND_NOTE","Unused authorization will be returned."));
+  }else if(o)readiness=trf("SHIPYARD_REFUND",{o->formatted_refund},"Refund if cancelled now  {0}")+"\n"+stellar::native_shipbuilding::localized_message(locale_,o->cancellation_blocker.value_or(tr("SHIPYARD_REFUND_NOTE","Unused authorization will be returned.")));
   text(out,l.readiness,std::move(readiness),muted,l.small_font_pixels);
   if(d){button(l.minus,"−");button(l.quantity,std::to_string(quantity_));button(l.plus,"+");button(l.favorite,has_ship(favorites_,d->id)?tr("SHIPYARD_FAVORITED","★ Favorite"):tr("SHIPYARD_FAVORITE","☆ Favorite"),has_ship(favorites_,d->id));}
   if(!notice_.empty())text(out,l.feedback,visible_message(notice_),notice_accepted_?muted:failure,l.small_font_pixels);

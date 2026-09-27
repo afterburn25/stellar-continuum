@@ -1,4 +1,5 @@
 #include "native_campaign_calendar.hpp"
+#include "native_shipbuilding_messages.hpp"
 #include "native_shipyard_workspace.hpp"
 #include "native_ui_layout.hpp"
 #include "native_ui_style.hpp"
@@ -199,7 +200,7 @@ void NativeShipyardWorkspace::discard_campaign() {
 }
 
 void NativeShipyardWorkspace::set_notice(std::string message, bool accepted) {
-  notice_ = std::move(message);
+  notice_ = stellar::native_shipbuilding::localized_message(locale_, message);
   notice_accepted_ = accepted;
   cancel_confirmation_id_.reset();
 }
