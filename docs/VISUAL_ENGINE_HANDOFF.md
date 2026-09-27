@@ -287,8 +287,9 @@ auto scene = Scene3D::create(camera, instances, key_light, point_lights,
   `ShadowMap3D::strength`; `shadow_softness` (document key
   `shadowSoftness`, [0,8], default 1) scales the PCF penumbra like
   `ShadowMap3D::softness`. Spot-only (`Scene3D::create` rejects an
-  omni caster) and capped at one shadowed spot per scene; Low tier
-  skips it like the directional map.
+  omni caster); every shadowed spot shares one depth atlas — full-size
+  for a single light, a quadrant each up to the four point-light
+  slots. Low tier skips it like the directional map.
 - Point lights (and spot cones) are independent of the key/fill
   directional lights.
 
@@ -477,7 +478,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
 - `ShadowMap3D` is an authored ortho box for the key light (plus an
   optional wider `cascade` far tier — two bands, not a full CSM split
-  chain) and one `casts_shadow` spot cone per scene — no omni
+  chain) and `casts_shadow` spot cones sharing one depth atlas (a
+  quadrant per light, up to four) — no omni
   point-light shadows; receivers outside the authored boxes (or outside
   the spot map's cone frustum) stay lit (by design).
 - Analytic ellipsoid/annulus blockers remain the ring↔planet shadow

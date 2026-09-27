@@ -208,14 +208,18 @@ int main()try{
   rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_inner=1.f;l.spot_outer=1.f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_outer=-.1f;l.spot_inner=.5f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.spot_inner=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
-  // Spot shadows: spot-only, at most one shadowed spot per scene.
+  // Spot shadows: spot-only; every shadowed spot up to the four-light
+  // budget shares the depth atlas (a quadrant each).
   {PointLight3D l;l.position={0,0,1};l.spot_direction={0,0,-1};l.spot_inner=.97f;l.spot_outer=.9f;l.casts_shadow=true;
    const auto shadowed=Scene3D::create(camera,{instance},{0,0,1},{l});
    check(shadowed->point_lights().size()==1&&shadowed->point_lights()[0].casts_shadow,
-       "Scene dropped a valid shadowed spot light");}
+       "Scene dropped a valid shadowed spot light");
+   PointLight3D m=l;m.spot_direction={1,0,0};
+   const auto pair=Scene3D::create(camera,{instance},{0,0,1},{l,m});
+   check(pair->point_lights().size()==2,"Scene dropped a second shadowed spot light");}
   rejects([&]{PointLight3D l;l.casts_shadow=true;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
-  rejects([&]{PointLight3D a,b;a.spot_direction={0,0,-1};b.spot_direction={1,0,0};a.casts_shadow=b.casts_shadow=true;
-              (void)Scene3D::create(camera,{instance},{0,0,1},{a,b});});
+  rejects([&]{PointLight3D l;l.casts_shadow=true;l.spot_direction={0,0,-1};l.spot_inner=1.f;l.spot_outer=1.f;
+              (void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.spot_direction={0,0,-1};l.spot_inner=.97f;l.spot_outer=.9f;l.casts_shadow=true;l.shadow_strength=1.5f;
               (void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.shadow_strength=-.1f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});

@@ -655,7 +655,36 @@ int main(int argc,char** argv)try{
     check(so>fu+15&&so>us*0.35&&so<us*0.7,
         "shadow_strength did not soften the spot umbra between full cut and lit");
     lamp.shadow_strength=1.f;
-    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_passed\n";
+    // Two shadowed spots share the depth atlas — each cone's receiver
+    // projects into its own quadrant, so a second lamp tilting right
+    // cuts an umbra through its own occluder without touching the
+    // first light's strip. lamp2's axis tilts right; occluder2 sits
+    // off that axis so its umbra strips ~x195-245 (census left half).
+    auto lamp2=lamp;lamp2.spot_direction={.24f,0,-.97f};
+    auto occluder2=occluder;occluder2.position={.1f,0,1.6f};
+    auto spot_two=[&](bool a_cast,bool b_cast,const char* name){
+      lamp.casts_shadow=a_cast;lamp2.casts_shadow=b_cast;
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder,occluder2},{0,0,1},{lamp,lamp2}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto both_unshadowed=spot_two(false,false,"point-light-spot2-noshadow.png");
+    const auto casters_before=window.scene3d_statistics().shadow_casters;
+    const auto both_shadowed=spot_two(true,true,"point-light-spot2-shadow.png");
+    // lamp2 as the ONLY shadowed light: the full-map path through its
+    // own tilted cone, verifying the single-light projection stays intact
+    // when the casting slot isn't the first point light in the scene.
+    const auto b_only=spot_two(false,true,"point-light-spot2-bonly.png");
+    lamp.casts_shadow=true;lamp2.casts_shadow=true;
+    std::cout<<"spot2_casters="<<(window.scene3d_statistics().shadow_casters-casters_before)<<"\n";
+    check(census(*both_shadowed,120,155)>census(*both_unshadowed,120,155)+20,
+        "First lamp lost its umbra when a second spot casts");
+    check(census(*both_shadowed,175,215)>census(*both_unshadowed,175,215)+10,
+        "Second shadowed spot did not cut an umbra through its own cone");
+    check(census(*b_only,175,215)>census(*both_unshadowed,175,215)+10,
+        "Second spot's umbra vanishes when it is the only shadowed light");
+    check(channel(*both_shadowed,272,160,1)>channel(*both_unshadowed,272,160,1)/2,
+        "Spot atlas darkened lamp2's lit rim outside its umbra");
+    lamp.casts_shadow=true;
+    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_passed\n";
   }
   {
     // Atmosphere limb scattering: a tinted shell brightens the silhouette

@@ -60,19 +60,22 @@ layout(set=2,binding=13,std430) readonly buffer Materials {
 // Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
 // 2 albedo, 3 normals, 4 roughness, 5 metallic, 6 emissive, 7 lighting,
 // 8 lod class / 9 residency class tint (texture_options.w).
-// debug_mode.y is the view's scene time driving animated material terms;
-// debug_mode.z is the shadowed spot light's authored umbra strength.
+// debug_mode.y is the view's scene time driving animated material terms.
 layout(set=3,binding=0) uniform ViewParams {
     vec4 debug_mode;
     // view → shadow-map clip space, then texel size / strength / bias /
     // enabled in shadow_options
     mat4 shadow_from_view;
     vec4 shadow_options;
-    // view → spot-cone shadow clip space for the (at most one) shadowed
-    // spot light; spot_options = texel size (>0 enabled), PCF radius in
-    // texels, shadowed point-light index, range-scaled depth bias
-    mat4 spot_from_view;
-    vec4 spot_options;
+    // view → spot-cone clip space per shadowed point light (index i matches
+    // material.point_*[i]); the quadrant offset bakes into the transform so
+    // each light writes its own depth-atlas cell. spot_options[i] = texel
+    // size (>0 enabled), PCF radius in texels, umbra strength, texel-scaled
+    // depth bias. spot_bounds[i] = the cell's uv range so out-of-cone
+    // fragments reject instead of sampling a neighbour quadrant.
+    mat4 spot_from_view[4];
+    vec4 spot_options[4];
+    vec4 spot_bounds[4];
     // view → far-cascade clip space: a wider ortho tier sharing the
     // directional box's centre/depth so coverage survives extreme zoom.
     // far_options = texel size (>0 enabled), PCF radius in texels, -, bias
@@ -81,12 +84,15 @@ layout(set=3,binding=0) uniform ViewParams {
 } view_params;
 
 // Shared shadow-map visibility: project clip → NDC, reject fragments
-// outside the map (they stay lit — coverage is an authored policy), then
-// step-compare depth with the fixed 8-tap kernel when a radius is set.
-float map_lit(sampler2D map,vec4 clip,float texel,float radius_texels,float bias) {
+// outside the map bounds (they stay lit — coverage is an authored
+// policy), then step-compare depth with the fixed 8-tap kernel when a
+// radius is set.
+float map_lit(sampler2D map,vec4 clip,float texel,float radius_texels,float bias,vec4 bounds) {
     vec3 ndc=clip.xyz/max(clip.w,1e-9);
-    vec2 suv=ndc.xy*0.5+0.5;
-    if(clip.w<=0.0||suv.x<0.0||suv.x>1.0||suv.y<0.0||suv.y>1.0||ndc.z<0.0||ndc.z>1.0)return 1.0;
+    // The backend's negative-height viewport writes NDC +y to texture row 0,
+    // so the sample's v axis runs opposite to the clip-space convention.
+    vec2 suv=vec2(ndc.x*0.5+0.5,0.5-ndc.y*0.5);
+    if(clip.w<=0.0||suv.x<bounds.x||suv.x>bounds.z||suv.y<bounds.y||suv.y>bounds.w||ndc.z<0.0||ndc.z>1.0)return 1.0;
     float radius=radius_texels*texel;
     if(radius>0.0) {
         vec2 taps[8]=vec2[](vec2(-1.0,-1.0),vec2(1.0,-1.0),vec2(-1.0,1.0),vec2(1.0,1.0),
@@ -331,15 +337,15 @@ void main() {
             const bool near_inside=clip.w>0.0&&edge<=1.0&&ndc.z>=0.0&&ndc.z<=1.0;
             const float flit=map_lit(shadow_far_map,
                 view_params.far_from_view*vec4(view_position,1.0),
-                view_params.far_options.x,view_params.far_options.y,view_params.far_options.w);
+                view_params.far_options.x,view_params.far_options.y,view_params.far_options.w,vec4(0.0,0.0,1.0,1.0));
             lit=near_inside
                 ?mix(map_lit(shadow_depth_map,clip,view_params.shadow_options.x,
-                             view_params.shadow_options.y,view_params.shadow_options.w),
+                             view_params.shadow_options.y,view_params.shadow_options.w,vec4(0.0,0.0,1.0,1.0)),
                      flit,smoothstep(0.9,1.0,edge))
                 :flit;
         } else {
             lit=map_lit(shadow_depth_map,clip,view_params.shadow_options.x,
-                        view_params.shadow_options.y,view_params.shadow_options.w);
+                        view_params.shadow_options.y,view_params.shadow_options.w,vec4(0.0,0.0,1.0,1.0));
         }
         visibility*=mix(1.0,lit,view_params.shadow_options.z);
     }
@@ -564,15 +570,16 @@ void main() {
         if(dot(cone.xyz,cone.xyz)>0.0)
             window*=smoothstep(material.point_outer[i],cone.w,
                                dot(-L,normalize(cone.xyz)));
-        // Shadowed spot (at most one per scene): receivers inside the
-        // cone project into the light's own depth map; fragments past
-        // the clamped map fov stay lit, which only matters inside the
-        // narrow band between the map edge and the outer cone.
-        if(view_params.spot_options.x>0.0&&int(view_params.spot_options.z+0.5)==i)
-            // debug_mode.z = the spot's authored umbra strength; 1 = full cut.
-            window*=mix(1.0,map_lit(spot_shadow_map,view_params.spot_from_view*vec4(view_position,1.0),
-                            view_params.spot_options.x,view_params.spot_options.y,
-                            view_params.spot_options.w),view_params.debug_mode.z);
+        // Shadowed spots: receivers inside the cone project into the
+        // light's own atlas cell; fragments past the clamped map fov (or
+        // landing in a neighbour quadrant) stay lit, which only matters
+        // inside the narrow band between the map edge and the outer cone.
+        if(view_params.spot_options[i].x>0.0)
+            // spot_options.z = the spot's authored umbra strength.
+            window*=mix(1.0,map_lit(spot_shadow_map,view_params.spot_from_view[i]*vec4(view_position,1.0),
+                            view_params.spot_options[i].x,view_params.spot_options[i].y,
+                            view_params.spot_options[i].w,view_params.spot_bounds[i]),
+                        view_params.spot_options[i].z);
         if(window<=0.0) continue;
         vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
         float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);

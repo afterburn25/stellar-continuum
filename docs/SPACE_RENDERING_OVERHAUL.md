@@ -82,8 +82,9 @@ same document headless-tested.
    ortho volume centred ahead of the camera, depth pass + 8-tap PCF,
    tier-scaled resolution, Low skips; casters share the lit pass's
    screen-space LOD pick and collapsed groups cast one light-facing
-   proxy) plus one shadowed spot light (`casts_shadow` on a coned
-   `PointLight3D`, cone frustum to `range`, same caster policy);
+   proxy) plus shadowed spot lights (`casts_shadow` on a coned
+   `PointLight3D`, cone frustum to `range`, one shared depth atlas —
+   a quadrant per light up to the four-light budget, same caster policy);
    `alpha_threshold` casters mask the depth pass per texel, so cutout
    meshes cast perforated silhouettes rather than full quads; an
    optional `cascade` far tier (a wider ortho box sharing centre/depth,
@@ -254,9 +255,10 @@ documented per-frame but accumulated. See
 - Deeper cascaded shadow maps and omni point-light shadows: the
   `ShadowMap3D` ortho volume plus its optional `cascade` far tier covers
   authored strategy scenes at two zoom bands (a 3+ cascade chain is the
-  remaining split work), and one `casts_shadow` spot cone carries a
-  depth map; omni point lights and analytic blockers still cover point
-  sources and planet↔ring. Documented limitation.
+  remaining split work), and `casts_shadow` spot cones share a
+  quadrant-atlas depth map (up to four); omni point lights and analytic
+  blockers still cover point sources and planet↔ring. Documented
+  limitation.
 - Indirect draws / GPU culling: vendored SDL3 exposes
   `SDL_DrawGPUIndexedPrimitivesIndirect`, but it only merges batches
   sharing bound state — the renderer's per-batch sampler/pipeline binds

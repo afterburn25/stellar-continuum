@@ -511,26 +511,30 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   through a cone frustum, so occlusion, not just cone attenuation,
   decides which receivers take the light.
 - **Modules:** `native_scene3d.hpp` (`PointLight3D::casts_shadow`),
-  `native_scene3d.cpp` (validation), `native_scene3d_gpu.cpp` (second
-  depth target + RenderGraph pass sharing the `scene3d_shadow`
+  `native_scene3d.cpp` (validation), `native_scene3d_gpu.cpp` (shared
+  depth-atlas target + RenderGraph pass sharing the `scene3d_shadow`
   pipeline and the lit pass's caster policy via a shared collection),
   `scene3d.frag` (`spot_shadow_map` sampler at `set=2,binding=11`,
-  plus `spot_from_view`/`spot_options` in the view uniform),
+  plus `spot_from_view`/`spot_options`/`spot_bounds` arrays in the
+  view uniform),
   `scene_document.*` (`castShadow`/`shadowStrength`/`shadowSoftness`
   keys), `runtime_host.cpp`, `app/engine_main.cpp` (`pointLights`
   row's 14th/15th/16th CSV fields).
 - **Public interface:** set `casts_shadow` on a `PointLight3D` with a
-  nonzero `spot_direction`; `Scene3D::create` rejects an omni caster
-  and a second shadowed spot. `shadow_strength` [0,1] blends the umbra
+  nonzero `spot_direction`; `Scene3D::create` rejects an omni caster.
+  Every shadowed spot shares one depth atlas — a full-size map for a
+  single light, a quadrant each when more than one casts (up to the
+  four point-light slots). `shadow_strength` [0,1] blends the umbra
   like `ShadowMap3D::strength` (1 = full cut); `shadow_softness` [0,8]
   scales the PCF penumbra like `ShadowMap3D::softness`. The cone
   frustum spans the authored outer cone (clamped to ~150 degrees map
   fov) out to `range`.
-- **Shader contract:** `spot_options` carries {texel, PCF radius,
-  light index, bias} and `debug_mode.z` carries the spot's
-  `shadow_strength`; the point-light loop blends the sampled
-  visibility into the flagged light's window only — other lights and
-  omni spots are untouched.
+- **Shader contract:** `spot_options[i]` carries {texel, PCF radius,
+  strength, bias} per light index and `spot_bounds[i]` clamps each
+  sample to its atlas cell so out-of-cone fragments stay lit instead
+  of sampling a neighbour quadrant; the point-light loop blends the
+  sampled visibility into each flagged light's window — omni lights
+  are untouched.
 - **Policies:** identical caster rules to the directional pass —
   no transparent casters, `visible_range` culls, shared LOD pick,
   collapsed groups cast one light-facing proxy, billboards face the
@@ -546,13 +550,16 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed vs
   half-strength spot captures (`point-light-spot-noshadow/shadow/
   softshadow.png`) with a lit-cone umbra census, right-of-umbra lit
-  check and a ~half-latency umbra texel probe; `engine_scene3d`
-  rejects omni/second-caster configs plus out-of-range
-  `shadow_strength`; `engine_project` parses, round-trips and rejects
-  `castShadow`/`shadowStrength`.
-- **Limitations:** one shadowed spot per scene (the second depth map
-  is per-view, not per-light); omni point lights stay unshadowed (a
-  cube/paraboloid path is a separate feature).
+  check and a ~half-latency umbra texel probe; a two-spot atlas probe
+  (`point-light-spot2-*.png`) censuses both umbrae, a lit rim outside
+  them, and the second light's umbra through the single-map path;
+  `engine_scene3d` accepts two shadowed spots, rejects omni casters
+  and out-of-range `shadow_strength`; `engine_project` parses,
+  round-trips and rejects `castShadow`/`shadowStrength`.
+- **Limitations:** omni point lights stay unshadowed (a
+  cube/paraboloid path is a separate feature); the shared atlas halves
+  per-light resolution once a second spot casts (2048² → 1024² cells
+  at Ultra).
 
 ## Scene3D scene-level environment probe (2026-10-07)
 
