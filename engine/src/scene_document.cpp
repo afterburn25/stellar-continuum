@@ -537,6 +537,8 @@ std::string Scene3dDocument::to_json() const {
       if (l.cast_shadow) li["castShadow"] = true;
       if (l.shadow_strength < 1.f) li["shadowStrength"] = l.shadow_strength;
       if (l.shadow_softness != 1.f) li["shadowSoftness"] = l.shadow_softness;
+      if (l.shadow_normal_offset != 0.f)
+        li["shadowNormalOffset"] = l.shadow_normal_offset;
       ls.push_back(std::move(li));
     }
   }
@@ -900,6 +902,10 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         if (!std::isfinite(l.shadow_softness) || l.shadow_softness < 0.f ||
             l.shadow_softness > 8.f)
           return fail("shadowSoftness must be in [0,8]");
+        l.shadow_normal_offset = li.value("shadowNormalOffset", 0.f);
+        if (!std::isfinite(l.shadow_normal_offset) ||
+            l.shadow_normal_offset < 0.f || l.shadow_normal_offset > 8.f)
+          return fail("shadowNormalOffset must be in [0,8]");
         scene.point_lights.push_back(l);
       }
     }

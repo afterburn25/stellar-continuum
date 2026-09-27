@@ -196,6 +196,11 @@ struct PointLight3D {
   // PCF penumbra width multiplier on the tier radius when casts_shadow
   // is set — same convention as ShadowMap3D::softness.
   float shadow_softness{1.f}; // [0,8]
+  // Receiver-side lift along the shading normal, authored in shadow-map
+  // texels and scaled by the fragment's distance to the light so it
+  // stays meaningful under a perspective cone or cube face (texel size
+  // grows with depth). Same convention as ShadowMap3D::normal_offset.
+  float shadow_normal_offset{0.f}; // [0,8]
 };
 inline constexpr std::size_t maximum_scene3d_point_lights=4;
 inline constexpr std::size_t maximum_scene3d_shadow_cascades=4;

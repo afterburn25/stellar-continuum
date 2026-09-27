@@ -254,6 +254,8 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
       throw std::invalid_argument("3D spot shadow_strength must be in [0,1].");
     if(!std::isfinite(l.shadow_softness)||l.shadow_softness<0.f||l.shadow_softness>8.f)
       throw std::invalid_argument("3D spot shadow_softness must be in [0,8].");
+    if(!std::isfinite(l.shadow_normal_offset)||l.shadow_normal_offset<0.f||l.shadow_normal_offset>8.f)
+      throw std::invalid_argument("3D point-light shadow_normal_offset must be in [0,8].");
   }
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
   std::size_t geometry=0,images=0;

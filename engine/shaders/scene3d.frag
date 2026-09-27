@@ -103,6 +103,12 @@ layout(set=3,binding=0) uniform ViewParams {
     // matrices are needed.
     vec4 omni_options[4];
     vec4 omni_atlas[4];
+    // Receiver-side normal offset for the point-light maps: the lift is
+    // authored in texels but texel size grows with light distance under
+    // a perspective cone/cube face, so x is a per-unit-distance world
+    // scale the shader multiplies by the fragment's light distance.
+    vec4 spot_advanced[4];
+    vec4 omni_advanced[4];
 } view_params;
 
 // Shared shadow-map visibility: project clip → NDC, reject fragments
@@ -646,7 +652,13 @@ void main() {
         // inside the narrow band between the map edge and the outer cone.
         if(view_params.spot_options[i].x>0.0){
             // spot_options.z = the spot's authored umbra strength.
-            const float slit=mix(1.0,map_lit(spot_shadow_map,view_params.spot_from_view[i]*vec4(view_position,1.0),
+            // Lift the receiver along its shading normal by the
+            // authored texel offset scaled to world units at this
+            // fragment's light distance — the cone map's texel size
+            // grows with depth, so a per-distance factor is required.
+            const vec3 rpos=view_position+normalize(view_normal)*
+                (view_params.spot_advanced[i].x*length(view_position-material.point_position[i].xyz));
+            const float slit=mix(1.0,map_lit(spot_shadow_map,view_params.spot_from_view[i]*vec4(rpos,1.0),
                             view_params.spot_options[i].x,view_params.spot_options[i].y,
                             view_params.spot_options[i].w,view_params.spot_bounds[i]),
                         view_params.spot_options[i].z*shadow_receive);
@@ -657,7 +669,13 @@ void main() {
         // depth rebuilds analytically (ndc_z = pn + pq/t), so no
         // per-face matrices ride the uniform.
         if(view_params.omni_options[i].x>0.0){
-            const vec3 dv=view_position-material.point_position[i].xyz;
+            const vec3 dv0=view_position-material.point_position[i].xyz;
+            // Same normal-offset lift as the spot path, scaled by the
+            // fragment's dominant-axis (face) distance — the cube
+            // face's texel size is proportional to it.
+            const vec3 a0=abs(dv0);
+            const float t0=max(a0.x,max(a0.y,a0.z));
+            const vec3 dv=dv0+normalize(view_normal)*(view_params.omni_advanced[i].x*t0);
             const vec3 ad=abs(dv);vec2 fuv;float t;float col;
             if(ad.x>=ad.y&&ad.x>=ad.z){
                 if(dv.x>0.0){col=0.0;fuv=vec2(-dv.z,dv.y);}else{col=1.0;fuv=vec2(dv.z,dv.y);}

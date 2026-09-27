@@ -86,7 +86,8 @@ same document headless-tested.
    tier-scaled resolution, Low skips; casters share the lit pass's
    screen-space LOD pick and collapsed groups cast one light-facing
    proxy) plus shadowed spot lights (`casts_shadow` on a coned
-   `PointLight3D`, cone frustum to `range`, one shared depth atlas —
+   `PointLight3D`, cone frustum to `range`, one shared depth atlas,
+   `shadowNormalOffset` distance-scaled like the directional lift —
    a quadrant per light up to the four-light budget, same caster policy)
    and shadowed omni lights (`casts_shadow` with no cone — six 90-degree
    cube faces per light in a shared atlas row, dominant-axis face

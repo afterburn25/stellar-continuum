@@ -336,6 +336,9 @@ struct Scene3dPointLight {
   // [0,8] PCF penumbra multiplier on the tier radius when castShadow
   // is set (1 = tier default).
   float shadow_softness{1.f};
+  // [0,8] receiver-side lift along the shading normal in map texels,
+  // scaled by the fragment's light distance (PointLight3D::shadow_normal_offset).
+  float shadow_normal_offset{0.f};
 };
 
 // A 3D scene: camera, key light, and mesh entities — the 3D counterpart of

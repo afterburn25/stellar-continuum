@@ -1994,10 +1994,13 @@ void commit_scene3_field(Shell &shell) {
           if (n >= 14) l.cast_shadow = v[13] != 0.f;
           if (n >= 15) l.shadow_strength = v[14];
           if (n >= 16) l.shadow_softness = v[15];
+          if (n >= 17) l.shadow_normal_offset = v[16];
           if (l.shadow_strength < 0.f || l.shadow_strength > 1.f)
             return fail("spot shadow strength must be in [0,1]");
           if (l.shadow_softness < 0.f || l.shadow_softness > 8.f)
             return fail("spot shadow softness must be in [0,8]");
+          if (l.shadow_normal_offset < 0.f || l.shadow_normal_offset > 8.f)
+            return fail("point-light shadow normal offset must be in [0,8]");
         }
         parsed.push_back(l);
       }
@@ -2751,7 +2754,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                           l.spot_inner, l.spot_outer,
                                           l.cast_shadow,
                                           l.shadow_strength,
-                                          l.shadow_softness});
+                                          l.shadow_softness,
+                                          l.shadow_normal_offset});
     std::optional<ShadowMap3D> shadow_map;
     if (doc.shadow_extent > 0.f) {
       shadow_map = ShadowMap3D{doc.shadow_extent, doc.shadow_distance,
@@ -3120,24 +3124,30 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                    std::to_string(l.spot_outer);
               if (l.cast_shadow) {
                 v += ",1";
-                if (l.shadow_strength < 1.f || l.shadow_softness != 1.f)
+                if (l.shadow_strength < 1.f || l.shadow_softness != 1.f ||
+                    l.shadow_normal_offset != 0.f)
                   v += "," + std::to_string(l.shadow_strength);
-                if (l.shadow_softness != 1.f)
+                if (l.shadow_softness != 1.f || l.shadow_normal_offset != 0.f)
                   v += "," + std::to_string(l.shadow_softness);
+                if (l.shadow_normal_offset != 0.f)
+                  v += "," + std::to_string(l.shadow_normal_offset);
               }
             } else if (l.cast_shadow) {
               // The 0,0,0,1,0 sentinel keeps the omni light's shadow
               // fields expressible in the row format.
               v += ",0,0,0,1,0,1";
-              if (l.shadow_strength < 1.f || l.shadow_softness != 1.f)
+              if (l.shadow_strength < 1.f || l.shadow_softness != 1.f ||
+                  l.shadow_normal_offset != 0.f)
                 v += "," + std::to_string(l.shadow_strength);
-              if (l.shadow_softness != 1.f)
+              if (l.shadow_softness != 1.f || l.shadow_normal_offset != 0.f)
                 v += "," + std::to_string(l.shadow_softness);
+              if (l.shadow_normal_offset != 0.f)
+                v += "," + std::to_string(l.shadow_normal_offset);
             }
           }
           return v;
         }(),
-        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness]]]]; 0,0,0,1,0 keeps omni; ... - max 4, empty clears");
+        ed(38), "x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness[,normalOffset]]]]]; 0,0,0,1,0 keeps omni; ... - max 4, empty clears");
   field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
         "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows");
   field(shell.hit3_shadow, "shadowMap", shadow_row_text(doc),

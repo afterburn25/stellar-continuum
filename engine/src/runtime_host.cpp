@@ -2662,7 +2662,8 @@ int RuntimeHost::run() {
                                             {l.spot_x, l.spot_y, l.spot_z},
                                             l.spot_inner, l.spot_outer,
                                             l.cast_shadow, l.shadow_strength,
-                                            l.shadow_softness});
+                                            l.shadow_softness,
+                                            l.shadow_normal_offset});
       if (auto scene = Scene3D::create(cam, std::move(instances),
                                        light_cam, std::move(point_lights),
                                        impl.shadow3, impl.environment3)) {

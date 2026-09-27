@@ -786,6 +786,18 @@ int main() {
               R"({"entities":[],"pointLights":[{"spotDir":[0,0,-1],"spotInner":0.97,"spotOuter":0.9,"shadowStrength":1.5}]})")
               .has_value(),
           "scene3d out-of-range shadowStrength rejected");
+    if (auto lifted = engine::Scene3dDocument::from_json(
+            R"({"entities":[],"pointLights":[{"castShadow":true,"shadowNormalOffset":1.25}]})")) {
+      check(std::abs(lifted->point_lights[0].shadow_normal_offset - 1.25f) < 1e-5f &&
+                lifted->to_json().find("shadowNormalOffset") != std::string::npos,
+            "scene3d did not round-trip point-light shadowNormalOffset");
+    } else {
+      check(false, "scene3d shadowNormalOffset light rejected");
+    }
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[],"pointLights":[{"castShadow":true,"shadowNormalOffset":9}]})")
+              .has_value(),
+          "scene3d out-of-range shadowNormalOffset rejected");
     if (auto probed = engine::Scene3dDocument::from_json(
             R"({"entities":[],"environment":"visual/starfield-equirect.png"})")) {
       check(probed->environment == "visual/starfield-equirect.png",

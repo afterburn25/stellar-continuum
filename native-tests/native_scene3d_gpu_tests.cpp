@@ -754,6 +754,38 @@ int main(int argc,char** argv)try{
      window.draw(d,folder/"point-light-omni-seam.png");}
     check(window.scene3d_statistics().omni_shadow_casters==one_face+1,
         "Face-seam occluder did not reach multiple cube faces");
+    // Point-light shadow_normal_offset: lifting the receiver along its
+    // shading normal translates the projected depth lookup — a constant
+    // bias can never move a footprint laterally, so the shift is a
+    // strict discriminator. The plate tilts about Y so the lift carries
+    // a lateral component in both the cube face and the spot cone
+    // (a +Z lift under an axis lamp only rescales the radial lookup).
+    MeshInstance3D tilt=plate;tilt.rotation=rotation_axis_angle({0,1,0},.8f);
+    const auto umbra_centroid=[&](const RgbaImage&img){
+      double sx=0;int n=0;for(int y=120;y<200;++y)for(int x=60;x<260;++x)
+        if(channel(img,x,y,1)<25){sx+=x;++n;}
+      return n>8?sx/n:-1.0;};
+    auto offset_view=[&](const PointLight3D& l,float offset,const char* name){
+      auto with=l;with.shadow_normal_offset=offset;
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{tilt,occluder},{0,0,1},{with}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto omni_off0=offset_view(lamp,0.f,"point-light-omni-off0.png");
+    const auto omni_off8=offset_view(lamp,8.f,"point-light-omni-off8.png");
+    const double oc0=umbra_centroid(*omni_off0),oc8=umbra_centroid(*omni_off8);
+    const auto lookup_diff=[&](const RgbaImage&a,const RgbaImage&b){
+      int n=0;for(int y=120;y<200;++y)for(int x=60;x<260;++x)
+        if(std::abs(channel(a,x,y,1)-channel(b,x,y,1))>15)++n;return n;};
+    check(oc0>0.0&&oc8>0.0&&oc8<oc0-2.0&&lookup_diff(*omni_off0,*omni_off8)>200,
+        "Omni shadow_normal_offset did not translate the receiver's depth lookup");
+    // The spot path uses the same authored lift — the cone widens so a
+    // cell texel spans enough world to move the footprint measurably.
+    auto wide=lamp;wide.spot_direction={0,0,-1};wide.spot_inner=.9f;wide.spot_outer=.5f;
+    const auto spot_off0=offset_view(wide,0.f,"point-light-spot-off0.png");
+    const auto spot_off8=offset_view(wide,8.f,"point-light-spot-off8.png");
+    const double sc0=umbra_centroid(*spot_off0),sc8=umbra_centroid(*spot_off8);
+    check(sc0>0.0&&sc8>0.0&&sc8<sc0-2.0&&lookup_diff(*spot_off0,*spot_off8)>100,
+        "Spot shadow_normal_offset did not translate the receiver's depth lookup");
+    lamp.spot_direction={0,0,0};
     // Mixed spot + omni shadows in one scene: the omni light must not
     // claim a spot slot (its zero direction would normalize to NaN), so
     // both atlases populate and each light keeps its own umbra strip.

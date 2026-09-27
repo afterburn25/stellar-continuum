@@ -309,7 +309,11 @@ auto scene = Scene3D::create(camera, instances, key_light, point_lights,
   `shadowStrength`, [0,1], default 1) blends the umbra like
   `ShadowMap3D::strength`; `shadow_softness` (document key
   `shadowSoftness`, [0,8], default 1) scales the PCF penumbra like
-  `ShadowMap3D::softness`. Low tier skips both atlases like the
+  `ShadowMap3D::softness`; `shadow_normal_offset` (document key
+  `shadowNormalOffset`, [0,8], default 0) lifts receivers along their
+  shading normal in map texels, scaled by the fragment's light
+  distance so the authored texel count means the same world lift at
+  any depth under a perspective map. Low tier skips both atlases like the
   directional map. `Scene3DStatistics::spot_shadow_casters` /
   `omni_shadow_casters` audit each atlas's submissions.
 - Point lights (and spot cones) are independent of the key/fill
@@ -547,10 +551,14 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   `casts_shadow` omni lights sharing a cube-face atlas (six faces per
   light, up to four rows, view-space-locked faces) — receivers outside
   the authored boxes (or outside a light's frustum/range) stay lit
-  (by design). The `normal_offset` lift is directional-only today:
-  spot/omni receivers rely on the authored `bias` (perspective texel
-  size varies with depth, so a per-fragment-scaled lift is future
-  work, not a direct port).
+  (by design). `PointLight3D::shadow_normal_offset` (document key
+  `shadowNormalOffset`, [0,8], editor shadow slot 16) ports the
+  same authored lift to spot and omni maps: since perspective texel
+  size grows with light distance, the upload carries a
+  per-unit-distance world scale (`offset·2·tanθ/cell_px` for cones,
+  `offset·2/cell_px` for cube faces) that the shader multiplies by
+  the fragment's light distance before projecting — a cone/cube
+  port of the directional lift, not a constant bias.
 - Analytic ellipsoid/annulus blockers remain the ring↔planet shadow
   path and are evaluated independently of the map.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or

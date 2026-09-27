@@ -97,8 +97,8 @@ struct PostUniform {std::array<float,4> a,b;};
 // the cascade arrays the optional wider tiers sharing the directional
 // box's centre/depth (one depth-array layer each, options .z carrying
 // each tier's own texel-scaled lift), the omni pair the cube-atlas rows.
-struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<float,4> shadow_advanced;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;std::array<Matrix4,maximum_scene3d_shadow_cascades> cascade_from_view;std::array<std::array<float,4>,maximum_scene3d_shadow_cascades> cascade_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==944);
+struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<float,4> shadow_advanced;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;std::array<Matrix4,maximum_scene3d_shadow_cascades> cascade_from_view;std::array<std::array<float,4>,maximum_scene3d_shadow_cascades> cascade_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;std::array<std::array<float,4>,4> spot_advanced,omni_advanced;};
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==1072);
 // Column-major rotation for a unit quaternion — same convention as
 // rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
 Matrix4 rotation_from(Quaternion q){
@@ -1074,6 +1074,12 @@ struct Scene3DRenderer::Storage {
         // geometric term already. z carries the umbra strength.
         view_uniform.spot_options[i]={1.f/static_cast<float>(spot_map),radius_texels,
             l.shadow_strength,1.5f/static_cast<float>(spot_map)};
+        // Receiver-side normal offset in texels → a per-unit-distance
+        // world lift: one cell texel spans 2·tan_o·d/cell_px at light
+        // distance d (cell_px = spot_map/2 under the 2x2 quadrant
+        // atlas, spot_map for a single shadowed spot).
+        view_uniform.spot_advanced[i]={l.shadow_normal_offset*
+            static_cast<float>(2.0*tan_o*(spot_count>1?2.0:1.0)/spot_map),0.f,0.f,0.f};
         collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,light_projection,from_view,cone_volume,
             spot_geometry[i],spot_transforms[i],spot_textures[i],spot_batcher[i],stats.spot_shadow_casters);
       }
@@ -1117,6 +1123,12 @@ struct Scene3DRenderer::Storage {
         // the shader rebuilds projective depth without a matrix.
         view_uniform.omni_options[i]={1.f/static_cast<float>(omni_map_w),radius_texels,
             l.shadow_strength,1.5f/static_cast<float>(omni_cell)};
+        // One cell texel spans 2·t/omni_cell at face distance t (a
+        // 90-degree face is 2t wide), so the authored lift in texels is
+        // a per-t world scale; the shader multiplies by the fragment's
+        // dominant-axis distance.
+        view_uniform.omni_advanced[i]={l.shadow_normal_offset*
+            (12.f/static_cast<float>(omni_map_w)),0.f,0.f,0.f};
         view_uniform.omni_atlas[i]={static_cast<float>(row/rows),static_cast<float>((row+1.0)/rows),
             static_cast<float>(pn),static_cast<float>(pq)};
         const double cx=cam.position.x-ex,cy=cam.position.y-ey,cz=cam.position.z-ez;

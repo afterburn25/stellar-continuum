@@ -557,7 +557,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   view uniform),
   `scene_document.*` (`castShadow`/`shadowStrength`/`shadowSoftness`
   keys), `runtime_host.cpp`, `app/engine_main.cpp` (`pointLights`
-  row's 14th/15th/16th CSV fields).
+  row's 14th/15th/16th CSV fields; `shadowNormalOffset` rides the
+  17th on both spot and omni rows).
 - **Public interface:** set `casts_shadow` on a `PointLight3D` with a
   nonzero `spot_direction` (omni casters take the cube-atlas path in
   the next record). Every shadowed spot shares one depth atlas — a
@@ -565,12 +566,18 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   one casts (up to the four point-light slots). `shadow_strength`
   [0,1] blends the umbra like `ShadowMap3D::strength` (1 = full cut);
   `shadow_softness` [0,8] scales the PCF penumbra like
-  `ShadowMap3D::softness`. The cone frustum spans the authored outer
+  `ShadowMap3D::softness`; `shadow_normal_offset` [0,8] lifts
+  receivers along their shading normal in map texels — the upload
+  carries a per-unit-distance world scale (perspective texel size
+  grows with depth) the shader multiplies by the fragment's light
+  distance before projecting. The cone frustum spans the authored outer
   cone (clamped to ~150 degrees map fov) out to `range`.
 - **Shader contract:** `spot_options[i]` carries {texel, PCF radius,
   strength, bias} per light index and `spot_bounds[i]` clamps each
   sample to its atlas cell so out-of-cone fragments stay lit instead
-  of sampling a neighbour quadrant; the point-light loop blends the
+  of sampling a neighbour quadrant; `spot_advanced[i]` supplies the
+  per-unit-distance world lift the shader applies along the shading
+  normal before projecting. The point-light loop blends the
   sampled visibility into each flagged light's window.
 - **Policies:** identical caster rules to the directional pass —
   no transparent casters, `visible_range` culls, shared LOD pick,
@@ -583,11 +590,15 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   (the shared `collect_casters` feeds both).
 - **Persistence:** `castShadow` document key round-trips on coned and
   omni lights alike. `shadowStrength` round-trips and rejects
-  outside [0,1].
+  outside [0,1]; `shadowNormalOffset` round-trips and rejects
+  outside [0,8].
 - **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed vs
   half-strength spot captures (`point-light-spot-noshadow/shadow/
   softshadow.png`) with a lit-cone umbra census, right-of-umbra lit
-  check and a ~half-latency umbra texel probe; a two-spot atlas probe
+  check and a ~half-latency umbra texel probe; the tilted-receiver
+  `shadow_normal_offset` probe (`point-light-spot-off0/off8.png`)
+  asserts the authored lift translates the projected lookup — a move
+  no constant bias can produce; a two-spot atlas probe
   (`point-light-spot2-*.png`) censuses both umbrae, a lit rim outside
   them, and the second light's umbra through the single-map path;
   `engine_scene3d` accepts two shadowed spots and out-of-range
@@ -617,8 +628,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   90-degree cube faces in a shared atlas — one row per light, up to
   the four point-light slots — with cell resolution tier-scaled
   (256/512/1024). `shadow_strength`/`shadow_softness` keep the spot
-  semantics; `range` bounds the face frusta (0 → 4096 fallback like
-  the spot path).
+  semantics; `shadow_normal_offset` lifts receivers along their
+  shading normal in map texels, scaled by the fragment's dominant-axis
+  (face) distance; `range` bounds the face frusta (0 → 4096 fallback
+  like the spot path).
 - **Shader contract:** `omni_options[i]` = {atlas texel width (>0
   enabled), PCF radius in cell texels, umbra strength, depth bias};
   `omni_atlas[i]` = {row v0, row v1, pn, pq} — the light's view-space
@@ -626,7 +639,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   receiver picks its face by the dominant axis of the offset and
   rebuilds `ndc_z = pn + pq/t` with no per-face matrices riding the
   uniform. Face cells bake their NDC offset into each face's
-  `light_mvp` exactly like spot quadrants.
+  `light_mvp` exactly like spot quadrants. `omni_advanced[i]` carries
+  the per-unit-distance world lift for `shadow_normal_offset` — the
+  shader scales it by the fragment's dominant-axis face distance
+  before offsetting the receiver.
 - **Policies:** identical caster rules to the other depth passes —
   transparents never cast, `casts_shadow`/`receives_shadow` opt-outs,
   `visible_range` culling, shared LOD pick, collapsed-group proxies,
@@ -634,17 +650,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   Low tier skips the atlas; the memoized per-view caster evaluation
   is shared, so each light's six collections only transform, volume
   test and emit.
-- **Persistence:** `castShadow`/`shadowStrength`/`shadowSoftness`
-  round-trip with or without `spotDir`; the `0,0,0,1,0` CSV sentinel
-  keeps the editor row unambiguous.
+- **Persistence:** `castShadow`/`shadowStrength`/`shadowSoftness`/
+  `shadowNormalOffset` round-trip with or without `spotDir`; the
+  `0,0,0,1,0` CSV sentinel keeps the editor row unambiguous.
 - **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed omni
   captures (`point-light-omni-noshadow/shadow.png`) with the umbra
   census and a lit-footprint non-vacuity check, the
   `omni_shadow_casters` counter asserted non-zero, and a
   `receives_shadow=false` fold-to-lit probe
-  (`point-light-omni-noreceive.png`); `engine_scene3d` accepts a
-  shadowed omni light; `engine_project` parses + round-trips omni
-  `castShadow`.
+  (`point-light-omni-noreceive.png`); the tilted-receiver
+  `shadow_normal_offset` probe (`point-light-omni-off0/off8.png`)
+  asserts the authored lift translates the cube-face lookup;
+  `engine_scene3d` accepts a shadowed omni light; `engine_project`
+  parses + round-trips omni `castShadow`.
 - **Performance:** six depth collections per shadowed omni light
   against the shared caster evaluation — a light near dense geometry
   submits each caster into every face it crosses;
