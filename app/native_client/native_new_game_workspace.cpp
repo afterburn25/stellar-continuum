@@ -171,14 +171,19 @@ NativeNewGameLayout NativeNewGameLayout::for_viewport(int width,
                146.f * scale};
   UiRect portrait{detail_content.x, detail_content.y, 116.f * scale,
                   116.f * scale};
+  const int small_font = std::max(12, static_cast<int>(14 * scale));
   const float size_width = (sizes.width - 6.f * scale) * .5f;
   const float size_height = 26.f * scale;
-  const float size_y = sizes.y + 18.f * scale;
+  // The group heading is rasterized at small_font pixels — reserve its real
+  // height so the first button row never overlaps the text.
+  const float size_y = sizes.y + std::max(18.f * scale,
+                                          static_cast<float>(small_font) +
+                                              6.f * scale);
   std::array<UiRect, 8> size_buttons{};
   for(std::size_t i=0;i<size_buttons.size();++i)size_buttons[i]={sizes.x+static_cast<float>(i%2)*(size_width+4.f*scale),
     size_y+static_cast<float>(i/2)*(size_height+4.f*scale),size_width,size_height};
   return {scale, static_cast<int>(24 * scale), std::max(14,static_cast<int>(17 * scale)),
-          std::max(12,static_cast<int>(14 * scale)), panel_rect, heading, cancel, story,
+          small_font, panel_rect, heading, cancel, story,
           sandbox, species, rows, details, detail_content, sizes, seed_label,
           seed_input, randomize_seed, restore_defaults, create, portrait, size_buttons,{restore_defaults.x+restore_defaults.width+8*scale,restore_defaults.y,138*scale,restore_defaults.height},
           {story.x,story.y+mode_h+4*scale,story.width,32*scale},
@@ -681,8 +686,8 @@ NativeNewGameIntent NativeNewGameWorkspace::handle(const InputEvent &event,
     std::vector<std::string> options;int chosen_option{};
     if(id<2){const auto& choices=id==0?view_->pre_warp_civilization_presets:view_->ancient_civilization_presets;const int current=id==0?selected_pre_warp_civilization_count_:selected_ancient_civilization_count_;
       for(const auto& choice:choices){if(choice.count==current)chosen_option=static_cast<int>(options.size());options.push_back(choice.label);}}
-    else if(id==2){for(int i=0;i<6;++i)options.emplace_back(stellar::core::morphology_name(static_cast<stellar::core::GalaxyMorphology>(i)));chosen_option=static_cast<int>(population_.morphology);}
-    else {for(int i=0;i<5;++i)options.emplace_back(stellar::core::population_state_name(static_cast<stellar::core::PopulationState>(i)));chosen_option=static_cast<int>(population_.state);}
+    else if(id==2){for(int i=0;i<6;++i){const auto m=static_cast<stellar::core::GalaxyMorphology>(i);options.emplace_back(tr(morphology_display_key(m),stellar::core::morphology_name(m)));}chosen_option=static_cast<int>(population_.morphology);}
+    else {for(int i=0;i<5;++i){const auto st=static_cast<stellar::core::PopulationState>(i);options.emplace_back(tr(population_state_key(st),stellar::core::population_state_name(st)));}chosen_option=static_cast<int>(population_.state);}
     dropdown_.open(id,std::move(options),chosen_option);pressed_=false;return {NativeNewGameIntentKind::None,true};
   }
   if (layout.randomize_seed.contains(event.position)) {
@@ -710,7 +715,7 @@ void NativeNewGameWorkspace::render(
     const PortraitProvider *portrait_provider,
     std::shared_ptr<const RgbaImage> backdrop) const {
   if (!view_) return;
-  if(page_!=SandboxPage::Configuration){render_galaxy_page(out,width,height,portrait_provider,std::move(backdrop));return;}
+  if(page_!=SandboxPage::Configuration){render_galaxy_page(out,width,height,measure,portrait_provider,std::move(backdrop));return;}
   const bool has_backdrop = static_cast<bool>(backdrop);
   const Color panel_tint = has_backdrop ? Color{8, 20, 36, 200}
                                         : panel;
@@ -747,6 +752,28 @@ void NativeNewGameWorkspace::render(
     }
     stroke(out, *visible, border);
   };
+  // Shared button-label fitting: shrink the font toward an 8px floor,
+  // then fall back to the compact catalog key before clipping mid-glyph.
+  const auto fit_control = [&](std::string_view key,
+                               std::string_view compact_key,
+                               std::string_view fallback,
+                               std::string_view compact_fallback,
+                               const UiRect &rect, int pixels, float padding) {
+    const int budget =
+        static_cast<int>(rect.width - padding * layout.scale);
+    const auto w = [&](const std::string &v, int size) {
+      return measure(Text{{}, v, bright, size, 0, {}}).width;
+    };
+    std::string label = tr(key, fallback);
+    int size = pixels;
+    while (size > 8 && w(label, size) > budget) --size;
+    if (w(label, size) > budget) {
+      label = tr(compact_key, compact_fallback);
+      size = pixels;
+      while (size > 8 && w(label, size) > budget) --size;
+    }
+    return std::pair{std::move(label), size};
+  };
   if (backdrop) {
     const float ratio = std::max(static_cast<float>(width) / backdrop->width(),
                                  static_cast<float>(height) / backdrop->height());
@@ -772,8 +799,8 @@ void NativeNewGameWorkspace::render(
        layout.body_font, TextAlign::Center);
 
   for(const auto& [rect,label]:std::array<std::pair<UiRect,std::string>,2>{
-      std::pair{layout.morphology,trf("SETUP_SHAPE",{population_.morphology==stellar::core::GalaxyMorphology::BarredSpiral?std::string("Barred Spiral"):std::string(stellar::core::morphology_name(population_.morphology))},"SHAPE: {0}")},
-      std::pair{layout.population,trf("SETUP_POPULATION",{std::string(stellar::core::population_selection_label(requested_population_))},"POPULATION: {0}")}]){
+      std::pair{layout.morphology,trf("SETUP_SHAPE",{tr(morphology_display_key(population_.morphology),stellar::core::morphology_name(population_.morphology))},"SHAPE: {0}")},
+      std::pair{layout.population,trf("SETUP_POPULATION",{tr(population_selection_key(requested_population_),stellar::core::population_selection_label(requested_population_))},"POPULATION: {0}")}]){
     fill(out,rect,rect.contains(pointer_)?hover:raised_tint);stroke(out,rect,border);text(out,rect,label,bright,layout.small_font,TextAlign::Center);
   }
   const auto count_label = [&](const auto &choices, const int count) {
@@ -788,7 +815,8 @@ void NativeNewGameWorkspace::render(
              layout.mode_story.width - 20 * s, 22 * s},
        tr("SETUP_RIVAL_EMPIRES", "RIVAL EMPIRES"), gold, layout.small_font);
   text(out, {layout.mode_story.x + 10 * s, layout.mode_story.y + 30 * s,
-             layout.mode_story.width - 20 * s, 18 * s},
+             layout.mode_story.width - 20 * s,
+             std::max(0.f, layout.mode_story.height - 34.f * s)},
        count_label(view_->pre_warp_civilization_presets,
                    selected_pre_warp_civilization_count_), bright, layout.body_font);
   fill(out, layout.mode_sandbox, layout.mode_sandbox.contains(pointer_) ? hover : raised_tint);
@@ -797,7 +825,8 @@ void NativeNewGameWorkspace::render(
              layout.mode_sandbox.width - 20 * s, 22 * s},
        tr("SETUP_ANCIENT_EMPIRES", "ANCIENT EMPIRES"), gold, layout.small_font);
   text(out, {layout.mode_sandbox.x + 10 * s, layout.mode_sandbox.y + 30 * s,
-             layout.mode_sandbox.width - 20 * s, 18 * s},
+             layout.mode_sandbox.width - 20 * s,
+             std::max(0.f, layout.mode_sandbox.height - 34.f * s)},
        count_label(view_->ancient_civilization_presets,
                    selected_ancient_civilization_count_), bright, layout.body_font);
 
@@ -958,9 +987,14 @@ void NativeNewGameWorkspace::render(
   fill(out, layout.restore_defaults,
        layout.restore_defaults.contains(pointer_) ? hover : raised_tint);
   stroke(out, layout.restore_defaults, border);
-  text(out, layout.restore_defaults,
-       tr("SETUP_RESTORE_DEFAULTS", "RESTORE DEFAULTS"), bright,
-       layout.small_font, TextAlign::Center);
+  {
+    const auto fitted = fit_control(
+        "SETUP_RESTORE_DEFAULTS", "SETUP_RESTORE_COMPACT",
+        "RESTORE DEFAULTS", "DEFAULTS", layout.restore_defaults,
+        layout.small_font, 12.f);
+    text(out, layout.restore_defaults, fitted.first, bright, fitted.second,
+         TextAlign::Center);
+  }
 
   if (!view_->size_presets.empty()) {
     const auto count =
@@ -987,7 +1021,14 @@ void NativeNewGameWorkspace::render(
          tr("SETUP_GALAXY_SIZE", "GALAXY SIZE · SYSTEMS"), gold,
          layout.small_font);
   }
-  native_menu_style::button(out,layout.copy_setup,tr("SETUP_COPY","COPY SETUP"),layout.small_font,layout.copy_setup.contains(pointer_),true,s);
+  {
+    const auto fitted = fit_control(
+        "SETUP_COPY", "SETUP_COPY_COMPACT", "COPY SETUP", "COPY",
+        layout.copy_setup, layout.small_font, 14.f);
+    native_menu_style::button(out, layout.copy_setup, fitted.first,
+                              fitted.second,
+                              layout.copy_setup.contains(pointer_), true, s);
+  }
   if(view_->developer_mode){
     const auto checkbox=[&](UiRect row,bool checked,std::string caption){
       const UiRect box{row.x,row.y+3*s,20*s,20*s};
@@ -1000,7 +1041,7 @@ void NativeNewGameWorkspace::render(
     checkbox(layout.developer_coverage,developer_coverage_,tr("SETUP_DEV_COVERAGE","Full celestial coverage (QA only)"));
     checkbox(layout.developer_exploration,developer_exploration_,tr("SETUP_DEV_EXPLORATION","Entire galaxy explored and surveyed"));
   }else text(out,{layout.seed_label.x,layout.create.y-32*s,layout.panel.width-28*s,26*s},
-       generation_configuration()?trf("SETUP_POPULATION_RESOLVED",{std::string(stellar::core::population_state_name(generation_configuration()->resolved_population)),std::to_string(selected_system_count_)},"Resolved population: {0} · {1} systems"):tr("SETUP_POPULATION_UNRESOLVED","Enter a valid seed to resolve the population"),muted,layout.small_font);
+       generation_configuration()?trf("SETUP_POPULATION_RESOLVED",{tr(population_state_key(generation_configuration()->resolved_population),stellar::core::population_state_name(generation_configuration()->resolved_population)),std::to_string(selected_system_count_)},"Resolved population: {0} · {1} systems"):tr("SETUP_POPULATION_UNRESOLVED","Enter a valid seed to resolve the population"),muted,layout.small_font);
   if(!view_->developer_mode)text(out,{layout.seed_label.x,layout.create.y+5*s,layout.create.x-layout.seed_label.x-10*s,25*s},
        tr("SETUP_REPRODUCTION_HINT","Reproduction requires the same seed and generation settings."),gold,layout.small_font);
   const UiRect notice{layout.seed_label.x,layout.create.y+layout.create.height+5*s,layout.create.x-layout.seed_label.x-10*s,18*s};
@@ -1016,8 +1057,15 @@ void NativeNewGameWorkspace::render(
   fill(out, layout.create,
        layout.create.contains(pointer_) ? hover : selected_tint);
   stroke(out, layout.create, accent);
-  text(out, layout.create, tr("SETUP_CREATE", "CREATE CAMPAIGN"), bright,
-       layout.body_font, TextAlign::Center);
+  {
+    // "KAMPAGNE ERSTELLEN" outgrows the compact button — shrink the font
+    // first, then fall back to the compact key like the other controls.
+    const auto fitted = fit_control("SETUP_CREATE", "SETUP_CREATE_COMPACT",
+                                    "CREATE CAMPAIGN", "CREATE",
+                                    layout.create, layout.body_font, 16.f);
+    text(out, layout.create, fitted.first, bright, fitted.second,
+         TextAlign::Center);
+  }
   const std::array choice_bounds{layout.mode_story,layout.mode_sandbox,layout.morphology,layout.population};
   for(const auto r:choice_bounds)text(out,{r.x+r.width-24*s,r.y+(r.height-layout.small_font)*.5f,20*s,24*s},"▼",accent,layout.small_font,TextAlign::Center);
   const auto focus_items = configuration_focusables(measured);
@@ -1059,17 +1107,16 @@ std::string NativeNewGameWorkspace::focused_label(
     case 2:
       return page_ == SandboxPage::GalaxyType
                  ? trf("SETUP_SHAPE",
-                       {population_.morphology ==
-                                stellar::core::GalaxyMorphology::BarredSpiral
-                            ? std::string("Barred Spiral")
-                            : std::string(stellar::core::morphology_name(
-                                  population_.morphology))},
+                       {tr(morphology_display_key(population_.morphology),
+                           stellar::core::morphology_name(
+                               population_.morphology))},
                        "Shape: {0}")
                  : tr("SETUP_NEXT", "Next");
     case 3:
       return trf("SETUP_POPULATION",
-                 {std::string(stellar::core::population_selection_label(
-                     requested_population_))},
+                 {tr(population_selection_key(requested_population_),
+                     stellar::core::population_selection_label(
+                         requested_population_))},
                  "Population: {0}");
     case 4:
       return view_ ? trf("SETUP_RIVALS_LABEL",

@@ -158,7 +158,7 @@ public:
 
 private:
   NativeNewGameIntent handle_galaxy_page(const stellar::native_map::InputEvent&,int,int,const TextMeasurer&);
-  void render_galaxy_page(stellar::native_map::DrawList&,int,int,const PortraitProvider*,std::shared_ptr<const stellar::native_map::RgbaImage>)const;
+  void render_galaxy_page(stellar::native_map::DrawList&,int,int,const TextMeasurer&,const PortraitProvider*,std::shared_ptr<const stellar::native_map::RgbaImage>)const;
   SandboxPage page_{SandboxPage::Configuration};
   bool morphology_selected_{};
   stellar::core::PopulationSelection requested_population_{stellar::core::PopulationSelection::Random};
