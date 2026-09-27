@@ -2,6 +2,7 @@
 #include "native_military_messages.hpp"
 #include "native_research_messages.hpp"
 #include "native_route_messages.hpp"
+#include "native_session_messages.hpp"
 
 #include <stellar/engine/localization.hpp>
 
@@ -267,6 +268,29 @@ int main() try {
               &german_tactical, "Vanguard acknowledged retreat.") ==
               "Vanguard acknowledged retreat.",
           "Unmapped order name should fall back to English.");
+
+  stellar::engine::LocalizationTable german_session("de", "en");
+  require(german_session.load_json(R"json({"locale":"de","strings":{
+      "SESSION_LOAD_READING":"Gespeicherter Spielstand wird gelesen",
+      "SESSION_NOTICE_SAVE_FAILED":"Speichern fehlgeschlagen: {0}"
+    }})json",
+                            &locale_error),
+          "German session locale failed to load.");
+  require(stellar::native_session::localized_session_message(
+              &german_session, "Reading saved campaign") ==
+              "Gespeicherter Spielstand wird gelesen",
+          "German load status kept the English literal.");
+  require(stellar::native_session::localized_session_message(
+              &german_session, "Save failed: disk full") ==
+              "Speichern fehlgeschlagen: disk full",
+          "German save failure kept the English skeleton.");
+  require(stellar::native_session::localized_session_message(
+              &german_session, "Autosave failed: locked") ==
+              "Autosave failed: locked",
+          "Unmapped autosave failure head should fall back to English.");
+  require(stellar::native_session::localized_session_message(
+              nullptr, "Reading saved campaign") == "Reading saved campaign",
+          "Null locale changed the session notice.");
 
   std::vector<NativeOwnFleet> first{
       fleet(12, 4, 7), fleet(10, 4, 7), fleet(14, 9, 3), fleet(11, 4, 7)};

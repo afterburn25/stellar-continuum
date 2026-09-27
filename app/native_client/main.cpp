@@ -73,6 +73,7 @@
 #include "native_research_controller.hpp"
 #include "native_research_workspace.hpp"
 #include "native_research_art.hpp"
+#include "native_session_messages.hpp"
 #include "native_shipbuilding_messages.hpp"
 #include "native_shipyard_controller.hpp"
 #include "native_shipyard_workspace.hpp"
@@ -8348,7 +8349,8 @@ class NativeCampaign final {
         (notice.kind==SessionNoticeKind::Saved||notice.kind==SessionNoticeKind::Loaded);
     if (!quiet_workspace_notice && (notice.kind != SessionNoticeKind::None || preparing_galaxy || support_notice)) {
       auto message = notice.message_key.empty()
-                         ? notice.message
+                         ? stellar::native_session::localized_session_message(
+                               locale_, notice.message)
                          : tr(notice.message_key, notice.message);
       if(preparing_galaxy&&(notice.kind==SessionNoticeKind::None||notice.kind==SessionNoticeKind::Saved||notice.kind==SessionNoticeKind::Loaded))
         message=tr("HUD_UPDATING_CHART","Updating star chart...");
