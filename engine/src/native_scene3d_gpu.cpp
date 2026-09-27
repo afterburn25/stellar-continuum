@@ -979,9 +979,14 @@ struct Scene3DRenderer::Storage {
     // get zero radiance anyway, so the map's fov clamps at ~150 degrees
     // without losing coverage.
     std::array<int,4> spot_slot{-1,-1,-1,-1};int spot_count=0;
-    for(std::size_t i=0;i<view.scene->point_lights().size();++i)
-      if(view.scene->point_lights()[i].casts_shadow&&view.scene->point_lights()[i].intensity>0.f)
+    for(std::size_t i=0;i<view.scene->point_lights().size();++i){
+      const auto& l=view.scene->point_lights()[i];
+      // Coned lights only — a zero-direction caster is an omni light and
+      // renders through the cube atlas below.
+      if(l.casts_shadow&&l.intensity>0.f&&
+         (l.spot_direction.x!=0.f||l.spot_direction.y!=0.f||l.spot_direction.z!=0.f))
         spot_slot[i]=spot_count++;
+    }
     const Uint32 spot_res=(spot_count>0&&shadow_supported&&!low_tier)?(opt.quality==RenderQuality3D::Ultra?2048u:opt.quality==RenderQuality3D::High?1024u:512u):0;
     const Uint32 spot_map=spot_count>1?spot_res*2u:spot_res;
     if(spot_res>0){

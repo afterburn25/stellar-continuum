@@ -754,6 +754,35 @@ int main(int argc,char** argv)try{
      window.draw(d,folder/"point-light-omni-seam.png");}
     check(window.scene3d_statistics().omni_shadow_casters==one_face+1,
         "Face-seam occluder did not reach multiple cube faces");
+    // Mixed spot + omni shadows in one scene: the omni light must not
+    // claim a spot slot (its zero direction would normalize to NaN), so
+    // both atlases populate and each light keeps its own umbra strip.
+    auto mixed=[&](bool omni_cast,bool spot_cast,const char* name){
+      lamp.casts_shadow=omni_cast;lamp2.casts_shadow=spot_cast;
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder,occluder2},{0,0,1},{lamp,lamp2}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto mixed_off=mixed(false,false,"point-light-mix-noshadow.png");
+    const auto mixed_on=mixed(true,true,"point-light-mix-shadow.png");
+    {const auto ms=window.scene3d_statistics();
+     check(ms.spot_shadow_casters>0&&ms.omni_shadow_casters>0,
+         "Mixed spot+omni scene did not populate both shadow atlases");}
+    check(census(*mixed_on,120,155)>census(*mixed_off,120,155)+20,
+        "Omni umbra vanished beside a shadowed spot");
+    check(census(*mixed_on,175,215)>census(*mixed_off,175,215)+10,
+        "Spot umbra vanished beside a shadowed omni light");
+    {const auto omni_only=mixed(true,false,"point-light-mix-omnionly.png");
+     check(census(*omni_only,120,155)>census(*mixed_off,120,155)+20&&
+           channel(*omni_only,272,160,1)>channel(*mixed_off,272,160,1)/2,
+         "Omni umbra broke or flooded the footprint beside a spot light");}
+    // A spot umbra only removes lamp2's own energy term — an unshadowed
+    // omni lamp covering the same area would keep the strip lit at full
+    // strength, so the spot-side probe dims the omni lamp until lamp2's
+    // cone dominates its strip.
+    lamp.intensity=.4f;lamp2.intensity=10;
+    {const auto dim_off=mixed(false,false,"point-light-mixdim-noshadow.png");
+     const auto dim_spot=mixed(false,true,"point-light-mixdim-spotonly.png");
+     check(census(*dim_spot,175,215)>census(*dim_off,175,215)+10,
+         "Spot umbra broke when an omni light shares the scene");}
     std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_debug_receive_omni_passed\n";
   }
   {
