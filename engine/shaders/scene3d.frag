@@ -390,10 +390,13 @@ void main() {
                 vec4 fclip=view_params.cascade_from_view[t]*vec4(view_position+shadow_n*view_params.cascade_options[t].z,1.0);
                 const float tlit=map_lit_layer(shadow_cascade_map,float(t),fclip,
                     view_params.cascade_options[t].x,view_params.cascade_options[t].y,view_params.cascade_options[t].w);
-                if(!seeded){flit=tlit;seeded=true;continue;} // widest tier
                 vec3 fndc=fclip.xyz/max(fclip.w,1e-9);
                 vec2 fsuv=fndc.xy*0.5+0.5;
                 const float fedge=2.0*max(abs(fsuv.x-0.5),abs(fsuv.y-0.5));
+                // Widest covering tier: soften its own authored boundary so
+                // the outermost band fades to lit over the same 10% margin
+                // instead of hard-clipping the umbra at the coverage edge.
+                if(!seeded){flit=mix(1.0,tlit,1.0-smoothstep(0.9,1.0,fedge));seeded=true;continue;}
                 const bool inside=fclip.w>0.0&&fedge<=1.0&&fndc.z>=0.0&&fndc.z<=1.0;
                 flit=inside?mix(tlit,flit,smoothstep(0.9,1.0,fedge)):flit;
             }
@@ -405,6 +408,13 @@ void main() {
         } else {
             lit=map_lit(shadow_depth_map,clip,view_params.shadow_options.x,
                         view_params.shadow_options.y,view_params.shadow_options.w,vec4(0.0,0.0,1.0,1.0));
+            // No cascade chain: the near map is the outermost band, so its
+            // authored boundary fades to lit over the outer 10% margin
+            // rather than hard-clipping the umbra edge.
+            vec3 ndc=clip.xyz/max(clip.w,1e-9);
+            vec2 suv=ndc.xy*0.5+0.5;
+            const float edge=2.0*max(abs(suv.x-0.5),abs(suv.y-0.5));
+            lit=mix(1.0,lit,1.0-smoothstep(0.9,1.0,edge));
         }
         visibility*=mix(1.0,lit,view_params.shadow_options.z*shadow_receive);
     }

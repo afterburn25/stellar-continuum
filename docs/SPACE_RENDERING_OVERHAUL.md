@@ -96,7 +96,9 @@ same document headless-tested.
    optional `cascade_extents` far tiers (wider ortho boxes sharing
    centre/depth, one depth-array layer each, crossfading over each
    tighter window's outer margin — up to four tiers covering
-   planet-scale through sector-scale receivers)
+   planet-scale through sector-scale receivers; the outermost band —
+   widest tier, or the near map alone — fades to lit over its own outer
+   10% margin so authored coverage never hard-clips an umbra edge)
    keep coverage at extreme zoom-out; `softness`/`shadowSoftness` scale
    the tier PCF radius on both maps so authored penumbra width isn't
    quality-locked; `normalOffset` lifts receivers along their shading

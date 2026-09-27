@@ -356,7 +356,11 @@ shadow.camera_fit = false;   // true: extents become multipliers of the
   next-wider across the tighter window's outer margin, so extreme
   zoom-out keeps coverage instead of stepping to lit at the near
   boundary; each fragment reads the tightest tier that covers it,
-  crossfading at the margins. The tiers share one depth-texture array —
+  crossfading at the margins. The outermost covering band (the widest
+  cascade tier, or the near map when no tiers exist) also fades its
+  term to lit over its own outer 10% margin, so the authored coverage
+  boundary soft-lands the umbra edge instead of hard-clipping it. The
+  tiers share one depth-texture array —
   tier index equals array layer — so the shader loops tiers through a
   single `sampler2DArray` binding.
 - Rendered as a depth-only pass (`scene3d_shadow.vert/.frag`) before the

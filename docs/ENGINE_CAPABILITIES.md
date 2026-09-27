@@ -457,8 +457,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `orthographic_height`/2 orthographic or `distance`·tan(fov/2)
   perspective — so the chain tracks zoom with stable texel density).
   Coverage is an authored policy: receivers outside every box stay lit;
-  the box tracks the camera so mid-zoom strategy views keep stable
-  texel density.
+  the outermost covering band (the near map alone, or the widest
+  cascade tier) fades its term to lit over its outer 10% margin so the
+  authored boundary doesn't hard-clip the umbra; the box tracks the
+  camera so mid-zoom strategy views keep stable texel density.
 - **Shader contract:** view-level fragment uniform carries the
   view→shadow-clip matrix plus {texel, PCF radius in texels, strength,
   bias} and the world-units normal-offset lift; the fragment adds

@@ -1074,6 +1074,22 @@ int main(int argc,char** argv)try{
     check(tier4_stats.shadow_casters==9&&tier4_stats.shadow_cascade_casters==(std::array<std::uint64_t,4>{2,2,2,2}),"Four cascade tiers misattributed their caster submissions");
     check(channel(*tier4,176,160,0)<channel(*open,176,160,0)/2,"The four-tier fold did not carry the shadow");
     check(channel(*tier4,60,160,0)>100,"The four-tier fold darkened an unoccluded fragment");
+    // Outermost-edge fade: the widest covering band soft-lands at its
+    // authored boundary instead of hard-clipping the umbra. The umbra
+    // fragment sits at light-x .78, so a .82 tier puts it at .95 of the
+    // half-extent — inside the 10% fade band — and must read a midtone
+    // between the fully-cut (tier 4) and fully-missed (tier .5) poles.
+    const int open_umbra=channel(*open,176,160,0);
+    const auto fade_tier=narrow_view({receiver,occluder},{.82f},"shadow-edge-fade.png");
+    const int fade_px=channel(*fade_tier,176,160,0);
+    check(fade_px>40&&fade_px<open_umbra-30,"The widest tier's outer edge did not fade the umbra to a midtone");
+    // The near map alone is the outermost band as well — the same fade
+    // applies when no cascade tiers are authored.
+    auto edge_map=narrow;edge_map.extent=.82f;
+    {DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{receiver,occluder},light,{},edge_map),{0,0,320,320}});
+     window.draw(list,folder/"shadow-edge-near.png");const auto edge_near=decode_rgba_image(folder/"shadow-edge-near.png");
+     const int np=channel(*edge_near,176,160,0);
+     check(np>40&&np<open_umbra-30,"The single near map did not fade its outer edge");}
     // Authored softness scales the tier PCF radius: 0 collapses the edge
     // to a binary tap while 4 widens the penumbra band measurably — the
     // umbra core keeps its full cut either way.
