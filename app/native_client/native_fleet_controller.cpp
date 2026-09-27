@@ -294,7 +294,8 @@ NativeFleetMapView NativeFleetController::build(
       const auto *live = find_owned(player, selected->id);
       selected->recovery = recovery_quote(*live, campaign_generation, player.player_id);
       if (live->return_to_base_failure_reason)
-        selected->recovery_message = *live->return_to_base_failure_reason;
+        selected->recovery_message = native_route::localized_message(
+            locale_, *live->return_to_base_failure_reason);
       else if (live->return_to_base_requested)
         selected->recovery_message = tr("FLEET_MSG_RETURN_QUEUED", "Return to base queued. Routing uses actual fuel at the next system.");
       else
