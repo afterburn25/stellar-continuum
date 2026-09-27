@@ -332,7 +332,8 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
         width,height,s,theme::Tone::Neutral);
   }
   if(view.nodes.empty())
-    theme::empty_state(out,b,tr("SUPPLY_EMPTY","No owned supply locations in the home system."),{},font);
+    theme::empty_state(out,b,tr("SUPPLY_EMPTY","No owned supply locations in the home system."),
+        tr("SUPPLY_EMPTY_HINT","Supply nodes appear as colonies and logistics facilities are established in the home system."),font);
   theme::scrollbar(out,{b.x+b.width+7.f*s,b.y,3.f*s,b.height},scroll_,24.f*s);
 }
 } // namespace stellar::native_logistics

@@ -1104,6 +1104,13 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                          "No recorded events yet."),
                  muted_color, std::max(11, static_cast<int>(std::lround(13.f * s))),
                  layout.empty_hint.width, layout.empty_hint);
+    clipped_text(out, {layout.empty_hint.x,
+                       layout.empty_hint.y + 20.f * s},
+                 resolve(locale_, "CHRONICLE_EMPTY_HINT",
+                         "Events are recorded as your civilization explores, "
+                         "builds, and negotiates."),
+                 muted_color, std::max(9, static_cast<int>(std::lround(11.f * s))),
+                 layout.empty_hint.width, layout.empty_hint);
   }
   for (std::size_t i = 0; i < layout.entries.size(); ++i) {
     const auto &card = layout.entries[i];

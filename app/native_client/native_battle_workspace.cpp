@@ -994,6 +994,10 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
     text(out, {field.width * .5f, (top + bottom) * .5f},
          tr("BATTLE_NONE","No tactical encounter is active."), text_secondary,
          layout.body_font_pixels, 0.f, TextAlign::Center);
+    text(out, {field.width * .5f, (top + bottom) * .5f +
+                  layout.body_font_pixels * 1.8f},
+         tr("BATTLE_NONE_HINT","Engage a hostile fleet to record an encounter."),
+         unknown, layout.small_font_pixels, 0.f, TextAlign::Center);
     return;
   }
   const auto &formations = snapshot_->formations;
