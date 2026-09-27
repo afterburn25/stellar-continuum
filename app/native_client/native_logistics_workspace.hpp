@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <string>
 #include <string_view>
+#include <array>
 #include <vector>
 
 namespace stellar::native_logistics {
@@ -51,6 +52,11 @@ private:
     std::vector<LinkRow> links;
     std::vector<ExternalRow> external;
     std::vector<CachedRow> rows;
+    // Measure-fitted header fonts — computed with the row geometry so an
+    // unchanged render does not re-measure.
+    std::array<int, 5> heading_sizes{};
+    std::array<int, 4> corridor_sizes{};
+    std::array<int, 4> external_sizes{};
     float height{};
     bool valid{};
   };

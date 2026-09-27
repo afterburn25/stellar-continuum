@@ -1774,7 +1774,7 @@ class NativeCampaign final {
        economy_controller_.attempted_refresh_count()!=before+1)
       throw std::runtime_error("Economy navigation did not perform exactly one ready projection.");
     const auto& runtime=session_->frame().runtime();
-    const auto reference=build_economy_view(runtime.world().campaign(),&runtime.research(),std::nullopt);
+    const auto reference=build_economy_view(runtime.world().campaign(),&runtime.research(),std::nullopt,locale_);
     if(view.cards!=reference.cards||view.income_rows!=reference.income_rows||view.cost_rows!=reference.cost_rows||
        view.income_rows.size()!=2||view.cost_rows.size()!=7)
       throw std::runtime_error("Economy displayed totals differ from Core.");

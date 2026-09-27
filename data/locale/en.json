@@ -597,6 +597,8 @@
     "ECONOMY_UNAVAILABLE_EMPTY": "Treasury data is unavailable for the current observer. Retry after a campaign is available.",
     "ECONOMY_UNAVAILABLE_GUIDANCE": "Treasury information is unavailable. Retry when the campaign is ready.",
     "ECONOMY_NOTICE": "ECONOMY NOTICE",
+    "ECONOMY_UNIT_PER_DAY": "/day",
+    "ECONOMY_UNIT_DAY": " / DAY",
     "ECONOMY_POLICY_BALANCED": "BALANCED",
     "ECONOMY_POLICY_INFRASTRUCTURE": "INFRASTRUCTURE",
     "ECONOMY_POLICY_SHIPBUILDING": "SHIPBUILDING",

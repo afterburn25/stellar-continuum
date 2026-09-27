@@ -1,5 +1,6 @@
 #include "native_research_controller.hpp"
 #include "native_research_presentation.hpp"
+#include "native_currency_format.hpp"
 
 #include <stellar/core/adaptive_research_funding.hpp>
 #include <stellar/core/sovereign_currency.hpp>
@@ -155,7 +156,7 @@ struct PlayerContext {
     const stellar::engine::LocalizationTable *locale) {
   if (value > 0. && currency.format(value) == currency.format(0.))
     return trf_at(locale, "RESEARCH_PER_DAY", {positive_amount(currency, value, locale)}, "{0}/day");
-  return currency.format_rate(-value);
+  return stellar::native_currency_format::format_rate_localized(locale, currency, -value);
 }
 
 [[nodiscard]] std::string funding_signature(

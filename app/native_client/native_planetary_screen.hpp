@@ -1,4 +1,5 @@
 #include "native_campaign_calendar.hpp"
+#include "native_currency_format.hpp"
 #pragma once
 #include "native_colony_controller.hpp"
 #include "native_surface_construction_controller.hpp"
@@ -497,7 +498,7 @@ class NativePlanetaryScreen {
       write(tr("PLANET_CLIMATE_UNAVAILABLE","Regional climate, pollution and terraforming simulation are not available."),muted);
     }else if(tab_==0&&!v.observer_only){
       write(tr("PLANET_PROD_TITLE","PRODUCTION & REQUIREMENTS"),cyan,l.font);write(tr("PLANET_PROD_NOTE","Rates use game days. Food, water and housing are population-support capacities."),muted);
-      const auto money=[&](double n){return v.currency.format_rate(n);};
+      const auto money=[&](double n){return stellar::native_currency_format::format_rate_localized(locale_,v.currency,n);};
       write(trf("PLANET_PROD_TAX",{money(v.local_credit_flow.colony_revenue_per_day)},"Tax revenue  {0}"));write(trf("PLANET_PROD_TRADE",{money(v.local_credit_flow.trade_revenue_per_day)},"Trade revenue  {0}"));write(trf("PLANET_PROD_OPERATING",{money(v.local_credit_flow.operating_costs_per_day)},"Local operating need  {0}"));
       write(trf("PLANET_PROD_BREAKDOWN",{money(v.local_credit_flow.colony_administration_per_day),money(v.local_credit_flow.population_services_per_day),money(v.local_credit_flow.habitat_support_per_day),money(v.local_credit_flow.surface_maintenance_per_day)},"Administration  {0}\nServices  {1}\nHabitats  {2}\nBuildings  {3}"),muted);
       write(trf("PLANET_PROD_LABS",{number(v.active_research_lab_units,2)},"Operational labs  {0}"));double materials=0;for(const auto& b:v.construction_sites)if(!b.complete)materials+=b.remaining_construction_materials;write(trf("PLANET_PROD_QUEUED",{number(materials,1)},"Queued materials  {0}"));

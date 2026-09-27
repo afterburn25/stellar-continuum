@@ -722,6 +722,8 @@
     "ECONOMY_UNAVAILABLE_EMPTY": "Kassendaten sind für den aktuellen Beobachter nicht verfügbar. Erneut versuchen, sobald eine Kampagne verfügbar ist.",
     "ECONOMY_UNAVAILABLE_GUIDANCE": "Kasseninformationen sind nicht verfügbar. Erneut versuchen, wenn die Kampagne bereit ist.",
     "ECONOMY_NOTICE": "WIRTSCHAFTSHINWEIS",
+    "ECONOMY_UNIT_PER_DAY": "/Tag",
+    "ECONOMY_UNIT_DAY": " / TAG",
     "ECONOMY_POLICY_BALANCED": "AUSGEWOGEN",
     "ECONOMY_POLICY_INFRASTRUCTURE": "INFRASTRUKTUR",
     "ECONOMY_POLICY_SHIPBUILDING": "SCHIFFBAU",

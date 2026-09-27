@@ -33,6 +33,20 @@ void label(DrawList& out,UiRect box,std::string value,int font,Color color,UiRec
   if(visible.width>0.f&&visible.height>0.f)
     out.overlay.emplace_back(Text{{box.x,box.y},std::move(value),color,font,box.width,visible});
 }
+// Localized column headers ("ANGEBOTEN / TAG") can exceed a narrow column at
+// the compact scale — shrink toward the 8px floor so they stay single-line.
+[[nodiscard]] int fit_font(const std::function<TextExtent(const Text&)>& measure,
+                           const std::string& value,float width,int size) {
+  if(!measure)return size;
+  while(size>8&&measure(Text{{},value,{},size,0,{}}).width>static_cast<int>(width))--size;
+  return size;
+}
+constexpr std::array<const char*,5> kHeadingKeys{"SUPPLY_COL_LOCATION","SUPPLY_COL_STATUS","SUPPLY_COL_OFFERED","SUPPLY_COL_DEMAND","SUPPLY_COL_DELIVERED"};
+constexpr std::array<const char*,5> kHeadingFallbacks{"LOCATION / FACILITY","STATUS","OFFERED / DAY","DEMAND / DAY","DELIVERED / DAY"};
+constexpr std::array<const char*,4> kCorridorKeys{"SUPPLY_COL_STATUS","SUPPLY_COL_CAPACITY","SUPPLY_COL_USED","SUPPLY_COL_TRANSIT"};
+constexpr std::array<const char*,4> kCorridorFallbacks{"STATUS","CAPACITY / DAY","USED / DAY","TRANSIT"};
+constexpr std::array<const char*,4> kExternalKeys{"SUPPLY_COL_STATUS","SUPPLY_COL_LOCAL","SUPPLY_COL_DEMAND","SUPPLY_COL_IMPORT"};
+constexpr std::array<const char*,4> kExternalFallbacks{"STATUS","LOCAL / DAY","DEMAND / DAY","IMPORT / DAY"};
 bool pointer_event(InputEventType type) {
   return type==InputEventType::LeftPressed||type==InputEventType::LeftReleased||
     type==InputEventType::RightPressed||type==InputEventType::RightReleased||
@@ -135,6 +149,15 @@ const SupplyWorkspace::CachedRows &SupplyWorkspace::rows_for(
       rows_.height+=row_height+6.f*s;
     }
   }
+  const auto fit_row=[&](const auto& keys,const auto& fallbacks,std::size_t column0,auto& out_sizes){
+    constexpr std::array<float,5> spans{.30f,.22f,.16f,.16f,.16f};
+    for(std::size_t i=0;i<keys.size();++i){
+      const float hw=layout.body.width*spans[i+column0]-16.f*s;
+      out_sizes[i]=fit_font(measure_,tr(keys[i],fallbacks[i]),hw,font-2);
+    }};
+  fit_row(kHeadingKeys,kHeadingFallbacks,0,rows_.heading_sizes);
+  fit_row(kCorridorKeys,kCorridorFallbacks,1,rows_.corridor_sizes);
+  fit_row(kExternalKeys,kExternalFallbacks,1,rows_.external_sizes);
   rows_.valid=true;return rows_;
 }
 SupplyCommand SupplyWorkspace::handle(const InputEvent& event,const View& view,int width,int height) {
@@ -224,14 +247,12 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
         theme::Tone::Neutral);
   }
   const auto b=layout.body;
+  const auto& rows=rows_for(view,layout,width,height);
   const std::array<float,5> columns{0.f,.30f,.52f,.68f,.84f};
   const std::array<float,5> spans{.30f,.22f,.16f,.16f,.16f};
-  const std::array<const char*,5> heading_keys{"SUPPLY_COL_LOCATION","SUPPLY_COL_STATUS","SUPPLY_COL_OFFERED","SUPPLY_COL_DEMAND","SUPPLY_COL_DELIVERED"};
-  const std::array<const char*,5> heading_fallbacks{"LOCATION / FACILITY","STATUS","OFFERED / DAY","DEMAND / DAY","DELIVERED / DAY"};
   for(std::size_t i=0;i<columns.size();++i)
-    label(out,{b.x+b.width*columns[i]+8.f*s,p.y+215.f*s,b.width*spans[i]-16.f*s,23.f*s},tr(heading_keys[i],heading_fallbacks[i]),font-2,muted,p);
+    label(out,{b.x+b.width*columns[i]+8.f*s,p.y+215.f*s,b.width*spans[i]-16.f*s,23.f*s},tr(kHeadingKeys[i],kHeadingFallbacks[i]),rows.heading_sizes[i],muted,p);
   theme::fill(out,{b.x,b.y-4.f*s,b.width,1.f},theme::color::keyline);
-  const auto& rows=rows_for(view,layout,width,height);
   scroll_.sync(rows.height,b.height);
   for(const auto& row:rows.rows){
     const UiRect box{b.x,b.y+row.y-scroll_.scroll_offset,b.width,row.height};
@@ -240,11 +261,9 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
       label(out,{box.x,box.y+6.f*s,box.width,20.f*s},
           tr("SUPPLY_CORRIDORS_TITLE","FREIGHT CORRIDORS"),font,
           theme::color::keyline_strong,b);
-      const std::array<const char*,4> corridor_keys{"SUPPLY_COL_STATUS","SUPPLY_COL_CAPACITY","SUPPLY_COL_USED","SUPPLY_COL_TRANSIT"};
-      const std::array<const char*,4> corridor_fallbacks{"STATUS","CAPACITY / DAY","USED / DAY","TRANSIT"};
-      for(std::size_t i=0;i<corridor_keys.size();++i)
+      for(std::size_t i=0;i<kCorridorKeys.size();++i)
         label(out,{box.x+b.width*columns[i+1]+8.f*s,box.y+24.f*s,b.width*spans[i+1]-16.f*s,18.f*s},
-              tr(corridor_keys[i],corridor_fallbacks[i]),font-2,muted,b);
+              tr(kCorridorKeys[i],kCorridorFallbacks[i]),rows.corridor_sizes[i],muted,b);
       if(const auto rule=theme::clipped({box.x,box.y+row.height-3.f*s,box.width,1.f},b))
         theme::fill(out,*rule,theme::color::keyline);
       continue;
@@ -265,11 +284,9 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
                "Daily demand from external colonies that no corridor can currently serve. Expand interstellar coverage to close the gap."),
             width,height,s,theme::Tone::Caution);
       }
-      const std::array<const char*,4> external_keys{"SUPPLY_COL_STATUS","SUPPLY_COL_LOCAL","SUPPLY_COL_DEMAND","SUPPLY_COL_IMPORT"};
-      const std::array<const char*,4> external_fallbacks{"STATUS","LOCAL / DAY","DEMAND / DAY","IMPORT / DAY"};
-      for(std::size_t i=0;i<external_keys.size();++i)
+      for(std::size_t i=0;i<kExternalKeys.size();++i)
         label(out,{box.x+b.width*columns[i+1]+8.f*s,box.y+24.f*s,b.width*spans[i+1]-16.f*s,18.f*s},
-              tr(external_keys[i],external_fallbacks[i]),font-2,muted,b);
+              tr(kExternalKeys[i],kExternalFallbacks[i]),rows.external_sizes[i],muted,b);
       if(const auto rule=theme::clipped({box.x,box.y+row.height-3.f*s,box.width,1.f},b))
         theme::fill(out,*rule,theme::color::keyline);
       continue;
