@@ -683,6 +683,7 @@ int main() {
         turret.atmo_b = 0.8f;
         turret.visible_range = 400.f;
         turret.visible_fade = .2f;
+        turret.casts_shadow = false;
         turret.normal_map = "maps/turret_n.png";
         turret.cloud_map = "maps/turret_clouds.png";
         turret.normal_strength = 0.9f;
@@ -765,6 +766,9 @@ int main() {
               "spawn_scene3d visible-range component");
         check(world3.get<VisibleRange>(ship_e) == nullptr,
               "unset range does not attach a component");
+        check(world3.get<NoShadow>(turret_e) != nullptr &&
+                  world3.get<NoShadow>(ship_e) == nullptr,
+              "castsShadow=false attaches the noshadow marker only");
         const auto *ms = world3.get<MaterialSurface>(turret_e);
         check(ms != nullptr && ms->normal_map == "maps/turret_n.png" &&
                   ms->properties_map.empty() &&
@@ -860,6 +864,8 @@ int main() {
             const auto *rv = restored.get<VisibleRange>(*re_turret);
             check(rv != nullptr && rv->range == 400.f && rv->fade == .2f,
                   "visiblerange codec round-trips");
+            check(restored.get<NoShadow>(*re_turret) != nullptr,
+                  "noshadow codec round-trips");
             const auto *rms = restored.get<MaterialSurface>(*re_turret);
             check(rms != nullptr && rms->cloud_map == "maps/turret_clouds.png" &&
                       rms->normal_map == "maps/turret_n.png" &&
@@ -923,7 +929,8 @@ int main() {
                   out.entities[1].atmo_strength == 2.f &&
                   out.entities[1].atmo_b == 0.8f &&
                   out.entities[1].visible_range == 400.f &&
-                  out.entities[1].visible_fade == .2f,
+                  out.entities[1].visible_fade == .2f &&
+                  out.entities[1].casts_shadow == false,
               "scene3d_from_world exports material extensions");
         check(out.entities[1].normal_map == "maps/turret_n.png" &&
                   out.entities[1].cloud_map == "maps/turret_clouds.png" &&

@@ -726,7 +726,7 @@ struct Scene3DRenderer::Storage {
         std::vector<std::shared_ptr<Texture>>& tex_table,engine::DrawBatcher& batcher){
       std::vector<const MeshInstance3D*> insts;
       for(const auto& instance:view.scene->instances()){
-        if(instance.material.transparent)continue;
+        if(instance.material.transparent||!instance.casts_shadow)continue;
         const double radius=static_cast<double>(instance.mesh->bounding_radius())*instance.scale;
         const double px=instance.position.x-cam.position.x,py=instance.position.y-cam.position.y,pz=instance.position.z-cam.position.z;
         const double cam_dist=std::sqrt(px*px+py*py+pz*pz);

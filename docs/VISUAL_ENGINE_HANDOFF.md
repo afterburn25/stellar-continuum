@@ -153,7 +153,16 @@ Per-instance distance culling lives on `MeshInstance3D`:
 MeshInstance3D inst;
 inst.visible_range = 2500.f;  // world units; 0 = visible at any range
 inst.visible_fade = .15f;     // [0,.5] fraction of range; 0 = hard cut
+inst.casts_shadow = true;     // false = stays out of the depth passes
 ```
+
+`casts_shadow` opts an opaque mesh out of the directional and spot
+shadow depth passes — backdrop shells and markers stay lit-only without
+going transparent (receiving is unaffected). The document key is
+`castsShadow` (bool, default true, serialized only when false); on the
+ECS side it maps to the `NoShadow` marker component. A collapsed LOD
+group casts only when its representative member opts in — the proxy
+stands in for the whole merged sphere.
 
 `visible_fade` dithers the object out over the last fraction of the
 range through the same screen-door mask the LOD crossfade uses — the
@@ -180,9 +189,10 @@ threshold per step (`lod_pixels/2^i`). The GPU backend applies the same
 pick in the streamer demand pass *and* the draw submission, so only the
 level a view submits holds residency. Selection is per-view screen
 space, not distance, so zoomed-out fleets shed vertex throughput without
-an authored distance table. Shadow casters always take the full mesh —
-the shadow volume is camera-independent, and a near receiver's shadow
-must not degrade with the camera's zoom. Validation: ≤ 8 levels, all
+an authored distance table. Shadow casters submit the same level the
+lit pass picks — the silhouette crossfades in lockstep with the visible
+mesh instead of popping a full-detail shadow from an LOD'd draw.
+Validation: ≤ 8 levels, all
 non-null, `lod_pixels` in [1,4096]; `lod_instances` on
 `Scene3DStatistics` audits the substitution count per frame.
 
@@ -327,7 +337,10 @@ shadow.cascade_extent = 0;  // 0 disables; >extent adds a wider far tier
   so a holed texture casts a perforated silhouette rather than its
   full quad. Billboard `card:` casters ignore authored rotation and
   face the light the way they face the camera, so an impostor never
-  shadows as an edge-on line.
+  shadows as an edge-on line. `casts_shadow=false`
+  (`MeshInstance3D` / entity `castsShadow` / `NoShadow` marker) keeps
+  an opaque mesh out of every depth pass — a collapsed group casts
+  only when its representative opts in.
 - Shadow darkness scales the key light only — ambient, point lights,
   emissive and the analytic `AnalyticShadow3D` blockers are independent.
 - `bias` is a receiver-side constant in NDC space; the rasterizer

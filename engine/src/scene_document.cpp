@@ -450,6 +450,7 @@ std::string Scene3dDocument::to_json() const {
                             {"power", e.atmo_power},
                             {"nightFloor", e.atmo_night}};
     if (e.visible_range != 0.f) item["range"] = e.visible_range;
+    if (!e.casts_shadow) item["castsShadow"] = false;
     if (e.visible_fade != .15f) item["visibleFade"] = e.visible_fade;
     if (!e.normal_map.empty() || !e.properties_map.empty() ||
         !e.cloud_map.empty() || e.normal_strength != 0.35f ||
@@ -669,6 +670,7 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.visible_range = item.value("range", 0.0f);
       if (!(e.visible_range >= 0.f))
         return fail("range must be non-negative");
+      e.casts_shadow = item.value("castsShadow", true);
       e.visible_fade = item.value("visibleFade", 0.15f);
       if (!(e.visible_fade >= 0.f && e.visible_fade <= 0.5f))
         return fail("visibleFade must be in [0,0.5]");

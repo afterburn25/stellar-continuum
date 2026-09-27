@@ -252,7 +252,9 @@ int main()try{
    rejects([&]{auto i=instance;i.visible_range=-1;(void)Scene3D::create(camera,{i});});
    rejects([&]{auto i=instance;i.visible_range=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
    rejects([&]{auto i=instance;i.visible_fade=.6f;(void)Scene3D::create(camera,{i});});
-   rejects([&]{auto i=instance;i.visible_fade=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});}
+   rejects([&]{auto i=instance;i.visible_fade=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+   {auto shy=instance;shy.casts_shadow=false;
+    check(!Scene3D::create(camera,{shy})->instances()[0].casts_shadow,"Cast opt-out did not survive scene creation");}}
   // Screen-space LOD: the level is a pure function of projected diameter
   // — each chain step halves the switch threshold.
   {auto loded=instance;loded.lod_meshes={sphere,sphere};

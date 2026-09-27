@@ -205,6 +205,10 @@ struct Scene3dEntity {
   // `range` [0,0.5] — the object dithers out instead of popping. The
   // authored disappearance distance is unchanged.
   float visible_fade{0.15f};
+  // Shadow casting opt-out (document key `castsShadow`, default true):
+  // false keeps an opaque mesh out of the directional and spot depth
+  // passes — backdrop shells and markers stay lit-only.
+  bool casts_shadow{true};
   // Opaque surface response — content-relative maps; any subset binds.
   // The cloud map's alpha self-shadows the surface (cloud_opacity) and
   // its RGB can composite as a visible deck (cloud_albedo), drifted by

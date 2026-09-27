@@ -339,8 +339,9 @@ struct MeshInstance3D {
   // once the projected bounding-sphere diameter drops below
   // lod_pixels/2^i pixels in the view being drawn — a 64px cruiser can
   // fall back to a 32px proxy mesh without an authored distance table.
-  // Selection is per-view; shadow casters always take the full mesh since
-  // the shadow volume is camera-independent. At most 8 levels.
+  // Selection is per-view; shadow casters submit the same level the lit
+  // pass picks so the silhouette crossfades in lockstep. At most 8
+  // levels.
   std::vector<std::shared_ptr<const Mesh3D>> lod_meshes;
   float lod_pixels{32.f};
   // Screen-door transition width above each LOD threshold, as a
@@ -362,6 +363,12 @@ struct MeshInstance3D {
   std::string lod_group;
   std::shared_ptr<const Mesh3D> lod_group_proxy;
   float lod_group_pixels{0.f};
+  // Shadow casting opt-out: false keeps the instance out of the
+  // directional and spot depth passes — decorative opaque shells and
+  // markers stay lit-only without going transparent. A collapsed
+  // lod_group casts only when its representative member does (the proxy
+  // stands in for the whole merged sphere).
+  bool casts_shadow{true};
 };
 // Directional shadow map for the scene key light. Instead of fitting the
 // camera frustum, the ortho coverage box centres `distance` world units

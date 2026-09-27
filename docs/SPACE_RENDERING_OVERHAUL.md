@@ -88,9 +88,11 @@ same document headless-tested.
    meshes cast perforated silhouettes rather than full quads; an
    optional `cascade` far tier (a wider ortho box sharing centre/depth,
    near→far crossfade over the inner window's outer margin) keeps
-   coverage at extreme zoom-out; and `softness`/`shadowSoftness` scale
+   coverage at extreme zoom-out; `softness`/`shadowSoftness` scale
    the tier PCF radius on both maps so authored penumbra width isn't
-   quality-locked. Remaining: cascade count is fixed at
+   quality-locked; and per-instance `castsShadow`/`NoShadow` opts an
+   opaque mesh out of every depth pass (a collapsed group follows its
+   representative). Remaining: cascade count is fixed at
    one far tier, omni point lights stay unshadowed; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an

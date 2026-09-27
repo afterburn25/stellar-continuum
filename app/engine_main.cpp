@@ -319,7 +319,7 @@ struct Shell {
       hit3_bandshear{}, hit3_bandwaves{}, hit3_banddrift{},
       hit3_orbitbeam{},
       hit3_starkelvin{}, hit3_accretion{}, hit3_fwdscatter{},
-      hit3_scnenv{},
+      hit3_scnenv{}, hit3_noshadow{},
       hit3_volume{}, hit3_lodfade{}, hit3_visfade{}, hit3_lodgroup{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
@@ -2164,6 +2164,12 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 0.f && a <= 1e12f) { next.visible_range = a; valid = true; }
           break;
+  case 73:
+          if (shell.scene3_buffer == "0" || shell.scene3_buffer == "1") {
+            next.casts_shadow = shell.scene3_buffer == "1";
+            valid = true;
+          }
+          break;
   case 53: { // surface maps: "normal,properties,cloud" (empty allowed)
           std::istringstream maps(shell.scene3_buffer);
           std::string first, second, third;
@@ -2458,7 +2464,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                                                         shell.hit3_visfade =
                                                                                             shell.hit3_lodgroup =
                                                                                                 shell.hit3_banddrift =
-                                                                                                    shell.hit3_scnenv = {};
+                                                                                                    shell.hit3_scnenv =
+                                                                                                        shell.hit3_noshadow = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2671,6 +2678,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                          e.atmo_power, e.atmo_night};
       inst.visible_range = e.visible_range;
       inst.visible_fade = e.visible_fade;
+      inst.casts_shadow = e.casts_shadow;
       inst.lod_pixels = e.lod_pixels;
       inst.lod_fade = e.lod_fade;
       for (const auto &spec : e.lod_meshes)
@@ -2942,6 +2950,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_visfade, "visFade",
         entity ? std::to_string(entity->visible_fade) : "", ed(67),
         "screen-door fade width 0..0.5 x range - 0 = hard cut");
+  field(shell.hit3_noshadow, "castShadow",
+        entity ? (entity->casts_shadow ? "1" : "0") : "", ed(73),
+        "1|0 - 0 keeps the mesh out of shadow depth passes");
   field(shell.hit3_surfmaps, "surfMaps",
         entity ? entity->normal_map + "," + entity->properties_map + "," +
                      entity->cloud_map
@@ -7069,6 +7080,8 @@ int main(int argc, char **argv) {
               edit3(72, doc.environment);
             else if (shell.hit3_range.contains(event.position) && se)
               edit3(51, std::to_string(se->visible_range));
+            else if (shell.hit3_noshadow.contains(event.position) && se)
+              edit3(73, se->casts_shadow ? "1" : "0");
             else if (shell.hit3_visfade.contains(event.position) && se)
               edit3(67, std::to_string(se->visible_fade));
             else if (shell.hit3_surfmaps.contains(event.position) && se)

@@ -586,16 +586,16 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   strategy-scale scenes.
 - **Modules:** `native_map_platform.hpp` (`DebugView3D` +
   `RenderOptions3D::debug_view`), `native_scene3d.hpp`
-  (`MeshInstance3D::visible_range`/`visible_fade`,
+  (`MeshInstance3D::visible_range`/`visible_fade`/`casts_shadow`,
   `Scene3DStatistics::visible_fades`), `native_scene3d.cpp`
   (validation + cull in `prepare_instance3d`),
   `native_scene3d_gpu.cpp` (per-view debug uniform, tier-gated samplers,
   volume step caps, culled instances skip streamer demand, range-fade
-  keep mask),
+  keep mask, cast-opt-out caster filter),
   `scene3d.frag` (diagnostic shading branches),
-  `scene_document.*`/`scene_components.*` (`range` entity key,
-  `VisibleRange` component, `render.debug`), `runtime_host.cpp`,
-  `app/engine_main.cpp`.
+  `scene_document.*`/`scene_components.*` (`range`/`castsShadow` entity
+  keys, `VisibleRange`/`NoShadow` components, `render.debug`),
+  `runtime_host.cpp`, `app/engine_main.cpp`.
 - **Public interfaces:** `DebugView3D` — Lit (default), Unlit, Albedo,
   Normals, Roughness, Metallic, Emissive, LightingOnly, Lod, Residency,
   Shadows — applies per view inside the production fragment path. `Lod` tints each
@@ -621,6 +621,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   distance is unchanged. Low tier and `visible_fade=0` keep the hard
   cut; a LOD pair inside the band degrades to one thinned draw;
   `visible_fades` audits thinned submissions.
+  `casts_shadow` = per-instance shadow-cast opt-out (default true):
+  false keeps an opaque mesh out of the directional and spot depth
+  passes so backdrop shells/markers stay lit-only; a collapsed LOD
+  group casts only when its representative member does.
   Quality gates: Low disables anisotropic + cubic-magnification sampling
   and caps emission-volume ray marching at 16 steps; Medium caps at 32;
   bloom remains Medium+, sharpen High+, MSAA Ultra.
@@ -628,12 +632,16 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   rejected) plus `visibleFade` [0,.5] map to the `VisibleRange` world
   component — its codec carries a trailing f32 fade that legacy 4-byte
   payloads decode as 0 (the hard cut they were authored with);
+  `castsShadow` (bool, serialized only when false) maps to the
+  `NoShadow` marker component — a zero-byte payload like
+  `hidden`/`oneway`;
   `render.debug` validates against the eleven mode names (`lod`/
   `residency`/`shadows` map to `DebugView3D::Lod`/`Residency`/`Shadows`
   — the LOD/residency class travels on the per-draw `texture_options.w`
   lane).
-- **Editor:** Scene3D tool gains `debugView` (scene), `visRange` and
-  `visFade` (entity) rows driving the real preview path.
+- **Editor:** Scene3D tool gains `debugView` (scene), `visRange`,
+  `visFade` and `castShadow` (entity) rows driving the real preview
+  path.
 - **Tests:** `engine_scene3d` (range validation + `prepare_instance3d`
   cull), `native_scene3d_gpu` (debug-view pixel probes per channel,
   culled-instance accounting, Lod view: a collapsed group proxy covers

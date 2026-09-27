@@ -266,6 +266,10 @@ struct VisibleRange {
   float range{0.f};
   float fade{0.f};
 };
+// Marker: the entity never casts into the directional or spot shadow
+// depth passes — the component counterpart of the entity document's
+// `castsShadow=false` key. Receiving is unaffected.
+struct NoShadow {};
 // Screen-space mesh LOD chain for a 3D entity — the component
 // counterpart of the entity document's `lods`/`lodPixels` keys. Specs
 // resolve through the same path as MeshRef; `specs[i]` substitutes for

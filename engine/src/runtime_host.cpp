@@ -2617,6 +2617,7 @@ int RuntimeHost::run() {
           inst.visible_range = vr->range;
           inst.visible_fade = vr->fade;
         }
+        if (world.get<NoShadow>(e)) inst.casts_shadow = false;
         if (const auto *ml = world.get<MeshLods>(e)) {
           inst.lod_pixels = ml->pixels;
           inst.lod_fade = ml->fade;

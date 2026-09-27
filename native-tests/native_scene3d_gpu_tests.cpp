@@ -920,7 +920,14 @@ int main(int argc,char** argv)try{
     check(penumbra(*hard_edge)<=4,"A zero softness edge still produced a penumbra band");
     check(penumbra(*soft_edge)>penumbra(*hard_edge)+16,"Softness did not widen the shadow penumbra");
     check(channel(*soft_edge,176,160,0)<channel(*open,176,160,0)/2,"Softness broke the umbra's full cut");
-    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_passed\n";
+    // Casting opt-out: casts_shadow=false keeps an opaque mesh lit-only —
+    // the receiver under it stays at its open-footprint value while a
+    // casting twin still darkens its half.
+    auto shy=occluder;shy.casts_shadow=false;
+    const auto optout=shadow_view({receiver,shy},{},"shadow-optout.png");
+    check(channel(*optout,176,160,0)>100,"A casts_shadow=false caster still wrote the depth pass");
+    check(channel(*optout,60,160,0)>100,"Caster opt-out darkened the wrong receiver region");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_optout_passed\n";
   }
   {
     // Screen-space mesh LOD: the projected bounding-sphere diameter picks
