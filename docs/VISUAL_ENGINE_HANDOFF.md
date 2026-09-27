@@ -250,7 +250,9 @@ submission per frame with 1024 instances collapsed to one instanced
 draw per LOD level — the number to watch as the renderer evolves. A
 shadowed variant (`fleet3d_shadow … shadow_casters=`) runs the same
 fleet under a `ShadowMap3D` box plus one shadowed spot cone so the
-caster-collection and depth-pass cost shows up next to the baseline.
+caster-collection and depth-pass cost shows up next to the baseline; a
+three-tier variant (`fleet3d_shadow_cascade … cascade= cascade2=`)
+enables both far windows so each tier's caster overhead is separable.
 
 - All PBR/atmosphere strengths default to 0 — absence of the optional
   blocks renders exactly as before (authored art untouched).

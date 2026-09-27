@@ -1354,7 +1354,28 @@ int main(int argc,char** argv)try{
      check(lit_stats.spot_shadow_casters>0,"Shadowed fleet submitted no spot casters");
      std::cout<<"fleet3d_shadow frames=60 instances=1024 cpu_submit_mean_ms="<<lit_submit/60<<" frame_wall_mean_ms="<<lit_wall/60
        <<" draw_calls="<<lit_stats.draw_calls<<" shadow_casters="<<lit_stats.shadow_casters
-       <<" spot_shadow_casters="<<lit_stats.spot_shadow_casters<<'\n';}
+       <<" spot_shadow_casters="<<lit_stats.spot_shadow_casters<<'\n';
+     // Three-tier chain: the same fleet through cascade/cascade2 windows
+     // re-collects the whole caster set per tier — the marginal cost of
+     // each coarser depth pass at strategy scale.
+     {std::vector<MeshInstance3D> cascade_ships;    cascade_ships.reserve(1024);
+      for(int row=0;row<32;++row)for(int col=0;col<32;++col){
+        MeshInstance3D ship{hull_mesh,{},{},.5f,hull};
+        ship.position={(col-16)*2.5,(row-16)*1.4,-10.0-row*6.0};
+        ship.lod_pixels=8;ship.lod_meshes={proxy};
+        cascade_ships.push_back(std::move(ship));
+      }
+      ShadowMap3D cascade_shadow=armada_shadow;cascade_shadow.cascade_extent=400;cascade_shadow.cascade2_extent=800;
+      DrawList cascade_armada;cascade_armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(cascade_ships),{0,0,1},{picket},cascade_shadow),{0,0,640,360}});
+      const auto cascade_start=std::chrono::steady_clock::now();double cascade_submit=0;
+      for(int i=0;i<60;++i){FrameTiming timing;window.draw(cascade_armada,std::nullopt,&timing);cascade_submit+=timing.submission_ms;}
+      const auto cascade_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cascade_start).count();
+      const auto cascade_stats=window.scene3d_statistics();
+      check(cascade_stats.shadow_cascade_casters>0&&cascade_stats.shadow_cascade2_casters>0,"Three-tier shadow fleet submitted no far casters");
+      std::cout<<"fleet3d_shadow_cascade frames=60 instances=1024 cpu_submit_mean_ms="<<cascade_submit/60<<" frame_wall_mean_ms="<<cascade_wall/60
+        <<" draw_calls="<<cascade_stats.draw_calls<<" shadow_casters="<<cascade_stats.shadow_casters
+        <<" cascade="<<cascade_stats.shadow_cascade_casters<<" cascade2="<<cascade_stats.shadow_cascade2_casters
+        <<" spot_shadow_casters="<<cascade_stats.spot_shadow_casters<<'\n';}}
   }
   DrawList invalid;invalid.world.emplace_back(Scene3DView{Scene3D::create(camera,{a}),{0,0,8192,8192}});
   bool rejected=false;try{window.draw(invalid);}catch(const std::length_error&){rejected=true;}check(rejected,"Oversized 3D target was accepted");

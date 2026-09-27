@@ -501,7 +501,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   umbra core keeps its full cut); `fleet3d_shadow` benchmark — the
   1024-instance fleet re-submitted through the directional box plus a
   shadowed spot cone, printing timing + `shadow_casters` next to the
-  unshadowed `fleet3d` baseline;
+  unshadowed `fleet3d` baseline, and a `fleet3d_shadow_cascade` variant
+  adding both far tiers so per-tier caster overhead prints separately
+  (`cascade=`/`cascade2=` counters);
   `engine_project` document round-trip + rejection coverage.
 - **Infrastructure fix bundled:** SDL fragment-set resource order —
   the materials SSBO sits after the sampled textures (now binding 14)
