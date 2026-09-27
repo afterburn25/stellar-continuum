@@ -19,9 +19,9 @@ layout(set=2,binding=9) uniform sampler2D metallic_roughness_map;
 // the shared cube atlas the shadowed omni lights render their faces into.
 layout(set=2,binding=10) uniform sampler2D shadow_depth_map;
 layout(set=2,binding=11) uniform sampler2D spot_shadow_map;
-layout(set=2,binding=12) uniform sampler2D shadow_far_map;
-layout(set=2,binding=13) uniform sampler2D shadow_far2_map;
-layout(set=2,binding=14) uniform sampler2D omni_shadow_map;
+// Far cascade tiers share one depth-array — layer index == tier index.
+layout(set=2,binding=12) uniform sampler2DArray shadow_cascade_map;
+layout(set=2,binding=13) uniform sampler2D omni_shadow_map;
 struct Material {
     vec4 tint;
     vec4 light_direction;
@@ -57,7 +57,7 @@ struct Material {
     vec4 point_outer; // per-light outer cos edge
     vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
 };
-layout(set=2,binding=15,std430) readonly buffer Materials {
+layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
 };
 // Per-view diagnostic shading selector (DebugView3D): 0 lit, 1 unlit,
@@ -79,15 +79,13 @@ layout(set=3,binding=0) uniform ViewParams {
     mat4 spot_from_view[4];
     vec4 spot_options[4];
     vec4 spot_bounds[4];
-    // view → far-cascade clip space: a wider ortho tier sharing the
-    // directional box's centre/depth so coverage survives extreme zoom.
-    // far_options = texel size (>0 enabled), PCF radius in texels, -, bias
-    mat4 far_from_view;
-    vec4 far_options;
-    // Third, coarsest tier past far_options — same lanes. Enabled only
-    // when the scene authors a second cascade extent.
-    mat4 far2_from_view;
-    vec4 far2_options;
+    // view → far-cascade clip space per authored tier: wider ortho
+    // volumes sharing the directional box's centre/depth so coverage
+    // survives extreme zoom. Tiers are contiguous from index 0, each
+    // writing layer t of the cascade depth-array. cascade_options[t] =
+    // texel size (>0 enabled), PCF radius in texels, -, bias.
+    mat4 cascade_from_view[4];
+    vec4 cascade_options[4];
     // Shadowed omni point lights (index i matches material.point_*[i]):
     // each light owns a row of six 90-degree cube faces in the shared
     // cube atlas. omni_options[i] = atlas texel width (>0 enabled), PCF
@@ -120,6 +118,23 @@ float map_lit(sampler2D map,vec4 clip,float texel,float radius_texels,float bias
         return lit*0.125;
     }
     return step(ndc.z-bias,texture(map,suv).r);
+}
+// Layered twin for the cascade depth-array — same projection math,
+// texel radius and bias terms; cascade bounds always span the layer.
+float map_lit_layer(sampler2DArray map,float layer,vec4 clip,float texel,float radius_texels,float bias) {
+    vec3 ndc=clip.xyz/max(clip.w,1e-9);
+    vec2 suv=vec2(ndc.x*0.5+0.5,0.5-ndc.y*0.5);
+    if(clip.w<=0.0||suv.x<0.0||suv.x>1.0||suv.y<0.0||suv.y>1.0||ndc.z<0.0||ndc.z>1.0)return 1.0;
+    float radius=radius_texels*texel;
+    if(radius>0.0) {
+        vec2 taps[8]=vec2[](vec2(-1.0,-1.0),vec2(1.0,-1.0),vec2(-1.0,1.0),vec2(1.0,1.0),
+                            vec2(-0.4,0.0),vec2(0.4,0.0),vec2(0.0,-0.4),vec2(0.0,0.4));
+        float lit=0.0;
+        for(int t=0;t<8;++t)
+            lit+=step(ndc.z-bias,texture(map,vec3(suv+taps[t]*radius,layer)).r);
+        return lit*0.125;
+    }
+    return step(ndc.z-bias,texture(map,vec3(suv,layer)).r);
 }
 // Per-invocation material copy — populated from the instance-indexed buffer
 // at the top of main so helper functions keep their shared access.
@@ -346,28 +361,29 @@ void main() {
     if(view_params.shadow_options.x>0.0) {
         vec4 clip=view_params.shadow_from_view*vec4(view_position,1.0);
         float lit;
-        if(view_params.far_options.x>0.0) {
-            // Cascade chain: the crisp near window rules where it covers,
-            // crossfading into the coarser far tier across its outer margin
-            // so the texel-density seam doesn't read as a step; far1 does
-            // the same handoff into the optional far2 tier. Receivers past
-            // every window stay lit (authored coverage policy).
+        if(view_params.cascade_options[0].x>0.0) {
+            // Cascade chain: fold the enabled tiers widest→narrowest —
+            // each tighter tier rules where it covers, crossfading into
+            // the coarser answer across its outer margin so the
+            // texel-density seams never read as steps; the crisp near
+            // window does the same handoff into the tightest cascade.
+            // Receivers past every authored tier stay lit.
             vec3 ndc=clip.xyz/max(clip.w,1e-9);
             vec2 suv=ndc.xy*0.5+0.5;
             const float edge=2.0*max(abs(suv.x-0.5),abs(suv.y-0.5));
             const bool near_inside=clip.w>0.0&&edge<=1.0&&ndc.z>=0.0&&ndc.z<=1.0;
-            vec4 fclip=view_params.far_from_view*vec4(view_position,1.0);
-            float flit=map_lit(shadow_far_map,fclip,
-                view_params.far_options.x,view_params.far_options.y,view_params.far_options.w,vec4(0.0,0.0,1.0,1.0));
-            if(view_params.far2_options.x>0.0) {
+            float flit=1.0;bool seeded=false;
+            for(int t=3;t>=0;--t) {
+                if(view_params.cascade_options[t].x<=0.0)continue;
+                vec4 fclip=view_params.cascade_from_view[t]*vec4(view_position,1.0);
+                const float tlit=map_lit_layer(shadow_cascade_map,float(t),fclip,
+                    view_params.cascade_options[t].x,view_params.cascade_options[t].y,view_params.cascade_options[t].w);
+                if(!seeded){flit=tlit;seeded=true;continue;} // widest tier
                 vec3 fndc=fclip.xyz/max(fclip.w,1e-9);
                 vec2 fsuv=fndc.xy*0.5+0.5;
                 const float fedge=2.0*max(abs(fsuv.x-0.5),abs(fsuv.y-0.5));
-                const bool far_inside=fclip.w>0.0&&fedge<=1.0&&fndc.z>=0.0&&fndc.z<=1.0;
-                const float flit2=map_lit(shadow_far2_map,
-                    view_params.far2_from_view*vec4(view_position,1.0),
-                    view_params.far2_options.x,view_params.far2_options.y,view_params.far2_options.w,vec4(0.0,0.0,1.0,1.0));
-                flit=far_inside?mix(flit,flit2,smoothstep(0.9,1.0,fedge)):flit2;
+                const bool inside=fclip.w>0.0&&fedge<=1.0&&fndc.z>=0.0&&fndc.z<=1.0;
+                flit=inside?mix(tlit,flit,smoothstep(0.9,1.0,fedge)):flit;
             }
             lit=near_inside
                 ?mix(map_lit(shadow_depth_map,clip,view_params.shadow_options.x,

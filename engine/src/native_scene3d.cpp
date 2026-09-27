@@ -226,12 +226,15 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
     if(!bounded(s.extent,1e9)||s.extent<=0||!bounded(s.distance,1e12)||s.distance<0||
        !bounded(s.depth,1e9)||s.depth<=0||!bounded(s.strength,1)||s.strength<0||
        !bounded(s.bias,.1)||s.bias<0||(s.resolution&&(s.resolution<64||s.resolution>8192))||
-       !bounded(s.cascade_extent,1e9)||s.cascade_extent<0||
-       (s.cascade_extent>0.f&&s.cascade_extent<=s.extent)||
-       !bounded(s.cascade2_extent,1e9)||s.cascade2_extent<0||
-       (s.cascade2_extent>0.f&&(s.cascade_extent<=0.f||s.cascade2_extent<=s.cascade_extent))||
+       s.cascade_extents.size()>maximum_scene3d_shadow_cascades||
        !bounded(s.softness,8)||s.softness<0)
       throw std::invalid_argument("3D shadow map requires positive extent/depth, bounded distance, strength, bias, resolution, softness and ordered cascade extents exceeding the near extent.");
+    float prev=s.extent;
+    for(const float e:s.cascade_extents){
+      if(!bounded(e,1e9)||e<=prev)
+        throw std::invalid_argument("3D shadow map requires strictly increasing cascade extents exceeding the near extent.");
+      prev=e;
+    }
   }
   if(instances.size()>maximum_scene3d_instances)throw std::length_error("3D scene exceeds its instance budget.");
   if(point_lights.size()>maximum_scene3d_point_lights)throw std::length_error("3D scene exceeds its point light budget.");

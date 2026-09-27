@@ -93,16 +93,17 @@ same document headless-tested.
    selection in the receiver shader);
    `alpha_threshold` casters mask the depth pass per texel, so cutout
    meshes cast perforated silhouettes rather than full quads; an
-   optional `cascade`/`cascade2` far tiers (wider ortho boxes sharing
-   centre/depth, crossfading over each inner window's outer margin —
-   three bands covering planet-scale through system-scale receivers)
+   optional `cascade_extents` far tiers (wider ortho boxes sharing
+   centre/depth, one depth-array layer each, crossfading over each
+   tighter window's outer margin — up to four tiers covering
+   planet-scale through sector-scale receivers)
    keep coverage at extreme zoom-out; `softness`/`shadowSoftness` scale
    the tier PCF radius on both maps so authored penumbra width isn't
    quality-locked; and per-instance `castsShadow`/`NoShadow` opts an
    opaque mesh out of every depth pass (a collapsed group follows its
    representative) while `receivesShadow`/`NoShadowReceive` keeps the
-   depth-map terms fully lit on a self-lit receiver. Remaining: the chain is fixed at
-   three bands; analytic
+   depth-map terms fully lit on a self-lit receiver. Remaining: the chain tops out at
+   four authored tiers; analytic
    ellipsoid/annulus blockers remain the ring↔planet path.
 4. **IBL** — landed: `pbr.environment`/`environmentMap` binds an
    equirect map on any PBR material and `pbr_values.w` scales diffuse
@@ -267,10 +268,11 @@ documented per-frame but accumulated. See
 
 ## Explicitly deferred / blockers
 
-- Arbitrary cascade splits: the `ShadowMap3D` ortho volume plus its
-  optional `cascade`/`cascade2` far tiers covers authored strategy
-  scenes at three zoom bands (an arbitrary-length chain is the
-  remaining split work), `casts_shadow` spot cones share a
+- Camera-fitted CSM: the `ShadowMap3D` ortho volume plus its
+  `cascade_extents` far tiers (up to four, one depth-array layer each)
+  covers authored strategy scenes at up to five zoom bands — splits are
+  authored extents, not derived from the camera frustum;
+  `casts_shadow` spot cones share a
   quadrant-atlas depth map (up to four), and `casts_shadow` omni
   lights share a cube-face atlas (six faces per light, up to four
   rows); analytic blockers still cover planet↔ring. Documented

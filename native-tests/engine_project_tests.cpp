@@ -5,6 +5,8 @@
 #include <stellar/engine/project.hpp>
 #include <stellar/engine/scene_document.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -521,8 +523,7 @@ int main() {
     scene.shadow_strength = 0.7f;
     scene.shadow_bias = 0.001f;
     scene.shadow_resolution = 2048;
-    scene.shadow_cascade = 96.f;
-    scene.shadow_cascade2 = 192.f;
+    scene.shadow_cascades = {96.f, 192.f};
     scene.shadow_softness = 2.5f;
     const auto reparsed =
         engine::Scene3dDocument::from_json(scene.to_json());
@@ -636,9 +637,24 @@ int main() {
       check(reparsed->shadow_extent == 32.f && reparsed->shadow_distance == 48.f &&
                 reparsed->shadow_depth == 128.f && reparsed->shadow_strength == 0.7f &&
                 reparsed->shadow_bias == 0.001f && reparsed->shadow_resolution == 2048 &&
-                reparsed->shadow_cascade == 96.f && reparsed->shadow_cascade2 == 192.f &&
+                reparsed->shadow_cascades == (std::vector<float>{96.f, 192.f}) &&
                 reparsed->shadow_softness == 2.5f,
             "scene3d shadow map settings round-trip");
+      // The emitter mirrors legacy cascade/cascade2 scalars alongside the
+      // cascades array, and a legacy document lacking the array parses
+      // the same chain.
+      const auto emitted = nlohmann::json::parse(reparsed->to_json());
+      check(emitted["render"]["shadow"]["cascades"].size() == 2 &&
+                emitted["render"]["shadow"]["cascade"] == 96.f &&
+                emitted["render"]["shadow"]["cascade2"] == 192.f,
+            "scene3d cascades array lost its legacy scalar mirror");
+      auto legacy_json = emitted;
+      legacy_json["render"]["shadow"].erase("cascades");
+      const auto legacy_parsed =
+          engine::Scene3dDocument::from_json(legacy_json.dump());
+      check(legacy_parsed &&
+                legacy_parsed->shadow_cascades == (std::vector<float>{96.f, 192.f}),
+            "legacy cascade/cascade2 scalars did not map into cascades");
       check(reparsed->entities[1].metallic == 0.f &&
                 reparsed->entities[1].emissive_strength == 0.f &&
                 reparsed->entities[1].atmo_strength == 0.f &&

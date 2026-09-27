@@ -1172,8 +1172,7 @@ int RuntimeHost::run() {
       map.strength = doc.shadow_strength;
       map.bias = doc.shadow_bias;
       map.resolution = doc.shadow_resolution;
-      map.cascade_extent = doc.shadow_cascade;
-      map.cascade2_extent = doc.shadow_cascade2;
+      map.cascade_extents = doc.shadow_cascades;
       map.softness = doc.shadow_softness;
       impl.shadow3 = map;
     } else

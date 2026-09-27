@@ -327,8 +327,9 @@ shadow.bias = 0.0005f;      // receiver-side depth bias, shadow-NDC units
 shadow.resolution = 0;      // 0 = tier default (Medium 1024 / High 2048 / Ultra 4096)
 shadow.softness = 1.f;      // [0,8] PCF penumbra multiplier on the tier
                             // radius (0 = hard single-tap edge)
-shadow.cascade_extent = 0;  // 0 disables; >extent adds a wider far tier
-shadow.cascade2_extent = 0; // 0 disables; >cascade adds the coarsest tier
+shadow.cascade_extents = {}; // up to 4 wider far tiers; each must be
+                             // strictly larger than the previous and
+                             // than `extent` (orbit → system → sector)
 ```
 
 - Strategy-scale fitting: instead of covering the camera frustum, the
@@ -336,14 +337,16 @@ shadow.cascade2_extent = 0; // 0 disables; >cascade adds the coarsest tier
   the authored `extent` picks how much of the scene is shadowed —
   receivers outside the box stay lit. The light direction and camera
   orientation both track the scene's key light each frame. An optional
-  `cascade_extent` (> `extent`; document key `cascade` in
-  `render.shadow`) adds a second, coarser ortho tier sharing the same
-  centre/depth — the fragment shader crossfades near→far over the inner
-  window's outer margin, so extreme zoom-out keeps coverage instead of
-  stepping to lit at the near boundary. A further `cascade2_extent`
-  (> `cascade`; document key `cascade2`) adds the coarsest third tier
-  for system-scale receivers; each fragment reads the tightest tier
-  that covers it, crossfading at the margins.
+  `cascade_extents` (document key `cascades` in `render.shadow` —
+  legacy `cascade`/`cascade2` scalars still parse and are emitted as a
+  mirror) adds up to four progressively coarser ortho tiers sharing the
+  same centre/depth — the fragment shader crossfades each tier into the
+  next-wider across the tighter window's outer margin, so extreme
+  zoom-out keeps coverage instead of stepping to lit at the near
+  boundary; each fragment reads the tightest tier that covers it,
+  crossfading at the margins. The tiers share one depth-texture array —
+  tier index equals array layer — so the shader loops tiers through a
+  single `sampler2DArray` binding.
 - Rendered as a depth-only pass (`scene3d_shadow.vert/.frag`) before the
   scene pass through the RenderGraph; the scene fragment shader applies
   a fixed 8-tap PCF kernel at High (1-texel radius) and Ultra (1.5),
@@ -351,9 +354,9 @@ shadow.cascade2_extent = 0; // 0 disables; >cascade adds the coarsest tier
 - Low tier skips the pass entirely (no depth target, no shader work);
   `visible_range`-culled and non-casting volumes are excluded.
   `Scene3DStatistics::shadow_casters` reports the per-frame directional
-  caster workload (near box plus any far tiers);
-  `shadow_cascade_casters`/`shadow_cascade2_casters` isolate each far
-  tier's submissions (near = total minus both);
+  caster workload (near box plus all cascade tiers);
+  `shadow_cascade_casters[t]` isolates tier t's submissions (near =
+  total minus the array's sum);
   `spot_shadow_casters`/`omni_shadow_casters` report the summed
   spot-quadrant and omni-face submissions respectively (one omni
   caster can submit to several faces of its light).
@@ -451,12 +454,14 @@ equirect path — a shared IBL probe that fills entities with
 `quality` ("low|medium|high|ultra"), `debug` in the `render` block
 ("lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows"), and
 `render.shadow` — `{extent, distance, depth, strength, bias,
-resolution, cascade, cascade2, softness}`; `extent ≤ 0` (or the key
+resolution, cascades, softness}`; `cascades` is an array of up to four
+wider ortho extents (legacy `cascade`/`cascade2` scalar keys still
+parse and are emitted alongside the array); `extent ≤ 0` (or the key
 absent) disables the map. Negative `range` and unknown
 `debug`/`quality` strings are rejected, as are nonpositive `depth`,
 `strength` outside [0,1], negative `bias`, `resolution` outside
-[64,8192], `cascade` inside `extent`, `cascade2` negative, missing
-its mid tier, or inside `cascade`, and `softness` outside [0,8].
+[64,8192], any cascade extent not strictly past the previous tier, a
+cascade list over four entries, and `softness` outside [0,8].
 
 `spawn_scene3d` attaches `MaterialPbr`/`AtmosphereShell`/`MaterialSurface`
 components (binary codec round-trips), a `VisibleRange` component when
@@ -480,7 +485,7 @@ LOD fade width.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
 quality tier, debug view, point lights (pos/color/intensity/range +
 optional spot dir/inner/outer/shadow flag),
-shadow map (extent/distance/depth/strength/bias/resolution/cascade/cascade2/softness), scene
+shadow map (extent/distance/depth/strength/bias/resolution/cascade…cascade4/softness), scene
 environment probe (equirect path — feeds `environmentStrength` opt-ins
 that author no own map).
 The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
@@ -507,7 +512,7 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   (casters already culled by `visible_range` and the shadow volume);
   per-instance caster evaluation (range cull, keep masks, group
   collapse, LOD pick) runs once per view and is shared across the
-  near/far/far2/spot collections — each pass only transforms, volume-
+  near/cascade/spot collections — each pass only transforms, volume-
   tests and emits. The depth
   target is `resolution`² D32 — tier-scaled, allocated lazily per
   target and shared across views.
@@ -515,8 +520,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 ## Known limitations
 
 - `ShadowMap3D` is an authored ortho box for the key light (plus up
-  to two optional wider `cascade`/`cascade2` far tiers — three bands,
-  not an arbitrary CSM split chain), `casts_shadow` spot cones
+  to four optional wider `cascade_extents` far tiers sharing one
+  depth-array — five bands maximum, still an authored split list rather
+  than a camera-fitted CSM), `casts_shadow` spot cones
   sharing one depth atlas (a quadrant per light, up to four) and
   `casts_shadow` omni lights sharing a cube-face atlas (six faces per
   light, up to four rows, view-space-locked faces) — receivers outside

@@ -1,6 +1,7 @@
 #include <stellar/engine/scene_document.hpp>
 
 #include <stellar/engine/atomic_file_write.hpp>
+#include <stellar/engine/native_scene3d.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -558,8 +559,15 @@ std::string Scene3dDocument::to_json() const {
                                {"strength", shadow_strength},
                                {"bias", shadow_bias},
                                {"resolution", shadow_resolution}};
-    if (shadow_cascade > 0.f) doc["render"]["shadow"]["cascade"] = shadow_cascade;
-    if (shadow_cascade2 > 0.f) doc["render"]["shadow"]["cascade2"] = shadow_cascade2;
+    // The legacy scalar keys mirror the first two tiers so readers
+    // predating the cascades array still see the authored chain head;
+    // the array itself is canonical on parse.
+    if (!shadow_cascades.empty()) {
+      doc["render"]["shadow"]["cascade"] = shadow_cascades[0];
+      if (shadow_cascades.size() > 1)
+        doc["render"]["shadow"]["cascade2"] = shadow_cascades[1];
+      doc["render"]["shadow"]["cascades"] = shadow_cascades;
+    }
     if (shadow_softness != 1.f) doc["render"]["shadow"]["softness"] = shadow_softness;
   }
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
@@ -924,18 +932,36 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         scene.shadow_strength = s.value("strength", 1.0f);
         scene.shadow_bias = s.value("bias", 0.0005f);
         scene.shadow_resolution = s.value("resolution", 0u);
-        scene.shadow_cascade = s.value("cascade", 0.0f);
-        scene.shadow_cascade2 = s.value("cascade2", 0.0f);
+        if (s.contains("cascades")) {
+          const auto &c = s.at("cascades");
+          if (!c.is_array() ||
+              c.size() > native_map::maximum_scene3d_shadow_cascades)
+            return fail("render shadow cascades must be an array of at most four extents");
+          for (const auto &e : c) {
+            if (!e.is_number()) return fail("render shadow cascades must be numbers");
+            scene.shadow_cascades.push_back(e.get<float>());
+          }
+        } else {
+          // Legacy scalar keys, in authored order — a cascade2 without
+          // its mid tier is a gap and stays rejected.
+          const float legacy_far = s.value("cascade", 0.0f);
+          const float legacy_far2 = s.value("cascade2", 0.0f);
+          if (legacy_far == 0.0f && legacy_far2 != 0.0f)
+            return fail("render shadow cascade2 requires a cascade mid tier");
+          if (legacy_far != 0.0f) scene.shadow_cascades.push_back(legacy_far);
+          if (legacy_far2 != 0.0f) scene.shadow_cascades.push_back(legacy_far2);
+        }
         scene.shadow_softness = s.value("softness", 1.0f);
+        bool ordered = true;
+        for (float prev = scene.shadow_extent; const float e : scene.shadow_cascades) {
+          if (!std::isfinite(e) || e > 1e9f || e <= prev) ordered = false;
+          prev = e;
+        }
         if (scene.shadow_extent < 0.f || scene.shadow_distance < 0.f ||
             scene.shadow_depth <= 0.f || scene.shadow_strength < 0.f ||
             scene.shadow_strength > 1.f || scene.shadow_bias < 0.f ||
-            scene.shadow_bias > 0.1f || scene.shadow_cascade < 0.f ||
-            scene.shadow_cascade2 < 0.f ||
+            scene.shadow_bias > 0.1f || !ordered ||
             scene.shadow_softness < 0.f || scene.shadow_softness > 8.f ||
-            (scene.shadow_cascade > 0.f && scene.shadow_cascade <= scene.shadow_extent) ||
-            (scene.shadow_cascade2 > 0.f &&
-             (scene.shadow_cascade <= 0.f || scene.shadow_cascade2 <= scene.shadow_cascade)) ||
             (scene.shadow_resolution != 0u &&
              (scene.shadow_resolution < 64u || scene.shadow_resolution > 8192u)))
           return fail("render shadow fields out of range");

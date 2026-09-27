@@ -2018,28 +2018,27 @@ void commit_scene3_field(Shell &shell) {
     doc.debug_view = d;
     return ok("debug view updated");
   }
-  case 52: { // key-light shadow map: "extent,dist,depth[,strength,bias[,res[,cascade[,softness[,cascade2]]]]]"
+  case 52: { // key-light shadow map: "extent,dist,depth[,strength,bias[,res[,cascade[,softness[,cascade2[,cascade3[,cascade4]]]]]]"
     if (shell.scene3_buffer.empty()) { // empty clears
       commit();
       doc.shadow_extent = 0.f;
-      doc.shadow_cascade = 0.f;
-      doc.shadow_cascade2 = 0.f;
+      doc.shadow_cascades.clear();
       return ok("shadow map disabled");
     }
-    float v[9]{};
+    float v[11]{};
     {
       std::istringstream values(shell.scene3_buffer);
       std::string token;
       int n = 0;
-      while (n < 9 && std::getline(values, token, ',')) {
+      while (n < 11 && std::getline(values, token, ',')) {
         try {
           v[n++] = std::stof(token);
         } catch (const std::exception &) {
-          return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness[,cascade2]]]]]");
+          return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness[,cascade2[,cascade3[,cascade4]]]]]]]");
         }
       }
       if (n < 3)
-        return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness[,cascade2]]]]]");
+        return fail("use extent,distance,depth[,strength,bias[,resolution[,cascade[,softness[,cascade2[,cascade3[,cascade4]]]]]]]");
       commit();
       doc.shadow_extent = v[0];
       doc.shadow_distance = v[1];
@@ -2048,9 +2047,11 @@ void commit_scene3_field(Shell &shell) {
       doc.shadow_bias = n > 4 ? v[4] : .0005f;
       doc.shadow_resolution =
           n > 5 ? static_cast<std::uint32_t>(std::max(0.f, v[5])) : 0u;
-      doc.shadow_cascade = n > 6 ? v[6] : 0.f;
+      doc.shadow_cascades.clear();
+      if (n > 6 && v[6] != 0.f) doc.shadow_cascades.push_back(v[6]);
       doc.shadow_softness = n > 7 ? v[7] : 1.f;
-      doc.shadow_cascade2 = n > 8 ? v[8] : 0.f;
+      for (int i = 8; i < n; ++i)
+        if (v[i] != 0.f) doc.shadow_cascades.push_back(v[i]);
     }
     return ok("shadow map updated");
   }
@@ -2407,20 +2408,22 @@ void commit_scene3_field(Shell &shell) {
   ok("entity updated");
 }
 
-// The shadow row carries up to nine fields; echoing them all keeps a
-// re-edit from silently dropping the authored strength/bias/cascade
-// values.
+// The shadow row echoes every authored field so a re-edit never drops
+// strength/bias/softness or any cascade tier.
 std::string shadow_row_text(const engine::Scene3dDocument &doc) {
   if (doc.shadow_extent <= 0.f) return {};
-  return std::to_string(doc.shadow_extent) + "," +
-         std::to_string(doc.shadow_distance) + "," +
-         std::to_string(doc.shadow_depth) + "," +
-         std::to_string(doc.shadow_strength) + "," +
-         std::to_string(doc.shadow_bias) + "," +
-         std::to_string(doc.shadow_resolution) + "," +
-         std::to_string(doc.shadow_cascade) + "," +
-         std::to_string(doc.shadow_softness) + "," +
-         std::to_string(doc.shadow_cascade2);
+  std::string text =
+      std::to_string(doc.shadow_extent) + "," +
+      std::to_string(doc.shadow_distance) + "," +
+      std::to_string(doc.shadow_depth) + "," +
+      std::to_string(doc.shadow_strength) + "," +
+      std::to_string(doc.shadow_bias) + "," +
+      std::to_string(doc.shadow_resolution) + "," +
+      std::to_string(doc.shadow_cascades.empty() ? 0.f : doc.shadow_cascades[0]) + "," +
+      std::to_string(doc.shadow_softness);
+  for (std::size_t i = 1; i < doc.shadow_cascades.size(); ++i)
+    text += "," + std::to_string(doc.shadow_cascades[i]);
+  return text;
 }
 
 void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
@@ -2738,11 +2741,13 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                           l.shadow_strength,
                                           l.shadow_softness});
     std::optional<ShadowMap3D> shadow_map;
-    if (doc.shadow_extent > 0.f)
+    if (doc.shadow_extent > 0.f) {
       shadow_map = ShadowMap3D{doc.shadow_extent, doc.shadow_distance,
                                doc.shadow_depth, doc.shadow_strength,
                                doc.shadow_bias, doc.shadow_resolution,
-                               doc.shadow_softness, doc.shadow_cascade};
+                               doc.shadow_softness, {}};
+      shadow_map->cascade_extents = doc.shadow_cascades;
+    }
     if (auto scene = Scene3D::create(cam, std::move(instances), light_cam,
                                      std::move(point_lights), shadow_map,
                                      doc.environment.empty()
@@ -3122,7 +3127,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_debug, "debugView", doc.debug_view, ed(39),
         "lit|unlit|albedo|normals|roughness|metallic|emissive|lighting|lod|residency|shadows");
   field(shell.hit3_shadow, "shadowMap", shadow_row_text(doc),
-        ed(52), "extent,dist,depth[,strength,bias[,res[,cascade[,softness]]]] - empty disables");
+        ed(52), "extent,dist,depth[,strength,bias[,res[,cascade[,softness[,cascade2..4]]]]] - empty disables");
   field(shell.hit3_scnenv, "environment", doc.environment, ed(72),
         "equirect path - shared IBL probe; empty disables");
 }

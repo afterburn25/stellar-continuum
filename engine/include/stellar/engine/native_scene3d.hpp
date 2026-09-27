@@ -198,6 +198,7 @@ struct PointLight3D {
   float shadow_softness{1.f}; // [0,8]
 };
 inline constexpr std::size_t maximum_scene3d_point_lights=4;
+inline constexpr std::size_t maximum_scene3d_shadow_cascades=4;
 // Single-scatter limb approximation: a wavelength-tinted shell driven by
 // (1 - N.V)^power, weighted to the day side with a nightside floor. It
 // enhances authored body art rather than replacing it.
@@ -393,15 +394,15 @@ struct ShadowMap3D {
   // PCF penumbra width multiplier on the tier radius (0 = a hard
   // single-tap edge even at High/Ultra, larger values widen the
   // 8-tap kernel's spread). Applies to both cascade tiers.
-  float softness{1.f};     // [0,8]
-  // Optional far cascade: a second, wider ortho tier sharing the same
-  // centre and depth so coverage keeps working at extreme zoom-out
-  // (the near tier stays crisp around `extent`; receivers past its
-  // window sample the coarse tier instead of snapping lit). 0 disables.
-  float cascade_extent{0.f}; // far-tier half-extent, must exceed extent
-  // Optional third tier: an even coarser window past cascade_extent for
-  // system-scale zoom-out. Requires cascade_extent>0 and must exceed it.
-  float cascade2_extent{0.f};
+  float softness{1.f};     // [0,8] — applied to every cascade tier
+  // Optional far cascades: coarser ortho tiers sharing the same centre
+  // and depth so coverage keeps working at extreme zoom-out (the near
+  // tier stays crisp around `extent`; receivers past its window sample
+  // the next covering tier instead of snapping lit). Entries must be
+  // finite, strictly increasing, and each must exceed `extent`; at most
+  // maximum_scene3d_shadow_cascades tiers — the first is orbit-scale,
+  // later ones system- to sector-scale.
+  std::vector<float> cascade_extents;
 };
 class Scene3D final {
  public:
@@ -457,10 +458,10 @@ struct Scene3DStatistics {
   // volume/visible_range culling) — the shadow-pass workload audit counter.
   // A configured far tier adds its own submissions to the same total.
   std::uint64_t shadow_casters{};
-  // Instances written to the optional far cascade tiers this frame —
-  // `shadow_casters - shadow_cascade_casters - shadow_cascade2_casters`
-  // recovers the near-window submissions.
-  std::uint64_t shadow_cascade_casters{},shadow_cascade2_casters{};
+  // Instances written to each optional far cascade tier this frame —
+  // `shadow_casters` minus the sum over shadow_cascade_casters recovers
+  // the near-window submissions.
+  std::array<std::uint64_t,maximum_scene3d_shadow_cascades> shadow_cascade_casters{};
   // Instances written to the shared spot atlas this frame, summed across
   // every shadowed spot light's quadrant.
   std::uint64_t spot_shadow_casters{};

@@ -232,9 +232,9 @@ int main()try{
   rejects([&]{PointLight3D l;l.shadow_softness=-.1f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   rejects([&]{PointLight3D l;l.shadow_softness=9.f;(void)Scene3D::create(camera,{instance},{0,0,1},{l});});
   // Directional shadow map settings validate bounds; a valid map round-trips.
-  {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;config.cascade_extent=16;config.cascade2_extent=48;config.softness=2.f;
+  {ShadowMap3D config;config.extent=4;config.distance=2;config.depth=8;config.resolution=512;config.cascade_extents={16,48};config.softness=2.f;
    const auto mapped=Scene3D::create(camera,{instance},{0,0,1},{},config);
-   check(mapped->shadow_map()&&mapped->shadow_map()->extent==4&&mapped->shadow_map()->resolution==512&&mapped->shadow_map()->cascade_extent==16&&mapped->shadow_map()->cascade2_extent==48&&mapped->shadow_map()->softness==2.f,"Scene dropped its shadow map settings");}
+   check(mapped->shadow_map()&&mapped->shadow_map()->extent==4&&mapped->shadow_map()->resolution==512&&mapped->shadow_map()->cascade_extents==(std::vector<float>{16,48})&&mapped->shadow_map()->softness==2.f,"Scene dropped its shadow map settings");}
   {// Scene environment probe: an optional shared IBL map that fills
    // materials which opt in via environment_strength without their own.
    const auto env=RgbaImage::create(1,1,{0,128,255,255});
@@ -248,14 +248,18 @@ int main()try{
   rejects([&]{ShadowMap3D s;s.bias=-.001f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.distance=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.resolution=32;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
-  rejects([&]{ShadowMap3D s;s.cascade_extent=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
-  rejects([&]{ShadowMap3D s;s.cascade_extent=4;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
-  rejects([&]{ShadowMap3D s;s.cascade_extent=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
-  // Third tier needs a middle tier and a strictly larger window.
-  rejects([&]{ShadowMap3D s;s.cascade2_extent=128;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
-  rejects([&]{ShadowMap3D s;s.cascade_extent=128;s.cascade2_extent=128;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
-  rejects([&]{ShadowMap3D s;s.cascade_extent=128;s.cascade2_extent=64;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
-  rejects([&]{ShadowMap3D s;s.cascade_extent=128;s.cascade2_extent=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  // Cascade extents: finite, strictly increasing, each past the near
+  // extent, at most four tiers — unordered or out-of-range chains reject.
+  rejects([&]{ShadowMap3D s;s.cascade_extents={-1};(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.cascade_extents={4};(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.cascade_extents={std::numeric_limits<float>::quiet_NaN()};(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.cascade_extents={128,128};(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.cascade_extents={128,64};(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.cascade_extents={128,-1};(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  rejects([&]{ShadowMap3D s;s.cascade_extents={32,64,128,256,512};(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
+  // Three and four valid tiers (each past the 64-unit near extent) pass.
+  check(Scene3D::create(camera,{instance},{0,0,1},{},[] {ShadowMap3D s;s.cascade_extents={128,256,512};return s;}())!=nullptr,"Three cascade tiers rejected");
+  check(Scene3D::create(camera,{instance},{0,0,1},{},[] {ShadowMap3D s;s.cascade_extents={128,256,512,1024};return s;}())!=nullptr,"Four cascade tiers rejected");
   rejects([&]{ShadowMap3D s;s.softness=-.5f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.softness=9.f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   // Distance culling: visible_range bounds the camera-to-surface distance;

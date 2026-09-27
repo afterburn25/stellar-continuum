@@ -61,14 +61,22 @@ struct Texture {
   std::size_t bytes()const{return owner->byte_size()+gpu_bytes;}
 };
 struct Target {
-  SDL_GPUDevice* device;SDL_GPUTexture* color{};SDL_GPUTexture* depth{};SDL_GPUTexture* hdr{};SDL_GPUTexture* msaa_color{};SDL_GPUTexture* msaa_depth{};SDL_GPUTexture* shadow{};SDL_GPUTexture* spot_shadow{};SDL_GPUTexture* point_shadow{};SDL_GPUTexture* shadow_far{};SDL_GPUTexture* shadow_far2{};SDL_Texture* composite{};int width{},height{};Uint32 hdr_levels{1};int shadow_size{},spot_shadow_size{},point_shadow_w{},point_shadow_h{},shadow_far_size{},shadow_far2_size{};
+  SDL_GPUDevice* device;SDL_GPUTexture* color{};SDL_GPUTexture* depth{};SDL_GPUTexture* hdr{};SDL_GPUTexture* msaa_color{};SDL_GPUTexture* msaa_depth{};SDL_GPUTexture* shadow{};SDL_GPUTexture* spot_shadow{};SDL_GPUTexture* point_shadow{};SDL_GPUTexture* shadow_cascade{};SDL_Texture* composite{};int width{},height{};Uint32 hdr_levels{1};int shadow_size{},spot_shadow_size{},point_shadow_w{},point_shadow_h{},shadow_cascade_size{},shadow_cascade_layers{};
   explicit Target(SDL_GPUDevice* d):device(d){}
-  ~Target(){if(composite)SDL_DestroyTexture(composite);if(shadow_far2)SDL_ReleaseGPUTexture(device,shadow_far2);if(shadow_far)SDL_ReleaseGPUTexture(device,shadow_far);if(point_shadow)SDL_ReleaseGPUTexture(device,point_shadow);if(spot_shadow)SDL_ReleaseGPUTexture(device,spot_shadow);if(shadow)SDL_ReleaseGPUTexture(device,shadow);if(msaa_depth)SDL_ReleaseGPUTexture(device,msaa_depth);if(msaa_color)SDL_ReleaseGPUTexture(device,msaa_color);if(hdr)SDL_ReleaseGPUTexture(device,hdr);if(depth)SDL_ReleaseGPUTexture(device,depth);if(color)SDL_ReleaseGPUTexture(device,color);}
-  std::size_t bytes()const{auto base=static_cast<std::size_t>(width)*height*(hdr?16u:8u);return base+(msaa_color?base*4+static_cast<std::size_t>(width)*height*16u:0)+static_cast<std::size_t>(shadow_size)*shadow_size*4+static_cast<std::size_t>(spot_shadow_size)*spot_shadow_size*4+static_cast<std::size_t>(point_shadow_w)*point_shadow_h*4+static_cast<std::size_t>(shadow_far_size)*shadow_far_size*4+static_cast<std::size_t>(shadow_far2_size)*shadow_far2_size*4;}
+  ~Target(){if(composite)SDL_DestroyTexture(composite);if(shadow_cascade)SDL_ReleaseGPUTexture(device,shadow_cascade);if(point_shadow)SDL_ReleaseGPUTexture(device,point_shadow);if(spot_shadow)SDL_ReleaseGPUTexture(device,spot_shadow);if(shadow)SDL_ReleaseGPUTexture(device,shadow);if(msaa_depth)SDL_ReleaseGPUTexture(device,msaa_depth);if(msaa_color)SDL_ReleaseGPUTexture(device,msaa_color);if(hdr)SDL_ReleaseGPUTexture(device,hdr);if(depth)SDL_ReleaseGPUTexture(device,depth);if(color)SDL_ReleaseGPUTexture(device,color);}
+  std::size_t bytes()const{auto base=static_cast<std::size_t>(width)*height*(hdr?16u:8u);return base+(msaa_color?base*4+static_cast<std::size_t>(width)*height*16u:0)+static_cast<std::size_t>(shadow_size)*shadow_size*4+static_cast<std::size_t>(spot_shadow_size)*spot_shadow_size*4+static_cast<std::size_t>(point_shadow_w)*point_shadow_h*4+static_cast<std::size_t>(shadow_cascade_size)*shadow_cascade_size*shadow_cascade_layers*4;}
 };
 SDL_GPUTexture* make_texture(SDL_GPUDevice* d,int w,int h,SDL_GPUTextureFormat format,SDL_GPUTextureUsageFlags usage,Uint32 levels=1,SDL_GPUSampleCount samples=SDL_GPU_SAMPLECOUNT_1){
   SDL_GPUTextureCreateInfo info{};info.type=SDL_GPU_TEXTURETYPE_2D;info.format=format;info.usage=usage;
   info.width=w;info.height=h;info.layer_count_or_depth=1;info.num_levels=levels;info.sample_count=samples;
+  auto* result=SDL_CreateGPUTexture(d,&info);if(!result)throw gpu_error("3D texture allocation failed");return result;
+}
+// Far cascades share one 2D-array depth texture so the fragment
+// shader loops tiers through a single sampler binding; each tier's
+// pass writes its own layer via the depth-target layer field.
+SDL_GPUTexture* make_texture_array(SDL_GPUDevice* d,int w,int h,int layers,SDL_GPUTextureFormat format,SDL_GPUTextureUsageFlags usage){
+  SDL_GPUTextureCreateInfo info{};info.type=SDL_GPU_TEXTURETYPE_2D_ARRAY;info.format=format;info.usage=usage;
+  info.width=w;info.height=h;info.layer_count_or_depth=static_cast<Uint32>(layers);info.num_levels=1;info.sample_count=SDL_GPU_SAMPLECOUNT_1;
   auto* result=SDL_CreateGPUTexture(d,&info);if(!result)throw gpu_error("3D texture allocation failed");return result;
 }
 template<class Map> void evict(Map& cache,std::size_t& bytes,std::size_t incoming,std::size_t budget){
@@ -87,8 +95,8 @@ struct PostUniform {std::array<float,4> a,b;};
 // bounds lane clamps sampling so out-of-cone fragments can't sample a
 // neighbour quadrant), the far pair the optional wider cascade tier
 // sharing the directional box's centre/depth.
-struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;Matrix4 far_from_view;std::array<float,4> far_options;Matrix4 far2_from_view;std::array<float,4> far2_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==768);
+struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;std::array<Matrix4,maximum_scene3d_shadow_cascades> cascade_from_view;std::array<std::array<float,4>,maximum_scene3d_shadow_cascades> cascade_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;};
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==928);
 // Column-major rotation for a unit quaternion — same convention as
 // rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
 Matrix4 rotation_from(Quaternion q){
@@ -117,9 +125,9 @@ struct Scene3DRenderer::Storage {
   std::unordered_map<engine::TextureId,std::weak_ptr<const RgbaImage>> stream_owners;
   std::uint64_t stream_frame{},stream_registrations{};
   Scene3DStatistics stats;std::uint64_t serial{};std::size_t next_view{};bool hdr{},msaa_supported{};SDL_GPUTextureFormat scene_format{};
-  SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};SDL_GPUBuffer* shadow_buffer{};SDL_GPUBuffer* spot_shadow_buffer[4]{};SDL_GPUBuffer* omni_shadow_buffer[4]{};SDL_GPUBuffer* far_shadow_buffer{};SDL_GPUBuffer* far2_shadow_buffer{};std::size_t vertex_capacity{64},fragment_capacity{64},shadow_capacity{64},spot_shadow_capacity[4]{},omni_shadow_capacity[4]{},far_shadow_capacity{64},far2_shadow_capacity{64};
+  SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};SDL_GPUBuffer* shadow_buffer{};SDL_GPUBuffer* spot_shadow_buffer[4]{};SDL_GPUBuffer* omni_shadow_buffer[4]{};SDL_GPUBuffer* cascade_shadow_buffer[maximum_scene3d_shadow_cascades]{};std::size_t vertex_capacity{64},fragment_capacity{64},shadow_capacity{64},spot_shadow_capacity[4]{},omni_shadow_capacity[4]{},cascade_shadow_capacity[maximum_scene3d_shadow_cascades]{};
   Storage(SDL_GPUDevice* d,SDL_Renderer* r):device(d),renderer(r){}
-  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);for(auto* p:pipelines_ms4)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(shadow_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,shadow_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);for(auto* b:spot_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);for(auto* b:omni_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);if(far2_shadow_buffer)SDL_ReleaseGPUBuffer(device,far2_shadow_buffer);if(far_shadow_buffer)SDL_ReleaseGPUBuffer(device,far_shadow_buffer);if(shadow_buffer)SDL_ReleaseGPUBuffer(device,shadow_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);if(repeat_sampler)SDL_ReleaseGPUSampler(device,repeat_sampler);if(repeat_aniso_sampler)SDL_ReleaseGPUSampler(device,repeat_aniso_sampler);}
+  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);for(auto* p:pipelines_ms4)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(shadow_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,shadow_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);for(auto* b:spot_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);for(auto* b:omni_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);for(auto* b:cascade_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);if(shadow_buffer)SDL_ReleaseGPUBuffer(device,shadow_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);if(repeat_sampler)SDL_ReleaseGPUSampler(device,repeat_sampler);if(repeat_aniso_sampler)SDL_ReleaseGPUSampler(device,repeat_aniso_sampler);}
   void require_owner()const{if(std::this_thread::get_id()!=owner)throw std::logic_error("3D rendering must run on the window thread.");}
   void initialize(){
     SDL_GPUSamplerCreateInfo sampling{};sampling.min_filter=sampling.mag_filter=SDL_GPU_FILTER_LINEAR;
@@ -147,7 +155,7 @@ struct Scene3DRenderer::Storage {
     const auto release=[&](SDL_GPUShader* value){SDL_ReleaseGPUShader(device,value);};
     msaa_supported=SDL_GPUTextureSupportsSampleCount(device,scene_format,SDL_GPU_SAMPLECOUNT_4)&&
       SDL_GPUTextureSupportsSampleCount(device,SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_SAMPLECOUNT_4);
-    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,1,15,1),release);
+    std::unique_ptr<SDL_GPUShader,decltype(release)> vertex(shader(shaders::scene3d_vert,SDL_GPU_SHADERSTAGE_VERTEX,0,0,1),release),fragment(shader(shaders::scene3d_frag,SDL_GPU_SHADERSTAGE_FRAGMENT,1,14,1),release);
     SDL_GPUVertexBufferDescription buffer{0,sizeof(Vertex3D),SDL_GPU_VERTEXINPUTRATE_VERTEX,0};
     const SDL_GPUVertexAttribute attributes[]{{0,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,position)},{1,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,offsetof(Vertex3D,normal)},{2,0,SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,offsetof(Vertex3D,uv)}};
     for(int index=0;index<4;++index){
@@ -725,9 +733,13 @@ struct Scene3DRenderer::Storage {
     std::array<std::vector<std::shared_ptr<Geometry>>,4> omni_geometry;std::array<std::vector<ShadowCast>,4> omni_transforms;std::array<std::vector<std::shared_ptr<Texture>>,4> omni_textures;
     std::array<std::vector<const MeshInstance3D*>,4> omni_insts;
     std::array<engine::DrawBatcher,4> omni_batcher;
-    std::vector<std::shared_ptr<Geometry>> far_geometry;std::vector<ShadowCast> far_transforms;std::vector<std::shared_ptr<Texture>> far_textures;
-    std::vector<std::shared_ptr<Geometry>> far2_geometry;std::vector<ShadowCast> far2_transforms;std::vector<std::shared_ptr<Texture>> far2_textures;
-    engine::DrawBatcher shadow_batcher,far_batcher,far2_batcher;
+    // Far cascades: per-tier caster lists — tier index == depth-array
+    // layer; the fragment reads the tightest covering tier.
+    std::array<std::vector<std::shared_ptr<Geometry>>,maximum_scene3d_shadow_cascades> cascade_geometry;
+    std::array<std::vector<ShadowCast>,maximum_scene3d_shadow_cascades> cascade_transforms;
+    std::array<std::vector<std::shared_ptr<Texture>>,maximum_scene3d_shadow_cascades> cascade_textures;
+    std::array<engine::DrawBatcher,maximum_scene3d_shadow_cascades> cascade_batcher;
+    engine::DrawBatcher shadow_batcher;
     const auto& cam=view.scene->camera();
     // Shared caster collection: emits every non-transparent instance's
     // light-facing submission (LOD pick, group proxy, range/LOD/group
@@ -939,38 +951,26 @@ struct Scene3DRenderer::Storage {
         return std::abs(lx)<=extent+r&&std::abs(ly)<=extent+r&&lz<=r&&lz>=-depth-r;};
       collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,light_projection,from_view,box_volume,
           caster_geometry,shadow_transforms,caster_textures,shadow_batcher,stats.shadow_casters);
-      // Optional far cascade: the same ortho centre/depth at cascade_extent
-      // — a second, coarser tier so receivers past the near window keep a
-      // shadow instead of snapping lit at extreme zoom.
-      if(s.cascade_extent>0.f){
-        const double far_extent=s.cascade_extent;
-        Matrix4 far_projection{};far_projection.values={{1.f/static_cast<float>(far_extent),0,0,0,0,1.f/static_cast<float>(far_extent),0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
-        view_uniform.far_from_view=multiply(far_projection,from_view);
-        view_uniform.far_options={1.f/static_cast<float>(shadow_res),radius_texels,0.f,s.bias};
-        const auto far_volume=[&](double lx,double ly,double lz,double r){
-          return std::abs(lx)<=far_extent+r&&std::abs(ly)<=far_extent+r&&lz<=r&&lz>=-depth-r;};
-        std::uint64_t far_casters=0;
-        collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,far_projection,from_view,far_volume,
-            far_geometry,far_transforms,far_textures,far_batcher,far_casters);
-        stats.shadow_casters+=far_casters;stats.shadow_cascade_casters+=far_casters;
-        // Optional third tier: same ortho box at cascade2_extent — the
-        // coarsest window, covering system-scale receivers past far1.
-        if(s.cascade2_extent>0.f){
-          const double far2_extent=s.cascade2_extent;
-          Matrix4 far2_projection{};far2_projection.values={{1.f/static_cast<float>(far2_extent),0,0,0,0,1.f/static_cast<float>(far2_extent),0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
-          view_uniform.far2_from_view=multiply(far2_projection,from_view);
-          view_uniform.far2_options={1.f/static_cast<float>(shadow_res),radius_texels,0.f,s.bias};
-          const auto far2_volume=[&](double lx,double ly,double lz,double r){
-            return std::abs(lx)<=far2_extent+r&&std::abs(ly)<=far2_extent+r&&lz<=r&&lz>=-depth-r;};
-          std::uint64_t far2_casters=0;
-          collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,far2_projection,from_view,far2_volume,
-              far2_geometry,far2_transforms,far2_textures,far2_batcher,far2_casters);
-          stats.shadow_casters+=far2_casters;stats.shadow_cascade2_casters+=far2_casters;
-        }
+      // Optional far cascades: the same ortho centre/depth at each
+      // authored cascade extent — progressively coarser tiers so
+      // receivers past the near window keep a shadow instead of
+      // snapping lit at extreme zoom. Tier index == depth-array layer.
+      const auto cascade_tiers=std::min(s.cascade_extents.size(),maximum_scene3d_shadow_cascades);
+      for(std::size_t t=0;t<cascade_tiers;++t){
+        const double tier_extent=s.cascade_extents[t];
+        Matrix4 tier_projection{};tier_projection.values={{1.f/static_cast<float>(tier_extent),0,0,0,0,1.f/static_cast<float>(tier_extent),0,0,0,0,-1.f/s.depth,0,0,0,0,1}};
+        view_uniform.cascade_from_view[t]=multiply(tier_projection,from_view);
+        view_uniform.cascade_options[t]={1.f/static_cast<float>(shadow_res),radius_texels,0.f,s.bias};
+        const auto tier_volume=[&](double lx,double ly,double lz,double r){
+          return std::abs(lx)<=tier_extent+r&&std::abs(ly)<=tier_extent+r&&lz<=r&&lz>=-depth-r;};
+        std::uint64_t tier_casters=0;
+        collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,tier_projection,from_view,tier_volume,
+            cascade_geometry[t],cascade_transforms[t],cascade_textures[t],cascade_batcher[t],tier_casters);
+        stats.shadow_casters+=tier_casters;stats.shadow_cascade_casters[t]+=tier_casters;
       }
     }
-    const Uint32 far_res=use_shadow&&shadow_settings->cascade_extent>0.f?shadow_res:0;
-    const Uint32 far2_res=use_shadow&&shadow_settings->cascade2_extent>0.f?shadow_res:0;
+    const Uint32 cascade_layers=use_shadow?static_cast<Uint32>(std::min(shadow_settings->cascade_extents.size(),maximum_scene3d_shadow_cascades)):0;
+    const Uint32 cascade_res=cascade_layers>0?shadow_res:0;
     // Shadowed spot lights: every coned point light flagged casts_shadow
     // gets a quadrant of the shared depth atlas — 2×2 when more than one
     // casts, a full-size map for a single light. Each caster pass renders
@@ -1139,19 +1139,16 @@ struct Scene3DRenderer::Storage {
     const auto shadow_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"shadow-depth",shadow_res,shadow_res,"d32",true});
     const auto spot_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"spot-shadow-depth",spot_map,spot_map,"d32",true});
     const auto omni_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"omni-shadow-depth",omni_map_w,omni_map_h,"d32",true});
-    const auto far_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"shadow-far-depth",far_res,far_res,"d32",true});
-    const auto far2_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"shadow-far2-depth",far2_res,far2_res,"d32",true});
+    const auto cascade_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"shadow-cascade-depth",cascade_res,cascade_res,"d32",true});
     graph.add_pass({"shadow",{},{shadow_target},{},"shadow",use_shadow});
     graph.add_pass({"spot-shadow",{},{spot_target},{},"spot-shadow",spot_res>0});
     graph.add_pass({"omni-shadow",{},{omni_target},{},"omni-shadow",omni_cell>0});
-    graph.add_pass({"shadow-far",{},{far_target},{},"shadow-far",far_res>0});
-    graph.add_pass({"shadow-far2",{},{far2_target},{},"shadow-far2",far2_res>0});
+    graph.add_pass({"shadow-cascade",{},{cascade_target},{},"shadow-cascade",cascade_res>0});
     std::vector<engine::ResourceId> scene_inputs;
     if(use_shadow)scene_inputs.push_back(shadow_target);
     if(spot_res>0)scene_inputs.push_back(spot_target);
     if(omni_cell>0)scene_inputs.push_back(omni_target);
-    if(far_res>0)scene_inputs.push_back(far_target);
-    if(far2_res>0)scene_inputs.push_back(far2_target);
+    if(cascade_res>0)scene_inputs.push_back(cascade_target);
     graph.add_pass({"scene3d",scene_inputs,{target.hdr?hdr_target:color_target,depth_target},{},"scene3d"});
     graph.add_pass({"tonemap",{hdr_target},{color_target},{},"tonemap",target.hdr!=nullptr});
     std::vector<std::string> order;std::vector<engine::RenderGraphDiagnostic> diagnostics;
@@ -1164,9 +1161,10 @@ struct Scene3DRenderer::Storage {
     std::array<Uint32,4> omni_bytes{};
     Uint32 omni_bytes_total=0;
     for(std::size_t i=0;i<4;++i){omni_bytes[i]=static_cast<Uint32>(omni_transforms[i].size()*sizeof(ShadowCast));omni_bytes_total+=omni_bytes[i];}
-    const auto far_bytes=static_cast<Uint32>(far_transforms.size()*sizeof(ShadowCast));
-    const auto far2_bytes=static_cast<Uint32>(far2_transforms.size()*sizeof(ShadowCast));
-    if(!sorted.empty()||shadow_bytes||spot_bytes_total||omni_bytes_total||far_bytes||far2_bytes){
+    std::array<Uint32,maximum_scene3d_shadow_cascades> cascade_bytes{};
+    Uint32 cascade_bytes_total=0;
+    for(std::size_t i=0;i<cascade_layers;++i){cascade_bytes[i]=static_cast<Uint32>(cascade_transforms[i].size()*sizeof(ShadowCast));cascade_bytes_total+=cascade_bytes[i];}
+    if(!sorted.empty()||shadow_bytes||spot_bytes_total||omni_bytes_total||cascade_bytes_total){
       const auto vertex_bytes=static_cast<Uint32>(vertex_data.size()*sizeof(VertexUniform)),fragment_bytes=static_cast<Uint32>(fragment_data.size()*sizeof(FragmentUniform));
       if(!vertex_buffer||!fragment_buffer||vertex_capacity<vertex_data.size()||fragment_capacity<fragment_data.size()){
         if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);
@@ -1197,19 +1195,14 @@ struct Scene3DRenderer::Storage {
           SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(omni_shadow_capacity[i]*sizeof(ShadowCast));
           omni_shadow_buffer[i]=SDL_CreateGPUBuffer(device,&info);if(!omni_shadow_buffer[i])throw gpu_error("3D omni shadow transform buffer creation failed");
         }
-      if(far_bytes&&(!far_shadow_buffer||far_shadow_capacity<far_transforms.size())){
-        if(far_shadow_buffer)SDL_ReleaseGPUBuffer(device,far_shadow_buffer);
-        far_shadow_capacity=std::max<std::size_t>(far_transforms.size(),far_shadow_capacity*2);
-        SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(far_shadow_capacity*sizeof(ShadowCast));
-        far_shadow_buffer=SDL_CreateGPUBuffer(device,&info);if(!far_shadow_buffer)throw gpu_error("3D far shadow transform buffer creation failed");
-      }
-      if(far2_bytes&&(!far2_shadow_buffer||far2_shadow_capacity<far2_transforms.size())){
-        if(far2_shadow_buffer)SDL_ReleaseGPUBuffer(device,far2_shadow_buffer);
-        far2_shadow_capacity=std::max<std::size_t>(far2_transforms.size(),far2_shadow_capacity*2);
-        SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(far2_shadow_capacity*sizeof(ShadowCast));
-        far2_shadow_buffer=SDL_CreateGPUBuffer(device,&info);if(!far2_shadow_buffer)throw gpu_error("3D far2 shadow transform buffer creation failed");
-      }
-      Transfer transfer(device,vertex_bytes+fragment_bytes+shadow_bytes+spot_bytes_total+omni_bytes_total+far_bytes+far2_bytes);auto* memory=static_cast<std::byte*>(transfer.map());
+      for(std::size_t i=0;i<cascade_layers;++i)
+        if(cascade_bytes[i]&&(!cascade_shadow_buffer[i]||cascade_shadow_capacity[i]<cascade_transforms[i].size())){
+          if(cascade_shadow_buffer[i])SDL_ReleaseGPUBuffer(device,cascade_shadow_buffer[i]);
+          cascade_shadow_capacity[i]=std::max<std::size_t>(cascade_transforms[i].size(),cascade_shadow_capacity[i]*2);
+          SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=static_cast<Uint32>(cascade_shadow_capacity[i]*sizeof(ShadowCast));
+          cascade_shadow_buffer[i]=SDL_CreateGPUBuffer(device,&info);if(!cascade_shadow_buffer[i])throw gpu_error("3D cascade shadow transform buffer creation failed");
+        }
+      Transfer transfer(device,vertex_bytes+fragment_bytes+shadow_bytes+spot_bytes_total+omni_bytes_total+cascade_bytes_total);auto* memory=static_cast<std::byte*>(transfer.map());
       if(vertex_bytes)std::memcpy(memory,vertex_data.data(),vertex_bytes);
       if(fragment_bytes)std::memcpy(memory+vertex_bytes,fragment_data.data(),fragment_bytes);
       if(shadow_bytes)std::memcpy(memory+vertex_bytes+fragment_bytes,shadow_transforms.data(),shadow_bytes);
@@ -1221,8 +1214,10 @@ struct Scene3DRenderer::Storage {
       for(std::size_t i=0;i<4;++i){
         if(omni_bytes[i]){std::memcpy(memory+omni_at,omni_transforms[i].data(),omni_bytes[i]);omni_at+=omni_bytes[i];}
       }
-      if(far_bytes)std::memcpy(memory+omni_at,far_transforms.data(),far_bytes);
-      if(far2_bytes)std::memcpy(memory+omni_at+far_bytes,far2_transforms.data(),far2_bytes);
+      std::size_t cascade_at=omni_at;
+      for(std::size_t i=0;i<cascade_layers;++i){
+        if(cascade_bytes[i]){std::memcpy(memory+cascade_at,cascade_transforms[i].data(),cascade_bytes[i]);cascade_at+=cascade_bytes[i];}
+      }
       SDL_UnmapGPUTransferBuffer(device,transfer.value);
       auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D instance upload copy pass failed");
       SDL_GPUTransferBufferLocation from{transfer.value,0};
@@ -1237,8 +1232,10 @@ struct Scene3DRenderer::Storage {
       for(std::size_t i=0;i<4;++i){
         if(omni_bytes[i]){from.offset=static_cast<Uint32>(omni_from);SDL_GPUBufferRegion to{omni_shadow_buffer[i],0,omni_bytes[i]};SDL_UploadToGPUBuffer(copy,&from,&to,false);omni_from+=omni_bytes[i];}
       }
-      if(far_bytes){from.offset=static_cast<Uint32>(omni_from);SDL_GPUBufferRegion to{far_shadow_buffer,0,far_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);}
-      if(far2_bytes){from.offset=static_cast<Uint32>(omni_from+far_bytes);SDL_GPUBufferRegion to{far2_shadow_buffer,0,far2_bytes};SDL_UploadToGPUBuffer(copy,&from,&to,false);}
+      std::size_t cascade_from=omni_from;
+      for(std::size_t i=0;i<cascade_layers;++i){
+        if(cascade_bytes[i]){from.offset=static_cast<Uint32>(cascade_from);SDL_GPUBufferRegion to{cascade_shadow_buffer[i],0,cascade_bytes[i]};SDL_UploadToGPUBuffer(copy,&from,&to,false);cascade_from+=cascade_bytes[i];}
+      }
       SDL_EndGPUCopyPass(copy);
     }
     // Resolve per-view quality policy once: Low keeps the tonemap-only path,
@@ -1262,8 +1259,7 @@ struct Scene3DRenderer::Storage {
     if(shadow_res==0&&target.shadow){SDL_ReleaseGPUTexture(device,target.shadow);target.shadow=nullptr;target.shadow_size=0;}
     if(spot_res==0&&target.spot_shadow){SDL_ReleaseGPUTexture(device,target.spot_shadow);target.spot_shadow=nullptr;target.spot_shadow_size=0;}
     if(omni_cell==0&&target.point_shadow){SDL_ReleaseGPUTexture(device,target.point_shadow);target.point_shadow=nullptr;target.point_shadow_w=target.point_shadow_h=0;}
-    if(far_res==0&&target.shadow_far){SDL_ReleaseGPUTexture(device,target.shadow_far);target.shadow_far=nullptr;target.shadow_far_size=0;}
-    if(far2_res==0&&target.shadow_far2){SDL_ReleaseGPUTexture(device,target.shadow_far2);target.shadow_far2=nullptr;target.shadow_far2_size=0;}
+    if(cascade_res==0&&target.shadow_cascade){SDL_ReleaseGPUTexture(device,target.shadow_cascade);target.shadow_cascade=nullptr;target.shadow_cascade_size=target.shadow_cascade_layers=0;}
     for(const auto& name:order){
       if(name=="shadow"){
         if(target.shadow_size!=static_cast<int>(shadow_res)){
@@ -1341,50 +1337,32 @@ struct Scene3DRenderer::Storage {
           }
         }
         SDL_EndGPURenderPass(pass);
-      }else if(name=="shadow-far"){
-        if(target.shadow_far_size!=static_cast<int>(far_res)){
-          if(target.shadow_far)SDL_ReleaseGPUTexture(device,target.shadow_far);
-          target.shadow_far=make_texture(device,static_cast<int>(far_res),static_cast<int>(far_res),SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
-          target.shadow_far_size=static_cast<int>(far_res);
+      }else if(name=="shadow-cascade"){
+        // One depth-array target, one layer per authored tier — any
+        // tier-count or resolution change reallocates the whole array.
+        if(target.shadow_cascade_size!=static_cast<int>(cascade_res)||target.shadow_cascade_layers!=static_cast<int>(cascade_layers)){
+          if(target.shadow_cascade)SDL_ReleaseGPUTexture(device,target.shadow_cascade);
+          target.shadow_cascade=make_texture_array(device,static_cast<int>(cascade_res),static_cast<int>(cascade_res),static_cast<int>(cascade_layers),SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
+          target.shadow_cascade_size=static_cast<int>(cascade_res);target.shadow_cascade_layers=static_cast<int>(cascade_layers);
         }
-        SDL_GPUDepthStencilTargetInfo map{};map.texture=target.shadow_far;map.clear_depth=1;map.load_op=SDL_GPU_LOADOP_CLEAR;map.store_op=SDL_GPU_STOREOP_STORE;map.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;map.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
-        auto* pass=SDL_BeginGPURenderPass(command.value,nullptr,0,&map);if(!pass)throw gpu_error("3D far shadow pass failed");
-        if(!far_transforms.empty()){
-          SDL_BindGPUGraphicsPipeline(pass,shadow_pipeline);
-          SDL_BindGPUVertexStorageBuffers(pass,0,&far_shadow_buffer,1);
-          for(const auto& batch:far_batcher.batches()){
-            const auto& geo=*far_geometry[batch.first_item];
-            const auto& cast=far_transforms[batch.first_item];
-            const SDL_GPUTextureSamplerBinding sampled[]{{far_textures[batch.material_id]->texture,(cast.tile_u!=1.f||cast.tile_v!=1.f)?repeat_sampler:sampler}};
-            SDL_BindGPUFragmentSamplers(pass,0,sampled,1);
-            const SDL_GPUBufferBinding vertices{geo.vertices,0},indices{geo.indices,0};
-            SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
-            SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(geo.owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
+        for(std::size_t tier=0;tier<cascade_layers;++tier){
+          SDL_GPUDepthStencilTargetInfo map{};map.texture=target.shadow_cascade;map.layer=static_cast<Uint8>(tier);map.clear_depth=1;map.load_op=SDL_GPU_LOADOP_CLEAR;map.store_op=SDL_GPU_STOREOP_STORE;map.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;map.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
+          auto* pass=SDL_BeginGPURenderPass(command.value,nullptr,0,&map);if(!pass)throw gpu_error("3D cascade shadow pass failed");
+          if(!cascade_transforms[tier].empty()){
+            SDL_BindGPUGraphicsPipeline(pass,shadow_pipeline);
+            SDL_BindGPUVertexStorageBuffers(pass,0,&cascade_shadow_buffer[tier],1);
+            for(const auto& batch:cascade_batcher[tier].batches()){
+              const auto& geo=*cascade_geometry[tier][batch.first_item];
+              const auto& cast=cascade_transforms[tier][batch.first_item];
+              const SDL_GPUTextureSamplerBinding sampled[]{{cascade_textures[tier][batch.material_id]->texture,(cast.tile_u!=1.f||cast.tile_v!=1.f)?repeat_sampler:sampler}};
+              SDL_BindGPUFragmentSamplers(pass,0,sampled,1);
+              const SDL_GPUBufferBinding vertices{geo.vertices,0},indices{geo.indices,0};
+              SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
+              SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(geo.owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
+            }
           }
+          SDL_EndGPURenderPass(pass);
         }
-        SDL_EndGPURenderPass(pass);
-      }else if(name=="shadow-far2"){
-        if(target.shadow_far2_size!=static_cast<int>(far2_res)){
-          if(target.shadow_far2)SDL_ReleaseGPUTexture(device,target.shadow_far2);
-          target.shadow_far2=make_texture(device,static_cast<int>(far2_res),static_cast<int>(far2_res),SDL_GPU_TEXTUREFORMAT_D32_FLOAT,SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET|SDL_GPU_TEXTUREUSAGE_SAMPLER);
-          target.shadow_far2_size=static_cast<int>(far2_res);
-        }
-        SDL_GPUDepthStencilTargetInfo map{};map.texture=target.shadow_far2;map.clear_depth=1;map.load_op=SDL_GPU_LOADOP_CLEAR;map.store_op=SDL_GPU_STOREOP_STORE;map.stencil_load_op=SDL_GPU_LOADOP_DONT_CARE;map.stencil_store_op=SDL_GPU_STOREOP_DONT_CARE;
-        auto* pass=SDL_BeginGPURenderPass(command.value,nullptr,0,&map);if(!pass)throw gpu_error("3D far2 shadow pass failed");
-        if(!far2_transforms.empty()){
-          SDL_BindGPUGraphicsPipeline(pass,shadow_pipeline);
-          SDL_BindGPUVertexStorageBuffers(pass,0,&far2_shadow_buffer,1);
-          for(const auto& batch:far2_batcher.batches()){
-            const auto& geo=*far2_geometry[batch.first_item];
-            const auto& cast=far2_transforms[batch.first_item];
-            const SDL_GPUTextureSamplerBinding sampled[]{{far2_textures[batch.material_id]->texture,(cast.tile_u!=1.f||cast.tile_v!=1.f)?repeat_sampler:sampler}};
-            SDL_BindGPUFragmentSamplers(pass,0,sampled,1);
-            const SDL_GPUBufferBinding vertices{geo.vertices,0},indices{geo.indices,0};
-            SDL_BindGPUVertexBuffers(pass,0,&vertices,1);SDL_BindGPUIndexBuffer(pass,&indices,SDL_GPU_INDEXELEMENTSIZE_32BIT);
-            SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(geo.owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
-          }
-        }
-        SDL_EndGPURenderPass(pass);
       }else if(name=="scene3d"){
         SDL_GPUColorTargetInfo color{};
         color.texture=use_msaa?target.msaa_color:(target.hdr?target.hdr:target.color);
@@ -1414,10 +1392,9 @@ struct Scene3DRenderer::Storage {
               {draw.emissive->texture,tiled?repeat_sampler:sampler},{draw.mr->texture,tiled?repeat_sampler:sampler},
               {use_shadow?target.shadow:texture(white)->texture,sampler},
               {spot_res>0?target.spot_shadow:texture(white)->texture,sampler},
-              {far_res>0?target.shadow_far:texture(white)->texture,sampler},
-              {far2_res>0?target.shadow_far2:texture(white)->texture,sampler},
+              {cascade_res>0?target.shadow_cascade:texture(white)->texture,sampler},
               {omni_cell>0?target.point_shadow:texture(white)->texture,sampler}};
-            SDL_BindGPUFragmentSamplers(pass,0,sampled,15);
+            SDL_BindGPUFragmentSamplers(pass,0,sampled,14);
             SDL_DrawGPUIndexedPrimitives(pass,static_cast<Uint32>(draw.mesh->owner->indices().size()),batch.count,0,0,batch.first_item);++stats.draw_calls;
           }
         }
@@ -1453,7 +1430,7 @@ struct Scene3DRenderer::Storage {
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
 Scene3DRenderer::~Scene3DRenderer()=default;
 void Scene3DRenderer::prepare(const DrawList& list){
-  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.shadow_cascade_casters=s.stats.shadow_cascade2_casters=s.stats.spot_shadow_casters=s.stats.omni_shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=s.stats.visible_fades=s.stats.lod_groups=0;
+  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.spot_shadow_casters=s.stats.omni_shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=s.stats.visible_fades=s.stats.lod_groups=0;s.stats.shadow_cascade_casters.fill(0);
   for(const auto& c:list.world)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   for(const auto& c:list.overlay)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");

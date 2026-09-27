@@ -1039,32 +1039,29 @@ int main(int argc,char** argv)try{
     // below the shadow footprint means only the cascade can carry the
     // umbra — single-tier leaves that receiver fragment lit.
     auto narrow=shadow;narrow.extent=.3f;
-    const auto narrow_view=[&](std::vector<MeshInstance3D> objects,float cascade,const char* name){
-      auto tier=narrow;tier.cascade_extent=cascade;
+    const auto narrow_view=[&](std::vector<MeshInstance3D> objects,std::vector<float> tiers,const char* name){
+      auto tier=narrow;tier.cascade_extents=std::move(tiers);
       DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},tier),{0,0,320,320}});
       window.draw(list,folder/name);return decode_rgba_image(folder/name);};
-    const auto near_only=narrow_view({receiver,occluder},0,"shadow-near-only.png");
-    const auto cascaded=narrow_view({receiver,occluder},4,"shadow-cascade.png");
+    const auto near_only=narrow_view({receiver,occluder},{},"shadow-near-only.png");
+    const auto cascaded=narrow_view({receiver,occluder},{4},"shadow-cascade.png");
     check(channel(*near_only,176,160,0)>100,"Near window covered a fragment outside its extent");
     check(channel(*cascaded,176,160,0)<channel(*open,176,160,0)/2,"Far cascade did not carry the out-of-window shadow");
     check(channel(*cascaded,60,160,0)>100,"Far cascade darkened a fragment inside the empty near window");
     // Third tier: the umbra fragment sits at light-space x≈.78, so a mid
-    // cascade at .5 still misses it — only the cascade2 window (4) covers.
-    // The mid-only capture staying lit proves the chain didn't smear.
-    const auto mid_only=narrow_view({receiver,occluder},.5f,"shadow-cascade-mid.png");
+    // cascade at .5 still misses it — only the second cascade window (4)
+    // covers. The mid-only capture staying lit proves the chain didn't
+    // smear.
+    const auto mid_only=narrow_view({receiver,occluder},{.5f},"shadow-cascade-mid.png");
     const auto mid_stats=window.scene3d_statistics();
-    const auto chain3=[&](std::vector<MeshInstance3D> objects,float c1,float c2,const char* name){
-      auto tier=narrow;tier.cascade_extent=c1;tier.cascade2_extent=c2;
-      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},tier),{0,0,320,320}});
-      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
-    const auto tier3=chain3({receiver,occluder},.5f,4.f,"shadow-cascade2.png");
+    const auto tier3=narrow_view({receiver,occluder},{.5f,4.f},"shadow-cascade2.png");
     const auto tier3_stats=window.scene3d_statistics();
     // The receiver sits inside every window; the occluder's volume test
-    // passes far1 (.5+radius) even though its umbra lands past the map
-    // edge — so far1 collects two casters and only cascade2 adds new
+    // passes tier 1 (.5+radius) even though its umbra lands past the map
+    // edge — so tier 1 collects two casters and only tier 2 adds new
     // submissions. The per-tier counters must attribute accordingly.
-    check(mid_stats.shadow_casters==3&&mid_stats.shadow_cascade_casters==2&&mid_stats.shadow_cascade2_casters==0,"Cascade counters misattributed the mid-tier submissions");
-    check(tier3_stats.shadow_casters==5&&tier3_stats.shadow_cascade_casters==2&&tier3_stats.shadow_cascade2_casters==2,"Cascade counters misattributed the far2 submissions");
+    check(mid_stats.shadow_casters==3&&mid_stats.shadow_cascade_casters[0]==2&&mid_stats.shadow_cascade_casters[1]==0,"Cascade counters misattributed the mid-tier submissions");
+    check(tier3_stats.shadow_casters==5&&tier3_stats.shadow_cascade_casters[0]==2&&tier3_stats.shadow_cascade_casters[1]==2,"Cascade counters misattributed the third-tier submissions");
     check(channel(*mid_only,176,160,0)>100,"Mid cascade covered a fragment outside its extent");
     check(channel(*tier3,176,160,0)<channel(*open,176,160,0)/2,"The third cascade tier did not carry the shadow");
     check(channel(*tier3,60,160,0)>100,"The third cascade tier darkened an unoccluded fragment");
@@ -1447,16 +1444,16 @@ int main(int argc,char** argv)try{
         ship.lod_pixels=8;ship.lod_meshes={proxy};
         cascade_ships.push_back(std::move(ship));
       }
-      ShadowMap3D cascade_shadow=armada_shadow;cascade_shadow.cascade_extent=400;cascade_shadow.cascade2_extent=800;
+      ShadowMap3D cascade_shadow=armada_shadow;cascade_shadow.cascade_extents={400,800};
       DrawList cascade_armada;cascade_armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(cascade_ships),{0,0,1},{picket},cascade_shadow),{0,0,640,360}});
       const auto cascade_start=std::chrono::steady_clock::now();double cascade_submit=0;
       for(int i=0;i<60;++i){FrameTiming timing;window.draw(cascade_armada,std::nullopt,&timing);cascade_submit+=timing.submission_ms;}
       const auto cascade_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cascade_start).count();
       const auto cascade_stats=window.scene3d_statistics();
-      check(cascade_stats.shadow_cascade_casters>0&&cascade_stats.shadow_cascade2_casters>0,"Three-tier shadow fleet submitted no far casters");
+      check(cascade_stats.shadow_cascade_casters[0]>0&&cascade_stats.shadow_cascade_casters[1]>0,"Three-tier shadow fleet submitted no far casters");
       std::cout<<"fleet3d_shadow_cascade frames=60 instances=1024 cpu_submit_mean_ms="<<cascade_submit/60<<" frame_wall_mean_ms="<<cascade_wall/60
         <<" draw_calls="<<cascade_stats.draw_calls<<" shadow_casters="<<cascade_stats.shadow_casters
-        <<" cascade="<<cascade_stats.shadow_cascade_casters<<" cascade2="<<cascade_stats.shadow_cascade2_casters
+        <<" cascade="<<cascade_stats.shadow_cascade_casters[0]<<" cascade2="<<cascade_stats.shadow_cascade_casters[1]
         <<" spot_shadow_casters="<<cascade_stats.spot_shadow_casters<<'\n';}
      // Omni receipt: the same picket with its cone removed collects into
      // every cube face the fleet spans — per-light caster work scales
