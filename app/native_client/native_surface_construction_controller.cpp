@@ -126,6 +126,59 @@ NativeSurfaceCommandOutcome stale(
                   "The campaign or surface quote changed; review it before confirming.")};
 }
 
+// The core assessment API reports denial reasons as stable English literals.
+// Map each literal to a localization key so denied orders explain themselves
+// in the active locale; unrecognized text passes through unchanged.
+std::string localized_denial(
+    const stellar::engine::LocalizationTable *locale,
+    const std::string &message) {
+  static const std::pair<std::string_view, std::string_view> table[] = {
+      {"You can build only in a colony you own.", "SURFACE_DENY_OWNED"},
+      {"You can build only on a planet you own.", "SURFACE_DENY_OWNED"},
+      {"Extreme stellar irradiation prohibits all surface construction.",
+       "SURFACE_DENY_IRRADIATION"},
+      {"A surveyed colony on a solid planetary surface is required.",
+       "SURFACE_DENY_SURVEYED_SOLID"},
+      {"The colony has no construction economy.", "SURFACE_DENY_NO_ECONOMY"},
+      {"A sealed resource outpost cannot support a civilian trade hub. Deliver extracted material by freighter.",
+       "SURFACE_DENY_SEALED_OUTPOST"},
+      {"That building type is available only as an upgrade.",
+       "SURFACE_DENY_UPGRADE_ONLY"},
+      {"Complete the Command Center before constructing planetary buildings.",
+       "SURFACE_DENY_HUB_FIRST"},
+      {"Complete the Command Center to unlock building slots.",
+       "SURFACE_DENY_HUB_SLOTS"},
+      {"Upgrade the Command Center to unlock this slot.",
+       "SURFACE_DENY_SLOT_LOCKED"},
+      {"This slot is occupied or reserved by construction.",
+       "SURFACE_DENY_SLOT_TAKEN"},
+      {"No compatible site is available for this building.",
+       "SURFACE_DENY_NO_SITE"},
+      {"No building identifier is available.", "SURFACE_DENY_NO_ID"},
+      {"Unknown building type.", "SURFACE_DENY_UNKNOWN_TYPE"},
+      {"Building position and rotation must be finite.",
+       "SURFACE_DENY_FINITE"},
+      {"Choose a position inside the colony boundary.",
+       "SURFACE_DENY_BOUNDARY"},
+      {"Leave room around the colony hub.", "SURFACE_DENY_HUB_CLEARANCE"},
+      {"This slope is too steep. Choose flatter ground.", "SURFACE_DENY_SLOPE"},
+      {"The colony contains an unknown building type.",
+       "SURFACE_DENY_UNKNOWN_MEMBER"},
+      {"That position overlaps another building or construction site.",
+       "SURFACE_DENY_OVERLAP"},
+      {"This demo colony has reached its 64-building limit.",
+       "SURFACE_DENY_LIMIT"},
+      {"You can remove buildings only from a colony you own.",
+       "SURFACE_DENY_REMOVE_OWNED"},
+      {"That surface building no longer exists.", "SURFACE_DENY_REMOVE_GONE"},
+      {"That surface building has an unknown type and cannot be removed safely.",
+       "SURFACE_DENY_REMOVE_UNKNOWN"},
+  };
+  for (const auto &[literal, key] : table)
+    if (message == literal) return resolve(locale, key, message);
+  return message;
+}
+
 std::string placement_preview_message(
     const SurfaceBuildingPlacementAssessment &assessment,
     const stellar::engine::LocalizationTable *locale) {
@@ -455,7 +508,7 @@ NativeSurfaceConstructionController::preview_placement(
   result.formatted_authorization = assessment.formatted_authorization;
   result.accepted = assessment.accepted;
   result.message = assessment.accepted ? placement_preview_message(assessment, locale_)
-                                      : assessment.message;
+                                      : localized_denial(locale_, assessment.message);
   if (assessment.accepted)
     quotes_.emplace(result.quote_revision,
                     PlacementRecord{view.system_id, view.body_id, view.revision,
@@ -494,7 +547,7 @@ NativeSurfaceRemovalQuote NativeSurfaceConstructionController::preview_removal(
   result.cancellation = assessment.cancellation;
   result.refund_budget_units = assessment.refund;
   result.formatted_refund = assessment.formatted_refund;
-  result.message = assessment.message;
+  result.message = localized_denial(locale_, assessment.message);
   if (assessment.accepted)
     quotes_.emplace(result.quote_revision,
                     RemovalRecord{view.system_id, view.body_id, view.revision,
@@ -535,8 +588,16 @@ NativeSurfaceConstructionController::confirm_placement(
   if (!live_binding(current, assessment.civilization_id, record.system_id,
                     record.body_id, assessment.colony_id))
     return stale(locale_);
-  const auto result =
+  auto result =
       commit_surface_building_placement(current.command, assessment);
+  if (result.accepted)
+    result.message = resolved(
+        locale_, "SURFACE_PLACEMENT_ORDERED",
+        {assessment.building_name, assessment.formatted_authorization},
+        "{0} placed and authorized for {1}. Construction uses available "
+        "materials.");
+  else
+    result.message = localized_denial(locale_, result.message);
   return {result.accepted, result.message};
 }
 
@@ -570,7 +631,19 @@ NativeSurfaceConstructionController::confirm_removal(
   if (!live_binding(current, assessment.civilization_id, record.system_id,
                     record.body_id, assessment.colony_id))
     return stale(locale_);
-  const auto result = commit_surface_building_removal(current.command, assessment);
+  auto result = commit_surface_building_removal(current.command, assessment);
+  if (result.accepted)
+    result.message = assessment.cancellation
+        ? resolved(locale_, "SURFACE_REMOVAL_CANCELLED",
+                   {assessment.building_name, assessment.formatted_refund},
+                   "{0} construction cancelled. {1} was recovered; spent "
+                   "industry was not recoverable.")
+        : resolved(locale_, "SURFACE_REMOVAL_DEMOLISHED",
+                   {assessment.building_name},
+                   "{0} demolished. Its power use and production have "
+                   "stopped.");
+  else
+    result.message = localized_denial(locale_, result.message);
   return {result.accepted, result.message};
 }
 

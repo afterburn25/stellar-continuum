@@ -4,6 +4,7 @@
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/engine/localization.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/player_campaign_persistence.hpp>
 #include <stellar/core/player_campaign_json.hpp>
@@ -175,6 +176,41 @@ void quote_and_progress_tests(const fs::path &research_root,
   require(progressed != colony(frame, selected.colony.colony_id).surface_buildings.end() &&
               progressed->industry_progress > progress_before,
           "surface site did not progress through CampaignFrame");
+
+  {
+    // Localization: confirmed-order and denial notices resolve through the
+    // bound table; unmatched core literals pass through unchanged.
+    stellar::engine::LocalizationTable german("de", "en");
+    std::string loc_error;
+    require(german.load_json(R"({"locale":"de","strings":{
+        "SURFACE_PLACEMENT_ORDERED":"{0} platziert und für {1} autorisiert.",
+        "SURFACE_DENY_UPGRADE_ONLY":"Nur als Aufwertung verfügbar."
+      }})",
+                              &loc_error),
+            loc_error);
+    NativeSurfaceConstructionController localized;
+    localized.set_localization(&german);
+    const auto denied_type = localized.preview_placement(
+        frame, 1, selected.colony, "not-a-building", 0.f, 0.f, 0.f);
+    require(!denied_type.accepted &&
+                denied_type.message == "Nur als Aufwertung verfügbar.",
+            "mapped denial literal did not resolve to the localized key");
+    const auto stale_outcome = localized.confirm_placement(frame, 1, denied_type);
+    require(!stale_outcome.accepted &&
+                stale_outcome.message ==
+                    "The campaign or surface quote changed; review it before "
+                    "confirming.",
+            "unmapped message did not pass through unchanged");
+    const auto loc_quote =
+        accepted_quote(localized, frame, 1, selected.colony, type);
+    const auto loc_placed = localized.confirm_placement(frame, 1, loc_quote);
+    require(loc_placed.accepted &&
+                loc_placed.message == loc_quote.building_name +
+                                          " platziert und für " +
+                                          loc_quote.formatted_authorization +
+                                          " autorisiert.",
+            "localized confirm did not use the bound table message");
+  }
 
   selected = select_home(frame, 1, systems, colonies);
   const auto removal = controller.preview_removal(

@@ -133,6 +133,8 @@ int main(int argc,char** argv)try{
     check(l.details.height>40,"Compact details column has no scroll viewport");
     check(l.tabs.y+l.tabs.height<=l.details.y&&l.details.y+l.details.height<=l.command.y&&l.command.y+l.command.height<=l.queue.y,"Compact right column overlaps itself");
     check(l.vitals.y+l.vitals.height<=l.alerts.y,"Compact vitals strip overlaps the alerts block");
+    check(l.save.width>=60.f&&l.save.x+l.save.width<=l.screen.x+l.screen.width+0.5f,
+          "Compact save control lost its readable width or left the screen");
     const auto in=[](const UiRect& r){return Point{r.x+r.width*.5f,r.y+r.height*.5f};};
     check(l.modal.contains(in(l.confirm))&&l.modal.contains(in(l.cancel)),"Compact modal lost its review buttons");
     NativePlanetaryScreen screen;NativeColonyView view;
@@ -140,13 +142,21 @@ int main(int argc,char** argv)try{
     view.campaign_generation=1;view.colony_id=7;view.building_capacity=32;
     view.surface_hub_level=2;view.body_display_name="Earth";
     screen.set_view(view);DrawList draw;screen.render(draw,view,w,h);
-    const Point slots_tab{l.tabs.x+l.tabs.width*.375f,l.tabs.y+l.tabs.height*.5f};
+    const int tab_rows=l.tabs.height>36*l.s?2:1,tab_cols=4/tab_rows;
+    const float tab_h=(l.tabs.height-(tab_rows-1)*4*l.s)/tab_rows,tab_w=l.tabs.width/tab_cols;
+    const Point slots_tab{l.tabs.x+(1%tab_cols)*tab_w+tab_w*.5f,l.tabs.y+(1/tab_cols)*(tab_h+4*l.s)+tab_h*.5f};
     (void)screen.handle({InputEventType::LeftPressed,slots_tab},w,h);
     (void)screen.handle({InputEventType::LeftReleased,slots_tab},w,h);
     draw={};screen.render(draw,view,w,h);
-    bool slot_listed=false;
-    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item);t&&t->value=="Available slot")slot_listed=true;
+    bool slot_listed=false,layer_short=false,layer_long=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item)){
+      if(t->value=="Available slot")slot_listed=true;
+      if(t->value=="○  Resources"||t->value=="○  Military")layer_short=true;
+      if(t->value.find("· unavailable")!=std::string::npos)layer_long=true;
+    }
     check(slot_listed,"Compact layout hides the available building slot");
+    check(layer_short&&!layer_long,
+          "Compact layer rows keep the overflowing qualifier instead of the short label");
   }
   {
     // Keyboard-focus contract: the ring walks the render-registered hit

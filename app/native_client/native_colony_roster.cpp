@@ -228,7 +228,7 @@ RosterLayout RosterLayout::for_viewport(int width, int height) noexcept {
            28.f * s},
           {panel.x + panel.width - 166.f * s, panel.y + 12.f * s, 112.f * s,
            28.f * s},
-          {panel.x + panel.width - 500.f * s, panel.y + 12.f * s, 320.f * s,
+          {panel.x + panel.width - 430.f * s, panel.y + 12.f * s, 250.f * s,
            28.f * s},
           s,
           std::max(58.f * s, height <= 800 ? 66.f * s : 60.f * s)};
@@ -671,9 +671,14 @@ void RosterWorkspace::render(DrawList &out, int width, int height) const {
   const auto p = layout.panel;
   const int font = std::max(11, static_cast<int>(15.f * layout.scale));
   stellar::native_ui_style::menu_panel(out, p);
+  // The title wraps when it exceeds its box (DT_WORDBREAK) and the single-line
+  // clip then hides the wrapped line — size the box up to the search field so
+  // longer translations (e.g. "EIGENE KOLONIEN") stay visible on one line.
   text(out,
        {p.x + 16.f * layout.scale, p.y + 12.f * layout.scale,
-        p.width - 520.f * layout.scale, 29.f * layout.scale},
+        std::max(0.f, layout.search.x - (p.x + 16.f * layout.scale) -
+                          10.f * layout.scale),
+        29.f * layout.scale},
        view_.developer_inspection
            ? tr("ROSTER_TITLE_ALL", "ALL COLONIES")
            : tr("ROSTER_TITLE_OWNED", "OWNED COLONIES"),

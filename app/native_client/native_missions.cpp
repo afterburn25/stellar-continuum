@@ -1291,11 +1291,20 @@ void NativeMissionView::render(
   const auto accent = theme::color::selected;
   const auto gold = theme::color::economy;
   native_ui_style::menu_panel(out, layout.panel);
-  out.overlay.emplace_back(Text{{layout.header.x, layout.header.y},
-                                mt(locale_, "MISSIONS_TITLE",
-                                   "MISSIONS & SETTLEMENT"),
-                                theme::color::text_primary,
-                                layout.heading_font_pixels});
+  // Bound the header text before the close button: longer translations
+  // (e.g. "MISSIONEN & BESIEDLUNG") otherwise paint under it. Narrow panels
+  // switch to the compact title — the heading font floors at 14 px, below
+  // which wrap remnants ghost through the header band.
+  const float title_width =
+      std::max(0.f, layout.close_button.x - layout.header.x - 8.f * scale);
+  const bool compact_title = title_width < 200.f;
+  out.overlay.emplace_back(
+      Text{{layout.header.x, layout.header.y},
+           mt(locale_, compact_title ? "MISSIONS_TITLE_COMPACT"
+                                     : "MISSIONS_TITLE",
+              compact_title ? "MISSIONS" : "MISSIONS & SETTLEMENT"),
+           theme::color::text_primary, layout.heading_font_pixels, title_width,
+           layout.header});
   theme::button(out, layout.close_button, "X", pointer_,
                 layout.body_font_pixels);
   theme::tab(out, layout.missions_tab,

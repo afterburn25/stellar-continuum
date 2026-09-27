@@ -38,7 +38,11 @@ struct PlanetaryLayout {
     l.s=std::min(std::clamp(height/1080.f,.8f,2.f),
                  std::max(.4f,(height-y)/692.f));
     const float s=l.s,g=10*s;
-    l.font=std::max(13,static_cast<int>(16*s));l.small=std::max(12,static_cast<int>(14*s));l.heading=static_cast<int>(24*s);
+    // Below s~.75 the fixed 13/12 px font floors exceed the scaled row pitch
+    // (28 s rows hold ~12 px at 640x360), so text clips and collides — let the
+    // floors track the compact scale down to a still-legible minimum.
+    const int font_floor=s<.75f?10:13,small_floor=s<.75f?9:12;
+    l.font=std::max(font_floor,static_cast<int>(16*s));l.small=std::max(small_floor,static_cast<int>(14*s));l.heading=static_cast<int>(24*s);
     l.screen={x,y,width-x-10*s,height-y-8*s};
     const float bottom=height-118*s,pw=std::clamp(l.screen.width*.21f,260*s,336*s);
     l.left={x,y,pw,bottom-y};l.right={width-pw-10*s,y,pw,bottom-y};
@@ -57,9 +61,17 @@ struct PlanetaryLayout {
     l.command={l.right.x+12*s,bottom-102*s,pw-24*s,32*s};
     l.queue={l.right.x+12*s,bottom-64*s,pw-24*s,54*s};
     l.tabs={l.right.x+12*s,y+218*s,pw-24*s,32*s};
-    l.details={l.tabs.x,l.tabs.y+42*s,l.tabs.width,l.command.y-l.tabs.y-54*s};
+    // Compact: four localized tab labels cannot share ~115 px — split the
+    // strip into a two-row grid so each keeps a readable width, and let the
+    // details viewport absorb the extra row.
+    if(l.tabs.width/4.f<44.f)l.tabs.height=32*s*2+4*s;
+    l.details={l.tabs.x,l.tabs.y+l.tabs.height+10*s,l.tabs.width,l.command.y-l.tabs.y-l.tabs.height-22*s};
     l.slots=l.details;l.metrics={};
-    l.actions={x,bottom+8*s,l.screen.width,72*s};l.save={x+l.screen.width-90*s,l.actions.y,90*s,72*s};
+    l.actions={x,bottom+8*s,l.screen.width,72*s};
+    // The save control needs a pixel floor: 90 s collapses below the localized
+    // label ("Speichern") at compact scales and clipped mid-glyph.
+    const float save_w=std::max(90.f*s,74.f);
+    l.save={x+l.screen.width-save_w,l.actions.y,save_w,72*s};
     l.view_modes={l.globe.x,l.globe.y+l.globe.height+5*s,l.globe.width,32*s};
     l.notice={x,bottom+86*s,l.screen.width,22*s};
     const float mw=std::min(650*s,l.screen.width),mh=std::min(350*s,l.screen.height-30*s);
@@ -168,7 +180,7 @@ class NativePlanetaryScreen {
   }
   void render(DrawList& out,const NativeColonyView& v,int width,int height)const{
     using namespace stellar::native_menu_style;
-    const auto l=PlanetaryLayout::make(width,height);const float s=l.s;hits_.clear();chip_tips_.clear();
+    const auto l=PlanetaryLayout::make(width,height);const float s=l.s;hits_.clear();chip_tips_.clear();layer_tips_.clear();
     out.overlay.emplace_back(FilledRectangle{l.screen,{2,9,16,255}});
     // Seeded starfield belongs to this planet view, with no background galaxies.
     for(int i=0;i<170;++i){const float x=l.globe.x+std::fmod(i*73.79f+v.body_id*.07f,std::max(1.f,l.globe.width)),y=l.globe.y+std::fmod(i*131.31f,std::max(1.f,l.globe.height));out.overlay.emplace_back(FilledRectangle{{x,y,i%17==0?2.f:1.f,1.f},{145,185,221,static_cast<std::uint8_t>(60+i%130)}});}
@@ -187,8 +199,16 @@ class NativePlanetaryScreen {
       const float vgap=6*s,vw=(l.vitals.width-4.f*vgap)/5.f;
       int vi=0;
       const auto vital=[&](std::string label,std::string value,native_ui::Tone tone){
-        native_ui::metric_tile(out,{l.vitals.x+vi*(vw+vgap),l.vitals.y,vw,l.vitals.height},
-            std::move(label),std::move(value),std::max(9,l.small-3),l.small,tone);
+        const UiRect tile{l.vitals.x+vi*(vw+vgap),l.vitals.y,vw,l.vitals.height};
+        // Below ~34px tile width every label clips mid-glyph — the value is the
+        // scannable datum, so compact tiles go value-only and the full label
+        // moves to a hover tooltip.
+        if(vw>=34.f)
+          native_ui::metric_tile(out,tile,std::move(label),std::move(value),std::max(9,l.small-3),l.small,tone);
+        else{
+          native_ui::metric_tile(out,tile,"",value,std::max(9,l.small-3),l.small,tone);
+          layer_tips_.push_back({tile,label,value,tone});
+        }
         ++vi;
       };
       vital(tr("PLANET_VITAL_POPULATION","POPULATION"),population(v.population_millions),native_ui::Tone::Neutral);
@@ -254,22 +274,36 @@ class NativePlanetaryScreen {
       }
       button(out,{l.alerts.x,l.alerts.y+l.alerts.height-32*s,l.alerts.width,30*s},critical?tr("PLANET_REVIEW_CRITICAL","Review critical needs"):tr("PLANET_REVIEW_STATUS","Review colony conditions"),{},l);hits_.back().tab=0;
     }
-    label(out,{l.layers.x,l.layers.y,l.layers.width,23*s},tr("PLANET_LAYERS_TITLE","PLANETARY MAP LAYERS"),l.small,cyan);
+    {std::string layers_title=tr("PLANET_LAYERS_TITLE","PLANETARY MAP LAYERS");int layers_font=l.small;
+      while(layers_font>8&&!text_fits(layers_title,layers_font,l.layers.width))--layers_font;
+      label(out,{l.layers.x,l.layers.y,l.layers.width,23*s},std::move(layers_title),layers_font,cyan);}
     const std::array<const char*,5> layer_keys={"PLANET_LAYER_PROVINCES","PLANET_LAYER_INFRA","PLANET_LAYER_POWER","PLANET_LAYER_RESOURCES","PLANET_LAYER_MILITARY"};
     const std::array<const char*,5> layer_names={"Geographic provinces","Infrastructure","Operational power","Resources · unavailable","Military · unavailable"};
-    for(int i=0;i<5;++i){UiRect r{l.layers.x,l.layers.y+28*s+i*28*s,l.layers.width,25*s};const bool enabled=i==0?v.planet.details.has_value():i<3&&!v.observer_only;button(out,r,(layer_==i?"●  ":"○  ")+tr(layer_keys[i],layer_names[i]),{},l,enabled);hits_.back().control=10+i;}
+    const std::array<const char*,5> layer_short_keys={"","","","PLANET_LAYER_RESOURCES_SHORT","PLANET_LAYER_MILITARY_SHORT"};
+    const std::array<const char*,5> layer_short_names={"","","","Resources","Military"};
+    for(int i=0;i<5;++i){UiRect r{l.layers.x,l.layers.y+28*s+i*28*s,l.layers.width,25*s};const bool enabled=i==0?v.planet.details.has_value():i<3&&!v.observer_only;
+      const std::string full=tr(layer_keys[i],layer_names[i]);std::string name=full;
+      // The "· unavailable" qualifier duplicates the disabled button style; at
+      // compact widths drop it and surface the full label on hover instead.
+      if(i>=3&&!text_fits(std::string("●  ")+name,l.font,r.width-16*s)){
+        layer_tips_.push_back({r,full,{},native_ui::Tone::Neutral});
+        name=tr(layer_short_keys[i],layer_short_names[i]);
+      }
+      button(out,r,(layer_==i?"●  ":"○  ")+name,{},l,enabled);hits_.back().control=10+i;}
     render_right(out,v,l);
     for(int i=0;i<3;++i){UiRect r{l.view_modes.x+i*(l.view_modes.width-76*s)/3,l.view_modes.y,(l.view_modes.width-82*s)/3,l.view_modes.height};button(out,r,i==0?tr("PLANET_VIEW_PLANET","Planet view"):i==1?tr("PLANET_VIEW_REGION","Region view"):globe_.night()?tr("PLANET_VIEW_DAY","Day view"):tr("PLANET_VIEW_NIGHT","Night view"),{},l,i!=1||globe_.selected()>=0);hits_.back().control=i;}
     for(int i=0;i<2;++i){UiRect r{l.view_modes.x+l.view_modes.width-70*s+i*36*s,l.view_modes.y,32*s,32*s};button(out,r,i==0?"+":"−",{},l);hits_.back().control=3+i;}
     const std::array<std::string,5> actions={v.foreign_settlement?tr("PLANET_ACTION_STRUCTURES","Structures"):tr("PLANET_ACTION_BUILD","Build"),tr("PLANET_ACTION_ECONOMY","Economy"),tr("PLANET_ACTION_ENVIRONMENT","Environment"),tr("PLANET_ACTION_TERRAFORM","Terraform"),tr("PLANET_ACTION_POLICIES","Policies")};
     const std::array<std::string,5> descriptions={v.foreign_settlement?tr("PLANET_DESC_STRUCTURES","Inspect structures"):tr("PLANET_DESC_BUILD","Construct structures"),v.foreign_settlement?tr("PLANET_DESC_COLONY_FOREIGN","Inspect colony"):tr("PLANET_DESC_COLONY","Manage colony"),tr("PLANET_DESC_ENVIRONMENT","Planet conditions"),tr("PLANET_DESC_TERRAFORM","Research required"),tr("PLANET_DESC_POLICIES","Not yet available")};
-    const float aw=(l.actions.width-102*s)/5;
+    const float aw=(l.actions.width-l.save.width-12*s)/5;
     for(int i=0;i<5;++i){UiRect r{l.actions.x+i*aw,l.actions.y,aw-8*s,l.actions.height};button(out,r,actions[i],{},l,i<3&&(i==2||!v.observer_only),{},action_art_?action_art_(i):Picture{},descriptions[i]);hits_.back().tab=i==0?1:i==1?0:3;}
     button(out,l.save,tr("PLANET_SAVE","Save"),{PlanetaryAction::Save},l);
     label(out,l.notice,notice_.empty()?(v.foreign_settlement?trf("PLANET_NOTICE_FOREIGN",{v.owner_name},"Developer inspection · {0} · Live statistics"):v.observer_only?(v.developer_inspection?tr("PLANET_NOTICE_UNSETTLED","Unsettled world · No colony population or structures."):tr("PLANET_NOTICE_SURVEY","Survey information only. Colony actions require an owned settlement.")):alerts(v)):notice_,l.small,notice_.empty()?muted:cyan);
     if(!modal()){
       for(const auto&[chip_rect,chip_detail]:chip_tips_)
         native_ui::hover_tooltip(out,chip_rect,pointer_,tr("PLANET_CHIP_AFFECTED","Affected structures"),chip_detail,static_cast<int>(l.screen.x+l.screen.width),static_cast<int>(l.screen.y+l.screen.height),s);
+      for(const auto& tip:layer_tips_)
+        if(tip.rect.contains(pointer_))native_ui::tooltip(out,{pointer_.x+14*s,pointer_.y+20*s},tip.title,tip.body,static_cast<int>(l.screen.x+l.screen.width),static_cast<int>(l.screen.y+l.screen.height),s,tip.tone);
       if(const auto hovered=globe_.hit(pointer_,l.globe)){const auto& region=globe_.regions()[*hovered];const float tw=std::min(235*s,l.globe.width),th=68*s;UiRect tip{std::clamp(pointer_.x+14*s,l.globe.x,l.globe.x+l.globe.width-tw),std::clamp(pointer_.y+18*s,l.globe.y,l.globe.y+l.globe.height-th),tw,th};panel(out,tip,s);label(out,{tip.x+10*s,tip.y+8*s,tw-20*s,24*s},region.name,l.small,cyan);label(out,{tip.x+10*s,tip.y+34*s,tw-20*s,25*s},region.terrain,l.small,ink);}}
     if(modal())render_confirmation(out,l);
     if(focus_>=0){const auto items=ring();if(focus_<static_cast<int>(items.size()))stellar::native_ui::focus_ring(out,hits_[static_cast<std::size_t>(items[static_cast<std::size_t>(focus_)])].rect);}
@@ -323,7 +357,11 @@ class NativePlanetaryScreen {
   mutable NativePlanetGlobe globe_;int layer_{0};
   Art art_;std::function<Picture(int)> action_art_;Picture portrait_;std::function<TextExtent(const Text&)> measure_;
   std::pair<std::uint64_t,int> identity_{};int selected_{-1},tab_{2},focus_{-1};mutable stellar::engine::ScrollView fact_scroll_{},detail_scroll_{},slot_scroll_{},queue_scroll_{};
-  mutable float fact_height_{},detail_height_{},slot_height_{},queue_height_{};mutable std::vector<Hit> hits_;mutable std::vector<std::pair<UiRect,std::string>> chip_tips_;std::optional<Hit> pressed_;Point pointer_{};std::string notice_;
+  mutable float fact_height_{},detail_height_{},slot_height_{},queue_height_{};mutable std::vector<Hit> hits_;mutable std::vector<std::pair<UiRect,std::string>> chip_tips_;
+  // Compact-fallback hover tips (layer/vitals labels that no longer fit their
+  // control): emitted at end-of-frame so later panels cannot overdraw them.
+  struct HoverTip{UiRect rect;std::string title,body;native_ui::Tone tone;};
+  mutable std::vector<HoverTip> layer_tips_;std::optional<Hit> pressed_;Point pointer_{};std::string notice_;
   std::variant<std::monostate,NativeSurfacePlacementQuote,NativeSurfaceManagementQuote,NativeSurfaceRemovalQuote> pending_;
   static std::string number(double n,int precision=1){std::ostringstream o;o<<std::fixed<<std::setprecision(precision)<<n;return o.str();}
   static std::string signed_number(double n){return (n>0?"+":"")+number(n,2);}
@@ -343,14 +381,29 @@ class NativePlanetaryScreen {
     else {int lines=1;float count=0,cols=std::max(1.f,r.width/(font*.55f));for(char c:t.value){if(c=='\n'){++lines;count=0;}else if(++count>cols){++lines;count=0;}}h=lines*(font+5.f);}
     out.overlay.emplace_back(std::move(t));return std::max(h,font+5.f);
   }
+  [[nodiscard]] bool text_fits(const std::string& value,int font,float width)const{
+    if(width<=0.f)return false;
+    const Text probe{{},value,{},font,0.f,{},TextAlign::Left,FontFace::Interface};
+    const TextExtent extent=measure_?measure_(probe):TextExtent{static_cast<int>(value.size()*font*.55f),font};
+    return static_cast<float>(extent.width)<=width;
+  }
   void button(DrawList& out,UiRect r,std::string title,PlanetaryCommand command,const PlanetaryLayout& l,bool enabled=true,std::optional<UiRect> clip={},Picture icon={},std::string subtitle={},int scroll_lane=0)const{
     const UiRect visible=clip?intersection(r,*clip):r;if(visible.height<=0||visible.width<=0)return;
     std::string title_copy=title;
     stellar::engine::ui_skin::control(out,r,visible.contains(pointer_),false,enabled,l.s,visible);
-    const int font=r.width<110*l.s||r.height<30*l.s?l.small:l.font;const float icon_size=subtitle.empty()?28*l.s:42*l.s,pad=icon?icon_size+18*l.s:8*l.s;
+    int font=r.width<110*l.s||r.height<30*l.s?l.small:l.font;const float icon_size=subtitle.empty()?28*l.s:42*l.s,pad=icon?icon_size+18*l.s:8*l.s;
+    // Localized strings can exceed a compact control: shrink the title to the
+    // small size, and move an overflowing subtitle onto a hover tooltip rather
+    // than letting it wrap out of the clipped row.
+    const float inner=std::max(0.f,r.width-pad-8*l.s);
+    if(!text_fits(title,font,inner)&&font>l.small)font=l.small;
+    const bool subtitle_row=!subtitle.empty()&&text_fits(subtitle,l.small,inner);
     if(icon)out.overlay.emplace_back(Image{icon,{r.x+8*l.s,r.y+(r.height-icon_size)*.5f,icon_size,icon_size},{},{255,255,255,static_cast<std::uint8_t>(enabled?255:110)},visible});
-    label(out,{r.x+pad,r.y+(subtitle.empty()?(r.height-font)*.5f:16*l.s),r.width-pad-8*l.s,r.height},std::move(title),font,enabled?stellar::native_menu_style::ink:stellar::native_menu_style::muted,visible);
-    if(!subtitle.empty())label(out,{r.x+pad,r.y+40*l.s,r.width-pad-8*l.s,24*l.s},std::move(subtitle),l.small,stellar::native_menu_style::muted,visible);
+    label(out,{r.x+pad,r.y+(subtitle_row?16*l.s:(r.height-font)*.5f),inner,r.height},std::move(title),font,enabled?stellar::native_menu_style::ink:stellar::native_menu_style::muted,visible);
+    if(!subtitle.empty()){
+      if(subtitle_row)label(out,{r.x+pad,r.y+40*l.s,inner,24*l.s},std::move(subtitle),l.small,stellar::native_menu_style::muted,visible);
+      else if(visible.contains(pointer_))native_ui::tooltip(out,{pointer_.x+14*l.s,pointer_.y+20*l.s},title_copy,subtitle,static_cast<int>(l.screen.x+l.screen.width),static_cast<int>(l.screen.y+l.screen.height),l.s);
+    }
     hits_.push_back({visible,static_cast<int>(hits_.size()),std::move(command),enabled,-1,-1,-1,std::move(title_copy),scroll_lane>0?std::optional<UiRect>{r}:std::nullopt,scroll_lane});
   }
   static void scrollbar(DrawList& out,UiRect r,const stellar::engine::ScrollView& scroll){stellar::native_ui::scrollbar(out,{r.x+r.width-3,r.y,3.f,r.height},scroll,14.f);}
@@ -380,7 +433,12 @@ class NativePlanetaryScreen {
   void render_right(DrawList& out,const NativeColonyView& v,const PlanetaryLayout& l)const{
     using namespace stellar::native_menu_style;const float s=l.s;panel(out,l.right,s);
     const auto region=globe_.selected()>=0?&globe_.regions()[globe_.selected()]:nullptr;
-    label(out,{l.right.x+12*s,l.right.y+10*s,l.right.width-24*s,28*s},region?region->name:v.foreign_settlement?tr("PLANET_TITLE_INSPECT","PLANET INSPECTION"):tr("PLANET_TITLE_COMMAND","PLANETARY COMMAND"),l.heading,ink);
+    const std::string right_title=region?region->name:v.foreign_settlement?tr("PLANET_TITLE_INSPECT","PLANET INSPECTION"):tr("PLANET_TITLE_COMMAND","PLANETARY COMMAND");
+    // Long single-token localized titles cannot word-wrap — shrink the heading
+    // toward the body size before it clips mid-glyph at the panel edge.
+    int heading_font=l.heading;
+    while(heading_font>l.font&&!text_fits(right_title,heading_font,l.right.width-24*s))--heading_font;
+    label(out,{l.right.x+12*s,l.right.y+10*s,l.right.width-24*s,28*s},right_title,heading_font,ink);
     label(out,{l.right.x+12*s,l.right.y+42*s,l.right.width-24*s,38*s},region?region->terrain:v.observer_only?tr("PLANET_SUB_INTEL","Surveyed intelligence"):tr("PLANET_SUB_OPS","Colony operations and development"),l.small,cyan);
     if(!v.observer_only&&v.surface_hub_level>0&&v.planet.sol_texture_key==std::optional<std::string>{"earth"}&&art_){
       if(const auto image=art_(false)){
@@ -408,7 +466,9 @@ class NativePlanetaryScreen {
     const std::array<const char*,4> caption_keys={"PLANET_TAB_ECONOMY","PLANET_TAB_STRUCTURES","PLANET_TAB_OVERVIEW","PLANET_TAB_CLIMATE"};
     const std::array<const char*,4> caption_names={"Economy","Structures","Overview","Climate"};
     const std::array<std::string,4> captions{tr(caption_keys[0],caption_names[0]),tr(caption_keys[1],caption_names[1]),tr(caption_keys[2],caption_names[2]),tr(caption_keys[3],caption_names[3])};
-    for(int i=0;i<4;++i){UiRect r{l.tabs.x+i*l.tabs.width*.25f,l.tabs.y,l.tabs.width*.25f,l.tabs.height};button(out,r,captions[i],{},l,!v.observer_only||i>=2);hits_.back().tab=i;if(tab_==i)out.overlay.emplace_back(FilledRectangle{{r.x,r.y+r.height-2*s,r.width,2*s},cyan});}
+    const int tab_rows=l.tabs.height>36*s?2:1,tab_cols=4/tab_rows;
+    const float tab_h=(l.tabs.height-(tab_rows-1)*4*s)/tab_rows;
+    for(int i=0;i<4;++i){const int tc=i%tab_cols,trow=i/tab_cols;UiRect r{l.tabs.x+tc*l.tabs.width/tab_cols,l.tabs.y+trow*(tab_h+4*s),l.tabs.width/tab_cols,tab_h};button(out,r,captions[i],{},l,!v.observer_only||i>=2);hits_.back().tab=i;if(tab_==i)out.overlay.emplace_back(FilledRectangle{{r.x,r.y+r.height-2*s,r.width,2*s},cyan});}
     if(tab_==1&&selected_<0&&!v.observer_only){render_slots(out,v,l);return;}
     float y=l.details.y-detail_scroll_.scroll_offset;const auto write=[&](std::string value,Color color=ink,int size=0){y+=wrapped(out,{l.details.x,y,l.details.width-7*s,0},l.details,std::move(value),size?size:l.small,color)+7*s;};
     const auto action=[&](std::string title,PlanetaryCommand cmd,bool enabled=true,std::string reason={}){const UiRect r{l.details.x,y,l.details.width-7*s,36*s};const bool active=enabled&&(!v.foreign_settlement||cmd.action==PlanetaryAction::None);button(out,r,title,cmd,l,active,l.details,{},std::string{},3);if(!active)native_ui::hover_tooltip(out,intersection(r,l.details),pointer_,title,std::move(reason),static_cast<int>(l.screen.x+l.screen.width),static_cast<int>(l.screen.y+l.screen.height),l.s);y+=44*s;};

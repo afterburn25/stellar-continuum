@@ -1419,7 +1419,7 @@ class NativeCampaign final {
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
       }while(settled<40);
       const auto rendered=scene(width,height);
-      for(const auto& command:rendered.overlay)if(const auto* t=std::get_if<Text>(&command);t&&t->value.find("not available to this observer")!=std::string::npos)
+      for(const auto& command:rendered.overlay)if(const auto* t=std::get_if<Text>(&command);t&&t->value==tr("PLANET_OBSERVER_LIMITED","Colony population, structures and military installations are not available to this observer."))
         throw std::runtime_error("Developer planetary screen still withholds colony data.");
       draw(rendered,suffix);
     };
@@ -1787,7 +1787,7 @@ class NativeCampaign final {
     if(economy_workspace_.scroll_offset()!=end)throw std::runtime_error("Economy scroll was unbounded.");
     auto end_scene=scene(width,height);bool research_visible=false;
     for(const auto& item:end_scene.overlay)if(const auto* label=std::get_if<Text>(&item))
-      if(label->value=="RESEARCH PROGRAMS")research_visible=true;
+      if(label->value==tr("ECONOMY_ROW_RESEARCH","RESEARCH PROGRAMS"))research_visible=true;
     if(!research_visible)throw std::runtime_error("Research operating costs were unreachable.");
     draw(end_scene,"end");
     const Point outside{static_cast<float>(width)-2.f,static_cast<float>(height)-2.f};
@@ -2003,7 +2003,7 @@ class NativeCampaign final {
         if(!update(input,width,height,0.,false))throw std::runtime_error("Scientist input unexpectedly exited campaign.");
       }
       if(system_workspace_.system_id()!=before||session_->frame().clock().simulation_days()!=day||
-         session_->frame().clock().speed()!=speed||system_workspace_.notice().find("Telemetry unavailable")==std::string::npos)
+         session_->frame().clock().speed()!=speed||system_workspace_.notice().find(tr("SYSTEM_TELEMETRY_UNAVAILABLE","Telemetry unavailable"))==std::string::npos)
         throw std::runtime_error("Repeated scientist guidance changed the paused observer state.");
       return;
     }
@@ -2511,9 +2511,9 @@ class NativeCampaign final {
       }
       throw std::runtime_error("Planetary control is not reachable: "+std::string(title));
     };
-    const auto before=state();click_label("Build");click_label("Available slot");
+    const auto before=state();click_label(tr("PLANET_ACTION_BUILD","Build"));click_label(tr("PLANET_SLOT_AVAILABLE","Available slot"));
     smoke_planetary_captures_.push_back(scene(width,height));
-    click_label("Begin construction");
+    click_label(tr("PLANET_BEGIN","Begin construction"));
     if(!screen.modal()||!std::get<NativeSurfacePlacementQuote>(screen.pending()).accepted||state()!=before)throw std::runtime_error("Planetary review mutated state or rejected its empty slot.");
     smoke_planetary_captures_.push_back(scene(width,height));
     const auto layout=PlanetaryLayout::make(width,height);
@@ -2521,7 +2521,7 @@ class NativeCampaign final {
     if(!screen.modal()||research_workspace_.visible())throw std::runtime_error("Navigation escaped the planetary confirmation.");
     route({{InputEventType::EscapePressed}});
     if(screen.modal()||state()!=before)throw std::runtime_error("Cancelled planetary review changed the campaign.");
-    click_label("Begin construction");(void)scene(width,height);
+    click_label(tr("PLANET_BEGIN","Begin construction"));(void)scene(width,height);
     const auto quote=std::get<NativeSurfacePlacementQuote>(screen.pending());
     click(center(layout.confirm));
     const auto& sites=colony_workspace_.view()->construction_sites;
@@ -2567,9 +2567,9 @@ class NativeCampaign final {
     const int index=static_cast<int>(found-rows.begin());
     if(index>0)route({{InputEventType::Wheel,center(layout.list),{},-static_cast<float>(index)*(layout.row_height+5.f*layout.scale)/(48.f*layout.scale)}});
     smoke_colony_roster_capture_=scene(width,height);
-    if(std::ranges::any_of(smoke_colony_roster_capture_->overlay,[](const auto& command){
+    if(std::ranges::any_of(smoke_colony_roster_capture_->overlay,[&](const auto& command){
       const auto* label=std::get_if<Text>(&command);
-      return label&&label->value=="SURVEY FINDINGS";
+      return label&&label->value==tr("INSPECTION_SURVEY_FINDINGS","SURVEY FINDINGS");
     }))throw std::runtime_error("System inspector rendered over the colony roster.");
     const auto button=colony_roster_.row_button(index,width,height);
     if(!layout.list.contains(center(button)))throw std::runtime_error("Roster target button was not visible after scrolling.");
@@ -2625,16 +2625,16 @@ class NativeCampaign final {
       }
       throw std::runtime_error("Planetary freight control not reachable: "+std::string(label));
     };
-    click_label("Economy");
+    click_label(tr("PLANET_ACTION_ECONOMY","Economy"));
     NativeOutpostFreightPreview quote;bool reviewed=false,cancelled=false;
     if(!reload){
-      click_label("Collect materials");
+      click_label(tr("PLANET_COLLECT","Collect materials"));
       if(!colony_workspace_.freight_preview()||!colony_workspace_.freight_preview()->accepted)
         throw std::runtime_error("Freight review unavailable: "+(colony_workspace_.freight_preview()?colony_workspace_.freight_preview()->message:"no review"));
       reviewed=state()==before;quote=*colony_workspace_.freight_preview();
       smoke_freight_review_capture_=scene(width,height);
       click(layout.freight_cancel);cancelled=!colony_workspace_.freight_preview()&&state()==before;
-      click_label("Collect materials");
+      click_label(tr("PLANET_COLLECT","Collect materials"));
       if(!colony_workspace_.freight_preview()||colony_workspace_.freight_preview()->fleet_id!=quote.fleet_id)
         throw std::runtime_error("Freight rereview changed its selected idle ship.");
       click(layout.freight_confirm);
@@ -2671,7 +2671,7 @@ class NativeCampaign final {
     const auto click=[&](Point point){InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("System travel smoke input closed the campaign.");};
     const auto *initial_travel=system_workspace_.travel_snapshot();if(!initial_travel)throw std::runtime_error("System travel smoke did not receive an observer-safe local travel view.");std::unordered_set<int> connected;for(const auto&lane:session_->frame().runtime().world().lanes().build())if(lane.connects(*smoke_system_travel_system_id_))connected.insert(lane.other(*smoke_system_travel_system_id_));smoke_system_travel_lane_count_=initial_travel->lanes.size();smoke_system_travel_lanes_connected_=smoke_system_travel_lane_count_==connected.size()&&std::ranges::all_of(initial_travel->lanes,[&](const auto&lane){return connected.contains(lane.destination_system_id);});if(!smoke_system_travel_lanes_connected_)throw std::runtime_error("System travel smoke destinations did not match the canonical connected set.");
     const auto known_lane=std::ranges::find_if(initial_travel->lanes,[](const auto&lane){return lane.known_label.has_value();}),unknown_lane=std::ranges::find_if(initial_travel->lanes,[](const auto&lane){return !lane.known_label.has_value();});if(known_lane==initial_travel->lanes.end()||unknown_lane==initial_travel->lanes.end())throw std::runtime_error("System travel smoke requires one authored known neighbor and one unknown neighbor.");const auto known_id=known_lane->destination_system_id,unknown_id=unknown_lane->destination_system_id;const auto geometry=system_workspace_.lane_geometry();const auto known_geometry=std::ranges::find(geometry,known_id,&NativeLocalLaneGeometry::destination_system_id),unknown_geometry=std::ranges::find(geometry,unknown_id,&NativeLocalLaneGeometry::destination_system_id);if(known_geometry==geometry.end()||unknown_geometry==geometry.end())throw std::runtime_error("System travel smoke could not place its connected lane arrows.");
-    const auto unknown_level=world.knowledge.system_survey_level(world.player_civilization_id,unknown_id);click(unknown_geometry->center);smoke_system_travel_unknown_denied_=system_workspace_.system_id()==smoke_system_travel_system_id_&&system_workspace_.notice().find("Telemetry unavailable")!=std::string::npos;smoke_system_travel_knowledge_unchanged_=world.knowledge.system_survey_level(world.player_civilization_id,unknown_id)==unknown_level;click(known_geometry->center);smoke_system_travel_known_opened_=system_workspace_.system_id()==known_id;if(!smoke_system_travel_known_opened_)throw std::runtime_error("System travel smoke known lane did not open its observer-gated destination.");const auto destination_layout=SystemWorkspaceLayout::for_viewport(width,height);click(center(destination_layout.back));const auto return_point=expose_smoke_map_point(system->second->position.x,system->second->position.y,width,height);InputSnapshot reenter;reenter.drawable_width=width;reenter.drawable_height=height;reenter.pointer=return_point;reenter.events={{InputEventType::LeftPressed,return_point,{},0,{},2},{InputEventType::LeftReleased,return_point}};if(system_workspace_.visible()||!update(reenter,width,height,0.,false)||system_workspace_.system_id()!=smoke_system_travel_system_id_)throw std::runtime_error("System travel smoke could not return to its local system after known-lane navigation.");
+    const auto unknown_level=world.knowledge.system_survey_level(world.player_civilization_id,unknown_id);click(unknown_geometry->center);smoke_system_travel_unknown_denied_=system_workspace_.system_id()==smoke_system_travel_system_id_&&system_workspace_.notice().find(tr("SYSTEM_TELEMETRY_UNAVAILABLE","Telemetry unavailable"))!=std::string::npos;smoke_system_travel_knowledge_unchanged_=world.knowledge.system_survey_level(world.player_civilization_id,unknown_id)==unknown_level;click(known_geometry->center);smoke_system_travel_known_opened_=system_workspace_.system_id()==known_id;if(!smoke_system_travel_known_opened_)throw std::runtime_error("System travel smoke known lane did not open its observer-gated destination.");const auto destination_layout=SystemWorkspaceLayout::for_viewport(width,height);click(center(destination_layout.back));const auto return_point=expose_smoke_map_point(system->second->position.x,system->second->position.y,width,height);InputSnapshot reenter;reenter.drawable_width=width;reenter.drawable_height=height;reenter.pointer=return_point;reenter.events={{InputEventType::LeftPressed,return_point,{},0,{},2},{InputEventType::LeftReleased,return_point}};if(system_workspace_.visible()||!update(reenter,width,height,0.,false)||system_workspace_.system_id()!=smoke_system_travel_system_id_)throw std::runtime_error("System travel smoke could not return to its local system after known-lane navigation.");
     const auto *before_snapshot=system_workspace_.travel_snapshot();if(!before_snapshot)throw std::runtime_error("System travel smoke did not receive an observer-safe local travel view.");const auto before_marker=std::ranges::find(before_snapshot->fleets,fleet->id,&NativeLocalFleetMarker::fleet_id);if(before_marker==before_snapshot->fleets.end())throw std::runtime_error("System travel smoke did not render the local player fleet.");const auto spatial=project_system(*system_workspace_.snapshot());const auto before_screen=local_fleet_anchor(*before_marker,spatial,*system_workspace_.viewport());const auto before_canonical=fleet->local_transit_position;
     InputSnapshot select;select.drawable_width=width;select.drawable_height=height;select.pointer=before_screen;select.events={{InputEventType::LeftPressed,before_screen},{InputEventType::LeftReleased,before_screen}};(void)update(select,width,height,0.,false);smoke_system_travel_selected_=fleet_controller_.selection()==std::optional<int>{fleet->id};
     smoke_system_travel_reload_=paused_reload;
@@ -3617,14 +3617,12 @@ class NativeCampaign final {
     diplomacy_smoke_select(other->contact_id,width,height);
     diplomacy_smoke_select(primary->contact_id,width,height);
     const auto layout=DiplomacyWorkspaceLayout::for_viewport(width,height);
-    // Smoke needles are UI chrome, so resolve them through the active locale
-    // table (the same path the workspace's tr() uses) rather than hardcoding
-    // English — non-English saves must run the same flow.
-    const auto smoke_tr=[&](std::string_view key,std::string_view fallback){
-      return locale_&&locale_->contains(key)?std::string(locale_->translate(key)):std::string(fallback);};
+    // Smoke needles are UI chrome — resolve them through the active locale
+    // table (the same tr() path the workspace uses) so non-English saves run
+    // the identical flow.
     if(!reload){
-      diplomacy_smoke_text(smoke_tr("DIPLOMACY_TAB_PROPOSALS","PROPOSALS"),layout.tabs,width,height);
-      diplomacy_smoke_text(smoke_tr("DIPLOMACY_ACCEPT","Accept"),layout.detail_rows,width,height);
+      diplomacy_smoke_text(tr("DIPLOMACY_TAB_PROPOSALS","PROPOSALS"),layout.tabs,width,height);
+      diplomacy_smoke_text(tr("DIPLOMACY_ACCEPT","Accept"),layout.detail_rows,width,height);
     }
     const auto after=session_->frame().runtime().diplomacy().snapshot();
     const auto resolved=std::ranges::find(after.proposals,proposal->proposal_id,&DiplomaticProposalSnapshot::proposal_id);
@@ -3632,7 +3630,7 @@ class NativeCampaign final {
       throw std::runtime_error("Incoming diplomatic proposal was not accepted through player input.");
     if(!std::ranges::any_of(after.agreements,[&](const auto&a){return a.type==DiplomaticAgreementType::research_exchange&&a.status==DiplomaticAgreementStatus::active&&((a.civilization_a_id==observer&&a.civilization_b_id==target)||(a.civilization_a_id==target&&a.civilization_b_id==observer));}))
       throw std::runtime_error("Diplomatic acceptance did not activate the canonical agreement.");
-    diplomacy_smoke_text(smoke_tr("DIPLOMACY_TAB_AGREEMENTS","AGREEMENTS"),layout.tabs,width,height);
+    diplomacy_smoke_text(tr("DIPLOMACY_TAB_AGREEMENTS","AGREEMENTS"),layout.tabs,width,height);
     InputSnapshot scroll;scroll.drawable_width=width;scroll.drawable_height=height;
     scroll.pointer=center(layout.detail_rows);scroll.events={{InputEventType::Wheel,scroll.pointer,{},-10.f}};
     if(!update(scroll,width,height,0.,false))throw std::runtime_error("Diplomacy agreement scrolling closed the campaign.");
@@ -5338,8 +5336,8 @@ class NativeCampaign final {
       if(const auto *label=std::get_if<Text>(&item)){
         colony_cost=colony_cost||label->value==initial->colony_ship.formatted_ship_cost;
         outpost_cost=outpost_cost||label->value==initial->resource_outpost.formatted_ship_cost;
-        guidance=guidance||label->value=="Explore other worlds";
-        shipyard_button=shipyard_button||label->value=="VIEW SHIPYARD";
+        guidance=guidance||label->value==tr("SYSTEM_STEP_EXPLORE","Explore other worlds");
+        shipyard_button=shipyard_button||label->value==tr("SYSTEM_VIEW_SHIPYARD","VIEW SHIPYARD");
       }};
     observe();
     int cost_capture_at=-1;bool cost_capture{};
@@ -5853,29 +5851,31 @@ class NativeCampaign final {
                           &BodySection::heading);
     const bool fully_surveyed = system_workspace_.snapshot()->survey_level ==
                                 SystemSurveyLevel::fully_surveyed;
+    const auto unconfirmed = tr("BODY_UNCONFIRMED", "Unconfirmed");
+    const auto type_label = tr("BODY_FACT_TYPE", "Type");
     first_survey_facts_visible_ =
         inspection->confirmed && physical != inspection->sections.end() &&
         environment != inspection->sections.end() && !physical->facts.empty() &&
         !environment->facts.empty() &&
         std::ranges::none_of(
             physical->facts,
-            [](const BodyFact &fact) { return fact.value == "Unconfirmed"; }) &&
-        std::ranges::none_of(environment->facts, [](const BodyFact &fact) {
-          return fact.value == "Unconfirmed";
+            [&](const BodyFact &fact) { return fact.value == unconfirmed; }) &&
+        std::ranges::none_of(environment->facts, [&](const BodyFact &fact) {
+          return fact.value == unconfirmed;
         });
     const bool partial_facts_private =
         !inspection->confirmed && physical != inspection->sections.end() &&
         environment != inspection->sections.end() &&
         std::ranges::all_of(physical->facts,
-                            [](const BodyFact &fact) {
+                            [&](const BodyFact &fact) {
                               // Reconnaissance identifies the broad body type;
                               // measured physical values remain hidden until
                               // the science survey completes.
-                              return fact.label == "Type" ||
-                                     fact.value == "Unconfirmed";
+                              return fact.label == type_label ||
+                                     fact.value == unconfirmed;
                             }) &&
-        std::ranges::all_of(environment->facts, [](const BodyFact &fact) {
-          return fact.value == "Unconfirmed";
+        std::ranges::all_of(environment->facts, [&](const BodyFact &fact) {
+          return fact.value == unconfirmed;
         });
     if (first_survey_facts_visible_ != fully_surveyed)
       throw std::runtime_error(
@@ -9597,8 +9597,16 @@ class NativeCampaign final {
       const std::array<std::pair<std::string,double>,3> resources{{{tr("HUD_CREDITS","CREDITS"),economy->credits},{tr("HUD_INDUSTRY","INDUSTRY"),economy->industry},{tr("HUD_SCIENCE","SCIENCE"),economy->science}}};
       const std::array<Color,3> colors{{{243,199,110,255},{233,164,124,255},{115,199,239,255}}};
       for(int i=0;i<3;++i){
-        const float x=12*s+i*cell;
-        hud_text(out,{x,4*s,cell-8*s,12*s},resources[i].first,static_cast<int>(9*s),colors[i]);
+        const float x=std::max(12.f*s,10.f)+i*cell;
+        // Localized labels can exceed the compact cell — shrink toward a
+        // legible floor before the cell clip cuts a glyph.
+        int label_font=static_cast<int>(9*s);
+        for(int floor=std::max(7,static_cast<int>(6*s));label_font>floor;--label_font){
+          const Text probe{{},resources[i].first,{},label_font,0.f,{},TextAlign::Left,FontFace::Heading};
+          const auto extent=text_measurer_?text_measurer_(probe):TextExtent{static_cast<int>(resources[i].first.size()*label_font*.58f),label_font};
+          if(extent.width<=cell-10*s)break;
+        }
+        hud_text(out,{x,4*s,cell-8*s,12*s},resources[i].first,label_font,colors[i]);
         hud_text(out,{x,17*s,cell-8*s,17*s},hud_amount(resources[i].second),static_cast<int>(13*s),{230,241,247,255});
       }
     }
