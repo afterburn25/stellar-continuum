@@ -557,6 +557,7 @@ void main() {
     }
     // Scene point lights: windowed inverse-square attenuation keeps distant
     // receivers at zero cost and bounded brightness at contact range.
+    float spot_shadow_vis=1.0; // Shadows debug view: product of spot map terms
     for(int i=0;i<4;++i){
         if(material.point_energy[i].w<=0.0) continue;
         vec3 to_light=material.point_position[i].xyz-view_position;
@@ -577,12 +578,13 @@ void main() {
         // light's own atlas cell; fragments past the clamped map fov (or
         // landing in a neighbour quadrant) stay lit, which only matters
         // inside the narrow band between the map edge and the outer cone.
-        if(view_params.spot_options[i].x>0.0)
+        if(view_params.spot_options[i].x>0.0){
             // spot_options.z = the spot's authored umbra strength.
-            window*=mix(1.0,map_lit(spot_shadow_map,view_params.spot_from_view[i]*vec4(view_position,1.0),
+            const float slit=mix(1.0,map_lit(spot_shadow_map,view_params.spot_from_view[i]*vec4(view_position,1.0),
                             view_params.spot_options[i].x,view_params.spot_options[i].y,
                             view_params.spot_options[i].w,view_params.spot_bounds[i]),
                         view_params.spot_options[i].z*shadow_receive);
+            window*=slit;spot_shadow_vis*=slit;}
         if(window<=0.0) continue;
         vec3 energy=material.point_energy[i].rgb*(material.point_energy[i].w*window/max(d2,0.0001))*cloud_shadow;
         float nl=material.surface_options.w>0.5?abs(dot(N,L)):clamp((dot(N,L)+terminator_wrap)/(1.0+terminator_wrap),0.0,1.0);
@@ -709,7 +711,7 @@ void main() {
                 :cls<3.5?vec3(1,.4,.05)
                 :vec3(1,.15,.1);
         }
-        else if(debug==10) shown=vec3(visibility);                 // Shadows: key-light occlusion term
+        else if(debug==10) shown=vec3(visibility*spot_shadow_vis); // Shadows: key-light + spot depth-map terms
         else shown=(result-emissive_part)/max(texel.rgb,vec3(.001));// Lighting
         shown=max(shown,vec3(0));
         if(material.view_options.w>0.5) shown=display_color(shown);

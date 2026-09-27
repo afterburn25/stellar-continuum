@@ -396,7 +396,7 @@ production material path (not a second renderer), so it stays faithful:
 | `LightingOnly` | shading with albedo divided out |
 | `Lod` | per-draw LOD class — gray full mesh, blue→green→yellow→orange for chain levels 1–4+, magenta group proxy; transition bands show their dithered member/proxy partition |
 | `Residency` | per-draw surface-texture residency — green mip-0 resident, lime/amber/orange/red deeper tails, magenta pinned fallback |
-| `Shadows` | key-light occlusion term as grayscale — analytic blocker × shadow-map visibility; umbra extent, bias and coverage tuning |
+| `Shadows` | occlusion terms as grayscale — analytic blocker × key-light map visibility × each shadowed spot's atlas term; umbra extent, bias and coverage tuning |
 
 ## Authoring path — `Scene3dDocument`
 

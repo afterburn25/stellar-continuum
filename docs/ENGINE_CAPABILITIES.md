@@ -620,8 +620,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   pressure is visible per object. Both share the `texture_options.w`
   class lane — the per-view mode selects the meaning. `Shadows` shows
   the key-light occlusion term as grayscale (analytic blockers × the
-  directional map's visibility, strength-blended) so authored `extent`/
-  `bias`/`strength` read as umbra extent rather than darkened albedo.
+  directional map's visibility, strength-blended) folded with the
+  product of spot depth-map terms, so authored `extent`/`bias`/
+  `strength` and each `casts_shadow` cone's footprint read as umbra
+  extent rather than darkened albedo.
   `visible_range` = world-unit
   camera distance beyond which the instance culls (bounding-sphere
   surface distance; 0 = unlimited; validated finite ≥ 0 ≤ 1e12).
@@ -666,7 +668,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   by level; a banded collapse shows the white-lifted transition tint on
   both the member and proxy shares; Residency view: denied bind
   magenta, mip-3 tail orange, mip-0 green; Shadows view: the mapped
-  umbra goes black against the lit receiver; a `receives_shadow=false`
+  umbra goes black against the lit receiver and both spot-atlas umbrae
+  darken while the lit rim stays white; a `receives_shadow=false`
   receiver stays at its open value inside the same umbra footprint),
   `engine_project` (document round-trip +
   malformed rejection), `engine_world` (`VisibleRange`/`NoShadow`/

@@ -683,8 +683,20 @@ int main(int argc,char** argv)try{
         "Second spot's umbra vanishes when it is the only shadowed light");
     check(channel(*both_shadowed,272,160,1)>channel(*both_unshadowed,272,160,1)/2,
         "Spot atlas darkened lamp2's lit rim outside its umbra");
+    // The Shadows debug view folds spot depth-map terms into the same
+    // grayscale the key light uses: both umbra strips read black while
+    // the lit rim stays bright — authors can see spot footprints without
+    // waiting for the diffuse result to show them.
+    {RenderOptions3D dbg_opt;dbg_opt.debug_view=DebugView3D::Shadows;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder,occluder2},{0,0,1},{lamp,lamp2}),{0,0,320,320},dbg_opt});
+     window.draw(d,folder/"point-light-spot2-debug.png");
+     const auto spot_dbg=decode_rgba_image(folder/"point-light-spot2-debug.png");
+     check(census(*spot_dbg,120,155)>20&&census(*spot_dbg,175,215)>10,
+         "Shadows debug view did not darken inside either spot umbra");
+     check(channel(*spot_dbg,272,160,0)>200,
+         "Shadows debug view darkened a lit rim outside the spot umbrae");}
     lamp.casts_shadow=true;
-    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_passed\n";
+    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_debug_passed\n";
   }
   {
     // Atmosphere limb scattering: a tinted shell brightens the silhouette
