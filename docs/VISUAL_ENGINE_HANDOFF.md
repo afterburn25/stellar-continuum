@@ -543,7 +543,10 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   `casts_shadow` omni lights sharing a cube-face atlas (six faces per
   light, up to four rows, view-space-locked faces) — receivers outside
   the authored boxes (or outside a light's frustum/range) stay lit
-  (by design).
+  (by design). The `normal_offset` lift is directional-only today:
+  spot/omni receivers rely on the authored `bias` (perspective texel
+  size varies with depth, so a per-fragment-scaled lift is future
+  work, not a direct port).
 - Analytic ellipsoid/annulus blockers remain the ring↔planet shadow
   path and are evaluated independently of the map.
 - Atmosphere = single-scatter limb approximation, no multi-scatter or
