@@ -490,7 +490,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   while a lit receiver inside the empty near window keeps its value);
   softness probe (`shadow-soft-0/4` — a zero multiplier collapses the
   penumbra to a binary edge, 4× grows an 80-pixel blend band while the
-  umbra core keeps its full cut);
+  umbra core keeps its full cut); `fleet3d_shadow` benchmark — the
+  1024-instance fleet re-submitted through the directional box plus a
+  shadowed spot cone, printing timing + `shadow_casters` next to the
+  unshadowed `fleet3d` baseline;
   `engine_project` document round-trip + rejection coverage.
 - **Infrastructure fix bundled:** SDL fragment-set resource order —
   the materials SSBO sits after the sampled textures (now binding 13)

@@ -223,7 +223,9 @@ z-fight; Low tier and `lod_fade=0` keep the hard switch, and
 `lod_fades` audits dual submissions. A fleet benchmark block in
 `native_scene3d_gpu` times a 1024-instance depth-sweep fleet over 60
 frames (`fleet3d` line: submission/wall means, draw calls, LOD picks —
-one instanced draw per level). Also
+one instanced draw per level), and a shadowed variant (`fleet3d_shadow`)
+re-submits the same fleet through the directional box plus a spot-atlas
+cone so the depth-pass cost surfaces in the same receipt. Also
 fixed: streamer registrations keyed by `RgbaImage*` are now
 liveness-verified (`weak_ptr` owner), closing a stale-TextureId reuse
 bug that intermittently skipped mip-tail promotions; and the per-frame

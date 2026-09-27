@@ -244,7 +244,10 @@ grid spread over a depth sweep submits 60 timed frames and reports
 `fleet3d frames cpu_submit_mean_ms frame_wall_mean_ms draw_calls
 lod_instances`. On this CI host (Vulkan) it measures ~0.75 ms CPU
 submission per frame with 1024 instances collapsed to one instanced
-draw per LOD level — the number to watch as the renderer evolves.
+draw per LOD level — the number to watch as the renderer evolves. A
+shadowed variant (`fleet3d_shadow … shadow_casters=`) runs the same
+fleet under a `ShadowMap3D` box plus one shadowed spot cone so the
+caster-collection and depth-pass cost shows up next to the baseline.
 
 - All PBR/atmosphere strengths default to 0 — absence of the optional
   blocks renders exactly as before (authored art untouched).
