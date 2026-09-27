@@ -10693,7 +10693,7 @@ int main(int argc,char **argv){
         std::erase_if(input.events,[](const InputEvent& event){
           return event.type!=InputEventType::PointerCancelled;
         });
-      if(options.restart_smoke&&!restart_completed){
+      if((options.restart_smoke||options.new_game_restart_smoke)&&!restart_completed){
         if(std::chrono::steady_clock::now()>restart_deadline)throw std::runtime_error("New Game lifecycle smoke timed out.");
         if(frames>=2&&!campaign.new_game_pending()&&restart_before.empty()&&
            (!options.audio_check||audio.assets_ready())){
@@ -10755,11 +10755,11 @@ int main(int argc,char **argv){
         if(!campaign.developer_session())config.host.default_save_path=campaign.save_path();
         audio.stop_voice();if(active_voice_playback)active_voice_playback->stop();window.set_text_input(false);
         std::optional<StartupEntryAutomation> automation;
-        if(options.restart_smoke){
+        if(options.restart_smoke||options.new_game_restart_smoke){
           window.draw(campaign.scene(input.drawable_width,input.drawable_height),sidecar_path(*options.smoke_screenshot,L"-saved"));
-          automation=StartupEntryAutomation{std::to_string(options.seed),"pelagic_high_pressure",250,
+          automation=StartupEntryAutomation{std::to_string(options.seed+(options.new_game_restart_smoke?1:0)),"pelagic_high_pressure",250,
               sidecar_path(*options.smoke_screenshot,L"-setup"),sidecar_path(*options.smoke_screenshot,L"-loading")};
-          automation->action=options.restart_action;
+          if(options.restart_smoke)automation->action=options.restart_action;
         }
         auto restart=run_native_startup_entry(window,std::move(config),automation?&*automation:nullptr);
         if(options.restart_smoke){
@@ -10788,6 +10788,11 @@ int main(int argc,char **argv){
           if(restart.session->save_path()==campaign.save_path())throw std::runtime_error("New Game reused the original save slot.");
           generated_save_path=restart.session->save_path();restart_completed=true;
           std::cout<<"restart_new_save="<<utf8_path(*generated_save_path)<<'\n';
+        }
+        if(options.new_game_restart_smoke){
+          if(restart.session->save_path()==campaign.save_path())throw std::runtime_error("New Game reused the original save slot.");
+          restart_save_path=restart.session->save_path();new_game_restart=true;restart_completed=true;
+          restart_evidence=restart.evidence;
         }
         session=std::move(restart.session);break;
       }
@@ -11134,6 +11139,7 @@ int main(int argc,char **argv){
           std::cout<<"]}";
         }
         if(options.new_game_restart_smoke){
+          if(!new_game_restart)throw std::runtime_error("New Game restart smoke ended before the in-session restart completed.");
           std::cout<<" new_game_restart={\"saved_previous\":true,\"restarted\":"<<(new_game_restart?"true":"false")
             <<",\"entry_opened\":"<<(restart_evidence.entry_opened?"true":"false")
             <<",\"setup_opened\":"<<(restart_evidence.setup_opened?"true":"false")
