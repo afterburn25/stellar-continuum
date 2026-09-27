@@ -1140,6 +1140,22 @@ int main(int argc,char** argv)try{
     check(umbra_area(*fit_near)<8,"Camera-fitted .5 still covered the umbra at the base zoom");
     check(umbra_area(*fit_far)>32,"Camera-fitted coverage did not track the doubled footprint");
     check(umbra_area(*fixed_far)<8,"A fixed .5 extent covered the umbra at the wider zoom");
+    // Perspective fit: the footprint is distance·tan(fov/2) at the box
+    // centre, so widening the fov grows coverage under the same authored
+    // multiplier — fov .4 keeps the umbra out (eff .41 vs the .78
+    // light-space umbra) while fov 1.6 covers it (eff 2.06), and the
+    // fixed .5 stays lit at either.
+    auto persp=camera;persp.projection=Projection3D::Perspective;persp.vertical_fov_radians=.4f;
+    auto persp_wide=persp;persp_wide.vertical_fov_radians=1.6f;
+    const auto fit_tight=fit_view(persp,fitted,{receiver,occluder},"shadow-fitp-tight.png");
+    const auto fit_wide=fit_view(persp_wide,fitted,{receiver,occluder},"shadow-fitp-wide.png");
+    const auto fixed_wide=fit_view(persp_wide,fixed,{receiver,occluder},"shadow-fitp-fixed.png");
+    // The plate stays inside [140,180]² at both fovs — no background in
+    // the window — so dark texels there are the umbra footprint.
+    const auto persp_umbra=[&](const RgbaImage&img){int n=0;for(int y=140;y<180;++y)for(int x=140;x<180;++x)if(channel(img,x,y,0)<60)++n;return n;};
+    check(persp_umbra(*fit_tight)<8,"Perspective fit still covered the umbra at fov .4");
+    check(persp_umbra(*fit_wide)>16,"Perspective fit did not grow coverage with the wider fov");
+    check(persp_umbra(*fixed_wide)<8,"A fixed .5 extent covered the umbra at fov 1.6");
     std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_optout_receive_normaloffset_camerafit_passed\n";
   }
   {
