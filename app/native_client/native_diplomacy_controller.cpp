@@ -47,6 +47,59 @@ std::string resolved(const stellar::engine::LocalizationTable *locale,
   return out;
 }
 
+// Observer-command results are stable English literals. Recompose them
+// through the locale table at the controller boundary so workspace notices
+// stay localized without changing the authoritative results or saves.
+std::string localized_command_message(
+    const stellar::engine::LocalizationTable *locale,
+    std::string_view message) {
+  static const std::pair<std::string_view, std::string_view> messages[] = {
+      {"No active diplomatic channel is available to that counterpart.",
+       "DIPLOMACY_ERR_NO_CHANNEL"},
+      {"No usable diplomatic contact is available to that counterpart.",
+       "DIPLOMACY_ERR_NO_CONTACT"},
+      {"That diplomatic action is not currently available.",
+       "DIPLOMACY_ERR_ACTION"},
+      {"The diplomatic request is not valid.", "DIPLOMACY_ERR_REQUEST"},
+      {"That territorial claim action is not currently available.",
+       "DIPLOMACY_ERR_TERRITORIAL_ACTION"},
+      {"The territorial claim request is not valid.",
+       "DIPLOMACY_ERR_TERRITORIAL_REQUEST"},
+      {"That border warning action is not currently available.",
+       "DIPLOMACY_ERR_BORDER_ACTION"},
+      {"The border warning request is not valid.",
+       "DIPLOMACY_ERR_BORDER_REQUEST"},
+      {"Communication channel is already available.",
+       "DIPLOMACY_MSG_CHANNEL_EXISTS"},
+      {"Communication channel established.", "DIPLOMACY_MSG_CHANNEL_OPENED"},
+      {"Proposal sent.", "DIPLOMACY_MSG_PROPOSAL_SENT"},
+      {"Proposal accepted.", "DIPLOMACY_MSG_PROPOSAL_ACCEPTED"},
+      {"Proposal rejected.", "DIPLOMACY_MSG_PROPOSAL_REJECTED"},
+      {"Proposal withdrawn.", "DIPLOMACY_MSG_PROPOSAL_WITHDRAWN"},
+      {"Access permission updated.", "DIPLOMACY_MSG_ACCESS_UPDATED"},
+      {"War declared.", "DIPLOMACY_MSG_WAR_DECLARED"},
+      {"Agreement was already terminated.",
+       "DIPLOMACY_MSG_AGREEMENT_ALREADY_ENDED"},
+      {"Agreement terminated.", "DIPLOMACY_MSG_AGREEMENT_TERMINATED"},
+      {"Territorial claim was already communicated.",
+       "DIPLOMACY_MSG_CLAIM_ALREADY_SENT"},
+      {"Territorial claim communicated.", "DIPLOMACY_MSG_CLAIM_SENT"},
+      {"Territorial claim response was already recorded.",
+       "DIPLOMACY_MSG_CLAIM_RESPONSE_EXISTS"},
+      {"Territorial claim recognized.", "DIPLOMACY_MSG_CLAIM_RECOGNIZED"},
+      {"Territorial claim disputed.", "DIPLOMACY_MSG_CLAIM_DISPUTED"},
+      {"Territorial claim is already active.",
+       "DIPLOMACY_MSG_CLAIM_ACTIVE"},
+      {"Territorial claim asserted.", "DIPLOMACY_MSG_CLAIM_ASSERTED"},
+      {"Border warning was already issued.",
+       "DIPLOMACY_MSG_WARNING_EXISTS"},
+      {"Border warning issued.", "DIPLOMACY_MSG_WARNING_SENT"},
+  };
+  for (const auto &[literal, key] : messages)
+    if (message == literal) return resolve(locale, key, literal);
+  return std::string(message);
+}
+
 // Display-name resolvers for the vocabularies players read as statuses.
 std::string political_name(const stellar::engine::LocalizationTable *locale,
                            DiplomaticPoliticalState value) {
@@ -784,7 +837,7 @@ NativeDiplomacyCommandOutcome NativeDiplomacyController::execute(
     break;
   }
   if (result.accepted) signature_.reset();
-  return {result.accepted, result.message};
+  return {result.accepted, localized_command_message(locale_, result.message)};
 }
 
 std::string NativeDiplomacyController::tr(std::string_view key,

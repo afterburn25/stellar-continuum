@@ -1,4 +1,5 @@
 #include "native_outpost_freight_controller.hpp"
+#include "native_route_messages.hpp"
 
 #include <stellar/core/colony_operations.hpp>
 #include <stellar/engine/localization.hpp>
@@ -350,7 +351,7 @@ NativeOutpostFreightController::issue(CampaignFrame &frame,
   try {
     current_holder.emplace(context(frame));
   } catch (const std::exception &error) {
-    return {false, error.what()};
+    return {false, native_route::localized_message(locale_, error.what())};
   }
   auto &current = *current_holder;
   const auto &q = held.preview;
@@ -392,7 +393,7 @@ NativeOutpostFreightController::issue(CampaignFrame &frame,
     operations = resource_outpost_snapshot(current.world.bodies,
                                            current.world.economies, *outpost);
   } catch (const std::exception &error) {
-    return {false, error.what()};
+    return {false, native_route::localized_message(locale_, error.what())};
   }
   if (!valid_operations(operations) ||
       operations.stored_materials != held.decision.stored_materials ||
@@ -408,21 +409,25 @@ NativeOutpostFreightController::issue(CampaignFrame &frame,
     preflight = current.runtime.core().issue_freight_collection_order(
         &copied, current.player_id, q.fleet_id, q.colony_id);
   } catch (const std::exception &error) {
-    return {false, error.what()};
+    return {false, native_route::localized_message(locale_, error.what())};
   }
   const auto *after =
       unique_by(copied.campaign().fleets, q.fleet_id, &FleetState::id);
   if (!preflight.accepted || !after ||
       !same_decision_fleet(*after, held.decision.fleet_after_preflight))
     return {false,
-            preflight.message.empty() ? stale().message : preflight.message};
+            preflight.message.empty()
+                ? stale().message
+                : native_route::localized_message(locale_,
+                                                  preflight.message)};
 
   try {
     const auto result = current.runtime.core().issue_freight_collection_order(
         &current.simulation, current.player_id, q.fleet_id, q.colony_id);
-    return {result.accepted, result.message};
+    return {result.accepted,
+            native_route::localized_message(locale_, result.message)};
   } catch (const std::exception &error) {
-    return {false, error.what()};
+    return {false, native_route::localized_message(locale_, error.what())};
   }
 }
 

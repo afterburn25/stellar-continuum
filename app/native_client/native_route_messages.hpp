@@ -71,6 +71,22 @@ namespace stellar::native_route {
       {"Finish the current cargo collection and delivery before assigning "
        "another course.",
        "ROUTE_FREIGHT_BUSY"},
+      {"No controllable bulk freighter with that fleet ID is available.",
+       "ROUTE_FREIGHT_NO_FREIGHTER"},
+      {"A freight run must depart from one of your developed colonies.",
+       "ROUTE_FREIGHT_COLONY"},
+      {"That staffed resource outpost is unavailable.",
+       "ROUTE_FREIGHT_OUTPOST"},
+      {"No confirmed extractable deposit", "ROUTE_FREIGHT_OP_NO_DEPOSIT"},
+      {"Deposit depleted: no extractable material remains",
+       "ROUTE_FREIGHT_OP_DEPLETED"},
+      {"Build a fabrication complex to begin extraction",
+       "ROUTE_FREIGHT_OP_BUILD"},
+      {"Extraction offline: processing complex lacks power",
+       "ROUTE_FREIGHT_OP_OFFLINE"},
+      {"Storage full: freight service required", "ROUTE_FREIGHT_OP_STORAGE"},
+      {"Extracting to local storage; freight service not yet established",
+       "ROUTE_FREIGHT_OP_LOCAL"},
       {"Select an active colony or outpost ship you control.",
        "ROUTE_COLONY_SELECT"},
       {"No controllable active civilian mission ship with that identity is "
@@ -188,6 +204,36 @@ namespace stellar::native_route {
     return trf("ROUTE_FREIGHT_COURSE_SET",
                {std::string(p->first), reason(p->second)},
                "{0}: course set. {1}");
+  // "{fleet} is already assigned to a freight run."
+  if (const auto name =
+          strip_suffix(message, " is already assigned to a freight run."))
+    return trf("ROUTE_FREIGHT_ASSIGNED", {std::string(*name)},
+               "{0} is already assigned to a freight run.");
+  // "{fleet} must finish its current lane leg before receiving a freight
+  //  order."
+  if (const auto name = strip_suffix(
+          message,
+          " must finish its current lane leg before receiving a freight "
+          "order."))
+    return trf("ROUTE_FREIGHT_LANE_LEG", {std::string(*name)},
+               "{0} must finish its current lane leg before receiving a "
+               "freight order.");
+  // "{fleet} dispatched to collect up to {n} material units from {outpost}.
+  //  {reason}"
+  if (const auto p = divide(message, " dispatched to collect up to "))
+    if (const auto q = divide(p->second, " material units from "))
+      if (const auto r = divide(q->second, ". "))
+        return trf("ROUTE_FREIGHT_DISPATCHED",
+                   {std::string(p->first), std::string(q->first),
+                    std::string(r->first), reason(r->second)},
+                   "{0} dispatched to collect up to {1} material units from "
+                   "{2}. {3}");
+  // "Extraction running at {n}% operating funding"
+  if (const auto rest = strip_prefix(message, "Extraction running at "))
+    if (const auto percent =
+            strip_suffix(*rest, "% operating funding"))
+      return trf("ROUTE_FREIGHT_OP_RUNNING", {std::string(*percent)},
+                 "Extraction running at {0}% operating funding");
   // "Returning {fleet} will abandon its paid colony authorization with no
   //  refund. Current establishment progress: {n} days; all of it will be
   //  lost. Colonists remain aboard. Confirm return to continue."

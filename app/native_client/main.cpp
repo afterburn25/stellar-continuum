@@ -69,6 +69,7 @@
 #include "native_fleet_controller.hpp"
 #include "native_fleet_presentation.hpp"
 #include "native_fleet_workspace.hpp"
+#include "native_military_messages.hpp"
 #include "native_research_controller.hpp"
 #include "native_research_workspace.hpp"
 #include "native_research_art.hpp"
@@ -1279,9 +1280,11 @@ class NativeCampaign final {
     const auto outcome=construction_controller_.start(
         session_->frame(),session_->cache().generation,
         view.construction_revision,candidate->id);
-    session_->publish_status(outcome.message);
+    session_->publish_status(
+        construction_workspace_.localized_construction_message(outcome.message));
     if(outcome.accepted){
-      publish_notification("Construction",outcome.message);
+      publish_notification("Construction",
+          construction_workspace_.localized_construction_message(outcome.message));
       construction_candidate_index_=0;
     }
     if(construction_workspace_.visible())refresh_construction(true);
@@ -9368,8 +9371,11 @@ class NativeCampaign final {
     }
     if(command.kind==FleetWorkspaceCommandKind::Engage){
       const auto outcome=session_->frame().begin_tactical(command.fleet_id);
-      fleet_workspace_.set_notice(observer_safe_fleet_message(outcome.message,observed_system_names(),locale_),outcome.accepted);
-      if(outcome.accepted)publish_notification("Combat",outcome.message);
+      const auto message=observer_safe_fleet_message(
+          stellar::native_military::localized_message(locale_,outcome.message),
+          observed_system_names(),locale_);
+      fleet_workspace_.set_notice(message,outcome.accepted);
+      if(outcome.accepted)publish_notification("Combat",message);
       refresh_fleets(true);return;
     }
     NativeFleetSelectionOutcome selection;

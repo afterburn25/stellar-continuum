@@ -1,5 +1,6 @@
 #include "native_battle_workspace.hpp"
 
+#include "native_military_messages.hpp"
 #include "native_ui_theme.hpp"
 
 #include <algorithm>
@@ -619,7 +620,7 @@ std::string NativeBattleWorkspace::localized_battle_message(
 }
 
 void NativeBattleWorkspace::set_status(std::string message, bool error) {
-  status_ = std::move(message);
+  status_ = stellar::native_military::localized_message(locale_, message);
   status_error_ = error;
 }
 void NativeBattleWorkspace::set_ship_targets(

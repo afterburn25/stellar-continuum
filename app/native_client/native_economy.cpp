@@ -50,6 +50,44 @@ constexpr std::size_t maximum_diagnostic_bytes = 256;
   return out;
 }
 
+// Core industry-allocation results are stable English literals or a fixed
+// skeleton carrying the display_priority name. Recompose them through the
+// locale table at the controller boundary so notices and notifications stay
+// localized without changing the authoritative result or saves.
+[[nodiscard]] std::string localized_allocation_message(
+    const stellar::engine::LocalizationTable *locale,
+    std::string_view message) {
+  if (!locale || message.empty()) return std::string(message);
+  if (message == "Only the owning civilization can set its industry priority.")
+    return tr_at(locale, "ECONOMY_ERR_OWNER",
+                 "Only the owning civilization can set its industry "
+                 "priority.");
+  if (message == "Unknown civilization economy.")
+    return tr_at(locale, "ECONOMY_ERR_UNKNOWN_ECONOMY",
+                 "Unknown civilization economy.");
+  static const std::pair<std::string_view, std::string_view> priorities[] = {
+      {"Infrastructure first", "ECONOMY_PRIORITY_NAME_INFRASTRUCTURE"},
+      {"Shipbuilding first", "ECONOMY_PRIORITY_NAME_SHIPBUILDING"},
+      {"Balanced", "ECONOMY_PRIORITY_NAME_BALANCED"},
+  };
+  if (const auto name =
+          message.starts_with("Industry priority set to ")
+              ? std::optional<std::string_view>{message.substr(25)}
+              : std::nullopt;
+      name)
+    if (const auto tail =
+            name->ends_with(".")
+                ? std::optional<std::string_view>{name->substr(0, name->size() - 1)}
+                : std::nullopt;
+        tail)
+      for (const auto &[literal, key] : priorities)
+        if (*tail == literal)
+          return trf_at(locale, "ECONOMY_MSG_PRIORITY_SET",
+                        {tr_at(locale, key, literal)},
+                        "Industry priority set to {0}.");
+  return std::string(message);
+}
+
 [[nodiscard]] bool finite(const double value) noexcept { return std::isfinite(value); }
 
 [[nodiscard]] std::string bounded(std::string value) {
@@ -386,7 +424,7 @@ IndustryPriorityChangeResult NativeEconomyController::change_priority(
     return stale();
   const auto result = set_industry_priority(campaign.economies, *observer_, *observer_, priority);
   if (result.accepted) view_.revision = 0;
-  return result;
+  return {result.accepted, localized_allocation_message(locale_, result.message)};
 }
 
 void NativeEconomyController::clear() {

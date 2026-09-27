@@ -36,6 +36,11 @@ namespace stellar::native_military {
         }
         return out;
       };
+  const auto strip_prefix = [](std::string_view text, std::string_view prefix)
+      -> std::optional<std::string_view> {
+    if (!text.starts_with(prefix)) return std::nullopt;
+    return text.substr(prefix.size());
+  };
   const auto strip_suffix = [](std::string_view text, std::string_view suffix)
       -> std::optional<std::string_view> {
     if (!text.ends_with(suffix)) return std::nullopt;
@@ -46,6 +51,36 @@ namespace stellar::native_military {
     const auto at = text.find(infix);
     if (at == std::string_view::npos) return std::nullopt;
     return std::pair{text.substr(0, at), text.substr(at + infix.size())};
+  };
+  // Tactical order acknowledgments embed the engine's PascalCase order name
+  // ("{formation} acknowledged StandoffAttack."). Map it back to the battle
+  // workspace's localized order vocabulary.
+  const auto tactical_order_name =
+      [&](std::string_view core_name) -> std::optional<std::string> {
+    static const std::pair<std::string_view, std::string_view> names[] = {
+        {"Engage", "BATTLE_ORDER_ENGAGE"},
+        {"Hold", "BATTLE_ORDER_HOLD"},
+        {"Defend", "BATTLE_ORDER_DEFEND"},
+        {"AdvanceCautiously", "BATTLE_ORDER_ADVANCE_CAUTIOUS"},
+        {"Advance", "BATTLE_ORDER_ADVANCE"},
+        {"StandoffAttack", "BATTLE_ORDER_STANDOFF"},
+        {"Screen", "BATTLE_ORDER_SCREEN"},
+        {"ProtectCriticalAsset", "BATTLE_ORDER_PROTECT"},
+        {"FocusFire", "BATTLE_ORDER_FOCUS"},
+        {"FlankLeft", "BATTLE_ORDER_FLANK_LEFT"},
+        {"FlankRight", "BATTLE_ORDER_FLANK_RIGHT"},
+        {"Intercept", "BATTLE_ORDER_INTERCEPT"},
+        {"Pursue", "BATTLE_ORDER_PURSUE"},
+        {"BreakContact", "BATTLE_ORDER_BREAK"},
+        {"Disengage", "BATTLE_ORDER_DISENGAGE"},
+        {"Retreat", "BATTLE_ORDER_RETREAT"},
+        {"EmergencyRetreat", "BATTLE_ORDER_EMERGENCY"},
+        {"Breakout", "BATTLE_ORDER_BREAKOUT"},
+        {"Surrender", "BATTLE_ORDER_SURRENDER"},
+    };
+    for (const auto &[literal, key] : names)
+      if (core_name == literal) return tr(key, literal);
+    return std::nullopt;
   };
   // Accepted-order results.
   if (const auto name = strip_suffix(message, " is holding position."))
@@ -103,9 +138,75 @@ namespace stellar::native_military {
        "engagement.",
        "MIL_ORDER_NO_HOSTILITY"},
       {"Unknown military order.", "MIL_ORDER_UNKNOWN"},
+      // Tactical engagement results (campaign massive-combat begin and
+      // per-formation order issues).
+      {"Combat time is invalid.", "MIL_TACTICAL_BAD_TIME"},
+      {"An encounter is already active. Use its tactical orders.",
+       "MIL_TACTICAL_ACTIVE"},
+      {"An armed fleet must be stationed in a system before engaging.",
+       "MIL_TACTICAL_STATIONED"},
+      {"No attackable hostile formation is detected in this system.",
+       "MIL_TACTICAL_NO_HOSTILE"},
+      {"A participating vessel has no combat-ready hull.",
+       "MIL_TACTICAL_NO_HULL"},
+      {"The participating vessels require more damage-compatible tactical "
+       "groups than the formation limit permits.",
+       "MIL_TACTICAL_GROUPS"},
+      {"There is no active tactical encounter.", "MIL_TACTICAL_NONE"},
+      {"The selected fleet must be present in a star system to engage "
+       "hostiles.",
+       "MIL_TACTICAL_NO_SYSTEM"},
+      {"No attackable hostile fleet is detected in this fleet's current "
+       "system.",
+       "MIL_TACTICAL_NO_TARGET"},
+      {"The combat order contains an invalid tactical mode.",
+       "MIL_TACTICAL_BAD_MODE"},
+      {"Combat objective must be finite.", "MIL_TACTICAL_BAD_OBJECTIVE"},
+      {"No active owned formation has that identity.",
+       "MIL_TACTICAL_NO_FORMATION"},
+      {"The protected asset must be an active friendly formation.",
+       "MIL_TACTICAL_PROTECT_TARGET"},
+      {"The requested target is not an active hostile formation.",
+       "MIL_TACTICAL_TARGET_HOSTILE"},
+      {"That combat order requires a target formation.",
+       "MIL_TACTICAL_NEEDS_TARGET"},
   };
   for (const auto &[literal, key] : statics)
     if (message == literal) return tr(key, literal);
+  // "This encounter exceeds the {n}-ship tactical limit."
+  if (const auto rest = strip_prefix(message, "This encounter exceeds the "))
+    if (const auto count = strip_suffix(*rest, "-ship tactical limit."))
+      return trf("MIL_TACTICAL_LIMIT", {std::string(*count)},
+                 "This encounter exceeds the {0}-ship tactical limit.");
+  // "Encounter established: {n} commissioned vessels. Tactical orders
+  //  ready."
+  if (const auto rest = strip_prefix(message, "Encounter established: "))
+    if (const auto count = strip_suffix(
+            *rest, " commissioned vessels. Tactical orders ready."))
+      return trf("MIL_TACTICAL_ESTABLISHED", {std::string(*count)},
+                 "Encounter established: {0} commissioned vessels. Tactical "
+                 "orders ready.");
+  // "{formation} surrendered."
+  if (const auto name = strip_suffix(message, " surrendered."))
+    return trf("MIL_TACTICAL_SURRENDERED", {std::string(*name)},
+               "{0} surrendered.");
+  // "{formation} acknowledged surrender."
+  if (const auto name = strip_suffix(message, " acknowledged surrender."))
+    return trf("MIL_TACTICAL_ACK_SURRENDER", {std::string(*name)},
+               "{0} acknowledged surrender.");
+  // "{formation}: {OrderName}." and "{formation} acknowledged {OrderName}."
+  if (const auto p = divide(message, ": "))
+    if (const auto order = strip_suffix(p->second, "."))
+      if (const auto name = tactical_order_name(*order))
+        return trf("MIL_TACTICAL_ORDER_EVENT",
+                   {std::string(p->first), *name},
+                   "{0}: {1}.");
+  if (const auto p = divide(message, " acknowledged "))
+    if (const auto order = strip_suffix(p->second, "."))
+      if (const auto name = tactical_order_name(*order))
+        return trf("MIL_TACTICAL_ACK_ORDER",
+                   {std::string(p->first), *name},
+                   "{0} acknowledged {1}.");
   return std::string(message);
 }
 } // namespace stellar::native_military

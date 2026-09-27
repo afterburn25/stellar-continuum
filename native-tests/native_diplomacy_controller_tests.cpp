@@ -1,5 +1,6 @@
 #include "native_diplomacy_controller.hpp"
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/diplomacy_simulation.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
@@ -274,6 +275,31 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
             return event.kind == "War Declared";
           }),
           "war declaration missing from observer history");
+
+  // Command results recompose through a bound locale table; unmatched and
+  // unbound messages keep the authoritative English text.
+  stellar::engine::LocalizationTable german("de", "en");
+  std::string locale_error;
+  require(german.load_json(R"json({"locale":"de","strings":{
+      "DIPLOMACY_MSG_WAR_DECLARED":"Krieg erklaert.",
+      "DIPLOMACY_ERR_ACTION":"Diese diplomatische Aktion ist derzeit nicht verfuegbar."
+    }})json",
+                          &locale_error),
+          "German diplomacy locale failed to load");
+  controller.set_localization(&german);
+  const auto war_again = controller.execute(
+      frame, 7, controller.build(frame, 7, 0).diplomacy_revision,
+      DiplomacyWorkspaceAction::declare_war, foreign->id, std::nullopt);
+  require(war_again.accepted && war_again.message == "Krieg erklaert.",
+          "German diplomacy result kept the English literal");
+  const auto missing_withdraw = controller.execute(
+      frame, 7, controller.build(frame, 7, 0).diplomacy_revision,
+      DiplomacyWorkspaceAction::withdraw_proposal, std::nullopt, 424242);
+  require(!missing_withdraw.accepted &&
+              missing_withdraw.message ==
+                  "Diese diplomatische Aktion ist derzeit nicht verfuegbar.",
+          "German withdraw denial kept the English literal");
+  controller.set_localization(nullptr);
 
   // Contact filters.
   const auto all = filter_native_diplomacy_contacts(
