@@ -93,8 +93,17 @@ void NativeResearchWorkspace::render_dashboard(DrawList& out,const ResearchWorks
 }
 void NativeResearchWorkspace::render_controls(DrawList& out,const ResearchWorkspaceLayout& l){
   const float s=l.scale;
-  const auto button=[&](UiRect r,std::string label,int action,std::string id={},bool enabled=true,theme::Tone tone=theme::Tone::Neutral,bool active=false){theme::button(out,r,label,pointer_,l.small_font_pixels,tone,active,enabled);if(enabled)interface_hits_.push_back({r,action,std::move(id),std::move(label)});};
-  for(int i=0;i<4;++i){UiRect r{l.view_tabs.x+i*l.view_tabs.width/4,l.view_tabs.y,l.view_tabs.width/4-4*s,l.view_tabs.height};const auto caption=tr(std::array{"RESEARCH_TAB_GUIDED","RESEARCH_TAB_TREE","RESEARCH_TAB_RECENT","RESEARCH_TAB_FAVORITES"}[i],std::array{"Guided","Tech Tree","Recent","Favorites"}[i]);theme::tab(out,r,caption,pointer_,l.small_font_pixels,static_cast<int>(mode_)==i);interface_hits_.push_back({r,100+i,{},caption});}
+  const auto fit=[&](std::string_view label,UiRect r){
+    int font=l.small_font_pixels;
+    if(text_measurer_&&r.width>0.f)while(font>8){
+      const auto extent=text_measurer_(Text{{},std::string(label),{},font});
+      if(extent.width<=r.width-6.f*s)return font;
+      --font;
+    }
+    return font;
+  };
+  const auto button=[&](UiRect r,std::string label,int action,std::string id={},bool enabled=true,theme::Tone tone=theme::Tone::Neutral,bool active=false){theme::button(out,r,label,pointer_,fit(label,r),tone,active,enabled);if(enabled)interface_hits_.push_back({r,action,std::move(id),std::move(label)});};
+  for(int i=0;i<4;++i){UiRect r{l.view_tabs.x+i*l.view_tabs.width/4,l.view_tabs.y,l.view_tabs.width/4-4*s,l.view_tabs.height};const auto caption=tr(std::array{"RESEARCH_TAB_GUIDED","RESEARCH_TAB_TREE","RESEARCH_TAB_RECENT","RESEARCH_TAB_FAVORITES"}[i],std::array{"Guided","Tech Tree","Recent","Favorites"}[i]);theme::tab(out,r,caption,pointer_,fit(caption,r),static_cast<int>(mode_)==i);interface_hits_.push_back({r,100+i,{},caption});}
   button(l.completed,tr("RESEARCH_TAB_COMPLETED","✓ Completed Research"),104,{},true,theme::Tone::Neutral,mode_==ResearchViewMode::Completed);button(l.queue,trf("RESEARCH_TAB_QUEUE",{std::to_string(plan_.queue.size())},"Research Queue · {0}"),105,{},true,theme::Tone::Neutral,mode_==ResearchViewMode::Queue);
   if(mode_==ResearchViewMode::Tree){button({l.graph.x+8*s,l.graph.y+6*s,100*s,30*s},tr("RESEARCH_RESET_VIEW","Reset view"),30);button({l.graph.x+116*s,l.graph.y+6*s,108*s,30*s},tr("RESEARCH_FOCUS_SELECTED","Focus selected"),31);button({l.graph.x+232*s,l.graph.y+6*s,100*s,30*s},tr("RESEARCH_FOCUS_ACTIVE","Focus active"),32);}
   else {
@@ -105,8 +114,8 @@ void NativeResearchWorkspace::render_controls(DrawList& out,const ResearchWorksp
     button(l.filter,tr(std::array{"RESEARCH_FILTER_AVAILABLE","RESEARCH_FILTER_ALL","RESEARCH_FILTER_RECOMMENDED","RESEARCH_FILTER_RESEARCHING","RESEARCH_FILTER_QUEUED","RESEARCH_FILTER_LOCKED","RESEARCH_FILTER_COMPLETED","RESEARCH_FILTER_FAVORITES"}[filter_],std::array{"Available ▾","All known ▾","Recommended ▾","Researching ▾","Queued ▾","Locked ▾","Completed ▾","Favorites ▾"}[filter_]),4);
   }
   if(const auto* n=selected_node()){
-    button(l.bookmark,includes(plan_.favorites,n->id)?"★ Favorited":"☆ Favorite",6,n->id,true,theme::Tone::Neutral,includes(plan_.favorites,n->id));
-    button(l.enqueue,includes(plan_.queue,n->id)?"Remove queue":"Add to queue",7,n->id,(!established(*n)&&!n->active)||includes(plan_.queue,n->id),theme::Tone::Neutral,includes(plan_.queue,n->id));
+    button(l.bookmark,includes(plan_.favorites,n->id)?tr("RESEARCH_FAVORITED","★ Favorited"):tr("RESEARCH_FAVORITE","☆ Favorite"),6,n->id,true,theme::Tone::Neutral,includes(plan_.favorites,n->id));
+    button(l.enqueue,includes(plan_.queue,n->id)?tr("RESEARCH_QUEUE_REMOVE_LABEL","Remove queue"):tr("RESEARCH_QUEUE_ADD","Add to queue"),7,n->id,(!established(*n)&&!n->active)||includes(plan_.queue,n->id),theme::Tone::Neutral,includes(plan_.queue,n->id));
     auto tree = l.tree_focus;
     if (n->active) {
       tree.width = (tree.width-6*s)*.5f;

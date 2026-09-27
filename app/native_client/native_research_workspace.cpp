@@ -286,7 +286,7 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
   l.scale=s;l.compact=s<.8f;l.title_font_pixels=theme::type::title(s);l.body_font_pixels=std::max(13,static_cast<int>(16*s));l.small_font_pixels=std::max(12,static_cast<int>(14*s));
   const float x=native_navigation_content_left*chrome.scale,right=width-12*s;
   l.surface={x,top,right-x,height-top-10*s};l.title={x,top,350*s,32*s};l.labs={x,top+36*s,right-x-115*s,25*s};
-  l.close={right-80*s,top,80*s,34*s};
+  l.close={right-160*s,top,160*s,34*s};
   const float body=top+124*s,sidebar_width=195*s,inspector_width=350*s;
   l.sidebar={x,top+78*s,sidebar_width,height-top-88*s};
   const float gx=x+sidebar_width+g,iw=right-inspector_width,gwidth=iw-g-gx;
@@ -984,9 +984,15 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
                              tab.bounds.y + 5.f * layout.scale,
                              tab.bounds.width - icon-18.f * layout.scale,
                              tab.bounds.height - 8.f * layout.scale};
+      int tab_font=layout.small_font_pixels;
+      if(text_measurer_)while(tab_font>8){
+        const auto extent=text_measurer_(stellar::native_map::Text{{},domain.label,{},tab_font});
+        if(extent.width<=tab_label.width)break;
+        --tab_font;
+      }
       clipped_text(out, tab_label, tab.bounds,
                    domain.label,
-                   active ? bright : muted, layout.small_font_pixels,
+                   active ? bright : muted, tab_font,
                    TextAlign::Left);
     }
   }
