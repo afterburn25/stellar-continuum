@@ -117,8 +117,14 @@ same document headless-tested.
    `Dielectric3D` transmits/reflects the same map. A scene-level
    `environment` probe (document key + `Scene3D::create` param) fills
    the slot for materials that opt in via `environmentStrength` but
-   author no map — one shared starfield per scene. Remaining: the
-   probe is a static authored equirect, not a captured/baked probe.
+   author no map — one shared starfield per scene. `environmentCapture`
+   (`EnvironmentCapture3D`) bakes a captured probe: six face views at
+   an authored anchor render through the full pipeline once per scene,
+   resample into an equirect, and override the authored slot — opt-in
+   materials reflect the local scene (sun disc, lit planets) rather
+   than only a starfield. Remaining: the bake is a static first-frame
+   snapshot — no refresh, no probe grid, no per-instance probe
+   selection.
 5. **Post** — landed: HDR tonemap plus per-view `exposure`,
    mip-chain `bloom` (soft threshold), `contrast`/`saturation` grading,
    unsharp `sharpen`, post-tonemap `vignette` (corner falloff on the

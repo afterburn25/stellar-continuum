@@ -807,6 +807,19 @@ int main() {
     } else {
       check(false, "scene3d environment probe rejected");
     }
+    if (auto baked = engine::Scene3dDocument::from_json(
+            R"({"entities":[],"probeCapture":true,"probeAnchor":[1,2,3],"probeResolution":64})")) {
+      check(baked->probe_capture && baked->probe_resolution == 64 &&
+                baked->probe_x == 1.f && baked->probe_z == 3.f &&
+                baked->to_json().find("probeCapture") != std::string::npos,
+            "scene3d did not round-trip probeCapture");
+    } else {
+      check(false, "scene3d probeCapture rejected");
+    }
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[],"probeCapture":true,"probeResolution":8})")
+              .has_value(),
+          "scene3d out-of-range probeResolution rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3]}],"pointLights":[{},{},{},{},{}]})")
               .has_value(),

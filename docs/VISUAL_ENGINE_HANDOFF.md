@@ -510,7 +510,8 @@ quality tier, debug view, point lights (pos/color/intensity/range +
 optional spot dir/inner/outer/shadow flag),
 shadow map (extent/distance/depth/strength/bias/resolution/cascade…cascade4/softness/normalOffset/fit), scene
 environment probe (equirect path — feeds `environmentStrength` opt-ins
-that author no own map).
+that author no own map), captured environment probe (anchor x,y,z +
+face resolution — bakes six pipeline face views into the env slot).
 The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 
 ## Performance notes
@@ -583,8 +584,10 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   multi-term phase functions or wavelength-dependent scattering; it
   scales radiance only, not alpha.
 - One shared equirect env map per material, or the scene-level
-  `environment` probe for opt-in PBR materials with no authored map —
-  no probe grid, no captured/baked probes.
+  `environment` probe for opt-in PBR materials with no authored map;
+  `environmentCapture` bakes six face views at an anchor into the slot
+  (first-frame snapshot — no refresh, no probe grid, no per-instance
+  probe selection).
 - Bloom blur kernels are box-blitted HDR mips (narrow halo reach).
 - Debug views are developer tooling — `Lod` tints the submitted
   level/proxy class and `Residency` the bound mip state; LightingOnly

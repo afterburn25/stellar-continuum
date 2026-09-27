@@ -219,8 +219,12 @@ std::shared_ptr<const Mesh3D> Mesh3D::uv_sphere(int columns,int rows){
   }
   return create(std::move(vertices),std::move(indices));
 }
-std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map,std::shared_ptr<const RgbaImage> environment){
+std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map,std::shared_ptr<const RgbaImage> environment,EnvironmentCapture3D environment_capture){
   validate_camera(camera);camera.orientation=normalized(camera.orientation);light=normalized(light);
+  if(environment_capture.enabled&&(
+       !std::isfinite(environment_capture.anchor.x)||!std::isfinite(environment_capture.anchor.y)||!std::isfinite(environment_capture.anchor.z)||
+       environment_capture.face_resolution<16||environment_capture.face_resolution>512))
+    throw std::invalid_argument("3D environment capture requires a finite anchor and face resolution in [16,512].");
   if(shadow_map){
     const auto& s=*shadow_map;
     if(!bounded(s.extent,1e9)||s.extent<=0||!bounded(s.distance,1e12)||s.distance<0||
@@ -279,7 +283,7 @@ std::shared_ptr<const Scene3D> Scene3D::create(Camera3D camera,std::vector<MeshI
   if(environment&&textures.insert(environment.get()).second)images+=texture_mip_layout3d(environment.get()).resident_bytes;
   if(geometry>maximum_mesh3d_cache_bytes||images>maximum_scene3d_texture_cache_bytes||meshes.size()>maximum_scene3d_resource_entries||textures.size()>maximum_scene3d_resource_entries)
     throw std::length_error("3D scene exceeds its resident resource budget.");
-  return std::shared_ptr<const Scene3D>(new Scene3D(camera,std::move(instances),light,std::move(point_lights),std::move(shadow_map),std::move(environment)));
+  return std::shared_ptr<const Scene3D>(new Scene3D(camera,std::move(instances),light,std::move(point_lights),std::move(shadow_map),std::move(environment),environment_capture));
 }
 PreparedInstance3D prepare_instance3d(const Camera3D& camera,const MeshInstance3D& instance,float aspect){
   validate_camera(camera);validate_instance(instance);

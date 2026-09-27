@@ -578,6 +578,11 @@ std::string Scene3dDocument::to_json() const {
   if (bg_r != 8 || bg_g != 16 || bg_b != 26)
     doc["background"] = {bg_r, bg_g, bg_b};
   if (!environment.empty()) doc["environment"] = environment;
+  if (probe_capture) {
+    doc["probeCapture"] = true;
+    doc["probeAnchor"] = {probe_x, probe_y, probe_z};
+    doc["probeResolution"] = probe_resolution;
+  }
   if (gravity != 0.0f) doc["gravity"] = gravity;
   if (ground_y != 0.0f) doc["groundY"] = ground_y;
   if (bounds != 0.0f) doc["bounds"] = bounds;
@@ -989,6 +994,22 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       scene.bg_b = bg[2].get<std::uint8_t>();
     }
     scene.environment = doc.value("environment", std::string{});
+    scene.probe_capture = doc.value("probeCapture", false);
+    if (doc.contains("probeAnchor")) {
+      const auto &pa = doc.at("probeAnchor");
+      if (!pa.is_array() || pa.size() != 3)
+        return fail("probeAnchor must be [x,y,z]");
+      scene.probe_x = pa[0].get<float>();
+      scene.probe_y = pa[1].get<float>();
+      scene.probe_z = pa[2].get<float>();
+    }
+    scene.probe_resolution = doc.value("probeResolution", 128);
+    if (scene.probe_capture &&
+        (!std::isfinite(scene.probe_x) || !std::isfinite(scene.probe_y) ||
+         !std::isfinite(scene.probe_z) || scene.probe_resolution < 16 ||
+         scene.probe_resolution > 512))
+      return fail("probeCapture requires a finite probeAnchor and "
+                  "probeResolution in [16,512]");
     scene.gravity = doc.value("gravity", 0.0f);
     scene.ground_y = doc.value("groundY", 0.0f);
     scene.bounds = doc.value("bounds", 0.0f);

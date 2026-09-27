@@ -424,12 +424,28 @@ struct ShadowMap3D {
   // centre). `distance`/`depth` remain authored world units.
   bool camera_fit{false};
 };
+// Captured scene environment probe: when enabled the renderer bakes
+// six face views at the anchor once per scene (its first prepared
+// frame), resamples them into an equirect, and binds that image as the
+// scene environment slot — PBR materials opting in via
+// environment_strength reflect the local scene (sun disc, lit planets,
+// nebulae) rather than only an authored starfield. Static by policy:
+// the bake captures the scene's initial layout; authored maps and
+// opt-in materials keep their own paths. The bake renders each face
+// through the full pipeline at face_resolution, so it inherits the
+// scene's lights, shadows and emission volumes.
+struct EnvironmentCapture3D {
+  Position3 anchor{0,0,0}; // world space
+  int face_resolution{128}; // [16,512] px per face; equirect out is 2r x r
+  bool enabled{false};
+};
 class Scene3D final {
  public:
   [[nodiscard]] static std::shared_ptr<const Scene3D> create(
       Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light_direction={.42f,.2f,.87f},
       std::vector<PointLight3D> point_lights={},std::optional<ShadowMap3D> shadow_map=std::nullopt,
-      std::shared_ptr<const RgbaImage> environment={});
+      std::shared_ptr<const RgbaImage> environment={},
+      EnvironmentCapture3D environment_capture={});
   [[nodiscard]] const auto& camera()const noexcept{return camera_;}
   [[nodiscard]] const auto& instances()const noexcept{return instances_;}
   [[nodiscard]] Vec3 light_direction()const noexcept{return light_;} // camera space
@@ -441,11 +457,14 @@ class Scene3D final {
   // PBR materials that opt in with environment_strength but author no
   // map of their own (a system view's shared starfield). Dielectrics
   // are unaffected — validation already requires their authored map.
+  // A captured probe (environment_capture) overrides this slot once
+  // the renderer bakes it.
   [[nodiscard]] const auto& environment()const noexcept{return environment_;}
+  [[nodiscard]] const auto& environment_capture()const noexcept{return environment_capture_;}
  private:
-  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map,std::shared_ptr<const RgbaImage> environment)
-      :camera_(camera),instances_(std::move(instances)),light_(light),point_lights_(std::move(point_lights)),shadow_map_(std::move(shadow_map)),environment_(std::move(environment)){}
-  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;std::vector<PointLight3D> point_lights_;std::optional<ShadowMap3D> shadow_map_;std::shared_ptr<const RgbaImage> environment_;
+  Scene3D(Camera3D camera,std::vector<MeshInstance3D> instances,Vec3 light,std::vector<PointLight3D> point_lights,std::optional<ShadowMap3D> shadow_map,std::shared_ptr<const RgbaImage> environment,EnvironmentCapture3D environment_capture)
+      :camera_(camera),instances_(std::move(instances)),light_(light),point_lights_(std::move(point_lights)),shadow_map_(std::move(shadow_map)),environment_(std::move(environment)),environment_capture_(environment_capture){}
+  Camera3D camera_;std::vector<MeshInstance3D> instances_;Vec3 light_;std::vector<PointLight3D> point_lights_;std::optional<ShadowMap3D> shadow_map_;std::shared_ptr<const RgbaImage> environment_;EnvironmentCapture3D environment_capture_;
 };
 struct PreparedInstance3D { Matrix4 model_view,model_view_projection;float camera_depth{};bool visible{}; };
 // Conservative sphere/frustum test, camera-relative matrices; no GPU required.
@@ -511,6 +530,9 @@ struct Scene3DStatistics {
   std::uint64_t streamed_partial_binds{};
   // Cumulative GPU bytes the TextureStreamer evicted from the texture cache.
   std::uint64_t streamed_evicted_bytes{};
+  // Captured environment probes baked since renderer creation — each
+  // counts six face renders for one scene's environmentCapture.
+  std::uint64_t probe_bakes{};
   // True when the device supports floating-point color targets: scenes render
   // into RGBA16F and resolve through the tonemap pass. False = direct UNORM.
   bool hdr{};

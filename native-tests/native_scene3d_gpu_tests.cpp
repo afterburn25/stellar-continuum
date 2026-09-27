@@ -579,6 +579,30 @@ int main(int argc,char** argv)try{
     window.draw(own_l,folder/"pbr-ibl-own.png");const auto own=decode_rgba_image(folder/"pbr-ibl-own.png");
     check(channel(*own,160,160,1)>40&&channel(*own,160,160,0)<30,
         "Authored environment map lost to the scene probe");
+    // Captured environment probe: environmentCapture bakes six face
+    // views at the anchor into an equirect and binds it as the scene
+    // env slot — opt-in materials reflect local geometry the authored
+    // map cannot know. The red sphere behind the camera is invisible
+    // to the view but dominates the probe's +Z hemisphere, which is
+    // the direction a camera-facing quad reflects.
+    {
+      auto mirror=enviro;mirror.material.pbr->environment.reset();
+      auto painter=mirror;painter.mesh=Mesh3D::uv_sphere(32,16);painter.scale=30;
+      painter.position={0,0,40};painter.material.tint={255,10,10,255};
+      painter.material.ambient=1;painter.material.diffuse=0;painter.material.pbr.reset();
+      const auto authored=RgbaImage::create(1,1,{0,0,255,255});
+      const auto bakes_before=window.scene3d_statistics().probe_bakes;
+      EnvironmentCapture3D capture_opts;capture_opts.enabled=true;capture_opts.face_resolution=64;
+      DrawList off_l;off_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{mirror,painter},{.42f,.2f,.87f},{},{},authored),{0,0,320,320}});
+      window.draw(off_l,folder/"pbr-probe-off.png");const auto off=decode_rgba_image(folder/"pbr-probe-off.png");
+      DrawList on_l;on_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{mirror,painter},{.42f,.2f,.87f},{},{},authored,capture_opts),{0,0,320,320}});
+      window.draw(on_l,folder/"pbr-probe-on.png");const auto on=decode_rgba_image(folder/"pbr-probe-on.png");
+      check(window.scene3d_statistics().probe_bakes==bakes_before+1,
+          "Captured environment probe did not bake");
+      check(channel(*on,160,160,0)>channel(*on,160,160,2)+40&&
+            channel(*on,160,160,0)>channel(*off,160,160,0)+40,
+          "Captured probe did not reflect scene geometry the authored map lacks");
+    }
     std::cout<<"pbr_gpu=emissive_metallic_cutout_tiling_ibl_probe_passed\n";
   }
   {

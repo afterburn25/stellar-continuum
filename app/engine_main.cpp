@@ -319,7 +319,7 @@ struct Shell {
       hit3_bandshear{}, hit3_bandwaves{}, hit3_banddrift{},
       hit3_orbitbeam{},
       hit3_starkelvin{}, hit3_accretion{}, hit3_fwdscatter{},
-      hit3_scnenv{}, hit3_noshadow{}, hit3_noreceive{},
+      hit3_scnenv{}, hit3_probe{}, hit3_noshadow{}, hit3_noreceive{},
       hit3_volume{}, hit3_lodfade{}, hit3_visfade{}, hit3_lodgroup{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
@@ -1820,6 +1820,35 @@ void commit_scene3_field(Shell &shell) {
     doc.environment = shell.scene3_buffer;
     return ok(doc.environment.empty() ? "scene environment cleared"
                                       : "scene environment updated");
+  case 75: // captured environment probe: "ax,ay,az[,res]" (empty disables)
+    if (shell.scene3_buffer.empty()) {
+      commit();
+      doc.probe_capture = false;
+      return ok("probe capture disabled");
+    }
+    {
+      std::istringstream values(shell.scene3_buffer);
+      std::string token;
+      float v[4]{};
+      int n = 0;
+      while (n < 4 && std::getline(values, token, ',')) {
+        try {
+          v[n++] = std::stof(token);
+        } catch (const std::exception &) {
+          return fail("use ax,ay,az[,res] - anchor world position, face res 16..512");
+        }
+      }
+      if (n != 3 && n != 4)
+        return fail("probe capture needs ax,ay,az[,res]");
+      const int res = n == 4 ? static_cast<int>(v[3]) : 128;
+      if (res < 16 || res > 512)
+        return fail("probe face resolution must be in [16,512]");
+      commit();
+      doc.probe_capture = true;
+      doc.probe_x = v[0]; doc.probe_y = v[1]; doc.probe_z = v[2];
+      doc.probe_resolution = res;
+      return ok("probe capture updated");
+    }
   case 23: // key light direction
     if (!parse_triple(shell.scene3_buffer, a, b, c))
       return fail("use \"x,y,z\"");
@@ -2497,7 +2526,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                                                             shell.hit3_lodgroup =
                                                                                                 shell.hit3_banddrift =
                                                                                                     shell.hit3_scnenv =
-                                                                                                        shell.hit3_noshadow =
+                                                                                                        shell.hit3_probe =
+                                                                                                            shell.hit3_noshadow =
                                                                                                             shell.hit3_noreceive = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
@@ -2766,11 +2796,16 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       shadow_map->normal_offset = doc.shadow_normal_offset;
       shadow_map->camera_fit = doc.shadow_fit;
     }
+    EnvironmentCapture3D probe;
+    probe.enabled = doc.probe_capture;
+    probe.anchor = {doc.probe_x, doc.probe_y, doc.probe_z};
+    probe.face_resolution = doc.probe_resolution;
     if (auto scene = Scene3D::create(cam, std::move(instances), light_cam,
                                      std::move(point_lights), shadow_map,
                                      doc.environment.empty()
                                          ? nullptr
-                                         : scene3_tex(shell, doc.environment))) {
+                                         : scene3_tex(shell, doc.environment),
+                                     probe)) {
       Scene3DView view{std::move(scene), pv};
       view.options.exposure = doc.exposure;
       view.options.bloom_strength = doc.bloom;
@@ -3154,6 +3189,13 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         ed(52), "extent,dist,depth[,strength,bias[,res[,cascade[,softness[,cascade2..4[,normalOffset[,fit]]]]]]] - empty disables");
   field(shell.hit3_scnenv, "environment", doc.environment, ed(72),
         "equirect path - shared IBL probe; empty disables");
+  field(shell.hit3_probe, "probeCapture",
+        doc.probe_capture ? std::to_string(doc.probe_x) + "," +
+                                std::to_string(doc.probe_y) + "," +
+                                std::to_string(doc.probe_z) + "," +
+                                std::to_string(doc.probe_resolution)
+                          : "",
+        ed(75), "ax,ay,az[,res] - captured env probe anchor + face res 16..512; empty disables");
 }
 
 std::vector<std::size_t> scene_draw_order(const engine::SceneDocument &doc) {
@@ -7134,6 +7176,13 @@ int main(int argc, char **argv) {
               edit3(52, shadow_row_text(doc));
             else if (shell.hit3_scnenv.contains(event.position))
               edit3(72, doc.environment);
+            else if (shell.hit3_probe.contains(event.position))
+              edit3(75, doc.probe_capture
+                            ? std::to_string(doc.probe_x) + "," +
+                                  std::to_string(doc.probe_y) + "," +
+                                  std::to_string(doc.probe_z) + "," +
+                                  std::to_string(doc.probe_resolution)
+                            : "");
             else if (shell.hit3_range.contains(event.position) && se)
               edit3(51, std::to_string(se->visible_range));
             else if (shell.hit3_noshadow.contains(event.position) && se)

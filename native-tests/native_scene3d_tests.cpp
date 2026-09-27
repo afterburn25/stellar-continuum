@@ -243,7 +243,15 @@ int main()try{
    const auto probed=Scene3D::create(camera,{instance},{0,0,1},{},{},env);
    check(probed->environment()==env,"Scene dropped its environment probe");
    const auto unprobed=Scene3D::create(camera,{instance});
-   check(!unprobed->environment(),"Scene invented an environment probe");}
+   check(!unprobed->environment(),"Scene invented an environment probe");
+   // Captured probe: a static bake the renderer runs once per scene.
+   EnvironmentCapture3D capture;capture.enabled=true;capture.anchor={1,2,3};capture.face_resolution=64;
+   const auto baked=Scene3D::create(camera,{instance},{0,0,1},{},{},env,capture);
+   check(baked->environment_capture().enabled&&baked->environment_capture().face_resolution==64&&baked->environment_capture().anchor.z==3,
+         "Scene dropped its environment capture settings");}
+  rejects([&]{EnvironmentCapture3D c;c.enabled=true;c.face_resolution=8;(void)Scene3D::create(camera,{instance},{0,0,1},{},{},nullptr,c);});
+  rejects([&]{EnvironmentCapture3D c;c.enabled=true;c.face_resolution=1024;(void)Scene3D::create(camera,{instance},{0,0,1},{},{},nullptr,c);});
+  rejects([&]{EnvironmentCapture3D c;c.enabled=true;c.anchor={std::numeric_limits<double>::quiet_NaN(),0,0};(void)Scene3D::create(camera,{instance},{0,0,1},{},{},nullptr,c);});
   rejects([&]{ShadowMap3D s;s.extent=0;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.depth=-1;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});
   rejects([&]{ShadowMap3D s;s.strength=1.5f;(void)Scene3D::create(camera,{instance},{0,0,1},{},s);});

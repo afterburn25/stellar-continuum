@@ -364,6 +364,14 @@ struct Scene3dDocument {
   // fills the IBL slot for entities that set environmentStrength but
   // author no environment map of their own.
   std::string environment;
+  // Captured environment probe: when probe_capture is set the renderer
+  // bakes six face views at probe_anchor once and binds the resampled
+  // equirect as the scene environment slot — opt-in materials reflect
+  // the local scene instead of only an authored map. Static bake: the
+  // probe holds the layout the first frame sees.
+  bool probe_capture{false};
+  float probe_x{0.f}, probe_y{0.f}, probe_z{0.f};
+  int probe_resolution{128}; // [16,512] px per face
   // Post-processing applied to the 3D view's HDR resolve. Exposure is a
   // linear pre-tonemap multiplier (1 = neutral), bloom is an additive mip
   // halo above its luminance threshold, contrast pivots about 0.18.

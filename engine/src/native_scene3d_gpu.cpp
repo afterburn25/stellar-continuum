@@ -115,6 +115,10 @@ struct Scene3DRenderer::Storage {
   std::unordered_map<const RgbaImage*,std::shared_ptr<Texture>> textures;
   std::vector<std::unique_ptr<Target>> targets;std::vector<const Scene3DView*> views;
   std::shared_ptr<const RgbaImage> white=RgbaImage::create(1,1,{255,255,255,255});
+  // Captured environment probes, keyed by weak scene owner: the baked
+  // equirect outlives the cache key's address so a freed scene can
+  // never lend its probe to a different scene reusing the heap slot.
+  std::map<std::weak_ptr<const Scene3D>,std::shared_ptr<const RgbaImage>,std::owner_less<>> probe_cache;
   // Engine TextureStreamer owns the byte-budget residency decision; this
   // backend registers real per-mip sizes, declares each frame's demand with
   // a camera-distance priority, and executes the streamer's load/evict list.
@@ -438,10 +442,13 @@ struct Scene3DRenderer::Storage {
         if(diameter<top)g.share=std::clamp((top-diameter)/(threshold*g.rep->lod_fade),0.f,1.f);
       }
     }
-    // Scene environment probe: a view-level equirect that fills the IBL
+    // Scene environment probe: a baked capture (environmentCapture)
+    // preferred, else the authored view-level equirect fills the IBL
     // slot for PBR materials which opted in (environment_strength > 0)
     // but authored no map of their own — one shared starfield per scene.
-    const std::shared_ptr<Texture> scene_env=view.scene->environment()?texture(view.scene->environment()):nullptr;
+    const std::shared_ptr<Texture> scene_env=[&]{
+      if(const auto it=probe_cache.find(std::weak_ptr<const Scene3D>(view.scene));it!=probe_cache.end())return texture(it->second);
+      return view.scene->environment()?texture(view.scene->environment()):nullptr;}();
     for(const auto& instance:view.scene->instances()){
       auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
       if(!prepared.visible){++stats.culled_instances;continue;}
@@ -1458,6 +1465,114 @@ struct Scene3DRenderer::Storage {
     command.submit();
     stats.draw_batches+=batcher.batches().size();stats.submitted_instances+=sorted.size();
   }
+  // Bakes a captured environment probe for one scene: six face views
+  // through the full pipeline at the authored resolution, downloaded
+  // and CPU-resampled into the equirect layout radiance() samples.
+  // Static by policy — the bake captures the layout the first prepared
+  // frame sees; cache-lifetime upload accounting is preserved while
+  // per-frame counters are restored so a bake never inflates them.
+  void bake_probe(const std::shared_ptr<const Scene3D>& scene,const RenderOptions3D& options){
+    const auto& cap=scene->environment_capture();
+    const int res=cap.face_resolution;
+    // Face orientations — identity looks -Z with +Y up; each quaternion
+    // aims the camera down one world axis. The resampler derives each
+    // face's basis by rotating the same quaternions, so bake and
+    // resample can never disagree about orientation.
+    static const std::array<Quaternion,6> faces{{
+        {0.f,-0.70710678f,0.f,0.70710678f},  // +X
+        {0.f, 0.70710678f,0.f,0.70710678f},  // -X
+        {0.70710678f,0.f,0.f,0.70710678f},   // +Y
+        {-0.70710678f,0.f,0.f,0.70710678f},  // -Y
+        {0.f,1.f,0.f,0.f},                   // +Z
+        {0.f,0.f,0.f,1.f}}};                 // -Z
+    const auto& cam=scene->camera();
+    // The authored key light is camera-space — convert through world so
+    // every face view lights the scene identically.
+    const auto world=rotate_vec(cam.orientation,scene->light_direction());
+    const Scene3DStatistics pre=stats;
+    std::array<std::vector<std::uint8_t>,6> face_pixels;
+    // A debug override must not bake into the probe.
+    RenderOptions3D capture_options=options;capture_options.debug_view=DebugView3D::Lit;
+    for(int f=0;f<6;++f){
+      Camera3D fc=cam;
+      fc.position=cap.anchor;
+      fc.orientation=faces[f];
+      fc.projection=Projection3D::Perspective;
+      fc.vertical_fov_radians=1.5707963267948966f;
+      const auto& fq=faces[f];
+      const auto fl=rotate_vec({-fq.x,-fq.y,-fq.z,fq.w},world);
+      const auto face_scene=Scene3D::create(fc,scene->instances(),fl,scene->point_lights(),scene->shadow_map(),scene->environment());
+      Scene3DView view{face_scene,{0.f,0.f,static_cast<float>(res),static_cast<float>(res)},capture_options};
+      auto face_target=target(res,res);
+      render(view,*face_target);
+      // Download the tonemapped face into a staging buffer.
+      face_pixels[f].resize(static_cast<std::size_t>(res)*res*4);
+      SDL_GPUTransferBufferCreateInfo info{};
+      info.usage=SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+      info.size=static_cast<Uint32>(face_pixels[f].size());
+      auto* dl=SDL_CreateGPUTransferBuffer(device,&info);
+      if(!dl)throw gpu_error("3D probe download buffer creation failed");
+      {
+        Command command(device);
+        auto* pass=SDL_BeginGPUCopyPass(command.value);
+        if(!pass)throw gpu_error("3D probe download copy pass failed");
+        SDL_GPUTextureRegion src{};src.texture=face_target->color;src.w=static_cast<Uint32>(res);src.h=static_cast<Uint32>(res);src.d=1;
+        SDL_GPUTextureTransferInfo dst{};dst.transfer_buffer=dl;dst.pixels_per_row=static_cast<Uint32>(res);dst.rows_per_layer=static_cast<Uint32>(res);
+        SDL_DownloadFromGPUTexture(pass,&src,&dst);
+        SDL_EndGPUCopyPass(pass);
+        command.submit();
+      }
+      checked(SDL_WaitForGPUIdle(device),"3D probe bake wait failed");
+      auto* mapped=SDL_MapGPUTransferBuffer(device,dl,false);
+      if(mapped)std::memcpy(face_pixels[f].data(),mapped,face_pixels[f].size());
+      SDL_UnmapGPUTransferBuffer(device,dl);
+      SDL_ReleaseGPUTransferBuffer(device,dl);
+      if(!mapped)throw gpu_error("3D probe download map failed");
+    }
+    // Resample the six faces into the equirect layout radiance()
+    // samples: u = atan(d.x,d.z)/2π+0.5 longitude, v = acos(d.y)/π
+    // latitude. Each output texel's direction projects onto the face
+    // whose camera-space forward dominates.
+    const int ew=2*res,eh=res;
+    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(ew)*eh*4);
+    std::array<Matrix4,6> basis;
+    for(int f=0;f<6;++f)basis[f]=rotation_from(faces[f]);
+    const auto texel=[&](int f,double u,double v,int c){
+      const double uu=std::clamp(u,0.,1.)*res-0.5,vv=std::clamp(v,0.,1.)*res-0.5;
+      const int x0=std::clamp(static_cast<int>(std::floor(uu)),0,res-1),y0=std::clamp(static_cast<int>(std::floor(vv)),0,res-1);
+      const int x1=std::min(x0+1,res-1),y1=std::min(y0+1,res-1);
+      const double tx=uu-x0,ty=vv-y0;
+      const auto& img=face_pixels[f];
+      const auto at=[&](int x,int y){return img[(static_cast<std::size_t>(y)*res+x)*4+c];};
+      return static_cast<std::uint8_t>(at(x0,y0)*(1-tx)*(1-ty)+at(x1,y0)*tx*(1-ty)+at(x0,y1)*(1-tx)*ty+at(x1,y1)*tx*ty+0.5);
+    };
+    for(int y=0;y<eh;++y)for(int x=0;x<ew;++x){
+      const double lon=6.2831853071795865*((x+0.5)/ew-0.5),lat=3.1415926535897932*(y+0.5)/eh;
+      const double s=std::sin(lat),dy=std::cos(lat),dx=s*std::sin(lon),dz=s*std::cos(lon);
+      int best=-1;double fwd=0.,cx=0.,cy=0.;
+      for(int f=0;f<6;++f){
+        const auto& m=basis[f].values;
+        const double px=dx*m[0]+dy*m[1]+dz*m[2],py=dx*m[4]+dy*m[5]+dz*m[6],cf=-(dx*m[8]+dy*m[9]+dz*m[10]);
+        if(cf>0&&cf>=std::abs(px)&&cf>=std::abs(py)&&cf>fwd){best=f;fwd=cf;cx=px;cy=py;}
+      }
+      auto* out=&pixels[(static_cast<std::size_t>(y)*ew+x)*4];
+      if(best<0){out[0]=out[1]=out[2]=0;out[3]=255;continue;}
+      const double u=cx/fwd*0.5+0.5,v=0.5-cy/fwd*0.5;
+      for(int c=0;c<4;++c)out[c]=texel(best,u,v,c);
+    }
+    // Preserve cache-lifetime accounting (the bake's uploads are real
+    // cache entries) while restoring the per-frame counters the six
+    // face renders accrued — a bake must not inflate frame stats.
+    const auto tex_bytes=stats.texture_cache_bytes-pre.texture_cache_bytes,
+        mesh_bytes=stats.mesh_cache_bytes-pre.mesh_cache_bytes,
+        tex_up=stats.texture_uploads-pre.texture_uploads,
+        mesh_up=stats.mesh_uploads-pre.mesh_uploads;
+    stats=pre;
+    stats.texture_cache_bytes+=tex_bytes;stats.mesh_cache_bytes+=mesh_bytes;
+    stats.texture_uploads+=tex_up;stats.mesh_uploads+=mesh_up;
+    ++stats.probe_bakes;
+    probe_cache[std::weak_ptr<const Scene3D>(scene)]=RgbaImage::create(ew,eh,std::move(pixels));
+  }
 };
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
 Scene3DRenderer::~Scene3DRenderer()=default;
@@ -1466,6 +1581,15 @@ void Scene3DRenderer::prepare(const DrawList& list){
   for(const auto& c:list.world)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   for(const auto& c:list.overlay)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");
+  // Captured environment probes bake once per scene — ahead of the
+  // demand pass so the baked equirect joins streamer residency, and
+  // ahead of the lit pass so opt-in materials bind it this frame.
+  for(const auto* view:s.views)
+    if(view->scene&&view->scene->environment_capture().enabled&&
+       !s.probe_cache.count(std::weak_ptr<const Scene3D>(view->scene)))
+      s.bake_probe(view->scene,view->options);
+  for(auto it=s.probe_cache.begin();it!=s.probe_cache.end();)
+    if(it->first.expired())it=s.probe_cache.erase(it);else++it;
   std::size_t total=0;
   std::unordered_set<const Mesh3D*> meshes;std::unordered_set<const RgbaImage*> textures;
   std::unordered_map<engine::TextureId,std::pair<float,std::uint32_t>> stream_demand;
@@ -1537,9 +1661,14 @@ void Scene3DRenderer::prepare(const DrawList& list){
           {if(textures.insert(pbr_image.get()).second)texture_bytes+=texture_mip_layout3d(pbr_image.get()).resident_bytes;stream_request(pbr_image,priority,mip_for(pbr_image));}
         // Environment maps are direction-space lookups: like dielectric
         // environments they keep full-chain residency. An unmapped PBR
-        // material that opted in (strength > 0) uses the scene probe.
+        // material that opted in (strength > 0) uses the scene probe —
+        // the baked capture when this scene has one, else its authored
+        // equirect.
         auto env=p.environment;
-        if(!env&&p.environment_strength>0.f)env=view->scene->environment();
+        if(!env&&p.environment_strength>0.f){
+          if(const auto it=s.probe_cache.find(std::weak_ptr<const Scene3D>(view->scene));it!=s.probe_cache.end())env=it->second;
+          else env=view->scene->environment();
+        }
         if(env){if(textures.insert(env.get()).second)texture_bytes+=texture_mip_layout3d(env.get()).resident_bytes;stream_request(env,priority,0u);}
       }
     }
