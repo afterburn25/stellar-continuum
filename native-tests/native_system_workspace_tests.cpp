@@ -113,6 +113,24 @@ int main(int argc,char**argv)try{
     keys.close();
   }
   {
+    // Compact viewport: the open inspector is an overlay that must stay inside
+    // the drawable and claim its own bounds even where HUD plates sit below it.
+    NativeSystemWorkspace compact;compact.open(reference,640,360);
+    const auto compact_field=SystemWorkspaceLayout::for_viewport(640,360).world_field;
+    const auto compact_scale=NativeUiLayout::for_viewport(640,360).scale;
+    const UiRect launcher{compact_field.x+12*compact_scale,compact_field.y+compact_field.height-35*compact_scale,180*compact_scale,29*compact_scale};
+    (void)compact.handle({InputEventType::LeftPressed,center(launcher)},640,360);
+    DrawList compact_draw;compact.render(compact_draw,640,360);
+    require(has_overlay_text(compact_draw,"SMALL-BODY SURVEY"),"compact launcher did not open the small-body panel");
+    const auto panel_fill=std::ranges::find_if(compact_draw.overlay,[](const UiOverlayCommand&item){const auto*fill=std::get_if<FilledRectangle>(&item);return fill&&fill->color.r==5&&fill->color.g==17&&fill->color.b==28&&fill->bounds.width>200.f;});
+    require(panel_fill!=compact_draw.overlay.end(),"compact small-body panel was not rendered");
+    const auto bounds=std::get_if<FilledRectangle>(&*panel_fill)->bounds;
+    require(bounds.x>=0.f&&bounds.y>=0.f&&bounds.x+bounds.width<=640.f&&bounds.y+bounds.height<=360.f,"small-body panel escaped the compact drawable");
+    const Point inside{bounds.x+bounds.width*.5f,bounds.y+bounds.height*.5f};
+    require(compact.small_body_panel_owns(inside,640,360)&&!compact.small_body_panel_owns({bounds.x-4.f,bounds.y+bounds.height*.5f},640,360),"small-body panel did not claim exactly its own compact bounds");
+    compact.close();
+  }
+  {
     NativeSystemWorkspace tracked;tracked.open(reference,1920,1080);
     const auto earth=std::ranges::find_if(reference.bodies,[](const auto& b){return b.sol_texture_key==std::optional<std::string>{"earth"};});require(earth!=reference.bodies.end(),"Earth missing for hourly motion test");
     require(tracked.select_body(earth->id),"Could not select Earth");
@@ -396,6 +414,16 @@ int main(int argc,char**argv)try{
     for(int component=0;component<3;++component){const auto p=workspace.viewport()->world_to_screen(chart.stellar_hosts[component].x,chart.stellar_hosts[component].y);
       require(field.contains({p.x,p.y}),"Fit System cropped a moving stellar component");
       require(std::ranges::any_of(draw.world,[&](const auto& command){const auto* text=std::get_if<Text>(&command);return text&&text->value.find(stellar_host_name(component))!=std::string::npos&&text->align==TextAlign::Center&&text->at.y>p.y;}),"Triple omitted its below-object component label");
+    }
+  }
+  // Minimum-resolution sweep: the naming contract survives a compact field —
+  // component labels shrink and clamp into the field instead of disappearing.
+  for(const auto days:{0.,100000.}){
+    workspace.set_simulation_days(days);workspace.reset_fit(640,360);draw={};workspace.render(draw,640,360);
+    const auto compact_chart=project_system(*workspace.snapshot());const auto compact_field=SystemWorkspaceLayout::for_viewport(640,360).world_field;
+    for(int component=0;component<3;++component){const auto p=workspace.viewport()->world_to_screen(compact_chart.stellar_hosts[component].x,compact_chart.stellar_hosts[component].y);
+      require(compact_field.contains({p.x,p.y}),"Compact fit cropped a moving stellar component");
+      require(std::ranges::any_of(draw.world,[&](const auto& command){const auto* text=std::get_if<Text>(&command);return text&&text->value.find(stellar_host_name(component))!=std::string::npos&&text->align==TextAlign::Center;}),"Compact field dropped a component star label");
     }
   }
   const auto fitted_scale=workspace.viewport()->scale;const auto field=SystemWorkspaceLayout::for_viewport(1280,720).world_field;

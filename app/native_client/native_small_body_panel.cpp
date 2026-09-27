@@ -19,17 +19,32 @@ struct Layout {
 };
 Layout layout_for(int w,int h){
   const auto field=SystemWorkspaceLayout::for_viewport(w,h).world_field;
-  const float s=NativeUiLayout::for_viewport(w,h).scale;
-  Layout l;l.scale=s;l.launcher={field.x+12*s,field.y+field.height-35*s,180*s,29*s};
+  const auto ui=NativeUiLayout::for_viewport(w,h);
+  const float s=ui.scale;
+  Layout l;l.launcher={field.x+12*s,field.y+field.height-35*s,180*s,29*s};
   l.motion={field.x+field.width-168*s,field.y+field.height-69*s,156*s,29*s};
-  l.panel={field.x+12*s,field.y+8*s,std::min(450*s,field.width-24*s),446*s};
-  const auto p=l.panel;l.close={p.x+p.width-65*s,p.y+9*s,55*s,25*s};
-  const float half=(p.width-30*s)*.5f;
-  l.previous={p.x+10*s,p.y+48*s,half,27*s};l.next={p.x+20*s+half,p.y+48*s,half,27*s};
-  const float third=(p.width-40*s)/3;
-  l.body={p.x+10*s,p.y+286*s,third,28*s};l.large={p.x+20*s+third,p.y+286*s,third,28*s};l.focus={p.x+30*s+third*2,p.y+286*s,third,28*s};
-  l.debug={p.x+10*s,p.y+323*s,p.width-20*s,27*s};
-  for(int i=0;i<4;++i)l.spawn[i]={p.x+(10+(i%2)*(half/s+10))*s,p.y+(362+(i/2)*33)*s,half,27*s};
+  UiRect panel{field.x+12*s,field.y+8*s,std::min(450*s,field.width-24*s),446*s};
+  // Compact fields: the inspector is a screen overlay, not a field inset.
+  // When the designed panel would slide off the drawable (or shrink to an
+  // unusably narrow strip where other HUD surfaces swallow its input),
+  // anchor it below the navigation bar on the chart column and compress its
+  // internal scale so every control stays inside the drawable.
+  float ps=s;
+  if(panel.y+panel.height>h-4.f*s||panel.width<280.f*s){
+    const float top=ui.navigation_bar.y+ui.navigation_bar.height+2.f*s;
+    const float bottom=h-4.f*s;
+    ps=std::clamp(std::min(bottom-top,446.f*s)/446.f,.45f,s);
+    panel={0,top,450.f*ps,446.f*ps};
+    panel.x=std::clamp(field.x+12*s,4.f*s,std::max(4.f*s,std::min(field.x+field.width+4.f*s,w-4.f*s)-panel.width));
+  }
+  l.scale=ps;l.panel=panel;
+  const auto p=l.panel;l.close={p.x+p.width-65*ps,p.y+9*ps,55*ps,25*ps};
+  const float half=(p.width-30*ps)*.5f;
+  l.previous={p.x+10*ps,p.y+48*ps,half,27*ps};l.next={p.x+20*ps+half,p.y+48*ps,half,27*ps};
+  const float third=(p.width-40*ps)/3;
+  l.body={p.x+10*ps,p.y+286*ps,third,28*ps};l.large={p.x+20*ps+third,p.y+286*ps,third,28*ps};l.focus={p.x+30*ps+third*2,p.y+286*ps,third,28*ps};
+  l.debug={p.x+10*ps,p.y+323*ps,p.width-20*ps,27*ps};
+  for(int i=0;i<4;++i)l.spawn[i]={p.x+(10+(i%2)*(half/ps+10))*ps,p.y+(362+(i/2)*33)*ps,half,27*ps};
   return l;
 }
 std::string number(double n,int precision=2){std::ostringstream s;s<<std::fixed<<std::setprecision(precision)<<n;return s.str();}
@@ -84,6 +99,9 @@ std::optional<UiRect> NativeSystemWorkspace::focused_bounds(int width,int height
   if(small_body_ring_>=static_cast<int>(ring.size()))return std::nullopt;
   return ring[static_cast<std::size_t>(small_body_ring_)].first;
 }
+bool NativeSystemWorkspace::small_body_panel_owns(Point point,int width,int height)const{
+  return small_body_panel_&&snapshot_&&layout_for(width,height).panel.contains(point);
+}
 std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies(const InputEvent& e,int width,int height){
   if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed){small_body_ring_=-1;return std::nullopt;}
   const auto l=layout_for(width,height);const SystemWorkspaceCommand handled{SystemWorkspaceCommandKind::none,true};
@@ -104,12 +122,9 @@ std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies
     }
     return std::nullopt;
   }
-  if(l.motion.contains(e.position)){
-    dragging_=false;
-    if(e.type==InputEventType::LeftPressed)return SystemWorkspaceCommand{SystemWorkspaceCommandKind::toggle_motion,true};
-    return handled;
-  }
-  if(e.type==InputEventType::LeftPressed&&l.launcher.contains(e.position)){small_body_panel_=!small_body_panel_;dragging_=false;return handled;}
+  // When the inspector is open its overlay draws over the launcher and
+  // motion controls (compact layouts can cover them entirely), so the panel
+  // claims hits first.
   if(small_body_panel_){
     if(e.type==InputEventType::EscapePressed){small_body_panel_=false;return handled;}
     if(l.panel.contains(e.position)){
@@ -136,6 +151,12 @@ std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies
       }return handled;
     }
   }
+  if(l.motion.contains(e.position)){
+    dragging_=false;
+    if(e.type==InputEventType::LeftPressed)return SystemWorkspaceCommand{SystemWorkspaceCommandKind::toggle_motion,true};
+    return handled;
+  }
+  if(e.type==InputEventType::LeftPressed&&l.launcher.contains(e.position)){small_body_panel_=!small_body_panel_;dragging_=false;return handled;}
   if(e.type==InputEventType::LeftPressed&&SystemWorkspaceLayout::for_viewport(width,height).world_field.contains(e.position)&&spatial_&&viewport_&&!viewport_->hit_body(*spatial_,e.position.x,e.position.y)&&fleet_hits(e.position).empty()){
     if(const auto hit=small_bodies_.hit(e.position)){const auto it=std::ranges::find(snapshot_->small_body_fields,hit->field_id,&SmallBodyField::id);if(it!=snapshot_->small_body_fields.end()){small_body_field_=static_cast<std::size_t>(it-snapshot_->small_body_fields.begin());small_body_index_=hit->body_index;small_body_panel_=true;dragging_=false;return handled;}}
   }return std::nullopt;

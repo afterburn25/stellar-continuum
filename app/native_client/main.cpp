@@ -2183,8 +2183,16 @@ class NativeCampaign final {
     const auto find_record=[&](){for(const auto& record:eruption_art_.records())if(record.id==id)return record;throw std::runtime_error("Authoritative eruption absent from live view");};
     const auto map_record=find_record();
     if(!enter_system(sol->id,width,height))throw std::runtime_error("Eruption system entry failed");
-    auto viewport=system_workspace_.viewport();Point center{viewport->center_x,viewport->center_y};
-    route({{InputEventType::Wheel,center,{},std::log(150.f/star_screen_radius(viewport->scale))/std::log(1.16f)}});
+    const auto world_field=SystemWorkspaceLayout::for_viewport(width,height).world_field;
+    // star_screen_radius bottoms out at 4 px, so a single wheel step computed
+    // from it cannot traverse the full zoom range at small viewports — iterate
+    // until the artwork detail radius is actually reached. The wheel anchor is
+    // the star's screen position clamped inside the world field, which keeps
+    // it off the inspector and controls rows at compact resolutions.
+    for(int i=0;i<48&&star_screen_radius(system_workspace_.viewport()->scale)<150.f;++i){
+      const auto& v=*system_workspace_.viewport();
+      route({{InputEventType::Wheel,{std::clamp(v.center_x,world_field.x,world_field.x+world_field.width),std::clamp(v.center_y,world_field.y,world_field.y+world_field.height)},{},20.f}});
+    }
     capture(L"-eruption-system");const auto system_record=find_record();
     if(map_record.progress!=system_record.progress||map_record.variant!=system_record.variant||map_record.stage!=system_record.stage)throw std::runtime_error("Changing live views restarted eruption");
     command.action=StellarActivityAction::TogglePause;(void)apply_developer_stellar_activity(world,frame.runtime().stellar_activity(),frame.runtime().stellar_activity_day(),command);
@@ -7081,6 +7089,31 @@ class NativeCampaign final {
               gesture_.capture_for_ui();continue;
             }
           }
+        }
+        // The open small-body inspector draws over the HUD plates — its
+        // bounds claim pointer input before the assets strip, the context
+        // plate and the legend would otherwise swallow it.
+        if((event.type==InputEventType::LeftPressed||event.type==InputEventType::LeftReleased||
+            event.type==InputEventType::PointerMove||event.type==InputEventType::Wheel)&&
+           system_workspace_.visible()&&!colony_workspace_.visible()&&
+           !shipyard_workspace_.visible()&&!menu_&&
+           system_workspace_.small_body_panel_owns(event.position,width,height)){
+          const auto command=system_workspace_.handle(event,width,height);
+          if(command.kind==SystemWorkspaceCommandKind::toggle_motion){
+            auto& clock=session_->frame().clock();if(clock.speed()==StrategicSpeed::Paused)clock.resume();else clock.set_speed(StrategicSpeed::Paused);
+          }
+          else if(command.kind==SystemWorkspaceCommandKind::spawn_small_body_field){
+            try{
+              auto& world=session_->frame().runtime().world().campaign();
+              const auto id=force_developer_small_body_field(world,*system_workspace_.system_id(),static_cast<SmallBodyFieldType>(command.target_id),session_->frame().clock().simulation_days(),system_workspace_.selected_body_id().value_or(-1));
+              refresh_system(true);
+              const auto& fields=system_workspace_.snapshot()->small_body_fields;
+              const auto found=std::ranges::find(fields,id,&SmallBodyField::id);
+              if(found!=fields.end())system_workspace_.inspect_small_body(static_cast<std::size_t>(found-fields.begin()));
+              system_workspace_.set_notice(tr("SYSTEM_NOTICE_FIELD","Field added to this developer campaign."));
+            }catch(const std::exception& error){system_workspace_.set_notice(error.what());}
+          }
+          gesture_.capture_for_ui();continue;
         }
         const auto asset_command=assets_.handle(event,width,height);
         if(asset_command.captured){if(asset_command.key)execute_asset(asset_command,width,height);gesture_.capture_for_ui();continue;}

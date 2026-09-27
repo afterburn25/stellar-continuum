@@ -306,12 +306,29 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
   if(!planet_instances.empty()){Camera3D camera;camera.projection=Projection3D::Orthographic;camera.position={0,0,50000};camera.orthographic_height=field.height;camera.near_plane=.1f;camera.far_plane=100000;
     out.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(planet_instances)),field});}
   std::stable_sort(body_labels.begin(),body_labels.end(),[](const auto&left,const auto&right){return std::pair{!left.selected,left.body_id}<std::pair{!right.selected,right.body_id};});std::vector<UiRect> accepted_labels;
-  for(const auto& label:star_labels){
-    const auto measured=text_measurer_?text_measurer_(label):TextExtent{static_cast<int>(label.value.size()*7u),19};
-    for(int row=0;row<8;++row){const UiRect bounds{label.at.x-measured.width*.5f,label.at.y+row*(measured.height+4.f),static_cast<float>(measured.width),static_cast<float>(measured.height)};
-      if(!contains_rect(field,bounds)||std::ranges::any_of(accepted_labels,[&](UiRect accepted){return overlaps(bounds,accepted,3.f);})||std::ranges::any_of(visible_discs,[&](const auto& disc){return intersects(bounds,disc.first.x,disc.first.y,disc.second);}))continue;
-      auto placed=label;placed.at.y=bounds.y;out.world.emplace_back(placed);accepted_labels.push_back(bounds);break;
+  for(auto label:star_labels){
+    auto measured=text_measurer_?text_measurer_(label):TextExtent{static_cast<int>(label.value.size()*7u),19};
+    // Star labels carry a naming contract: shrink the font before a compact
+    // field edge drops the label entirely.
+    for(const int size:{13,11,9}){
+      if(measured.width<=field.width-6.f)break;
+      label.font_pixel_size=size;
+      measured=text_measurer_?text_measurer_(label):TextExtent{static_cast<int>(label.value.size()*7u*size/15u),static_cast<int>(19u*size/15u)};
     }
+    // Star labels carry a naming contract: clamp each candidate row into
+    // the field so a component near the edge keeps its label at compact
+    // viewports, tolerate disc overlap when the field is crowded, and fall
+    // back to the clamped anchor before dropping a component's identity.
+    const auto place=[&](bool allow_disc_overlap,bool allow_label_overlap){
+      for(int row=0;row<8;++row){UiRect bounds{label.at.x-measured.width*.5f,label.at.y+row*(measured.height+4.f),static_cast<float>(measured.width),static_cast<float>(measured.height)};
+        bounds.x=std::clamp(bounds.x,field.x,std::max(field.x,field.x+field.width-bounds.width));
+        bounds.y=std::clamp(bounds.y,field.y,std::max(field.y,field.y+field.height-bounds.height));
+        if(!contains_rect(field,bounds))continue;
+        if(!allow_label_overlap&&std::ranges::any_of(accepted_labels,[&](UiRect accepted){return overlaps(bounds,accepted,3.f);}))continue;
+        if(!allow_disc_overlap&&std::ranges::any_of(visible_discs,[&](const auto& disc){return intersects(bounds,disc.first.x,disc.first.y,disc.second);}))continue;
+        auto placed=label;placed.at.y=bounds.y;out.world.emplace_back(placed);accepted_labels.push_back(bounds);return true;}
+      return false;};
+    if(!place(false,false)&&!place(true,false))(void)place(true,true);
   }
   for(const auto&candidate:body_labels)for(const auto&bounds:candidate.placements){if(!contains_rect(field,bounds))continue;const auto overlaps_disc=std::ranges::any_of(visible_discs,[&](const auto&disc){return intersects(bounds,disc.first.x,disc.first.y,disc.second);});const auto overlaps_label=std::ranges::any_of(accepted_labels,[&](UiRect accepted){return overlaps(bounds,accepted,3.f);});if(overlaps_disc||overlaps_label)continue;out.world.emplace_back(Text{{bounds.x,bounds.y},candidate.value,text,15,0,field});accepted_labels.push_back(bounds);break;}
   if(travel_)for(const auto&fleet:travel_->fleets){const auto p=local_fleet_anchor(fleet,*spatial_,*viewport_);if(!contains_disc(field,p,16))continue;const auto selected=selected_fleet_id_==fleet.fleet_id,hovered=hovered_fleet_id_==fleet.fleet_id;const Color fleet_color=selected?Color{124,255,182,255}:hovered?Color{94,235,158,255}:Color{66,196,126,240};if(fleet.moving&&!fleet.held){const auto dx=fleet.chart_target.x-fleet.chart_position.x,dy=fleet.chart_target.y-fleet.chart_position.y,length=std::hypot(dx,dy);if(length>.0001){const auto ux=dx/length,uy=dy/length,nx=-uy,ny=ux;for(const auto offset:{-2.5f,2.5f}){const Point a{p.x-ux*7+nx*offset,p.y-uy*7+ny*offset},b{p.x-ux*15+nx*offset,p.y-uy*15+ny*offset};if(const auto segment=clipped(a,b,field))out.world.emplace_back(Line{segment->first,segment->second,{92,225,154,170}});}}}out.world.emplace_back(Circle{p,selected?9.f:7.f,{fleet_color.r,fleet_color.g,fleet_color.b,selected?std::uint8_t{120}:std::uint8_t{80}}});out.world.emplace_back(Circle{p,selected?5.f:4.f,fleet_color});out.world.emplace_back(Text{{p.x,p.y-5},fleet_role(fleet.role),{225,255,237,255},9,0,field,TextAlign::Center});}

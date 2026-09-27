@@ -117,6 +117,9 @@ public:
   // is focused.
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   focused_bounds(int width,int height)const;
+  // True when the small-body inspector overlay is open and owns the point —
+  // the panel draws over HUD chrome, so it claims hits first.
+  [[nodiscard]] bool small_body_panel_owns(stellar::native_map::Point point,int width,int height)const;
   [[nodiscard]] std::optional<stellar::core::SmallBodyInstance> focused_small_body()const{
     if(!snapshot_||!small_body_focus_||snapshot_->small_body_fields.empty())return std::nullopt;
     const auto& f=snapshot_->small_body_fields[small_body_field_%snapshot_->small_body_fields.size()];
