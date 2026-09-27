@@ -1960,17 +1960,17 @@ void commit_scene3_field(Shell &shell) {
       while (std::getline(entries, entry, ';')) {
         std::istringstream values(entry);
         std::string token;
-        float v[16];
+        float v[17];
         int n = 0;
-        while (n < 16 && std::getline(values, token, ',')) {
+        while (n < 17 && std::getline(values, token, ',')) {
           try {
             v[n++] = std::stof(token);
           } catch (const std::exception &) {
-            return fail("use \"x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness]]]]; ...\"");
+            return fail("use \"x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness[,normalOffset]]]]]; ...\"");
           }
         }
-        if (n != 8 && n != 13 && n != 14 && n != 15 && n != 16)
-          return fail("each point light needs x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness]]]]");
+        if (n != 8 && n != 13 && n != 14 && n != 15 && n != 16 && n != 17)
+          return fail("each point light needs x,y,z,r,g,b,intensity,range[,dx,dy,dz,inner,outer[,shadow[,strength[,softness[,normalOffset]]]]]");
         engine::Scene3dPointLight l;
         l.x = v[0]; l.y = v[1]; l.z = v[2];
         l.r = v[3]; l.g = v[4]; l.b = v[5];
