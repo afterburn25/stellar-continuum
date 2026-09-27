@@ -1,4 +1,5 @@
 #include "native_body_inspection.hpp"
+#include "native_data_names.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -105,9 +106,32 @@ int main() {
             "Continental");
     stellar::engine::LocalizationTable german("de", "en");
     german.load_json(
-        R"({"locale":"de","strings":{"BODY_FACT_CLASS":"Weltklasse","BODY_CLASS_CONTINENTAL":"Kontinentalwelt"}})");
+        R"({"locale":"de","strings":{"BODY_FACT_CLASS":"Weltklasse","BODY_CLASS_CONTINENTAL":"Kontinentalwelt","DATA_SUBCLASS_ANCIENT_GREY_CRATER":"Antiker grauer Krater","DATA_STELLAR_G_YELLOW":"Gelber Stern der Klasse G","DATA_SPECIES_TERRAN_BASELINE":"Terranische Basis"}})");
     REQUIRE(fact(*build_body_inspection(classified, 3, &german), "Weltklasse") ==
             "Kontinentalwelt");
+
+    // Data-authored subclass names resolve through DATA_SUBCLASS_* keys.
+    auto appeared = snapshot;
+    stellar::core::PlanetAppearance appearance;
+    appearance.primary_class = stellar::core::PlanetClass::Barren;
+    appearance.subclass = "ancient-grey-crater";
+    appeared.bodies.front().appearance = appearance;
+    REQUIRE(fact(*build_body_inspection(appeared, 3), "World class") ==
+            "Ancient Grey Crater");
+    REQUIRE(fact(*build_body_inspection(appeared, 3, &german), "Weltklasse") ==
+            "Antiker grauer Krater");
+    // Class fallback and species/stellar resolvers use the same keyed path.
+    REQUIRE(stellar::native_data::stellar_object_name(
+                &german,
+                stellar::core::stellar_object_definition(
+                    stellar::core::StellarObjectType::GYellowStar)) ==
+            "Gelber Stern der Klasse G");
+    REQUIRE(stellar::native_data::species_display_name(
+                &german, "terran_baseline", "Terran Baseline") ==
+            "Terranische Basis");
+    REQUIRE(stellar::native_data::species_display_name(
+                nullptr, "terran_baseline", "Terran Baseline") ==
+            "Terran Baseline");
 
     auto below_partial = snapshot;
     below_partial.survey_level = stellar::core::SystemSurveyLevel::detected;

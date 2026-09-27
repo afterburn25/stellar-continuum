@@ -1,5 +1,6 @@
 #include "native_construction_controller.hpp"
 #include "native_currency_format.hpp"
+#include "native_data_names.hpp"
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
 #include <stellar/engine/localization.hpp>
 #include <algorithm>
@@ -81,11 +82,11 @@ Projection project(CampaignFrame &frame,std::uint64_t generation,const stellar::
   for(const auto &definition:construction_project_catalog()){
     if(!known.contains(definition.id)) continue;
     NativeConstructionProject p;
-    p.id=definition.id;p.name=definition.name;p.description=definition.description;p.category=definition.category;
+    p.id=definition.id;p.name=stellar::native_data::construction_project_name(locale,definition);p.description=stellar::native_data::construction_project_description(locale,definition);p.category=definition.category;
     p.industry_cost=definition.industry_cost;p.credit_cost=definition.credit_cost;p.upkeep_credits_per_day=definition.upkeep_credits_per_day;p.industry_per_day=definition.industry_per_day;
     p.formatted_credit_cost=v.currency.format(p.credit_cost);p.formatted_upkeep_rate=stellar::native_currency_format::format_rate_localized(locale,v.currency,-p.upkeep_credits_per_day);
     for(const auto&id:definition.required_technologies)p.requirements.push_back(requirement_name(id));
-    for(const auto&id:definition.required_projects)p.requirements.push_back(get_construction_project(id).name);
+    for(const auto&id:definition.required_projects)p.requirements.push_back(stellar::native_data::construction_project_name(locale,get_construction_project(id)));
     p.complete=std::ranges::contains(c.state.completed_project_ids,p.id);p.active=c.state.active_project_id==p.id;
     const auto queued=std::ranges::find(c.state.queued_projects,p.id,&QueuedConstructionProject::project_id);
     p.queued=queued!=c.state.queued_projects.end();

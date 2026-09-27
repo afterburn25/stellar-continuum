@@ -1,5 +1,6 @@
 #include "native_settlement_mission_controller.hpp"
 
+#include "native_data_names.hpp"
 #include "native_settlement_messages.hpp"
 
 #include <stellar/core/colonization_runtime.hpp>
@@ -159,11 +160,15 @@ bool same_candidate(const NativeSettlementCandidate &left,
          left.initial_deposit_materials == right.initial_deposit_materials;
 }
 
-std::string species_name(const std::string &id) {
+std::string species_name(const stellar::engine::LocalizationTable *locale,
+                         const std::string &id) {
   const auto profiles = species_environment_profiles();
   const auto found = std::ranges::find(profiles, id,
                                         &SpeciesEnvironmentProfile::id);
-  return found == profiles.end() ? std::string{} : found->display_name;
+  return found == profiles.end()
+             ? std::string{}
+             : stellar::native_data::species_display_name(locale, id,
+                                                          found->display_name);
 }
 
 } // namespace
@@ -229,7 +234,7 @@ NativeSettlementTargetPreview NativeSettlementMissionController::preview_exact(
   result.design_id = fleet->design_id;
   result.personnel_species_id =
       fleet->embarked_population_species_id.value_or("");
-  result.personnel_species_name = species_name(result.personnel_species_id);
+  result.personnel_species_name = species_name(locale_, result.personnel_species_id);
   result.personnel_millions = fleet->embarked_population_millions;
   result.currency = sovereign_currency_for_civilization(
       current.world.civilizations, current.player.id);

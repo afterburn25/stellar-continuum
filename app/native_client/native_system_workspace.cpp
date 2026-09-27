@@ -1,4 +1,5 @@
 #include "native_campaign_calendar.hpp"
+#include "native_data_names.hpp"
 #include "native_shipbuilding_messages.hpp"
 #include "native_system_workspace.hpp"
 #include "native_ui_layout.hpp"
@@ -426,7 +427,7 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
   }
   overlay_fill(out,panel,{6,18,33,242});overlay_stroke(out,panel,border);float y=panel.y+14;const UiRect row_clip{panel.x,panel.y,panel.width,std::max(0.f,content_bottom-panel.y)};const auto add=[&](std::string value,Color color,int size=14,float step=20){const Text label{{panel.x+14,y},std::move(value),color,size,panel.width-28,row_clip};const auto measured=text_measurer_?text_measurer_(label):TextExtent{0,size+6};const float need=measured.height>0?static_cast<float>(measured.height):static_cast<float>(size)+6.f;if(y+need>content_bottom)return;out.overlay.emplace_back(label);y+=std::max(step,need+4.f);};if(!selected_body())add(tr("SYSTEM_INSPECTOR","SYSTEM INSPECTOR"),text,18,31);const auto*fleet=selected_fleet();if(inspector_focus_!=InspectorFocus::body&&fleet){add(fleet->foreign_inspection?tr("SYSTEM_FLEET_DEV","DEVELOPER FLEET INSPECTION"):tr("SYSTEM_FLEET_OWNED","OWNED LOCAL FLEET"),muted,13,21);add(fleet->name,text,17,26);add(trf("SYSTEM_FLEET_STATE",{fleet_role(fleet->role),fleet->moving?tr("SYSTEM_STATE_MOVING","Moving"):fleet->held?tr("SYSTEM_STATE_HOLDING","Holding"):tr("SYSTEM_STATE_LOCAL","Local")},"{0}  {1}"),text,14,24);if(settlement_status_&&settlement_status_->fleet_id==fleet->fleet_id){add(settlement_status_->status,{102,232,164,255},13,21);if(settlement_status_->destination_body_id)add(trf("SYSTEM_ESTABLISHMENT",{number(settlement_status_->settlement_days_completed,1),number(settlement_status_->establishment_days,0)},"Establishment  {0} / {1} days"),text,13,20);}}else if(selected_body()){body_inspection_.render(out,panel,layout.focus_action.y);}else {
     if(snapshot_->stellar_object){const auto& p=*snapshot_->stellar_object;const auto& d=stellar::core::stellar_object_definition(p.type);
-      add(d.name,text,16,26);
+      add(stellar::native_data::stellar_object_name(locale_,d),text,16,26);
       add(trf("SYSTEM_RADIUS",{compact_km(p.radius_solar*695700.)},"Radius  {0} km"),text,13,20);
       add(trf("SYSTEM_SURFACE_TEMP",{number(p.effective_temperature_kelvin,0)},"Surface  {0} K"),text,13,20);
       add(trf("SYSTEM_LUMINOSITY",{number(p.luminosity_solar,4)},"Luminosity  {0} x Sol"),text,13,20);

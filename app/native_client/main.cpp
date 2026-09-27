@@ -64,6 +64,7 @@
 #include "native_surface_construction_controller.hpp"
 #include "native_construction_controller.hpp"
 #include "native_construction_workspace.hpp"
+#include "native_data_names.hpp"
 #include "native_diplomacy_controller.hpp"
 #include "native_diplomacy_workspace.hpp"
 #include "native_fleet_controller.hpp"
@@ -8680,7 +8681,7 @@ class NativeCampaign final {
     else{colony_entry_view_.reset();system_workspace_.set_colony_body(std::nullopt);}
     system_workspace_.set_settlement_preparation(colony_entry_view_?std::nullopt:
         stellar::native_settlement_preparation::build_settlement_preparation(session_->frame(),session_->cache().generation,
-            *system_workspace_.system_id(),*system_workspace_.selected_body_id()));
+            *system_workspace_.system_id(),*system_workspace_.selected_body_id(),locale_));
   }
 
   std::optional<NativeColonyView> planetary_view(int body_id){
@@ -9664,7 +9665,7 @@ class NativeCampaign final {
     const auto player=std::ranges::find(world.civilizations,world.player_civilization_id,&Civilization::id);
     const bool in_system=system_workspace_.visible();
     std::string title=in_system?system_workspace_.snapshot()->catalog_name:player!=world.civilizations.end()?player->name:tr("HUD_EMPIRE","Empire");
-    std::string subtitle=in_system?tr("HUD_SYSTEM_VIEW","SYSTEM VIEW"):player!=world.civilizations.end()?species_environment_profile(player->species_id).display_name:"";
+    std::string subtitle=in_system?tr("HUD_SYSTEM_VIEW","SYSTEM VIEW"):player!=world.civilizations.end()?stellar::native_data::species_display_name(locale_,player->species_id,species_environment_profile(player->species_id).display_name):"";
     const bool paused=session_->frame().clock().speed()==StrategicSpeed::Paused;
     render_context_plate(out,l,title,subtitle,paused,pointer_,hud_crest_,in_system?hud_galaxy_icon_:hud_system_icon_,in_system||selected_id_.has_value(),locale_);
     const auto& view=colony_roster_.view();
@@ -9904,7 +9905,7 @@ class NativeCampaign final {
     const auto& r=*std::ranges::find(phenomena_.field()->regions,*context.dominant,&GalaxyPhenomenon::id);
     const bool known=world.knowledge.system_survey_level(world.player_civilization_id,id)>=SystemSurveyLevel::partially_surveyed||developer_session();
     const float s=std::clamp(height/1080.f,.7f,1.7f);const auto layout=SystemWorkspaceLayout::for_viewport(width,height);const auto row=layout.controls_row;const UiRect box{row.x+row.width*.53f,row.y+4*s,row.width*.45f,row.height-8*s};
-    std::ostringstream label;label<<(known?std::string(phenomenon_definition(r.type).name):tr("PHENOMENA_UNKNOWN","Uncharted interstellar cloud"));if(known)label<<" · "<<tr("PHENOMENA_SENSOR","Sensor range")<<" "<<static_cast<int>(context.effects.sensor*100)<<"% · "<<tr("PHENOMENA_SURVEY","Survey effort")<<" "<<std::fixed<<std::setprecision(2)<<context.effects.scanning<<"x";
+    std::ostringstream label;label<<(known?stellar::native_data::phenomenon_name(locale_,phenomenon_definition(r.type)):tr("PHENOMENA_UNKNOWN","Uncharted interstellar cloud"));if(known)label<<" · "<<tr("PHENOMENA_SENSOR","Sensor range")<<" "<<static_cast<int>(context.effects.sensor*100)<<"% · "<<tr("PHENOMENA_SURVEY","Survey effort")<<" "<<std::fixed<<std::setprecision(2)<<context.effects.scanning<<"x";
     stellar::native_menu_style::text(out,box,label.str(),std::max(12,static_cast<int>(13*s)),{150,215,235,255});
   }
   void refresh_inspection() {

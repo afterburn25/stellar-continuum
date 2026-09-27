@@ -4,6 +4,8 @@
 #include "native_colony_controller.hpp"
 #include "native_surface_construction_controller.hpp"
 #include "native_menu_style.hpp"
+#include "native_body_inspection.hpp"
+#include "native_data_names.hpp"
 #include "native_ui_theme.hpp"
 #include "native_ui_layout.hpp"
 #include "native_planet_globe.hpp"
@@ -369,7 +371,7 @@ class NativePlanetaryScreen {
   std::string population(double n)const{return std::abs(n)>=1000?number(n/1000,2)+tr("PLANET_POP_BILLIONS"," B"):number(n,2)+tr("PLANET_POP_MILLIONS"," M");}
   std::string atmosphere(stellar::core::PlanetaryAtmosphereRegime v)const{const std::array<const char*,7> keys={"PLANET_ATMO_VACUUM","PLANET_ATMO_OXYGEN","PLANET_ATMO_OXYGEN_RICH","PLANET_ATMO_CO2","PLANET_ATMO_REDUCING","PLANET_ATMO_INERT","PLANET_ATMO_OTHER"};const std::array<const char*,7> names={"Vacuum","Oxygen / nitrogen","Oxygen rich","Carbon dioxide rich","Reducing","Inert","Other"};const auto i=static_cast<std::size_t>(v);return i<names.size()?tr(keys[i],names[i]):tr("PLANET_ATMO_SURVEYED","Surveyed atmosphere");}
   std::string solvent(stellar::core::PlanetarySolventRegime v)const{const std::array<const char*,5> keys={"PLANET_SOLVENT_NONE","PLANET_SOLVENT_WATER","PLANET_SOLVENT_AMMONIA","PLANET_SOLVENT_HYDROCARBON","PLANET_SOLVENT_OTHER"};const std::array<const char*,5> names={"None","Water","Ammonia","Hydrocarbons","Other"};const auto i=static_cast<std::size_t>(v);return i<names.size()?tr(keys[i],names[i]):tr("PLANET_SOLVENT_SURVEYED","Surveyed solvent");}
-  std::string world_class(const NativeColonyView& v)const{if(v.planet.appearance&&!v.planet.appearance->source_asset_id.starts_with("sol:"))return stellar::core::planet_appearance_display_name(*v.planet.appearance);return v.planet.world_class?std::string(stellar::core::planetary_world_class_name(*v.planet.world_class)):tr("PLANET_CLASS_UNKNOWN","Classification unknown");}
+  std::string world_class(const NativeColonyView& v)const{if(v.planet.appearance&&!v.planet.appearance->source_asset_id.starts_with("sol:"))return stellar::native_data::planet_appearance_name(locale_,*v.planet.appearance);return v.planet.world_class?stellar::native_system_ui::world_class_name(*v.planet.world_class,locale_):tr("PLANET_CLASS_UNKNOWN","Classification unknown");}
   std::string classification(const NativeColonyView& v)const{
     using K=stellar::native_system::NativeSystemBodyVisualClass;
     switch(v.planet.visual_class){case K::oceanic:case K::frozen:case K::hot_rocky:return tr("PLANET_CLASS_ROCKY","Rocky world");case K::gas_giant:return tr("PLANET_CLASS_GAS","Gas giant");case K::ice_giant:return tr("PLANET_CLASS_ICE","Ice giant");case K::moon:return tr("PLANET_CLASS_MOON","Rocky moon");case K::unknown_planet:case K::unknown_moon:return tr("PLANET_CLASS_UNSURVEYED","Unsurveyed world");default:return tr("PLANET_CLASS_ROCKY","Rocky world");}

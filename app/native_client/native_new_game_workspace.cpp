@@ -1,4 +1,5 @@
 #include "native_new_game_workspace.hpp"
+#include "native_data_names.hpp"
 #include "native_menu_style.hpp"
 #include "native_ui_theme.hpp"
 #include <stellar/core/stellar_population_profiles.hpp>
@@ -331,7 +332,9 @@ NativeNewGameMeasuredLayout NativeNewGameWorkspace::measure_layout(
   float y = layout.species_rows.y - species_scroll_.scroll_offset;
   for (const auto &option : view_->species) {
     const float label_height = measured_height(
-        option.display_name, layout.body_font,
+        stellar::native_data::species_display_name(
+            locale_, option.id, option.display_name),
+        layout.body_font,
         layout.species_rows.width - 64.f * layout.scale);
     const float row_height = std::max(44.f * layout.scale,
                                       label_height + 16.f * layout.scale);
@@ -346,9 +349,10 @@ NativeNewGameMeasuredLayout NativeNewGameWorkspace::measure_layout(
     const float identity_width = layout.details_content.width -
                                  layout.portrait.width - 12.f * layout.scale;
     const auto presentation = species_presentation(option->id);
-    const float title_height = measured_height(option->display_name,
-                                               layout.heading_font,
-                                               identity_width);
+    const float title_height = measured_height(
+        stellar::native_data::species_display_name(
+            locale_, option->id, option->display_name),
+        layout.heading_font, identity_width);
     const float biography_height = presentation
         ? measured_height(tr(species_biography_key(option->id),
                              presentation->biography),
@@ -864,7 +868,10 @@ void NativeNewGameWorkspace::render(
                      presentation->portrait_asset_path);
     clipped_text(out, {row.x + 50 * s, row.y + 8 * s,
                        row.width - 56 * s, row.height - 16 * s},
-                 layout.species_rows, view_->species[index].display_name,
+                 layout.species_rows,
+                 stellar::native_data::species_display_name(
+                     locale_, view_->species[index].id,
+                     view_->species[index].display_name),
                  chosen ? accent : bright, layout.body_font);
   }
 
@@ -878,10 +885,12 @@ void NativeNewGameWorkspace::render(
       portrait_image(portrait, clip, presentation->portrait_asset_path);
     const float identity_x = portrait.x + portrait.width + 12.f * s;
     const float identity_width = clip.x + clip.width - identity_x;
+    const auto species_name = stellar::native_data::species_display_name(
+        locale_, species->id, species->display_name);
     const float title_height = measured_height(
-        species->display_name, layout.heading_font, identity_width);
+        species_name, layout.heading_font, identity_width);
     clipped_text(out, {identity_x, clip.y, identity_width,
-                       title_height}, clip, species->display_name, accent,
+                       title_height}, clip, species_name, accent,
                  layout.heading_font);
     float biography_height{};
     if (presentation) {
@@ -1106,7 +1115,9 @@ std::string NativeNewGameWorkspace::focused_label(
                    ? tr(galaxy_card_name_keys[index], galaxy_card_names[index])
                    : std::string{};
       return view_ && index < view_->species.size()
-                 ? view_->species[index].display_name
+                 ? stellar::native_data::species_display_name(
+                       locale_, view_->species[index].id,
+                       view_->species[index].display_name)
                  : std::string{};
     }
     const auto count_label = [&](const auto &choices, int count) {

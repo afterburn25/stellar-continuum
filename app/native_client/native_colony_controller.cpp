@@ -1,4 +1,5 @@
 #include "native_colony_controller.hpp"
+#include "native_data_names.hpp"
 #include <stellar/core/campaign_observation.hpp>
 
 #include <stellar/core/adaptive_research_authority.hpp>
@@ -320,7 +321,10 @@ NativeColonyViewResult NativeColonyController::build(
   view.colony_name = colony->name;
   view.body_display_name = shown_body->name;
   view.population_species_id = colony->population_species_id;
-  view.population_species_name = species_environment_profile(colony->population_species_id).display_name;
+  view.population_species_name =
+      stellar::native_data::species_display_name(
+          locale_, colony->population_species_id,
+          species_environment_profile(colony->population_species_id).display_name);
   view.resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
   if (system.system_id == owner->home_system_id) {
     // Use the same Core body resolution as campaign seeding, never display names.

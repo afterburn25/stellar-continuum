@@ -331,6 +331,7 @@ endif()
 
 add_executable(stellar_native_colony_workspace_tests
   native-tests/native_colony_workspace_tests.cpp
+  app/native_client/native_body_inspection.cpp
   app/native_client/native_colony_workspace.cpp)
 target_include_directories(stellar_native_colony_workspace_tests PRIVATE
   app/native_client
@@ -674,7 +675,9 @@ if(MSVC)
 endif()
 add_test(NAME native_colony_roster COMMAND stellar_native_colony_roster_tests)
 
-add_executable(stellar_native_planetary_screen_tests native-tests/native_planetary_screen_tests.cpp)
+add_executable(stellar_native_planetary_screen_tests
+  native-tests/native_planetary_screen_tests.cpp
+  app/native_client/native_body_inspection.cpp)
 target_include_directories(stellar_native_planetary_screen_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_planetary_screen_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_planetary_screen COMMAND stellar_native_planetary_screen_tests "${CMAKE_SOURCE_DIR}/assets/visual/sol")

@@ -1,4 +1,5 @@
 #include "native_settlement_preparation.hpp"
+#include "native_data_names.hpp"
 
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
 #include <stellar/core/colonization_runtime.hpp>
@@ -48,7 +49,8 @@ Option build_option(const ShipbuildingReadView &read,
 std::optional<View> build_settlement_preparation(CampaignFrame &frame,
                                                   const std::uint64_t generation,
                                                   const int system_id,
-                                                  const int body_id) {
+                                                  const int body_id,
+                                                  const stellar::engine::LocalizationTable *locale) {
   auto &runtime = frame.runtime();
   const auto &world = runtime.world().campaign();
   const auto *player = find_by_id(world.civilizations, world.player_civilization_id,
@@ -88,7 +90,8 @@ std::optional<View> build_settlement_preparation(CampaignFrame &frame,
   result.body_id = body->id;
   result.body_name = body->name;
   result.species_id = player->species_id;
-  result.species_name = profile->display_name;
+  result.species_name = stellar::native_data::species_display_name(
+      locale, player->species_id, profile->display_name);
   result.currency = sovereign_currency_for_civilization(world.civilizations, player->id);
   result.treasury = economy->credits;
   result.formatted_treasury = result.currency.format(result.treasury);

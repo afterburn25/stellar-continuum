@@ -1,5 +1,6 @@
 #include <stellar/engine/asset_registry.hpp>
 #include "native_phenomena.hpp"
+#include "native_data_names.hpp"
 #include "native_menu_style.hpp"
 #include <stellar/core/stellar_population_profiles.hpp>
 #include <stellar/engine/foundation.hpp>
@@ -117,7 +118,7 @@ void NativePhenomena::append_map(DrawList& out,const Camera& camera,int w,int h,
     if(known&&extent>=90.f&&extent<=520.f){
       const auto& d=phenomenon_definition(r.type);
       surveyed_labels.emplace_back(Text{{p.x,p.y+extent*.42f},
-          r.designation.empty()?d.name:r.designation+" · "+d.name,
+          r.designation.empty()?stellar::native_data::phenomenon_name(locale_,d):r.designation+" · "+stellar::native_data::phenomenon_name(locale_,d),
           {152,230,247,static_cast<std::uint8_t>(std::min(255.,150.+strength*180.))},
           static_cast<int>(std::clamp(extent*.075f,10.f,14.f)),extent*2.f,screen,
           TextAlign::Center,FontFace::Heading});
@@ -133,7 +134,7 @@ void NativePhenomena::append_map(DrawList& out,const Camera& camera,int w,int h,
       if(batches.empty()||!append_decal_batch(batches.back(),std::move(mesh)))batches.push_back(std::move(mesh));
     }
     if(options.bounds){const Color line{90,220,255,130};diagnostics.world.emplace_back(Line{{dest.x,dest.y},{dest.x+dest.width,dest.y},line});diagnostics.world.emplace_back(Line{{dest.x+dest.width,dest.y},{dest.x+dest.width,dest.y+dest.height},line});diagnostics.world.emplace_back(Line{{dest.x+dest.width,dest.y+dest.height},{dest.x,dest.y+dest.height},line});diagnostics.world.emplace_back(Line{{dest.x,dest.y+dest.height},{dest.x,dest.y},line});}
-    if(options.labels||options.region_bias||options.membership||options.filenames)diagnostics.world.emplace_back(Text{p,r.designation+" "+((known||options.labels)?phenomenon_definition(r.type).name:tr(locale_,"PHENOMENA_UNKNOWN_SHORT","Uncharted cloud"))+(options.filenames?" | "+a.filename:"")+(options.region_bias?" | "+std::string(stellar_region_name(r.affinity)):"")+(options.membership?" | systems "+std::to_string(r.systems_contained.size()):""),{152,230,247,255},12,420,screen});
+    if(options.labels||options.region_bias||options.membership||options.filenames)diagnostics.world.emplace_back(Text{p,r.designation+" "+((known||options.labels)?stellar::native_data::phenomenon_name(locale_,phenomenon_definition(r.type)):tr(locale_,"PHENOMENA_UNKNOWN_SHORT","Uncharted cloud"))+(options.filenames?" | "+a.filename:"")+(options.region_bias?" | "+std::string(stellar_region_name(r.affinity)):"")+(options.membership?" | systems "+std::to_string(r.systems_contained.size()):""),{152,230,247,255},12,420,screen});
   }
   for(auto& mesh:batches)out.world.emplace_back(std::move(mesh));
   for(auto& label:surveyed_labels)out.world.emplace_back(std::move(label));
@@ -162,8 +163,8 @@ void NativePhenomena::inspect(DrawList& out,const Camera& camera,Point pointer,i
   if(!field_||pointer.x<60||pointer.y<110||pointer.x>w-330||pointer.y>h-105)return;
   const auto p=camera.unproject(pointer,w,h);const auto c=phenomenon_context(field(),p.x,p.y);if(!c.dominant)return;
   const auto& r=region(*field_,*c.dominant);const bool known=developer||surveyed.contains(r.id);const auto& d=phenomenon_definition(r.type);
-  std::ostringstream text;text<<(known?r.designation+" · "+d.name:tr(locale_,"PHENOMENA_UNKNOWN","Uncharted interstellar cloud"))<<'\n';
-  if(known){text<<d.description<<'\n'<<tr(locale_,"PHENOMENA_SENSOR","Sensor range")<<' '<<std::fixed<<std::setprecision(0)<<c.effects.sensor*100<<"% · "<<tr(locale_,"PHENOMENA_SURVEY","Survey effort")<<' '<<std::setprecision(2)<<c.effects.scanning<<"x\n";
+  std::ostringstream text;text<<(known?r.designation+" · "+stellar::native_data::phenomenon_name(locale_,d):tr(locale_,"PHENOMENA_UNKNOWN","Uncharted interstellar cloud"))<<'\n';
+  if(known){text<<stellar::native_data::phenomenon_description(locale_,d)<<'\n'<<tr(locale_,"PHENOMENA_SENSOR","Sensor range")<<' '<<std::fixed<<std::setprecision(0)<<c.effects.sensor*100<<"% · "<<tr(locale_,"PHENOMENA_SURVEY","Survey effort")<<' '<<std::setprecision(2)<<c.effects.scanning<<"x\n";
     text<<tr(locale_,"PHENOMENA_RADIATION","Radiation potential")<<' '<<std::setprecision(2)<<c.effects.hazard<<" · "<<r.systems_contained.size()<<' '<<tr(locale_,"PHENOMENA_INTERSECTING","intersecting systems");
     if(developer)text<<"\nID "<<r.id<<" · "<<c.overlaps.size()<<" overlaps · edge "<<c.overlaps.front().edge_distance<<" ly\nDensity "<<c.overlaps.front().density<<" · shape seed "<<r.shape.seed;
   }else text<<tr(locale_,"PHENOMENA_HINT","Survey a system inside this cloud to identify its environment.");
