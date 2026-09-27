@@ -211,6 +211,7 @@ SystemInspection build_system_inspection(const FreshCampaignState& state, int se
   }
   result.name = system->name;
   result.guidance = tr(developer ? "INSPECTION_DEVELOPER_GUIDANCE" : "INSPECTION_SURVEYED_GUIDANCE", developer ? "Developer inspection · live stellar and settlement statistics." : "Survey complete. Review stellar findings and owned settlements below.");
+  result.foreign_settlement_intelligence = tr("INSPECTION_FOREIGN_INTEL","Foreign settlement intelligence unavailable");
   if (developer) result.foreign_settlement_intelligence = tr("INSPECTION_DEVELOPER_SETTLEMENTS","Developer access: all settlements shown with actual population and development.");
   result.facts.push_back({tr("INSPECTION_PRIMARY_STAR","PRIMARY STAR"), system->stellar_object?stellar_object_definition(system->stellar_object->type).name:tr(star_key(system->primary),star_label(system->primary)), true});
   if(system->stellar_object){

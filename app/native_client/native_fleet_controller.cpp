@@ -1,4 +1,5 @@
 #include "native_fleet_controller.hpp"
+#include "native_military_messages.hpp"
 #include <stellar/core/campaign_observation.hpp>
 #include <stellar/engine/localization.hpp>
 #include <unordered_set>
@@ -560,7 +561,8 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(
       MilitaryOrder{type, {}, type == MilitaryOrderType::Defend ? fleet->current_system_id : std::nullopt});
   military_order_quote_.reset();
   const auto *after = find_owned(player, quote.fleet_id);
-  return {outcome.accepted, outcome.message,
+  return {outcome.accepted,
+          native_military::localized_message(locale_, outcome.message),
           after ? after->mission_order_revision : quote.mission_order_revision};
 }
 

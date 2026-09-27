@@ -1,4 +1,7 @@
 #include "native_fleet_presentation.hpp"
+#include "native_military_messages.hpp"
+
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <array>
@@ -70,6 +73,35 @@ int main() try {
               "Solar probes are not Unknown system, and Unknown system is "
               "hidden.",
           "System-name redaction ignored token boundaries or UTF-8 names.");
+
+  stellar::engine::LocalizationTable german("de", "en");
+  std::string locale_error;
+  require(german.load_json(R"json({"locale":"de","strings":{
+      "MIL_ORDER_DEFENDING":"{0} verteidigt System {1}.",
+      "MIL_ORDER_UNKNOWN":"Unbekannter Militärbefehl."
+    }})json",
+                            &locale_error),
+          "German military locale failed to load.");
+  require(stellar::native_military::localized_message(
+              &german, "Pathfinder One is defending system 0.") ==
+              "Pathfinder One verteidigt System 0.",
+          "German military order result kept the English skeleton.");
+  require(stellar::native_military::localized_message(&german,
+                                             "Unknown military order.") ==
+              "Unbekannter Militärbefehl.",
+          "German static military message did not translate.");
+  require(stellar::native_military::localized_message(
+              &german, "Pathfinder One is attacking Vanguard.") ==
+              "Pathfinder One is attacking Vanguard.",
+          "Unkeyed German military skeleton should fall back to English.");
+  require(stellar::native_military::localized_message(
+              nullptr, "Pathfinder One is defending system 0.") ==
+              "Pathfinder One is defending system 0.",
+          "Missing locale altered an authoritative military message.");
+  require(stellar::native_military::localized_message(&german,
+                                             "Free-form status text.") ==
+              "Free-form status text.",
+          "Unmapped military message was rewritten.");
 
   std::vector<NativeOwnFleet> first{
       fleet(12, 4, 7), fleet(10, 4, 7), fleet(14, 9, 3), fleet(11, 4, 7)};

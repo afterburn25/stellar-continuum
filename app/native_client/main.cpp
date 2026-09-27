@@ -1951,7 +1951,8 @@ class NativeCampaign final {
     };
     select_star(*home);
     auto known_scene=scene(width,height);
-    if(!card_text(known_scene,home->name)||!card_text(known_scene,"Fully surveyed"))
+    if(!card_text(known_scene,home->name)||
+       !card_text(known_scene,tr("INSPECTION_SURVEY_FULL","Fully surveyed")))
       throw std::runtime_error("Surveyed star facts are missing from the visible card.");
     draw(known_scene,"known");
     const auto bounds=inspection_bounds(width,height);
@@ -1980,7 +1981,8 @@ class NativeCampaign final {
     if(selected_id_||inspection_card_.visible())throw std::runtime_error("Inspection close retained its selected target.");
     select_star(*unknown);
     const auto unknown_scene=scene(width,height);
-    if(!card_text(unknown_scene,"UNKNOWN")||card_text(unknown_scene,unknown->name))
+    if(!card_text(unknown_scene,tr("INSPECTION_NAME_UNKNOWN","UNKNOWN"))||
+       card_text(unknown_scene,unknown->name))
       throw std::runtime_error("Unknown inspection failed its rendered name redaction.");
     draw(unknown_scene,"unknown");
     click(center(SystemInspectionCard::close_bounds(bounds)));
@@ -2439,10 +2441,14 @@ class NativeCampaign final {
     wheel(-10000.f);
     const auto end=scene(width,height);
     collect(end);
-    const bool physical=seen.count("Physical")&&seen.count("6,371 km")&&
-      seen.count("9.81 m/s²")&&seen.count("SURVEY COMPLETE");
-    const bool environment=seen.count("Environment")&&seen.count("Oxygen / nitrogen")&&
-      seen.count("Satellites & signals")&&seen.count("Known moons");
+    const bool physical=seen.count(tr("BODY_SECTION_PHYSICAL","Physical"))&&
+      seen.count("6,371 km")&&seen.count("9.81 m/s²")&&
+      seen.count(tr("BODY_SURVEY_COMPLETE","SURVEY COMPLETE"));
+    const bool environment=
+      seen.count(tr("BODY_SECTION_ENVIRONMENT","Environment"))&&
+      seen.count(tr("BODY_ATMO_OXYGEN","Oxygen / nitrogen"))&&
+      seen.count(tr("BODY_SECTION_SATELLITES","Satellites & signals"))&&
+      seen.count(tr("BODY_FACT_MOONS","Known moons"));
     const float end_scroll=system_workspace_.inspection_scroll();
     wheel(-10000.f);
     const bool bounded=system_workspace_.inspection_scroll()==end_scroll;
