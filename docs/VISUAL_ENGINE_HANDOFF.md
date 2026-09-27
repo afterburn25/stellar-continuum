@@ -495,8 +495,12 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - Low tier skips aniso/cubic samplers entirely (linear clamp/repeat
   samplers bound instead) and caps emission-volume marching at 16
   steps (Medium: 32; authored `volume_steps` applies at High+).
-- The shadow pass is one extra depth-only draw set per frame (casters
-  already culled by `visible_range` and the shadow volume); the depth
+- The shadow pass is one extra depth-only draw set per frame per tier
+  (casters already culled by `visible_range` and the shadow volume);
+  per-instance caster evaluation (range cull, keep masks, group
+  collapse, LOD pick) runs once per view and is shared across the
+  near/far/far2/spot collections — each pass only transforms, volume-
+  tests and emits. The depth
   target is `resolution`² D32 — tier-scaled, allocated lazily per
   target and shared across views.
 

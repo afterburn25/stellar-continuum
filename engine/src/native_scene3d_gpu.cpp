@@ -728,13 +728,23 @@ struct Scene3DRenderer::Storage {
     // transform+geometry lists, then batches and sorts them so
     // gl_InstanceIndex maps. `in_volume` decides the light-space frustum
     // cut (ortho box for the key light, cone for a shadowed spot).
-    const auto collect_casters=[&](double ex,double ey,double ez,
-        double xx,double xy,double xz,double yx,double yy,double yz,double zx,double zy,double zz,
-        const Matrix4& light_rotation,const Matrix4& light_projection,const Matrix4& view_to_light,const auto& in_volume,
-        std::vector<std::shared_ptr<Geometry>>& geo,std::vector<ShadowCast>& xf,
-        std::vector<std::shared_ptr<Texture>>& tex_table,engine::DrawBatcher& batcher,
-        std::uint64_t& audit){
-      std::vector<const MeshInstance3D*> insts;
+    // Per-instance caster evaluation is camera-side only: every depth
+    // pass (near, both far tiers, each spot quadrant) recomputes the
+    // same range cull, keep masks, group collapse and LOD pick, so they
+    // are evaluated once per frame and each pass only transforms, tests
+    // its own volume and emits.
+    struct CasterEval{
+      const MeshInstance3D* inst;double radius;
+      // group!=nullptr ⇒ the rep emits the merged proxy at proxy_keep;
+      // mesh==nullptr ⇒ proxy-only (collapsed rep). partner emits on the
+      // complementary fade share when non-null.
+      const GroupBounds* group{};float proxy_keep{};
+      float keep{},partner_keep{};
+      std::shared_ptr<const Mesh3D> mesh,partner;
+    };
+    std::vector<CasterEval> caster_evals;bool caster_evals_built=false;
+    const auto build_caster_evals=[&]{
+      if(caster_evals_built)return;caster_evals_built=true;
       for(const auto& instance:view.scene->instances()){
         if(instance.material.transparent||!instance.casts_shadow)continue;
         const double radius=static_cast<double>(instance.mesh->bounding_radius())*instance.scale;
@@ -753,6 +763,49 @@ struct Scene3DRenderer::Storage {
         // Collapsed groups share one caster: the representative submits
         // its proxy scaled to the merged sphere, identity-rotated so a
         // card faces the light like it faces the camera in the lit pass.
+        if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->collapse){
+          if(git->second->rep!=&instance)continue;
+          caster_evals.push_back({&instance,radius,git->second,1.f});
+          continue;
+        }
+        // Inside a collapse band members thin by 1-p while the rep
+        // additionally submits the proxy on the complementary share —
+        // the same partition the lit pass screen-doors.
+        float group_keep=1.f;const GroupBounds* proxy_group=nullptr;float proxy_keep=0.f;
+        if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->share>0.f){
+          const GroupBounds&g=*git->second;
+          group_keep=1.f-g.share;
+          if(g.rep==&instance){proxy_group=&g;proxy_keep=-g.share;}
+        }
+        // Screen-space LOD: casters submit the level the lit pass picks
+        // instead of always paying the full mesh's vertex cost, plus the
+        // next-coarser partner on its complementary share inside a band.
+        std::shared_ptr<const Mesh3D> caster_mesh=instance.mesh;
+        std::size_t lvl=0;float lod_share=0.f;
+        if(!instance.lod_meshes.empty()){
+          const float diameter=2.f*instance.scale*static_cast<float>(instance.mesh->bounding_radius())*lod_focal/
+            (lod_camera.projection==Projection3D::Orthographic?1.f:static_cast<float>(std::max(cam_dist,1e-4)));
+          lvl=select_lod3d_level(instance,diameter);
+          if(lvl>0)caster_mesh=instance.lod_meshes[lvl-1];
+          lod_share=lod3d_fade_share(instance,diameter);
+        }
+        const bool fading=lod_share>0.f&&lvl<instance.lod_meshes.size()&&range_keep>=1.f;
+        caster_evals.push_back({&instance,radius,proxy_group,proxy_keep,
+            (fading?1.f-lod_share:range_keep)*group_keep,
+            fading?-lod_share*group_keep:0.f,
+            std::move(caster_mesh),fading?instance.lod_meshes[lvl]:nullptr});
+      }
+    };
+    const auto collect_casters=[&](double ex,double ey,double ez,
+        double xx,double xy,double xz,double yx,double yy,double yz,double zx,double zy,double zz,
+        const Matrix4& light_rotation,const Matrix4& light_projection,const Matrix4& view_to_light,const auto& in_volume,
+        std::vector<std::shared_ptr<Geometry>>& geo,std::vector<ShadowCast>& xf,
+        std::vector<std::shared_ptr<Texture>>& tex_table,engine::DrawBatcher& batcher,
+        std::uint64_t& audit){
+      build_caster_evals();
+      std::vector<const MeshInstance3D*> insts;
+      for(const auto& eval:caster_evals){
+        const auto& instance=*eval.inst;
         const auto emit_proxy=[&](const GroupBounds&g,float keep){
           // g is view-space (the merged sphere accumulates model_view
           // translations) — map it through the pass's view→light transform.
@@ -773,36 +826,11 @@ struct Scene3DRenderer::Storage {
               instance.material.texture_tiling.x,instance.material.texture_tiling.y});
           insts.push_back(&instance);
         };
-        if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->collapse){
-          const GroupBounds&g=*git->second;
-          if(g.rep!=&instance)continue;
-          emit_proxy(g,1.f);
-          continue;
-        }
-        // Inside a collapse band members thin by 1-p while the rep
-        // additionally submits the proxy on the complementary share —
-        // the same partition the lit pass screen-doors.
-        float group_keep=1.f;
-        if(const auto git=group_of.find(&instance);git!=group_of.end()&&git->second->share>0.f){
-          const GroupBounds&g=*git->second;
-          group_keep=1.f-g.share;
-          if(g.rep==&instance)emit_proxy(g,-g.share);
-        }
-        // Screen-space LOD: casters submit the level the lit pass picks
-        // instead of always paying the full mesh's vertex cost, plus the
-        // next-coarser partner on its complementary share inside a band.
-        std::shared_ptr<const Mesh3D> caster_mesh=instance.mesh;
-        std::size_t lvl=0;float lod_share=0.f;
-        if(!instance.lod_meshes.empty()){
-          const float diameter=2.f*instance.scale*static_cast<float>(instance.mesh->bounding_radius())*lod_focal/
-            (lod_camera.projection==Projection3D::Orthographic?1.f:static_cast<float>(std::max(cam_dist,1e-4)));
-          lvl=select_lod3d_level(instance,diameter);
-          if(lvl>0)caster_mesh=instance.lod_meshes[lvl-1];
-          lod_share=lod3d_fade_share(instance,diameter);
-        }
+        if(eval.group)emit_proxy(*eval.group,eval.proxy_keep);
+        if(!eval.mesh)continue;
         const double dx=instance.position.x-ex,dy=instance.position.y-ey,dz=instance.position.z-ez;
         const double lx=xx*dx+xy*dy+xz*dz,ly=yx*dx+yy*dy+yz*dz,lz=zx*dx+zy*dy+zz*dz;
-        if(!in_volume(lx,ly,lz,radius))continue;
+        if(!in_volume(lx,ly,lz,eval.radius))continue;
         // A billboard caster faces the light the way it faces the camera
         // in the lit pass — the identity-rotation collapse the group
         // proxy uses; authored rotation would make a card edge-on.
@@ -822,9 +850,8 @@ struct Scene3DRenderer::Storage {
               instance.material.texture_tiling.x,instance.material.texture_tiling.y});
           insts.push_back(&instance);
         };
-        const bool fading=lod_share>0.f&&lvl<instance.lod_meshes.size()&&range_keep>=1.f;
-        emit_caster(caster_mesh,(fading?1.f-lod_share:range_keep)*group_keep);
-        if(fading)emit_caster(instance.lod_meshes[lvl],-lod_share*group_keep);
+        emit_caster(eval.mesh,eval.keep);
+        if(eval.partner)emit_caster(eval.partner,eval.partner_keep);
       }
       // Same instancing convention as the scene pass: batch by mesh, then
       // reorder transforms/geometry to sorted order so gl_InstanceIndex maps.
