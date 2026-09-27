@@ -138,9 +138,11 @@ same document headless-tested.
    (kept out — an effect with no gameplay value).
 6. **Atmosphere** — landed: authorable limb shell (`atmosphere` block /
    `AtmosphereShell` component — color, strength, power, `night_floor`
-   day/night limb response). Remaining: still a screen-space limb
-   approximation — no wavelength-weighted scattering or volumetric
-   transmission.
+   day/night limb response, plus an opt-in `sunset`/`sunsetStrength`
+   terminator tint that reddens the rim where the limb meets the
+   day/night boundary — the grazing-path transmission a static tint
+   can't express). Remaining: still a screen-space limb approximation —
+   no full spectral scattering model or volumetric transmission.
 7. **Planet features** — landed: `SurfaceResponse3D` is authorable
    end-to-end (normal/properties/cloud maps, any subset; `surface` doc
    block + `MaterialSurface` component + editor rows), `cloud_albedo`

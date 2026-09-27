@@ -931,7 +931,22 @@ int main(int argc,char** argv)try{
     const auto limb=capture({planet},"atmo-limb.png");
     check(channel(*limb,280,160,2)>channel(*bare,280,160,2)+12&&channel(*limb,280,160,2)>channel(*limb,280,160,0),
         "Atmosphere did not brighten the limb with its tint");
-    std::cout<<"atmosphere_gpu=limb_tint_dayweight_passed\n";
+    // Terminator reddening: with the incident light at +X the dusk band
+    // sits ~72° up/down the right rim (limb x terminator), while the
+    // noon edge keeps the authored tint. White body light cancels in
+    // R-B; a sunset_strength=0 control rim stays uniformly tinted.
+    planet.material.light_direction=Vec3{1,0,0};
+    planet.material.atmosphere->tint={0,0,1};planet.material.atmosphere->sunset={1,0,0};
+    planet.material.atmosphere->sunset_strength=1.f;
+    const auto dusk=capture({planet},"atmo-dusk-on.png");
+    planet.material.atmosphere->sunset_strength=0;
+    const auto dusk_off=capture({planet},"atmo-dusk-off.png");
+    check(channel(*dusk,201,34,0)-channel(*dusk,201,34,2)>
+              channel(*dusk,292,160,0)-channel(*dusk,292,160,2)+25,
+        "Atmosphere rim did not redden toward the terminator");
+    check(channel(*dusk,201,34,0)>channel(*dusk_off,201,34,0)+20,
+        "Sunset strength 0 did not keep the authored rim tint");
+    std::cout<<"atmosphere_gpu=limb_tint_dayweight_terminator_passed\n";
   }
   if(window.scene3d_statistics().hdr){
     // Post stack: exposure brightens, bloom spreads super-threshold light,

@@ -256,6 +256,10 @@ struct EmissionVolume {
 struct AtmosphereShell {
   float r{0.45f}, g{0.62f}, b{1.f};
   float strength{1.f}, power{3.f}, night_floor{0.05f};
+  // Terminator-transmitted tint: the rim blends toward this color where
+  // the limb meets the day/night boundary — sunset_strength 0 off.
+  float sunset_r{0.85f}, sunset_g{0.35f}, sunset_b{0.12f};
+  float sunset_strength{0.f};
 };
 // Distance culling for a 3D entity: the renderer drops the instance once
 // the camera is farther than `range` world units from its bounding-sphere

@@ -210,6 +210,14 @@ inline constexpr std::size_t maximum_scene3d_shadow_cascades=4;
 struct Atmosphere3D {
   Vec3 tint{.45f,.62f,1.f};
   float strength{1.f},power{3.f},night_floor{.05f};
+  // Terminator-transmitted tint: the rim color blends toward `sunset`
+  // where the limb meets the day/night boundary — the dusk reddening a
+  // long grazing path produces as blue light scatters out. The blend
+  // peaks at the terminator, fades toward the subsolar point, and
+  // reaches slightly past it as twilight. `sunset_strength` is the
+  // maximum blend weight [0,1] — 0 keeps the authored tint everywhere.
+  Vec3 sunset{.85f,.35f,.12f};
+  float sunset_strength{};
 };
 struct Material3D {
   std::shared_ptr<const RgbaImage> texture;

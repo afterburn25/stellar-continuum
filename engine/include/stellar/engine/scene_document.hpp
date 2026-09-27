@@ -198,6 +198,11 @@ struct Scene3dEntity {
   // strength 0 leaves the body's authored art untouched.
   float atmo_strength{0.f}, atmo_power{3.f}, atmo_night{0.05f};
   float atmo_r{0.45f}, atmo_g{0.62f}, atmo_b{1.f};
+  // Terminator-transmitted rim tint — the limb blends toward this color
+  // at the day/night boundary (sunset reddening). strength 0 keeps the
+  // authored tint everywhere.
+  float atmo_sunset_strength{0.f};
+  float atmo_sunset_r{0.85f}, atmo_sunset_g{0.35f}, atmo_sunset_b{0.12f};
   // Distance culling: hidden once the camera is farther than this many
   // world units from the bounding-sphere surface. 0 = always visible.
   float visible_range{0.f};

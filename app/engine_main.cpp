@@ -320,7 +320,8 @@ struct Shell {
       hit3_orbitbeam{},
       hit3_starkelvin{}, hit3_accretion{}, hit3_fwdscatter{},
       hit3_scnenv{}, hit3_probe{}, hit3_noshadow{}, hit3_noreceive{},
-      hit3_volume{}, hit3_lodfade{}, hit3_visfade{}, hit3_lodgroup{};
+      hit3_volume{}, hit3_lodfade{}, hit3_visfade{}, hit3_lodgroup{},
+      hit3_dusk{};
 
   // Simulation tool: a live engine::SimulationExecutor driving real
   // framework state (per-settlement Population cohorts, a shared power
@@ -2208,6 +2209,15 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= 0.f && a <= 1e12f) { next.visible_range = a; valid = true; }
           break;
+  case 76: {
+          float dusk_w;
+          valid = parse_quad(shell.scene3_buffer, a, b, c, dusk_w);
+          if (valid && a >= 0.f && b >= 0.f && c >= 0.f &&
+              dusk_w >= 0.f && dusk_w <= 1.f) {
+            next.atmo_sunset_r = a; next.atmo_sunset_g = b;
+            next.atmo_sunset_b = c; next.atmo_sunset_strength = dusk_w;
+          } else valid = false;
+          break; }
   case 73:
           if (shell.scene3_buffer == "0" || shell.scene3_buffer == "1") {
             next.casts_shadow = shell.scene3_buffer == "1";
@@ -2528,7 +2538,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                                                                                                     shell.hit3_scnenv =
                                                                                                         shell.hit3_probe =
                                                                                                             shell.hit3_noshadow =
-                                                                                                            shell.hit3_noreceive = {};
+                                                                                                            shell.hit3_noreceive =
+                                                                                                            shell.hit3_dusk = {};
     shell.hit3_mode_move = shell.hit3_mode_rot =
         shell.hit3_mode_scale = {};
     shell.scene3_preview = shell.scene3_rows = {};
@@ -2738,7 +2749,10 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       if (e.atmo_strength != 0.f)
         inst.material.atmosphere =
             Atmosphere3D{{e.atmo_r, e.atmo_g, e.atmo_b}, e.atmo_strength,
-                         e.atmo_power, e.atmo_night};
+                         e.atmo_power, e.atmo_night,
+                         {e.atmo_sunset_r, e.atmo_sunset_g,
+                          e.atmo_sunset_b},
+                         e.atmo_sunset_strength};
       inst.visible_range = e.visible_range;
       inst.visible_fade = e.visible_fade;
       inst.casts_shadow = e.casts_shadow;
@@ -3022,6 +3036,13 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                      std::to_string(entity->atmo_b)
                : "",
         ed(50), "rim color r,g,b 0..1");
+  field(shell.hit3_dusk, "atmoSunset",
+        entity ? std::to_string(entity->atmo_sunset_r) + "," +
+                     std::to_string(entity->atmo_sunset_g) + "," +
+                     std::to_string(entity->atmo_sunset_b) + "," +
+                     std::to_string(entity->atmo_sunset_strength)
+               : "",
+        ed(76), "terminator tint r,g,b,blend 0..1 - 0 off");
   field(shell.hit3_range, "visRange",
         entity ? std::to_string(entity->visible_range) : "", ed(51),
         "distance cull, world units - 0 always");
@@ -7160,6 +7181,11 @@ int main(int argc, char **argv) {
               edit3(50, std::to_string(se->atmo_r) + "," +
                             std::to_string(se->atmo_g) + "," +
                             std::to_string(se->atmo_b));
+            else if (shell.hit3_dusk.contains(event.position) && se)
+              edit3(76, std::to_string(se->atmo_sunset_r) + "," +
+                            std::to_string(se->atmo_sunset_g) + "," +
+                            std::to_string(se->atmo_sunset_b) + "," +
+                            std::to_string(se->atmo_sunset_strength));
             else if (shell.hit3_exposure.contains(event.position))
               edit3(34, std::to_string(doc.exposure));
             else if (shell.hit3_bloom.contains(event.position))

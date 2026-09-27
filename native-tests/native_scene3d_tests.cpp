@@ -102,6 +102,10 @@ int main()try{
   rejects([&]{auto i=instance;i.material.pbr=PbrSurface3D{};i.material.pbr->night_emissive=2.f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->power=.1f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->strength=-1.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->sunset_strength=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->sunset={-.1f,.3f,.5f};(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.atmosphere=Atmosphere3D{};i.material.atmosphere->sunset_strength=.8f;
+   const auto dusk=Scene3D::create(camera,{i});check(dusk->instances()[0].material.atmosphere->sunset_strength==.8f,"Atmosphere sunset strength was rejected");}
   // Surface response accepts any subset of maps — a cloud-only material is
   // legal — but still requires at least one and bounds every scalar.
   {auto i=instance;i.material.surface_response=SurfaceResponse3D{};i.material.surface_response->cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});

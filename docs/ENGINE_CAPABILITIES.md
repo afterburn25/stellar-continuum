@@ -889,7 +889,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   response, split energy-conserving: the specular fresnel share is
   subtracted from the diffuse irradiance term), `Material3D::atmosphere`
   (wavelength-tinted `(1-N·V)^power` limb scattering, day-side weighting,
-  `night_floor`), `alpha_threshold` cutout, `texture_tiling`;
+  `night_floor`, opt-in `sunset`/`sunset_strength` terminator tint — the
+  rim blends toward a transmitted dusk color where limb meets
+  terminator), `alpha_threshold` cutout, `texture_tiling`;
   `Scene3D::create(...)` accepts up to
   `maximum_scene3d_point_lights` = 4 `PointLight3D`s (position/color/
   intensity/range, windowed inverse-square with hard cutoff — range 0 =

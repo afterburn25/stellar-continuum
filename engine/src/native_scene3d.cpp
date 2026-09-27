@@ -149,7 +149,9 @@ void validate_instance(const MeshInstance3D& i){
   if(m.atmosphere){const auto& a=*m.atmosphere;
     if(!bounded(a.strength,16)||a.strength<0||!bounded(a.power,16)||a.power<.5f||
        !bounded(a.night_floor,1)||a.night_floor<0||!valid(a.tint)||
-       a.tint.x<0||a.tint.y<0||a.tint.z<0)
+       a.tint.x<0||a.tint.y<0||a.tint.z<0||
+       !bounded(a.sunset_strength,1)||a.sunset_strength<0||!valid(a.sunset)||
+       a.sunset.x<0||a.sunset.y<0||a.sunset.z<0)
       throw std::invalid_argument("3D atmosphere requires bounded strength, power, floor and tint.");
   }
   if(!bounded(m.alpha_threshold,1)||m.alpha_threshold<0||

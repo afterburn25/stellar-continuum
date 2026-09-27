@@ -87,7 +87,7 @@ template<class Map> void evict(Map& cache,std::size_t& bytes,std::size_t incomin
   }
 }
 struct VertexUniform {Matrix4 mvp,model_view,shadow_from_model;};
-struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy,point_cone;std::array<float,4> point_outer;std::array<float,4> anim_options;};
+struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy,point_cone;std::array<float,4> point_outer;std::array<float,4> anim_options;std::array<float,4> atmo_sunset;};
 struct PostUniform {std::array<float,4> a,b;};
 // View-wide fragment uniform: debug selector, then the key light's
 // view→shadow-clip transform, {texel size (>0 enables), PCF radius in
@@ -99,7 +99,7 @@ struct PostUniform {std::array<float,4> a,b;};
 // box's centre/depth (one depth-array layer each, options .z carrying
 // each tier's own texel-scaled lift), the omni pair the cube-atlas rows.
 struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<float,4> shadow_advanced;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;std::array<Matrix4,maximum_scene3d_shadow_cascades> cascade_from_view;std::array<std::array<float,4>,maximum_scene3d_shadow_cascades> cascade_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;std::array<std::array<float,4>,4> spot_advanced,omni_advanced;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==768&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==1072);
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==784&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==1072);
 // Column-major rotation for a unit quaternion — same convention as
 // rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
 Matrix4 rotation_from(Quaternion q){
@@ -733,7 +733,8 @@ struct Scene3DRenderer::Storage {
       if(material.band_waves!=0.f)fragment.texture_options[1]=material.band_waves;
       if(material.atmosphere){const auto& a=*material.atmosphere;
         fragment.atmo_options={a.tint.x,a.tint.y,a.tint.z,a.strength};
-        fragment.atmo_shape={a.power,a.night_floor,fragment.atmo_shape[2],fragment.atmo_shape[3]};}
+        fragment.atmo_shape={a.power,a.night_floor,fragment.atmo_shape[2],fragment.atmo_shape[3]};
+        fragment.atmo_sunset={a.sunset.x,a.sunset.y,a.sunset.z,a.sunset_strength};}
       fragment.point_position=pl_position;fragment.point_energy=pl_energy;
       fragment.point_cone=pl_cone;fragment.point_outer=pl_outer;
     }

@@ -517,11 +517,31 @@ void register_scene_components(World &world) {
       encode_fields<AtmosphereShell, &AtmosphereShell::r,
                     &AtmosphereShell::g, &AtmosphereShell::b,
                     &AtmosphereShell::strength, &AtmosphereShell::power,
-                    &AtmosphereShell::night_floor>,
-      decode_fields<AtmosphereShell, &AtmosphereShell::r,
-                    &AtmosphereShell::g, &AtmosphereShell::b,
-                    &AtmosphereShell::strength, &AtmosphereShell::power,
-                    &AtmosphereShell::night_floor>);
+                    &AtmosphereShell::night_floor,
+                    &AtmosphereShell::sunset_r, &AtmosphereShell::sunset_g,
+                    &AtmosphereShell::sunset_b,
+                    &AtmosphereShell::sunset_strength>,
+      [](const std::vector<std::uint8_t> &b) {
+        // The sunset tint tails the six base floats so legacy payloads
+        // keep their authored rim instead of resetting to defaults.
+        AtmosphereShell m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        if (b.size() >= 24) {
+          m.r = f(); m.g = f(); m.b = f();
+          m.strength = f(); m.power = f(); m.night_floor = f();
+        }
+        if (b.size() - at >= 16) {
+          m.sunset_r = f(); m.sunset_g = f(); m.sunset_b = f();
+          m.sunset_strength = f();
+        }
+        return m;
+      });
   // f32 range + f32 fade — decode tolerates the legacy 4-byte payload so
   // older saves keep their authored range and the hard cut they had.
   world.register_component<VisibleRange>(
@@ -987,7 +1007,9 @@ std::vector<EntityId> spawn_scene3d(World &world,
     if (s.atmo_strength != 0.f)
       world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
                                         s.atmo_strength, s.atmo_power,
-                                        s.atmo_night});
+                                        s.atmo_night, s.atmo_sunset_r,
+                                        s.atmo_sunset_g, s.atmo_sunset_b,
+                                        s.atmo_sunset_strength});
     if (s.visible_range > 0.f)
       world.add(entity, VisibleRange{s.visible_range, s.visible_fade});
     if (!s.casts_shadow) world.add(entity, NoShadow{});
@@ -1116,6 +1138,10 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.atmo_strength = at->strength;
       s.atmo_power = at->power;
       s.atmo_night = at->night_floor;
+      s.atmo_sunset_r = at->sunset_r;
+      s.atmo_sunset_g = at->sunset_g;
+      s.atmo_sunset_b = at->sunset_b;
+      s.atmo_sunset_strength = at->sunset_strength;
     }
     if (const auto *vr = world.get<VisibleRange>(entity)) {
       s.visible_range = vr->range;

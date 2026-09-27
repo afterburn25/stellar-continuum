@@ -445,11 +445,18 @@ std::string Scene3dDocument::to_json() const {
       item["uvTile"] = {e.uv_tile_x, e.uv_tile_y};
     if (e.atmo_strength != 0.f || e.atmo_power != 3.f ||
         e.atmo_night != 0.05f || e.atmo_r != 0.45f || e.atmo_g != 0.62f ||
-        e.atmo_b != 1.f)
+        e.atmo_b != 1.f || e.atmo_sunset_strength != 0.f) {
       item["atmosphere"] = {{"tint", {e.atmo_r, e.atmo_g, e.atmo_b}},
                             {"strength", e.atmo_strength},
                             {"power", e.atmo_power},
                             {"nightFloor", e.atmo_night}};
+      if (e.atmo_sunset_strength != 0.f || e.atmo_sunset_r != 0.85f ||
+          e.atmo_sunset_g != 0.35f || e.atmo_sunset_b != 0.12f) {
+        auto &at = item["atmosphere"];
+        at["sunset"] = {e.atmo_sunset_r, e.atmo_sunset_g, e.atmo_sunset_b};
+        at["sunsetStrength"] = e.atmo_sunset_strength;
+      }
+    }
     if (e.visible_range != 0.f) item["range"] = e.visible_range;
     if (!e.casts_shadow) item["castsShadow"] = false;
     if (!e.receives_shadow) item["receivesShadow"] = false;
@@ -686,6 +693,11 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         e.atmo_strength = at.value("strength", 0.0f);
         e.atmo_power = at.value("power", 3.0f);
         e.atmo_night = at.value("nightFloor", 0.05f);
+        if (at.contains("sunset") &&
+            !vec3_of(at, "sunset", e.atmo_sunset_r, e.atmo_sunset_g,
+                     e.atmo_sunset_b))
+          return std::nullopt;
+        e.atmo_sunset_strength = at.value("sunsetStrength", 0.0f);
       }
       e.visible_range = item.value("range", 0.0f);
       if (!(e.visible_range >= 0.f))

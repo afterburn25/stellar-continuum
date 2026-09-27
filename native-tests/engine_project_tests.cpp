@@ -421,6 +421,10 @@ int main() {
     cube.atmo_r = 0.3f;
     cube.atmo_g = 0.5f;
     cube.atmo_b = 0.9f;
+    cube.atmo_sunset_strength = .7f;
+    cube.atmo_sunset_r = .9f;
+    cube.atmo_sunset_g = .4f;
+    cube.atmo_sunset_b = .1f;
     cube.visible_range = 250.f;
     cube.visible_fade = .1f;
     cube.casts_shadow = false;
@@ -585,6 +589,9 @@ int main() {
                 rc.atmo_strength == 1.5f && rc.atmo_power == 2.5f &&
                 rc.atmo_night == 0.1f && rc.atmo_r == 0.3f &&
                 rc.atmo_g == 0.5f && rc.atmo_b == 0.9f &&
+                rc.atmo_sunset_strength == .7f &&
+                rc.atmo_sunset_r == .9f && rc.atmo_sunset_g == .4f &&
+                rc.atmo_sunset_b == .1f &&
                 rc.visible_range == 250.f && rc.visible_fade == .1f &&
                 rc.casts_shadow == false && rc.receives_shadow == false,
             "scene3d pbr/atmosphere/cull fields round-trip");

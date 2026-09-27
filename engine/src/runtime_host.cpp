@@ -2599,7 +2599,10 @@ int RuntimeHost::run() {
         if (const auto *at = world.get<AtmosphereShell>(e))
           inst.material.atmosphere =
               native_map::Atmosphere3D{{at->r, at->g, at->b}, at->strength,
-                                       at->power, at->night_floor};
+                                       at->power, at->night_floor,
+                                       {at->sunset_r, at->sunset_g,
+                                        at->sunset_b},
+                                       at->sunset_strength};
         // Emission volume: the entity's own texture is the emission
         // image and the volume branch requires transparency — a missing
         // texture drops the component rather than failing the instance.

@@ -33,6 +33,8 @@ m.atmosphere->tint = {0.3f, 0.5f, 0.9f};    // wavelength tint
 m.atmosphere->strength = 1.2f;              // [0,8]
 m.atmosphere->power = 3.f;                  // (0,8] limb exponent
 m.atmosphere->night_floor = 0.05f;          // [0,1] nightside floor
+m.atmosphere->sunset = {0.9f, 0.4f, 0.1f};  // terminator-transmitted tint
+m.atmosphere->sunset_strength = 0.8f;       // [0,1] dusk blend, 0 off
 m.alpha_threshold = 0.5f;                   // [0,1], 0 = off (discard)
 m.texture_tiling = {2.f, 2.f};              // each in [0.01,64]
 m.surface_response = SurfaceResponse3D{};   // opt-in authored detail maps

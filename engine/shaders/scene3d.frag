@@ -56,6 +56,7 @@ struct Material {
     vec4 point_cone[4]; // view-space spot dir (zero = omni), inner cos
     vec4 point_outer; // per-light outer cos edge
     vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
+    vec4 atmo_sunset; // terminator-transmitted tint rgb, blend strength
 };
 layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
@@ -799,7 +800,15 @@ void main() {
         vec3 Ng=normalize(view_normal);
         float limb=pow(clamp(1.0-abs(dot(Ng,V)),0.0,1.0),material.atmo_shape.x);
         float day=max(material.atmo_shape.y,smoothstep(-0.25,0.3,dot(Ng,material.light_direction.xyz)));
-        vec3 rim=material.atmo_options.rgb*material.atmo_options.w*limb*day*light_color;
+        // Terminator reddening: the grazing path peaks where the limb
+        // meets the day/night boundary, so the transmitted tint blends
+        // toward the authored sunset color there (and slightly past it
+        // as twilight) — 0 keeps the authored rim everywhere.
+        float dusk=pow(clamp(1.0-abs(dot(Ng,material.light_direction.xyz)),0.0,1.0),2.0)
+            *smoothstep(-0.15,0.5,dot(Ng,material.light_direction.xyz));
+        vec3 rim_tint=mix(material.atmo_options.rgb,material.atmo_sunset.rgb,
+            clamp(dusk*material.atmo_sunset.w,0.0,1.0));
+        vec3 rim=rim_tint*material.atmo_options.w*limb*day*light_color;
         emissive_part+=rim;result+=rim;
     }
     // Preserve legacy diffuse materials and premultiplied composition.
