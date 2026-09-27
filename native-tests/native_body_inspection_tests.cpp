@@ -98,6 +98,17 @@ int main() {
     mutated.bodies.front().details->temperature_kelvin = 9000.0;
     REQUIRE(build_body_inspection(mutated, 3) == redacted);
 
+    auto classified = snapshot;
+    classified.bodies.front().world_class =
+        stellar::core::PlanetaryWorldClass::Continental;
+    REQUIRE(fact(*build_body_inspection(classified, 3), "World class") ==
+            "Continental");
+    stellar::engine::LocalizationTable german("de", "en");
+    german.load_json(
+        R"({"locale":"de","strings":{"BODY_FACT_CLASS":"Weltklasse","BODY_CLASS_CONTINENTAL":"Kontinentalwelt"}})");
+    REQUIRE(fact(*build_body_inspection(classified, 3, &german), "Weltklasse") ==
+            "Kontinentalwelt");
+
     auto below_partial = snapshot;
     below_partial.survey_level = stellar::core::SystemSurveyLevel::detected;
     REQUIRE(!build_body_inspection(below_partial, 3));

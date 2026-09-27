@@ -48,6 +48,27 @@ Layout layout_for(int w,int h){
   return l;
 }
 std::string number(double n,int precision=2){std::ostringstream s;s<<std::fixed<<std::setprecision(precision)<<n;return s.str();}
+std::string resolve(const stellar::engine::LocalizationTable* locale,std::string_view key,std::string_view fallback){
+  if(locale&&locale->contains(key))return std::string(locale->translate(key));
+  return std::string(fallback);}
+std::string field_type_display(SmallBodyFieldType type,const stellar::engine::LocalizationTable* locale){
+  constexpr std::array keys{"SMALLBODY_TYPE_ROCKY","SMALLBODY_TYPE_METALLIC","SMALLBODY_TYPE_CARBONACEOUS","SMALLBODY_TYPE_MIXED","SMALLBODY_TYPE_ICE","SMALLBODY_TYPE_DEBRIS_DISK","SMALLBODY_TYPE_SHATTERED","SMALLBODY_TYPE_CRACKED","SMALLBODY_TYPE_PLANETARY_HALO"};
+  const auto i=static_cast<std::size_t>(type);
+  return resolve(locale,i<keys.size()?keys[i]:"SMALLBODY_TYPE_ROCKY",small_body_field_name(type));}
+std::string material_display(SmallBodyMaterial material,const stellar::engine::LocalizationTable* locale){
+  constexpr std::array keys{"SMALLBODY_MAT_ROCK","SMALLBODY_MAT_METAL","SMALLBODY_MAT_CARBON","SMALLBODY_MAT_WATER_ICE","SMALLBODY_MAT_METHANE_ICE","SMALLBODY_MAT_AMMONIA_ICE","SMALLBODY_MAT_ROCK_ICE","SMALLBODY_MAT_VOLATILES"};
+  const auto i=static_cast<std::size_t>(material);
+  return resolve(locale,i<keys.size()?keys[i]:"SMALLBODY_MAT_ROCK",small_body_material_name(material));}
+std::string resource_display(SmallBodyResource resource,const stellar::engine::LocalizationTable* locale){
+  constexpr std::array keys{"SMALLBODY_RES_MINERALS","SMALLBODY_RES_METALS","SMALLBODY_RES_ORGANICS","SMALLBODY_RES_WATER","SMALLBODY_RES_HYDROGEN","SMALLBODY_RES_DEUTERIUM","SMALLBODY_RES_VOLATILES","SMALLBODY_RES_SALVAGE","SMALLBODY_RES_EXOTICS"};
+  const auto i=static_cast<std::size_t>(resource);
+  return resolve(locale,i<keys.size()?keys[i]:"SMALLBODY_RES_MINERALS",small_body_resource_name(resource));}
+std::string size_display(const SmallBodyInstance& body,const stellar::engine::LocalizationTable* locale){
+  const auto radius=small_body_display_radius(body);
+  if(radius>=36.f)return resolve(locale,"SMALLBODY_SIZE_HUGE","Huge");
+  if(radius>=13.f)return resolve(locale,"SMALLBODY_SIZE_LARGE","Large");
+  if(radius>=4.f)return resolve(locale,"SMALLBODY_SIZE_MEDIUM","Medium");
+  return resolve(locale,"SMALLBODY_SIZE_SMALL","Small");}
 void label(DrawList& out,UiRect r,std::string value,Color c={207,224,238,255},int size=13){out.overlay.emplace_back(Text{{r.x+8,r.y+5},std::move(value),c,size,r.width-16,r});}
 void button(DrawList& out,UiRect r,std::string value){out.overlay.emplace_back(FilledRectangle{r,{13,35,51,252}});out.overlay.emplace_back(StrokedRectangle{r,{65,130,157,255}});label(out,r,std::move(value));}
 }
@@ -180,11 +201,11 @@ void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int 
   else {
     small_body_field_%=snapshot_->small_body_fields.size();const auto& f=snapshot_->small_body_fields[small_body_field_];small_body_index_%=f.visible_count;
     const auto body=small_body_instance(f,small_body_index_);
-    row(trf("SMALLBODY_FIELD",{std::string(small_body_field_name(f.type)),std::to_string(f.id)},"{0}  #{1}"));
+    row(trf("SMALLBODY_FIELD",{field_type_display(f.type,locale_),std::to_string(f.id)},"{0}  #{1}"));
     row(trf(f.planet_centered?"SMALLBODY_RANGE_PARENT":"SMALLBODY_RANGE_STAR",{number(f.inner_radius_au,f.planet_centered?5:2),number(f.outer_radius_au,f.planet_centered?5:2)},f.planet_centered?"{0} - {1} AU from parent":"{0} - {1} AU from star"));
-    row(trf("SMALLBODY_BODY",{std::to_string(body.id),std::string(small_body_size_name(body)),std::string(small_body_material_name(body.material))},"Body {0} / {1} / {2}"));
+    row(trf("SMALLBODY_BODY",{std::to_string(body.id),size_display(body,locale_),material_display(body.material,locale_)},"Body {0} / {1} / {2}"));
     const auto resources=small_body_resources(f,body.id);std::string r;
-    for(std::size_t i=0;i<resources.size();++i)if(resources[i]>0){if(!r.empty())r+="  ";r+=std::string(small_body_resource_name(static_cast<SmallBodyResource>(i)))+" "+number(resources[i],0);}
+    for(std::size_t i=0;i<resources.size();++i)if(resources[i]>0){if(!r.empty())r+="  ";r+=resource_display(static_cast<SmallBodyResource>(i),locale_)+" "+number(resources[i],0);}
     row(r);
     const auto position=stellar::engine::analytic_orbit_position(body.orbit,snapshot_->simulation_days-f.epoch_days);
     const auto environment=small_body_environment(f,position,snapshot_->simulation_days);

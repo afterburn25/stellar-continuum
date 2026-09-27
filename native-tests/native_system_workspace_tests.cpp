@@ -7,6 +7,7 @@
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/engine/localization.hpp>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -129,6 +130,30 @@ int main(int argc,char**argv)try{
     const Point inside{bounds.x+bounds.width*.5f,bounds.y+bounds.height*.5f};
     require(compact.small_body_panel_owns(inside,640,360)&&!compact.small_body_panel_owns({bounds.x-4.f,bounds.y+bounds.height*.5f},640,360),"small-body panel did not claim exactly its own compact bounds");
     compact.close();
+  }
+  {
+    // The field type, body size/material and resource rows must resolve through
+    // the active locale rather than leaking raw English enum names.
+    stellar::engine::LocalizationTable locale("de","en");
+    locale.load_json(R"({"locale":"de","strings":{
+      "SMALLBODY_TYPE_ROCKY":"ZZZ","SMALLBODY_TYPE_METALLIC":"ZZZ","SMALLBODY_TYPE_CARBONACEOUS":"ZZZ",
+      "SMALLBODY_TYPE_MIXED":"ZZZ","SMALLBODY_TYPE_ICE":"ZZZ","SMALLBODY_TYPE_DEBRIS_DISK":"ZZZ",
+      "SMALLBODY_TYPE_SHATTERED":"ZZZ","SMALLBODY_TYPE_CRACKED":"ZZZ","SMALLBODY_TYPE_PLANETARY_HALO":"ZZZ",
+      "SMALLBODY_MAT_ROCK":"ZZZ","SMALLBODY_MAT_METAL":"ZZZ","SMALLBODY_MAT_CARBON":"ZZZ",
+      "SMALLBODY_MAT_WATER_ICE":"ZZZ","SMALLBODY_MAT_METHANE_ICE":"ZZZ","SMALLBODY_MAT_AMMONIA_ICE":"ZZZ",
+      "SMALLBODY_MAT_ROCK_ICE":"ZZZ","SMALLBODY_MAT_VOLATILES":"ZZZ",
+      "SMALLBODY_RES_MINERALS":"ZZZ","SMALLBODY_RES_METALS":"ZZZ","SMALLBODY_RES_ORGANICS":"ZZZ",
+      "SMALLBODY_RES_WATER":"ZZZ","SMALLBODY_RES_HYDROGEN":"ZZZ","SMALLBODY_RES_DEUTERIUM":"ZZZ",
+      "SMALLBODY_RES_VOLATILES":"ZZZ","SMALLBODY_RES_SALVAGE":"ZZZ","SMALLBODY_RES_EXOTICS":"ZZZ",
+      "SMALLBODY_SIZE_HUGE":"ZZZ","SMALLBODY_SIZE_LARGE":"ZZZ","SMALLBODY_SIZE_MEDIUM":"ZZZ","SMALLBODY_SIZE_SMALL":"ZZZ"}})");
+    NativeSystemWorkspace localized;localized.set_localization(&locale);localized.open(reference,1920,1080);
+    const auto field_rect=SystemWorkspaceLayout::for_viewport(1920,1080).world_field;
+    const float scale=NativeUiLayout::for_viewport(1920,1080).scale;
+    (void)localized.handle({InputEventType::LeftPressed,center({field_rect.x+12*scale,field_rect.y+field_rect.height-35*scale,180*scale,29*scale})},1920,1080);
+    DrawList localized_draw;localized.render(localized_draw,1920,1080);
+    require(has_overlay_text(localized_draw,"ZZZ  #"+std::to_string(reference.small_body_fields.front().id)),"small-body field type did not resolve through the locale");
+    require(has_overlay_text(localized_draw,"/ ZZZ / ZZZ"),"small-body size/material did not resolve through the locale");
+    localized.close();
   }
   {
     NativeSystemWorkspace tracked;tracked.open(reference,1920,1080);
