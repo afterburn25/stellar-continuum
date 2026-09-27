@@ -1,5 +1,6 @@
 #include "native_fleet_controller.hpp"
 #include "native_military_messages.hpp"
+#include "native_route_messages.hpp"
 #include <stellar/core/campaign_observation.hpp>
 #include <stellar/engine/localization.hpp>
 #include <unordered_set>
@@ -415,7 +416,7 @@ NativeFleetRoutePreview NativeFleetController::preview_selected_route(
   }
   result.route_supported = reach.is_supported;
   result.route_authoritative = reach.is_authoritative;
-  result.message = reach.reason;
+  result.message = native_route::localized_message(locale_, reach.reason);
   result.route_distance_light_years = reach.route_distance_light_years;
   if (reach.route_system_ids) result.route_system_ids = *reach.route_system_ids;
   if (!reach.is_supported) return result;
@@ -480,7 +481,7 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_route(
             fleet->mission_order_revision};
   }
   const auto current = find_owned(player, preview.fleet_id);
-  return {accepted, std::move(message),
+  return {accepted, native_route::localized_message(locale_, message),
           current ? current->mission_order_revision
                   : preview.expected_mission_order_revision};
 }
@@ -523,8 +524,8 @@ NativeFleetOrderOutcome NativeFleetController::issue_civilian_recovery(
     message = outcome.message;
   } else return {false, tr("FLEET_MSG_UNKNOWN_RECOVERY", "Unknown civilian recovery action.")};
   const auto *current = find_owned(player, id);
-  return {accepted, std::move(message), current ? current->mission_order_revision : 0,
-          confirmation};
+  return {accepted, native_route::localized_message(locale_, message),
+          current ? current->mission_order_revision : 0, confirmation};
 }
 
 NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(

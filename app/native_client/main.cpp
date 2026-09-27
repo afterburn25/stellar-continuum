@@ -9821,10 +9821,11 @@ class NativeCampaign final {
     const auto generation=session_->cache().generation;
     const auto day=session_->frame().clock().simulation_days();
     const auto& current=colony_roster_.view();
-    const bool changed=current.generation!=generation||current.player_id!=world.player_civilization_id;
+    const auto active_locale=locale_?locale_->locale():std::string{};
+    const bool changed=current.generation!=generation||current.player_id!=world.player_civilization_id||roster_locale_!=active_locale;
     if(!force&&!changed&&(!current.available|| (roster_day_&&(*roster_day_==day||roster_refresh_elapsed_<1.))))return;
     colony_roster_.set_view(stellar::native_colony_roster::build(world,generation,locale_));
-    roster_day_=day;roster_refresh_elapsed_=0.;
+    roster_day_=day;roster_refresh_elapsed_=0.;roster_locale_=active_locale;
   }
   void open_roster_colony(const stellar::native_colony_roster::RosterCommand& command,int width,int height){
     const auto generation=session_->cache().generation;
@@ -9965,6 +9966,7 @@ class NativeCampaign final {
   std::string smoke_colony_roster_evidence_;
   std::optional<double> roster_day_;
   double roster_refresh_elapsed_{};
+  std::string roster_locale_;
   double supply_refresh_elapsed_{};
   std::optional<double> supply_day_;
   std::optional<std::uint64_t> supply_generation_;
