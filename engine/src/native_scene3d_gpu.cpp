@@ -731,7 +731,8 @@ struct Scene3DRenderer::Storage {
         double xx,double xy,double xz,double yx,double yy,double yz,double zx,double zy,double zz,
         const Matrix4& light_rotation,const Matrix4& light_projection,const Matrix4& view_to_light,const auto& in_volume,
         std::vector<std::shared_ptr<Geometry>>& geo,std::vector<ShadowCast>& xf,
-        std::vector<std::shared_ptr<Texture>>& tex_table,engine::DrawBatcher& batcher){
+        std::vector<std::shared_ptr<Texture>>& tex_table,engine::DrawBatcher& batcher,
+        std::uint64_t& audit){
       std::vector<const MeshInstance3D*> insts;
       for(const auto& instance:view.scene->instances()){
         if(instance.material.transparent||!instance.casts_shadow)continue;
@@ -850,7 +851,7 @@ struct Scene3DRenderer::Storage {
           ordered_geometry[slot]=std::move(geo[sorted_items[slot].instance_index]);
         }
         xf=std::move(ordered);geo=std::move(ordered_geometry);
-        stats.shadow_casters+=xf.size();
+        audit+=xf.size();
       }
     };
     if(use_shadow){
@@ -888,7 +889,7 @@ struct Scene3DRenderer::Storage {
       const auto box_volume=[&](double lx,double ly,double lz,double r){
         return std::abs(lx)<=extent+r&&std::abs(ly)<=extent+r&&lz<=r&&lz>=-depth-r;};
       collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,light_projection,from_view,box_volume,
-          caster_geometry,shadow_transforms,caster_textures,shadow_batcher);
+          caster_geometry,shadow_transforms,caster_textures,shadow_batcher,stats.shadow_casters);
       // Optional far cascade: the same ortho centre/depth at cascade_extent
       // — a second, coarser tier so receivers past the near window keep a
       // shadow instead of snapping lit at extreme zoom.
@@ -900,7 +901,7 @@ struct Scene3DRenderer::Storage {
         const auto far_volume=[&](double lx,double ly,double lz,double r){
           return std::abs(lx)<=far_extent+r&&std::abs(ly)<=far_extent+r&&lz<=r&&lz>=-depth-r;};
         collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,far_projection,from_view,far_volume,
-            far_geometry,far_transforms,far_textures,far_batcher);
+            far_geometry,far_transforms,far_textures,far_batcher,stats.shadow_casters);
       }
     }
     const Uint32 far_res=use_shadow&&shadow_settings->cascade_extent>0.f?shadow_res:0;
@@ -983,7 +984,7 @@ struct Scene3DRenderer::Storage {
         view_uniform.spot_options[i]={1.f/static_cast<float>(spot_map),radius_texels,
             l.shadow_strength,1.5f/static_cast<float>(spot_map)};
         collect_casters(ex,ey,ez,xx,xy,xz,yx,yy,yz,zx,zy,zz,light_rotation,light_projection,from_view,cone_volume,
-            spot_geometry[i],spot_transforms[i],spot_textures[i],spot_batcher[i]);
+            spot_geometry[i],spot_transforms[i],spot_textures[i],spot_batcher[i],stats.spot_shadow_casters);
       }
     }
     // Pass scheduling goes through the engine RenderGraph: resources and
@@ -1225,7 +1226,7 @@ struct Scene3DRenderer::Storage {
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}
 Scene3DRenderer::~Scene3DRenderer()=default;
 void Scene3DRenderer::prepare(const DrawList& list){
-  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=s.stats.visible_fades=s.stats.lod_groups=0;
+  auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.spot_shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=s.stats.visible_fades=s.stats.lod_groups=0;
   for(const auto& c:list.world)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   for(const auto& c:list.overlay)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");

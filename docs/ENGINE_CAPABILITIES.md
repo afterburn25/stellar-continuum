@@ -428,7 +428,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   sized for strategy scenes — ship/station occlusion under a sun key
   light — without a camera-frustum fit that swims at system scale.
 - **Modules:** `native_scene3d.hpp` (`ShadowMap3D`, `Scene3D::create`
-  parameter, `Scene3DStatistics::shadow_casters`), `native_scene3d.cpp`
+  parameter, `Scene3DStatistics::shadow_casters`/`spot_shadow_casters`),
+  `native_scene3d.cpp`
   (validation), `scene3d_shadow.vert/.frag` (depth-only pass),
   `scene3d.frag` (view→shadow-clip transform + PCF block),
   `native_scene3d_gpu.cpp` (ortho fit, caster culling, depth pipeline,

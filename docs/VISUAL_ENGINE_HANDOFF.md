@@ -335,8 +335,9 @@ shadow.cascade_extent = 0;  // 0 disables; >extent adds a wider far tier
   and a single depth tap at Medium.
 - Low tier skips the pass entirely (no depth target, no shader work);
   `visible_range`-culled and non-casting volumes are excluded.
-  `Scene3DStatistics::shadow_casters` reports the per-frame caster
-  workload.
+  `Scene3DStatistics::shadow_casters` reports the per-frame directional
+  caster workload (near box plus any far tier);
+  `spot_shadow_casters` reports the summed spot-atlas submissions.
 - Casters submit the same screen-space LOD the lit pass picks (chain
   levels, one merged-sphere proxy per collapsed group) and carry the
   signed screen-door keep mask plus the material's alpha-cutout terms —

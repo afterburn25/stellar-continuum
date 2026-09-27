@@ -1330,9 +1330,11 @@ int main(int argc,char** argv)try{
      for(int i=0;i<60;++i){FrameTiming timing;window.draw(lit_armada,std::nullopt,&timing);lit_submit+=timing.submission_ms;}
      const auto lit_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-lit_start).count();
      const auto lit_stats=window.scene3d_statistics();
-     check(lit_stats.shadow_casters>0,"Shadowed fleet submitted no shadow casters");
+     check(lit_stats.shadow_casters>0,"Shadowed fleet submitted no directional casters");
+     check(lit_stats.spot_shadow_casters>0,"Shadowed fleet submitted no spot casters");
      std::cout<<"fleet3d_shadow frames=60 instances=1024 cpu_submit_mean_ms="<<lit_submit/60<<" frame_wall_mean_ms="<<lit_wall/60
-       <<" draw_calls="<<lit_stats.draw_calls<<" shadow_casters="<<lit_stats.shadow_casters<<'\n';}
+       <<" draw_calls="<<lit_stats.draw_calls<<" shadow_casters="<<lit_stats.shadow_casters
+       <<" spot_shadow_casters="<<lit_stats.spot_shadow_casters<<'\n';}
   }
   DrawList invalid;invalid.world.emplace_back(Scene3DView{Scene3D::create(camera,{a}),{0,0,8192,8192}});
   bool rejected=false;try{window.draw(invalid);}catch(const std::length_error&){rejected=true;}check(rejected,"Oversized 3D target was accepted");

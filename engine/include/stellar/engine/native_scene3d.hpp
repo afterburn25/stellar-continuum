@@ -451,7 +451,11 @@ struct Scene3DStatistics {
   std::uint64_t draw_batches{},submitted_instances{};
   // Instances written to the directional shadow map this frame (post
   // volume/visible_range culling) — the shadow-pass workload audit counter.
+  // A configured far tier adds its own submissions to the same total.
   std::uint64_t shadow_casters{};
+  // Instances written to the shared spot atlas this frame, summed across
+  // every shadowed spot light's quadrant.
+  std::uint64_t spot_shadow_casters{};
   // Instances drawn below LOD level 0 this frame — the screen-space LOD
   // workload audit counter for fleet-scale scenes.
   std::uint64_t lod_instances{};
