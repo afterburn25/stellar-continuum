@@ -89,23 +89,23 @@ NativeGeneralSettings::NativeGeneralSettings(std::filesystem::path path):path_(s
     if(json.contains("textScale")){if(!json.at("textScale").is_number())throw std::runtime_error("Invalid text scale");const auto scale=json.at("textScale").get<float>();if(scale<0.75f||scale>2.f)throw std::runtime_error("Invalid text scale");saved_.accessibility.text_scale=scale;}
     if(json.contains("locale")){if(!json.at("locale").is_string())throw std::runtime_error("Invalid locale id");const auto id=json.at("locale").get<std::string>();if(id.empty()||id.size()>16||id.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-")!=std::string::npos)throw std::runtime_error("Invalid locale id");saved_.locale=id;}
   } catch(const std::exception& error) {
-    error_="Saved screenshot folder unavailable. The default location is active.";
+    error_=tr("SETTINGS_LOAD_FAILED","Saved screenshot folder unavailable. The default location is active.");
     std::cerr<<"General settings load failed: "<<error.what()<<'\n';
   }
 }
 bool NativeGeneralSettings::save(GeneralPreferences value) {
-  if(value.eruption_quality<0||value.eruption_quality>3){error_="Choose a stellar eruption quality.";return false;}
-  if(value.interface_scale<0||value.interface_scale>3){error_="Choose an interface scale.";return false;}
-  if(const auto mode=static_cast<int>(value.accessibility.color_blind);mode<0||mode>3){error_="Choose a color-blind mode.";return false;}
-  if(value.locale.empty()||value.locale.size()>16||value.locale.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-")!=std::string::npos){error_="Choose a language.";return false;}
-  if(value.nebula_density<0||value.nebula_density>2){error_="Choose Low, Medium or High nebula density.";return false;}
-  if(!valid_directory(value.screenshot_directory)){error_="Choose an existing absolute folder.";return false;}
+  if(value.eruption_quality<0||value.eruption_quality>3){error_=tr("SETTINGS_ERR_ERUPTION","Choose a stellar eruption quality.");return false;}
+  if(value.interface_scale<0||value.interface_scale>3){error_=tr("SETTINGS_ERR_INTERFACE_SCALE","Choose an interface scale.");return false;}
+  if(const auto mode=static_cast<int>(value.accessibility.color_blind);mode<0||mode>3){error_=tr("SETTINGS_ERR_COLOR_BLIND","Choose a color-blind mode.");return false;}
+  if(value.locale.empty()||value.locale.size()>16||value.locale.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-")!=std::string::npos){error_=tr("SETTINGS_ERR_LANGUAGE","Choose a language.");return false;}
+  if(value.nebula_density<0||value.nebula_density>2){error_=tr("SETTINGS_ERR_NEBULA","Choose Low, Medium or High nebula density.");return false;}
+  if(!valid_directory(value.screenshot_directory)){error_=tr("SETTINGS_FOLDER_ERR_INVALID","Choose an existing absolute folder.");return false;}
   try {
     const auto text=nlohmann::json{{"schemaVersion",1},{"screenshotDirectory",utf8(value.screenshot_directory)},{"assetCategoriesCollapsed",value.asset_categories_collapsed},{"assetsHidden",value.assets_hidden},{"nebulaDensity",value.nebula_density},{"eruptionQuality",value.eruption_quality},{"reduceMotion",value.accessibility.reduce_motion},{"interfaceScale",value.interface_scale},{"reduceFlashing",value.accessibility.reduce_flashing},{"highContrast",value.accessibility.high_contrast},{"colorBlind",static_cast<int>(value.accessibility.color_blind)},{"subtitlesEnabled",value.accessibility.subtitles_enabled},{"subtitleScale",value.accessibility.subtitle_scale},{"textScale",value.accessibility.text_scale},{"locale",value.locale}}.dump();
     if(text.size()>maximum_bytes)throw std::runtime_error("settings are oversized");
     stellar::engine::write_file_atomically(path_,std::span{reinterpret_cast<const std::byte*>(text.data()),text.size()});
   } catch(const std::exception& error) {
-    error_="Could not save settings. Your previous screenshot folder is retained.";
+    error_=tr("SETTINGS_SAVE_FAILED","Could not save settings. Your previous screenshot folder is retained.");
     std::cerr<<"General settings save failed: "<<error.what()<<'\n';return false;
   }
   saved_=std::move(value);error_.clear();if(apply_)apply_(saved_);return true;
@@ -163,9 +163,9 @@ Text NativeGeneralSettings::path_text(const GeneralSettingsLayout& l) const {
 void NativeGeneralSettings::accept_browse_result(FolderDialogResult result) {
   if(!visible_||!pending_request_||result.request_id!=*pending_request_)return;
   pending_request_.reset();
-  if(!result.error.empty()){error_="Folder browser could not open. Please try again.";std::cerr<<result.error<<'\n';return;}
+  if(!result.error.empty()){error_=tr("SETTINGS_FOLDER_ERR_OPEN","Folder browser could not open. Please try again.");std::cerr<<result.error<<'\n';return;}
   if(!result.directory)return;
-  if(result.directory->empty()||!valid_directory(*result.directory)){error_="Choose an existing absolute folder.";return;}
+  if(result.directory->empty()||!valid_directory(*result.directory)){error_=tr("SETTINGS_FOLDER_ERR_INVALID","Choose an existing absolute folder.");return;}
   draft_.screenshot_directory=std::move(*result.directory);path_scroll_={};error_.clear();
 }
 bool NativeGeneralSettings::handle(const InputEvent& event,int width,int height) {
@@ -228,13 +228,13 @@ void NativeGeneralSettings::activate_at(const GeneralSettingsLayout& layout,stel
   if(layout.audio.contains(position)&&audio_){cancel();audio_();}
   else if(layout.video.contains(position)&&video_){cancel();video_();}
   else if(layout.browse.contains(position)) {
-    if(!browse_){error_="Folder browser is unavailable.";return;}
+    if(!browse_){error_=tr("SETTINGS_FOLDER_ERR_UNAVAILABLE","Folder browser is unavailable.");return;}
     const auto id=++next_request_;pending_request_=id;
     try {
       if(!browse_(id,draft_.screenshot_directory.empty()?default_directory_:draft_.screenshot_directory)){
-        pending_request_.reset();error_="Finish the open folder browser before trying again.";
+        pending_request_.reset();error_=tr("SETTINGS_FOLDER_ERR_PENDING","Finish the open folder browser before trying again.");
       } else error_.clear();
-    } catch(const std::exception& error){pending_request_.reset();error_="Folder browser could not open. Please try again.";std::cerr<<error.what()<<'\n';}
+    } catch(const std::exception& error){pending_request_.reset();error_=tr("SETTINGS_FOLDER_ERR_OPEN","Folder browser could not open. Please try again.");std::cerr<<error.what()<<'\n';}
   } else if(layout.defaults.contains(position)){draft_.screenshot_directory.clear();path_scroll_={};error_.clear();}
   else if(layout.save.contains(position)&&save(draft_))visible_=false;
 }
@@ -286,36 +286,47 @@ void NativeGeneralSettings::render(DrawList& draw,int width,int height)const {
   const auto quality_name=[&](std::string_view key,std::string_view fallback){return tr(key,fallback);};
   const std::array<std::string,3> densities{quality_name("SETTINGS_QUALITY_LOW","Low"),quality_name("SETTINGS_QUALITY_MEDIUM","Medium"),quality_name("SETTINGS_QUALITY_HIGH","High")};
   const std::array<std::string,4> details{densities[0],densities[1],densities[2],quality_name("SETTINGS_QUALITY_ULTRA","Ultra")};
+  // Shrink a button's font toward the 8px rasterizer floor when its label
+  // would overflow — compact viewports cut the option columns to ~99px.
+  const auto fit=[&](const std::string& text,float max_width){
+    int size=l.font_pixels;
+    if(measure_){
+      while(size>8){
+        const Text probe{{0.f,0.f},text,text_color,size,0.f,std::nullopt,TextAlign::Center,FontFace::Interface};
+        if(static_cast<float>(measure_(probe).width)<=max_width)break;--size;}
+    }
+    return size;
+  };
   label(draw,{l.panel.x+30*s,l.panel.y+20*s,l.panel.width-60*s,36*s},tr("SETTINGS_GENERAL_TITLE","GENERAL SETTINGS"),l.heading_pixels);
-  button(draw,l.audio,tr("SETTINGS_NAV_AUDIO","AUDIO"),l.font_pixels,false,browsing());button(draw,l.video,tr("SETTINGS_NAV_VIDEO","VIDEO"),l.font_pixels,false,browsing());
-  button(draw,l.nebula,trf("SETTINGS_NEBULA_DENSITY",{densities.at(draft_.nebula_density)},"Space phenomena density: {0} ▾"),l.font_pixels,false,browsing());
-  button(draw,l.eruptions,trf("SETTINGS_ERUPTION_DETAIL",{details.at(draft_.eruption_quality)},"Stellar eruption detail: {0} ▾"),l.font_pixels,false,browsing());
-  button(draw,l.motion,trf("SETTINGS_REDUCE_MOTION",{tr(draft_.accessibility.reduce_motion?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.reduce_motion?"On":"Off")},"Reduced motion (decorative animation): {0}"),l.font_pixels,false,browsing());
+  button(draw,l.audio,tr("SETTINGS_NAV_AUDIO","AUDIO"),fit(tr("SETTINGS_NAV_AUDIO","AUDIO"),l.audio.width),false,browsing());button(draw,l.video,tr("SETTINGS_NAV_VIDEO","VIDEO"),fit(tr("SETTINGS_NAV_VIDEO","VIDEO"),l.video.width),false,browsing());
+  button(draw,l.nebula,trf("SETTINGS_NEBULA_DENSITY",{densities.at(draft_.nebula_density)},"Space phenomena density: {0} ▾"),fit(trf("SETTINGS_NEBULA_DENSITY",{densities.at(draft_.nebula_density)},"Space phenomena density: {0} ▾"),l.nebula.width),false,browsing());
+  button(draw,l.eruptions,trf("SETTINGS_ERUPTION_DETAIL",{details.at(draft_.eruption_quality)},"Stellar eruption detail: {0} ▾"),fit(trf("SETTINGS_ERUPTION_DETAIL",{details.at(draft_.eruption_quality)},"Stellar eruption detail: {0} ▾"),l.eruptions.width),false,browsing());
+  button(draw,l.motion,trf("SETTINGS_REDUCE_MOTION",{tr(draft_.accessibility.reduce_motion?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.reduce_motion?"On":"Off")},"Reduced motion (decorative animation): {0}"),fit(trf("SETTINGS_REDUCE_MOTION",{tr(draft_.accessibility.reduce_motion?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.reduce_motion?"On":"Off")},"Reduced motion (decorative animation): {0}"),l.motion.width),false,browsing());
   const std::array<std::string,4> scale_names{quality_name("SETTINGS_SCALE_COMPACT","Compact"),quality_name("SETTINGS_SCALE_STANDARD","Standard"),
     quality_name("SETTINGS_SCALE_LARGE","Large"),quality_name("SETTINGS_SCALE_HUGE","Huge")};
-  button(draw,l.iscale,trf("SETTINGS_INTERFACE_SCALE",{scale_names.at(static_cast<std::size_t>(draft_.interface_scale))},"Interface scale: {0}"),l.font_pixels,false,browsing());
-  button(draw,l.flashing,trf("SETTINGS_REDUCE_FLASHING",{tr(draft_.accessibility.reduce_flashing?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.reduce_flashing?"On":"Off")},"Reduce flashing: {0}"),l.font_pixels,false,browsing());
-  button(draw,l.contrast,trf("SETTINGS_HIGH_CONTRAST",{tr(draft_.accessibility.high_contrast?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.high_contrast?"On":"Off")},"High contrast: {0}"),l.font_pixels,false,browsing());
+  button(draw,l.iscale,trf("SETTINGS_INTERFACE_SCALE",{scale_names.at(static_cast<std::size_t>(draft_.interface_scale))},"Interface scale: {0}"),fit(trf("SETTINGS_INTERFACE_SCALE",{scale_names.at(static_cast<std::size_t>(draft_.interface_scale))},"Interface scale: {0}"),l.iscale.width),false,browsing());
+  button(draw,l.flashing,trf("SETTINGS_REDUCE_FLASHING",{tr(draft_.accessibility.reduce_flashing?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.reduce_flashing?"On":"Off")},"Reduce flashing: {0}"),fit(trf("SETTINGS_REDUCE_FLASHING",{tr(draft_.accessibility.reduce_flashing?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.reduce_flashing?"On":"Off")},"Reduce flashing: {0}"),l.flashing.width),false,browsing());
+  button(draw,l.contrast,trf("SETTINGS_HIGH_CONTRAST",{tr(draft_.accessibility.high_contrast?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.high_contrast?"On":"Off")},"High contrast: {0}"),fit(trf("SETTINGS_HIGH_CONTRAST",{tr(draft_.accessibility.high_contrast?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.high_contrast?"On":"Off")},"High contrast: {0}"),l.contrast.width),false,browsing());
   const std::array<std::string,4> colorblind_names{quality_name("SETTINGS_COLORBLIND_NONE","Off"),quality_name("SETTINGS_COLORBLIND_PROTANOPIA","Protanopia"),
     quality_name("SETTINGS_COLORBLIND_DEUTERANOPIA","Deuteranopia"),quality_name("SETTINGS_COLORBLIND_TRITANOPIA","Tritanopia")};
-  button(draw,l.colorblind,trf("SETTINGS_COLOR_BLIND",{colorblind_names.at(static_cast<std::size_t>(draft_.accessibility.color_blind))},"Color-blind mode: {0}"),l.font_pixels,false,browsing());
+  button(draw,l.colorblind,trf("SETTINGS_COLOR_BLIND",{colorblind_names.at(static_cast<std::size_t>(draft_.accessibility.color_blind))},"Color-blind mode: {0}"),fit(trf("SETTINGS_COLOR_BLIND",{colorblind_names.at(static_cast<std::size_t>(draft_.accessibility.color_blind))},"Color-blind mode: {0}"),l.colorblind.width),false,browsing());
   // Native-language names for shipped locale ids; unknown ids display raw.
   const auto locale_name=[&](std::string_view id){if(id=="en")return std::string("English");if(id=="de")return std::string("Deutsch");return std::string(id);};
-  button(draw,l.language,trf("SETTINGS_LANGUAGE",{locale_name(draft_.locale)},"Language: {0}"),l.font_pixels,false,browsing());
-  button(draw,l.subtitles,trf("SETTINGS_SUBTITLES",{tr(draft_.accessibility.subtitles_enabled?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.subtitles_enabled?"On":"Off")},"Subtitles: {0}"),l.font_pixels,false,browsing());
-  button(draw,l.subtitle_scale,trf("SETTINGS_SUBTITLE_SCALE",{scale_percent(draft_.accessibility.subtitle_scale)},"Subtitle size: {0}"),l.font_pixels,false,browsing());
-  button(draw,l.text_scale,trf("SETTINGS_TEXT_SCALE",{scale_percent(draft_.accessibility.text_scale)},"Text size: {0}"),l.font_pixels,false,browsing());
+  button(draw,l.language,trf("SETTINGS_LANGUAGE",{locale_name(draft_.locale)},"Language: {0}"),fit(trf("SETTINGS_LANGUAGE",{locale_name(draft_.locale)},"Language: {0}"),l.language.width),false,browsing());
+  button(draw,l.subtitles,trf("SETTINGS_SUBTITLES",{tr(draft_.accessibility.subtitles_enabled?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.subtitles_enabled?"On":"Off")},"Subtitles: {0}"),fit(trf("SETTINGS_SUBTITLES",{tr(draft_.accessibility.subtitles_enabled?"SETTINGS_STATE_ON":"SETTINGS_STATE_OFF",draft_.accessibility.subtitles_enabled?"On":"Off")},"Subtitles: {0}"),l.subtitles.width),false,browsing());
+  button(draw,l.subtitle_scale,trf("SETTINGS_SUBTITLE_SCALE",{scale_percent(draft_.accessibility.subtitle_scale)},"Subtitle size: {0}"),fit(trf("SETTINGS_SUBTITLE_SCALE",{scale_percent(draft_.accessibility.subtitle_scale)},"Subtitle size: {0}"),l.subtitle_scale.width),false,browsing());
+  button(draw,l.text_scale,trf("SETTINGS_TEXT_SCALE",{scale_percent(draft_.accessibility.text_scale)},"Text size: {0}"),fit(trf("SETTINGS_TEXT_SCALE",{scale_percent(draft_.accessibility.text_scale)},"Text size: {0}"),l.text_scale.width),false,browsing());
   label(draw,{l.folder.x,l.panel.y+266*s,l.folder.width,20*s},tr("SETTINGS_SCREENSHOT_FOLDER","SCREENSHOT FOLDER"),l.font_pixels);
   label(draw,{l.folder.x,l.panel.y+288*s,l.folder.width,18*s},tr("SETTINGS_SCREENSHOT_HINT","Press F12 to save a PNG of the game."),l.font_pixels);
   draw.overlay.emplace_back(FilledRectangle{l.folder,{5,16,30,255}});draw.overlay.emplace_back(StrokedRectangle{l.folder,{65,111,143,255}});
   auto path=path_text(l);
   const auto maximum=measure_?std::max(0.f,static_cast<float>(measure_(path).height)-path.clip->height):0.f;
   path.at.y-=std::min(path_scroll_.scroll_offset,maximum);draw.overlay.emplace_back(std::move(path));
-  label(draw,l.status,browsing()?"Choose a folder in the Windows browser...":!error_.empty()?error_:
-    maximum>0?"Scroll over the path to see the full folder. Save to keep your choice.":draft_.screenshot_directory.empty()?"Using the default Pictures folder. Save to keep this choice.":"Save to use this folder. Cancel keeps your current location.",l.font_pixels);
-  button(draw,l.browse,browsing()?tr("SETTINGS_BROWSING","BROWSING..."):tr("SETTINGS_BROWSE","BROWSE"),l.font_pixels,false,browsing());
-  button(draw,l.defaults,tr("SETTINGS_USE_DEFAULT","USE DEFAULT"),l.font_pixels,false,browsing());button(draw,l.cancel,tr("SETTINGS_CANCEL","CANCEL"),l.font_pixels);
-  button(draw,l.save,tr("SETTINGS_SAVE","SAVE"),l.font_pixels,true,browsing());
+  label(draw,l.status,browsing()?tr("SETTINGS_FOLDER_BROWSING_STATUS","Choose a folder in the Windows browser…"):!error_.empty()?error_:
+    maximum>0?tr("SETTINGS_FOLDER_SCROLL_HINT","Scroll over the path to see the full folder. Save to keep your choice."):draft_.screenshot_directory.empty()?tr("SETTINGS_FOLDER_DEFAULT_HINT","Using the default Pictures folder. Save to keep this choice."):tr("SETTINGS_FOLDER_SAVE_HINT","Save to use this folder. Cancel keeps your current location."),l.font_pixels);
+  button(draw,l.browse,browsing()?tr("SETTINGS_BROWSING","BROWSING..."):tr("SETTINGS_BROWSE","BROWSE"),fit(browsing()?tr("SETTINGS_BROWSING","BROWSING..."):tr("SETTINGS_BROWSE","BROWSE"),l.browse.width),false,browsing());
+  button(draw,l.defaults,tr("SETTINGS_USE_DEFAULT","USE DEFAULT"),fit(tr("SETTINGS_USE_DEFAULT","USE DEFAULT"),l.defaults.width),false,browsing());button(draw,l.cancel,tr("SETTINGS_CANCEL","CANCEL"),fit(tr("SETTINGS_CANCEL","CANCEL"),l.cancel.width));
+  button(draw,l.save,tr("SETTINGS_SAVE","SAVE"),fit(tr("SETTINGS_SAVE","SAVE"),l.save.width),true,browsing());
   if(focus_>=0){
     const std::array<UiRect,17> focusables{l.audio,l.video,l.nebula,l.eruptions,l.motion,l.iscale,l.flashing,l.contrast,l.colorblind,l.language,l.subtitles,l.subtitle_scale,l.text_scale,l.browse,l.defaults,l.cancel,l.save};
     const auto& rect=browsing()?l.cancel:focusables[static_cast<std::size_t>(std::min(focus_,16))];
