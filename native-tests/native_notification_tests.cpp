@@ -472,6 +472,25 @@ void category_filter() {
   }
   require(chip_focus >= 0,
           "topic chip did not join the keyboard focus ring");
+  // Pointer users get the same vocabulary as a hover hint.
+  (void)view.handle({InputEventType::PointerMove, chip}, notifications.items(),
+                    1280, 720);
+  DrawList hinted;
+  view.render(hinted, notifications.items(), 1280, 720);
+  bool chip_hint = false;
+  for (const auto& primitive : hinted.overlay)
+    if (const auto* text = std::get_if<Text>(&primitive);
+        text && text->value == "Cycle report topic")
+      chip_hint = true;
+  require(chip_hint, "hovered topic chip did not render its pointer hint");
+  (void)view.handle({InputEventType::PointerMove, {2.f, 2.f}},
+                    notifications.items(), 1280, 720);
+  DrawList unhinted;
+  view.render(unhinted, notifications.items(), 1280, 720);
+  for (const auto& primitive : unhinted.overlay)
+    if (const auto* text = std::get_if<Text>(&primitive))
+      require(text->value != "Cycle report topic",
+              "chip hint rendered while the pointer rested elsewhere");
 }
 
 } // namespace

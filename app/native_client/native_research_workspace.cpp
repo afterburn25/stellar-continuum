@@ -1277,6 +1277,9 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
     const auto enabled = node->primary_action.enabled;
     theme::button(out,layout.action,action_text,pointer_,
                   layout.body_font_pixels,theme::Tone::Science,true,enabled);
+    theme::hover_tooltip(out,layout.action,pointer_,action_text,
+                         node->primary_action.reason,width,height,
+                         layout.scale,theme::Tone::Caution);
   }
   const auto feedback_text =
       !notice_.empty() ? notice_accepted_

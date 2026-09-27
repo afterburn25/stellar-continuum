@@ -497,6 +497,78 @@ int main() {
           "a solid-surface colony Land button must issue LandColony");
   }
   {
+    // Disabled colony actions explain themselves on hover: Collect surfaces
+    // the authoritative freight reason, Land the solid-surface requirement.
+    auto campaign = campaign_fixture();
+    PlanetaryBody solid;
+    solid.id = 9;
+    solid.system_id = 1;
+    solid.environment.has_solid_surface = true;
+    campaign.bodies = {solid};
+    Colony habitat;
+    habitat.id = 30;
+    habitat.civilization_id = 1;
+    habitat.system_id = 1;
+    habitat.name = "Hab Ring";
+    Colony outpost;
+    outpost.id = 31;
+    outpost.civilization_id = 1;
+    outpost.system_id = 1;
+    outpost.name = "Pit 7";
+    outpost.kind = SettlementKind::ResourceOutpost;
+    outpost.planetary_body_id = 9;
+    outpost.stored_extracted_materials = 40.0;
+    campaign.colonies = {habitat, outpost};
+    const auto colonies = build_owned_colony_rows(campaign);
+    check(!colonies[0].can_land && colonies[1].is_resource_outpost &&
+              !colonies[1].can_request_freight,
+          "tooltip fixture must hold a non-landable colony and a gated outpost");
+    const auto board = build_mission_board(campaign);
+    const std::vector<native_colony::NativeSettlementMissionView> fleets{};
+
+    NativeMissionView panel;
+    panel.open();
+    const auto selection = colony_site_selection(fleets, 0, 0);
+    const auto layout = mission_layout_for(board, selection, colonies.size(),
+                                           1600, 900, true);
+    native_map::InputEvent tab;
+    tab.type = native_map::InputEventType::LeftReleased;
+    tab.position = {layout.sites_tab.x + 4.f, layout.sites_tab.y + 4.f};
+    (void)panel.handle(tab, board, fleets, colonies, 1600, 900);
+    const auto tipped = [](const native_map::DrawList &draw,
+                           std::string_view needle) {
+      for (const auto &item : draw.overlay)
+        if (const auto *text = std::get_if<native_map::Text>(&item);
+            text && text->value.find(needle) != std::string::npos)
+          return true;
+      return false;
+    };
+    // Pointer outside the panel: no explainer.
+    native_map::InputEvent move{native_map::InputEventType::PointerMove};
+    move.position = {4.f, 4.f};
+    (void)panel.handle(move, board, fleets, colonies, 1600, 900);
+    native_map::DrawList idle;
+    panel.render(idle, board, fleets, colonies, 1600, 900);
+    check(!tipped(idle, "Bulk Freighter"),
+          "missions rendered a freight tooltip while nothing was hovered");
+    // Disabled Collect on the freighter-less outpost → the build reason.
+    move.position = {layout.colony_collect_buttons[1].x + 4.f,
+                     layout.colony_collect_buttons[1].y + 4.f};
+    (void)panel.handle(move, board, fleets, colonies, 1600, 900);
+    native_map::DrawList hovered_collect;
+    panel.render(hovered_collect, board, fleets, colonies, 1600, 900);
+    check(tipped(hovered_collect, "Build an Interstellar Bulk Freighter"),
+          "a gated Collect button did not surface the freight reason");
+    // Disabled Land on the orbital habitat → the surface requirement.
+    move.position = {layout.colony_land_buttons[0].x + 4.f,
+                     layout.colony_land_buttons[0].y + 4.f};
+    (void)panel.handle(move, board, fleets, colonies, 1600, 900);
+    native_map::DrawList hovered_land;
+    panel.render(hovered_land, board, fleets, colonies, 1600, 900);
+    check(tipped(hovered_land, "solid surface"),
+          "a gated Land button did not explain the surface requirement");
+  }
+  {
     // Sites tab interaction: tab switch, select-ship focus, colony View.
     auto campaign = campaign_fixture();
     const auto board = build_mission_board(campaign);

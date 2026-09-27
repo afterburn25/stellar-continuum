@@ -205,6 +205,12 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
   const std::array<const char*,4> metric_keys{"SUPPLY_METRIC_AVAILABLE","SUPPLY_METRIC_DEMAND","SUPPLY_METRIC_DELIVERED","SUPPLY_METRIC_SHORTFALL"};
   const std::array<std::string,4> metric_fallbacks{"AVAILABLE","DEMAND","DELIVERED","SHORTFALL"};
   const std::array<std::string,4> names{tr(metric_keys[0],metric_fallbacks[0]),tr(metric_keys[1],metric_fallbacks[1]),tr(metric_keys[2],metric_fallbacks[2]),tr(metric_keys[3],metric_fallbacks[3])};
+  const std::array<const char*,4> metric_tips{"SUPPLY_TIP_AVAILABLE","SUPPLY_TIP_DEMAND","SUPPLY_TIP_DELIVERED","SUPPLY_TIP_SHORTFALL"};
+  const std::array<std::string,4> metric_tip_fallbacks{
+      "Exportable surplus the home network can move each day across active links.",
+      "Combined daily requirement of every facility in the home system.",
+      "Materials actually delivered each day. Below demand means facilities run short.",
+      "Daily demand that goes unmet — the gap between demand and deliveries."};
   const std::array<double,4> values{view.supply_per_day,view.demand_per_day,view.delivered_per_day,view.shortfall_per_day};
   const float metric_width=(p.width-54.f*s)/4.f;
   for(std::size_t index=0;index<4;++index){
@@ -213,6 +219,9 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
     theme::metric_tile(out,box,names[index],
         trf("SUPPLY_PER_DAY",{number(values[index])},"{0} / day"),font-2,font+3,
         shortfall?theme::Tone::Caution:theme::Tone::Neutral);
+    theme::hover_tooltip(out,box,pointer_,names[index],
+        tr(metric_tips[index],metric_tip_fallbacks[index]),width,height,s,
+        theme::Tone::Neutral);
   }
   const auto b=layout.body;
   const std::array<float,5> columns{0.f,.30f,.52f,.68f,.84f};
@@ -244,11 +253,18 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
       label(out,{box.x,box.y+6.f*s,box.width,20.f*s},
           tr("SUPPLY_EXTERNAL_TITLE","INTERSTELLAR COVERAGE"),font,
           theme::color::keyline_strong,b);
-      if(view.support_gap_per_day>.00001)
-        label(out,{box.x+b.width*.44f,box.y+6.f*s,b.width*.56f,20.f*s},
+      if(view.support_gap_per_day>.00001){
+        const UiRect gap{box.x+b.width*.44f,box.y+6.f*s,b.width*.56f,20.f*s};
+        label(out,gap,
               trf("SUPPLY_SUPPORT_GAP",{number(view.support_gap_per_day)},
                   "UNREPRESENTED INTERSTELLAR DEMAND  {0} / DAY"),
               font-2,amber,b);
+        theme::hover_tooltip(out,gap,pointer_,
+            tr("SUPPLY_EXTERNAL_TITLE","INTERSTELLAR COVERAGE"),
+            tr("SUPPLY_TIP_GAP",
+               "Daily demand from external colonies that no corridor can currently serve. Expand interstellar coverage to close the gap."),
+            width,height,s,theme::Tone::Caution);
+      }
       const std::array<const char*,4> external_keys{"SUPPLY_COL_STATUS","SUPPLY_COL_LOCAL","SUPPLY_COL_DEMAND","SUPPLY_COL_IMPORT"};
       const std::array<const char*,4> external_fallbacks{"STATUS","LOCAL / DAY","DEMAND / DAY","IMPORT / DAY"};
       for(std::size_t i=0;i<external_keys.size();++i)
@@ -274,6 +290,10 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
       for(std::size_t i=1;i<columns.size();++i)
         label(out,{box.x+b.width*columns[i]+8.f*s,box.y+12.f*s,b.width*spans[i]-16.f*s,row.height-20.f*s},values_text[i-1],font,
               i==1?condition_tone:i==4&&external.import_per_day>.00001&&!external.corridor?amber:ink,b);
+      theme::hover_tooltip(out,visible,pointer_,external.name,
+          tr("SUPPLY_TIP_EXTERNAL",
+             "Supply coverage of owned colonies outside the home system. Local is the system's own daily capacity, Demand what its colonies require, and Import the shortfall a corridor would have to carry."),
+          width,height,s,theme::Tone::Neutral);
       continue;
     }
     theme::fill(out,visible,theme::color::surface_secondary);
@@ -292,6 +312,11 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
       for(std::size_t i=1;i<columns.size();++i)
         label(out,{box.x+b.width*columns[i]+8.f*s,box.y+12.f*s,b.width*spans[i]-16.f*s,row.height-20.f*s},values_text[i-1],font,
               i==1?status_tone:ink,b);
+      theme::hover_tooltip(out,visible,pointer_,
+          link.from+(link.bidirectional?" <-> ":" -> ")+link.to,
+          tr("SUPPLY_TIP_CORRIDOR",
+             "A transport link between supply nodes. Capacity is the maximum daily volume; Used is today's allocated flow; Transit is one-way travel time. Amber means the link is saturated, disabled, or idle."),
+          width,height,s,theme::Tone::Neutral);
       continue;
     }
     const auto& n=view.nodes[row.index];
@@ -301,6 +326,10 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
     for(std::size_t i=1;i<columns.size();++i)
       label(out,{box.x+b.width*columns[i]+8.f*s,box.y+12.f*s,b.width*spans[i]-16.f*s,row.height-20.f*s},values_text[i-1],font,
             i==1&&n.delivered_per_day+.00001<n.demand_per_day?amber:ink,b);
+    theme::hover_tooltip(out,visible,pointer_,n.name,
+        tr("SUPPLY_TIP_NODE",
+           "A facility drawing on the home supply network. Amber status means its daily deliveries fall short of its demand."),
+        width,height,s,theme::Tone::Neutral);
   }
   if(view.nodes.empty())
     theme::empty_state(out,b,tr("SUPPLY_EMPTY","No owned supply locations in the home system."),{},font);

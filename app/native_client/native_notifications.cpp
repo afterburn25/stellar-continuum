@@ -635,6 +635,19 @@ void NativeNotificationView::render(DrawList& out, const std::deque<NativePlayer
                     resolve(locale_, "NOTIFY_FILTER_IMPORTANT", "IMPORTANT"),
                     pointer_, chip_pixels, native_ui::Tone::Caution,
                     important_only_);
+  // Pointer hints reuse the same localized labels the focus ring announces.
+  const auto chip_hint = [&](const UiRect &bounds, std::string_view key,
+                             std::string_view fallback) {
+    if (!bounds.contains(pointer_)) return;
+    native_ui::hint(out, {pointer_.x + 12.f * s, pointer_.y + 18.f * s},
+                    resolve(locale_, key, fallback), width, height,
+                    chip_pixels, s, measure_);
+  };
+  chip_hint(layout.filter_category, "NOTIFY_FILTER_CATEGORY_LABEL",
+            "Cycle report topic");
+  chip_hint(layout.filter_all, "NOTIFY_FILTER_ALL_LABEL", "All reports");
+  chip_hint(layout.filter_important, "NOTIFY_FILTER_IMPORTANT_LABEL",
+            "Important only");
   if (feed.empty()) { clipped_text(out, {layout.empty_hint.x, layout.empty_hint.y}, resolve(locale_, !category_filter_.empty() ? "NOTIFY_EMPTY_TOPIC" : important_only_ ? "NOTIFY_EMPTY_IMPORTANT" : "NOTIFY_EMPTY", !category_filter_.empty() ? "No reports on this topic yet." : important_only_ ? "No alerts or warnings yet." : "No major events yet."), muted_color,
       std::max(11, static_cast<int>(std::lround(13.f * s))), layout.empty_hint.width, layout.empty_hint); }
   else {

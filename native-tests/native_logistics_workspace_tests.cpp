@@ -333,6 +333,79 @@ void external_coverage_renders_system_rows_and_gap() {
                   contains(layout.panel, *text->clip),
               "external coverage text escaped its clip region");
 }
+
+void hover_explainers_cover_tiles_and_rows() {
+  SupplyWorkspace workspace;
+  workspace.set_text_measurer(measured);
+  workspace.open();
+  auto view = ready_view(1);
+  view.support_gap_per_day = 3.50;
+  view.links.push_back({7, "Homeworld", "Depot", "Busy", 4., 3., .5, true,
+                        false});
+  view.external.push_back({3, "Frontier", "Strained", SupplyCondition::Strained,
+                           2, 4., 6., 2., false});
+  const auto layout = SupplyLayout::for_viewport(1600, 900);
+  const auto tipped = [](const DrawList &draw, std::string_view needle) {
+    for (const auto &item : draw.overlay)
+      if (const auto *text = std::get_if<Text>(&item);
+          text && text->value.find(needle) != std::string::npos)
+        return true;
+    return false;
+  };
+  // Nothing hovered: no explainer renders.
+  (void)workspace.handle({InputEventType::PointerMove, {4.f, 4.f}}, view, 1600,
+                         900);
+  DrawList idle;
+  workspace.render(idle, view, 1600, 900);
+  require(!tipped(idle, "supply network"), "idle supply render emitted a tooltip");
+  // Metric tile.
+  const float s = layout.scale;
+  const UiRect tile{layout.panel.x + 18.f * s, layout.panel.y + 136.f * s,
+                    (layout.panel.width - 54.f * s) / 4.f, 60.f * s};
+  (void)workspace.handle({InputEventType::PointerMove, center(tile)}, view,
+                         1600, 900);
+  DrawList hovered_tile;
+  workspace.render(hovered_tile, view, 1600, 900);
+  require(tipped(hovered_tile, "Exportable surplus"),
+          "hovered supply metric tile did not explain itself");
+  const auto find = [](const DrawList &draw, const std::string &value) {
+    for (const auto &item : draw.overlay)
+      if (const auto *text = std::get_if<Text>(&item);
+          text && text->value == value)
+        return text->at;
+    return Point{-1.f, -1.f};
+  };
+  // Corridor row explains its columns on hover.
+  const auto route_at = find(hovered_tile, "Homeworld -> Depot");
+  require(route_at.x >= 0.f, "corridor route text missing for tooltip test");
+  (void)workspace.handle({InputEventType::PointerMove,
+                          {route_at.x + 6.f, route_at.y + 6.f}},
+                         view, 1600, 900);
+  DrawList hovered_link;
+  workspace.render(hovered_link, view, 1600, 900);
+  require(tipped(hovered_link, "transport link between supply nodes"),
+          "hovered corridor row did not explain its columns");
+  // External coverage row.
+  const auto system_at = find(hovered_link, "Frontier");
+  require(system_at.x >= 0.f, "external coverage row missing for tooltip test");
+  (void)workspace.handle({InputEventType::PointerMove,
+                          {system_at.x + 6.f, system_at.y + 6.f}},
+                         view, 1600, 900);
+  DrawList hovered_external;
+  workspace.render(hovered_external, view, 1600, 900);
+  require(tipped(hovered_external, "colonies outside the home system"),
+          "hovered external coverage row did not explain its columns");
+  // The demand-gap callout explains itself on hover.
+  const auto gap_at = find(hovered_external, "UNREPRESENTED INTERSTELLAR DEMAND  3.50 / DAY");
+  require(gap_at.x >= 0.f, "demand gap callout missing for tooltip test");
+  (void)workspace.handle({InputEventType::PointerMove,
+                          {gap_at.x + 6.f, gap_at.y + 6.f}},
+                         view, 1600, 900);
+  DrawList hovered_gap;
+  workspace.render(hovered_gap, view, 1600, 900);
+  require(tipped(hovered_gap, "no corridor can currently serve"),
+          "hovered demand-gap callout did not explain itself");
+}
 }  // namespace
 
 int main() {
@@ -347,6 +420,7 @@ int main() {
     keyboard_focus();
     corridors_render_in_the_scroll_body();
     external_coverage_renders_system_rows_and_gap();
+    hover_explainers_cover_tiles_and_rows();
     return 0;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

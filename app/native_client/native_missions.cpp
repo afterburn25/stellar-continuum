@@ -1460,10 +1460,27 @@ void NativeMissionView::render(
           layout.list_viewport);
     nav(layout.colony_land_buttons[i], mt(locale_, "MISSIONS_LAND", "Land"),
         row.can_land, layout.list_viewport);
-    if (row.is_resource_outpost)
+    if (!row.can_land)
+      if (const auto band =
+              clip_rect(layout.colony_land_buttons[i], layout.list_viewport))
+        theme::hover_tooltip(
+            out, *band, pointer_, mt(locale_, "MISSIONS_LAND", "Land"),
+            mt(locale_, "MISSIONS_TIP_NO_LAND",
+               "Landing requires a colony on a planetary body with a solid "
+               "surface — orbital habitats cannot receive a landing."),
+            width, height, scale, theme::Tone::Caution);
+    if (row.is_resource_outpost) {
       nav(layout.colony_collect_buttons[i],
           mt(locale_, "MISSIONS_COLLECT", "Collect"), row.can_request_freight,
           layout.list_viewport);
+      if (const auto band = clip_rect(layout.colony_collect_buttons[i],
+                                      layout.list_viewport))
+        theme::hover_tooltip(
+            out, *band, pointer_, mt(locale_, "MISSIONS_COLLECT", "Collect"),
+            row.freight_reason, width, height, scale,
+            row.can_request_freight ? theme::Tone::Neutral
+                                    : theme::Tone::Caution);
+    }
   }
   draw_focus_ring();
 }
