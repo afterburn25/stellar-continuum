@@ -783,6 +783,20 @@ int main(int argc,char** argv)try{
      const auto dim_spot=mixed(false,true,"point-light-mixdim-spotonly.png");
      check(census(*dim_spot,175,215)>census(*dim_off,175,215)+10,
          "Spot umbra broke when an omni light shares the scene");}
+    // Two shadowed omni lights share the cube atlas — the second lamp
+    // gets its own six-face row (atlas height doubles) and its caster
+    // submissions land on the counter beside the first lamp's.
+    lamp.intensity=4;
+    {auto lamp3=lamp;lamp3.position={-.3f,.2f,2.2f};lamp3.color={1,0,0};
+     lamp.casts_shadow=true;lamp3.casts_shadow=true;lamp2.casts_shadow=false;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder},{0,0,1},{lamp,lamp2,lamp3}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-omni2-shadow.png");
+     const auto two_omni=decode_rgba_image(folder/"point-light-omni2-shadow.png");
+     // Plate + occluder each sit in the -Z face of both lamps → ≥4
+     // face submissions across the two atlas rows.
+     check(window.scene3d_statistics().omni_shadow_casters>=4&&
+           census(*two_omni,120,155)>20,
+         "Second shadowed omni light broke the shared cube atlas");}
     std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_debug_receive_omni_passed\n";
   }
   {
