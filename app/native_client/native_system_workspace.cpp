@@ -342,16 +342,46 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
   artwork_ready_=artwork_ready_&&!celestial_appearance_.preparation_pending();
   render_small_body_panel(out,width,height);
   if(!artwork_ready_)overlay_text(out,field.x+18.f,field.y+12.f,tr("SYSTEM_PREPARING","Preparing system imagery..."),muted,14,field.width-36.f,field);
-  const auto ui_scale=NativeUiLayout::for_viewport(width,height).scale;overlay_fill(out,layout.controls_row,{5,15,28,238});overlay_stroke(out,layout.controls_row,border);overlay_fill(out,layout.back,{10,27,47,245});overlay_stroke(out,layout.back,border);overlay_text(out,layout.back.x+22.f*ui_scale,layout.back.y+6.f*ui_scale,tr("SYSTEM_BACK","BACK"),text,15);overlay_fill(out,layout.reset,{10,27,47,245});overlay_stroke(out,layout.reset,border);overlay_text(out,layout.reset.x+14.f*ui_scale,layout.reset.y+6.f*ui_scale,tr("SYSTEM_FIT","FIT SYSTEM"),text,12);
+  const auto ui_scale=NativeUiLayout::for_viewport(width,height).scale;overlay_fill(out,layout.controls_row,{5,15,28,238});overlay_stroke(out,layout.controls_row,border);overlay_fill(out,layout.back,{10,27,47,245});overlay_stroke(out,layout.back,border);overlay_text(out,layout.back.x+22.f*ui_scale,layout.back.y+6.f*ui_scale,tr("SYSTEM_BACK","BACK"),text,15);overlay_fill(out,layout.reset,{10,27,47,245});overlay_stroke(out,layout.reset,border);
+  {
+    // Long localized labels ("SYSTEM EINPASSEN") cannot fit the compact
+    // button even at the rasterizer floor — shrink first, then fall back
+    // to the compact key rather than bleeding into the title.
+    std::string fit_label=tr("SYSTEM_FIT","FIT SYSTEM");
+    int fit_size=12;const float fit_budget=layout.reset.width-24.f*ui_scale;
+    const auto fit_width=[&](const std::string&value,int size){return text_measurer_?text_measurer_(Text{{},value,text,size,0,{}}).width:static_cast<int>(value.size())*7;};
+    while(fit_size>8&&fit_width(fit_label,fit_size)>static_cast<int>(fit_budget))--fit_size;
+    if(fit_width(fit_label,fit_size)>static_cast<int>(fit_budget)){fit_label=tr("SYSTEM_FIT_COMPACT","FIT");fit_size=12;while(fit_size>8&&fit_width(fit_label,fit_size)>static_cast<int>(fit_budget))--fit_size;}
+    overlay_text(out,layout.reset.x+12.f*ui_scale,layout.reset.y+6.f*ui_scale,fit_label,text,fit_size,0,layout.reset);
+  }
   if(tracked_body_id_){const auto body=std::ranges::find(snapshot_->bodies,*tracked_body_id_,&NativeSystemBody::id);
     if(body!=snapshot_->bodies.end())overlay_text(out,field.x+12*ui_scale,field.y+12*ui_scale,trf("SYSTEM_FOLLOWING",{body->name},"Following {0} · drag to release"),{164,221,237,255},13,field.width-24*ui_scale,field);}
   const UiRect zoom_badge{field.x+field.width-168.f*ui_scale,field.y+field.height-35.f*ui_scale,156.f*ui_scale,29.f*ui_scale};
   overlay_fill(out,zoom_badge,{8,25,39,245});overlay_stroke(out,zoom_badge,border);
   overlay_text(out,zoom_badge.x+12.f*ui_scale,zoom_badge.y+6.f*ui_scale,trf("SYSTEM_ZOOM",{number(magnification(),2)},"Zoom {0}x"),{164,221,237,255},13,zoom_badge.width-20.f*ui_scale,zoom_badge);
-  const auto title_x=layout.reset.x+layout.reset.width+24.f*ui_scale;const Text title{{title_x,layout.controls_row.y+4.f*ui_scale},snapshot_->catalog_name,text,16,0,layout.controls_row};
-  const auto title_extent=text_measurer_?text_measurer_(title):TextExtent{static_cast<int>(title.value.size()*11u),28};
+  const auto title_x=layout.reset.x+layout.reset.width+24.f*ui_scale;
+  const auto row_right=layout.controls_row.x+layout.controls_row.width;
+  // The survey badge takes precedence over title width — reserve its
+  // measured space first so a long catalog name clips itself instead of
+  // pushing the badge off the row.
+  std::string survey_value=snapshot_->survey_level==SystemSurveyLevel::fully_surveyed?tr("SYSTEM_SURVEY_FULL","FULL SURVEY"):tr("SYSTEM_SURVEY_RECON","RECONNAISSANCE");
+  int survey_size=12;
+  const auto survey_width=[&](const std::string&value,int size){return text_measurer_?text_measurer_(Text{{},value,muted,size,0,{}}).width:static_cast<int>(value.size())*7;};
+  const float survey_budget=std::min(170.f*ui_scale,layout.controls_row.width*.45f);
+  while(survey_size>8&&survey_width(survey_value,survey_size)>static_cast<int>(survey_budget))--survey_size;
+  if(survey_width(survey_value,survey_size)>static_cast<int>(survey_budget)){survey_value=snapshot_->survey_level==SystemSurveyLevel::fully_surveyed?tr("SYSTEM_SURVEY_FULL_COMPACT","SURVEYED"):tr("SYSTEM_SURVEY_RECON_COMPACT","RECON");survey_size=12;while(survey_size>8&&survey_width(survey_value,survey_size)>static_cast<int>(survey_budget))--survey_size;}
+  const auto badge_width=static_cast<float>(survey_width(survey_value,survey_size));
+  const float title_max=std::max(0.f,row_right-title_x-badge_width-26.f*ui_scale);
+  // Prefer shrinking the catalog name over a mid-glyph clip — the badge
+  // keeps its reserved space either way.
+  int title_size=16;
+  if(text_measurer_)while(title_size>8&&text_measurer_(Text{{},snapshot_->catalog_name,text,title_size,0,{}}).width>static_cast<int>(title_max))--title_size;
+  const UiRect title_clip{title_x,layout.controls_row.y,title_max,layout.controls_row.height};
+  const Text title{{title_x,layout.controls_row.y+4.f*ui_scale},snapshot_->catalog_name,text,title_size,0,title_clip};
+  const auto title_extent=text_measurer_?text_measurer_(title):TextExtent{static_cast<int>(std::min(static_cast<float>(title.value.size())*11.f,title_max)),28};
   out.overlay.emplace_back(title);
-  overlay_text(out,title_x+static_cast<float>(title_extent.width)+18.f*ui_scale,layout.controls_row.y+11.f*ui_scale,snapshot_->survey_level==SystemSurveyLevel::fully_surveyed?tr("SYSTEM_SURVEY_FULL","FULL SURVEY"):tr("SYSTEM_SURVEY_RECON","RECONNAISSANCE"),muted,12,0,layout.controls_row);
+  const float survey_x=std::min(title_x+static_cast<float>(title_extent.width)+18.f*ui_scale,row_right-badge_width-8.f*ui_scale);
+  overlay_text(out,std::max(title_x,survey_x),layout.controls_row.y+11.f*ui_scale,survey_value,muted,survey_size,0,layout.controls_row);
   overlay_fill(out,panel,{6,18,33,242});overlay_stroke(out,panel,border);float y=panel.y+14;const auto add=[&](std::string value,Color color,int size=14,float step=20){const Text label{{panel.x+14,y},std::move(value),color,size,panel.width-28,panel};const auto measured=text_measurer_?text_measurer_(label):TextExtent{0,size+6};out.overlay.emplace_back(label);y+=std::max(step,static_cast<float>(measured.height)+4.f);};if(!selected_body())add(tr("SYSTEM_INSPECTOR","SYSTEM INSPECTOR"),text,18,31);const auto*fleet=selected_fleet();if(inspector_focus_!=InspectorFocus::body&&fleet){add(fleet->foreign_inspection?tr("SYSTEM_FLEET_DEV","DEVELOPER FLEET INSPECTION"):tr("SYSTEM_FLEET_OWNED","OWNED LOCAL FLEET"),muted,13,21);add(fleet->name,text,17,26);add(trf("SYSTEM_FLEET_STATE",{fleet_role(fleet->role),fleet->moving?tr("SYSTEM_STATE_MOVING","Moving"):fleet->held?tr("SYSTEM_STATE_HOLDING","Holding"):tr("SYSTEM_STATE_LOCAL","Local")},"{0}  {1}"),text,14,24);if(settlement_status_&&settlement_status_->fleet_id==fleet->fleet_id){add(settlement_status_->status,{102,232,164,255},13,21);if(settlement_status_->destination_body_id)add(trf("SYSTEM_ESTABLISHMENT",{number(settlement_status_->settlement_days_completed,1),number(settlement_status_->establishment_days,0)},"Establishment  {0} / {1} days"),text,13,20);}}else if(selected_body()){body_inspection_.render(out,panel,layout.focus_action.y);}else {
     if(snapshot_->stellar_object){const auto& p=*snapshot_->stellar_object;const auto& d=stellar::core::stellar_object_definition(p.type);
       add(d.name,text,16,26);

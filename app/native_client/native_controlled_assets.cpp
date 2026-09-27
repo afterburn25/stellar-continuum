@@ -324,9 +324,20 @@ void Navigator::render(DrawList& out,int w,int h,const Art& art){
     if(selected)out.overlay.emplace_back(FilledRectangle{{clip.x,clip.y,2*s,clip.height},cyan});
     if(art)if(auto picture=art(row))out.overlay.emplace_back(Image{picture,{r.x+6*s,r.y+10*s,40*s,40*s},{},{255,255,255,255},clip});
     const float x=r.x+52*s,tw=r.width-83*s;
-    label(out,{x,r.y+5*s,tw,21*s},row.name,ink,normal,clip);
-    label(out,{x,r.y+27*s,tw,18*s},row.detail,muted,small,clip);
-    label(out,{x,r.y+46*s,tw,18*s},row.progress?row.activity:row.activity+" · "+tr(row.controlled?"ASSETS_CONTROLLED":"ASSETS_OWNED",row.controlled?"Controlled":"Owned"),row.controlled?cyan:muted,small,clip);
+    // Localized rows overflow the narrow card before the rasterizer's own
+    // floor is reached: measure at the drawn size, drop the redundant
+    // ownership suffix first, then shrink toward the 8px floor.
+    const auto fits=[&](const std::string& value,int size){
+      if(!measure_)return true;
+      return measure_(Text{{},value,ink,size,0,{}}).width<=static_cast<int>(tw);};
+    const auto fit_size=[&](const std::string& value,int size){
+      while(size>8&&measure_&&!fits(value,size))--size;return size;};
+    std::string activity=row.progress?row.activity:row.activity+" · "+tr(row.controlled?"ASSETS_CONTROLLED":"ASSETS_OWNED",row.controlled?"Controlled":"Owned");
+    if(measure_&&!fits(activity,small)&&!row.progress)activity=row.activity;
+    const int activity_size=fit_size(activity,small);
+    label(out,{x,r.y+5*s,tw,21*s},row.name,ink,fit_size(row.name,normal),clip);
+    label(out,{x,r.y+27*s,tw,18*s},row.detail,muted,fit_size(row.detail,small),clip);
+    label(out,{x,r.y+46*s,tw,18*s},activity,row.controlled?cyan:muted,activity_size,clip);
     label(out,{r.x+r.width-25*s,r.y+7*s,24*s,25*s},"›",row.actionable?cyan:muted,normal,clip);
     label(out,{r.x+r.width-24*s,r.y+34*s,22*s,23*s},row.severity?"!":"•",row.severity>1?Color{255,113,105,255}:row.severity?amber:green,normal,clip);
     if(row.progress){const UiRect bar{x,r.y+r.height-5*s,tw,3*s};stellar::engine::ui_skin::progress(out,bar,static_cast<float>(*row.progress),s,clip);}

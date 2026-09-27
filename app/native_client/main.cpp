@@ -819,6 +819,7 @@ class NativeCampaign final {
     economy_workspace_.set_text_measurer(text_measurer_);
     notification_view_.set_text_measurer(text_measurer_);
     chronicle_view_.set_text_measurer(text_measurer_);
+    assets_.set_text_measurer(text_measurer_);
     chronicle_view_.set_actor_name_resolver([this](std::uint64_t id){
       if(!session_)return std::string{};
       const auto& world=session_->frame().runtime().world().campaign();
@@ -8159,8 +8160,13 @@ class NativeCampaign final {
       if(active||bounds.contains(pointer_)||!tab)panel(out,bounds,bounds.contains(pointer_),active);
       const float icon=tab?27.f*layout.scale:bounds.width-8.f*layout.scale;
       if(const auto image=navigation_art_.image(action))out.overlay.emplace_back(Image{image,{bounds.x+(bounds.width-icon)*.5f,bounds.y+(tab?5.f*layout.scale:4.f*layout.scale),icon,icon}});
-      if(tab)out.overlay.emplace_back(Text{{bounds.x+bounds.width*.5f,bounds.y+36.f*layout.scale},std::string(tip),
-          active?Color{137,229,255,255}:Color{194,219,238,255},static_cast<int>(13.f*layout.scale),bounds.width-4.f*layout.scale,bounds,TextAlign::Center,FontFace::Interface});
+      if(tab){
+        int label_size=static_cast<int>(13.f*layout.scale);
+        const float available=bounds.width-4.f*layout.scale;
+        if(text_measurer_)while(label_size>8&&text_measurer_(Text{{},std::string(tip),{},label_size,0,{}}).width>static_cast<int>(available))--label_size;
+        out.overlay.emplace_back(Text{{bounds.x+bounds.width*.5f,bounds.y+36.f*layout.scale},std::string(tip),
+          active?Color{137,229,255,255}:Color{194,219,238,255},label_size,available,bounds,TextAlign::Center,FontFace::Interface});
+      }
       if(action==UiAction::ZoomIn||action==UiAction::ZoomOut){const auto glyph=action==UiAction::ZoomIn?"+":"−";out.overlay.emplace_back(Text{{bounds.x+bounds.width*.5f,bounds.y+bounds.height*.5f-9.f*layout.scale},glyph,{245,250,255,255},static_cast<int>(18.f*layout.scale),0,bounds,TextAlign::Center,FontFace::Heading});}
       if(tab||!bounds.contains(pointer_))return;
       stellar::native_ui::hint(out,{bounds.x+bounds.width+8.f,bounds.y},std::string(tip),width,height,layout.metric_font_pixels,layout.scale,text_measurer_);

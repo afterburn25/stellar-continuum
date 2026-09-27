@@ -237,7 +237,13 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
   text(out,{l.title.x,l.title.y+31*s,l.title.width,24*s},view_?trf("SHIPYARD_SUBTITLE",{view_->yard_name,view_->formatted_treasury,number(view_->available_industry,0)},"{0}  ·  Treasury {1}  ·  Industry {2}"):tr("SHIPYARD_LOADING","Loading shipyard…"),muted,l.small_font_pixels);
   button(l.close,"×");
   for(int i=0;i<static_cast<int>(ship_categories.size());++i)button({l.categories.x,l.categories.y+i*54*s,l.categories.width,48*s},tr(ship_category_keys[i],ship_categories[i]),category_==i);
-  button(l.search,search_.empty()?tr("SHIPYARD_SEARCH","Search ships…"):search_,search_focused_);button(l.sort,tr(ship_sort_keys[sort_],ship_sorts[sort_])+" ▾");button(l.filter,tr(ship_filter_keys[filter_],ship_filters[filter_])+" ▾");
+  button(l.search,search_.empty()?tr("SHIPYARD_SEARCH","Search ships…"):search_,search_focused_);button(l.sort,tr(ship_sort_keys[sort_],ship_sorts[sort_])+" ▾");
+  // Compact viewports cannot hold long filter captions ("Alle bekannten ▾") —
+  // fall back to the short label when the measured text overflows the button.
+  std::string filter_caption=tr(ship_filter_keys[filter_],ship_filters[filter_])+" ▾";
+  if(measure_&&measure_(Text{{},filter_caption,muted,l.small_font_pixels,0,{}}).width>static_cast<int>(l.filter.width-10.f*s))
+    filter_caption=tr("SHIPYARD_FILTER_COMPACT","All")+" ▾";
+  button(l.filter,std::move(filter_caption));
   const auto designs=filtered_designs();
   const auto clipped_text=[&](UiRect r,UiRect clip,std::string value,Color color,int size){if(intersection(r,clip))out.overlay.emplace_back(Text{{r.x,r.y},std::move(value),color,size,r.width,clip});};
   if(designs.empty())theme::empty_state(out,l.designs,search_.empty()?tr("SHIPYARD_EMPTY_FILTER","No known designs match these filters."):tr("SHIPYARD_EMPTY_SEARCH","No known designs match your search."),tr("SHIPYARD_EMPTY_HINT","Clear the search or change the filters."),l.body_font_pixels);
@@ -249,7 +255,7 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
     clipped_text({r.x+8*s,r.y+147*s,r.width-16*s,38*s},*clip,d.name,bright,l.body_font_pixels);
     clipped_text({r.x+8*s,r.y+188*s,r.width-16*s,20*s},*clip,role_name(d.role,locale_),muted,l.small_font_pixels);
     clipped_text({r.x+8*s,r.y+210*s,r.width-16*s,20*s},*clip,d.formatted_credit_cost,d.can_start?good:warning,l.small_font_pixels);
-    clipped_text({r.x+8*s,r.y+234*s,r.width-16*s,20*s},*clip,trf("SHIPYARD_BUILD_MINIMUM",{stellar::native_campaign::format_campaign_duration(d.minimum_build_days_at_full_shipyard_rate)},"{0} minimum"),muted,l.small_font_pixels);
+    clipped_text({r.x+8*s,r.y+234*s,r.width-16*s,20*s},*clip,trf("SHIPYARD_BUILD_MINIMUM",{stellar::native_campaign::format_campaign_duration_localized(locale_,d.minimum_build_days_at_full_shipyard_rate)},"{0} minimum"),muted,l.small_font_pixels);
   }
   stellar::native_ui_style::menu_panel(out,l.orders);theme::section_header(out,{l.orders.x+10*s,l.orders.y+6*s,l.orders.width-20*s,22*s},trf("SHIPYARD_ORDERS_HEADING",{std::to_string(view_?view_->orders.size():0)},"BUILD ORDERS  /  {0}"),l.small_font_pixels);
   const UiRect queue{l.orders.x+5*s,l.orders.y+30*s,l.orders.width-10*s,l.orders.height-35*s};
@@ -259,7 +265,7 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
     if(selected_order_id_==o.order_id)fill(out,{clip->x,clip->y,3*s,clip->height},theme::color::selected);float x=r.x+12*s;
     if(art){if(auto image=art->image_for(o.design_id,stellar::core::FleetRole::Military)){const UiRect p{x,r.y+5*s,70*s,49*s};out.overlay.emplace_back(Image{image,p,cover_source(*image,p),{255,255,255,255},queue});}x+=80*s;}
     clipped_text({x,r.y+4*s,r.width-(x-r.x)-122*s,22*s},queue,o.design_name,bright,l.body_font_pixels);
-    clipped_text({x,r.y+27*s,r.width-(x-r.x)-122*s,18*s},queue,trf(o.active?"SHIPYARD_ORDER_ACTIVE":"SHIPYARD_ORDER_QUEUED",{number(o.progress_fraction*100,0),stellar::native_campaign::format_campaign_duration(o.industry_remaining/stellar::core::shipbuilding_industry_per_day)},o.active?"ACTIVE · {0}%  ·  {1} at full production":"QUEUED · {0}%  ·  {1} at full production"),muted,l.small_font_pixels);
+    clipped_text({x,r.y+27*s,r.width-(x-r.x)-122*s,18*s},queue,trf(o.active?"SHIPYARD_ORDER_ACTIVE":"SHIPYARD_ORDER_QUEUED",{number(o.progress_fraction*100,0),stellar::native_campaign::format_campaign_duration_localized(locale_,o.industry_remaining/stellar::core::shipbuilding_industry_per_day)},o.active?"ACTIVE · {0}%  ·  {1} at full production":"QUEUED · {0}%  ·  {1} at full production"),muted,l.small_font_pixels);
     const UiRect track{x,r.y+51*s,r.width-(x-r.x)-122*s,4*s};if(auto c=intersection(track,queue))fill(out,*c,row);if(auto c=intersection({track.x,track.y,progress_width(o.progress_fraction,track.width),track.height},queue))fill(out,*c,good);
     const float bx=r.x+r.width-110*s;
     if(queue.contains({bx,r.y+12*s})&&queue.contains({bx+102*s,r.y+42*s})){

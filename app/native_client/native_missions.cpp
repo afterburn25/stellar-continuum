@@ -1,4 +1,5 @@
 #include "native_missions.hpp"
+#include "native_settlement_messages.hpp"
 #include "native_ui_layout.hpp"
 #include "native_ui_style.hpp"
 #include "native_ui_theme.hpp"
@@ -546,8 +547,9 @@ NativeColonySiteSelection colony_site_selection(
                              : "Colony ship {0}/{1}: {2} - {3}");
 
   if (!view.can_receive_orders || view.candidates.empty()) {
-    selection.details = heading + "\n\n" + view.status;
-    selection.status = view.status;
+    const auto status = native_settlement::localized_message(locale, view.status);
+    selection.details = heading + "\n\n" + status;
+    selection.status = status;
     selection.action_label =
         selection.outpost ? mt(locale, "MISSIONS_ACTION_DEPLOY",
                                "Fund & Deploy")
@@ -587,7 +589,8 @@ NativeColonySiteSelection colony_site_selection(
          affordable ? mt(locale, "MISSIONS_FUNDED", "funded")
                     : mt(locale, "MISSIONS_FUNDING_NEEDED",
                          "additional funding required"),
-         compact_reason(site.reason)},
+         compact_reason(native_settlement::localized_message(
+             locale, site.reason))},
         "Resource site {0}/{1}{2} {3} / {4}\n{5} {6} | yield {7}x | access "
         "{8} | reserve {9}\nNatural fit {10} | unprotected capacity {11} | "
         "limiting factor {12}\nSealed outpost authorization: {13}\nTreasury "
@@ -599,7 +602,7 @@ NativeColonySiteSelection colony_site_selection(
             ? mtfn(locale, "MISSIONS_OUTPOST_REQUIRES",
                    {view.formatted_authorization, view.formatted_treasury},
                    "Outpost deployment requires {0}; {1} is available.")
-            : site.reason;
+            : native_settlement::localized_message(locale, site.reason);
     return selection;
   }
 
@@ -625,7 +628,8 @@ NativeColonySiteSelection colony_site_selection(
        affordable ? mt(locale, "MISSIONS_FUNDED", "funded")
                   : mt(locale, "MISSIONS_FUNDING_NEEDED",
                        "additional funding required"),
-       compact_reason(site.reason)},
+       compact_reason(native_settlement::localized_message(
+           locale, site.reason))},
       "Site {0}/{1}{2} {3} / {4}\nViability: {5} | natural fit {6} | "
       "unprotected {7}\nLimiting factor: {8} | reach: {9}{10}\nExpedition "
       "authorization: {11}\nTreasury available: {12} - {13}\n\n{14}");
@@ -635,7 +639,7 @@ NativeColonySiteSelection colony_site_selection(
           ? mtfn(locale, "MISSIONS_SETTLE_REQUIRES",
                  {view.formatted_authorization, view.formatted_treasury},
                  "Settlement requires {0}; {1} is available.")
-          : site.reason;
+          : native_settlement::localized_message(locale, site.reason);
   return selection;
 }
 
