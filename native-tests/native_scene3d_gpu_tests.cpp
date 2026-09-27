@@ -970,11 +970,19 @@ int main(int argc,char** argv)try{
     // cascade at .5 still misses it — only the cascade2 window (4) covers.
     // The mid-only capture staying lit proves the chain didn't smear.
     const auto mid_only=narrow_view({receiver,occluder},.5f,"shadow-cascade-mid.png");
+    const auto mid_stats=window.scene3d_statistics();
     const auto chain3=[&](std::vector<MeshInstance3D> objects,float c1,float c2,const char* name){
       auto tier=narrow;tier.cascade_extent=c1;tier.cascade2_extent=c2;
       DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},tier),{0,0,320,320}});
       window.draw(list,folder/name);return decode_rgba_image(folder/name);};
     const auto tier3=chain3({receiver,occluder},.5f,4.f,"shadow-cascade2.png");
+    const auto tier3_stats=window.scene3d_statistics();
+    // The receiver sits inside every window; the occluder's volume test
+    // passes far1 (.5+radius) even though its umbra lands past the map
+    // edge — so far1 collects two casters and only cascade2 adds new
+    // submissions. The per-tier counters must attribute accordingly.
+    check(mid_stats.shadow_casters==3&&mid_stats.shadow_cascade_casters==2&&mid_stats.shadow_cascade2_casters==0,"Cascade counters misattributed the mid-tier submissions");
+    check(tier3_stats.shadow_casters==5&&tier3_stats.shadow_cascade_casters==2&&tier3_stats.shadow_cascade2_casters==2,"Cascade counters misattributed the far2 submissions");
     check(channel(*mid_only,176,160,0)>100,"Mid cascade covered a fragment outside its extent");
     check(channel(*tier3,176,160,0)<channel(*open,176,160,0)/2,"The third cascade tier did not carry the shadow");
     check(channel(*tier3,60,160,0)>100,"The third cascade tier darkened an unoccluded fragment");
