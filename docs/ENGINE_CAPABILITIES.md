@@ -508,8 +508,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   1024-instance fleet re-submitted through the directional box plus a
   shadowed spot cone, printing timing + `shadow_casters` next to the
   unshadowed `fleet3d` baseline, and a `fleet3d_shadow_cascade` variant
-  adding both far tiers so per-tier caster overhead prints separately
-  (`cascade=`/`cascade2=` counters), plus a `fleet3d_shadow_omni`
+  adding all four far tiers so per-tier caster overhead prints
+  separately (the `cascades=` counter list), plus a `fleet3d_shadow_omni`
   variant showing omni caster work scales with covering faces (≈1 per
   fleet caster for a near-planar fleet) rather than a flat six;
   `engine_project` document round-trip + rejection coverage.

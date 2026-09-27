@@ -1065,6 +1065,15 @@ int main(int argc,char** argv)try{
     check(channel(*mid_only,176,160,0)>100,"Mid cascade covered a fragment outside its extent");
     check(channel(*tier3,176,160,0)<channel(*open,176,160,0)/2,"The third cascade tier did not carry the shadow");
     check(channel(*tier3,60,160,0)>100,"The third cascade tier darkened an unoccluded fragment");
+    // Four authored tiers saturate the depth-array bound: every tier
+    // past the mid collects both casters, the widest→narrowest fold
+    // still resolves to the tightest covering tier, and the umbra
+    // keeps its full cut.
+    const auto tier4=narrow_view({receiver,occluder},{.5f,2.f,4.f,8.f},"shadow-cascade4.png");
+    const auto tier4_stats=window.scene3d_statistics();
+    check(tier4_stats.shadow_casters==9&&tier4_stats.shadow_cascade_casters==(std::array<std::uint64_t,4>{2,2,2,2}),"Four cascade tiers misattributed their caster submissions");
+    check(channel(*tier4,176,160,0)<channel(*open,176,160,0)/2,"The four-tier fold did not carry the shadow");
+    check(channel(*tier4,60,160,0)>100,"The four-tier fold darkened an unoccluded fragment");
     // Authored softness scales the tier PCF radius: 0 collapses the edge
     // to a binary tap while 4 widens the penumbra band measurably — the
     // umbra core keeps its full cut either way.
@@ -1444,16 +1453,16 @@ int main(int argc,char** argv)try{
         ship.lod_pixels=8;ship.lod_meshes={proxy};
         cascade_ships.push_back(std::move(ship));
       }
-      ShadowMap3D cascade_shadow=armada_shadow;cascade_shadow.cascade_extents={400,800};
+      ShadowMap3D cascade_shadow=armada_shadow;cascade_shadow.cascade_extents={400,800,1600,3200};
       DrawList cascade_armada;cascade_armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(cascade_ships),{0,0,1},{picket},cascade_shadow),{0,0,640,360}});
       const auto cascade_start=std::chrono::steady_clock::now();double cascade_submit=0;
       for(int i=0;i<60;++i){FrameTiming timing;window.draw(cascade_armada,std::nullopt,&timing);cascade_submit+=timing.submission_ms;}
       const auto cascade_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cascade_start).count();
       const auto cascade_stats=window.scene3d_statistics();
-      check(cascade_stats.shadow_cascade_casters[0]>0&&cascade_stats.shadow_cascade_casters[1]>0,"Three-tier shadow fleet submitted no far casters");
+      check(cascade_stats.shadow_cascade_casters[0]>0&&cascade_stats.shadow_cascade_casters[1]>0&&cascade_stats.shadow_cascade_casters[2]>0&&cascade_stats.shadow_cascade_casters[3]>0,"Five-band shadow fleet submitted no far casters");
       std::cout<<"fleet3d_shadow_cascade frames=60 instances=1024 cpu_submit_mean_ms="<<cascade_submit/60<<" frame_wall_mean_ms="<<cascade_wall/60
         <<" draw_calls="<<cascade_stats.draw_calls<<" shadow_casters="<<cascade_stats.shadow_casters
-        <<" cascade="<<cascade_stats.shadow_cascade_casters[0]<<" cascade2="<<cascade_stats.shadow_cascade_casters[1]
+        <<" cascades="<<cascade_stats.shadow_cascade_casters[0]<<","<<cascade_stats.shadow_cascade_casters[1]<<","<<cascade_stats.shadow_cascade_casters[2]<<","<<cascade_stats.shadow_cascade_casters[3]
         <<" spot_shadow_casters="<<cascade_stats.spot_shadow_casters<<'\n';}
      // Omni receipt: the same picket with its cone removed collects into
      // every cube face the fleet spans — per-light caster work scales

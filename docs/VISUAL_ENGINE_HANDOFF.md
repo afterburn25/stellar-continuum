@@ -251,8 +251,8 @@ draw per LOD level — the number to watch as the renderer evolves. A
 shadowed variant (`fleet3d_shadow … shadow_casters=`) runs the same
 fleet under a `ShadowMap3D` box plus one shadowed spot cone so the
 caster-collection and depth-pass cost shows up next to the baseline; a
-three-tier variant (`fleet3d_shadow_cascade … cascade= cascade2=`)
-enables both far windows so each tier's caster overhead is separable,
+five-band variant (`fleet3d_shadow_cascade … cascades=`)
+enables all four far windows so each tier's caster overhead is separable,
 and `fleet3d_shadow_omni … omni_shadow_casters=` swaps the picket's
 cone for a shadowed omni light so per-face caster scaling is visible
 (≈1 face per fleet caster — cost tracks covering faces, not a flat 6×).
