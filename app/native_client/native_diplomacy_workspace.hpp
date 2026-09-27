@@ -171,6 +171,7 @@ private:
   bool notice_accepted_{};
   stellar::engine::ScrollView contact_scroll_{};
   stellar::engine::ScrollView detail_scroll_{};
+  mutable stellar::engine::ScrollView meter_scroll_{};
   int focus_{-1};
 };
 

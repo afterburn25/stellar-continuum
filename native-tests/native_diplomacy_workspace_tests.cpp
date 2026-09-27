@@ -151,6 +151,16 @@ int main() try {
                 contained(layout.surface, layout.feedback) &&
                 contained(viewport, layout.modal_panel),
             "Diplomacy workspace escaped its viewport.");
+    // The three action slots stay pinned inside the meter panel at every
+    // resolution; the meter viewport sits above them and scrolls instead.
+    require(contained(layout.meter_panel, layout.actions) &&
+                contained(layout.meter_panel, layout.meters),
+            "Meter panel children escaped at this viewport.");
+    require(layout.actions.height >= 3.f * 36.f * layout.scale,
+            "Action column clipped its three pinned buttons.");
+    require(layout.meters.y + layout.meters.height <=
+                layout.actions.y + .01f,
+            "Meter viewport overlaps the pinned action strip.");
     if(height>=720)
       require(layout.surface.x >=
                   navigation.inspect.x + navigation.inspect.width,

@@ -56,6 +56,8 @@ struct BattleOrderButton {
   MassiveCombatOrderType type;
   bool needs_target{};
   std::string_view label_key{};
+  std::string_view tip_key{};
+  std::string_view tip{};
 };
 [[nodiscard]] const std::vector<BattleOrderButton> &battle_order_buttons();
 

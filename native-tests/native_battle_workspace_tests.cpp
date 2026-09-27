@@ -873,6 +873,35 @@ void keyboard_focus() {
           "Pointer cancellation did not clear keyboard focus.");
 }
 
+void order_button_tips() {
+  constexpr int width = 1280, height = 720;
+  NativeBattleWorkspace workspace;
+  workspace.open(snapshot(), 1, width, height);
+  const auto layout = BattleWorkspaceLayout::for_viewport(width, height);
+  InputEvent hover{};
+  hover.type = InputEventType::PointerMove;
+  hover.position = center(layout.order_buttons[0]);
+  (void)workspace.handle(hover, width, height);
+  DrawList draw;
+  workspace.render(draw, width, height);
+  require(std::ranges::any_of(draw.overlay, [](const auto &item) {
+            const auto *label = std::get_if<Text>(&item);
+            return label &&
+                   label->value == "Hold position and fight from the current post.";
+          }),
+          "Hovered Hold button emitted no order explanation.");
+  hover.position = {8.f, 8.f};
+  (void)workspace.handle(hover, width, height);
+  DrawList clear;
+  workspace.render(clear, width, height);
+  require(!std::ranges::any_of(clear.overlay, [](const auto &item) {
+            const auto *label = std::get_if<Text>(&item);
+            return label &&
+                   label->value == "Hold position and fight from the current post.";
+          }),
+          "Order explanation persisted after the pointer left the grid.");
+}
+
 } // namespace
 
 int main() {
@@ -892,6 +921,7 @@ int main() {
     targeted_chrome_gesture_does_not_order();
     spatial_orders_preserve_depth();
     fit_keeps_formations_clear_of_controls();
+    order_button_tips();
   } catch (const std::exception &error) {
     std::cerr << "native battle workspace tests failed: " << error.what()
               << '\n';

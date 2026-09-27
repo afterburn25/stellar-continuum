@@ -258,17 +258,25 @@ DiplomacyWorkspaceLayout DiplomacyWorkspaceLayout::for_viewport(
   const UiRect stage_caption{stage.x + 12.f * scale,
                              stage.y + stage.height - 96.f * scale,
                              stage.width - 24.f * scale, 88.f * scale};
-  const UiRect meters{meter_panel.x + 8.f * scale, meter_panel.y + 34.f * scale,
-                      meter_panel.width - 16.f * scale, 152.f * scale};
-  // Anchored to the panel bottom so action buttons can never overlap the tab
-  // strip below the columns at any viewport scale.
+  // The three action slots stay pinned and fully visible at the panel bottom;
+  // the meter rows take the remaining height and scroll when the column is
+  // short. At compact viewports the old fixed 152s meter block left ~0px for
+  // the actions, which then rendered over the tab strip.
+  const auto action_stack_h = 8.f * scale + 3.f * 36.f * scale;
   const auto action_area_h =
-      std::max(30.f * scale,
-               std::min(160.f * scale, meter_panel.height - 40.f * scale -
-                                           meters.height - 6.f * scale));
+      std::clamp(meter_panel.height - 34.f * scale - 90.f * scale - 6.f * scale,
+                 std::min(action_stack_h,
+                          std::max(18.f * scale,
+                                   meter_panel.height - 34.f * scale)),
+                 160.f * scale);
   const UiRect actions{meter_panel.x,
                        meter_panel.y + meter_panel.height - action_area_h,
                        meter_panel.width, action_area_h};
+  const UiRect meters{meter_panel.x + 8.f * scale, meter_panel.y + 34.f * scale,
+                      meter_panel.width - 16.f * scale,
+                      std::clamp(actions.y - 6.f * scale -
+                                     (meter_panel.y + 34.f * scale),
+                                 18.f * scale, 152.f * scale)};
   const auto tabs_y = inner_y + columns_h + gap;
   const UiRect tabs{inner_x, tabs_y, inner_w, 34.f * scale};
   const auto detail_y = tabs.y + tabs.height + gap;
@@ -705,6 +713,11 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
       contact_scroll_.scroll_by(-event.wheel_y * 26.f);
       return {DiplomacyWorkspaceCommandKind::None, true};
     }
+    if (layout.meters.contains(event.position)) {
+      meter_scroll_.sync(5.f * 30.f * layout.scale, layout.meters.height);
+      meter_scroll_.scroll_by(-event.wheel_y * 26.f);
+      return {DiplomacyWorkspaceCommandKind::None, true};
+    }
     if (layout.detail_rows.contains(event.position)) {
       detail_scroll_.sync(detail_content_height(layout),
                           layout.detail_rows.height);
@@ -1126,33 +1139,49 @@ void NativeDiplomacyWorkspace::render(
   const Color meter_colors[] = {theme::color::diplomacy, theme::color::selected,
                                 theme::color::economy, theme::color::danger,
                                 theme::color::science};
+  // At compact heights the meter list is shorter than its 5-row content —
+  // scroll it like the contact and detail lists instead of overflowing into
+  // the pinned action buttons.
+  meter_scroll_.sync(5.f * 30.f * s, layout.meters.height);
+  const auto meter_clip = [&](UiRect bounds) {
+    return intersection(bounds, layout.meters);
+  };
   for (std::size_t index = 0; index < 5; ++index) {
-    const auto y = layout.meters.y + static_cast<float>(index) * 30.f * s;
+    const auto y = layout.meters.y + static_cast<float>(index) * 30.f * s -
+                   meter_scroll_.scroll_offset;
     const UiRect row_bounds{layout.meters.x, y, layout.meters.width, 28.f * s};
-    text(out, {layout.meters.x, y, layout.meters.width * .62f, 18.f * s},
-         meter_rows[index].first, muted, layout.small_font_pixels);
-    theme::hover_tooltip(out, row_bounds, pointer_, meter_rows[index].first,
+    const auto row_clip = meter_clip(row_bounds);
+    if (!row_clip) continue;
+    out.overlay.emplace_back(Text{
+        {layout.meters.x, y}, meter_rows[index].first, muted,
+        layout.small_font_pixels, layout.meters.width * .62f, *row_clip});
+    theme::hover_tooltip(out, *row_clip, pointer_, meter_rows[index].first,
                          tr(meter_tip_keys[index], meter_tip_fallbacks[index]),
                          width, height, s, theme::Tone::Neutral);
     const auto &value = meter_rows[index].second;
-    text(out,
-         {layout.meters.x + layout.meters.width * .62f, y,
-          layout.meters.width * .38f, 18.f * s},
-         value ? std::to_string(static_cast<int>(
-                     std::lround(std::clamp(*value, 0., 1.) * 100.))) +
-                     "%"
-               : tr("DIPLOMACY_UNKNOWN", "UNKNOWN"),
-         value ? meter_colors[index] : muted, layout.small_font_pixels,
-         TextAlign::Right);
+    out.overlay.emplace_back(
+        Text{{layout.meters.x + layout.meters.width * .62f, y},
+             value ? std::to_string(static_cast<int>(std::lround(
+                         std::clamp(*value, 0., 1.) * 100.))) +
+                         "%"
+                   : tr("DIPLOMACY_UNKNOWN", "UNKNOWN"),
+             value ? meter_colors[index] : muted, layout.small_font_pixels,
+             layout.meters.width * .38f, *row_clip, TextAlign::Right});
     const UiRect bar{layout.meters.x, y + 20.f * s, layout.meters.width,
                      8.f * s};
-    fill(out, bar, theme::color::canvas);
-    if (value)
-      fill(out, {bar.x, bar.y,
-                 bar.width * static_cast<float>(std::clamp(*value, 0., 1.)),
-                 bar.height},
-           meter_colors[index]);
+    if (const auto bar_clip = meter_clip(bar)) {
+      fill(out, *bar_clip, theme::color::canvas);
+      if (value)
+        fill(out, {bar_clip->x, bar_clip->y,
+                   bar.width * static_cast<float>(std::clamp(*value, 0., 1.)),
+                   bar_clip->height},
+             meter_colors[index]);
+    }
   }
+  theme::scrollbar(out,
+                   {layout.meters.x + layout.meters.width - 2.f * s,
+                    layout.meters.y, 2.f * s, layout.meters.height},
+                   meter_scroll_, 20.f * s);
   std::size_t action_index = 0;
   const auto draw_action = [&](std::string label, bool enabled,
                                std::string disabled_tip, bool danger_button) {

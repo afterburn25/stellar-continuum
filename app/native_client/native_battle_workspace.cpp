@@ -261,15 +261,24 @@ Point formation_offset(std::int64_t id, int token,
 
 const std::vector<BattleOrderButton> &battle_order_buttons() {
   static const std::vector<BattleOrderButton> buttons{
-      {"Hold", MassiveCombatOrderType::Hold, false, "BATTLE_BTN_HOLD"},
-      {"Defend", MassiveCombatOrderType::Defend, false, "BATTLE_BTN_DEFEND"},
-      {"Advance", MassiveCombatOrderType::Advance, true, "BATTLE_BTN_ADVANCE"},
-      {"Focus fire", MassiveCombatOrderType::FocusFire, true, "BATTLE_BTN_FOCUS"},
-      {"Flank left", MassiveCombatOrderType::FlankLeft, true, "BATTLE_BTN_FLANK_LEFT"},
-      {"Flank right", MassiveCombatOrderType::FlankRight, true, "BATTLE_BTN_FLANK_RIGHT"},
-      {"Intercept", MassiveCombatOrderType::Intercept, true, "BATTLE_BTN_INTERCEPT"},
-      {"Break contact", MassiveCombatOrderType::BreakContact, false, "BATTLE_BTN_BREAK"},
-      {"Retreat", MassiveCombatOrderType::Retreat, false, "BATTLE_BTN_RETREAT"}};
+      {"Hold", MassiveCombatOrderType::Hold, false, "BATTLE_BTN_HOLD",
+       "BATTLE_TIP_HOLD", "Hold position and fight from the current post."},
+      {"Defend", MassiveCombatOrderType::Defend, false, "BATTLE_BTN_DEFEND",
+       "BATTLE_TIP_DEFEND", "Guard this area; intercept attackers that close in."},
+      {"Advance", MassiveCombatOrderType::Advance, true, "BATTLE_BTN_ADVANCE",
+       "BATTLE_TIP_ADVANCE", "Move toward the selected point or contact."},
+      {"Focus fire", MassiveCombatOrderType::FocusFire, true, "BATTLE_BTN_FOCUS",
+       "BATTLE_TIP_FOCUS", "Concentrate batteries on one hostile formation."},
+      {"Flank left", MassiveCombatOrderType::FlankLeft, true, "BATTLE_BTN_FLANK_LEFT",
+       "BATTLE_TIP_FLANK_LEFT", "Swing wide to strike the hostile's left flank."},
+      {"Flank right", MassiveCombatOrderType::FlankRight, true, "BATTLE_BTN_FLANK_RIGHT",
+       "BATTLE_TIP_FLANK_RIGHT", "Swing wide to strike the hostile's right flank."},
+      {"Intercept", MassiveCombatOrderType::Intercept, true, "BATTLE_BTN_INTERCEPT",
+       "BATTLE_TIP_INTERCEPT", "Meet the target on its projected course."},
+      {"Break contact", MassiveCombatOrderType::BreakContact, false, "BATTLE_BTN_BREAK",
+       "BATTLE_TIP_BREAK", "Disengage and pull out of the firing lines."},
+      {"Retreat", MassiveCombatOrderType::Retreat, false, "BATTLE_BTN_RETREAT",
+       "BATTLE_TIP_RETREAT", "Withdraw from the engagement toward the system edge."}};
   return buttons;
 }
 
@@ -1450,6 +1459,13 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
                  {rect.x + rect.width * .5f, rect.y + rect.height * .3f},
                  tr(button.label_key, button.label), text_primary, layout.small_font_pixels,
                  rect.width - 6.f, rect, TextAlign::Center);
+    if (rect.contains(pointer_))
+      stellar::native_ui::hint(
+          out,
+          {pointer_.x + 12.f * layout.scale,
+           pointer_.y + 18.f * layout.scale},
+          tr(button.tip_key, button.tip), width, height,
+          layout.small_font_pixels, layout.scale);
   }
 
   if (focus_ >= 0) {
