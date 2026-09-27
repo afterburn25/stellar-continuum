@@ -2084,6 +2084,8 @@
     "DATA_PROJECT_DESC_ORBITAL_SHIPYARD": "Construct a permanent orbital yard capable of assembling large interplanetary and future interstellar vessels.",
     "DATA_PROJECT_DESC_ASTEROID_RESOURCE_NETWORK": "Deploy prospectors, autonomous extraction platforms, and cargo tugs across the home system's resource belt.",
     "DATA_PROJECT_DESC_WARP_TEST_FACILITY": "A remote hardened research and engineering complex for full-scale spacetime-field experiments.",
+    "DATA_TECH_ORBITAL_INDUSTRY": "Orbital Industry",
+    "DATA_TECH_WARP_FIELD_CONTROL": "Warp Field Control",
     "STATUS_NO_RESEARCH_CHOICES": "No research choices are currently available. A construction prerequisite may be missing.",
     "STATUS_RESEARCH_CANDIDATE": "Research candidate: {0}",
     "STATUS_NO_RESEARCH_SELECTED": "No available research project selected. Check construction prerequisites.",

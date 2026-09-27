@@ -43,10 +43,14 @@ Context context(CampaignFrame &frame) {
   ConstructionWorld command{world.civilizations,world.bodies,world.construction,world.colonies,world.economies,{},query};
   return {world,*player,*state,*economy,command,command.read()};
 }
-std::string requirement_name(std::string_view id) {
-  if(id=="orbital_industry") return "Orbital Industry";
-  if(id=="warp_field_control") return "Warp Field Control";
-  return std::string(id);
+std::string requirement_name(const stellar::engine::LocalizationTable *locale,
+                             std::string_view id) {
+  const char *key{};
+  const char *fallback{};
+  if(id=="orbital_industry"){key="DATA_TECH_ORBITAL_INDUSTRY";fallback="Orbital Industry";}
+  else if(id=="warp_field_control"){key="DATA_TECH_WARP_FIELD_CONTROL";fallback="Warp Field Control";}
+  else return std::string(id);
+  return locale&&locale->contains(key)?std::string(locale->translate(key)):std::string(fallback);
 }
 void append(std::ostringstream &out,std::string_view value){out<<value.size()<<':'<<value<<';';}
 bool same_currency(const SovereignCurrencyDefinition&a,const SovereignCurrencyDefinition&b){return a.name==b.name&&a.code==b.code&&a.symbol==b.symbol&&a.local_units_per_budget_unit==b.local_units_per_budget_unit;}
@@ -85,7 +89,7 @@ Projection project(CampaignFrame &frame,std::uint64_t generation,const stellar::
     p.id=definition.id;p.name=stellar::native_data::construction_project_name(locale,definition);p.description=stellar::native_data::construction_project_description(locale,definition);p.category=definition.category;
     p.industry_cost=definition.industry_cost;p.credit_cost=definition.credit_cost;p.upkeep_credits_per_day=definition.upkeep_credits_per_day;p.industry_per_day=definition.industry_per_day;
     p.formatted_credit_cost=v.currency.format(p.credit_cost);p.formatted_upkeep_rate=stellar::native_currency_format::format_rate_localized(locale,v.currency,-p.upkeep_credits_per_day);
-    for(const auto&id:definition.required_technologies)p.requirements.push_back(requirement_name(id));
+    for(const auto&id:definition.required_technologies)p.requirements.push_back(requirement_name(locale,id));
     for(const auto&id:definition.required_projects)p.requirements.push_back(stellar::native_data::construction_project_name(locale,get_construction_project(id)));
     p.complete=std::ranges::contains(c.state.completed_project_ids,p.id);p.active=c.state.active_project_id==p.id;
     const auto queued=std::ranges::find(c.state.queued_projects,p.id,&QueuedConstructionProject::project_id);

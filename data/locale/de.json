@@ -2309,6 +2309,8 @@
     "DATA_PROJECT_DESC_ORBITAL_SHIPYARD": "Errichtet eine permanente Orbitwerft, die große interplanetare und künftige interstellare Schiffe montieren kann.",
     "DATA_PROJECT_DESC_ASTEROID_RESOURCE_NETWORK": "Setzt Prospektoren, autonome Extraktionsplattformen und Frachtschlepper im Ressourcengürtel des Heimatsystems ein.",
     "DATA_PROJECT_DESC_WARP_TEST_FACILITY": "Eine abgelegene gehärtete Forschungs- und Ingenieursanlage für großangelegte Raumzeitfeld-Experimente.",
+    "DATA_TECH_ORBITAL_INDUSTRY": "Orbitale Industrie",
+    "DATA_TECH_WARP_FIELD_CONTROL": "Warpfeldsteuerung",
     "STATUS_NO_RESEARCH_CHOICES": "Derzeit sind keine Forschungsoptionen verfügbar. Möglicherweise fehlt eine Bauvoraussetzung.",
     "STATUS_RESEARCH_CANDIDATE": "Forschungskandidat: {0}",
     "STATUS_NO_RESEARCH_SELECTED": "Kein verfügbares Forschungsprojekt ausgewählt. Bauvoraussetzungen prüfen.",
