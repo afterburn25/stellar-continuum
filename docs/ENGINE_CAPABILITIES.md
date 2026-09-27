@@ -718,7 +718,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   downloads each face, CPU-resamples into the equirect layout
   `environment()` samples, and binds it as the scene env slot —
   overriding the authored `environment` map for mapless opt-ins while
-  authored maps still win. The authored key light is rotated through
+  authored maps still win. On HDR-capable devices the faces download
+  the pre-tonemap RGBA16F target and encode RGBM (rgb*a*8 — up to 8x
+  display white survives), so a captured sun or emissive body keeps
+  real radiance headroom that specular reflection and bloom can pick
+  up; `RgbaImage::hdr_rgbm` marks the image and a per-draw
+  `env_flags` lane selects the decode, leaving authored maps literal.
+  Without float-target support the bake keeps the tonemapped UNORM
+  composite. The authored key light is rotated through
   world space so all faces light identically. The bake caches once per
   key: `probe_epoch == 0` keys on the scene instance (weak, so a freed
   scene's probe can never alias), while a nonzero epoch keys on the
@@ -738,10 +745,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Persistence:** `probeCapture` bool, `probeAnchor` [x,y,z] and
   `probeResolution` keys round-trip; absent keys mean no capture
   (prior documents load identically).
-- **Tests:** `native_scene3d_gpu` — a red ambient sphere behind the
+- **Tests:** `native_scene3d_gpu` — a red emissive sphere behind the
   camera dominates the +Z face; a mapless opt-in quad reflects red
   with capture on but authored-map blue with capture off, and
   `probe_bakes` advances exactly once (`pbr-probe-off/on.png`); the
+  HDR probe asserts an emissive-6 sun decodes brighter than an
+  authored clamped-white map can reflect (`pbr-probe-hdr/ldr.png`,
+  `probe_bakes_hdr` gates the strict margin on HDR-capable devices);
+  the
   epoch probe rebuilds the scene thrice under one epoch and asserts a
   single bake, then asserts a bumped epoch rebakes
   (`pbr-epoch-*.png`); `engine_scene3d` rejects bad
@@ -755,8 +766,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   design); one probe per scene, no probe grid or per-instance
   selection; equirect output is bilinear-resampled (roughness response
   shares the authored path's box-mip prefilter, not a true GGX
-  convolution); each bake downloads six faces synchronously — a
-  hitch when an epoch flips, so editors should bump it per commit,
+  convolution); RGBM quantizes radiance into 8x display white — a
+  sun brighter than that still clips, and authored env maps remain
+  8-bit by provenance; each bake downloads six faces synchronously —
+  a hitch when an epoch flips, so editors should bump it per commit,
   not per frame.
 
 ## Scene3D debug views, quality gates and distance culling (2026-09-25)

@@ -541,6 +541,9 @@ struct Scene3DStatistics {
   // Captured environment probes baked since renderer creation — each
   // counts six face renders for one scene's environmentCapture.
   std::uint64_t probe_bakes{};
+  // Bakes whose faces downloaded from the HDR target and encoded RGBM —
+  // zero on devices without floating-point color-target support.
+  std::uint64_t probe_bakes_hdr{};
   // True when the device supports floating-point color targets: scenes render
   // into RGBA16F and resolve through the tonemap pass. False = direct UNORM.
   bool hdr{};

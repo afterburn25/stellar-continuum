@@ -43,7 +43,7 @@ enum class TextureFormat;
 class RgbaImage final {
  public:
   [[nodiscard]] static std::shared_ptr<const RgbaImage> create(
-      int width,int height,std::vector<std::uint8_t> rgba_pixels,std::vector<Bc1MipLevel> bc1_mips={});
+      int width,int height,std::vector<std::uint8_t> rgba_pixels,std::vector<Bc1MipLevel> bc1_mips={},bool hdr_rgbm=false);
   [[nodiscard]] static std::shared_ptr<const RgbaImage> create_cooked(TextureFormat,std::vector<Bc1MipLevel>);
   [[nodiscard]] const auto& cooked_mips()const noexcept{return cooked_mips_;}
   [[nodiscard]] TextureFormat cooked_format()const noexcept{return cooked_format_;}
@@ -54,11 +54,13 @@ class RgbaImage final {
   [[nodiscard]] const std::vector<std::uint8_t>& pixels() const noexcept{return pixels_.empty()&&!cooked_mips_.empty()?cooked_mips_.front().blocks:pixels_;}
   [[nodiscard]] std::size_t byte_size() const noexcept{std::size_t n=pixels_.size();for(const auto& mip:bc1_mips_)n+=mip.blocks.size();for(const auto& mip:cooked_mips_)n+=mip.blocks.size();return n;}
   [[nodiscard]] const auto& bc1_mips()const noexcept{return bc1_mips_;}
+  // True when rgb*a*8 recovers linear HDR radiance (RGBM-encoded bakes).
+  [[nodiscard]] bool hdr_rgbm() const noexcept{return hdr_rgbm_;}
  private:
   RgbaImage(int width,int height,std::vector<std::uint8_t> pixels)
       :width_(width),height_(height),pixels_(std::move(pixels)){}
   int width_{},height_{};std::vector<std::uint8_t> pixels_;std::vector<Bc1MipLevel> bc1_mips_;
-  TextureFormat cooked_format_{};std::vector<Bc1MipLevel> cooked_mips_;
+  TextureFormat cooked_format_{};std::vector<Bc1MipLevel> cooked_mips_;bool hdr_rgbm_{};
 };
 enum class ImageDecodeUsage { PreserveMipChain, PixelsOnly };
 // Exact retained output size for cooked inputs, including compressed mips and

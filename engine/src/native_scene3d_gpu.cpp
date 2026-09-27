@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -87,7 +88,7 @@ template<class Map> void evict(Map& cache,std::size_t& bytes,std::size_t incomin
   }
 }
 struct VertexUniform {Matrix4 mvp,model_view,shadow_from_model;};
-struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy,point_cone;std::array<float,4> point_outer;std::array<float,4> anim_options;std::array<float,4> atmo_sunset;};
+struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy,point_cone;std::array<float,4> point_outer;std::array<float,4> anim_options;std::array<float,4> atmo_sunset;std::array<float,4> env_flags;};
 struct PostUniform {std::array<float,4> a,b;};
 // View-wide fragment uniform: debug selector, then the key light's
 // view→shadow-clip transform, {texel size (>0 enables), PCF radius in
@@ -99,7 +100,15 @@ struct PostUniform {std::array<float,4> a,b;};
 // box's centre/depth (one depth-array layer each, options .z carrying
 // each tier's own texel-scaled lift), the omni pair the cube-atlas rows.
 struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<float,4> shadow_advanced;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;std::array<Matrix4,maximum_scene3d_shadow_cascades> cascade_from_view;std::array<std::array<float,4>,maximum_scene3d_shadow_cascades> cascade_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;std::array<std::array<float,4>,4> spot_advanced,omni_advanced;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==784&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==1072);
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==800&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==1072);
+// IEEE-754 binary16 -> float for the RGBA16F probe downloads.
+float half_to_float(std::uint16_t h){
+  const int e=(h>>10)&0x1f,m=h&0x3ff;
+  const float v=e==0?std::ldexp(static_cast<float>(m),-24)
+    :e==31?std::numeric_limits<float>::infinity()
+    :std::ldexp(1.f+static_cast<float>(m)/1024.f,e-15);
+  return h&0x8000?-v:v;
+}
 // Column-major rotation for a unit quaternion — same convention as
 // rotation_matrix in native_scene3d.cpp, kept local to avoid exporting it.
 Matrix4 rotation_from(Quaternion q){
@@ -726,6 +735,9 @@ struct Scene3DRenderer::Storage {
         // strength keeps the shader off that path.
         fragment.pbr_values={p.metallic,p.roughness,p.emissive_strength,(p.environment||scene_env)?p.environment_strength:0.f};
         fragment.emissive_tint={p.emissive_tint.x,p.emissive_tint.y,p.emissive_tint.z,0.f};}
+      // HDR bakes ride the same RGBA8 image path RGBM-encoded — the flag
+      // selects the decode so authored maps keep their literal pixels.
+      if(draw.environment->owner&&draw.environment->owner->hdr_rgbm())fragment.env_flags[0]=1.f;
       // Band shear rides the spare emissive_tint.w lane — written after
       // the PBR block since that branch clears the channel. The zonal
       // harmonic strength shares texture_options (x = cubic sampling).
@@ -1514,7 +1526,11 @@ struct Scene3DRenderer::Storage {
     // every face view lights the scene identically.
     const auto world=rotate_vec(cam.orientation,scene->light_direction());
     const Scene3DStatistics pre=stats;
-    std::array<std::vector<std::uint8_t>,6> face_pixels;
+    // Linear radiance per face, three channels. HDR-capable targets
+    // download the RGBA16F scene target so the bake keeps pre-tonemap
+    // headroom; the UNORM fallback keeps the tonemapped composite.
+    std::array<std::vector<float>,6> face_pixels;
+    bool hdr_bake=false;
     // A debug override must not bake into the probe.
     RenderOptions3D capture_options=options;capture_options.debug_view=DebugView3D::Lit;
     for(int f=0;f<6;++f){
@@ -1529,18 +1545,18 @@ struct Scene3DRenderer::Storage {
       Scene3DView view{face_scene,{0.f,0.f,static_cast<float>(res),static_cast<float>(res)},capture_options};
       auto face_target=target(res,res);
       render(view,*face_target);
-      // Download the tonemapped face into a staging buffer.
-      face_pixels[f].resize(static_cast<std::size_t>(res)*res*4);
+      const bool hdr_face=face_target->hdr!=nullptr;if(f==0)hdr_bake=hdr_face;
+      face_pixels[f].resize(static_cast<std::size_t>(res)*res*3);
       SDL_GPUTransferBufferCreateInfo info{};
       info.usage=SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
-      info.size=static_cast<Uint32>(face_pixels[f].size());
+      info.size=static_cast<Uint32>(res*res*(hdr_face?8u:4u));
       auto* dl=SDL_CreateGPUTransferBuffer(device,&info);
       if(!dl)throw gpu_error("3D probe download buffer creation failed");
       {
         Command command(device);
         auto* pass=SDL_BeginGPUCopyPass(command.value);
         if(!pass)throw gpu_error("3D probe download copy pass failed");
-        SDL_GPUTextureRegion src{};src.texture=face_target->color;src.w=static_cast<Uint32>(res);src.h=static_cast<Uint32>(res);src.d=1;
+        SDL_GPUTextureRegion src{};src.texture=hdr_face?face_target->hdr:face_target->color;src.w=static_cast<Uint32>(res);src.h=static_cast<Uint32>(res);src.d=1;
         SDL_GPUTextureTransferInfo dst{};dst.transfer_buffer=dl;dst.pixels_per_row=static_cast<Uint32>(res);dst.rows_per_layer=static_cast<Uint32>(res);
         SDL_DownloadFromGPUTexture(pass,&src,&dst);
         SDL_EndGPUCopyPass(pass);
@@ -1548,7 +1564,13 @@ struct Scene3DRenderer::Storage {
       }
       checked(SDL_WaitForGPUIdle(device),"3D probe bake wait failed");
       auto* mapped=SDL_MapGPUTransferBuffer(device,dl,false);
-      if(mapped)std::memcpy(face_pixels[f].data(),mapped,face_pixels[f].size());
+      if(mapped){
+        if(hdr_face){const auto* half=static_cast<const std::uint16_t*>(mapped);
+          for(std::size_t i=0;i<face_pixels[f].size();++i)face_pixels[f][i]=half_to_float(half[i/3*4+(i%3)]);
+        }else{const auto* bytes=static_cast<const std::uint8_t*>(mapped);
+          for(std::size_t i=0;i<face_pixels[f].size();++i)face_pixels[f][i]=bytes[i/3*4+(i%3)]/255.f;
+        }
+      }
       SDL_UnmapGPUTransferBuffer(device,dl);
       SDL_ReleaseGPUTransferBuffer(device,dl);
       if(!mapped)throw gpu_error("3D probe download map failed");
@@ -1567,8 +1589,8 @@ struct Scene3DRenderer::Storage {
       const int x1=std::min(x0+1,res-1),y1=std::min(y0+1,res-1);
       const double tx=uu-x0,ty=vv-y0;
       const auto& img=face_pixels[f];
-      const auto at=[&](int x,int y){return img[(static_cast<std::size_t>(y)*res+x)*4+c];};
-      return static_cast<std::uint8_t>(at(x0,y0)*(1-tx)*(1-ty)+at(x1,y0)*tx*(1-ty)+at(x0,y1)*(1-tx)*ty+at(x1,y1)*tx*ty+0.5);
+      const auto at=[&](int x,int y){return img[(static_cast<std::size_t>(y)*res+x)*3+c];};
+      return at(x0,y0)*(1-tx)*(1-ty)+at(x1,y0)*tx*(1-ty)+at(x0,y1)*(1-tx)*ty+at(x1,y1)*tx*ty;
     };
     for(int y=0;y<eh;++y)for(int x=0;x<ew;++x){
       const double lon=6.2831853071795865*((x+0.5)/ew-0.5),lat=3.1415926535897932*(y+0.5)/eh;
@@ -1582,7 +1604,24 @@ struct Scene3DRenderer::Storage {
       auto* out=&pixels[(static_cast<std::size_t>(y)*ew+x)*4];
       if(best<0){out[0]=out[1]=out[2]=0;out[3]=255;continue;}
       const double u=cx/fwd*0.5+0.5,v=0.5-cy/fwd*0.5;
-      for(int c=0;c<4;++c)out[c]=texel(best,u,v,c);
+      const float r=static_cast<float>(texel(best,u,v,0)),g=static_cast<float>(texel(best,u,v,1)),b=static_cast<float>(texel(best,u,v,2));
+      if(hdr_bake){
+        // RGBM: alpha stores the shared magnitude so rgb*a*8 decodes up
+        // to 8x white — a captured sun survives the clamp that would
+        // flatten it to a plain white blob in the LDR path.
+        const float mx=std::max(r,std::max(g,b));
+        const float a=mx>0.f?std::ceil(std::min(mx/8.f,1.f)*255.f)/255.f:0.f;
+        const float inv=a>0.f?1.f/(a*8.f):0.f;
+        out[0]=static_cast<std::uint8_t>(std::clamp(r*inv,0.f,1.f)*255.f+0.5f);
+        out[1]=static_cast<std::uint8_t>(std::clamp(g*inv,0.f,1.f)*255.f+0.5f);
+        out[2]=static_cast<std::uint8_t>(std::clamp(b*inv,0.f,1.f)*255.f+0.5f);
+        out[3]=static_cast<std::uint8_t>(a*255.f);
+      }else{
+        out[0]=static_cast<std::uint8_t>(std::clamp(r,0.f,1.f)*255.f+0.5f);
+        out[1]=static_cast<std::uint8_t>(std::clamp(g,0.f,1.f)*255.f+0.5f);
+        out[2]=static_cast<std::uint8_t>(std::clamp(b,0.f,1.f)*255.f+0.5f);
+        out[3]=255;
+      }
     }
     // Preserve cache-lifetime accounting (the bake's uploads are real
     // cache entries) while restoring the per-frame counters the six
@@ -1594,8 +1633,8 @@ struct Scene3DRenderer::Storage {
     stats=pre;
     stats.texture_cache_bytes+=tex_bytes;stats.mesh_cache_bytes+=mesh_bytes;
     stats.texture_uploads+=tex_up;stats.mesh_uploads+=mesh_up;
-    ++stats.probe_bakes;
-    probe_cache[key]=RgbaImage::create(ew,eh,std::move(pixels));
+    ++stats.probe_bakes;if(hdr_bake)++stats.probe_bakes_hdr;
+    probe_cache[key]=RgbaImage::create(ew,eh,std::move(pixels),{},hdr_bake);
   }
 };
 Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):storage_(std::make_unique<Storage>(device,renderer)){storage_->initialize();}

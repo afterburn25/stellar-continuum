@@ -39,7 +39,7 @@ class ComApartment final {
 void require_wic(HRESULT result,const char *operation){if(FAILED(result))throw std::runtime_error(std::string(operation)+" (HRESULT "+std::to_string(static_cast<unsigned long>(result))+").");}
 }
 
-std::shared_ptr<const RgbaImage> RgbaImage::create(int width,int height,std::vector<std::uint8_t> rgba_pixels,std::vector<Bc1MipLevel> bc1_mips){
+std::shared_ptr<const RgbaImage> RgbaImage::create(int width,int height,std::vector<std::uint8_t> rgba_pixels,std::vector<Bc1MipLevel> bc1_mips,bool hdr_rgbm){
   if(width<=0||height<=0||width>maximum_rgba_image_dimension||height>maximum_rgba_image_dimension)throw std::length_error("RGBA image dimensions must be between 1 and 8192 pixels.");
   const auto wide=static_cast<std::size_t>(width),high=static_cast<std::size_t>(height);
   if(wide>maximum_rgba_image_bytes/4u/high)throw std::length_error("RGBA image exceeds the 64 MiB decoded-byte limit.");
@@ -53,7 +53,7 @@ std::shared_ptr<const RgbaImage> RgbaImage::create(int width,int height,std::vec
       if(w==1&&h==1)break;w=std::max(1,w/2);h=std::max(1,h/2);
     }if(n!=bc1_mips.size())throw std::invalid_argument("Excess BC1 mip levels");
   }
-  auto result=std::shared_ptr<RgbaImage>(new RgbaImage(width,height,std::move(rgba_pixels)));result->bc1_mips_=std::move(bc1_mips);return result;
+  auto result=std::shared_ptr<RgbaImage>(new RgbaImage(width,height,std::move(rgba_pixels)));result->bc1_mips_=std::move(bc1_mips);result->hdr_rgbm_=hdr_rgbm;return result;
 }
 
 std::shared_ptr<const RgbaImage> RgbaImage::create_cooked(TextureFormat format,std::vector<Bc1MipLevel> mips){

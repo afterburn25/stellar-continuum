@@ -126,7 +126,11 @@ same document headless-tested.
    an authored anchor render through the full pipeline once per scene,
    resample into an equirect, and override the authored slot — opt-in
    materials reflect the local scene (sun disc, lit planets) rather
-   than only a starfield. Remaining: the bake is a static snapshot per
+   than only a starfield. On HDR-capable devices the faces download
+   the pre-tonemap RGBA16F target RGBM-encoded (8x headroom — a baked
+   sun survives the LDR clamp and can bloom in reflections); UNORM
+   devices fall back to the display path. Remaining: the bake is a
+   static snapshot per
    caller-declared epoch (`Scene3DView::probe_epoch` — document loads
    and editor edits bump it, rebuilding per frame does not); no probe
    grid, no per-instance probe selection.

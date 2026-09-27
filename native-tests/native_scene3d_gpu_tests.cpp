@@ -589,7 +589,11 @@ int main(int argc,char** argv)try{
       auto mirror=enviro;mirror.material.pbr->environment.reset();
       auto painter=mirror;painter.mesh=Mesh3D::uv_sphere(32,16);painter.scale=30;
       painter.position={0,0,40};painter.material.tint={255,10,10,255};
-      painter.material.ambient=1;painter.material.diffuse=0;painter.material.pbr.reset();
+      // HDR bakes read pre-tonemap radiance — an ambient-lit body stays
+      // dim there; an emitter carries decisive luminance in both paths.
+      painter.material.ambient=0;painter.material.diffuse=0;
+      painter.material.pbr->environment_strength=0;painter.material.pbr->emissive_strength=6.f;
+      painter.material.pbr->emissive_tint={1.f,0.f,0.f};
       const auto authored=RgbaImage::create(1,1,{0,0,255,255});
       const auto bakes_before=window.scene3d_statistics().probe_bakes;
       EnvironmentCapture3D capture_opts;capture_opts.enabled=true;capture_opts.face_resolution=64;
@@ -667,6 +671,31 @@ int main(int argc,char** argv)try{
       epoch_draw(12,"pbr-epoch-return.png");
       check(window.scene3d_statistics().probe_bakes==bakes_epoch+3,
           "Undeclared probe epoch did not release its baked entry");
+    }
+    // HDR captured probe: when the device supports float targets the
+    // bake downloads the pre-tonemap RGBA16F faces and RGBM-encodes
+    // them, so a captured emitter keeps its headroom — an authored
+    // clamped-white map can only reflect display 1.0. The emissive
+    // sphere sits behind the camera: invisible to the view, dominant
+    // in the +Z hemisphere the camera-facing mirror reflects.
+    {
+      auto mirror=enviro;mirror.material.pbr->environment.reset();
+      mirror.material.pbr->metallic=1.f;mirror.material.pbr->roughness=.04f;
+      auto sun=mirror;sun.mesh=Mesh3D::uv_sphere(32,16);sun.scale=30;
+      sun.position={0,0,40};sun.material.pbr->environment_strength=0;
+      sun.material.pbr->emissive_strength=6.f;
+      const auto white=RgbaImage::create(1,1,{255,255,255,255});
+      EnvironmentCapture3D cap_hdr;cap_hdr.enabled=true;cap_hdr.face_resolution=64;
+      const auto hdr_before=window.scene3d_statistics().probe_bakes_hdr;
+      DrawList ldr_l;ldr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{mirror,sun},{.42f,.2f,.87f},{},{},white),{0,0,320,320}});
+      window.draw(ldr_l,folder/"pbr-probe-ldr.png");const auto ldr=decode_rgba_image(folder/"pbr-probe-ldr.png");
+      DrawList hdr_l;hdr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{mirror,sun},{.42f,.2f,.87f},{},{},nullptr,cap_hdr),{0,0,320,320}});
+      window.draw(hdr_l,folder/"pbr-probe-hdr.png");const auto hdr=decode_rgba_image(folder/"pbr-probe-hdr.png");
+      const int on=channel(*hdr,160,160,0),off=channel(*ldr,160,160,0);
+      if(window.scene3d_statistics().probe_bakes_hdr==hdr_before+1)
+        check(on>off+25,"HDR probe bake lost the emitter's radiance headroom");
+      else
+        check(on>off-15,"LDR probe bake fell below the authored clamp baseline");
     }
     std::cout<<"pbr_gpu=emissive_metallic_cutout_tiling_ibl_probe_passed\n";
   }

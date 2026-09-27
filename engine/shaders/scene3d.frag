@@ -57,6 +57,7 @@ struct Material {
     vec4 point_outer; // per-light outer cos edge
     vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
     vec4 atmo_sunset; // terminator-transmitted tint rgb, blend strength
+    vec4 env_flags; // x: bound environment map is RGBM-encoded HDR
 };
 layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
@@ -192,7 +193,10 @@ vec3 environment(vec3 d,float roughness) {
     vec2 uv=vec2(atan(d.x,d.z)/(2.0*PI)+0.5,acos(clamp(d.y,-1.0,1.0))/PI);
     float levels=float(textureQueryLevels(environment_map));
     float lod=min(roughness*roughness*(levels-1.0),max(levels-3.0,0.0));
-    return textureLod(environment_map,uv,lod).rgb;
+    vec4 texel=textureLod(environment_map,uv,lod);
+    // Captured probes keep linear radiance RGBM-encoded so a baked sun
+    // disc retains its headroom; authored maps sample literally.
+    return material.env_flags.x>0.5?texel.rgb*texel.a*8.0:texel.rgb;
 }
 float fresnel(float cosine,float f0) {return f0+(1.0-f0)*pow(1.0-cosine,5.0);}
 vec3 fresnel3(float cosine,vec3 f0) {return f0+(vec3(1.0)-f0)*pow(1.0-cosine,5.0);}
