@@ -75,9 +75,9 @@ same document headless-tested.
 2. **Lighting** — landed: key + up to two fill/rim directionals and ≤4
    windowed point lights per scene (`lights[]`, `pointLights`), each
    optionally gated to a smooth spot cone (`spotDir`/`spotInner`/
-   `spotOuter` on the entry — zero direction stays omni). One spot per
-   scene can also cast (`castShadow`) through its own cone-frustum
-   depth map.
+   `spotOuter` on the entry — zero direction stays omni). Shadowed
+   spots (`castShadow`) each cast through their own cone-frustum
+   projection into a quadrant of one shared depth atlas.
 3. **Shadows** — landed: key-light directional shadow map (authored
    ortho volume centred ahead of the camera, depth pass + 8-tap PCF,
    tier-scaled resolution, Low skips; casters share the lit pass's
