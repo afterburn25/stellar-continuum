@@ -29,6 +29,9 @@ struct NativePlayerNotification {
   // Catalog key/format-arg for fixed publisher messages; empty keeps the
   // composed `message` literal (core-emitted summaries stay English).
   std::string message_key, message_arg;
+  // Raw engine history category for chronicle-seeded entries ("diplomacy.",
+  // "war.", ...); the display path uses it to recompose localized summaries.
+  std::string history_category;
   std::optional<int> diplomatic_contact_id;
   std::optional<int> system_id; // located events can navigate there
   NotificationSeverity severity{NotificationSeverity::Info};
@@ -42,7 +45,8 @@ class NativeNotificationFeed final {
                std::optional<int> diplomatic_contact_id = std::nullopt,
                std::optional<int> system_id = std::nullopt,
                std::string message_key = {}, std::string message_arg = {},
-               NotificationSeverity severity = NotificationSeverity::Info);
+               NotificationSeverity severity = NotificationSeverity::Info,
+               std::string history_category = {});
   [[nodiscard]] const std::deque<NativePlayerNotification>& items() const noexcept { return items_; }
   [[nodiscard]] std::int64_t latest_sequence() const noexcept { return next_sequence_ - 1; }
   [[nodiscard]] int unread_count(std::int64_t last_read) const noexcept;

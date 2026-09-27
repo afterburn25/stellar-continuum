@@ -1,5 +1,6 @@
 #include <stellar/engine/native_ui_skin.hpp>
 #include "native_notifications.hpp"
+#include "native_history_messages.hpp"
 #include "native_ui_theme.hpp"
 
 #include <algorithm>
@@ -98,13 +99,16 @@ std::vector<std::string> feed_categories(
 // Keyed messages translate at display; `message` stays the English fallback.
 std::string display_message(const NativePlayerNotification& item,
                             const stellar::engine::LocalizationTable* locale) {
-  if (item.message_key.empty()) return item.message;
-  if (locale && locale->contains(item.message_key)) {
+  if (!item.message_key.empty() && locale &&
+      locale->contains(item.message_key)) {
     const std::array<std::string, 1> args{item.message_arg};
     return locale->format(item.message_key,
                           std::span<const std::string>(args));
   }
-  return item.message;
+  return native_history::localized_history_summary(
+      locale, item.history_category.empty() ? item.category
+                                            : item.history_category,
+      item.message);
 }
 
 bool intersects(UiRect a, UiRect b) noexcept {
@@ -309,11 +313,14 @@ void NativeNotificationFeed::publish(std::string category, std::string date, std
                                      std::optional<int> system_id,
                                      std::string message_key,
                                      std::string message_arg,
-                                     NotificationSeverity severity) {
+                                     NotificationSeverity severity,
+                                     std::string history_category) {
   if (category.empty() || date.empty() || message.empty()) return;
   items_.push_back({next_sequence_++, std::move(category), std::move(date),
                     std::move(message), std::move(message_key),
-                    std::move(message_arg), contact, system_id, severity});
+                    std::move(message_arg),
+                    std::move(history_category), contact, system_id,
+                    severity});
   while (items_.size() > maximum_items) items_.pop_front();
 }
 

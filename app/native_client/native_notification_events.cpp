@@ -81,6 +81,9 @@ void seed_chronicle_notifications(NativeNotificationFeed& feed,
   const auto observer=static_cast<std::uint64_t>(observer_civilization_id);
   for(auto it=begin;it!=events.end();++it){
     const auto* event=*it;
+    // Keep the raw engine category on the entry so the display path can
+    // recompose localized history summaries (the public `category` carries
+    // the publisher label the chips and topic cycle expect).
     const char* label=native_chronicle::category_label(event->category);
     // Located reports get a VIEW SYSTEM action — the feed() projection
     // already confined them to the observer's authorized visibility.
@@ -102,7 +105,7 @@ void seed_chronicle_notifications(NativeNotificationFeed& feed,
         native_campaign::format_campaign_date(event->at_day),
         event->summary,counterpart,system,{},{},
         event->category.starts_with("war.")?NotificationSeverity::Alert
-            :NotificationSeverity::Info);
+            :NotificationSeverity::Info,std::string(event->category));
   }
 }
 

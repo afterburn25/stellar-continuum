@@ -3663,7 +3663,7 @@ class NativeCampaign final {
     scroll.pointer=center(layout.detail_rows);scroll.events={{InputEventType::Wheel,scroll.pointer,{},-10.f}};
     if(!update(scroll,width,height,0.,false))throw std::runtime_error("Diplomacy agreement scrolling closed the campaign.");
     DrawList draw;diplomacy_workspace_.render(draw,width,height,&diplomacy_portrait_provider_);
-    if(!std::ranges::any_of(draw.overlay,[&](const auto&item){const auto*label=std::get_if<Text>(&item);if(!label||label->value!="Research Exchange"||!label->clip)return false;const auto&c=*label->clip;const auto&r=layout.detail_rows;return std::min(c.y+c.height,r.y+r.height)-std::max(c.y,r.y)>=4.f&&std::min(c.x+c.width,r.x+r.width)-std::max(c.x,r.x)>=8.f;}))
+    if(!std::ranges::any_of(draw.overlay,[&](const auto&item){const auto*label=std::get_if<Text>(&item);if(!label||label->value!=tr("DIPLOMACY_ATYPE_RESEARCH_EXCHANGE","Research Exchange")||!label->clip)return false;const auto&c=*label->clip;const auto&r=layout.detail_rows;return std::min(c.y+c.height,r.y+r.height)-std::max(c.y,r.y)>=4.f&&std::min(c.x+c.width,r.x+r.width)-std::max(c.x,r.x)>=8.f;}))
       throw std::runtime_error("Accepted research agreement is not visible after scrolling.");
     if(!std::ranges::any_of(draw.overlay,[&](const auto&item){const auto*image=std::get_if<Image>(&item);return image&&image->resource&&image->resource->width()==2172&&image->resource->height()==724&&layout.stage.contains(center(image->destination));}))
       throw std::runtime_error("Native diplomacy did not render the reviewed transmission artwork.");
