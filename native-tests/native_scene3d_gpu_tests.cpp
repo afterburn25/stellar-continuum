@@ -1312,6 +1312,27 @@ int main(int argc,char** argv)try{
     check(fleet_stats.lod_instances>0&&fleet_stats.lod_instances<1024,"Fleet LOD pick did not partition by depth");
     std::cout<<"fleet3d frames=60 instances=1024 cpu_submit_mean_ms="<<fleet_submit/60<<" frame_wall_mean_ms="<<fleet_wall/60
       <<" draw_calls="<<fleet_stats.draw_calls<<" lod_instances="<<fleet_stats.lod_instances<<'\n';
+    // Same fleet under the shadow paths: the directional box plus a
+    // shadowed spot cone each re-submit the caster set, doubling the
+    // per-frame submission work the timing surfaces.
+    {std::vector<MeshInstance3D> lit_ships;lit_ships.reserve(1024);
+     for(int row=0;row<32;++row)for(int col=0;col<32;++col){
+       MeshInstance3D ship{hull_mesh,{},{},.5f,hull};
+       ship.position={(col-16)*2.5,(row-16)*1.4,-10.0-row*6.0};
+       ship.lod_pixels=8;ship.lod_meshes={proxy};
+       lit_ships.push_back(std::move(ship));
+     }
+     ShadowMap3D armada_shadow;armada_shadow.extent=200;armada_shadow.distance=120;armada_shadow.depth=400;
+     PointLight3D picket;picket.position={20,0,-40};picket.color={1.f,.9f,.8f};picket.intensity=3.f;
+     picket.range=220.f;picket.spot_direction={-.1f,0,-1};picket.spot_inner=.995f;picket.spot_outer=.97f;picket.casts_shadow=true;
+     DrawList lit_armada;lit_armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(lit_ships),{0,0,1},{picket},armada_shadow),{0,0,640,360}});
+     const auto lit_start=std::chrono::steady_clock::now();double lit_submit=0;
+     for(int i=0;i<60;++i){FrameTiming timing;window.draw(lit_armada,std::nullopt,&timing);lit_submit+=timing.submission_ms;}
+     const auto lit_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-lit_start).count();
+     const auto lit_stats=window.scene3d_statistics();
+     check(lit_stats.shadow_casters>0,"Shadowed fleet submitted no shadow casters");
+     std::cout<<"fleet3d_shadow frames=60 instances=1024 cpu_submit_mean_ms="<<lit_submit/60<<" frame_wall_mean_ms="<<lit_wall/60
+       <<" draw_calls="<<lit_stats.draw_calls<<" shadow_casters="<<lit_stats.shadow_casters<<'\n';}
   }
   DrawList invalid;invalid.world.emplace_back(Scene3DView{Scene3D::create(camera,{a}),{0,0,8192,8192}});
   bool rejected=false;try{window.draw(invalid);}catch(const std::length_error&){rejected=true;}check(rejected,"Oversized 3D target was accepted");
