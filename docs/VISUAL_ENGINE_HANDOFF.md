@@ -2,7 +2,10 @@
 
 Branch: `engine/space-graphics-overhaul`. Last updated: 2026-09-25.
 Companion docs: `docs/SPACE_RENDERING_OVERHAUL.md` (audit/plan),
-`docs/ENGINE_CAPABILITIES.md` (registry record). This file is the
+`docs/ENGINE_CAPABILITIES.md` (registry record),
+`docs/GAME_VISUAL_ENGINE_REQUESTS.md` (game-side intake for new
+renderer needs — file a request there rather than building parallel
+rendering in `app/`). This file is the
 integration surface — what a consumer (RuntimeHost, game client,
 editor) sets to drive the new renderer features.
 
