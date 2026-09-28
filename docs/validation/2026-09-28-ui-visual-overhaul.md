@@ -154,6 +154,15 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `--inspection-check`, `--logistics-check`, `--economy-check` under
   `--smoke`; and `--campaign-profile --profile-frames 120`
   (16.9 ms steady-state frame mean at 1920×1080).
+- Visual capture audit: marquee render paths confirmed by eye, not only
+  by assertion — galaxy backdrop art (`nav.bmp`), Sol photosphere
+  granulation at 2054× zoom (`gal-star-system-maximum.bmp`), Earth PBR
+  globe with terminator, night-side city lights and atmosphere rim
+  (`pl-planetary-1.bmp`), Jupiter amber storm bands and Saturn's full
+  ring system (`work/fexp-{jupiter,saturn}-globe-front.bmp`), emissive
+  ship engine flames in the battle view (`bt.bmp`). `--planetary-smoke`
+  green at 2560×1440 (review read-only, modal isolation, slot
+  reservation, timed).
 
 ## Known limitations
 
