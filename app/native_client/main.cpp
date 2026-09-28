@@ -8197,6 +8197,7 @@ class NativeCampaign final {
     diplomacy_workspace_.render(out, width, height, &diplomacy_portrait_provider_);
     colony_workspace_.planetary().globe().set_simulation_days(session_->frame().clock().simulation_days());
     colony_workspace_.planetary().globe().set_visual_seconds(system_workspace_.visual_seconds());
+    colony_workspace_.planetary().globe().set_environment(phenomena_.local_environment());
     if(colony_workspace_.visible())refresh_planetary_portrait();
     colony_workspace_.render(out, width, height);
     settlement_workspace_.render(out,width,height);
