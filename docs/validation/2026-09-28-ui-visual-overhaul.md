@@ -189,7 +189,10 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   smoke save under `--record`. Both erase sites now guard with
   `is_object()`. Post-fix: recording produces a journal, replay
   verifies 42/42 checkpoints with `diverged:false`, `--replay-info`
-  inspects the file (seed, build id, ordered commands/checkpoints).
+  inspects the file (seed, build id, ordered commands/checkpoints),
+  `--replay-until 20` dumps the canonical tick-20 document to
+  `replay-until-20.json`, and `--replay-exit` ends at the verdict with
+  `replay_verified` printed.
 
 ## Known limitations
 
