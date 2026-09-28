@@ -10,6 +10,7 @@
 #include <stellar/core/planetary_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/ship_designs.hpp>
+#include <stellar/core/developer_campaign.hpp>
 #include <stellar/core/player_campaign_json.hpp>
 #include <stellar/core/player_campaign_persistence.hpp>
 #include <stellar/core/species_environment.hpp>
@@ -28,6 +29,14 @@
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <psapi.h>
+#endif
 
 using Json = nlohmann::json;
 using namespace stellar::core;
@@ -202,6 +211,47 @@ Json adaptive_diagnostic(IntegratedAdaptiveCampaignRuntime &runtime,
   return result;
 }
 
+// Canonicalizes a developer save document for continuation comparison.
+// The C# format is intentionally order-unstable across a round-trip in
+// one place: civilization leadership is captured in world order but
+// restored ordinally (parity fixture
+// civilization-current-unsorted-leadership). Object member order is never
+// sim-semantic, so sorting all object keys yields the canonical document.
+void canonicalize_save(nlohmann::ordered_json &value) {
+  if (value.is_object()) {
+    nlohmann::ordered_json sorted =
+        nlohmann::ordered_json::object();
+    std::vector<std::string> keys;
+    keys.reserve(value.size());
+    for (const auto &[key, _] : value.items()) keys.push_back(key);
+    std::sort(keys.begin(), keys.end());
+    for (const auto &key : keys) {
+      auto member = value.at(key);
+      canonicalize_save(member);
+      sorted[key] = std::move(member);
+    }
+    value = std::move(sorted);
+    return;
+  }
+  if (value.is_array())
+    for (auto &entry : value) canonicalize_save(entry);
+}
+
+// Process working set (0 when the platform offers no probe).
+std::uint64_t process_memory_bytes(bool peak = false) {
+#ifdef _WIN32
+  PROCESS_MEMORY_COUNTERS_EX counters{};
+  if (GetProcessMemoryInfo(
+          GetCurrentProcess(),
+          reinterpret_cast<PPROCESS_MEMORY_COUNTERS>(&counters),
+          sizeof(counters)))
+    return peak ? counters.PeakWorkingSetSize : counters.WorkingSetSize;
+#else
+  (void)peak;
+#endif
+  return 0;
+}
+
 std::string state_hash(std::string_view text) {
   const auto digest = detail::adaptive_research_sha256(
       {reinterpret_cast<const std::uint8_t *>(text.data()), text.size()});
@@ -334,14 +384,21 @@ int run_adaptive_campaign_host(
                      options.repeats))
     throw std::invalid_argument(
         "Adaptive campaign ticks, repeats and step days are outside bounds");
-  if ((options.systems != 250 && options.systems != 500 &&
-       options.systems != 1000 && options.systems != 2500) ||
-      options.pre_warp_civilizations < 1 ||
-      options.pre_warp_civilizations > 13 ||
+  const bool supported_systems =
+      options.systems == 250 || options.systems == 500 ||
+      options.systems == 1000 || options.systems == 2500 ||
+      options.systems == 5000 || options.systems == 10000 ||
+      options.systems == 25000 || options.systems == 50000;
+  if (!supported_systems || options.pre_warp_civilizations < 1 ||
+      options.pre_warp_civilizations > 25 ||
       options.ancient_civilizations < 0 ||
       options.ancient_civilizations > 3)
     throw std::invalid_argument(
         "Adaptive campaign systems or civilization counts are outside bounds");
+  if (options.verify_continuation_tick < 0 ||
+      options.verify_continuation_tick >= options.simulation_ticks)
+    throw std::invalid_argument(
+        "Adaptive campaign continuation verify tick must be 0..ticks-1");
   if (options.autosave_every < 0 ||
       options.autosave_every > options.simulation_ticks)
     throw std::invalid_argument(
@@ -358,7 +415,11 @@ int run_adaptive_campaign_host(
   std::string retained_state;
   Json final_diagnostic;
   Json phase_timings = Json::array();
-  std::size_t fleet_count = 0;
+  std::size_t fleet_count = 0, colony_count = 0, civilization_count = 0,
+              war_count = 0;
+  double credits_total = 0.0, industry_total = 0.0;
+  std::string continuation_save;
+  std::string continuation_final_save;
   bool advanced = true;
   std::uint64_t sensor_contacts = 0, adaptive_events = 0,
                 diplomacy_events = 0, industry_allocations = 0,
@@ -381,6 +442,11 @@ int run_adaptive_campaign_host(
          options.pre_warp_civilizations, options.ancient_civilizations,
          options.player_species});
     inject_stress_fleets(fresh_world, options.stress_fleets);
+    // The continuation-verify path captures a developer-envelope save,
+    // which requires the campaign to carry developer provenance.
+    if (options.verify_continuation_tick > 0 && repeat == 0)
+      fresh_world.developer_provenance =
+          CampaignDeveloperProvenance{.tools_used = true};
     auto runtime = IntegratedAdaptiveCampaignRuntime::create_fresh(
         load_runtime(research_root), std::move(fresh_world));
     if (options.civilization_automation)
@@ -435,6 +501,13 @@ int run_adaptive_campaign_host(
       exploration_events += result.core.exploration_events.size();
       combat_events += result.core.combat_events.size();
       colonization_events += result.core.colonization_events.size();
+      if (repeat == 0 && options.verify_continuation_tick > 0 &&
+          tick + 1 == options.verify_continuation_tick)
+        continuation_save = capture_developer_campaign_json(
+            runtime,
+            {static_cast<double>(options.verify_continuation_tick) *
+                 options.step_days,
+             "adaptive-benchmark", "2050-03-21T00:00:00Z"});
       if (options.autosave_every > 0 &&
           (tick + 1) % options.autosave_every == 0) {
         const auto save_started = std::chrono::steady_clock::now();
@@ -453,6 +526,16 @@ int run_adaptive_campaign_host(
     }
     final_diagnostic = adaptive_diagnostic(runtime, campaign_diagnostic);
     fleet_count = runtime.world().campaign().fleets.size();
+    colony_count = runtime.world().campaign().colonies.size();
+    civilization_count = runtime.world().campaign().civilizations.size();
+    for (const auto &economy : runtime.world().campaign().economies) {
+      credits_total += economy.credits;
+      industry_total += economy.industry;
+    }
+    for (const auto &relationship :
+         runtime.diplomacy().snapshot().relationships)
+      if (relationship.political_state == DiplomaticPoliticalState::at_war)
+        ++war_count;
     phase_timings = Json::array();
     for (const auto &sample : runtime.performance_samples())
       phase_timings.push_back(
@@ -466,14 +549,68 @@ int run_adaptive_campaign_host(
            {"maxMs", sample.timing.maximum_nanoseconds / 1e6}});
     const auto serialized = final_diagnostic.dump();
     advanced = advanced && serialized != initial_state;
-    if (repeat == 0)
+    if (repeat == 0) {
       retained_state = serialized;
-    else if (retained_state != serialized)
+      // The uninterrupted baseline for the continuation proof: the
+      // developer save of the untouched runtime at the final tick.
+      if (!continuation_save.empty())
+        continuation_final_save = capture_developer_campaign_json(
+            runtime,
+            {static_cast<double>(options.simulation_ticks) *
+                 options.step_days,
+             "adaptive-benchmark", "2050-03-21T00:00:00Z"});
+    } else if (retained_state != serialized)
       throw std::runtime_error(
           "Adaptive campaign final state differs between repeats");
   }
 
   const auto final_hash = state_hash(retained_state);
+  // Mid-run save→restore→continue proof: a second runtime restored from
+  // the developer save captured at the verify tick must advance the
+  // remaining ticks to the identical final state.
+  bool continuation_deterministic = false;
+  std::int64_t continuation_diff_offset = -1;
+  std::string continuation_diff_context;
+  if (!continuation_save.empty()) {
+    auto restored = restore_developer_campaign_json(
+        load_runtime(research_root), continuation_save);
+    auto continued = std::move(restored).activate();
+    continued.set_profiling_enabled(true);
+    for (int tick = options.verify_continuation_tick;
+         tick < options.simulation_ticks; ++tick)
+      (void)continued.advance(
+          options.step_days,
+          static_cast<double>(tick + 1) * options.step_days);
+    // Compare canonicalized developer saves — the authoritative world +
+    // continuation document — not the human diagnostic. Set-semantic
+    // members are already sorted at capture; sorting object keys removes
+    // the one remaining format artifact (leadership office ordering).
+    auto continued_save = nlohmann::ordered_json::parse(
+        capture_developer_campaign_json(
+            continued,
+            {static_cast<double>(options.simulation_ticks) *
+                 options.step_days,
+             "adaptive-benchmark", "2050-03-21T00:00:00Z"}));
+    auto retained_save = nlohmann::ordered_json::parse(
+        continuation_final_save);
+    canonicalize_save(continued_save);
+    canonicalize_save(retained_save);
+    const auto continued_dump = continued_save.dump();
+    const auto retained_dump = retained_save.dump();
+    continuation_deterministic = continued_dump == retained_dump;
+    if (!continuation_deterministic) {
+      const auto extent = std::min(continued_dump.size(),
+                                   retained_dump.size());
+      std::size_t at = 0;
+      while (at < extent && continued_dump[at] == retained_dump[at]) ++at;
+      continuation_diff_offset = static_cast<std::int64_t>(at);
+      continuation_diff_context =
+          "orig:..." +
+          retained_dump.substr(at > 80 ? at - 80 : 0, 200) +
+          "\ncont:..." +
+          continued_dump.substr(at > 80 ? at - 80 : 0, 200);
+    }
+  }
   final_diagnostic["simulation"] =
       {{"ticks", options.simulation_ticks}, {"stepDays", options.step_days},
        {"totalSimulatedDays", options.simulation_ticks * options.step_days},
@@ -545,6 +682,27 @@ int run_adaptive_campaign_host(
         {"combatIntelligenceObservations",
          final_diagnostic.at("combatIntelligence").size()},
         {"fleets", fleet_count}}},
+      {"campaignMetrics",
+       {{"civilizations", civilization_count},
+        {"colonies", colony_count},
+        {"fleets", fleet_count},
+        {"wars", war_count},
+        {"economyCreditsTotal", credits_total},
+        {"economyIndustryTotal", industry_total},
+        {"scriptedEventDefinitions",
+         final_diagnostic.at("scriptedEvents").at("definitions")},
+        {"scriptedEventJournalEntries",
+         final_diagnostic.at("scriptedEvents").at("journalEntries")}}},
+      {"workingSetBytes", process_memory_bytes()},
+      {"peakWorkingSetBytes", process_memory_bytes(true)},
+      {"continuationVerifyTick", options.verify_continuation_tick},
+      {"continuationSaveBytes", continuation_save.size()},
+      {"continuationDeterministic",
+       options.verify_continuation_tick > 0
+           ? Json(continuation_deterministic)
+           : Json(nullptr)},
+      {"continuationDiffOffset", continuation_diff_offset},
+      {"continuationDiffContext", continuation_diff_context},
       {"legacyResearchDisabled", true},
       {"stateAdvancedBeyondSeed", advanced},
       {"repeatFinalStatesDeterministic", true},

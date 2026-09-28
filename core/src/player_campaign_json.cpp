@@ -1183,11 +1183,16 @@ Json encode_runtime_continuation(const CampaignRuntimeContinuation &state){
         {"Reason",entry.reason},{"Alternatives",std::move(alternatives)},
         {"Constraints",entry.constraints}});
     }
+    Json proposals=Json::array();
+    for(const auto &proposal:controller.last_proposals)
+      proposals.push_back({{"Domain",proposal.domain},
+        {"ActionId",proposal.action_id}});
     civilizations.push_back({{"CivilizationId",civilization.civilization_id},
       {"Domains",std::move(domains)},{"Locks",std::move(locks)},
       {"Mind",{{"Incumbents",std::move(incumbents)},
         {"LastCommits",std::move(stamps)},{"Journal",std::move(mind_journal)}}},
-      {"Journal",std::move(journal)}});
+      {"Journal",std::move(journal)},
+      {"LastProposals",std::move(proposals)}});
   }
   automation["Civilizations"]=std::move(civilizations);
   // Scripted-event coordinator state is an opaque serialized document
@@ -1333,6 +1338,16 @@ CampaignRuntimeContinuation decode_runtime_continuation(const OrderedValue &valu
           decision.candidates=static_cast<std::uint32_t>(typed_integer<std::int64_t>(field(je,"Candidates"),path));
           decision.switched=typed_bool(field(je,"Switched"),path);
           civilization.controller.mind.journal.push_back(std::move(decision));
+        }
+      }
+      if(const auto *proposals_member=member(c,"LastProposals")){
+        const auto &proposals=typed_array(field(c,"LastProposals"),path);
+        if(proposals.size()>64)throw PlayerCampaignPersistenceDataError("Too many automation advisory proposals.");
+        for(const auto &proposal_entry:proposals){
+          const auto &pe=object(proposal_entry);
+          civilization.controller.last_proposals.push_back(
+            {typed_string(field(pe,"Domain"),path),
+             typed_string(field(pe,"ActionId"),path)});
         }
       }
       const auto &journal=typed_array(field(c,"Journal"),path);

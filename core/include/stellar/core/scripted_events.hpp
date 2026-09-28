@@ -178,9 +178,12 @@ public:
     [[nodiscard]] bool auto_choose_player() const noexcept;
 
     // --- Save/load ---------------------------------------------------------
+    // The snapshot embeds the authored definition documents, so a save is
+    // self-contained: restore re-registers its trigger contract before
+    // instances come back and never depends on a host data root.
     [[nodiscard]] std::string capture_state() const;
-    // Definitions must be loaded first; unknown mission/stage references
-    // in the document are an error (the data set must match the save).
+    // Unknown mission/stage references in the document are an error —
+    // they indicate save corruption, not missing data files.
     [[nodiscard]] bool restore_state(std::string_view document,
                                      std::string *error = nullptr);
 

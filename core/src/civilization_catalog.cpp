@@ -33,6 +33,22 @@ constexpr Template pre_warp_templates[] = {
     {"Vask Dominion", CivilizationArchetype::Militarist, {.76,.62,.24,.26,.58,1.00,false}},
     {"Pelagos Combine", CivilizationArchetype::Mercantile, {.18,.18,.76,.50,.26,1.00,false}},
     {"Thren Observatory", CivilizationArchetype::Scientific, {.14,.16,.22,.90,.24,1.00,false}},
+    // Extended entries engage only when a campaign requests more than the
+    // historical 13 pre-warp civilizations; requests of 13 or fewer draw
+    // from the first 13 entries so every seeded roster — and every parity
+    // fixture pinned to it — is byte-identical.
+    {"Corvath League", CivilizationArchetype::Territorial, {.48,.80,.34,.30,.44,1.00,false}},
+    {"Ilssyn Combine", CivilizationArchetype::Mercantile, {.22,.16,.72,.42,.28,1.00,false}},
+    {"Omethe Synod", CivilizationArchetype::Isolationist, {.16,.50,.20,.55,.20,1.00,false}},
+    {"Brayik Assembly", CivilizationArchetype::Adaptive, {.30,.26,.40,.46,.36,1.00,false}},
+    {"Sundered Pact", CivilizationArchetype::Militarist, {.70,.55,.26,.28,.55,1.00,false}},
+    {"Quellin Trust", CivilizationArchetype::Diplomatic, {.14,.10,.28,.58,.24,1.00,false}},
+    {"Mireth Compact", CivilizationArchetype::Scientific, {.16,.18,.24,.88,.28,1.00,false}},
+    {"Ozkar Khanate", CivilizationArchetype::HonorBound, {.62,.42,.18,.30,.72,.92,true}},
+    {"Talvik Union", CivilizationArchetype::Adaptive, {.33,.22,.44,.50,.40,1.00,false}},
+    {"Reshan Exchange", CivilizationArchetype::Mercantile, {.24,.14,.78,.40,.32,1.00,false}},
+    {"Nydral Keep", CivilizationArchetype::Isolationist, {.10,.58,.16,.52,.16,1.00,false}},
+    {"Avest Dominion", CivilizationArchetype::Militarist, {.78,.60,.28,.32,.60,1.00,false}},
 };
 constexpr Template ancient_templates[] = {
     {"Aurelian Custodians", CivilizationArchetype::AncientCustodian, {.08,.08,.05,.96,.10,1.00,false}},
@@ -48,13 +64,12 @@ std::int32_t seeder_seed(std::int64_t seed) {
     return std::bit_cast<std::int32_t>(static_cast<std::uint32_t>(value));
 }
 
-template <std::size_t N>
-std::vector<const Template*> randomized_deck(const Template (&templates)[N], int take, LegacyRandom& random) {
+std::vector<const Template*> randomized_deck(std::span<const Template> templates, int take, LegacyRandom& random) {
     // Enumerable.Take(0) is deferred and never enumerates OrderBy, so an empty ancient deck
     // consumes no random values at all.
     if (take == 0) return {};
     std::vector<std::pair<int, const Template*>> keyed;
-    keyed.reserve(N);
+    keyed.reserve(templates.size());
     // LINQ OrderBy evaluates its selector once in source order and is stable.
     for (const auto& item : templates) keyed.emplace_back(random.next(), &item);
     std::stable_sort(keyed.begin(), keyed.end(), [](const auto& left, const auto& right) { return left.first < right.first; });
@@ -71,6 +86,14 @@ std::vector<Civilization> seed_civilizations(std::span<const StellarSystem> syst
     const std::string& player_species_id) {
     if (pre_warp_count < 1 || pre_warp_count > static_cast<int>(std::size(pre_warp_templates)))
         throw std::out_of_range{"pre_warp_count"};
+    // The historical roster is the first 13 entries: smaller campaigns
+    // draw only from it so seeded content (and its parity fixtures) never
+    // changes, while larger campaigns draw from the full pool.
+    constexpr std::size_t historical_pool = 13;
+    const std::span<const Template> pre_warp_pool =
+        pre_warp_count <= static_cast<int>(historical_pool)
+            ? std::span<const Template>{pre_warp_templates}.first(historical_pool)
+            : std::span<const Template>{pre_warp_templates};
     if (ancient_count < 0 || ancient_count > static_cast<int>(std::size(ancient_templates)))
         throw std::out_of_range{"ancient_count"};
     (void)species_environment_profile(player_species_id); // Preserve the C# unknown-player validation.
@@ -89,8 +112,8 @@ std::vector<Civilization> seed_civilizations(std::span<const StellarSystem> syst
     const auto homes = plan_species_homeworlds(systems, bodies, species_ids);
 
     LegacyRandom random(seeder_seed(seed));
-    const auto pre_warp_deck = randomized_deck(pre_warp_templates, pre_warp_count, random);
-    const auto ancient_deck = randomized_deck(ancient_templates, ancient_count, random);
+    const auto pre_warp_deck = randomized_deck(pre_warp_pool, pre_warp_count, random);
+    const auto ancient_deck = randomized_deck(std::span<const Template>{ancient_templates}, ancient_count, random);
     std::vector<Civilization> result;
     result.reserve(static_cast<std::size_t>(civilization_count));
     for (int index = 0; index < pre_warp_count; ++index) {

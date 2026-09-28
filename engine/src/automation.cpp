@@ -288,6 +288,12 @@ AutomationController::State AutomationController::capture_state() const {
     state.locks = locks();
     state.mind = mind_.capture_state();
     state.journal = journal_;
+    for (const auto &[domain, proposal] : last_proposal_)
+        state.last_proposals.push_back({domain, proposal});
+    std::sort(state.last_proposals.begin(), state.last_proposals.end(),
+              [](const DomainProposal &a, const DomainProposal &b) {
+                  return a.domain < b.domain;
+              });
     return state;
 }
 
@@ -303,6 +309,8 @@ void AutomationController::restore_state(const State &state) {
     mind_.restore_state(state.mind);
     journal_ = state.journal;
     while (journal_.size() > journal_capacity_) journal_.pop_front();
+    for (const auto &proposal : state.last_proposals)
+        last_proposal_[proposal.domain] = proposal.action_id;
 }
 
 void AutomationController::append_journal(AutomationJournalEntry entry) {

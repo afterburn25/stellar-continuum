@@ -477,6 +477,7 @@ int run_galaxy_catalog(int argc, char **argv) {
   bool no_automation = false;
   bool scripted_player_auto_choose = true;
   std::filesystem::path events_root;
+  std::int64_t verify_continuation_tick = 0;
   double step_days = 0.25;
   bool plan_homes = false, found_civilizations = false,
        founding_options = false, constrained_fallback = false,
@@ -545,6 +546,9 @@ int run_galaxy_catalog(int argc, char **argv) {
     if (arg == "--events-root") {
       events_root = value;
       simulation_options = true;
+    } else if (arg == "--verify-continuation-tick") {
+      verify_continuation_tick = signed_number(value);
+      simulation_options = true;
     } else if (arg == "--seed")
       seed = signed_number(value);
     else if (arg == "--systems")
@@ -579,24 +583,27 @@ int run_galaxy_catalog(int argc, char **argv) {
     } else
       throw std::invalid_argument("Unknown galaxy argument: " + arg);
   }
-  if ((count != 250 && count != 500 && count != 1000 && count != 2500) ||
+  if ((count != 250 && count != 500 && count != 1000 && count != 2500 &&
+       count != 5000 && count != 10000 && count != 25000 &&
+       count != 50000) ||
       repeats < 1 || repeats > 100)
     throw std::invalid_argument(
-        "Galaxy size must be 250, 500, 1000 or 2500; repeat must be 1..100");
+        "Galaxy size must be 250, 500, 1000, 2500, 5000, 10000, 25000 or "
+        "50000; repeat must be 1..100");
   if ((simulate_campaign || simulate_adaptive_campaign) &&
-      (simulation_ticks < 1 || simulation_ticks > 10000 || repeats > 10))
+      (simulation_ticks < 1 || simulation_ticks > 50000 || repeats > 10))
     throw std::invalid_argument(
-        "Campaign simulation ticks must be 1..10000 and repeat must be 1..10");
+        "Campaign simulation ticks must be 1..50000 and repeat must be 1..10");
   if ((simulate_campaign || simulate_adaptive_campaign) &&
       (!std::isfinite(step_days * static_cast<double>(simulation_ticks)) ||
        !std::isfinite(step_days * static_cast<double>(simulation_ticks) *
                       static_cast<double>(repeats))))
     throw std::invalid_argument(
         "Campaign simulation total days must be finite");
-  if (pre_warp_count < 1 || pre_warp_count > 13 || ancient_count < 0 ||
+  if (pre_warp_count < 1 || pre_warp_count > 25 || ancient_count < 0 ||
       ancient_count > 3)
     throw std::invalid_argument(
-        "Ordinary civilizations must be 1..13 and ancient civilizations 0..3");
+        "Ordinary civilizations must be 1..25 and ancient civilizations 0..3");
   if ((seed_campaign || simulate_campaign || simulate_adaptive_campaign) &&
       preview_mode_requested)
     throw std::invalid_argument("Choose one campaign or catalog preview mode");
@@ -631,6 +638,10 @@ int run_galaxy_catalog(int argc, char **argv) {
     throw std::invalid_argument(
         "--no-scripted-player-auto-choose requires "
         "--simulate-adaptive-campaign");
+  if (verify_continuation_tick != 0 && !simulate_adaptive_campaign)
+    throw std::invalid_argument(
+        "--verify-continuation-tick requires "
+        "--simulate-adaptive-campaign");
   if (founding_options && !found_civilizations)
     throw std::invalid_argument(
         "Civilization options require --found-civilizations");
@@ -657,6 +668,8 @@ int run_galaxy_catalog(int argc, char **argv) {
          .civilization_automation = !no_automation,
          .events_root = events_root,
          .scripted_player_auto_choose = scripted_player_auto_choose,
+         .verify_continuation_tick =
+             static_cast<int>(verify_continuation_tick),
          .asset_root = asset_root,
          .output = output},
         catalog,

@@ -139,6 +139,10 @@ struct ScriptedEventCoordinator::Impl {
     std::vector<std::pair<std::uint64_t, ScriptedEventContext>> contexts;
     std::deque<std::string> journal;
     std::vector<std::string> definition_ids;
+    // Raw authored documents, kept so snapshots are self-contained — a
+    // save restores its trigger contract even when the host never loaded
+    // a data root.
+    std::vector<std::pair<std::string, std::string>> definition_documents;
     bool auto_choose_ai{true};
     bool auto_choose_player{false};
 
@@ -364,9 +368,20 @@ bool ScriptedEventCoordinator::load_definition(
     if (!parsed)
         return false;
     const auto id = parsed->id;
+    const bool fresh_id = std::ranges::find(impl_->definition_ids, id) ==
+                          impl_->definition_ids.end();
     if (!impl_->runtime.add_definition(std::move(*parsed), error))
         return false;
-    impl_->definition_ids.push_back(id);
+    if (fresh_id)
+        impl_->definition_ids.push_back(id);
+    const auto retained = std::ranges::find(
+        impl_->definition_documents, id,
+        &std::pair<std::string, std::string>::first);
+    if (retained == impl_->definition_documents.end())
+        impl_->definition_documents.emplace_back(
+            id, std::string{json_document});
+    else
+        retained->second = std::string{json_document};
     return true;
 }
 
@@ -612,6 +627,17 @@ std::string ScriptedEventCoordinator::capture_state() const {
     } catch (...) {
         doc["runtime"] = nlohmann::json::object();
     }
+    doc["definitions"] = nlohmann::json::array();
+    for (const auto &[id, document] : impl.definition_documents) {
+        try {
+            doc["definitions"].push_back(
+                {{"id", id},
+                 {"document", nlohmann::json::parse(document)}});
+        } catch (...) {
+            // Unparseable retained document — skip rather than corrupt the
+            // snapshot (the runtime still has the live definition).
+        }
+    }
     doc["contexts"] = nlohmann::json::array();
     for (const auto &[instance, context] : impl.contexts)
         doc["contexts"].push_back(
@@ -641,6 +667,26 @@ bool ScriptedEventCoordinator::restore_state(std::string_view document,
         if (error != nullptr)
             *error = "scripted event snapshot must be an object";
         return false;
+    }
+    // Embedded definitions make the snapshot self-contained; they
+    // re-register before instances restore so unknown-mission references
+    // cannot strand a save taken under a different data root.
+    const auto definition_docs =
+        doc.value("definitions", nlohmann::json::array());
+    if (definition_docs.size() > 64) {
+        if (error != nullptr)
+            *error = "scripted event definition count exceeds bound";
+        return false;
+    }
+    for (const auto &entry : definition_docs) {
+        if (!entry.is_object() || !entry.contains("document"))
+            continue;
+        std::string failure;
+        if (!load_definition(entry["document"].dump(), &failure)) {
+            if (error != nullptr)
+                *error = "embedded definition: " + failure;
+            return false;
+        }
     }
     std::vector<std::pair<std::uint64_t, ScriptedEventContext>> contexts;
     const auto context_doc =

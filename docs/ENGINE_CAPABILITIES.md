@@ -42,7 +42,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Research | IMPLEMENTED BUT NEEDS POLISH | Core `adaptive_research_*` catalogs/services/snapshots | native adaptive research parity family | Existing domain runtime, not proof that every advanced research design is fully exposed in UI |
 | Strategic AI | PARTIALLY IMPLEMENTED | Core strategic intent/planning and fleet intelligence | strategic/campaign/exploration tests | Correctness coverage does not demonstrate effective complete long-game AI |
 | Scripted event chains | PARTIALLY IMPLEMENTED | Engine `mission_graph.hpp` (`MissionRuntime`: JSON definitions, conditional triggers, timed stages, choices, EventBus effects, serialize/restore — previously unconsumed); Core `scripted_events.hpp` (`ScriptedEventCoordinator`: feeds every accepted step's typed domain events as named triggers + scalar JSON payloads, binds trigger context per instance, interprets authored `grant_credits`/`charge_credits`/`adjust_stability`/`damage_building`/`set_building_enabled`/`start_project` effects through canonical commands, AI/headless deterministic auto-choice, pending surface for UI, continuation + developer-save persistence); shipped `data/events/*.json` chains fire on real campaign events | `scripted_events`, `mission_graph`; parity suite unchanged (inert without definitions) | Player-facing chain UI and adaptive-research/diplomacy/sensor event families unfed; effect vocabulary covers treasury/stability/buildings/projects only — no fleet/anomaly spawning yet |
-| Civilization automation | PARTIALLY IMPLEMENTED | Engine `automation.hpp` (`AutomationController`: Off/Advisory/Assisted/Automatic domain modes, policy+constraint knobs, operator override locks, bounded explainable journal, hysteresis/cooldown shared with `StrategicMind`, sorted capture/restore); Core `civilization_automation.hpp` (`CivilizationAutomationCoordinator` — per-civ controllers, colonies + player construction domains, canonical assess→commit surface/industry commands, driven by the `automatic_orders` phase before the legacy AI order helpers, opt-in defaults preserve pre-automation parity); runtime continuation + developer-save JSON carry policies/locks/incumbents/cooldowns/journals | `automation`, `civilization_automation`; campaign parity suite unchanged under default-off | Colony placements only (repair/enable/hub/placement + empire project queue); economy/logistics/research/fleet/diplomacy automation, player-facing automation UI, and save-path coverage beyond the developer continuation envelope remain open |
+| Civilization automation | PARTIALLY IMPLEMENTED | Engine `automation.hpp` (`AutomationController`: Off/Advisory/Assisted/Automatic domain modes, policy+constraint knobs, operator override locks, bounded explainable journal, hysteresis/cooldown shared with `StrategicMind`, sorted capture/restore); Core `civilization_automation.hpp` (`CivilizationAutomationCoordinator` — per-civ controllers, colonies + player construction domains, canonical assess→commit surface/industry commands, driven by the `automatic_orders` phase before the legacy AI order helpers, opt-in defaults preserve pre-automation parity); runtime continuation + developer-save JSON carry policies/locks/incumbents/cooldowns/journals + advisory proposal-suppression state (save→continue deterministic) | `automation`, `civilization_automation`; campaign parity suite unchanged under default-off | Colony placements only (repair/enable/hub/placement + empire project queue); economy/logistics/research/fleet/diplomacy automation, player-facing automation UI, and save-path coverage beyond the developer continuation envelope remain open |
 | Diplomacy | IMPLEMENTED BUT NEEDS POLISH | Core diplomacy lifecycle/runtime/observer commands; App workspace | diplomacy parity and native controller/workspace | Current game feature set, not all design ambitions |
 | Combat | PARTIALLY IMPLEMENTED | Core combat/massive combat state and 3D motion; App battle workspace | combat/massive persistence/engine/lifecycle tests | Large combined AI/fleet/tactical performance and final gameplay breadth unverified |
 | Save/recovery | IMPLEMENTED BUT NEEDS POLISH | Core Player17 DTO/JSON/recovery; Engine atomic files | persistence/recovery/save tests | Large JSON latency/memory, no incremental world DB/cloud-save service |
@@ -168,6 +168,52 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   automation policies/journals restore via the developer envelope;
   player-facing automation UI, scripted events, and remaining domains
   are future work.
+
+## Late-game scale campaign + deterministic save/continue (2026-09-28)
+
+- Purpose: prove the integrated campaign supports the target scale
+  class — 5,000 systems, 25 civilizations, century-length advances —
+  with observable survival/colony/fleet/war/event/research/economy
+  metrics, working-set memory, save size and a machine-checked
+  save→restore→continue determinism proof.
+- Modules: `core/src/civilization_catalog.cpp` (pre-warp template pool
+  extended to 25 entries — campaigns requesting ≤ 13 civilizations draw
+  only from the historical first-13 pool so every seeded roster and its
+  C# parity fixtures stay byte-identical; larger campaigns draw the full
+  pool); `app/adaptive_campaign_host.cpp` (system bounds widened to the
+  catalog-supported 250..50000 range, civilization bounds 1..25/0..3,
+  `verify_continuation_tick`, working-set/peak-memory probe, campaign
+  metrics, deterministic-continuation proof); `engine/automation.hpp`
+  `AutomationController::State::last_proposals` — the advisory-mode
+  top-pick suppression is now part of the captured state, closing the
+  last save/continue divergence found by the scale harness.
+- Public interfaces: `--verify-continuation-tick <n>` CLI captures a
+  developer save mid-run, restores a second runtime from it, advances
+  both to the end and compares canonicalized developer-save documents
+  (`continuationDeterministic`, `continuationSaveBytes`,
+  `continuationDiffOffset/Context` diagnostics on mismatch); the report
+  adds `campaignMetrics` (civilizations, colonies, fleets, wars,
+  economy credit/industry totals, scripted event counters),
+  `workingSetBytes`/`peakWorkingSetBytes`, per-phase `phaseTimings`.
+- Consumers: the headless adaptive-campaign benchmark is the shipped
+  consumer; the continuation proof exercises the same developer
+  envelope player/developer tooling uses.
+- Tests: 14/14 campaign parity + automation + scripted-event suites
+  green after the catalog expansion; 5,000-system/25-civ scale smoke
+  (200 ticks, verify at 100) deterministic with
+  `continuationDeterministic: true`; full-century 100-year run
+  (7,300 × 5-day ticks, `--repeats 2`, midpoint save/restore/continue)
+  exercised in the validation run.
+- Save/performance impact: larger pools only engage above the
+  historical 13-civilization bound — seeded rosters are unchanged for
+  all existing saves and fixtures; the continuation check is opt-in
+  and allocates the save document plus one parse tree while verifying.
+- Limitations: comparison canonicalizes only object-member order —
+  the one order-unstable field the C# format itself produces
+  (leadership office ordering is ordinal on restore, founding order on
+  fresh capture; parity-pinned both ways). Organic fleet/war emergence
+  still requires stress-fleet injection at seeded scales; 50k-system
+  headroom exists in the catalog but is unexercised.
 
 ## Scene3D screen-space mesh LOD chains (2026-09-25)
 

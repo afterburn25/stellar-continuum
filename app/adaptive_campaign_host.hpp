@@ -32,6 +32,11 @@ struct AdaptiveCampaignHostOptions {
   // Headless runs resolve player-bound chain choices deterministically;
   // AI civilizations always auto-resolve.
   bool scripted_player_auto_choose{true};
+  // Mid-run save→restore→continue determinism check: at this tick a
+  // developer save is captured; after the uninterrupted run completes, a
+  // second runtime restores from it, advances the remaining ticks, and
+  // its final diagnostic hash must match. 0 disables.
+  int verify_continuation_tick{0};
   std::filesystem::path asset_root;
   std::filesystem::path output;
 };

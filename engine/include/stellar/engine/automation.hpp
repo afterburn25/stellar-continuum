@@ -170,12 +170,21 @@ public:
     // authoritative automation state and round-trip through State.
     // Actions/explainers are code — the owner re-registers them, then
     // restores this state.
+    struct DomainProposal {
+        std::string domain;
+        std::string action_id;
+    };
     struct State {
         std::uint32_t version{1};
         std::vector<AutomationDomainPolicy> policies; // sorted by domain
         std::vector<AutomationOverrideLock> locks;    // sorted
         StrategicMind::State mind;
         std::deque<AutomationJournalEntry> journal;
+        // Last advisedly-proposed top pick per domain — the suppression
+        // that keeps advisory mode from re-journaling identical advice.
+        // Without it a restored controller re-proposes once per domain
+        // and save→load→continue diverges from the uninterrupted run.
+        std::vector<DomainProposal> last_proposals;   // sorted by domain
     };
     [[nodiscard]] State capture_state() const;
     void restore_state(const State &state);

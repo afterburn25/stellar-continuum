@@ -280,7 +280,7 @@ int main(int argc, char **argv) {
 
         Fixture f2 = make_fixture();
         ScriptedEventCoordinator restored;
-        restored.load_definition(kChain);
+        (void)restored.load_definition(kChain);
         check(restored.restore_state(state),
               "state restores into a fresh coordinator");
         auto pending = restored.pending();
