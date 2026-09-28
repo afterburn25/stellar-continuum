@@ -308,16 +308,21 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
       // the relativistic disc carries orbital beaming plus the paired
       // doppler tint, so the approaching lane reads hotter and brighter.
       static const auto disc=annulus_mesh(.34f,1.f,192,.012f);
-      MeshInstance3D ring;ring.mesh=disc;
-      ring.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
-      ring.rotation=rotation_axis_angle({1.f,0.f,0.f},1.22f);
-      ring.scale=radius*2.1f;
       // The authoritative object type picks the flow regime: accreting and
       // jet-launching holes keep the hot strongly beamed two-armed spiral,
       // while quiescent holes run a radiatively inefficient cooler flow —
       // dimmer, weaker density waves, a softer doppler split.
       const auto type=physics?physics->type:StellarObjectType::QuiescentBlackHole;
       const bool active=type==StellarObjectType::AccretingBlackHole||type==StellarObjectType::JetBlackHole;
+      MeshInstance3D ring;ring.mesh=disc;
+      ring.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
+      // Spin the pattern about the disc's local +Y axis before the tilt:
+      // the beaming velocity field is axisymmetric about that axis, so the
+      // doppler lane stays view-fixed while the spiral arms revolve. The
+      // hotter active flow orbits visibly faster than the inefficient one.
+      const float spin=static_cast<float>(std::fmod(visual_seconds_*(active?.32:.16),std::numbers::pi*2.));
+      ring.rotation=compose_rotation(rotation_axis_angle({1.f,0.f,0.f},1.22f),rotation_axis_angle({0.f,1.f,0.f},spin));
+      ring.scale=radius*2.1f;
       ring.material=active?accretion_disc_material3d(.34f,1.f,9800.,.7f,.5f,2,.9f)
                          :accretion_disc_material3d(.34f,1.f,5400.,.45f,.25f,2,.9f);
       ring.material.orbital_beaming_tint=active?.45f:.3f;
