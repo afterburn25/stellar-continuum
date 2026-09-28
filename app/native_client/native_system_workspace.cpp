@@ -390,6 +390,10 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
     Camera3D camera;camera.projection=Projection3D::Orthographic;camera.position={0,0,50000};camera.orthographic_height=field.height;camera.near_plane=.1f;camera.far_plane=120000;
     Scene3DView view{Scene3D::create(camera,std::move(star_instances)),field};
     view.options.quality=scene3d_quality_;view.options.exposure=1.16f;view.options.bloom_strength=.42f;view.options.bloom_threshold=.82f;
+    // Matches the planet scene: star-side materials currently animate through
+    // instance rotation, but any future time-driven term (disc flow, band
+    // drift) must advance with the same paused-aware clock.
+    view.options.time=static_cast<float>(std::fmod(std::max(0.,visual_seconds_),512.));
     out.world.insert(out.world.begin()+static_cast<std::ptrdiff_t>(stellar_art_begin),std::move(view));
   }
   std::vector<BodyLabelCandidate> body_labels;

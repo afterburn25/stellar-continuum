@@ -238,6 +238,9 @@ int main(int argc,char**argv)try{
     const auto&disc_material=std::ranges::find_if(std::get<Scene3DView>(*disc_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
     require(disc_material.texture&&disc_material.texture->height()==64,"Accretion disc did not bake its spiral-arm texture");
     require(disc_material.orbital_beaming_tint>0,"Accretion disc lost its paired doppler tint");
+    // legacy_draw is cleared below for each re-render — capture the quiescent
+    // tint by value; the material reference dangles once the world vector frees.
+    const float quiescent_tint=disc_material.orbital_beaming_tint;
     legacy.stellar_object=generate_stellar_physics(7,StellarObjectType::AccretingBlackHole);
     artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
     const auto active_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
@@ -245,7 +248,7 @@ int main(int argc,char**argv)try{
       return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
     require(active_view!=legacy_draw.world.end(),"Accreting black hole emitted no beamed disc");
     const auto&active_material=std::ranges::find_if(std::get<Scene3DView>(*active_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
-    require(active_material.orbital_beaming_tint>disc_material.orbital_beaming_tint,"Accreting and quiescent discs are not differentiated");
+    require(active_material.orbital_beaming_tint>quiescent_tint,"Accreting and quiescent discs are not differentiated");
     const auto active_rotation=std::ranges::find_if(std::get<Scene3DView>(*active_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->rotation;
     artwork_ui.advance_tumble(4,true);
     legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
@@ -255,6 +258,7 @@ int main(int argc,char**argv)try{
     require(spun_view!=legacy_draw.world.end(),"Accreting disc vanished while the clock ran");
     const auto spun_rotation=std::ranges::find_if(std::get<Scene3DView>(*spun_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->rotation;
     require(spun_rotation.w!=active_rotation.w||spun_rotation.x!=active_rotation.x||spun_rotation.y!=active_rotation.y||spun_rotation.z!=active_rotation.z,"Accretion spiral did not revolve with game time");
+    require(std::get<Scene3DView>(*spun_view).options.time>0.f,"Star scene carries no scene clock for animated material terms");
     legacy.stellar_object=generate_stellar_physics(13,StellarObjectType::JetBlackHole);
     artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
     const auto jet_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
@@ -275,7 +279,7 @@ int main(int argc,char**argv)try{
     const auto&proto_scene=std::get<Scene3DView>(*proto_view).scene->instances();
     require(std::ranges::any_of(proto_scene,[](const auto&i){return i.material.limb_darkening_mid>0;}),"Protostar lost its physical photosphere beneath the debris disc");
     const auto&proto_disc=*std::ranges::find_if(proto_scene,[](const auto&i){return i.material.orbital_beaming>0;});
-    require(proto_disc.material.orbital_beaming_tint>0&&proto_disc.material.orbital_beaming_tint<disc_material.orbital_beaming_tint,
+    require(proto_disc.material.orbital_beaming_tint>0&&proto_disc.material.orbital_beaming_tint<quiescent_tint,
       "Protoplanetary disc should carry a gentler doppler split than a relativistic flow");
     legacy.primary_stellar_class=StellarClass::GYellowDwarf;
   }
