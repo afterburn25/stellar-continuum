@@ -181,6 +181,15 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   galaxy), and `--smoke-full-exploration` under `--developer-smoke`
   (250 systems fully surveyed, `unexplored:0`). Every flag-legal path
   in the client binary is now exercised green.
+- Record/replay audit: `--record`/`--replay`/`--replay-info` exercised
+  on `work/de-travel-r.json`. Found and fixed a real bug
+  (`85a27563`): saves authored before `GenerationMetadata` carry the
+  key as null, and the replay observer's unconditional
+  `meta->erase("CreatedAtUtc")` threw `type_error.307`, aborting the
+  smoke save under `--record`. Both erase sites now guard with
+  `is_object()`. Post-fix: recording produces a journal, replay
+  verifies 42/42 checkpoints with `diverged:false`, `--replay-info`
+  inspects the file (seed, build id, ordered commands/checkpoints).
 
 ## Known limitations
 
