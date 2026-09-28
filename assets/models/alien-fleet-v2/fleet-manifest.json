@@ -1,0 +1,6102 @@
+{
+  "schemaVersion": 1,
+  "kind": "stellar-alien-fleet-asset-pack",
+  "version": "0.2.0",
+  "date": "2026-09-14",
+  "status": "library_candidate",
+  "visualStage": "metal_construction_pass_pending_final_art_review",
+  "supersedes": "0.1.0 blockout; user requested realistic assembled metal construction",
+  "units": "metres",
+  "axes": {
+    "up": "+Y",
+    "forward": "-Z",
+    "moduleOutward": "+Y"
+  },
+  "races": [
+    {
+      "id": "pelagic_high_pressure",
+      "short": "Pelagic",
+      "title": "Pelagic High-Pressure",
+      "tagline": "Pressure shells • flowing ribs • immersed habitats",
+      "color": "#55dccd",
+      "hull": "#717b82",
+      "dark": "#202a32",
+      "metal": "#68767b",
+      "glow": "#4ffff0",
+      "accent": "#807c68",
+      "clearance": "3.2 m swimways · 2.8 m turning volume",
+      "biology": "Radial aquatic bodies, 2.10 × 0.80 m; 0.85 g, 282 K, 350 kPa; continuous immersion.",
+      "habitatM3": 90,
+      "shapeAllowance": 0.12,
+      "names": [
+        "Tidefinder",
+        "Songweaver",
+        "Reefguard",
+        "Tidehold",
+        "Shoalforge",
+        "Great Current"
+      ],
+      "sizes": [
+        [
+          155,
+          94,
+          54
+        ],
+        [
+          260,
+          170,
+          95
+        ],
+        [
+          210,
+          142,
+          72
+        ],
+        [
+          520,
+          280,
+          178
+        ],
+        [
+          4200,
+          2400,
+          1500
+        ],
+        [
+          12000,
+          8000,
+          3600
+        ]
+      ],
+      "language": "Rounded pressure vessels, four-way access, water circulation trunks and a sweeping protective shell."
+    },
+    {
+      "id": "compact_high_gravity",
+      "short": "High-Gravity",
+      "title": "Compact High-Gravity",
+      "tagline": "Stepped armor • wide stance • short structural spans",
+      "color": "#ffba67",
+      "hull": "#555c64",
+      "dark": "#282c33",
+      "metal": "#737875",
+      "glow": "#ffc167",
+      "accent": "#82705c",
+      "clearance": "2.0 m clear height · 2.6 m turning width",
+      "biology": "Horizontal quadrupedal bodies, 1.35 × 0.75 m; 1.75 g, 300 K, 160 kPa; short reach.",
+      "habitatM3": 55,
+      "shapeAllowance": 0.18,
+      "names": [
+        "Cairn",
+        "Deep Anvil",
+        "Bulwark",
+        "Loadstone",
+        "Foundry Seed",
+        "Mountainhome"
+      ],
+      "sizes": [
+        [
+          116,
+          96,
+          36
+        ],
+        [
+          185,
+          168,
+          52
+        ],
+        [
+          168,
+          156,
+          49
+        ],
+        [
+          390,
+          320,
+          102
+        ],
+        [
+          3200,
+          2100,
+          1000
+        ],
+        [
+          9500,
+          6500,
+          2400
+        ]
+      ],
+      "language": "Low broad decks, layered wedge armor, exposed transverse braces and paired heavy engine blocks."
+    },
+    {
+      "id": "cryogenic_hydrocarbon",
+      "short": "Cryogenic",
+      "title": "Cryogenic Hydrocarbon",
+      "tagline": "Cold lanterns • thermal separation • sixfold structure",
+      "color": "#b4acff",
+      "hull": "#858d96",
+      "dark": "#283548",
+      "metal": "#687681",
+      "glow": "#8caaff",
+      "accent": "#817d8c",
+      "clearance": "2.4 m radial bays · 2.8 m turning diameter",
+      "biology": "Radial multipedal bodies, 1.20 × 1.00 m; 0.14 g, 94 K, 150 kPa; hydrocarbon solvent.",
+      "habitatM3": 65,
+      "shapeAllowance": 0.1,
+      "names": [
+        "Pale Thread",
+        "Aurora Lens",
+        "Frost Lance",
+        "Cold Vault",
+        "Rime Seed",
+        "Long Winter"
+      ],
+      "sizes": [
+        [
+          184,
+          98,
+          78
+        ],
+        [
+          330,
+          224,
+          150
+        ],
+        [
+          248,
+          142,
+          110
+        ],
+        [
+          650,
+          380,
+          248
+        ],
+        [
+          4500,
+          2600,
+          1700
+        ],
+        [
+          13000,
+          7600,
+          4200
+        ]
+      ],
+      "language": "Faceted cold habitat lanterns, sixfold docking and sensor geometry, long thermally isolated engine booms."
+    }
+  ],
+  "roles": [
+    {
+      "id": "warp_scout",
+      "name": "Scout",
+      "crew": 24,
+      "passengers": 0,
+      "points": 14,
+      "power": 18,
+      "weapon": 2,
+      "utility": 2,
+      "defense": 1,
+      "cargo": 0,
+      "thermal": 1
+    },
+    {
+      "id": "science_vessel",
+      "name": "Science vessel",
+      "crew": 72,
+      "passengers": 0,
+      "points": 24,
+      "power": 32,
+      "weapon": 2,
+      "utility": 4,
+      "defense": 2,
+      "cargo": 0,
+      "thermal": 2
+    },
+    {
+      "id": "patrol_corvette",
+      "name": "Patrol corvette",
+      "crew": 85,
+      "passengers": 0,
+      "points": 36,
+      "power": 44,
+      "weapon": 6,
+      "utility": 2,
+      "defense": 2,
+      "cargo": 0,
+      "thermal": 2
+    },
+    {
+      "id": "bulk_freighter",
+      "name": "Bulk freighter",
+      "crew": 60,
+      "passengers": 0,
+      "points": 26,
+      "power": 30,
+      "weapon": 2,
+      "utility": 2,
+      "defense": 2,
+      "cargo": 4,
+      "thermal": 2
+    },
+    {
+      "id": "resource_outpost_ship",
+      "name": "Outpost carrier",
+      "crew": 180,
+      "passengers": 8000000,
+      "points": 42,
+      "power": 50,
+      "weapon": 4,
+      "utility": 4,
+      "defense": 4,
+      "cargo": 4,
+      "thermal": 2
+    },
+    {
+      "id": "colony_ship",
+      "name": "Colony ark",
+      "crew": 320,
+      "passengers": 250000000,
+      "points": 56,
+      "power": 70,
+      "weapon": 6,
+      "utility": 4,
+      "defense": 4,
+      "cargo": 6,
+      "thermal": 2
+    }
+  ],
+  "modules": [
+    {
+      "id": "beam_turret",
+      "name": "Beam turret",
+      "kind": "weapon",
+      "size": "M",
+      "points": 4,
+      "power": 6,
+      "description": "Twin energy barrels on a rotating armored mount."
+    },
+    {
+      "id": "kinetic_turret",
+      "name": "Kinetic turret",
+      "kind": "weapon",
+      "size": "M",
+      "points": 4,
+      "power": 3,
+      "description": "Paired long rail barrels and an ammunition housing."
+    },
+    {
+      "id": "missile_pod",
+      "name": "Missile battery",
+      "kind": "weapon",
+      "size": "L",
+      "points": 6,
+      "power": 2,
+      "description": "Six individually visible launch cells."
+    },
+    {
+      "id": "point_defense",
+      "name": "Point defense",
+      "kind": "weapon",
+      "size": "S",
+      "points": 2,
+      "power": 2,
+      "description": "Compact four-barrel close defense mount."
+    },
+    {
+      "id": "sensor_array",
+      "name": "Sensor array",
+      "kind": "utility",
+      "size": "M",
+      "points": 3,
+      "power": 3,
+      "description": "Raised array with a distinct dish or radial sensor head."
+    },
+    {
+      "id": "command_relay",
+      "name": "Command relay",
+      "kind": "utility",
+      "size": "S",
+      "points": 2,
+      "power": 2,
+      "description": "Communications mast with visible transmitter vanes."
+    },
+    {
+      "id": "shield_emitter",
+      "name": "Shield emitter",
+      "kind": "defense",
+      "size": "M",
+      "points": 4,
+      "power": 7,
+      "description": "Raised emitter cage; optional equipment, not a permanent hull detail."
+    },
+    {
+      "id": "armor_plate",
+      "name": "Armor plating",
+      "kind": "defense",
+      "size": "L",
+      "points": 3,
+      "power": 0,
+      "description": "Raised layered external armor panel."
+    },
+    {
+      "id": "cargo_pod",
+      "name": "Cargo pod",
+      "kind": "cargo",
+      "size": "L",
+      "points": 3,
+      "power": 1,
+      "description": "External freight container with race-specific pressure or insulation shell."
+    },
+    {
+      "id": "habitat_pod",
+      "name": "Habitat support pod",
+      "kind": "cargo",
+      "size": "L",
+      "points": 5,
+      "power": 4,
+      "description": "Supplementary life-support volume; does not alter the game population capacity."
+    },
+    {
+      "id": "radiator",
+      "name": "Thermal radiator",
+      "kind": "thermal",
+      "size": "M",
+      "points": 2,
+      "power": 0,
+      "description": "Deployable panel geometry with heat transport piping."
+    },
+    {
+      "id": "power_unit",
+      "name": "Auxiliary power unit",
+      "kind": "thermal",
+      "size": "M",
+      "points": 4,
+      "power": 0,
+      "powerSupply": 6,
+      "description": "External power pod; adds six workshop power units."
+    }
+  ],
+  "ships": [
+    {
+      "id": "sc.ships.pelagic_high_pressure.warp_scout.v2",
+      "raceId": "pelagic_high_pressure",
+      "roleId": "warp_scout",
+      "name": "Tidefinder",
+      "dimensions": {
+        "length": 155,
+        "width": 94,
+        "height": 54
+      },
+      "crew": 24,
+      "populationReservation": 0,
+      "points": 14,
+      "power": 18,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/pelagic_high_pressure--warp_scout.glb",
+      "lod1": "Hulls/pelagic_high_pressure--warp_scout--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "M",
+          "position": [
+            -15.980000000000004,
+            10.943538647152689,
+            -43.400000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "M",
+          "position": [
+            15.980000000000004,
+            10.943538647152689,
+            -43.400000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -7.05,
+            26.169639655703914,
+            -26.35
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            7.05,
+            26.169639640203002,
+            -26.35
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -21.62,
+            -16.41643878513514,
+            -9.3
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -14.1,
+            8.297569964596736,
+            44.95
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_D01": "shield_emitter"
+      }
+    },
+    {
+      "id": "sc.ships.pelagic_high_pressure.science_vessel.v2",
+      "raceId": "pelagic_high_pressure",
+      "roleId": "science_vessel",
+      "name": "Songweaver",
+      "dimensions": {
+        "length": 260,
+        "width": 170,
+        "height": 95
+      },
+      "crew": 72,
+      "populationReservation": 0,
+      "points": 24,
+      "power": 32,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/pelagic_high_pressure--science_vessel.glb",
+      "lod1": "Hulls/pelagic_high_pressure--science_vessel--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -28.900000000000002,
+            2.6213045223244538,
+            -72.80000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            28.900000000000002,
+            2.6236900587847045,
+            -72.80000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -12.75,
+            44.111869889366844,
+            -44.2
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            12.75,
+            44.11187000242637,
+            -44.2
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U03",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -12.75,
+            33.32927464031439,
+            7.799999999999997
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U04",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            12.75,
+            33.32927467638752,
+            7.799999999999997
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -39.1,
+            -34.381065433796536,
+            -15.600000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            39.1,
+            -34.381065433796536,
+            -15.600000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -25.5,
+            11.820442241594895,
+            75.4
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            25.5,
+            10.282235645641066,
+            75.4
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_U03": "sensor_array",
+        "HP_U04": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter"
+      }
+    },
+    {
+      "id": "sc.ships.pelagic_high_pressure.patrol_corvette.v2",
+      "raceId": "pelagic_high_pressure",
+      "roleId": "patrol_corvette",
+      "name": "Reefguard",
+      "dimensions": {
+        "length": 210,
+        "width": 142,
+        "height": 72
+      },
+      "crew": 85,
+      "populationReservation": 0,
+      "points": 36,
+      "power": 44,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/pelagic_high_pressure--patrol_corvette.glb",
+      "lod1": "Hulls/pelagic_high_pressure--patrol_corvette--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -24.14,
+            11.82535589829081,
+            -58.8
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            24.14,
+            11.826800360481899,
+            -58.8
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W03",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -24.14,
+            19.998262188598638,
+            -10.500000000000007
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W04",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            24.14,
+            19.998262188598638,
+            -10.500000000000007
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W05",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -24.14,
+            15.663304989588289,
+            37.8
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W06",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            24.14,
+            15.663304989588289,
+            37.8
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -10.650000000000002,
+            34.33547887881543,
+            -35.7
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            10.650000000000002,
+            34.335478907058835,
+            -35.7
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -32.660000000000004,
+            -25.09866726578141,
+            -12.600000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            32.660000000000004,
+            -25.09866721881281,
+            -12.600000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -21.300000000000004,
+            7.457149427367679,
+            60.900000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            21.300000000000004,
+            7.457149427367695,
+            60.900000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "kinetic_turret",
+        "HP_W02": "beam_turret",
+        "HP_W03": "kinetic_turret",
+        "HP_W04": "kinetic_turret",
+        "HP_W05": "kinetic_turret",
+        "HP_W06": "kinetic_turret",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_T01": "radiator"
+      }
+    },
+    {
+      "id": "sc.ships.pelagic_high_pressure.bulk_freighter.v2",
+      "raceId": "pelagic_high_pressure",
+      "roleId": "bulk_freighter",
+      "name": "Tidehold",
+      "dimensions": {
+        "length": 520,
+        "width": 280,
+        "height": 178
+      },
+      "crew": 60,
+      "populationReservation": 0,
+      "points": 26,
+      "power": 30,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/pelagic_high_pressure--bulk_freighter.glb",
+      "lod1": "Hulls/pelagic_high_pressure--bulk_freighter--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -47.60000000000001,
+            12.18677853574668,
+            -145.60000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            47.60000000000001,
+            12.191049809183893,
+            -145.60000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -21,
+            83.30504946415714,
+            -88.4
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            21,
+            83.30504946710721,
+            -88.4
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -64.4,
+            -57.4893330674594,
+            -31.200000000000003
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            64.4,
+            -57.48933284319445,
+            -31.200000000000003
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C01",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -89.60000000000002,
+            29.05380753876801,
+            -130
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C02",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            89.60000000000002,
+            29.05380753563426,
+            -130
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C03",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -89.60000000000001,
+            13.679242876435337,
+            -7.105427357601002e-15
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C04",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            89.60000000000001,
+            13.67924304310342,
+            -7.105427357601002e-15
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -42,
+            23.116766962648725,
+            150.8
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            42,
+            22.297852748735036,
+            150.8
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter",
+        "HP_C01": "cargo_pod",
+        "HP_C02": "cargo_pod",
+        "HP_T01": "radiator"
+      }
+    },
+    {
+      "id": "sc.ships.pelagic_high_pressure.resource_outpost_ship.v2",
+      "raceId": "pelagic_high_pressure",
+      "roleId": "resource_outpost_ship",
+      "name": "Shoalforge",
+      "dimensions": {
+        "length": 4200,
+        "width": 2400,
+        "height": 1500
+      },
+      "crew": 180,
+      "populationReservation": 8000000,
+      "points": 42,
+      "power": 50,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/pelagic_high_pressure--resource_outpost_ship.glb",
+      "lod1": "Hulls/pelagic_high_pressure--resource_outpost_ship--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -408.00000000000006,
+            276.49620159388064,
+            -1176.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            408.00000000000006,
+            276.5225082807364,
+            -1176.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W03",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -408.00000000000006,
+            457.45426359104107,
+            756.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W04",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            408.00000000000006,
+            457.45426359104107,
+            756.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -180,
+            714.512196254863,
+            -713.9999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            180,
+            714.5121962730328,
+            -713.9999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U03",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -179.99999999999997,
+            595.7974108012437,
+            126.00000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U04",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            179.99999999999997,
+            595.7974113340274,
+            126.00000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -552,
+            -151.8121261332238,
+            -252.00000000000017
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            552,
+            -151.81212475198132,
+            -252.00000000000017
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D03",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -552,
+            -176.39023157599283,
+            714
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D04",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            552,
+            -176.39023209217683,
+            714
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C01",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -768,
+            380.3798926522735,
+            -1049.9999999999998
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C02",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            768,
+            380.3798926329724,
+            -1049.9999999999998
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C03",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -768,
+            320.1223301987181,
+            2.842170943040401e-14
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C04",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            768,
+            320.122332656085,
+            2.842170943040401e-14
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -360.00000000000006,
+            343.8137796219208,
+            1218
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            360.00000000000006,
+            338.77010351356165,
+            1218
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_W03": "point_defense",
+        "HP_W04": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_U03": "sensor_array",
+        "HP_U04": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter",
+        "HP_D03": "shield_emitter",
+        "HP_D04": "shield_emitter",
+        "HP_C01": "cargo_pod",
+        "HP_C02": "cargo_pod"
+      }
+    },
+    {
+      "id": "sc.ships.pelagic_high_pressure.colony_ship.v2",
+      "raceId": "pelagic_high_pressure",
+      "roleId": "colony_ship",
+      "name": "Great Current",
+      "dimensions": {
+        "length": 12000,
+        "width": 8000,
+        "height": 3600
+      },
+      "crew": 320,
+      "populationReservation": 250000000,
+      "points": 56,
+      "power": 70,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/pelagic_high_pressure--colony_ship.glb",
+      "lod1": "Hulls/pelagic_high_pressure--colony_ship--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -1360,
+            1325.3313717329274,
+            -3360.0000000000014
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            1360,
+            1325.3313657866515,
+            -3360.0000000000014
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W03",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -1360,
+            1599.2045011752884,
+            -600.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W04",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            1360,
+            1599.204506045658,
+            -600.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W05",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -1360,
+            1562.476698258243,
+            2160
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W06",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            1360,
+            1562.4766982992735,
+            2160
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -600,
+            1107.2967012022327,
+            -2040.000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            600,
+            1107.2966184720158,
+            -2040.000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U03",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -599.9999999999999,
+            1775.391598750838,
+            360
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U04",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            599.9999999999999,
+            1775.3915988037397,
+            360
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -1840,
+            -1716.2796308653756,
+            -720
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            1840,
+            -1716.2796307971487,
+            -720
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D03",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -1840,
+            -1715.288312624514,
+            2040.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D04",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            1840,
+            -1715.288312735672,
+            2040.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C01",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -2560,
+            192.28702708444771,
+            -3000
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C02",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            2560,
+            192.28702705362767,
+            -3000
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C03",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -2560,
+            1400.953757173969,
+            -1.1368683772161603e-13
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C04",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            2560,
+            1400.9537529438871,
+            -1.1368683772161603e-13
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C05",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -2560,
+            1273.7706028549758,
+            3000.000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C06",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            2560,
+            1273.7705916743432,
+            3000.000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -1200,
+            1540.2663441858845,
+            3480
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            1200,
+            1540.2663451552703,
+            3480
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_W03": "point_defense",
+        "HP_W04": "point_defense",
+        "HP_W05": "point_defense",
+        "HP_W06": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_U03": "sensor_array",
+        "HP_U04": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter",
+        "HP_D03": "shield_emitter",
+        "HP_D04": "shield_emitter",
+        "HP_C01": "cargo_pod",
+        "HP_C02": "cargo_pod",
+        "HP_C03": "cargo_pod",
+        "HP_C04": "cargo_pod",
+        "HP_C05": "cargo_pod"
+      }
+    },
+    {
+      "id": "sc.ships.compact_high_gravity.warp_scout.v2",
+      "raceId": "compact_high_gravity",
+      "roleId": "warp_scout",
+      "name": "Cairn",
+      "dimensions": {
+        "length": 116,
+        "width": 96,
+        "height": 36
+      },
+      "crew": 24,
+      "populationReservation": 0,
+      "points": 14,
+      "power": 18,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/compact_high_gravity--warp_scout.glb",
+      "lod1": "Hulls/compact_high_gravity--warp_scout--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "M",
+          "position": [
+            -16.32,
+            8.302952189967574,
+            -32.480000000000004
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "M",
+          "position": [
+            16.32,
+            8.302952189967574,
+            -32.480000000000004
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -7.199999999999998,
+            16.711601094614025,
+            -19.720000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            7.199999999999998,
+            16.711601094614025,
+            -19.720000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -22.08,
+            -15.660352455912465,
+            -6.96
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -14.399999999999997,
+            5.195695909482202,
+            33.64
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_D01": "shield_emitter"
+      }
+    },
+    {
+      "id": "sc.ships.compact_high_gravity.science_vessel.v2",
+      "raceId": "compact_high_gravity",
+      "roleId": "science_vessel",
+      "name": "Deep Anvil",
+      "dimensions": {
+        "length": 185,
+        "width": 168,
+        "height": 52
+      },
+      "crew": 72,
+      "populationReservation": 0,
+      "points": 24,
+      "power": 32,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/compact_high_gravity--science_vessel.glb",
+      "lod1": "Hulls/compact_high_gravity--science_vessel--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -28.560000000000002,
+            7.473000442654261,
+            -51.80000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            28.560000000000002,
+            7.473000442654261,
+            -51.80000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -12.599999999999998,
+            18.18079621487889,
+            -31.45000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            12.599999999999998,
+            18.18079621487889,
+            -31.45000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U03",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -12.599999999999998,
+            23.60422651765295,
+            5.55
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U04",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            12.599999999999998,
+            23.604226083272536,
+            5.55
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -38.64,
+            -22.998756861338656,
+            -11.100000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            38.64,
+            -22.998756861338656,
+            -11.100000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -25.199999999999996,
+            3.5161381642192318,
+            53.650000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            25.199999999999996,
+            3.5161381642192318,
+            53.650000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_U03": "sensor_array",
+        "HP_U04": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter"
+      }
+    },
+    {
+      "id": "sc.ships.compact_high_gravity.patrol_corvette.v2",
+      "raceId": "compact_high_gravity",
+      "roleId": "patrol_corvette",
+      "name": "Bulwark",
+      "dimensions": {
+        "length": 168,
+        "width": 156,
+        "height": 49
+      },
+      "crew": 85,
+      "populationReservation": 0,
+      "points": 36,
+      "power": 44,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/compact_high_gravity--patrol_corvette.glb",
+      "lod1": "Hulls/compact_high_gravity--patrol_corvette--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -26.520000000000007,
+            10.768587691557027,
+            -47.040000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            26.520000000000007,
+            10.768587691557027,
+            -47.040000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W03",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -26.520000000000007,
+            13.36765516682581,
+            -8.400000000000004
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W04",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            26.520000000000007,
+            13.36765516682581,
+            -8.400000000000004
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W05",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -26.520000000000007,
+            13.15717049982944,
+            30.240000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W06",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            26.520000000000007,
+            13.15717049982944,
+            30.240000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -11.7,
+            22.052156269387417,
+            -28.560000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            11.7,
+            22.052156269387417,
+            -28.560000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -35.88000000000001,
+            -21.33307420877046,
+            -10.080000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            35.88000000000001,
+            -21.33307420877046,
+            -10.080000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -23.4,
+            6.598959523305531,
+            48.72000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            23.4,
+            6.598959523305531,
+            48.72000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "kinetic_turret",
+        "HP_W02": "beam_turret",
+        "HP_W03": "kinetic_turret",
+        "HP_W04": "kinetic_turret",
+        "HP_W05": "kinetic_turret",
+        "HP_W06": "kinetic_turret",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_T01": "radiator"
+      }
+    },
+    {
+      "id": "sc.ships.compact_high_gravity.bulk_freighter.v2",
+      "raceId": "compact_high_gravity",
+      "roleId": "bulk_freighter",
+      "name": "Loadstone",
+      "dimensions": {
+        "length": 390,
+        "width": 320,
+        "height": 102
+      },
+      "crew": 60,
+      "populationReservation": 0,
+      "points": 26,
+      "power": 30,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/compact_high_gravity--bulk_freighter.glb",
+      "lod1": "Hulls/compact_high_gravity--bulk_freighter--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -54.40000000000001,
+            24.944343891579127,
+            -109.20000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            54.40000000000001,
+            24.944343891579127,
+            -109.20000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -24.000000000000004,
+            47.4220447659457,
+            -66.30000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            24.000000000000004,
+            47.4220447659457,
+            -66.30000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -73.60000000000002,
+            -38.84580260625563,
+            -23.400000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            73.60000000000002,
+            -38.84580260625563,
+            -23.400000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C01",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -81.92000000000003,
+            13.285466707182733,
+            -97.50000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C02",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            81.92000000000003,
+            13.306282911517064,
+            -97.50000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C03",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -102.40000000000002,
+            -3.009258869662613,
+            0
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C04",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            102.40000000000002,
+            -3.003302947103376,
+            0
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -48.00000000000001,
+            16.638137031859674,
+            113.10000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            48.00000000000001,
+            16.638137031859674,
+            113.10000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter",
+        "HP_C01": "cargo_pod",
+        "HP_C02": "cargo_pod",
+        "HP_T01": "radiator"
+      }
+    },
+    {
+      "id": "sc.ships.compact_high_gravity.resource_outpost_ship.v2",
+      "raceId": "compact_high_gravity",
+      "roleId": "resource_outpost_ship",
+      "name": "Foundry Seed",
+      "dimensions": {
+        "length": 3200,
+        "width": 2100,
+        "height": 1000
+      },
+      "crew": 180,
+      "populationReservation": 8000000,
+      "points": 42,
+      "power": 50,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/compact_high_gravity--resource_outpost_ship.glb",
+      "lod1": "Hulls/compact_high_gravity--resource_outpost_ship--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -357,
+            338.159604977445,
+            -896
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            357,
+            338.159604977445,
+            -896
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W03",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -357,
+            367.6386808226381,
+            576
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W04",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            357,
+            367.6386808226381,
+            576
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -157.49999999999997,
+            477.41756696155545,
+            -544
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            157.49999999999997,
+            477.41756696155545,
+            -544
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U03",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -157.49999999999997,
+            467.1453893263189,
+            95.99999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U04",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            157.49999999999997,
+            467.1453893263189,
+            95.99999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -482.99999999999994,
+            -56.21351190515881,
+            -192
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            482.99999999999994,
+            -56.21351190515881,
+            -192
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D03",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -482.99999999999994,
+            -64.52197631042196,
+            544
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D04",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            482.99999999999994,
+            -64.52197631042196,
+            544
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C01",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -537.5999999999999,
+            265.92839748888804,
+            -799.9999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C02",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            537.5999999999999,
+            266.05736184374143,
+            -799.9999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C03",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -672,
+            164.976334481875,
+            0
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C04",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            672,
+            165.01323370221655,
+            0
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -314.99999999999994,
+            286.69947364247923,
+            927.9999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            314.99999999999994,
+            286.69947364247923,
+            927.9999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_W03": "point_defense",
+        "HP_W04": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_U03": "sensor_array",
+        "HP_U04": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter",
+        "HP_D03": "shield_emitter",
+        "HP_D04": "shield_emitter",
+        "HP_C01": "cargo_pod",
+        "HP_C02": "cargo_pod"
+      }
+    },
+    {
+      "id": "sc.ships.compact_high_gravity.colony_ship.v2",
+      "raceId": "compact_high_gravity",
+      "roleId": "colony_ship",
+      "name": "Mountainhome",
+      "dimensions": {
+        "length": 9500,
+        "width": 6500,
+        "height": 2400
+      },
+      "crew": 320,
+      "populationReservation": 250000000,
+      "points": 56,
+      "power": 70,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/compact_high_gravity--colony_ship.glb",
+      "lod1": "Hulls/compact_high_gravity--colony_ship--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -1105.0000000000005,
+            1155.5270014236064,
+            -2660.000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            1105.0000000000005,
+            1155.5270014236064,
+            -2660.000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W03",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -1105.0000000000005,
+            1155.5270014236064,
+            -475.00000000000017
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W04",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            1105.0000000000005,
+            1155.5270014236064,
+            -475.00000000000017
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W05",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -1105.0000000000005,
+            1155.5270014236064,
+            1710.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W06",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            1105.0000000000005,
+            1155.5270014236064,
+            1710.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -487.50000000000017,
+            1155.5270014236064,
+            -1615.000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            487.50000000000017,
+            1155.5270014236064,
+            -1615.000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U03",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -487.50000000000017,
+            1155.5270014236064,
+            285
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U04",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            487.50000000000017,
+            1155.5270014236064,
+            285
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -1495.0000000000007,
+            -1200.08,
+            -570
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            1495.0000000000007,
+            -1200.08,
+            -570
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D03",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -1495.0000000000007,
+            -1200.08,
+            1615.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D04",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            1495.0000000000007,
+            -1200.08,
+            1615.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C01",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -2080.0000000000005,
+            1155.5270014236064,
+            -2375
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C02",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            2080.0000000000005,
+            1155.5270014236064,
+            -2375
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C03",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -2080.0000000000005,
+            1155.5270014236064,
+            -5.684341886080802e-14
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C04",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            2080.0000000000005,
+            1155.5270014236064,
+            -5.684341886080802e-14
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C05",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -2080.0000000000005,
+            1155.5270014236064,
+            2375.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C06",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            2080.0000000000005,
+            1155.5270014236064,
+            2375.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -975.0000000000003,
+            1155.5270014236064,
+            2755.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            975.0000000000003,
+            1159.9236665479084,
+            2755.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_W03": "point_defense",
+        "HP_W04": "point_defense",
+        "HP_W05": "point_defense",
+        "HP_W06": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_U03": "sensor_array",
+        "HP_U04": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter",
+        "HP_D03": "shield_emitter",
+        "HP_D04": "shield_emitter",
+        "HP_C01": "cargo_pod",
+        "HP_C02": "cargo_pod",
+        "HP_C03": "cargo_pod",
+        "HP_C04": "cargo_pod",
+        "HP_C05": "cargo_pod"
+      }
+    },
+    {
+      "id": "sc.ships.cryogenic_hydrocarbon.warp_scout.v2",
+      "raceId": "cryogenic_hydrocarbon",
+      "roleId": "warp_scout",
+      "name": "Pale Thread",
+      "dimensions": {
+        "length": 184,
+        "width": 98,
+        "height": 78
+      },
+      "crew": 24,
+      "populationReservation": 0,
+      "points": 14,
+      "power": 18,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/cryogenic_hydrocarbon--warp_scout.glb",
+      "lod1": "Hulls/cryogenic_hydrocarbon--warp_scout--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "M",
+          "position": [
+            -16.660000000000004,
+            11.076205569481958,
+            -51.52000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "M",
+          "position": [
+            16.66,
+            11.076205707768112,
+            -51.52000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -7.35,
+            17.16349739063941,
+            -31.28000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            7.3500000000000005,
+            17.163497438803088,
+            -31.28000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -9.016000000000004,
+            -4.350209119349008,
+            -11.04
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -8.819999999999999,
+            28.238582233657237,
+            53.36
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_D01": "shield_emitter"
+      }
+    },
+    {
+      "id": "sc.ships.cryogenic_hydrocarbon.science_vessel.v2",
+      "raceId": "cryogenic_hydrocarbon",
+      "roleId": "science_vessel",
+      "name": "Aurora Lens",
+      "dimensions": {
+        "length": 330,
+        "width": 224,
+        "height": 150
+      },
+      "crew": 72,
+      "populationReservation": 0,
+      "points": 24,
+      "power": 32,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/cryogenic_hydrocarbon--science_vessel.glb",
+      "lod1": "Hulls/cryogenic_hydrocarbon--science_vessel--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -38.08,
+            14.026410855700853,
+            -92.4
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            38.08,
+            14.026410863319471,
+            -92.4
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -16.8,
+            67.6564291972037,
+            -56.1
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            16.8,
+            67.6564291997399,
+            -56.1
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U03",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -16.8,
+            6.358617618979277,
+            9.9
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U04",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            16.8,
+            6.358617618979327,
+            9.9
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -10.304,
+            -71.56182539876258,
+            -19.8
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            10.304,
+            -71.56182512389655,
+            -19.8
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -13.44,
+            43.306334199602915,
+            95.69999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            13.44,
+            43.306334199602915,
+            95.69999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_U03": "sensor_array",
+        "HP_U04": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter"
+      }
+    },
+    {
+      "id": "sc.ships.cryogenic_hydrocarbon.patrol_corvette.v2",
+      "raceId": "cryogenic_hydrocarbon",
+      "roleId": "patrol_corvette",
+      "name": "Frost Lance",
+      "dimensions": {
+        "length": 248,
+        "width": 142,
+        "height": 110
+      },
+      "crew": 85,
+      "populationReservation": 0,
+      "points": 36,
+      "power": 44,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/cryogenic_hydrocarbon--patrol_corvette.glb",
+      "lod1": "Hulls/cryogenic_hydrocarbon--patrol_corvette--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -24.14,
+            15.587469392859171,
+            -69.44000000000003
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            24.14,
+            15.587469587878106,
+            -69.44000000000003
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W03",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -9.656,
+            7.422089811486983,
+            -12.40000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W04",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            9.656000000000002,
+            7.422089811486983,
+            -12.40000000000001
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W05",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -14.483999999999998,
+            39.79082109874741,
+            44.63999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W06",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            14.484,
+            39.79082109874741,
+            44.63999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -10.65,
+            24.172111704747888,
+            -42.160000000000004
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            10.650000000000002,
+            24.172111772671048,
+            -42.160000000000004
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -13.064000000000002,
+            -6.102089783697317,
+            -14.879999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            13.064000000000004,
+            -6.102089783697317,
+            -14.879999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -21.3,
+            12.644854122194955,
+            71.91999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            21.300000000000004,
+            12.644854083961182,
+            71.91999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "kinetic_turret",
+        "HP_W02": "beam_turret",
+        "HP_W03": "kinetic_turret",
+        "HP_W04": "kinetic_turret",
+        "HP_W05": "kinetic_turret",
+        "HP_W06": "kinetic_turret",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_T01": "radiator"
+      }
+    },
+    {
+      "id": "sc.ships.cryogenic_hydrocarbon.bulk_freighter.v2",
+      "raceId": "cryogenic_hydrocarbon",
+      "roleId": "bulk_freighter",
+      "name": "Cold Vault",
+      "dimensions": {
+        "length": 650,
+        "width": 380,
+        "height": 248
+      },
+      "crew": 60,
+      "populationReservation": 0,
+      "points": 26,
+      "power": 30,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/cryogenic_hydrocarbon--bulk_freighter.glb",
+      "lod1": "Hulls/cryogenic_hydrocarbon--bulk_freighter--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -51.68000000000001,
+            26.722909193938563,
+            -182.00000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            51.68000000000001,
+            26.72290948585349,
+            -182.00000000000006
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -28.500000000000004,
+            40.406027820126795,
+            -110.5
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            28.500000000000004,
+            40.40602794012815,
+            -110.5
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -87.40000000000003,
+            -32.363447296848456,
+            -39
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            87.40000000000006,
+            -32.363447296848506,
+            -39
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C01",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -121.60000000000001,
+            67.22182477841903,
+            -162.50000000000003
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C02",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            121.60000000000001,
+            66.69670505121873,
+            -162.50000000000003
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C03",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -121.60000000000001,
+            68.068988210416,
+            7.105427357601002e-15
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C04",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            121.60000000000001,
+            68.06898810485453,
+            7.105427357601002e-15
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -22.8,
+            70.23789486160321,
+            188.50000000000003
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            22.8,
+            70.23789486160321,
+            188.50000000000003
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter",
+        "HP_C01": "cargo_pod",
+        "HP_C02": "cargo_pod",
+        "HP_T01": "radiator"
+      }
+    },
+    {
+      "id": "sc.ships.cryogenic_hydrocarbon.resource_outpost_ship.v2",
+      "raceId": "cryogenic_hydrocarbon",
+      "roleId": "resource_outpost_ship",
+      "name": "Rime Seed",
+      "dimensions": {
+        "length": 4500,
+        "width": 2600,
+        "height": 1700
+      },
+      "crew": 180,
+      "populationReservation": 8000000,
+      "points": 42,
+      "power": 50,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/cryogenic_hydrocarbon--resource_outpost_ship.glb",
+      "lod1": "Hulls/cryogenic_hydrocarbon--resource_outpost_ship--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -353.60000000000014,
+            182.71284528103104,
+            -1260.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            353.60000000000014,
+            182.7128472820602,
+            -1260.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W03",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -265.20000000000005,
+            756.8465719336937,
+            810
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W04",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            265.20000000000005,
+            756.8465721159527,
+            810
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -195.00000000000003,
+            276.5084165089337,
+            -764.9999999999998
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            195.00000000000003,
+            276.5084173315236,
+            -764.9999999999998
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U03",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -195.00000000000003,
+            68.99337084273448,
+            135
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U04",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            195.00000000000003,
+            68.99337084273448,
+            135
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -598.0000000000002,
+            -221.37782421226765,
+            -269.99999999999994
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            598,
+            -221.37782421226788,
+            -270
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D03",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -597.9999999999998,
+            -336.6434296260764,
+            764.9999999999998
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D04",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            597.9999999999997,
+            -336.64342962607594,
+            764.9999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C01",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -832,
+            460.3263795294859,
+            -1125
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C02",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            832,
+            456.7267684962569,
+            -1125
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C03",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -832,
+            466.1335482165607,
+            5.684341886080802e-14
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C04",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            832,
+            466.13354749295445,
+            5.684341886080802e-14
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -156,
+            481.0010534867962,
+            1305
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            156,
+            481.0010534867962,
+            1305
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_W03": "point_defense",
+        "HP_W04": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_U03": "sensor_array",
+        "HP_U04": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter",
+        "HP_D03": "shield_emitter",
+        "HP_D04": "shield_emitter",
+        "HP_C01": "cargo_pod",
+        "HP_C02": "cargo_pod"
+      }
+    },
+    {
+      "id": "sc.ships.cryogenic_hydrocarbon.colony_ship.v2",
+      "raceId": "cryogenic_hydrocarbon",
+      "roleId": "colony_ship",
+      "name": "Long Winter",
+      "dimensions": {
+        "length": 13000,
+        "width": 7600,
+        "height": 4200
+      },
+      "crew": 320,
+      "populationReservation": 250000000,
+      "points": 56,
+      "power": 70,
+      "stage": "library_candidate",
+      "gameIntegration": "pending",
+      "hull": "Hulls/cryogenic_hydrocarbon--colony_ship.glb",
+      "lod1": "Hulls/cryogenic_hydrocarbon--colony_ship--lod1.glb",
+      "sockets": [
+        {
+          "id": "HP_W01",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -1292.0000000000002,
+            1782.7477572703747,
+            -3640.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W02",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            1292.0000000000002,
+            1782.7477559074728,
+            -3640.0000000000005
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W03",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -516.8000000000001,
+            1492.8815781971791,
+            -650.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W04",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            516.8000000000001,
+            1492.8815761539252,
+            -650.0000000000002
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W05",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            -1292.0000000000002,
+            415.791941400715,
+            2339.9999999999986
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_W06",
+          "kind": "weapon",
+          "size": "L",
+          "position": [
+            1292.0000000000002,
+            415.79194140071394,
+            2339.999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_U01",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -570,
+            503.0393070269894,
+            -2210
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U02",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            570,
+            503.0393086386755,
+            -2210
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U03",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            -342,
+            163.08966192316552,
+            389.99999999999994
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_U04",
+          "kind": "utility",
+          "size": "M",
+          "position": [
+            342,
+            163.08966192316444,
+            389.99999999999994
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_D01",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -1748,
+            -861.5422068389278,
+            -779.9999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D02",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            1748,
+            -861.5422082032941,
+            -779.9999999999999
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D03",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            -1748,
+            -874.422848611789,
+            2209.9999999999995
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_D04",
+          "kind": "defense",
+          "size": "L",
+          "position": [
+            1748,
+            -874.4228500748259,
+            2209.9999999999995
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            1,
+            0
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C01",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -2432,
+            928.6233200037632,
+            -3250
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C02",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            2432,
+            928.6233246986923,
+            -3250
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C03",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -2432,
+            947.0538662580342,
+            -1.1368683772161603e-13
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C04",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            2432,
+            947.0538676757843,
+            -1.1368683772161603e-13
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C05",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            -2432,
+            906.6080282691966,
+            3250
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_C06",
+          "kind": "cargo",
+          "size": "L",
+          "position": [
+            2432,
+            906.6080287505154,
+            3250
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 24
+        },
+        {
+          "id": "HP_T01",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            -1139.9999999999993,
+            340.52378941124937,
+            3769.9999999999995
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        },
+        {
+          "id": "HP_T02",
+          "kind": "thermal",
+          "size": "M",
+          "position": [
+            1139.9999999999993,
+            340.52378941124937,
+            3769.9999999999995
+          ],
+          "rotationQuaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "moduleForward": "-Z",
+          "moduleOutward": "+Y",
+          "footprintMeters": 12
+        }
+      ],
+      "sampleFitting": {
+        "HP_W01": "point_defense",
+        "HP_W02": "point_defense",
+        "HP_W03": "point_defense",
+        "HP_W04": "point_defense",
+        "HP_W05": "point_defense",
+        "HP_W06": "point_defense",
+        "HP_U01": "sensor_array",
+        "HP_U02": "sensor_array",
+        "HP_U03": "sensor_array",
+        "HP_U04": "sensor_array",
+        "HP_D01": "shield_emitter",
+        "HP_D02": "shield_emitter",
+        "HP_D03": "shield_emitter",
+        "HP_D04": "shield_emitter",
+        "HP_C01": "cargo_pod",
+        "HP_C02": "cargo_pod",
+        "HP_C03": "cargo_pod",
+        "HP_C04": "cargo_pod",
+        "HP_C05": "cargo_pod"
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "Hulls/pelagic_high_pressure--warp_scout.glb",
+      "bytes": 3193252,
+      "sha256": "fd1d6ee8b423663d8fb747b3319088bbf6a77437898da34fef514bb3219f3d7f",
+      "triangles": 46988,
+      "meshes": 81
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--warp_scout--lod1.glb",
+      "bytes": 924248,
+      "sha256": "0fb1750ae10b77fcf7011a7948d05931717b4e8af7d89626defa9546a1a7efee",
+      "triangles": 9252,
+      "meshes": 73
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--science_vessel.glb",
+      "bytes": 3964668,
+      "sha256": "1dd9951eedc29b0ac4224922c97ff0a1a2864d4f2460e452d14e46f47eff1fd9",
+      "triangles": 60908,
+      "meshes": 108
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--science_vessel--lod1.glb",
+      "bytes": 1133612,
+      "sha256": "f6d25d7f76ec0831c579813083692d45903c9bfa4766d0db5c74e68546eadcc9",
+      "triangles": 12652,
+      "meshes": 98
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--patrol_corvette.glb",
+      "bytes": 5303028,
+      "sha256": "b26284b14e5e695c6f97ce9a806d8f2c97b30ec8481d9663a6973fe163690ec9",
+      "triangles": 81492,
+      "meshes": 148
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--patrol_corvette--lod1.glb",
+      "bytes": 1419068,
+      "sha256": "a90058d543c17b81ed078d7e3d66a19a9502a074e5c308e52da68fa41df00c0c",
+      "triangles": 16460,
+      "meshes": 133
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--bulk_freighter.glb",
+      "bytes": 5384428,
+      "sha256": "cbf186d03e9b70f0e4e29c7af12d64885996cdf0ad335b392644917079d7a555",
+      "triangles": 85388,
+      "meshes": 141
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--bulk_freighter--lod1.glb",
+      "bytes": 1484920,
+      "sha256": "a30654e3f447fe938a8f43bdb22dacdd05b3014413dbe05f0d34f3b4a17d6c49",
+      "triangles": 18396,
+      "meshes": 127
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--resource_outpost_ship.glb",
+      "bytes": 6155552,
+      "sha256": "bdc799f889b27798d83f804e873c3c557aa7eda4437689db40a665c41289e718",
+      "triangles": 98876,
+      "meshes": 171
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--resource_outpost_ship--lod1.glb",
+      "bytes": 1706412,
+      "sha256": "1c9b639b8e4e411a51648b80df407d2b41ba9db50043c3c2f99e8f7797a69b30",
+      "triangles": 21876,
+      "meshes": 155
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--colony_ship.glb",
+      "bytes": 9618708,
+      "sha256": "a9352197625dfd4d7910239083ff452e69e9cd6e71f058928642650c7347d7d0",
+      "triangles": 163484,
+      "meshes": 276
+    },
+    {
+      "path": "Hulls/pelagic_high_pressure--colony_ship--lod1.glb",
+      "bytes": 2580372,
+      "sha256": "4cdd11afba42ec279046087794f32b5f7757b895e9679eb988c4b5fcd819a59f",
+      "triangles": 36676,
+      "meshes": 251
+    },
+    {
+      "path": "Hulls/compact_high_gravity--warp_scout.glb",
+      "bytes": 2890900,
+      "sha256": "89a4702bb977a820a331e8893a83d0c95527c391c462c64adcf7009afc0ece97",
+      "triangles": 33716,
+      "meshes": 108
+    },
+    {
+      "path": "Hulls/compact_high_gravity--warp_scout--lod1.glb",
+      "bytes": 660688,
+      "sha256": "2ed409e0a9b3e6425d53f3743400199164d919425d7424fb109e8dd99b6130bf",
+      "triangles": 3116,
+      "meshes": 93
+    },
+    {
+      "path": "Hulls/compact_high_gravity--science_vessel.glb",
+      "bytes": 3140400,
+      "sha256": "fa3e763defd267b60d7b4ed820625608251efe199fdf8610857f7415e2865b62",
+      "triangles": 36052,
+      "meshes": 145
+    },
+    {
+      "path": "Hulls/compact_high_gravity--science_vessel--lod1.glb",
+      "bytes": 736520,
+      "sha256": "c805f90413636f351cc808d9da013e475785539f70cd035c8b17d580c8436a9d",
+      "triangles": 3652,
+      "meshes": 124
+    },
+    {
+      "path": "Hulls/compact_high_gravity--patrol_corvette.glb",
+      "bytes": 4122032,
+      "sha256": "12513bb5d641150ddbacc9ad5d8647178e617c30633198c54bcd18345927bc3a",
+      "triangles": 49800,
+      "meshes": 155
+    },
+    {
+      "path": "Hulls/compact_high_gravity--patrol_corvette--lod1.glb",
+      "bytes": 818556,
+      "sha256": "cf31b194e62167c2f65d1e23c878e81575eb4af525b296f240bd2dee71f9c814",
+      "triangles": 4364,
+      "meshes": 131
+    },
+    {
+      "path": "Hulls/compact_high_gravity--bulk_freighter.glb",
+      "bytes": 3358140,
+      "sha256": "38c6c8046d20b46a8dc6c502cd7922c48136c6caedbb63f958ae127b09a74dd0",
+      "triangles": 37560,
+      "meshes": 211
+    },
+    {
+      "path": "Hulls/compact_high_gravity--bulk_freighter--lod1.glb",
+      "bytes": 844716,
+      "sha256": "e2624ec0a0842753d5792d4041c820663cbc398918200ec93266ac447ac0b8fa",
+      "triangles": 4240,
+      "meshes": 172
+    },
+    {
+      "path": "Hulls/compact_high_gravity--resource_outpost_ship.glb",
+      "bytes": 3564900,
+      "sha256": "dd1b66300acce4e75ecf0517bcb5f8ccb1d2f97c307b21a6c4988474341f5c77",
+      "triangles": 39660,
+      "meshes": 242
+    },
+    {
+      "path": "Hulls/compact_high_gravity--resource_outpost_ship--lod1.glb",
+      "bytes": 910188,
+      "sha256": "6df30281bc311a6769ae76f5c00fc15b5d8673a5a0558c6072bde597ca25ca7e",
+      "triangles": 4724,
+      "meshes": 197
+    },
+    {
+      "path": "Hulls/compact_high_gravity--colony_ship.glb",
+      "bytes": 4846272,
+      "sha256": "3d129611d7ed493ec448c3e4c768a3951ceb87a9a2089cc3956d2b4a286d387b",
+      "triangles": 54104,
+      "meshes": 345
+    },
+    {
+      "path": "Hulls/compact_high_gravity--colony_ship--lod1.glb",
+      "bytes": 1120560,
+      "sha256": "57eaa0c975c6312c236c321c579c1af366655d4017c83abeb2fecbcb2a1b261f",
+      "triangles": 6128,
+      "meshes": 288
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--warp_scout.glb",
+      "bytes": 1668316,
+      "sha256": "66881f6930967cdbf330909a32cd2e49e90619fbf97973d56bbde9584d0911d4",
+      "triangles": 15536,
+      "meshes": 144
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--warp_scout--lod1.glb",
+      "bytes": 616424,
+      "sha256": "94f6ba053b0985bedd549568099d4dd1fc82284d3d2edff47171437907365d4f",
+      "triangles": 2628,
+      "meshes": 110
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--science_vessel.glb",
+      "bytes": 2469644,
+      "sha256": "d434ab1dafe310f1211b603ccc721d89e88f5d30c721455ba4bd48f126a06b25",
+      "triangles": 24768,
+      "meshes": 219
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--science_vessel--lod1.glb",
+      "bytes": 833952,
+      "sha256": "274b4c6273a44a3ecf899edaa4eb947d03265d987e34760c8cee2b4f5811d9c2",
+      "triangles": 4404,
+      "meshes": 173
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--patrol_corvette.glb",
+      "bytes": 2506484,
+      "sha256": "26bb6fb7baee72dc7515c6788bb2e9fafbab52ea3bca59eb4b93ef2f9fe56d91",
+      "triangles": 26544,
+      "meshes": 185
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--patrol_corvette--lod1.glb",
+      "bytes": 768344,
+      "sha256": "bb1eec4da4e93fc056fe1d10b0d05cdb3783698dcc9283e2e60b964149a53008",
+      "triangles": 3880,
+      "meshes": 143
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--bulk_freighter.glb",
+      "bytes": 3243636,
+      "sha256": "6e9dfd820bc8ec278ca897d11cc44b2111e206402e6494fdfc4650b72fb8ff77",
+      "triangles": 33248,
+      "meshes": 288
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--bulk_freighter--lod1.glb",
+      "bytes": 1035920,
+      "sha256": "eb6075dd5bb82ed39e56fba7fae8cb6a4e6d100ca135e3122e9f6584e26b8b86",
+      "triangles": 5940,
+      "meshes": 230
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--resource_outpost_ship.glb",
+      "bytes": 4051204,
+      "sha256": "a1507168a231f249a4c7931c4c47c5a0ad017dd5b8135e090425951b77044deb",
+      "triangles": 42296,
+      "meshes": 367
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--resource_outpost_ship--lod1.glb",
+      "bytes": 1265692,
+      "sha256": "4fdac68f8c101f667c6dbdf08513420a68a8e0f887c0c606fb8e89c85f0c7406",
+      "triangles": 7788,
+      "meshes": 297
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--colony_ship.glb",
+      "bytes": 7087968,
+      "sha256": "57e71b30bb1f81b2346f3f8aba48bae603abccaf61e5d1151f5c01deeee47725",
+      "triangles": 77392,
+      "meshes": 611
+    },
+    {
+      "path": "Hulls/cryogenic_hydrocarbon--colony_ship--lod1.glb",
+      "bytes": 1985652,
+      "sha256": "436a9b6427bdc76ffc42ff4241198283f2c29d8fe98842fa7617476f5295ee02",
+      "triangles": 13460,
+      "meshes": 493
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--beam_turret.glb",
+      "bytes": 664340,
+      "sha256": "1c2229fd5c12bf11d788d53506046ff462cf1e817aea339dddfe1c850c106dd9",
+      "triangles": 6484,
+      "meshes": 16
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--kinetic_turret.glb",
+      "bytes": 667952,
+      "sha256": "bb4adcd1c83750e16bf65b908ac9a657cfb9dfecab7c1820556d8e8a8f3aa703",
+      "triangles": 6508,
+      "meshes": 18
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--missile_pod.glb",
+      "bytes": 685844,
+      "sha256": "4987c5f78d96e60d811b33f4a602a4f5e6ac5bf4c373fb8ca0903ece34b52cac",
+      "triangles": 6784,
+      "meshes": 21
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--point_defense.glb",
+      "bytes": 667580,
+      "sha256": "cbf23eb1c17155c94d22606c6bf97f224b5d98af62272207da93b054575abb25",
+      "triangles": 6508,
+      "meshes": 18
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--sensor_array.glb",
+      "bytes": 29472,
+      "sha256": "e15f5723a7963d228b67b8d3e6c4f5414d2843db4b4bca4e9d50325259cca751",
+      "triangles": 384,
+      "meshes": 6
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--command_relay.glb",
+      "bytes": 33344,
+      "sha256": "a5704532b6962d884c2f512861ed8ab8b6405d421356975f0c3702e50ca4fbb3",
+      "triangles": 600,
+      "meshes": 8
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--shield_emitter.glb",
+      "bytes": 947904,
+      "sha256": "671002242e946474c10e4ac9feae77b0e1f5b23889a85dba56292e642b0e5c3a",
+      "triangles": 7896,
+      "meshes": 40
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--armor_plate.glb",
+      "bytes": 1424428,
+      "sha256": "67518f969addc8db76bcc4e68f857b5a2e945607caf1b9c265498671f860a01a",
+      "triangles": 13828,
+      "meshes": 23
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--cargo_pod.glb",
+      "bytes": 423800,
+      "sha256": "063e1cc8df57aee042e423fc0890f54cbfe48d4f7caec7989c34c57e070ca4e2",
+      "triangles": 1760,
+      "meshes": 13
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--habitat_pod.glb",
+      "bytes": 442312,
+      "sha256": "c68be12e5e729042b7000b919b6485e811a4da0f582bf4f55ed943c395cf1a1b",
+      "triangles": 1880,
+      "meshes": 23
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--radiator.glb",
+      "bytes": 51580,
+      "sha256": "441feed3f643bfbd0111d8ac6b0e71b560e840fe332e79b491b10095bbbd887a",
+      "triangles": 388,
+      "meshes": 25
+    },
+    {
+      "path": "Modules/pelagic_high_pressure--power_unit.glb",
+      "bytes": 680176,
+      "sha256": "9d91ee12d57fce1900ad5834513013fe7ccfd63776fd15e09e97eb48aa03b51a",
+      "triangles": 6880,
+      "meshes": 20
+    },
+    {
+      "path": "Modules/compact_high_gravity--beam_turret.glb",
+      "bytes": 926960,
+      "sha256": "0cf329f91145434b8ae12acd70d248a1a74218576e1c57064e8b39ccb5d2cb7a",
+      "triangles": 7564,
+      "meshes": 18
+    },
+    {
+      "path": "Modules/compact_high_gravity--kinetic_turret.glb",
+      "bytes": 930572,
+      "sha256": "d63c03e4f0a02e5fae185ebfc7d2358e1114253eccd8338643d156b9fa823f62",
+      "triangles": 7588,
+      "meshes": 20
+    },
+    {
+      "path": "Modules/compact_high_gravity--missile_pod.glb",
+      "bytes": 968008,
+      "sha256": "58e4e1ba4e72d47c9bf0fb874ae87b7859d1b4f50c1dd9286bd9516bc2995856",
+      "triangles": 8056,
+      "meshes": 23
+    },
+    {
+      "path": "Modules/compact_high_gravity--point_defense.glb",
+      "bytes": 930196,
+      "sha256": "4f380fac9c00a86cb8c47a000183063816edb14abf2aca04ac7ac56847c79c20",
+      "triangles": 7588,
+      "meshes": 20
+    },
+    {
+      "path": "Modules/compact_high_gravity--sensor_array.glb",
+      "bytes": 26864,
+      "sha256": "8a299411ad5976e5baced835b8a1a6a44f20b99c78d7cd3fa3adb157caee32bb",
+      "triangles": 336,
+      "meshes": 6
+    },
+    {
+      "path": "Modules/compact_high_gravity--command_relay.glb",
+      "bytes": 30728,
+      "sha256": "ddcf2b8e33104196784eeb26061c72046fc16c7ca0c52fef4ecb9e5cc17886bc",
+      "triangles": 552,
+      "meshes": 8
+    },
+    {
+      "path": "Modules/compact_high_gravity--shield_emitter.glb",
+      "bytes": 945304,
+      "sha256": "b20e45af16228f6cf3c17648c52006babd5fe528af226f97d18d3c21effb7432",
+      "triangles": 7848,
+      "meshes": 40
+    },
+    {
+      "path": "Modules/compact_high_gravity--armor_plate.glb",
+      "bytes": 1421824,
+      "sha256": "9e171af2f85702b3ff26c41ad61efab77f9171a579a45dfc76102555d7d872a0",
+      "triangles": 13780,
+      "meshes": 23
+    },
+    {
+      "path": "Modules/compact_high_gravity--cargo_pod.glb",
+      "bytes": 953560,
+      "sha256": "48108e3a7cb2168061ae56a4f9574fa8a9ab9f740ec24cbdbf2b2c3c0445883c",
+      "triangles": 7852,
+      "meshes": 14
+    },
+    {
+      "path": "Modules/compact_high_gravity--habitat_pod.glb",
+      "bytes": 972080,
+      "sha256": "fb70e77a19dfe1ac0fd5b4fb17e1bcbd3bc52d1d4241f91f82c7eb5395af2844",
+      "triangles": 7972,
+      "meshes": 24
+    },
+    {
+      "path": "Modules/compact_high_gravity--radiator.glb",
+      "bytes": 48964,
+      "sha256": "4b5a4075848b99a34a297359030548f211e25b2723d8c465f2713e4c66f7de41",
+      "triangles": 340,
+      "meshes": 25
+    },
+    {
+      "path": "Modules/compact_high_gravity--power_unit.glb",
+      "bytes": 972124,
+      "sha256": "d5a73ad6c84c444eef543ff89db851e32ec58f9bc52134dc84753c05ce04903a",
+      "triangles": 8248,
+      "meshes": 22
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--beam_turret.glb",
+      "bytes": 429244,
+      "sha256": "275259c84255371041b5b67f11a29b02a365099a32ef926542bc074a02be4db3",
+      "triangles": 1548,
+      "meshes": 18
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--kinetic_turret.glb",
+      "bytes": 432860,
+      "sha256": "ac08d48e10102fa92c647e25d04c575034319edff1b05fc36bab476f9eb058d4",
+      "triangles": 1572,
+      "meshes": 20
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--missile_pod.glb",
+      "bytes": 450720,
+      "sha256": "a07b929f08849950ec0c85c8d43dda9fc635f7dab09995ed4f47bd4e9d515983",
+      "triangles": 1848,
+      "meshes": 23
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--point_defense.glb",
+      "bytes": 432484,
+      "sha256": "daf52af2470fa65b680db7f2abcda317b593f1e451eaf1ce75ff19dbfbcb8404",
+      "triangles": 1572,
+      "meshes": 20
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--sensor_array.glb",
+      "bytes": 21236,
+      "sha256": "c6ade9204c75692f81a629368438110f13457f68e81cdd8e218109acaef6f4d4",
+      "triangles": 232,
+      "meshes": 6
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--command_relay.glb",
+      "bytes": 35084,
+      "sha256": "b6368b6be95270c749494e0946ca5ab78853cf39ee200a529a70e65032cd088f",
+      "triangles": 584,
+      "meshes": 10
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--shield_emitter.glb",
+      "bytes": 1261912,
+      "sha256": "162ffbc9129d720c09f6c1fd80db16fd11df45452de2f9facb88fad60a932b2a",
+      "triangles": 11408,
+      "meshes": 58
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--armor_plate.glb",
+      "bytes": 1422252,
+      "sha256": "b94edbc83479645623c7e1ec36981344805999e3180bcecb9d8f8e0977621d3d",
+      "triangles": 13788,
+      "meshes": 23
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--cargo_pod.glb",
+      "bytes": 426196,
+      "sha256": "ea3ea78e258a0abbd4c153e087f3b4a33b266057f4910fb52763b663d0dbb05d",
+      "triangles": 1560,
+      "meshes": 15
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--habitat_pod.glb",
+      "bytes": 444724,
+      "sha256": "60125ea8dcf2f4f9209928b686c89acfbf9956d6d683ada7731977f37db64a08",
+      "triangles": 1680,
+      "meshes": 25
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--radiator.glb",
+      "bytes": 49400,
+      "sha256": "b6bf7d6386480d856ea647760747856acd58a25a524adee2a2ee00049e311181",
+      "triangles": 348,
+      "meshes": 25
+    },
+    {
+      "path": "Modules/cryogenic_hydrocarbon--power_unit.glb",
+      "bytes": 445092,
+      "sha256": "188cdfadb6af502a6c569a043176e9b1f90d4e0bce603c3b326f8f598a1a9615",
+      "triangles": 1944,
+      "meshes": 22
+    }
+  ],
+  "supportingAssets": [
+    {
+      "path": "ART-PROVENANCE.md",
+      "bytes": 7716,
+      "sha256": "e5775b2d125fa737013777dc8dd649c3181f046aa0a561e44499db016dce5285",
+      "purpose": "art_provenance_and_exact_prompts"
+    },
+    {
+      "path": "Textures/hull-metal-albedo.png",
+      "bytes": 141031,
+      "sha256": "7fbd449d181f682b14da22e81fb59c52ba334a7d2e635c9304ad7fa565c85c63",
+      "purpose": "original_or_derived_material_texture"
+    },
+    {
+      "path": "Textures/hull-metal-normal.png",
+      "bytes": 91933,
+      "sha256": "babe198281e6552d53d5c09beb7c77dd2ba4fbc6076e2a3faaeb0c59c99d948e",
+      "purpose": "original_or_derived_material_texture"
+    },
+    {
+      "path": "Textures/hull-metal-orm.png",
+      "bytes": 50641,
+      "sha256": "603a402abca73aa358fb3335b3f9debef66296a0903cecc52d8386330c870adb",
+      "purpose": "original_or_derived_material_texture"
+    },
+    {
+      "path": "Textures/hull-metal-source.png",
+      "bytes": 2874865,
+      "sha256": "81888d0592c294063d499e2e4b3b31f2d3f1393e0b2f33f538b4645fe56efcd4",
+      "purpose": "original_or_derived_material_texture"
+    },
+    {
+      "path": "References/realistic-metal-construction-reference.png",
+      "bytes": 2574169,
+      "sha256": "5c344cfcc0a218c56a6d800f9f4ff18484fd432b231cd99c4d81f95de5a1b40c",
+      "purpose": "generated_design_reference_not_a_model_render"
+    }
+  ],
+  "integration": {
+    "godot": "pending",
+    "nativeCpp": "pending",
+    "researchBindings": "pending",
+    "damageStates": "pending",
+    "weaponArcsAndCollision": "pending"
+  },
+  "sizePolicy": "Proposed exterior dimensions. Population reservations are preserved as literal passengers for carrier sizing; provisional volume allowances are not modeled interiors or engineering certification."
+}

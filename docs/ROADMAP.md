@@ -4,6 +4,75 @@ This is the public roadmap for **Stellar Continuum**, the working title for the 
 
 For durable design rules, current baseline status, and engineering constraints, also read the continuity records linked from the repository README.
 
+## Immediate content production — Stations and species fleets
+
+**Latest content request, 2026-09-13:** unique nonhuman ship families sized for each
+species, with hardpoints whose fitted weapons and modules change the silhouette.
+The [alien fleet collection](content/ALIEN_FLEET.md) now contains 18 hulls, 18
+reduced-detail variants and 36 matching equipment models. Its offline workshop
+supports fitting, removal, blueprint saving/loading and fitted GLB export. These
+are reusable library candidates; native/campaign integration is pending. Station
+and Terran fleet work below remains in scope.
+
+**Visual revision, 2026-09-14 UTC:** alien fleet 0.2.0 adds segmented metal plates,
+service hardware and textured metallic surfaces to the actual models. The user
+rejected the earlier cartoonish style; 0.1.0 is a superseded blockout. The realistic
+generated construction sheet is a design reference. Final model detailing and
+art approval remain pending alongside native integration.
+
+**First content priority, updated 2026-09-13:** create the
+[Human Modular Orbital Station](content/HUMAN_MODULAR_STATION.md). The user wants
+one station family supporting orbital-hub, military-defense and shipyard/industrial
+roles, with weapon hardpoints, upgradeable modules and a visible structural change
+at every upgrade. Stations begin as bare cores with zero modules. Core expansion
+adds empty slots; modules and their upgrades require completed research and paid
+construction at every tier. Tiers 5 and 6 stack decks upward; Tier 7 fills the gaps
+with a solid starbase hull around the retained structure. Initial assets cover
+bare cores, equipped examples, module upgrades, stacked decks and the solid Tier 7
+form plus attachment/research rules. The player-ship queue follows.
+
+Every station core also includes permanent docking bays with clamps and extending
+boarding tunnels. Basic ship docking and personnel access use no module slots;
+optional docking modules add capacity and specialized services.
+
+Custom station loadouts select weapons, shields, armor and other modules within
+tier-specific allocation points and compatible slots. Both capacities increase
+at every core upgrade, including Tier 7. Research and construction still apply;
+see [station outfitting](content/STATION_OUTFITTING.md) for provisional budgets.
+
+Priority updated 2026-09-13 at the user's request: begin **player ships and matching
+assets while Stellar Engine conversion continues**. Content briefs, concepts,
+models, textures, icons, effects and audio can advance now. Connect finished packs
+to playable builds as their native rendering and gameplay support becomes ready.
+
+Start with the six existing Terran ship designs. Each already has presentation
+art and a procedural game model; build a coherent production asset pack from those
+references and preserve its existing design identity.
+
+| Order | Ship / content | Immediate deliverable |
+| --- | --- | --- |
+| 1 | Shared player-fleet reference and parts kit | Consistent silhouettes, scale plan, hull materials, drives, radiators, docking parts and asset records |
+| 2 | Pathfinder Scout | First complete ship pack: design views, reusable model, textures, portrait, icon and preview |
+| 3 | Deep-Space Science Vessel | Matching science ship pack with distinct instruments, laboratory spine and habitat features |
+| 4 | Patrol Corvette | Matching escort pack with readable protection and weapon locations |
+| 5 | Interstellar Bulk Freighter | Cargo modules, transfer points and a distinct working-vessel silhouette |
+| 6 | Sealed Resource Outpost Vessel | Sealed habitat and deployable industrial payload visuals |
+| 7 | Interstellar Colony Ship | Settlement-carrier pack following a review of its represented capacity and scale |
+| Alongside | Fleet icons, drive/survey effects, launch/docking audio | Reusable support assets for the six ships, retaining the established officers and existing useful cues |
+| Following | Orbital shipyard and assembly assets | A matching gantry, construction stages and docking context for the player fleet |
+
+Every new asset should enter **Engine Assets** with its ship/role mapping, version,
+source, dependencies, preview and production status. Preserve editable masters
+and ship a complete copy of the assets a project uses. Existing art remains a
+reference until its replacement is checked in the intended view.
+
+The detailed queue and first production briefs are in
+[Player fleet production](content/PLAYER_FLEET_ROADMAP.md). The
+[structured queue](content/PLAYER_FLEET_QUEUE.json) uses existing ship IDs and records
+the remaining deliverables. This authoring track can proceed alongside conversion;
+gameplay balance, research unlocks, save compatibility and release acceptance stay
+with their owning game/engine work.
+
 ## Local interplanetary travel — open simulation gap
 
 The expanded orbital map and free zoom in 0.1.2 Alpha use schematic display distances.
