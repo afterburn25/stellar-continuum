@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
+    <Compile Remove="editor/**/*.cs" />
     <EmbeddedResource Include="data/astronomy/hyg-nearby-500-v1.json" LogicalName="Game.Astronomy.Nearby500.json" />
     <Content Include="data/research/v1/**/*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
