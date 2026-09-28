@@ -153,7 +153,8 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `--construction-smoke`, `--quick-find-smoke` on `work/de-ship.json`;
   `--inspection-check`, `--logistics-check`, `--economy-check` under
   `--smoke`; and `--campaign-profile --profile-frames 120`
-  (16.9 ms steady-state frame mean at 1920×1080).
+  (16.9 ms steady-state frame mean at 1920×1080; 16.68 ms at
+  2560×1440 — update 0.47 ms, scene 0.19 ms, effectively vsync-bound).
 - Visual capture audit: marquee render paths confirmed by eye, not only
   by assertion — galaxy backdrop art (`nav.bmp`), Sol photosphere
   granulation at 2054× zoom (`gal-star-system-maximum.bmp`), Earth PBR
