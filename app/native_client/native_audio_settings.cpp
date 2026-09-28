@@ -1,6 +1,7 @@
 #include "native_audio_settings.hpp"
 
 #include "native_menu_style.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/engine/atomic_file_write.hpp>
 
 #include <nlohmann/json.hpp>
@@ -25,13 +26,15 @@ using namespace stellar::native_map;
 using Json = nlohmann::json;
 
 constexpr std::size_t maximum_settings_bytes = 4u * 1024u;
+// Settings chrome aliases the shared theme palette — the veil scrim has no
+// token equivalent and stays literal.
 constexpr Color veil{3, 10, 22, 48};
-constexpr Color panel_fill{10, 25, 45, 250};
-constexpr Color panel_stroke{104, 184, 212, 255};
-constexpr Color track_fill{25, 49, 72, 255};
-constexpr Color accent{104, 224, 188, 255};
-constexpr Color text_color{232, 243, 250, 255};
-constexpr Color muted_color{244, 185, 108, 255};
+constexpr Color panel_fill = stellar::native_ui::color::surface_opaque;
+constexpr Color panel_stroke = stellar::native_ui::color::keyline_strong;
+constexpr Color track_fill = stellar::native_ui::color::surface_raised;
+constexpr Color accent = stellar::native_ui::color::success;
+constexpr Color text_color = stellar::native_ui::color::text_primary;
+constexpr Color muted_color = stellar::native_ui::color::caution;
 
 float clamp_gain(float value) noexcept { return std::clamp(value, 0.f, 1.f); }
 bool valid_gain(float value) noexcept { return std::isfinite(value) && value >= 0.f && value <= 1.f; }
@@ -368,7 +371,7 @@ void NativeAudioSettings::render(DrawList& draw, int width, int height) const {
     if (general_navigation_) focusables[count++] = layout.general;
     if (focus_ < count) {
       const auto& rect = focusables[static_cast<std::size_t>(focus_)];
-      draw.overlay.emplace_back(StrokedRectangle{rect, {160, 210, 255, 255}});
+      stellar::native_ui::focus_ring(draw, rect);
     }
   }
 }

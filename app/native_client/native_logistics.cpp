@@ -93,25 +93,40 @@ std::optional<View> unavailable_for(const FreshCampaignState &campaign,
   return std::nullopt;
 }
 
-HomeSystemLogisticsNetwork canonical_project(const FreshCampaignState &campaign,
-                                             const int civilization_id) {
+CivilizationLogisticsCoverage canonical_project(const FreshCampaignState &campaign,
+                                                const int civilization_id) {
   auto construction = economic_construction_projection(campaign.construction);
   auto fleets = economic_fleet_projection(campaign.fleets);
   const EconomyWorldView world{campaign.civilizations, campaign.bodies,
                                construction, fleets};
-  return home_system_logistics(world, campaign.colonies, campaign.economies,
-                               civilization_id);
+  return civilization_logistics_coverage(world, campaign.colonies,
+                                         campaign.economies, civilization_id);
+}
+
+std::string condition_label(const SupplyCondition condition,
+                            const engine::LocalizationTable *locale) {
+  switch (condition) {
+    case SupplyCondition::Critical:
+      return resolve(locale, "SUPPLY_CONDITION_CRITICAL", "Critical");
+    case SupplyCondition::Strained:
+      return resolve(locale, "SUPPLY_CONDITION_STRAINED", "Strained");
+    case SupplyCondition::Healthy:
+      break;
+  }
+  return resolve(locale, "SUPPLY_CONDITION_HEALTHY", "Healthy");
 }
 
 View make_view(const FreshCampaignState &campaign, const int civilization_id,
-               const HomeSystemLogisticsNetwork &network,
+               const CivilizationLogisticsCoverage &coverage,
                const engine::LocalizationTable *locale) {
   const auto observer = std::ranges::find(campaign.civilizations,
                                           civilization_id, &Civilization::id);
-  if (network.civilization_id != civilization_id ||
+  const auto &network = coverage.home_system;
+  if (coverage.civilization_id != civilization_id ||
+      network.civilization_id != civilization_id ||
       observer == campaign.civilizations.end() ||
       network.home_system_id != observer->home_system_id)
-    throw std::invalid_argument("Home logistics projection identity does not match the active observer.");
+    throw std::invalid_argument("Logistics coverage identity does not match the active observer.");
   View view;
   view.state = LoadState::Ready;
   const auto system = std::ranges::find(campaign.systems, network.home_system_id,
@@ -132,12 +147,14 @@ View make_view(const FreshCampaignState &campaign, const int civilization_id,
   for (const auto &item : network.demands) demand[item.node_id] += item.required_per_day;
   for (const auto &item : network.daily_flow.allocations)
     delivered[item.destination_node_id] += item.allocated_per_day;
+  std::unordered_map<int, std::string_view> sealed_names;
   for (const auto &node : network.nodes) {
     // Do not trust a malformed projection to disclose another civilization or
     // system. Core normally guarantees this, but presentation remains sealed.
     if (node.civilization_id != civilization_id ||
         node.system_id != network.home_system_id)
       continue;
+    sealed_names.emplace(node.id, node.name);
     const double node_demand = demand[node.id];
     const double node_delivered = delivered[node.id];
     const std::string status =
@@ -151,6 +168,61 @@ View make_view(const FreshCampaignState &campaign, const int civilization_id,
     view.nodes.push_back({node.id, node.name, kind_label(node.kind, locale),
                           status, supply[node.id], node_demand,
                           node_delivered});
+  }
+  // Freight corridors: the canonical link graph plus per-link usage summed
+  // from the day's flow allocations. Links touching a sealed node are dropped
+  // rather than partially disclosed.
+  std::unordered_map<int, double> link_used;
+  for (const auto &allocation : network.daily_flow.allocations)
+    for (const int link_id : allocation.route_link_ids)
+      link_used[link_id] += allocation.allocated_per_day;
+  for (const auto &link : network.links) {
+    if (link.civilization_id != civilization_id) continue;
+    const auto from = sealed_names.find(link.from_node_id);
+    const auto to = sealed_names.find(link.to_node_id);
+    if (from == sealed_names.end() || to == sealed_names.end()) continue;
+    const double used = link_used[link.id];
+    const char *key = "SUPPLY_LINK_IDLE";
+    if (!link.enabled) key = "SUPPLY_LINK_DISABLED";
+    else if (link.capacity_per_day <= .0001)
+      key = used > .0001 ? "SUPPLY_LINK_SATURATED" : "SUPPLY_LINK_IDLE";
+    else if (used >= link.capacity_per_day - .0001)
+      key = "SUPPLY_LINK_SATURATED";
+    else if (used >= link.capacity_per_day * .75) key = "SUPPLY_LINK_BUSY";
+    else if (used > .0001) key = "SUPPLY_LINK_NORMAL";
+    const char *fallback = !link.enabled ? "Disabled"
+        : link.capacity_per_day <= .0001
+              ? (used > .0001 ? "Saturated" : "Idle")
+        : used >= link.capacity_per_day - .0001 ? "Saturated"
+        : used >= link.capacity_per_day * .75   ? "Busy"
+        : used > .0001                          ? "Normal"
+                                                : "Idle";
+    view.links.push_back({link.id, std::string(from->second),
+                          std::string(to->second), resolve(locale, key, fallback),
+                          link.capacity_per_day, used, link.transit_days,
+                          link.enabled, link.bidirectional});
+  }
+  // External coverage: owned systems beyond the home system. Rows whose
+  // identity or system record cannot be verified are dropped rather than
+  // partially disclosed — same sealing rule as node/link endpoints.
+  view.owned_system_count = coverage.owned_system_count;
+  view.support_gap_per_day =
+      coverage.unrepresented_interstellar_support_per_day;
+  for (const auto &external : coverage.external_systems) {
+    if (external.civilization_id != civilization_id ||
+        external.system_id == network.home_system_id)
+      continue;
+    const auto record = std::ranges::find(campaign.systems,
+                                          external.system_id,
+                                          &StellarSystem::id);
+    if (record == campaign.systems.end()) continue;
+    view.external.push_back({external.system_id, record->name,
+                             condition_label(external.condition, locale),
+                             external.condition, external.colony_count,
+                             external.local_support_capacity_per_day,
+                             external.support_demand_per_day,
+                             external.import_requirement_per_day,
+                             external.has_represented_interstellar_freight_corridor});
   }
   return view;
 }

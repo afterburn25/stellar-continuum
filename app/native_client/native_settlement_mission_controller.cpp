@@ -1,5 +1,8 @@
 #include "native_settlement_mission_controller.hpp"
 
+#include "native_data_names.hpp"
+#include "native_settlement_messages.hpp"
+
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/species_environment.hpp>
 #include <stellar/engine/localization.hpp>
@@ -157,11 +160,15 @@ bool same_candidate(const NativeSettlementCandidate &left,
          left.initial_deposit_materials == right.initial_deposit_materials;
 }
 
-std::string species_name(const std::string &id) {
+std::string species_name(const stellar::engine::LocalizationTable *locale,
+                         const std::string &id) {
   const auto profiles = species_environment_profiles();
   const auto found = std::ranges::find(profiles, id,
                                         &SpeciesEnvironmentProfile::id);
-  return found == profiles.end() ? std::string{} : found->display_name;
+  return found == profiles.end()
+             ? std::string{}
+             : stellar::native_data::species_display_name(locale, id,
+                                                          found->display_name);
 }
 
 } // namespace
@@ -227,7 +234,7 @@ NativeSettlementTargetPreview NativeSettlementMissionController::preview_exact(
   result.design_id = fleet->design_id;
   result.personnel_species_id =
       fleet->embarked_population_species_id.value_or("");
-  result.personnel_species_name = species_name(result.personnel_species_id);
+  result.personnel_species_name = species_name(locale_, result.personnel_species_id);
   result.personnel_millions = fleet->embarked_population_millions;
   result.currency = sovereign_currency_for_civilization(
       current.world.civilizations, current.player.id);
@@ -252,14 +259,16 @@ NativeSettlementTargetPreview NativeSettlementMissionController::preview_exact(
             &current.simulation, current.player.id, fleet_id,
             destination_system_id, body_id);
     result.accepted = assessment.accepted;
-    result.message = assessment.message;
+    result.message = stellar::native_settlement::localized_message(
+        locale_, assessment.message);
     if (assessment.candidate) result.candidate = copy(*assessment.candidate);
   } else {
     const auto assessment = current.runtime.core().assess_colony_fleet_order(
         &current.simulation, current.player.id, fleet_id,
         destination_system_id, body_id);
     result.accepted = assessment.accepted;
-    result.message = assessment.message;
+    result.message = stellar::native_settlement::localized_message(
+        locale_, assessment.message);
     if (assessment.candidate) result.candidate = copy(*assessment.candidate);
   }
   exact_ = result;
@@ -322,14 +331,16 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue_exact(
             &current.simulation, current.player.id, fleet->id,
             prior.destination_system_id, prior.body_id);
     accepted = assessment.accepted;
-    message = assessment.message;
+    message = stellar::native_settlement::localized_message(
+        locale_, assessment.message);
     if (assessment.candidate) candidate = copy(*assessment.candidate);
   } else {
     const auto assessment = current.runtime.core().assess_colony_fleet_order(
         &current.simulation, current.player.id, fleet->id,
         prior.destination_system_id, prior.body_id);
     accepted = assessment.accepted;
-    message = assessment.message;
+    message = stellar::native_settlement::localized_message(
+        locale_, assessment.message);
     if (assessment.candidate) candidate = copy(*assessment.candidate);
   }
   if (!accepted) return {false, std::move(message), fleet->mission_order_revision};
@@ -355,7 +366,9 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue_exact(
     exact_.reset();
     projected_.clear();
   }
-  return {result.accepted, result.message,
+  return {result.accepted,
+          stellar::native_settlement::localized_message(locale_,
+                                                        result.message),
           updated == current.world.fleets.end()
               ? 0
               : updated->mission_order_revision};
@@ -557,7 +570,9 @@ NativeSettlementCommandOutcome NativeSettlementMissionController::issue(
   const auto updated = std::ranges::find(current.world.fleets, fleet_id,
                                           &FleetState::id);
   if (result.accepted) projected_.clear();
-  return {result.accepted, result.message,
+  return {result.accepted,
+          stellar::native_settlement::localized_message(locale_,
+                                                        result.message),
           updated == current.world.fleets.end()
               ? 0
               : updated->mission_order_revision};

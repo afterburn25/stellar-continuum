@@ -98,8 +98,10 @@ public:
     const auto banner=banner_rect(width,height);
     const int banner_font=std::max(12,static_cast<int>(16*s));
     stellar::engine::ui_skin::control(out,banner,banner.contains(pointer_),false,true,s);
-    native_menu_style::text(out,{banner.x+8*s,banner.y+(banner.height-banner_font)*.5f,banner.width-16*s,static_cast<float>(banner_font)+1.f},
-        provenance->player_ai_control?"DEV CONTROLS · AI CONTROL":"DEV CONTROLS · ISOLATED CAMPAIGN",banner_font);
+    native_menu_style::text(out,{banner.x+8*s,banner.y+(banner.height-banner_font)*.5f,std::max(0.f,banner.width-16*s),static_cast<float>(banner_font)+1.f},
+        banner.width>=220.f*s
+            ?(provenance->player_ai_control?"DEV CONTROLS · AI CONTROL":"DEV CONTROLS · ISOLATED CAMPAIGN")
+            :(provenance->player_ai_control?"DEV · AI":"DEV · ISOLATED"),banner_font);
     if(!visible_)return;
     const auto l=layout(width,height);
     out.overlay.emplace_back(FilledRectangle{l.panel,{3,14,25,250}});
@@ -143,9 +145,11 @@ private:
     const auto ui=NativeUiLayout::for_viewport(w,h);
     const float s=std::clamp(std::min(w/1920.f,h/1080.f),.67f,2.f);
     const float right=std::max(0.f,ui.day_text.x-12.f*ui.scale);
-    const float left=std::min(580.f*ui.scale,right);
-    const float width=std::min(420.f*s,right-left);
-    return {std::clamp(w*.5f-width*.5f,left,right-width),4.f*ui.scale,width,28.f*ui.scale};
+    const float minimum=std::min(200.f*s,std::max(0.f,w-8.f*ui.scale));
+    float left=std::min(580.f*ui.scale,right);
+    if(right-left<minimum)left=std::max(4.f*ui.scale,right-minimum);
+    const float width=std::min(420.f*s,std::max(0.f,right-left));
+    return {std::clamp(w*.5f-width*.5f,left,std::max(left,right-width)),4.f*ui.scale,width,28.f*ui.scale};
   }
   static bool tactical(stellar::core::CampaignFrame &frame){const auto &battle=frame.runtime().world().campaign().active_combat_encounter;return battle&&!battle->reconciled;}
   static bool paused(stellar::core::CampaignFrame &frame){return tactical(frame)?frame.tactical_clock().speed_multiplier()==0.:frame.clock().speed()==stellar::core::StrategicSpeed::Paused;}
@@ -199,7 +203,8 @@ private:
     else close();
   }
   static Layout layout(int width,int height){
-    const float s=std::clamp(std::min(width/1920.f,height/1080.f),.67f,2.f);
+    const float s=std::clamp(std::min(width/1920.f,height/1080.f),
+        std::min(.67f,std::max(.45f,(height-12.f)/630.f)),2.f);
     const UiRect panel{width*.5f-300*s,height*.5f-315*s,600*s,630*s};Layout l{panel,{}};
     for(int i=0;i<5;++i)l.buttons[i]={panel.x+(18+114*i)*s,panel.y+124*s,108*s,36*s};
     l.buttons[5]={panel.x+18*s,panel.y+174*s,276*s,36*s};

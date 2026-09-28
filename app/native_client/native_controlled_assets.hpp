@@ -17,6 +17,9 @@ struct Row {
   std::string name, detail, activity, tooltip, search;
   bool controlled{}, actionable{true};
   int severity{};
+  // Display-order rank inside the Fleets category: 0 engaged, 1 in transit,
+  // 2 on mission/active orders, 3 stationed. Lower sorts first.
+  int urgency{3};
   std::optional<double> progress;
   bool operator==(const Row&) const = default;
 };
@@ -57,6 +60,8 @@ public:
   void set_preferences(Preferences p){preferences_=p;rebuild();}
   void set_persist(std::function<bool(const Preferences&)> fn){persist_=std::move(fn);}
   void set_localization(const stellar::engine::LocalizationTable* table)noexcept{locale_=table;}
+  using TextMeasurer=std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)>;
+  void set_text_measurer(TextMeasurer value){measure_=std::move(value);}
   [[nodiscard]] const Preferences& preferences()const{return preferences_;}
   [[nodiscard]] const View& view()const{return view_;}
   [[nodiscard]] const std::string& search()const{return search_;}
@@ -124,5 +129,6 @@ private:
   mutable stellar::engine::ScrollView scroll_{};
   stellar::native_map::Point pointer_{};
   const stellar::engine::LocalizationTable* locale_{};
+  TextMeasurer measure_;
 };
 }

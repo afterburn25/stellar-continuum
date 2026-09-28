@@ -1,6 +1,8 @@
 #include <stellar/engine/native_ui_skin.hpp>
 #include "native_campaign_calendar.hpp"
+#include "native_settlement_messages.hpp"
 #include "native_settlement_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/core/colonization_runtime.hpp>
 
@@ -154,10 +156,10 @@ void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
     add(p.candidate->body_name+"  /  "+p.candidate->system_name,text_color,layout.title_font,36.f*layout.scale);
     add(trf(p.requires_new_authorization?"SETTLE_AUTH_NEW":"SETTLE_AUTH_RETAINED",{p.formatted_authorization},p.requires_new_authorization?"New authorization  {0}":"Retarget authorization retained  ·  New charge  {0}"));
     add(trf("SETTLE_TREASURY",{p.formatted_treasury},"Current treasury  {0}"));
-    add(trf("SETTLE_ROUTE",{stellar::core::format_interstellar_metric_primary(p.candidate->reach.route_distance_light_years)},"Route distance  {0}"));
+    add(trf("SETTLE_ROUTE",{stellar::native_settlement::localized_metric(locale_,stellar::core::format_interstellar_metric_primary(p.candidate->reach.route_distance_light_years))},"Route distance  {0}"));
     if(p.candidate->reach.route_system_ids)add(trf("SETTLE_LANES",{std::to_string(p.candidate->reach.route_system_ids->size()>0?p.candidate->reach.route_system_ids->size()-1:0)},"Confirmed lane route  {0} hop(s)"));
     add(tr("SETTLE_ETA_UNKNOWN","Travel duration estimate unavailable"),muted,layout.small_font);
-    add(trf("SETTLE_ESTABLISH",{stellar::native_campaign::format_campaign_duration(establishment_days(p.kind))},"Establishment after arrival  {0}"));
+    add(trf("SETTLE_ESTABLISH",{stellar::native_campaign::format_campaign_duration_localized(locale_,establishment_days(p.kind))},"Establishment after arrival  {0}"));
     if(p.kind==NativeSettlementMissionKind::Colony){
       add(trf("SETTLE_HABITABILITY",{number(p.candidate->natural_habitability*100.,1),number(p.candidate->unprotected_operational_capacity*100.,1)},"Natural habitability  {0}%  |  Operational capacity  {1}%"));
     }else{
@@ -168,6 +170,6 @@ void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
   label(out,{x,y,content_w,55.f*layout.scale},p.message,p.accepted?good:bad,layout.small_font);
   stellar::engine::ui_skin::control(out,layout.cancel,layout.cancel.contains(pointer_),false,true,layout.scale);label(out,layout.cancel,tr("SETTLE_CANCEL","CANCEL"),text_color,layout.body_font,TextAlign::Center);
   const auto can_confirm=p.accepted;stellar::engine::ui_skin::control(out,layout.confirm,layout.confirm.contains(pointer_),true,can_confirm,layout.scale);label(out,layout.confirm,tr("SETTLE_CONFIRM","CONFIRM MISSION"),can_confirm?text_color:muted,layout.body_font,TextAlign::Center);
-  if(focus_>=0)stroke(out,focus_==0?layout.cancel:layout.confirm,{160,210,255,255});
+  if(focus_>=0)stellar::native_ui::focus_ring(out,focus_==0?layout.cancel:layout.confirm);
 }
 } // namespace stellar::native_colony_ui

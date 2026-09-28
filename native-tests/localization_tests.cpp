@@ -170,6 +170,14 @@ int main() {
         "MAJOR_FLARE",                // eruption dataset classification token
         "SMALL_PROMINENCE",           // eruption dataset classification token
         "SETTINGS_ACTION_",           // dynamic prefix for controls-rebind keys
+        "DATA_STELLAR_",              // dynamic prefix: data-authored stellar ids
+        "DATA_PLANET_CLASS_",         // dynamic prefix: planet class ids
+        "DATA_SUBCLASS_",             // dynamic prefix: planet subclass ids
+        "DATA_SPECIES_",              // dynamic prefix: species profile ids
+        "DATA_PHENOMENON_",           // dynamic prefix: phenomenon type ids
+        "DATA_PHENOMENON_DESC_",      // dynamic prefix: phenomenon descriptions
+        "DATA_PROJECT_NAME_",         // dynamic prefix: construction project names
+        "DATA_PROJECT_DESC_",         // dynamic prefix: project descriptions
     };
     const auto key_shaped = [](const std::string &text) {
       if (text.size() < 5 || text.find('_') == std::string::npos)

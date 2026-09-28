@@ -179,6 +179,7 @@ class NativeMissionView final {
   bool visible_{}, show_sites_{};
   int fleet_index_{}, site_index_{};
   int focus_{-1};
+  native_map::Point pointer_{};
   // Scrolls whichever list the active tab shows (mission cards or colony
   // rows); reset when the panel or the tab changes.
   stellar::engine::ScrollView scroll_{};

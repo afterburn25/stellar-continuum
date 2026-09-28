@@ -23,7 +23,8 @@ private:
   std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure_;
   mutable std::vector<Item> items_;
   mutable stellar::native_map::UiRect panel_{},body_{};
-  mutable float footer_top_{},name_height_{};
+  mutable float footer_top_{},name_height_{},status_inset_{50.f};
+  mutable bool compact_header_{};
   mutable stellar::engine::ScrollView scroll_{};
   mutable bool valid_{};
 };

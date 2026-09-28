@@ -1,7 +1,8 @@
-#include <stellar/engine/native_ui_skin.hpp>
 #include "native_campaign_calendar.hpp"
 #include "native_construction_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_style.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -15,16 +16,14 @@ namespace {
 using namespace stellar::native_construction;
 using namespace stellar::native_map;
 
-constexpr Color panel{7, 17, 32, 252};
-constexpr Color inset{5, 14, 27, 250};
-constexpr Color row{12, 31, 54, 248};
-constexpr Color hover{24, 61, 94, 252};
-constexpr Color selected{19, 73, 68, 252};
-constexpr Color border{91, 151, 205, 235};
-constexpr Color good{102, 232, 164, 255};
-constexpr Color bright{235, 244, 255, 255};
-constexpr Color muted{154, 181, 211, 240};
-constexpr Color failure{255, 133, 123, 255};
+namespace theme = stellar::native_ui;
+constexpr Color row = theme::color::surface_secondary;
+constexpr Color hover = theme::color::surface_hover;
+constexpr Color selected = theme::color::surface_raised;
+constexpr Color good = theme::color::success;
+constexpr Color bright = theme::color::text_primary;
+constexpr Color muted = theme::color::text_secondary;
+constexpr Color failure = theme::color::danger;
 
 void fill(DrawList &out, UiRect bounds, Color color) {
   out.overlay.emplace_back(FilledRectangle{bounds, color});
@@ -138,7 +137,11 @@ ConstructionWorkspaceLayout ConstructionWorkspaceLayout::for_viewport(
                        inner_h - 276.f * scale};
   const UiRect orders{details.x + details.width + gap, inner_y, right_w,
                       inner_h};
-  const auto action_y = inner_y + inner_h - 42.f * scale;
+  // The command HUD's context plate owns the bottom-center strip — the
+  // center column's action row clears it instead of underlapping.
+  const auto context_top = CommandHudLayout::make(width, height).context.y;
+  const auto action_y =
+      std::min(inner_y + inner_h, context_top - 8.f * scale) - 42.f * scale;
   const auto action_gap = 8.f * scale;
   const auto action_w = (details.width - action_gap) * .5f;
   const UiRect primary{details.x, action_y, action_w, 42.f * scale};
@@ -151,9 +154,9 @@ ConstructionWorkspaceLayout ConstructionWorkspaceLayout::for_viewport(
                      std::max(0.f, feedback.y - details.y -
                                        details.height - 16.f * scale)};
   return {scale,
-          static_cast<int>(std::lround(24.f * scale)),
-          static_cast<int>(std::lround(15.f * scale)),
-          static_cast<int>(std::lround(12.f * scale)),
+          theme::type::title(scale),
+          theme::type::body(scale),
+          theme::type::small(scale),
           surface,
           {inner_x, surface.y + 14.f * scale,
            surface.width - 92.f * scale, 32.f * scale},
@@ -166,6 +169,106 @@ ConstructionWorkspaceLayout ConstructionWorkspaceLayout::for_viewport(
           feedback,
           primary,
           secondary};
+}
+
+std::string NativeConstructionWorkspace::localized_construction_message(
+    std::string_view message) const {
+  if (!locale_ || message.empty()) return std::string(message);
+  const auto divide = [](std::string_view text, std::string_view infix)
+      -> std::optional<std::pair<std::string_view, std::string_view>> {
+    const auto at = text.find(infix);
+    if (at == std::string::npos) return std::nullopt;
+    return std::pair{text.substr(0, at), text.substr(at + infix.size())};
+  };
+  const auto strip_prefix = [](std::string_view text, std::string_view prefix)
+      -> std::optional<std::string_view> {
+    if (!text.starts_with(prefix)) return std::nullopt;
+    return text.substr(prefix.size());
+  };
+  const auto strip_suffix = [](std::string_view text, std::string_view suffix)
+      -> std::optional<std::string_view> {
+    if (!text.ends_with(suffix)) return std::nullopt;
+    return text.substr(0, text.size() - suffix.size());
+  };
+  // "The queued construction head is blocked: {lock}. Cancel it or restore
+  //  its requirements first." / "{name} is locked: {lock}." / "requires {list}"
+  if (const auto rest =
+          strip_prefix(message, "The queued construction head is blocked: "))
+    if (const auto lock = strip_suffix(
+            *rest, ". Cancel it or restore its requirements first."))
+      return trf("CONSTRUCTION_HEAD_BLOCKED",
+                 {localized_construction_message(*lock)},
+                 "The queued construction head is blocked: {0}. Cancel it or "
+                 "restore its requirements first.");
+  if (const auto p = divide(message, " is locked: "))
+    if (const auto lock = strip_suffix(p->second, "."))
+      return trf("CONSTRUCTION_LOCKED",
+                 {std::string(p->first),
+                  localized_construction_message(*lock)},
+                 "{0} is locked: {1}.");
+  if (const auto list = strip_prefix(message, "requires "))
+    return trf("CONSTRUCTION_REQUIRES", {std::string(*list)}, "requires {0}");
+  // Order outcomes: "Queued {name}. Authorized for {cost}." /
+  // "Construction started: {name}. Authorized for {cost}." /
+  // "Cancelled {name}; refunded {cost}." variants.
+  if (const auto rest = strip_prefix(message, "Queued "))
+    if (const auto q = divide(*rest, ". Authorized for "))
+      if (const auto cost = strip_suffix(q->second, "."))
+        return trf("CONSTRUCTION_QUEUED_MSG",
+                   {std::string(q->first), std::string(*cost)},
+                   "Queued {0}. Authorized for {1}.");
+  if (const auto rest = strip_prefix(message, "Construction started: "))
+    if (const auto q = divide(*rest, ". Authorized for "))
+      if (const auto cost = strip_suffix(q->second, "."))
+        return trf("CONSTRUCTION_STARTED_MSG",
+                   {std::string(q->first), std::string(*cost)},
+                   "Construction started: {0}. Authorized for {1}.");
+  if (const auto rest = strip_prefix(message, "Cancelled queued "))
+    if (const auto q = divide(*rest, "; refunded "))
+      if (const auto cost = strip_suffix(q->second, "."))
+        return trf("CONSTRUCTION_CANCELLED_QUEUED",
+                   {std::string(q->first), std::string(*cost)},
+                   "Cancelled queued {0}; refunded {1}.");
+  if (const auto rest = strip_prefix(message, "Cancelled "))
+    if (const auto q = divide(*rest, "; refunded "))
+      if (const auto cost =
+              strip_suffix(q->second, ". Consumed materials are not refunded."))
+        return trf("CONSTRUCTION_CANCELLED_MSG",
+                   {std::string(q->first), std::string(*cost)},
+                   "Cancelled {0}; refunded {1}. Consumed materials are not "
+                   "refunded.");
+  // "{cost} is required to authorize {name}." / "{name} is already ..."
+  if (const auto p = divide(message, " is required to authorize "))
+    if (const auto name = strip_suffix(p->second, "."))
+      return trf("CONSTRUCTION_AUTH_REQUIRED",
+                 {std::string(p->first), std::string(*name)},
+                 "{0} is required to authorize {1}.");
+  if (const auto name = strip_suffix(message, " is already complete."))
+    return trf("CONSTRUCTION_ALREADY_COMPLETE", {std::string(*name)},
+               "{0} is already complete.");
+  if (const auto name =
+          strip_suffix(message, " is already active or queued."))
+    return trf("CONSTRUCTION_ALREADY_ACTIVE", {std::string(*name)},
+               "{0} is already active or queued.");
+  // Stable denial/notice literals from the core assessment paths.
+  static const std::pair<std::string_view, std::string_view> statics[] = {
+      {"Unknown civilization.", "CONSTRUCTION_DENY_CIV"},
+      {"A construction project is already in progress.",
+       "CONSTRUCTION_DENY_ACTIVE"},
+      {"A queued construction project is waiting to start.",
+       "CONSTRUCTION_QUEUE_WAITING"},
+      {"The construction queue is full (8 projects maximum).",
+       "CONSTRUCTION_QUEUE_FULL"},
+      {"Unknown construction project.", "CONSTRUCTION_DENY_UNKNOWN"},
+      {"Queued project is unavailable.", "CONSTRUCTION_QUEUE_UNAVAILABLE"},
+      {"Extreme stellar irradiation prevents construction at the home "
+       "settlement.",
+       "CONSTRUCTION_DENY_IRRADIATION"},
+      {"That project is not active or queued.",
+       "CONSTRUCTION_DENY_NOT_ACTIVE"}};
+  for (const auto &[literal, key] : statics)
+    if (message == literal) return tr(key, literal);
+  return std::string(message);
 }
 
 std::string NativeConstructionWorkspace::tr(
@@ -571,22 +674,17 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                                          int height) const {
   if (!visible_) return;
   const auto layout = ConstructionWorkspaceLayout::for_viewport(width, height);
-  stellar::engine::ui_skin::surface(out,layout.surface,layout.scale);
+  stellar::native_ui_style::menu_panel(out,layout.surface);
   text(out, layout.title, tr("CONSTRUCTION_TITLE", "PLAYER CONSTRUCTION"),
        bright,
        layout.title_font_pixels, FontFace::Heading);
-  stellar::engine::ui_skin::control(out,layout.close,layout.close.contains(pointer_),false,true,layout.scale);
-  text(out, {layout.close.x, layout.close.y + 7.f * layout.scale,
-             layout.close.width, layout.close.height - 8.f * layout.scale},
-       "X", bright, layout.body_font_pixels, FontFace::Interface,
-       TextAlign::Center);
+  theme::button(out,layout.close,"X",pointer_,layout.body_font_pixels);
   const auto section = [&](UiRect bounds, std::string heading) {
-    stellar::engine::ui_skin::surface(out,bounds,layout.scale);
-    text(out, {bounds.x + 8.f * layout.scale,
-               bounds.y + 6.f * layout.scale,
-               bounds.width - 16.f * layout.scale, 20.f * layout.scale},
-         std::move(heading), muted, layout.small_font_pixels,
-         FontFace::Heading);
+    theme::panel(out,bounds);
+    theme::section_header(
+        out,{bounds.x + 8.f * layout.scale, bounds.y + 6.f * layout.scale,
+             bounds.width - 16.f * layout.scale, 20.f * layout.scale},
+        std::move(heading), layout.small_font_pixels);
   };
   section(layout.projects, tr("CONSTRUCTION_KNOWN_PROJECTS", "KNOWN PROJECTS"));
   section(layout.details, tr("CONSTRUCTION_DETAILS", "PROJECT DETAILS"));
@@ -598,14 +696,13 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
   project_scroll_.configure(view_ ? view_->projects.size() : 0,
                             58.f * layout.scale, project_rows.height);
   if (!view_ || view_->projects.empty()) {
-    text(out, {project_rows.x + 10.f * layout.scale,
-               project_rows.y + 8.f * layout.scale,
-               project_rows.width - 20.f * layout.scale,
-               project_rows.height - 16.f * layout.scale},
-         tr("CONSTRUCTION_NO_PROJECTS",
-            "No known projects are available. Research prerequisites remain "
-            "locked."),
-         muted, layout.body_font_pixels);
+    theme::empty_state(out, project_rows,
+        tr("CONSTRUCTION_NO_PROJECTS",
+           "No known projects are available. Research prerequisites remain "
+           "locked."),
+        tr("CONSTRUCTION_NO_PROJECTS_HINT",
+           "Completed research unlocks new projects here."),
+        layout.body_font_pixels);
   } else {
     for (std::size_t index = 0; index < view_->projects.size(); ++index) {
       const auto &project = view_->projects[index];
@@ -619,6 +716,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
            selected_project_id_ == project.id
                ? selected
                : clipped->contains(pointer_) ? hover : row);
+      if (selected_project_id_ == project.id)
+        fill(out, {clipped->x, clipped->y, 3.f * layout.scale,
+                   clipped->height}, theme::color::selected);
       if (const auto line = intersection(
               *clipped, {bounds.x + 8.f * layout.scale,
                          bounds.y + 5.f * layout.scale,
@@ -683,6 +783,9 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
            selected_project_id_ == value.id
                ? selected
                : clipped->contains(pointer_) ? hover : row);
+      if (selected_project_id_ == value.id)
+        fill(out, {clipped->x, clipped->y, 3.f * layout.scale,
+                   clipped->height}, theme::color::selected);
       if (const auto line = intersection(
               *clipped, {bounds.x + 8.f * layout.scale,
                          bounds.y + 5.f * layout.scale,
@@ -718,7 +821,7 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                          bounds.width - 16.f * layout.scale,
                          3.f * layout.scale};
       if (const auto clipped_track = intersection(track, order_rows)) {
-        fill(out, *clipped_track, {23, 45, 67, 255});
+        fill(out, *clipped_track, theme::color::canvas);
         const UiRect completed{track.x, track.y,
                                progress_width(value, track.width),
                                track.height};
@@ -727,14 +830,12 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
       }
     }
   if (status_order_.empty())
-    text(out, {order_rows.x + 10.f * layout.scale,
-               order_rows.y + 8.f * layout.scale,
-               order_rows.width - 20.f * layout.scale,
-               order_rows.height - 16.f * layout.scale},
-         tr("CONSTRUCTION_NO_ACTIVE",
-            "No projects are active, queued, or completed."),
-         muted,
-         layout.body_font_pixels);
+    theme::empty_state(out, order_rows,
+        tr("CONSTRUCTION_NO_ACTIVE",
+           "No projects are active, queued, or completed."),
+        tr("CONSTRUCTION_NO_ACTIVE_HINT",
+           "Start a project from the known list."),
+        layout.body_font_pixels);
 
   if (project && view_) {
     std::string costs = trf(
@@ -742,8 +843,8 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
         {project->formatted_credit_cost, number(project->industry_cost, 1),
          project->formatted_upkeep_rate, view_->formatted_treasury,
          number(view_->available_industry, 1),
-         stellar::native_campaign::format_campaign_duration(
-             project->minimum_days_remaining)},
+         stellar::native_campaign::format_campaign_duration_localized(
+             locale_, project->minimum_days_remaining)},
         "COST AND READINESS\nAuthorization {0}  |  Materials {1}\nUpkeep "
         "{2}  |  Treasury {3}\nAvailable industry {4}  |  Minimum remaining "
         "{5}");
@@ -752,16 +853,18 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
                    {project->formatted_authorization,
                     project->formatted_cancellation_refund},
                    "\nAuthorized {0}  |  Refund now {1}");
-    if (project->queue_blocker) costs += "\n" + *project->queue_blocker;
+    if (project->queue_blocker)
+      costs += "\n" + localized_construction_message(*project->queue_blocker);
     text(out, layout.costs, std::move(costs), muted,
          layout.small_font_pixels);
   }
 
-  std::string feedback = notice_;
+  std::string feedback = localized_construction_message(notice_);
   if (feedback.empty() && project && !project->complete && !project->active &&
       !project->queued) {
     feedback = trf("CONSTRUCTION_START_QUEUE",
-                   {project->start.message, project->queue.message},
+                   {localized_construction_message(project->start.message),
+                    localized_construction_message(project->queue.message)},
                    "Start: {0}\nQueue: {1}");
   }
   if (!feedback.empty())
@@ -769,14 +872,13 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
          notice_.empty() || notice_accepted_ ? muted : failure,
          layout.small_font_pixels);
 
-  const auto action = [&](UiRect bounds, std::string label, bool enabled) {
-    stellar::engine::ui_skin::control(out,bounds,bounds.contains(pointer_),enabled,enabled,layout.scale);
-    text(out, {bounds.x + 6.f * layout.scale,
-               bounds.y + 10.f * layout.scale,
-               bounds.width - 12.f * layout.scale,
-               bounds.height - 12.f * layout.scale},
-         std::move(label), enabled ? bright : muted,
-         layout.body_font_pixels, FontFace::Interface, TextAlign::Center);
+  const auto action = [&](UiRect bounds, std::string label, bool enabled,
+                          std::string reason = {}) {
+    theme::button(out, bounds, label, pointer_, layout.body_font_pixels,
+                  theme::Tone::Construction, enabled, enabled);
+    if (!enabled)
+      theme::hover_tooltip(out, bounds, pointer_, std::move(label),
+                           std::move(reason), width, height, layout.scale);
   };
   if (project) {
     if (project->active || project->queued) {
@@ -794,9 +896,11 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
              tr(project->start.will_queue ? "CONSTRUCTION_START_QUEUE_BTN"
                                           : "CONSTRUCTION_START_NOW",
                 project->start.will_queue ? "START / QUEUE" : "START NOW"),
-             project->start.enabled);
+             project->start.enabled,
+             localized_construction_message(project->start.message));
       action(layout.secondary_action, tr("CONSTRUCTION_QUEUE", "QUEUE"),
-             project->queue.enabled);
+             project->queue.enabled,
+             localized_construction_message(project->queue.message));
     } else {
       action(layout.primary_action,
              tr("CONSTRUCTION_STATE_COMPLETED", "COMPLETED"), false);
@@ -806,8 +910,7 @@ void NativeConstructionWorkspace::render(DrawList &out, int width,
   if (focus_ >= 0) {
     const auto items = focusables(layout);
     if (focus_ < static_cast<int>(items.size()))
-      stroke(out, items[static_cast<std::size_t>(focus_)].bounds,
-             {160, 210, 255, 255});
+      theme::focus_ring(out, items[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 

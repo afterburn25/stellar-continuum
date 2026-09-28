@@ -489,11 +489,18 @@ void long_unicode_path_wrap_cache_and_scroll(const TempDirectory& temp) {
   require(settings.save({path}), "could not save the long Unicode screenshot path");
   std::size_t wrapped_height_measurements{};
   std::size_t measurement_calls{};
-  std::string last_measurement;
+  std::size_t segment_measurements{};
+  std::string source_path;
+  std::string wrapped_path;
   settings.set_text_measurer([&](const Text& text) {
     ++measurement_calls;
-    last_measurement = text.value;
     if (text.value.find('\n') != std::string::npos) ++wrapped_height_measurements;
+    // A wrap recompute probes candidate substrings of the source path;
+    // button fits and the cached-path height probe never match it.
+    if (!source_path.empty() && text.value != wrapped_path &&
+        text.value.size() <= source_path.size() &&
+        source_path.find(text.value) != std::string::npos)
+      ++segment_measurements;
     const auto lines = static_cast<int>(1 + std::count(text.value.begin(), text.value.end(), '\n'));
     return TextExtent{static_cast<int>(codepoint_count(text.value) * 22u), lines * 18};
   });
@@ -504,8 +511,10 @@ void long_unicode_path_wrap_cache_and_scroll(const TempDirectory& temp) {
   settings.render(first_draw, width, height);
   const auto& path_label = find_path_label(first_draw, layout.folder);
   const std::string rendered = path_label.value;
+  wrapped_path = rendered;
   const auto encoded_path = path.u8string();
   const std::string original(reinterpret_cast<const char*>(encoded_path.data()), encoded_path.size());
+  source_path = original;
   std::string rebuilt;
   std::size_t line_start{};
   while (line_start <= rendered.size()) {
@@ -527,12 +536,14 @@ void long_unicode_path_wrap_cache_and_scroll(const TempDirectory& temp) {
           "first path render did not perform exactly one whole-path height measurement");
 
   DrawList second_draw;
-  const auto measurements_after_first = measurement_calls;
+  // A re-render also re-fits the option buttons (one or more probes each).
+  // The path itself must stay cached: the only path-related measurement is
+  // the already-wrapped text's height — no segment probes may reappear.
+  const auto segments_after_first = segment_measurements;
   settings.render(second_draw, width, height);
   require(find_path_label(second_draw, layout.folder).value == rendered &&
               wrapped_height_measurements == 2 &&
-              measurement_calls == measurements_after_first + 1 &&
-              last_measurement == rendered,
+              segment_measurements == segments_after_first,
           "unchanged path render recomputed wrapping instead of measuring height only");
   const auto save_before = find_text_label(second_draw, "SAVE").at;
   const auto path_y_before = find_path_label(second_draw, layout.folder).at.y;
@@ -696,6 +707,18 @@ int main() {
       require(find_text_label(draw,"ALLGEMEINE EINSTELLUNGEN").value=="ALLGEMEINE EINSTELLUNGEN","German title was not rendered");
       require(find_text_label(draw,"Sprache: English").value=="Sprache: English","German language label was not rendered");
       require(find_text_label(draw,"SPEICHERN").value=="SPEICHERN","German save label was not rendered");
+      settings.cancel();
+      // Folder status/error paths localize through SETTINGS_FOLDER_*.
+      std::uint64_t request_id{};
+      settings.set_browse([&](std::uint64_t id, const auto&) { request_id = id; return true; });
+      const auto gl=GeneralSettingsLayout::for_viewport(1280,720);
+      settings.open();
+      click_button(settings,gl.browse,"browse under German");
+      settings.accept_browse_result({request_id,std::filesystem::path("relative-folder"),{}});
+      require(settings.error()=="Bestehenden absoluten Ordner wählen.","German invalid-folder error was not localized");
+      click_button(settings,gl.browse,"second browse under German");
+      settings.accept_browse_result({request_id,std::nullopt,"picker service unavailable"});
+      require(settings.error()=="Ordnerbrowser fehlgeschlagen. Erneut versuchen.","German picker-open error was not localized");
       settings.cancel();
     }
 #endif

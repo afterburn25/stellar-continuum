@@ -61,7 +61,7 @@ class NativeEconomyWorkspace final {
   void render(native_map::DrawList&, const NativeEconomyView&, int width, int height) const;
 
  private:
-  struct Row { std::string left, right; bool income{}, warning{}, tile{}; int tile_column{}; float y{}, height{}; };
+  struct Row { std::string left, right, detail; bool income{}, warning{}, tile{}; int tile_column{}; float y{}, height{}; };
   struct Cache {
     int width{}, height{};
     std::uint64_t generation{}, revision{}, measure_revision{};
@@ -87,6 +87,7 @@ class NativeEconomyWorkspace final {
   int focus_{-1};
   PressTarget pressed_{PressTarget::None};
   native_map::Point press_point_{};
+  native_map::Point pointer_{};
   float press_scroll_{};
   mutable stellar::engine::ScrollView scroll_{};
   TextMeasurer measure_;

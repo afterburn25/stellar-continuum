@@ -6,6 +6,22 @@ constexpr std::array galaxy_card_name_keys{"SETUP_GALAXY_SPIRAL","SETUP_GALAXY_B
 constexpr std::array galaxy_card_descriptions{"Sweeping arms around a bright central bulge.","Spiral arms extend from an elongated central bar.","A broad body dominated by older stellar populations.","A smooth disk and bulge with little spiral structure.","Asymmetric structure and patchy stellar nurseries.","A distinct ring surrounds a sparse interior."};
 constexpr std::array galaxy_card_description_keys{"SETUP_GALAXY_SPIRAL_DESC","SETUP_GALAXY_BARRED_DESC","SETUP_GALAXY_ELLIPTICAL_DESC","SETUP_GALAXY_LENTICULAR_DESC","SETUP_GALAXY_IRREGULAR_DESC","SETUP_GALAXY_RING_DESC"};
 constexpr std::array population_description_keys{"SETUP_POPSTATE_DETERMINED","SETUP_POPSTATE_INTENSE","SETUP_POPSTATE_ONGOING","SETUP_POPSTATE_BALANCED","SETUP_POPSTATE_REDUCED","SETUP_POPSTATE_MINIMAL"};
+// Enum-indexed localization keys for the core-authored generation labels —
+// morphology follows enum order (Lenticular before Elliptical), NOT the
+// visual card order above. Population states reuse the selection label keys
+// since selection == state + one leading Random value.
+[[nodiscard]] std::string_view morphology_display_key(stellar::core::GalaxyMorphology m) noexcept {
+  static constexpr std::array keys{"SETUP_GALAXY_SPIRAL","SETUP_GALAXY_BARRED","SETUP_GALAXY_LENTICULAR","SETUP_GALAXY_ELLIPTICAL","SETUP_GALAXY_IRREGULAR","SETUP_GALAXY_RING"};
+  return keys.at(static_cast<std::size_t>(m));
+}
+[[nodiscard]] std::string_view population_selection_key(stellar::core::PopulationSelection s) noexcept {
+  static constexpr std::array keys{"SETUP_POPSEL_RANDOM","SETUP_POPSEL_STARBURST","SETUP_POPSEL_ACTIVE","SETUP_POPSEL_MATURE","SETUP_POPSEL_AGING","SETUP_POPSEL_QUIESCENT"};
+  return keys.at(static_cast<std::size_t>(s));
+}
+[[nodiscard]] std::string_view population_state_key(stellar::core::PopulationState s) noexcept {
+  static constexpr std::array keys{"SETUP_POPSEL_STARBURST","SETUP_POPSEL_ACTIVE","SETUP_POPSEL_MATURE","SETUP_POPSEL_AGING","SETUP_POPSEL_QUIESCENT"};
+  return keys.at(static_cast<std::size_t>(s));
+}
 constexpr std::array population_descriptions{
  "Population state is determined from the galaxy seed and morphology. The same settings always give the same result.",
  "Intense star formation. More young massive stars, supergiants and Wolf-Rayet stars, with stronger stellar hazards.",
@@ -15,7 +31,11 @@ constexpr std::array population_descriptions{
  "Very little current star formation. Older, long-lived stars and remnants dominate."};
 }
 GalaxyChoiceLayout GalaxyChoiceLayout::for_viewport(int width,int height) noexcept {
-  const float s=std::clamp(height/1080.f,.65f,2.f),pw=std::min(1520*s,width-48*s),ph=std::min(942*s,height-40*s);
+  // Summary needs 520s of stack above it plus a usable height; adapt the scale
+  // floor on short viewports instead of letting the rect collapse negative.
+  float s=std::clamp(height/1080.f,.65f,2.f);
+  if(560.f*s+64.f>height)s=std::clamp((height-64.f)/560.f,.45f,s);
+  const float pw=std::min(1520*s,width-48*s),ph=std::min(942*s,height-40*s);
   GalaxyChoiceLayout l;l.scale=s;l.panel={(width-pw)*.5f,(height-ph)*.5f,pw,ph};
   const float x=l.panel.x+28*s,y=l.panel.y+24*s,w=pw-56*s;
   l.heading={x,y,w,54*s};l.back={x,l.panel.y+ph-64*s,124*s,40*s};l.next={x+w-170*s,l.back.y,170*s,40*s};
@@ -56,13 +76,13 @@ NativeNewGameIntent NativeNewGameWorkspace::handle_galaxy_page(const InputEvent&
     if(l.next.contains(e.position)&&morphology_selected_){page_=SandboxPage::Population;reset_interaction();}
   }else{
     if(l.population.contains(e.position)){
-      std::vector<std::string> labels;for(int i=0;i<6;++i)labels.emplace_back(stellar::core::population_selection_label(static_cast<stellar::core::PopulationSelection>(i)));
+      std::vector<std::string> labels;for(int i=0;i<6;++i){const auto selection=static_cast<stellar::core::PopulationSelection>(i);labels.emplace_back(tr(population_selection_key(selection),stellar::core::population_selection_label(selection)));}
       dropdown_.open(0,std::move(labels),static_cast<int>(requested_population_));
     }else if(l.next.contains(e.position)){page_=SandboxPage::Configuration;reset_interaction();}
   }
   return {NativeNewGameIntentKind::None,true};
 }
-void NativeNewGameWorkspace::render_galaxy_page(DrawList& out,int width,int height,const PortraitProvider* provider,std::shared_ptr<const RgbaImage> backdrop)const{
+void NativeNewGameWorkspace::render_galaxy_page(DrawList& out,int width,int height,const TextMeasurer& measure,const PortraitProvider* provider,std::shared_ptr<const RgbaImage> backdrop)const{
   const auto l=GalaxyChoiceLayout::for_viewport(width,height);const float s=l.scale;const int title=static_cast<int>(27*s),body=std::max(13,static_cast<int>(18*s)),small=std::max(12,static_cast<int>(15*s));
   if(backdrop){const float k=std::max(width/static_cast<float>(backdrop->width()),height/static_cast<float>(backdrop->height()));out.overlay.emplace_back(Image{backdrop,{(width-backdrop->width()*k)*.5f,(height-backdrop->height()*k)*.5f,backdrop->width()*k,backdrop->height()*k},std::nullopt,{255,255,255,255}});}
   else fill(out,{0,0,static_cast<float>(width),static_cast<float>(height)},background);
@@ -71,25 +91,46 @@ void NativeNewGameWorkspace::render_galaxy_page(DrawList& out,int width,int heig
   text(out,{l.heading.x,l.heading.y+43*s,l.heading.width,26*s},tr(page_==SandboxPage::GalaxyType?"SETUP_GALAXY_TYPE_HINT":"SETUP_POPULATION_HINT",page_==SandboxPage::GalaxyType?"Choose the shape of your civilization’s new home.":"Choose its stellar age and activity. Galaxy shape and population are independent."),muted,small);
   const auto image=[&](UiRect area,const std::string& path){if(!provider)return;const auto art=(*provider)(path);if(!art)return;const float k=std::min(area.width/art->width(),area.height/art->height());out.overlay.emplace_back(Image{art,{area.x+(area.width-art->width()*k)*.5f,area.y+(area.height-art->height()*k)*.5f,art->width()*k,art->height()*k},std::nullopt,{255,255,255,255},area});};
   if(page_==SandboxPage::GalaxyType){
+    // The card text block is measured before the preview image claims its
+    // share — on compact viewports the image yields height so localized
+    // descriptions render fully instead of clipping mid-line.
+    float desc_need=0.f;
+    for(std::size_t i=0;i<l.cards.size();++i){
+      const auto value=tr(galaxy_card_description_keys[i],galaxy_card_descriptions[i]);
+      const auto extent=measure(Text{{},value,muted,small,l.cards[i].width-32.f*s});
+      if(extent.height>0)desc_need=std::max(desc_need,static_cast<float>(extent.height));
+    }
+    int desc_font=small;
+    auto desc_space=[&](float ih){return l.cards.front().height-ih-58.f*s;};
+    float shared_ih=std::min((l.cards.front().width-16*s)*9/16,l.cards.front().height-92.f*s);
+    if(desc_need>desc_space(shared_ih))shared_ih=std::max(24.f*s,l.cards.front().height-58.f*s-desc_need);
+    while(desc_font>9&&desc_need>desc_space(shared_ih)){
+      --desc_font;desc_need=0.f;
+      for(std::size_t i=0;i<l.cards.size();++i){
+        const auto value=tr(galaxy_card_description_keys[i],galaxy_card_descriptions[i]);
+        const auto extent=measure(Text{{},value,muted,desc_font,l.cards[i].width-32.f*s});
+        if(extent.height>0)desc_need=std::max(desc_need,static_cast<float>(extent.height));
+      }
+    }
     for(std::size_t i=0;i<l.cards.size();++i){const auto r=l.cards[i];const bool active=morphology_selected_&&population_.morphology==galaxy_card_order[i];stellar::engine::ui_skin::control(out,r,s,r.contains(pointer_),active);
-      const float ih=std::min((r.width-16*s)*9/16,r.height-92*s);
+      const float ih=std::min((r.width-16*s)*9/16,shared_ih);
       image({r.x+8*s,r.y+8*s,r.width-16*s,ih},stellar::core::galaxy_visual_pair(galaxy_card_order[i]).preview_path);
       text(out,{r.x+16*s,r.y+ih+20*s,r.width-32*s,28*s},tr(galaxy_card_name_keys[i],galaxy_card_names[i]),bright,body);
-      text(out,{r.x+16*s,r.y+ih+52*s,r.width-32*s,45*s},tr(galaxy_card_description_keys[i],galaxy_card_descriptions[i]),muted,small);
+      text(out,{r.x+16*s,r.y+ih+52*s,r.width-32*s,std::max(0.f,r.y+r.height-6.f*s-(r.y+ih+52.f*s))},tr(galaxy_card_description_keys[i],galaxy_card_descriptions[i]),muted,desc_font);
       if(active)text(out,{r.x+r.width-120*s,r.y+12*s,100*s,24*s},tr("SETUP_SELECTED","✓ SELECTED"),{113,231,255,255},small,TextAlign::Right);
     }
   }else{
     const auto c=generation_configuration();const auto pair=stellar::core::galaxy_visual_pair(population_.morphology,c?std::optional{c->resolved_population}:std::optional{stellar::core::PopulationState::Mature});
     image(l.preview,pair.preview_path);
     text(out,{l.population.x,l.population.y-37*s,l.population.width,29*s},tr("SETUP_POPULATION_STATE","POPULATION STATE"),{150,225,255,255},body);
-    native_menu_style::button(out,l.population,std::string(stellar::core::population_selection_label(requested_population_))+"  ▼",body,l.population.contains(pointer_),true,s);
+    native_menu_style::button(out,l.population,tr(population_selection_key(requested_population_),stellar::core::population_selection_label(requested_population_))+"  ▼",body,l.population.contains(pointer_),true,s);
     text(out,l.description,tr(population_description_keys[static_cast<std::size_t>(requested_population_)],population_descriptions[static_cast<std::size_t>(requested_population_)]),bright,body);
-    if(c)text(out,l.summary,trf("SETUP_SUMMARY",{std::string(stellar::core::morphology_name(c->morphology)),std::string(stellar::core::population_state_name(c->resolved_population)),seed_text_},"Type: {0}\nResolved population: {1}\nSeed: {2}\n\nYou can change the seed and galaxy size on the next screen."),muted,body);
+    if(c)text(out,l.summary,trf("SETUP_SUMMARY",{tr(morphology_display_key(c->morphology),stellar::core::morphology_name(c->morphology)),tr(population_state_key(c->resolved_population),stellar::core::population_state_name(c->resolved_population)),seed_text_},"Type: {0}\nResolved population: {1}\nSeed: {2}\n\nYou can change the seed and galaxy size on the next screen."),muted,body);
   }
   native_menu_style::button(out,l.back,tr("STARTUP_BACK","BACK"),body,l.back.contains(pointer_),true,s);
   native_menu_style::button(out,l.next,tr("SETUP_NEXT","NEXT"),body,l.next.contains(pointer_),page_==SandboxPage::Population||morphology_selected_,s);
   const auto focus_items=galaxy_focusables(l);
   if(focus_>=0&&focus_<static_cast<int>(focus_items.size()))
-    stroke(out,focus_items[static_cast<std::size_t>(focus_)].rect,{160,210,255,255});
+    stellar::native_ui::focus_ring(out,focus_items[static_cast<std::size_t>(focus_)].rect);
   if(dropdown_.visible())dropdown_.render(out,l.population,width,height,body);
 }

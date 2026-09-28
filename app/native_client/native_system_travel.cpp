@@ -84,7 +84,7 @@ std::vector<int> hit_local_fleets(std::span<const NativeLocalFleetMarker>fleets,
 
 float local_orbital_boundary_radius(const SystemSpatialSnapshot&system,const SystemSpatialViewport&viewport)noexcept{auto extent=system.design_radius*viewport.scale;for(const auto&body:system.bodies)extent=std::max(extent,std::hypot(body.offset_x,body.offset_y)*viewport.scale+viewport.body_radius(body));return extent+std::max(36.F,extent*.15F);}
 
-std::vector<NativeLocalLaneGeometry> layout_local_lanes(const SystemSpatialSnapshot&system,const SystemSpatialViewport&viewport,std::span<const NativeLocalLaneMarker>lanes,std::span<const NativeLaneLabelMetrics>metrics){
+std::vector<NativeLocalLaneGeometry> layout_local_lanes(const SystemSpatialSnapshot&system,const SystemSpatialViewport&viewport,UiRect field,std::span<const NativeLocalLaneMarker>lanes,std::span<const NativeLaneLabelMetrics>metrics){
   std::map<int,NativeLaneLabelMetrics> measured;for(const auto&item:metrics){if(!std::isfinite(item.width)||!std::isfinite(item.height)||item.width<0||item.height<0)throw std::invalid_argument("Lane label metrics must be finite and non-negative.");if(!measured.emplace(item.destination_system_id,item).second)throw std::invalid_argument("Lane label metrics contain a duplicate destination.");}
   std::vector<const NativeLocalLaneMarker*> ordered;ordered.reserve(lanes.size());for(const auto&lane:lanes)ordered.push_back(&lane);std::ranges::sort(ordered,{},[](const auto*lane){return lane->destination_system_id;});
   const Point origin{viewport.center_x,viewport.center_y};const auto factor=system.design_radius*local_chart_render_radius_factor*viewport.scale;const auto boundary=local_orbital_boundary_radius(system,viewport);std::vector<NativeLocalLaneGeometry> result;result.reserve(ordered.size());
@@ -120,6 +120,25 @@ std::vector<NativeLocalLaneGeometry> layout_local_lanes(const SystemSpatialSnaps
       if(blockers.empty())break;
       float step{};for(const auto*blocker:blockers)step=std::max(step,outward_clearance(placed.bounds,blocker->bounds,direction));
       stagger+=step;
+    }
+    // Keep the affordance inside the chart field: the workspace swallows input
+    // outside world_field, so an arrow past the edge is invisible and dead.
+    // Pull along the lane's own bearing so the gate direction stays truthful.
+    // A degenerate field means "unclamped" — workspace_fit reserves raw bounds.
+    if(field.width>0.F&&field.height>0.F){
+      constexpr float margin=4.F;
+      const auto&b=placed.bounds;float pull=0.F,limit=std::numeric_limits<float>::infinity();
+      const auto edge=[&](float bound_start,float bound_size,float field_start,float field_size,float dir_axis){
+        if(dir_axis>0.F){pull=std::max(pull,(bound_start+bound_size-(field_start+field_size-margin))/dir_axis);limit=std::min(limit,(bound_start-field_start-margin)/dir_axis);}
+        else if(dir_axis<0.F){pull=std::max(pull,(field_start+margin-bound_start)/-dir_axis);limit=std::min(limit,(field_start+field_size-margin-bound_start-bound_size)/-dir_axis);}
+      };
+      edge(b.x,b.width,field.x,field.width,direction.x);edge(b.y,b.height,field.y,field.height,direction.y);
+      pull=std::max(0.F,std::min(pull,std::max(0.F,limit)));
+      if(pull>0.F){
+        const Vec2 delta{-direction.x*pull,-direction.y*pull};
+        for(auto*point:{&placed.center,&placed.base_a,&placed.base_b,&placed.apex,&placed.label_center})*point=add(*point,delta);
+        placed.bounds.x+=delta.x;placed.bounds.y+=delta.y;placed.label_bounds.x+=delta.x;placed.label_bounds.y+=delta.y;
+      }
     }
     result.push_back(placed);
   }return result;

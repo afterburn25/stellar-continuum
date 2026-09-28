@@ -1,4 +1,6 @@
 #include "native_fleet_controller.hpp"
+#include "native_military_messages.hpp"
+#include "native_route_messages.hpp"
 #include <stellar/core/campaign_observation.hpp>
 #include <stellar/engine/localization.hpp>
 #include <unordered_set>
@@ -8,6 +10,7 @@
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/industry_allocation.hpp>
+#include <stellar/core/ship_designs.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -242,6 +245,16 @@ NativeFleetMapView NativeFleetController::build(
     if (const auto status = status_by_id.find(fleet.id);
         status != status_by_id.end())
       item.combat_status = status->second;
+    if (fleet.design_id)
+      if (const auto *design = find_ship_design(*fleet.design_id))
+        item.design_name = design->name;
+    item.cargo_materials = fleet.cargo_materials;
+    item.cargo_material_capacity = fleet.cargo_material_capacity;
+    item.embarked_population_millions = fleet.embarked_population_millions;
+    if (fleet.tactical_vessel) {
+      item.has_vessel_state = true;
+      item.hull_integrity = fleet.tactical_vessel->hull_fraction;
+    }
     item.owner_civilization_id = fleet.civilization_id;
     item.foreign_inspection = fleet.civilization_id != player.player_id;
     const auto owner = std::ranges::find(player.world.civilizations, fleet.civilization_id, &Civilization::id);
@@ -281,7 +294,8 @@ NativeFleetMapView NativeFleetController::build(
       const auto *live = find_owned(player, selected->id);
       selected->recovery = recovery_quote(*live, campaign_generation, player.player_id);
       if (live->return_to_base_failure_reason)
-        selected->recovery_message = *live->return_to_base_failure_reason;
+        selected->recovery_message = native_route::localized_message(
+            locale_, *live->return_to_base_failure_reason);
       else if (live->return_to_base_requested)
         selected->recovery_message = tr("FLEET_MSG_RETURN_QUEUED", "Return to base queued. Routing uses actual fuel at the next system.");
       else
@@ -403,7 +417,7 @@ NativeFleetRoutePreview NativeFleetController::preview_selected_route(
   }
   result.route_supported = reach.is_supported;
   result.route_authoritative = reach.is_authoritative;
-  result.message = reach.reason;
+  result.message = native_route::localized_message(locale_, reach.reason);
   result.route_distance_light_years = reach.route_distance_light_years;
   if (reach.route_system_ids) result.route_system_ids = *reach.route_system_ids;
   if (!reach.is_supported) return result;
@@ -468,7 +482,7 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_route(
             fleet->mission_order_revision};
   }
   const auto current = find_owned(player, preview.fleet_id);
-  return {accepted, std::move(message),
+  return {accepted, native_route::localized_message(locale_, message),
           current ? current->mission_order_revision
                   : preview.expected_mission_order_revision};
 }
@@ -511,8 +525,8 @@ NativeFleetOrderOutcome NativeFleetController::issue_civilian_recovery(
     message = outcome.message;
   } else return {false, tr("FLEET_MSG_UNKNOWN_RECOVERY", "Unknown civilian recovery action.")};
   const auto *current = find_owned(player, id);
-  return {accepted, std::move(message), current ? current->mission_order_revision : 0,
-          confirmation};
+  return {accepted, native_route::localized_message(locale_, message),
+          current ? current->mission_order_revision : 0, confirmation};
 }
 
 NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(
@@ -549,7 +563,8 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(
       MilitaryOrder{type, {}, type == MilitaryOrderType::Defend ? fleet->current_system_id : std::nullopt});
   military_order_quote_.reset();
   const auto *after = find_owned(player, quote.fleet_id);
-  return {outcome.accepted, outcome.message,
+  return {outcome.accepted,
+          native_military::localized_message(locale_, outcome.message),
           after ? after->mission_order_revision : quote.mission_order_revision};
 }
 

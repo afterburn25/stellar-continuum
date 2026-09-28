@@ -83,6 +83,10 @@ public:
   // Client-pixel rect of the ringed control — null when nothing is focused.
   [[nodiscard]] std::optional<stellar::native_map::UiRect>
   focused_bounds(const ConstructionWorkspaceLayout &) const;
+  // Recomposes core-authored English construction assessment/outcome
+  // skeletons through the locale table; unrecognized text passes through.
+  [[nodiscard]] std::string
+  localized_construction_message(std::string_view message) const;
 
 private:
   struct FocusRect {

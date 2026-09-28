@@ -123,9 +123,15 @@ private:
     std::uint64_t diplomacy_revision{};
     bool danger{};
     std::string confirm_label;
-    std::vector<std::pair<std::string,
-                          stellar::native_diplomacy::DiplomacyWorkspaceAction>>
-        terms;
+    struct ModalTerm {
+      std::string label;
+      stellar::native_diplomacy::DiplomacyWorkspaceAction action{
+          stellar::native_diplomacy::DiplomacyWorkspaceAction::declare_war};
+      bool enabled{};
+      // Authoritative status surfaced as the why when `enabled` is false.
+      std::string tip;
+    };
+    std::vector<ModalTerm> terms;
   };
 
   void reconcile_selection();
@@ -165,6 +171,7 @@ private:
   bool notice_accepted_{};
   stellar::engine::ScrollView contact_scroll_{};
   stellar::engine::ScrollView detail_scroll_{};
+  mutable stellar::engine::ScrollView meter_scroll_{};
   int focus_{-1};
 };
 

@@ -33,7 +33,7 @@ void check_video_settings(NativeVideoController& controller,
   const auto initial = controller.active();
   const auto original_file = bytes_at(settings_path);
   const auto layout = VideoSettingsLayout::for_viewport(width, height);
-  require(layout.choice_buttons.size() == 6,
+  require(layout.choice_buttons.size() == 8,
           "Video settings did not expose display, resolution, V-Sync and frame-cap rows.");
   const auto click = [&](UiRect bounds) {
     const Point point{bounds.x + bounds.width * .5f,

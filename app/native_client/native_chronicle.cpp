@@ -1,5 +1,7 @@
 #include "native_chronicle.hpp"
 #include "native_campaign_calendar.hpp"
+#include "native_history_messages.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/engine/native_ui_skin.hpp>
 
@@ -370,7 +372,8 @@ const char *category_label(std::string_view category) noexcept {
 ChronicleSnapshot snapshot(const engine::EventHistory &history,
                            int observer_civilization_id,
                            const ChronicleFilter &filter,
-                           std::size_t max_entries) {
+                           std::size_t max_entries,
+                           const stellar::engine::LocalizationTable *locale) {
   const auto observer =
       static_cast<std::uint64_t>(observer_civilization_id);
   // feed() == query() with these three fields — query() is the same
@@ -416,11 +419,13 @@ ChronicleSnapshot snapshot(const engine::EventHistory &history,
         if (contact != 0 && contact != id) { contact = 0; break; }
         contact = id;
       }
-    snap.entries.push_back({event->id, event->location, contact,
-                            label ? std::string(label) : event->category,
-                            native_campaign::format_campaign_date(
-                                event->at_day),
-                            event->summary, event->tags});
+    snap.entries.push_back(
+        {event->id, event->location, contact,
+         label ? std::string(label) : event->category,
+         native_campaign::format_campaign_date(event->at_day),
+         native_history::localized_history_summary(locale, event->category,
+                                                   event->summary),
+         event->tags});
   }
   return snap;
 }
@@ -445,7 +450,7 @@ void NativeChronicleView::open(const engine::EventHistory &history,
   search_.clear();
   search_focused_ = false;
   focus_ = -1;
-  snapshot_ = snapshot(history, observer_civilization_id);
+  snapshot_ = snapshot(history, observer_civilization_id, {}, 4000, locale_);
   cancel_press();
 }
 
@@ -482,7 +487,7 @@ void NativeChronicleView::refresh() {
     filter.since_day = -std::numeric_limits<double>::infinity();
   }
   filter.search = search_;
-  snapshot_ = snapshot(*history_, observer_, filter);
+  snapshot_ = snapshot(*history_, observer_, filter, 4000, locale_);
   scroll_ = {};
 }
 
@@ -1103,6 +1108,13 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                          "No recorded events yet."),
                  muted_color, std::max(11, static_cast<int>(std::lround(13.f * s))),
                  layout.empty_hint.width, layout.empty_hint);
+    clipped_text(out, {layout.empty_hint.x,
+                       layout.empty_hint.y + 20.f * s},
+                 resolve(locale_, "CHRONICLE_EMPTY_HINT",
+                         "Events are recorded as your civilization explores, "
+                         "builds, and negotiates."),
+                 muted_color, std::max(9, static_cast<int>(std::lround(11.f * s))),
+                 layout.empty_hint.width, layout.empty_hint);
   }
   for (std::size_t i = 0; i < layout.entries.size(); ++i) {
     const auto &card = layout.entries[i];
@@ -1174,20 +1186,16 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                  std::max(11, static_cast<int>(std::lround(13.f * s))),
                  card.message_bounds.width, layout.list_viewport);
   }
-  if (const auto thumb = layout.scroll.thumb(layout.list_viewport.height,
-                                             16.f * s);
-      thumb.size > 0.f) {
-    fill(out,
-         {layout.list_viewport.x + layout.list_viewport.width - 3.f * s,
-          layout.list_viewport.y + thumb.offset, 2.f * s, thumb.size},
-         muted_color);
-  }
+  stellar::native_ui::scrollbar(
+      out,
+      {layout.list_viewport.x + layout.list_viewport.width - 3.f * s,
+       layout.list_viewport.y, 2.f * s, layout.list_viewport.height},
+      layout.scroll, 16.f * s);
   if (focus_ >= 0) {
     const auto items = focusables(layout, snapshot_, locale_);
     if (focus_ < static_cast<int>(items.size()))
-      out.overlay.emplace_back(StrokedRectangle{
-          items[static_cast<std::size_t>(focus_)].bounds,
-          {160, 210, 255, 255}});
+      stellar::native_ui::focus_ring(
+          out, items[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 

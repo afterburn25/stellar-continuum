@@ -112,6 +112,14 @@ int main(int argc,char** argv)try{
   VisualOptions debug;debug.labels=true;debug.bounds=true;debug.filenames=true;DrawList inspected;native.append_map(inspected,{{0,0},10},1280,720,debug,{});
   check(std::holds_alternative<TriangleMesh>(inspected.world.front())&&std::holds_alternative<Text>(inspected.world.back()),"Developer overlays hidden beneath artwork");
   const auto& label=std::get<Text>(inspected.world.back());check(label.value.find("Reflection Nebula")!=std::string::npos&&label.value.find(".png")!=std::string::npos,"Developer type/filename toggle concealed unknown artwork");
+  const auto texts=[&](const DrawList&d){std::vector<std::string> v;for(const auto&c:d.world)if(const auto*t=std::get_if<Text>(&c))v.push_back(t->value);return v;};
+  check(texts(map).empty(),"Unsurveyed phenomenon disclosed a map label");
+  auto named_fixture=fixture;named_fixture.regions[0].designation="RC-1";NativePhenomena charted;charted.bind(&named_fixture);
+  DrawList charted_map;charted.append_map(charted_map,{{0,0},10},1280,720,{},{named_fixture.regions[0].id});
+  const auto player_labels=texts(charted_map);
+  check(player_labels.size()==1&&player_labels[0].find("RC-1")!=std::string::npos&&player_labels[0].find("Reflection Nebula")!=std::string::npos,"Surveyed phenomenon lost its designation label");
+  DrawList charted_overview;charted.append_map(charted_overview,{{0,0},.15},1280,720,{},{named_fixture.regions[0].id});
+  check(texts(charted_overview).empty(),"Phenomenon label cluttered the overview zoom");
   for(const auto size:{std::pair{1280,720},std::pair{1920,1080}}){PhenomenaDebug panel;const float s=size.first/1280.f,px=(size.first-940*s)*.5f,py=(size.second-650*s)*.5f;
     const auto click=[&](float x,float y){InputEvent event{};event.type=InputEventType::LeftPressed;event.position={px+x*s,py+y*s};check(panel.handle(event,size.first,size.second),"Developer control did not capture input");};
     panel.toggle();click(490,128);check(panel.options.membership,"System overlap toggle failed");click(800,128);check(panel.options.filenames,"Artwork filename toggle failed");

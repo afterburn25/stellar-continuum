@@ -37,6 +37,10 @@ struct ResearchTabLayout {
 
 struct ResearchWorkspaceLayout {
   float scale{};
+  // True when the drawable is too short for the full inspector header —
+  // the hero artwork block is skipped so the details list keeps a scrollable
+  // viewport.
+  bool compact{};
   int title_font_pixels{};
   int body_font_pixels{};
   int small_font_pixels{};

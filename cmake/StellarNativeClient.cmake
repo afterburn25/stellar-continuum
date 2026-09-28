@@ -391,7 +391,8 @@ target_sources(stellar-continuum-native PRIVATE
 
 target_sources(stellar-continuum-native PRIVATE
   app/native_client/native_diplomacy_controller.cpp
-  app/native_client/native_diplomacy_workspace.cpp)
+  app/native_client/native_diplomacy_workspace.cpp
+  app/native_client/native_quick_find.cpp)
 
 
 if(BUILD_TESTING)

@@ -16,6 +16,8 @@ namespace stellar::native_economy {
 enum class EconomyState { Unavailable, Ready, Failed };
 struct NativeEconomyCard {
   std::string label, value;
+  // Localized "what this measures" explainer, surfaced on hover.
+  std::string detail;
   bool warning{};
   bool operator==(const NativeEconomyCard&) const = default;
 };

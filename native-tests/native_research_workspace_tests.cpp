@@ -336,9 +336,13 @@ int main() try {
   cancellation_controls();
   keyboard_focus_traversal();
   for (const auto [width, height] :
-       std::array{std::pair{1280, 720}, std::pair{1920, 1080},
-                  std::pair{2560, 1440}, std::pair{3840, 2160}})
+       std::array{std::pair{640, 360}, std::pair{1280, 720},
+                  std::pair{1920, 1080}, std::pair{2560, 1440},
+                  std::pair{3840, 2160}})
     verify_layout(width, height);
+  require(ResearchWorkspaceLayout::for_viewport(640, 360, 18).compact &&
+              !ResearchWorkspaceLayout::for_viewport(1280, 720, 18).compact,
+          "Compact research layout flag misfires.");
 
   {
     auto real_tabs = sample_window();
@@ -794,6 +798,28 @@ int main() try {
                                      "Action unavailable. Scroll for details."),
           "Shrinking content did not clamp scroll or expose the full action "
           "reason.");
+
+  // The disabled action button also surfaces the reason on hover — the
+  // details pane already emits it once, so the tooltip is a second copy.
+  const auto reason_copies = [](const DrawList &draw) {
+    int count = 0;
+    for (const auto &primitive : draw.overlay)
+      if (const auto *text = std::get_if<Text>(&primitive);
+          text && text->value.find("cannot proceed") != std::string::npos)
+        ++count;
+    return count;
+  };
+  send(workspace, InputEventType::PointerMove, {2.f, 2.f}, 1280, 720);
+  DrawList idle_action;
+  workspace.render(idle_action, 1280, 720);
+  const int idle_copies = reason_copies(idle_action);
+  send(workspace, InputEventType::PointerMove, center(layout.action), 1280,
+       720);
+  DrawList hovered_action;
+  workspace.render(hovered_action, 1280, 720);
+  require(reason_copies(hovered_action) == idle_copies + 1,
+          "hovering the disabled action did not surface its reason as a "
+          "tooltip.");
 
   auto expanded = sample_window();
   expanded.selected_node_id = "known-active";

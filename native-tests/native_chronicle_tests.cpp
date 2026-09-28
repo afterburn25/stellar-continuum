@@ -1,4 +1,5 @@
 #include "native_chronicle.hpp"
+#include "native_ui_theme.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -605,7 +606,8 @@ void keyboard_focus() {
     for (const auto &command : out.overlay)
       if (const auto *stroke =
               std::get_if<native_map::StrokedRectangle>(&command))
-        if (stroke->color.r == 160 && stroke->color.g == 210)
+        if (stroke->color.r == native_ui::color::focus.r &&
+            stroke->color.g == native_ui::color::focus.g)
           ring = true;
     require(ring, "Focused control rendered no ring");
   }
@@ -635,6 +637,85 @@ void keyboard_focus() {
           "Escape did not close with the ring active");
 }
 
+void localized_summaries() {
+  // The recorded summary stays authoritative English; the snapshot's
+  // locale argument recomposes known journal skeletons for display
+  // while search/filter axes still run on the raw record.
+  engine::EventHistory history;
+  const auto add = [&](double day, std::string category,
+                       std::string summary) {
+    engine::HistoryEvent event;
+    event.at_day = day;
+    event.category = std::move(category);
+    event.summary = std::move(summary);
+    event.visible_to = {1};
+    history.record(std::move(event));
+  };
+  add(400., "diplomacy.proposal_accepted",
+      "A diplomatic proposal has been accepted.");
+  add(401., "war.engagement_started", "Alpha engaged Beta.");
+  add(402., "construction.project", "Sol completed Drydock.");
+  add(403., "exploration.sensor_contact",
+      "Sensors added 2 systems to the local chart.");
+  add(404., "colony.founded",
+      "Aster established a sealed staffed resource outpost on Neris with "
+      "12.5 million specialist personnel.");
+  add(405., "research.adaptive", "Empirical Engines advanced to Demonstrated.");
+  add(406., "custom.record", "Freeform journal text");
+
+  stellar::engine::LocalizationTable german("de", "en");
+  std::string loc_error;
+  require(german.load_json(R"json({"locale":"de","strings":{
+      "HISTORY_DIP_PROPOSAL_ACCEPTED":"Ein diplomatischer Vorschlag wurde angenommen.",
+      "HISTORY_WAR_ENGAGED":"{0} eröffnete das Gefecht gegen {1}.",
+      "HISTORY_COMPLETED":"{0} schloss {1} ab.",
+      "HISTORY_EXP_SENSOR":"Sensoren fügten {0} Systeme zur lokalen Karte hinzu.",
+      "HISTORY_COLONY_OUTPOST":"{0} errichtete einen versiegelten Rohstoff-Außenposten auf {1} mit {2} Millionen Spezialisten.",
+      "HISTORY_RESEARCH_ADVANCED":"{0} erreichte Stufe {1}.",
+      "HISTORY_MATURITY_DEMONSTRATED":"Demonstriert"
+    }})json",
+                            &loc_error),
+          "German locale table did not load");
+
+  const auto snap = snapshot(history, 1, {}, 4000, &german);
+  require(snap.entries.size() == 7, "Localized snapshot dropped entries");
+  // Newest first — entry order mirrors the adds above.
+  require(snap.entries[0].summary == "Freeform journal text",
+          "Unmapped summary was not passed through");
+  require(snap.entries[1].summary ==
+              "Empirical Engines erreichte Stufe Demonstriert.",
+          "Research advancement did not localize");
+  require(snap.entries[2].summary ==
+              "Aster errichtete einen versiegelten Rohstoff-Außenposten "
+              "auf Neris mit 12.5 Millionen Spezialisten.",
+          "Outpost founding did not localize");
+  require(snap.entries[3].summary ==
+              "Sensoren fügten 2 Systeme zur lokalen Karte hinzu.",
+          "Sensor contact did not localize");
+  require(snap.entries[4].summary == "Sol schloss Drydock ab.",
+          "Completion skeleton did not localize");
+  require(snap.entries[5].summary == "Alpha eröffnete das Gefecht gegen Beta.",
+          "Engagement skeleton did not localize");
+  require(snap.entries[6].summary ==
+              "Ein diplomatischer Vorschlag wurde angenommen.",
+          "Diplomatic kind phrase did not localize");
+
+  // Search runs on the authoritative English record, not the display
+  // text — a German player still matches the recorded substring.
+  const auto found =
+      snapshot(history, 1, {.search = "accepted"}, 4000, &german);
+  require(found.total == 1 &&
+              found.entries.front().summary ==
+                  "Ein diplomatischer Vorschlag wurde angenommen.",
+          "Search did not apply to the authoritative summary");
+
+  // Without a table the raw record passes through unchanged.
+  const auto raw = snapshot(history, 1);
+  require(raw.entries[6].summary ==
+              "A diplomatic proposal has been accepted.",
+          "Raw snapshot localized without a table");
+}
+
 void render_smoke() {
   auto history = make_history();
   NativeChronicleView view;
@@ -657,6 +738,7 @@ int main() {
     search_filtering();
     keyboard_focus();
     view_lifecycle();
+    localized_summaries();
     render_smoke();
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

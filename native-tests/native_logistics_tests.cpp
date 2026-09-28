@@ -6,8 +6,10 @@
 #include <stellar/engine/localization.hpp>
 
 #include <iostream>
+#include <ranges>
 #include <stdexcept>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 namespace {
@@ -40,11 +42,12 @@ FreshCampaignState world(const int home_nodes = 2) {
   return result;
 }
 
-HomeSystemLogisticsNetwork canonical(const FreshCampaignState &state, int id) {
+CivilizationLogisticsCoverage canonical(const FreshCampaignState &state, int id) {
   const auto construction = economic_construction_projection(state.construction);
   const auto fleets = economic_fleet_projection(state.fleets);
-  return home_system_logistics({state.civilizations, state.bodies, construction,
-                                fleets}, state.colonies, state.economies, id);
+  return civilization_logistics_coverage({state.civilizations, state.bodies,
+                                          construction, fleets},
+                                         state.colonies, state.economies, id);
 }
 
 void observer_and_missing_state_are_unavailable() {
@@ -70,10 +73,10 @@ void home_only_and_canonical_totals() {
   const auto expected = canonical(state, 1);
   const auto view = build_home_logistics(state, 1);
   require(view.state == LoadState::Ready, "valid home network did not load");
-  require(view.supply_per_day == expected.total_supply_offered_per_day &&
-              view.demand_per_day == expected.total_demand_per_day &&
-              view.delivered_per_day == expected.total_allocated_per_day &&
-              view.shortfall_per_day == expected.total_unmet_demand_per_day,
+  require(view.supply_per_day == expected.home_system.total_supply_offered_per_day &&
+              view.demand_per_day == expected.home_system.total_demand_per_day &&
+              view.delivered_per_day == expected.home_system.total_allocated_per_day &&
+              view.shortfall_per_day == expected.home_system.total_unmet_demand_per_day,
           "view totals were recomputed instead of copied from Core");
   const auto baseline_nodes = view.nodes.size();
   Colony foreign;
@@ -123,8 +126,9 @@ void malformed_projector_identity_fails_without_foreign_totals() {
   HomeLogisticsController controller([](const FreshCampaignState &value, int id) {
     auto result = canonical(value, id);
     result.civilization_id = 2;
-    result.home_system_id = 2;
-    result.total_supply_offered_per_day = 42.;
+    result.home_system.civilization_id = 2;
+    result.home_system.home_system_id = 2;
+    result.home_system.total_supply_offered_per_day = 42.;
     return result;
   });
   require(controller.refresh(state, 1, 9), "malformed projector was not attempted");
@@ -171,6 +175,87 @@ void locale_resolves_node_labels_and_unavailable_message() {
           "controller locale did not resolve the unavailable message");
 }
 
+void corridors_match_the_canonical_link_graph() {
+  const auto state = world(3);
+  const auto expected = canonical(state, 1);
+  const auto view = build_home_logistics(state, 1);
+  require(view.state == LoadState::Ready,
+          "valid home network did not load for corridor check");
+  require(view.links.size() == expected.home_system.links.size(),
+          "corridor rows diverged from the canonical link graph");
+  std::unordered_map<int, double> expected_used;
+  for (const auto &allocation : expected.home_system.daily_flow.allocations)
+    for (const int link : allocation.route_link_ids)
+      expected_used[link] += allocation.allocated_per_day;
+  for (const auto &row : view.links) {
+    const auto link = std::ranges::find(expected.home_system.links, row.id,
+                                        &LogisticsLink::id);
+    require(link != expected.home_system.links.end() && !row.from.empty() &&
+                !row.to.empty() && !row.status.empty(),
+            "corridor row lost its canonical link, endpoints or status");
+    require(row.capacity_per_day == link->capacity_per_day &&
+                row.transit_days == link->transit_days &&
+                row.enabled == link->enabled &&
+                row.bidirectional == link->bidirectional,
+            "corridor row rewrote canonical link metrics");
+    require(row.used_per_day == expected_used[row.id],
+            "corridor usage diverged from flow allocations");
+  }
+  if (expected.home_system.links.empty())
+    std::cout << "note: canonical home network had no links in the fixture\n";
+}
+
+void external_coverage_projects_owned_distant_systems() {
+  auto state = world(2);
+  // A second owned system gives the canonical coverage an external entry.
+  state.systems.push_back({3, "Frontier", {30.f, 0.f}});
+  Colony distant;
+  distant.id = 100;
+  distant.civilization_id = 1;
+  distant.system_id = 3;
+  distant.name = "Frontier Colony";
+  distant.population_millions = 55.;
+  distant.infrastructure = 1.;
+  distant.stability = 1.;
+  state.colonies.push_back(distant);
+  const auto expected = canonical(state, 1);
+  const auto view = build_home_logistics(state, 1);
+  require(view.state == LoadState::Ready,
+          "coverage fixture did not load as ready");
+  require(view.external.size() == expected.external_systems.size() &&
+              !view.external.empty(),
+          "external systems were truncated from the view");
+  require(view.owned_system_count == expected.owned_system_count &&
+              view.support_gap_per_day ==
+                  expected.unrepresented_interstellar_support_per_day,
+          "coverage totals were recomputed instead of copied from Core");
+  for (const auto &row : view.external) {
+    const auto entry = std::ranges::find(
+        expected.external_systems, row.system_id,
+        &ExternalSystemLogisticsStatus::system_id);
+    require(entry != expected.external_systems.end() && !row.name.empty() &&
+                !row.status.empty(),
+            "external row lost its canonical entry, name or status");
+    require(row.colony_count == entry->colony_count &&
+                row.condition == entry->condition &&
+                row.capacity_per_day == entry->local_support_capacity_per_day &&
+                row.demand_per_day == entry->support_demand_per_day &&
+                row.import_per_day == entry->import_requirement_per_day &&
+                row.corridor ==
+                    entry->has_represented_interstellar_freight_corridor,
+            "external row rewrote canonical coverage metrics");
+    require(row.name == "Frontier",
+            "external row did not resolve the owning system's name");
+  }
+  // Foreign-owned external colonies and the home system itself stay out.
+  require(std::ranges::none_of(view.external,
+                               [](const auto &row) {
+                                 return row.name == "Foreign" ||
+                                        row.name == "Sol";
+                               }),
+          "foreign or home system leaked into external coverage rows");
+}
+
 void identity_generation_and_clear_do_not_keep_stale_view() {
   auto state = world();
   HomeLogisticsController controller;
@@ -195,6 +280,8 @@ int main() {
     failure_latches_until_explicit_retry();
     malformed_projector_identity_fails_without_foreign_totals();
     locale_resolves_node_labels_and_unavailable_message();
+    corridors_match_the_canonical_link_graph();
+    external_coverage_projects_owned_distant_systems();
     identity_generation_and_clear_do_not_keep_stale_view();
     std::cout << "native logistics tests passed\n";
     return 0;

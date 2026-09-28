@@ -143,6 +143,17 @@ private:
                                std::string_view fallback) const;
   [[nodiscard]] std::string trf(std::string_view key, std::string_view arg,
                                 std::string_view fallback) const;
+  // Localized option labels — the enum→string maps above stay English for the
+  // settings file; these only paint the dropdown rows and announcements.
+  [[nodiscard]] std::string display_label(VideoDisplayMode) const;
+  [[nodiscard]] std::string vsync_label(VideoVsync) const;
+  [[nodiscard]] std::string frame_cap_label(VideoFrameCap) const;
+  [[nodiscard]] std::string quality_label(int) const;
+  [[nodiscard]] std::string density_label(int) const;
+  [[nodiscard]] std::string samples_label(int) const;
+  [[nodiscard]] std::string scene_res_label(int) const;
+  [[nodiscard]] std::string resolution_label(const NativeVideoSettings &) const;
+  [[nodiscard]] std::string choice_value(std::size_t) const;
 
   bool visible_{};
   const stellar::engine::LocalizationTable *locale_{};

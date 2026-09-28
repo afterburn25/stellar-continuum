@@ -1,4 +1,5 @@
 #include "native_inspection.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/core/fleet_reach.hpp>
 
@@ -375,7 +376,7 @@ void card_keyboard_focus() {
   card.render(draw,bounds);
   require(std::ranges::any_of(draw.overlay,[&](const UiOverlayCommand&item){
     const auto*stroke=std::get_if<StrokedRectangle>(&item);
-    return stroke&&stroke->bounds.x==close.x&&stroke->bounds.y==close.y&&stroke->color.r==164;}),
+    return stroke&&stroke->bounds.x==close.x&&stroke->bounds.y==close.y&&stroke->color.r==stellar::native_ui::color::focus.r;}),
           "focused card did not ring its close control");
   require(key(kRight).captured&&key(kEnd).captured&&card.focus()==0,
           "single-control ring left the close control");

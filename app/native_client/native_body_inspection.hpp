@@ -36,4 +36,8 @@ build_body_inspection(const native_system::NativeSystemSnapshot &, int body_id,
                       const stellar::engine::LocalizationTable *locale =
                           nullptr);
 
+[[nodiscard]] std::string world_class_name(
+    stellar::core::PlanetaryWorldClass value,
+    const stellar::engine::LocalizationTable *locale = nullptr);
+
 } // namespace stellar::native_system_ui

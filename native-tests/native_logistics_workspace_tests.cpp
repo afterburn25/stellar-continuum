@@ -14,6 +14,7 @@
 namespace {
 using namespace stellar::native_logistics;
 using namespace stellar::native_map;
+using stellar::core::SupplyCondition;
 
 void require(bool value, std::string_view message) {
   if (!value) throw std::runtime_error(std::string(message));
@@ -126,11 +127,19 @@ void unavailable_and_failed_do_not_render_stale_totals() {
   SupplyWorkspace workspace;
   workspace.open();
   const auto ready = ready_view();
-  const std::array<View, 2> states{
-      View{LoadState::Unavailable, "SUPPLY NETWORK", "Economy missing.", {}, 0,
-           999., 999., 999., 999., {}},
-      View{LoadState::Failed, "SUPPLY NETWORK", "Retry after state is ready.",
-           "Core failure", 0, 999., 999., 999., 999., ready.nodes}};
+  std::array<View, 2> states;
+  states[0].state = LoadState::Unavailable;
+  states[0].system_name = "SUPPLY NETWORK";
+  states[0].message = "Economy missing.";
+  states[0].supply_per_day = states[0].demand_per_day =
+      states[0].delivered_per_day = states[0].shortfall_per_day = 999.;
+  states[1].state = LoadState::Failed;
+  states[1].system_name = "SUPPLY NETWORK";
+  states[1].message = "Retry after state is ready.";
+  states[1].diagnostic = "Core failure";
+  states[1].supply_per_day = states[1].demand_per_day =
+      states[1].delivered_per_day = states[1].shortfall_per_day = 999.;
+  states[1].nodes = ready.nodes;
   for (const auto &view : states) {
     DrawList draw;
     workspace.render(draw, view, 1280, 720);
@@ -270,6 +279,133 @@ void keyboard_focus() {
   workspace.open();
   require(workspace.focus() < 0, "reopened panel kept a stale focus index");
 }
+
+void corridors_render_in_the_scroll_body() {
+  SupplyWorkspace workspace;
+  workspace.set_text_measurer(measured);
+  workspace.open();
+  auto view = ready_view(2);
+  view.links.push_back({7, "Homeworld", "Depot", "Busy", 4., 3., .5, true, false});
+  DrawList draw;
+  workspace.render(draw, view, 1600, 900);
+  const auto layout = SupplyLayout::for_viewport(1600, 900);
+  bool header = false, route = false;
+  for (const auto &item : draw.overlay)
+    if (const auto *text = std::get_if<Text>(&item)) {
+      header |= text->value == "FREIGHT CORRIDORS";
+      route |= text->value == "Homeworld -> Depot";
+    }
+  require(header && route, "corridor section did not render its title or route");
+  for (const auto &item : draw.overlay)
+    if (const auto *text = std::get_if<Text>(&item))
+      require(!text->clip || contains(layout.body, *text->clip) ||
+                  contains(layout.panel, *text->clip),
+              "corridor text escaped its clip region");
+}
+
+void external_coverage_renders_system_rows_and_gap() {
+  SupplyWorkspace workspace;
+  workspace.set_text_measurer(measured);
+  workspace.open();
+  auto view = ready_view(2);
+  view.support_gap_per_day = 3.50;
+  view.external.push_back({3, "Frontier", "Strained",
+                           SupplyCondition::Strained, 2, 4., 6., 2., false});
+  view.external.push_back({4, "Outpost", "Healthy",
+                           SupplyCondition::Healthy, 1, 8., 5., 0., true});
+  DrawList draw;
+  workspace.render(draw, view, 1600, 900);
+  const auto layout = SupplyLayout::for_viewport(1600, 900);
+  bool header = false, system = false, colonies = false, gap = false;
+  for (const auto &item : draw.overlay)
+    if (const auto *text = std::get_if<Text>(&item)) {
+      header |= text->value == "INTERSTELLAR COVERAGE";
+      system |= text->value == "Frontier";
+      colonies |= text->value == "2 colonies";
+      gap |= text->value.find("3.50 / DAY") != std::string::npos;
+    }
+  require(header && system && colonies,
+          "external coverage did not render its title, system or colony count");
+  require(gap, "unrepresented interstellar demand was not surfaced");
+  for (const auto &item : draw.overlay)
+    if (const auto *text = std::get_if<Text>(&item))
+      require(!text->clip || contains(layout.body, *text->clip) ||
+                  contains(layout.panel, *text->clip),
+              "external coverage text escaped its clip region");
+}
+
+void hover_explainers_cover_tiles_and_rows() {
+  SupplyWorkspace workspace;
+  workspace.set_text_measurer(measured);
+  workspace.open();
+  auto view = ready_view(1);
+  view.support_gap_per_day = 3.50;
+  view.links.push_back({7, "Homeworld", "Depot", "Busy", 4., 3., .5, true,
+                        false});
+  view.external.push_back({3, "Frontier", "Strained", SupplyCondition::Strained,
+                           2, 4., 6., 2., false});
+  const auto layout = SupplyLayout::for_viewport(1600, 900);
+  const auto tipped = [](const DrawList &draw, std::string_view needle) {
+    for (const auto &item : draw.overlay)
+      if (const auto *text = std::get_if<Text>(&item);
+          text && text->value.find(needle) != std::string::npos)
+        return true;
+    return false;
+  };
+  // Nothing hovered: no explainer renders.
+  (void)workspace.handle({InputEventType::PointerMove, {4.f, 4.f}}, view, 1600,
+                         900);
+  DrawList idle;
+  workspace.render(idle, view, 1600, 900);
+  require(!tipped(idle, "supply network"), "idle supply render emitted a tooltip");
+  // Metric tile.
+  const float s = layout.scale;
+  const UiRect tile{layout.panel.x + 18.f * s, layout.panel.y + 136.f * s,
+                    (layout.panel.width - 54.f * s) / 4.f, 60.f * s};
+  (void)workspace.handle({InputEventType::PointerMove, center(tile)}, view,
+                         1600, 900);
+  DrawList hovered_tile;
+  workspace.render(hovered_tile, view, 1600, 900);
+  require(tipped(hovered_tile, "Exportable surplus"),
+          "hovered supply metric tile did not explain itself");
+  const auto find = [](const DrawList &draw, const std::string &value) {
+    for (const auto &item : draw.overlay)
+      if (const auto *text = std::get_if<Text>(&item);
+          text && text->value == value)
+        return text->at;
+    return Point{-1.f, -1.f};
+  };
+  // Corridor row explains its columns on hover.
+  const auto route_at = find(hovered_tile, "Homeworld -> Depot");
+  require(route_at.x >= 0.f, "corridor route text missing for tooltip test");
+  (void)workspace.handle({InputEventType::PointerMove,
+                          {route_at.x + 6.f, route_at.y + 6.f}},
+                         view, 1600, 900);
+  DrawList hovered_link;
+  workspace.render(hovered_link, view, 1600, 900);
+  require(tipped(hovered_link, "transport link between supply nodes"),
+          "hovered corridor row did not explain its columns");
+  // External coverage row.
+  const auto system_at = find(hovered_link, "Frontier");
+  require(system_at.x >= 0.f, "external coverage row missing for tooltip test");
+  (void)workspace.handle({InputEventType::PointerMove,
+                          {system_at.x + 6.f, system_at.y + 6.f}},
+                         view, 1600, 900);
+  DrawList hovered_external;
+  workspace.render(hovered_external, view, 1600, 900);
+  require(tipped(hovered_external, "colonies outside the home system"),
+          "hovered external coverage row did not explain its columns");
+  // The demand-gap callout explains itself on hover.
+  const auto gap_at = find(hovered_external, "UNREPRESENTED INTERSTELLAR DEMAND  3.50 / DAY");
+  require(gap_at.x >= 0.f, "demand gap callout missing for tooltip test");
+  (void)workspace.handle({InputEventType::PointerMove,
+                          {gap_at.x + 6.f, gap_at.y + 6.f}},
+                         view, 1600, 900);
+  DrawList hovered_gap;
+  workspace.render(hovered_gap, view, 1600, 900);
+  require(tipped(hovered_gap, "no corridor can currently serve"),
+          "hovered demand-gap callout did not explain itself");
+}
 }  // namespace
 
 int main() {
@@ -282,6 +418,9 @@ int main() {
     tiny_positive_totals_are_not_rendered_as_zero();
     pointer_and_commands_route_without_leakage();
     keyboard_focus();
+    corridors_render_in_the_scroll_body();
+    external_coverage_renders_system_rows_and_gap();
+    hover_explainers_cover_tiles_and_rows();
     return 0;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

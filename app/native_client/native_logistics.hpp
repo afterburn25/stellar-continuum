@@ -26,19 +26,58 @@ struct NodeRow {
   [[nodiscard]] bool operator==(const NodeRow &) const = default;
 };
 
+// One canonical freight link between two observer-visible nodes. `used_per_day`
+// is the sum of authoritative flow allocations routed over the link.
+struct LinkRow {
+  int id{};
+  std::string from;
+  std::string to;
+  std::string status;
+  double capacity_per_day{};
+  double used_per_day{};
+  double transit_days{};
+  bool enabled{true};
+  bool bidirectional{true};
+  [[nodiscard]] bool operator==(const LinkRow &) const = default;
+};
+
+// One owned system outside the home system. Metrics are copied verbatim from
+// the canonical `ExternalSystemLogisticsStatus`; `condition` is the worst
+// per-colony `SupplyCondition` in that system.
+struct ExternalRow {
+  int system_id{};
+  std::string name;
+  std::string status;
+  stellar::core::SupplyCondition condition{};
+  int colony_count{};
+  double capacity_per_day{};
+  double demand_per_day{};
+  double import_per_day{};
+  bool corridor{};
+  [[nodiscard]] bool operator==(const ExternalRow &) const = default;
+};
+
 // A detached, read-only presentation projection of one civilization's home
-// system. Totals are copied verbatim from Core's canonical network result.
+// system plus its owned external systems. Totals are copied verbatim from
+// Core's canonical coverage result.
 struct View {
   LoadState state{LoadState::Unavailable};
   std::string system_name{"SUPPLY NETWORK"};
   std::string message{"Supply network is unavailable."};
   std::string diagnostic;
   int corridor_count{};
+  int owned_system_count{1};
   double supply_per_day{};
   double demand_per_day{};
   double delivered_per_day{};
   double shortfall_per_day{};
+  // Interstellar demand with no represented freight corridor — Core's
+  // `unrepresented_interstellar_support_per_day`, surfaced so players can see
+  // colonies the home network cannot reach.
+  double support_gap_per_day{};
   std::vector<NodeRow> nodes;
+  std::vector<LinkRow> links;
+  std::vector<ExternalRow> external;
 };
 
 [[nodiscard]] View build_home_logistics(
@@ -47,7 +86,7 @@ struct View {
 
 class HomeLogisticsController final {
  public:
-  using Projector = std::function<stellar::core::HomeSystemLogisticsNetwork(
+  using Projector = std::function<stellar::core::CivilizationLogisticsCoverage(
       const stellar::core::FreshCampaignState &, int)>;
 
   HomeLogisticsController();

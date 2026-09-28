@@ -22,29 +22,6 @@ namespace stellar::native_diplomacy {
 namespace {
 using namespace stellar::core;
 
-[[nodiscard]] std::string words(std::string_view value) {
-  std::string out;
-  out.reserve(value.size());
-  bool boundary = true;
-  for (char c : value) {
-    if (c == '_') {
-      out += ' ';
-      boundary = true;
-      continue;
-    }
-    if (c == ' ') {
-      out += ' ';
-      boundary = true;
-      continue;
-    }
-    out += boundary ? static_cast<char>(
-                          std::toupper(static_cast<unsigned char>(c)))
-                    : c;
-    boundary = false;
-  }
-  return out;
-}
-
 std::string resolve(const stellar::engine::LocalizationTable *locale,
                     std::string_view key, std::string_view fallback) {
   if (locale && locale->contains(key))
@@ -70,76 +47,60 @@ std::string resolved(const stellar::engine::LocalizationTable *locale,
   return out;
 }
 
-[[nodiscard]] std::string_view name_of(ContactAwareness value) noexcept {
-  switch (value) {
-  case ContactAwareness::unknown: return "unknown";
-  case ContactAwareness::detected_unidentified: return "detected unidentified";
-  case ContactAwareness::identified: return "identified";
-  case ContactAwareness::contact_possible: return "contact possible";
-  case ContactAwareness::contact_established: return "contact established";
-  case ContactAwareness::communication_available: return "communication available";
-  }
-  return "unknown";
+// Observer-command results are stable English literals. Recompose them
+// through the locale table at the controller boundary so workspace notices
+// stay localized without changing the authoritative results or saves.
+std::string localized_command_message(
+    const stellar::engine::LocalizationTable *locale,
+    std::string_view message) {
+  static const std::pair<std::string_view, std::string_view> messages[] = {
+      {"No active diplomatic channel is available to that counterpart.",
+       "DIPLOMACY_ERR_NO_CHANNEL"},
+      {"No usable diplomatic contact is available to that counterpart.",
+       "DIPLOMACY_ERR_NO_CONTACT"},
+      {"That diplomatic action is not currently available.",
+       "DIPLOMACY_ERR_ACTION"},
+      {"The diplomatic request is not valid.", "DIPLOMACY_ERR_REQUEST"},
+      {"That territorial claim action is not currently available.",
+       "DIPLOMACY_ERR_TERRITORIAL_ACTION"},
+      {"The territorial claim request is not valid.",
+       "DIPLOMACY_ERR_TERRITORIAL_REQUEST"},
+      {"That border warning action is not currently available.",
+       "DIPLOMACY_ERR_BORDER_ACTION"},
+      {"The border warning request is not valid.",
+       "DIPLOMACY_ERR_BORDER_REQUEST"},
+      {"Communication channel is already available.",
+       "DIPLOMACY_MSG_CHANNEL_EXISTS"},
+      {"Communication channel established.", "DIPLOMACY_MSG_CHANNEL_OPENED"},
+      {"Proposal sent.", "DIPLOMACY_MSG_PROPOSAL_SENT"},
+      {"Proposal accepted.", "DIPLOMACY_MSG_PROPOSAL_ACCEPTED"},
+      {"Proposal rejected.", "DIPLOMACY_MSG_PROPOSAL_REJECTED"},
+      {"Proposal withdrawn.", "DIPLOMACY_MSG_PROPOSAL_WITHDRAWN"},
+      {"Access permission updated.", "DIPLOMACY_MSG_ACCESS_UPDATED"},
+      {"War declared.", "DIPLOMACY_MSG_WAR_DECLARED"},
+      {"Agreement was already terminated.",
+       "DIPLOMACY_MSG_AGREEMENT_ALREADY_ENDED"},
+      {"Agreement terminated.", "DIPLOMACY_MSG_AGREEMENT_TERMINATED"},
+      {"Territorial claim was already communicated.",
+       "DIPLOMACY_MSG_CLAIM_ALREADY_SENT"},
+      {"Territorial claim communicated.", "DIPLOMACY_MSG_CLAIM_SENT"},
+      {"Territorial claim response was already recorded.",
+       "DIPLOMACY_MSG_CLAIM_RESPONSE_EXISTS"},
+      {"Territorial claim recognized.", "DIPLOMACY_MSG_CLAIM_RECOGNIZED"},
+      {"Territorial claim disputed.", "DIPLOMACY_MSG_CLAIM_DISPUTED"},
+      {"Territorial claim is already active.",
+       "DIPLOMACY_MSG_CLAIM_ACTIVE"},
+      {"Territorial claim asserted.", "DIPLOMACY_MSG_CLAIM_ASSERTED"},
+      {"Border warning was already issued.",
+       "DIPLOMACY_MSG_WARNING_EXISTS"},
+      {"Border warning issued.", "DIPLOMACY_MSG_WARNING_SENT"},
+  };
+  for (const auto &[literal, key] : messages)
+    if (message == literal) return resolve(locale, key, literal);
+  return std::string(message);
 }
-[[nodiscard]] std::string_view name_of(ContactCondition value) noexcept {
-  switch (value) {
-  case ContactCondition::active: return "active";
-  case ContactCondition::hostile: return "hostile";
-  case ContactCondition::stale_or_lost: return "stale or lost";
-  }
-  return "unknown";
-}
-[[nodiscard]] std::string_view name_of(DiplomaticPoliticalState value) noexcept {
-  switch (value) {
-  case DiplomaticPoliticalState::unknown: return "Unknown";
-  case DiplomaticPoliticalState::peace: return "Peace";
-  case DiplomaticPoliticalState::hostile: return "Hostile";
-  case DiplomaticPoliticalState::at_war: return "AtWar";
-  case DiplomaticPoliticalState::ceasefire: return "Ceasefire";
-  }
-  return "Unknown";
-}
-[[nodiscard]] std::string_view name_of(AccessPermission value) noexcept {
-  switch (value) {
-  case AccessPermission::unspecified: return "UNSPECIFIED";
-  case AccessPermission::granted: return "GRANTED";
-  case AccessPermission::denied: return "DENIED";
-  }
-  return "UNSPECIFIED";
-}
-[[nodiscard]] std::string_view name_of(DiplomaticAgreementType value) noexcept {
-  switch (value) {
-  case DiplomaticAgreementType::peace: return "peace";
-  case DiplomaticAgreementType::non_aggression: return "non aggression";
-  case DiplomaticAgreementType::access: return "access";
-  case DiplomaticAgreementType::trade: return "trade";
-  case DiplomaticAgreementType::research_exchange: return "research exchange";
-  case DiplomaticAgreementType::ceasefire: return "ceasefire";
-  case DiplomaticAgreementType::cooperation: return "cooperation";
-  }
-  return "agreement";
-}
-[[nodiscard]] std::string_view name_of(DiplomaticAgreementStatus value) noexcept {
-  switch (value) {
-  case DiplomaticAgreementStatus::active: return "ACTIVE";
-  case DiplomaticAgreementStatus::terminated: return "TERMINATED";
-  }
-  return "unknown";
-}
-[[nodiscard]] std::string_view name_of(DiplomaticProposalKind value) noexcept {
-  switch (value) {
-  case DiplomaticProposalKind::agreement: return "agreement";
-  case DiplomaticProposalKind::access_request: return "access request";
-  case DiplomaticProposalKind::trade_offer: return "trade offer";
-  case DiplomaticProposalKind::demand: return "demand";
-  case DiplomaticProposalKind::peace_offer: return "peace offer";
-  case DiplomaticProposalKind::ceasefire_offer: return "ceasefire offer";
-  }
-  return "proposal";
-}
-// Display-name resolvers for the two vocabularies players read as statuses.
-// Enum-derived strings for agreements, proposals, events, awareness and
-// condition remain stable data tokens until they get keyed coverage.
+
+// Display-name resolvers for the vocabularies players read as statuses.
 std::string political_name(const stellar::engine::LocalizationTable *locale,
                            DiplomaticPoliticalState value) {
   switch (value) {
@@ -180,29 +141,145 @@ std::string agreement_status_name(
   return resolve(locale, "DIPLOMACY_AGREEMENT_TERMINATED", "TERMINATED");
 }
 
-[[nodiscard]] std::string_view name_of(DiplomaticEventKind value) noexcept {
+std::string awareness_name(const stellar::engine::LocalizationTable *locale,
+                           ContactAwareness value) {
   switch (value) {
-  case DiplomaticEventKind::contact_observed: return "contact observed";
-  case DiplomaticEventKind::contact_established: return "contact established";
-  case DiplomaticEventKind::communication_available: return "communication available";
-  case DiplomaticEventKind::contact_lost: return "contact lost";
-  case DiplomaticEventKind::access_changed: return "access changed";
-  case DiplomaticEventKind::claim_asserted: return "claim asserted";
-  case DiplomaticEventKind::claim_communicated: return "claim communicated";
-  case DiplomaticEventKind::claim_responded: return "claim responded";
-  case DiplomaticEventKind::border_warning_issued: return "border warning issued";
-  case DiplomaticEventKind::trespass_recorded: return "trespass recorded";
-  case DiplomaticEventKind::proposal_sent: return "proposal sent";
-  case DiplomaticEventKind::proposal_accepted: return "proposal accepted";
-  case DiplomaticEventKind::proposal_rejected: return "proposal rejected";
-  case DiplomaticEventKind::proposal_withdrawn: return "proposal withdrawn";
-  case DiplomaticEventKind::proposal_expired: return "proposal expired";
-  case DiplomaticEventKind::agreement_activated: return "agreement activated";
-  case DiplomaticEventKind::agreement_terminated: return "agreement terminated";
-  case DiplomaticEventKind::relationship_changed: return "relationship changed";
-  case DiplomaticEventKind::war_declared: return "war declared";
+  case ContactAwareness::unknown:
+    return resolve(locale, "DIPLOMACY_AWARE_UNKNOWN", "unknown");
+  case ContactAwareness::detected_unidentified:
+    return resolve(locale, "DIPLOMACY_AWARE_DETECTED_UNIDENTIFIED",
+                   "detected unidentified");
+  case ContactAwareness::identified:
+    return resolve(locale, "DIPLOMACY_AWARE_IDENTIFIED", "identified");
+  case ContactAwareness::contact_possible:
+    return resolve(locale, "DIPLOMACY_AWARE_CONTACT_POSSIBLE",
+                   "contact possible");
+  case ContactAwareness::contact_established:
+    return resolve(locale, "DIPLOMACY_AWARE_CONTACT_ESTABLISHED",
+                   "contact established");
+  case ContactAwareness::communication_available:
+    return resolve(locale, "DIPLOMACY_AWARE_COMMUNICATION",
+                   "communication available");
   }
-  return "event";
+  return resolve(locale, "DIPLOMACY_AWARE_UNKNOWN", "unknown");
+}
+std::string condition_name(const stellar::engine::LocalizationTable *locale,
+                           ContactCondition value) {
+  switch (value) {
+  case ContactCondition::active:
+    return resolve(locale, "DIPLOMACY_COND_ACTIVE", "active");
+  case ContactCondition::hostile:
+    return resolve(locale, "DIPLOMACY_COND_HOSTILE", "hostile");
+  case ContactCondition::stale_or_lost:
+    return resolve(locale, "DIPLOMACY_COND_STALE_OR_LOST", "stale or lost");
+  }
+  return resolve(locale, "DIPLOMACY_COND_ACTIVE", "active");
+}
+std::string agreement_type_name(
+    const stellar::engine::LocalizationTable *locale,
+    DiplomaticAgreementType value) {
+  switch (value) {
+  case DiplomaticAgreementType::peace:
+    return resolve(locale, "DIPLOMACY_ATYPE_PEACE", "Peace");
+  case DiplomaticAgreementType::non_aggression:
+    return resolve(locale, "DIPLOMACY_ATYPE_NON_AGGRESSION",
+                   "Non Aggression");
+  case DiplomaticAgreementType::access:
+    return resolve(locale, "DIPLOMACY_ATYPE_ACCESS", "Access");
+  case DiplomaticAgreementType::trade:
+    return resolve(locale, "DIPLOMACY_ATYPE_TRADE", "Trade");
+  case DiplomaticAgreementType::research_exchange:
+    return resolve(locale, "DIPLOMACY_ATYPE_RESEARCH_EXCHANGE",
+                   "Research Exchange");
+  case DiplomaticAgreementType::ceasefire:
+    return resolve(locale, "DIPLOMACY_ATYPE_CEASEFIRE", "Ceasefire");
+  case DiplomaticAgreementType::cooperation:
+    return resolve(locale, "DIPLOMACY_ATYPE_COOPERATION", "Cooperation");
+  }
+  return resolve(locale, "DIPLOMACY_ATYPE_PEACE", "Peace");
+}
+std::string proposal_kind_name(
+    const stellar::engine::LocalizationTable *locale,
+    DiplomaticProposalKind value) {
+  switch (value) {
+  case DiplomaticProposalKind::agreement:
+    return resolve(locale, "DIPLOMACY_PKIND_AGREEMENT", "Agreement");
+  case DiplomaticProposalKind::access_request:
+    return resolve(locale, "DIPLOMACY_PKIND_ACCESS_REQUEST",
+                   "Access Request");
+  case DiplomaticProposalKind::trade_offer:
+    return resolve(locale, "DIPLOMACY_PKIND_TRADE_OFFER", "Trade Offer");
+  case DiplomaticProposalKind::demand:
+    return resolve(locale, "DIPLOMACY_PKIND_DEMAND", "Demand");
+  case DiplomaticProposalKind::peace_offer:
+    return resolve(locale, "DIPLOMACY_PKIND_PEACE_OFFER", "Peace Offer");
+  case DiplomaticProposalKind::ceasefire_offer:
+    return resolve(locale, "DIPLOMACY_PKIND_CEASEFIRE_OFFER",
+                   "Ceasefire Offer");
+  }
+  return resolve(locale, "DIPLOMACY_PKIND_AGREEMENT", "Agreement");
+}
+std::string event_kind_name(const stellar::engine::LocalizationTable *locale,
+                            DiplomaticEventKind value) {
+  switch (value) {
+  case DiplomaticEventKind::contact_observed:
+    return resolve(locale, "DIPLOMACY_EVENT_CONTACT_OBSERVED",
+                   "Contact Observed");
+  case DiplomaticEventKind::contact_established:
+    return resolve(locale, "DIPLOMACY_EVENT_CONTACT_ESTABLISHED",
+                   "Contact Established");
+  case DiplomaticEventKind::communication_available:
+    return resolve(locale, "DIPLOMACY_EVENT_COMMUNICATION_AVAILABLE",
+                   "Communication Available");
+  case DiplomaticEventKind::contact_lost:
+    return resolve(locale, "DIPLOMACY_EVENT_CONTACT_LOST", "Contact Lost");
+  case DiplomaticEventKind::access_changed:
+    return resolve(locale, "DIPLOMACY_EVENT_ACCESS_CHANGED",
+                   "Access Changed");
+  case DiplomaticEventKind::claim_asserted:
+    return resolve(locale, "DIPLOMACY_EVENT_CLAIM_ASSERTED",
+                   "Claim Asserted");
+  case DiplomaticEventKind::claim_communicated:
+    return resolve(locale, "DIPLOMACY_EVENT_CLAIM_COMMUNICATED",
+                   "Claim Communicated");
+  case DiplomaticEventKind::claim_responded:
+    return resolve(locale, "DIPLOMACY_EVENT_CLAIM_RESPONDED",
+                   "Claim Responded");
+  case DiplomaticEventKind::border_warning_issued:
+    return resolve(locale, "DIPLOMACY_EVENT_BORDER_WARNING",
+                   "Border Warning Issued");
+  case DiplomaticEventKind::trespass_recorded:
+    return resolve(locale, "DIPLOMACY_EVENT_TRESPASS_RECORDED",
+                   "Trespass Recorded");
+  case DiplomaticEventKind::proposal_sent:
+    return resolve(locale, "DIPLOMACY_EVENT_PROPOSAL_SENT",
+                   "Proposal Sent");
+  case DiplomaticEventKind::proposal_accepted:
+    return resolve(locale, "DIPLOMACY_EVENT_PROPOSAL_ACCEPTED",
+                   "Proposal Accepted");
+  case DiplomaticEventKind::proposal_rejected:
+    return resolve(locale, "DIPLOMACY_EVENT_PROPOSAL_REJECTED",
+                   "Proposal Rejected");
+  case DiplomaticEventKind::proposal_withdrawn:
+    return resolve(locale, "DIPLOMACY_EVENT_PROPOSAL_WITHDRAWN",
+                   "Proposal Withdrawn");
+  case DiplomaticEventKind::proposal_expired:
+    return resolve(locale, "DIPLOMACY_EVENT_PROPOSAL_EXPIRED",
+                   "Proposal Expired");
+  case DiplomaticEventKind::agreement_activated:
+    return resolve(locale, "DIPLOMACY_EVENT_AGREEMENT_ACTIVATED",
+                   "Agreement Activated");
+  case DiplomaticEventKind::agreement_terminated:
+    return resolve(locale, "DIPLOMACY_EVENT_AGREEMENT_TERMINATED",
+                   "Agreement Terminated");
+  case DiplomaticEventKind::relationship_changed:
+    return resolve(locale, "DIPLOMACY_EVENT_RELATIONSHIP_CHANGED",
+                   "Relationship Changed");
+  case DiplomaticEventKind::war_declared:
+    return resolve(locale, "DIPLOMACY_EVENT_WAR_DECLARED", "War Declared");
+  }
+  return resolve(locale, "DIPLOMACY_EVENT_RELATIONSHIP_CHANGED",
+                 "Relationship Changed");
 }
 
 using stellar::native_campaign::format_campaign_date;
@@ -447,8 +524,8 @@ struct Projection {
                                     {contact_row.contact_id}, "UNIDENTIFIED CONTACT {0}");
     s.contact_status =
         resolved(locale, "DIPLOMACY_CONTACT_STATUS",
-                 {std::string(name_of(raw.awareness)),
-                  std::string(name_of(raw.condition)),
+                 {awareness_name(locale, raw.awareness),
+                  condition_name(locale, raw.condition),
                   std::to_string(static_cast<int>(std::lround(raw.confidence * 100.)))},
                  "{0} · {1} · {2}% confidence");
     s.communication_status =
@@ -510,7 +587,7 @@ struct Projection {
           continue;
         NativeDiplomacyAgreementRow row;
         row.agreement_id = agreement.agreement_id;
-        row.type = words(name_of(agreement.type));
+        row.type = agreement_type_name(locale, agreement.type);
         row.agreement_status = agreement.status;
         row.status = agreement_status_name(locale, agreement.status);
         row.started = format_campaign_date(
@@ -550,9 +627,10 @@ struct Projection {
         const bool incoming = proposal.recipient_civilization_id == observer;
         row.direction = incoming ? resolve(locale, "DIPLOMACY_INCOMING", "INCOMING")
                                  : resolve(locale, "DIPLOMACY_OUTGOING", "OUTGOING");
-        row.kind = words(name_of(proposal.kind));
+        row.kind = proposal_kind_name(locale, proposal.kind);
         if (proposal.agreement_type)
-          row.agreement_type = words(name_of(*proposal.agreement_type));
+          row.agreement_type =
+              agreement_type_name(locale, *proposal.agreement_type);
         row.summary = proposal.summary;
         row.can_accept = incoming;
         row.can_reject = incoming;
@@ -575,7 +653,7 @@ struct Projection {
         row.date = format_campaign_date(
             static_cast<double>(event.tick) /
             static_cast<double>(DiplomacyCampaignClock::ticks_per_simulation_day));
-        row.kind = words(name_of(event.kind));
+        row.kind = event_kind_name(locale, event.kind);
         row.summary = event.summary;
         v.history.push_back(std::move(row));
       }
@@ -759,7 +837,7 @@ NativeDiplomacyCommandOutcome NativeDiplomacyController::execute(
     break;
   }
   if (result.accepted) signature_.reset();
-  return {result.accepted, result.message};
+  return {result.accepted, localized_command_message(locale_, result.message)};
 }
 
 std::string NativeDiplomacyController::tr(std::string_view key,
