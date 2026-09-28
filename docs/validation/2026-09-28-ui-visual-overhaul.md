@@ -168,6 +168,19 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   engine flames in the battle view (`bt.bmp`). `--planetary-smoke`
   green at 2560×1440 (review read-only, modal isolation, slot
   reservation, timed).
+- Flag audit closed: after enumerating every `--*-smoke`/`--*-check`/
+  modifier flag in the option parser, the last unexercised entries were
+  run green — `--restart-cancel-smoke` and `--restart-exit-smoke`
+  (ReturnToCampaign/Exit paths), `--new-game-restart-smoke` (restart
+  into seed 115502), `--eruption-smoke` under `--dev-game` (live
+  map/system eruption continuity and campaign payload),
+  `--support-failure-check` (a `support` blocker file beside the save
+  forces the Failed path; both triggers fail cleanly, blocker and
+  campaign untouched), `--smoke-galaxy-card`/`--smoke-system-count`
+  (new-game automation honors both — generated a 1000-system card-3
+  galaxy), and `--smoke-full-exploration` under `--developer-smoke`
+  (250 systems fully surveyed, `unexplored:0`). Every flag-legal path
+  in the client binary is now exercised green.
 
 ## Known limitations
 
