@@ -39,7 +39,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Navigation/logistics | IMPLEMENTED BUT NEEDS POLISH | Core lane network, reach, exploration, freight/logistics | route/reach/freight/exploration parity | Domain-specific rules, not generic Engine route service; combined fleet stress still needed |
 | Knowledge/observation | IMPLEMENTED BUT NEEDS POLISH | Core knowledge, campaign observation, observer commands | knowledge/diplomacy invariants | Game-scoped privacy model; no general fog engine |
 | Economy/production | IMPLEMENTED BUT NEEDS POLISH | Core economy/industry/construction/shipbuilding/biology | economy/production parity, 5k colony scale | Not a generic resource graph; combined late-game load unverified |
-| Research | IMPLEMENTED BUT NEEDS POLISH | Core `adaptive_research_*` catalogs/services/snapshots | native adaptive research parity family | Existing domain runtime, not proof that every advanced research design is fully exposed in UI |
+| Research | IMPLEMENTED BUT NEEDS POLISH | Core `adaptive_research_*` catalogs/services/snapshots; AI final-slot commitment scheduling in `adaptive_research_campaign_simulation.cpp` (over-horizon picks deferred for bounded alternatives at the last free directed slot) | native adaptive research parity family, `adaptive_research_ai_scheduling` | Existing domain runtime, not proof that every advanced research design is fully exposed in UI; AI scheduling bounds commitment size but does not steer toward strategic unlocks |
 | Strategic AI | PARTIALLY IMPLEMENTED | Core strategic intent/planning and fleet intelligence | strategic/campaign/exploration tests | Correctness coverage does not demonstrate effective complete long-game AI |
 | Scripted event chains | PARTIALLY IMPLEMENTED | Engine `mission_graph.hpp` (`MissionRuntime`: JSON definitions, conditional triggers, timed stages, choices, EventBus effects, serialize/restore — previously unconsumed); Core `scripted_events.hpp` (`ScriptedEventCoordinator`: feeds every accepted step's typed domain events as named triggers + scalar JSON payloads, binds trigger context per instance, interprets authored `grant_credits`/`charge_credits`/`adjust_stability`/`damage_building`/`set_building_enabled`/`start_project` effects through canonical commands, AI/headless deterministic auto-choice, pending surface for UI, continuation + developer-save persistence); shipped `data/events/*.json` chains fire on real campaign events | `scripted_events`, `mission_graph`; parity suite unchanged (inert without definitions) | Player-facing chain UI and adaptive-research/diplomacy/sensor event families unfed; effect vocabulary covers treasury/stability/buildings/projects only — no fleet/anomaly spawning yet |
 | Civilization automation | PARTIALLY IMPLEMENTED | Engine `automation.hpp` (`AutomationController`: Off/Advisory/Assisted/Automatic domain modes, policy+constraint knobs, operator override locks, bounded explainable journal, hysteresis/cooldown shared with `StrategicMind`, sorted capture/restore); Core `civilization_automation.hpp` (`CivilizationAutomationCoordinator` — per-civ controllers, colonies + player construction domains, canonical assess→commit surface/industry commands, driven by the `automatic_orders` phase before the legacy AI order helpers, opt-in defaults preserve pre-automation parity); runtime continuation + developer-save JSON carry policies/locks/incumbents/cooldowns/journals + advisory proposal-suppression state (save→continue deterministic) | `automation`, `civilization_automation`; campaign parity suite unchanged under default-off | Colony placements only (repair/enable/hub/placement + empire project queue); economy/logistics/research/fleet/diplomacy automation, player-facing automation UI, and save-path coverage beyond the developer continuation envelope remain open |
@@ -63,6 +63,47 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Mods/accessibility/editor | IMPLEMENTED / PARTIALLY IMPLEMENTED foundations | Package system (`PackageRegistry`, `mods/` scan, `write_save_package_manifest`/`verify_save_package_manifest` save attestation), input/settings, Developer tools/import CLI, standalone editor | `package_platform` (incl. manifest attestation cases), editor + settings tests | Mod loading is content-only: namespaced package ids, priority-based overrides, semver dependency constraints and protected base namespaces resolve through `PackageRegistry::resolve`; world saves record the resolved load plan in a `<save>.packages.json` sidecar and `RuntimeHost` verifies it on F9/`load_world_from_file` restores — missing or version-mismatched packages log through `RuntimeDiagnostics` (report-only; loading proceeds). Executable plugins stay untrusted by design. Accessibility/editor remain partial — see the roadmap |
 
 ## Implementation records (newest first)
+
+## Adaptive research AI final-slot scheduling (2026-09-28)
+
+- Purpose: stop a single-slot directed program office from committing its
+  one free slot to a project whose estimated horizon dwarfs every bounded
+  alternative — in the 5000-system/25-civ century campaign every pre-warp
+  civilization matured ~129 nodes yet never reached
+  `experimental_interstellar_transit` because deep frontier picks (e.g.
+  `planetary_deflection_network`, a depth-7 node) kept winning the shortlist
+  while short gateway prerequisites (e.g. `field_theory`, the root of the
+  warp chain) starved investigable for decades.
+- Modules: `core/src/adaptive_research_campaign_simulation.cpp` (selection
+  site only — the shared `research_agenda_runtime_policy.json` contract is
+  untouched so parity fingerprints stay stable).
+- Policy: when the civilization's directed program stage reports a single
+  free slot, the AI computes a commitment horizon
+  `max(2y, min(4x shortest startable estimate, 15y))` over the materialized
+  visible shortlist. Over-horizon candidates are deferred in utility order;
+  the highest-utility deferred candidate still starts when nothing bounded
+  is startable and affordable. Uses only materialized state — no hidden
+  graph lookahead — and only ever fires inside the autonomous selection
+  path, so player command semantics are unchanged.
+- Public interfaces: none added; `ResearchVisibleProjectCandidate::
+  estimated_years_to_mature` (existing shortlist field) is the policy input.
+- Consumers: `AdaptiveResearchCampaignSimulation::advance` AI selection for
+  civilizations where `campaign_civilization_uses_ai` holds.
+- Tests: `adaptive_research_ai_scheduling` — seeds a two-candidate visible
+  shortlist through `AdaptiveResearchStateWriter` on a real
+  `AdaptiveResearchCampaignState` (frontier candidate pressure-boosted to
+  the top, bounded foundation alternative): asserts the deferral picks the
+  bounded candidate and that the fallback still starts the over-horizon
+  candidate when nothing shorter qualifies.
+- Save/performance impact: none — scheduling constants live in code, no new
+  persisted state; one extra O(shortlist) scan per selection.
+- Limitations: the policy bounds commitment size but does not steer toward
+  strategic unlocks — gateway nodes must still win by agenda utility among
+  bounded candidates; whether pre-warp civilizations now reach warp inside
+  a century is measured by the scale-campaign diagnostic rather than
+  assumed.
+
+
 
 ## Scripted event chains — campaign consumer for MissionRuntime (2026-09-28)
 

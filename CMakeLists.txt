@@ -1084,6 +1084,11 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/data/research/v1"
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-campaign-simulation.json")
   set_tests_properties(adaptive_research_campaign_simulation_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_research_ai_scheduling_tests native-tests/adaptive_research_ai_scheduling_tests.cpp)
+  target_link_libraries(stellar_research_ai_scheduling_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME adaptive_research_ai_scheduling COMMAND stellar_research_ai_scheduling_tests
+    "${CMAKE_SOURCE_DIR}/data/research/v1")
+  set_tests_properties(adaptive_research_ai_scheduling PROPERTIES TIMEOUT 60)
   add_executable(stellar_diplomacy_state_tests native-tests/diplomacy_state_tests.cpp)
   target_link_libraries(stellar_diplomacy_state_tests PRIVATE stellar_core stellar_json)
   add_test(NAME diplomacy_state_parity COMMAND stellar_diplomacy_state_tests

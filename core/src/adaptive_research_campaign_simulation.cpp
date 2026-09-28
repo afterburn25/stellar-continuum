@@ -248,27 +248,72 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
     bool allpaused = std::all_of(state.active_projects().begin(), state.active_projects().end(),
                                  [](auto &p) { return p.paused; });
     if (campaign_civilization_uses_ai(w,c->id) && allpaused) {
-      for (auto &candidate : campaign.runtime().agenda().build_visible_shortlist(state)) {
+      const auto &authority_catalog = campaign.runtime().authority().catalog();
+      const auto &program_stage = authority_catalog.get_directed_program_stage(
+          state.directed_program_stage_id());
+      const auto active_directed = std::ranges::count_if(
+          state.active_projects(),
+          [](const auto &project) { return !project.paused; });
+      const bool final_slot =
+          program_stage.directed_program_limit.has_value() &&
+          *program_stage.directed_program_limit - active_directed <= 1;
+      // A program office with a single free directed slot should not commit it
+      // to a project whose estimated horizon dwarfs every bounded alternative:
+      // deep frontier programs otherwise starve the short gateway projects
+      // that unlock new branches. The candidate is deferred while a startable
+      // and affordable alternative fits inside the commitment horizon; when
+      // nothing shorter qualifies, it still starts. Native scheduling policy;
+      // the shared research catalog contract stays untouched.
+      constexpr double final_slot_commitment_floor_years = 2.0;
+      constexpr double final_slot_commitment_ratio = 4.0;
+      constexpr double final_slot_commitment_hard_years = 15.0;
+      const auto shortlist =
+          campaign.runtime().agenda().build_visible_shortlist(state);
+      double shortest_startable_years = std::numeric_limits<double>::infinity();
+      for (const auto &candidate : shortlist)
+        if (candidate.can_start)
+          shortest_startable_years = std::min(
+              shortest_startable_years, candidate.estimated_years_to_mature);
+      const double horizon = std::max(
+          final_slot_commitment_floor_years,
+          std::min(shortest_startable_years * final_slot_commitment_ratio,
+                   final_slot_commitment_hard_years));
+      auto try_start = [&](const ResearchVisibleProjectCandidate &candidate) {
+        auto quote = AdaptiveResearchFundingPolicy::quote(
+            authority_catalog.get_node(candidate.node_id),
+            candidate.requested_effective_labs, authority_catalog);
+        if (economy->credits + .000001 <
+            AdaptiveResearchCampaignCommands::credits_needed_to_start(quote))
+          return false;
+        auto &start = campaign.get_start(c->id);
+        AdaptiveResearchFundingWorldView view{w.civilizations, w.economies};
+        auto result = AdaptiveResearchCampaignCommands::start_directed_research(
+            view, campaign, c->id, candidate.node_id,
+            candidate.requested_effective_labs,
+            start.applicability_context_id);
+        if (!result.accepted)
+          throw AdaptiveResearchCampaignOperationError(
+              "Adaptive Research AI selected invalid project '" +
+              candidate.node_id + "': " + result.message);
+        append(out, c->id, result.events);
+        return true;
+      };
+      const ResearchVisibleProjectCandidate *deferred = nullptr;
+      for (const auto &candidate : shortlist) {
         if (!candidate.can_start)
           continue;
-        auto quote = AdaptiveResearchFundingPolicy::quote(
-            campaign.runtime().authority().catalog().get_node(candidate.node_id),
-            candidate.requested_effective_labs, campaign.runtime().authority().catalog());
-        if (economy->credits + .000001 >=
-            AdaptiveResearchCampaignCommands::credits_needed_to_start(quote)) {
-          auto &start = campaign.get_start(c->id);
-          AdaptiveResearchFundingWorldView view{w.civilizations, w.economies};
-          auto result = AdaptiveResearchCampaignCommands::start_directed_research(
-              view, campaign, c->id, candidate.node_id, candidate.requested_effective_labs,
-              start.applicability_context_id);
-          if (!result.accepted)
-            throw AdaptiveResearchCampaignOperationError(
-                "Adaptive Research AI selected invalid project '" + candidate.node_id +
-                "': " + result.message);
-          append(out, c->id, result.events);
+        if (final_slot && candidate.estimated_years_to_mature > horizon) {
+          if (!deferred)
+            deferred = &candidate;
+          continue;
+        }
+        if (try_start(candidate)) {
+          deferred = nullptr;
           break;
         }
       }
+      if (deferred)
+        (void)try_start(*deferred);
     }
     std::vector<ResearchProjectRuntimeState> active;
     for (auto &p : state.active_projects())
