@@ -216,13 +216,22 @@ std::shared_ptr<const RgbaImage> spherical_material_thumbnail(const SphericalMat
   put(p,static_cast<std::size_t>(y)*size+x,color,smooth(0,.03,1-rr));
  }return RgbaImage::create(size,size,std::move(p));
 }
-Material3D accretion_disc_material3d(float inner,float outer,double kelvin,float beaming){
+Material3D accretion_disc_material3d(float inner,float outer,double kelvin,float beaming,
+                                     float spiral,int spiral_arms,float spiral_turns){
  if(!std::isfinite(inner)||!std::isfinite(outer)||inner<=0.f||outer<=inner)
   throw std::invalid_argument("Accretion disc radii must satisfy 0<inner<outer.");
  if(!std::isfinite(kelvin)||kelvin<100||kelvin>100000)
   throw std::invalid_argument("Accretion disc temperature must be between 100 and 100000 kelvin.");
  if(!std::isfinite(beaming)||std::abs(beaming)>1.f)
   throw std::invalid_argument("Accretion disc beaming must be in [-1,1].");
+ if(!std::isfinite(spiral)||spiral<0.f||spiral>1.f)
+  throw std::invalid_argument("Accretion disc spiral depth must be in [0,1].");
+ // Arms/turns bind only when a spiral is authored — the zero-tail
+ // defaults (legacy payloads) keep the uniform disc without throwing.
+ if(spiral>0.f&&(spiral_arms<1||spiral_arms>4))
+  throw std::invalid_argument("Accretion disc spiral arms must be in [1,4].");
+ if(spiral>0.f&&(!std::isfinite(spiral_turns)||std::abs(spiral_turns)>4.f))
+  throw std::invalid_argument("Accretion disc spiral turns must be in [-4,4].");
  // Radial column: Shakura–Sunyaev thin-disc T ∝ r^(-3/4); emitted flux
  // ∝ T^4 dims the outer rim while the blackbody curve shifts its hue.
  // linear_light decodes texels as sRGB, so encode gamma here.
@@ -231,16 +240,31 @@ Material3D accretion_disc_material3d(float inner,float outer,double kelvin,float
   const double s=linear<=0.0031308?12.92*linear:1.055*std::pow(linear,1./2.4)-0.055;
   return static_cast<std::uint8_t>(std::lround(s*255.));
  };
- std::vector<std::uint8_t> pixels(256*4);
- for(int i=0;i<256;++i){
+ // Spiral density waves ride the annulus's angular V coordinate: the
+ // arm phase winds `turns` times from inner to outer along the log
+ // spiral m·φ + turns·ln(r/inner)/ln(outer/inner). Compressional
+ // heating perturbs the local temperature on the crest — flux ∝ T^4
+ // and the blackbody hue follow together, and the integral arm count
+ // keeps the azimuth wrap seamless. spiral=0 keeps the compact
+ // radial-only row.
+ const int rows=spiral>0.f?64:1;
+ std::vector<std::uint8_t> pixels(256*4*rows);
+ const double log_span=std::log(outer/inner);
+ for(int y=0;y<rows;++y)for(int i=0;i<256;++i){
   const double r=inner+(outer-inner)*(i+.5)/256.;
   const double t=kelvin*std::pow(r/inner,-.75);
-  const auto c=blackbody_light_color(std::clamp(t,100.,100000.));
-  const double flux=std::pow(std::clamp(t,100.,100000.)/kelvin,4.);
-  pixels[i*4+0]=srgb(c.x*flux);pixels[i*4+1]=srgb(c.y*flux);pixels[i*4+2]=srgb(c.z*flux);pixels[i*4+3]=255;
+  const double arm=spiral>0.f
+      ?std::cos(2.*pi*(spiral_arms*(y+.5)/rows+
+                       spiral_turns*std::log(r/inner)/log_span))
+      :0.;
+  const double tt=std::clamp(t*(1.+.25*spiral*arm),100.,100000.);
+  const auto c=blackbody_light_color(tt);
+  const double flux=std::pow(tt/kelvin,4.);
+  const auto at=(static_cast<std::size_t>(y)*256+i)*4;
+  pixels[at+0]=srgb(c.x*flux);pixels[at+1]=srgb(c.y*flux);pixels[at+2]=srgb(c.z*flux);pixels[at+3]=255;
  }
  Material3D m;
- m.texture=RgbaImage::create(256,1,std::move(pixels));
+ m.texture=RgbaImage::create(256,rows,std::move(pixels));
  m.ambient=1.f;m.diffuse=0.f; // self-luminous plasma
  m.light_color=blackbody_light_color(kelvin);
  m.linear_light=true;

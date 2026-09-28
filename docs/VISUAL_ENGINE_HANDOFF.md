@@ -130,6 +130,13 @@ cools and dims), emissive-dominant response, double-sided, anisotropic
 filtering, and `orbital_beaming` for the approaching-lane asymmetry. The
 texture is 256×1 — authored for an `annulus:i,o` mesh at matching radii
 (annulus U is radial, so the column maps straight onto the disc). The
+`spiral`/`spiral_arms`/`spiral_turns` parameters grow it to 256×64 and
+bake grand-design density-wave arms into the angular V axis: the phase
+`arms·φ + turns·ln(r/in)/ln(out/in)` winds `turns` times inner→outer
+(integral m-mode keeps the V wrap seamless), and compressional heating
+perturbs the local temperature so crests read hotter and brighter while
+troughs cool — one perturbation drives both the T⁴ flux and the
+blackbody hue. The
 implementation lives in `spherical_material_preparation.cpp` because
 `RgbaImage::create` lives in `stellar_native_image`, which already links
 `stellar_engine` — keep generated-texture factories on that side of the
@@ -528,7 +535,8 @@ UV tiling, atmosphere tint/strength/power/night floor, visible range,
 surface maps (normal/properties/cloud), surface scalars (normal
 strength/relief), cloud deck (opacity/albedo/offset), terminator wrap,
 limb darkening, band shear, orbital beaming, starKelvin photosphere
-preset, accretion disc preset (inner,outer,kelvin,beaming csv),
+preset, accretion disc preset (inner,outer,kelvin,beaming csv with
+optional spiral,arms,turns tail),
 forward-scatter phase, mesh LOD chain (csv specs), LOD switch size and
 LOD fade width.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
@@ -603,9 +611,11 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - `orbital_beaming` is a first-order asymmetry — `orbital_beaming_tint`
   adds a bounded linear doppler color shift (bright lane blueshifts,
   dim lane redshifts); no gravitational redshift or lensing.
-- `accretion_disc_material3d` is an azimuthally uniform thin-disc
-  profile — no spiral fluctuations, no relativistic ray-bending; the
-  annulus radii must be re-stated in the `annulus:i,o` mesh spec.
+- `accretion_disc_material3d` is a thin-disc profile with optional
+  baked spiral density-wave arms (`spiral`/`arms`/`turns` — compressional
+  heating modulates the generated texture; static arms, no live shear or
+  turbulence evolution) — no relativistic ray-bending; the annulus radii
+  must be re-stated in the `annulus:i,o` mesh spec.
 - `volume_scatter` attenuates its limb boost by a coarse 4-tap
   light-path extinction march through the same density field (plus
   occluder-sphere blocking) — no multi-scatter or shadow-map-grade

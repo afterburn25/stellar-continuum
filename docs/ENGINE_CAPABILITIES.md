@@ -374,11 +374,21 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   Implemented in `spherical_material_preparation.cpp` — generated
   textures need `RgbaImage::create` (`stellar_native_image`), which
   cannot be linked back into `stellar_engine` (it depends on it).
-  Authored via `accretion:[i,o,k,b]` doc key + `AccretionDisc`
-  component (codec/spawn/export), runtime + editor `accretion` row.
-  CPU test covers bounds/determinism/profile; GPU probe asserts the
-  radial falloff and the beamed lane asymmetry on a tilted annulus.
-  Remaining: azimuthally uniform texture (no spiral arm fluctuations),
+  Optional `spiral`/`spiral_arms`/`spiral_turns` bake grand-design
+  density-wave arms into a 256×64 texture: the arm phase winds
+  `turns`× along the log spiral `arms·φ + turns·ln(r/in)/ln(out/in)`
+  (integral m-mode keeps the azimuth wrap seamless), and compressional
+  heating perturbs the local temperature `T·(1+0.25·spiral·cos)` so
+  crests read hotter and brighter while troughs cool — flux and hue
+  follow the same perturbation and mean flux is preserved. Zero depth
+  keeps the compact one-row texture. Authored via
+  `accretion:[i,o,k,b[,spiral,arms,turns]]` doc key + `AccretionDisc`
+  component (append-only codec tail/spawn/export), runtime + editor
+  `accretion` CSV row. CPU test covers bounds/determinism/profile plus
+  azimuthal variance and wrap seam; GPU probe asserts the radial
+  falloff, the beamed lane asymmetry, and crest/trough modulation vs a
+  uniform twin on a tilted annulus.
+  Remaining: static baked arms (no live shear or turbulence evolution),
   no relativistic ray-bending, and the radii must be re-stated in the
   `annulus:i,o` mesh spec — the engine does not derive them.
 

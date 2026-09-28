@@ -705,7 +705,7 @@ int main() {
         turret.orbital_beaming = 0.65f;
         turret.orbital_beaming_tint = 0.35f;
         turret.star_kelvin = 5800.0;
-        turret.accretion = {0.3f, 1.f, 12000.f, -0.6f};
+        turret.accretion = {0.3f, 1.f, 12000.f, -0.6f, 0.4f, 3.f, 1.f};
         turret.forward_scatter = 0.4f;
         turret.forward_scatter_back = -0.35f;
         turret.forward_scatter_back_mix = 0.25f;
@@ -915,7 +915,9 @@ int main() {
                   "starphotosphere codec round-trips");
             const auto *rad = restored.get<AccretionDisc>(*re_turret);
             check(rad != nullptr && rad->inner == 0.3f &&
-                      rad->kelvin == 12000.f && rad->beaming == -0.6f,
+                      rad->kelvin == 12000.f && rad->beaming == -0.6f &&
+                      rad->spiral == 0.4f && rad->spiral_arms == 3.f &&
+                      rad->spiral_turns == 1.f,
                   "accretiondisc codec round-trips");
             const auto *rev = restored.get<EmissionVolume>(*re_turret);
             check(rev != nullptr && rev->depth == 0.3f &&
@@ -972,6 +974,9 @@ int main() {
                   out.entities[1].accretion[0] == 0.3f &&
                   out.entities[1].accretion[2] == 12000.f &&
                   out.entities[1].accretion[3] == -0.6f &&
+                  out.entities[1].accretion[4] == 0.4f &&
+                  out.entities[1].accretion[5] == 3.f &&
+                  out.entities[1].accretion[6] == 1.f &&
                   out.entities[1].forward_scatter == 0.4f &&
                   out.entities[1].forward_scatter_back == -0.35f &&
                   out.entities[1].forward_scatter_back_mix == 0.25f &&
