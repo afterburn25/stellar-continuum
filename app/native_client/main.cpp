@@ -1819,11 +1819,15 @@ class NativeCampaign final {
     const bool restore_running=session_->frame().clock().speed()!=StrategicSpeed::Paused;
     if(restore_running)click(center(ui.pause));
     const auto layout=fleet_workspace_.layout(width,height);
+    if(!fleet_workspace_.view())refresh_fleets(true);
     const auto& fleets=fleet_workspace_.view()->own_fleets;
     const auto military=std::ranges::find_if(fleets,[](const auto& fleet){
       return fleet.role==FleetRole::Military&&fleet.current_system_id&&
              fleet.combat_status&&fleet.combat_status->is_armed;});
-    if(military==fleets.end())throw std::runtime_error("Military proof needs an owned armed fixture.");
+    if(military==fleets.end()){
+      std::string dump="rows="+std::to_string(fleets.size());
+      for(const auto& f:fleets)dump+=" ["+std::to_string(f.id)+":role="+std::to_string(static_cast<int>(f.role))+" sys="+(f.current_system_id?std::to_string(*f.current_system_id):"none")+" combat="+(f.combat_status?std::string(f.combat_status->is_armed?"armed":"unarmed"):"none")+"]";
+      throw std::runtime_error("Military proof needs an owned armed fixture. "+dump);}
     const int fleet_id=military->id;
     const auto index=static_cast<std::size_t>(military-fleets.begin());
     click(scroll_fleet_row_into_view(index,width,height));
