@@ -192,7 +192,13 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   inspects the file (seed, build id, ordered commands/checkpoints),
   `--replay-until 20` dumps the canonical tick-20 document to
   `replay-until-20.json`, and `--replay-exit` ends at the verdict with
-  `replay_verified` printed.
+  `replay_verified` printed. Negative path also verified: replaying
+  `rec.rep` against a save whose fleet-0 `LocalTransitPositionX` was
+  mutated fails fast with `Replay divergence ... at tick 42293
+  (save:Galaxy)`, dumps the actual document to
+  `replay-divergence-42293.json`, and leaf-diffs to
+  `Galaxy.Fleets[0].LocalTransitPositionX` in the `.diff.txt` —
+  the section-localizing contract works end-to-end.
 
 ## Known limitations
 
