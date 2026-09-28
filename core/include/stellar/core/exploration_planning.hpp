@@ -8,6 +8,7 @@
 #include <functional>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace stellar::core {
@@ -93,7 +94,9 @@ private:
   build_candidate(ExplorationPlanningWorldView world, const FleetState &fleet,
                   const StellarSystem &system,OperationalReachBatch *batch=nullptr,
                   MissionFuelPolicy fuel_policy=MissionFuelPolicy::ReachDestination,
-                  SurveyOperationsBatch *surveys=nullptr) const;
+                  SurveyOperationsBatch *surveys=nullptr,
+                  const std::unordered_map<int, const StellarSystem *>
+                      *systems_index = nullptr) const;
   bool uses_canonical_reach_{};
   ExplorationReachAssessment operational_reach_;
   SurveyOperationsProfiler survey_profiler_;

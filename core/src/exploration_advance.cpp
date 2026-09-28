@@ -11,6 +11,8 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <unordered_map>
+#include <vector>
 
 namespace stellar::core {
 namespace {
@@ -60,26 +62,82 @@ std::string target_ordinal(int system_id) {
   return wrapped < 0 ? "-" + digits : digits;
 }
 
-const StellarSystem &first_system(std::span<const StellarSystem> systems,
-                                  int id) {
-  const auto found = std::find_if(systems.begin(), systems.end(),
-                                  [=](const auto &value) {
-                                    return value.id == id;
-                                  });
-  if (found == systems.end())
-    throw std::runtime_error("Sequence contains no matching element");
-  return *found;
+// Per-advance lookup tables. The world view's flat system/body/colony spans
+// are immutable for the duration of a step, so the id- and membership-scans
+// the helpers below perform resolve in O(1) instead of O(systems) or
+// O(bodies) per fleet per tick — identical results, just indexed.
+class AdvanceIndex {
+public:
+  explicit AdvanceIndex(std::span<const StellarSystem> systems) {
+    systems_by_id_.reserve(systems.size());
+    for (const auto &system : systems)
+      systems_by_id_.emplace(system.id, &system);
+  }
+
+  const StellarSystem *system(int id) const {
+    const auto found = systems_by_id_.find(id);
+    return found == systems_by_id_.end() ? nullptr : found->second;
+  }
+
+  const StellarSystem &required_system(int id) const {
+    const auto *found = system(id);
+    if (!found)
+      throw std::runtime_error("Sequence contains no matching element");
+    return *found;
+  }
+
+  const std::vector<const PlanetaryBody *> &
+  bodies_for(std::span<const PlanetaryBody> bodies, int system_id) {
+    if (!bodies_ready_) {
+      for (const auto &body : bodies)
+        bodies_by_system_[body.system_id].push_back(&body);
+      bodies_ready_ = true;
+    }
+    static const std::vector<const PlanetaryBody *> empty;
+    const auto found = bodies_by_system_.find(system_id);
+    return found == bodies_by_system_.end() ? empty : found->second;
+  }
+
+  double refueling(std::span<const Colony> colonies, int civilization_id,
+                   int system_id) {
+    if (!refueling_ready_) {
+      for (const auto &colony : colonies) {
+        const double service =
+            colony.kind == SettlementKind::Colony
+                ? 1.0
+                : colony.kind == SettlementKind::ResourceOutpost ? 0.5 : 0.0;
+        auto &value = refueling_[key(colony.civilization_id,
+                                     colony.system_id)];
+        if (service > value)
+          value = service;
+      }
+      refueling_ready_ = true;
+    }
+    const auto found = refueling_.find(key(civilization_id, system_id));
+    return found == refueling_.end() ? 0.0 : found->second;
+  }
+
+private:
+  static std::int64_t key(int civilization_id, int system_id) {
+    return (static_cast<std::int64_t>(civilization_id) << 32) |
+           static_cast<std::uint32_t>(system_id);
+  }
+
+  std::unordered_map<int, const StellarSystem *> systems_by_id_;
+  std::unordered_map<int, std::vector<const PlanetaryBody *>>
+      bodies_by_system_;
+  std::unordered_map<std::int64_t, double> refueling_;
+  bool bodies_ready_{};
+  bool refueling_ready_{};
+};
+
+const StellarSystem &first_system(const AdvanceIndex &index, int id) {
+  return index.required_system(id);
 }
 
-const StellarSystem *first_system_or_null(
-    std::span<const StellarSystem> systems, std::optional<int> id) {
-  if (!id)
-    return nullptr;
-  const auto found = std::find_if(systems.begin(), systems.end(),
-                                  [=](const auto &value) {
-                                    return value.id == *id;
-                                  });
-  return found == systems.end() ? nullptr : &*found;
+const StellarSystem *first_system_or_null(const AdvanceIndex &index,
+                                          std::optional<int> id) {
+  return id ? index.system(*id) : nullptr;
 }
 
 const Civilization &first_civilization(
@@ -97,27 +155,18 @@ bool is_survey_fleet(const FleetState &fleet) {
   return fleet.role == FleetRole::Scout || fleet.role == FleetRole::Science;
 }
 
-double refueling_service_level(ExplorationAdvanceWorldView world,
+double refueling_service_level(AdvanceIndex &index,
+                               ExplorationAdvanceWorldView world,
                                int civilization_id, int system_id) {
-  bool outpost = false;
-  for (const auto &colony : world.colonies) {
-    if (colony.civilization_id != civilization_id ||
-        colony.system_id != system_id)
-      continue;
-    if (colony.kind == SettlementKind::Colony)
-      return 1.0;
-    if (colony.kind == SettlementKind::ResourceOutpost)
-      outpost = true;
-  }
-  return outpost ? 0.5 : 0.0;
+  return index.refueling(world.colonies, civilization_id, system_id);
 }
 
 std::vector<const PlanetaryBody *>
-ordered_bodies(ExplorationAdvanceWorldView world, int system_id) {
-  std::vector<const PlanetaryBody *> result;
-  for (const auto &body : world.bodies)
-    if (body.system_id == system_id)
-      result.push_back(&body);
+ordered_bodies(AdvanceIndex &index, ExplorationAdvanceWorldView world,
+               int system_id) {
+  const auto &matching = index.bodies_for(world.bodies, system_id);
+  std::vector<const PlanetaryBody *> result(matching.begin(),
+                                            matching.end());
   std::stable_sort(result.begin(), result.end(), [](const auto *first,
                                                     const auto *second) {
     return first->id < second->id;
@@ -125,10 +174,11 @@ ordered_bodies(ExplorationAdvanceWorldView world, int system_id) {
   return result;
 }
 
-void emit_reconnaissance_signatures(ExplorationAdvanceWorldView world,
+void emit_reconnaissance_signatures(AdvanceIndex &index,
+                                    ExplorationAdvanceWorldView world,
                                     const FleetState &fleet, int system_id,
                                     std::vector<ExplorationEvent> &events) {
-  for (const auto *body : ordered_bodies(world, system_id)) {
+  for (const auto *body : ordered_bodies(index, world, system_id)) {
     if (body->has_rare_resource)
       events.push_back({ExplorationEventType::ResourceSignatureDetected,
                         fleet.civilization_id, fleet.id, system_id,
@@ -154,10 +204,11 @@ void emit_reconnaissance_signatures(ExplorationAdvanceWorldView world,
   }
 }
 
-void emit_confirmed_discoveries(ExplorationAdvanceWorldView world,
+void emit_confirmed_discoveries(AdvanceIndex &index,
+                                ExplorationAdvanceWorldView world,
                                 const FleetState &fleet, int system_id,
                                 std::vector<ExplorationEvent> &events) {
-  for (const auto *body : ordered_bodies(world, system_id)) {
+  for (const auto *body : ordered_bodies(index, world, system_id)) {
     if (body->has_anomaly)
       events.push_back({ExplorationEventType::AnomalySurveyed,
                         fleet.civilization_id, fleet.id, system_id,
@@ -223,11 +274,12 @@ std::string hazard_name(SurveyOperationalHazard hazard) {
   return std::to_string(static_cast<int>(hazard));
 }
 
-bool process_local_survey(ExplorationAdvanceWorldView world, FleetState &fleet,
+bool process_local_survey(AdvanceIndex &index,
+                          ExplorationAdvanceWorldView world, FleetState &fleet,
                           int system_id, double simulation_delta,
-                          const SurveyOperationsProfiler &profiler,
+                          SurveyOperationsBatch &surveys,
                           std::vector<ExplorationEvent> &events) {
-  const auto& location=first_system(world.systems,system_id);
+  const auto& location=first_system(index,system_id);
   const auto scan_effort=phenomenon_context(world.phenomena,location.position.x,location.position.y,system_id).effects.scanning;
   simulation_delta/=scan_effort;
   if (fleet.role == FleetRole::Scout) {
@@ -248,8 +300,8 @@ bool process_local_survey(ExplorationAdvanceWorldView world, FleetState &fleet,
             fleet.civilization_id, system_id,
             ExplorationSimulation::scout_reconnaissance_progress))
       return false;
-    const auto &system = first_system(world.systems, system_id);
-    const auto profile = profiler.build(world.systems, world.bodies, system_id);
+    const auto &system = first_system(index, system_id);
+    const auto profile = surveys.build(system_id);
     events.push_back({
         ExplorationEventType::SystemReconnoitered, fleet.civilization_id,
         fleet.id, system_id,
@@ -259,7 +311,7 @@ bool process_local_survey(ExplorationAdvanceWorldView world, FleetState &fleet,
                                         0, 1) +
             " days (" + hazard_name(profile.operational_hazard) +
             " survey conditions)."});
-    emit_reconnaissance_signatures(world, fleet, system_id, events);
+    emit_reconnaissance_signatures(index, world, fleet, system_id, events);
     return true;
   }
 
@@ -271,7 +323,7 @@ bool process_local_survey(ExplorationAdvanceWorldView world, FleetState &fleet,
       world.knowledge.system_survey_level(fleet.civilization_id, system_id);
   const auto previous_progress =
       world.knowledge.system_survey_progress(fleet.civilization_id, system_id);
-  const auto profile = profiler.build(world.systems, world.bodies, system_id);
+  const auto profile = surveys.build(system_id);
   const auto completed = world.knowledge.advance_system_survey(
       fleet.civilization_id, system_id,
       profile.progress_per_day() * simulation_delta);
@@ -281,7 +333,7 @@ bool process_local_survey(ExplorationAdvanceWorldView world, FleetState &fleet,
       world.knowledge.system_survey_level(fleet.civilization_id, system_id);
   if (current_progress <= previous_progress + 0.0000001)
     return false;
-  const auto &system = first_system(world.systems, system_id);
+  const auto &system = first_system(index, system_id);
   if (previous_level < SystemSurveyLevel::partially_surveyed) {
     events.push_back({ExplorationEventType::SystemSurveyStarted,
                       fleet.civilization_id, fleet.id, system_id,
@@ -291,23 +343,23 @@ bool process_local_survey(ExplorationAdvanceWorldView world, FleetState &fleet,
                               profile.estimated_science_survey_days*scan_effort, 0, 1) +
                           " days."});
     if (current_level == SystemSurveyLevel::partially_surveyed)
-      emit_reconnaissance_signatures(world, fleet, system_id, events);
+      emit_reconnaissance_signatures(index, world, fleet, system_id, events);
   }
   if (completed) {
     events.push_back({ExplorationEventType::SystemSurveyed,
                       fleet.civilization_id, fleet.id, system_id,
                       fleet.name + " completed a detailed survey of " +
                           system.name + "."});
-    emit_confirmed_discoveries(world, fleet, system_id, events);
+    emit_confirmed_discoveries(index, world, fleet, system_id, events);
   }
   return true;
 }
 
-bool handle_inbound(ExplorationAdvanceWorldView world, FleetState &fleet,
-                    const StellarSystem &target,
+bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
+                    FleetState &fleet, const StellarSystem &target,
                     std::vector<ExplorationEvent> &events) {
   const auto service = refueling_service_level(
-      world, fleet.civilization_id, target.id);
+      index, world, fleet.civilization_id, target.id);
   if (service > 0)
     fleet.fuel_remaining_light_years = max_preserving_nan(
         fleet.fuel_remaining_light_years,
@@ -411,6 +463,8 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
     return {};
 
   std::vector<ExplorationEvent> events;
+  AdvanceIndex index(world.systems);
+  SurveyOperationsBatch surveys(world.systems, world.bodies);
   for (auto &fleet : world.fleets) {
     if (!fleet.is_active)
       continue;
@@ -422,7 +476,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
       continue;
     if (fleet.current_system_id) {
       const auto service = refueling_service_level(
-          world, fleet.civilization_id, *fleet.current_system_id);
+          index, world, fleet.civilization_id, *fleet.current_system_id);
       if (service > 0)
         fleet.fuel_remaining_light_years = max_preserving_nan(
             fleet.fuel_remaining_light_years,
@@ -435,8 +489,8 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
     if (fleet.transit_phase == FleetTransitPhase::None &&
         !fleet.destination_system_id && is_survey_fleet(fleet) &&
         fleet.current_system_id &&
-        process_local_survey(world, fleet, *fleet.current_system_id,
-                             simulation_delta * capacity, survey_profiler_,
+        process_local_survey(index, world, fleet, *fleet.current_system_id,
+                             simulation_delta * capacity, surveys,
                              events)) {
       detect_civilization_contacts(world, fleet, events);
       continue;
@@ -455,7 +509,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
                            selection.candidate->system_id,
                            selection.candidate->reach);
       else if(ai_fuel_policy_==MissionFuelPolicy::RetainReturnToService&&fleet.current_system_id&&
-          refueling_service_level(world,fleet.civilization_id,*fleet.current_system_id)<=0){
+          refueling_service_level(index,world,fleet.civilization_id,*fleet.current_system_id)<=0){
         const auto recovery=request_civilian_fleet_return(
             {world.systems,world.colonies,world.fleets,world.lanes},fleet.civilization_id,fleet.id);
         // Do not manufacture fuel for old saves that are already stranded.
@@ -495,12 +549,12 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
           !fleet.planned_route_system_ids.empty()
               ? fleet.planned_route_system_ids.front()
               : *fleet.destination_system_id;
-      const auto &target = first_system(world.systems, movement_target_id);
+      const auto &target = first_system(index, movement_target_id);
       if (fleet.transit_phase == FleetTransitPhase::None) {
         if (!fleet.current_system_id)
           break;
         const auto &origin =
-            first_system(world.systems, *fleet.current_system_id);
+            first_system(index, *fleet.current_system_id);
         fleet.position = chart_position(origin);
         fleet.transit_origin_system_id = origin.id;
         fleet.transit_target_system_id = target.id;
@@ -562,7 +616,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
       }
 
       const auto *physical_origin = first_system_or_null(
-          world.systems, fleet.transit_origin_system_id);
+          index, fleet.transit_origin_system_id);
       auto full_distance =
           physical_origin
               ? distance_light_years(physical_origin->position, target.position)
@@ -620,12 +674,12 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
                                  ? fleet.planned_route_system_ids[1]
                                  : *fleet.destination_system_id;
         final_target = fleet_gate_towards(
-            chart_position(first_system(world.systems, next_id)),
+            chart_position(first_system(index, next_id)),
             chart_position(target));
       }
       begin_fleet_local_transit(fleet, FleetTransitPhase::LocalArrival, inbound,
                                 final_target,target.stellar_object?&*target.stellar_object:nullptr);
-      if (handle_inbound(world, fleet, target, events))
+      if (handle_inbound(index, world, fleet, target, events))
         break;
       if (fleet.hold_requested)
         break;

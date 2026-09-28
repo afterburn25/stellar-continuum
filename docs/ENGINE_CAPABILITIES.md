@@ -64,6 +64,52 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Exploration advance indexing (2026-09-28)
+
+- Purpose: remove quadratic work from the per-tick exploration phase. The
+  transit loop resolved `first_system` by linear scan over the whole galaxy
+  per fleet per hop, `SurveyOperationsProfiler::build` rescanned the full
+  body catalog for every surveying fleet every tick, and mission planning
+  ran a system lookup per candidate — late-game cost scaled as
+  O(fleets × systems) and O(fleets × bodies) inside the hottest phase of
+  the step (exploration dominated mean step time at canonical scale).
+- Modules: `core/src/exploration_advance.cpp` — a step-local `AdvanceIndex`
+  (system id → `const StellarSystem *`, lazily system id → ordered body
+  pointers, lazily (civilization, system) → refueling service level) is
+  built once per `ExplorationSimulation::advance` and threaded through the
+  transit, arrival, survey and refueling helpers; one
+  `SurveyOperationsBatch` per advance replaces per-fleet profiler calls
+  (the batch lazily prepares all profiles on first query — identical
+  `finish` math and `Unknown system` errors).
+  `core/src/exploration_planning.cpp` — `build_plan` constructs one
+  id→system index per pass and `build_candidate` accepts it explicitly
+  (falling back to the span scan when absent).
+  `core/src/fleet_transit.cpp` — new resolved-pointer overload
+  `interstellar_distance_from_fleet(origin, waypoint, fleet, target)`;
+  the original span overload now resolves origin/waypoint once and
+  delegates, preserving its public behavior.
+- Semantics: unchanged by construction — `emplace` keeps the first entry
+  per id (same as `find_if` first-match), body lists preserve source order
+  before the existing stable id sort, refueling is the per-pair max of the
+  same service table (Colony 1.0 / ResourceOutpost 0.5 / else 0), and the
+  waypoint term still applies only in `InterstellarWarp`. Fleet mutation
+  order is untouched and `detect_civilization_contacts` stays a linear
+  scan because fleet positions mutate mid-step.
+- Save/performance impact: none — the index lives for one `advance` call
+  and persists nothing. Complexity moves from O(fleets × systems +
+  fleets × bodies) toward O(systems + bodies + fleets + candidates).
+- Tests: `exploration_advance_parity`, `exploration_planning_parity`,
+  `exploration_orders_parity`, `exploration_fuel_safety`,
+  `fleet_transit_parity`, `operational_reach_batch`, `survey_batch`,
+  `survey_batch_50000`, `survey_operations_parity`, `lane_network_parity`,
+  `fleet_reach_parity`, `route_policy`, `galaxy_phenomena` — all green;
+  organic campaign hash parity verified against the pre-optimization run.
+- Limitations: the per-plan index is rebuilt for each idle survey fleet's
+  `build_plan` call (still O(systems) per idle fleet per tick);
+  contact detection remains O(fleets × contacts) by design; route-tree
+  caching already covered the dominant planner cost so gains concentrate
+  in transit/survey bookkeeping.
+
 ## Autonomous warfare coordination (2026-09-28)
 
 - Purpose: close the organic-war gap — diplomacy recorded first contacts and

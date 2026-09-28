@@ -95,7 +95,6 @@ private:
               int destination_system_id, bool require_survey_work) const;
   ExplorationMissionPlanner mission_planner_;
   MissionFuelPolicy ai_fuel_policy_;
-  SurveyOperationsProfiler survey_profiler_;
 };
 
 } // namespace stellar::core

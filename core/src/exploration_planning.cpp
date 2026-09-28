@@ -6,6 +6,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace stellar::core {
@@ -129,10 +130,22 @@ MissionReachAssessment ExplorationMissionPlanner::assess_operational_reach(
                             mission_kind(fleet.role));
 }
 
+namespace {
+const StellarSystem *
+indexed_system(const std::unordered_map<int, const StellarSystem *> &index,
+               std::optional<int> id) {
+  if (!id)
+    return nullptr;
+  const auto found = index.find(*id);
+  return found == index.end() ? nullptr : found->second;
+}
+} // namespace
+
 ExplorationMissionCandidate
 ExplorationMissionPlanner::build_candidate(ExplorationPlanningWorldView world,
                                            const FleetState &fleet,
-                                           const StellarSystem &system,OperationalReachBatch *batch,MissionFuelPolicy fuel_policy,SurveyOperationsBatch *surveys) const {
+                                           const StellarSystem &system,OperationalReachBatch *batch,MissionFuelPolicy fuel_policy,SurveyOperationsBatch *surveys,
+                                           const std::unordered_map<int, const StellarSystem *> *systems_index) const {
   const auto level =
       world.knowledge.system_survey_level(fleet.civilization_id, system.id);
   const auto progress =
@@ -148,7 +161,23 @@ ExplorationMissionPlanner::build_candidate(ExplorationPlanningWorldView world,
         std::isnan(remaining) ? remaining : std::max(0.0, remaining);
   }
   const auto distance =
-      interstellar_distance_from_fleet(world.systems, fleet, system);
+      systems_index
+          ? interstellar_distance_from_fleet(
+                indexed_system(*systems_index,
+                               fleet.transit_phase ==
+                                       FleetTransitPhase::InterstellarWarp
+                                   ? fleet.transit_origin_system_id
+                                   : fleet.current_system_id),
+                indexed_system(
+                    *systems_index,
+                    fleet.transit_phase == FleetTransitPhase::InterstellarWarp
+                        ? (!fleet.planned_route_system_ids.empty()
+                               ? std::optional<int>(
+                                     fleet.planned_route_system_ids.front())
+                               : fleet.destination_system_id)
+                        : std::nullopt),
+                fleet, system)
+          : interstellar_distance_from_fleet(world.systems, fleet, system);
   auto reach = batch?batch->assess(fleet,system.id,mission_kind(fleet.role),fuel_policy):assess_operational_reach(world, fleet, system.id);
   const auto priority = survey_priority(fleet.role, level);
   return {system.id,
@@ -186,11 +215,16 @@ ExplorationMissionPlanner::build_plan(ExplorationPlanningWorldView world,
 
   std::vector<ExplorationMissionCandidate> candidates;
   SurveyOperationsBatch surveys(world.systems,world.bodies);
+  // One id->system index per plan instead of a linear scan per candidate.
+  std::unordered_map<int, const StellarSystem *> systems_index;
+  systems_index.reserve(world.systems.size());
+  for (const auto &system : world.systems)
+    systems_index.emplace(system.id, &system);
   std::optional<OperationalReachBatch> batch;
   if(uses_canonical_reach_)batch.emplace(OperationalReachWorldView{world.systems,world.colonies,world.lanes},fleet->civilization_id);
   for (const auto &system : world.systems)
     if (needs_survey_work(world.knowledge, *fleet, system.id))
-      candidates.push_back(build_candidate(world, *fleet, system,batch?&*batch:nullptr,fuel_policy,&surveys));
+      candidates.push_back(build_candidate(world, *fleet, system,batch?&*batch:nullptr,fuel_policy,&surveys,&systems_index));
   std::stable_sort(
       candidates.begin(), candidates.end(),
       [](const auto &left, const auto &right) {
