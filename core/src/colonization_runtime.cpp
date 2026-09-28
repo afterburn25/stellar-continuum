@@ -11,8 +11,8 @@
 #include <cmath>
 #include <format>
 #include <limits>
+#include <optional>
 #include <stdexcept>
-#include <unordered_map>
 
 namespace stellar::core {
 namespace {
@@ -233,6 +233,10 @@ ColonizationSimulation::advance(ColonizationWorldView world,
         "(Parameter 'simulationDays')");
   if (simulation_days == 0)
     return {};
+  // Built lazily on the first idle colony ship: the catalog index groups
+  // bodies by system and carries the id lookups the planner would otherwise
+  // rebuild on every call.
+  std::optional<SettlementBodiesIndex> bodies_index;
   std::vector<ColonizationEvent> events;
   for (auto &fleet : world.fleets) {
     if (!fleet.is_active || fleet.role != FleetRole::Colony ||
@@ -377,21 +381,33 @@ ColonizationSimulation::advance(ColonizationWorldView world,
     }
     if (!fleet.destination_system_id && civilization_uses_ai(civilization,world.control) &&
         fleet.embarked_population_millions > 0) {
-      std::unordered_map<int, const StellarSystem *> systems;
-      for (const auto &system : world.systems)
-        if (!systems.emplace(system.id, &system).second)
-          throw std::invalid_argument(
-              "An item with the same key has already been added. Key: " +
-              std::to_string(system.id));
-      std::unordered_map<int, const PlanetaryBody *> bodies;
-      for (const auto &candidate : world.bodies)
-        if (!bodies.emplace(candidate.id, &candidate).second)
-          throw std::invalid_argument(
-              "An item with the same key has already been added. Key: " +
-              std::to_string(candidate.id));
+      if (!bodies_index)
+        bodies_index =
+            build_settlement_bodies_index(world.systems, world.bodies);
+      const auto &systems = bodies_index->systems_by_id;
+      const auto &bodies = bodies_index->by_id;
+      const auto lookup_system = [&](std::optional<int> id)
+          -> const StellarSystem * {
+        if (!id)
+          return nullptr;
+        const auto found = systems.find(*id);
+        return found == systems.end() ? nullptr : found->second;
+      };
+      const auto *fleet_origin = lookup_system(
+          fleet.transit_phase == FleetTransitPhase::InterstellarWarp
+              ? fleet.transit_origin_system_id
+              : fleet.current_system_id);
+      const auto *fleet_waypoint =
+          fleet.transit_phase == FleetTransitPhase::InterstellarWarp
+              ? lookup_system(!fleet.planned_route_system_ids.empty()
+                                  ? std::optional<int>(
+                                        fleet.planned_route_system_ids.front())
+                                  : fleet.destination_system_id)
+              : nullptr;
       const auto plan = opportunity_planner_.build_plan(
           world.planning(), fleet.id,
-          ColonizationOpportunityPlanner::hard_maximum_candidates);
+          ColonizationOpportunityPlanner::hard_maximum_candidates,
+          &*bodies_index);
       const ColonizationOpportunityCandidate *best = nullptr;
       double best_score{};
       for (const auto &candidate : plan.candidates) {
@@ -406,8 +422,8 @@ ColonizationSimulation::advance(ColonizationWorldView world,
           const float dy = fleet.position.y - system.position.y;
           distance = static_cast<double>(dx * dx + dy * dy);
         } else {
-          const auto physical =
-              interstellar_distance_from_fleet(world.systems, fleet, system);
+          const auto physical = interstellar_distance_from_fleet(
+              fleet_origin, fleet_waypoint, fleet, system);
           distance = physical * physical;
         }
         const auto value =

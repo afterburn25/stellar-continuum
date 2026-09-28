@@ -176,7 +176,8 @@ ColonizationOpportunityPlanner::ColonizationOpportunityPlanner(
     : reach_(std::move(r)) {}
 ColonizationOpportunityPlan
 ColonizationOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
-                                           int id, int maximum) const {
+                                           int id, int maximum,
+                                           const SettlementBodiesIndex *bodies_index) const {
   maximum = std::clamp(maximum, 1, 64);
   const auto *f = colony_fleet(w, id);
   if (!f)
@@ -197,11 +198,20 @@ ColonizationOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
             "",    0,
             false, "The colony ship's passenger species identity is invalid.",
             {}};
-  const auto systems = unique(w.systems);
-  const auto bodies = unique(w.bodies);
-  (void)bodies;
+  // The unique-id maps are rebuilt per call unless the caller shares the
+  // per-step catalog index — same contents, built once.
+  std::unordered_map<int, const StellarSystem *> owned_systems;
+  std::unordered_map<int, const PlanetaryBody *> owned_bodies;
+  if (!bodies_index) {
+    owned_systems = unique(w.systems);
+    owned_bodies = unique(w.bodies);
+  }
+  const auto &systems =
+      bodies_index ? bodies_index->systems_by_id : owned_systems;
+  const auto &bodies = bodies_index ? bodies_index->by_id : owned_bodies;
   auto views = build_known_suitability_for_species(w.knowledge_view(),
-                                                   f->civilization_id, sp->id);
+                                                   f->civilization_id, sp->id,
+                                                   bodies_index);
   auto reservations =
       build_friendly_colony_mission_reservations(w.knowledge_view(), *f);
   std::optional<OperationalReachBatch> batch;

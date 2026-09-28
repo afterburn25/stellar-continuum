@@ -106,9 +106,14 @@ public:
   static constexpr int default_maximum_candidates = 32,
                        hard_maximum_candidates = 64;
   explicit ColonizationOpportunityPlanner(SettlementReachAssessment reach = {});
+  // bodies_index (optional) is a caller-shared catalog grouping produced by
+  // build_settlement_bodies_index — repeated plans then reuse its id lookups
+  // instead of rebuilding them per call and only scan the civilization's
+  // surveyed systems instead of the whole body catalog.
   ColonizationOpportunityPlan
   build_plan(SettlementPlanningWorldView, int,
-             int maximum_candidates = default_maximum_candidates) const;
+             int maximum_candidates = default_maximum_candidates,
+             const SettlementBodiesIndex *bodies_index = nullptr) const;
   ColonizationOrderAssessment assess_order(SettlementPlanningWorldView, int,
                                            int, int) const;
   MissionReachAssessment assess_operational_reach(SettlementPlanningWorldView,

@@ -64,6 +64,46 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Colonization settlement catalog indexing (2026-09-28)
+
+- Purpose: remove per-call catalog scans from the colonization phase. Every
+  idle colony ship ran `ColonizationOpportunityPlanner::build_plan` every
+  tick, and each call rebuilt `unique()` hash maps over all systems and
+  bodies twice (planner + caller score pass) plus a full body-catalog scan
+  in `build_known_suitability_for_species` — ~13,600 planning calls at
+  ~4.5 ms each dominated the phase at canonical scale.
+- Modules: `core/include/stellar/core/settlement_knowledge.hpp` /
+  `core/src/settlement_knowledge.cpp` — new `SettlementBodiesIndex`
+  (system id → `const StellarSystem *`, body id → `const PlanetaryBody *`,
+  system id → ordered body pointers) built by
+  `build_settlement_bodies_index(systems, bodies)`; it throws the same
+  duplicate-key `invalid_argument` in the same check order (systems then
+  bodies) as the maps it replaces. `build_known_suitability_for_species`
+  gains an optional index parameter: with it, the suitability gather walks
+  the observer's surveyed-system knowledge and looks bodies up by system
+  instead of scanning the full catalog; without it the original span scan
+  is preserved, and both paths emit the same (system id, body id) ordering.
+  `core/src/settlement_planning.cpp` —
+  `ColonizationOpportunityPlanner::build_plan` accepts the optional index
+  (default `nullptr` keeps the previous per-call `unique()` behavior for
+  one-shot consumers) and forwards it to the suitability gather.
+  `core/src/colonization_runtime.cpp` — `ColonizationSimulation::advance`
+  lazily constructs one index per step on the first idle colony ship,
+  shares it with `build_plan`, and uses its id lookups plus the
+  resolved-pointer `interstellar_distance_from_fleet` overload in the
+  best-candidate score pass.
+- Semantics: unchanged — duplicate-id errors surface identically, body
+  lists preserve catalog order within each system before the existing
+  stable (system id, body id) sort, and one-shot planner entry points
+  (`get_opportunity_plan`, order assessment) keep the original per-call
+  path.
+- Save/performance impact: none persisted — the index lives for one
+  `advance` call. Instrumented profile (2500 systems, 137 simulated years,
+  seed 8374837): planning calls drop from ~4.5 ms to ~0.65 ms each, the
+  colonization phase from ~6.8 ms to 1.1 ms mean (~6×), and total step
+  time to 16.7 ms mean; the campaign's final state hash is bit-identical
+  to the pre-optimization run.
+
 ## Exploration advance indexing (2026-09-28)
 
 - Purpose: remove quadratic work from the per-tick exploration phase. The
