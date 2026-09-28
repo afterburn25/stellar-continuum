@@ -342,7 +342,7 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
     if(selected_body_id_==body.body_id)out.world.emplace_back(Circle{{p.x,p.y},radius+4,{122,230,190,90}});
     const Text label{{},body.label,text,15};const auto measured=text_measurer_?text_measurer_(label):TextExtent{static_cast<int>(body.label.size()*7u),19};if(measured.width<0||measured.height<0)throw std::runtime_error("Renderer returned invalid system label bounds.");const auto label_width=static_cast<float>(measured.width),label_height=static_cast<float>(measured.height);std::array<UiRect,4> placements{};for(int row=0;row<4;++row)placements[row]={p.x-label_width*.5f,p.y+footprint+5.f+row*(label_height+4.f),label_width,label_height};body_labels.push_back(BodyLabelCandidate{body.body_id,selected_body_id_==body.body_id,body.label,placements});}
   if(!planet_instances.empty()){Camera3D camera;camera.projection=Projection3D::Orthographic;camera.position={0,0,50000};camera.orthographic_height=field.height;camera.near_plane=.1f;camera.far_plane=100000;
-    Scene3DView view{Scene3D::create(camera,std::move(planet_instances)),field};
+    Scene3DView view{Scene3D::create(camera,std::move(planet_instances),{.42f,.2f,.87f},{},std::nullopt,scene_environment_),field};
     view.options.quality=scene3d_quality_;view.options.exposure=1.1f;view.options.bloom_strength=.28f;view.options.bloom_threshold=.95f;
     view.options.time=static_cast<float>(std::fmod(std::max(0.,visual_seconds_),512.));
     out.world.emplace_back(std::move(view));}

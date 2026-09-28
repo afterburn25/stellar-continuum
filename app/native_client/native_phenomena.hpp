@@ -32,6 +32,9 @@ public:
   void inspect(DrawList&,const Camera&,Point,int,int,const std::set<std::uint32_t>& surveyed,bool developer,bool pinned=false)const;
   const stellar::core::SystemPhenomenonContext& context(int,double,double);
   const stellar::core::GalaxyPhenomena* field()const{return field_?&*field_:nullptr;}
+  // Composited local nebula field for the last append_system context —
+  // usable as the system Scene3D environment slot for IBL-tinted worlds.
+  const std::shared_ptr<const RgbaImage>& local_environment()const noexcept{return local_;}
   bool ready()const{return ready_;}
   std::size_t cache_bytes()const;
 private:

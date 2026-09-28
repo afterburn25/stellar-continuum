@@ -250,6 +250,10 @@ inline void append_instances(std::vector<MeshInstance3D>& out,const PlanetAppear
     // Scalar factor multiplies the packed map's authored roughness;
     // metallic stays 0 — every world shades as a dielectric.
     pbr.roughness=giant?.8f:.95f;
+    // Opt in to the scene environment slot: when the host binds a local
+    // nebula composite, surrounding clouds wash the diffuse/specular IBL
+    // response. Restrained so the star key light stays dominant.
+    pbr.environment_strength=.32f;
     if(maps.night&&inhabited){pbr.emissive=maps.night;pbr.emissive_strength=1.35f;pbr.night_emissive=1.f;}
     material.pbr=pbr;
   }

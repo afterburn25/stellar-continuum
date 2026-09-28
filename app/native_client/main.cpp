@@ -7881,6 +7881,7 @@ class NativeCampaign final {
       const auto sid=*system_workspace_.system_id();const auto system=std::ranges::find(world.systems,sid,&StellarSystem::id);
       system_background_.append(out,sid,width,height,starfield_quality(),starfield_density());
       if(system!=world.systems.end())phenomena_.append_system(out,sid,system->position.x,system->position.y,width,height,system_workspace_.viewport()?system_workspace_.viewport()->scale:1.,phenomena_options(sid));
+      system_workspace_.set_scene_environment(phenomena_.local_environment());
       system_workspace_.set_simulation_days(session_->frame().clock().simulation_days());
       system_workspace_.set_motion_running(session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!world.active_combat_encounter||world.active_combat_encounter->reconciled));
       system_workspace_.render(out,width,height,false);
