@@ -129,6 +129,31 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
 - Fixture hazard recorded for future runs: stale `.bak`/`.integrity`
   sidecars next to `--save-path` make the loader silently recover the
   previous save — clean sidecars when swapping fixture paths.
+- Final coverage sweep (tip `497e219e` binary): every native smoke and
+  check flag in the client is now exercised green. Newly verified:
+  `--fleet-smoke` and `--ship-art-smoke` on `work/de-ship.json`;
+  `--galaxy-art-smoke` at 2560×1440; `--fresh-progression-smoke` and
+  `--fresh-progression-reload-smoke` at seed 115501 (6568.5 simulated
+  days, save roundtrip); `--navigation-smoke` (workspace switches,
+  keyboard playback, canonical unchanged); `--settlement-smoke`,
+  `--settlement-reload-smoke`, `--settlement-completion-smoke` and
+  `--settlement-founded-smoke` (authorized→founded colony chain on a
+  `tools/author_settlement_save.py` fixture grafted from
+  `populated-vessel.player17.json`); `--settlement-preparation-smoke` on
+  `work/en-settle-prep.json`; `--colony-smoke` on
+  `work/founded.player17.json`; `--new-game-smoke` and
+  `--restart-smoke` on fresh seed-115501 campaigns;
+  `--diplomacy-reload-smoke` on `work/de-diplo-r6.json`;
+  `--first-exploration-smoke`/`--first-exploration-paused-smoke`/
+  `--first-exploration-resume-smoke` (depart→resume chained through the
+  smoke autosave; `work/fed-run.json`, `work/expl-paused.json`);
+  `--first-survey-smoke`/`--first-survey-paused-smoke`/
+  `--first-survey-resume-smoke` (`work/survey-depart.json`,
+  `work/svr-run.json`); `--research-smoke`, `--shipyard-smoke`,
+  `--construction-smoke`, `--quick-find-smoke` on `work/de-ship.json`;
+  `--inspection-check`, `--logistics-check`, `--economy-check` under
+  `--smoke`; and `--campaign-profile --profile-frames 120`
+  (16.9 ms steady-state frame mean at 1920×1080).
 
 ## Known limitations
 
