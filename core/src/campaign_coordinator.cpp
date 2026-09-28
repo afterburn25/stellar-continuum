@@ -496,6 +496,7 @@ GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
       construction_capability_(std::move(other.construction_capability_)),
       shipbuilding_capability_(std::move(other.shipbuilding_capability_)),
       strategic_(std::move(other.strategic_)),
+      automation_(std::move(other.automation_)),
       combat_(std::move(other.combat_)),
       subsystems_(std::move(other.subsystems_)) {
   // Rebind phase tasks to this object, then carry the source executor's
@@ -519,6 +520,7 @@ GalaxySimulationStepCoordinator::operator=(
   construction_capability_ = std::move(other.construction_capability_);
   shipbuilding_capability_ = std::move(other.shipbuilding_capability_);
   strategic_ = std::move(other.strategic_);
+  automation_ = std::move(other.automation_);
   combat_ = std::move(other.combat_);
   subsystems_ = std::move(other.subsystems_);
   const auto carried = other.executor_.capture_state();
@@ -561,9 +563,16 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          timing.finish(performance_[1]);
        },
        .domain = "strategic_ai"},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
+         // Configured automation runs first so its placements feed the
+         // same tick's industry allocation and construction budgets.
+         automation_.advance(
+             construction_world(campaign, construction_capability_),
+             phase_days);
          ensure_automatic_construction_orders(
              construction_world(campaign, construction_capability_));
          ensure_automatic_ship_orders(shipbuilding_world(
@@ -843,6 +852,16 @@ GalaxySimulationStepCoordinator::strategic_runtime() noexcept {
 const CivilizationStrategicRuntimeCoordinator &
 GalaxySimulationStepCoordinator::strategic_runtime() const noexcept {
   return strategic_;
+}
+
+CivilizationAutomationCoordinator &
+GalaxySimulationStepCoordinator::automation() noexcept {
+  return automation_;
+}
+
+const CivilizationAutomationCoordinator &
+GalaxySimulationStepCoordinator::automation() const noexcept {
+  return automation_;
 }
 
 CombatSimulation &

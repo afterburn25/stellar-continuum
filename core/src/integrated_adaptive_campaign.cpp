@@ -129,13 +129,15 @@ std::vector<TravelingCmeLaunch> IntegratedAdaptiveCampaignRuntime::advance_stell
 }
 
 CampaignRuntimeContinuation IntegratedAdaptiveCampaignRuntime::continuation() const {
-  return {storage_->core.strategic_runtime().snapshot(),storage_->diplomacy_runtime.schedule()};
+  return {storage_->core.strategic_runtime().snapshot(),storage_->diplomacy_runtime.schedule(),
+          storage_->core.automation().capture_state()};
 }
 void IntegratedAdaptiveCampaignRuntime::restore_continuation(
     const CampaignRuntimeContinuation &state,double day){
   validate_campaign_runtime_continuation(state,storage_->world.campaign(),day);
   storage_->core.strategic_runtime().restore(state.strategic);
   storage_->diplomacy_runtime.restore_schedule(state.diplomacy);
+  storage_->core.automation().restore_state(state.automation);
 }
 void IntegratedAdaptiveCampaignRuntime::set_profiling_enabled(bool enabled) noexcept {
   storage_->profiling_enabled=enabled;storage_->core.set_profiling_enabled(enabled);

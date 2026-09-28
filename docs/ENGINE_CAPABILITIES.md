@@ -41,6 +41,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Economy/production | IMPLEMENTED BUT NEEDS POLISH | Core economy/industry/construction/shipbuilding/biology | economy/production parity, 5k colony scale | Not a generic resource graph; combined late-game load unverified |
 | Research | IMPLEMENTED BUT NEEDS POLISH | Core `adaptive_research_*` catalogs/services/snapshots | native adaptive research parity family | Existing domain runtime, not proof that every advanced research design is fully exposed in UI |
 | Strategic AI | PARTIALLY IMPLEMENTED | Core strategic intent/planning and fleet intelligence | strategic/campaign/exploration tests | Correctness coverage does not demonstrate effective complete long-game AI |
+| Civilization automation | PARTIALLY IMPLEMENTED | Engine `automation.hpp` (`AutomationController`: Off/Advisory/Assisted/Automatic domain modes, policy+constraint knobs, operator override locks, bounded explainable journal, hysteresis/cooldown shared with `StrategicMind`, sorted capture/restore); Core `civilization_automation.hpp` (`CivilizationAutomationCoordinator` — per-civ controllers, colonies + player construction domains, canonical assess→commit surface/industry commands, driven by the `automatic_orders` phase before the legacy AI order helpers, opt-in defaults preserve pre-automation parity); runtime continuation + developer-save JSON carry policies/locks/incumbents/cooldowns/journals | `automation`, `civilization_automation`; campaign parity suite unchanged under default-off | Colony placements only (repair/enable/hub/placement + empire project queue); economy/logistics/research/fleet/diplomacy automation, scripted-event runtime, player-facing automation UI, and save-path coverage beyond the developer continuation envelope remain open |
 | Diplomacy | IMPLEMENTED BUT NEEDS POLISH | Core diplomacy lifecycle/runtime/observer commands; App workspace | diplomacy parity and native controller/workspace | Current game feature set, not all design ambitions |
 | Combat | PARTIALLY IMPLEMENTED | Core combat/massive combat state and 3D motion; App battle workspace | combat/massive persistence/engine/lifecycle tests | Large combined AI/fleet/tactical performance and final gameplay breadth unverified |
 | Save/recovery | IMPLEMENTED BUT NEEDS POLISH | Core Player17 DTO/JSON/recovery; Engine atomic files | persistence/recovery/save tests | Large JSON latency/memory, no incremental world DB/cloud-save service |
@@ -61,6 +62,62 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Mods/accessibility/editor | IMPLEMENTED / PARTIALLY IMPLEMENTED foundations | Package system (`PackageRegistry`, `mods/` scan, `write_save_package_manifest`/`verify_save_package_manifest` save attestation), input/settings, Developer tools/import CLI, standalone editor | `package_platform` (incl. manifest attestation cases), editor + settings tests | Mod loading is content-only: namespaced package ids, priority-based overrides, semver dependency constraints and protected base namespaces resolve through `PackageRegistry::resolve`; world saves record the resolved load plan in a `<save>.packages.json` sidecar and `RuntimeHost` verifies it on F9/`load_world_from_file` restores — missing or version-mismatched packages log through `RuntimeDiagnostics` (report-only; loading proceeds). Executable plugins stay untrusted by design. Accessibility/editor remain partial — see the roadmap |
 
 ## Implementation records (newest first)
+
+## Civilization automation framework + colony domain (2026-09-28)
+
+- Purpose: reusable, deterministic, explainable automation substrate so
+  civilizations — AI or delegated player — operate real game domains
+  through the same canonical commands a human command uses. No
+  simulation is duplicated: candidates are ordinary
+  `StrategicMind::UtilityAction`s scored from observable state, and
+  commits call the authoritative assess→commit command functions.
+- Modules: `engine/include/stellar/engine/automation.hpp` +
+  `engine/src/automation.cpp` (framework); `core/include/stellar/core/
+  civilization_automation.hpp` + `core/src/civilization_automation.cpp`
+  (domains + coordinator); `strategic_ai.hpp/.cpp` extended with action
+  `target`/`routine` metadata, advisory `rank()` and an `eligible`
+  decision filter.
+- Public interfaces: `AutomationMode` (Off/Advisory/Assisted/Automatic),
+  `AutomationDomainPolicy` (mode, priority, hysteresis, min_utility,
+  sorted policy/constraint knobs), `AutomationController`
+  (`set_domain_policy`, `add_action`, `record_operator_override`,
+  `decide`, `evaluate`, bounded `journal()`, capture/restore `State`);
+  core `AutomationDomain` keys (empire, colonies, construction,
+  economy, logistics, research, exploration, colonization, fleets,
+  military, shipbuilding, diplomacy), `AutomationDefaults`,
+  `ColonyAutomationReport`, `CivilizationAutomationCoordinator`
+  (`advance(ConstructionWorld, days)`, `set_domain_policy`,
+  `record_operator_override`, `capture_state`/`restore_state`);
+  `GalaxySimulationStepCoordinator::automation()` accessor;
+  `IntegratedAdaptiveCampaignRuntime` continuation carries the state;
+  `AdaptiveCampaignHostOptions::civilization_automation` +
+  `--no-automation` CLI toggle.
+- Consumers: `automatic_orders` phase (automation runs first so its
+  placements feed the same tick's industry allocation); headless
+  `adaptive_campaign_host` enables `ai_colonies=Automatic` — the
+  shipped production consumer driving real colonies through canonical
+  commands; native tests exercise every mode.
+- Tests: `automation` (mode gating, advisory journal throttling,
+  assisted routine-only commits, operator locks + expiry, bounded
+  journal, determinism, state round-trip, knobs); `civilization_automation`
+  (real `ConstructionWorld` fixture: AI colony canonical placement,
+  player advisory non-commit, delegation, lock suppress/resume, state
+  continuation determinism, treasury-reserve blocking, domain name
+  round-trip).
+- Save/performance impact: automation state rides
+  `CampaignRuntimeContinuation` (developer-save `RuntimeContinuation`
+  envelope encodes policies, locks, incumbents, cooldowns and the
+  bounded journal; older saves restore an empty automation block).
+  Candidates rebuild per tick as cheap spans+closures; one decide per
+  configured domain per civilization per phase.
+- Limitations: shipped domains are colonies (power/food/water/housing
+  placements, repairs, re-enables, hub upgrades, growth buildings) and
+  player construction-project queueing; other domains intentionally
+  stay with existing subsystem behavior (no policy → Off → no
+  double-run). Player saves do not yet carry continuation state —
+  automation policies/journals restore via the developer envelope;
+  player-facing automation UI, scripted events, and remaining domains
+  are future work.
 
 ## Scene3D screen-space mesh LOD chains (2026-09-25)
 

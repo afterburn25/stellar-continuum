@@ -1133,7 +1133,64 @@ Json encode_runtime_continuation(const CampaignRuntimeContinuation &state){
   Json strategic={{"Days",state.strategic.strategic_days},{"Plans",std::move(plans)}};
   if(state.strategic.campaign_seed)strategic["CampaignSeed"]=*state.strategic.campaign_seed;
   const auto &d=state.diplomacy;const auto &m=d.maintenance;
-  return {{"Version",1},{"Strategic",std::move(strategic)},
+  // Automation policies, locks, histories and journal — the maps inside
+  // the coordinator state are already ordered, so this encodes
+  // deterministically.
+  const auto &a=state.automation;
+  Json automation={{"Days",a.automation_day},
+    {"Defaults",{{"AiColonies",static_cast<int>(a.defaults.ai_colonies)},
+      {"PlayerColonies",static_cast<int>(a.defaults.player_colonies)},
+      {"PlayerConstruction",static_cast<int>(a.defaults.player_construction)},
+      {"OverrideLockDays",a.defaults.default_override_lock_days}}}};
+  Json civilizations=Json::array();
+  for(const auto &civilization:a.civilizations){
+    const auto &controller=civilization.controller;
+    Json domains=Json::array();
+    for(const auto &policy:controller.policies){
+      Json policies=Json::array(),constraints=Json::array();
+      for(const auto &knob:policy.policies)
+        policies.push_back({{"Id",knob.id},{"Value",knob.value}});
+      for(const auto &knob:policy.constraints)
+        constraints.push_back({{"Id",knob.id},{"Value",knob.value}});
+      domains.push_back({{"Domain",policy.domain},
+        {"Mode",static_cast<int>(policy.mode)},{"Priority",policy.priority},
+        {"Hysteresis",policy.hysteresis},{"MinUtility",policy.min_utility},
+        {"Policies",std::move(policies)},{"Constraints",std::move(constraints)}});
+    }
+    Json locks=Json::array();
+    for(const auto &lock:controller.locks)
+      locks.push_back({{"Domain",lock.domain},{"Target",lock.target},
+        {"UntilDay",lock.locked_until_day},{"Source",lock.source}});
+    Json incumbents=Json::array(),stamps=Json::array(),mind_journal=Json::array();
+    for(const auto &incumbent:controller.mind.incumbents)
+      incumbents.push_back({{"Domain",incumbent.domain},{"ActionId",incumbent.action_id}});
+    for(const auto &stamp:controller.mind.last_commits)
+      stamps.push_back({{"ActionId",stamp.action_id},{"Day",stamp.last_day}});
+    for(const auto &decision:controller.mind.journal)
+      mind_journal.push_back({{"AtDay",decision.at_day},{"Domain",decision.domain},
+        {"ActionId",decision.action_id},{"Target",decision.target},
+        {"Utility",decision.utility},{"Candidates",decision.candidates},
+        {"Switched",decision.switched}});
+    Json journal=Json::array();
+    for(const auto &entry:controller.journal){
+      Json alternatives=Json::array();
+      for(const auto &alt:entry.alternatives)
+        alternatives.push_back({{"ActionId",alt.action_id},{"Utility",alt.utility}});
+      journal.push_back({{"AtDay",entry.at_day},{"Domain",entry.domain},
+        {"ActionId",entry.action_id},{"Target",entry.target},
+        {"Mode",static_cast<int>(entry.mode)},{"Executed",entry.executed},
+        {"Switched",entry.switched},{"Utility",entry.utility},
+        {"Reason",entry.reason},{"Alternatives",std::move(alternatives)},
+        {"Constraints",entry.constraints}});
+    }
+    civilizations.push_back({{"CivilizationId",civilization.civilization_id},
+      {"Domains",std::move(domains)},{"Locks",std::move(locks)},
+      {"Mind",{{"Incumbents",std::move(incumbents)},
+        {"LastCommits",std::move(stamps)},{"Journal",std::move(mind_journal)}}},
+      {"Journal",std::move(journal)}});
+  }
+  automation["Civilizations"]=std::move(civilizations);
+  return {{"Version",1},{"Strategic",std::move(strategic)},{"Automation",std::move(automation)},
     {"Diplomacy",{{"LastProcessed",d.last_processed_tick},{"Initialized",m.initialized},
       {"NextReview",m.next_review_tick},{"LastReview",m.last_review_tick},
       {"ReviewInterval",m.policy.review_interval_ticks},{"ContactStaleAfter",m.policy.contact_stale_after_ticks},
@@ -1180,6 +1237,140 @@ CampaignRuntimeContinuation decode_runtime_continuation(const OrderedValue &valu
   m.initialized=typed_bool(field(d,"Initialized"),"$.RuntimeContinuation.Initialized");
   m.next_review_tick=integer_field(d,"NextReview");m.last_review_tick=integer_field(d,"LastReview");
   m.policy={integer_field(d,"ReviewInterval"),integer_field(d,"ContactStaleAfter"),integer_field(d,"ProposalLifetime")};
+  if(const auto *automation_member=member(root,"Automation")){
+    const auto &a=object(*automation_member);
+    const char *path="$.RuntimeContinuation.Automation";
+    auto &automation=result.automation;
+    automation.automation_day=typed_double(field(a,"Days"),path);
+    if(const auto *defaults=member(a,"Defaults")){
+      const auto &df=object(*defaults);
+      const auto decode_mode=[&](const char *name){
+        const auto mode=typed_integer<int>(field(df,name),path);
+        if(mode<0||mode>3)throw PlayerCampaignPersistenceDataError("Unknown automation mode.");
+        return static_cast<engine::AutomationMode>(mode);
+      };
+      automation.defaults.ai_colonies=decode_mode("AiColonies");
+      automation.defaults.player_colonies=decode_mode("PlayerColonies");
+      automation.defaults.player_construction=decode_mode("PlayerConstruction");
+      if(const auto *lock_days=member(df,"OverrideLockDays"))
+        automation.defaults.default_override_lock_days=typed_double(*lock_days,path);
+    }
+    const auto &civilizations=typed_array(field(a,"Civilizations"),path);
+    if(civilizations.size()>512)throw PlayerCampaignPersistenceDataError("Too many automated civilizations.");
+    const auto decode_knobs=[&](const OrderedObject &o,const char *name){
+      std::vector<engine::AutomationKnob> knobs;
+      const auto &array=typed_array(field(o,name),path);
+      if(array.size()>64)throw PlayerCampaignPersistenceDataError("Too many automation knobs.");
+      for(const auto &entry:array){
+        const auto &k=object(entry);
+        knobs.push_back({typed_string(field(k,"Id"),path),
+                         typed_double(field(k,"Value"),path)});
+      }
+      return knobs;
+    };
+    for(const auto &entry:civilizations){
+      const auto &c=object(entry);
+      CivilizationAutomationCoordinator::CivilizationState civilization;
+      civilization.civilization_id=typed_integer<int>(field(c,"CivilizationId"),path);
+      const auto &domains=typed_array(field(c,"Domains"),path);
+      if(domains.size()>16)throw PlayerCampaignPersistenceDataError("Too many automation domain policies.");
+      for(const auto &domain_entry:domains){
+        const auto &de=object(domain_entry);
+        engine::AutomationDomainPolicy policy;
+        policy.domain=typed_string(field(de,"Domain"),path);
+        const auto mode=typed_integer<int>(field(de,"Mode"),path);
+        if(mode<0||mode>3)throw PlayerCampaignPersistenceDataError("Unknown automation mode.");
+        policy.mode=static_cast<engine::AutomationMode>(mode);
+        policy.priority=typed_double(field(de,"Priority"),path);
+        policy.hysteresis=typed_double(field(de,"Hysteresis"),path);
+        policy.min_utility=typed_double(field(de,"MinUtility"),path);
+        policy.policies=decode_knobs(de,"Policies");
+        policy.constraints=decode_knobs(de,"Constraints");
+        civilization.controller.policies.push_back(std::move(policy));
+      }
+      const auto &locks=typed_array(field(c,"Locks"),path);
+      if(locks.size()>256)throw PlayerCampaignPersistenceDataError("Too many automation target locks.");
+      for(const auto &lock_entry:locks){
+        const auto &le=object(lock_entry);
+        engine::AutomationOverrideLock lock;
+        lock.domain=typed_string(field(le,"Domain"),path);
+        lock.target=typed_string(field(le,"Target"),path);
+        lock.locked_until_day=typed_double(field(le,"UntilDay"),path);
+        lock.source=member(le,"Source")?typed_string(field(le,"Source"),path):std::string("operator");
+        civilization.controller.locks.push_back(std::move(lock));
+      }
+      if(const auto *mind_member=member(c,"Mind")){
+        const auto &mind=object(*mind_member);
+        const auto &incumbents=typed_array(field(mind,"Incumbents"),path);
+        if(incumbents.size()>64)throw PlayerCampaignPersistenceDataError("Too many automation incumbents.");
+        for(const auto &incumbent_entry:incumbents){
+          const auto &ie=object(incumbent_entry);
+          civilization.controller.mind.incumbents.push_back(
+            {typed_string(field(ie,"Domain"),path),
+             typed_string(field(ie,"ActionId"),path)});
+        }
+        const auto &stamps=typed_array(field(mind,"LastCommits"),path);
+        if(stamps.size()>4096)throw PlayerCampaignPersistenceDataError("Too many automation cooldown stamps.");
+        for(const auto &stamp_entry:stamps){
+          const auto &se=object(stamp_entry);
+          civilization.controller.mind.last_commits.push_back(
+            {typed_string(field(se,"ActionId"),path),
+             typed_double(field(se,"Day"),path)});
+        }
+        const auto &decisions=typed_array(field(mind,"Journal"),path);
+        if(decisions.size()>8192)throw PlayerCampaignPersistenceDataError("Too many automation decisions.");
+        for(const auto &decision_entry:decisions){
+          const auto &je=object(decision_entry);
+          engine::Decision decision;
+          decision.at_day=typed_double(field(je,"AtDay"),path);
+          decision.domain=typed_string(field(je,"Domain"),path);
+          decision.action_id=typed_string(field(je,"ActionId"),path);
+          decision.target=typed_string(field(je,"Target"),path);
+          decision.utility=typed_double(field(je,"Utility"),path);
+          decision.candidates=static_cast<std::uint32_t>(typed_integer<std::int64_t>(field(je,"Candidates"),path));
+          decision.switched=typed_bool(field(je,"Switched"),path);
+          civilization.controller.mind.journal.push_back(std::move(decision));
+        }
+      }
+      const auto &journal=typed_array(field(c,"Journal"),path);
+      if(journal.size()>8192)throw PlayerCampaignPersistenceDataError("Too many automation journal entries.");
+      for(const auto &journal_entry:journal){
+        const auto &je=object(journal_entry);
+        engine::AutomationJournalEntry decision;
+        decision.at_day=typed_double(field(je,"AtDay"),path);
+        decision.domain=typed_string(field(je,"Domain"),path);
+        decision.action_id=typed_string(field(je,"ActionId"),path);
+        decision.target=typed_string(field(je,"Target"),path);
+        const auto mode=typed_integer<int>(field(je,"Mode"),path);
+        if(mode<0||mode>3)throw PlayerCampaignPersistenceDataError("Unknown automation mode.");
+        decision.mode=static_cast<engine::AutomationMode>(mode);
+        decision.executed=typed_bool(field(je,"Executed"),path);
+        decision.switched=typed_bool(field(je,"Switched"),path);
+        decision.utility=typed_double(field(je,"Utility"),path);
+        decision.reason=typed_string(field(je,"Reason"),path);
+        const auto &alternatives=typed_array(field(je,"Alternatives"),path);
+        if(alternatives.size()>16)throw PlayerCampaignPersistenceDataError("Too many automation alternatives.");
+        for(const auto &alt_entry:alternatives){
+          const auto &ae=object(alt_entry);
+          decision.alternatives.push_back(
+            {typed_string(field(ae,"ActionId"),path),
+             typed_double(field(ae,"Utility"),path)});
+        }
+        const auto &constraints=typed_array(field(je,"Constraints"),path);
+        if(constraints.size()>32)throw PlayerCampaignPersistenceDataError("Too many automation journal constraints.");
+        for(const auto &constraint:constraints)
+          decision.constraints.push_back(typed_string(constraint,path));
+        civilization.controller.journal.push_back(std::move(decision));
+      }
+      automation.civilizations.push_back(std::move(civilization));
+    }
+    try{
+      CivilizationAutomationCoordinator probe;
+      probe.restore_state(automation);
+    }catch(const std::invalid_argument &error){
+      throw PlayerCampaignPersistenceDataError(std::string("Invalid automation state: ")+error.what());
+    }
+  }
   return result;
 }
 engine::EventHistory::State decode_event_history(const OrderedValue &value){

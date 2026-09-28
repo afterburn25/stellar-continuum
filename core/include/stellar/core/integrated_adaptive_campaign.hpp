@@ -27,6 +27,9 @@ struct CampaignPerformanceSample {
 struct CampaignRuntimeContinuation {
   StrategicRuntimeSnapshot strategic;
   DiplomacyRuntimeSchedule diplomacy;
+  // Civilization automation — per-civilization domain policies, operator
+  // locks, action histories and the explainable decision journal.
+  CivilizationAutomationCoordinator::State automation;
 };
 void validate_campaign_runtime_continuation(const CampaignRuntimeContinuation &,
     const FreshCampaignState &, double simulation_days);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/campaign_economy.hpp>
+#include <stellar/core/civilization_automation.hpp>
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/civilian_recovery.hpp>
 #include <stellar/core/own_combat_fleet_status.hpp>
@@ -274,6 +275,12 @@ issue_civilian_return_to_base_order(
       noexcept;
   [[nodiscard]] const CivilizationStrategicRuntimeCoordinator &
   strategic_runtime() const noexcept;
+  // The civilization automation coordinator — per-civilization domain
+  // policies, operator locks and the explainable decision journal,
+  // driven by the automatic_orders phase through canonical commands.
+  [[nodiscard]] CivilizationAutomationCoordinator &automation() noexcept;
+  [[nodiscard]] const CivilizationAutomationCoordinator &
+  automation() const noexcept;
   [[nodiscard]] CombatSimulation &combat_simulation() noexcept;
   [[nodiscard]] const CombatSimulation &combat_simulation() const noexcept;
 
@@ -307,6 +314,7 @@ private:
   std::shared_ptr<CampaignShipbuildingCapabilityQuery>
       shipbuilding_capability_;
   CivilizationStrategicRuntimeCoordinator strategic_;
+  CivilizationAutomationCoordinator automation_;
   std::variant<CombatCommandRuntime, CombatSimulation> combat_;
   CampaignSubsystemRuntime subsystems_;
 };

@@ -22,6 +22,10 @@ struct AdaptiveCampaignHostOptions {
   std::string player_species{"terran_baseline"};
   int autosave_every{0};
   int stress_fleets{0};
+  // When true, AI civilizations run their colonies through the
+  // civilization automation coordinator (canonical construction
+  // commands). Disable for parity-strict comparisons.
+  bool civilization_automation{true};
   std::filesystem::path asset_root;
   std::filesystem::path output;
 };

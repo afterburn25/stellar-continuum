@@ -369,6 +369,9 @@ int run_adaptive_campaign_host(
     inject_stress_fleets(fresh_world, options.stress_fleets);
     auto runtime = IntegratedAdaptiveCampaignRuntime::create_fresh(
         load_runtime(research_root), std::move(fresh_world));
+    if (options.civilization_automation)
+      runtime.core().automation().defaults().ai_colonies =
+          stellar::engine::AutomationMode::Automatic;
     runtime.set_profiling_enabled(true);
     const auto &world = runtime.world().campaign();
     const auto research_civilizations =

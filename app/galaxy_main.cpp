@@ -474,6 +474,7 @@ int run_galaxy_catalog(int argc, char **argv) {
   std::int64_t seed = 8374837, count = 500, repeats = 1;
   std::int64_t pre_warp_count = 6, ancient_count = 1;
   std::int64_t simulation_ticks = 40, autosave_every = 0, stress_fleets = 0;
+  bool no_automation = false;
   double step_days = 0.25;
   bool plan_homes = false, found_civilizations = false,
        founding_options = false, constrained_fallback = false,
@@ -524,6 +525,11 @@ int run_galaxy_catalog(int argc, char **argv) {
       simulate_adaptive_campaign = true;
       found_civilizations = true;
       seed_settlements = true;
+      continue;
+    }
+    if (arg == "--no-automation") {
+      no_automation = true;
+      simulation_options = true;
       continue;
     }
     if (i + 1 == argc)
@@ -605,6 +611,9 @@ int run_galaxy_catalog(int argc, char **argv) {
   if (stress_fleets && !simulate_adaptive_campaign)
     throw std::invalid_argument(
         "--stress-fleets requires --simulate-adaptive-campaign");
+  if (no_automation && !simulate_adaptive_campaign)
+    throw std::invalid_argument(
+        "--no-automation requires --simulate-adaptive-campaign");
   if (founding_options && !found_civilizations)
     throw std::invalid_argument(
         "Civilization options require --found-civilizations");
@@ -628,6 +637,7 @@ int run_galaxy_catalog(int argc, char **argv) {
          .player_species = player_species,
          .autosave_every = static_cast<int>(autosave_every),
          .stress_fleets = static_cast<int>(stress_fleets),
+         .civilization_automation = !no_automation,
          .asset_root = asset_root,
          .output = output},
         catalog,
