@@ -89,7 +89,8 @@ void validate_instance(const MeshInstance3D& i){
      !bounded(m.orbital_beaming,1.f)||!bounded(m.orbital_beaming_tint,1.f)||m.orbital_beaming_tint<0||
      !bounded(m.forward_scatter,1.f)||
      !bounded(m.forward_scatter_back,1.f)||
-     !bounded(m.forward_scatter_back_mix,1.f)||m.forward_scatter_back_mix<0)
+     !bounded(m.forward_scatter_back_mix,1.f)||m.forward_scatter_back_mix<0||
+     !bounded(m.forward_scatter_hue,1.f)||m.forward_scatter_hue<0)
     throw std::invalid_argument("3D material lighting and opacity must be finite and bounded.");
   if(i.lod_meshes.size()>8||!bounded(i.lod_pixels,4096)||i.lod_pixels<1.f||
      !bounded(i.lod_fade,.5f)||i.lod_fade<0.f)

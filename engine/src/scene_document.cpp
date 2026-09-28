@@ -496,6 +496,8 @@ std::string Scene3dDocument::to_json() const {
       item["forwardScatterBack"] = e.forward_scatter_back;
     if (e.forward_scatter_back_mix != 0.f)
       item["forwardScatterBackMix"] = e.forward_scatter_back_mix;
+    if (e.forward_scatter_hue != 0.f)
+      item["forwardScatterHue"] = e.forward_scatter_hue;
     if (e.star_kelvin != 0.0) item["starKelvin"] = e.star_kelvin;
     if (e.accretion[2] != 0.f) {
       // Emit the spiral tail only when authored so existing documents
@@ -799,6 +801,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       if (!(e.forward_scatter_back_mix >= 0.f &&
             e.forward_scatter_back_mix <= 1.f))
         return fail("forwardScatterBackMix must be in [0,1]");
+      e.forward_scatter_hue = item.value("forwardScatterHue", 0.0f);
+      if (!(e.forward_scatter_hue >= 0.f && e.forward_scatter_hue <= 1.f))
+        return fail("forwardScatterHue must be in [0,1]");
       e.star_kelvin = item.value("starKelvin", 0.0);
       if (!(e.star_kelvin == 0.0 ||
             (e.star_kelvin >= 100.0 && e.star_kelvin <= 100000.0)))

@@ -178,6 +178,12 @@ int main()try{
   rejects([&]{auto i=instance;i.material.forward_scatter_back_mix=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.forward_scatter_back_mix=-.1f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.forward_scatter_back=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter_hue=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter_hue=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter_hue=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.forward_scatter_hue=.7f;const auto tinted=Scene3D::create(camera,{i});
+   check(close(tinted->instances()[0].material.forward_scatter_hue,.7f),
+         "Scatter hue did not survive scene creation");}
   {auto i=instance;i.material.forward_scatter_back=-.4f;i.material.forward_scatter_back_mix=.3f;
    const auto phased=Scene3D::create(camera,{i});
    check(close(phased->instances()[0].material.forward_scatter_back,-.4f)&&

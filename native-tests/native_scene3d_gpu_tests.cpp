@@ -1689,6 +1689,20 @@ int main(int argc,char** argv)try{
     const int back_two=channel(*two_back,160,120,0),face_two=channel(*two_face,160,120,0);
     check(face_two>face_on*5/4,"Two-term back lobe did not lift the face-lit ring");
     check(back_two>back_off,"Two-term mix lost the forward-scatter boost");
+    // Rayleigh wavelength weight: the same phase lobe tilts blue —
+    // probing the unsaturated face-lit sheet, the hue capture's
+    // blue/red ratio multiplies by the (450/lambda)^4 spread and blue
+    // gains over the achromatic baseline while red depletes.
+    ring.material.forward_scatter_hue=1.f;
+    DrawList face4;face4.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,1}),{0,0,320,320}});
+    window.draw(face4,folder/"ring-facelit-icy.png");const auto icy_face=decode_rgba_image(folder/"ring-facelit-icy.png");
+    const float achrom_br=static_cast<float>(channel(*two_face,160,120,2))/
+                          std::max(1.f,static_cast<float>(channel(*two_face,160,120,0)));
+    const float icy_br=static_cast<float>(channel(*icy_face,160,120,2))/
+                       std::max(1.f,static_cast<float>(channel(*icy_face,160,120,0)));
+    check(icy_br>achrom_br*2.5f,"Rayleigh hue did not blue-shift the scattered light");
+    check(channel(*icy_face,160,120,2)>channel(*two_face,160,120,2),
+        "Rayleigh hue did not lift the blue channel");
     std::cout<<"forward_scatter_gpu=backlit_boost_passed\n";
   }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());

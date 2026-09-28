@@ -320,6 +320,12 @@ struct Material3D {
   // the single-lobe path unchanged.
   float forward_scatter_back{};
   float forward_scatter_back_mix{};
+  // Wavelength weight for the phase lobes [0,1]: Rayleigh-style
+  // λ⁻⁴ scattering redistributes the phase boost toward blue —
+  // crest-lit dusty sheets read icy blue instead of achromatic white.
+  // Mean-normalized so luminance is preserved; 0 keeps achromatic
+  // scatter, 1 is the full small-particle spectrum.
+  float forward_scatter_hue{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;

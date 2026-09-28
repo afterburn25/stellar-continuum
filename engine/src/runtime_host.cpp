@@ -2602,6 +2602,7 @@ int RuntimeHost::run() {
           inst.material.forward_scatter_back = sf->forward_scatter_back;
           inst.material.forward_scatter_back_mix =
               sf->forward_scatter_back_mix;
+          inst.material.forward_scatter_hue = sf->forward_scatter_hue;
         }
         if (const auto *at = world.get<AtmosphereShell>(e))
           inst.material.atmosphere =
