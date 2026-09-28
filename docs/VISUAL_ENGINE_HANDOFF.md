@@ -131,10 +131,14 @@ a dark sphere inside the annulus — not an engine concept.
 
 `SurfaceEffect3D::volume_scatter` [0,1] adds directional single-scatter
 to the emission-volume march: each sample's emission scales by a limb
-gradient `mix(1, .35+1.3·facing, scatter)` where `facing` measures the
+gradient `mix(1, .35+1.3·facing·T, scatter)` where `facing` measures the
 sample's proxy-center direction against the object-space key light —
 the star-lit side brightens ~1.65×, the far side dims to ~0.35, so
-nebulae read illuminated rather than uniformly self-glowing. It rides
+nebulae read illuminated rather than uniformly self-glowing. `T` is a
+secondary-extinction term: four coarse taps toward the light through
+the same density field give `exp(-σ·τ)` transmittance over the authored
+optical density, so filaments deep in the cloud lose the boost and an
+authored occluder sphere crossing the path blocks it entirely. It rides
 the `atmo_shape.z` lane: `main()` early-returns into `emission_volume`
 whenever `volume_depth > 0`, so atmosphere lanes are inert on volume
 materials and free to carry it. Authored scenes use the `volume` entity
@@ -588,8 +592,10 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - `accretion_disc_material3d` is an azimuthally uniform thin-disc
   profile — no spiral fluctuations, no relativistic ray-bending; the
   annulus radii must be re-stated in the `annulus:i,o` mesh spec.
-- `volume_scatter` is a limb-gradient approximation — no real
-  light-path extinction march inside the volume.
+- `volume_scatter` attenuates its limb boost by a coarse 4-tap
+  light-path extinction march through the same density field (plus
+  occluder-sphere blocking) — no multi-scatter or shadow-map-grade
+  resolution.
 - `forward_scatter` is a single Henyey-Greenstein lobe — no
   multi-term phase functions or wavelength-dependent scattering; it
   scales radiance only, not alpha.

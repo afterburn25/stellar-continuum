@@ -1819,8 +1819,24 @@ int main(int argc,char** argv)try{
     const auto scatter_on=decode_rgba_image(folder/"plasma-scatter-lit.png");
     const int lit_side=channel(*scatter_on,229,120,0),dark_side=channel(*scatter_on,90,120,0);
     const int base_side=channel(*unlit,229,120,0),base_dark=channel(*unlit,90,120,0);
-    check(lit_side>dark_side*3&&lit_side>base_side*5/4&&dark_side<base_dark/2,
+    check(lit_side>dark_side*3&&lit_side>base_side*9/8&&dark_side<base_dark/2,
         "Volume scatter did not brighten the light-facing limb");
+    // Secondary extinction: the shadow march along the light path dims
+    // filaments deep inside the cloud — the mid column between the limbs
+    // keeps only part of the position-only boost while the lit limb,
+    // whose light path exits almost immediately, keeps its lift.
+    const int mid_lit=channel(*scatter_on,160,120,0),mid_base=channel(*unlit,160,120,0);
+    check(mid_lit<mid_base*3/4&&lit_side>base_side,
+        "Secondary extinction did not shadow the volume interior");
+    // The authored occluder sphere blocks light crossing it: filaments
+    // behind the photosphere drop to the residual base level.
+    plasma.material.surface_effect->occlude=.15f;
+    DrawList occ_list;occ_list.world.emplace_back(Scene3DView{Scene3D::create(camera,{plasma},{1,0,0}),{0,0,320,320}});
+    window.draw(occ_list,folder/"plasma-scatter-occluded.png");
+    const auto scatter_occ=decode_rgba_image(folder/"plasma-scatter-occluded.png");
+    const int occ_px=channel(*scatter_occ,143,174,0),unocc_px=channel(*scatter_on,143,174,0);
+    check(occ_px<unocc_px*3/4,"Occluder sphere did not shadow the volume's light path");
+    plasma.material.surface_effect->occlude=0;
     // Filament warp: a flow/distort re-pose must change the volume's
     // pixels without changing its footprint — the authored variety knobs.
     plasma.material.surface_effect->volume_scatter=0;

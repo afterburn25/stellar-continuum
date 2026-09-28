@@ -314,4 +314,7 @@ documented per-frame but accumulated. See
   for the SDL_GPU forward renderer; approximations land per-phase with
   quality budgets. Volumetric nebulae land as the existing bounded
   emission-volume march plus `SurfaceEffect3D::volume_scatter` — a
-  directional limb gradient that makes the cloud read star-lit.
+  directional limb gradient that makes the cloud read star-lit, now
+  attenuated by a coarse light-path extinction march through the same
+  density field (deep filaments behind a dense core lose the boost,
+  and the authored occluder sphere blocks it outright).

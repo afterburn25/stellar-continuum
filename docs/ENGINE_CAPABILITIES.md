@@ -377,10 +377,17 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   makes the star-facing side of a nebula ~1.65× brighter and the far
   side ~0.35×, so volumes read illuminated instead of flat emissive.
   Rides `atmo_shape.z` (inert on volume materials — `main()` early-
-  returns into `emission_volume`); validated [0,1]; `engine_scene3d`
-  bounds + GPU probe measuring a ~4× lit/dark limb gradient with light
-  from view +x. Remaining: gradient only — no secondary extinction
-  march toward the light.
+  returns into `emission_volume`); validated [0,1]. The facing boost
+  now rides a coarse secondary-extinction march — four taps toward the
+  light through the same density field give `exp(-σ·τ)` transmittance
+  over the authored optical density, so deep filaments behind a dense
+  core keep only the residual base while the lit limb stays bright;
+  an authored occluder sphere (`effect_sphere`) crossing the light
+  path blocks the boost entirely. `engine_scene3d` bounds + GPU probe
+  measuring a ~4× lit/dark limb gradient, a ~0.6× interior shadow
+  factor, and a ~0.28× occluder shadow factor with light from view +x.
+  Remaining: the shadow taps are a coarse 4-sample estimate — no
+  multi-scatter or shadow-map-grade resolution.
 
 ### Follow-up: `Material3D::forward_scatter` phase function
 

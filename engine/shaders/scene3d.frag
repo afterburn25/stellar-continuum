@@ -247,6 +247,31 @@ vec2 uv_shift_for(vec3 dp,vec2 uv){
 }
 vec3 linear_color(vec3 c) {return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c));}
 vec3 display_color(vec3 c) {c=max(c,vec3(0));return mix(c*12.92,1.055*pow(c,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}
+// Unpremultiplied emission colour and Beer-Lambert density for one
+// object-space point — shared by the view march and the coarse
+// light-side shadow taps below, so both read one density field.
+vec4 volume_sample(vec3 p,float phase,float seed,float mip) {
+    vec2 uv=vec2(p.x+.5,.78-p.y);
+    float vertical=sin(PI*clamp(uv.y,0.0,1.0));
+    float z=p.z/material.volume_options.x;
+    // Coherent depth-dependent shear and twisting preserve the supplied
+    // image's broad shape while giving front/back filaments different paths.
+    uv.x+=vertical*(.065*z*sin(uv.y*8.0+phase*.3+seed)+material.effect_options.w*sin(p.y*19.0+phase+z*3.0));
+    uv.y+=vertical*.035*z*sin(p.x*11.0-phase*.4+seed);
+    vec2 margin=min(uv,vec2(1)-uv);
+    float edge=smoothstep(0.0,.085,min(margin.x,margin.y));
+    vec4 a=textureLod(surface_map,uv,mip),b=textureLod(sequence_map,uv,mip);
+    vec4 texel=mix(vec4(a.rgb*a.a,a.a),vec4(b.rgb*b.a,b.a),material.effect_options.y);
+    vec3 emission=texel.a>.00001?texel.rgb/texel.a:vec3(0);
+    // Rounded cross sections, a fine filament core and a faint envelope.
+    float axis=.16*sin(p.y*10.0+seed+phase*.22)*vertical;
+    float thickness=.24+.68*sqrt(clamp(texel.a,0.0,1.0));
+    float cross_section=exp(-2.8*pow((z-axis)/thickness,2.0));
+    cross_section*=1.0-smoothstep(.78,1.0,abs(z));
+    float folds=sin(p.x*43.0+p.z*37.0+seed+phase*.6)*sin(p.y*31.0-p.z*29.0-phase*.45);
+    float density=pow(max(texel.a,0.0),.85)*edge*cross_section*(.72+.28*folds);
+    return vec4(emission,density);
+}
 vec4 emission_volume(vec3 V) {
     // Integrate the interior of a closed proxy, exactly once per camera ray.
     // All density/flow lives in object space: it has parallax and cannot turn
@@ -292,32 +317,39 @@ vec4 emission_volume(vec3 V) {
     for(int step=0;step<64;++step){
         if(step>=steps||integrated.a>.985) break;
         vec3 p=origin+direction*(entry+(float(step)+.5)*step_size);
-        vec2 uv=vec2(p.x+.5,.78-p.y);
-        float vertical=sin(PI*clamp(uv.y,0.0,1.0));
-        // Coherent depth-dependent shear and twisting preserve the supplied
-        // image's broad shape while giving front/back filaments different paths.
-        float z=p.z/material.volume_options.x;
-        uv.x+=vertical*(.065*z*sin(uv.y*8.0+phase*.3+seed)+material.effect_options.w*sin(p.y*19.0+phase+z*3.0));
-        uv.y+=vertical*.035*z*sin(p.x*11.0-phase*.4+seed);
-        vec2 margin=min(uv,vec2(1)-uv);
-        float edge=smoothstep(0.0,.085,min(margin.x,margin.y));
-        vec4 a=textureLod(surface_map,uv,mip),b=textureLod(sequence_map,uv,mip);
-        vec4 texel=mix(vec4(a.rgb*a.a,a.a),vec4(b.rgb*b.a,b.a),material.effect_options.y);
-        vec3 emission=texel.a>.00001?texel.rgb/texel.a:vec3(0);
-        // Rounded cross sections, a fine filament core and a faint envelope.
-        float axis=.16*sin(p.y*10.0+seed+phase*.22)*vertical;
-        float thickness=.24+.68*sqrt(clamp(texel.a,0.0,1.0));
-        float cross_section=exp(-2.8*pow((z-axis)/thickness,2.0));
-        cross_section*=1.0-smoothstep(.78,1.0,abs(z));
-        float folds=sin(p.x*43.0+p.z*37.0+seed+phase*.6)*sin(p.y*31.0-p.z*29.0-phase*.45);
-        float density=pow(max(texel.a,0.0),.85)*edge*cross_section*(.72+.28*folds);
+        vec4 s=volume_sample(p,phase,seed,mip);
+        vec3 emission=s.rgb;float density=s.a;
         // Beer-Lambert integration is stable across quality levels and zoom.
         float alpha=1.0-exp(-density*material.volume_options.z*step_size);
         emission*=.85+.3*sqrt(max(density,0.0));
         if(scatter>0.0){
             // Limb gradient about the proxy centre: facing the light ≈1.
             float facing=.5+.5*dot(normalize(p-vec3(0,.28,0)),light_o);
-            emission*=mix(1.0,.35+1.3*facing,scatter);
+            // Secondary extinction: a coarse shadow march along the light
+            // direction through the same density field — deep filaments
+            // behind a dense core keep only the residual base, so the
+            // facing boost reads as light actually reaching the point.
+            float tau=0.0;
+            vec3 safe_light=mix(vec3(-1),vec3(1),greaterThanEqual(light_o,vec3(0)))*max(abs(light_o),vec3(.000001));
+            vec3 lt0=(lower-p)/safe_light,lt1=(upper-p)/safe_light;
+            vec3 llast=max(lt0,lt1);
+            float lexit=min(llast.x,min(llast.y,llast.z));
+            if(lexit>0.0){
+                float spacing=lexit/4.0;
+                for(int tap=0;tap<4;++tap)
+                    tau+=volume_sample(p+light_o*(float(tap)+.5)*spacing,phase,seed,mip).a*spacing;
+            }
+            float transmission=exp(-tau*material.volume_options.z);
+            // The authored photosphere occluder fully blocks light whose
+            // path crosses it — corona filaments in the star's shadow
+            // lose the whole directional boost.
+            if(material.effect_sphere.w>0.0){
+                vec3 sc=(material.effect_from_view*vec4(material.effect_sphere.xyz,1)).xyz-p;
+                float sr=material.effect_sphere.w/scale;
+                float sb=dot(sc,light_o),sd=sb*sb-dot(sc,sc)+sr*sr;
+                if(sd>0.0&&sb+sqrt(sd)>0.0) transmission=0.0;
+            }
+            emission*=mix(1.0,.35+1.3*facing*transmission,scatter);
         }
         integrated.rgb+=(1.0-integrated.a)*emission*alpha;
         integrated.a+=(1.0-integrated.a)*alpha;
