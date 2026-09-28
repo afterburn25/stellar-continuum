@@ -297,6 +297,10 @@ inline void append_instances(std::vector<MeshInstance3D>& out,const PlanetAppear
     // pick up a mild opposition component away from the forward peak.
     m.forward_scatter_back=-.3f*std::clamp(static_cast<float>(a.rings.reflectivity),0.f,1.f);
     m.forward_scatter_back_mix=.4f;
+    // Rayleigh weight: small ice grains scatter blue — bright icy sheets
+    // pick up the (450/lambda)^4 tilt while dark rocky rings stay near
+    // achromatic. Luminance is preserved; only the hue redistributes.
+    m.forward_scatter_hue=.15f+.5f*std::clamp(static_cast<float>(a.rings.reflectivity),0.f,1.f);
     // Ring grains orbit the planet: a restrained doppler asymmetry plus its
     // paired tint gives the approaching lane a subtle bright/blue edge.
     m.orbital_beaming=.08f;m.orbital_beaming_tint=.4f;
