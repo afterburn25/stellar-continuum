@@ -125,8 +125,58 @@ Re-run results (fixed binary):
   step mean 56.3 ms / p95 280.1 ms, working set ~118 MB (run used
   `--ancients 0`; deterministic repeat unchanged for identical configs).
 
-Remaining honest limitations: wars still 0; expansion is gated by
+Remaining honest limitations: expansion is gated by
 organic survey coverage so only the earliest warp-capable civilizations
 colonized within the run; pre-warp→warp promotion needs ~120+ years at
 this tech pacing; the 50k-system headroom and research/diplomacy/sensor
 event feeds are unchanged gaps.
+
+## Follow-up: autonomous warfare coordination (commit `06e88f8b`)
+
+The century runs above all reported `wars: 0` — the strategic evaluator
+already computed `recommend_war`, but no production caller existed: the
+knowledge provider never filled `has_military_estimate`, no territorial
+tension was generated, and nothing issued the canonical `declare_war`
+command or military orders.
+
+A new `WarfareCoordinator` phase now runs inside
+`IntegratedAdaptiveCampaignRuntime::advance` after diplomacy processing.
+On a phase-staggered ~7-day review cadence (step-size agnostic floor-
+quotient boundary crossing) each AI-controlled civilization: records
+canonical `record_trespass` events for identified foreign military
+presence inside its colony systems (skipping already-at-war
+counterparts — the war is the fact); builds `KnownCivilization` inputs
+from the observer's diplomacy view plus fleet-power observations, with a
+deterministic neutral prior at 0.10 confidence when no scanner intel
+exists; and calls `StrategicDecisionEvaluator::evaluate_war` — a
+`recommend_war` issues `ObserverDiplomacyCommandService::declare_war`.
+Every tick, armed fleets at war receive canonical
+`issue_engage_hostiles` orders when hostiles co-locate, and idle armed
+fleets route to the nearest hostile-occupied system via
+`assess_operational_reach` + `assign_fleet_route`. No new persisted
+state; stable-id ordering throughout; evaluator weights untouched.
+
+Native coverage: `warfare_coordination` 5/5 — aggressive border contact
+declares war and transitions to `at_war`; passive contact under
+identical geometry does not; co-located at-war fleet receives `Attack`;
+idle at-war fleet deploys toward hostile space; trespass recorded.
+
+Re-run results (2,500 systems / 12 pre-warp + 1 ancient / 10,000 ticks /
+~137 years, seed 8374837):
+
+- **wars: 3 organically** — civ 8 declared on civs 3 and 0, civ 5 on
+  civ 2 — plus 61 combat events, 77 diplomacy events, 86 fleets (86
+  shipbuilding events: wartime militarization under `Defend`), 48
+  colonies, 36 trespass events, no journal flooding.
+- `repeatFinalStatesDeterministic: true`, final hash
+  `e98e42b82e2315932464d861b922ed5819b832ca17bc0a4c5db7526e7a61d56b`,
+  step mean 51.5 ms / p95 269.5 ms, warfare phase mean 0.19 ms,
+  working set ~117 MB.
+
+Remaining honest limitations: wars are durable — no autonomous
+peace/ceasefire proposal-response loop yet (`peace_offer`/
+`ceasefire_offer` exist but need a recipient-side evaluation pass);
+military estimates without scanner research use the uncertain prior;
+engagements require fleet co-location — there is no operational war
+plan (no concentration, retreats, or orbital assault); war declares
+happen at a 120 ly frontier-adjacency radius, not borders.
