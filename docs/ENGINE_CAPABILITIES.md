@@ -78,7 +78,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - Public interfaces:
   `WarfareCoordinator::advance(WarfareWorldView, DiplomacyCampaignRuntimeCoordinator&, diplomacy_tick)`
   returning per-step counts (`trespasses_recorded`, `wars_declared`,
-  `engagement_orders`, `deployment_orders`); the result is surfaced on
+  `belligerent_contacts_reacquired`, `communications_established`,
+  `peace_offers_sent`/`accepted`/`rejected`, `engagement_orders`,
+  `deployment_orders`); the result is surfaced on
   `IntegratedAdaptiveCampaignStepResult::warfare` and the advance trace.
 - Behavior: for every AI-controlled civilization (player civs excluded via
   `campaign_civilization_control`), on a per-civ review cadence — each
@@ -98,6 +100,31 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
     declare_war` — the same command a player issues — terminating
     agreements, denying access and recording the `war_declared` event.
     At most one declaration per civilization per review tick.
+  - Belligerent contact reacquisition: an active war or ceasefire is
+    continuing mutual contact, so at review each civilization re-observes
+    every counterpart it shares such a relationship with — through the
+    canonical `process_contact_opportunity` pipeline — when its contact
+    record is missing or `stale_or_lost`. This is what keeps a war
+    settleable: contacts legitimately drift stale mid-conflict, and a
+    civilization that never identified its aggressor would otherwise not
+    even see the war relationship (observer views are knowledge-filtered).
+  - Communication channels are opened with every identified counterpart —
+    `establish_communication` is the canonical command a player uses and no
+    other autonomous consumer called it, so settlement offers (and future
+    agreement proposals) previously had no path to exist.
+  - Settlement review runs before declarations on the same cadence: pending
+    incoming `peace_offer`/`ceasefire_offer` proposals are answered through
+    canonical `respond_to_proposal`, and each at-war or ceasefire
+    counterpart is evaluated by `StrategicDecisionEvaluator::evaluate_peace`
+    (additive scoring — `evaluate_war` weights untouched). A war's weariness
+    is the journal age of its `war_declared` event normalized to ten years;
+    a declaration that has scrolled off the 256-event history counts as
+    fully wearisome. Ceasefires upgrade to `peace_offer` at a lower
+    threshold. One pending offer per pair, and a rejection suppresses
+    re-offers for four review intervals. A ceasefire entered by mutual
+    consent is also respected by the offensive pass — a civilization will
+    not break a ceasefire it accepted within the same window, though the
+    constraint expires and war can legitimately resume afterward.
   - Every tick, armed fleets of at-war civilizations receive canonical
     `CombatCommandRuntime::issue_engage_hostiles` orders when a hostile
     fleet shares their system, and idle armed fleets route toward the
@@ -114,17 +141,23 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   advances; `DiplomacyRuntimeSchedule` already covers diplomacy clocks and
   combat orders persist in `FleetState::combat`. Per-tick cost is O(civs ×
   identified contacts + armed fleets); war declaration cadence is bounded.
-- Tests: `warfare_coordination` — five scenarios on a synthetic world:
+- Tests: `warfare_coordination` — eleven scenarios on a synthetic world:
   aggressive border contact declares war via the observer command and the
   relationship transitions to `at_war`; a passive contact under identical
-  geometry does not; a co-located at-war fleet receives an `Attack` order;
-  an idle at-war fleet routes toward the nearest hostile system; foreign
-  military presence records a trespass.
-- Limitations: wars are currently durable — no autonomous peace/ceasefire
-  proposal-response loop yet (`peace_offer`/`ceasefire_offer` exist but
-  need a recipient-side evaluation pass); military estimates without
-  scanner research use a deliberately uncertain prior rather than real
-  intel; engagements only occur where fleets co-locate — there is no
+  geometry does not; an identified contact gains a communication channel;
+  a co-located at-war fleet receives an `Attack` order; an idle at-war
+  fleet routes toward the nearest hostile system; foreign military
+  presence records a trespass; a weary losing civilization sends a
+  settlement offer; a weary civilization accepts an incoming peace offer
+  (relationship transitions to `peace`); a fresh winning war offers
+  nothing; a war fought on drifted-stale contacts reacquires both
+  belligerents, opens a channel, and produces a settlement offer; a
+  freshly accepted ceasefire defers redeclaration until the respect
+  window expires.
+- Limitations: war weariness degrades gracefully when the bounded diplomacy
+  journal scrolls (war reads as fully wearisome); military estimates
+  without scanner research use a deliberately uncertain prior rather than
+  real intel; engagements only occur where fleets co-locate — there is no
   operational war plan (no concentration, retreats, or orbital assault).
 
 ## Autonomous colony settlement completion (2026-09-28)

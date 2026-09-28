@@ -426,7 +426,13 @@ int run_adaptive_campaign_host(
                 construction_events = 0, shipbuilding_events = 0,
                 exploration_events = 0, combat_events = 0,
                 colonization_events = 0, warfare_trespasses = 0,
-                warfare_wars_declared = 0, warfare_engagement_orders = 0,
+                warfare_wars_declared = 0,
+                warfare_contacts_reacquired = 0,
+                warfare_communications_established = 0,
+                warfare_peace_offers_sent = 0,
+                warfare_peace_offers_accepted = 0,
+                warfare_peace_offers_rejected = 0,
+                warfare_engagement_orders = 0,
                 warfare_deployment_orders = 0;
   double initialization_total_ms = 0.0, step_total_ms = 0.0;
   std::vector<double> step_times;
@@ -505,6 +511,13 @@ int run_adaptive_campaign_host(
       colonization_events += result.core.colonization_events.size();
       warfare_trespasses += result.warfare.trespasses_recorded;
       warfare_wars_declared += result.warfare.wars_declared;
+      warfare_contacts_reacquired +=
+          result.warfare.belligerent_contacts_reacquired;
+      warfare_communications_established +=
+          result.warfare.communications_established;
+      warfare_peace_offers_sent += result.warfare.peace_offers_sent;
+      warfare_peace_offers_accepted += result.warfare.peace_offers_accepted;
+      warfare_peace_offers_rejected += result.warfare.peace_offers_rejected;
       warfare_engagement_orders += result.warfare.engagement_orders;
       warfare_deployment_orders += result.warfare.deployment_orders;
       if (repeat == 0 && options.verify_continuation_tick > 0 &&
@@ -679,6 +692,13 @@ int run_adaptive_campaign_host(
         {"diplomacyEvents", diplomacy_events},
         {"warfareTrespasses", warfare_trespasses},
         {"warfareWarsDeclared", warfare_wars_declared},
+        {"warfareBelligerentContactsReacquired",
+         warfare_contacts_reacquired},
+        {"warfareCommunicationsEstablished",
+         warfare_communications_established},
+        {"warfarePeaceOffersSent", warfare_peace_offers_sent},
+        {"warfarePeaceOffersAccepted", warfare_peace_offers_accepted},
+        {"warfarePeaceOffersRejected", warfare_peace_offers_rejected},
         {"warfareEngagementOrders", warfare_engagement_orders},
         {"warfareDeploymentOrders", warfare_deployment_orders},
         {"sensorContactsRecorded", sensor_contacts}}},

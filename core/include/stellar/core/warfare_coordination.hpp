@@ -33,6 +33,11 @@ struct WarfareWorldView {
 struct WarfareStepResult {
   int trespasses_recorded{};
   int wars_declared{};
+  int belligerent_contacts_reacquired{};
+  int communications_established{};
+  int peace_offers_sent{};
+  int peace_offers_accepted{};
+  int peace_offers_rejected{};
   int engagement_orders{};
   int deployment_orders{};
 };
@@ -60,6 +65,14 @@ public:
   static constexpr double unobserved_strength_confidence = 0.10;
   // High bound of the neutral prior as a multiple of own armed strength.
   static constexpr double unobserved_strength_multiplier = 1.5;
+  // War duration (diplomacy ticks, 1000/day) at which war weariness saturates
+  // for peace evaluation — ten years. When the declaration scrolled off the
+  // bounded diplomacy journal the war counts as fully wearisome.
+  static constexpr std::int64_t war_weariness_full_ticks = 3650 * 1000;
+  // After a counterpart rejects a peace or ceasefire offer the civilization
+  // waits this long before offering again.
+  static constexpr std::int64_t peace_offer_cooldown_ticks =
+      review_interval_ticks * 4;
 
   WarfareStepResult advance(WarfareWorldView world,
                             DiplomacyCampaignRuntimeCoordinator &diplomacy,

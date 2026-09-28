@@ -164,7 +164,7 @@ WarfareCoordinator::advance(WarfareWorldView world,
   StrategicDecisionEvaluator evaluator;
   for (const auto *civilization : civilizations) {
     const int civ = civilization->id;
-    const auto view = diplomacy.build_view(civ);
+    auto view = diplomacy.build_view(civ);
 
     // Identified counterparts and war state, in stable id order.
     std::vector<int> identified;
@@ -187,6 +187,72 @@ WarfareCoordinator::advance(WarfareWorldView world,
         own_strength += own_fleet_combat_power(fleet);
     const auto &own_systems = colony_systems[civ];
 
+    // Strategic knowledge about a counterpart: observed fleet power when the
+    // observer's scanners have recorded it, a deliberately uncertain neutral
+    // prior otherwise. Shared by the war and peace evaluations.
+    const auto build_known = [&](int target) {
+      bool shared_border = false;
+      const auto &their_systems = colony_systems[target];
+      for (const auto *own : own_systems)
+        for (const auto *theirs : their_systems)
+          if (system_distance(*own, *theirs) <= shared_border_light_years)
+            shared_border = true;
+      std::int64_t last_observation = 0;
+      const auto observed =
+          observed_military_strength(world.combat_intelligence, civ, target,
+                                   world.fleets, last_observation);
+      const auto relationship =
+          diplomacy.state().get_relationship(civ, target);
+      KnownCivilization known;
+      known.civilization_id = target;
+      known.trust = relationship ? relationship->trust - relationship->hostility
+                                 : 0.0;
+      known.has_shared_border = shared_border;
+      known.known_war_exhaustion = 0;
+      known.has_defense_treaty_with_observer =
+          has_active_pact(view, civ, target);
+      if (observed) {
+        known.has_military_estimate = true;
+        known.estimated_military_low = *observed * 0.8;
+        known.estimated_military_high = *observed * 1.25;
+        known.estimate_confidence = 0.6;
+        known.last_military_observation_tick = last_observation;
+      } else {
+        // Neutral prior: the counterpart could range from unarmed to
+        // somewhat stronger than the observer; the near-zero confidence
+        // makes the evaluator price in that uncertainty.
+        known.has_military_estimate = true;
+        known.estimated_military_low = 0;
+        known.estimated_military_high =
+            std::max(1.0, own_strength * unobserved_strength_multiplier);
+        known.estimate_confidence = unobserved_strength_confidence;
+        known.last_military_observation_tick = diplomacy_tick;
+      }
+      return known;
+    };
+
+    // War weariness from the diplomacy journal: age of the most recent
+    // war_declared between the pair, normalized to full weariness at ten
+    // years. A war whose declaration scrolled off the bounded journal counts
+    // as fully wearisome.
+    const auto war_weariness = [&](int target) {
+      std::int64_t declared = -1;
+      for (const auto &event : view.recent_events) {
+        const bool between =
+            (event.primary_civilization_id == civ &&
+             event.secondary_civilization_id == target) ||
+            (event.primary_civilization_id == target &&
+             event.secondary_civilization_id == civ);
+        if (event.kind == DiplomaticEventKind::war_declared && between)
+          declared = std::max(declared, event.tick);
+      }
+      if (declared < 0)
+        return 1.0;
+      return std::min(
+          1.0, static_cast<double>(diplomacy_tick - declared) /
+                   static_cast<double>(war_weariness_full_ticks));
+    };
+
     // Territorial friction: identified foreign military presence inside a
     // system holding one of the observer's colonies records a trespass. This
     // runs on the civ's review cadence so events stay bounded.
@@ -204,54 +270,233 @@ WarfareCoordinator::advance(WarfareWorldView world,
         elapsed_ticks > 0 &&
         floor_div(diplomacy_tick - phase) !=
             floor_div(diplomacy_tick - elapsed_ticks - phase);
-    // Offensive review: evaluate war against every identified counterpart in
-    // stable order; at most one declaration per review tick per civilization.
     if (review_tick) {
+      // Belligerents cannot lose track of each other: an active war or
+      // ceasefire is continuing mutual contact, so stale or never-created
+      // contacts are reacquired through the canonical observation pipeline.
+      // Without this, wars started on already-stale contacts — or declared
+      // on a civilization that never identified its aggressor — could never
+      // be settled, since every proposal path requires mutual communication.
+      bool reacquired = false;
+      std::vector<int> belligerents;
+      for (const auto &other : world.civilizations) {
+        if (other.id == civ)
+          continue;
+        const auto relationship =
+            diplomacy.state().get_relationship(civ, other.id);
+        if (relationship &&
+            (relationship->political_state ==
+                 DiplomaticPoliticalState::at_war ||
+             relationship->political_state ==
+                 DiplomaticPoliticalState::ceasefire))
+          belligerents.push_back(other.id);
+      }
+      std::sort(belligerents.begin(), belligerents.end());
+      for (const int belligerent : belligerents) {
+        const DiplomaticContactView *latest = nullptr;
+        for (const auto &contact : view.contacts)
+          if (contact.target_civilization_id == belligerent &&
+              (!latest ||
+               contact.last_observed_tick > latest->last_observed_tick))
+            latest = &contact;
+        if (latest && latest->awareness >= ContactAwareness::identified &&
+            latest->condition != ContactCondition::stale_or_lost)
+          continue;
+        FirstContactOpportunity revival;
+        revival.observer_civilization_id = civ;
+        revival.contact_id = latest
+                                 ? latest->contact_id
+                                 : "civilization:" +
+                                       std::to_string(belligerent);
+        revival.target_civilization_id = belligerent;
+        revival.observed_at_tick = diplomacy_tick;
+        revival.awareness = ContactAwareness::identified;
+        revival.condition = ContactCondition::active;
+        revival.confidence = 1.0;
+        (void)simulation.process_contact_opportunity(revival);
+        ++result.belligerent_contacts_reacquired;
+        reacquired = true;
+      }
+      if (reacquired) {
+        // Fresh contact records change what the observer knows (the war
+        // relationship only becomes visible once the counterpart is
+        // identified), so rebuild the view and derived sets.
+        view = diplomacy.build_view(civ);
+        identified.clear();
+        for (const auto &contact : view.contacts)
+          if (contact.target_civilization_id &&
+              contact.awareness >= ContactAwareness::identified)
+            identified.push_back(*contact.target_civilization_id);
+        std::sort(identified.begin(), identified.end());
+        identified.erase(
+            std::unique(identified.begin(), identified.end()),
+            identified.end());
+        at_war.clear();
+        for (const auto &relationship : view.relationships)
+          if (relationship.political_state == DiplomaticPoliticalState::at_war)
+            at_war.insert(relationship.other_civilization_id);
+      }
+
+      // Open communication channels with identified counterparts — the
+      // proposal path (peace, ceasefire, future agreements) requires a
+      // live channel and nothing else establishes one autonomously.
+      for (const int target : identified) {
+        if (target == civ)
+          continue;
+        const bool has_channel = std::ranges::any_of(
+            view.contacts, [&](const auto &contact) {
+              return contact.target_civilization_id == target &&
+                     contact.communication_available &&
+                     contact.condition != ContactCondition::stale_or_lost;
+            });
+        if (has_channel)
+          continue;
+        const auto opened = diplomacy.commands().establish_communication(
+            civ, target, diplomacy_tick);
+        if (opened.accepted)
+          ++result.communications_established;
+      }
+
+      // Settlement review: answer pending incoming peace/ceasefire offers
+      // first, since acceptance may end a war before this civilization weighs
+      // its own offers or declarations.
+      std::vector<const DiplomaticProposalSnapshot *> pending_peace;
+      for (const auto &proposal : view.proposals)
+        if (proposal.recipient_civilization_id == civ &&
+            proposal.status == DiplomaticProposalStatus::pending &&
+            (proposal.kind == DiplomaticProposalKind::peace_offer ||
+             proposal.kind == DiplomaticProposalKind::ceasefire_offer))
+          pending_peace.push_back(&proposal);
+      std::ranges::sort(pending_peace, {},
+                        &DiplomaticProposalSnapshot::proposal_id);
+      for (const auto *proposal : pending_peace) {
+        const int proposer = proposal->proposer_civilization_id;
+        const auto relationship = std::ranges::find(
+            view.relationships, proposer,
+            &DiplomaticRelationshipView::other_civilization_id);
+        const bool at_war_with =
+            relationship != view.relationships.end() &&
+            relationship->political_state == DiplomaticPoliticalState::at_war;
+        const bool ceasefire_with =
+            relationship != view.relationships.end() &&
+            relationship->political_state ==
+                DiplomaticPoliticalState::ceasefire;
+        bool accept = false;
+        if (at_war_with || ceasefire_with) {
+          const auto peace = evaluator.evaluate_peace(
+              civilization->traits, own_strength, build_known(proposer),
+              relationship->hostility, relationship->fear,
+              war_weariness(proposer), ceasefire_with);
+          accept = peace.accept_terms;
+        }
+        const auto answered = diplomacy.commands().respond_to_proposal(
+            civ, proposal->proposal_id, accept, diplomacy_tick);
+        if (answered.accepted)
+          ++(accept ? result.peace_offers_accepted
+                    : result.peace_offers_rejected);
+      }
+      if (!pending_peace.empty()) {
+        // Responses may have ended wars or activated agreements; rebuild the
+        // observer's view so the offer/declaration passes see current state.
+        view = diplomacy.build_view(civ);
+        at_war.clear();
+        for (const auto &relationship : view.relationships)
+          if (relationship.political_state == DiplomaticPoliticalState::at_war)
+            at_war.insert(relationship.other_civilization_id);
+      }
+
+      // Settlement offers: for each counterpart still at war or in ceasefire,
+      // evaluate whether this civilization wants the conflict to end.
+      std::vector<int> settleable;
+      for (const auto &relationship : view.relationships) {
+        if (relationship.political_state ==
+                DiplomaticPoliticalState::at_war ||
+            relationship.political_state ==
+                DiplomaticPoliticalState::ceasefire)
+          settleable.push_back(relationship.other_civilization_id);
+      }
+      std::sort(settleable.begin(), settleable.end());
+      for (const int target : settleable) {
+        if (target == civ)
+          continue;
+        const auto relationship = std::ranges::find(
+            view.relationships, target,
+            &DiplomaticRelationshipView::other_civilization_id);
+        if (relationship == view.relationships.end())
+          continue;
+        const bool ceasefire_active =
+            relationship->political_state == DiplomaticPoliticalState::ceasefire;
+        // One outstanding offer per pair at a time; a rejection cools the
+        // offer cadence so the journal isn't flooded by refusals.
+        const auto pending_offer = std::ranges::any_of(
+            view.proposals, [&](const auto &proposal) {
+              return proposal.proposer_civilization_id == civ &&
+                     proposal.recipient_civilization_id == target &&
+                     proposal.status == DiplomaticProposalStatus::pending &&
+                     (proposal.kind == DiplomaticProposalKind::peace_offer ||
+                      proposal.kind == DiplomaticProposalKind::ceasefire_offer);
+            });
+        if (pending_offer)
+          continue;
+        const auto recently_rejected = std::ranges::any_of(
+            view.recent_events, [&](const auto &event) {
+              return event.kind == DiplomaticEventKind::proposal_rejected &&
+                     event.primary_civilization_id == target &&
+                     event.secondary_civilization_id == civ &&
+                     diplomacy_tick - event.tick <= peace_offer_cooldown_ticks;
+            });
+        if (recently_rejected)
+          continue;
+        const auto peace = evaluator.evaluate_peace(
+            civilization->traits, own_strength, build_known(target),
+            relationship->hostility, relationship->fear,
+            war_weariness(target), ceasefire_active);
+        std::optional<DiplomaticProposalKind> kind;
+        if (ceasefire_active)
+          kind = peace.offer_peace
+                     ? std::optional{DiplomaticProposalKind::peace_offer}
+                     : std::nullopt;
+        else if (peace.offer_peace)
+          kind = DiplomaticProposalKind::peace_offer;
+        else if (peace.offer_ceasefire)
+          kind = DiplomaticProposalKind::ceasefire_offer;
+        if (!kind)
+          continue;
+        const auto issued = diplomacy.commands().send_proposal(
+            civ, target, *kind, diplomacy_tick,
+            *kind == DiplomaticProposalKind::peace_offer
+                ? "Offers peace to end the war."
+                : "Offers a ceasefire to halt active hostilities.");
+        if (issued.accepted)
+          ++result.peace_offers_sent;
+      }
+
+      // Offensive review: evaluate war against every identified counterpart
+      // in stable order; at most one declaration per review tick per
+      // civilization.
       for (const int target : identified) {
         if (target == civ || at_war.contains(target))
           continue;
-        const auto relationship =
-            diplomacy.state().get_relationship(civ, target);
-
-        bool shared_border = false;
-        const auto &their_systems = colony_systems[target];
-        for (const auto *own : own_systems) {
-          for (const auto *theirs : their_systems)
-            if (system_distance(*own, *theirs) <= shared_border_light_years)
-              shared_border = true;
-        }
-
-        std::int64_t last_observation = 0;
-        const auto observed = observed_military_strength(
-            world.combat_intelligence, civ, target, world.fleets,
-            last_observation);
-
-        KnownCivilization known;
-        known.civilization_id = target;
-        known.trust = relationship ? relationship->trust - relationship->hostility
-                                   : 0.0;
-        known.has_shared_border = shared_border;
-        known.known_war_exhaustion = 0;
-        known.has_defense_treaty_with_observer =
-            has_active_pact(view, civ, target);
-        if (observed) {
-          known.has_military_estimate = true;
-          known.estimated_military_low = *observed * 0.8;
-          known.estimated_military_high = *observed * 1.25;
-          known.estimate_confidence = 0.6;
-          known.last_military_observation_tick = last_observation;
-        } else {
-          // Neutral prior: the counterpart could range from unarmed to
-          // somewhat stronger than the observer; the near-zero confidence
-          // makes the evaluator price in that uncertainty.
-          known.has_military_estimate = true;
-          known.estimated_military_low = 0;
-          known.estimated_military_high =
-              std::max(1.0, own_strength * unobserved_strength_multiplier);
-          known.estimate_confidence = unobserved_strength_confidence;
-          known.last_military_observation_tick = diplomacy_tick;
-        }
-
+        // A ceasefire entered by mutual consent is not a free reload —
+        // without this guard an aggressive civilization's own declaration
+        // pass would break a ceasefire it just accepted on the same tick.
+        const auto fresh_ceasefire = std::ranges::any_of(
+            view.agreements, [&](const auto &agreement) {
+              if (agreement.status != DiplomaticAgreementStatus::active ||
+                  agreement.type != DiplomaticAgreementType::ceasefire)
+                return false;
+              const bool involves =
+                  (agreement.civilization_a_id == civ &&
+                   agreement.civilization_b_id == target) ||
+                  (agreement.civilization_a_id == target &&
+                   agreement.civilization_b_id == civ);
+              return involves &&
+                     diplomacy_tick - agreement.started_at_tick <=
+                         peace_offer_cooldown_ticks;
+            });
+        if (fresh_ceasefire)
+          continue;
+        const auto known = build_known(target);
         const auto assessment = evaluator.evaluate_war(
             civilization->traits, own_strength, known, diplomacy_tick);
         if (!assessment.recommend_war)
