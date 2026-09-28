@@ -2,6 +2,7 @@
 
 #include <stellar/core/civilization_control.hpp>
 #include <stellar/core/construction_projects.hpp>
+#include <stellar/core/settlement_body_index.hpp>
 #include <stellar/core/surface_construction.hpp>
 
 #include <algorithm>
@@ -77,9 +78,10 @@ automation_domain_from_name(std::string_view name) noexcept {
     return std::nullopt;
 }
 
+namespace {
 ColonyAutomationReport
-assess_colony_automation(std::span<const PlanetaryBody> bodies,
-                         const Colony &colony) {
+assess_colony_automation_impl(const auto &bodies,
+                              const Colony &colony) {
     ColonyAutomationReport report;
     report.colony_id = colony.id;
     report.population_millions = colony.population_millions;
@@ -128,6 +130,17 @@ assess_colony_automation(std::span<const PlanetaryBody> bodies,
         output.cargo_transfer_capacity_per_day <= 0.0)
         report.issues.push_back("stockpile without cargo handling");
     return report;
+}
+}
+ColonyAutomationReport
+assess_colony_automation(std::span<const PlanetaryBody> bodies,
+                         const Colony &colony) {
+    return assess_colony_automation_impl(bodies, colony);
+}
+ColonyAutomationReport
+assess_colony_automation(const SettlementBodyIndex &bodies,
+                         const Colony &colony) {
+    return assess_colony_automation_impl(bodies, colony);
 }
 
 CivilizationAutomationCoordinator::CivilizationAutomationCoordinator(
@@ -268,6 +281,14 @@ void CivilizationAutomationCoordinator::advance(
     if (phase_days < 0.0 || !std::isfinite(phase_days))
         return;
     automation_day_ += phase_days;
+    // Colony refresh resolves each colony's body out of the catalog;
+    // share one catalog index across every civilization instead of
+    // rescanning `world.bodies` per colony.
+    std::optional<SettlementBodyIndex> local_body_index;
+    if (!world.body_index) {
+        local_body_index.emplace(world.bodies);
+        world.body_index = &*local_body_index;
+    }
     for (const auto &civilization : world.civilizations) {
         if (civilization.is_seeded_ancient) continue;
         const bool uses_ai =
@@ -310,18 +331,18 @@ void CivilizationAutomationCoordinator::refresh_colony_domain(
         if (colony.surface_hub_level <= 0) continue;
         // Placement requires a surveyed solid-surface body — the same
         // precondition the canonical assess path enforces.
-        const PlanetaryBody *body = nullptr;
-        if (colony.planetary_body_id)
-            for (const auto &candidate : world.bodies)
-                if (candidate.id == *colony.planetary_body_id)
-                    body = &candidate;
+        const PlanetaryBody *body =
+            colony.planetary_body_id
+                ? world.body_index->last_body_with_id(
+                      *colony.planetary_body_id)
+                : nullptr;
         if (!body || !body->environment.has_solid_surface) continue;
         const std::string target = colony_target(colony.id);
         if (controller.target_locked(domain, target, automation_day_))
             continue;
 
         const auto report =
-            assess_colony_automation(world.bodies, colony);
+            assess_colony_automation(*world.body_index, colony);
         const auto output = surface_colony_output(colony);
         const auto slots = free_slots(colony);
 

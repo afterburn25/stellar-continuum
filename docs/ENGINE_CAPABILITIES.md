@@ -64,6 +64,57 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Automatic-orders shared settlement body index (2026-09-28)
+
+- Purpose: the automatic-orders phase ran full body-catalog scans per owned
+  colony per tick — `refresh_colony_domain` scanned all ~50k bodies for each
+  colony and `assess_colony_automation` ran a second scan inside
+  `colony_sustenance_capacity` — while construction `lock()` scanned the
+  catalog per candidate project per idle civilization and
+  `surface_construction` re-scanned it per placement assessment. Profiling
+  showed `automation_.advance` at ~2.8 ms/tick and the construction-order
+  pass at ~1.1 ms/tick (~4.1 ms mean for the phase).
+- Modules: `core/include/stellar/core/settlement_body_index.hpp` — new
+  catalog-scoped constructor `SettlementBodyIndex(std::span<const
+  PlanetaryBody>)` that populates the same first-match (system id, body id)
+  map plus `first_body_with_id` / `last_body_with_id` id lookups; the
+  request-scoped (colonies, bodies) constructor keeps its original
+  lightweight key-seeding behavior so its callers are unchanged.
+  `core/src/colony_economy.cpp` — `colony_sustenance_capacity` gains an
+  index-accepting overload sharing one resolved-body core with the original
+  span overload. `core/include/stellar/core/construction_state.hpp` —
+  `ConstructionWorld` and `ConstructionReadView` carry an optional `const
+  SettlementBodyIndex*`; `core/src/construction_projects.cpp` `lock()` and
+  `core/src/surface_construction.cpp` body resolution use it when present
+  and keep the original catalog scan otherwise, so scripted-event and UI
+  consumers need no index. `core/src/civilization_automation.cpp` —
+  `CivilizationAutomationCoordinator::advance` resolves the catalog index
+  once and threads it through `refresh_colony_domain`,
+  `assess_colony_automation` and the construction worlds.
+  `core/src/campaign_coordinator.cpp` — `GalaxySimulationStepCoordinator`
+  caches the catalog index member and rebuilds it only when the body span
+  identity (data pointer, size, front/back ids) changes, since rebuilding
+  ~150k hash entries per tick erased the win.
+- Semantics: unchanged — request-scoped `bodies_for` still resolves colony
+  (system id, body id) keys to the first catalog match; catalog-scoped id
+  lookups expose distinct first/last matches so duplicate-id edge cases stay
+  observable; missing bodies remain missing; canonical missing-body errors,
+  construction lock order, placement assessment order and canonical command
+  paths are preserved. Deferred `commit` lambdas capture `world` by value
+  including the index pointer, but every commit executes inside `decide()`
+  during `advance`, so the index outlives all dereferences.
+- Tests: `economy_scale` / `economy_scale_5000_colonies`
+  `body_lookup_contract` pins request-scoped pair lookup against
+  `std::find_if`, duplicate-id first/last catalog matches, stale-binding
+  refresh, empty-index behavior and canonical missing-body errors at
+  thousands-of-colonies scale.
+- Save/performance impact: none persisted. Measured (2500 systems, seed
+  8374837, 10,000 ticks x 2 repeats, continuation verified at tick 5000):
+  `automatic_orders` mean ~4.1 ms -> ~0.9 ms, `core_total` ~7.9 ms, whole
+  step ~9.5 ms mean; the final campaign hash is bit-identical to the
+  pre-optimization run (`8b6963c2...`) and save/restore/continue stays
+  deterministic.
+
 ## Adaptive research shared credit-flow index (2026-09-28)
 
 - Purpose: the adaptive research phase ran `economy_credit_flow` once per

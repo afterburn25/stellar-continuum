@@ -72,6 +72,11 @@ struct ColonyAutomationReport {
 [[nodiscard]] ColonyAutomationReport
 assess_colony_automation(std::span<const PlanetaryBody> bodies,
                          const Colony &colony);
+// Caller-shared index form: identical report, the caller performs the
+// colony->body resolution once for many colonies.
+[[nodiscard]] ColonyAutomationReport
+assess_colony_automation(const SettlementBodyIndex &bodies,
+                         const Colony &colony);
 
 // The per-civilization automation coordinator: owns one engine
 // AutomationController per civilization and drives domain planners
@@ -120,7 +125,8 @@ public:
     // every configured domain and lets each civilization's controller
     // decide. `world` is the canonical construction world (commands
     // flow through its assess→commit path); `phase_days` is the
-    // elapsed simulation span being integrated.
+    // elapsed simulation span being integrated. When `world.body_index`
+    // is unset a local catalog index is built for the call.
     void advance(ConstructionWorld world, double phase_days);
 
     // Monotonic automation clock — days accumulated across advances;

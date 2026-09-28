@@ -330,6 +330,14 @@ private:
   ScriptedEventCoordinator scripted_events_;
   std::variant<CombatCommandRuntime, CombatSimulation> combat_;
   CampaignSubsystemRuntime subsystems_;
+  // Tick-shared body-catalog index for the automatic_orders phase. The
+  // catalog is immutable during a campaign; the index is rebuilt only when
+  // the bodies span identity (or its edge ids) changes.
+  std::optional<SettlementBodyIndex> body_index_;
+  const PlanetaryBody *body_index_data_{};
+  std::size_t body_index_size_{};
+  int body_index_front_id_{}, body_index_back_id_{};
+  const SettlementBodyIndex &catalog_body_index(FreshCampaignState &campaign);
 };
 
 } // namespace stellar::core

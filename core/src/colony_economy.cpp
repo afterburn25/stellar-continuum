@@ -1,5 +1,7 @@
 #include <stellar/core/colony_economy.hpp>
 
+#include <stellar/core/settlement_body_index.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -134,17 +136,11 @@ ColonyLaborSnapshot colony_labor(const Colony& colony, bool industrial_automatio
     return {population, working_age, employed, std::max(0.0, working_age - employed), working_age <= 0.0 ? 0.0 : employed / working_age};
 }
 
-ColonySustenanceCapacity colony_sustenance_capacity(std::span<const PlanetaryBody> bodies,
+namespace {
+ColonySustenanceCapacity sustenance_capacity(const PlanetaryBody* body,
     const Colony& colony, const SurfaceSustenanceCapacity& surface) {
     const double infrastructure = std::clamp(colony.infrastructure, .1, 5.0);
     const double sealed = sealed_capacity_per_infrastructure * infrastructure;
-    const PlanetaryBody* body = nullptr;
-    if (colony.planetary_body_id) {
-        const auto found = std::find_if(bodies.begin(), bodies.end(), [&](const PlanetaryBody& candidate) {
-            return candidate.id == *colony.planetary_body_id && candidate.system_id == colony.system_id;
-        });
-        if (found != bodies.end()) body = &*found;
-    }
     double natural_food, natural_water, natural_housing;
     if (!body) {
         natural_food = natural_water = natural_housing = std::max(0.0, colony.population_millions - sealed);
@@ -164,6 +160,23 @@ ColonySustenanceCapacity colony_sustenance_capacity(std::span<const PlanetaryBod
     return {natural_food, natural_water, natural_housing, surface.food_capacity_millions, surface.water_capacity_millions,
         surface.housing_capacity_millions, food, water, housing, supported,
         colony.population_millions <= 0.0 ? 1.0 : supported / colony.population_millions, limiting_name(food, water, housing)};
+}
+}
+ColonySustenanceCapacity colony_sustenance_capacity(std::span<const PlanetaryBody> bodies,
+    const Colony& colony, const SurfaceSustenanceCapacity& surface) {
+    const PlanetaryBody* body = nullptr;
+    if (colony.planetary_body_id) {
+        const auto found = std::find_if(bodies.begin(), bodies.end(), [&](const PlanetaryBody& candidate) {
+            return candidate.id == *colony.planetary_body_id && candidate.system_id == colony.system_id;
+        });
+        if (found != bodies.end()) body = &*found;
+    }
+    return sustenance_capacity(body, colony, surface);
+}
+ColonySustenanceCapacity colony_sustenance_capacity(const SettlementBodyIndex& bodies,
+    const Colony& colony, const SurfaceSustenanceCapacity& surface) {
+    const auto resolved = bodies.bodies_for(colony);
+    return sustenance_capacity(resolved.empty() ? nullptr : &resolved.front(), colony, surface);
 }
 
 ColonySustenanceReserveSnapshot preview_colony_reserves(const Colony& colony, const ColonySustenanceCapacity& capacity, double simulation_days) {

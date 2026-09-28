@@ -23,6 +23,9 @@ struct ConstructionReadView {
     std::span<const CivilizationEconomy> economies;
     std::span<const CivilizationConstructionCapabilities> capabilities;
     std::function<bool(int, std::string_view)> capability_query;
+    // Optional shared body-catalog index; when set, id lookups use it
+    // instead of rescanning `bodies`. Must describe the same catalog.
+    const SettlementBodyIndex* body_index{nullptr};
 };
 struct ConstructionWorld {
     std::span<const Civilization> civilizations;
@@ -33,7 +36,8 @@ struct ConstructionWorld {
     std::span<const CivilizationConstructionCapabilities> capabilities;
     std::function<bool(int, std::string_view)> capability_query;
     CivilizationControlQuery control;
-    ConstructionReadView read() const { return {civilizations,bodies,construction,colonies,economies,capabilities,capability_query}; }
+    const SettlementBodyIndex* body_index{nullptr};
+    ConstructionReadView read() const { return {civilizations,bodies,construction,colonies,economies,capabilities,capability_query,body_index}; }
 };
 bool construction_has_capability(ConstructionReadView world, int civilization_id, std::string_view id);
 std::vector<ConstructionState> seed_construction(std::span<const Civilization> civilizations);
