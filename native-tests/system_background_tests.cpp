@@ -114,7 +114,10 @@ int main(int argc,char** argv)try{
  stellar::native_phenomena::VisualOptions visual;visual.background_stars=false;
  const auto& star=*std::ranges::find(world.systems,id,&StellarSystem::id);
  for(int n=0;n<3000;++n){scene=draw();nebula.append_system(scene,id,star.position.x,star.position.y,1280,720,1,visual);if(nebula.ready())break;std::this_thread::sleep_for(std::chrono::milliseconds(1));}
- check(nebula.ready()&&scene.world.size()>1&&std::holds_alternative<Scene3DView>(scene.world.front())&&std::holds_alternative<Image>(scene.world.back()),"Real nebula failed to load above the celestial dome");
+ check(nebula.ready()&&scene.world.size()>1&&std::holds_alternative<Scene3DView>(scene.world.front())&&std::holds_alternative<Scene3DView>(scene.world.back()),"Real nebula failed to load above the celestial dome");
+ {const auto& cloud=std::get<Scene3DView>(scene.world.back());check(cloud.scene->instances().size()==1,"Nebula volume scene must carry exactly one proxy");
+  const auto& material=cloud.scene->instances().front().material;
+  check(material.surface_effect&&material.surface_effect->volume_depth>0&&material.surface_effect->volume_scatter>0&&material.surface_effect->flow_rate>0&&material.transparent&&material.texture&&material.tint.a>0,"Local nebula did not emit an authored emission volume");}
  scene.world.emplace_back(Circle{{640,360},35,{240,140,80,255}});window.draw(scene,output/"generated-dark-nebula.png");const auto dark_scene=decode_rgba_image(output/"generated-dark-nebula.png");check(dark_scene->pixels()[(360*1280+640)*4]>200,"Real cloud obscured a later system object");
  // Put the canonical preset at a known generated cloud location. Its clear
  // local policy must skip both absorption and imagery in System and battle,

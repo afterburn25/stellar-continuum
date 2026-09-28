@@ -5,6 +5,7 @@
 #include <stellar/engine/texture_decal.hpp>
 #include <stellar/engine/spatial_region_index.hpp>
 #include <stellar/engine/native_image_preparation.hpp>
+#include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/localization.hpp>
 #include <chrono>
 #include <map>
@@ -26,6 +27,8 @@ public:
   void use_queue(std::shared_ptr<ImagePreparationQueue> q){queue_=std::move(q);}
   void set_localization(const stellar::engine::LocalizationTable* table)noexcept{locale_=table;}
   void bind(const stellar::core::GalaxyPhenomena* field);
+  void set_visual_seconds(double seconds)noexcept{if(std::isfinite(seconds))visual_seconds_=seconds;}
+  void set_scene3d_quality(RenderQuality3D value)noexcept{scene3d_quality_=value;}
   void poll();
   void append_map(DrawList&,const Camera&,int,int,const VisualOptions&,const std::set<std::uint32_t>& surveyed);
   void append_system(DrawList&,int system,double x,double y,int w,int h,double zoom,const VisualOptions&,bool combat=false);
@@ -48,8 +51,12 @@ private:
   stellar::engine::SpatialRegionIndex index_;
   std::optional<stellar::core::GalaxyPhenomena> field_;
   std::shared_ptr<ImagePreparationQueue> queue_;
-  std::optional<ImagePreparationQueue::Ticket> atlas_job_,local_job_;
-  std::shared_ptr<const RgbaImage> atlas_,local_;
+  std::optional<ImagePreparationQueue::Ticket> atlas_job_,local_job_,local_volume_job_;
+  std::shared_ptr<const RgbaImage> atlas_,local_,local_volume_;
+  std::shared_ptr<const Scene3D> local_volume_scene_;
+  const RgbaImage* local_volume_source_{};
+  int local_volume_w_{},local_volume_h_{};std::uint8_t local_volume_opacity_{};
+  double visual_seconds_{};RenderQuality3D scene3d_quality_{RenderQuality3D::High};
   std::map<int,stellar::core::SystemPhenomenonContext> contexts_;
   int local_system_{-1};bool ready_{true};
   std::chrono::steady_clock::time_point transition_{std::chrono::steady_clock::now()};

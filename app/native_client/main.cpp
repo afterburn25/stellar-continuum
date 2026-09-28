@@ -864,6 +864,7 @@ class NativeCampaign final {
     fleet_workspace_.set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
     battle_sprites_.set_render_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
     colony_workspace_.planetary().globe().set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
+    phenomena_.set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
     colony_workspace_.planetary().globe().set_materials(planet_provider);
     system_workspace_.use_background_preparation(image_preparation_);
 
@@ -1571,6 +1572,28 @@ class NativeCampaign final {
         draw(rendered,L"-protostar-system");
         system_workspace_.close();
         std::cout<<"protostar=debris_disc_artwork_submitted_passed\n";
+      }
+    }
+    {
+      const auto nebula_system=std::ranges::find_if(revealed.systems,[&](const auto& s){
+        return system_background_.catalog.profile(s.id).local_nebula;});
+      if(nebula_system==revealed.systems.end())std::cout<<"local_nebula=no_nebulous_system_in_galaxy\n";
+      else{
+        if(!enter_system(nebula_system->id,width,height))throw std::runtime_error("Nebula smoke cannot enter the nebulous system.");
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);int settled=0;
+        do { route({{InputEventType::PointerMove,{0,0}}});(void)scene(width,height);settled=artwork_ready()&&phenomena_.ready()?settled+1:0;
+          if(std::chrono::steady_clock::now()>deadline)throw std::runtime_error("Nebulous system artwork failed to settle.");
+          std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }while(settled<40);
+        const auto rendered=scene(width,height);
+        const auto volume=std::ranges::any_of(rendered.world,[](const auto& command){
+          const auto*view=std::get_if<Scene3DView>(&command);
+          return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){
+            return i.material.surface_effect&&i.material.surface_effect->volume_depth>0;});});
+        if(!volume)throw std::runtime_error("Nebulous system emitted no emission volume layer.");
+        draw(rendered,L"-local-nebula");
+        system_workspace_.close();
+        std::cout<<"local_nebula=emission_volume_submitted_passed\n";
       }
     }
     if(!enter_system(sol_system_id,width,height))throw std::runtime_error("Small-body smoke cannot enter Sol.");
@@ -7956,7 +7979,7 @@ class NativeCampaign final {
     if(system_workspace_.visible()){
       const auto sid=*system_workspace_.system_id();const auto system=std::ranges::find(world.systems,sid,&StellarSystem::id);
       system_background_.append(out,sid,width,height,starfield_quality(),starfield_density());
-      if(system!=world.systems.end())phenomena_.append_system(out,sid,system->position.x,system->position.y,width,height,system_workspace_.viewport()?system_workspace_.viewport()->scale:1.,phenomena_options(sid));
+      if(system!=world.systems.end()){phenomena_.set_visual_seconds(system_workspace_.visual_seconds());phenomena_.append_system(out,sid,system->position.x,system->position.y,width,height,system_workspace_.viewport()?system_workspace_.viewport()->scale:1.,phenomena_options(sid));}
       system_workspace_.set_scene_environment(phenomena_.local_environment());
       system_workspace_.set_simulation_days(session_->frame().clock().simulation_days());
       system_workspace_.set_motion_running(session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!world.active_combat_encounter||world.active_combat_encounter->reconciled));
