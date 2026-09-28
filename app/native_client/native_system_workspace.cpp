@@ -310,7 +310,9 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
       ring.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
       ring.rotation=rotation_axis_angle({1.f,0.f,0.f},1.22f);
       ring.scale=radius*2.1f;
-      ring.material=accretion_disc_material3d(.34f,1.f,9800.,.7f);
+      // Two-armed grand-design density waves bake into the disc texture:
+      // crests read hotter and brighter through compressional heating.
+      ring.material=accretion_disc_material3d(.34f,1.f,9800.,.7f,.5f,2,.9f);
       ring.material.orbital_beaming_tint=.45f;
       star_instances.push_back(std::move(ring));}
     if(stellar_art_&&artwork)stellar_art_(out,{screen.x,screen.y},radius,*artwork,presentation_seconds(),field);
