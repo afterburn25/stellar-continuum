@@ -213,8 +213,9 @@ class NativeDiplomacyRuntimeTests(unittest.TestCase):
                 encoded = "{malformed" if fault == "malformed" else json.dumps(state)
                 notifications = {"mode": "paused_reload" if reload else "progress",
                                  "opened": True, "closed": True,
-                                 "items": 0 if reload else 2, "unread_before": 0 if reload else 2,
+                                 "items": 6 if reload else 2, "unread_before": 6 if reload else 2,
                                  "unread_after": 0, "focused_target": -1 if reload else 1,
+                                 "chronicle": True,
                                  "canonical_unchanged": True, "paused": True}
                 if fault == "notifications_missing": notification_line = ""
                 elif fault == "notifications_bad":
@@ -338,6 +339,7 @@ class NotificationProofTests(unittest.TestCase):
     def test_rejects_false_or_mistyped_claims_and_wrong_target(self):
         valid = {"mode": "progress", "opened": True, "closed": True, "items": 2,
                  "unread_before": 2, "unread_after": 0, "focused_target": 7,
+                 "chronicle": True,
                  "canonical_unchanged": True, "paused": True}
         self.assertEqual(_notifications("notifications=" + json.dumps(valid), "progress", 7), valid)
         for key, value in (("canonical_unchanged", False), ("paused", 1), ("items", True),
@@ -347,12 +349,22 @@ class NotificationProofTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     _notifications("notifications=" + json.dumps(bad), "progress", 7)
 
-    def test_rejects_retained_alerts_on_reload(self):
-        proof = {"mode": "paused_reload", "opened": True, "closed": True, "items": 2,
+    def test_accepts_consistent_retained_feed_on_reload(self):
+        proof = {"mode": "paused_reload", "opened": True, "closed": True, "items": 6,
+                 "unread_before": 6, "unread_after": 0, "focused_target": -1,
+                 "chronicle": True, "canonical_unchanged": True, "paused": True}
+        self.assertEqual(_notifications("notifications=" + json.dumps(proof),
+                                        "paused_reload", 7), proof)
+
+    def test_rejects_inconsistent_retained_feed_on_reload(self):
+        proof = {"mode": "paused_reload", "opened": True, "closed": True, "items": 6,
                  "unread_before": 2, "unread_after": 0, "focused_target": -1,
-                 "canonical_unchanged": True, "paused": True}
+                 "chronicle": True, "canonical_unchanged": True, "paused": True}
         with self.assertRaises(RuntimeError):
             _notifications("notifications=" + json.dumps(proof), "paused_reload", 7)
+        bad = dict(proof, items=True, unread_before=True)
+        with self.assertRaises(RuntimeError):
+            _notifications("notifications=" + json.dumps(bad), "paused_reload", 7)
 
     def test_rejects_malformed_duplicate_or_nonobject_proof(self):
         for value in ('{bad}', '{"opened":true,"opened":false}', '[]', 'null',
