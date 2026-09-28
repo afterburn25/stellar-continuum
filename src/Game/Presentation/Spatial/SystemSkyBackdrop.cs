@@ -12,8 +12,22 @@ public partial class SystemSkyBackdrop : Control
     private ShaderMaterial? _gasMaterial;
     private static Shader? _shader;
     private int? _systemId;
+    private Game.Presentation.PlanetIdentity.SystemSkyProfile? _profile;
     public int? SystemId => _systemId;
     public int StarCount => _stars.Length;
+    public void SetProfile(Game.Presentation.PlanetIdentity.SystemSkyProfile profile)
+    {
+        if(_profile==profile)return;
+        _systemId=null;SetSystem(profile.SystemId);_profile=profile;
+        _gasMaterial!.SetShaderParameter("scenery_seed",(float)(profile.Identity%1000003)/113f);
+        _gasMaterial.SetShaderParameter("gas_color",new Color(profile.NebulaColor));
+        _gasMaterial.SetShaderParameter("secondary_color",new Color(profile.DustColor));
+        _gasMaterial.SetShaderParameter("gas_density",profile.NebulaVisibility);
+        var random=new Random(unchecked((int)profile.Identity));
+        _stars=new SkyStar[profile.StarDensity];
+        for(int i=0;i<_stars.Length;i++)_stars[i]=new(new((float)random.NextDouble(),(float)random.NextDouble()),i%47==0?1.3f:.5f,new Color("b9c6d7",.25f+(float)random.NextDouble()*.45f),i%47==0);
+        QueueRedraw();
+    }
 
     public SystemSkyBackdrop()
     {

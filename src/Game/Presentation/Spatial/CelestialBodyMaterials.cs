@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Game.Presentation.PlanetIdentity;
 using Godot;
 
 namespace Game.Presentation.Spatial;
@@ -8,7 +10,7 @@ namespace Game.Presentation.Spatial;
 public static class CelestialBodyMaterials
 {
     public const string PlanetShaderPath = "res://assets/visual/shaders/celestial_planet.gdshader";
-    private readonly record struct Appearance(bool IsKnown, bool HasAtmosphere, SystemSpatialBodyVisualClass VisualClass, string? SourceKey);
+    private readonly record struct Appearance(bool IsKnown, bool HasAtmosphere, SystemSpatialBodyVisualClass VisualClass, string? SourceKey, PlanetPresentation? Identity);
     private sealed record MaterialEntry(Appearance Appearance, ShaderMaterial Material);
     private static readonly Dictionary<int, MaterialEntry> PlanetMaterials = new();
     private static Shader? _planetShader;
@@ -45,7 +47,8 @@ public static class CelestialBodyMaterials
         var sourceKey = known && SolBodyMaterials.IsCanonicalKey(body.SurfaceKey) ? body.SurfaceKey : null;
         var hasAtmosphere = known && body.Atmosphere is not null
             && body.Atmosphere != Game.Simulation.Models.PlanetaryAtmosphereRegime.Vacuum;
-        var appearance = new Appearance(known, hasAtmosphere, body.VisualClass, sourceKey);
+        var identity=known?body.Presentation:null;
+        var appearance = new Appearance(known, hasAtmosphere, body.VisualClass, sourceKey,identity);
         if (PlanetMaterials.TryGetValue(body.BodyId, out var entry) && entry.Appearance == appearance)
         {
             UpdateLighting(entry.Material, new Vector2(-body.OffsetX, -body.OffsetY));
@@ -73,7 +76,20 @@ public static class CelestialBodyMaterials
             body.VisualClass == SystemSpatialBodyVisualClass.IceGiant ? new Color("8bbbc4") : new Color("c5b598"));
         material.SetShaderParameter("atmosphere_strength", !hasAtmosphere ? 0.0f : ocean ? 0.20f :
             sourceKey == "venus" ? 0.15f : gas ? 0.12f : 0.0f);
+        if(identity is {CanonicalKey:null} p)
+        {
+            material.Shader=GD.Load<Shader>("res://assets/visual/shaders/planet_identity_disc.gdshader");
+            var configured=PlanetIdentityMaterials.Orbit(p);
+            foreach(var property in configured.Shader.GetShaderUniformList())
+            {
+                var name=property.AsGodotDictionary()["name"].AsString();
+                material.SetShaderParameter(name,configured.GetShaderParameter(name));
+            }
+            configured.Dispose();
+        }
+        else material.Shader=_planetShader;
         UpdateLighting(material, new Vector2(-body.OffsetX, -body.OffsetY));
+        if(PlanetMaterials.Count>=128&&!PlanetMaterials.ContainsKey(body.BodyId))PlanetMaterials.Remove(PlanetMaterials.Keys.First());
         PlanetMaterials[body.BodyId] = new MaterialEntry(appearance, material);
         return material;
     }
@@ -82,6 +98,7 @@ public static class CelestialBodyMaterials
     {
         var direction = towardStar.LengthSquared() > 0.0001f ? towardStar.Normalized() : new Vector2(-0.8f, -0.4f);
         material.SetShaderParameter("light_direction", new Vector3(direction.X * 0.86f, direction.Y * 0.86f, 0.54f).Normalized());
+        material.SetShaderParameter("sun_direction", new Vector3(direction.X*.86f,-direction.Y*.86f,.54f).Normalized());
     }
 
     /// <summary>Release the cache owner only; Godot nodes may still reference the material safely.</summary>

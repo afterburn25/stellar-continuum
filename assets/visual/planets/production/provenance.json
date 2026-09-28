@@ -1,0 +1,18 @@
+{
+  "asset": "assets/visual/planets/modifiers/mineral-detail-packed.png",
+  "dimensions": [
+    2048,
+    2048
+  ],
+  "channels": [
+    "mineral height",
+    "roughness",
+    "fine grain"
+  ],
+  "generator": "scripts/planet_art.py / periodic Fourier synthesis / numpy PCG64 seed 928317",
+  "source": "Original mathematical synthesis; no external image, model, LoRA or encoder used.",
+  "sha256": "de5350e47138dab63ee4b69dbbe73b5109f68ecc49720637a55334dd16f6c1bb",
+  "license": "Original project asset; no third-party asset license.",
+  "comfyModelUsed": null,
+  "comfyGenerationCompleted": false
+}

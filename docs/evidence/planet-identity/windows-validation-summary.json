@@ -1,0 +1,21 @@
+{
+  "captures": 110,
+  "resolutions": [
+    "1920x1080",
+    "1280x720"
+  ],
+  "nodeRange": [
+    394,
+    403
+  ],
+  "videoMemoryMiB": [
+    145.63,
+    276.5
+  ],
+  "processMemoryMiB": [
+    542.62,
+    892.12
+  ],
+  "limitations": "Synthetic specimens, RTX 3080 Ti / OpenGL compatibility; this is not a full campaign FPS benchmark.",
+  "failures": []
+}

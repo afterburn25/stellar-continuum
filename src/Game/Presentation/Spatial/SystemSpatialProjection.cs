@@ -4,6 +4,7 @@ using System.Linq;
 using Game.Simulation.Exploration;
 using Game.Simulation.Knowledge;
 using Game.Simulation.Models;
+using Game.Presentation.PlanetIdentity;
 
 namespace Game.Presentation.Spatial;
 
@@ -49,12 +50,14 @@ public sealed record SystemSpatialBodyMarker(
     bool HasCityLights = false,
     float OrbitalEccentricity = 0,
     float OrbitalInclinationDegrees = 0,
-    float OffsetHeight = 0)
+    float OffsetHeight = 0,
+    PlanetPresentation? Presentation = null,
+    PlanetarySolventRegime? AvailableSolvent = null, double? RadiationHazard = null, bool? HasSolidSurface = null)
 {
     // A terrestrial Earth still illustrates oceans without becoming an immersed environment.
     public bool HasIllustratedOcean => HasDetailedEnvironment &&
         VisualClass is not (SystemSpatialBodyVisualClass.UnknownPlanet or SystemSpatialBodyVisualClass.UnknownMoon) &&
-        (VisualClass == SystemSpatialBodyVisualClass.Oceanic || SurfaceKey == "earth");
+        (VisualClass == SystemSpatialBodyVisualClass.Oceanic || SurfaceKey == "earth" || Presentation?.Variant.OceanCoverage > .25f);
 }
 
 public enum SystemSpatialInfrastructureState
@@ -83,7 +86,7 @@ public sealed record SystemSpatialSnapshot(
     IReadOnlyList<SystemSpatialInfrastructureMarker>? Infrastructure = null,
     StellarPrimaryClass? StellarClass = null,
     StellarPrimaryClass? SecondaryStellarClass = null,
-    StellarPrimaryClass? TertiaryStellarClass = null);
+    StellarPrimaryClass? TertiaryStellarClass = null, SystemSkyProfile? Sky = null, long CampaignSeed = 0);
 
 /// <summary>
 /// Converts the simulation-owned fog-safe exploration read model into deterministic schematic
@@ -95,7 +98,7 @@ public sealed class SystemSpatialProjection
     private const float FirstMoonOrbit = 40.0f;
     private const float MoonOrbitStep = 24.0f;
 
-    public SystemSpatialSnapshot Build(KnownSystemExplorationView system)
+    public SystemSpatialSnapshot Build(KnownSystemExplorationView system, long campaignSeed = 0, double? radialFraction = null)
     {
         ArgumentNullException.ThrowIfNull(system);
         if (system.SurveyLevel < SystemSurveyLevel.PartiallySurveyed || !system.HasReconnaissanceCatalog)
@@ -135,7 +138,7 @@ public sealed class SystemSpatialProjection
             var y = point.Y;
             var displayRadius = ResolveDisplayRadius(body);
             var marker = BuildMarker(body, x, y, orbitRadius, displayRadius, system.CatalogPresetId)
-                with { OffsetHeight = point.Height };
+                with { OffsetHeight = point.Height, Presentation = ResolveIdentity(body, system, campaignSeed, radialFraction) };
             markers.Add(marker);
             positions[body.BodyId] = (x, y, ParentExtent(body));
         }
@@ -157,7 +160,8 @@ public sealed class SystemSpatialProjection
             var x = parent.X + MathF.Cos(angle) * orbitRadius;
             var y = parent.Y + MathF.Sin(angle) * orbitRadius;
             var displayRadius = ResolveDisplayRadius(body);
-            var marker = BuildMarker(body, x, y, orbitRadius, displayRadius, system.CatalogPresetId);
+            var marker = BuildMarker(body, x, y, orbitRadius, displayRadius, system.CatalogPresetId)
+                with { Presentation = ResolveIdentity(body, system, campaignSeed, radialFraction) };
             markers.Add(marker);
             positions[body.BodyId] = (x, y, displayRadius);
         }
@@ -182,7 +186,22 @@ public sealed class SystemSpatialProjection
             markers.OrderBy(marker => marker.BodyId).ToArray(), system.CatalogPresetId,
             StellarClass: system.StellarClass,
             SecondaryStellarClass: system.SecondaryStellarClass,
-            TertiaryStellarClass: system.TertiaryStellarClass);
+            TertiaryStellarClass: system.TertiaryStellarClass,
+            Sky: SystemSkyResolver.Resolve(campaignSeed, system.SystemId, system.StellarClass,
+                system.SecondaryStellarClass, system.TertiaryStellarClass, system.Archetype, radialFraction), CampaignSeed: campaignSeed);
+    }
+
+    private static PlanetPresentation? ResolveIdentity(PlanetaryBodyExplorationView body, KnownSystemExplorationView system, long seed, double? radial)
+    {
+        if (!system.HasDetailedSurvey || !body.HasDetailedEnvironment || body.MassEarth is null || body.GravityG is null ||
+            body.TemperatureKelvin is null || body.PressureKPa is null || body.Atmosphere is null || body.AvailableSolvent is null ||
+            body.RadiationHazard is null || body.IsImmersedEnvironment is null || body.HasSolidSurface is null) return null;
+        var facts = new PlanetaryBodyState(body.BodyId,system.SystemId,body.ParentBodyId,body.OrbitIndex,body.Name,body.Kind,body.RadiusEarth,body.MassEarth.Value,
+            new(body.GravityG.Value,body.TemperatureKelvin.Value,body.PressureKPa.Value,body.Atmosphere.Value,body.AvailableSolvent.Value,body.RadiationHazard.Value,body.IsImmersedEnvironment.Value,body.HasSolidSurface.Value),
+            false,body.HasRareResource==true,body.HasAnomaly==true,body.HasPreWarpCivilization==true,body.OrbitalEccentricity,body.OrbitalInclinationDegrees);
+        var star=new StarSystemState(system.SystemId,system.CatalogName,System.Numerics.Vector2.Zero,system.Archetype??StarArchetype.Standard,
+            false,false,false,false,system.CatalogPresetId,system.StellarClass,system.SecondaryStellarClass,system.TertiaryStellarClass);
+        return PlanetPresentationResolver.Resolve(facts,star,seed,radialFraction:radial);
     }
 
     private static SystemSpatialBodyMarker BuildMarker(
@@ -215,7 +234,10 @@ public sealed class SystemSpatialProjection
             body.Atmosphere,
             body.HasDetailedEnvironment && catalogPresetId == "sol-v1" ? body.Name.ToLowerInvariant() : null,
             OrbitalEccentricity: (float)body.OrbitalEccentricity,
-            OrbitalInclinationDegrees: (float)body.OrbitalInclinationDegrees);
+            OrbitalInclinationDegrees: (float)body.OrbitalInclinationDegrees,
+            AvailableSolvent: body.HasDetailedEnvironment ? body.AvailableSolvent : null,
+            RadiationHazard: body.HasDetailedEnvironment ? body.RadiationHazard : null,
+            HasSolidSurface: body.HasDetailedEnvironment ? body.HasSolidSurface : null);
 
     private static float ResolveDisplayRadius(PlanetaryBodyExplorationView body) =>
         SystemCelestialScale.BodyRadius(body.RadiusEarth, body.Kind);

@@ -43,6 +43,7 @@ public partial class PlanetSurfaceView
         // Match the ordinary surface environment after an orbital round trip.
         _environment.FogDensity = .00032f;
         _environment.AmbientLightEnergy = .42f;
+        ApplyIdentityAtmosphere();
         _camera.Near = .5f; _camera.Far = 3200;
     }
 
@@ -92,6 +93,7 @@ public partial class PlanetSurfaceView
         }
         _descentSky = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/visual/shaders/descent_sky.gdshader") };
         _descentSky.SetShaderParameter("seed", (float)(body.BodyId % 1024));
+        if(body.Presentation is {} identity) PlanetIdentity.PlanetIdentityMaterials.Sky(_descentSky,identity.Sky,identity);
         _environment.Sky.SkyMaterial = _descentSky;
         UpdateOrbitalEnvironment();
         UpdateCamera();
@@ -145,11 +147,13 @@ public partial class PlanetSurfaceView
         _descentSky.SetShaderParameter("air_density", density);
         _descentSky.SetShaderParameter("sky_color", _skyMaterial.SkyTopColor);
         _descentSky.SetShaderParameter("horizon_color", _skyMaterial.SkyHorizonColor);
+        if(_planetIdentity is {} identity)
+            _descentSky.SetShaderParameter("atmosphere",Math.Clamp(identity.AtmosphereDensity*1.85f*density,0,.985f));
         _environment.FogEnabled = _hasAtmosphere && altitude < 30000;
         // Meet the grounded scene at the same final values, while the high
         // atmosphere remains thin and dim.
-        _environment.FogDensity = .00032f * density;
-        _environment.AmbientLightEnergy = .12f + density * .30f;
+        _environment.FogDensity = (_planetIdentity is {} p?.00008f+.00065f*p.AtmosphereDensity*p.Variant.Haze:.00032f) * density;
+        _environment.AmbientLightEnergy = .075f + density * .30f;
         if (_orbitalWorld is not null) _orbitalWorld.Visible = altitude > 15000;
         if (_regionalTerrain is not null) _regionalTerrain.Visible = altitude < 100000;
     }

@@ -29,7 +29,8 @@ public sealed record UiSurfaceSnapshot(int ColonyId, int BodyId, string PlanetNa
     string SustenanceStatus, string SustenanceRecoveryAction,
     double WorkforceAvailableMillions, double WorkforceDemandMillions,
     double WorkingAgePopulationMillions, double EmployedPopulationMillions, double EmploymentRate,
-    double FoodReserveDays, double WaterReserveDays, double HubUpgradeDaysRemaining = 0);
+    double FoodReserveDays, double WaterReserveDays, double HubUpgradeDaysRemaining = 0,
+    Game.Presentation.PlanetIdentity.PlanetPresentation? Presentation = null);
 public sealed record UiSurfaceBuilding(int Id, string TypeId, string Name, float X, float Z,
     float RotationDegrees, double Progress, double Cost, bool Complete, bool Powered,
     bool CanUpgrade = false, string? UpgradeName = null, double UpgradeCreditCost = 0,

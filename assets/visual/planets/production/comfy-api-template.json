@@ -1,0 +1,126 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "REPLACE_WITH_LICENSED_SDXL_CHECKPOINT.safetensors"
+    }
+  },
+  "2": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "1",
+        1
+      ],
+      "text": "Photorealistic scientific planetary visualization, Terran, Continental Blue, seamless 2:1 equirectangular planetary albedo map, no sphere, no sky, no perspective, no terminator, uniform diffuse illumination, longitude wraps seamlessly at left and right edges, mineral and terrain detail, natural albedo palette #49634b and #92846a, no fictional biological habitability assumptions"
+    }
+  },
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "1",
+        1
+      ],
+      "text": "cartoon, anime, toy, game board, oversaturated, glowing neon terrain, text, logo, watermark, frame, ships, people, buildings, artificial cities, blurry, low resolution, duplicated planet, baked interface"
+    }
+  },
+  "4": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 512,
+      "batch_size": 1
+    }
+  },
+  "5": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "2",
+        0
+      ],
+      "negative": [
+        "3",
+        0
+      ],
+      "latent_image": [
+        "4",
+        0
+      ],
+      "seed": 381982540238668,
+      "steps": 32,
+      "cfg": 5.5,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "denoise": 1.0
+    }
+  },
+  "6": {
+    "class_type": "LatentUpscale",
+    "inputs": {
+      "samples": [
+        "5",
+        0
+      ],
+      "upscale_method": "bislerp",
+      "width": 2048,
+      "height": 1024,
+      "crop": "disabled"
+    }
+  },
+  "7": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "2",
+        0
+      ],
+      "negative": [
+        "3",
+        0
+      ],
+      "latent_image": [
+        "6",
+        0
+      ],
+      "seed": 381982540238668,
+      "steps": 18,
+      "cfg": 5.0,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "denoise": 0.28
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "7",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "8",
+        0
+      ],
+      "filename_prefix": "stellar-candidates/terran-01-orbital"
+    }
+  }
+}

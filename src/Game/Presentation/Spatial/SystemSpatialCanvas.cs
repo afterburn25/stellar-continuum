@@ -369,6 +369,7 @@ public partial class SystemSpatialCanvas : Control
         }
         _sky.Size = size;
         _sky.SetSystem(_snapshot!.SystemId);
+        if(_snapshot.Sky is {} profile)_sky.SetProfile(profile);
     }
 
     private void DrawHeader(SystemSpatialSnapshot snapshot)

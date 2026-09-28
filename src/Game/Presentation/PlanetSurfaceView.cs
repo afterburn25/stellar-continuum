@@ -195,7 +195,7 @@ public partial class PlanetSurfaceView : Control
         VideoSettingsService.ApplyToViewport(_viewport);
         _refresh -= delta;
         _messageRemaining -= delta;
-        if (_refresh <= 0) { _refresh = .15; RefreshSnapshot(); }
+        if (_refresh <= 0) { _refresh = .15; if (!_visualPreview) RefreshSnapshot(); }
         if (InputBlocked)
         {
             _orbitDragging = _leftPanCandidate = _leftPanMoved = false;
@@ -598,9 +598,10 @@ public partial class PlanetSurfaceView : Control
             _selectedBuildingId = null;
         _snapshot = next;
         ApplyWorldPalette(next.SurfaceVisualClass, next.BodyId);
+        ApplyPlanetIdentity(next.Presentation);
         ApplySettlementVisual(next);
         ApplyHubVisual(next);
-        _title.Text = $"{next.PlanetName.ToUpperInvariant()}  /  {next.ColonyName}";
+        _title.Text = $"{next.PlanetName.ToUpperInvariant()}  /  {next.Presentation?.Classification.Name ?? next.ColonyName}";
         var availablePower = next.PowerSupply + next.StorageDischargePerDay;
         _resources.Text = $"{next.Currency.Code}  {next.Currency.Format(next.Credits, includeCode: false)}     Materials  {next.Industry:N0}";
         _colonyFacts["Population"].Text = next.SustenanceDeclining
@@ -767,9 +768,9 @@ public partial class PlanetSurfaceView : Control
             var px = axis[x];
             var pz = axis[z];
             var index = z * (segments + 1) + x;
-            vertices[index] = new(px, SurfaceConstruction.TerrainHeight(px, pz), pz);
-            normals[index] = new Vector3(SurfaceConstruction.TerrainHeight(px - 1, pz) - SurfaceConstruction.TerrainHeight(px + 1, pz),
-                2, SurfaceConstruction.TerrainHeight(px, pz - 1) - SurfaceConstruction.TerrainHeight(px, pz + 1)).Normalized();
+            vertices[index] = new(px, VisualTerrainHeight(px, pz), pz);
+            normals[index] = new Vector3(VisualTerrainHeight(px - 1, pz) - VisualTerrainHeight(px + 1, pz),
+                2, VisualTerrainHeight(px, pz - 1) - VisualTerrainHeight(px, pz + 1)).Normalized();
             var tangent = Vector3.Right.Slide(normals[index]).Normalized();
             tangents[index * 4] = tangent.X; tangents[index * 4 + 1] = tangent.Y;
             tangents[index * 4 + 2] = tangent.Z; tangents[index * 4 + 3] = -1;
@@ -791,7 +792,7 @@ public partial class PlanetSurfaceView : Control
         arrays[(int)Godot.Mesh.ArrayType.Index] = indices;
         var mesh = new ArrayMesh();
         mesh.AddSurfaceFromArrays(Godot.Mesh.PrimitiveType.Triangles, arrays);
-        _terrainMaterial = new ShaderMaterial
+        _terrainMaterial ??= new ShaderMaterial
             { Shader = GD.Load<Shader>("res://assets/visual/shaders/colony_terrain.gdshader") };
         return new MeshInstance3D { Name = "Terrain", Mesh = mesh, MaterialOverride = _terrainMaterial };
     }

@@ -322,7 +322,7 @@ internal static class SpatialPresentationValidation
 
         var procedural = projection.Build(known with { CatalogPresetId = null });
         Require(procedural.Bodies.Single(body => body.Label == "Jupiter").VisualClass == SystemSpatialBodyVisualClass.IceGiant &&
-                procedural.Bodies.All(body => body.SurfaceKey is null && !body.HasIllustratedOcean),
+                procedural.Bodies.All(body => body.SurfaceKey is null && body.Presentation?.CanonicalKey is null),
             "a procedural world's name activated canonical Sol appearance");
         var reconBodies = known.PlanetaryBodies.Select(body => CreateReconBody(body.BodyId, body.ParentBodyId,
             body.OrbitIndex, body.Name, body.Kind, body.RadiusEarth)).ToArray();

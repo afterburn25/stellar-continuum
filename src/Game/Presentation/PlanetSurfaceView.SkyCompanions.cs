@@ -21,14 +21,14 @@ public partial class PlanetSurfaceView
 
         // The read model supplies surveyed moons of the active surface body only. No
         // decorative companion is invented when orbital knowledge contains none.
-        var moons = ReadSkyCompanions().OrderBy(moon => moon.BodyId).ToArray();
+        var moons = ReadSkyCompanions().Where(body=>body.HasDetailedEnvironment).OrderBy(moon => moon.BodyId).Take(6).ToArray();
         var ids = moons.Select(moon => moon.BodyId).ToHashSet();
         foreach (var stale in _skyCompanions.Keys.Where(id => !ids.Contains(id)).ToArray())
             RemoveSkyCompanion(stale);
 
         foreach (var moon in moons)
         {
-            var visualKey = $"{moon.SurfaceKey}|{moon.VisualClass}|{moon.HasDetailedEnvironment}";
+            var visualKey = $"{moon.SurfaceKey}|{moon.Presentation?.Identity}|{moon.VisualClass}|{moon.HasDetailedEnvironment}";
             if (!_skyCompanions.TryGetValue(moon.BodyId, out var mesh))
             {
                 mesh = new MeshInstance3D
@@ -36,13 +36,15 @@ public partial class PlanetSurfaceView
                     Name = $"SkyMoon_{moon.BodyId}",
                     Mesh = new SphereMesh
                     {
-                        Radius = SkyCompanionRadius, Height = SkyCompanionRadius * 2,
+                        Radius = CompanionRadius(moon), Height = CompanionRadius(moon) * 2,
                         RadialSegments = 96, Rings = 48,
                     },
                     CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
                 };
                 _world.AddChild(mesh);
                 _skyCompanions[moon.BodyId] = mesh;
+                if(moon.Presentation?.Modifiers.HasFlag(PlanetIdentity.PlanetVisualModifier.Ringed)==true)
+                    SystemScene3D.AddRings(mesh,CompanionRadius(moon));
             }
             if (!_skyCompanionVisualKeys.TryGetValue(moon.BodyId, out var previousKey) || previousKey != visualKey)
             {
@@ -61,6 +63,7 @@ public partial class PlanetSurfaceView
                 var atmosphericDaylight = SurfaceVisualClass == "airless" ? 1f :
                     Mathf.Lerp(.42f, .92f, Mathf.Clamp((-towardSun.Y + .16f) / .72f, 0, 1));
                 material.SetShaderParameter("sun_direction_world", towardSun);
+                material.SetShaderParameter("sun_direction", mesh.Basis.Inverse()*towardSun);
                 material.SetShaderParameter("sky_visibility", atmosphericDaylight);
             }
         }
@@ -68,6 +71,8 @@ public partial class PlanetSurfaceView
 
     private static ShaderMaterial CreateSkyCompanionMaterial(SystemSpatialBodyMarker moon)
     {
+        if(moon.Presentation is {} identity && (identity.CanonicalKey is null || moon.Kind!=Game.Simulation.Models.PlanetaryBodyKind.Moon))
+            return (ShaderMaterial)PlanetMaterial3D.Create(moon);
         var material = new ShaderMaterial
         {
             Shader = GD.Load<Shader>("res://assets/visual/shaders/surface_sky_moon.gdshader")
@@ -85,11 +90,16 @@ public partial class PlanetSurfaceView
 
     private static Vector3 SkyCompanionDirection(SystemSpatialBodyMarker moon)
     {
+        if(moon.Kind!=Game.Simulation.Models.PlanetaryBodyKind.Moon)return new Vector3(.45f,.17f,-.87f);
         if (moon.SurfaceKey == "moon") return new Vector3(-.57f, .32f, -.75f);
         var azimuth = (moon.BodyId * 2.3999632f) % MathF.Tau;
         var altitude = -.12f + ((moon.BodyId * 37) % 9) * .075f;
         return new Vector3(MathF.Cos(azimuth), altitude, MathF.Sin(azimuth));
     }
+    // Schematic angular sizes are deliberately bounded. The current simulation stores orbit
+    // order, not satellite separation in kilometres; these are illustrations, not ephemerides.
+    private static float CompanionRadius(SystemSpatialBodyMarker body)=>body.Kind==Game.Simulation.Models.PlanetaryBodyKind.Moon
+        ?Math.Clamp((float)body.RadiusEarth*40,6,23):Math.Clamp((float)body.RadiusEarth*14,32,135);
 
     private void RemoveSkyCompanion(int bodyId)
     {

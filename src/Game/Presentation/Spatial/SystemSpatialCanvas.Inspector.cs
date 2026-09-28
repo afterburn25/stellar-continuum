@@ -7,6 +7,7 @@ public partial class SystemSpatialCanvas
 {
     private PlanetInspectorPanel? _inspector;
     public Func<int, bool>? CanOpenSurface { get; set; }
+    public Func<bool>? ShowPlanetDebug { get; set; }
     public event Action<int>? OpenSurfaceRequested;
 
     private void UpdatePlanetInspector()
@@ -29,6 +30,7 @@ public partial class SystemSpatialCanvas
             };
             AddChild(_inspector);
         }
+        _inspector.DeveloperDetails=ShowPlanetDebug?.Invoke()==true;
         _inspector.Visible = IsObjectInspectorOpen?.Invoke() != true;
         var selected = _focusedBodyId ?? _selectedBodyId;
         _inspector.Position = new(Size.X - 282, 84);

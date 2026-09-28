@@ -126,7 +126,7 @@ public partial class SystemScene3D : Control
         ResizeViewport(); // Presentation can arrive before the control's first layout notification.
         var changedSystem = _snapshot?.SystemId != snapshot.SystemId;
         var bodiesChanged = changedSystem || _snapshot is null || !_snapshot.Bodies.SequenceEqual(snapshot.Bodies) ||
-            _snapshot.StarArchetype != snapshot.StarArchetype || _snapshot.StellarClass != snapshot.StellarClass ||
+            _snapshot.StarArchetype != snapshot.StarArchetype || _snapshot.StellarClass != snapshot.StellarClass || _snapshot.Sky != snapshot.Sky ||
             _snapshot.SecondaryStellarClass != snapshot.SecondaryStellarClass || _snapshot.TertiaryStellarClass != snapshot.TertiaryStellarClass ||
             MathF.Abs(_snapshot.DesignRadius - snapshot.DesignRadius) > .001f;
         var infrastructureChanged = changedSystem || _snapshot is null ||
@@ -222,8 +222,10 @@ public partial class SystemScene3D : Control
         // Approach from the day-side quarter; further mouse orbiting remains unrestricted.
         var towardStar = -body.Root.Position.Normalized();
         _targetYaw = MathF.Atan2(towardStar.X, towardStar.Z) + .72f;
-        _targetPitch = body.Marker.SurfaceKey == "saturn" ? .80f : .34f;
-        var framingRadius = body.Marker.SurfaceKey == "saturn" && body.Marker.HasDetailedEnvironment ? 8f : 3.8f;
+        var ringed=body.Marker.HasDetailedEnvironment && (body.Marker.SurfaceKey=="saturn" ||
+            body.Marker.Presentation?.Modifiers.HasFlag(Game.Presentation.PlanetIdentity.PlanetVisualModifier.Ringed)==true);
+        _targetPitch = ringed ? .80f : .34f;
+        var framingRadius = ringed ? 8f : 3.8f;
         _targetDistance = Math.Clamp(body.Radius * framingRadius, body.Radius + .025f, FitDistance * .72f);
     }
 
@@ -343,6 +345,7 @@ public partial class SystemScene3D : Control
         _camera.Near = .005f;
         var sky = (ShaderMaterial)_world.GetChildren().OfType<WorldEnvironment>().Single().Environment.Sky.SkyMaterial;
         sky.SetShaderParameter("seed", (float)snapshot.SystemId);
+        if (snapshot.Sky is {} profile) Game.Presentation.PlanetIdentity.PlanetIdentityMaterials.Sky(sky,profile);
         BuildLocalSky(snapshot.SystemId);
         BuildStar(snapshot);
         foreach (var marker in snapshot.Bodies.OrderBy(marker => marker.Kind).ThenBy(marker => marker.BodyId)) BuildBody(marker);
@@ -438,7 +441,7 @@ public partial class SystemScene3D : Control
         root.AddChild(globe);
         ((ShaderMaterial)globe.MaterialOverride).SetShaderParameter("sun_direction", root.Basis.Inverse() * -position.Normalized());
         if (marker.HasDetailedEnvironment && marker.SurfaceKey == "saturn") globe.Scale = new(1, .91f, 1);
-        if (marker.HasIllustratedOcean && marker.SurfaceKey != "earth")
+        if (marker.HasIllustratedOcean && marker.SurfaceKey != "earth" && marker.Presentation is not {CanonicalKey:null})
         {
             var clouds = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/visual/shaders/planet_clouds.gdshader") };
             clouds.SetShaderParameter("seed", (float)marker.BodyId);
@@ -456,12 +459,14 @@ public partial class SystemScene3D : Control
             _atmosphereShader ??= GD.Load<Shader>("res://assets/visual/shaders/atmosphere_shell.gdshader");
             var haze = new ShaderMaterial { Shader = _atmosphereShader };
             haze.SetShaderParameter("atmosphere_color", PlanetMaterial3D.AtmosphereColor(marker));
-            haze.SetShaderParameter("density", marker.VisualClass is SystemSpatialBodyVisualClass.GasGiant or SystemSpatialBodyVisualClass.IceGiant ? .22f : .14f);
+            haze.SetShaderParameter("density", marker.Presentation is {} p ? .03f+p.AtmosphereDensity*.19f :
+                marker.VisualClass is SystemSpatialBodyVisualClass.GasGiant or SystemSpatialBodyVisualClass.IceGiant ? .22f : .14f);
             atmosphere = new MeshInstance3D { Name = "Atmosphere", CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
                 Mesh = new SphereMesh { Radius = radius * 1.025f, Height = radius * 2.05f, RadialSegments = 128, Rings = 64 }, MaterialOverride = haze };
             root.AddChild(atmosphere);
         }
-        if (marker.HasDetailedEnvironment && marker.SurfaceKey == "saturn") AddRings(root, radius);
+        if (marker.HasDetailedEnvironment && (marker.SurfaceKey == "saturn" ||
+            marker.Presentation?.Modifiers.HasFlag(Game.Presentation.PlanetIdentity.PlanetVisualModifier.Ringed)==true)) AddRings(root, radius);
         _bodies[marker.BodyId] = new BodyVisual(marker, root, globe, radius, atmosphere);
     }
 
@@ -502,7 +507,7 @@ public partial class SystemScene3D : Control
         return new Vector3(marker.OffsetX, marker.OrbitRadius * inclination, marker.OffsetY);
     }
 
-    private static void AddRings(Node3D parent, float radius)
+    public static void AddRings(Node3D parent, float radius)
     {
         const int segments = 192;
         const float innerScale = 1.16f;
@@ -535,7 +540,7 @@ public partial class SystemScene3D : Control
         var random = new Random(seed ^ 0x53544152);
         var starMaterial = new StandardMaterial3D { AlbedoColor = new Color("c8d5df"), EmissionEnabled = true, Emission = new Color("a9c9df"), EmissionEnergyMultiplier = 1.6f, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
         var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-            Mesh = new SphereMesh { Radius = .16f, Height = .32f, RadialSegments = 8, Rings = 4 }, InstanceCount = 560 };
+            Mesh = new SphereMesh { Radius = .16f, Height = .32f, RadialSegments = 8, Rings = 4 }, InstanceCount = _snapshot?.Sky?.StarDensity ?? 560 };
         for (var index = 0; index < multi.InstanceCount; index++)
         {
             var direction = new Vector3((float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1).Normalized();
