@@ -1511,6 +1511,25 @@ class NativeCampaign final {
       system_workspace_.close();
     }
     std::cout<<"multiple_stars=binary_and_triple_components_paths_and_artwork_submitted_passed\n";
+    {
+      const auto bh_system=std::ranges::find_if(revealed.systems,[&](const auto& s){
+        return s.stellar_object&&stellar::core::stellar_object_definition(s.stellar_object->type).black_hole;});
+      if(bh_system==revealed.systems.end()||!enter_system(bh_system->id,width,height))
+        throw std::runtime_error("Black-hole smoke needs a revealed black-hole system.");
+      const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);int settled=0;
+      do { route({{InputEventType::PointerMove,{0,0}}});(void)scene(width,height);settled=artwork_ready()?settled+1:0;
+        if(std::chrono::steady_clock::now()>deadline)throw std::runtime_error("Black-hole system artwork failed to settle.");
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+      }while(settled<40);
+      const auto rendered=scene(width,height);
+      const auto disc=std::ranges::any_of(rendered.world,[](const auto& command){
+        const auto*view=std::get_if<Scene3DView>(&command);
+        return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+      if(!disc)throw std::runtime_error("Black-hole system emitted no beamed accretion disc.");
+      draw(rendered,L"-black-hole");
+      system_workspace_.close();
+    }
+    std::cout<<"black_hole=accretion_disc_artwork_submitted_passed\n";
     if(!enter_system(sol_system_id,width,height))throw std::runtime_error("Small-body smoke cannot enter Sol.");
     capture_planet(L"-belts-sol-overview");
     const auto belts_launcher=trf("SMALLBODY_LAUNCHER",{""},"BELTS & DEBRIS  {0}");
