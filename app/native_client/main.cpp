@@ -1336,11 +1336,13 @@ class NativeCampaign final {
     if(!developer_diagnostics_.visible())return;
     std::ostringstream out;
     out<<"GPU scene3d: draws "<<stats.draw_calls
-       <<" · instances "<<stats.submitted_instances
+       <<" · inst "<<stats.submitted_instances
        <<" · culled "<<stats.culled_instances
-       <<" · shadows "<<stats.shadow_casters
-       <<" · lod "<<stats.lod_instances
-       <<" · stream-fallbacks "<<stats.streamed_fallbacks;
+       <<" · sh "<<stats.shadow_casters
+       <<" · lod "<<stats.lod_instances<<'+'<<stats.lod_fades<<'f'
+       <<" · partial "<<stats.streamed_partial_binds
+       <<" · fb "<<stats.streamed_fallbacks
+       <<(stats.hdr?" · hdr":" · unorm");
     developer_diagnostics_.set_renderer_stats(out.str());
   }
   [[nodiscard]] bool new_game_ready()const{return session_->new_campaign_transition()==NewCampaignTransition::Ready;}
