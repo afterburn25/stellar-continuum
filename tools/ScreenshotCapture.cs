@@ -120,8 +120,24 @@ public partial class ScreenshotCapture : Node
         var menu = _main.GetNode<MainMenuLayer>("MainMenuLayer");
         var dialog = FindNode<ConfirmationDialog>(menu)
             ?? throw new InvalidOperationException("Campaign confirmation dialog did not instantiate.");
-        await WaitForStartupLoadingAsync(menu, captureEvidence: focus is "loading-splash" or "loading-contexts");
+        if (focus == "catalog-artwork")
+        {
+            // This focused suite starts after readiness; startup's intermediate splash
+            // frames have their own dedicated suite and can pass during cold art import.
+            for (var frame = 0; frame < 1800 && menu.IsLoadingCampaign; frame++) await WaitFramesAsync(1);
+            Require(menu.HasCompletedStartupLoading && _main is IntegratedMain { UiRuntimeReady: true },
+                "Artwork review could not reach the initialized campaign.");
+        }
+        else await WaitForStartupLoadingAsync(menu, captureEvidence: focus is "loading-splash" or "loading-contexts");
         await WaitFramesAsync(30);
+        if (focus == "catalog-artwork")
+        {
+            await ClickNamedButtonAsync(menu, "ResumeCampaign");
+            await WaitForRefreshAsync();
+            _main.UiResumeAtSpeed(SimulationClock.SpeedLevel.Paused);
+            await VerifyCatalogArtworkAsync();
+            return;
+        }
         if (focus == "loading-splash")
         {
             GD.Print("STELLAR_FOCUSED_LOADING_SPLASH_COMPLETE");

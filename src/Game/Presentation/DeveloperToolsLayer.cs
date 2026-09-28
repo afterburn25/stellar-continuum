@@ -68,6 +68,14 @@ public partial class DeveloperToolsLayer : CanvasLayer
             _result.Modulate = VisualUi.Muted;
         }, VisualIconLibrary.Save);
         save.Name = "DeveloperSave"; body.AddChild(save);
+        var artwork = VisualUi.Button("Module & research artwork", "Browse the equipment and research art library.", () =>
+        {
+            if (_overlay.GetNodeOrNull<CatalogArtworkGallery>("CatalogArtworkGallery") is not null) return;
+            var gallery = new CatalogArtworkGallery();
+            gallery.CloseRequested += () => _close.GrabFocus();
+            _overlay.AddChild(gallery);
+        });
+        artwork.Name = "DeveloperArtworkLibrary"; body.AddChild(artwork);
         AddChild(_overlay);
         GetViewport().GuiFocusChanged += KeepToolsFocus;
     }
@@ -109,6 +117,7 @@ public partial class DeveloperToolsLayer : CanvasLayer
     public override void _Input(InputEvent input)
     {
         if (!IsOpen || _main.UiIsMenuOpen) return;
+        if (_overlay.GetNodeOrNull<CatalogArtworkGallery>("CatalogArtworkGallery") is not null) return;
         if (input.IsActionPressed("ui_cancel")) { Close(); GetViewport().SetInputAsHandled(); }
     }
 

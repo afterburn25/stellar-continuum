@@ -1,0 +1,3907 @@
+{
+  "schemaVersion": 1,
+  "research": [
+    {
+      "id": "systems_engineering",
+      "name": "Systems Engineering",
+      "domain": "foundations",
+      "depth": 0,
+      "art": "research-foundations"
+    },
+    {
+      "id": "computational_science",
+      "name": "Computational Science",
+      "domain": "foundations",
+      "depth": 0,
+      "art": "research-foundations"
+    },
+    {
+      "id": "advanced_material_characterization",
+      "name": "Advanced Material Characterization",
+      "domain": "foundations",
+      "depth": 0,
+      "art": "research-foundations"
+    },
+    {
+      "id": "high_energy_physics",
+      "name": "High-Energy Physics",
+      "domain": "foundations",
+      "depth": 0,
+      "art": "research-foundations"
+    },
+    {
+      "id": "quantum_measurement",
+      "name": "Quantum Measurement",
+      "domain": "foundations",
+      "depth": 1,
+      "art": "research-foundations"
+    },
+    {
+      "id": "space_weather_science",
+      "name": "Space Weather Science",
+      "domain": "foundations",
+      "depth": 0,
+      "art": "research-foundations"
+    },
+    {
+      "id": "exoplanetary_science",
+      "name": "Exoplanetary Science",
+      "domain": "foundations",
+      "depth": 0,
+      "art": "research-foundations"
+    },
+    {
+      "id": "gravitational_physics",
+      "name": "Gravitational Physics",
+      "domain": "foundations",
+      "depth": 1,
+      "art": "research-foundations"
+    },
+    {
+      "id": "field_theory",
+      "name": "Unified Field Modeling",
+      "domain": "foundations",
+      "depth": 2,
+      "art": "research-foundations"
+    },
+    {
+      "id": "complex_systems_science",
+      "name": "Complex Systems Science",
+      "domain": "foundations",
+      "depth": 1,
+      "art": "research-foundations"
+    },
+    {
+      "id": "xenochemical_methods",
+      "name": "Xenochemical Methods",
+      "domain": "foundations",
+      "depth": 1,
+      "art": "research-foundations"
+    },
+    {
+      "id": "comparative_biology",
+      "name": "Comparative Xenobiology",
+      "domain": "foundations",
+      "depth": 2,
+      "art": "research-foundations"
+    },
+    {
+      "id": "advanced_fission",
+      "name": "Advanced Fission Systems",
+      "domain": "energy",
+      "depth": 1,
+      "art": "research-energy"
+    },
+    {
+      "id": "fusion_power",
+      "name": "Practical Fusion Power",
+      "domain": "energy",
+      "depth": 1,
+      "art": "research-energy"
+    },
+    {
+      "id": "high_temp_superconductors",
+      "name": "High-Temperature Superconductors",
+      "domain": "energy",
+      "depth": 2,
+      "art": "research-energy"
+    },
+    {
+      "id": "pulsed_fusion",
+      "name": "Pulsed Fusion Reactors",
+      "domain": "energy",
+      "depth": 3,
+      "art": "research-energy"
+    },
+    {
+      "id": "aneutronic_fusion",
+      "name": "Aneutronic Fusion",
+      "domain": "energy",
+      "depth": 4,
+      "art": "research-energy"
+    },
+    {
+      "id": "orbital_solar",
+      "name": "Orbital Solar Power",
+      "domain": "energy",
+      "depth": 4,
+      "art": "research-energy"
+    },
+    {
+      "id": "beamed_power",
+      "name": "Beamed Power Transmission",
+      "domain": "energy",
+      "depth": 5,
+      "art": "research-energy"
+    },
+    {
+      "id": "superconducting_grid",
+      "name": "Superconducting Power Grid",
+      "domain": "energy",
+      "depth": 3,
+      "art": "research-energy"
+    },
+    {
+      "id": "high_density_storage",
+      "name": "High-Density Energy Storage",
+      "domain": "energy",
+      "depth": 1,
+      "art": "research-energy"
+    },
+    {
+      "id": "antimatter_detection",
+      "name": "Antimatter Detection",
+      "domain": "energy",
+      "depth": 2,
+      "art": "research-energy"
+    },
+    {
+      "id": "antimatter_production",
+      "name": "Controlled Antimatter Production",
+      "domain": "energy",
+      "depth": 4,
+      "art": "research-energy"
+    },
+    {
+      "id": "antimatter_containment",
+      "name": "Antimatter Containment",
+      "domain": "energy",
+      "depth": 5,
+      "art": "research-energy"
+    },
+    {
+      "id": "exotic_energy_coupling",
+      "name": "Exotic Energy Coupling",
+      "domain": "energy",
+      "depth": 3,
+      "art": "research-energy"
+    },
+    {
+      "id": "field_energy_conversion",
+      "name": "Field-Energy Conversion",
+      "domain": "energy",
+      "depth": 4,
+      "art": "research-energy"
+    },
+    {
+      "id": "nuclear_thermal_propulsion",
+      "name": "Nuclear Thermal Propulsion",
+      "domain": "propulsion",
+      "depth": 2,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "electric_propulsion",
+      "name": "High-Efficiency Electric Propulsion",
+      "domain": "propulsion",
+      "depth": 2,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "fusion_propulsion",
+      "name": "Fusion Propulsion",
+      "domain": "propulsion",
+      "depth": 2,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "plasma_drive",
+      "name": "Advanced Plasma Drive",
+      "domain": "propulsion",
+      "depth": 3,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "laser_sail",
+      "name": "Laser Sail Propulsion",
+      "domain": "propulsion",
+      "depth": 5,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "beamed_sail",
+      "name": "Beamed Sail Network",
+      "domain": "propulsion",
+      "depth": 6,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "magnetic_sail",
+      "name": "Magnetic Sail",
+      "domain": "propulsion",
+      "depth": 3,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "fusion_torch",
+      "name": "Fusion Torch Drive",
+      "domain": "propulsion",
+      "depth": 4,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "high_efficiency_reaction",
+      "name": "High-Efficiency Reaction Mass",
+      "domain": "propulsion",
+      "depth": 3,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "relativistic_navigation",
+      "name": "Relativistic Navigation",
+      "domain": "propulsion",
+      "depth": 7,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "inertia_management_hypothesis",
+      "name": "Inertial Field Hypothesis",
+      "domain": "propulsion",
+      "depth": 3,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "field_propulsion_hypothesis",
+      "name": "Field Propulsion Hypothesis",
+      "domain": "propulsion",
+      "depth": 4,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "warp_metric_theory",
+      "name": "Warp-Metric Theory",
+      "domain": "propulsion",
+      "depth": 3,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "micro_field_distortion",
+      "name": "Microscopic Field Distortion",
+      "domain": "propulsion",
+      "depth": 4,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "warp_field_control",
+      "name": "Controlled Warp Field",
+      "domain": "propulsion",
+      "depth": 5,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "prototype_warp_drive",
+      "name": "Prototype Warp Drive",
+      "domain": "propulsion",
+      "depth": 8,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "stable_warp_drive",
+      "name": "Stable Warp Drive",
+      "domain": "propulsion",
+      "depth": 9,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "long_range_warp",
+      "name": "Long-Range Warp Architecture",
+      "domain": "propulsion",
+      "depth": 11,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "wormhole_topology",
+      "name": "Traversable Wormhole Topology",
+      "domain": "propulsion",
+      "depth": 3,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "wormhole_stabilization",
+      "name": "Artificial Wormhole Stabilization",
+      "domain": "propulsion",
+      "depth": 8,
+      "art": "research-propulsion"
+    },
+    {
+      "id": "reusable_launch",
+      "name": "Reusable Launch Systems",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "orbital_construction",
+      "name": "Orbital Construction",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "orbital_fuel_depots",
+      "name": "Orbital Fuel Depots",
+      "domain": "space_industry",
+      "depth": 4,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "in_space_assembly",
+      "name": "In-Space Assembly",
+      "domain": "space_industry",
+      "depth": 4,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "orbital_shipyard",
+      "name": "Orbital Shipyard",
+      "domain": "space_industry",
+      "depth": 7,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "lunar_industry",
+      "name": "Low-Gravity Industrialization",
+      "domain": "space_industry",
+      "depth": 4,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "asteroid_prospecting",
+      "name": "Asteroid Prospecting",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "asteroid_mining",
+      "name": "Asteroid Mining",
+      "domain": "space_industry",
+      "depth": 4,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "vacuum_refining",
+      "name": "Vacuum Refining",
+      "domain": "space_industry",
+      "depth": 5,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "orbital_manufacturing",
+      "name": "Orbital Manufacturing",
+      "domain": "space_industry",
+      "depth": 6,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "autonomous_mining",
+      "name": "Autonomous Resource Extraction",
+      "domain": "space_industry",
+      "depth": 5,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "mass_driver",
+      "name": "Electromagnetic Mass Driver",
+      "domain": "space_industry",
+      "depth": 4,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "skyhook",
+      "name": "Momentum-Exchange Skyhook",
+      "domain": "space_industry",
+      "depth": 4,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "space_elevator_materials",
+      "name": "Space Elevator Materials",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "space_elevator",
+      "name": "Space Elevator",
+      "domain": "space_industry",
+      "depth": 4,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "rotating_habitat",
+      "name": "Rotating Space Habitats",
+      "domain": "space_industry",
+      "depth": 4,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "deep_space_habitat",
+      "name": "Deep-Space Habitats",
+      "domain": "space_industry",
+      "depth": 5,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "megastructure_fabrication",
+      "name": "Megastructure Fabrication",
+      "domain": "space_industry",
+      "depth": 7,
+      "art": "research-space_industry"
+    },
+    {
+      "id": "closed_loop_recycling",
+      "name": "Closed-Loop Recycling",
+      "domain": "life_medicine",
+      "depth": 1,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "controlled_environment_agriculture",
+      "name": "Controlled-Environment Agriculture",
+      "domain": "life_medicine",
+      "depth": 2,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "bioregenerative_life_support",
+      "name": "Bioregenerative Life Support",
+      "domain": "life_medicine",
+      "depth": 3,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "radiation_countermeasures",
+      "name": "Radiation Medical Countermeasures",
+      "domain": "life_medicine",
+      "depth": 2,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "artificial_ecosystem",
+      "name": "Artificial Ecosystem Management",
+      "domain": "life_medicine",
+      "depth": 4,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "precision_medicine",
+      "name": "Precision Medicine",
+      "domain": "life_medicine",
+      "depth": 1,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "gene_therapy",
+      "name": "Advanced Gene Therapy",
+      "domain": "life_medicine",
+      "depth": 2,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "torpor_hypothesis",
+      "name": "Induced Torpor Hypothesis",
+      "domain": "life_medicine",
+      "depth": 2,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "torpor_induction",
+      "name": "Induced Metabolic Torpor",
+      "domain": "life_medicine",
+      "depth": 3,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "high_g_cardiovascular",
+      "name": "High-Gravity Cardiovascular Adaptation",
+      "domain": "life_medicine",
+      "depth": 2,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "high_g_musculoskeletal",
+      "name": "High-Gravity Musculoskeletal Adaptation",
+      "domain": "life_medicine",
+      "depth": 2,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "low_g_bone_preservation",
+      "name": "Low-Gravity Bone Preservation",
+      "domain": "life_medicine",
+      "depth": 2,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "low_g_development",
+      "name": "Low-Gravity Developmental Medicine",
+      "domain": "life_medicine",
+      "depth": 3,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "gravity_adaptation_genetics",
+      "name": "Heritable Gravity Adaptation",
+      "domain": "life_medicine",
+      "depth": 4,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "microbiome_control",
+      "name": "Microbiome Engineering",
+      "domain": "life_medicine",
+      "depth": 2,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "immune_modulation",
+      "name": "Advanced Immune Modulation",
+      "domain": "life_medicine",
+      "depth": 3,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "synthetic_food",
+      "name": "Synthetic Nutrient Fabrication",
+      "domain": "life_medicine",
+      "depth": 3,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "cellular_repair",
+      "name": "Cellular Repair Medicine",
+      "domain": "life_medicine",
+      "depth": 3,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "longevity_medicine",
+      "name": "Longevity Medicine",
+      "domain": "life_medicine",
+      "depth": 4,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "xenomedicine",
+      "name": "Comparative Xenomedicine",
+      "domain": "life_medicine",
+      "depth": 3,
+      "art": "research-life_medicine"
+    },
+    {
+      "id": "atmospheric_modeling",
+      "name": "Advanced Atmospheric Modeling",
+      "domain": "planetary",
+      "depth": 1,
+      "art": "research-planetary"
+    },
+    {
+      "id": "closed_surface_habitats",
+      "name": "Closed Surface Habitats",
+      "domain": "planetary",
+      "depth": 2,
+      "art": "research-planetary"
+    },
+    {
+      "id": "pressure_adaptation",
+      "name": "Pressure-Adaptive Habitats",
+      "domain": "planetary",
+      "depth": 3,
+      "art": "research-planetary"
+    },
+    {
+      "id": "thermal_habitat",
+      "name": "Extreme-Temperature Habitats",
+      "domain": "planetary",
+      "depth": 3,
+      "art": "research-planetary"
+    },
+    {
+      "id": "radiation_shelters",
+      "name": "Planetary Radiation Shelters",
+      "domain": "planetary",
+      "depth": 3,
+      "art": "research-planetary"
+    },
+    {
+      "id": "local_resource_utilization",
+      "name": "In-Situ Resource Utilization",
+      "domain": "planetary",
+      "depth": 1,
+      "art": "research-planetary"
+    },
+    {
+      "id": "soil_ecology_engineering",
+      "name": "Soil Ecology Engineering",
+      "domain": "planetary",
+      "depth": 3,
+      "art": "research-planetary"
+    },
+    {
+      "id": "desalination_cycles",
+      "name": "Closed-Cycle Desalination",
+      "domain": "planetary",
+      "depth": 2,
+      "art": "research-planetary"
+    },
+    {
+      "id": "ocean_habitat",
+      "name": "Oceanic Habitats",
+      "domain": "planetary",
+      "depth": 4,
+      "art": "research-planetary"
+    },
+    {
+      "id": "subterranean_habitat",
+      "name": "Subterranean Habitats",
+      "domain": "planetary",
+      "depth": 3,
+      "art": "research-planetary"
+    },
+    {
+      "id": "planetary_geoengineering",
+      "name": "Planetary Geoengineering",
+      "domain": "planetary",
+      "depth": 2,
+      "art": "research-planetary"
+    },
+    {
+      "id": "atmospheric_processing",
+      "name": "Atmospheric Processing",
+      "domain": "planetary",
+      "depth": 7,
+      "art": "research-planetary"
+    },
+    {
+      "id": "regional_climate_control",
+      "name": "Regional Climate Control",
+      "domain": "planetary",
+      "depth": 3,
+      "art": "research-planetary"
+    },
+    {
+      "id": "terraforming_biota",
+      "name": "Engineered Terraforming Biota",
+      "domain": "planetary",
+      "depth": 4,
+      "art": "research-planetary"
+    },
+    {
+      "id": "planetary_terraforming",
+      "name": "Planetary-Scale Terraforming",
+      "domain": "planetary",
+      "depth": 8,
+      "art": "research-planetary"
+    },
+    {
+      "id": "high_pressure_colonization",
+      "name": "High-Pressure Colonization",
+      "domain": "planetary",
+      "depth": 4,
+      "art": "research-planetary"
+    },
+    {
+      "id": "cryogenic_colonization",
+      "name": "Cryogenic-Environment Colonization",
+      "domain": "planetary",
+      "depth": 4,
+      "art": "research-planetary"
+    },
+    {
+      "id": "ecology_preservation",
+      "name": "Planetary Ecology Preservation",
+      "domain": "planetary",
+      "depth": 2,
+      "art": "research-planetary"
+    },
+    {
+      "id": "advanced_composites",
+      "name": "Advanced Composites",
+      "domain": "materials",
+      "depth": 1,
+      "art": "research-materials"
+    },
+    {
+      "id": "ceramic_matrix",
+      "name": "Ceramic-Matrix Structures",
+      "domain": "materials",
+      "depth": 1,
+      "art": "research-materials"
+    },
+    {
+      "id": "nanostructured_alloys",
+      "name": "Nanostructured Alloys",
+      "domain": "materials",
+      "depth": 2,
+      "art": "research-materials"
+    },
+    {
+      "id": "metamaterials",
+      "name": "Engineered Metamaterials",
+      "domain": "materials",
+      "depth": 2,
+      "art": "research-materials"
+    },
+    {
+      "id": "self_healing_materials",
+      "name": "Self-Healing Materials",
+      "domain": "materials",
+      "depth": 4,
+      "art": "research-materials"
+    },
+    {
+      "id": "smart_materials",
+      "name": "Adaptive Smart Materials",
+      "domain": "materials",
+      "depth": 3,
+      "art": "research-materials"
+    },
+    {
+      "id": "radiation_hardened_materials",
+      "name": "Radiation-Hardened Materials",
+      "domain": "materials",
+      "depth": 2,
+      "art": "research-materials"
+    },
+    {
+      "id": "high_g_structures",
+      "name": "High-Gravity Structural Systems",
+      "domain": "materials",
+      "depth": 2,
+      "art": "research-materials"
+    },
+    {
+      "id": "cryogenic_materials",
+      "name": "Cryogenic Structural Materials",
+      "domain": "materials",
+      "depth": 1,
+      "art": "research-materials"
+    },
+    {
+      "id": "ultra_high_temp_materials",
+      "name": "Ultra-High-Temperature Materials",
+      "domain": "materials",
+      "depth": 2,
+      "art": "research-materials"
+    },
+    {
+      "id": "superconducting_structures",
+      "name": "Superconducting Structural Systems",
+      "domain": "materials",
+      "depth": 3,
+      "art": "research-materials"
+    },
+    {
+      "id": "diamondoid_fabrication",
+      "name": "Diamondoid Fabrication",
+      "domain": "materials",
+      "depth": 7,
+      "art": "research-materials"
+    },
+    {
+      "id": "programmable_matter_hypothesis",
+      "name": "Programmable Matter Hypothesis",
+      "domain": "materials",
+      "depth": 8,
+      "art": "research-materials"
+    },
+    {
+      "id": "programmable_matter",
+      "name": "Programmable Matter",
+      "domain": "materials",
+      "depth": 9,
+      "art": "research-materials"
+    },
+    {
+      "id": "living_materials",
+      "name": "Living Structural Materials",
+      "domain": "materials",
+      "depth": 3,
+      "art": "research-materials"
+    },
+    {
+      "id": "autonomous_navigation",
+      "name": "Autonomous Navigation",
+      "domain": "computing",
+      "depth": 1,
+      "art": "research-computing"
+    },
+    {
+      "id": "industrial_robotics",
+      "name": "Industrial Robotics",
+      "domain": "computing",
+      "depth": 1,
+      "art": "research-computing"
+    },
+    {
+      "id": "machine_learning",
+      "name": "Machine Learning Systems",
+      "domain": "computing",
+      "depth": 1,
+      "art": "research-computing"
+    },
+    {
+      "id": "expert_systems",
+      "name": "Scientific Expert Systems",
+      "domain": "computing",
+      "depth": 2,
+      "art": "research-computing"
+    },
+    {
+      "id": "distributed_compute",
+      "name": "Distributed High-Performance Computing",
+      "domain": "computing",
+      "depth": 1,
+      "art": "research-computing"
+    },
+    {
+      "id": "resilient_ai",
+      "name": "Fault-Tolerant Machine Intelligence",
+      "domain": "computing",
+      "depth": 2,
+      "art": "research-computing"
+    },
+    {
+      "id": "swarm_robotics",
+      "name": "Swarm Robotics",
+      "domain": "computing",
+      "depth": 2,
+      "art": "research-computing"
+    },
+    {
+      "id": "predictive_maintenance",
+      "name": "Predictive Maintenance",
+      "domain": "computing",
+      "depth": 3,
+      "art": "research-computing"
+    },
+    {
+      "id": "self_repairing_machines",
+      "name": "Self-Repairing Machines",
+      "domain": "computing",
+      "depth": 4,
+      "art": "research-computing"
+    },
+    {
+      "id": "synthetic_cognition",
+      "name": "Synthetic Cognition",
+      "domain": "computing",
+      "depth": 3,
+      "art": "research-computing"
+    },
+    {
+      "id": "machine_scientist",
+      "name": "Machine-Assisted Science",
+      "domain": "computing",
+      "depth": 3,
+      "art": "research-computing"
+    },
+    {
+      "id": "autonomous_research",
+      "name": "Autonomous Research Systems",
+      "domain": "computing",
+      "depth": 4,
+      "art": "research-computing"
+    },
+    {
+      "id": "ai_governance",
+      "name": "AI Governance and Verification",
+      "domain": "computing",
+      "depth": 3,
+      "art": "research-computing"
+    },
+    {
+      "id": "mind_emulation_hypothesis",
+      "name": "Mind Emulation Hypothesis",
+      "domain": "computing",
+      "depth": 4,
+      "art": "research-computing"
+    },
+    {
+      "id": "whole_mind_emulation",
+      "name": "Whole-Mind Emulation",
+      "domain": "computing",
+      "depth": 5,
+      "art": "research-computing"
+    },
+    {
+      "id": "synthetic_personhood_systems",
+      "name": "Synthetic Personhood Systems",
+      "domain": "computing",
+      "depth": 6,
+      "art": "research-computing"
+    },
+    {
+      "id": "deep_space_radar",
+      "name": "Deep-Space Radar",
+      "domain": "sensors_comms",
+      "depth": 1,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "optical_interferometry",
+      "name": "Long-Baseline Optical Interferometry",
+      "domain": "sensors_comms",
+      "depth": 1,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "neutrino_detection",
+      "name": "Neutrino Detection",
+      "domain": "sensors_comms",
+      "depth": 2,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "gravimetric_sensing",
+      "name": "Precision Gravimetric Sensing",
+      "domain": "sensors_comms",
+      "depth": 2,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "quantum_sensors",
+      "name": "Quantum Sensor Arrays",
+      "domain": "sensors_comms",
+      "depth": 3,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "distributed_sensor_network",
+      "name": "Distributed Sensor Networks",
+      "domain": "sensors_comms",
+      "depth": 2,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "long_baseline_array",
+      "name": "Interplanetary Baseline Arrays",
+      "domain": "sensors_comms",
+      "depth": 2,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "deep_space_comms",
+      "name": "Deep-Space Communications",
+      "domain": "sensors_comms",
+      "depth": 1,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "laser_comms",
+      "name": "Laser Communications",
+      "domain": "sensors_comms",
+      "depth": 2,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "delay_tolerant_network",
+      "name": "Delay-Tolerant Networking",
+      "domain": "sensors_comms",
+      "depth": 2,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "quantum_secure_comms",
+      "name": "Quantum-Secure Communications",
+      "domain": "sensors_comms",
+      "depth": 3,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "stealth_detection",
+      "name": "Low-Signature Detection",
+      "domain": "sensors_comms",
+      "depth": 4,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "alien_signal_analysis",
+      "name": "Alien Signal Analysis",
+      "domain": "sensors_comms",
+      "depth": 3,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "field_signature_detection",
+      "name": "Exotic Field Signature Detection",
+      "domain": "sensors_comms",
+      "depth": 3,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "nonlocal_comms_hypothesis",
+      "name": "Nonlocal Communication Hypothesis",
+      "domain": "sensors_comms",
+      "depth": 3,
+      "art": "research-sensors_comms"
+    },
+    {
+      "id": "kinetic_intercept",
+      "name": "Kinetic Intercept Systems",
+      "domain": "military",
+      "depth": 2,
+      "art": "research-military"
+    },
+    {
+      "id": "point_defense",
+      "name": "Point-Defense Coordination",
+      "domain": "military",
+      "depth": 3,
+      "art": "research-military"
+    },
+    {
+      "id": "missile_guidance",
+      "name": "Advanced Missile Guidance",
+      "domain": "military",
+      "depth": 2,
+      "art": "research-military"
+    },
+    {
+      "id": "autonomous_munitions",
+      "name": "Autonomous Munitions",
+      "domain": "military",
+      "depth": 3,
+      "art": "research-military"
+    },
+    {
+      "id": "coilgun",
+      "name": "Coilgun Weapons",
+      "domain": "military",
+      "depth": 3,
+      "art": "research-military"
+    },
+    {
+      "id": "railgun",
+      "name": "Railgun Weapons",
+      "domain": "military",
+      "depth": 4,
+      "art": "research-military"
+    },
+    {
+      "id": "laser_weapon",
+      "name": "High-Energy Laser Weapons",
+      "domain": "military",
+      "depth": 2,
+      "art": "research-military"
+    },
+    {
+      "id": "particle_beam",
+      "name": "Particle-Beam Weapons",
+      "domain": "military",
+      "depth": 2,
+      "art": "research-military"
+    },
+    {
+      "id": "directed_energy_pd",
+      "name": "Directed-Energy Point Defense",
+      "domain": "military",
+      "depth": 4,
+      "art": "research-military"
+    },
+    {
+      "id": "layered_armor",
+      "name": "Layered Composite Armor",
+      "domain": "military",
+      "depth": 2,
+      "art": "research-military"
+    },
+    {
+      "id": "reactive_armor",
+      "name": "Reactive Armor",
+      "domain": "military",
+      "depth": 4,
+      "art": "research-military"
+    },
+    {
+      "id": "adaptive_armor",
+      "name": "Adaptive Armor",
+      "domain": "military",
+      "depth": 5,
+      "art": "research-military"
+    },
+    {
+      "id": "active_protection",
+      "name": "Active Protection Systems",
+      "domain": "military",
+      "depth": 4,
+      "art": "research-military"
+    },
+    {
+      "id": "electronic_warfare",
+      "name": "Electronic Warfare",
+      "domain": "military",
+      "depth": 2,
+      "art": "research-military"
+    },
+    {
+      "id": "cyberwarfare",
+      "name": "Military Cyber Operations",
+      "domain": "military",
+      "depth": 3,
+      "art": "research-military"
+    },
+    {
+      "id": "stealth_materials",
+      "name": "Stealth Materials",
+      "domain": "military",
+      "depth": 3,
+      "art": "research-military"
+    },
+    {
+      "id": "signature_management",
+      "name": "Integrated Signature Management",
+      "domain": "military",
+      "depth": 4,
+      "art": "research-military"
+    },
+    {
+      "id": "fleet_battle_network",
+      "name": "Fleet Battle Networks",
+      "domain": "military",
+      "depth": 3,
+      "art": "research-military"
+    },
+    {
+      "id": "hardened_command",
+      "name": "Hardened Command Architecture",
+      "domain": "military",
+      "depth": 4,
+      "art": "research-military"
+    },
+    {
+      "id": "orbital_defense",
+      "name": "Orbital Defense Architecture",
+      "domain": "military",
+      "depth": 4,
+      "art": "research-military"
+    },
+    {
+      "id": "field_defense_hypothesis",
+      "name": "Defensive Field Hypothesis",
+      "domain": "military",
+      "depth": 4,
+      "art": "research-military"
+    },
+    {
+      "id": "field_defense",
+      "name": "Localized Defensive Fields",
+      "domain": "military",
+      "depth": 5,
+      "art": "research-military"
+    },
+    {
+      "id": "drone_carriers",
+      "name": "Autonomous Drone Carrier Doctrine",
+      "domain": "military",
+      "depth": 8,
+      "art": "research-military"
+    },
+    {
+      "id": "planetary_defense_network",
+      "name": "Planetary Defense Network",
+      "domain": "military",
+      "depth": 5,
+      "art": "research-military"
+    },
+    {
+      "id": "standardized_cargo",
+      "name": "Standardized Interplanetary Cargo",
+      "domain": "logistics",
+      "depth": 1,
+      "art": "research-logistics"
+    },
+    {
+      "id": "orbital_transfer_network",
+      "name": "Orbital Transfer Network",
+      "domain": "logistics",
+      "depth": 4,
+      "art": "research-logistics"
+    },
+    {
+      "id": "predictive_logistics",
+      "name": "Predictive Logistics",
+      "domain": "logistics",
+      "depth": 2,
+      "art": "research-logistics"
+    },
+    {
+      "id": "deep_space_supply",
+      "name": "Deep-Space Supply Doctrine",
+      "domain": "logistics",
+      "depth": 3,
+      "art": "research-logistics"
+    },
+    {
+      "id": "modular_spares",
+      "name": "Modular Spare-Part Architecture",
+      "domain": "logistics",
+      "depth": 1,
+      "art": "research-logistics"
+    },
+    {
+      "id": "additive_manufacturing",
+      "name": "Advanced Additive Manufacturing",
+      "domain": "logistics",
+      "depth": 1,
+      "art": "research-logistics"
+    },
+    {
+      "id": "in_situ_manufacturing",
+      "name": "In-Situ Manufacturing",
+      "domain": "logistics",
+      "depth": 2,
+      "art": "research-logistics"
+    },
+    {
+      "id": "autonomous_repair",
+      "name": "Autonomous Repair Systems",
+      "domain": "logistics",
+      "depth": 4,
+      "art": "research-logistics"
+    },
+    {
+      "id": "fleet_tenders",
+      "name": "Fleet Tender Operations",
+      "domain": "logistics",
+      "depth": 8,
+      "art": "research-logistics"
+    },
+    {
+      "id": "mobile_refinery",
+      "name": "Mobile Refinery Systems",
+      "domain": "logistics",
+      "depth": 8,
+      "art": "research-logistics"
+    },
+    {
+      "id": "colony_resupply",
+      "name": "Long-Horizon Colony Resupply",
+      "domain": "logistics",
+      "depth": 5,
+      "art": "research-logistics"
+    },
+    {
+      "id": "supply_depots",
+      "name": "Deep-Space Supply Depots",
+      "domain": "logistics",
+      "depth": 5,
+      "art": "research-logistics"
+    },
+    {
+      "id": "molecular_fabrication_hypothesis",
+      "name": "Molecular Fabrication Hypothesis",
+      "domain": "logistics",
+      "depth": 3,
+      "art": "research-logistics"
+    },
+    {
+      "id": "molecular_fabrication",
+      "name": "Molecular Fabrication",
+      "domain": "logistics",
+      "depth": 8,
+      "art": "research-logistics"
+    },
+    {
+      "id": "advanced_replication",
+      "name": "Advanced Matter Replication",
+      "domain": "logistics",
+      "depth": 10,
+      "art": "research-logistics"
+    },
+    {
+      "id": "closed_resource_cycles",
+      "name": "Closed Industrial Resource Cycles",
+      "domain": "logistics",
+      "depth": 11,
+      "art": "research-logistics"
+    },
+    {
+      "id": "interstellar_logistics_network",
+      "name": "Interstellar Logistics Network",
+      "domain": "logistics",
+      "depth": 10,
+      "art": "research-logistics"
+    },
+    {
+      "id": "digital_governance",
+      "name": "Digital Governance",
+      "domain": "social_admin",
+      "depth": 2,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "remote_administration",
+      "name": "Remote Colonial Administration",
+      "domain": "social_admin",
+      "depth": 3,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "asynchronous_governance",
+      "name": "Delay-Tolerant Governance",
+      "domain": "social_admin",
+      "depth": 4,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "colonial_charters",
+      "name": "Adaptive Colonial Charters",
+      "domain": "social_admin",
+      "depth": 4,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "federated_administration",
+      "name": "Federated Administration",
+      "domain": "social_admin",
+      "depth": 5,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "predictive_public_services",
+      "name": "Predictive Public Services",
+      "domain": "social_admin",
+      "depth": 3,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "interstellar_law",
+      "name": "Interstellar Legal Frameworks",
+      "domain": "social_admin",
+      "depth": 5,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "multispecies_governance",
+      "name": "Multispecies Governance",
+      "domain": "social_admin",
+      "depth": 6,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "cultural_archives",
+      "name": "Civilizational Cultural Archives",
+      "domain": "social_admin",
+      "depth": 2,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "institutional_memory",
+      "name": "Institutional Memory Systems",
+      "domain": "social_admin",
+      "depth": 3,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "autonomous_sector_admin",
+      "name": "Autonomous Sector Administration",
+      "domain": "social_admin",
+      "depth": 6,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "long_distance_diplomacy",
+      "name": "Long-Distance Diplomatic Protocols",
+      "domain": "social_admin",
+      "depth": 3,
+      "art": "research-social_admin"
+    },
+    {
+      "id": "xenolinguistics",
+      "name": "Xenolinguistics",
+      "domain": "xenoscience",
+      "depth": 2,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "xenochemistry",
+      "name": "Xenochemistry",
+      "domain": "xenoscience",
+      "depth": 2,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "foreign_device_forensics",
+      "name": "Foreign Device Forensics",
+      "domain": "xenoscience",
+      "depth": 2,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "alien_material_analysis",
+      "name": "Alien Material Analysis",
+      "domain": "xenoscience",
+      "depth": 3,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "reverse_engineering_methods",
+      "name": "Reverse-Engineering Methodology",
+      "domain": "xenoscience",
+      "depth": 3,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "technology_compatibility_science",
+      "name": "Technology Compatibility Science",
+      "domain": "xenoscience",
+      "depth": 4,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "alien_power_analysis",
+      "name": "Alien Power-System Analysis",
+      "domain": "xenoscience",
+      "depth": 4,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "alien_propulsion_analysis",
+      "name": "Alien Propulsion Analysis",
+      "domain": "xenoscience",
+      "depth": 4,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "foreign_science_translation",
+      "name": "Foreign Scientific Translation",
+      "domain": "xenoscience",
+      "depth": 4,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "foreign_manufacturing_analysis",
+      "name": "Foreign Manufacturing Analysis",
+      "domain": "xenoscience",
+      "depth": 5,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "xenobiological_compatibility",
+      "name": "Xenobiological Compatibility Science",
+      "domain": "xenoscience",
+      "depth": 4,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "cross_lineage_engineering",
+      "name": "Cross-Lineage Engineering",
+      "domain": "xenoscience",
+      "depth": 5,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "hybrid_design_methodology",
+      "name": "Hybrid Technology Design",
+      "domain": "xenoscience",
+      "depth": 6,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "hazardous_foreign_tech_protocols",
+      "name": "Hazardous Foreign-Technology Protocols",
+      "domain": "xenoscience",
+      "depth": 4,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "foreign_propulsion_derivative_engineering",
+      "name": "Foreign-Derived Propulsion Engineering",
+      "domain": "xenoscience",
+      "depth": 7,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "foreign_power_derivative_engineering",
+      "name": "Foreign-Derived Power Engineering",
+      "domain": "xenoscience",
+      "depth": 7,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "foreign_material_derivative_engineering",
+      "name": "Foreign-Derived Materials Engineering",
+      "domain": "xenoscience",
+      "depth": 7,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "foreign_manufacturing_derivative_engineering",
+      "name": "Foreign-Derived Manufacturing Engineering",
+      "domain": "xenoscience",
+      "depth": 7,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "foreign_control_derivative_engineering",
+      "name": "Foreign-Derived Control Systems",
+      "domain": "xenoscience",
+      "depth": 7,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "foreign_biosystem_derivative_engineering",
+      "name": "Foreign-Derived Biosystem Engineering",
+      "domain": "xenoscience",
+      "depth": 7,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "hybrid_propulsion_architecture",
+      "name": "Hybrid Propulsion Architecture",
+      "domain": "xenoscience",
+      "depth": 9,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "hybrid_power_architecture",
+      "name": "Hybrid Power Architecture",
+      "domain": "xenoscience",
+      "depth": 9,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "hybrid_manufacturing_architecture",
+      "name": "Hybrid Manufacturing Architecture",
+      "domain": "xenoscience",
+      "depth": 9,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "hybrid_biosystem_interface",
+      "name": "Hybrid Biosystem Interface",
+      "domain": "xenoscience",
+      "depth": 9,
+      "art": "research-xenoscience"
+    },
+    {
+      "id": "synthetic_biology",
+      "name": "Synthetic Biology",
+      "domain": "biotechnology",
+      "depth": 2,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "engineered_microbes",
+      "name": "Engineered Microbial Systems",
+      "domain": "biotechnology",
+      "depth": 3,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "biofabrication",
+      "name": "Biological Fabrication",
+      "domain": "biotechnology",
+      "depth": 4,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "organism_designed_mining",
+      "name": "Organism-Designed Mining",
+      "domain": "biotechnology",
+      "depth": 4,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "biological_recycling",
+      "name": "Biological Industrial Recycling",
+      "domain": "biotechnology",
+      "depth": 4,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "symbiotic_life_support",
+      "name": "Symbiotic Life-Support Systems",
+      "domain": "biotechnology",
+      "depth": 5,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "neural_interfaces",
+      "name": "Advanced Neural Interfaces",
+      "domain": "biotechnology",
+      "depth": 3,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "biological_computing",
+      "name": "Biological Computing",
+      "domain": "biotechnology",
+      "depth": 4,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "genetic_ecosystem_design",
+      "name": "Genetic Ecosystem Design",
+      "domain": "biotechnology",
+      "depth": 5,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "living_hull",
+      "name": "Living Spacecraft Hulls",
+      "domain": "biotechnology",
+      "depth": 8,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "regenerative_hull",
+      "name": "Regenerative Living Hulls",
+      "domain": "biotechnology",
+      "depth": 9,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "bioindustrial_ecosystem",
+      "name": "Bioindustrial Ecosystem",
+      "domain": "biotechnology",
+      "depth": 7,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "cultured_organs",
+      "name": "Cultured Replacement Organs",
+      "domain": "biotechnology",
+      "depth": 3,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "adaptive_bioreactors",
+      "name": "Adaptive Bioreactors",
+      "domain": "biotechnology",
+      "depth": 4,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "photosynthetic_habitats",
+      "name": "Engineered Photosynthetic Habitats",
+      "domain": "biotechnology",
+      "depth": 6,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "habitat_biosphere_seeding",
+      "name": "Habitat Biosphere Seeding",
+      "domain": "biotechnology",
+      "depth": 7,
+      "art": "research-biotechnology"
+    },
+    {
+      "id": "machine_integrity",
+      "name": "Machine Integrity Engineering",
+      "domain": "synthetic_systems",
+      "depth": 2,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "radiation_hardened_compute",
+      "name": "Radiation-Hardened Compute Substrates",
+      "domain": "synthetic_systems",
+      "depth": 3,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "thermal_compute_management",
+      "name": "Extreme Compute Thermal Management",
+      "domain": "synthetic_systems",
+      "depth": 3,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "distributed_identity",
+      "name": "Distributed Machine Identity",
+      "domain": "synthetic_systems",
+      "depth": 3,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "redundant_cognition",
+      "name": "Redundant Cognition Architecture",
+      "domain": "synthetic_systems",
+      "depth": 4,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "substrate_migration",
+      "name": "Cognitive Substrate Migration",
+      "domain": "synthetic_systems",
+      "depth": 5,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "energy_optimized_cognition",
+      "name": "Energy-Optimized Cognition",
+      "domain": "synthetic_systems",
+      "depth": 4,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "autonomous_foundry",
+      "name": "Autonomous Foundry Systems",
+      "domain": "synthetic_systems",
+      "depth": 3,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "machine_habitat",
+      "name": "Machine Habitat Infrastructure",
+      "domain": "synthetic_systems",
+      "depth": 4,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "machine_colonization",
+      "name": "Autonomous Machine Colonization",
+      "domain": "synthetic_systems",
+      "depth": 5,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "machine_self_replication",
+      "name": "Controlled Machine Self-Replication",
+      "domain": "synthetic_systems",
+      "depth": 5,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "recursive_design_tools",
+      "name": "Recursive Engineering Tools",
+      "domain": "synthetic_systems",
+      "depth": 5,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "synthetic_ecology",
+      "name": "Synthetic Infrastructure Ecology",
+      "domain": "synthetic_systems",
+      "depth": 12,
+      "art": "research-synthetic_systems"
+    },
+    {
+      "id": "nutrient_cycle_modeling",
+      "name": "Closed Nutrient-Cycle Modeling",
+      "domain": "biosphere_agriculture",
+      "depth": 3,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "microbial_protein_industry",
+      "name": "Microbial Protein Industry",
+      "domain": "biosphere_agriculture",
+      "depth": 3,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "high_density_vertical_agriculture",
+      "name": "High-Density Vertical Agriculture",
+      "domain": "biosphere_agriculture",
+      "depth": 3,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "closed_loop_nutrient_recovery",
+      "name": "Closed-Loop Nutrient Recovery",
+      "domain": "biosphere_agriculture",
+      "depth": 4,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "resilient_crop_genomics",
+      "name": "Resilient Crop Genomics",
+      "domain": "biosphere_agriculture",
+      "depth": 3,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "automated_agronomy",
+      "name": "Autonomous Agronomy",
+      "domain": "biosphere_agriculture",
+      "depth": 4,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "bioreactor_food_production",
+      "name": "Bioreactor Food Production",
+      "domain": "biosphere_agriculture",
+      "depth": 4,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "artificial_pollination_ecology",
+      "name": "Artificial Pollination Ecology",
+      "domain": "biosphere_agriculture",
+      "depth": 3,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "soilless_ecosystem_engineering",
+      "name": "Soilless Ecosystem Engineering",
+      "domain": "biosphere_agriculture",
+      "depth": 5,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "orbital_agriculture_complexes",
+      "name": "Orbital Agriculture Complexes",
+      "domain": "biosphere_agriculture",
+      "depth": 5,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "planetary_biosphere_monitoring",
+      "name": "Planetary Biosphere Monitoring",
+      "domain": "biosphere_agriculture",
+      "depth": 4,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "biosphere_restoration",
+      "name": "Biosphere Restoration Ecology",
+      "domain": "biosphere_agriculture",
+      "depth": 5,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "nonnative_ecology_containment",
+      "name": "Nonnative Ecology Containment",
+      "domain": "biosphere_agriculture",
+      "depth": 5,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "xenonutrition_analysis",
+      "name": "Xenonutrition Analysis",
+      "domain": "biosphere_agriculture",
+      "depth": 3,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "cross_biosphere_food_compatibility",
+      "name": "Cross-Biosphere Food Compatibility",
+      "domain": "biosphere_agriculture",
+      "depth": 4,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "engineered_symbiotic_crops",
+      "name": "Engineered Symbiotic Crops",
+      "domain": "biosphere_agriculture",
+      "depth": 5,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "self_sustaining_colony_biosphere",
+      "name": "Self-Sustaining Colony Biosphere",
+      "domain": "biosphere_agriculture",
+      "depth": 7,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "ecopoiesis_habitat_seeding",
+      "name": "Ecopoiesis Habitat Seeding",
+      "domain": "biosphere_agriculture",
+      "depth": 8,
+      "art": "research-biosphere_agriculture"
+    },
+    {
+      "id": "resource_accounting_systems",
+      "name": "Civilization-Scale Resource Accounting",
+      "domain": "economic_trade",
+      "depth": 2,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "supply_chain_analytics",
+      "name": "Predictive Supply-Chain Analytics",
+      "domain": "economic_trade",
+      "depth": 3,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "strategic_reserve_modeling",
+      "name": "Strategic Reserve Modeling",
+      "domain": "economic_trade",
+      "depth": 4,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "market_simulation",
+      "name": "Complex Market Simulation",
+      "domain": "economic_trade",
+      "depth": 3,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "interplanetary_trade_standards",
+      "name": "Interplanetary Trade Standards",
+      "domain": "economic_trade",
+      "depth": 3,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "automated_contracting",
+      "name": "Verified Automated Contracting",
+      "domain": "economic_trade",
+      "depth": 3,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "distributed_clearing_networks",
+      "name": "Delay-Tolerant Clearing Networks",
+      "domain": "economic_trade",
+      "depth": 4,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "scarcity_forecasting",
+      "name": "Strategic Scarcity Forecasting",
+      "domain": "economic_trade",
+      "depth": 4,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "resource_substitution_economics",
+      "name": "Resource Substitution Planning",
+      "domain": "economic_trade",
+      "depth": 5,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "colonial_credit_systems",
+      "name": "Autonomous Colonial Credit Systems",
+      "domain": "economic_trade",
+      "depth": 4,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "interstellar_exchange_protocols",
+      "name": "Interstellar Exchange Protocols",
+      "domain": "economic_trade",
+      "depth": 5,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "autonomous_trade_agents",
+      "name": "Autonomous Trade Agents",
+      "domain": "economic_trade",
+      "depth": 5,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "strategic_industrial_planning",
+      "name": "Strategic Industrial Planning",
+      "domain": "economic_trade",
+      "depth": 5,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "multispecies_commercial_law",
+      "name": "Multispecies Commercial Law",
+      "domain": "economic_trade",
+      "depth": 6,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "technology_licensing_institutions",
+      "name": "Technology Licensing Institutions",
+      "domain": "economic_trade",
+      "depth": 7,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "interstellar_market_mesh",
+      "name": "Interstellar Market Mesh",
+      "domain": "economic_trade",
+      "depth": 8,
+      "art": "research-economic_trade"
+    },
+    {
+      "id": "neural_interface",
+      "name": "Bidirectional Neural Interface",
+      "domain": "cybernetics",
+      "depth": 3,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "prosthetic_integration",
+      "name": "Integrated Advanced Prosthetics",
+      "domain": "cybernetics",
+      "depth": 3,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "sensory_augmentation",
+      "name": "Sensory Augmentation",
+      "domain": "cybernetics",
+      "depth": 4,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "powered_exoskeletons",
+      "name": "Powered Exoskeletons",
+      "domain": "cybernetics",
+      "depth": 3,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "adaptive_exoskeletons",
+      "name": "Adaptive Exoskeleton Systems",
+      "domain": "cybernetics",
+      "depth": 4,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "cybernetic_rehabilitation",
+      "name": "Cybernetic Rehabilitation Medicine",
+      "domain": "cybernetics",
+      "depth": 4,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "brain_machine_coprocessing",
+      "name": "Brain-Machine Co-Processing",
+      "domain": "cybernetics",
+      "depth": 4,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "memory_assist_implants",
+      "name": "Memory Assist Implants",
+      "domain": "cybernetics",
+      "depth": 5,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "remote_presence_control",
+      "name": "High-Fidelity Remote Presence",
+      "domain": "cybernetics",
+      "depth": 5,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "synthetic_organ_replacement",
+      "name": "Synthetic Organ Replacement",
+      "domain": "cybernetics",
+      "depth": 4,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "endocrine_adaptation_implants",
+      "name": "Endocrine Adaptation Implants",
+      "domain": "cybernetics",
+      "depth": 4,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "gravity_compensation_implants",
+      "name": "Gravity Compensation Implants",
+      "domain": "cybernetics",
+      "depth": 5,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "radiation_hardened_implants",
+      "name": "Radiation-Hardened Implants",
+      "domain": "cybernetics",
+      "depth": 5,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "cognition_acceleration",
+      "name": "Cognitive Acceleration Interfaces",
+      "domain": "cybernetics",
+      "depth": 6,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "cybernetic_personhood_frameworks",
+      "name": "Cybernetic Personhood Frameworks",
+      "domain": "cybernetics",
+      "depth": 7,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "integrated_bio_cybernetic_systems",
+      "name": "Integrated Bio-Cybernetic Systems",
+      "domain": "cybernetics",
+      "depth": 7,
+      "art": "research-cybernetics"
+    },
+    {
+      "id": "precision_metrology",
+      "name": "Precision Metrology Networks",
+      "domain": "research_infrastructure",
+      "depth": 2,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "automated_experimentation",
+      "name": "Automated Experimentation",
+      "domain": "research_infrastructure",
+      "depth": 3,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "open_science_networks",
+      "name": "Open Scientific Data Networks",
+      "domain": "research_infrastructure",
+      "depth": 3,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "reproducibility_systems",
+      "name": "Reproducibility Verification Systems",
+      "domain": "research_infrastructure",
+      "depth": 3,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "coordinated_research_networks",
+      "name": "Coordinated Research Networks",
+      "domain": "research_infrastructure",
+      "depth": 4,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "orbital_microgravity_labs",
+      "name": "Orbital Microgravity Laboratories",
+      "domain": "research_infrastructure",
+      "depth": 4,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "high_energy_research_facilities",
+      "name": "High-Energy Research Facilities",
+      "domain": "research_infrastructure",
+      "depth": 4,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "deep_space_observatory_network",
+      "name": "Deep-Space Observatory Network",
+      "domain": "research_infrastructure",
+      "depth": 4,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "gravitational_observatories",
+      "name": "Gravitational Observatory Arrays",
+      "domain": "research_infrastructure",
+      "depth": 4,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "xenoscience_containment_labs",
+      "name": "Xenoscience Containment Laboratories",
+      "domain": "research_infrastructure",
+      "depth": 4,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "simulation_first_engineering",
+      "name": "Simulation-First Engineering",
+      "domain": "research_infrastructure",
+      "depth": 4,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "autonomous_experiment_arrays",
+      "name": "Autonomous Experiment Arrays",
+      "domain": "research_infrastructure",
+      "depth": 5,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "multiworld_research_network",
+      "name": "Multiworld Research Network",
+      "domain": "research_infrastructure",
+      "depth": 5,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "distributed_scientific_portfolios",
+      "name": "Distributed Scientific Portfolios",
+      "domain": "research_infrastructure",
+      "depth": 6,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "frontier_research_campuses",
+      "name": "Frontier Research Campuses",
+      "domain": "research_infrastructure",
+      "depth": 6,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "machine_discovery_labs",
+      "name": "Machine Discovery Laboratories",
+      "domain": "research_infrastructure",
+      "depth": 6,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "autonomous_research_portfolios",
+      "name": "Autonomous Research Portfolios",
+      "domain": "research_infrastructure",
+      "depth": 7,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "civilization_scale_science_grid",
+      "name": "Civilization-Scale Science Grid",
+      "domain": "research_infrastructure",
+      "depth": 8,
+      "art": "research-research_infrastructure"
+    },
+    {
+      "id": "large_scale_orbital_architecture",
+      "name": "Large-Scale Orbital Architecture",
+      "domain": "stellar_engineering",
+      "depth": 6,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "orbital_ring",
+      "name": "Orbital Ring Infrastructure",
+      "domain": "stellar_engineering",
+      "depth": 7,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "planetary_shade_array",
+      "name": "Planetary Shade Array",
+      "domain": "stellar_engineering",
+      "depth": 7,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "orbital_mirror_network",
+      "name": "Orbital Mirror Network",
+      "domain": "stellar_engineering",
+      "depth": 7,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "stellar_power_swarm",
+      "name": "Stellar Power Collector Swarm",
+      "domain": "stellar_engineering",
+      "depth": 8,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "beamed_power_web",
+      "name": "System-Wide Beamed Power Web",
+      "domain": "stellar_engineering",
+      "depth": 9,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "asteroid_repositioning",
+      "name": "Controlled Asteroid Repositioning",
+      "domain": "stellar_engineering",
+      "depth": 6,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "planetary_deflection_network",
+      "name": "Planetary Deflection Network",
+      "domain": "stellar_engineering",
+      "depth": 7,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "artificial_magnetosphere",
+      "name": "Artificial Magnetosphere",
+      "domain": "stellar_engineering",
+      "depth": 8,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "atmospheric_retention_array",
+      "name": "Atmospheric Retention Array",
+      "domain": "stellar_engineering",
+      "depth": 9,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "star_lifting_hypothesis",
+      "name": "Star-Lifting Hypothesis",
+      "domain": "stellar_engineering",
+      "depth": 8,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "star_lifting_industry",
+      "name": "Star-Lifting Industry",
+      "domain": "stellar_engineering",
+      "depth": 10,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "stellar_fuel_management",
+      "name": "Stellar Fuel Management",
+      "domain": "stellar_engineering",
+      "depth": 11,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "system_scale_logistics",
+      "name": "System-Scale Logistics Architecture",
+      "domain": "stellar_engineering",
+      "depth": 8,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "wormhole_gate_complex",
+      "name": "Wormhole Gate Complex",
+      "domain": "stellar_engineering",
+      "depth": 10,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "warp_beacon_network",
+      "name": "Warp Navigation Beacon Network",
+      "domain": "stellar_engineering",
+      "depth": 10,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "interstellar_gateway_grid",
+      "name": "Interstellar Gateway Grid",
+      "domain": "stellar_engineering",
+      "depth": 12,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "civilization_scale_energy_architecture",
+      "name": "Civilization-Scale Energy Architecture",
+      "domain": "stellar_engineering",
+      "depth": 10,
+      "art": "research-stellar_engineering"
+    },
+    {
+      "id": "solvent_biochemistry_modeling",
+      "name": "Alternative-Solvent Biochemistry Modeling",
+      "domain": "alternative_biochemistry",
+      "depth": 2,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "extreme_biochemistry_homeostasis",
+      "name": "Extreme-Biochemistry Homeostasis",
+      "domain": "alternative_biochemistry",
+      "depth": 3,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "biochemical_feedstock_engineering",
+      "name": "Biochemical Feedstock Engineering",
+      "domain": "alternative_biochemistry",
+      "depth": 3,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "biochemical_containment_engineering",
+      "name": "Extreme-Biochemistry Containment Engineering",
+      "domain": "alternative_biochemistry",
+      "depth": 4,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "ammonia_solvent_homeostasis",
+      "name": "Ammonia-Solvent Homeostasis",
+      "domain": "alternative_biochemistry",
+      "depth": 3,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "ammonia_closed_loop_recycling",
+      "name": "Ammonia Closed-Loop Recycling",
+      "domain": "alternative_biochemistry",
+      "depth": 5,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "ammonia_nutrient_synthesis",
+      "name": "Ammonia-Biochemistry Nutrient Synthesis",
+      "domain": "alternative_biochemistry",
+      "depth": 4,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "ammonia_bioregenerative_support",
+      "name": "Ammonia Bioregenerative Life Support",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "ammonia_bioindustrial_processes",
+      "name": "Ammonia Bioindustrial Processes",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "ammonia_ecosystem_stabilization",
+      "name": "Ammonia Ecosystem Stabilization",
+      "domain": "alternative_biochemistry",
+      "depth": 7,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "cryogenic_solvent_homeostasis",
+      "name": "Cryogenic Hydrocarbon Homeostasis",
+      "domain": "alternative_biochemistry",
+      "depth": 3,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "cryogenic_membrane_materials",
+      "name": "Cryogenic Biological Membrane Engineering",
+      "domain": "alternative_biochemistry",
+      "depth": 4,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "hydrocarbon_nutrient_synthesis",
+      "name": "Hydrocarbon-Biosphere Nutrient Synthesis",
+      "domain": "alternative_biochemistry",
+      "depth": 4,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "hydrocarbon_closed_ecology",
+      "name": "Cryogenic Hydrocarbon Closed Ecology",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "cryogenic_bioreactor_industry",
+      "name": "Cryogenic Bioreactor Industry",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "cryogenic_biosphere_management",
+      "name": "Cryogenic Biosphere Management",
+      "domain": "alternative_biochemistry",
+      "depth": 7,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "silicon_biochemical_frameworks",
+      "name": "Silicon-Centered Biochemical Frameworks",
+      "domain": "alternative_biochemistry",
+      "depth": 3,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "silicate_metabolic_cycles",
+      "name": "Silicate Metabolic Cycles",
+      "domain": "alternative_biochemistry",
+      "depth": 4,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "mineral_nutrient_processing",
+      "name": "Mineral Nutrient Processing",
+      "domain": "alternative_biochemistry",
+      "depth": 4,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "silicon_tissue_repair",
+      "name": "Silicon-Centered Tissue Repair",
+      "domain": "alternative_biochemistry",
+      "depth": 4,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "mineral_structural_regeneration",
+      "name": "Mineral-Structural Regeneration",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "mineral_biofabrication",
+      "name": "Mineral Biological Fabrication",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "silicon_life_support_cycles",
+      "name": "Silicon-Biochemistry Life-Support Cycles",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "silicon_biological_computation",
+      "name": "Silicon Biological Computation",
+      "domain": "alternative_biochemistry",
+      "depth": 5,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "cross_solvent_biochemistry",
+      "name": "Cross-Solvent Comparative Biochemistry",
+      "domain": "alternative_biochemistry",
+      "depth": 4,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "xenonutrient_translation",
+      "name": "Xenonutrient Translation",
+      "domain": "alternative_biochemistry",
+      "depth": 5,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "biochemical_interface_engineering",
+      "name": "Cross-Biochemistry Interface Engineering",
+      "domain": "alternative_biochemistry",
+      "depth": 5,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "cross_biochemistry_medicine",
+      "name": "Cross-Biochemistry Medicine",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "multibiochemistry_habitat",
+      "name": "Multi-Biochemistry Habitat Support",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    },
+    {
+      "id": "cross_biochemistry_biofabrication",
+      "name": "Cross-Biochemistry Biofabrication",
+      "domain": "alternative_biochemistry",
+      "depth": 6,
+      "art": "research-alternative_biochemistry"
+    }
+  ],
+  "plannedResearch": [
+    {
+      "id": "sc.station.human_station_docking.l1",
+      "name": "Docking expansion and traffic",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_docking--l1"
+    },
+    {
+      "id": "sc.station.human_station_docking.l2",
+      "name": "Docking expansion and traffic",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_docking--l2"
+    },
+    {
+      "id": "sc.station.human_station_docking.l3",
+      "name": "Docking expansion and traffic",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_docking--l3"
+    },
+    {
+      "id": "sc.station.human_station_habitat.l1",
+      "name": "Habitat and life support",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_habitat--l1"
+    },
+    {
+      "id": "sc.station.human_station_habitat.l2",
+      "name": "Habitat and life support",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_habitat--l2"
+    },
+    {
+      "id": "sc.station.human_station_habitat.l3",
+      "name": "Habitat and life support",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_habitat--l3"
+    },
+    {
+      "id": "sc.station.human_station_power.l1",
+      "name": "Power plant",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_power--l1"
+    },
+    {
+      "id": "sc.station.human_station_power.l2",
+      "name": "Power plant",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_power--l2"
+    },
+    {
+      "id": "sc.station.human_station_power.l3",
+      "name": "Power plant",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_power--l3"
+    },
+    {
+      "id": "sc.station.human_station_thermal.l1",
+      "name": "Thermal control",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_thermal--l1"
+    },
+    {
+      "id": "sc.station.human_station_thermal.l2",
+      "name": "Thermal control",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_thermal--l2"
+    },
+    {
+      "id": "sc.station.human_station_thermal.l3",
+      "name": "Thermal control",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_thermal--l3"
+    },
+    {
+      "id": "sc.station.human_station_cargo.l1",
+      "name": "Cargo and logistics",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_cargo--l1"
+    },
+    {
+      "id": "sc.station.human_station_cargo.l2",
+      "name": "Cargo and logistics",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_cargo--l2"
+    },
+    {
+      "id": "sc.station.human_station_cargo.l3",
+      "name": "Cargo and logistics",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_cargo--l3"
+    },
+    {
+      "id": "sc.station.human_station_sensors.l1",
+      "name": "Sensors and communications",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_sensors--l1"
+    },
+    {
+      "id": "sc.station.human_station_sensors.l2",
+      "name": "Sensors and communications",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_sensors--l2"
+    },
+    {
+      "id": "sc.station.human_station_sensors.l3",
+      "name": "Sensors and communications",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_sensors--l3"
+    },
+    {
+      "id": "sc.station.human_station_research.l1",
+      "name": "Research facilities",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_research--l1"
+    },
+    {
+      "id": "sc.station.human_station_research.l2",
+      "name": "Research facilities",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_research--l2"
+    },
+    {
+      "id": "sc.station.human_station_research.l3",
+      "name": "Research facilities",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_research--l3"
+    },
+    {
+      "id": "sc.station.human_station_shipyard.l1",
+      "name": "Shipyard and repair",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_shipyard--l1"
+    },
+    {
+      "id": "sc.station.human_station_shipyard.l2",
+      "name": "Shipyard and repair",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_shipyard--l2"
+    },
+    {
+      "id": "sc.station.human_station_shipyard.l3",
+      "name": "Shipyard and repair",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_shipyard--l3"
+    },
+    {
+      "id": "sc.station.human_station_industry.l1",
+      "name": "Industry and fabrication",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_industry--l1"
+    },
+    {
+      "id": "sc.station.human_station_industry.l2",
+      "name": "Industry and fabrication",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_industry--l2"
+    },
+    {
+      "id": "sc.station.human_station_industry.l3",
+      "name": "Industry and fabrication",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_industry--l3"
+    },
+    {
+      "id": "sc.station.human_station_protection.l1",
+      "name": "Protection and armor",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_protection--l1"
+    },
+    {
+      "id": "sc.station.human_station_protection.l2",
+      "name": "Protection and armor",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_protection--l2"
+    },
+    {
+      "id": "sc.station.human_station_protection.l3",
+      "name": "Protection and armor",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_protection--l3"
+    },
+    {
+      "id": "sc.station.human_station_shields.l1",
+      "name": "Shield generators",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_shields--l1"
+    },
+    {
+      "id": "sc.station.human_station_shields.l2",
+      "name": "Shield generators",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_shields--l2"
+    },
+    {
+      "id": "sc.station.human_station_shields.l3",
+      "name": "Shield generators",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_shields--l3"
+    },
+    {
+      "id": "sc.station.human_station_point_defense.l1",
+      "name": "Point defense",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_point_defense--l1"
+    },
+    {
+      "id": "sc.station.human_station_point_defense.l2",
+      "name": "Point defense",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_point_defense--l2"
+    },
+    {
+      "id": "sc.station.human_station_point_defense.l3",
+      "name": "Point defense",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_point_defense--l3"
+    },
+    {
+      "id": "sc.station.human_station_defense_turret.l1",
+      "name": "Defense turret",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_defense_turret--l1"
+    },
+    {
+      "id": "sc.station.human_station_defense_turret.l2",
+      "name": "Defense turret",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_defense_turret--l2"
+    },
+    {
+      "id": "sc.station.human_station_defense_turret.l3",
+      "name": "Defense turret",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_defense_turret--l3"
+    },
+    {
+      "id": "sc.station.human_station_heavy_battery.l1",
+      "name": "Heavy battery",
+      "domain": "space_industry",
+      "depth": 1,
+      "art": "human_station_heavy_battery--l1"
+    },
+    {
+      "id": "sc.station.human_station_heavy_battery.l2",
+      "name": "Heavy battery",
+      "domain": "space_industry",
+      "depth": 2,
+      "art": "human_station_heavy_battery--l2"
+    },
+    {
+      "id": "sc.station.human_station_heavy_battery.l3",
+      "name": "Heavy battery",
+      "domain": "space_industry",
+      "depth": 3,
+      "art": "human_station_heavy_battery--l3"
+    }
+  ],
+  "modules": [
+    {
+      "id": "human_station_docking--l1",
+      "family": "human_station_docking",
+      "name": "Docking expansion and traffic",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_docking--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Additional docking collar and traffic mast",
+      "research": [
+        "sc.station.human_station_docking.l1"
+      ]
+    },
+    {
+      "id": "human_station_docking--l2",
+      "family": "human_station_docking",
+      "name": "Docking expansion and traffic",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_docking--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Branching dock pier and control booth",
+      "research": [
+        "sc.station.human_station_docking.l2"
+      ]
+    },
+    {
+      "id": "human_station_docking--l3",
+      "family": "human_station_docking",
+      "name": "Docking expansion and traffic",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_docking--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Large traffic arm with separated docking structures",
+      "research": [
+        "sc.station.human_station_docking.l3"
+      ]
+    },
+    {
+      "id": "human_station_habitat--l1",
+      "family": "human_station_habitat",
+      "name": "Habitat and life support",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_habitat--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Single sealed pressure pod",
+      "research": [
+        "sc.station.human_station_habitat.l1"
+      ]
+    },
+    {
+      "id": "human_station_habitat--l2",
+      "family": "human_station_habitat",
+      "name": "Habitat and life support",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_habitat--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Multi-pod habitat block and service plant",
+      "research": [
+        "sc.station.human_station_habitat.l2"
+      ]
+    },
+    {
+      "id": "human_station_habitat--l3",
+      "family": "human_station_habitat",
+      "name": "Habitat and life support",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_habitat--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Large habitat cluster and environmental-control hardware",
+      "research": [
+        "sc.station.human_station_habitat.l3"
+      ]
+    },
+    {
+      "id": "human_station_power--l1",
+      "family": "human_station_power",
+      "name": "Power plant",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_power--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Compact power housing and collectors",
+      "research": [
+        "sc.station.human_station_power.l1"
+      ]
+    },
+    {
+      "id": "human_station_power--l2",
+      "family": "human_station_power",
+      "name": "Power plant",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_power--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Larger generator housing and collector/radiator surfaces",
+      "research": [
+        "sc.station.human_station_power.l2"
+      ]
+    },
+    {
+      "id": "human_station_power--l3",
+      "family": "human_station_power",
+      "name": "Power plant",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_power--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Reinforced power complex and distribution trunks",
+      "research": [
+        "sc.station.human_station_power.l3"
+      ]
+    },
+    {
+      "id": "human_station_thermal--l1",
+      "family": "human_station_thermal",
+      "name": "Thermal control",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_thermal--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Fold-out radiator pair",
+      "research": [
+        "sc.station.human_station_thermal.l1"
+      ]
+    },
+    {
+      "id": "human_station_thermal--l2",
+      "family": "human_station_thermal",
+      "name": "Thermal control",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_thermal--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Segmented radiator wing",
+      "research": [
+        "sc.station.human_station_thermal.l2"
+      ]
+    },
+    {
+      "id": "human_station_thermal--l3",
+      "family": "human_station_thermal",
+      "name": "Thermal control",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_thermal--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Multiple independently supported radiator banks",
+      "research": [
+        "sc.station.human_station_thermal.l3"
+      ]
+    },
+    {
+      "id": "human_station_cargo--l1",
+      "family": "human_station_cargo",
+      "name": "Cargo and logistics",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_cargo--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Container rack",
+      "research": [
+        "sc.station.human_station_cargo.l1"
+      ]
+    },
+    {
+      "id": "human_station_cargo--l2",
+      "family": "human_station_cargo",
+      "name": "Cargo and logistics",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_cargo--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Expanded racks and transfer equipment",
+      "research": [
+        "sc.station.human_station_cargo.l2"
+      ]
+    },
+    {
+      "id": "human_station_cargo--l3",
+      "family": "human_station_cargo",
+      "name": "Cargo and logistics",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_cargo--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Large cargo cluster and freight-transfer docks",
+      "research": [
+        "sc.station.human_station_cargo.l3"
+      ]
+    },
+    {
+      "id": "human_station_sensors--l1",
+      "family": "human_station_sensors",
+      "name": "Sensors and communications",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_sensors--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Small mast and dish",
+      "research": [
+        "sc.station.human_station_sensors.l1"
+      ]
+    },
+    {
+      "id": "human_station_sensors--l2",
+      "family": "human_station_sensors",
+      "name": "Sensors and communications",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_sensors--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Dish cluster and separated sensor booms",
+      "research": [
+        "sc.station.human_station_sensors.l2"
+      ]
+    },
+    {
+      "id": "human_station_sensors--l3",
+      "family": "human_station_sensors",
+      "name": "Sensors and communications",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_sensors--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Distributed instrument array",
+      "research": [
+        "sc.station.human_station_sensors.l3"
+      ]
+    },
+    {
+      "id": "human_station_research--l1",
+      "family": "human_station_research",
+      "name": "Research facilities",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_research--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Sealed laboratory pod",
+      "research": [
+        "sc.station.human_station_research.l1"
+      ]
+    },
+    {
+      "id": "human_station_research--l2",
+      "family": "human_station_research",
+      "name": "Research facilities",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_research--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Larger laboratory block and instruments",
+      "research": [
+        "sc.station.human_station_research.l2"
+      ]
+    },
+    {
+      "id": "human_station_research--l3",
+      "family": "human_station_research",
+      "name": "Research facilities",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_research--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Multi-lab complex with dedicated service connections",
+      "research": [
+        "sc.station.human_station_research.l3"
+      ]
+    },
+    {
+      "id": "human_station_shipyard--l1",
+      "family": "human_station_shipyard",
+      "name": "Shipyard and repair",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_shipyard--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Open service cradle and repair arms",
+      "research": [
+        "sc.station.human_station_shipyard.l1"
+      ]
+    },
+    {
+      "id": "human_station_shipyard--l2",
+      "family": "human_station_shipyard",
+      "name": "Shipyard and repair",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_shipyard--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Fabrication gantry with additional tooling",
+      "research": [
+        "sc.station.human_station_shipyard.l2"
+      ]
+    },
+    {
+      "id": "human_station_shipyard--l3",
+      "family": "human_station_shipyard",
+      "name": "Shipyard and repair",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_shipyard--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Large multi-section construction dock and cranes",
+      "research": [
+        "sc.station.human_station_shipyard.l3"
+      ]
+    },
+    {
+      "id": "human_station_industry--l1",
+      "family": "human_station_industry",
+      "name": "Industry and fabrication",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_industry--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Compact machinery enclosure",
+      "research": [
+        "sc.station.human_station_industry.l1"
+      ]
+    },
+    {
+      "id": "human_station_industry--l2",
+      "family": "human_station_industry",
+      "name": "Industry and fabrication",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_industry--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Expanded production block and handling fixtures",
+      "research": [
+        "sc.station.human_station_industry.l2"
+      ]
+    },
+    {
+      "id": "human_station_industry--l3",
+      "family": "human_station_industry",
+      "name": "Industry and fabrication",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_industry--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Manufacturing cluster with expanded thermal and logistics hardware",
+      "research": [
+        "sc.station.human_station_industry.l3"
+      ]
+    },
+    {
+      "id": "human_station_protection--l1",
+      "family": "human_station_protection",
+      "name": "Protection and armor",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_protection--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Local reinforcement and covers",
+      "research": [
+        "sc.station.human_station_protection.l1"
+      ]
+    },
+    {
+      "id": "human_station_protection--l2",
+      "family": "human_station_protection",
+      "name": "Protection and armor",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_protection--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Deeper armor sections and protected services",
+      "research": [
+        "sc.station.human_station_protection.l2"
+      ]
+    },
+    {
+      "id": "human_station_protection--l3",
+      "family": "human_station_protection",
+      "name": "Protection and armor",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_protection--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Reinforced external structural plating",
+      "research": [
+        "sc.station.human_station_protection.l3"
+      ]
+    },
+    {
+      "id": "human_station_shields--l1",
+      "family": "human_station_shields",
+      "name": "Shield generators",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_shields--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Compact shield projector and visible emitter housing",
+      "research": [
+        "sc.station.human_station_shields.l1"
+      ]
+    },
+    {
+      "id": "human_station_shields--l2",
+      "family": "human_station_shields",
+      "name": "Shield generators",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_shields--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Paired projector assembly with additional cooling and emitter heads",
+      "research": [
+        "sc.station.human_station_shields.l2"
+      ]
+    },
+    {
+      "id": "human_station_shields--l3",
+      "family": "human_station_shields",
+      "name": "Shield generators",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_shields--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Large distributed projector assembly with reinforced emitters and service hardware",
+      "research": [
+        "sc.station.human_station_shields.l3"
+      ]
+    },
+    {
+      "id": "human_station_point_defense--l1",
+      "family": "human_station_point_defense",
+      "name": "Point defense",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_point_defense--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Compact single assembly on a standardized mount",
+      "research": [
+        "sc.station.human_station_point_defense.l1"
+      ]
+    },
+    {
+      "id": "human_station_point_defense--l2",
+      "family": "human_station_point_defense",
+      "name": "Point defense",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_point_defense--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Larger protected assembly with visible side cooling",
+      "research": [
+        "sc.station.human_station_point_defense.l2"
+      ]
+    },
+    {
+      "id": "human_station_point_defense--l3",
+      "family": "human_station_point_defense",
+      "name": "Point defense",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_point_defense--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Reinforced weapon assembly with additional cooling and protection",
+      "research": [
+        "sc.station.human_station_point_defense.l3"
+      ]
+    },
+    {
+      "id": "human_station_defense_turret--l1",
+      "family": "human_station_defense_turret",
+      "name": "Defense turret",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_defense_turret--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Compact single assembly on a standardized mount",
+      "research": [
+        "sc.station.human_station_defense_turret.l1"
+      ]
+    },
+    {
+      "id": "human_station_defense_turret--l2",
+      "family": "human_station_defense_turret",
+      "name": "Defense turret",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_defense_turret--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Larger protected assembly with visible side cooling",
+      "research": [
+        "sc.station.human_station_defense_turret.l2"
+      ]
+    },
+    {
+      "id": "human_station_defense_turret--l3",
+      "family": "human_station_defense_turret",
+      "name": "Defense turret",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_defense_turret--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Reinforced weapon assembly with additional cooling and protection",
+      "research": [
+        "sc.station.human_station_defense_turret.l3"
+      ]
+    },
+    {
+      "id": "human_station_heavy_battery--l1",
+      "family": "human_station_heavy_battery",
+      "name": "Heavy battery",
+      "race": "terran_baseline",
+      "level": 1,
+      "art": "human_station_heavy_battery--l1",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Compact single assembly on a standardized mount",
+      "research": [
+        "sc.station.human_station_heavy_battery.l1"
+      ]
+    },
+    {
+      "id": "human_station_heavy_battery--l2",
+      "family": "human_station_heavy_battery",
+      "name": "Heavy battery",
+      "race": "terran_baseline",
+      "level": 2,
+      "art": "human_station_heavy_battery--l2",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Larger protected assembly with visible side cooling",
+      "research": [
+        "sc.station.human_station_heavy_battery.l2"
+      ]
+    },
+    {
+      "id": "human_station_heavy_battery--l3",
+      "family": "human_station_heavy_battery",
+      "name": "Heavy battery",
+      "race": "terran_baseline",
+      "level": 3,
+      "art": "human_station_heavy_battery--l3",
+      "status": "Concept artwork; station outfitting is planned",
+      "description": "Reinforced weapon assembly with additional cooling and protection",
+      "research": [
+        "sc.station.human_station_heavy_battery.l3"
+      ]
+    },
+    {
+      "id": "pelagic_high_pressure--beam_turret",
+      "family": "beam_turret",
+      "name": "Beam turret",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--beam_turret",
+      "status": "Model render; fleet asset candidate",
+      "description": "Twin energy barrels on a rotating armored mount.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--beam_turret.glb",
+      "modelSha256": "1c2229fd5c12bf11d788d53506046ff462cf1e817aea339dddfe1c850c106dd9",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--kinetic_turret",
+      "family": "kinetic_turret",
+      "name": "Kinetic turret",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--kinetic_turret",
+      "status": "Model render; fleet asset candidate",
+      "description": "Paired long rail barrels and an ammunition housing.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--kinetic_turret.glb",
+      "modelSha256": "bb4adcd1c83750e16bf65b908ac9a657cfb9dfecab7c1820556d8e8a8f3aa703",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--missile_pod",
+      "family": "missile_pod",
+      "name": "Missile battery",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--missile_pod",
+      "status": "Model render; fleet asset candidate",
+      "description": "Six individually visible launch cells.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--missile_pod.glb",
+      "modelSha256": "4987c5f78d96e60d811b33f4a602a4f5e6ac5bf4c373fb8ca0903ece34b52cac",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--point_defense",
+      "family": "point_defense",
+      "name": "Point defense",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--point_defense",
+      "status": "Model render; fleet asset candidate",
+      "description": "Compact four-barrel close defense mount.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--point_defense.glb",
+      "modelSha256": "cbf23eb1c17155c94d22606c6bf97f224b5d98af62272207da93b054575abb25",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--sensor_array",
+      "family": "sensor_array",
+      "name": "Sensor array",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--sensor_array",
+      "status": "Model render; fleet asset candidate",
+      "description": "Raised array with a distinct dish or radial sensor head.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--sensor_array.glb",
+      "modelSha256": "e15f5723a7963d228b67b8d3e6c4f5414d2843db4b4bca4e9d50325259cca751",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--command_relay",
+      "family": "command_relay",
+      "name": "Command relay",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--command_relay",
+      "status": "Model render; fleet asset candidate",
+      "description": "Communications mast with visible transmitter vanes.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--command_relay.glb",
+      "modelSha256": "a5704532b6962d884c2f512861ed8ab8b6405d421356975f0c3702e50ca4fbb3",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--shield_emitter",
+      "family": "shield_emitter",
+      "name": "Shield emitter",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--shield_emitter",
+      "status": "Model render; fleet asset candidate",
+      "description": "Raised emitter cage; optional equipment, not a permanent hull detail.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--shield_emitter.glb",
+      "modelSha256": "671002242e946474c10e4ac9feae77b0e1f5b23889a85dba56292e642b0e5c3a",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--armor_plate",
+      "family": "armor_plate",
+      "name": "Armor plating",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--armor_plate",
+      "status": "Model render; fleet asset candidate",
+      "description": "Raised layered external armor panel.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--armor_plate.glb",
+      "modelSha256": "67518f969addc8db76bcc4e68f857b5a2e945607caf1b9c265498671f860a01a",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--cargo_pod",
+      "family": "cargo_pod",
+      "name": "Cargo pod",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--cargo_pod",
+      "status": "Model render; fleet asset candidate",
+      "description": "External freight container with race-specific pressure or insulation shell.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--cargo_pod.glb",
+      "modelSha256": "063e1cc8df57aee042e423fc0890f54cbfe48d4f7caec7989c34c57e070ca4e2",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--habitat_pod",
+      "family": "habitat_pod",
+      "name": "Habitat support pod",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--habitat_pod",
+      "status": "Model render; fleet asset candidate",
+      "description": "Supplementary life-support volume; does not alter the game population capacity.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--habitat_pod.glb",
+      "modelSha256": "c68be12e5e729042b7000b919b6485e811a4da0f582bf4f55ed943c395cf1a1b",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--radiator",
+      "family": "radiator",
+      "name": "Thermal radiator",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--radiator",
+      "status": "Model render; fleet asset candidate",
+      "description": "Deployable panel geometry with heat transport piping.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--radiator.glb",
+      "modelSha256": "441feed3f643bfbd0111d8ac6b0e71b560e840fe332e79b491b10095bbbd887a",
+      "research": []
+    },
+    {
+      "id": "pelagic_high_pressure--power_unit",
+      "family": "power_unit",
+      "name": "Auxiliary power unit",
+      "race": "pelagic_high_pressure",
+      "level": 1,
+      "art": "pelagic_high_pressure--power_unit",
+      "status": "Model render; fleet asset candidate",
+      "description": "External power pod; adds six workshop power units.",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--power_unit.glb",
+      "modelSha256": "9d91ee12d57fce1900ad5834513013fe7ccfd63776fd15e09e97eb48aa03b51a",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--beam_turret",
+      "family": "beam_turret",
+      "name": "Beam turret",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--beam_turret",
+      "status": "Model render; fleet asset candidate",
+      "description": "Twin energy barrels on a rotating armored mount.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--beam_turret.glb",
+      "modelSha256": "0cf329f91145434b8ae12acd70d248a1a74218576e1c57064e8b39ccb5d2cb7a",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--kinetic_turret",
+      "family": "kinetic_turret",
+      "name": "Kinetic turret",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--kinetic_turret",
+      "status": "Model render; fleet asset candidate",
+      "description": "Paired long rail barrels and an ammunition housing.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--kinetic_turret.glb",
+      "modelSha256": "d63c03e4f0a02e5fae185ebfc7d2358e1114253eccd8338643d156b9fa823f62",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--missile_pod",
+      "family": "missile_pod",
+      "name": "Missile battery",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--missile_pod",
+      "status": "Model render; fleet asset candidate",
+      "description": "Six individually visible launch cells.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--missile_pod.glb",
+      "modelSha256": "58e4e1ba4e72d47c9bf0fb874ae87b7859d1b4f50c1dd9286bd9516bc2995856",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--point_defense",
+      "family": "point_defense",
+      "name": "Point defense",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--point_defense",
+      "status": "Model render; fleet asset candidate",
+      "description": "Compact four-barrel close defense mount.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--point_defense.glb",
+      "modelSha256": "4f380fac9c00a86cb8c47a000183063816edb14abf2aca04ac7ac56847c79c20",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--sensor_array",
+      "family": "sensor_array",
+      "name": "Sensor array",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--sensor_array",
+      "status": "Model render; fleet asset candidate",
+      "description": "Raised array with a distinct dish or radial sensor head.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--sensor_array.glb",
+      "modelSha256": "8a299411ad5976e5baced835b8a1a6a44f20b99c78d7cd3fa3adb157caee32bb",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--command_relay",
+      "family": "command_relay",
+      "name": "Command relay",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--command_relay",
+      "status": "Model render; fleet asset candidate",
+      "description": "Communications mast with visible transmitter vanes.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--command_relay.glb",
+      "modelSha256": "ddcf2b8e33104196784eeb26061c72046fc16c7ca0c52fef4ecb9e5cc17886bc",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--shield_emitter",
+      "family": "shield_emitter",
+      "name": "Shield emitter",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--shield_emitter",
+      "status": "Model render; fleet asset candidate",
+      "description": "Raised emitter cage; optional equipment, not a permanent hull detail.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--shield_emitter.glb",
+      "modelSha256": "b20e45af16228f6cf3c17648c52006babd5fe528af226f97d18d3c21effb7432",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--armor_plate",
+      "family": "armor_plate",
+      "name": "Armor plating",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--armor_plate",
+      "status": "Model render; fleet asset candidate",
+      "description": "Raised layered external armor panel.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--armor_plate.glb",
+      "modelSha256": "9e171af2f85702b3ff26c41ad61efab77f9171a579a45dfc76102555d7d872a0",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--cargo_pod",
+      "family": "cargo_pod",
+      "name": "Cargo pod",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--cargo_pod",
+      "status": "Model render; fleet asset candidate",
+      "description": "External freight container with race-specific pressure or insulation shell.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--cargo_pod.glb",
+      "modelSha256": "48108e3a7cb2168061ae56a4f9574fa8a9ab9f740ec24cbdbf2b2c3c0445883c",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--habitat_pod",
+      "family": "habitat_pod",
+      "name": "Habitat support pod",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--habitat_pod",
+      "status": "Model render; fleet asset candidate",
+      "description": "Supplementary life-support volume; does not alter the game population capacity.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--habitat_pod.glb",
+      "modelSha256": "fb70e77a19dfe1ac0fd5b4fb17e1bcbd3bc52d1d4241f91f82c7eb5395af2844",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--radiator",
+      "family": "radiator",
+      "name": "Thermal radiator",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--radiator",
+      "status": "Model render; fleet asset candidate",
+      "description": "Deployable panel geometry with heat transport piping.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--radiator.glb",
+      "modelSha256": "4b5a4075848b99a34a297359030548f211e25b2723d8c465f2713e4c66f7de41",
+      "research": []
+    },
+    {
+      "id": "compact_high_gravity--power_unit",
+      "family": "power_unit",
+      "name": "Auxiliary power unit",
+      "race": "compact_high_gravity",
+      "level": 1,
+      "art": "compact_high_gravity--power_unit",
+      "status": "Model render; fleet asset candidate",
+      "description": "External power pod; adds six workshop power units.",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--power_unit.glb",
+      "modelSha256": "d5a73ad6c84c444eef543ff89db851e32ec58f9bc52134dc84753c05ce04903a",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--beam_turret",
+      "family": "beam_turret",
+      "name": "Beam turret",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--beam_turret",
+      "status": "Model render; fleet asset candidate",
+      "description": "Twin energy barrels on a rotating armored mount.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--beam_turret.glb",
+      "modelSha256": "275259c84255371041b5b67f11a29b02a365099a32ef926542bc074a02be4db3",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--kinetic_turret",
+      "family": "kinetic_turret",
+      "name": "Kinetic turret",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--kinetic_turret",
+      "status": "Model render; fleet asset candidate",
+      "description": "Paired long rail barrels and an ammunition housing.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--kinetic_turret.glb",
+      "modelSha256": "ac08d48e10102fa92c647e25d04c575034319edff1b05fc36bab476f9eb058d4",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--missile_pod",
+      "family": "missile_pod",
+      "name": "Missile battery",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--missile_pod",
+      "status": "Model render; fleet asset candidate",
+      "description": "Six individually visible launch cells.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--missile_pod.glb",
+      "modelSha256": "a07b929f08849950ec0c85c8d43dda9fc635f7dab09995ed4f47bd4e9d515983",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--point_defense",
+      "family": "point_defense",
+      "name": "Point defense",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--point_defense",
+      "status": "Model render; fleet asset candidate",
+      "description": "Compact four-barrel close defense mount.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--point_defense.glb",
+      "modelSha256": "daf52af2470fa65b680db7f2abcda317b593f1e451eaf1ce75ff19dbfbcb8404",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--sensor_array",
+      "family": "sensor_array",
+      "name": "Sensor array",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--sensor_array",
+      "status": "Model render; fleet asset candidate",
+      "description": "Raised array with a distinct dish or radial sensor head.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--sensor_array.glb",
+      "modelSha256": "c6ade9204c75692f81a629368438110f13457f68e81cdd8e218109acaef6f4d4",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--command_relay",
+      "family": "command_relay",
+      "name": "Command relay",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--command_relay",
+      "status": "Model render; fleet asset candidate",
+      "description": "Communications mast with visible transmitter vanes.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--command_relay.glb",
+      "modelSha256": "b6368b6be95270c749494e0946ca5ab78853cf39ee200a529a70e65032cd088f",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--shield_emitter",
+      "family": "shield_emitter",
+      "name": "Shield emitter",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--shield_emitter",
+      "status": "Model render; fleet asset candidate",
+      "description": "Raised emitter cage; optional equipment, not a permanent hull detail.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--shield_emitter.glb",
+      "modelSha256": "162ffbc9129d720c09f6c1fd80db16fd11df45452de2f9facb88fad60a932b2a",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--armor_plate",
+      "family": "armor_plate",
+      "name": "Armor plating",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--armor_plate",
+      "status": "Model render; fleet asset candidate",
+      "description": "Raised layered external armor panel.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--armor_plate.glb",
+      "modelSha256": "b94edbc83479645623c7e1ec36981344805999e3180bcecb9d8f8e0977621d3d",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--cargo_pod",
+      "family": "cargo_pod",
+      "name": "Cargo pod",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--cargo_pod",
+      "status": "Model render; fleet asset candidate",
+      "description": "External freight container with race-specific pressure or insulation shell.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--cargo_pod.glb",
+      "modelSha256": "ea3ea78e258a0abbd4c153e087f3b4a33b266057f4910fb52763b663d0dbb05d",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--habitat_pod",
+      "family": "habitat_pod",
+      "name": "Habitat support pod",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--habitat_pod",
+      "status": "Model render; fleet asset candidate",
+      "description": "Supplementary life-support volume; does not alter the game population capacity.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--habitat_pod.glb",
+      "modelSha256": "60125ea8dcf2f4f9209928b686c89acfbf9956d6d683ada7731977f37db64a08",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--radiator",
+      "family": "radiator",
+      "name": "Thermal radiator",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--radiator",
+      "status": "Model render; fleet asset candidate",
+      "description": "Deployable panel geometry with heat transport piping.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--radiator.glb",
+      "modelSha256": "b6bf7d6386480d856ea647760747856acd58a25a524adee2a2ee00049e311181",
+      "research": []
+    },
+    {
+      "id": "cryogenic_hydrocarbon--power_unit",
+      "family": "power_unit",
+      "name": "Auxiliary power unit",
+      "race": "cryogenic_hydrocarbon",
+      "level": 1,
+      "art": "cryogenic_hydrocarbon--power_unit",
+      "status": "Model render; fleet asset candidate",
+      "description": "External power pod; adds six workshop power units.",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--power_unit.glb",
+      "modelSha256": "188cdfadb6af502a6c569a043176e9b1f90d4e0bce603c3b326f8f598a1a9615",
+      "research": []
+    }
+  ]
+}

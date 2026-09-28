@@ -18,6 +18,9 @@ jobs:
       - name: Validate visual asset contract
         run: python3 scripts/validate_visual_assets.py
 
+      - name: Validate module and research thumbnail coverage
+        run: python3 scripts/validate_catalog_art.py
+
       - name: Verify visual contract regression checks
         run: python3 scripts/test_validate_visual_assets.py
 
