@@ -7985,8 +7985,8 @@ class NativeCampaign final {
       system_background_.append(out,sid,width,height,starfield_quality(),starfield_density());
       if(system!=world.systems.end()){phenomena_.set_visual_seconds(system_workspace_.visual_seconds());phenomena_.append_system(out,sid,system->position.x,system->position.y,width,height,system_workspace_.viewport()?system_workspace_.viewport()->scale:1.,phenomena_options(sid));}
       system_workspace_.set_scene_environment(phenomena_.local_environment());
+      system_workspace_.set_motion_running(session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!general_settings_||!general_settings_->saved().accessibility.reduce_motion)&&(!world.active_combat_encounter||world.active_combat_encounter->reconciled));
       system_workspace_.set_simulation_days(session_->frame().clock().simulation_days());
-      system_workspace_.set_motion_running(session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!world.active_combat_encounter||world.active_combat_encounter->reconciled));
       system_workspace_.render(out,width,height,false);
       render_system_environment(out,width,height);
       if(!system_background_.ready()||!phenomena_.ready()){out={};out.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},tr("MAP_ENVIRONMENT_LOADING","Loading system environment…"),{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
