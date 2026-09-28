@@ -860,6 +860,7 @@ class NativeCampaign final {
     planet_material_cache_.set_root(asset_root_/"assets/visual");
     const stellar::native_planets::MaterialProvider planet_provider=[this](const stellar::core::PlanetAppearance& a,int width){return planet_material_cache_.request(a,width);};
     system_workspace_.set_planet_materials(planet_provider);
+    system_workspace_.set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
     colony_workspace_.planetary().globe().set_materials(planet_provider);
     system_workspace_.use_background_preparation(image_preparation_);
 

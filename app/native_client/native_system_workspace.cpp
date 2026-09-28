@@ -56,6 +56,22 @@ std::string environmental_hazard(EnvironmentalLimitingFactor value,
 Color visual_color(NativeSystemBodyVisualClass value){switch(value){case NativeSystemBodyVisualClass::rocky:return {178,143,115,255};case NativeSystemBodyVisualClass::oceanic:return {70,152,213,255};case NativeSystemBodyVisualClass::frozen:return {171,217,235,255};case NativeSystemBodyVisualClass::hot_rocky:return {222,116,66,255};case NativeSystemBodyVisualClass::gas_giant:return {211,167,114,255};case NativeSystemBodyVisualClass::ice_giant:return {111,190,215,255};case NativeSystemBodyVisualClass::moon:return {180,184,190,255};case NativeSystemBodyVisualClass::unknown_moon:return {112,137,160,255};default:return {94,132,166,255};}}
 Color star_color(std::optional<StellarClass> value){if(!value)return {135,150,174,235};switch(*value){case StellarClass::MRedDwarf:return {255,119,76,230};case StellarClass::KOrangeDwarf:return {255,167,92,235};case StellarClass::GYellowDwarf:return {255,230,150,245};case StellarClass::FYellowWhiteDwarf:return {255,247,215,245};case StellarClass::AWhiteStar:return {225,236,255,245};case StellarClass::HotBlueStar:return {126,174,255,245};case StellarClass::Giant:return {255,142,88,245};case StellarClass::WhiteDwarf:return {221,236,255,235};case StellarClass::NeutronStar:return {133,218,255,250};case StellarClass::BlackHole:return {126,92,178,230};case StellarClass::Protostar:return {255,112,160,230};case StellarClass::Pulsar:return {91,229,255,250};}return {135,150,174,235};}
 std::uint32_t mix(std::uint32_t value){value^=value>>16;value*=0x7feb352du;value^=value>>15;value*=0x846ca68bu;return value^(value>>16);}
+// Effective temperature for the Scene3D photosphere: real stellar physics
+// when surveyed, a spectral-class midpoint otherwise. Black holes have no
+// photosphere — 0 keeps them on the authored-art path.
+double stellar_photosphere_kelvin(const std::optional<StellarPhysicalProperties>&physics,std::optional<StellarClass>cls){
+  if(physics&&physics->effective_temperature_kelvin>0){
+    if(stellar::core::stellar_object_definition(physics->type).black_hole)return 0;
+    return std::clamp(physics->effective_temperature_kelvin,100.,100000.);}
+  if(!cls)return 0;
+  switch(*cls){case StellarClass::MRedDwarf:return 3100.;case StellarClass::KOrangeDwarf:return 4400.;
+  case StellarClass::GYellowDwarf:return 5778.;case StellarClass::FYellowWhiteDwarf:return 6700.;
+  case StellarClass::AWhiteStar:return 8600.;case StellarClass::HotBlueStar:return 22000.;
+  case StellarClass::Giant:return 4200.;case StellarClass::WhiteDwarf:return 14000.;
+  case StellarClass::NeutronStar:case StellarClass::Pulsar:return 100000.;
+  case StellarClass::Protostar:return 3200.;case StellarClass::BlackHole:default:return 0;}
+}
+const std::shared_ptr<const Mesh3D>&star_scene_mesh(){static const auto value=Mesh3D::uv_sphere(48,24);return value;}
 std::optional<std::pair<Point,Point>> clipped(Point a,Point b,UiRect r){float t0=0,t1=1;const float dx=b.x-a.x,dy=b.y-a.y;const std::array p{-dx,dx,-dy,dy};const std::array q{a.x-r.x,r.x+r.width-a.x,a.y-r.y,r.y+r.height-a.y};for(std::size_t i=0;i<p.size();++i){if(p[i]==0){if(q[i]<0)return std::nullopt;continue;}const auto t=q[i]/p[i];if(p[i]<0)t0=std::max(t0,t);else t1=std::min(t1,t);if(t0>t1)return std::nullopt;}return std::pair{Point{a.x+t0*dx,a.y+t0*dy},Point{a.x+t1*dx,a.y+t1*dy}};}
 bool intersects(UiRect r,float x,float y,float radius){return x+radius>=r.x&&x-radius<=r.x+r.width&&y+radius>=r.y&&y-radius<=r.y+r.height;}
 bool contains_disc(UiRect r,Point center,float radius){return center.x-radius>=r.x&&center.x+radius<=r.x+r.width&&center.y-radius>=r.y&&center.y+radius<=r.y+r.height;}
@@ -257,6 +273,8 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
   const auto orbital_system=snapshot_stellar_system(*snapshot_);
   const int stellar_count=snapshot_->stellar_orbits?static_cast<int>(snapshot_->stellar_orbits->companions.size()+1):1;
   std::vector<Text> star_labels;
+  std::vector<MeshInstance3D> star_instances;
+  const std::size_t stellar_art_begin=out.world.size();
   for(int component=0;component<stellar_count;++component){
     const auto center=spatial_->stellar_hosts[component];const auto screen=viewport_->world_to_screen(center.x,center.y);
     if(stellar_count>1){const auto& path=spatial_->stellar_paths[component];for(std::size_t i=1;i<path.size();++i){
@@ -269,12 +287,30 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
     if(stellar_count>1){const auto index=component==2?1:0;const auto& component_orbit=snapshot_->stellar_orbits->relative_orbits[index];
       radius=std::min(radius,std::max(3.f,static_cast<float>(component_orbit.radius)*spatial_->stellar_orbit_scales[index]*viewport_->scale*.18f));}
     if(!intersects(field,screen.x,screen.y,radius*1.6f))continue;
+    // Physical photosphere beneath the authored art: a limb-darkened HDR
+    // disc driven by the component's real temperature. Authored imagery
+    // stays the canonical surface — the sphere supplies the HDR core,
+    // blackbody color and physical edge falloff the bitmap cannot.
+    if(const double kelvin=stellar_photosphere_kelvin(physics,cls);kelvin>0){
+      MeshInstance3D star;star.mesh=star_scene_mesh();
+      star.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
+      star.scale=radius;star.material=star_photosphere3d(kelvin);
+      PbrSurface3D glow;glow.emissive_strength=.9f;star.material.pbr=glow;
+      star_instances.push_back(std::move(star));}
     if(stellar_art_&&artwork)stellar_art_(out,{screen.x,screen.y},radius,*artwork,presentation_seconds(),field);
     else celestial_appearance_.append_stellar_disc(out,{screen.x,screen.y},radius,{star_color(cls),cls==StellarClass::BlackHole,mix(static_cast<std::uint32_t>(snapshot_->system_id)*3+component)},presentation_seconds(),field);
     if(artwork&&stellar_activity_)stellar_activity_(out,{screen.x,screen.y},radius,snapshot_->system_id,component,field);
     visible_discs.emplace_back(Point{screen.x,screen.y},radius*1.45f);
     {std::ostringstream label;label<<snapshot_->catalog_name;if(stellar_count>1)label<<" "<<stellar_host_name(component);
       star_labels.push_back(Text{{screen.x,screen.y+radius*1.45f+8},label.str(),{244,216,164,255},15,0,field,TextAlign::Center});}
+  }
+  // The photospheres composite beneath the authored stellar art — insert
+  // the scene where the art batch began so 2D imagery still wins the limb.
+  if(!star_instances.empty()){
+    Camera3D camera;camera.projection=Projection3D::Orthographic;camera.position={0,0,50000};camera.orthographic_height=field.height;camera.near_plane=.1f;camera.far_plane=120000;
+    Scene3DView view{Scene3D::create(camera,std::move(star_instances)),field};
+    view.options.quality=scene3d_quality_;view.options.exposure=1.16f;view.options.bloom_strength=.42f;view.options.bloom_threshold=.82f;
+    out.world.insert(out.world.begin()+static_cast<std::ptrdiff_t>(stellar_art_begin),std::move(view));
   }
   std::vector<BodyLabelCandidate> body_labels;
   std::vector<MeshInstance3D> planet_instances;int detailed_planets=0,close_planets=0;
@@ -306,7 +342,10 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
     if(selected_body_id_==body.body_id)out.world.emplace_back(Circle{{p.x,p.y},radius+4,{122,230,190,90}});
     const Text label{{},body.label,text,15};const auto measured=text_measurer_?text_measurer_(label):TextExtent{static_cast<int>(body.label.size()*7u),19};if(measured.width<0||measured.height<0)throw std::runtime_error("Renderer returned invalid system label bounds.");const auto label_width=static_cast<float>(measured.width),label_height=static_cast<float>(measured.height);std::array<UiRect,4> placements{};for(int row=0;row<4;++row)placements[row]={p.x-label_width*.5f,p.y+footprint+5.f+row*(label_height+4.f),label_width,label_height};body_labels.push_back(BodyLabelCandidate{body.body_id,selected_body_id_==body.body_id,body.label,placements});}
   if(!planet_instances.empty()){Camera3D camera;camera.projection=Projection3D::Orthographic;camera.position={0,0,50000};camera.orthographic_height=field.height;camera.near_plane=.1f;camera.far_plane=100000;
-    out.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(planet_instances)),field});}
+    Scene3DView view{Scene3D::create(camera,std::move(planet_instances)),field};
+    view.options.quality=scene3d_quality_;view.options.exposure=1.1f;view.options.bloom_strength=.28f;view.options.bloom_threshold=.95f;
+    view.options.time=static_cast<float>(std::fmod(std::max(0.,visual_seconds_),512.));
+    out.world.emplace_back(std::move(view));}
   std::stable_sort(body_labels.begin(),body_labels.end(),[](const auto&left,const auto&right){return std::pair{!left.selected,left.body_id}<std::pair{!right.selected,right.body_id};});std::vector<UiRect> accepted_labels;
   for(auto label:star_labels){
     auto measured=text_measurer_?text_measurer_(label):TextExtent{static_cast<int>(label.value.size()*7u),19};

@@ -210,7 +210,10 @@ class NativePlanetGlobe {
     if(appearance_&&material_set_){std::vector<MeshInstance3D> instances;
       const auto light=v.stellar_lighting.value_or(stellar::native_planets::lighting(v.illumination_x,v.illumination_y,v.illumination_star?&*v.illumination_star:nullptr,v.planet.details&&v.planet.details->stellar_exposure?v.planet.details->stellar_exposure->incident_flux:1));
       stellar::native_planets::append_instances(instances,*appearance_,*material_set_,{},1,1024,days_,light,manual_rotation(),night_view_,v.population_millions>0,visual_seconds_,parent_bearing_);
-      out.overlay.emplace_back(Scene3DView{Scene3D::create(camera,std::move(instances)),area});return;}
+      Scene3DView scene{Scene3D::create(camera,std::move(instances)),area};
+      scene.options.exposure=1.08f;scene.options.bloom_strength=.22f;scene.options.bloom_threshold=.95f;
+      scene.options.time=static_cast<float>(std::fmod(std::max(0.,visual_seconds_),512.));
+      out.overlay.emplace_back(std::move(scene));return;}
     const auto rotation=compose_rotation(rotation_axis_angle({0,0,1},roll_),compose_rotation(rotation_axis_angle({1,0,0},pitch_),rotation_axis_angle({0,1,0},-yaw_)));
     std::vector<MeshInstance3D> instances;instances.reserve(3);
     Material3D surface;surface.texture=albedo_;surface.ambient=night_view_?.08f:.12f;surface.diffuse=night_view_?.12f:.88f;
