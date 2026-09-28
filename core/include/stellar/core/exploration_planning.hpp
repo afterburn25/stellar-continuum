@@ -6,9 +6,11 @@
 #include <stellar/core/survey_operations.hpp>
 
 #include <functional>
+#include <optional>
 #include <span>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace stellar::core {
@@ -84,6 +86,19 @@ public:
   assess_operational_reach(ExplorationPlanningWorldView world,
                            const FleetState &fleet,
                            int destination_system_id) const;
+
+  // AI mission selection fast path: ranks survey targets in the same order
+  // build_plan uses, but defers the route assessment until the selection is
+  // decided. Returns the candidate select_mission would pick from the full
+  // plan — first supported target not present in reservation_set, or the
+  // first supported target overall with used_shared_fallback set when every
+  // supported target is reserved. Null when nothing is supported.
+  std::optional<ExplorationMissionCandidate>
+  select_supported_candidate(ExplorationPlanningWorldView world,
+                             const FleetState &fleet,
+                             MissionFuelPolicy fuel_policy,
+                             const std::unordered_set<int> &reservation_set,
+                             bool &used_shared_fallback) const;
 
   static bool needs_survey_work(const CivilizationKnowledgeState &knowledge,
                                 const FleetState &fleet, int system_id);

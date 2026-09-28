@@ -83,7 +83,17 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `finish` math and `Unknown system` errors).
   `core/src/exploration_planning.cpp` — `build_plan` constructs one
   id→system index per pass and `build_candidate` accepts it explicitly
-  (falling back to the span scan when absent).
+  (falling back to the span scan when absent); new
+  `ExplorationMissionPlanner::select_supported_candidate` powers the AI
+  `select_mission` path with lazy route assessment: targets needing survey
+  work are ranked exactly as the plan comparator orders supported
+  candidates (priority band, distance with NaN last, system id), then
+  assessed in order until the first unreserved supported target is found —
+  the same candidate the full sweep selects, without paying an
+  `OperationalReachBatch::assess` for every unsurveyed system every tick.
+  The `hard_maximum_candidates` plan-window bound, the shared-fallback
+  rule, the fuel-policy guard and the stored-fleet (not caller-reference)
+  subject semantics all match `build_plan`.
   `core/src/fleet_transit.cpp` — new resolved-pointer overload
   `interstellar_distance_from_fleet(origin, waypoint, fleet, target)`;
   the original span overload now resolves origin/waypoint once and
@@ -95,20 +105,27 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   waypoint term still applies only in `InterstellarWarp`. Fleet mutation
   order is untouched and `detect_civilization_contacts` stays a linear
   scan because fleet positions mutate mid-step.
-- Save/performance impact: none — the index lives for one `advance` call
-  and persists nothing. Complexity moves from O(fleets × systems +
-  fleets × bodies) toward O(systems + bodies + fleets + candidates).
-- Tests: `exploration_advance_parity`, `exploration_planning_parity`,
+- Save/performance impact: none persisted — indexes and batches live for
+  one `advance`/`build_plan` call. Instrumented profile (2500 systems,
+  137 simulated years, seed 8374837): mission selection consumed ~95% of
+  the phase (5,544 selection calls at ~48.6 ms each). After lazy
+  assessment the phase drops from 29.2 ms to 2.6 ms mean (~11×) and total
+  step time from 50.5 ms to 23.1 ms mean (~2.2×); the campaign's final
+  state hash is bit-identical to the pre-optimization run.
+- Tests: `exploration_advance_parity`, `exploration_planning_parity`
+  (including the detached-fleet and injected-reach `Select` fixtures),
   `exploration_orders_parity`, `exploration_fuel_safety`,
   `fleet_transit_parity`, `operational_reach_batch`, `survey_batch`,
   `survey_batch_50000`, `survey_operations_parity`, `lane_network_parity`,
   `fleet_reach_parity`, `route_policy`, `galaxy_phenomena` — all green;
   organic campaign hash parity verified against the pre-optimization run.
-- Limitations: the per-plan index is rebuilt for each idle survey fleet's
-  `build_plan` call (still O(systems) per idle fleet per tick);
-  contact detection remains O(fleets × contacts) by design; route-tree
-  caching already covered the dominant planner cost so gains concentrate
-  in transit/survey bookkeeping.
+- Limitations: when every supported target is reserved or nothing is
+  supported the lazy scan still pays the full assessment sweep (bounded
+  by `hard_maximum_candidates` supported entries); `build_plan` itself —
+  the player/UI planning surface — still assesses every target;
+  `detect_civilization_contacts` remains O(civs × (colonies + fleets))
+  per surveying fleet by design since positions mutate mid-step; the
+  lane route cache still clears wholesale at capacity.
 
 ## Autonomous warfare coordination (2026-09-28)
 

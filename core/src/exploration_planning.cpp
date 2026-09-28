@@ -139,6 +139,24 @@ indexed_system(const std::unordered_map<int, const StellarSystem *> &index,
   const auto found = index.find(*id);
   return found == index.end() ? nullptr : found->second;
 }
+
+double indexed_distance_from_fleet(
+    const std::unordered_map<int, const StellarSystem *> &index,
+    const FleetState &fleet, const StellarSystem &target) {
+  return interstellar_distance_from_fleet(
+      indexed_system(index,
+                     fleet.transit_phase == FleetTransitPhase::InterstellarWarp
+                         ? fleet.transit_origin_system_id
+                         : fleet.current_system_id),
+      indexed_system(index,
+                     fleet.transit_phase == FleetTransitPhase::InterstellarWarp
+                         ? (!fleet.planned_route_system_ids.empty()
+                                ? std::optional<int>(
+                                      fleet.planned_route_system_ids.front())
+                                : fleet.destination_system_id)
+                         : std::nullopt),
+      fleet, target);
+}
 } // namespace
 
 ExplorationMissionCandidate
@@ -162,21 +180,7 @@ ExplorationMissionPlanner::build_candidate(ExplorationPlanningWorldView world,
   }
   const auto distance =
       systems_index
-          ? interstellar_distance_from_fleet(
-                indexed_system(*systems_index,
-                               fleet.transit_phase ==
-                                       FleetTransitPhase::InterstellarWarp
-                                   ? fleet.transit_origin_system_id
-                                   : fleet.current_system_id),
-                indexed_system(
-                    *systems_index,
-                    fleet.transit_phase == FleetTransitPhase::InterstellarWarp
-                        ? (!fleet.planned_route_system_ids.empty()
-                               ? std::optional<int>(
-                                     fleet.planned_route_system_ids.front())
-                               : fleet.destination_system_id)
-                        : std::nullopt),
-                fleet, system)
+          ? indexed_distance_from_fleet(*systems_index, fleet, system)
           : interstellar_distance_from_fleet(world.systems, fleet, system);
   auto reach = batch?batch->assess(fleet,system.id,mission_kind(fleet.role),fuel_policy):assess_operational_reach(world, fleet, system.id);
   const auto priority = survey_priority(fleet.role, level);
@@ -254,6 +258,100 @@ ExplorationMissionPlanner::build_plan(ExplorationPlanningWorldView world,
           true,      std::move(status), std::move(candidates)};
 }
 
+std::optional<ExplorationMissionCandidate>
+ExplorationMissionPlanner::select_supported_candidate(
+    ExplorationPlanningWorldView world, const FleetState &fleet,
+    MissionFuelPolicy fuel_policy,
+    const std::unordered_set<int> &reservation_set,
+    bool &used_shared_fallback) const {
+  used_shared_fallback = false;
+  if(fuel_policy!=MissionFuelPolicy::ReachDestination&&!uses_canonical_reach_)
+    throw std::invalid_argument("Return fuel planning requires the canonical operational reach provider.");
+  // Match build_plan: the stored fleet — not the caller's reference — is the
+  // planning subject, and a missing/inactive/wrong-role fleet has no plan.
+  const auto stored =
+      std::find_if(world.fleets.begin(), world.fleets.end(),
+                   [&fleet](const auto &candidate) {
+                     return candidate.id == fleet.id && candidate.is_active;
+                   });
+  if (stored == world.fleets.end() ||
+      (stored->role != FleetRole::Scout && stored->role != FleetRole::Science))
+    return std::nullopt;
+  const auto &subject = *stored;
+  std::unordered_map<int, const StellarSystem *> systems_index;
+  systems_index.reserve(world.systems.size());
+  for (const auto &system : world.systems)
+    systems_index.emplace(system.id, &system);
+  std::optional<OperationalReachBatch> batch;
+  if(uses_canonical_reach_)batch.emplace(OperationalReachWorldView{world.systems,world.colonies,world.lanes},subject.civilization_id);
+
+  // Light ranking identical to the build_plan comparator restricted to the
+  // supported subsequence: (priority band, distance with NaN last, id).
+  struct RankedTarget {
+    const StellarSystem *system;
+    int priority_band;
+    double distance;
+  };
+  std::vector<RankedTarget> targets;
+  targets.reserve(world.systems.size());
+  for (const auto &system : world.systems) {
+    if (!needs_survey_work(world.knowledge, subject, system.id))
+      continue;
+    targets.push_back(
+        {&system,
+         survey_priority(
+             subject.role,
+             world.knowledge.system_survey_level(subject.civilization_id,
+                                                 system.id)),
+         indexed_distance_from_fleet(systems_index, subject, system)});
+  }
+  std::stable_sort(targets.begin(), targets.end(),
+                   [](const RankedTarget &left, const RankedTarget &right) {
+                     if (left.priority_band != right.priority_band)
+                       return left.priority_band < right.priority_band;
+                     const bool left_nan = std::isnan(left.distance);
+                     const bool right_nan = std::isnan(right.distance);
+                     if (left_nan != right_nan)
+                       return left_nan;
+                     if (!left_nan && left.distance != right.distance)
+                       return left.distance < right.distance;
+                     return left.system->id < right.system->id;
+                   });
+
+  // Assess lazily in plan order. The plan truncates to
+  // hard_maximum_candidates entries with supported candidates first, so only
+  // the first hard_maximum_candidates supported targets can be selected.
+  const StellarSystem *first_supported = nullptr;
+  const StellarSystem *chosen = nullptr;
+  int supported_seen = 0;
+  for (const auto &target : targets) {
+    if (supported_seen >= hard_maximum_candidates)
+      break;
+    const auto reach =
+        batch ? batch->assess(subject, target.system->id,
+                              mission_kind(subject.role), fuel_policy)
+              : assess_operational_reach(world, subject, target.system->id);
+    if (!reach.is_supported)
+      continue;
+    ++supported_seen;
+    if (!first_supported)
+      first_supported = target.system;
+    if (!reservation_set.contains(target.system->id)) {
+      chosen = target.system;
+      break;
+    }
+  }
+  if (!chosen) {
+    if (!first_supported)
+      return std::nullopt;
+    chosen = first_supported;
+    used_shared_fallback = true;
+  }
+  SurveyOperationsBatch surveys(world.systems, world.bodies);
+  return build_candidate(world, subject, *chosen, batch ? &*batch : nullptr,
+                         fuel_policy, &surveys, &systems_index);
+}
+
 ExplorationMissionOrderAssessment
 ExplorationMissionPlanner::assess_order(ExplorationPlanningWorldView world,
                                         int fleet_id, int destination_system_id,
@@ -326,19 +424,6 @@ ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
             {},
             "Only active scout/science fleets participate in AI exploration "
             "coordination."};
-  const auto plan = mission_planner_.build_plan(
-      world, fleet.id, ExplorationMissionPlanner::hard_maximum_candidates,fuel_policy);
-  std::vector<const ExplorationMissionCandidate *> supported;
-  for (const auto &candidate : plan.candidates)
-    if (candidate.reach.is_supported)
-      supported.push_back(&candidate);
-  if (supported.empty())
-    return {fleet.id,
-            std::nullopt,
-            false,
-            {},
-            "No supported survey work is currently available."};
-
   std::unordered_set<int> reservation_set;
   for (const auto &other : world.fleets) {
     if (!other.is_active || other.id == fleet.id ||
@@ -354,12 +439,15 @@ ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
                                                      *other.current_system_id))
       reservation_set.insert(*other.current_system_id);
   }
-  const auto unique = std::find_if(
-      supported.begin(), supported.end(), [&](const auto *candidate) {
-        return !reservation_set.contains(candidate->system_id);
-      });
-  const bool shared = unique == supported.end();
-  const auto *selected = shared ? supported.front() : *unique;
+  bool shared = false;
+  auto selected = mission_planner_.select_supported_candidate(
+      world, fleet, fuel_policy, reservation_set, shared);
+  if (!selected)
+    return {fleet.id,
+            std::nullopt,
+            false,
+            {},
+            "No supported survey work is currently available."};
   std::vector<int> reservations(reservation_set.begin(), reservation_set.end());
   std::sort(reservations.begin(), reservations.end());
   return {fleet.id, *selected, shared, std::move(reservations),
