@@ -1,5 +1,8 @@
 #include "native_fleet_workspace.hpp"
 
+#include <stellar/engine/native_scene3d.hpp>
+
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -130,6 +133,29 @@ int main() try {
         center(commands.layout(1280,720).confirm)},1280,720,{},{});
     require(confirm.kind==FleetWorkspaceCommandKind::Confirm,
         "Selected fleet command card lost canonical travel confirmation.");
+  }
+  {
+    NativeFleetWorkspace ships{FleetWorkspacePresentation::SelectedCommands};
+    ships.set_view(player_view(true));
+    DrawList draw;
+    const std::array markers{FleetScreenMarker{10,{600,380},35.f,true},
+                             FleetScreenMarker{12,{700,420}}};
+    ships.render(draw,1280,720,markers);
+    require(draw.circles.size()==markers.size()*2,
+        "Scene3D fleet glyphs displaced the faction marker circles.");
+    const auto scene=std::ranges::find_if(draw.world,[](const auto &command){
+        return std::holds_alternative<Scene3DView>(command);});
+    require(scene!=draw.world.end(),
+        "Fleet markers emitted no Scene3D ship layer.");
+    const auto &instances=std::get<Scene3DView>(*scene).scene->instances();
+    require(instances.size()==4,
+        "Transit and idle fleet glyphs did not emit the expected hull and flame instances.");
+    require(std::ranges::count_if(instances,[](const auto &instance){
+        return instance.material.pbr&&instance.material.pbr->metallic>0.f;})==2,
+        "Fleet ship hulls lost their lit PBR materials.");
+    require(std::ranges::count_if(instances,[](const auto &instance){
+        return instance.material.pbr&&instance.material.pbr->emissive;})==1,
+        "Engine emission did not stay exclusive to the transiting fleet.");
   }
   {
     auto view = player_view(true);

@@ -861,6 +861,7 @@ class NativeCampaign final {
     const stellar::native_planets::MaterialProvider planet_provider=[this](const stellar::core::PlanetAppearance& a,int width){return planet_material_cache_.request(a,width);};
     system_workspace_.set_planet_materials(planet_provider);
     system_workspace_.set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
+    fleet_workspace_.set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
     battle_sprites_.set_render_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
     colony_workspace_.planetary().globe().set_materials(planet_provider);
     system_workspace_.use_background_preparation(image_preparation_);
@@ -9026,7 +9027,22 @@ class NativeCampaign final {
         point.x+=fleet_marker_offsets_[offset_index].pixels.x;
         point.y+=fleet_marker_offsets_[offset_index].pixels.y;
       }
-      result.push_back({fleet.id,point});
+      FleetScreenMarker marker{fleet.id,point};
+      marker.in_transit=
+          fleet.transit_phase!=stellar::core::FleetTransitPhase::None;
+      if(fleet.destination_system_id){
+        const auto found=session_->cache().systems_by_id.find(
+            *fleet.destination_system_id);
+        if(found!=session_->cache().systems_by_id.end()){
+          const auto to=camera_.project(
+              {found->second->position.x,found->second->position.y},
+              width,height);
+          if(std::hypot(to.x-point.x,to.y-point.y)>.5f)
+            marker.heading_degrees=
+                std::atan2(to.y-point.y,to.x-point.x)*57.29577951f;
+        }
+      }
+      result.push_back(marker);
     }
     return result;
   }

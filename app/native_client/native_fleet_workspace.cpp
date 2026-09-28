@@ -3,9 +3,13 @@
 #include "native_ui_layout.hpp"
 #include "native_ui_theme.hpp"
 
+#include <stellar/engine/native_geometry3d.hpp>
+#include <stellar/engine/native_scene3d.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <iomanip>
 #include <memory>
 #include <ranges>
@@ -759,6 +763,114 @@ void NativeFleetWorkspace::render(
     out.circles.push_back(
         {marker.position, selected ? 5.f * layout.scale : 3.5f * layout.scale,
          own_color});
+  }
+
+  {
+    // Scene3D fleet glyphs above the faction halo: a lit extruded hull per
+    // marker, with HDR engine flames only while the fleet is observed in
+    // transit. The world layer keeps them under the UI overlay, and the
+    // marker circles/hit-testing beneath are unchanged.
+    static const auto hull = extruded_convex_mesh(
+        std::array<Point, 8>{{{.48f, 0}, {.16f, .15f}, {-.29f, .22f},
+                              {-.45f, .14f}, {-.48f, 0}, {-.45f, -.14f},
+                              {-.29f, -.22f}, {.16f, -.15f}}},
+        .11f);
+    static const auto flame_outer = [] {
+      std::vector<Vertex3D> v;
+      std::vector<std::uint32_t> idx;
+      for (const float nozzle : {-.125f, .125f}) {
+        const auto base = static_cast<std::uint32_t>(v.size());
+        v.push_back({{-.455f, nozzle - .025f, .05f}, {0, 0, 1}, {0, 0}});
+        v.push_back({{-.72f, nozzle, .05f}, {0, 0, 1}, {.5f, 0}});
+        v.push_back({{-.455f, nozzle + .025f, .05f}, {0, 0, 1}, {1, 0}});
+        idx.insert(idx.end(), {base, base + 1, base + 2});
+      }
+      return Mesh3D::create(std::move(v), std::move(idx));
+    }();
+    static const auto flame_inner = [] {
+      std::vector<Vertex3D> v;
+      std::vector<std::uint32_t> idx;
+      for (const float nozzle : {-.125f, .125f}) {
+        const auto base = static_cast<std::uint32_t>(v.size());
+        v.push_back({{-.455f, nozzle - .012f, .052f}, {0, 0, 1}, {0, 0}});
+        v.push_back({{-.61f, nozzle, .052f}, {0, 0, 1}, {.5f, 0}});
+        v.push_back({{-.455f, nozzle + .012f, .052f}, {0, 0, 1}, {1, 0}});
+        idx.insert(idx.end(), {base, base + 1, base + 2});
+      }
+      return Mesh3D::create(std::move(v), std::move(idx));
+    }();
+    static const std::shared_ptr<const RgbaImage> white =
+        RgbaImage::create(1, 1, {255, 255, 255, 255});
+    const UiRect field{0.f, 0.f, static_cast<float>(width),
+                       static_cast<float>(height)};
+    std::vector<MeshInstance3D> ships;
+    ships.reserve(markers.size());
+    for (const auto &marker : markers) {
+      if (!std::isfinite(marker.position.x) ||
+          !std::isfinite(marker.position.y))
+        continue;
+      const bool selected = selected_fleet_id() == marker.fleet_id;
+      const float side = (selected ? 20.f : 15.f) * layout.scale;
+      const auto angle = marker.heading_degrees * .01745329252f;
+      const auto rotation = compose_rotation(
+          rotation_axis_angle({0, 0, 1}, -angle),
+          rotation_axis_angle({1, 0, 0}, .38f));
+      const Position3 position{marker.position.x - field.x -
+                                   field.width * .5f,
+                               field.y + field.height * .5f -
+                                   marker.position.y,
+                               0.f};
+      Material3D metal;
+      metal.tint = {116, 148, 168, 255};
+      metal.ambient = .22f;
+      metal.diffuse = .72f;
+      metal.linear_light = true;
+      metal.light_direction = {-.38f, -.52f, .76f};
+      metal.light_color = {1.f, 1.f, 1.f};
+      metal.light_intensity = 1.05f;
+      PbrSurface3D metal_pbr;
+      metal_pbr.metallic = .8f;
+      metal_pbr.roughness = .42f;
+      metal.pbr = metal_pbr;
+      ships.push_back({hull, position, rotation, side, metal});
+      if (marker.in_transit) {
+        Material3D fringe;
+        fringe.tint = {40, 148, 255, 160};
+        fringe.ambient = 1.f;
+        fringe.diffuse = 0;
+        fringe.transparent = true;
+        fringe.opacity = .62f;
+        fringe.double_sided = true;
+        Material3D core;
+        core.tint = {155, 231, 255, 220};
+        core.ambient = 1.f;
+        core.diffuse = 0;
+        core.transparent = true;
+        core.opacity = .85f;
+        core.double_sided = true;
+        PbrSurface3D glow;
+        glow.emissive = white;
+        glow.emissive_tint = {.3f, .62f, 1.f};
+        glow.emissive_strength = 2.6f;
+        core.pbr = glow;
+        ships.push_back({flame_outer, position, rotation, side, fringe});
+        ships.push_back({flame_inner, position, rotation, side, core});
+      }
+    }
+    if (!ships.empty()) {
+      Camera3D camera;
+      camera.projection = Projection3D::Orthographic;
+      camera.position = {0, 0, 10000};
+      camera.orthographic_height = field.height;
+      camera.near_plane = 1;
+      camera.far_plane = 20000;
+      Scene3DView scene{Scene3D::create(camera, std::move(ships)), field};
+      scene.options.quality = scene3d_quality_;
+      scene.options.exposure = 1.05f;
+      scene.options.bloom_strength = .35f;
+      scene.options.bloom_threshold = .8f;
+      out.world.emplace_back(std::move(scene));
+    }
   }
 
   if (!panel_bounds(width, height)) return;
