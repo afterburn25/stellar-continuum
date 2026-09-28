@@ -2,6 +2,8 @@
 
 #include "native_system_view.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <optional>
 #include <string>
 #include <vector>
@@ -30,6 +32,8 @@ struct BodyInspection {
 };
 
 [[nodiscard]] std::optional<BodyInspection>
-build_body_inspection(const native_system::NativeSystemSnapshot &, int body_id);
+build_body_inspection(const native_system::NativeSystemSnapshot &, int body_id,
+                      const stellar::engine::LocalizationTable *locale =
+                          nullptr);
 
 } // namespace stellar::native_system_ui

@@ -200,6 +200,30 @@ void owner_guard(const fs::path& path) {
   other.join();
   require(rejected, "voice settings accepted a non-owner call");
 }
+
+void localized_labels(const fs::path& path) {
+  stellar::engine::LocalizationTable locale{"en", "en"};
+  std::string error;
+  require(locale.load_json(
+              R"({"locale":"en","strings":{"SETTINGS_VOICE_TITLE":"VOIX ET SOUS-TITRES","SETTINGS_VOICE_REPLAY":"Rejouer"}})",
+              &error),
+          "the test locale table must parse");
+  NativeVoiceSettings settings(path, {}, [] {}, [] {});
+  settings.set_localization(&locale);
+  settings.open();
+  DrawList draw;
+  settings.render(draw, 1280, 720);
+  bool heading{}, replay{}, fallback{};
+  for (const auto& command : draw.overlay)
+    if (const auto* text = std::get_if<Text>(&command)) {
+      heading = heading || text->value == "VOIX ET SOUS-TITRES";
+      replay = replay || text->value == "Rejouer";
+      fallback = fallback || text->value == "Enable voices";
+    }
+  require(heading && replay, "catalogued voice labels must render translated");
+  require(fallback, "uncatalogued voice labels must keep their English text");
+  settings.cancel();
+}
 } // namespace
 
 int main(int argc, char** argv) try {
@@ -212,6 +236,7 @@ int main(int argc, char** argv) try {
   persistence_and_failed_save(scratch);
   malformed_preferences(scratch);
   owner_guard(scratch / "owner.json");
+  localized_labels(scratch / "localized.json");
   std::cout << "Native voice settings tests passed\n";
   return 0;
 } catch (const std::exception& error) {

@@ -2,10 +2,12 @@
 
 #include "native_research_controller.hpp"
 #include "native_dropdown.hpp"
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <cstddef>
 #include <functional>
+#include <initializer_list>
 #include <optional>
 #include <memory>
 #include <string>
@@ -59,6 +61,10 @@ public:
   using ArtworkResolver = std::function<std::shared_ptr<const stellar::native_map::RgbaImage>(
       std::string_view node_id, bool portrait)>;
   void set_text_measurer(TextMeasurer measure);
+  void
+  set_localization(const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   [[nodiscard]] const stellar::core::AdaptiveResearchPlan& plan()const{return plan_;}
   void set_view_mode(ResearchViewMode mode){mode_=mode;guided_scroll_=0;}
   [[nodiscard]] ResearchViewMode view_mode()const{return mode_;}
@@ -117,12 +123,18 @@ private:
 
   void reconcile_selection();
   void select(std::string node_id);
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string
+  trf(std::string_view key, std::initializer_list<std::string> args,
+      std::string_view fallback) const;
   [[nodiscard]] const stellar::native_research::NativeResearchNode *
   selected_node() const noexcept;
   [[nodiscard]] stellar::native_map::UiRect
   transformed_card(const NodePlacement &placement,
                    const ResearchWorkspaceLayout &layout) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   bool visible_{};
   bool search_focused_{};
   bool dragging_{};

@@ -1,8 +1,10 @@
 #pragma once
 
 #include "native_settlement_mission_controller.hpp"
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
+#include <initializer_list>
 #include <optional>
 
 namespace stellar::native_colony_ui {
@@ -29,6 +31,10 @@ public:
   void clear() noexcept;
   void cancel_pending_input() noexcept { reset_gesture(); }
   void discard_campaign() noexcept { clear(); }
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   [[nodiscard]] bool visible() const noexcept { return preview_.has_value(); }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeSettlementTargetPreview>& preview() const noexcept { return preview_; }
   [[nodiscard]] SettlementWorkspaceCommand handle(
@@ -37,6 +43,12 @@ public:
 private:
   enum class PressTarget { None, Confirm, Cancel };
   void reset_gesture() noexcept;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string
+  trf(std::string_view key, std::initializer_list<std::string> args,
+      std::string_view fallback) const;
+  const stellar::engine::LocalizationTable *locale_{};
   std::optional<stellar::native_colony::NativeSettlementTargetPreview> preview_;
   stellar::native_map::Point pointer_{};
   bool pointer_owned_{};

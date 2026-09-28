@@ -5,8 +5,15 @@
 #include <stellar/core/detail/adaptive_research_outcome_snapshot_json.hpp>
 #include <stellar/core/detail/adaptive_research_sha256.hpp>
 #include <stellar/core/diplomacy_state.hpp>
+#include <stellar/core/fleet_transit.hpp>
 #include <stellar/core/integrated_adaptive_campaign.hpp>
+#include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/core/ship_designs.hpp>
+#include <stellar/core/player_campaign_json.hpp>
+#include <stellar/core/player_campaign_persistence.hpp>
 #include <stellar/core/species_environment.hpp>
+#include <stellar/engine/atomic_file_write.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 
 #include <algorithm>
@@ -15,6 +22,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 #include <span>
 #include <sstream>
 #include <stdexcept>
@@ -235,6 +243,66 @@ AdaptiveResearchStrategicRuntime load_runtime(
   }
 }
 
+// Late-game stress: give every warp-capable civilization extra active military
+// fleets mirroring starter_fleet's field invariants. Even-indexed squadrons are
+// in interstellar transit toward Sol so movement and sensor/contact phases run
+// real work each tick; the rest hold at home.
+void inject_stress_fleets(FreshCampaignState &world, int per_civilization) {
+  if (per_civilization <= 0)
+    return;
+  const auto &design = ship_design_for_role(FleetRole::Military);
+  const auto contested =
+      std::ranges::find(world.systems, sol_system_id, &StellarSystem::id);
+  int next_id = 0;
+  for (const auto &fleet : world.fleets)
+    next_id = std::max(next_id, fleet.id + 1);
+  for (const auto &civilization : world.civilizations) {
+    if (civilization.development_stage ==
+        CivilizationDevelopmentStage::PreWarp)
+      continue;
+    const auto home = std::ranges::find(world.systems,
+                                        civilization.home_system_id,
+                                        &StellarSystem::id);
+    if (home == world.systems.end())
+      continue;
+    for (int index = 0; index < per_civilization; ++index, ++next_id) {
+      if (next_id == std::numeric_limits<int>::max())
+        throw std::overflow_error("Fleet identity space is exhausted.");
+      FleetState fleet;
+      fleet.id = next_id;
+      fleet.civilization_id = civilization.id;
+      fleet.name =
+          civilization.name + " Squadron " + std::to_string(index + 1);
+      fleet.role = design.role;
+      fleet.design_id = design.id;
+      fleet.strategic_speed = design.strategic_speed;
+      fleet.maximum_leg_range_light_years =
+          design.maximum_leg_range_light_years;
+      fleet.fuel_capacity_light_years = design.fuel_endurance_light_years;
+      fleet.fuel_remaining_light_years = design.fuel_endurance_light_years;
+      fleet.sensor_range = design.sensor_range;
+      fleet.is_active = true;
+      if (index % 2 == 0 && contested != world.systems.end() &&
+          home->id != contested->id) {
+        fleet.transit_phase = FleetTransitPhase::InterstellarWarp;
+        fleet.transit_origin_system_id = home->id;
+        fleet.transit_target_system_id = contested->id;
+        fleet.destination_system_id = contested->id;
+        fleet.planned_route_system_ids = {contested->id};
+        fleet.transit_progress =
+            0.05 + 0.9 * static_cast<double>(index) /
+                       std::max(1, per_civilization);
+        fleet.position =
+            interpolate_chart_position(*home, *contested, fleet.transit_progress);
+      } else {
+        fleet.position = {home->position.x, home->position.y};
+        fleet.current_system_id = home->id;
+      }
+      world.fleets.push_back(std::move(fleet));
+    }
+  }
+}
+
 } // namespace
 
 int run_adaptive_campaign_host(
@@ -260,6 +328,13 @@ int run_adaptive_campaign_host(
       options.ancient_civilizations > 3)
     throw std::invalid_argument(
         "Adaptive campaign systems or civilization counts are outside bounds");
+  if (options.autosave_every < 0 ||
+      options.autosave_every > options.simulation_ticks)
+    throw std::invalid_argument(
+        "Adaptive campaign autosave interval must be 0..ticks");
+  if (options.stress_fleets < 0 || options.stress_fleets > 100000)
+    throw std::invalid_argument(
+        "Adaptive campaign stress fleets must be 0..100000 per civilization");
   (void)species_environment_profile(options.player_species);
   const auto asset_root = std::filesystem::absolute(
       options.asset_root.empty() ? stellar::engine::executable_directory()
@@ -268,6 +343,8 @@ int run_adaptive_campaign_host(
       asset_root / "Data/research/v1");
   std::string retained_state;
   Json final_diagnostic;
+  Json phase_timings = Json::array();
+  std::size_t fleet_count = 0;
   bool advanced = true;
   std::uint64_t sensor_contacts = 0, adaptive_events = 0,
                 diplomacy_events = 0, industry_allocations = 0,
@@ -276,15 +353,23 @@ int run_adaptive_campaign_host(
                 colonization_events = 0;
   double initialization_total_ms = 0.0, step_total_ms = 0.0;
   std::vector<double> step_times;
+  std::vector<double> autosave_times;
+  std::size_t autosave_bytes = 0;
+  const auto autosave_path =
+      std::filesystem::temp_directory_path() /
+      ("stellar-adaptive-autosave-" + std::to_string(options.seed) + ".json");
 
   for (int repeat = 0; repeat < options.repeats; ++repeat) {
     const auto initialization_started = std::chrono::steady_clock::now();
+    auto fresh_world = seed_persistable_fresh_campaign(
+        options.seed, stellar_catalog,
+        {"2050-03-21T00:00:00Z", options.systems,
+         options.pre_warp_civilizations, options.ancient_civilizations,
+         options.player_species});
+    inject_stress_fleets(fresh_world, options.stress_fleets);
     auto runtime = IntegratedAdaptiveCampaignRuntime::create_fresh(
-        load_runtime(research_root),
-        seed_fresh_campaign(options.seed, stellar_catalog, options.systems,
-                            options.pre_warp_civilizations,
-                            options.ancient_civilizations,
-                            options.player_species));
+        load_runtime(research_root), std::move(fresh_world));
+    runtime.set_profiling_enabled(true);
     const auto &world = runtime.world().campaign();
     const auto research_civilizations =
         runtime.research().civilization_ids();
@@ -324,8 +409,35 @@ int run_adaptive_campaign_host(
       exploration_events += result.core.exploration_events.size();
       combat_events += result.core.combat_events.size();
       colonization_events += result.core.colonization_events.size();
+      if (options.autosave_every > 0 &&
+          (tick + 1) % options.autosave_every == 0) {
+        const auto save_started = std::chrono::steady_clock::now();
+        const auto save_json = encode_player_campaign_v17_json(
+            capture_player_campaign_v17(
+                runtime, {(tick + 1) * options.step_days,
+                          "adaptive-benchmark", "2050-03-21T00:00:00Z"}));
+        stellar::engine::write_file_atomically(
+            autosave_path, std::as_bytes(std::span(save_json)));
+        autosave_bytes = save_json.size();
+        autosave_times.push_back(std::chrono::duration<double, std::milli>(
+                                     std::chrono::steady_clock::now() -
+                                     save_started)
+                                     .count());
+      }
     }
     final_diagnostic = adaptive_diagnostic(runtime, campaign_diagnostic);
+    fleet_count = runtime.world().campaign().fleets.size();
+    phase_timings = Json::array();
+    for (const auto &sample : runtime.performance_samples())
+      phase_timings.push_back(
+          {{"phase", std::string(sample.phase)},
+           {"samples", sample.timing.samples},
+           {"totalMs", sample.timing.total_nanoseconds / 1e6},
+           {"meanMs", sample.timing.samples
+                          ? sample.timing.total_nanoseconds / 1e6 /
+                                static_cast<double>(sample.timing.samples)
+                          : 0.0},
+           {"maxMs", sample.timing.maximum_nanoseconds / 1e6}});
     const auto serialized = final_diagnostic.dump();
     advanced = advanced && serialized != initial_state;
     if (repeat == 0)
@@ -344,6 +456,13 @@ int run_adaptive_campaign_host(
   std::sort(step_times.begin(), step_times.end());
   const auto percentile =
       static_cast<std::size_t>(std::ceil(step_times.size() * .95)) - 1;
+  std::sort(autosave_times.begin(), autosave_times.end());
+  const double autosave_total_ms =
+      std::accumulate(autosave_times.begin(), autosave_times.end(), 0.0);
+  if (options.autosave_every > 0) {
+    std::error_code ignored;
+    std::filesystem::remove(autosave_path, ignored);
+  }
   Json report = {
       {"mode", "adaptive-campaign-simulation-benchmark"},
       {"engineVersion", STELLAR_ENGINE_VERSION},
@@ -361,6 +480,21 @@ int run_adaptive_campaign_host(
       {"stepTotalMs", step_total_ms},
       {"stepMeanMs", step_total_ms / step_times.size()},
       {"stepP95Ms", step_times[percentile]}, {"stepPeakMs", step_times.back()},
+      {"autosaveIntervalTicks", options.autosave_every},
+      {"autosaveCount", autosave_times.size()},
+      {"autosaveMeanMs", autosave_times.empty()
+                             ? 0.0
+                             : autosave_total_ms / autosave_times.size()},
+      {"autosaveP95Ms", autosave_times.empty()
+                            ? 0.0
+                            : autosave_times[static_cast<std::size_t>(
+                                  std::ceil(autosave_times.size() * .95)) -
+                                1]},
+      {"autosavePeakMs",
+       autosave_times.empty() ? 0.0 : autosave_times.back()},
+      {"autosaveBytes", autosave_bytes},
+      {"stressFleetsPerCivilization", options.stress_fleets},
+      {"phaseTimings", phase_timings},
       {"sensorContactsRecorded", sensor_contacts},
       {"adaptiveResearchEvents", adaptive_events},
       {"diplomacyEvents", diplomacy_events},
@@ -383,7 +517,8 @@ int run_adaptive_campaign_host(
         {"diplomaticRelationships",
          final_diagnostic.at("diplomacy").at("relationships").size()},
         {"combatIntelligenceObservations",
-         final_diagnostic.at("combatIntelligence").size()}}},
+         final_diagnostic.at("combatIntelligence").size()},
+        {"fleets", fleet_count}}},
       {"legacyResearchDisabled", true},
       {"stateAdvancedBeyondSeed", advanced},
       {"repeatFinalStatesDeterministic", true},

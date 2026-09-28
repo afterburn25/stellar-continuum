@@ -17,6 +17,7 @@ namespace stellar::engine {
 class JobSystem;
 namespace audio { class AudioOutput; }
 }
+namespace stellar::native_audio { struct PcmData; }
 
 namespace stellar::native_audio {
 
@@ -60,6 +61,10 @@ class NativeAudioDirector final {
   void play_event(Cue cue);
   void speak(VoiceCue cue);
   void stop_voice();
+  // Voice-pipeline sink: plays a decoded 48 kHz stereo PCM line on the voice
+  // channel, replacing the currently playing line. Null/mismatched streams
+  // are dropped.
+  void play_dialogue_pcm(std::shared_ptr<const PcmData> pcm);
   void set_volumes(float master, float music, float effects);
   void set_voice_preferences(const VoicePreferences&);
   [[nodiscard]] VoicePreferences voice_preferences() const;

@@ -1,0 +1,106 @@
+#pragma once
+
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace stellar::engine {
+
+// Reusable UI view-model primitives. These are renderer-agnostic data
+// structures: the native UI binds them to drawing code. They centralize the
+// behavior every list/table/tree needs — virtualization windows, selection,
+// sorting, expansion — so screens don't reimplement scrolling state.
+
+// A windowed view over N rows: given scroll offset and viewport height, the
+// model reports which row range must be rendered.
+struct VirtualizedList {
+  std::size_t row_count{};
+  float row_height{24.0f};
+  float scroll_offset{};
+  float viewport_height{};
+
+  struct Range {
+    std::size_t first{}, last{}; // [first, last) visible row indices
+    float content_height{};
+  };
+  Range visible_range() const;
+  // Scrolls so `row` is inside the viewport.
+  void ensure_visible(std::size_t row);
+  float max_scroll() const;
+  void scroll_to(float offset);
+};
+
+struct TableColumn {
+  std::string id;
+  std::string title_key; // localization key
+  float width{120.0f};
+  bool sortable{true};
+};
+
+// Row model with stable sort (deterministic ties by row id).
+class TableModel {
+public:
+  struct Cell {
+    std::string text;
+    double numeric{};
+    bool is_numeric{};
+  };
+  using Row = std::pair<std::string, std::vector<Cell>>; // id -> cells
+
+  void set_columns(std::vector<TableColumn> columns);
+  void set_rows(std::vector<Row> rows);
+
+  const std::vector<TableColumn> &columns() const { return columns_; }
+  // Rows in display order (post-sort).
+  const std::vector<const Row *> &display_rows() const { return display_; }
+
+  void sort_by(std::string_view column_id, bool ascending);
+  const std::optional<std::pair<std::string, bool>> &sort_state() const {
+    return sort_state_;
+  }
+  void refilter(std::string_view needle); // case-insensitive contains
+  std::string_view filter() const { return filter_; }
+
+private:
+  void rebuild_display();
+
+  std::vector<TableColumn> columns_;
+  std::vector<Row> rows_;
+  std::vector<const Row *> display_;
+  std::optional<std::pair<std::string, bool>> sort_state_;
+  std::string filter_;
+};
+
+// Expandable tree with stable node ids.
+class TreeModel {
+public:
+  struct Node {
+    std::string id;
+    std::string parent_id; // empty = root
+    std::string label_key;
+    bool expanded{};
+    std::vector<std::string> children; // insertion order preserved
+  };
+
+  Node &add(std::string id, std::string label_key,
+            std::string parent_id = {});
+  Node *find(std::string_view id);
+  const Node *find(std::string_view id) const;
+
+  void set_expanded(std::string_view id, bool expanded);
+  bool is_expanded(std::string_view id) const;
+
+  // Depth-first flattened view: visible rows (a node appears only when all
+  // ancestors are expanded). Pair = (node, depth).
+  std::vector<std::pair<const Node *, int>> flattened() const;
+
+private:
+  std::vector<Node> nodes_;                       // stable by pointer? no —
+  std::vector<std::string> roots_;                // ids only
+  Node *find_node(std::string_view id);
+};
+
+} // namespace stellar::engine

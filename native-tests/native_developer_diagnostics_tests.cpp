@@ -4,6 +4,7 @@
 #include "native_stellar_observation.hpp"
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/developer_campaign.hpp>
+#include <stellar/engine/profiler.hpp>
 #include <iostream>
 using namespace stellar::core;
 using namespace stellar::native_map;
@@ -64,6 +65,16 @@ int main(int argc,char **argv)try{
     const auto draw=[&]{DrawList list;window.render(list,w,h,frame,monitor);return list;};
     const auto click=[&](std::string_view name){auto p=control(draw(),name);(void)window.handle({InputEventType::LeftPressed,p},w,h,monitor);(void)window.handle({InputEventType::LeftReleased,p},w,h,monitor);};
     auto view=draw();(void)control(view,"Unmeasured");
+    {
+      auto &profiler=stellar::engine::Profiler::instance();
+      profiler.set_enabled(true);
+      {const auto scope=profiler.span("test.phase","client");}
+      profiler.begin_frame();(void)profiler.end_frame();
+      InputEvent scroll{InputEventType::Wheel,control(draw(),"Unmeasured"),{},-100.f};
+      (void)window.handle(scroll,w,h,monitor);
+      (void)control(draw(),"client/test.phase");
+      profiler.set_enabled(false);profiler.reset_aggregates();
+    }
     for(const auto &c:view.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){const auto &r=*t->clip;
       check(r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h,"Diagnostics text escaped viewport.");}
     click("RECENT EVENTS");(void)control(draw(),"Observing the isolated");

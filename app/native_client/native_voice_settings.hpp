@@ -2,11 +2,13 @@
 #include "native_menu_hover.hpp"
 #include "native_dropdown.hpp"
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <thread>
 
 namespace stellar::native_audio {
@@ -50,6 +52,7 @@ class NativeVoiceSettings final {
   NativeVoiceSettings& operator=(NativeVoiceSettings&&) = delete;
 
   void set_hover_callback(std::function<void()> callback){hover_feedback_.set_callback(std::move(callback));}
+  void set_localization(const stellar::engine::LocalizationTable* table){locale_=table;}
   void open();
   [[nodiscard]] bool visible() const;
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
@@ -68,6 +71,7 @@ class NativeVoiceSettings final {
   void save();
   void preview();
   void set_from_track(Dragged, stellar::native_map::Point, const VoiceSettingsLayout&);
+  [[nodiscard]] std::string tr(std::string_view key, std::string_view fallback) const;
 
   std::thread::id owner_{std::this_thread::get_id()};
   std::filesystem::path path_;
@@ -82,6 +86,7 @@ class NativeVoiceSettings final {
   int viewport_height_{};
   std::string status_;
   bool save_diagnostic_emitted_{};
+  const stellar::engine::LocalizationTable* locale_{};
 };
 
 } // namespace stellar::native_audio

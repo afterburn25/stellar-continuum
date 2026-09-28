@@ -19,6 +19,40 @@ inline Quaternion rotation_frame(Vec3 forward,Vec3 up){
   else{const float s=std::sqrt(1+z.z-x.x-y.y)*2;q={(z.x+x.z)/s,(z.y+y.z)/s,s*.25f,(x.y-y.x)/s};}
   return q;
 }
+// Axis-aligned box centered on the origin, sx/sy/sz full extents — the
+// canonical "cube" primitive. Flat normals per face; unit UVs per face.
+inline std::shared_ptr<const Mesh3D> box_mesh(float sx=1.f, float sy=1.f,
+                                              float sz=1.f) {
+  if (!std::isfinite(sx) || !std::isfinite(sy) || !std::isfinite(sz) ||
+      sx <= 0.f || sy <= 0.f || sz <= 0.f)
+    throw std::invalid_argument("Invalid box geometry");
+  const float hx = sx * .5f, hy = sy * .5f, hz = sz * .5f;
+  std::vector<Vertex3D> vertices;
+  std::vector<std::uint32_t> indices;
+  vertices.reserve(24);
+  indices.reserve(36);
+  const auto face = [&](Vec3 normal, Vec3 u, Vec3 v, Vec3 c) {
+    const auto base = static_cast<std::uint32_t>(vertices.size());
+    const Vec3 corners[4] = {
+        {c.x - u.x - v.x, c.y - u.y - v.y, c.z - u.z - v.z},
+        {c.x + u.x - v.x, c.y + u.y - v.y, c.z + u.z - v.z},
+        {c.x + u.x + v.x, c.y + u.y + v.y, c.z + u.z + v.z},
+        {c.x - u.x + v.x, c.y - u.y + v.y, c.z - u.z + v.z}};
+    const Point uvs[4] = {{0.f, 1.f}, {1.f, 1.f}, {1.f, 0.f}, {0.f, 0.f}};
+    for (int i = 0; i < 4; ++i)
+      vertices.push_back({corners[i], normal, uvs[i]});
+    indices.insert(indices.end(),
+                   {base, base + 1, base + 2, base, base + 2, base + 3});
+  };
+  face({0, 0, 1}, {hx, 0, 0}, {0, hy, 0}, {0, 0, hz});    // +Z
+  face({0, 0, -1}, {-hx, 0, 0}, {0, hy, 0}, {0, 0, -hz}); // -Z
+  face({1, 0, 0}, {0, 0, -hz}, {0, hy, 0}, {hx, 0, 0});   // +X
+  face({-1, 0, 0}, {0, 0, hz}, {0, hy, 0}, {-hx, 0, 0});  // -X
+  face({0, 1, 0}, {hx, 0, 0}, {0, 0, -hz}, {0, hy, 0});   // +Y
+  face({0, -1, 0}, {hx, 0, 0}, {0, 0, hz}, {0, -hy, 0});  // -Y
+  return Mesh3D::create(std::move(vertices), std::move(indices));
+}
+
 // Flat XZ annulus, +Y normal, with radial U and angular V coordinates.
 // Immutable geometry works with the existing depth-tested, double-sided material.
 inline std::shared_ptr<const Mesh3D> annulus_mesh(float inner,float outer,int segments=256,float thickness=0){

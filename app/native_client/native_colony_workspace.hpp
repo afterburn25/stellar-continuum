@@ -4,10 +4,14 @@
 #include "native_planetary_screen.hpp"
 #include "native_outpost_freight_controller.hpp"
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <optional>
 #include <functional>
+#include <initializer_list>
+#include <string>
+#include <string_view>
 
 namespace stellar::native_colony_ui {
 
@@ -42,6 +46,7 @@ public:
   void set_freight_preview(stellar::native_colony::NativeOutpostFreightPreview);
   void cancel_freight() noexcept;
   void set_freight_notice(std::string notice) { planetary_.complete(std::move(notice)); }
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept { locale_ = table; planetary_.set_localization(table); }
   [[nodiscard]] const auto& freight_preview() const noexcept { return freight_preview_; }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
@@ -54,7 +59,11 @@ public:
   void render(stellar::native_map::DrawList &, int width, int height) const;
 
 private:
+  [[nodiscard]] std::string tr(std::string_view key, std::string_view fallback) const;
+  [[nodiscard]] std::string trf(std::string_view key, std::initializer_list<std::string> args,
+                                std::string_view fallback) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   bool visible_{};
   NativePlanetaryScreen planetary_;
   std::optional<stellar::native_colony::NativeColonyView> view_;

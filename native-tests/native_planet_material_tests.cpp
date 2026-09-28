@@ -190,5 +190,10 @@ int main(int argc,char** argv)try{
  auto hot=*make_planet_type_example(2,10001,1,2,star,PlanetClass::Volcanic,"magma-ocean").appearance;hot.source_asset_id.clear();hot.material_id="procedural:volcanic:magma-ocean";
  for(int i=0;i<16;++i){hot.visual_seed=static_cast<std::uint64_t>(i);(void)fetch(hot,1024);check(cache.resident_bytes()<=MaterialCache::budget,"Planet streaming exceeded its CPU budget");}
  check(same->identity==close.identity&&same->albedo->pixels()==close.albedo->pixels(),"Eviction invalidated a live planet view");
+ // Decode jobs run on the persistent engine JobSystem worker; submitted and
+ // completed counts must match once the queue drains.
+ check(cache.ready(),"Material queue did not drain");stellar::engine::JobStats jobs;
+ {const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);do{jobs=cache.job_stats();}while(jobs.completed<jobs.submitted&&std::chrono::steady_clock::now()<deadline);}
+ check(jobs.submitted>=18&&jobs.submitted==jobs.completed&&jobs.failed==0&&jobs.cancelled==0&&jobs.workers==1,"Material decode jobs did not complete on the tagged worker");
  std::cout<<"Historical 47-folder audit plus reviewed replacement giants; 710 runtime materials, shared identity/LOD, static planets, no extra clouds for all 65 subclasses, star lighting and bounded streaming passed.\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

@@ -9,6 +9,12 @@ param(
 )
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
+# Windows PowerShell 5.1 compatibility (see build-release-installer.ps1).
+function Write-Utf8NoBomFile([string]$Path,[string]$Text){
+    $Text=$Text -replace "`r`n","`n"
+    $Text=$Text -replace "`n","`r`n"
+    [IO.File]::WriteAllText($Path,$Text+"`r`n")
+}
 function Resolve-ReleasePath([string]$Path){[IO.Path]::GetFullPath($(if([IO.Path]::IsPathRooted($Path)){$Path}else{Join-Path $repo $Path}))}
 $base=Resolve-ReleasePath $BaseReleaseDirectory
 $full=Resolve-ReleasePath $FullReleaseDirectory
@@ -39,7 +45,7 @@ $after | Add-Member -NotePropertyName updateFrom -NotePropertyValue @{gameVersio
 $after | Add-Member -NotePropertyName payloadPaths -NotePropertyValue @($changed.path) -Force
 $after.maximumAdditionalBytes=$total+64MB
 $manifest=Join-Path $payload 'release-manifest.json'
-$after | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $manifest -Encoding utf8NoBOM
+Write-Utf8NoBomFile $manifest ($after | ConvertTo-Json -Depth 12)
 $cmake='C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe'
 $build=Resolve-ReleasePath $BuildDirectory
 & $cmake -S $repo -B $build "-DSTELLAR_SETUP_RELEASE_MANIFEST=$manifest"
@@ -55,7 +61,7 @@ if($SigningCertificateThumbprint){
 }
 $check=Start-Process -FilePath $setup -ArgumentList '--check-package' -WindowStyle Hidden -Wait -PassThru
 if($check.ExitCode){throw 'Changed-file payload validation failed.'}
-@"
+$updateText=@"
 STELLAR CONTINUUM — CHANGED-FILES UPDATE
 
 From: $($before.gameVersion) / $($before.buildId)
@@ -71,8 +77,9 @@ when this preflight fails. The same update can repair the files it contains.
 Game crash/error reports: %LOCALAPPDATA%\Stellar Continuum\Logs
 Setup reports: %LOCALAPPDATA%\Stellar Continuum\Installer\Logs
 This development update is unsigned unless build-report.json says otherwise.
-"@ | Set-Content -LiteralPath (Join-Path $output 'UPDATE.txt') -Encoding utf8NoBOM
-@{gameVersion=$after.gameVersion;engineVersion=$after.engineVersion;buildId=$after.buildId;updateFrom=$after.updateFrom;changedFiles=$changed;changedBytes=$total;unchangedFiles=$after.files.Count-$changed.Count;setupSha256=(Get-FileHash -LiteralPath $setup).Hash.ToLowerInvariant();manifestSha256=(Get-FileHash -LiteralPath $manifest).Hash.ToLowerInvariant();authenticode=$(if($SigningCertificateThumbprint){'signed-and-verified'}else{'unsigned-development-build'});packageVerification='passed'} | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $output 'build-report.json') -Encoding utf8NoBOM
+"@
+Write-Utf8NoBomFile (Join-Path $output 'UPDATE.txt') $updateText
+Write-Utf8NoBomFile (Join-Path $output 'build-report.json') (@{gameVersion=$after.gameVersion;engineVersion=$after.engineVersion;buildId=$after.buildId;updateFrom=$after.updateFrom;changedFiles=$changed;changedBytes=$total;unchangedFiles=$after.files.Count-$changed.Count;setupSha256=(Get-FileHash -LiteralPath $setup).Hash.ToLowerInvariant();manifestSha256=(Get-FileHash -LiteralPath $manifest).Hash.ToLowerInvariant();authenticode=$(if($SigningCertificateThumbprint){'signed-and-verified'}else{'unsigned-development-build'});packageVerification='passed'} | ConvertTo-Json -Depth 12)
 $symbols=Join-Path $repo "work/cooker/symbols/$($after.gameVersion)"
 New-Item -ItemType Directory -Force -Path $symbols | Out-Null
 Copy-Item -LiteralPath (Join-Path $build 'installer-tools/StellarContinuumSetup.pdb') -Destination (Join-Path $symbols 'StellarContinuumUpdate.pdb')

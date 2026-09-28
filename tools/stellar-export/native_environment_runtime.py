@@ -56,5 +56,6 @@ def native_environment_asset_files(root):
                  'data/planets/ring-asset-audit-v1.json','data/planets/deprecated-giant-art-v1.json',
                  'data/stellar/starfields-v1.json','data/stellar/starfield-asset-audit-v1.json',
                  'export/native-environment-assets.json'):
-        result[name] = root/name
+        # Data ships under the canonical capitalized package directory.
+        result['Data' + name[4:] if name.startswith('data/') else name] = root/name
     return result

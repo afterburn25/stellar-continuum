@@ -65,5 +65,8 @@ int main(int argc,char **argv)try{
   fast["Campaign"]["SavedAtUtc"]=slow["Campaign"]["SavedAtUtc"];
   if(fast!=slow)std::cerr<<Json::diff(fast,slow).dump().substr(0,3000)<<'\n';
   check(fast==slow,"Headless acceleration/checkpoint continuation diverged.");
+  // Successful runs carry no diagnostic value; keep run directories only on
+  // failure so repeated suites do not exhaust the drive (~0.6 GB per run).
+  {std::error_code cleanup;fs::remove_all(root,cleanup);}
   std::cout<<"developer QA host tests passed\n";return 0;
 }catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}

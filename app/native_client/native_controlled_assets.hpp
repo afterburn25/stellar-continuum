@@ -1,4 +1,5 @@
 #pragma once
+#include <stellar/engine/localization.hpp>
 #include "native_colony_roster.hpp"
 #include "native_fleet_controller.hpp"
 #include "native_shipyard_controller.hpp"
@@ -27,7 +28,8 @@ struct View {
     const stellar::native_colony_roster::View&,
     const stellar::native_fleet::NativeFleetMapView&,
     const stellar::native_shipyard::NativeShipyardView*,
-    const std::function<std::string(int)>& known_system_name);
+    const std::function<std::string(int)>& known_system_name,
+    const stellar::engine::LocalizationTable* locale = nullptr);
 struct Preferences {
   std::array<bool,5> collapsed{false,true,false,true,false};
   bool hidden{};
@@ -52,6 +54,7 @@ public:
   void set_selection(std::optional<Key>,bool external=true);
   void set_preferences(Preferences p){preferences_=p;rebuild();}
   void set_persist(std::function<bool(const Preferences&)> fn){persist_=std::move(fn);}
+  void set_localization(const stellar::engine::LocalizationTable* table)noexcept{locale_=table;}
   [[nodiscard]] const Preferences& preferences()const{return preferences_;}
   [[nodiscard]] const View& view()const{return view_;}
   [[nodiscard]] const std::string& search()const{return search_;}
@@ -67,6 +70,8 @@ private:
   struct Entry { std::optional<std::size_t> row; Category category{}; };
   void rebuild();
   void commit_preferences(Preferences);
+  [[nodiscard]] std::string tr(std::string_view key,std::string_view fallback)const;
+  [[nodiscard]] std::string trf(std::string_view key,std::initializer_list<std::string> args,std::string_view fallback)const;
   [[nodiscard]] float extent(const Layout&)const;
   [[nodiscard]] stellar::native_map::UiRect entry_bounds(std::size_t,const Layout&)const;
   View view_;
@@ -82,5 +87,6 @@ private:
   bool search_focused_{},reveal_selection_{};
   mutable float scroll_{};
   stellar::native_map::Point pointer_{};
+  const stellar::engine::LocalizationTable* locale_{};
 };
 }

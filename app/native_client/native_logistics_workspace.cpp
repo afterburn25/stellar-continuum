@@ -43,6 +43,30 @@ SupplyLayout SupplyLayout::for_viewport(int width,int height) {
     {panel.x+panel.width-46.f*s,panel.y+14.f*s,30.f*s,30.f*s},
     {panel.x+panel.width-188.f*s,panel.y+14.f*s,128.f*s,30.f*s},s};
 }
+std::string SupplyWorkspace::tr(std::string_view key,
+                                std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+std::string SupplyWorkspace::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
 void SupplyWorkspace::clear_rows() noexcept { rows_={}; }
 void SupplyWorkspace::open() noexcept { visible_=true;scroll_=0.f;owned_=false;clear_rows(); }
 void SupplyWorkspace::close() noexcept { visible_=false;owned_=false;clear_rows(); }
@@ -98,18 +122,22 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
   const auto p=layout.panel;const float s=layout.scale;
   const int font=static_cast<int>(15.f*s);
   stellar::native_ui_style::menu_panel(out,p);
-  label(out,{p.x+18.f*s,p.y+14.f*s,p.width-225.f*s,32.f*s},"SUPPLY NETWORK",static_cast<int>(24.f*s),ink,p);
+  label(out,{p.x+18.f*s,p.y+14.f*s,p.width-225.f*s,32.f*s},tr("SUPPLY_TITLE","SUPPLY NETWORK"),static_cast<int>(24.f*s),ink,p);
   stellar::native_ui_style::panel(out,layout.refresh,false,false);
   label(out,{layout.refresh.x+10.f*s,layout.refresh.y+5.f*s,layout.refresh.width-20.f*s,24.f*s},
-      view.state==LoadState::Failed?"RETRY":"REFRESH",font,cyan,layout.refresh);
+      tr(view.state==LoadState::Failed?"SUPPLY_RETRY":"SUPPLY_REFRESH",view.state==LoadState::Failed?"RETRY":"REFRESH"),font,cyan,layout.refresh);
   stellar::native_ui_style::panel(out,layout.close,false,false);
   label(out,{layout.close.x+9.f*s,layout.close.y+4.f*s,22.f*s,25.f*s},"X",font,ink,layout.close);
   const bool ready=view.state==LoadState::Ready;
   label(out,{p.x+18.f*s,p.y+54.f*s,p.width-36.f*s,28.f*s},
-      ready?view.system_name+"  /  HOME SYSTEM  /  "+std::to_string(view.corridor_count)+" TRANSPORT LINKS":"HOME SYSTEM SUPPLY UNAVAILABLE",font,cyan,p);
+      ready?trf("SUPPLY_SUBTITLE",{view.system_name,std::to_string(view.corridor_count)},
+                "{0}  /  HOME SYSTEM  /  {1} TRANSPORT LINKS")
+           :tr("SUPPLY_UNAVAILABLE","HOME SYSTEM SUPPLY UNAVAILABLE"),font,cyan,p);
   label(out,{p.x+18.f*s,p.y+85.f*s,p.width-36.f*s,45.f*s},view.message,font,ready?muted:amber,p);
   if(!ready)return; // Never render stale totals or healthy zeroes after a failure.
-  const std::array<std::string,4> names{"AVAILABLE","DEMAND","DELIVERED","SHORTFALL"};
+  const std::array<const char*,4> metric_keys{"SUPPLY_METRIC_AVAILABLE","SUPPLY_METRIC_DEMAND","SUPPLY_METRIC_DELIVERED","SUPPLY_METRIC_SHORTFALL"};
+  const std::array<std::string,4> metric_fallbacks{"AVAILABLE","DEMAND","DELIVERED","SHORTFALL"};
+  const std::array<std::string,4> names{tr(metric_keys[0],metric_fallbacks[0]),tr(metric_keys[1],metric_fallbacks[1]),tr(metric_keys[2],metric_fallbacks[2]),tr(metric_keys[3],metric_fallbacks[3])};
   const std::array<double,4> values{view.supply_per_day,view.demand_per_day,view.delivered_per_day,view.shortfall_per_day};
   const float metric_width=(p.width-54.f*s)/4.f;
   for(std::size_t index=0;index<4;++index){
@@ -117,14 +145,15 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
     out.overlay.emplace_back(FilledRectangle{box,{12,36,54,245}});
     const auto color=index==3&&values[index]>.00001?amber:cyan;
     label(out,{box.x+10.f*s,box.y+6.f*s,box.width-20.f*s,19.f*s},names[index],font-2,muted,box);
-    label(out,{box.x+10.f*s,box.y+27.f*s,box.width-20.f*s,30.f*s},number(values[index])+" / day",font+3,color,box);
+    label(out,{box.x+10.f*s,box.y+27.f*s,box.width-20.f*s,30.f*s},trf("SUPPLY_PER_DAY",{number(values[index])},"{0} / day"),font+3,color,box);
   }
   const auto b=layout.body;
   const std::array<float,5> columns{0.f,.30f,.52f,.68f,.84f};
   const std::array<float,5> spans{.30f,.22f,.16f,.16f,.16f};
-  const std::array<std::string,5> headings{"LOCATION / FACILITY","STATUS","OFFERED / DAY","DEMAND / DAY","DELIVERED / DAY"};
+  const std::array<const char*,5> heading_keys{"SUPPLY_COL_LOCATION","SUPPLY_COL_STATUS","SUPPLY_COL_OFFERED","SUPPLY_COL_DEMAND","SUPPLY_COL_DELIVERED"};
+  const std::array<const char*,5> heading_fallbacks{"LOCATION / FACILITY","STATUS","OFFERED / DAY","DEMAND / DAY","DELIVERED / DAY"};
   for(std::size_t i=0;i<columns.size();++i)
-    label(out,{b.x+b.width*columns[i]+8.f*s,p.y+215.f*s,b.width*spans[i]-16.f*s,23.f*s},headings[i],font-2,muted,p);
+    label(out,{b.x+b.width*columns[i]+8.f*s,p.y+215.f*s,b.width*spans[i]-16.f*s,23.f*s},tr(heading_keys[i],heading_fallbacks[i]),font-2,muted,p);
   const auto& rows=rows_for(view,layout,width,height);
   const auto maximum=std::max(0.f,rows.height-b.height);
   scroll_=std::clamp(scroll_,0.f,maximum);
@@ -140,7 +169,7 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
       label(out,{box.x+b.width*columns[i]+8.f*s,box.y+12.f*s,b.width*spans[i]-16.f*s,row.height-20.f*s},values_text[i-1],font,
             i==1&&n.delivered_per_day+.00001<n.demand_per_day?amber:ink,b);
   }
-  if(view.nodes.empty())label(out,{b.x+8.f*s,b.y+12.f*s,b.width-16.f*s,50.f*s},"No owned supply locations in the home system.",font,muted,b);
+  if(view.nodes.empty())label(out,{b.x+8.f*s,b.y+12.f*s,b.width-16.f*s,50.f*s},tr("SUPPLY_EMPTY","No owned supply locations in the home system."),font,muted,b);
   if(maximum>0.f){
     const float thumb=std::max(24.f*s,b.height*b.height/rows.height);
     const float y=b.y+(b.height-thumb)*scroll_/maximum;

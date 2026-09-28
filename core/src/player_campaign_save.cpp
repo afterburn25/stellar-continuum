@@ -1,6 +1,9 @@
 #include <stellar/core/player_campaign_save.hpp>
+#include <stellar/core/developer_campaign.hpp>
 #include <stellar/core/player_campaign_json.hpp>
 #include <stellar/engine/atomic_file_write.hpp>
+#include <stellar/engine/save_history.hpp>
+#include <stellar/engine/save_integrity.hpp>
 
 #include <chrono>
 #include <cctype>
@@ -55,9 +58,20 @@ void write_prepared_player_campaign(const std::filesystem::path &path,
                                    const PreparedPlayerCampaignSave &prepared,
                                    bool preserve_existing_backup) {
   require_save_path(path);
+  if (prepared.kind() != CampaignSaveKind::Player)
+    throw std::invalid_argument(
+        "A Developer-envelope capture requires the Developer writer.");
+  // Roll deeper history slots only when this write produces a fresh .bak;
+  // a preserved backup must remain in slot 1.
+  if (!preserve_existing_backup)
+    stellar::engine::rotate_save_history(path);
   stellar::engine::write_file_atomically_stream(path,[&](const stellar::engine::AtomicTextSink& sink){
     stream_player_campaign_v17_json(prepared.payload(),sink);
   },{preserve_existing_backup});
+  // Integrity sidecars are best-effort: a missing sidecar is tolerated on
+  // load, while a present-but-mismatched one detects corruption.
+  stellar::engine::write_integrity_sidecar_for_file(path);
+  stellar::engine::write_history_sidecars(path);
 }
 
 void write_prepared_campaign(const std::filesystem::path &path,
@@ -68,9 +82,13 @@ void write_prepared_campaign(const std::filesystem::path &path,
   }
   if(!is_developer_campaign_save_path(path))
     throw std::invalid_argument("Developer campaigns require a separate .dev17.json save path.");
+  if(!preserve)
+    stellar::engine::rotate_save_history(path);
   stellar::engine::write_file_atomically_stream(path,[&](const stellar::engine::AtomicTextSink& sink){
     stream_developer_campaign_json(prepared.developer_payload(),sink);
   },{preserve});
+  stellar::engine::write_integrity_sidecar_for_file(path);
+  stellar::engine::write_history_sidecars(path);
 }
 
 PreparedPlayerCampaignSave PlayerCampaignSaveController::capture(
@@ -117,6 +135,10 @@ PlayerCampaignSaveResult PlayerCampaignSaveController::failure(
 }
 void PlayerCampaignSaveController::submit(PreparedPlayerCampaignSave prepared,
                                           double captured_day, bool preserve) {
+  // Observed before the write job is submitted so replay sees canonical state
+  // even if the background write later fails.
+  if (capture_observer_ && prepared.kind() == CampaignSaveKind::Player)
+    capture_observer_(captured_day, prepared.payload());
   const auto destination = path_; const auto writer = writer_;
   // Allocate all pending metadata before submitting. No operation after submit
   // can throw and lose tracking of an already running immutable write.
@@ -176,6 +198,8 @@ PlayerCampaignSaveResult PlayerCampaignSaveController::save_manual(
   const bool preserve = preserve_backup_;
   try {
     const auto prepared = capture(runtime, options);
+    if (capture_observer_ && prepared.kind() == CampaignSaveKind::Player)
+      capture_observer_(options.simulation_days, prepared.payload());
     writer_(path_, prepared, preserve);
     scheduler_.mark_success(options.simulation_days); preserve_backup_ = false;
     return {true, path_, options.simulation_days, preserve, {}, {}};
@@ -199,6 +223,11 @@ std::optional<PlayerCampaignSaveResult> PlayerCampaignSaveController::begin_manu
     scheduler_.mark_failure(options.simulation_days); return result;
   }
   return std::nullopt;
+}
+void PlayerCampaignSaveController::set_capture_observer(
+    PlayerCampaignCaptureObserver observer) {
+  require_owner();
+  capture_observer_ = std::move(observer);
 }
 bool PlayerCampaignSaveController::pending() const noexcept { return pending_.has_value(); }
 bool PlayerCampaignSaveController::preserves_recovered_backup() const noexcept { return preserve_backup_; }

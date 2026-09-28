@@ -29,7 +29,7 @@ bool visible(UiRect clip,Point p,float r){return p.x+r>=clip.x&&p.x-r<=clip.x+cl
 }
 Point NativeSmallBodyRenderer::position(const SmallBodyField& f,const SmallBodyInstance& b,const SystemSpatialSnapshot& s,const SystemSpatialViewport& v,double days){return projected(f,s,v,stellar::engine::analytic_orbit_position(b.orbit,days-f.epoch_days));}
 void NativeSmallBodyRenderer::render(DrawList& out,const NativeSystemSnapshot& snapshot,const SystemSpatialSnapshot& spatial,const SystemSpatialViewport& view,UiRect clip,double days,bool debug){
-  statistics_={};hits_.clear();
+  statistics_={};hits_.clear();last_scene_.reset();
   if(snapshot.survey_level!=SystemSurveyLevel::fully_surveyed){clear();return;}
   if(generation_!=snapshot.campaign_generation||system_!=snapshot.system_id){clear();generation_=snapshot.campaign_generation;system_=snapshot.system_id;}
   if(clip.width<=0||clip.height<=0)return;
@@ -95,7 +95,8 @@ void NativeSmallBodyRenderer::render(DrawList& out,const NativeSystemSnapshot& s
         {float(q[0]),float(q[1]),float(q[2]),float(q[3])},s.radius*unit,surface});
       hits_.push_back({s.field,b.id,s.p,s.radius});
     }
-    out.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(instances)),clip});
+    last_scene_=Scene3D::create(camera,std::move(instances));
+    out.world.emplace_back(Scene3DView{last_scene_,clip});
     statistics_.solid_bodies=solids.size();statistics_.batches+=solids.size();
   }
   std::erase_if(cache_,[&](const auto& item){return std::ranges::none_of(snapshot.small_body_fields,[&](const auto& f){return f.id==item.first;});});

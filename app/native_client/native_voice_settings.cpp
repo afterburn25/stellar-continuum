@@ -293,6 +293,11 @@ void NativeVoiceSettings::cancel() {
   require_owner(); dropdown_.close(); dragging_ = Dragged::None; values_ = saved_; preview(); visible_ = false;
 }
 
+std::string NativeVoiceSettings::tr(std::string_view key, std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
 void NativeVoiceSettings::render(DrawList& draw, int width, int height) const {
   require_owner();
   if (!visible_) return;
@@ -301,32 +306,44 @@ void NativeVoiceSettings::render(DrawList& draw, int width, int height) const {
   draw.overlay.emplace_back(FilledRectangle{{0, 0, static_cast<float>(std::max(width, 1)),
                                               static_cast<float>(std::max(height, 1))}, veil});
   native_menu_style::panel(draw, layout.panel, scale);
-  label(draw, layout.title, "VOICE & SUBTITLES", layout.heading_font_pixels, native_menu_style::gold);
+  label(draw, layout.title, tr("SETTINGS_VOICE_TITLE", "VOICE & SUBTITLES"),
+        layout.heading_font_pixels, native_menu_style::gold);
   label(draw, layout.introduction,
-        "British English scientist announcements. Subtitles remain available when speech is disabled.",
+        tr("SETTINGS_VOICE_INTRO",
+           "British English scientist announcements. Subtitles remain available when speech is disabled."),
         std::max(11, layout.body_font_pixels - 2), native_menu_style::muted);
-  toggle(draw, layout.enable_voices, "Enable voices", values_.enabled, layout.body_font_pixels, scale);
-  slider(draw, layout.volume_track, "Voice volume", values_.volume, layout.body_font_pixels, scale);
-  toggle(draw, layout.subtitles, "Subtitles", values_.subtitles, layout.body_font_pixels, scale);
-  choice(draw, layout.subtitle_size, "Subtitle size", std::to_string(values_.subtitle_size) + " px",
-         layout.body_font_pixels, scale);
-  slider(draw, layout.background_track, "Subtitle background", values_.subtitle_background_opacity,
-         layout.body_font_pixels, scale);
-  toggle(draw, layout.speaker_labels, "Speaker labels", values_.speaker_labels, layout.body_font_pixels, scale);
-  slider(draw, layout.filter_track, "Communication filter", values_.communication_filter,
-         layout.body_font_pixels, scale);
-  choice(draw, layout.frequency, "Announcement frequency", frequency_name(values_.frequency),
-         layout.body_font_pixels, scale);
-  toggle(draw, layout.no_interruptions, "Do not interrupt dialogue", values_.no_interruptions,
-         layout.body_font_pixels, scale);
-  native_menu_style::button(draw, layout.replay, "Replay last announcement", layout.body_font_pixels, false,
-                            static_cast<bool>(replay_), scale);
-  native_menu_style::button(draw, layout.stop, "Stop", layout.body_font_pixels, false,
-                            static_cast<bool>(stop_), scale);
-  native_menu_style::button(draw, layout.defaults, "Defaults", layout.body_font_pixels, false, true, scale);
-  native_menu_style::button(draw, layout.cancel, "Cancel", layout.body_font_pixels, false, true, scale);
-  native_menu_style::button(draw, layout.save, "Save", layout.body_font_pixels, true, true, scale);
-  label(draw, layout.status, status_.empty() ? "Changes preview immediately. Save keeps them; Cancel restores the saved settings."
+  toggle(draw, layout.enable_voices, tr("SETTINGS_VOICE_ENABLE", "Enable voices"),
+         values_.enabled, layout.body_font_pixels, scale);
+  slider(draw, layout.volume_track, tr("SETTINGS_VOICE_VOLUME", "Voice volume"),
+         values_.volume, layout.body_font_pixels, scale);
+  toggle(draw, layout.subtitles, tr("SETTINGS_VOICE_SUBTITLES", "Subtitles"),
+         values_.subtitles, layout.body_font_pixels, scale);
+  choice(draw, layout.subtitle_size, tr("SETTINGS_VOICE_SUBTITLE_SIZE", "Subtitle size"),
+         std::to_string(values_.subtitle_size) + " px", layout.body_font_pixels, scale);
+  slider(draw, layout.background_track,
+         tr("SETTINGS_VOICE_SUBTITLE_BACKGROUND", "Subtitle background"),
+         values_.subtitle_background_opacity, layout.body_font_pixels, scale);
+  toggle(draw, layout.speaker_labels, tr("SETTINGS_VOICE_SPEAKER_LABELS", "Speaker labels"),
+         values_.speaker_labels, layout.body_font_pixels, scale);
+  slider(draw, layout.filter_track, tr("SETTINGS_VOICE_COMMS_FILTER", "Communication filter"),
+         values_.communication_filter, layout.body_font_pixels, scale);
+  choice(draw, layout.frequency, tr("SETTINGS_VOICE_FREQUENCY", "Announcement frequency"),
+         frequency_name(values_.frequency), layout.body_font_pixels, scale);
+  toggle(draw, layout.no_interruptions,
+         tr("SETTINGS_VOICE_NO_INTERRUPTIONS", "Do not interrupt dialogue"),
+         values_.no_interruptions, layout.body_font_pixels, scale);
+  native_menu_style::button(draw, layout.replay,
+                            tr("SETTINGS_VOICE_REPLAY", "Replay last announcement"),
+                            layout.body_font_pixels, false, static_cast<bool>(replay_), scale);
+  native_menu_style::button(draw, layout.stop, tr("SETTINGS_VOICE_STOP", "Stop"),
+                            layout.body_font_pixels, false, static_cast<bool>(stop_), scale);
+  native_menu_style::button(draw, layout.defaults, tr("SETTINGS_DEFAULTS", "Defaults"),
+                            layout.body_font_pixels, false, true, scale);
+  native_menu_style::button(draw, layout.cancel, tr("SETTINGS_CANCEL", "Cancel"),
+                            layout.body_font_pixels, false, true, scale);
+  native_menu_style::button(draw, layout.save, tr("SETTINGS_SAVE", "Save"),
+                            layout.body_font_pixels, true, true, scale);
+  label(draw, layout.status, status_.empty() ? tr("SETTINGS_VOICE_HINT", "Changes preview immediately. Save keeps them; Cancel restores the saved settings.")
                                              : status_,
         std::max(11, layout.body_font_pixels - 2), native_menu_style::muted);
   if(dropdown_.visible())dropdown_.render(draw,dropdown_.id()==0?layout.subtitle_size:layout.frequency,width,height,layout.body_font_pixels);

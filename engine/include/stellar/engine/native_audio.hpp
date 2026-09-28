@@ -33,6 +33,10 @@ class AudioClip final {
 // Decodes supported Windows Media Foundation audio formats (including WAV and MP3).
 // The caller is expected to invoke this off the owner/UI thread.
 [[nodiscard]] std::shared_ptr<const AudioClip> decode_audio_clip(const std::filesystem::path& path);
+// In-memory variant for cooked packages and embedded content; `label` is
+// only used for error/diagnostic context.
+[[nodiscard]] std::shared_ptr<const AudioClip> decode_audio_clip(
+    std::span<const std::uint8_t> encoded, const std::filesystem::path& label);
 
 struct AudioDiagnostics final {
   std::size_t queued_music_bytes{};

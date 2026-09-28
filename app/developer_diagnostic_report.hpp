@@ -5,6 +5,7 @@
 #include <stellar/core/developer_campaign.hpp>
 #include <stellar/core/developer_celestial_index.hpp>
 #include <stellar/engine/diagnostic_bundle.hpp>
+#include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/sha256.hpp>
 #include <nlohmann/json.hpp>
 #include <iomanip>
@@ -105,11 +106,13 @@ inline std::vector<Entry> capture_developer_report(stellar::core::CampaignFrame 
       "- native-events.jsonl: bounded historical canonical events and newly detected findings since the current native session began. Rotation/filter counts are in session.json.\n"
       "- coverage.json: real celestial population, stable IDs and explicit forced-coverage markers.\n"
       "- performance.csv: measured phase aggregates since profiling began; zero samples mean unmeasured, not zero cost.\n"
+      "- memory.json: tracked subsystem residency (used/reserved bytes and high-water marks) reported since session start; absent subsystems are unmeasured.\n"
       "- replay.json: exact-build checkpoint continuation instructions. Full command replay is not yet implemented.\n"
       "- session.log and system.txt: bounded recent native session messages and renderer/window context.\n\n"
       "Export does not advance, reveal, fund or repair the campaign. No unrelated files are collected.\n"},
     {"errors.jsonl",std::move(errors)},{"warnings.jsonl",std::move(warning_log)},{"diagnostics.jsonl",std::move(diagnostics)},
-    {"coverage.json",coverage_json(world)},{"performance.csv",performance_csv(frame)},{"replay.json",replay.dump(2)}
+    {"coverage.json",coverage_json(world)},{"performance.csv",performance_csv(frame)},{"replay.json",replay.dump(2)},
+    {"memory.json",stellar::engine::MemoryTracker::instance().export_json()}
   };
   if(checkpoint.empty())report.push_back({"checkpoint-error.txt",std::move(checkpoint_error)});
   else report.push_back({"latest.dev17.json",std::move(checkpoint)});

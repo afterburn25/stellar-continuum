@@ -10,6 +10,8 @@
 #include <thread>
 #include <vector>
 
+namespace stellar::engine { class LocalizationTable; }
+
 namespace stellar::native_research {
 
 enum class NativeResearchIntent { None, Start, Pause, Resume, Cancel,
@@ -131,6 +133,7 @@ public:
           NativeResearchIntent intent, std::string_view node_id);
 
   void select(std::optional<std::string> node_id);
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept {locale_=table;}
   [[nodiscard]] const std::optional<std::string> &selection() const;
 
 private:
@@ -142,6 +145,7 @@ private:
   std::uint64_t funding_revision_{};
   std::optional<std::string> funding_signature_;
   std::optional<std::string> selected_node_id_;
+  const stellar::engine::LocalizationTable *locale_{nullptr};
 };
 
 } // namespace stellar::native_research

@@ -185,6 +185,8 @@
     "event": "research.completed",
     "profile": "human_female_chief_scientist",
     "dialogueKey": "research.completed",
+    "prerecordedPath": "assets/audio/voice/scientist-research-report.wav",
+    "subtitleText": "Our research team has a new report. Review the findings before selecting our next objective.",
     "speakerRole": "ChiefScientist",
     "priority": 40,
     "cooldownSeconds": 2,
@@ -308,6 +310,8 @@
   {
     "event": "exploration.survey.completed",
     "profile": "human_female_chief_scientist",
+    "prerecordedPath": "assets/audio/voice/scientist-survey-complete.wav",
+    "subtitleText": "System survey complete. The updated observations are ready for your review.",
     "speakerRole": "ChiefScientist",
     "priority": 20,
     "cooldownSeconds": 5,
@@ -666,6 +670,8 @@
   {
     "event": "exploration.system.reconnaissance_required",
     "profile": "human_female_chief_scientist",
+    "prerecordedPath": "assets/audio/voice/scientist-reconnaissance.wav",
+    "subtitleText": "Long-range telemetry is incomplete. Dispatch a scout vessel to chart this system before approach.",
     "lines": [
       "Long-range telemetry is incomplete. Dispatch a scout vessel to chart this system before approach."
     ],

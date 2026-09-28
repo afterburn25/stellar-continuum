@@ -3,6 +3,7 @@
 #include "native_menu_style.hpp"
 #include "native_planet_rings.hpp"
 #include "native_planet_materials.hpp"
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_geometry3d.hpp>
 #include <array>
 #include <functional>
@@ -60,8 +61,16 @@ class NativePlanetGlobe {
       const float lon=-pi+(sector+.5f)*pi*.5f,lat=(1-band)*pi/3;
       const auto color=sample(lon,lat);
       const bool gas=kind_==stellar::native_system::NativeSystemBodyVisualClass::gas_giant||kind_==stellar::native_system::NativeSystemBodyVisualClass::ice_giant;
-      std::string terrain=gas?"Atmospheric band":kind_==stellar::native_system::NativeSystemBodyVisualClass::frozen?"Ice province":kind_==stellar::native_system::NativeSystemBodyVisualClass::hot_rocky?"Volcanic province":color.b>color.r*1.25f?"Ocean basin":color.g>color.r*1.1f?"Vegetated province":"Rocky province";
-      regions_.push_back({band*4+sector,lon,lat,(band==0?"Northern ":band==2?"Southern ":"Equatorial ")+std::string(gas?"band ":"province ")+std::to_string(sector+1),terrain});
+      const auto resolve=[&](std::string_view key,std::string_view fallback){
+        if(locale_&&locale_->contains(key))return std::string(locale_->translate(key));
+        return std::string(fallback);};
+      const auto format=[&](std::string_view key,std::initializer_list<std::string> args,std::string_view fallback){
+        if(locale_&&locale_->contains(key)){const std::vector<std::string> values(args.begin(),args.end());return locale_->format(key,std::span<const std::string>(values));}
+        std::string out{fallback};std::size_t index=0;for(const auto& arg:args){const std::string marker="{"+std::to_string(index++)+"}";if(const auto at=out.find(marker);at!=std::string::npos)out.replace(at,marker.size(),arg);}return out;};
+      std::string terrain=gas?resolve("GLOBE_TERRAIN_GAS","Atmospheric band"):kind_==stellar::native_system::NativeSystemBodyVisualClass::frozen?resolve("GLOBE_TERRAIN_FROZEN","Ice province"):kind_==stellar::native_system::NativeSystemBodyVisualClass::hot_rocky?resolve("GLOBE_TERRAIN_VOLCANIC","Volcanic province"):color.b>color.r*1.25f?resolve("GLOBE_TERRAIN_OCEAN","Ocean basin"):color.g>color.r*1.1f?resolve("GLOBE_TERRAIN_VEGETATED","Vegetated province"):resolve("GLOBE_TERRAIN_ROCKY","Rocky province");
+      const auto direction=resolve(band==0?"GLOBE_DIR_NORTH":band==2?"GLOBE_DIR_SOUTH":"GLOBE_DIR_EQUATOR",band==0?"Northern":band==2?"Southern":"Equatorial");
+      const auto region_kind=gas?resolve("GLOBE_KIND_BAND","band"):resolve("GLOBE_KIND_PROVINCE","province");
+      regions_.push_back({band*4+sector,lon,lat,format("GLOBE_REGION_NAME",{direction,region_kind,std::to_string(sector+1)},"{0} {1} {2}"),terrain});
     }
   }
   [[nodiscard]] const auto& regions()const{return regions_;}
@@ -74,6 +83,9 @@ class NativePlanetGlobe {
     const auto p=appearance_?rotate(locked_rotation_.value_or(stellar::native_planets::display_orientation(*appearance_,visual_seconds_,parent_bearing_)),point):point;
     yaw_=std::atan2(p.x,p.z);pitch_=std::atan2(p.y,std::hypot(p.x,p.z));roll_=0;zoom_=1.55f;hit_key_.reset();}
   void set_night(bool enabled){night_view_=enabled;}
+  void set_localization(const stellar::engine::LocalizationTable *table){
+    if(locale_==table)return;locale_=table;reset();
+  }
   [[nodiscard]] bool night()const{return night_view_;}
   void zoom_by(float factor){zoom_=std::clamp(zoom_*factor,.75f,3.f);}
   [[nodiscard]] Point center(UiRect area)const{return {area.x+area.width*.5f,area.y+area.height*.49f};}
@@ -111,7 +123,7 @@ class NativePlanetGlobe {
   }
   [[nodiscard]] float surface_elevation(float longitude,float latitude)const{return elevation({std::cos(latitude)*std::sin(longitude),std::sin(latitude),std::cos(latitude)*std::cos(longitude)});}
   void render(DrawList& out,UiRect area,const stellar::native_colony::NativeColonyView& v,int layer,int font){
-    bind(v);if(!albedo_){native_menu_style::text(out,area,"Loading planet material...",font,native_menu_style::ink,TextAlign::Center);return;}
+    bind(v);if(!albedo_){native_menu_style::text(out,area,locale_&&locale_->contains("GLOBE_LOADING")?std::string(locale_->translate("GLOBE_LOADING")):std::string("Loading planet material..."),font,native_menu_style::ink,TextAlign::Center);return;}
     const auto c=center(area);const float r=radius(area);
     TriangleMesh halo;halo.clip=area;halo.color={255,255,255,255};
     const bool atmosphere=v.planet.details&&v.planet.details->pressure_kpa>.1;
@@ -142,6 +154,7 @@ class NativePlanetGlobe {
   }
  private:
   static constexpr float pi=std::numbers::pi_v<float>;
+  const stellar::engine::LocalizationTable *locale_{};
   std::function<Picture(std::string_view,int)> maps_;Picture albedo_,night_;
   stellar::native_planets::MaterialProvider materials_;
   std::shared_ptr<const stellar::native_planets::MaterialSet> material_set_;

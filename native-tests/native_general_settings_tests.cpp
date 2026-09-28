@@ -1,4 +1,5 @@
 #include "native_general_settings.hpp"
+#include <stellar/engine/localization.hpp>
 
 #include <array>
 #include <chrono>
@@ -64,7 +65,7 @@ void empty_default_and_unicode_round_trip(const TempDirectory& temp) {
   require(json.find("\"schemaVersion\":1") != std::string::npos,
           "schema version was not persisted");
   require(reloaded.saved().nebula_density==1,"Nebula preference did not default to Medium");
-  auto navigator=reloaded.saved();navigator.asset_categories_collapsed={true,false,true,false,true};navigator.assets_hidden=true;navigator.nebula_density=2;
+  auto navigator=reloaded.saved();navigator.asset_categories_collapsed={true,false,true,false,true};navigator.assets_hidden=true;navigator.nebula_density=2;navigator.reduce_motion=true;
   require(reloaded.save(navigator),"Navigator preferences failed to save");
   NativeGeneralSettings navigator_reload(file);
   require(navigator_reload.saved()==navigator,"Category collapse/hide preferences did not round-trip with screenshot path");
@@ -84,6 +85,7 @@ void invalid_files_use_default(const TempDirectory& temp) {
       "{\"schemaVersion\":1,\"screenshotDirectory\":\"" + relative + "\"}",
       "{\"schemaVersion\":1,\"screenshotDirectory\":\"" + non_directory + "\"}",
       "{\"schemaVersion\":1,\"screenshotDirectory\":\"" + nul_path + "\"}",
+      R"({"schemaVersion":1,"screenshotDirectory":"","assetCategoriesCollapsed":[false,true,false,true,false],"assetsHidden":false,"nebulaDensity":1,"eruptionQuality":2,"reduceMotion":1})",
       std::string(4097, 'x')};
   for (const auto& contents : invalid) {
     write_raw(file, contents);
@@ -193,10 +195,13 @@ void layouts_fit_and_keep_controls_separate() {
     };
     for (const auto rect : {layout.panel, layout.audio, layout.video, layout.folder,
                             layout.status, layout.browse, layout.defaults,
-                            layout.cancel, layout.save})
+                            layout.cancel, layout.save, layout.motion})
       require(inside(rect), "General Settings layout escaped the viewport");
     require(!overlaps(layout.audio, layout.video), "audio and video navigation overlap");
     require(!overlaps(layout.folder, layout.status), "folder path and status areas overlap");
+    require(!overlaps(layout.motion, layout.nebula) && !overlaps(layout.motion, layout.eruptions) &&
+                !overlaps(layout.motion, layout.folder) && !overlaps(layout.motion, layout.status),
+            "reduced motion control overlaps another General Settings region");
     const std::array<UiRect, 4> actions{layout.browse, layout.defaults,
                                         layout.cancel, layout.save};
     for (std::size_t i = 0; i < actions.size(); ++i) {
@@ -447,6 +452,33 @@ int main() {
       require(density.draft().nebula_density==2&&density.saved().nebula_density==1,"Dropdown selection did not stay in draft");
       click_button(density,l.save,"save nebula density");NativeGeneralSettings reloaded(temp.path/"nebula-visual.json");require(reloaded.saved().nebula_density==2,"Selected nebula visual density was not saved");
       reloaded.open();click_button(reloaded,l.nebula,"nebula dropdown");InputEvent home{InputEventType::KeyPressed};home.key=0x4000004au;(void)reloaded.handle(home,1280,720);(void)reloaded.handle(accept,1280,720);reloaded.cancel();require(reloaded.saved().nebula_density==2,"Cancel changed nebula density");
+    }
+    {
+      NativeGeneralSettings motion(temp.path/"motion.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);
+      motion.open();click_button(motion,l.motion,"reduced motion toggle");
+      require(motion.draft().reduce_motion&&!motion.saved().reduce_motion,"Reduced motion click did not stay in draft");
+      click_button(motion,l.save,"save reduced motion");
+      NativeGeneralSettings reloaded(temp.path/"motion.json");
+      require(reloaded.saved().reduce_motion,"Reduced motion preference did not persist");
+      reloaded.open();click_button(reloaded,l.motion,"reduced motion off");reloaded.cancel();
+      require(reloaded.saved().reduce_motion,"Cancel changed reduced motion");
+      DrawList draw;reloaded.open();reloaded.render(draw,1280,720);
+      require(find_text_label(draw,"Reduced motion (decorative animation): On").value.size()>0,"Reduced motion state was not rendered");
+    }
+    {
+      // Localization: loaded keys override literals; missing keys fall back.
+      stellar::engine::LocalizationTable locale{"en","en"};
+      std::string lerr;
+      require(locale.load_json(R"({"locale":"en","strings":{"SETTINGS_GENERAL_TITLE":"TEST TITLE","SETTINGS_STATE_OFF":"DISABLED","SETTINGS_REDUCE_MOTION":"Motion: {0}","SETTINGS_NEBULA_DENSITY":"Nebula {0} ▾"}})",&lerr),("Locale JSON rejected: "+lerr).c_str());
+      NativeGeneralSettings localized(temp.path/"localized.json");
+      localized.set_localization(&locale);
+      localized.open();
+      DrawList draw;localized.render(draw,1280,720);
+      require(find_text_label(draw,"TEST TITLE").value=="TEST TITLE","Localized title was not rendered");
+      require(find_text_label(draw,"Motion: DISABLED").value=="Motion: DISABLED","Localized format substitution failed");
+      require(find_text_label(draw,"Nebula Medium ▾").value=="Nebula Medium ▾","Nested localized quality name failed");
+      require(find_text_label(draw,"SAVE").value=="SAVE","Missing key did not fall back to the literal");
+      require(find_text_label(draw,"SCREENSHOT FOLDER").value=="SCREENSHOT FOLDER","Unlisted label did not fall back to the literal");
     }
     invalid_files_use_default(temp);
     rejected_saves_retain_saved_preference(temp);

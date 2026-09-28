@@ -157,54 +157,65 @@ std::string grouped(std::int64_t value) {
     text.insert(static_cast<std::size_t>(at), 1, ',');
   return text;
 }
-std::string order_name(MassiveCombatOrderType type) {
+std::string translate(const stellar::engine::LocalizationTable *locale,
+                      std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+std::string order_name(MassiveCombatOrderType type,
+                       const stellar::engine::LocalizationTable *locale) {
   switch (type) {
-  case MassiveCombatOrderType::Engage: return "engage";
-  case MassiveCombatOrderType::Hold: return "hold";
-  case MassiveCombatOrderType::Defend: return "defend";
-  case MassiveCombatOrderType::Advance: return "advance";
-  case MassiveCombatOrderType::AdvanceCautiously: return "advance cautiously";
-  case MassiveCombatOrderType::StandoffAttack: return "standoff attack";
-  case MassiveCombatOrderType::Screen: return "screen";
+  case MassiveCombatOrderType::Engage: return translate(locale,"BATTLE_ORDER_ENGAGE","engage");
+  case MassiveCombatOrderType::Hold: return translate(locale,"BATTLE_ORDER_HOLD","hold");
+  case MassiveCombatOrderType::Defend: return translate(locale,"BATTLE_ORDER_DEFEND","defend");
+  case MassiveCombatOrderType::Advance: return translate(locale,"BATTLE_ORDER_ADVANCE","advance");
+  case MassiveCombatOrderType::AdvanceCautiously: return translate(locale,"BATTLE_ORDER_ADVANCE_CAUTIOUS","advance cautiously");
+  case MassiveCombatOrderType::StandoffAttack: return translate(locale,"BATTLE_ORDER_STANDOFF","standoff attack");
+  case MassiveCombatOrderType::Screen: return translate(locale,"BATTLE_ORDER_SCREEN","screen");
   case MassiveCombatOrderType::ProtectCriticalAsset:
-    return "protect critical asset";
-  case MassiveCombatOrderType::FocusFire: return "focus fire";
-  case MassiveCombatOrderType::FlankLeft: return "flank left";
-  case MassiveCombatOrderType::FlankRight: return "flank right";
-  case MassiveCombatOrderType::Intercept: return "intercept";
-  case MassiveCombatOrderType::Pursue: return "pursue";
-  case MassiveCombatOrderType::BreakContact: return "break contact";
-  case MassiveCombatOrderType::Disengage: return "disengage";
-  case MassiveCombatOrderType::Retreat: return "retreat";
-  case MassiveCombatOrderType::EmergencyRetreat: return "emergency retreat";
-  case MassiveCombatOrderType::Breakout: return "breakout";
-  case MassiveCombatOrderType::Surrender: return "surrender";
+    return translate(locale,"BATTLE_ORDER_PROTECT","protect critical asset");
+  case MassiveCombatOrderType::FocusFire: return translate(locale,"BATTLE_ORDER_FOCUS","focus fire");
+  case MassiveCombatOrderType::FlankLeft: return translate(locale,"BATTLE_ORDER_FLANK_LEFT","flank left");
+  case MassiveCombatOrderType::FlankRight: return translate(locale,"BATTLE_ORDER_FLANK_RIGHT","flank right");
+  case MassiveCombatOrderType::Intercept: return translate(locale,"BATTLE_ORDER_INTERCEPT","intercept");
+  case MassiveCombatOrderType::Pursue: return translate(locale,"BATTLE_ORDER_PURSUE","pursue");
+  case MassiveCombatOrderType::BreakContact: return translate(locale,"BATTLE_ORDER_BREAK","break contact");
+  case MassiveCombatOrderType::Disengage: return translate(locale,"BATTLE_ORDER_DISENGAGE","disengage");
+  case MassiveCombatOrderType::Retreat: return translate(locale,"BATTLE_ORDER_RETREAT","retreat");
+  case MassiveCombatOrderType::EmergencyRetreat: return translate(locale,"BATTLE_ORDER_EMERGENCY","emergency retreat");
+  case MassiveCombatOrderType::Breakout: return translate(locale,"BATTLE_ORDER_BREAKOUT","breakout");
+  case MassiveCombatOrderType::Surrender: return translate(locale,"BATTLE_ORDER_SURRENDER","surrender");
   }
-  return "order";
+  return translate(locale,"BATTLE_ORDER_GENERIC","order");
 }
-std::string shape_name(stellar::core::MassiveFormationShape shape) {
+std::string shape_name(stellar::core::MassiveFormationShape shape,
+                       const stellar::engine::LocalizationTable *locale) {
   switch (shape) {
-  case stellar::core::MassiveFormationShape::Screen: return "SCREEN";
-  case stellar::core::MassiveFormationShape::Line: return "LINE";
-  case stellar::core::MassiveFormationShape::Wedge: return "WEDGE";
-  case stellar::core::MassiveFormationShape::Standoff: return "STANDOFF";
-  case stellar::core::MassiveFormationShape::Dispersed: return "DISPERSED";
-  case stellar::core::MassiveFormationShape::Escort: return "ESCORT";
+  case stellar::core::MassiveFormationShape::Screen: return translate(locale,"BATTLE_SHAPE_SCREEN","SCREEN");
+  case stellar::core::MassiveFormationShape::Line: return translate(locale,"BATTLE_SHAPE_LINE","LINE");
+  case stellar::core::MassiveFormationShape::Wedge: return translate(locale,"BATTLE_SHAPE_WEDGE","WEDGE");
+  case stellar::core::MassiveFormationShape::Standoff: return translate(locale,"BATTLE_SHAPE_STANDOFF","STANDOFF");
+  case stellar::core::MassiveFormationShape::Dispersed: return translate(locale,"BATTLE_SHAPE_DISPERSED","DISPERSED");
+  case stellar::core::MassiveFormationShape::Escort: return translate(locale,"BATTLE_SHAPE_ESCORT","ESCORT");
   case stellar::core::MassiveFormationShape::RetreatColumn:
-    return "RETREAT COLUMN";
-  case stellar::core::MassiveFormationShape::Breakout: return "BREAKOUT";
+    return translate(locale,"BATTLE_SHAPE_RETREAT","RETREAT COLUMN");
+  case stellar::core::MassiveFormationShape::Breakout: return translate(locale,"BATTLE_SHAPE_BREAKOUT","BREAKOUT");
   }
-  return "FORMATION";
+  return translate(locale,"BATTLE_SHAPE_GENERIC","FORMATION");
 }
-std::string formation_state(const MassiveObservedFormation &value) {
-  if (value.is_warp_blocked) return "WARP BLOCKED";
+std::string formation_state(const MassiveObservedFormation &value,
+                            const stellar::engine::LocalizationTable *locale) {
+  if (value.is_warp_blocked) return translate(locale,"BATTLE_WARP_BLOCKED","WARP BLOCKED");
   if (value.warp_spool_progress > 0.f) {
-    std::ostringstream out;
-    out << "WARP " << static_cast<int>(value.warp_spool_progress * 100.f)
-        << "%";
-    return out.str();
+    auto pattern = translate(locale, "BATTLE_WARP_SPOOL", "WARP {0}%");
+    const auto percent =
+        std::to_string(static_cast<int>(value.warp_spool_progress * 100.f));
+    if (const auto at = pattern.find("{0}"); at != std::string::npos)
+      pattern.replace(at, 3, percent);
+    return pattern;
   }
-  return shape_name(value.shape);
+  return shape_name(value.shape, locale);
 }
 float hash01(std::int64_t id, int token) {
   auto value = static_cast<std::uint64_t>(id) ^
@@ -248,15 +259,15 @@ Point formation_offset(std::int64_t id, int token,
 
 const std::vector<BattleOrderButton> &battle_order_buttons() {
   static const std::vector<BattleOrderButton> buttons{
-      {"Hold", MassiveCombatOrderType::Hold, false},
-      {"Defend", MassiveCombatOrderType::Defend, false},
-      {"Advance", MassiveCombatOrderType::Advance, true},
-      {"Focus fire", MassiveCombatOrderType::FocusFire, true},
-      {"Flank left", MassiveCombatOrderType::FlankLeft, true},
-      {"Flank right", MassiveCombatOrderType::FlankRight, true},
-      {"Intercept", MassiveCombatOrderType::Intercept, true},
-      {"Break contact", MassiveCombatOrderType::BreakContact, false},
-      {"Retreat", MassiveCombatOrderType::Retreat, false}};
+      {"Hold", MassiveCombatOrderType::Hold, false, "BATTLE_BTN_HOLD"},
+      {"Defend", MassiveCombatOrderType::Defend, false, "BATTLE_BTN_DEFEND"},
+      {"Advance", MassiveCombatOrderType::Advance, true, "BATTLE_BTN_ADVANCE"},
+      {"Focus fire", MassiveCombatOrderType::FocusFire, true, "BATTLE_BTN_FOCUS"},
+      {"Flank left", MassiveCombatOrderType::FlankLeft, true, "BATTLE_BTN_FLANK_LEFT"},
+      {"Flank right", MassiveCombatOrderType::FlankRight, true, "BATTLE_BTN_FLANK_RIGHT"},
+      {"Intercept", MassiveCombatOrderType::Intercept, true, "BATTLE_BTN_INTERCEPT"},
+      {"Break contact", MassiveCombatOrderType::BreakContact, false, "BATTLE_BTN_BREAK"},
+      {"Retreat", MassiveCombatOrderType::Retreat, false, "BATTLE_BTN_RETREAT"}};
   return buttons;
 }
 
@@ -443,6 +454,29 @@ void NativeBattleWorkspace::set_tactical_speed(const double current,
   tactical_speed_ = current;
   tactical_resume_speed_ = resume;
 }
+std::string NativeBattleWorkspace::tr(std::string_view key,
+                                      std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+std::string NativeBattleWorkspace::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
 void NativeBattleWorkspace::set_status(std::string message, bool error) {
   status_ = std::move(message);
   status_error_ = error;
@@ -664,7 +698,7 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
     box_selecting_ = false;
     if (targeting_source_) {
       targeting_source_.reset();
-      set_status("Target selection cancelled.");
+      set_status(tr("BATTLE_TARGET_CANCELLED","Target selection cancelled."));
     } else {
       command.kind = BattleWorkspaceCommandKind::Menu;
     }
@@ -680,7 +714,7 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
         auto objective=formation->position;objective.z=std::clamp(objective.z+(event.wheel_y>0?100.f:-100.f),-10000.f,10000.f);
         command.orders.push_back({id,MassiveCombatOrderType::Advance,std::nullopt,objective,std::nullopt});
       }
-      if(!command.orders.empty()){command.kind=BattleWorkspaceCommandKind::IssueOrder;set_status("Changing formation depth.");}
+      if(!command.orders.empty()){command.kind=BattleWorkspaceCommandKind::IssueOrder;set_status(tr("BATTLE_DEPTH_CHANGE","Changing formation depth."));}
       return command;
     }
     const auto factor = event.wheel_y > 0.f ? 1.25f : 1.f / 1.25f;
@@ -754,14 +788,14 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
       const auto &button = battle_order_buttons()[index];
       const auto selected = selected_owned();
       if (selected.empty()) {
-        set_status("Select one or more friendly formations first.", true);
+        set_status(tr("BATTLE_SELECT_FIRST","Select one or more friendly formations first."), true);
         return command;
       }
       if (button.needs_target) {
         targeting_source_ = selected.front();
         targeting_order_ = button.type;
-        set_status(order_name(button.type) +
-                   ": choose a formation or open-space objective.");
+        set_status(trf("BATTLE_CHOOSE_OBJECTIVE",{order_name(button.type, locale_)},
+                       "{0}: choose a formation or open-space objective."));
         return command;
       }
       command.kind = BattleWorkspaceCommandKind::IssueOrder;
@@ -877,7 +911,7 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
 
   if (!snapshot_) {
     text(out, {field.width * .5f, (top + bottom) * .5f},
-         "No tactical encounter is active.", text_secondary,
+         tr("BATTLE_NONE","No tactical encounter is active."), text_secondary,
          layout.body_font_pixels, 0.f, TextAlign::Center);
     return;
   }
@@ -1150,20 +1184,16 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
                  static_cast<int>(12.f * layout.scale), 0.f,
                  {bounds.x, bounds.y, bounds.width, line_height});
     clipped_text(out, {label_x, bounds.y + line_height},
-                 count + " ships · " + formation_state(formation), color,
+                 trf("BATTLE_SHIP_COUNT",{count,formation_state(formation,locale_)},"{0} ships · {1}"), color,
                  layout.small_font_pixels, 0.f,
                  {bounds.x, bounds.y + line_height, bounds.width, line_height});
     if (hovered_formation_ == formation.formation_id) {
-      std::string strength = "Power unknown";
+      std::string strength = tr("BATTLE_POWER_UNKNOWN","Power unknown");
       if (formation.strength_low) {
         strength = formation.strength_low == formation.strength_high
-                       ? "Power " + grouped(static_cast<std::int64_t>(
-                                          *formation.strength_low))
-                       : "Power " + grouped(static_cast<std::int64_t>(
-                                          *formation.strength_low)) +
-                             "-" +
-                             grouped(static_cast<std::int64_t>(
-                                 *formation.strength_high));
+                       ? trf("BATTLE_POWER",{grouped(static_cast<std::int64_t>(*formation.strength_low))},"Power {0}")
+                       : trf("BATTLE_POWER_RANGE",{grouped(static_cast<std::int64_t>(*formation.strength_low)),
+                             grouped(static_cast<std::int64_t>(*formation.strength_high))},"Power {0}-{1}");
       }
       clipped_text(out, {label_x, bounds.y + line_height * 2.f},
                    strength, text_secondary, layout.small_font_pixels,
@@ -1191,9 +1221,7 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
                  field);
     clipped_line(out, {18.f + pixels, y - 4.f}, {18.f + pixels, y + 4.f},
                  text_secondary, field);
-    std::ostringstream scale_label;
-    scale_label << static_cast<int>(kilometres) << " km";
-    text(out, {18.f, layout.scale_bar.y}, scale_label.str(), text_secondary,
+    text(out, {18.f, layout.scale_bar.y}, trf("BATTLE_SCALE_KM",{std::to_string(static_cast<int>(kilometres))},"{0} km"), text_secondary,
          layout.small_font_pixels);
   }
 
@@ -1205,10 +1233,10 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
         });
     std::string summary =
         selected == 0
-            ? "Select or drag around friendly formations · right-click to "
-              "engage or advance · right-drag to pan · wheel to zoom"
-            : std::to_string(selected) + " formation" +
-                  (selected == 1 ? "" : "s");
+            ? tr("BATTLE_HINT","Select or drag around friendly formations · right-click to engage or advance · right-drag to pan · wheel to zoom")
+            : trf(selected == 1 ? "BATTLE_SELECTED_ONE" : "BATTLE_SELECTED_MANY",
+                  {std::to_string(selected)},
+                  selected == 1 ? "{0} formation" : "{0} formations");
     if (selected > 0) {
       std::int64_t low = 0, high = 0;
       bool exact = true;
@@ -1218,9 +1246,10 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
           high += formation.ship_count_high;
           exact &= formation.is_exact;
         }
-      summary += " · " + grouped(low) +
-                 (exact ? " ships" : "-" + grouped(high) + " estimated ships");
-      summary += " · Alt + wheel to change depth";
+      summary += trf(exact ? "BATTLE_SHIPS_EXACT" : "BATTLE_SHIPS_ESTIMATED",
+                     {grouped(low), grouped(high)},
+                     exact ? " · {0} ships" : " · {0}-{1} estimated ships");
+      summary += tr("BATTLE_DEPTH_HINT"," · Alt + wheel to change depth");
     }
     text(out, {layout.selection_summary.x, layout.selection_summary.y},
          summary, text_secondary, layout.body_font_pixels);
@@ -1229,14 +1258,16 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
                               [&](const auto &f) { return is_owned(f); }));
     const auto contacts =
         static_cast<int>(formations.size()) - friendly;
-    std::ostringstream battle;
-    battle << "T+" << std::fixed << std::setprecision(1)
-           << snapshot_->simulated_seconds << "s"
-           << "  ·  " << grouped(snapshot_->exact_own_ships)
-           << " friendly ships  ·  " << contacts << " detected hostile "
-           << "formation" << (contacts == 1 ? "" : "s");
+    std::ostringstream seconds;
+    seconds << std::fixed << std::setprecision(1) << snapshot_->simulated_seconds;
     text(out, {layout.battle_summary.x, layout.battle_summary.y},
-         battle.str(), text_secondary, layout.body_font_pixels);
+         trf(contacts == 1 ? "BATTLE_SUMMARY_ONE" : "BATTLE_SUMMARY_MANY",
+             {seconds.str(), grouped(snapshot_->exact_own_ships),
+              std::to_string(contacts)},
+             contacts == 1
+                 ? "T+{0}s  ·  {1} friendly ships  ·  {2} detected hostile formation"
+                 : "T+{0}s  ·  {1} friendly ships  ·  {2} detected hostile formations"),
+         text_secondary, layout.body_font_pixels);
   }
 
   // Recent combat events feed (observer-filtered snapshot tail).
@@ -1247,7 +1278,7 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
       const auto row_height = 42.f * layout.scale;
       const auto y = layout.event_feed.y + static_cast<float>(lines) * row_height;
       clipped_text(out, {layout.event_feed.x, y},
-                   it->details_known ? it->message : "Signal intercept.",
+                   it->details_known ? it->message : tr("BATTLE_INTERCEPT","Signal intercept."),
                    it->details_known ? text_secondary : unknown,
                    layout.small_font_pixels, layout.event_feed.width,
                    {layout.event_feed.x, y, layout.event_feed.width, row_height - 4.f * layout.scale});
@@ -1271,11 +1302,11 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
        layout.speed.contains(pointer_) ? hover_color : button_color);
   stroke(out, layout.speed, border);
   {
-    std::ostringstream label;
-    label << "> " << tactical_resume_speed_ << "x";
+    std::ostringstream speed_value;
+    speed_value << tactical_resume_speed_;
     text(out, {layout.speed.x + layout.speed.width * .5f,
                layout.speed.y + layout.speed.height * .32f},
-         label.str(),
+         trf("BATTLE_SPEED",{speed_value.str()},"> {0}x"),
          tactical_speed_ > 0. ? text_primary : caution,
          layout.body_font_pixels, 0.f, TextAlign::Center);
   }
@@ -1284,14 +1315,14 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
   stroke(out, layout.fit, border);
   text(out, {layout.fit.x + layout.fit.width * .5f,
              layout.fit.y + layout.fit.height * .32f},
-         "FIT", text_primary, layout.body_font_pixels, 0.f,
+         tr("BATTLE_FIT","FIT"), text_primary, layout.body_font_pixels, 0.f,
          TextAlign::Center);
   fill(out, layout.menu,
        layout.menu.contains(pointer_) ? hover_color : button_color);
   stroke(out, layout.menu, border);
   text(out, {layout.menu.x + layout.menu.width * .5f,
              layout.menu.y + layout.menu.height * .32f},
-         "MENU", text_primary, layout.body_font_pixels, 0.f,
+         tr("BATTLE_MENU","MENU"), text_primary, layout.body_font_pixels, 0.f,
          TextAlign::Center);
 
   // Order column.
@@ -1307,7 +1338,7 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
     stroke(out, rect, active_targeting ? focus : border);
     clipped_text(out,
                  {rect.x + rect.width * .5f, rect.y + rect.height * .3f},
-                 button.label, text_primary, layout.small_font_pixels,
+                 tr(button.label_key, button.label), text_primary, layout.small_font_pixels,
                  rect.width - 6.f, rect, TextAlign::Center);
   }
 }

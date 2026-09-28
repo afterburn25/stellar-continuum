@@ -41,15 +41,24 @@ int main(int argc,char **argv)try{
     one.set_developer_speed(1);twenty_five.set_developer_speed(25);
     for(int i=0;i<32;++i){(void)one.advance(.25);(void)twenty_five.advance(.25);}
     // Accelerated strategic ticks are intentionally bounded per frame. Draining
-    // that work with no new real time must not advance stellar activity again.
+    // that work with no new real time must still advance the authoritative
+    // activity clock, because the backlog is real simulated time.
     while(twenty_five.developer_ticks_behind())(void)twenty_five.advance(0.);
+    require(std::abs(one.runtime().stellar_activity_day()-8./24.)<1e-12,
+        "Activity clock did not retain fixed 1x cadence");
+    require(twenty_five.clock().simulation_days()>one.clock().simulation_days()*20,"Flare isolation stopped strategic acceleration");
+    // Drive the 1x leg through the same simulated interval the accelerated leg
+    // reached: the authoritative flare schedule must be identical regardless
+    // of the frame speed that produced it.
+    const double target_day=twenty_five.clock().simulation_days();
+    while(one.clock().simulation_days()<target_day)(void)one.advance(.25);
+    require(one.clock().simulation_days()==target_day,"Speed-1 replay overshot the accelerated endpoint");
     const auto& one_star=one.runtime().world().campaign().systems.front();
     const auto& fast_star=twenty_five.runtime().world().campaign().systems.front();
     require(one_star.stellar_activity==fast_star.stellar_activity&&one_star.stellar_activity->front().counter>0,
         "Game speed changed flare frequency, identities, sites or durations");
-    require(std::abs(one.runtime().stellar_activity_day()-8./24.)<1e-12&&
-        one.runtime().stellar_activity_day()==twenty_five.runtime().stellar_activity_day(),"Activity clock did not retain fixed 1x cadence");
-    require(twenty_five.clock().simulation_days()>one.clock().simulation_days()*20,"Flare isolation stopped strategic acceleration");
+    require(std::abs(one.runtime().stellar_activity_day()-twenty_five.runtime().stellar_activity_day())<1e-9,
+        "Activity clock diverged over the same simulated interval");
     const auto checkpoint=saved(twenty_five);
     auto restored=restore_developer_campaign_json(load_adaptive_research_strategic_runtime(root),checkpoint);
     auto loaded=std::move(restored).activate();
@@ -90,10 +99,17 @@ int main(int argc,char **argv)try{
     };
     auto normal=make_player(),fast=make_player();fast.clock().set_speed(StrategicSpeed::Maximum);
     for(int i=0;i<32;++i){(void)normal.advance(.25);(void)fast.advance(.25);}
-    require(normal.runtime().stellar_activity_day()==fast.runtime().stellar_activity_day()&&
+    require(fast.clock().simulation_days()>normal.clock().simulation_days()*7.,"Player strategic acceleration stopped");
+    // The authoritative activity clock tracks simulated days. Replaying the
+    // same simulated interval at normal speed must yield an identical
+    // schedule, no matter which frame speed produced it.
+    const double player_target=fast.clock().simulation_days();
+    while(normal.clock().simulation_days()<player_target-1e-12)
+      (void)normal.advance(std::min(6.,(player_target-normal.clock().simulation_days())*24.));
+    require(std::abs(normal.clock().simulation_days()-player_target)<1e-9,"Normal-speed replay overshot the accelerated endpoint");
+    require(std::abs(normal.runtime().stellar_activity_day()-fast.runtime().stellar_activity_day())<1e-9&&
         normal.runtime().world().campaign().systems.front().stellar_activity==fast.runtime().world().campaign().systems.front().stellar_activity,
         "Player speed changed flare timing or frequency");
-    require(fast.clock().simulation_days()>normal.clock().simulation_days()*7.,"Player strategic acceleration stopped");
   }
   auto hourly=make();hourly.clock().set_days_per_second(1./24.);hourly.set_developer_speed(1);
   {
@@ -163,11 +179,11 @@ int main(int argc,char **argv)try{
   require(loaded.developer_ticks_behind()==0&&loaded.clock().simulation_days()==25.,"Pending work failed to drain without new wall time.");
   loaded.set_developer_speed(1);
   auto a=nlohmann::json::parse(saved(slow)),b=nlohmann::json::parse(saved(loaded));
-  // Equal strategic ticks took different real durations. Activity intentionally
-  // follows unscaled real time; all strategic state must still agree.
-  require(std::abs(slow.runtime().stellar_activity_day()-25./24.)<1e-12&&
-      std::abs(loaded.runtime().stellar_activity_day()-1./24.)<1e-12,"Speed-independent activity elapsed time is wrong");
-  a["Campaign"]["Galaxy"].erase("StellarActivityDay");b["Campaign"]["Galaxy"].erase("StellarActivityDay");
+  // Equal strategic ticks took different real durations, but the authoritative
+  // activity clock and event schedule follow simulated time: the full saves,
+  // StellarActivityDay included, must agree bit for bit.
+  require(std::abs(slow.runtime().stellar_activity_day()-25.)<1e-9&&
+      std::abs(loaded.runtime().stellar_activity_day()-25.)<1e-9,"Speed-independent activity elapsed time is wrong");
   if(a!=b){const auto diff=nlohmann::json::diff(a,b);std::cerr<<diff.dump().substr(0,6500)<<"\n";}
   require(a==b,"1x and 25x diverged after identical authoritative fixed ticks and save/reload.");
   const auto before=saved(loaded);denied=false;try{loaded.set_developer_speed(3);}catch(const std::exception&){denied=true;}

@@ -2,7 +2,10 @@
 namespace {
 constexpr std::array galaxy_card_order{stellar::core::GalaxyMorphology::Spiral,stellar::core::GalaxyMorphology::BarredSpiral,stellar::core::GalaxyMorphology::Elliptical,stellar::core::GalaxyMorphology::Lenticular,stellar::core::GalaxyMorphology::Irregular,stellar::core::GalaxyMorphology::Ring};
 constexpr std::array galaxy_card_names{"Spiral Galaxy","Barred Spiral Galaxy","Elliptical Galaxy","Lenticular Galaxy","Irregular Galaxy","Ring Galaxy"};
+constexpr std::array galaxy_card_name_keys{"SETUP_GALAXY_SPIRAL","SETUP_GALAXY_BARRED","SETUP_GALAXY_ELLIPTICAL","SETUP_GALAXY_LENTICULAR","SETUP_GALAXY_IRREGULAR","SETUP_GALAXY_RING"};
 constexpr std::array galaxy_card_descriptions{"Sweeping arms around a bright central bulge.","Spiral arms extend from an elongated central bar.","A broad body dominated by older stellar populations.","A smooth disk and bulge with little spiral structure.","Asymmetric structure and patchy stellar nurseries.","A distinct ring surrounds a sparse interior."};
+constexpr std::array galaxy_card_description_keys{"SETUP_GALAXY_SPIRAL_DESC","SETUP_GALAXY_BARRED_DESC","SETUP_GALAXY_ELLIPTICAL_DESC","SETUP_GALAXY_LENTICULAR_DESC","SETUP_GALAXY_IRREGULAR_DESC","SETUP_GALAXY_RING_DESC"};
+constexpr std::array population_description_keys{"SETUP_POPSTATE_DETERMINED","SETUP_POPSTATE_INTENSE","SETUP_POPSTATE_ONGOING","SETUP_POPSTATE_BALANCED","SETUP_POPSTATE_REDUCED","SETUP_POPSTATE_MINIMAL"};
 constexpr std::array population_descriptions{
  "Population state is determined from the galaxy seed and morphology. The same settings always give the same result.",
  "Intense star formation. More young massive stars, supergiants and Wolf-Rayet stars, with stronger stellar hazards.",
@@ -62,26 +65,26 @@ void NativeNewGameWorkspace::render_galaxy_page(DrawList& out,int width,int heig
   if(backdrop){const float k=std::max(width/static_cast<float>(backdrop->width()),height/static_cast<float>(backdrop->height()));out.overlay.emplace_back(Image{backdrop,{(width-backdrop->width()*k)*.5f,(height-backdrop->height()*k)*.5f,backdrop->width()*k,backdrop->height()*k},std::nullopt,{255,255,255,255}});}
   else fill(out,{0,0,static_cast<float>(width),static_cast<float>(height)},background);
   stellar::engine::ui_skin::surface(out,l.panel,s);
-  text(out,l.heading,page_==SandboxPage::GalaxyType?"CHOOSE GALAXY TYPE":"GALAXY POPULATION STATE",{150,225,255,255},title,TextAlign::Left,FontFace::Heading);
-  text(out,{l.heading.x,l.heading.y+43*s,l.heading.width,26*s},page_==SandboxPage::GalaxyType?"Choose the shape of your civilization’s new home.":"Choose its stellar age and activity. Galaxy shape and population are independent.",muted,small);
+  text(out,l.heading,tr(page_==SandboxPage::GalaxyType?"SETUP_GALAXY_TYPE_TITLE":"SETUP_POPULATION_TITLE",page_==SandboxPage::GalaxyType?"CHOOSE GALAXY TYPE":"GALAXY POPULATION STATE"),{150,225,255,255},title,TextAlign::Left,FontFace::Heading);
+  text(out,{l.heading.x,l.heading.y+43*s,l.heading.width,26*s},tr(page_==SandboxPage::GalaxyType?"SETUP_GALAXY_TYPE_HINT":"SETUP_POPULATION_HINT",page_==SandboxPage::GalaxyType?"Choose the shape of your civilization’s new home.":"Choose its stellar age and activity. Galaxy shape and population are independent."),muted,small);
   const auto image=[&](UiRect area,const std::string& path){if(!provider)return;const auto art=(*provider)(path);if(!art)return;const float k=std::min(area.width/art->width(),area.height/art->height());out.overlay.emplace_back(Image{art,{area.x+(area.width-art->width()*k)*.5f,area.y+(area.height-art->height()*k)*.5f,art->width()*k,art->height()*k},std::nullopt,{255,255,255,255},area});};
   if(page_==SandboxPage::GalaxyType){
     for(std::size_t i=0;i<l.cards.size();++i){const auto r=l.cards[i];const bool active=morphology_selected_&&population_.morphology==galaxy_card_order[i];stellar::engine::ui_skin::control(out,r,s,r.contains(pointer_),active);
       const float ih=std::min((r.width-16*s)*9/16,r.height-92*s);
       image({r.x+8*s,r.y+8*s,r.width-16*s,ih},stellar::core::galaxy_visual_pair(galaxy_card_order[i]).preview_path);
-      text(out,{r.x+16*s,r.y+ih+20*s,r.width-32*s,28*s},galaxy_card_names[i],bright,body);
-      text(out,{r.x+16*s,r.y+ih+52*s,r.width-32*s,45*s},galaxy_card_descriptions[i],muted,small);
-      if(active)text(out,{r.x+r.width-120*s,r.y+12*s,100*s,24*s},"✓ SELECTED",{113,231,255,255},small,TextAlign::Right);
+      text(out,{r.x+16*s,r.y+ih+20*s,r.width-32*s,28*s},tr(galaxy_card_name_keys[i],galaxy_card_names[i]),bright,body);
+      text(out,{r.x+16*s,r.y+ih+52*s,r.width-32*s,45*s},tr(galaxy_card_description_keys[i],galaxy_card_descriptions[i]),muted,small);
+      if(active)text(out,{r.x+r.width-120*s,r.y+12*s,100*s,24*s},tr("SETUP_SELECTED","✓ SELECTED"),{113,231,255,255},small,TextAlign::Right);
     }
   }else{
     const auto c=generation_configuration();const auto pair=stellar::core::galaxy_visual_pair(population_.morphology,c?std::optional{c->resolved_population}:std::optional{stellar::core::PopulationState::Mature});
     image(l.preview,pair.preview_path);
-    text(out,{l.population.x,l.population.y-37*s,l.population.width,29*s},"POPULATION STATE",{150,225,255,255},body);
+    text(out,{l.population.x,l.population.y-37*s,l.population.width,29*s},tr("SETUP_POPULATION_STATE","POPULATION STATE"),{150,225,255,255},body);
     native_menu_style::button(out,l.population,std::string(stellar::core::population_selection_label(requested_population_))+"  ▼",body,l.population.contains(pointer_),true,s);
-    text(out,l.description,population_descriptions[static_cast<std::size_t>(requested_population_)],bright,body);
-    if(c)text(out,l.summary,"Type: "+std::string(stellar::core::morphology_name(c->morphology))+"\nResolved population: "+std::string(stellar::core::population_state_name(c->resolved_population))+"\nSeed: "+seed_text_+"\n\nYou can change the seed and galaxy size on the next screen.",muted,body);
+    text(out,l.description,tr(population_description_keys[static_cast<std::size_t>(requested_population_)],population_descriptions[static_cast<std::size_t>(requested_population_)]),bright,body);
+    if(c)text(out,l.summary,trf("SETUP_SUMMARY",{std::string(stellar::core::morphology_name(c->morphology)),std::string(stellar::core::population_state_name(c->resolved_population)),seed_text_},"Type: {0}\nResolved population: {1}\nSeed: {2}\n\nYou can change the seed and galaxy size on the next screen."),muted,body);
   }
-  native_menu_style::button(out,l.back,"BACK",body,l.back.contains(pointer_),true,s);
-  native_menu_style::button(out,l.next,"NEXT",body,l.next.contains(pointer_),page_==SandboxPage::Population||morphology_selected_,s);
+  native_menu_style::button(out,l.back,tr("STARTUP_BACK","BACK"),body,l.back.contains(pointer_),true,s);
+  native_menu_style::button(out,l.next,tr("SETUP_NEXT","NEXT"),body,l.next.contains(pointer_),page_==SandboxPage::Population||morphology_selected_,s);
   if(dropdown_.visible())dropdown_.render(out,l.population,width,height,body);
 }

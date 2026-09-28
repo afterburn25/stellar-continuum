@@ -10,6 +10,15 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
+# Windows PowerShell 5.1 compatibility helpers (see build-release-installer.ps1).
+function Get-RelativePathCompat([string]$Base,[string]$Full){
+    return ($Full.Substring($Base.Length) -replace '^[\\/]+','')
+}
+function Write-Utf8NoBomFile([string]$Path,[string]$Text){
+    $Text=$Text -replace "`r`n","`n"
+    $Text=$Text -replace "`n","`r`n"
+    [IO.File]::WriteAllText($Path,$Text+"`r`n")
+}
 $build = [IO.Path]::GetFullPath($(if([IO.Path]::IsPathRooted($BuildDirectory)){$BuildDirectory}else{Join-Path $repo $BuildDirectory}))
 $stage = [IO.Path]::GetFullPath($(if([IO.Path]::IsPathRooted($OutputDirectory)){$OutputDirectory}else{Join-Path $repo $OutputDirectory}))
 if ($stage -eq $repo -or $stage -eq $build) { throw 'Choose a separate package output directory.' }
@@ -63,9 +72,9 @@ setlocal
 cd /d "%~dp0"
 start "" "%~dp0stellar-continuum-native.exe" --dev-game
 '@
-[IO.File]::WriteAllText((Join-Path $stage 'Play Game.cmd'),$player.Replace("`n","`r`n"))
-[IO.File]::WriteAllText((Join-Path $stage 'Developer Game.cmd'),$developer.Replace("`n","`r`n"))
-[IO.File]::WriteAllText((Join-Path $stage 'README.txt'), @'
+[IO.File]::WriteAllText((Join-Path $stage 'Play Game.cmd'),($player -replace "`r`n","`n" -replace "`n","`r`n"))
+[IO.File]::WriteAllText((Join-Path $stage 'Developer Game.cmd'),($developer -replace "`r`n","`n" -replace "`n","`r`n"))
+$readme = @'
 Stellar Continuum - portable development preview
 
 Extract the entire folder before playing.
@@ -93,21 +102,22 @@ Original artwork remains in the development master library. Verified rejected
 runtime duplicates and superseded generated packages have been cleaned up.
 Large-battle stress coverage and large-save latency still need further work.
 Debug symbols and development tools are excluded from this download.
-'@)
+'@
+[IO.File]::WriteAllText((Join-Path $stage 'README.txt'),($readme -replace "`r`n","`n" -replace "`n","`r`n"))
 # Only runtime files are admitted. Never silently ZIP a development source tree.
 $allowedTop = @('stellar-continuum-native.exe','SDL3.dll','StellarContinuumUninstall.exe','cooked-only.marker','Play Game.cmd','Developer Game.cmd','README.txt','package-files.json','release-manifest.json','Content','Licenses')
 foreach ($item in Get-ChildItem -LiteralPath $stage) {
     if ($item.Name -notin $allowedTop) { throw "Unexpected shipping file: $($item.Name)" }
 }
 $files = @(Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object { $_.Name -ne 'package-files.json' } | Sort-Object FullName | ForEach-Object {
-    @{path=[IO.Path]::GetRelativePath($stage,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
+    @{path=(Get-RelativePathCompat $stage $_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 })
 $versions = Get-Content -LiteralPath (Join-Path $repo 'export/runtime-config.json') -Raw | ConvertFrom-Json
 $packageFiles = @($files | Where-Object {$_.path -like 'Content/*.stpak'})
-$release = @{gameVersion=$versions.gameVersion;engineVersion=$versions.engineVersion;manifestVersion=1;cookerVersion='stellar-cooker-v1.0.0-20260920';platform='windows-x64';profile=$Profile;assetCount=(Get-Content -LiteralPath $validation -Raw | ConvertFrom-Json).assets;runtimeBytes=($files | Where-Object {$_.path -ne 'release-manifest.json'} | Measure-Object bytes -Sum).Sum;packages=$packageFiles}
-$release | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $stage 'release-manifest.json') -Encoding utf8
+$release = @{gameVersion=$versions.gameVersion;engineVersion=$versions.engineVersion;manifestVersion=1;cookerVersion='stellar-cooker-v1.0.0-20260920';platform='windows-x64';profile=$Profile;assetCount=(Get-Content -LiteralPath $validation -Raw | ConvertFrom-Json).assets;runtimeBytes=($files | Where-Object {$_.path -ne 'release-manifest.json'} | ForEach-Object {$_.bytes} | Measure-Object -Sum).Sum;packages=$packageFiles}
+Write-Utf8NoBomFile (Join-Path $stage 'release-manifest.json') ($release | ConvertTo-Json -Depth 6)
 $files = @($files | Where-Object {$_.path -ne 'release-manifest.json'}) + @{path='release-manifest.json';bytes=(Get-Item -LiteralPath (Join-Path $stage 'release-manifest.json')).Length;sha256=(Get-FileHash -LiteralPath (Join-Path $stage 'release-manifest.json')).Hash.ToLowerInvariant()}
-@{profile=$Profile;assets='cooked-only';files=$files} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $stage 'package-files.json') -Encoding utf8
+Write-Utf8NoBomFile (Join-Path $stage 'package-files.json') (@{profile=$Profile;assets='cooked-only';files=$files} | ConvertTo-Json -Depth 6)
 $sizeReport = @{runtimeBytes=(Get-ChildItem -LiteralPath $stage -File -Recurse | Measure-Object Length -Sum).Sum;packages=$packageFiles;previousRuntimeBytes=$null;packageDeltas=@();warnings=@()}
 if ($PreviousReport) {
     $previous = Get-Content -LiteralPath $PreviousReport -Raw | ConvertFrom-Json
@@ -115,12 +125,12 @@ if ($PreviousReport) {
     foreach ($package in $packageFiles) {
         $group=([IO.Path]::GetFileName($package.path) -split '-')[0]
         $before=@($previous.packages | Where-Object {([IO.Path]::GetFileName($_.path) -split '-')[0] -eq $group})
-        $oldBytes=($before | Measure-Object bytes -Sum).Sum
+        $oldBytes=($before | ForEach-Object {$_.bytes} | Measure-Object -Sum).Sum
         $sizeReport.packageDeltas+=@{group=$group;beforeBytes=$oldBytes;afterBytes=$package.bytes;deltaBytes=$package.bytes-$oldBytes}
         if ($oldBytes -gt 0 -and $package.bytes -gt $oldBytes*1.10) {$sizeReport.warnings+="$group grew by more than 10%; review new assets before publishing."}
     }
 }
-$sizeReport | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $repo "work/cooker/$Profile-size-report.json") -Encoding utf8
+Write-Utf8NoBomFile (Join-Path $repo "work/cooker/$Profile-size-report.json") ($sizeReport | ConvertTo-Json -Depth 6)
 # Symbols remain available in a separate developer artifact, never in the game.
 $symbolRoot=Join-Path $repo "work/cooker/symbols/$($versions.gameVersion)"
 New-Item -ItemType Directory -Force -Path $symbolRoot | Out-Null

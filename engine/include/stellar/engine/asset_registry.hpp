@@ -5,11 +5,12 @@
 #include <span>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace stellar::engine {
 enum class AssetState { AcceptedRuntime, SourceOnly, Rejected, QaOnly, EditorOnly, DebugOnly, Deprecated };
-enum class AssetCodec : std::uint32_t { None=0, XpressHuff=1, XpressRgbaDelta=2 };
+enum class AssetCodec : std::uint32_t { None=0, XpressHuff=1, XpressRgbaDelta=2, Lzms=3, LzmsRgbaDelta=4 };
 struct AssetChunk {
   std::string package,hash;
   std::uint64_t offset{},stored_bytes{},raw_bytes{};

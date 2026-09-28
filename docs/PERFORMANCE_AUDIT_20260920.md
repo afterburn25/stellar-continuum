@@ -136,3 +136,41 @@ separate work. Existing cache/draw limits are preserved. Compressed 3D materials
 can still retain decoded CPU pixels alongside GPU-format mip data when required
 by their consumers. This pass does not change schematic orbit spacing or add
 advanced ice reflection/refraction physics.
+
+## Combined late-game scenario measurement — 2026-09-21
+
+`--simulate-adaptive-campaign` now accepts `--autosave-every N` (periodic
+full Player17 capture/encode/atomic-write inside the running campaign) and
+`--stress-fleets N` (injects N additional active military fleets per
+spacefaring civilization, half converging on Sol in interstellar transit).
+The benchmark also enables the existing per-phase profiling counters and
+reports `phaseTimings` per phase (samples/total/mean/max). The campaign now
+seeds via `seed_persistable_fresh_campaign` so the world carries the
+authoritative galactic core and generation metadata required by the real
+save path — same generation, plus metadata.
+
+Reproducible scenario (local Windows release build):
+
+```
+stellar-continuum.exe --headless --simulate-adaptive-campaign --systems 2500
+  --seed 8374837 --ticks 4000 --step-days 0.25 --autosave-every 500
+  --stress-fleets 1000
+```
+
+Result: 1,000 active fleets, 7 research civilizations, 24,000 industry
+allocations, 185 research events over 1,000 simulated days.
+
+| Metric | Measured |
+|---|---:|
+| Simulation step mean / p95 / peak | 2.36 ms / 3.18 ms / 8.85 ms |
+| Autosave (66.7 MB Player17 JSON, capture+encode+atomic write) | mean 1,481 ms, peak 1,516 ms |
+| Dominant phases (total over 4,000 ticks) | adaptive_research 3,742 ms, combat 2,320 ms, automatic_orders 927 ms, construction 855 ms, economy 715 ms |
+
+Read: the combined tick stays far under a 16.6 ms frame budget at this
+scale; a full save is a ~1.5 s backgroundable hitch, not a frame cost.
+Honest limits: no combat engagements fired (fleet transit had not
+converged inside 1,000 days and wars do not start organically in this
+harness), colony counts stay at founding levels (no organic colonization
+events), and the injected fleets are uniform patrol-corvette squadrons,
+not heterogeneous late-game compositions. Combat mass is exercised by the
+per-tick combat scan, not by resolved engagements.

@@ -5,6 +5,7 @@
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/player_campaign_recovery.hpp>
 #include <stellar/core/player_campaign_save.hpp>
+#include <stellar/engine/foundation.hpp>
 
 #include <cstdint>
 #include <filesystem>
@@ -27,6 +28,7 @@ enum class SessionNoticeKind {
   Saved,
   Loaded,
   Recovered,
+  Status,
   Failure,
 };
 
@@ -117,6 +119,18 @@ public:
   [[nodiscard]] bool service(const std::string &saved_at_utc,
                              bool menu_open);
 
+  // Forwards a capture observer onto the live save controller. Reinstall after
+  // service() replaces the live session (replay recording/verification).
+  void set_save_capture_observer(
+      stellar::core::PlayerCampaignCaptureObserver observer);
+
+  // Reference SetStatus: a transient status line for keyboard and
+  // command-driven feedback (candidate cycling, speed changes, rejections).
+  void publish_status(std::string message) {
+    require_owner();
+    notice_ = {SessionNoticeKind::Status, std::move(message), 1.};
+  }
+
 private:
   struct Live;
   struct LoadProgress;
@@ -147,6 +161,9 @@ private:
   NativeCampaignSessionDependencies dependencies_;
   std::thread::id owner_{std::this_thread::get_id()};
   std::unique_ptr<PendingLoad> pending_load_;
+  // Persistent tagged worker for campaign load instead of a fresh std::async
+  // thread per request.
+  stellar::engine::JobSystem load_jobs_{1};
   SessionNotice notice_;
   bool save_requested_{};
   bool exit_requested_{};

@@ -331,7 +331,8 @@ void generate_planet_appearances(std::int64_t seed,std::span<const StellarSystem
  for(auto& b:bodies){if(b.appearance){migrate_giant_appearance(b);continue;}const auto it=stars.find(b.system_id);
   // Canonical material identity is known even in legacy spectral-only Sol saves.
   if(b.system_id==sol_system_id){b.appearance=planet_appearance_for_existing(static_cast<std::uint64_t>(seed),b,it==stars.end()?nullptr:it->second);continue;}
-  if(it==stars.end())continue;const auto& star=*it->second;
+  if(it==stars.end()){b.appearance=planet_appearance_for_existing(static_cast<std::uint64_t>(seed),b,nullptr);continue;}
+  const auto& star=*it->second;
   const bool cold_hydrocarbon=b.environment.available_solvent==PlanetarySolventRegime::Hydrocarbon&&b.environment.temperature_kelvin>=70&&b.environment.temperature_kelvin<165;
   if(b.system_id==sol_system_id||b.legacy_colonization_candidate||b.has_pre_warp_civilization||cold_hydrocarbon){b.appearance=planet_appearance_for_existing(static_cast<std::uint64_t>(seed),b,&star);continue;}
   const auto choices=planet_class_eligibility(b,star);double total=0;for(const auto& c:choices)total+=c.weight;

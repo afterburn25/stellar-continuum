@@ -11,11 +11,13 @@
 // state; the host applies each emitted payload through the Window setters
 // and owns the rollback deadline.
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace stellar::native_video_settings {
@@ -103,6 +105,9 @@ public:
   [[nodiscard]] bool confirming() const noexcept { return confirming_; }
   void set_confirming(bool confirming) noexcept { confirming_ = confirming; dropdown_.close(); }
   void set_error(std::string message);
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
 
   [[nodiscard]] VideoSettingsResult
   handle(const stellar::native_map::InputEvent &event, int width, int height);
@@ -114,8 +119,13 @@ private:
   void open_choice(int index);
   void select_choice(int index, int option) noexcept;
   void reconcile_resolution() noexcept;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string trf(std::string_view key, std::string_view arg,
+                                std::string_view fallback) const;
 
   bool visible_{};
+  const stellar::engine::LocalizationTable *locale_{};
   stellar::native_ui::Dropdown dropdown_;
   bool confirming_{};
   stellar::native_map::Point pointer_{};

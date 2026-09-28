@@ -1,6 +1,7 @@
 #pragma once
 
 #include "native_support.hpp"
+#include <stellar/engine/foundation.hpp>
 #include <deque>
 #include <functional>
 #include <future>
@@ -10,8 +11,9 @@
 namespace stellar::native_support {
 enum class SupportExportState { Idle, Working, Succeeded, Failed };
 
-// Main-thread service: one immutable request owns one background writer.
-// No automatic retries, pending queue, simulation access or per-frame disk IO.
+// Main-thread service: one immutable request owns one background writer on the
+// engine JobSystem. No automatic retries, pending queue, simulation access or
+// per-frame disk IO.
 class NativeSupportService final {
  public:
   using Writer = std::function<std::filesystem::path(const SupportBundleRequest&)>;
@@ -29,6 +31,8 @@ class NativeSupportService final {
   Writer writer_;
   std::deque<std::string> log_;
   std::future<std::filesystem::path> worker_;
+  std::future<void> worker_status_;
+  stellar::engine::JobSystem jobs_{1};
   SupportExportState state_{};
   std::filesystem::path result_;
   std::string error_;

@@ -180,11 +180,41 @@ void centered(DrawList &out, UiRect bounds, std::string value, Color color,
   return "KNOWN";
 }
 
+[[nodiscard]] const char *maturity_key(stellar::core::ResearchMaturity value) {
+  using stellar::core::ResearchMaturity;
+  switch (value) {
+  case ResearchMaturity::rumored:
+    return "RESEARCH_MATURITY_RUMORED";
+  case ResearchMaturity::hypothesized:
+    return "RESEARCH_MATURITY_HYPOTHESIZED";
+  case ResearchMaturity::investigable:
+    return "RESEARCH_MATURITY_INVESTIGABLE";
+  case ResearchMaturity::experimental:
+    return "RESEARCH_MATURITY_EXPERIMENTAL";
+  case ResearchMaturity::demonstrated:
+    return "RESEARCH_MATURITY_DEMONSTRATED";
+  case ResearchMaturity::engineering:
+    return "RESEARCH_MATURITY_ENGINEERING";
+  case ResearchMaturity::mature:
+    return "RESEARCH_MATURITY_MATURE";
+  case ResearchMaturity::archived:
+    return "RESEARCH_MATURITY_ARCHIVED";
+  }
+  return "RESEARCH_MATURITY_KNOWN";
+}
+
 [[nodiscard]] std::string node_state(const NativeResearchNode &node) {
   if (node.cancelled) return "CANCELLED · WORK RETAINED";
   if (node.active)
     return node.paused ? "PAUSED PROGRAM" : "ACTIVE PROGRAM";
   return maturity(node.maturity);
+}
+
+[[nodiscard]] const char *node_state_key(const NativeResearchNode &node) {
+  if (node.cancelled) return "RESEARCH_STATE_CANCELLED";
+  if (node.active)
+    return node.paused ? "RESEARCH_STATE_PAUSED" : "RESEARCH_STATE_ACTIVE";
+  return maturity_key(node.maturity);
 }
 
 [[nodiscard]] std::string action_label(NativeResearchIntent intent) {
@@ -217,6 +247,19 @@ void erase_last_utf8(std::string &value) {
                              : static_cast<char>(character);
   });
   return value;
+}
+
+[[nodiscard]] const char *action_key(NativeResearchIntent intent) {
+  switch (intent) {
+  case NativeResearchIntent::Start:
+    return "RESEARCH_ACTION_BEGIN";
+  case NativeResearchIntent::Pause:
+    return "RESEARCH_ACTION_PAUSE";
+  case NativeResearchIntent::Resume:
+    return "RESEARCH_ACTION_RESUME";
+  default:
+    return "";
+  }
 }
 
 [[nodiscard]] bool matches_query(const NativeResearchNode &node,
@@ -258,6 +301,30 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
   l.action={iw+12*s,height-106*s,inspector_width-24*s,38*s};
   l.bookmark={iw+12*s,height-58*s,(inspector_width-32*s)*.5f,36*s};l.enqueue={l.bookmark.x+l.bookmark.width+8*s,l.bookmark.y,l.bookmark.width,36*s};
   l.feedback={iw+12*s,l.action.y-36*s,inspector_width-24*s,30*s};l.tree_focus={iw+12*s,body+34*s,inspector_width-24*s,20*s};return l;
+}
+
+std::string NativeResearchWorkspace::tr(std::string_view key,
+                                        std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+std::string NativeResearchWorkspace::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
 }
 
 void NativeResearchWorkspace::open() {
@@ -670,14 +737,26 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
   fill(out, layout.surface, background);
   fill(out,{layout.title.x,layout.title.y+2*layout.scale,3*layout.scale,50*layout.scale},{66,207,255,255});
   auto research_title=layout.title;research_title.x+=16*layout.scale;
-  text(out, research_title, "RESEARCH", {151,222,255,255}, layout.title_font_pixels,
+  text(out, research_title, tr("RESEARCH_TITLE", "RESEARCH"),
+       {151,222,255,255}, layout.title_font_pixels,
        TextAlign::Left, FontFace::Heading);
   if (window_) {
-    auto summary = fixed(window_->free_effective_labs) + " / " +
-                   fixed(window_->total_effective_labs) +
-                   " effective labs free  ·  " + std::to_string(window_->active_program_count) + (window_->lab_capacity_only?" active programs · lab capacity limited":" / "+std::to_string(window_->maximum_programs.value_or(0))+" research slots");
+    auto summary = trf(
+        "RESEARCH_LABS_SUMMARY",
+        {fixed(window_->free_effective_labs), fixed(window_->total_effective_labs),
+         std::to_string(window_->active_program_count),
+         window_->lab_capacity_only
+             ? tr("RESEARCH_LAB_LIMITED",
+                  " active programs · lab capacity limited")
+             : trf("RESEARCH_RESEARCH_SLOTS",
+                   {std::to_string(
+                       window_->maximum_programs.value_or(0))},
+                   " / {0} research slots")},
+        "{0} / {1} effective labs free  ·  {2}{3}");
     if (window_->formatted_treasury)
-      summary = *window_->formatted_treasury + " treasury  |  " + summary;
+      summary = trf("RESEARCH_TREASURY_PREFIX", {*window_->formatted_treasury},
+                    "{0} treasury  |  ") +
+                summary;
     text(out, layout.labs, std::move(summary), muted, layout.small_font_pixels);
   }
   stellar::engine::ui_skin::control(out,layout.search,false,search_focused_,true,layout.scale);
@@ -686,11 +765,14 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
         layout.search.y + 9.f * layout.scale,
         layout.search.width - 20.f * layout.scale,
         layout.search.height - 10.f * layout.scale},
-       query_.search.empty() ? "Search technology, effects, unlocks…" : query_.search,
+       query_.search.empty()
+           ? tr("RESEARCH_SEARCH_HINT",
+                "Search technology, effects, unlocks…")
+           : query_.search,
        query_.search.empty() ? muted : bright, layout.body_font_pixels);
   stellar::engine::ui_skin::control(out,layout.close,layout.close.contains(pointer_),false,true,layout.scale);
-  centered(out, layout.close, "CLOSE", bright, layout.body_font_pixels,
-           layout.scale);
+  centered(out, layout.close, tr("RESEARCH_CLOSE", "CLOSE"), bright,
+           layout.body_font_pixels, layout.scale);
 
   if (window_) {
     for (const auto &tab : layout.tabs) {
@@ -725,7 +807,8 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
          {layout.graph.x + 24.f * layout.scale,
           layout.graph.y + 24.f * layout.scale,
           layout.graph.width - 48.f * layout.scale, 40.f * layout.scale},
-         "Building the known research view...", muted, layout.body_font_pixels);
+         tr("RESEARCH_BUILDING_VIEW", "Building the known research view..."),
+         muted, layout.body_font_pixels);
     return;
   }
   if (mode_==ResearchViewMode::Tree&&placements_.empty()) {
@@ -733,7 +816,8 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
          {layout.graph.x + 24.f * layout.scale,
           layout.graph.y + 24.f * layout.scale,
           layout.graph.width - 48.f * layout.scale, 60.f * layout.scale},
-         "No known research matches this view.", muted,
+         tr("RESEARCH_NO_MATCH", "No known research matches this view."),
+         muted,
          layout.body_font_pixels);
   }
 
@@ -806,7 +890,8 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
                  {thumbnail.x + thumbnail.width + 9.f * card_scale,
                   bounds.y + 92.f * card_scale,
                   bounds.width - thumbnail.width - 26.f * card_scale, 20.f * card_scale},
-                 clipping, node_state(node), node.active ? positive : muted,
+                 clipping, tr(node_state_key(node), node_state(node)),
+                 node.active ? positive : muted,
                  std::max(8, static_cast<int>(std::lround(layout.small_font_pixels * zoom_))));
     const auto progress =
         static_cast<float>(std::clamp(node.total_progress, 0., 1.));
@@ -825,12 +910,15 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
   const auto inspector_width = layout.inspector.width - 28.f * layout.scale;
   auto inspector_y = layout.inspector.y + 14.f * layout.scale;
   text(out, {inspector_x, inspector_y, inspector_width, 18.f * layout.scale},
-       "SELECTED TECHNOLOGY", muted, layout.small_font_pixels);
+       tr("RESEARCH_SELECTED_TECHNOLOGY", "SELECTED TECHNOLOGY"), muted,
+       layout.small_font_pixels);
   inspector_y += 42.f * layout.scale;
   const auto *node = selected_node();
   if (!node) {
     text(out, {inspector_x, inspector_y, inspector_width, 60.f * layout.scale},
-         "Select a known program to inspect its current details.", muted,
+         tr("RESEARCH_SELECT_HINT",
+            "Select a known program to inspect its current details."),
+         muted,
          layout.body_font_pixels);
     dropdown_.render(out,dropdown_.id()==1?layout.filter:dropdown_.id()==2?layout.sort:layout.toolbar,width,height,layout.small_font_pixels);
     return;
@@ -845,7 +933,7 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
   const float name_height=text_measurer_?static_cast<float>(text_measurer_(name_probe).height):56*layout.scale;
   text(out,{inspector_x,inspector_y,inspector_width,std::max(56*layout.scale,name_height)},node->display_name,bright,layout.title_font_pixels);inspector_y+=std::max(56*layout.scale,name_height)+6*layout.scale;
   text(out, {inspector_x, inspector_y, inspector_width, 22.f * layout.scale},
-       node->domain_label + "  |  " + node_state(*node),
+       node->domain_label + "  |  " + tr(node_state_key(*node), node_state(*node)),
        node->active ? positive : muted, layout.small_font_pixels);
   inspector_y += 27.f * layout.scale;
   fill(out, {inspector_x, inspector_y, inspector_width, 7.f * layout.scale},
@@ -857,13 +945,17 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
         7.f * layout.scale},
        positive);
   inspector_y += 17.f * layout.scale;
-  auto progress_text =
-      "Progress " + fixed(node->total_progress * 100., 0) + "%";
+  auto progress_text = trf("RESEARCH_PROGRESS",
+                           {fixed(node->total_progress * 100., 0)},
+                           "Progress {0}%");
   if (node->active)
-    progress_text += "  |  " + fixed(node->assigned_effective_labs) + " labs";
+    progress_text += trf("RESEARCH_LABS_SUFFIX",
+                         {fixed(node->assigned_effective_labs)},
+                         "  |  {0} labs");
   else if (node->cost)
-    progress_text += "  |  Planned staffing " +
-                     fixed(node->cost->assigned_effective_labs) + " labs";
+    progress_text += trf("RESEARCH_PLANNED_STAFFING",
+                         {fixed(node->cost->assigned_effective_labs)},
+                         "  |  Planned staffing {0} labs");
   text(out, {inspector_x, inspector_y, inspector_width, 20.f * layout.scale},
        std::move(progress_text), muted, layout.small_font_pixels);
   inspector_y += 28.f * layout.scale;
@@ -875,38 +967,47 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
     std::string node_id;
   };
   std::vector<InspectorBlock> details;
-  if (node->cancelled) details.push_back({"RESTARTING THIS PROGRAM\nRetained progress resumes in its original context. New authorization and milestone funding are required.", muted});
-  if (!node->purpose.empty()) details.push_back({"WHAT IT DOES\n" + node->purpose, bright});
-  if (!node->benefits.empty()) details.push_back({"WHAT THIS CHANGES\n" + node->benefits, bright});
-  if (node->active) details.push_back({"CANCELLATION\n" + node->cancel_action.reason, muted});
-  if(!node->recommendation_reasons.empty()){std::string why="RECOMMENDED BECAUSE";for(const auto& reason:node->recommendation_reasons)why+="\n• "+reason;details.push_back({std::move(why),warning});}
-  for(const auto& edge:window_->edges)if(edge.to_id==node->id||edge.from_id==node->id){const bool prerequisite=edge.to_id==node->id;const auto id=prerequisite?edge.from_id:edge.to_id;const auto other=std::ranges::find(window_->nodes,id,&NativeResearchNode::id);if(other!=window_->nodes.end())details.push_back({(prerequisite?"REQUIRES\n":"LEADS TO\n")+std::string(other->maturity>=stellar::core::ResearchMaturity::mature?"✓ ":"› ")+other->display_name,prerequisite&&other->maturity<stellar::core::ResearchMaturity::mature?warning:positive,0,id});}
+  if (node->cancelled) details.push_back({tr("RESEARCH_RESTARTING","RESTARTING THIS PROGRAM\nRetained progress resumes in its original context. New authorization and milestone funding are required."), muted});
+  if (!node->purpose.empty()) details.push_back({tr("RESEARCH_WHAT_IT_DOES","WHAT IT DOES") + "\n" + node->purpose, bright});
+  if (!node->benefits.empty()) details.push_back({tr("RESEARCH_WHAT_CHANGES","WHAT THIS CHANGES") + "\n" + node->benefits, bright});
+  if (node->active) details.push_back({tr("RESEARCH_CANCELLATION","CANCELLATION") + "\n" + node->cancel_action.reason, muted});
+  if(!node->recommendation_reasons.empty()){std::string why=tr("RESEARCH_RECOMMENDED","RECOMMENDED BECAUSE");for(const auto& reason:node->recommendation_reasons)why+="\n• "+reason;details.push_back({std::move(why),warning});}
+  for(const auto& edge:window_->edges)if(edge.to_id==node->id||edge.from_id==node->id){const bool prerequisite=edge.to_id==node->id;const auto id=prerequisite?edge.from_id:edge.to_id;const auto other=std::ranges::find(window_->nodes,id,&NativeResearchNode::id);if(other!=window_->nodes.end())details.push_back({(prerequisite?tr("RESEARCH_REQUIRES","REQUIRES"):tr("RESEARCH_LEADS_TO","LEADS TO"))+"\n"+std::string(other->maturity>=stellar::core::ResearchMaturity::mature?"✓ ":"› ")+other->display_name,prerequisite&&other->maturity<stellar::core::ResearchMaturity::mature?warning:positive,0,id});}
   if (node->research_points > 0.)
-    details.push_back({"RESEARCH WORK\n" + fixed(node->research_points, 0) + " RP", muted});
+    details.push_back({trf("RESEARCH_WORK", {fixed(node->research_points, 0)},
+                           "RESEARCH WORK\n{0} RP"),
+                       muted});
   if (!node->active && node->maturity >= stellar::core::ResearchMaturity::mature)
-    details.push_back({"COMPLETED\nEstablished knowledge has no ongoing program cost and is not charged again.", positive});
+    details.push_back({tr("RESEARCH_COMPLETED",
+                          "COMPLETED\nEstablished knowledge has no ongoing "
+                          "program cost and is not charged again."),
+                       positive});
   if (node->cost) {
     const auto &cost = *node->cost;
-    auto value = "COST & TIME\nAuthorization " + cost.formatted_authorization +
-                 "\nMilestones " + cost.formatted_milestone_commitment +
-                 "\nOperations " + cost.formatted_operating_cost_rate +
-                 "\nEstimated total " + cost.formatted_estimated_total +
-                 "\nReserve to start " +
-                 cost.formatted_credits_needed_to_start + "\n";
+    auto value = trf(
+        "RESEARCH_COST_TIME",
+        {cost.formatted_authorization, cost.formatted_milestone_commitment,
+         cost.formatted_operating_cost_rate, cost.formatted_estimated_total,
+         cost.formatted_credits_needed_to_start},
+        "COST & TIME\nAuthorization {0}\nMilestones {1}\nOperations {2}\n"
+        "Estimated total {3}\nReserve to start {4}\n");
     value += std::isfinite(cost.estimated_years_at_full_funding)
-                 ? "At full funding " +
-                       stellar::native_campaign::format_campaign_duration(cost.estimated_years_at_full_funding * 365.25)
-                 : "Staffed duration unavailable";
+                 ? trf("RESEARCH_FULL_FUNDING",
+                       {stellar::native_campaign::format_campaign_duration(
+                           cost.estimated_years_at_full_funding * 365.25)},
+                       "At full funding {0}")
+                 : tr("RESEARCH_DURATION_UNAVAILABLE",
+                      "Staffed duration unavailable");
     details.push_back({std::move(value), bright});
   }
   if (!node->known_capabilities.empty()) {
-    std::string value = "KNOWN CAPABILITIES\n";
+    std::string value = tr("RESEARCH_KNOWN_CAPABILITIES", "KNOWN CAPABILITIES") + "\n";
     for (const auto &capability : node->known_capabilities)
       value += capability.display_name + "\n";
     details.push_back({std::move(value), bright});
   }
   if (!node->blockers.empty()) {
-    std::string value = "REQUIREMENTS / STATUS\n";
+    std::string value = tr("RESEARCH_REQUIREMENTS_STATUS", "REQUIREMENTS / STATUS") + "\n";
     for (const auto &blocker : node->blockers)
       value += blocker + "\n";
     details.push_back({std::move(value), warning});
@@ -915,11 +1016,14 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
       std::ranges::find(node->blockers, node->primary_action.reason) ==
           node->blockers.end()) {
     details.push_back(
-        {"ACTION STATUS\n" + node->primary_action.reason, warning});
+        {tr("RESEARCH_ACTION_STATUS", "ACTION STATUS") + "\n" +
+             node->primary_action.reason,
+         warning});
   }
   if (!notice_.empty()) {
     details.push_back(
-        {"PROGRAM NOTICE\n" + notice_, notice_accepted_ ? positive : failure});
+        {tr("RESEARCH_PROGRAM_NOTICE", "PROGRAM NOTICE") + "\n" + notice_,
+         notice_accepted_ ? positive : failure});
   }
   const auto details_end = layout.feedback.y - 6.f * layout.scale;
   const UiRect details_clip{inspector_x, inspector_y, inspector_width,
@@ -987,7 +1091,7 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
           2.f * layout.scale, thumb},
          muted);
   }
-  const auto action_text = node->cancelled && node->primary_action.intent == NativeResearchIntent::Start ? std::string("Restart research") : action_label(node->primary_action.intent);
+  const auto action_text = node->cancelled && node->primary_action.intent == NativeResearchIntent::Start ? tr("RESEARCH_ACTION_RESTART", "Restart research") : tr(action_key(node->primary_action.intent), action_label(node->primary_action.intent));
   if (!action_text.empty()) {
     const auto enabled = node->primary_action.enabled;
     stellar::engine::ui_skin::control(out,layout.action,layout.action.contains(pointer_),enabled,enabled,layout.scale);
@@ -996,10 +1100,13 @@ void NativeResearchWorkspace::render(DrawList &out, int width, int height) {
   }
   const auto feedback_text =
       !notice_.empty() ? notice_accepted_
-                             ? "Program updated. Scroll for details."
-                             : "Action unavailable. Scroll for details."
+                             ? tr("RESEARCH_PROGRAM_UPDATED",
+                                  "Program updated. Scroll for details.")
+                             : tr("RESEARCH_ACTION_UNAVAILABLE",
+                                  "Action unavailable. Scroll for details.")
       : !node->primary_action.enabled && !node->primary_action.reason.empty()
-          ? "Action unavailable. Scroll for details."
+          ? tr("RESEARCH_ACTION_UNAVAILABLE",
+               "Action unavailable. Scroll for details.")
           : std::string{};
   if (!feedback_text.empty())
     text(out, layout.feedback, feedback_text,

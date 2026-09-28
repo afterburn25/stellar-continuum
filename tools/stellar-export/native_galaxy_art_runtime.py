@@ -7,7 +7,9 @@ import json
 
 NATIVE_GALAXY_ART_SOURCES = {
     key: (f"assets/visual/space/{key}.png", f"assets/visual/space/{key}.png")
-    for key in ('deep-field-v3', 'spiral-galaxy-v3', 'regional-nebula-b', 'star-background')
+    for key in ('deep-field-v3', 'spiral-galaxy-v3', 'regional-nebula-b',
+                'star-background', 'deep-field-v2', 'milky-way-layer-v2',
+                'campaign-galaxy-four-arm-v1')
 }
 NATIVE_GALAXY_ART_SOURCES["credits"] = (
     "docs/engine/NATIVE_GALAXY_ART_SOURCES.md", "Licenses/Galaxy-art-sources.md")

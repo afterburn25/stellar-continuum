@@ -8,9 +8,11 @@
 #include "native_system_travel.hpp"
 #include "native_celestial_appearance.hpp"
 #include "native_settlement_preparation.hpp"
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
@@ -84,6 +86,9 @@ public:
   void inspect_small_body(std::size_t field,std::uint32_t body=0){small_body_field_=field;small_body_index_=body;small_body_panel_=true;}
   void focus_small_body(int width,int height);
   const auto& small_body_statistics()const{return small_bodies_.statistics();}
+  // The exact solids scene the small-body renderer submitted this frame;
+  // other Scene3DViews in the frame (sky dome, planet globes) are separate.
+  [[nodiscard]] std::shared_ptr<const stellar::native_map::Scene3D> small_body_scene()const{return small_bodies_.last_scene();}
   void use_background_preparation(std::shared_ptr<stellar::native_map::ImagePreparationQueue>);
   [[nodiscard]] bool artwork_ready() const noexcept{return artwork_ready_;}
   void open(stellar::native_system::NativeSystemSnapshot,int width,int height);
@@ -96,11 +101,16 @@ public:
   [[nodiscard]] const auto &settlement_preparation() const noexcept { return preparation_; }
   void set_settlement_status(std::optional<NativeSystemSettlementStatus> value);
   void set_notice(std::string);
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept { locale_ = table; body_inspection_.set_localization(table); }
   void close() noexcept;
   void discard_campaign() noexcept;
   [[nodiscard]] bool visible()const noexcept{return snapshot_.has_value();}
   [[nodiscard]] std::optional<int> system_id()const noexcept;
   [[nodiscard]] std::optional<int> selected_body_id()const noexcept{return selected_body_id_;}
+  [[nodiscard]] std::optional<stellar::core::SmallBodyInstance> focused_small_body()const{
+    if(!snapshot_||!small_body_focus_||snapshot_->small_body_fields.empty())return std::nullopt;
+    const auto& f=snapshot_->small_body_fields[small_body_field_%snapshot_->small_body_fields.size()];
+    return stellar::core::small_body_instance(f,small_body_index_%f.visible_count);}
   [[nodiscard]] std::optional<std::uint64_t> campaign_generation()const noexcept;
   [[nodiscard]] std::optional<stellar::core::SystemSurveyLevel> survey_level()const noexcept;
   [[nodiscard]] const stellar::native_system::SystemSpatialViewport *viewport()const noexcept;
@@ -135,6 +145,11 @@ private:
   [[nodiscard]] const stellar::native_system::NativeSystemBody *selected_body()const noexcept;
   [[nodiscard]] const stellar::native_system_travel::NativeLocalFleetMarker *selected_fleet()const noexcept;
   [[nodiscard]] std::vector<int> fleet_hits(stellar::native_map::Point)const;
+  [[nodiscard]] std::string tr(std::string_view key, std::string_view fallback) const;
+  [[nodiscard]] std::string trf(std::string_view key,
+                                std::initializer_list<std::string> args,
+                                std::string_view fallback) const;
+  const stellar::engine::LocalizationTable *locale_{};
   StellarArtProvider stellar_art_;
   StellarActivityProvider stellar_activity_;
   stellar::native_planets::MaterialProvider planet_materials_;

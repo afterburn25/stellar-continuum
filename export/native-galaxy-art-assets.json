@@ -85,6 +85,21 @@
       "source": "assets/visual/space/star-background.png",
       "runtimePath": "assets/visual/space/star-background.png",
       "sha256": "7e48914134e12b7498499a20202773f4382b88dc5809ee0e945f4d0b12b57406"
+    },
+    "campaign-galaxy-four-arm-v1": {
+      "source": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
+      "runtimePath": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
+      "sha256": "f250eabcf2d70197bfacc419fc761e544d3b7d9fbdee15b267a7094936aca6b9"
+    },
+    "deep-field-v2": {
+      "source": "assets/visual/space/deep-field-v2.png",
+      "runtimePath": "assets/visual/space/deep-field-v2.png",
+      "sha256": "d186ea8de9918208efcae61b6eefa93b9725e73ddeeb123c3f21351c79890ce5"
+    },
+    "milky-way-layer-v2": {
+      "source": "assets/visual/space/milky-way-layer-v2.png",
+      "runtimePath": "assets/visual/space/milky-way-layer-v2.png",
+      "sha256": "c9b207419192e7575c63036d0e89ba91e769b72bdc7f14c8c4527ac8e0656fb5"
     }
   }
 }

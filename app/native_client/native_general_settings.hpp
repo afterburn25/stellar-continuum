@@ -3,11 +3,14 @@
 #include "native_dropdown.hpp"
 
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/localization.hpp>
 #include <filesystem>
 #include <array>
 #include <functional>
+#include <initializer_list>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace stellar::native_general {
 // Application preference only. Empty means the platform Pictures default.
@@ -17,6 +20,9 @@ struct GeneralPreferences final {
   bool assets_hidden{};
   int eruption_quality{2}; // Low / Medium / High / Ultra; rendering only.
   int nebula_density{1}; // Low / Medium / High; presentation only.
+  // Accessibility: pauses decorative motion (system tumble, planet spin,
+  // eruption animation) without touching simulation or authoritative clocks.
+  bool reduce_motion{};
   bool operator==(const GeneralPreferences&) const = default;
 };
 struct GeneralSettingsLayout final {
@@ -25,6 +31,7 @@ struct GeneralSettingsLayout final {
   stellar::native_map::UiRect panel, audio, video, folder, status;
   stellar::native_map::UiRect browse, defaults, cancel, save;
   stellar::native_map::UiRect nebula,eruptions;
+  stellar::native_map::UiRect motion;
   [[nodiscard]] static GeneralSettingsLayout for_viewport(int width,int height) noexcept;
 };
 class NativeGeneralSettings final {
@@ -45,6 +52,8 @@ class NativeGeneralSettings final {
   void set_default_directory(std::filesystem::path value) { default_directory_=std::move(value); }
   void set_text_measurer(Measure measure) { measure_=std::move(measure); }
   void set_navigation(Navigate audio,Navigate video) { audio_=std::move(audio);video_=std::move(video); }
+  // Borrowed; the owner must outlive this view. Null keeps literal English.
+  void set_localization(const stellar::engine::LocalizationTable* table){locale_=table;}
   void open();
   void cancel();
   [[nodiscard]] bool visible() const noexcept { return visible_; }
@@ -57,6 +66,8 @@ class NativeGeneralSettings final {
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
   stellar::native_ui::Dropdown nebula_dropdown_,eruption_dropdown_;
   [[nodiscard]] stellar::native_map::Text path_text(const GeneralSettingsLayout&) const;
+  [[nodiscard]] std::string tr(std::string_view key,std::string_view fallback)const;
+  [[nodiscard]] std::string trf(std::string_view key,std::initializer_list<std::string> args,std::string_view fallback)const;
   std::filesystem::path path_,default_directory_;
   GeneralPreferences saved_,draft_;
   std::string error_;
@@ -64,6 +75,7 @@ class NativeGeneralSettings final {
   Apply apply_;
   Navigate audio_,video_;
   Measure measure_;
+  const stellar::engine::LocalizationTable* locale_{};
   mutable std::string cached_path_source_,cached_path_lines_;
   mutable float cached_path_width_{};
   mutable int cached_path_font_{};

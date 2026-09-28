@@ -2,6 +2,7 @@
 #include "campaign_diagnostic_monitor.hpp"
 #include "diagnostic_zip_test_reader.hpp"
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/runtime_paths.hpp>
 #include <chrono>
 #include <iostream>
@@ -25,6 +26,8 @@ int main(int argc,char **argv)try{
   monitor.observe(frame,{},stamp);
   check(monitor.invariant_checks()==1&&monitor.history().records().size()==1,"Native monitor did not initialize with current-state inspection.");
   monitor.observe(frame,{},stamp);check(monitor.invariant_checks()==1&&monitor.history().records().size()==1,"Paused rendering spammed diagnostics.");
+  const auto memory_id=stellar::engine::MemoryTracker::instance().register_subsystem("test-subsystem");
+  stellar::engine::MemoryTracker::instance().report(memory_id,1234,4096);
   const auto entries=capture_developer_report(frame,{"test","engine-test","commit-test",hash},stamp,&monitor.history());
   check(before==capture_developer_campaign_json(frame.runtime(),{0,"test",stamp}),"Report modified authoritative campaign.");
   const auto root=fs::path(argv[3])/std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
@@ -39,6 +42,9 @@ int main(int argc,char **argv)try{
   check(restored.simulation_days()==0,"Exported checkpoint cannot be restored.");
   check(Json::parse(files.at("coverage.json"))["objects"].size()>=250,"Coverage omitted real celestial objects.");
   check(files.at("errors.jsonl").empty()&&files.at("performance.csv").starts_with("phase,samples,"),"Findings/performance artifacts missing.");
+  const auto memory_json=Json::parse(files.at("memory.json"));
+  bool tracked=false;for(const auto &s:memory_json["subsystems"])if(s["name"]=="test-subsystem"&&s["currentBytes"]==1234&&s["reservedBytes"]==4096)tracked=true;
+  check(tracked,"Diagnostic bundle omitted the tracked subsystem memory report.");
   // Resume after capture; the exported bytes must remain at their capture tick.
   frame.set_profiling_enabled(true);frame.clock().set_speed(StrategicSpeed::Normal);
   const auto result=frame.advance(.25);monitor.observe(frame,result,stamp);
@@ -76,5 +82,6 @@ int main(int argc,char **argv)try{
       Json::parse(partial.at("session.json"))["checkpointIncluded"]==false&&
       Json::parse(partial.at("replay.json"))["continuationSupported"]==false,"Failed checkpoint capture discarded evidence or promised replay.");
   monitor.reset();check(monitor.history().records().empty()&&monitor.invariant_checks()==0,"Monitor leaked history across campaigns.");
+  {std::error_code cleanup;fs::remove_all(root,cleanup);}// retain run dir only on failure
   std::cout<<"Developer diagnostic snapshot/checkpoint/archive checks passed\n";return 0;
 }catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}

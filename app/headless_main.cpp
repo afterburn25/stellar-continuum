@@ -122,7 +122,8 @@ int run(int argc, char **argv) {
         arg == "--catalog-output" || arg == "--civilizations" ||
         arg == "--ancients" || arg == "--player-species" ||
         arg == "--step-days" || arg=="--output" || arg=="--years" ||
-        arg=="--speed" || arg=="--checkpoint-days" || arg=="--log-level") {
+        arg=="--speed" || arg=="--checkpoint-days" || arg=="--log-level" ||
+        arg == "--autosave-every" || arg == "--stress-fleets") {
       require(i + 1 < argc, "Missing option value");
       ++i;
     }
@@ -163,7 +164,7 @@ int run(int argc, char **argv) {
              "[--repeat 1] [--catalog-output new-file]\nAdaptive campaign "
              "simulation: --headless --simulate-adaptive-campaign [--systems "
              "500] [--seed 8374837] [--ticks 40] [--step-days 0.25] "
-             "[--repeat 1] [--catalog-output new-file]\nCampaign simulation "
+             "[--repeat 1] [--autosave-every N] [--catalog-output new-file]\nCampaign simulation "
              "output is deterministic diagnostic data, not a player save.\n";
       return 0;
     }

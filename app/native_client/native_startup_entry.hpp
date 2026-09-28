@@ -18,6 +18,7 @@ namespace stellar::native_audio { class NativeAudioSettings; }
 namespace stellar::native_general { class NativeGeneralSettings; }
 namespace stellar::native_settings { class NativeSettingsHub; }
 namespace stellar::native_audio { class NativeVoiceSettings; }
+namespace stellar::engine { class LocalizationTable; }
 namespace stellar::native_startup_ui {
 struct StartupAudioHooks {
   std::function<void()> service, menu_ready, confirm;
@@ -38,6 +39,7 @@ struct StartupEntryConfig {
   stellar::native_audio::NativeVoiceSettings* voice_settings{};
   std::function<void(stellar::native_map::DrawList&,int,int)> caption;
   stellar::engine::DeveloperAccess *developer_access{};
+  const stellar::engine::LocalizationTable *locale{};
 };
 enum class StartupEntryAutomationAction { Create, ReturnToCampaign, Exit };
 struct StartupEntryAutomation {

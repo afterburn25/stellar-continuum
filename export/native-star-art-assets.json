@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "star-a-white": {
+      "source": "assets/visual/stars/star-a-white.png",
+      "runtimePath": "assets/visual/stars/star-a-white.png",
+      "sha256": "d78305289c43d3d713e81b959e797801d9c36907bb45ae3bdc0e60df5750a672"
+    },
+    "star-f-dwarf": {
+      "source": "assets/visual/stars/star-f-dwarf.png",
+      "runtimePath": "assets/visual/stars/star-f-dwarf.png",
+      "sha256": "e5ccc40b63abcb16e111c4a7a8195815c2c8c1f0543c545c9dd9f8d908c48120"
+    },
+    "star-g-dwarf": {
+      "source": "assets/visual/stars/star-g-dwarf.png",
+      "runtimePath": "assets/visual/stars/star-g-dwarf.png",
+      "sha256": "53197625b375a1f5ea3427e76e9567929289336e397b3de6bd9abe1447919177"
+    },
+    "star-giant": {
+      "source": "assets/visual/stars/star-giant.png",
+      "runtimePath": "assets/visual/stars/star-giant.png",
+      "sha256": "03f48eed604488a07fa514edb1c9dff3fb3e496d8aeaceb16bcbc329a629f7ba"
+    },
+    "star-hot-blue": {
+      "source": "assets/visual/stars/star-hot-blue.png",
+      "runtimePath": "assets/visual/stars/star-hot-blue.png",
+      "sha256": "8c7ba2579fa2119186e1d0e95bd2769b0a019ed5978e0c9ce26d2de42b7ece4b"
+    },
+    "star-k-dwarf": {
+      "source": "assets/visual/stars/star-k-dwarf.png",
+      "runtimePath": "assets/visual/stars/star-k-dwarf.png",
+      "sha256": "12b6e7a8540cf936e26c4fe933657d024197e6fd781062776fdceeaf384e36cc"
+    },
+    "star-m-dwarf": {
+      "source": "assets/visual/stars/star-m-dwarf.png",
+      "runtimePath": "assets/visual/stars/star-m-dwarf.png",
+      "sha256": "9afffc6573ce7ea60ccb8295d5e7b3be3d2e0d70979583fa807823820a9d50f4"
+    },
+    "star-neutron": {
+      "source": "assets/visual/stars/star-neutron.png",
+      "runtimePath": "assets/visual/stars/star-neutron.png",
+      "sha256": "3d8a4dad12821912a08a1cde3656372325c8a9ba9e4d7466759b8dfe33d95b7a"
+    },
+    "star-protostar": {
+      "source": "assets/visual/stars/star-protostar.png",
+      "runtimePath": "assets/visual/stars/star-protostar.png",
+      "sha256": "9bb147e5f721d345d590566d9430721b16a3a9838ae8378e09e6e86c7a6bb6aa"
+    },
+    "star-pulsar": {
+      "source": "assets/visual/stars/star-pulsar.png",
+      "runtimePath": "assets/visual/stars/star-pulsar.png",
+      "sha256": "c3a8917534bfe3b7e189d3942ae4478f73d3ebc3d6334e718433e8a481322da7"
+    },
+    "star-white-dwarf": {
+      "source": "assets/visual/stars/star-white-dwarf.png",
+      "runtimePath": "assets/visual/stars/star-white-dwarf.png",
+      "sha256": "3627cb59b56f484734ae981711ff3ab9485b7f301a327808b94a101dd45833e1"
+    },
+    "credits": {
+      "source": "docs/engine/NATIVE_STAR_ART_SOURCES.md",
+      "runtimePath": "Licenses/Star-art-sources.md",
+      "sha256": "4c450de9bf667dc443afadc649706955f3d5b667a771e996adee5a053c2ffd44"
+    }
+  }
+}

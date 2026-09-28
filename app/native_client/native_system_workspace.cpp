@@ -22,17 +22,24 @@ void overlay_fill(DrawList&o,UiRect b,Color c){o.overlay.emplace_back(FilledRect
 void overlay_stroke(DrawList&o,UiRect b,Color c){o.overlay.emplace_back(StrokedRectangle{b,c});}
 void overlay_text(DrawList&o,float x,float y,std::string value,Color c,int size=15,float wrap=0,std::optional<UiRect> clip=std::nullopt){o.overlay.emplace_back(Text{{x,y},std::move(value),c,size,wrap,clip});}
 std::string number(double value,int precision=2){std::ostringstream out;out<<std::fixed<<std::setprecision(precision)<<value;return out.str();}
-std::string environmental_hazard(EnvironmentalLimitingFactor value){
+std::string translate(const stellar::engine::LocalizationTable *locale,
+                      std::string_view key, std::string_view fallback) {
+  if (locale && locale->contains(key))
+    return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+std::string environmental_hazard(EnvironmentalLimitingFactor value,
+                                 const stellar::engine::LocalizationTable *locale){
   switch(value){
-  case EnvironmentalLimitingFactor::Gravity:return "Gravity";
-  case EnvironmentalLimitingFactor::Temperature:return "Temperature";
-  case EnvironmentalLimitingFactor::Pressure:return "Pressure";
-  case EnvironmentalLimitingFactor::Atmosphere:return "Atmosphere";
-  case EnvironmentalLimitingFactor::Solvent:return "Biological solvent";
-  case EnvironmentalLimitingFactor::Immersion:return "Immersion";
-  case EnvironmentalLimitingFactor::Radiation:return "Radiation";
-  case EnvironmentalLimitingFactor::None:return "None";
-  }return "Unconfirmed";
+  case EnvironmentalLimitingFactor::Gravity:return translate(locale,"SYSTEM_FACTOR_GRAVITY","Gravity");
+  case EnvironmentalLimitingFactor::Temperature:return translate(locale,"SYSTEM_FACTOR_TEMPERATURE","Temperature");
+  case EnvironmentalLimitingFactor::Pressure:return translate(locale,"SYSTEM_FACTOR_PRESSURE","Pressure");
+  case EnvironmentalLimitingFactor::Atmosphere:return translate(locale,"SYSTEM_FACTOR_ATMOSPHERE","Atmosphere");
+  case EnvironmentalLimitingFactor::Solvent:return translate(locale,"SYSTEM_FACTOR_SOLVENT","Biological solvent");
+  case EnvironmentalLimitingFactor::Immersion:return translate(locale,"SYSTEM_FACTOR_IMMERSION","Immersion");
+  case EnvironmentalLimitingFactor::Radiation:return translate(locale,"SYSTEM_FACTOR_RADIATION","Radiation");
+  case EnvironmentalLimitingFactor::None:return translate(locale,"SYSTEM_FACTOR_NONE","None");
+  }return translate(locale,"SYSTEM_UNCONFIRMED","Unconfirmed");
 }
 Color visual_color(NativeSystemBodyVisualClass value){switch(value){case NativeSystemBodyVisualClass::rocky:return {178,143,115,255};case NativeSystemBodyVisualClass::oceanic:return {70,152,213,255};case NativeSystemBodyVisualClass::frozen:return {171,217,235,255};case NativeSystemBodyVisualClass::hot_rocky:return {222,116,66,255};case NativeSystemBodyVisualClass::gas_giant:return {211,167,114,255};case NativeSystemBodyVisualClass::ice_giant:return {111,190,215,255};case NativeSystemBodyVisualClass::moon:return {180,184,190,255};case NativeSystemBodyVisualClass::unknown_moon:return {112,137,160,255};default:return {94,132,166,255};}}
 Color star_color(std::optional<StellarClass> value){if(!value)return {135,150,174,235};switch(*value){case StellarClass::MRedDwarf:return {255,119,76,230};case StellarClass::KOrangeDwarf:return {255,167,92,235};case StellarClass::GYellowDwarf:return {255,230,150,245};case StellarClass::FYellowWhiteDwarf:return {255,247,215,245};case StellarClass::AWhiteStar:return {225,236,255,245};case StellarClass::HotBlueStar:return {126,174,255,245};case StellarClass::Giant:return {255,142,88,245};case StellarClass::WhiteDwarf:return {221,236,255,235};case StellarClass::NeutronStar:return {133,218,255,250};case StellarClass::BlackHole:return {126,92,178,230};case StellarClass::Protostar:return {255,112,160,230};case StellarClass::Pulsar:return {91,229,255,250};}return {135,150,174,235};}
@@ -75,6 +82,29 @@ SystemWorkspaceLayout SystemWorkspaceLayout::for_viewport(int width,int height) 
           {panel.x+10*s,panel.y+panel.height-44*s,panel.width-20*s,32*s},
           {left+panel_width+24*s,top+44*s,std::max(1.f,w-left-panel_width-384*s),std::max(1.f,h-top-116*s)},
           {panel.x+10*s,panel.y+panel.height-84*s,panel.width-20*s,32*s}};
+}
+
+std::string NativeSystemWorkspace::tr(std::string_view key,
+                                      std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+std::string NativeSystemWorkspace::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
 }
 
 NativeSystemWorkspace::NativeSystemWorkspace(SystemImageProvider provider,SystemTextMeasurer measurer):image_provider_(std::move(provider)),text_measurer_(std::move(measurer)){body_inspection_.set_text_measurer(text_measurer_);}
@@ -154,7 +184,7 @@ if(e.type==InputEventType::LeftReleased&&pressed_lane_id_){
   if(travel_)for(const auto& geometry:lane_geometry())if(geometry.destination_system_id==target&&hit_local_lane(geometry,e.position)){
     const auto marker=std::ranges::find(travel_->lanes,target,&NativeLocalLaneMarker::destination_system_id);
     if(marker!=travel_->lanes.end()&&marker->known_label){notice_.clear();return {SystemWorkspaceCommandKind::open_destination,true,target};}
-    notice_="Telemetry unavailable. Dispatch a scout to establish a local survey.";
+    notice_=tr("SYSTEM_TELEMETRY_UNAVAILABLE","Telemetry unavailable. Dispatch a scout to establish a local survey.");
     return {SystemWorkspaceCommandKind::reconnaissance_required,true};
   }
   return {SystemWorkspaceCommandKind::none,true};
@@ -273,50 +303,50 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
     if(shipyard_image_)out.world.emplace_back(Image{shipyard_image_,*r,{},{255,255,255,255},field});
     else out.world.emplace_back(Circle{{r->x+r->width*.5f,r->y+r->height*.5f},12,{90,216,239,255}});
     if(shipyard_selected_||r->contains(pointer_))out.overlay.emplace_back(StrokedRectangle{*r,{105,219,246,255}});
-    out.world.emplace_back(Text{{r->x+r->width*.5f,r->y+r->height+2},"Orbital Shipyard",{141,221,242,255},12,180,field,TextAlign::Center});
+    out.world.emplace_back(Text{{r->x+r->width*.5f,r->y+r->height+2},tr("SYSTEM_SHIPYARD","Orbital Shipyard"),{141,221,242,255},12,180,field,TextAlign::Center});
   }
   artwork_ready_=artwork_ready_&&!celestial_appearance_.preparation_pending();
   render_small_body_panel(out,width,height);
-  if(!artwork_ready_)overlay_text(out,field.x+18.f,field.y+12.f,"Preparing system imagery...",muted,14,field.width-36.f,field);
-  const auto ui_scale=NativeUiLayout::for_viewport(width,height).scale;overlay_fill(out,layout.controls_row,{5,15,28,238});overlay_stroke(out,layout.controls_row,border);overlay_fill(out,layout.back,{10,27,47,245});overlay_stroke(out,layout.back,border);overlay_text(out,layout.back.x+22.f*ui_scale,layout.back.y+6.f*ui_scale,"BACK",text,15);overlay_fill(out,layout.reset,{10,27,47,245});overlay_stroke(out,layout.reset,border);overlay_text(out,layout.reset.x+14.f*ui_scale,layout.reset.y+6.f*ui_scale,"FIT SYSTEM",text,12);
+  if(!artwork_ready_)overlay_text(out,field.x+18.f,field.y+12.f,tr("SYSTEM_PREPARING","Preparing system imagery..."),muted,14,field.width-36.f,field);
+  const auto ui_scale=NativeUiLayout::for_viewport(width,height).scale;overlay_fill(out,layout.controls_row,{5,15,28,238});overlay_stroke(out,layout.controls_row,border);overlay_fill(out,layout.back,{10,27,47,245});overlay_stroke(out,layout.back,border);overlay_text(out,layout.back.x+22.f*ui_scale,layout.back.y+6.f*ui_scale,tr("SYSTEM_BACK","BACK"),text,15);overlay_fill(out,layout.reset,{10,27,47,245});overlay_stroke(out,layout.reset,border);overlay_text(out,layout.reset.x+14.f*ui_scale,layout.reset.y+6.f*ui_scale,tr("SYSTEM_FIT","FIT SYSTEM"),text,12);
   if(tracked_body_id_){const auto body=std::ranges::find(snapshot_->bodies,*tracked_body_id_,&NativeSystemBody::id);
-    if(body!=snapshot_->bodies.end())overlay_text(out,field.x+12*ui_scale,field.y+12*ui_scale,"Following "+body->name+" · drag to release",{164,221,237,255},13,field.width-24*ui_scale,field);}
+    if(body!=snapshot_->bodies.end())overlay_text(out,field.x+12*ui_scale,field.y+12*ui_scale,trf("SYSTEM_FOLLOWING",{body->name},"Following {0} · drag to release"),{164,221,237,255},13,field.width-24*ui_scale,field);}
   const UiRect zoom_badge{field.x+field.width-168.f*ui_scale,field.y+field.height-35.f*ui_scale,156.f*ui_scale,29.f*ui_scale};
   overlay_fill(out,zoom_badge,{8,25,39,245});overlay_stroke(out,zoom_badge,border);
-  overlay_text(out,zoom_badge.x+12.f*ui_scale,zoom_badge.y+6.f*ui_scale,"Zoom "+number(magnification(),2)+"x",{164,221,237,255},13,zoom_badge.width-20.f*ui_scale,zoom_badge);
+  overlay_text(out,zoom_badge.x+12.f*ui_scale,zoom_badge.y+6.f*ui_scale,trf("SYSTEM_ZOOM",{number(magnification(),2)},"Zoom {0}x"),{164,221,237,255},13,zoom_badge.width-20.f*ui_scale,zoom_badge);
   const auto title_x=layout.reset.x+layout.reset.width+24.f*ui_scale;const Text title{{title_x,layout.controls_row.y+4.f*ui_scale},snapshot_->catalog_name,text,16,0,layout.controls_row};
   const auto title_extent=text_measurer_?text_measurer_(title):TextExtent{static_cast<int>(title.value.size()*11u),28};
   out.overlay.emplace_back(title);
-  overlay_text(out,title_x+static_cast<float>(title_extent.width)+18.f*ui_scale,layout.controls_row.y+11.f*ui_scale,snapshot_->survey_level==SystemSurveyLevel::fully_surveyed?"FULL SURVEY":"RECONNAISSANCE",muted,12,0,layout.controls_row);
-  overlay_fill(out,panel,{6,18,33,242});overlay_stroke(out,panel,border);float y=panel.y+14;const auto add=[&](std::string value,Color color,int size=14,float step=20){const Text label{{panel.x+14,y},std::move(value),color,size,panel.width-28,panel};const auto measured=text_measurer_?text_measurer_(label):TextExtent{0,size+6};out.overlay.emplace_back(label);y+=std::max(step,static_cast<float>(measured.height)+4.f);};if(!selected_body())add("SYSTEM INSPECTOR",text,18,31);const auto*fleet=selected_fleet();if(inspector_focus_!=InspectorFocus::body&&fleet){add(fleet->foreign_inspection?"DEVELOPER FLEET INSPECTION":"OWNED LOCAL FLEET",muted,13,21);add(fleet->name,text,17,26);add(fleet_role(fleet->role)+std::string(fleet->moving?"  Moving":fleet->held?"  Holding":"  Local"),text,14,24);if(settlement_status_&&settlement_status_->fleet_id==fleet->fleet_id){add(settlement_status_->status,{102,232,164,255},13,21);if(settlement_status_->destination_body_id)add("Establishment  "+number(settlement_status_->settlement_days_completed,1)+" / "+number(settlement_status_->establishment_days,0)+" days",text,13,20);}}else if(selected_body()){body_inspection_.render(out,panel,layout.focus_action.y);}else {
+  overlay_text(out,title_x+static_cast<float>(title_extent.width)+18.f*ui_scale,layout.controls_row.y+11.f*ui_scale,snapshot_->survey_level==SystemSurveyLevel::fully_surveyed?tr("SYSTEM_SURVEY_FULL","FULL SURVEY"):tr("SYSTEM_SURVEY_RECON","RECONNAISSANCE"),muted,12,0,layout.controls_row);
+  overlay_fill(out,panel,{6,18,33,242});overlay_stroke(out,panel,border);float y=panel.y+14;const auto add=[&](std::string value,Color color,int size=14,float step=20){const Text label{{panel.x+14,y},std::move(value),color,size,panel.width-28,panel};const auto measured=text_measurer_?text_measurer_(label):TextExtent{0,size+6};out.overlay.emplace_back(label);y+=std::max(step,static_cast<float>(measured.height)+4.f);};if(!selected_body())add(tr("SYSTEM_INSPECTOR","SYSTEM INSPECTOR"),text,18,31);const auto*fleet=selected_fleet();if(inspector_focus_!=InspectorFocus::body&&fleet){add(fleet->foreign_inspection?tr("SYSTEM_FLEET_DEV","DEVELOPER FLEET INSPECTION"):tr("SYSTEM_FLEET_OWNED","OWNED LOCAL FLEET"),muted,13,21);add(fleet->name,text,17,26);add(trf("SYSTEM_FLEET_STATE",{fleet_role(fleet->role),fleet->moving?tr("SYSTEM_STATE_MOVING","Moving"):fleet->held?tr("SYSTEM_STATE_HOLDING","Holding"):tr("SYSTEM_STATE_LOCAL","Local")},"{0}  {1}"),text,14,24);if(settlement_status_&&settlement_status_->fleet_id==fleet->fleet_id){add(settlement_status_->status,{102,232,164,255},13,21);if(settlement_status_->destination_body_id)add(trf("SYSTEM_ESTABLISHMENT",{number(settlement_status_->settlement_days_completed,1),number(settlement_status_->establishment_days,0)},"Establishment  {0} / {1} days"),text,13,20);}}else if(selected_body()){body_inspection_.render(out,panel,layout.focus_action.y);}else {
     if(snapshot_->stellar_object){const auto& p=*snapshot_->stellar_object;const auto& d=stellar::core::stellar_object_definition(p.type);
       add(d.name,text,16,26);
-      add("Radius  "+number(p.radius_solar*695700.,0)+" km",text,13,20);
-      add("Surface  "+number(p.effective_temperature_kelvin,0)+" K",text,13,20);
-      add("Luminosity  "+number(p.luminosity_solar,4)+" x Sol",text,13,20);
-      add("Safe approach  "+number(p.safe_approach_au*stellar::core::astronomical_unit_km,0)+" km",{241,182,98,255},13,20);
-      if(p.luminosity_solar>0)add("Temperate zone  "+number(p.inner_hz_au*stellar::core::astronomical_unit_km/1000000.,1)+" - "+number(p.outer_hz_au*stellar::core::astronomical_unit_km/1000000.,1)+" million km",muted,13,20);
-      if(p.jet_half_angle_radians>0)add("DANGER: directional high-energy jets",{241,139,98,255},13,20);
-      if(p.habitability_modifier<.2)add("Severe radiation or short stellar lifetime limits habitability.",muted,13,20);
+      add(trf("SYSTEM_RADIUS",{number(p.radius_solar*695700.,0)},"Radius  {0} km"),text,13,20);
+      add(trf("SYSTEM_SURFACE_TEMP",{number(p.effective_temperature_kelvin,0)},"Surface  {0} K"),text,13,20);
+      add(trf("SYSTEM_LUMINOSITY",{number(p.luminosity_solar,4)},"Luminosity  {0} x Sol"),text,13,20);
+      add(trf("SYSTEM_SAFE_APPROACH",{number(p.safe_approach_au*stellar::core::astronomical_unit_km,0)},"Safe approach  {0} km"),{241,182,98,255},13,20);
+      if(p.luminosity_solar>0)add(trf("SYSTEM_HZ",{number(p.inner_hz_au*stellar::core::astronomical_unit_km/1000000.,1),number(p.outer_hz_au*stellar::core::astronomical_unit_km/1000000.,1)},"Temperate zone  {0} - {1} million km"),muted,13,20);
+      if(p.jet_half_angle_radians>0)add(tr("SYSTEM_JETS_DANGER","DANGER: directional high-energy jets"),{241,139,98,255},13,20);
+      if(p.habitability_modifier<.2)add(tr("SYSTEM_HABITABILITY_LIMIT","Severe radiation or short stellar lifetime limits habitability."),muted,13,20);
     }
     if(snapshot_->stellar_orbits){const auto& a=*snapshot_->stellar_orbits;
       for(std::size_t i=0;i<a.relative_orbits.size();++i){const double years=2*std::numbers::pi/a.relative_orbits[i].angular_speed/365.25;
-        add(std::string(i==0?"A+B orbit: ":"AB+C orbit: ")+number(years,1)+" years",muted,12,20);}
+        add(trf(i==0?"SYSTEM_ORBIT_AB":"SYSTEM_ORBIT_ABC",{number(years,1)},i==0?"A+B orbit: {0} years":"AB+C orbit: {0} years"),muted,12,20);}
     }
-    add("Select a visible body or owned fleet",muted,14,20);
+    add(tr("SYSTEM_INSPECTOR_HINT","Select a visible body or owned fleet"),muted,14,20);
   }if(selected_body()){
   overlay_fill(out,layout.focus_action,layout.focus_action.contains(pointer_)?Color{26,63,82,255}:Color{12,37,55,255});
   overlay_stroke(out,layout.focus_action,{102,205,224,255});
-  overlay_text(out,layout.focus_action.x+10.f,layout.focus_action.y+9.f,"FOCUS PLANET",text,14,layout.focus_action.width-20.f,layout.focus_action);
+  overlay_text(out,layout.focus_action.x+10.f,layout.focus_action.y+9.f,tr("SYSTEM_FOCUS","FOCUS PLANET"),text,14,layout.focus_action.width-20.f,layout.focus_action);
 }
-if(colony_body_id_&&selected_body_id_==colony_body_id_){overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});overlay_stroke(out,layout.colony_action,{102,232,164,255});overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,"MANAGE PLANET",text,14,layout.colony_action.width-20,layout.colony_action);}else if(preparation_&&selected_body()){
+if(colony_body_id_&&selected_body_id_==colony_body_id_){overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});overlay_stroke(out,layout.colony_action,{102,232,164,255});overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,tr("SYSTEM_MANAGE","MANAGE PLANET"),text,14,layout.colony_action.width-20,layout.colony_action);}else if(preparation_&&selected_body()){
 overlay_fill(out,layout.colony_action,layout.colony_action.contains(pointer_)?Color{24,76,71,255}:Color{13,51,52,255});
 overlay_stroke(out,layout.colony_action,{102,232,164,255});
-overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,"VIEW SHIPYARD",text,14,layout.colony_action.width-20,layout.colony_action);
+overlay_text(out,layout.colony_action.x+10,layout.colony_action.y+9,tr("SYSTEM_VIEW_SHIPYARD","VIEW SHIPYARD"),text,14,layout.colony_action.width-20,layout.colony_action);
 }else if(!notice_.empty()){const UiRect notice_bounds=selected_body()?layout.colony_action:UiRect{panel.x+12,panel.y+panel.height-88,panel.width-24,74};overlay_fill(out,notice_bounds,{35,25,16,235});overlay_stroke(out,notice_bounds,{139,92,42,255});overlay_text(out,notice_bounds.x+8,notice_bounds.y+8,notice_,{245,183,93,250},13,notice_bounds.width-16,notice_bounds);}}
 void NativeSystemWorkspace::sync_body_inspection(){
   if(!snapshot_||!selected_body_id_){preparation_.reset();preparation_pressed_=false;body_inspection_.clear();return;}
-  auto inspection=build_body_inspection(*snapshot_,*selected_body_id_);
+  auto inspection=build_body_inspection(*snapshot_,*selected_body_id_,locale_);
   if(preparation_&&(preparation_->campaign_generation!=snapshot_->campaign_generation||
       preparation_->player_civilization_id!=snapshot_->observer_civilization_id||
       preparation_->system_id!=snapshot_->system_id||preparation_->body_id!=selected_body_id_||
@@ -326,51 +356,53 @@ void NativeSystemWorkspace::sync_body_inspection(){
   if(inspection&&preparation_){
     const auto& v=*preparation_;const auto& a=v.suitability;const auto& e=a.environment;
     std::string habitat;
-    const auto support=[&](bool needed,const char* name){if(needed){if(!habitat.empty())habitat+="; ";habitat+=name;}};
-    support(e.requires_gravity_mitigation,"Gravity support");support(e.requires_thermal_control,"Thermal control");
-    support(e.requires_pressure_control,"Pressure control");support(e.requires_sealed_habitat,"Sealed habitat");
-    support(e.requires_artificial_biosphere,"Artificial biosphere");support(e.requires_radiation_shielding,"Radiation shielding");
+    const auto support=[&](bool needed,std::string name){if(needed){if(!habitat.empty())habitat+="; ";habitat+=name;}};
+    support(e.requires_gravity_mitigation,tr("SYSTEM_SUPPORT_GRAVITY","Gravity support"));support(e.requires_thermal_control,tr("SYSTEM_SUPPORT_THERMAL","Thermal control"));
+    support(e.requires_pressure_control,tr("SYSTEM_SUPPORT_PRESSURE","Pressure control"));support(e.requires_sealed_habitat,tr("SYSTEM_SUPPORT_SEALED","Sealed habitat"));
+    support(e.requires_artificial_biosphere,tr("SYSTEM_SUPPORT_BIOSPHERE","Artificial biosphere"));support(e.requires_radiation_shielding,tr("SYSTEM_SUPPORT_RADIATION","Radiation shielding"));
     std::string site;
-    if(!v.solid_surface)site="No solid settlement surface";
-    else if(v.native_pre_warp_life)site="Protected native civilization";
-    else if(a.viability==SpeciesColonizationViability::Unsuitable)site="Too harsh for a colony";
-    else if(a.viability==SpeciesColonizationViability::HabitatSupportedFallback)site="Habitat support required";
-    else site="Naturally viable environment";
-    BodySection readiness{"SETTLEMENT ASSESSMENT",{
-      {"Population",v.species_name},
-      {"Environment",site},
-      {"Natural fit",number(e.natural_habitability*100.,0)+"%"},
-      {"Primary hazard",environmental_hazard(e.limiting_factor)},
-      {"Life support",habitat.empty()?"No environmental mitigation":habitat},
-      {"Rare deposit",v.rare_resource?"Confirmed":"None confirmed"},
-      {"Next step",a.can_found_current_colony?"Prepare a colony vessel":
-          v.solid_surface&&!v.native_pre_warp_life&&v.rare_resource?"Review a sealed resource outpost":"Explore other worlds"}
+    if(!v.solid_surface)site=tr("SYSTEM_SITE_NO_SURFACE","No solid settlement surface");
+    else if(v.native_pre_warp_life)site=tr("SYSTEM_SITE_PROTECTED","Protected native civilization");
+    else if(a.viability==SpeciesColonizationViability::Unsuitable)site=tr("SYSTEM_SITE_HARSH","Too harsh for a colony");
+    else if(a.viability==SpeciesColonizationViability::HabitatSupportedFallback)site=tr("SYSTEM_SITE_HABITAT","Habitat support required");
+    else site=tr("SYSTEM_SITE_VIABLE","Naturally viable environment");
+    BodySection readiness{tr("SYSTEM_SECTION_ASSESSMENT","SETTLEMENT ASSESSMENT"),{
+      {tr("SYSTEM_FACT_POPULATION","Population"),v.species_name},
+      {tr("SYSTEM_FACT_ENVIRONMENT","Environment"),site},
+      {tr("SYSTEM_FACT_FIT","Natural fit"),trf("SYSTEM_PERCENT",{number(e.natural_habitability*100.,0)},"{0}%")},
+      {tr("SYSTEM_FACT_HAZARD","Primary hazard"),environmental_hazard(e.limiting_factor,locale_)},
+      {tr("SYSTEM_FACT_LIFE_SUPPORT","Life support"),habitat.empty()?tr("SYSTEM_NO_MITIGATION","No environmental mitigation"):habitat},
+      {tr("SYSTEM_FACT_DEPOSIT","Rare deposit"),v.rare_resource?tr("SYSTEM_CONFIRMED","Confirmed"):tr("SYSTEM_NOT_CONFIRMED","None confirmed")},
+      {tr("SYSTEM_FACT_NEXT_STEP","Next step"),a.can_found_current_colony?tr("SYSTEM_STEP_COLONY","Prepare a colony vessel"):
+          v.solid_surface&&!v.native_pre_warp_life&&v.rare_resource?tr("SYSTEM_STEP_OUTPOST","Review a sealed resource outpost"):tr("SYSTEM_STEP_EXPLORE","Explore other worlds")}
     }};
     inspection->sections.insert(inspection->sections.begin(),std::move(readiness));
     const auto add_option=[&](const stellar::native_settlement_preparation::Option& o){
       inspection->sections.push_back({o.design_name,{
-        {"Ship cost",o.formatted_ship_cost},{"Industry",number(o.industry_cost,0)+" over construction"},
-        {"Population",number(o.population_reservation_millions,0)+" million reserved"},
-        {"Build time",stellar::native_campaign::format_campaign_duration(o.minimum_build_days)+" minimum at full production"},
-        {"Shipyard",o.shipbuilding_blocker.value_or("Ready to order")},
-        {"Expedition",o.formatted_expedition_cost+" separately authorized"},
-        {"Establishment",number(o.establishment_days,0)+" work days after arrival"}}});
+        {tr("SYSTEM_FACT_SHIP_COST","Ship cost"),o.formatted_ship_cost},{tr("SYSTEM_FACT_INDUSTRY","Industry"),trf("SYSTEM_OVER_CONSTRUCTION",{number(o.industry_cost,0)},"{0} over construction")},
+        {tr("SYSTEM_FACT_POPULATION","Population"),trf("SYSTEM_POP_RESERVED",{number(o.population_reservation_millions,0)},"{0} million reserved")},
+        {tr("SYSTEM_FACT_BUILD_TIME","Build time"),trf("SYSTEM_MIN_PRODUCTION",{stellar::native_campaign::format_campaign_duration(o.minimum_build_days)},"{0} minimum at full production")},
+        {tr("SYSTEM_FACT_SHIPYARD","Shipyard"),o.shipbuilding_blocker.value_or(tr("SYSTEM_READY_TO_ORDER","Ready to order"))},
+        {tr("SYSTEM_FACT_EXPEDITION","Expedition"),trf("SYSTEM_EXPEDITION_COST",{o.formatted_expedition_cost},"{0} separately authorized")},
+        {tr("SYSTEM_FACT_ESTABLISHMENT","Establishment"),trf("SYSTEM_WORK_DAYS",{number(o.establishment_days,0)},"{0} work days after arrival")}}});
     };
     add_option(v.colony_ship);add_option(v.resource_outpost);
-    inspection->sections.push_back({"BEFORE COMMITTING",{{"Treasury",v.formatted_treasury},
-      {"Timing","Supply and funding can delay completion"},
-      {"Mission","Select a populated vessel and right-click a surveyed world. Route, occupancy, reservations and funds are checked before confirmation."}}});
+    inspection->sections.push_back({tr("SYSTEM_SECTION_COMMITTING","BEFORE COMMITTING"),{{tr("SYSTEM_FACT_TREASURY","Treasury"),v.formatted_treasury},
+      {tr("SYSTEM_FACT_TIMING","Timing"),tr("SYSTEM_TIMING_NOTE","Supply and funding can delay completion")},
+      {tr("SYSTEM_FACT_MISSION","Mission"),tr("SYSTEM_MISSION_NOTE","Select a populated vessel and right-click a surveyed world. Route, occupancy, reservations and funds are checked before confirmation.")}}});
   }
   if(inspection&&settlement_status_&&snapshot_->survey_level==SystemSurveyLevel::fully_surveyed&&
      settlement_status_->destination_body_id==selected_body_id_&&
      (!settlement_status_->destination_system_id||*settlement_status_->destination_system_id==snapshot_->system_id)){
     const auto& status=*settlement_status_;
-    inspection->sections.insert(inspection->sections.begin(),{"SETTLEMENT IN PROGRESS",{
-      {"Status",status.status},
-      {"Establishment",number(status.settlement_days_completed,1)+" / "+number(status.establishment_days,1)+" days"},
-      {"Next step","Keep the expedition supplied while establishment completes."}
+    inspection->sections.insert(inspection->sections.begin(),{tr("SYSTEM_SECTION_PROGRESS","SETTLEMENT IN PROGRESS"),{
+      {tr("SYSTEM_FACT_STATUS","Status"),status.status},
+      {tr("SYSTEM_FACT_ESTABLISHMENT","Establishment"),trf("SYSTEM_ESTABLISHMENT_DAYS",{number(status.settlement_days_completed,1),number(status.establishment_days,1)},"{0} / {1} days")},
+      {tr("SYSTEM_FACT_NEXT_STEP","Next step"),tr("SYSTEM_STEP_SUPPLIED","Keep the expedition supplied while establishment completes.")}
     }});
-    if(preparation_&&!inspection->sections.empty())for(auto&section:inspection->sections)if(section.heading=="SETTLEMENT ASSESSMENT")for(auto&fact:section.facts)if(fact.label=="Next step")fact.value="Settlement expedition is establishing this body.";
+    const auto assessment=tr("SYSTEM_SECTION_ASSESSMENT","SETTLEMENT ASSESSMENT");
+    const auto next_step=tr("SYSTEM_FACT_NEXT_STEP","Next step");
+    if(preparation_&&!inspection->sections.empty())for(auto&section:inspection->sections)if(section.heading==assessment)for(auto&fact:section.facts)if(fact.label==next_step)fact.value=tr("SYSTEM_STEP_ESTABLISHING","Settlement expedition is establishing this body.");
   }
   body_inspection_.set_inspection(std::move(inspection));
 }

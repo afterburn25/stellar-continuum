@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/fresh_campaign.hpp>
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <functional>
@@ -27,13 +28,18 @@ struct SystemInspection {
   [[nodiscard]] bool operator==(const SystemInspection&) const = default;
 };
 [[nodiscard]] SystemInspection build_system_inspection(
-    const stellar::core::FreshCampaignState&, int selected_system_id);
+    const stellar::core::FreshCampaignState&, int selected_system_id,
+    const stellar::engine::LocalizationTable *locale = nullptr);
 
 struct InspectionHandleResult { bool captured{}, closed{}; };
 class SystemInspectionCard final {
 public:
   void set_text_measurer(std::function<stellar::native_map::TextExtent(
       const stellar::native_map::Text&)>);
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
   void set_inspection(SystemInspection);
   void clear() noexcept;
   [[nodiscard]] static stellar::native_map::UiRect close_bounds(stellar::native_map::UiRect) noexcept;
@@ -49,6 +55,7 @@ private:
   mutable std::optional<stellar::native_map::UiRect> last_bounds_;
   std::function<stellar::native_map::TextExtent(
       const stellar::native_map::Text&)> text_measurer_;
+  const stellar::engine::LocalizationTable *locale_{};
   bool pointer_owned_{};
 };
 } // namespace stellar::native_inspection

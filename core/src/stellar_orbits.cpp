@@ -131,9 +131,13 @@ void initialize_stellar_orbits(std::int64_t seed,std::vector<StellarSystem>& sys
    if(fresh&&a.companions.size()==2&&a.companions[1].luminosity_solar>1e-6&&!compact&&!b->legacy_colonization_candidate&&!b->cracked_world&&b->orbit_index%8==5)host=2;
    s.stellar_orbits->planets.push_back({b->id,host});
    if(host&&b->stellar_exposure){const auto hp=stellar_host_physics(s,host);const double factor=std::sqrt(std::max(.000001,hp.luminosity_solar)/std::max(.000001,s.stellar_object->luminosity_solar));
-    const auto radius=b->stellar_exposure->orbit_au*factor;b->stellar_exposure=stellar_planet_exposure(hp,radius);
+    const auto radius=b->stellar_exposure->orbit_au*factor;
+    // A flux-equivalent orbit inside the companion's destruction radius is not a
+    // survivable S-type orbit; keep the body bound to the primary instead.
+    if(radius*(1-std::clamp(b->orbital_eccentricity,0.,.9))<=hp.destruction_radius_au){s.stellar_orbits->planets.back().host=0;}
+    else{b->stellar_exposure=stellar_planet_exposure(hp,radius);
     if(b->appearance){b->appearance->climate.snow_line_au=2.7*std::sqrt(hp.luminosity_solar);if(b->appearance->giant.version)b->appearance->giant.formation_snow_line_au=b->appearance->climate.snow_line_au;}
-    outer=std::max(outer,radius*(1+b->orbital_eccentricity));}
+    outer=std::max(outer,radius*(1+b->orbital_eccentricity));}}
   }
   for(auto* b:grouped[s.id])if(b->parent_body_id){const int host=planetary_stellar_host(s,*b->parent_body_id);s.stellar_orbits->planets.push_back({b->id,host});
    for(auto* parent:grouped[s.id])if(parent->id==*b->parent_body_id)b->stellar_exposure=parent->stellar_exposure;}

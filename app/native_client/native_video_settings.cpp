@@ -465,6 +465,26 @@ NativeVideoSettingsView::handle(const InputEvent &event, const int width,
   return result;
 }
 
+std::string NativeVideoSettingsView::tr(std::string_view key,
+                                        std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+std::string NativeVideoSettingsView::trf(std::string_view key,
+                                         std::string_view arg,
+                                         std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::string value{arg};
+    return locale_->format(key, std::span<const std::string>{&value, 1});
+  }
+  std::string out{fallback};
+  if (const auto at = out.find("{0}"); at != std::string::npos)
+    out.replace(at, 3, arg);
+  return out;
+}
+
 void NativeVideoSettingsView::render(DrawList &out, const int width,
                                      const int height,
                                      const double rollback_remaining) const {
@@ -473,10 +493,11 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
   fill(out, {0.f, 0.f, static_cast<float>(width), static_cast<float>(height)},
        {4, 9, 18, 48});
   native_menu_style::panel(out,layout.panel,layout.scale);
-  text(out, layout.title, "VIDEO", text_primary,
+  text(out, layout.title, tr("SETTINGS_NAV_VIDEO", "VIDEO"), text_primary,
        layout.title_font_pixels, TextAlign::Left, FontFace::Heading);
   text(out, layout.hint,
-       "Detected display modes and graphics controls for this computer.",
+       tr("SETTINGS_VIDEO_HINT",
+          "Detected display modes and graphics controls for this computer."),
        text_muted, layout.small_font_pixels);
   text(out,layout.adapter,adapter_label_,{112,223,238,255},layout.small_font_pixels);
   const auto draw_button = [&](UiRect bounds, std::string caption, bool enabled = true, float inset = 0.f) {
@@ -494,10 +515,15 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
       std::to_string(values_.scene_resolution_percent)+"%"+(values_.scene_resolution_percent==100?" · Native":" · Reduced"),
       std::array<std::string,4>{"Low","Medium","High","Ultra"}[values_.starfield_quality],
       std::array<std::string,3>{"Low","Normal","High"}[values_.starfield_density]};
+  const std::array<std::string_view, 8> choice_keys = {
+      "SETTINGS_VIDEO_DISPLAY", "SETTINGS_VIDEO_RESOLUTION", "SETTINGS_VIDEO_VSYNC",
+      "SETTINGS_VIDEO_FRAME_CAP", "SETTINGS_VIDEO_SMOOTHING", "SETTINGS_VIDEO_SCENE_RES",
+      "SETTINGS_VIDEO_STARFIELD_QUALITY", "SETTINGS_VIDEO_STARFIELD_DENSITY"};
   for (int index = 0; index < 8; ++index) {
     text(out, layout.choice_labels[index],
-         std::string(choice_names[static_cast<std::size_t>(index)]), gold,
-         layout.small_font_pixels);
+         tr(choice_keys[static_cast<std::size_t>(index)],
+            choice_names[static_cast<std::size_t>(index)]),
+         gold, layout.small_font_pixels);
     const auto enabled = index != 1 ||
                          ((values_.display == VideoDisplayMode::Exclusive && !display_choices_.empty()) ||
                           (values_.display == VideoDisplayMode::Windowed && !windowed_choices_.empty()));
@@ -509,14 +535,14 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
            "▼",text_primary,layout.small_font_pixels,TextAlign::Center);
     }
   }
-  text(out,layout.quality_hint,"Borderless fullscreen is recommended. Supersampling smooths the scene; interface text stays at native resolution.",text_muted,layout.small_font_pixels);
-  if(open_panel_)draw_button(layout.nvidia,"Open NVIDIA Control Panel");
-  else text(out,layout.nvidia,"NVIDIA Control Panel is not installed on this computer.",text_muted,layout.small_font_pixels);
+  text(out,layout.quality_hint,tr("SETTINGS_VIDEO_QUALITY_HINT","Borderless fullscreen is recommended. Supersampling smooths the scene; interface text stays at native resolution."),text_muted,layout.small_font_pixels);
+  if(open_panel_)draw_button(layout.nvidia,tr("SETTINGS_VIDEO_OPEN_NVIDIA","Open NVIDIA Control Panel"));
+  else text(out,layout.nvidia,tr("SETTINGS_VIDEO_NO_NVIDIA","NVIDIA Control Panel is not installed on this computer."),text_muted,layout.small_font_pixels);
   if (!error_.empty())
     text(out, layout.error, error_, text_error,
          layout.small_font_pixels);
-  draw_button(layout.apply, "APPLY");
-  draw_button(layout.cancel, "CANCEL");
+  draw_button(layout.apply, tr("SETTINGS_VIDEO_APPLY", "APPLY"));
+  draw_button(layout.cancel, tr("SETTINGS_CANCEL", "CANCEL"));
 
   if(dropdown_.visible()&&!confirming_)dropdown_.render(out,layout.choice_buttons[dropdown_.id()],width,height,layout.body_font_pixels);
 
@@ -526,16 +552,16 @@ void NativeVideoSettingsView::render(DrawList &out, const int width,
          {0, 0, 0, 184});
     stellar::engine::ui_skin::surface(out,layout.confirm_panel,layout.scale);
     text(out, layout.confirm_title,
-         "CONFIRM DISPLAY", text_primary, layout.title_font_pixels,
-         TextAlign::Left, FontFace::Heading);
+         tr("SETTINGS_VIDEO_CONFIRM_TITLE", "CONFIRM DISPLAY"), text_primary,
+         layout.title_font_pixels, TextAlign::Left, FontFace::Heading);
     text(out, layout.confirm_text,
-         "Keep these display settings? Reverting in " +
+         trf("SETTINGS_VIDEO_CONFIRM_TEXT",
              std::to_string(
-                 std::max(0, static_cast<int>(std::ceil(rollback_remaining)))) +
-             " seconds.",
+                 std::max(0, static_cast<int>(std::ceil(rollback_remaining)))),
+             "Keep these display settings? Reverting in {0} seconds."),
          text_muted, layout.body_font_pixels);
-    draw_button(layout.keep, "KEEP");
-    draw_button(layout.revert, "REVERT");
+    draw_button(layout.keep, tr("SETTINGS_VIDEO_KEEP", "KEEP"));
+    draw_button(layout.revert, tr("SETTINGS_VIDEO_REVERT", "REVERT"));
   }
 }
 

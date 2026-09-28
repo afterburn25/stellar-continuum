@@ -4,6 +4,7 @@
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/fleet_state.hpp>
 #include <stellar/core/sovereign_currency.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -23,6 +24,31 @@ using namespace stellar::core;
 
 constexpr std::size_t maximum_diagnostic_bytes = 256;
 
+[[nodiscard]] std::string tr_at(const stellar::engine::LocalizationTable *table,
+                                std::string_view key, std::string_view fallback) {
+  if (table && table->contains(key))
+    return std::string(table->translate(key));
+  return std::string(fallback);
+}
+
+[[nodiscard]] std::string trf_at(const stellar::engine::LocalizationTable *table,
+                                 std::string_view key,
+                                 std::initializer_list<std::string> args,
+                                 std::string_view fallback) {
+  if (table && table->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return table->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
 [[nodiscard]] bool finite(const double value) noexcept { return std::isfinite(value); }
 
 [[nodiscard]] std::string bounded(std::string value) {
@@ -31,17 +57,21 @@ constexpr std::size_t maximum_diagnostic_bytes = 256;
   return value + "...";
 }
 
-[[nodiscard]] NativeEconomyView unavailable(std::string diagnostic) {
+[[nodiscard]] NativeEconomyView unavailable(std::string diagnostic,
+                                            const stellar::engine::LocalizationTable *locale) {
   NativeEconomyView view;
-  view.message = "Economy information is unavailable. Refresh when the campaign is ready.";
+  view.message = tr_at(locale, "ECONOMY_VIEW_UNAVAILABLE",
+      "Economy information is unavailable. Refresh when the campaign is ready.");
   view.diagnostic = bounded(std::move(diagnostic));
   return view;
 }
 
-[[nodiscard]] NativeEconomyView failed(std::exception const& error) {
+[[nodiscard]] NativeEconomyView failed(std::exception const& error,
+                                       const stellar::engine::LocalizationTable *locale) {
   NativeEconomyView view;
   view.state = EconomyState::Failed;
-  view.message = "Economy information failed to load. Retry the panel; if it persists, export diagnostics.";
+  view.message = tr_at(locale, "ECONOMY_VIEW_FAILED",
+      "Economy information failed to load. Retry the panel; if it persists, export diagnostics.");
   view.diagnostic = bounded(error.what());
   return view;
 }
@@ -138,11 +168,12 @@ struct EconomyContext {
   return currency.format(value);
 }
 
-[[nodiscard]] std::string priority_name(const IndustryPriority priority) {
+[[nodiscard]] std::string priority_name(const IndustryPriority priority,
+                                        const stellar::engine::LocalizationTable *locale) {
   switch (priority) {
-  case IndustryPriority::Balanced: return "Balanced";
-  case IndustryPriority::InfrastructureFirst: return "Infrastructure first";
-  case IndustryPriority::ShipbuildingFirst: return "Shipbuilding first";
+  case IndustryPriority::Balanced: return tr_at(locale, "ECONOMY_PRIORITY_NAME_BALANCED", "Balanced");
+  case IndustryPriority::InfrastructureFirst: return tr_at(locale, "ECONOMY_PRIORITY_NAME_INFRASTRUCTURE", "Infrastructure first");
+  case IndustryPriority::ShipbuildingFirst: return tr_at(locale, "ECONOMY_PRIORITY_NAME_SHIPBUILDING", "Shipbuilding first");
   }
   throw std::runtime_error("The actual player economy has an unknown industry priority.");
 }
@@ -170,7 +201,8 @@ struct EconomyContext {
 
 NativeEconomyView build_economy_view(
     const FreshCampaignState& campaign, const AdaptiveResearchCampaignState* research,
-    const std::optional<CivilizationIndustryAllocation>& last_allocation) {
+    const std::optional<CivilizationIndustryAllocation>& last_allocation,
+    const stellar::engine::LocalizationTable* locale) {
   try {
     const auto context = validate(campaign);
     const auto player = context.player.id;
@@ -194,52 +226,60 @@ NativeEconomyView build_economy_view(
     NativeEconomyView view;
     view.state = EconomyState::Ready;
     view.player_civilization_id = player;
-    view.message = "Live civilian revenue and operating commitments.";
-    view.cards = {{{"RESERVES", amount(currency, context.economy.credits)},
-                   {"NET / DAY", rate(currency, flow.net_credits_per_day), flow.net_credits_per_day < 0.},
-                   {"INCOME / DAY", rate(currency, flow.gross_income_per_day)},
-                   {"COSTS / DAY", rate(currency, -flow.operating_costs_per_day), true},
-                   {"MATERIALS IN STORAGE", grouped(context.economy.industry) + " / " + grouped(capacity)},
-                   {"MATERIALS / DAY", material_rate(context.economy.last_industry_per_second)}}};
+    view.message = tr_at(locale, "ECONOMY_VIEW_READY",
+        "Live civilian revenue and operating commitments.");
+    view.cards = {{{tr_at(locale, "ECONOMY_CARD_RESERVES", "RESERVES"), amount(currency, context.economy.credits)},
+                   {tr_at(locale, "ECONOMY_CARD_NET", "NET / DAY"), rate(currency, flow.net_credits_per_day), flow.net_credits_per_day < 0.},
+                   {tr_at(locale, "ECONOMY_CARD_INCOME", "INCOME / DAY"), rate(currency, flow.gross_income_per_day)},
+                   {tr_at(locale, "ECONOMY_CARD_COSTS", "COSTS / DAY"), rate(currency, -flow.operating_costs_per_day), true},
+                   {tr_at(locale, "ECONOMY_CARD_MATERIALS", "MATERIALS IN STORAGE"), grouped(context.economy.industry) + " / " + grouped(capacity)},
+                   {tr_at(locale, "ECONOMY_CARD_RATE", "MATERIALS / DAY"), material_rate(context.economy.last_industry_per_second)}}};
     const auto health = assess_treasury(context.economy.credits, flow.net_credits_per_day,
                                         context.economy.operating_arrears);
     view.treasury_healthy = health.state == TreasuryHealthState::Surplus;
     switch (health.state) {
-    case TreasuryHealthState::Surplus: view.treasury_status = "SURPLUS: Current income covers operating commitments."; break;
+    case TreasuryHealthState::Surplus: view.treasury_status = tr_at(locale, "ECONOMY_TREASURY_SURPLUS", "SURPLUS: Current income covers operating commitments."); break;
     case TreasuryHealthState::Deficit:
       if (!finite(health.runway_days)) throw std::runtime_error("Treasury runway is non-finite.");
-      view.treasury_status = std::format("DEFICIT: Treasury runway {:.1f} days.", health.runway_days); break;
-    case TreasuryHealthState::Depleted: view.treasury_status = "TREASURY DEPLETED: New authorizations are blocked."; break;
-    case TreasuryHealthState::Arrears: view.treasury_status = "OPERATING ARREARS: New income repays arrears before rebuilding reserves."; break;
+      view.treasury_status = trf_at(locale, "ECONOMY_TREASURY_DEFICIT",
+          {std::format("{:.1f}", health.runway_days)}, "DEFICIT: Treasury runway {0} days."); break;
+    case TreasuryHealthState::Depleted: view.treasury_status = tr_at(locale, "ECONOMY_TREASURY_DEPLETED", "TREASURY DEPLETED: New authorizations are blocked."); break;
+    case TreasuryHealthState::Arrears: view.treasury_status = tr_at(locale, "ECONOMY_TREASURY_ARREARS", "OPERATING ARREARS: New income repays arrears before rebuilding reserves."); break;
     }
     view.industry_priority = context.economy.industry_priority.value_or(IndustryPriority::Balanced);
     if (!valid_priority(view.industry_priority))
       throw std::runtime_error("The actual player economy has an unknown industry priority.");
     const auto weights = campaign_industry_weights(campaign.economies, player);
-    view.priority_guidance = "Free to change. Infrastructure : ships when materials compete — ";
+    view.priority_guidance = tr_at(locale, "ECONOMY_GUIDANCE_PREFIX",
+        "Free to change. Infrastructure : ships when materials compete — ");
     for (const auto choice : {IndustryPriority::Balanced, IndustryPriority::InfrastructureFirst,
                               IndustryPriority::ShipbuildingFirst}) {
       auto preview = context.economy;
       preview.industry_priority = choice;
       const auto candidate = campaign_industry_weights(std::span{&preview, 1}, player);
       if (choice != IndustryPriority::Balanced) view.priority_guidance += "; ";
-      view.priority_guidance += std::format("{} {:.0f}:{:.0f}", priority_name(choice),
-          candidate.construction_weight, candidate.shipbuilding_weight);
+      view.priority_guidance += trf_at(locale, "ECONOMY_GUIDANCE_WEIGHTS",
+          {priority_name(choice, locale), std::format("{:.0f}", candidate.construction_weight),
+           std::format("{:.0f}", candidate.shipbuilding_weight)}, "{0} {1}:{2}");
     }
     if (!finite(weights.construction_weight) || !finite(weights.shipbuilding_weight))
       throw std::runtime_error("The actual player industry weights are non-finite.");
-    view.priority_status = std::format("Current choice: {} ({:.0f}:{:.0f}).",
-                                       priority_name(view.industry_priority),
-                                       weights.construction_weight, weights.shipbuilding_weight);
+    view.priority_status = trf_at(locale, "ECONOMY_PRIORITY_CURRENT",
+        {priority_name(view.industry_priority, locale),
+         std::format("{:.0f}", weights.construction_weight),
+         std::format("{:.0f}", weights.shipbuilding_weight)},
+        "Current choice: {0} ({1}:{2}).");
     if (last_allocation && last_allocation->civilization_id == player &&
         finite(last_allocation->construction_allocated) && finite(last_allocation->shipbuilding_allocated))
-      view.priority_status += std::format(" Most recent allocation: {:.1f} materials to infrastructure and {:.1f} to shipbuilding.",
-                                          last_allocation->construction_allocated,
-                                          last_allocation->shipbuilding_allocated);
+      view.priority_status += trf_at(locale, "ECONOMY_PRIORITY_ALLOCATION",
+          {std::format("{:.1f}", last_allocation->construction_allocated),
+           std::format("{:.1f}", last_allocation->shipbuilding_allocated)},
+          " Most recent allocation: {0} materials to infrastructure and {1} to shipbuilding.");
     else
-      view.priority_status += " It applies when demand competes; spare materials go to other work.";
-    view.income_rows = {{"COLONY ECONOMY", rate(currency, flow.colony_revenue_per_day), {}, true},
-                        {"SURFACE TRADE", rate(currency, flow.trade_revenue_per_day), {}, true}};
+      view.priority_status += tr_at(locale, "ECONOMY_PRIORITY_NOTE",
+          " It applies when demand competes; spare materials go to other work.");
+    view.income_rows = {{tr_at(locale, "ECONOMY_ROW_COLONY", "COLONY ECONOMY"), rate(currency, flow.colony_revenue_per_day), {}, true},
+                        {tr_at(locale, "ECONOMY_ROW_TRADE", "SURFACE TRADE"), rate(currency, flow.trade_revenue_per_day), {}, true}};
     double reserved{};
     if (research) for (const auto& funding : research->project_funding(player)) {
       const auto remaining = funding.reserved_milestone_credits - funding.consumed_milestone_credits;
@@ -247,28 +287,29 @@ NativeEconomyView build_economy_view(
       reserved += std::max(0., remaining);
     }
     if (!finite(reserved)) throw std::runtime_error("Research reservation is non-finite.");
-    view.cost_rows = {{"COLONY ADMINISTRATION", rate(currency, -flow.colony_administration_per_day)},
-      {"POPULATION SERVICES", rate(currency, -flow.population_services_per_day)},
-      {"HABITAT SUPPORT", rate(currency, -flow.habitat_support_per_day)},
-      {"FLEET OPERATIONS", rate(currency, -flow.fleet_operations_per_day)},
-      {"ORBITAL MAINTENANCE", rate(currency, -flow.orbital_maintenance_per_day)},
-      {"SURFACE MAINTENANCE", rate(currency, -flow.surface_maintenance_per_day)},
-      {"RESEARCH PROGRAMS", rate(currency, -flow.research_operations_per_day), " · " + amount(currency, reserved) + " RESERVED"}};
+    view.cost_rows = {{tr_at(locale, "ECONOMY_ROW_ADMIN", "COLONY ADMINISTRATION"), rate(currency, -flow.colony_administration_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_SERVICES", "POPULATION SERVICES"), rate(currency, -flow.population_services_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_HABITAT", "HABITAT SUPPORT"), rate(currency, -flow.habitat_support_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_FLEET", "FLEET OPERATIONS"), rate(currency, -flow.fleet_operations_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_ORBITAL", "ORBITAL MAINTENANCE"), rate(currency, -flow.orbital_maintenance_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_SURFACE", "SURFACE MAINTENANCE"), rate(currency, -flow.surface_maintenance_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_RESEARCH", "RESEARCH PROGRAMS"), rate(currency, -flow.research_operations_per_day),
+       trf_at(locale, "ECONOMY_ROW_RESERVED", {amount(currency, reserved)}, " · {0} RESERVED")}};
     return view;
   } catch (const EconomyUnavailable& error) {
-    auto view = unavailable(error.what());
+    auto view = unavailable(error.what(), locale);
     view.player_civilization_id = campaign.player_civilization_id;
     return view;
   } catch (const std::exception& error) {
-    auto view = failed(error);
+    auto view = failed(error, locale);
     view.player_civilization_id = campaign.player_civilization_id;
     return view;
   }
 }
 
-NativeEconomyController::NativeEconomyController() : projector_(build_economy_view) {}
+NativeEconomyController::NativeEconomyController() = default;
 NativeEconomyController::NativeEconomyController(Projector projector)
-    : projector_(projector ? std::move(projector) : Projector{build_economy_view}) {}
+    : projector_(std::move(projector)) {}
 
 void NativeEconomyController::require_owner() const {
   if (std::this_thread::get_id() != owner_)
@@ -287,10 +328,11 @@ bool NativeEconomyController::refresh(CampaignFrame& frame, const std::uint64_t 
   if (!same_identity) { failure_latched_ = false; generation_ = generation; observer_ = observer; view_ = {}; }
   ++attempted_refresh_count_;
   NativeEconomyView projected;
-  try { projected = projector_(campaign, &runtime.research(), last_allocation); }
-  catch (const std::exception& error) { projected = failed(error); }
+  try { projected = projector_ ? projector_(campaign, &runtime.research(), last_allocation)
+                               : build_economy_view(campaign, &runtime.research(), last_allocation, locale_); }
+  catch (const std::exception& error) { projected = failed(error, locale_); }
   if (projected.state == EconomyState::Ready && projected.player_civilization_id != observer)
-    projected = failed(std::runtime_error("Economy projection identity does not match the actual player observer."));
+    projected = failed(std::runtime_error("Economy projection identity does not match the actual player observer."), locale_);
   if (projected.state != EconomyState::Ready) projected.player_civilization_id = observer;
   projected.campaign_generation = generation;
   if (projected.state == EconomyState::Failed) failure_latched_ = true;
@@ -309,27 +351,30 @@ IndustryPriorityChangeResult NativeEconomyController::change_priority(
     CampaignFrame& frame, const std::uint64_t generation, const std::uint64_t view_revision,
     const IndustryPriority priority) {
   require_owner();
-  if (!valid_priority(priority)) return {false, "Unknown industry priority."};
+  const auto stale = [&] {
+    return IndustryPriorityChangeResult{false, tr_at(locale_, "ECONOMY_ERR_STALE",
+        "Economy changed; refresh before setting industry priority.")}; };
+  if (!valid_priority(priority)) return {false, tr_at(locale_, "ECONOMY_ERR_UNKNOWN_PRIORITY", "Unknown industry priority.")};
   if (!generation_ || !observer_ || *generation_ != generation || view_.state != EconomyState::Ready ||
       view_.revision == 0 || view_.revision != view_revision)
-    return {false, "Economy changed; refresh before setting industry priority."};
+    return stale();
   auto& campaign = frame.runtime().world().campaign();
-  if (campaign.player_civilization_id != *observer_) return {false, "Economy changed; refresh before setting industry priority."};
+  if (campaign.player_civilization_id != *observer_) return stale();
   try {
     const auto live = validate(campaign);
-    if (live.player.id != *observer_) return {false, "Economy changed; refresh before setting industry priority."};
+    if (live.player.id != *observer_) return stale();
   } catch (const std::exception&) {
-    return {false, "Economy changed; refresh before setting industry priority."};
+    return stale();
   }
   const auto player = std::ranges::find(campaign.civilizations, *observer_, &Civilization::id);
   if (std::ranges::count(campaign.civilizations, *observer_, &Civilization::id) != 1 ||
-      player == campaign.civilizations.end() || !player->is_player) return {false, "Economy changed; refresh before setting industry priority."};
+      player == campaign.civilizations.end() || !player->is_player) return stale();
   if (std::ranges::count(campaign.economies, *observer_, &CivilizationEconomy::civilization_id) != 1)
-    return {false, "Economy changed; refresh before setting industry priority."};
+    return stale();
   const auto economy = std::ranges::find(campaign.economies, *observer_, &CivilizationEconomy::civilization_id);
   if (economy == campaign.economies.end() ||
       economy->industry_priority.value_or(IndustryPriority::Balanced) != view_.industry_priority)
-    return {false, "Economy changed; refresh before setting industry priority."};
+    return stale();
   const auto result = set_industry_priority(campaign.economies, *observer_, *observer_, priority);
   if (result.accepted) view_.revision = 0;
   return result;

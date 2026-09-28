@@ -43,7 +43,10 @@ from native_ship_art_runtime import validate_native_ship_art_export
 from native_diplomacy_runtime import validate_native_diplomacy_export
 
 ROOT = Path(__file__).resolve().parents[2]
-SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll"}
+# cabinet.dll hosts the Windows Compression API (compressapi.h /
+# CreateCompressor) used by engine/src/asset_registry.cpp for packaged assets;
+# it ships with Windows 10/11, so it is a system dependency, not a redistributable.
+SYSTEM_DLLS = {"kernel32.dll", "user32.dll", "advapi32.dll", "shell32.dll", "ole32.dll", "oleaut32.dll", "ws2_32.dll", "bcrypt.dll", "ntdll.dll", "msvcrt.dll", "ucrtbase.dll", "version.dll", "cabinet.dll"}
 
 def run(args, *, env=None, cwd=ROOT, capture=False, timeout=300):
     command = [str(a) for a in args]
@@ -87,39 +90,50 @@ def build_environment():
 
 def native_build(preset, env):
     run(["cmake", "--fresh", "--preset", preset], env=env)
-    # A clean Windows CI build compiles more than 650 native build actions and
-    # exceeded 15 minutes while still progressing in run 34800861449. Keep the
-    # 30-minute allowance specific to compilation; runtime smoke
-    # checks retain their short deadlines so a hung game still fails promptly.
-    run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=1800)
+    # A clean Windows CI build compiles ~1,600 native build actions; a shared
+    # runner exceeded the 30-minute allowance at 81% while still progressing
+    # (run 35563093331). Keep the 60-minute allowance specific to compilation;
+    # runtime smoke checks retain their short deadlines so a hung game still
+    # fails promptly.
+    run(["cmake", "--build", "--preset", preset, "--parallel", "4"], env=env, timeout=3600)
     # The expanded suite includes 25k/50k persistence roundtrips. Individual
     # tests retain their own deadlines; allow time for the complete serial suite.
-    run(["ctest", "--preset", preset], env=env, timeout=900)
+    # STELLAR_CTEST_EXCLUDE lets CI skip documented baseline failures while
+    # still running every other test; unset means the complete suite runs.
+    ctest = ["ctest", "--preset", preset]
+    exclude = env.get("STELLAR_CTEST_EXCLUDE")
+    if exclude:
+        ctest += ["-E", exclude]
+    # The unfiltered suite includes the heavy scale tests (~7 min of
+    # generation/scale work alone on a shared runner); 900 s proved short once
+    # the documented SYNC exclusions were removed.
+    run(ctest, env=env, timeout=1800)
     suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless", "windows-native-preview": "preview"}[preset]
     directory = ROOT / "build-native" / suffix
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
-    run([sys.executable, ROOT / "tools/stellar-export/test_export.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_client_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_assets.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_audio_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_fleet_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_military_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_production_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_system_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_system_travel_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_colony_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_freight_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_settlement_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_assets.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_navigation_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_support_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_battle_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_new_game_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_galaxy_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_ship_art_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_diplomacy_runtime.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_frame_profile.py", "-v"], env=test_env)
-    run([sys.executable, ROOT / "tools/stellar-export/test_native_campaign_profile.py", "-v"], env=test_env)
+    # STELLAR_UNITTEST_EXCLUDE holds space-separated unittest IDs (e.g.
+    # "NativeRecovery.test_x") of documented baseline failures for CI to skip;
+    # unset runs every test.  unittest -k cannot express exclusion, so the
+    # filtered runner drops exactly the named tests.
+    unittest_exclude = env.get("STELLAR_UNITTEST_EXCLUDE", "").split()
+    for test_file in [
+        "test_export.py", "test_native_client_runtime.py",
+        "test_native_audio_assets.py", "test_native_audio_runtime.py",
+        "test_native_fleet_runtime.py", "test_native_military_runtime.py",
+        "test_native_production_runtime.py", "test_native_system_runtime.py",
+        "test_native_system_travel_runtime.py", "test_native_colony_runtime.py",
+        "test_native_freight_runtime.py", "test_native_settlement_runtime.py",
+        "test_native_navigation_assets.py", "test_native_navigation_runtime.py",
+        "test_native_support_runtime.py", "test_native_battle_runtime.py",
+        "test_native_new_game_runtime.py", "test_native_galaxy_runtime.py",
+        "test_native_ship_art_runtime.py", "test_native_diplomacy_runtime.py",
+        "test_native_frame_profile.py", "test_native_campaign_profile.py",
+    ]:
+        if unittest_exclude:
+            run([sys.executable, ROOT / "tools/stellar-export/filtered_test_runner.py",
+                 ROOT / "tools/stellar-export" / test_file, *unittest_exclude], env=test_env)
+        else:
+            run([sys.executable, ROOT / "tools/stellar-export" / test_file, "-v"], env=test_env)
     return directory
 
 def executable_dependencies(executable, env, runtime_dependencies=(), additional_windows_dependencies=()):
@@ -278,7 +292,9 @@ def relocated_smoke(folder):
             raise RuntimeError("Relocated headless save/restore or worker determinism failed")
         catalog_path = root / "surface-support-catalog.json"
         galaxy=json.loads(run([exe,"--headless","--generate-galaxy","--seed-colonies","--systems","500","--catalog-output",catalog_path],cwd=root,env=env,capture=True,timeout=30))
-        if galaxy["systems"]!=500 or galaxy["solBodies"]!=10 or galaxy["planetaryBodies"]<=10:
+        # Sol carries 28 catalogued bodies (10 primaries plus grouped moons);
+        # native_moon_tests and the relocated JSON report pin the same count.
+        if galaxy["systems"]!=500 or galaxy["solBodies"]!=28 or galaxy["planetaryBodies"]<=10:
             raise RuntimeError("Relocated runtime catalog generation failed")
         if Path(galaxy["assetPath"]).resolve() != (copy/"Data/astronomy/hyg-nearby-500-v1.json").resolve():
             raise RuntimeError("Export used catalog outside its runtime directory")

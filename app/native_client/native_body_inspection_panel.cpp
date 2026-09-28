@@ -58,7 +58,8 @@ void BodyInspectionPanel::scroll(float wheel,UiRect panel,float footer_top){
 }
 void BodyInspectionPanel::render(DrawList& out,UiRect panel,float footer_top) const {
   if(!value_)return;layout(panel,footer_top);
-  draw_text(out,{panel.x+14.f,panel.y+14.f,panel.width-28.f,28.f},"SYSTEM INSPECTOR",ink,18,panel);
+  const auto heading=locale_&&locale_->contains("SYSTEM_INSPECTOR")?std::string(locale_->translate("SYSTEM_INSPECTOR")):std::string("SYSTEM INSPECTOR");
+  draw_text(out,{panel.x+14.f,panel.y+14.f,panel.width-28.f,28.f},heading,ink,18,panel);
   draw_text(out,{panel.x+14.f,panel.y+47.f,panel.width-32.f,name_height_},value_->name,ink,17,panel);
   draw_text(out,{panel.x+14.f,panel.y+50.f+name_height_,panel.width-28.f,20.f},value_->survey_status,
             value_->confirmed?Color{109,229,174,255}:Color{248,195,109,255},12,panel);

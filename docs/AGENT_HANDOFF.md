@@ -18,6 +18,15 @@ old research/editor branch. The default branch does not represent this native
 working build. Engine `0.1.64`; game `0.1.14.2-dev`; source of truth:
 [`export/runtime-config.json`](../export/runtime-config.json).
 
+> **`work/foundation-1-30-codex-integration`** merges the
+> `engine/foundation-expansion-1-30` engine work (save history, replay,
+> input mapping, localization, developer tools, engine libraries) onto this
+> line without replacing its renderer/artwork/installer systems. Evidence:
+> [foundation-merge receipt](validation/2026-09-20-foundation-merge.md).
+> It awaits PR integration into `cpp/codex-native-architecture-integration`.
+> Consumer-audit conclusion and final validation:
+> [consumer-audit receipt](validation/2026-09-22-consumer-audit.md).
+
 ## Read in this order
 
 1. [Project state](PROJECT_STATE.md) and [verification receipt](validation/2026-09-20-development-sync.md).
@@ -81,6 +90,139 @@ ice optics, sharper rings, independent flare timing and scoped simulation
 lookup/image-memory optimizations. [Progress](DEVELOPMENT_PROGRESS.md) links the
 owners and evidence. Do not infer that a historical report describes the latest
 behavior when a newer correction supersedes it.
+
+**Standalone engine platform:** `stellar-engine.exe` is the engine-only tools
+host (no game module). Its Projects tool drives the full game-project loop:
+`engine::EngineProject` manifests (`project.stellar.json`, `EngineProject::save`
+atomic rewrite), `create_project` scaffolding (base package, content dirs,
+`mods/`, generated consumer `CMakeLists.txt`, windowed ECS starter
+`src/main.cpp` running a `World` Transform/Velocity loop), asset import,
+generic `scan_content` cooking into project-namespaced packages with
+streamed `done/total` progress, BUILD with a live `build.log` tail, RUN,
+EDITOR (launches `stellar-editor.exe --project <root>`; its documents live
+in `<project>/editor/`), PACKAGE (distributable `dist/<name>/` = host +
+runtime + `Content/` + `packages/`), and RENAME via the name field.
+BUILD/RUN consume the exported `engine-sdk/` beside the shell (headers,
+prebuilt libs, SDL3 runtime + default font, `stellar::engine`/
+`stellar::cooker`/`stellar::platform`/`stellar::audio` consumer targets);
+the shell itself accepts `--project <root>` and `--tool <name>`, and the
+whole loop is scriptable headlessly via `--create/--cook/--build/
+--package/--run/--test` (verbs dispatch before the asset-browser scan
+and may follow `--project <root>`). The Assets tool re-roots to project content and can toggle
+between SOURCE files and COOKED `runtime.stmanifest` records. The Scene
+tool authors `editor/scene.json` (`engine::SceneDocument` — named
+entities with position/extent/velocity/tint/optional sprite) with
+bounded undo/redo (`engine::UndoHistory`, Ctrl+Z/Y + buttons),
+DUPLICATE, and preview click-select/drag; the
+windowed starter is now a ~20-line `RuntimeHost` client: the engine's
+`stellar_engine_runtime` lib (`engine::RuntimeHost`, exported as
+`stellar::runtime`) owns the SDL loop, package scan, `ContentResolver`
+(cooked `Content/` or `build/cooked/` first, loose
+`packages/<id>/content/` fallback, `pkg:path` qualified lookups
+for mod packages), the `scene_components` ECS set (registered codecs
+for every field), `spawn_scene`/`scene_from_world`, scene-file hot
+reload, action-mapped player input, music/effects audio, F5/F9 quicksave
+through `saves/quicksave.stw` (atomic write plus a rotated `.bak`
+history chain — load recovers through the slots), and
+`RuntimeDiagnostics` crash dumps in `<root>/logs/`. Input runs through
+`InputMapper`: a built-in "game" context binds WASD/arrows/D-pad,
+left-stick `move_x`/`move_y` axes, Space/LMB/pad-RB fire and C/pad-West
+mine; `host.input()` exposes the mapper and `--input-map` stacks project
+contexts (gamepads hot-plug via `SDL_INIT_GAMEPAD`, first pad wins).
+Game code hooks
+in via `on_update`/`on_event`/`on_status`/`on_collision`/`on_draw`
+callbacks and drives the loop with `request_quit()`/`set_paused()`/
+`set_time_scale()`/`set_scene()` (level switching)/`spawn_entity()`/
+`destroy_entity()`/`set_camera()`/`tile_at()`/`set_tile_at()`.
+Runtime options/args: `--scene`,
+`--fixed-hz` (deterministic N-step-per-frame under `--frames`),
+`--frames` (bounded CI runs), `--snapshot-out` (byte-comparable world
+dumps), `--world-w/--world-h`, `--speed`, `--width/--height`,
+`--fullscreen`, `--input-map`, `--move-speed`, `--jump`, `--save`;
+P pauses, F12 screenshots to `<root>/screenshots/`.
+`SceneEntity` authoring surface: name, position/extent/velocity,
+tint, sprite path, layer (stable-sorted draw order), parallax
+(0 = screen-pinned), text label, gravityScale + solid (platformer
+physics: doc-level gravity, landing on solid tops, side blocking,
+ceiling bumps, grounded W/Up jump — solid/tilemap blocking applies
+to all movers, so gravity-free scenes get top-down walls), sprite-sheet `frames`/`fps`/`fcols` (sim-time
+indexed; `fcols` slices grid sheets, 0 = strip; `animLoop`
+false holds the last frame),
+`rotation`, `ttl` (sim-time self-destruct),
+`flipX`/`flipY`, `visible`, `bounce`, `spin`, `data`, `opacity`,
+`oneway`, `vfx` (named emitter auto-attached on spawn and re-attached after save restore — definitions can be declared in the document's `emitters` array: rate/lifetime/velocity/spread/gravity/over-life curves/max/LOD, so particles need no game code),
+and `parent` — name-keyed attachment resolved by
+`resolve_hierarchy` each sim step: children keep their authored
+offset and follow the resolved parent (chains root-first; cycles
+and missing parents keep the last position), while a child's own
+world-space motion re-bakes into its stored offset. Attachments
+survive save/load since the component stores the parent's name, not
+its entity id. Scenes also carry a `tilemaps`
+array (`SceneTilemap`: tileset image path, `x`/`y` grid origin in
+world px, `tileW`/`tileH`, `columns`, `layer`, `parallax`, `collide`,
+row-major `cells` with `-1` empty; legacy single-`"tilemap"` documents
+still parse) —
+each tilemap lives in the world as a `Tilemap` component on its own
+dedicated entity in document order (`host.tilemap_entities()`,
+`tilemap_entity()` returns the first), so cell state is authoritative:
+runtime edits (destructible terrain) snapshot with F5/F9 saves and
+`scene_from_world` re-exports every map. RuntimeHost renders each map
+through the sprite path at its own layer/parallax (stable layer sort
+interleaved with entities) and runs cell collision against every
+`collide` map using that map's geometry (side-blocking, top landing,
+grounded) in the same authoritative pass. `tile_at`/`set_tile_at`
+address the first map; layered games use `tilemap_entities()`. The
+Scene tool exposes every field in an adaptive multi-column property
+list with an animated/flipped/rotated preview that paints all maps,
+plus TILES + / MAP k/n / TILES - layer-stack controls, tilemap fields
+(tileset, tile size, columns, collide, layer, parallax, cells CSV,
+brush id) that edit the selected map, and a PAINT mode that
+click/drag-writes cells in the preview with a grid overlay, a
+tileset picker strip along the preview's top edge (click a tile to
+make it the brush), and one undo step per stroke.
+`stellar-editor.exe` is the separate authoritative-world editor
+(galaxy/system/body workspaces, annotations, undo, atomic project
+documents, `--project` interop). Both are registry rows in
+[ENGINE_CAPABILITIES.md](ENGINE_CAPABILITIES.md).
+
+**3D scene mode:** generated projects can also run 3D worlds —
+`RuntimeHostOptions::scene3d` / `--scene3d` loads
+`editor/scene3d.json` (`engine::Scene3dDocument`: camera pos/yaw/pitch/
+fov/near/far, world-space key light + intensity, background, `gravity`,
+`groundY` rest plane, `bounds`, `music`, shared `emitters`) into the
+same World as a separate `Transform3D`/`Velocity3D`/`MeshRef`/
+`TextureRef`/`DoubleSided`/`Parent3D` entity set (registered codecs —
+F5/F9 snapshots cover it, `load_world` partitions it back out). Mesh
+specs are `box[:sx,sy,sz]`/`annulus:i,o[,seg]`/`sphere[:cols,rows]` or
+content-relative `.obj` paths (`load_obj_mesh`); `Mesh3D` carries local
+AABB bounds that become each entity's `ObBox3D` under rotation+scale —
+`obb_separation` (SAT over the 15 candidate axes, physics3d.hpp) gives
+both the overlap test and the minimum translation vector for solid
+push-out/landing, while the rotated world AABB still drives ground
+resting, `bounds`, and broad-phase pair rejection. The host flies the
+camera via the rebindable "game" context
+(WASD + Space/C + right-drag look + wheel fov, `--fly-speed`),
+integrates gravity/velocity at the fixed timestep, fires
+`on_collision`/`on_land`/`on_spawn3d`, and renders through
+`Scene3DView` under the 2D pass (2D entities remain HUD). Helpers:
+`entities3d()`, `entities3d_in_radius`, `spawn_entity3d`,
+`set_camera3d` + getters. Narrow-phase collision is SAT OBB over each
+entity's rotated+scaled mesh bounds; the camera snapshots via a
+`Camera3DState` carrier;
+`lights` adds up to two directional fills; windowed projects ship a
+starter `editor/scene3d.json`. `raycast3d(origin,dir,max)` casts
+against actual mesh triangles in each mesh's local frame
+(`physics3d::segment_triangle`, rotation+scale aware) and returns the
+nearest `{entity,distance,point}`; `entity3d_at(sx,sy)` is the
+screen-space pick counterpart of `entity_at`. The engine shell's
+**Scene3D tab** authors `editor/scene3d.json` end-to-end: entity list +
+all entity/document fields, undo history, a live `Scene3D` preview
+(shares `resolve_mesh_spec`/texture decode with the runtime), right-drag
+camera orbit, wheel fov, and click-select via `raycast_world3d` over a
+scratch `spawn_scene3d` world. Limitations: OBB-over-mesh-bounds (not
+per-triangle) collision, no rigid-body solver, ground/`bounds` still use
+the world AABB, raycast is O(tris) per entity with no spatial partition,
+editor has no transform gizmos — see the registry record.
 
 **Recommended next workstream: native validation and release reliability.**
 Start from this branch in an isolated checkout; fix the failures recorded in

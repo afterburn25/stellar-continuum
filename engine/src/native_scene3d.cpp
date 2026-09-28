@@ -1,6 +1,7 @@
 #include <stellar/engine/native_scene3d.hpp>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <stdexcept>
 #include <unordered_set>
@@ -125,13 +126,17 @@ std::shared_ptr<const Mesh3D> Mesh3D::create(std::vector<Vertex3D> vertices,std:
   if(vertices.empty()||indices.empty()||vertices.size()>maximum_mesh3d_vertices||indices.size()>maximum_mesh3d_indices||indices.size()%3)
     throw std::invalid_argument("3D mesh exceeds its budget or has incomplete triangles.");
   float radius=0;
+  Vec3 bounds_min{std::numeric_limits<float>::max(),std::numeric_limits<float>::max(),std::numeric_limits<float>::max()};
+  Vec3 bounds_max{-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max()};
   for(auto& v:vertices){
     if(!valid(v.position)||!bounded(v.uv.x,1)||!bounded(v.uv.y,1)||v.uv.x<0||v.uv.y<0)
       throw std::invalid_argument("3D mesh requires bounded vertices and normalized texture coordinates.");
     v.normal=normalized(v.normal);radius=std::max(radius,std::hypot(v.position.x,v.position.y,v.position.z));
+    bounds_min.x=std::min(bounds_min.x,v.position.x);bounds_min.y=std::min(bounds_min.y,v.position.y);bounds_min.z=std::min(bounds_min.z,v.position.z);
+    bounds_max.x=std::max(bounds_max.x,v.position.x);bounds_max.y=std::max(bounds_max.y,v.position.y);bounds_max.z=std::max(bounds_max.z,v.position.z);
   }
   for(auto i:indices)if(i>=vertices.size())throw std::invalid_argument("3D mesh index is outside its vertex array.");
-  return std::shared_ptr<const Mesh3D>(new Mesh3D(std::move(vertices),std::move(indices),radius));
+  return std::shared_ptr<const Mesh3D>(new Mesh3D(std::move(vertices),std::move(indices),radius,bounds_min,bounds_max));
 }
 std::shared_ptr<const Mesh3D> Mesh3D::uv_sphere(int columns,int rows){
   if(columns<3||rows<2||columns>512||rows>256)throw std::invalid_argument("3D sphere tessellation is out of range.");

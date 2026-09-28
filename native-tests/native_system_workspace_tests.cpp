@@ -66,6 +66,12 @@ int main(int argc,char**argv)try{
     require(has_overlay_text(fitted,"Zoom 1.00x"),"Magnification indicator did not follow Fit System");
     camera_test.inspect_small_body(1);camera_test.focus_small_body(1920,1080);DrawList draw;camera_test.render(draw,1920,1080);
     require(camera_test.small_body_statistics().visible>0&&camera_test.viewport()->scale>5,"Small ice-body focus failed to magnify the actual body");
+    const auto focused=camera_test.focused_small_body();
+    require(focused&&focused->id==small_body_instance(camera_test.snapshot()->small_body_fields[1],0).id,"Focused small body did not resolve to the inspected instance");
+    const auto solids=camera_test.small_body_scene();
+    require(solids&&solids->instances().size()==camera_test.small_body_statistics().solid_bodies,"Submitted small-body scene did not match the render statistics");
+    if(focused->material>=stellar::core::SmallBodyMaterial::WaterIce)
+      require(std::ranges::any_of(solids->instances(),[](const auto& instance){return instance.material.dielectric.has_value();}),"Focused icy solid lost its dielectric optics");
   }
   {
     NativeSystemWorkspace tracked;tracked.open(reference,1920,1080);

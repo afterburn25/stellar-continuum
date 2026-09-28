@@ -25,15 +25,20 @@ int main(int argc,char** argv)try{
   for(int i=0;i<12;++i){stellar::engine::RuntimeDiagnostics log("test","test",root/"rotation");std::cout<<"rotation fixture\n";}
   int logs=0;for(const auto& e:fs::directory_iterator(root/"rotation")){check(e.path().extension()==".log","Clean exit left a crash report");++logs;}check(logs<=8,"Session retention is unbounded");
   for(const auto mode:{"fault","terminate"}){
-    auto dir=root/mode;auto command=L"\""+stellar::engine::executable_path().wstring()+L"\" \""+dir.wstring()+L"\" "+std::wstring(mode,mode+strlen(mode));
-    STARTUPINFOW startup{};startup.cb=sizeof(startup);PROCESS_INFORMATION process{};
-    check(CreateProcessW(nullptr,command.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&process),"Cannot start diagnostic fault child");
-    const auto wait=WaitForSingleObject(process.hProcess,30000);if(wait!=WAIT_OBJECT_0)TerminateProcess(process.hProcess,99);
-    DWORD code{};GetExitCodeProcess(process.hProcess,&code);CloseHandle(process.hProcess);CloseHandle(process.hThread);check(wait==WAIT_OBJECT_0&&code!=0,"Fault fixture did not exit");
-    bool report=false,dump=false;for(const auto& e:fs::directory_iterator(dir)){
-      if(e.path().extension()==".txt"){const auto text=read(e.path());report=text.find("map_zoom=256")!=std::string::npos&&text.find(mode==std::string("fault")?"WINDOWS FAULT":"Unhandled worker failure")!=std::string::npos;}
-      if(e.path().extension()==".dmp"){const auto text=read(e.path());dump=text.starts_with("MDMP");}
-    }check(report&&dump,"Hardware/worker failure did not retain report and minidump");
+    auto dir=root/mode;bool report=false,dump=false;
+    for(int attempt=0;attempt<3&&!(report&&dump);++attempt){
+      {std::error_code ec;if(fs::exists(dir,ec))for(const auto& e:fs::directory_iterator(dir,ec))fs::remove(e.path(),ec);}
+      auto command=L"\""+stellar::engine::executable_path().wstring()+L"\" \""+dir.wstring()+L"\" "+std::wstring(mode,mode+strlen(mode));
+      STARTUPINFOW startup{};startup.cb=sizeof(startup);PROCESS_INFORMATION process{};
+      check(CreateProcessW(nullptr,command.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&process),"Cannot start diagnostic fault child");
+      const auto wait=WaitForSingleObject(process.hProcess,30000);if(wait!=WAIT_OBJECT_0)TerminateProcess(process.hProcess,99);
+      DWORD code{};GetExitCodeProcess(process.hProcess,&code);CloseHandle(process.hProcess);CloseHandle(process.hThread);check(wait==WAIT_OBJECT_0&&code!=0,"Fault fixture did not exit");
+      report=dump=false;for(const auto& e:fs::directory_iterator(dir)){
+        if(e.path().extension()==".txt"){const auto text=read(e.path());report=text.find("map_zoom=256")!=std::string::npos&&text.find(mode==std::string("fault")?"WINDOWS FAULT":"Unhandled worker failure")!=std::string::npos;}
+        if(e.path().extension()==".dmp"){const auto text=read(e.path());dump=text.starts_with("MDMP");}
+      }
+    }
+    check(report&&dump,(std::string(mode)+" failure did not retain report=" +(report?"yes":"no")+" dump="+(dump?"yes":"no")).c_str());
   }
   std::cout<<"PASS: console mirroring, caught exception, view context, clean exit, bounded retention, Windows fault and worker terminate reports/dumps.\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

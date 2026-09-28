@@ -1,4 +1,5 @@
 #include <stellar/core/stellar_object.hpp>
+#include <stellar/core/stellar_orbits.hpp>
 #include <stellar/core/stellar_population_profiles.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/galaxy_payload_json.hpp>
@@ -48,7 +49,7 @@ int main(int argc,char** argv)try {
     check(first.galactic_core&&first.galactic_core->black_hole&&first.core,"One separate central object");
     check(first.core->position.x==full_galaxy_core(size).position.x&&first.core->position.y==full_galaxy_core(size).position.y,"Core at configured dynamical center");
     for(const auto& s:first.systems)check(std::hypot(s.position.x-first.core->position.x,s.position.y-first.core->position.y)>=first.core->exclusion_radius,"Empty central zone");
-    for(const auto& b:first.bodies) {const auto& p=*first.systems.at(static_cast<std::size_t>(b.system_id)).stellar_object;check(b.stellar_exposure.has_value(),"Persisted orbital exposure");check(b.stellar_exposure->orbit_au>p.destruction_radius_au,"No intact engulfed planet");if(b.stellar_exposure->baked)check(!b.legacy_colonization_candidate,"No baked candidate");}
+    for(const auto& b:first.bodies) {const auto& sys=first.systems.at(static_cast<std::size_t>(b.system_id));check(b.stellar_exposure.has_value(),"Persisted orbital exposure");const auto host=stellar_host_physics(sys,planetary_stellar_host(sys,b.id));check(b.stellar_exposure->orbit_au>host.destruction_radius_au,"No intact engulfed planet");if(b.stellar_exposure->baked)check(!b.legacy_colonization_candidate,"No baked candidate");}
     std::cout<<size<<" systems deterministic/save round trip passed in "<<std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()<<" s\n";
     if(size==500&&argc>2){std::ofstream report(argv[2]);report<<stellar_population_diagnostics(first.systems,first.bodies,*options.stellar_population,first.galactic_core->black_hole,42);}
   }

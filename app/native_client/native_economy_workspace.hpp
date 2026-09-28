@@ -2,12 +2,15 @@
 
 #include "native_economy.hpp"
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace stellar::native_economy {
@@ -39,6 +42,7 @@ class NativeEconomyWorkspace final {
   void clear() noexcept;
   [[nodiscard]] bool visible() const noexcept { return visible_; }
   void set_text_measurer(TextMeasurer measure);
+  void set_localization(const stellar::engine::LocalizationTable *table);
   void set_notice(std::string notice);
   [[nodiscard]] float scroll_offset() const noexcept { return scroll_; }
 
@@ -62,7 +66,13 @@ class NativeEconomyWorkspace final {
   void reset_gesture() noexcept;
   [[nodiscard]] PressTarget hit(native_map::Point, const EconomyLayout&) const noexcept;
   [[nodiscard]] static core::IndustryPriority priority_for(PressTarget) noexcept;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string
+  trf(std::string_view key, std::initializer_list<std::string> args,
+      std::string_view fallback) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   bool visible_{}, pointer_owned_{}, dragging_{};
   PressTarget pressed_{PressTarget::None};
   native_map::Point press_point_{};

@@ -72,6 +72,37 @@ EconomyLayout EconomyLayout::for_viewport(int width,int height) noexcept {
 }
 
 void NativeEconomyWorkspace::reset_gesture() noexcept { pointer_owned_=dragging_=false; pressed_=PressTarget::None; }
+std::string NativeEconomyWorkspace::tr(std::string_view key,
+                                       std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+std::string NativeEconomyWorkspace::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
+void NativeEconomyWorkspace::set_localization(
+    const stellar::engine::LocalizationTable *table) {
+  if (locale_ == table) return;
+  locale_ = table;
+  cache_.valid = false;
+}
+
 void NativeEconomyWorkspace::open() noexcept { visible_=true; scroll_=0; reset_gesture(); }
 void NativeEconomyWorkspace::close() noexcept { visible_=false; reset_gesture(); }
 void NativeEconomyWorkspace::clear() noexcept { close(); notice_.clear(); cache_={}; observed_generation_=observed_revision_=0; observed_observer_=0; }
@@ -106,22 +137,22 @@ const NativeEconomyWorkspace::Cache& NativeEconomyWorkspace::cache_for(const Nat
       cache_.content_height+=tile_height+tile_gap;
     }
     cache_.content_height+=2.f*layout.scale;
-    add("TREASURY HEALTH",view.treasury_status,view.treasury_healthy,!view.treasury_healthy);
-    add("INDUSTRIAL PRIORITY",view.priority_status,true);
-    add("INCOME", "", true);
+    add(tr("ECONOMY_HEALTH","TREASURY HEALTH"),view.treasury_status,view.treasury_healthy,!view.treasury_healthy);
+    add(tr("ECONOMY_PRIORITY","INDUSTRIAL PRIORITY"),view.priority_status,true);
+    add(tr("ECONOMY_INCOME","INCOME"), "", true);
     for(const auto& r:view.income_rows) add(r.label,r.value+r.suffix,true);
-    add("OPERATING COSTS", "", false,true);
+    add(tr("ECONOMY_COSTS","OPERATING COSTS"), "", false,true);
     for(const auto& r:view.cost_rows) add(r.label,r.value+r.suffix,false,true);
-    add("TREASURY GUIDANCE", "Construction and ship orders are capital costs. Active research and operations are daily commitments.",true);
+    add(tr("ECONOMY_GUIDANCE_HEADING","TREASURY GUIDANCE"), tr("ECONOMY_GUIDANCE_TEXT","Construction and ship orders are capital costs. Active research and operations are daily commitments."),true);
   } else {
     const auto failed=view.state==EconomyState::Failed;
-    add("TREASURY DATA UNAVAILABLE",failed
-        ? "Treasury data could not be refreshed. Retry to request a new snapshot."
-        : "Treasury data is unavailable for the current observer. Retry after a campaign is available.",false,true);
+    add(tr("ECONOMY_UNAVAILABLE_HEADING","TREASURY DATA UNAVAILABLE"),failed
+        ? tr("ECONOMY_UNAVAILABLE_FAILED","Treasury data could not be refreshed. Retry to request a new snapshot.")
+        : tr("ECONOMY_UNAVAILABLE_EMPTY","Treasury data is unavailable for the current observer. Retry after a campaign is available."),false,true);
     // Diagnostics belong in the application's log. A player-facing workspace
     // must not expose exception text or a serialized campaign/player object.
   }
-  if(!notice_.empty()) add("ECONOMY NOTICE",notice_,true);
+  if(!notice_.empty()) add(tr("ECONOMY_NOTICE","ECONOMY NOTICE"),notice_,true);
   if(!cache_.rows.empty()) cache_.content_height-=6.f*layout.scale;
   cache_.valid=true; return cache_;
 }
@@ -170,14 +201,16 @@ EconomyCommand NativeEconomyWorkspace::handle(const InputEvent& event,const Nati
 void NativeEconomyWorkspace::render(DrawList& out,const NativeEconomyView& view,int width,int height) const {
   if(!visible_) return; const auto layout=EconomyLayout::for_viewport(width,height); const auto& rows=cache_for(view,layout,width,height); const auto maximum=std::max(0.f,rows.content_height-layout.body.height); scroll_=std::clamp(scroll_,0.f,maximum);
   native_ui_style::menu_panel(out,layout.panel); fill(out,layout.body,inset);
-  text(out,layout.header,layout.panel,"SOVEREIGN TREASURY",gold,layout.heading_font_pixels);
-  native_ui_style::panel(out,layout.refresh,false,false); text(out,layout.refresh,layout.refresh,view.state==EconomyState::Ready?"REFRESH":"RETRY",accent,layout.small_font_pixels,TextAlign::Center);
+  text(out,layout.header,layout.panel,tr("ECONOMY_TITLE","SOVEREIGN TREASURY"),gold,layout.heading_font_pixels);
+  native_ui_style::panel(out,layout.refresh,false,false); text(out,layout.refresh,layout.refresh,tr(view.state==EconomyState::Ready?"ECONOMY_REFRESH":"ECONOMY_RETRY",view.state==EconomyState::Ready?"REFRESH":"RETRY"),accent,layout.small_font_pixels,TextAlign::Center);
   native_ui_style::panel(out,layout.close,false,false); text(out,layout.close,layout.close,"X",ink,layout.body_font_pixels,TextAlign::Center);
-  const auto guidance=view.state==EconomyState::Ready?view.priority_guidance:"Treasury information is unavailable. Retry when the campaign is ready.";
+  const auto unavailable=tr("ECONOMY_UNAVAILABLE_GUIDANCE","Treasury information is unavailable. Retry when the campaign is ready.");
+  const auto guidance=view.state==EconomyState::Ready?view.priority_guidance:unavailable;
   const auto notice=notice_.empty()?guidance:notice_+"  |  "+guidance;
   text(out,layout.notice,layout.notice,notice,view.state==EconomyState::Ready?muted:warning,layout.small_font_pixels);
+  constexpr std::array<const char*,3> keys{"ECONOMY_POLICY_BALANCED","ECONOMY_POLICY_INFRASTRUCTURE","ECONOMY_POLICY_SHIPBUILDING"};
   constexpr std::array<const char*,3> labels{"BALANCED","INFRASTRUCTURE","SHIPBUILDING"};
-  for(int i=0;i<3;++i) { const bool active=static_cast<int>(view.industry_priority)==i; const bool enabled=view.state==EconomyState::Ready&&!active; native_ui_style::panel(out,layout.priority_buttons[i],false,active); text(out,layout.priority_buttons[i],layout.panel,labels[i],enabled?ink:muted,layout.small_font_pixels,TextAlign::Center); }
+  for(int i=0;i<3;++i) { const bool active=static_cast<int>(view.industry_priority)==i; const bool enabled=view.state==EconomyState::Ready&&!active; native_ui_style::panel(out,layout.priority_buttons[i],false,active); text(out,layout.priority_buttons[i],layout.panel,tr(keys[i],labels[i]),enabled?ink:muted,layout.small_font_pixels,TextAlign::Center); }
   for(const auto& r:rows.rows) {
     UiRect box{layout.body.x,layout.body.y+r.y-scroll_,layout.body.width,r.height};
     if(r.tile) { const auto gap=6.f*layout.scale; const auto tile_width=(layout.body.width-2.f*gap)/3.f; box.x+=static_cast<float>(r.tile_column)*(tile_width+gap);box.width=tile_width; }
