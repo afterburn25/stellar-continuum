@@ -94,7 +94,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `core/src/campaign_coordinator.cpp` — `GalaxySimulationStepCoordinator`
   caches the catalog index member and rebuilds it only when the body span
   identity (data pointer, size, front/back ids) changes, since rebuilding
-  ~150k hash entries per tick erased the win.
+  ~150k hash entries per tick erased the win. The same cached index is also
+  attached to the `construction` phase's world so `promote`, `lock()` and
+  surface placement checks stop rescanning the catalog there as well
+  (construction phase ~0.9 ms -> ~0.02 ms mean at 2,500 systems).
 - Semantics: unchanged — request-scoped `bodies_for` still resolves colony
   (system id, body id) keys to the first catalog match; catalog-scoped id
   lookups expose distinct first/last matches so duplicate-id edge cases stay

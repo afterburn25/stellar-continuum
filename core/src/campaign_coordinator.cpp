@@ -659,8 +659,11 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          auto &campaign = step_.state->campaign();
          const double phase_days =
              step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
+         auto construction =
+             construction_world(campaign, construction_capability_);
+         construction.body_index = &catalog_body_index(campaign);
          step_.result->construction_events = advance_construction(
-             construction_world(campaign, construction_capability_),
+             construction,
              std::span<const ConstructionIndustryBudget>{
                  step_.construction_budgets},
              phase_days);

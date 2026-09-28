@@ -251,3 +251,25 @@ Remaining honest limitations: most offers are rejected (75/79) —
 the peace scorer is intentionally conservative; trespass counts rise
 post-settlement as parked fleets become trespassers again under
 peace; engagement still requires co-location (no operational war plan).
+
+## Performance refresh: canonical run at commit `a6084828`+ (2026-09-28)
+
+Same command as the header run (5,000 systems / 22 pre-warp + 3 ancients /
+7,300 ticks / step 5 days / `--repeat 2` / `--stress-fleets 50` /
+`--events-root data/events` / `--verify-continuation-tick 3650`), re-run
+after the late-game performance arc (lazy exploration mission selection,
+indexed per-advance lookups, colonization catalog indexing, strategic
+input lazy probe, shared adaptive-research credit-flow index, cached
+automatic-orders body index):
+
+- `repeatFinalStatesDeterministic: true`, `continuationDeterministic:
+  true`; continuation save 145,103,156 bytes.
+- Final hash `f9c5f28cd673ddf6d213db342779cdfa1c920b2891ad910a2ddc26052e20d012`
+  — differs from the header receipt because semantic changes (organic war
+  settlement, belligerent contact reacquisition, research scheduling)
+  landed since `2af8d120`; this hash is the current-commit baseline.
+- **Step mean 16.03 ms** (was 65.31 ms in the header receipt — ~4.1x),
+  p95 26.36 ms, peak 78.07 ms; working set 520.7 MB / peak 2,263.4 MB.
+- Phase means: construction 6.66 ms (top; pre-indexing), adaptive_research
+  2.67, strategic_ai 2.15, economy 1.67, automatic_orders 1.21,
+  exploration 0.60, core_total 12.92.
