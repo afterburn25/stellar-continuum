@@ -199,6 +199,11 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `replay-divergence-42293.json`, and leaf-diffs to
   `Galaxy.Fleets[0].LocalTransitPositionX` in the `.diff.txt` —
   the section-localizing contract works end-to-end.
+- Suite re-run on the post-replay-fix binary (`85a27563`): parallel
+  `-j8` pass produced 325/327 with `campaign_phase_cadence_oracle`
+  (timeout) and `native_planetary_screen` (SEGFAULT under load); both
+  pass serially. Effective 327/327 — same load-contention signature as
+  earlier sweeps; no regression.
 
 ## Known limitations
 
