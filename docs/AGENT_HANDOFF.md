@@ -91,6 +91,17 @@ lookup/image-memory optimizations. [Progress](DEVELOPMENT_PROGRESS.md) links the
 owners and evidence. Do not infer that a historical report describes the latest
 behavior when a newer correction supersedes it.
 
+**Graphics integration (branch `game/ui-visual-overhaul`, PR #338):** the
+`engine/space-graphics-overhaul` renderer is fully adopted in the runtime —
+system/planetary/battle/fleet Scene3D surfaces, phenomena emission volumes,
+small-body lighting/LOD fade, quality propagation to every view, accessibility
+gates (reduce-motion/reduce-flashing/high-contrast) on 3D scenes, and the
+DebugView3D diagnostics panel. Per-commit record and the adopted-vs-declined
+engine-API inventory live in [UI_UX_OVERHAUL_PLAN.md](UI_UX_OVERHAUL_PLAN.md);
+open renderer/core needs stay filed in
+[GAME_VISUAL_ENGINE_REQUESTS.md](GAME_VISUAL_ENGINE_REQUESTS.md). Suite: 327/327;
+live smokes green at every quality tier and both density extremes.
+
 **Space-strategy specialization (branch
 `engine/space-strategy-simulation-specialization`):** Stellar Engine is being
 specialized into a space strategy/simulation engine — see
