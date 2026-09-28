@@ -1530,6 +1530,28 @@ class NativeCampaign final {
       system_workspace_.close();
     }
     std::cout<<"black_hole=accretion_disc_artwork_submitted_passed\n";
+    {
+      const auto jet_system=std::ranges::find_if(revealed.systems,[&](const auto& s){
+        return s.stellar_object&&s.stellar_object->jet_half_angle_radians>0;});
+      if(jet_system==revealed.systems.end())std::cout<<"relativistic_jets=no_jet_bearing_system_in_galaxy\n";
+      else{
+        if(!enter_system(jet_system->id,width,height))throw std::runtime_error("Jet smoke cannot enter the jet-bearing system.");
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);int settled=0;
+        do { route({{InputEventType::PointerMove,{0,0}}});(void)scene(width,height);settled=artwork_ready()?settled+1:0;
+          if(std::chrono::steady_clock::now()>deadline)throw std::runtime_error("Jet system artwork failed to settle.");
+          std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }while(settled<40);
+        const auto rendered=scene(width,height);
+        const auto spindle=std::ranges::any_of(rendered.world,[](const auto& command){
+          const auto*view=std::get_if<Scene3DView>(&command);
+          return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){
+            return i.material.transparent&&i.material.ambient>0&&i.material.diffuse==0&&i.material.pbr&&i.material.pbr->emissive_strength>1.f;});});
+        if(!spindle)throw std::runtime_error("Jet-bearing system emitted no luminous jet spindle.");
+        draw(rendered,L"-jet-system");
+        system_workspace_.close();
+        std::cout<<"relativistic_jets=luminous_spindle_submitted_passed\n";
+      }
+    }
     if(!enter_system(sol_system_id,width,height))throw std::runtime_error("Small-body smoke cannot enter Sol.");
     capture_planet(L"-belts-sol-overview");
     const auto belts_launcher=trf("SMALLBODY_LAUNCHER",{""},"BELTS & DEBRIS  {0}");

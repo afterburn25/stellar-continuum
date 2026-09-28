@@ -236,6 +236,17 @@ int main(int argc,char**argv)try{
     require(active_view!=legacy_draw.world.end(),"Accreting black hole emitted no beamed disc");
     const auto&active_material=std::ranges::find_if(std::get<Scene3DView>(*active_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
     require(active_material.orbital_beaming_tint>disc_material.orbital_beaming_tint,"Accreting and quiescent discs are not differentiated");
+    legacy.stellar_object=generate_stellar_physics(13,StellarObjectType::JetBlackHole);
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto jet_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){
+        return i.material.transparent&&i.material.ambient>0&&i.material.diffuse==0&&i.material.pbr&&i.material.pbr->emissive_strength>1.f;});});
+    require(jet_view!=legacy_draw.world.end(),"Jet black hole emitted no luminous jet spindle");
+    const auto&jet_instance=*std::ranges::find_if(std::get<Scene3DView>(*jet_view).scene->instances(),[](const auto&i){
+      return i.material.transparent&&i.material.ambient>0&&i.material.diffuse==0&&i.material.pbr&&i.material.pbr->emissive_strength>1.f;});
+    require(jet_instance.material.texture&&jet_instance.material.texture->height()==64,"Jet spindle lost its base-glow gradient");
+    require(jet_instance.scale>0,"Jet spindle submitted with no authoritative reach");
     legacy.stellar_object.reset();
   }
   // Read-only preparation is bound to the exact admitted body and observer.

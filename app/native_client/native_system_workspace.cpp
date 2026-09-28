@@ -5,6 +5,8 @@
 #include "native_ui_layout.hpp"
 #include "native_planet_rings.hpp"
 
+#include <stellar/engine/native_solid_mesh.hpp>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -320,6 +322,37 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
                          :accretion_disc_material3d(.34f,1.f,5400.,.45f,.25f,2,.9f);
       ring.material.orbital_beaming_tint=active?.45f:.3f;
       star_instances.push_back(std::move(ring));}
+    if(physics&&physics->jet_half_angle_radians>0){
+      // Relativistic jets along the authored axis: a self-luminous
+      // spindle in the orbital plane whose tips match the reach the
+      // 2D hazard rays already project. The lobes brighten at the
+      // base and fade through texture alpha, so the same mesh reads
+      // pointed without star-shaped-degenerate poles. Any jet-bearing
+      // body uses it — black holes and pulsars alike. The mesh is
+      // authored ten times unit size so the pole derivatives clear the
+      // engine's finite-difference floor; scale renormalises to reach.
+      static const auto jet_mesh=directional_solid_mesh([](Vec3 n){
+        return Vec3{n.x*.45f,n.y*10.f,n.z*.45f};},48,24);
+      static const auto jet_texture=[]{
+        constexpr int w=8,h=64;std::vector<std::uint8_t> pixels(static_cast<std::size_t>(w)*h*4);
+        for(int y=0;y<h;++y){const float v=static_cast<float>(y)/(h-1),t=std::clamp(1.f-std::abs(v-.5f)*2.f,0.f,1.f);
+          const float glow=std::pow(t,1.6f),edge=std::pow(t,2.2f);
+          for(int x=0;x<w;++x){const auto at=(static_cast<std::size_t>(y)*w+x)*4;
+            pixels[at]=static_cast<std::uint8_t>(30+120*glow);pixels[at+1]=static_cast<std::uint8_t>(40+160*glow);
+            pixels[at+2]=static_cast<std::uint8_t>(60+195*glow);pixels[at+3]=static_cast<std::uint8_t>(255*edge);}}
+        return RgbaImage::create(w,h,std::move(pixels));}();
+      const auto reach=static_cast<float>(stellar_hazard_extent_au(*physics)*
+          spatial_->design_radius*local_chart_render_radius_factor*viewport_->scale/stellar_navigation_au_per_unit(*physics));
+      if(reach>radius*1.4f){
+        MeshInstance3D jet;jet.mesh=jet_mesh;
+        jet.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-19950.f};
+        jet.rotation=rotation_axis_angle({0.f,0.f,1.f},static_cast<float>(physics->jet_axis_radians)-std::numbers::pi_v<float>*.5f);
+        jet.scale=reach*.1f;
+        Material3D material;material.texture=jet_texture;material.ambient=1.f;material.diffuse=0.f;
+        material.transparent=true;material.linear_light=true;material.tint={150,185,255,255};material.light_color={.4f,.6f,1.f};
+        PbrSurface3D emission;emission.emissive_strength=1.25f;material.pbr=emission;
+        jet.material=material;
+        star_instances.push_back(std::move(jet));}}
     if(stellar_art_&&artwork)stellar_art_(out,{screen.x,screen.y},radius,*artwork,presentation_seconds(),field);
     else celestial_appearance_.append_stellar_disc(out,{screen.x,screen.y},radius,{star_color(cls),cls==StellarClass::BlackHole,mix(static_cast<std::uint32_t>(snapshot_->system_id)*3+component)},presentation_seconds(),field);
     if(artwork&&stellar_activity_)stellar_activity_(out,{screen.x,screen.y},radius,snapshot_->system_id,component,field);
