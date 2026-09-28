@@ -71,7 +71,7 @@ int main(int argc,char** argv)try{
     const auto count=calls;v.planet.details.reset();screen.set_view(v);
     check(calls==count&&screen.globe().regions().empty()&&material()!=maps[*planet_surface_asset_index("earth",0)],"Hidden world retained authored details");
     v.planet.details.emplace();v.planet.sol_texture_key="earth";v.planet.details->pressure_kpa=101;v.population_millions=1;v.infrastructure=1;screen.set_view(v);
-    DrawList earth;screen.render(earth,v,1920,1080);bool found=false;for(const auto& item:earth.overlay)if(const auto* s=std::get_if<Scene3DView>(&item);s&&s->scene){found=true;check(s->scene->instances().size()==2&&s->scene->instances()[0].material.texture==maps[0],"Earth must retain its colour and night layers without added clouds");}check(found,"Earth scene absent");
+    DrawList earth;screen.render(earth,v,1920,1080);bool found=false;for(const auto& item:earth.overlay)if(const auto* s=std::get_if<Scene3DView>(&item);s&&s->scene){found=true;const auto& surface=s->scene->instances()[0].material;check(s->scene->instances().size()==1&&surface.texture==maps[0]&&surface.pbr&&surface.pbr->emissive==maps[*planet_surface_asset_index("earth",1)],"Earth must retain its colour and night layers without added clouds");}check(found,"Earth scene absent");
     check(!planet_surface_asset_index("../jupiter",0)&&!planet_surface_asset_index("mars",1)&&!planet_surface_asset_index("mars",-1),"Map resolver accepted an unsupported path/layer");
   }
   for(const auto [w,h]:std::array<std::pair<int,int>,5>{{{1280,720},{1920,1080},{2560,1440},{3440,1440},{3840,2160}}}){
