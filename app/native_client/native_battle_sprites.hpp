@@ -16,6 +16,9 @@ public:
   void append(stellar::native_map::DrawList&, std::span<const BattleArtSprite>,
               const stellar::core::StellarPhysicalProperties* star = nullptr);
   void set_render_quality(stellar::native_map::RenderQuality3D value) noexcept {quality_ = value;}
+  // World-fixed equirect environment for hull IBL — the encounter system's
+  // phenomena probe; the metal pbr opts in via environment_strength.
+  void set_environment(std::shared_ptr<const stellar::native_map::RgbaImage> image){environment_=std::move(image);}
   [[nodiscard]] const stellar::native_map::RgbaImage* resource() const noexcept {
     return image_.get();
   }
@@ -23,6 +26,7 @@ public:
 private:
   std::filesystem::path root_;
   std::shared_ptr<const stellar::native_map::RgbaImage> image_;
+  std::shared_ptr<const stellar::native_map::RgbaImage> environment_;
   std::size_t transparent_pixels_{};
   stellar::native_map::RenderQuality3D quality_{stellar::native_map::RenderQuality3D::High};
 };

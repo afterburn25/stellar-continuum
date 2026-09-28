@@ -26,6 +26,14 @@ int main(int argc,char**argv){
     const auto& hull=image.scene->instances()[0];
     require(hull.material.pbr&&hull.material.pbr->metallic>.5f&&hull.material.linear_light,
         "Hull lost its lit PBR metal.");
+    require(hull.material.pbr->environment_strength>0.f,"Hull metal does not opt in to the environment probe.");
+    require(!image.scene->environment(),"Unbound battle scene must not fabricate an environment.");
+    const auto probe=RgbaImage::create(4,2,std::vector<std::uint8_t>(4*2*4,128));
+    assets.set_environment(probe);
+    DrawList lit;assets.append(lit,std::span{&sprite,1});
+    require(std::get<Scene3DView>(lit.overlay.back()).scene->environment()==probe,
+        "Encounter environment probe was not bound to the battle scene.");
+    assets.set_environment(nullptr);
     const auto& plume=image.scene->instances()[2];
     const auto& core=image.scene->instances()[3];
     require(plume.material.transparent&&core.material.transparent&&core.material.pbr&&core.material.pbr->emissive&&core.material.pbr->emissive_strength>1.f,

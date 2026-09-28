@@ -65,7 +65,7 @@ void NativeBattleSprites::append(DrawList& out,std::span<const BattleArtSprite> 
       field.y+field.height*.5f-sprite.center.y,std::clamp(sprite.depth_pixels,-4000.f,4000.f)};
     const auto lit=[&](Material3D& m){m.linear_light=true;m.light_direction=key_direction;m.light_color=key_color;m.light_intensity=1.05f;};
     Material3D metal;metal.tint={98,132,155,255};metal.ambient=.14f;metal.diffuse=.8f;lit(metal);
-    PbrSurface3D metal_pbr;metal_pbr.metallic=.85f;metal_pbr.roughness=.38f;metal.pbr=metal_pbr;
+    PbrSurface3D metal_pbr;metal_pbr.metallic=.85f;metal_pbr.roughness=.38f;metal_pbr.environment_strength=.3f;metal.pbr=metal_pbr;
     instances.push_back({hull,position,rotation,side,metal});
     Material3D paint;paint.texture=image_;paint.ambient=.5f;paint.diffuse=.5f;paint.transparent=true;paint.double_sided=true;lit(paint);
     instances.push_back({deck,position,rotation,side,paint});
@@ -84,7 +84,7 @@ void NativeBattleSprites::append(DrawList& out,std::span<const BattleArtSprite> 
   if(!instances.empty()){
     Camera3D camera;camera.projection=Projection3D::Orthographic;camera.position={0,0,10000};
     camera.orthographic_height=field.height;camera.near_plane=1;camera.far_plane=20000;
-    Scene3DView scene{Scene3D::create(camera,std::move(instances)),field};
+    Scene3DView scene{Scene3D::create(camera,std::move(instances),{.42f,.2f,.87f},{},std::nullopt,environment_),field};
     scene.options.quality=quality_;scene.options.exposure=1.05f;scene.options.bloom_strength=.35f;scene.options.bloom_threshold=.8f;
     out.overlay.emplace_back(std::move(scene));
   }
