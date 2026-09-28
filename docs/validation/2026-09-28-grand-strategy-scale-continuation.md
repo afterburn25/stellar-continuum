@@ -207,3 +207,47 @@ event definitions loaded):
   century because pre-warp promotion lands just past 100 years at this
   pacing. Organic wars at canonical scale are a ~137-year-horizon
   result, not a century result.
+
+## Follow-up: autonomous war settlement (commit 61de5ba4)
+
+Wars can now end. Two parity-safe seams close the loop:
+
+- **Belligerent contact reacquisition** — an active war or ceasefire is
+  continuing mutual contact, so the warfare coordinator re-observes
+  every belligerent through the canonical `process_contact_opportunity`
+  pipeline when the contact record is missing or `stale_or_lost`. This
+  preserves the `war-visible-stale` observer-command parity fixture
+  (which pins that `declare_war` on a stale contact is *rejected*) while
+  keeping wars settleable: contacts drift stale mid-conflict, and
+  observer views are knowledge-filtered so a victim that never
+  identified its aggressor would otherwise not even see the war.
+- **`StrategicDecisionEvaluator::evaluate_peace`** — additive scoring
+  (`evaluate_war` weights untouched): war weariness normalized to ten
+  years against the `war_declared` journal event, strength ratio,
+  survival priority, hostility/fear. Offers/answers flow through
+  canonical `send_proposal`/`respond_to_proposal`; acceptance activates
+  `ceasefire`/`peace` agreements. A ceasefire respect window (four
+  review intervals) prevents same-tick ceasefire violations.
+
+Re-run results (2,500 systems / 12 pre-warp + 1 ancient / 10,000 ticks /
+~137 years, seed 8374837, `--repeat 2`):
+
+- **wars declared: 6** (3 per repeat); **peace offers sent: 158,
+  accepted: 8, rejected: 150**; **114 belligerent contact reacquisitions**;
+  14 communication channels established.
+- Two wars resolved through the canonical **ceasefire → peace** ladder:
+  `Kesh Exchange ↔ Tarkesh Reach` (ceasefire tick 41,405,000 → peace
+  41,410,000) and pair (2,5) (ceasefire 46,160,000 → peace 46,170,000)
+  — agreements recorded in authoritative diplomacy state. One war
+  (0↔8) still active at horizon.
+- `repeatFinalStatesDeterministic: true`; final hash
+  `8b6963c2ccf0df2ba3ebedbd8aa9087fc740b690046e918b591119d6e3aa64c4`.
+- `warfare_coordination` 11/11 — new scenarios: stale war contacts
+  reacquire → channel opens → settlement flows; freshly accepted
+  ceasefire defers redeclaration until the respect window expires.
+- Full diplomacy/strategic/campaign parity batch: 26/26 green.
+
+Remaining honest limitations: most offers are rejected (75/79) —
+the peace scorer is intentionally conservative; trespass counts rise
+post-settlement as parked fleets become trespassers again under
+peace; engagement still requires co-location (no operational war plan).
