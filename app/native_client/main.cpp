@@ -11178,6 +11178,20 @@ int main(int argc,char **argv){
           window.draw(campaign.research_cancellation_smoke(window.drawable_width(),window.drawable_height(),true),
               sidecar_path(*options.smoke_screenshot,L"-restarted"));
         }
+        // Settings checks enter through the pause menu's Settings entry; a
+        // smoke that exits with the menu closed (e.g. system-travel) must
+        // open it first — Escape falls through to toggle_menu, which also
+        // pauses the clock.
+        const auto ensure_paused_menu=[&](const char* check,int width,int height){
+          for(int attempt=0;attempt<8&&!campaign.paused_menu_visible();++attempt){
+            InputSnapshot open;open.drawable_width=width;open.drawable_height=height;
+            open.events={{InputEventType::EscapePressed}};
+            if(!campaign.update(open,width,height,0.,false))
+              throw std::runtime_error(std::string(check)+" exited the campaign while opening the menu.");
+          }
+          if(!campaign.paused_menu_visible())
+            throw std::runtime_error(std::string(check)+" could not open the paused campaign menu.");
+        };
         if(options.audio_settings_check&&!options.new_game_smoke){
           const int width=window.drawable_width(),height=window.drawable_height();
           const auto route=[&](const InputEvent& event){
@@ -11186,6 +11200,7 @@ int main(int argc,char **argv){
             if(!campaign.update(input,width,height,0.,false))throw std::runtime_error("Audio settings unexpectedly exited the campaign.");
             if(!campaign.paused_menu_visible())throw std::runtime_error("Audio settings closed the parent menu or resumed the campaign.");
           };
+          ensure_paused_menu("Audio settings",width,height);
           stellar::native_audio::check_audio_settings(audio_settings,settings_path,width,height,"pause",
             [&]{settings_hub.close();const auto bounds=NativeUiLayout::for_viewport(width,height).settings_button;route({InputEventType::LeftPressed,center(bounds)});route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[1])});},
             route,[&]{window.draw(campaign.scene(width,height),sidecar_path(*options.smoke_screenshot,L"-audio-settings"));});
@@ -11199,6 +11214,7 @@ int main(int argc,char **argv){
             if(!campaign.update(input,width,height,0.,false)||!campaign.paused_menu_visible())
               throw std::runtime_error("Video settings escaped the paused campaign menu.");
           };
+          ensure_paused_menu("Video settings",width,height);
           stellar::native_video_settings::check_video_settings(video_settings,video_settings_path,width,height,"pause",
             [&]{settings_hub.close();route({InputEventType::LeftPressed,center(NativeUiLayout::for_viewport(width,height).settings_button)});
                 route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[2])});},
@@ -11213,6 +11229,7 @@ int main(int argc,char **argv){
             if(!campaign.update(input,width,height,0.,false)||!campaign.paused_menu_visible())
               throw std::runtime_error("General settings escaped the paused campaign menu.");
           };
+          ensure_paused_menu("General settings",width,height);
           settings_hub.close();
           route({InputEventType::LeftPressed,center(NativeUiLayout::for_viewport(width,height).settings_button)});
           route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[0])});
