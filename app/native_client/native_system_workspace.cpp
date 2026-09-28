@@ -295,8 +295,24 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
       MeshInstance3D star;star.mesh=star_scene_mesh();
       star.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
       star.scale=radius;star.material=star_photosphere3d(kelvin);
+      // Sing three-term law on top of the preset's linear coefficient:
+      // the quadratic term steepens the rim while the mid-curve reaches
+      // further into the disc for a fuller transit profile.
+      star.material.limb_darkening_q=.18f;star.material.limb_darkening_mid=.12f;
       PbrSurface3D glow;glow.emissive_strength=.9f;star.material.pbr=glow;
       star_instances.push_back(std::move(star));}
+    else if(cls==StellarClass::BlackHole){
+      // Shakura-Sunyaev accretion annulus beneath the authored hole art:
+      // the relativistic disc carries orbital beaming plus the paired
+      // doppler tint, so the approaching lane reads hotter and brighter.
+      static const auto disc=annulus_mesh(.34f,1.f,192,.012f);
+      MeshInstance3D ring;ring.mesh=disc;
+      ring.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
+      ring.rotation=rotation_axis_angle({1.f,0.f,0.f},1.22f);
+      ring.scale=radius*2.1f;
+      ring.material=accretion_disc_material3d(.34f,1.f,9800.,.7f);
+      ring.material.orbital_beaming_tint=.45f;
+      star_instances.push_back(std::move(ring));}
     if(stellar_art_&&artwork)stellar_art_(out,{screen.x,screen.y},radius,*artwork,presentation_seconds(),field);
     else celestial_appearance_.append_stellar_disc(out,{screen.x,screen.y},radius,{star_color(cls),cls==StellarClass::BlackHole,mix(static_cast<std::uint32_t>(snapshot_->system_id)*3+component)},presentation_seconds(),field);
     if(artwork&&stellar_activity_)stellar_activity_(out,{screen.x,screen.y},radius,snapshot_->system_id,component,field);

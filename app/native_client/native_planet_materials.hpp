@@ -293,6 +293,13 @@ inline void append_instances(std::vector<MeshInstance3D>& out,const PlanetAppear
     // ring's authoritative reflectivity (icy stays near neutral, dusty
     // diffuse rings pick up the Saturn E-ring look).
     m.forward_scatter=.2f+.45f*std::clamp(static_cast<float>(a.rings.reflectivity),0.f,1.f);
+    // Real dust phase functions carry a second, broader lobe — icy sheets
+    // pick up a mild opposition component away from the forward peak.
+    m.forward_scatter_back=-.3f*std::clamp(static_cast<float>(a.rings.reflectivity),0.f,1.f);
+    m.forward_scatter_back_mix=.4f;
+    // Ring grains orbit the planet: a restrained doppler asymmetry plus its
+    // paired tint gives the approaching lane a subtle bright/blue edge.
+    m.orbital_beaming=.08f;m.orbital_beaming_tint=.4f;
     lit(m);m.shadow=s;
     out.push_back({rings[cache_key],p,ring_rotation,radius,m});
   }
