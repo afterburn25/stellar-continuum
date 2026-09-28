@@ -117,6 +117,31 @@ public:
     return found == refueling_.end() ? 0.0 : found->second;
   }
 
+  // Lazily sorted-by-x catalog for sensor-radius queries. Building it
+  // validates every catalog position — the same validation the original
+  // full-catalog distance scan applied to every system on every call.
+  const std::vector<const StellarSystem *> &
+  systems_by_x(std::span<const StellarSystem> systems) {
+    if (!by_x_ready_) {
+      by_x_.reserve(systems.size());
+      for (const auto &system : systems) {
+        const auto &position = system.position;
+        if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
+            (position.depth_light_years &&
+             !std::isfinite(*position.depth_light_years)))
+          throw std::invalid_argument(
+              "Star position must contain finite light-year coordinates");
+        by_x_.push_back(&system);
+      }
+      std::stable_sort(by_x_.begin(), by_x_.end(),
+                       [](const auto *first, const auto *second) {
+                         return first->position.x < second->position.x;
+                       });
+      by_x_ready_ = true;
+    }
+    return by_x_;
+  }
+
 private:
   static std::int64_t key(int civilization_id, int system_id) {
     return (static_cast<std::int64_t>(civilization_id) << 32) |
@@ -127,8 +152,10 @@ private:
   std::unordered_map<int, std::vector<const PlanetaryBody *>>
       bodies_by_system_;
   std::unordered_map<std::int64_t, double> refueling_;
+  std::vector<const StellarSystem *> by_x_;
   bool bodies_ready_{};
   bool refueling_ready_{};
+  bool by_x_ready_{};
 };
 
 const StellarSystem &first_system(const AdvanceIndex &index, int id) {
@@ -366,8 +393,38 @@ bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
         fleet.fuel_capacity_light_years * service);
   const auto already_known =
       world.knowledge.is_system_known(fleet.civilization_id, target.id);
-  const auto revealed = world.knowledge.reveal_within_sensor_range(
-      fleet.civilization_id, target.id, world.systems, fleet.sensor_range*phenomenon_context(world.phenomena,target.position.x,target.position.y,target.id).effects.sensor);
+  const auto range =
+      fleet.sensor_range*phenomenon_context(world.phenomena,target.position.x,target.position.y,target.id).effects.sensor;
+  // Same contract as reveal_within_sensor_range: reveal every catalog
+  // system whose charted distance is within range, count the new reveals.
+  // The x-sorted index only prefilters candidates; acceptance still uses
+  // squared_distance_light_years, so the reveal set is identical. The
+  // band is widened slightly because the 2-D distance is evaluated in
+  // float math and |dx| can round across the radius boundary.
+  int revealed = 0;
+  {
+    const double range_squared = static_cast<double>(range) * range;
+    const double band =
+        std::fabs(static_cast<double>(range)) * 1.0001 + 0.001;
+    const double low = static_cast<double>(target.position.x) - band;
+    const double high = static_cast<double>(target.position.x) + band;
+    const auto &sorted = index.systems_by_x(world.systems);
+    const auto first = std::lower_bound(
+        sorted.begin(), sorted.end(), low,
+        [](const StellarSystem *system, double bound) {
+          return static_cast<double>(system->position.x) < bound;
+        });
+    const auto last = std::upper_bound(
+        first, sorted.end(), high,
+        [](double bound, const StellarSystem *system) {
+          return bound < static_cast<double>(system->position.x);
+        });
+    for (auto it = first; it != last; ++it)
+      if (squared_distance_light_years(target.position, (*it)->position) <=
+              range_squared &&
+          world.knowledge.reveal_system(fleet.civilization_id, (*it)->id))
+        ++revealed;
+  }
   if (!already_known)
     events.push_back({ExplorationEventType::SystemDetected,
                       fleet.civilization_id, fleet.id, target.id,
