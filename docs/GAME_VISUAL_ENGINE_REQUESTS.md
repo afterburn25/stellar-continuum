@@ -206,6 +206,39 @@ FALLBACK IF NOT AVAILABLE:
   disturbing the doppler lane; the shear would only add inner-edge
   differential motion.
 
+### REQUEST: Render-scale for Scene3DView targets under budget pressure
+Status:        OPEN
+Requested:    2026-09-28
+WHY NEEDED:
+  The renderer enforces a 128 MiB aggregate cap on 3D render-target
+  memory (`maximum_scene3d_target_bytes`, w*h*16 B per HDR view). The
+  game now gates whole layers on that budget: past ~2560x1440 the
+  fullscreen celestial dome and the local-nebula emission volume drop
+  to their authored 2D paths so content views (planets, globes, hulls)
+  keep their targets. That is an all-or-nothing trade — at cap pressure
+  the sky loses the tangent warp and the cloud loses raymarching even
+  though a half-res 3D target would still look visibly better than the
+  flat composite.
+CURRENT GAME SCREEN:
+  `app/native_client/main.cpp` — `scene_content` stages the system
+  backdrop and picks 3D-vs-2D once the frame's total target bytes are
+  known; the battle environment gates identically at its early return.
+  `native_system_background.hpp` (flat `Image` path) and
+  `native_phenomena.cpp` (`volumetric=false`) carry the 2D sides.
+DESIRED PUBLIC API:
+  A `render_scale` (0.25..1) field on `Scene3DView` that allocates the
+  target at `destination * scale` and upscales on composite — cheaper
+  targets that keep the volumetric/warped shading. Bonus: a
+  `scene3d_target_bytes(const DrawList&)`-equivalent accessor so the
+  game mirrors the engine's real accounting (HDR flag included)
+  instead of assuming 16 B/px worst-case.
+PERFORMANCE CONSTRAINT:
+  Strictly reduces target memory; upscale is one blit pass the
+  compositor already performs per view.
+FALLBACK IF NOT AVAILABLE:
+  The shipped whole-layer gate stays — visuals degrade stepwise but
+  never crash.
+
 ## Delivered
 
 (none yet)
