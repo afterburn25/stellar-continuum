@@ -565,7 +565,7 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
              economy_world(campaign, step_.economic_construction,
                            step_.economic_fleets),
              campaign.colonies, campaign.economies, phase_days,
-             advance_legacy_research_);
+             catalog_body_index(campaign), advance_legacy_research_);
          timing.finish(performance_[0]);
        },
        .domain = "economy"},

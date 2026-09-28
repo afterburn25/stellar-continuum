@@ -40,4 +40,9 @@ void apply_industry_storage_caps(EconomyWorldView world, std::span<const Colony>
     std::span<CivilizationEconomy> economies, std::span<const IndustryReserve> existing_reserves = {});
 void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies,
     std::span<CivilizationEconomy> economies, double simulation_days, bool accrue_legacy_science = true);
+// Caller-shared index form: identical computation, but the colony->body
+// index is built once by the caller instead of inside every advance.
+void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies,
+    std::span<CivilizationEconomy> economies, double simulation_days,
+    const SettlementBodyIndex& body_index, bool accrue_legacy_science = true);
 } // namespace stellar::core
