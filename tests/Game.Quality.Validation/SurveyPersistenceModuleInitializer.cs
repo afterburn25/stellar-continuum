@@ -5,7 +5,7 @@ namespace Game.Quality.Validation;
 
 internal static class SurveyPersistenceModuleInitializer
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunSurveyPersistenceChecks()
     {
         SurveyPersistenceValidation.Run();

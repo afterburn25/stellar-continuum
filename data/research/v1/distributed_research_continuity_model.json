@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Models communication-delayed scientific dissemination, regional active practice, archive continuity, isolation, political fracture, and reintegration without creating a complete research-graph copy per colony or region.",
+  "core_distinctions": {
+    "scientific_truth": "Research-node maturity/resolution describes what has been established by a scientific community; it is not a physical object that teleports everywhere.",
+    "codified_access": "Whether a research context currently possesses usable records/data/protocols for known knowledge.",
+    "active_practice": "Whether the context has current competence, experts, facilities, tooling, and training sufficient to use/extend knowledge efficiently.",
+    "physical_deployment": "Whether actual infrastructure/populations/devices exist; remains owned by the relevant gameplay subsystem.",
+    "rule": "A civilization may know a technology historically while an isolated region lacks local records or practical ability to apply it."
+  },
+  "research_context": {
+    "meaning": "A scientifically distinct communication/institution context created only when local research access or practice materially diverges from the civilization default.",
+    "examples": [
+      "well-connected core research network",
+      "long-isolated colony cluster",
+      "censored or embargoed research region",
+      "federation member with autonomous scientific institutions",
+      "new successor state after political fracture"
+    ],
+    "not_one_per_colony": true,
+    "creation_rule": "Do not create an explicit context for a normal colony that has the same scientific access/practice as its parent civilization. Create or retain one only when communication isolation, institutional autonomy, censorship, major practice specialization, or polity separation produces meaningful persistent divergence.",
+    "merge_rule": "When two contexts have restored communication and their sparse access/practice deviations fall below meaningful thresholds for long enough, merge them back to shared/default state while preserving compressed history."
+  },
+  "context_state": {
+    "required_identity": ["context_id","owning_polity_id_or_null","source_region_refs"],
+    "sparse_fields": [
+      "knowledge_access_exceptions",
+      "field_practice_exceptions",
+      "located_tacit_asset_refs",
+      "located_research_facility_refs",
+      "pending_knowledge_transmissions",
+      "local_archive_replica_summary",
+      "active_training_pipeline_summary",
+      "isolation_state",
+      "compressed_continuity_history"
+    ],
+    "forbidden_full_copies": [
+      "complete static Technology Possibility Graph",
+      "complete civilization node-state map when identical to parent/default",
+      "complete field competence map when identical to parent/default",
+      "per-scientist objects"
+    ]
+  },
+  "knowledge_access_states": [
+    {"id":"absent","meaning":"Context has no usable local record of the knowledge beyond possible rumor/history."},
+    {"id":"reference_only","meaning":"Context has summaries or incomplete references sufficient to know the knowledge exists but not to reproduce serious work."},
+    {"id":"codified","meaning":"Context has adequate formal records/data/protocols to understand and reconstruct research with suitable facilities/competence."},
+    {"id":"practiced","meaning":"Context has codified access plus active institutions/expertise maintaining real experimental/engineering practice."}
+  ],
+  "knowledge_dissemination": {
+    "trigger": "A research node state/resolution or strategically meaningful codified asset changes in one context and another authorized context does not already possess equivalent access.",
+    "transmission_payload": [
+      "node_id_or_scoped_knowledge_asset_ref",
+      "research_state_or_revision",
+      "resolution_if_applicable",
+      "source_context_id",
+      "destination_context_id",
+      "codified_asset_classes_included",
+      "provenance_and_integrity_summary"
+    ],
+    "transport_inputs_owned_elsewhere": [
+      "communication_path_exists",
+      "one_way_latency",
+      "bandwidth_or_data_transfer_limit_when_relevant",
+      "security_or_censorship policy",
+      "physical travel time for non-data assets"
+    ],
+    "rules": [
+      "Ordinary publications/models can propagate after communication latency rather than after physical travel.",
+      "Large experimental datasets may be delayed by real bandwidth limits when the communications subsystem reports them as material.",
+      "Expert cohorts, prototypes, manufacturing tooling, operating institutions, and other physical/tacit assets do not teleport as data.",
+      "Remote training can help only when latency/bandwidth/interface permit it; difficult hands-on practice may still require local experts or physical travel.",
+      "Receiving codified knowledge never creates missing facilities, tooling, populations, materials, or engineering practice.",
+      "No universal distance research penalty is applied; only actual information/practice constraints matter."
+    ]
+  },
+  "civilization_default_and_exceptions": {
+    "default_access": "Well-connected contexts inherit the civilization's current synchronized codified-access baseline without separate node rows.",
+    "exception_storage": "Store only missing/delayed/restricted/locally-advanced node access and locally divergent field practice.",
+    "frontier_advanced_rule": "A regional context may temporarily know a discovery before the civilization default synchronizes; store that source context plus pending dissemination rather than pretending every region already knows it.",
+    "default_update_rule": "Once all materially connected default contexts have received equivalent codified knowledge, the civilization synchronized baseline can advance and redundant context exceptions are deleted."
+  },
+  "field_practice": {
+    "base_model": "research_competence_model.json",
+    "regional_representation": "Sparse deltas/bands only for fields whose local theoretical/experimental/engineering practice materially differs from the synchronized civilization baseline.",
+    "practice_sources": [
+      "located expert cohorts",
+      "active research institutions/facilities",
+      "training pipelines",
+      "local experimental/manufacturing practice",
+      "recent project participation"
+    ],
+    "atrophy_rule": "Isolation does not automatically reduce competence; practice declines only when local institutions/training/activity disappear according to the existing competence atrophy model.",
+    "recovery_rule": "Reconnected records can restore theoretical access quickly, but experimental/engineering practice recovers only through actual facilities/training/experts/work."
+  },
+  "archive_continuity": {
+    "archive_replica_classes": ["local_only","regional_redundant","civilization_redundant","external_or_allied_copy_known"],
+    "archive_loss_pressure": "archive_loss",
+    "rules": [
+      "Destroying one archive does not erase knowledge if independent codified copies survive elsewhere.",
+      "A context isolated from surviving copies may lose local codified access after genuine archive destruction/corruption.",
+      "Historical awareness that a technology once existed can survive as reference_only even when actionable records are gone.",
+      "Recovered external or archaeological records can restore codified access but not automatically active practice.",
+      "Censorship can make records inaccessible without physically deleting every copy; later political change can restore access if archives survived."
+    ]
+  },
+  "isolation_and_reconnection": {
+    "relevant_existing_pressures": ["communication_delay","administrative_distance","political_fragmentation","archive_loss","research_bottleneck"],
+    "isolation_causes": [
+      "communication network failure",
+      "extreme communications latency relative to decision/research timescale",
+      "deliberate censorship or information embargo",
+      "war/blockade/jamming",
+      "political secession or federation autonomy",
+      "intergalactic or very-long-distance separation"
+    ],
+    "reconnection_pipeline": [
+      "compare context knowledge revisions and archive integrity",
+      "exchange newly available codified records according to rights/security/path",
+      "resolve conflicting scientific records by provenance/evidence rather than choosing owner by rank",
+      "update local access states",
+      "update tacit/training/facility availability only if physical people/assets actually move or institutions cooperate",
+      "merge redundant sparse context state when material differences disappear"
+    ]
+  },
+  "political_fracture_and_successors": {
+    "event_owner": "governance/politics system decides that polity ownership/fracture occurred; Adaptive Research computes research inheritance from factual local state.",
+    "inheritance_inputs": [
+      "contexts and archives physically/administratively inherited",
+      "codified knowledge already received locally",
+      "located expert cohorts",
+      "located facilities/tooling/prototypes",
+      "training pipelines",
+      "accessible external archives/allies",
+      "active projects and participant institutions"
+    ],
+    "inheritance_rules": [
+      "A successor does not automatically receive every technology ever known by the former empire.",
+      "A successor keeps codified knowledge actually present in inherited contexts/archives even if active practice is weak.",
+      "Tacit expertise/facilities follow their real location, people, control, and loyalty—not a global technology checkbox.",
+      "Shared foundational knowledge will normally overlap heavily because records are widely replicated; frontier/recent/specialist knowledge can diverge sharply.",
+      "Active projects may split, pause, continue locally, or lose necessary participating institutions.",
+      "Later diplomacy/trade/reintegration can restore missing knowledge through the normal record/expert/facility pathways."
+    ]
+  },
+  "federation_and_allied_science": {
+    "rule": "Political alliance does not create one merged technology tree.",
+    "sharing_modes": ["publication_access","joint_project","shared_dataset","expert_exchange","facility_access","licensed_engineering_records"],
+    "rights_and_security": "Use the existing technology-exchange/legal-rights model; sharing can be partial, delayed, restricted, revoked, or violated where technically possible.",
+    "joint_project_rule": "Participants can contribute real lab/facility/expert capacity only when project coordination and access agreements permit; do not mint free RP because a treaty exists."
+  },
+  "runtime_events": [
+    "research_context_materially_diverged",
+    "research_context_remerged",
+    "knowledge_transmission_created",
+    "knowledge_transmission_delivered",
+    "knowledge_transmission_blocked_or_lost",
+    "archive_replica_changed",
+    "research_context_isolated",
+    "research_context_reconnected",
+    "research_polity_fractured",
+    "research_polities_reintegrated",
+    "located_expertise_changed"
+  ],
+  "queries": [
+    "context_knowledge_access",
+    "context_can_apply_capability",
+    "context_field_practice",
+    "pending_knowledge_delivery",
+    "successor_research_inheritance_preview",
+    "research_context_divergence_summary"
+  ],
+  "performance": {
+    "no_full_graph_copy_per_context": true,
+    "no_context_for_normal_synchronized_colony": true,
+    "knowledge_access_stored_as_exceptions": true,
+    "field_practice_stored_as_exceptions": true,
+    "pending_transmissions_bounded_and_mergeable_by_destination_revision": true,
+    "delivered_transmissions_removed_after_state_application": true,
+    "old_context_events_compressed": true,
+    "obsolete_contexts_merge_or_archive": true,
+    "low_frequency_continuity_maintenance": true
+  },
+  "fair_information": {
+    "player_and_AI_same_access_rules": true,
+    "AI_cannot_use_unsynchronized_core_knowledge_in_isolated_context": true,
+    "successor_AI_receives_only_inherited_research_state": true,
+    "enemy_or_foreign_context_state_requires_legitimate_intelligence": true
+  },
+  "cross_workstream_ownership": {
+    "adaptive_research": "knowledge access/practice semantics, context exceptions, dissemination records, research inheritance calculation",
+    "communications_logistics": "communication path, latency, bandwidth, physical travel time, jamming/blockade state",
+    "governance_politics": "polity boundaries, censorship policy, secession/fracture/reintegration decisions",
+    "population": "expert cohort location/migration/demography",
+    "construction_economy": "physical archive/facility/tooling existence, damage, repair, upkeep",
+    "diplomacy_trade": "external science-sharing rights/agreements and consequences"
+  }
+}

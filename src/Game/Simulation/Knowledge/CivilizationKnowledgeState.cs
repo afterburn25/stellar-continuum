@@ -14,6 +14,23 @@ namespace Game.Simulation.Knowledge;
 public sealed class CivilizationKnowledgeState
 {
     private readonly Dictionary<int, HashSet<int>> _knownSystems = new();
+    private readonly HashSet<int> _coreAccessUnlocked = new();
+    private readonly HashSet<int> _coreExplored = new();
+
+    public bool HasGalacticCoreAccess(int civilizationId) => _coreAccessUnlocked.Contains(civilizationId);
+    public bool IsGalacticCoreDiscovered(int civilizationId) =>
+        HasGalacticCoreAccess(civilizationId) && _coreExplored.Contains(civilizationId);
+    public IReadOnlyCollection<int> GetGalacticCoreObservers() => _coreAccessUnlocked.OrderBy(id => id).ToArray();
+
+    // Called by the eventual authoritative unlock and exploration systems, never by map clicks.
+    public void UnlockGalacticCoreAccess(int civilizationId)
+    {
+        if (civilizationId < 0) throw new ArgumentOutOfRangeException(nameof(civilizationId));
+        _coreAccessUnlocked.Add(civilizationId);
+    }
+
+    public bool RecordGalacticCoreExploration(int civilizationId) =>
+        HasGalacticCoreAccess(civilizationId) && _coreExplored.Add(civilizationId);
     private readonly Dictionary<int, HashSet<int>> _knownCivilizations = new();
     private readonly Dictionary<int, Dictionary<int, MutableSystemSurveyKnowledge>> _systemSurveyKnowledge = new();
 
@@ -162,10 +179,10 @@ public sealed class CivilizationKnowledgeState
             ?? throw new InvalidOperationException($"Unknown sensor origin system {originSystemId}.");
 
         var revealed = 0;
-        var rangeSquared = sensorRange * sensorRange;
+        var rangeSquared = (double)sensorRange * sensorRange;
         foreach (var system in systems)
         {
-            if (System.Numerics.Vector2.DistanceSquared(origin.Position, system.Position) <= rangeSquared &&
+            if (InterstellarDistance.SquaredBetween(origin, system) <= rangeSquared &&
                 RevealSystem(civilizationId, system.Id))
             {
                 revealed++;

@@ -1,0 +1,681 @@
+[
+  {
+    "event": "opening",
+    "profile": "human_female_narrator",
+    "lines": [
+      "A new chapter begins. Our home is secure. The stars await our next decision."
+    ],
+    "priority": 100,
+    "once": true,
+    "cooldownSeconds": 12,
+    "interruptible": false,
+    "speakerRole": "Narrator",
+    "frequency": "Minimal"
+  },
+  {
+    "event": "research",
+    "profile": "human_female_chief_scientist",
+    "lines": [
+      "Research milestone achieved. {detail}",
+      "The team has completed its current program. {detail}"
+    ],
+    "priority": 40,
+    "once": false,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "ChiefScientist"
+  },
+  {
+    "event": "construction",
+    "profile": "human_male_governor",
+    "lines": [
+      "Construction complete. {detail}"
+    ],
+    "priority": 40,
+    "once": false,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "OperationsOfficer"
+  },
+  {
+    "event": "shipyard",
+    "profile": "human_female_fleet_commander",
+    "lines": [
+      "Orbital shipyard online. We are ready to build our first fleet."
+    ],
+    "priority": 60,
+    "once": true,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "FleetCommander"
+  },
+  {
+    "event": "ship_launch",
+    "profile": "human_female_fleet_commander",
+    "lines": [
+      "A new vessel is ready for orders. {detail}"
+    ],
+    "priority": 40,
+    "once": false,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "FleetCommander"
+  },
+  {
+    "event": "departure",
+    "profile": "ship_computer",
+    "lines": [
+      "Interstellar departure confirmed. {detail} is underway."
+    ],
+    "priority": 60,
+    "once": true,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "ShipComputer"
+  },
+  {
+    "event": "arrival",
+    "profile": "human_female_fleet_commander",
+    "lines": [
+      "We have reached another star. {detail} is on station."
+    ],
+    "priority": 60,
+    "once": true,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "FleetCommander"
+  },
+  {
+    "event": "discovery",
+    "profile": "human_female_chief_scientist",
+    "lines": [
+      "Sensors have found something worth investigating. {detail}"
+    ],
+    "priority": 40,
+    "once": false,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "ChiefScientist"
+  },
+  {
+    "event": "survey",
+    "profile": "human_female_chief_scientist",
+    "lines": [
+      "Survey complete. {detail}"
+    ],
+    "priority": 20,
+    "once": false,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "ChiefScientist"
+  },
+  {
+    "event": "colony",
+    "profile": "human_male_governor",
+    "lines": [
+      "A new home among the stars. {detail}"
+    ],
+    "priority": 60,
+    "once": true,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "Governor"
+  },
+  {
+    "event": "unknown_contact",
+    "profile": "ship_computer",
+    "lines": [
+      "Unidentified contact detected. Its intentions are unknown."
+    ],
+    "priority": 60,
+    "once": false,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "ShipComputer"
+  },
+  {
+    "event": "first_contact",
+    "profile": "human_female_diplomat",
+    "lines": [
+      "We have made contact. {detail}"
+    ],
+    "priority": 60,
+    "once": true,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "Diplomat"
+  },
+  {
+    "event": "alien_transmission",
+    "profile": "grey_diplomat",
+    "lines": [
+      "Incoming translated transmission. {detail}"
+    ],
+    "priority": 60,
+    "once": false,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "AlienDiplomat"
+  },
+  {
+    "event": "critical_hull",
+    "profile": "human_female_fleet_commander",
+    "lines": [
+      "Critical hull damage. Review the fleet and consider withdrawal."
+    ],
+    "priority": 80,
+    "once": false,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "ShipComputer"
+  },
+  {
+    "event": "treasury",
+    "profile": "human_male_governor",
+    "lines": [
+      "Our operations are underfunded. {detail}"
+    ],
+    "priority": 60,
+    "once": false,
+    "cooldownSeconds": 12,
+    "interruptible": true,
+    "speakerRole": "EconomicAdvisor"
+  },
+  {
+    "event": "research.completed",
+    "profile": "human_female_chief_scientist",
+    "dialogueKey": "research.completed",
+    "speakerRole": "ChiefScientist",
+    "priority": 40,
+    "cooldownSeconds": 2,
+    "frequency": "Normal",
+    "category": "research",
+    "firstLines": [
+      "Our first research program is complete. {research_name} is now available."
+    ],
+    "lines": [
+      "Research complete. {research_name} is now available.",
+      "Our work on {research_name} is complete."
+    ]
+  },
+  {
+    "event": "research.breakthrough.major",
+    "profile": "human_female_chief_scientist",
+    "speakerRole": "ChiefScientist",
+    "priority": 60,
+    "cooldownSeconds": 1,
+    "frequency": "Minimal",
+    "category": "research_major",
+    "emotion": "excited",
+    "lines": [
+      "Major breakthrough confirmed. {research_name} changes what is possible."
+    ]
+  },
+  {
+    "event": "construction.completed",
+    "profile": "human_operations_officer",
+    "speakerRole": "OperationsOfficer",
+    "priority": 20,
+    "cooldownSeconds": 5,
+    "frequency": "Normal",
+    "category": "construction",
+    "lines": [
+      "{project_name} construction is complete.",
+      "{project_name} is now operational."
+    ]
+  },
+  {
+    "event": "construction.orbital_launch_complex.completed",
+    "profile": "human_operations_officer",
+    "speakerRole": "OperationsOfficer",
+    "priority": 40,
+    "cooldownSeconds": 2,
+    "frequency": "Minimal",
+    "category": "orbital_launch_complex",
+    "lines": [
+      "Orbital launch complex complete. Launch operations are now available."
+    ]
+  },
+  {
+    "event": "construction.orbital_shipyard.completed",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "FleetCommander",
+    "priority": 40,
+    "once": true,
+    "cooldownSeconds": 2,
+    "frequency": "Minimal",
+    "category": "orbital_shipyard",
+    "lines": [
+      "Orbital shipyard construction complete. Shipbuilding operations may begin."
+    ]
+  },
+  {
+    "event": "ship.completed",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "FleetCommander",
+    "priority": 40,
+    "cooldownSeconds": 3,
+    "frequency": "Normal",
+    "category": "shipbuilding",
+    "lines": [
+      "{ship_name} is ready for deployment.",
+      "{ship_class} construction complete. {ship_name} awaits orders."
+    ]
+  },
+  {
+    "event": "ship.launched",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "FleetCommander",
+    "priority": 40,
+    "cooldownSeconds": 2,
+    "frequency": "Normal",
+    "category": "ship_launch",
+    "lines": [
+      "{ship_name} has cleared the shipyard."
+    ]
+  },
+  {
+    "event": "ship.interstellar.first_launch",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "FleetCommander",
+    "priority": 60,
+    "once": true,
+    "cooldownSeconds": 1,
+    "frequency": "Minimal",
+    "category": "first_launch",
+    "firstLines": [
+      "Our first interstellar vessel, {ship_name}, is underway."
+    ],
+    "lines": [
+      "Interstellar departure confirmed. {ship_name} is underway."
+    ]
+  },
+  {
+    "event": "exploration.system.reached",
+    "profile": "human_female_chief_scientist",
+    "speakerRole": "ChiefScientist",
+    "priority": 40,
+    "cooldownSeconds": 3,
+    "frequency": "Normal",
+    "category": "exploration",
+    "firstLines": [
+      "Humanity has reached its first extrasolar system. Welcome to {system_name}."
+    ],
+    "lines": [
+      "We have reached {system_name}. Survey teams are standing by."
+    ]
+  },
+  {
+    "event": "exploration.survey.completed",
+    "profile": "human_female_chief_scientist",
+    "speakerRole": "ChiefScientist",
+    "priority": 20,
+    "cooldownSeconds": 5,
+    "frequency": "Normal",
+    "category": "survey",
+    "lines": [
+      "Survey of {system_name} is complete."
+    ]
+  },
+  {
+    "event": "exploration.anomaly.discovered",
+    "profile": "human_female_chief_scientist",
+    "speakerRole": "ChiefScientist",
+    "priority": 60,
+    "cooldownSeconds": 3,
+    "frequency": "Minimal",
+    "category": "anomaly",
+    "emotion": "concerned",
+    "lines": [
+      "An anomalous signature has been detected near {planet_name}."
+    ]
+  },
+  {
+    "event": "colony.founded",
+    "profile": "human_male_governor",
+    "speakerRole": "Governor",
+    "priority": 60,
+    "cooldownSeconds": 3,
+    "frequency": "Minimal",
+    "category": "colony",
+    "firstLines": [
+      "Our first extrasolar settlement is established on {planet_name}."
+    ],
+    "lines": [
+      "Settlement established on {planet_name}. Welcome to {colony_name}."
+    ]
+  },
+  {
+    "event": "contact.unknown.detected",
+    "profile": "ship_computer",
+    "speakerRole": "ShipComputer",
+    "priority": 60,
+    "cooldownSeconds": 8,
+    "frequency": "Minimal",
+    "category": "contact_warning",
+    "emotion": "urgent",
+    "lines": [
+      "Unidentified contact detected in {system_name}. Intentions unknown."
+    ]
+  },
+  {
+    "event": "contact.first",
+    "profile": "human_female_diplomat",
+    "speakerRole": "Diplomat",
+    "priority": 80,
+    "once": false,
+    "cooldownSeconds": 1,
+    "frequency": "Minimal",
+    "category": "first_contact",
+    "lines": [
+      "We have received a transmission from {civilization_name}."
+    ]
+  },
+  {
+    "event": "diplomacy.alien.transmission",
+    "profile": "grey_diplomat",
+    "speakerRole": "AlienDiplomat",
+    "priority": 60,
+    "cooldownSeconds": 2,
+    "frequency": "Minimal",
+    "category": "alien_transmission",
+    "communicationsFilter": true,
+    "lines": [
+      "{message}"
+    ]
+  },
+  {
+    "event": "diplomacy.war.declared",
+    "profile": "human_female_diplomat",
+    "speakerRole": "Diplomat",
+    "priority": 80,
+    "once": false,
+    "cooldownSeconds": 1,
+    "frequency": "Minimal",
+    "category": "war",
+    "emotion": "urgent",
+    "lines": [
+      "War has been declared with {enemy_name}."
+    ],
+    "firstLines": [
+      "For the first time, we are at war with {enemy_name}."
+    ],
+    "queueBehavior": "InterruptLowerPriority"
+  },
+  {
+    "event": "combat.fleet.attacked",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "FleetCommander",
+    "priority": 80,
+    "cooldownSeconds": 3,
+    "frequency": "Minimal",
+    "category": "combat",
+    "emotion": "urgent",
+    "queueBehavior": "InterruptLowerPriority",
+    "lines": [
+      "{fleet_name} is under attack in {system_name}."
+    ]
+  },
+  {
+    "event": "combat.hull.critical",
+    "profile": "ship_computer",
+    "speakerRole": "ShipComputer",
+    "priority": 80,
+    "cooldownSeconds": 8,
+    "frequency": "Minimal",
+    "category": "critical_hull",
+    "emotion": "urgent",
+    "interruptible": false,
+    "queueBehavior": "InterruptLowerPriority",
+    "lines": [
+      "Warning. Hull integrity critical aboard {ship_name}."
+    ]
+  },
+  {
+    "event": "combat.fleet.retreat_initiated",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "FleetCommander",
+    "priority": 60,
+    "cooldownSeconds": 3,
+    "frequency": "Minimal",
+    "category": "combat",
+    "emotion": "urgent",
+    "lines": [
+      "{fleet_name} is withdrawing from {system_name}."
+    ]
+  },
+  {
+    "event": "combat.fleet.destroyed",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "FleetCommander",
+    "priority": 80,
+    "cooldownSeconds": 1,
+    "frequency": "Minimal",
+    "category": "combat_loss",
+    "emotion": "urgent",
+    "queueBehavior": "InterruptLowerPriority",
+    "lines": [
+      "{fleet_name} has been lost in {system_name}."
+    ]
+  },
+  {
+    "event": "combat.engagement.concluded",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "FleetCommander",
+    "priority": 40,
+    "cooldownSeconds": 2,
+    "frequency": "Minimal",
+    "category": "combat",
+    "lines": [
+      "The engagement in {system_name} has concluded."
+    ]
+  },
+  {
+    "event": "diplomacy.proposal.rejected",
+    "profile": "human_female_diplomat",
+    "speakerRole": "Diplomat",
+    "priority": 40,
+    "cooldownSeconds": 2,
+    "frequency": "Normal",
+    "category": "diplomacy",
+    "lines": [
+      "{message}"
+    ]
+  },
+  {
+    "event": "diplomacy.agreement.activated",
+    "profile": "human_female_diplomat",
+    "speakerRole": "Diplomat",
+    "priority": 60,
+    "cooldownSeconds": 2,
+    "frequency": "Minimal",
+    "category": "diplomacy",
+    "lines": [
+      "{message}"
+    ]
+  },
+  {
+    "event": "diplomacy.border_warning.issued",
+    "profile": "human_female_diplomat",
+    "speakerRole": "Diplomat",
+    "priority": 60,
+    "cooldownSeconds": 3,
+    "frequency": "Minimal",
+    "category": "diplomacy_warning",
+    "emotion": "urgent",
+    "lines": [
+      "{message}"
+    ]
+  },
+  {
+    "event": "logistics.critical",
+    "profile": "human_operations_officer",
+    "speakerRole": "OperationsOfficer",
+    "priority": 60,
+    "cooldownSeconds": 45,
+    "frequency": "Minimal",
+    "category": "logistics_warning",
+    "emotion": "concerned",
+    "lines": [
+      "Critical logistics failure in {system_name}. {detail}"
+    ]
+  },
+  {
+    "event": "economy.treasury.critical",
+    "profile": "human_male_governor",
+    "speakerRole": "EconomicAdvisor",
+    "priority": 60,
+    "cooldownSeconds": 60,
+    "frequency": "Minimal",
+    "category": "economy_warning",
+    "emotion": "concerned",
+    "lines": [
+      "Treasury reserves are critically low. {amount} remains."
+    ]
+  },
+  {
+    "event": "expedition.reactor.problem",
+    "profile": "ship_computer",
+    "speakerRole": "ShipComputer",
+    "priority": 80,
+    "cooldownSeconds": 10,
+    "frequency": "Minimal",
+    "category": "expedition_emergency",
+    "emotion": "urgent",
+    "lines": [
+      "Reactor instability detected. {detail}"
+    ]
+  },
+  {
+    "event": "expedition.navigation.correction",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "ExpeditionCommander",
+    "priority": 20,
+    "cooldownSeconds": 10,
+    "frequency": "Frequent",
+    "category": "expedition_navigation",
+    "lines": [
+      "Navigation correction complete. New heading set for {destination_name}."
+    ]
+  },
+  {
+    "event": "expedition.unknown.signal",
+    "profile": "human_female_chief_scientist",
+    "speakerRole": "ChiefScientist",
+    "priority": 60,
+    "cooldownSeconds": 8,
+    "frequency": "Minimal",
+    "category": "expedition_discovery",
+    "lines": [
+      "An unknown signal has been detected at {system_name}."
+    ]
+  },
+  {
+    "event": "expedition.major.discovery",
+    "profile": "human_female_chief_scientist",
+    "speakerRole": "ChiefScientist",
+    "priority": 60,
+    "cooldownSeconds": 3,
+    "frequency": "Minimal",
+    "category": "expedition_discovery",
+    "emotion": "excited",
+    "lines": [
+      "Major discovery confirmed. {detail}"
+    ]
+  },
+  {
+    "event": "expedition.destination.approach",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "ExpeditionCommander",
+    "priority": 60,
+    "once": true,
+    "cooldownSeconds": 1,
+    "frequency": "Minimal",
+    "category": "expedition_destination",
+    "lines": [
+      "We are approaching {destination_name}. All stations prepare for arrival."
+    ]
+  },
+  {
+    "event": "expedition.resource.shortage",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "ExpeditionCommander",
+    "priority": 60,
+    "cooldownSeconds": 30,
+    "frequency": "Minimal",
+    "category": "expedition_resources",
+    "emotion": "concerned",
+    "lines": [
+      "Expedition stores are critically low. {amount} of {resource_name} remains."
+    ]
+  },
+  {
+    "event": "expedition.crew.issue",
+    "profile": "human_female_fleet_commander",
+    "speakerRole": "ExpeditionCommander",
+    "priority": 60,
+    "cooldownSeconds": 20,
+    "frequency": "Minimal",
+    "category": "expedition_crew",
+    "emotion": "concerned",
+    "lines": [
+      "A serious crew issue requires command attention. {detail}"
+    ]
+  },
+  {
+    "event": "expedition.rogue_planet",
+    "profile": "human_female_chief_scientist",
+    "speakerRole": "ChiefScientist",
+    "priority": 60,
+    "cooldownSeconds": 5,
+    "frequency": "Minimal",
+    "category": "expedition_discovery",
+    "emotion": "excited",
+    "lines": [
+      "A rogue planet has been confirmed. We have designated it {planet_name}."
+    ]
+  },
+  {
+    "event": "expedition.intergalactic_object",
+    "profile": "human_female_chief_scientist",
+    "speakerRole": "ChiefScientist",
+    "priority": 60,
+    "cooldownSeconds": 5,
+    "frequency": "Minimal",
+    "category": "expedition_discovery",
+    "emotion": "excited",
+    "lines": [
+      "An intergalactic object is on our sensors. Preliminary designation: {object_name}."
+    ]
+  },
+  {
+    "event": "expedition.ship.damage",
+    "profile": "ship_computer",
+    "speakerRole": "ShipComputer",
+    "priority": 80,
+    "cooldownSeconds": 8,
+    "frequency": "Minimal",
+    "category": "expedition_emergency",
+    "emotion": "urgent",
+    "interruptible": false,
+    "queueBehavior": "InterruptLowerPriority",
+    "lines": [
+      "Warning. {ship_name} has sustained major damage. {detail}"
+    ]
+  },
+  {
+    "event": "exploration.system.reconnaissance_required",
+    "profile": "human_female_chief_scientist",
+    "lines": [
+      "Long-range telemetry is incomplete. Dispatch a scout vessel to chart this system before approach."
+    ],
+    "priority": 35,
+    "once": false,
+    "cooldownSeconds": 8,
+    "interruptible": true,
+    "speakerRole": "ChiefScientist",
+    "frequency": "Minimal",
+    "category": "exploration-guidance",
+    "communicationsFilter": false
+  }
+]

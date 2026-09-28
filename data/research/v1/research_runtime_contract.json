@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Defines the authoritative runtime boundary for Adaptive Research. Other simulation workstreams exchange normalized facts/events and consume capabilities/view models; they do not directly mutate hidden research graph internals.",
+  "authoritative_runtime_state": {
+    "per_civilization_sparse_state": [
+      "node_state_by_known_node_id",
+      "active_directed_projects",
+      "directed_program_capacity_stage",
+      "effective_research_lab_pools_and_assignments",
+      "recognized_nonzero_research_pressures",
+      "evidence_instances",
+      "applicability_traits_and_context",
+      "cross_lineage_capabilities_and_context",
+      "active_field_competence",
+      "strategically_relevant_tacit_knowledge_assets",
+      "foreign_technology_assessments",
+      "owned_or_accessible_technology_transfer_packages",
+      "research_agenda_state",
+      "last_scientific_culture_context_revision",
+      "compressed_research_history"
+    ],
+    "static_shared_not_copied_per_civilization": [
+      "technology possibility catalog",
+      "knowledge field catalog",
+      "pressure rules and indexes",
+      "evidence/trait/capability definitions",
+      "facility archetypes",
+      "starting profile fragments",
+      "research agenda/culture/AI planning contracts",
+      "UI contract"
+    ]
+  },
+  "initialization_pipeline": [
+    "load one base-era fragment and selected historically justified fragments",
+    "merge node states, competence, traits, capabilities, institutions, pressure/evidence/tacit seeds under starting-profile rules",
+    "validate composed historical state",
+    "materialize only legitimately visible starting candidates from prerequisite/evidence/pressure/applicability indexes",
+    "initialize research agenda from recognized state plus externally supplied government/scientific-culture context",
+    "create compact campaign research state",
+    "discard composition scratch data"
+  ],
+  "external_input_events": [
+    {"id":"condition_metric_changed","producer":"economy/population/logistics/environment/military/etc.","payload":"metric id, normalized value, context, observation confidence where relevant","effect":"updates only indexed Research Pressure rules"},
+    {"id":"research_relevant_event","producer":"any owning subsystem","payload":"event type, context, severity, evidence/provenance refs","effect":"updates pressure/evidence and wakes only indexed candidates"},
+    {"id":"evidence_acquired","producer":"exploration/sensors/diplomacy/espionage/archaeology/foreign-tech","payload":"evidence instance","effect":"stores evidence and wakes indexed candidates/foreign assessments"},
+    {"id":"physical_research_capacity_changed","producer":"construction/economy","payload":"institution/facility capacity added, removed, damaged, restored","effect":"updates eligible lab/facility pools and blocker/readiness state"},
+    {"id":"population_or_species_context_changed","producer":"population/species","payload":"applicability trait/context gained/lost/changed","effect":"wakes only trait-indexed candidates and rechecks population-scoped capabilities"},
+    {"id":"deployment_event","producer":"construction/population/AI/etc.","payload":"declared research deployment event id + context","effect":"applies validated technology-grant structural effects"},
+    {"id":"foreign_asset_access_changed","producer":"diplomacy/conquest/trade/intelligence","payload":"knowledge/physical/package/expert asset acquired, lost, damaged, transferred","effect":"updates tacit readiness, evidence, foreign-tech assessment, brokerage state"},
+    {"id":"legitimate_foreign_capability_observed","producer":"sensors/intelligence/combat/diplomacy","payload":"observed capability, uncertainty, provenance","effect":"creates evidence/pressure without exposing hidden implementation"},
+    {"id":"research_policy_changed","producer":"player/government/AI strategy","payload":"recognized domain/field/problem/capability priority changes and high-level research orientation","effect":"updates research agenda and schedules bounded recommendation/capacity review; never directly unlocks a node"},
+    {"id":"scientific_culture_context_changed","producer":"social/governance/institution simulation","payload":"revision plus bounded scientific-culture axis values and provenance","effect":"updates agenda/planning behavior; never directly multiplies RP or reveals hidden nodes"},
+    {"id":"strategic_research_goal_changed","producer":"government/AI strategy","payload":"recognized strategic capability/problem goal and urgency","effect":"schedules agenda/project/capacity review over visible/recognized state only"}
+  ],
+  "external_queries": [
+    {"id":"has_capability","consumer":"shipbuilding/colonization/logistics/military/economy/etc.","input":"civilization + capability id + optional target context","output":"yes/no/limited with scope/context","rule":"never require callers to know which technology supplied the capability"},
+    {"id":"technology_maturity","consumer":"construction/UI/integration","input":"civilization + known node id","output":"known visible state only"},
+    {"id":"research_project_blockers","consumer":"UI/AI","input":"civilization + visible node id","output":"specific recognized blockers such as labs/facility/evidence/pressure/capability/coordination"},
+    {"id":"materialized_research_view","consumer":"UI","input":"civilization + view/filter state","output":"visible nodes/edges/projects/history/agenda summaries only"},
+    {"id":"foreign_technology_assessment","consumer":"UI/diplomacy/economy/AI","input":"civilization + foreign asset/lineage id","output":"known Understanding/Operability/Reproduction/Adaptation assessment and confidence"},
+    {"id":"technology_package_research_utility","consumer":"diplomacy/economy/AI","input":"civilization + package id","output":"research/operational/dependency/hazard/assimilation assessment based only on legitimate knowledge"},
+    {"id":"available_research_capacity","consumer":"UI/AI","input":"civilization + optional field/stage","output":"eligible free effective lab capacity plus directed-program availability"},
+    {"id":"research_agenda_summary","consumer":"UI/government/AI","input":"civilization","output":"recognized high-level priorities/orientations and explanation provenance; never hidden candidates"},
+    {"id":"research_capacity_requests","consumer":"construction/economy/government/diplomacy","input":"civilization + optional priority threshold","output":"ranked desired lab/facility/training/sample/foreign-access planning requests; no asset is created by the query"}
+  ],
+  "internal_event_indexes": {
+    "pressure_to_candidate_nodes": true,
+    "evidence_type_to_candidate_nodes": true,
+    "trait_to_candidate_nodes": true,
+    "prerequisite_to_children": true,
+    "capability_to_candidate_nodes": true,
+    "knowledge_field_to_nodes": true,
+    "foreign_constraint_to_assessments": true,
+    "agenda_target_to_visible_candidates": true,
+    "ui_layout_uses_visible_graph_only": true
+  },
+  "tick_policy": {
+    "no_full_graph_per_tick_scan": true,
+    "active_projects_tick_at_research_simulation_frequency": true,
+    "pressure_metrics_are_pushed_by_owning_subsystems_or_reviewed_low_frequency": true,
+    "competence_atrophy_and_asset_decay_use_low_frequency_maintenance": true,
+    "foreign_assessments_recompute_on_relevant_change_only": true,
+    "agenda_and_AI_planning_review_event_driven_or_low_frequency": true,
+    "UI_projection_rebuilds_on_research_state_change_not_every_frame": true,
+    "dormant_civilizations_can_use_coarser_research_updates": true
+  },
+  "project_progress_pipeline": [
+    "verify node remains visible/investigable and directed-program slot exists",
+    "verify minimum eligible assigned Effective Research Labs",
+    "verify hard stage requirements such as facilities/evidence/material access",
+    "compute stage-relevant Project Readiness from competence/facility/evidence/tacit inputs",
+    "apply lab diminishing-return curve and readiness efficiency to generated RP",
+    "advance stage progress",
+    "resolve only contextually permitted setback/hypothesis outcomes with campaign-seeded deterministic uncertainty",
+    "on state transition emit compact research-state event",
+    "on Mature apply node capabilities plus validated technology/deployment grants",
+    "wake only direct/indexed candidate neighbors"
+  ],
+  "research_output_events": [
+    "research_node_became_visible",
+    "research_node_state_changed",
+    "research_project_started",
+    "research_project_paused",
+    "research_project_blocked",
+    "research_project_unblocked",
+    "research_setback_occurred",
+    "hypothesis_resolved",
+    "side_discovery_created",
+    "capability_gained_or_lost",
+    "research_capacity_stage_changed",
+    "foreign_technology_assessment_changed",
+    "technology_package_assimilation_changed",
+    "research_agenda_changed",
+    "research_capacity_requests_changed"
+  ],
+  "save_contract": {
+    "stable_ids_only": true,
+    "do_not_serialize_static_catalog": true,
+    "do_not_serialize_reconstructible_indexes": true,
+    "do_not_serialize_UI_layout_cache": true,
+    "archive_old_project_details_to_summary": true,
+    "foreign_package_and_tacit_asset_provenance_preserved_when_strategically_relevant": true,
+    "agenda_state_is_small_and_sparse": true,
+    "scientific_culture_source_remains_external_but_research_may_cache_revision": true,
+    "versioned_migration_required_for_schema_changes": true
+  },
+  "fair_information_contract": {
+    "AI_and_player_use_same_authoritative_research_state_rules": true,
+    "enemy_exact_hidden_technology_never_used_as_research_input": true,
+    "observed_foreign_capability_can_create_pressure/evidence_only_at_observed_confidence": true,
+    "research_agenda_never_uses_hidden_global_technology_rank": true,
+    "trade_valuation_uses_legitimately_known_buyer_and_market_information": true
+  },
+  "cross_workstream_ownership": {
+    "adaptive_research_owns":"research state, graph, emergence, project progression, research agenda, competence, research-facing capacity requests, foreign-tech interpretation, research-facing facilities/capabilities, view-model semantics",
+    "social_governance_owns":"scientific-culture/government/institutional-value context supplied to research; wider political consequences of funding priorities",
+    "AI_strategy_owns":"high-level civilization goals supplied to fair-information research planner",
+    "construction_economy_owns":"physical construction cost/time/upkeep/damage of research institutions and supplied industrial assets; whether research capacity requests can be fulfilled",
+    "population_species_owns":"biological/population facts that map to applicability contexts",
+    "diplomacy_trade_owns":"negotiation/payment/legal enforcement/consequences for technology packages/licenses and foreign expert access",
+    "exploration_intelligence_owns":"how observations/evidence/foreign assets are legitimately obtained",
+    "UI_implementation_owns":"rendering/interactions that consume the research view-model contract"
+  }
+}

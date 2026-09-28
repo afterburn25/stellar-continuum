@@ -1,0 +1,195 @@
+using System;
+using System.Linq;
+using Game.Simulation.Research.Adaptive;
+
+static void Assert(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}
+
+static void AssertNear(double actual, double expected, double tolerance, string message)
+{
+    if (Math.Abs(actual - expected) > tolerance)
+        throw new InvalidOperationException($"{message} Actual={actual}, expected={expected}.");
+}
+
+var repoRoot = Directory.GetCurrentDirectory();
+var dataRoot = Path.Combine(repoRoot, "data", "research", "v1");
+var strategic = AdaptiveResearchStrategicRuntime.LoadFromDirectory(dataRoot);
+var authority = strategic.Authority;
+
+Assert(strategic.PressureCatalog.Rules.Count == 59, "Strategic runtime must load all 59 Research Pressure rules.");
+Assert(strategic.AgendaCatalog.CultureAxes.Count == 12, "Strategic runtime must load all 12 scientific-culture axes.");
+Assert(strategic.AgendaCatalog.ShortlistBound == 12, "Fair AI shortlist must remain bounded to 12 visible candidates.");
+
+// Causal metric Pressure: real conditions raise urgency gradually rather than instantly or from rank.
+var pressureState = authority.CreateCivilizationState("pressure-check");
+strategic.Pressure.ReportMetricSignal(pressureState, "unserved_energy_fraction", 0.80);
+AssertNear(pressureState.GetPressure("energy_shortage"), 0.0, 0.000001,
+    "Metric reports should update causal support; scheduled maintenance owns Pressure movement.");
+strategic.Pressure.Advance(pressureState, 0.25);
+AssertNear(pressureState.GetPressure("energy_shortage"), 10.0, 0.000001,
+    "Quarter-year Pressure rise should respect the configured 40 points/year response rate.");
+AssertNear(strategic.Pressure.GetMetricTarget(pressureState, "energy_shortage"), 80.0, 0.000001,
+    "Single normalized 0.8 signal should create an 80/100 metric target.");
+strategic.Pressure.Advance(pressureState, 2.0);
+AssertNear(pressureState.GetPressure("energy_shortage"), 80.0, 0.000001,
+    "Pressure should approach but not overshoot its sustained metric target.");
+
+strategic.Pressure.ReportMetricSignal(pressureState, "unserved_energy_fraction", 0.0);
+strategic.Pressure.Advance(pressureState, 1.0);
+AssertNear(pressureState.GetPressure("energy_shortage"), 68.0, 0.000001,
+    "Energy-shortage Pressure should decay at its configured 12 points/year after support disappears.");
+
+_ = strategic.Pressure.ReportEventSignal(pressureState, "major_power_shortage", 1.0);
+AssertNear(pressureState.GetPressure("energy_shortage"), 100.0, 0.000001,
+    "A full-severity major power shortage should add the bounded 45-point urgency pulse and clamp at 100.");
+Assert(strategic.Pressure.GetSupportState(pressureState).MetricSignals.Count == 0,
+    "Zero metric signals must be removed from sparse support state.");
+Assert(strategic.Pressure.GetSupportState(pressureState).ActivePressureIds.Count < strategic.PressureCatalog.Rules.Count,
+    "One pressure episode must not materialize all 59 pressure runtime records.");
+
+// Historical memory floors apply only after legitimate activation.
+var alienMemory = authority.CreateCivilizationState("alien-memory-check");
+AssertNear(alienMemory.GetPressure("alien_signal"), 0.0, 0.000001,
+    "Alien-signal memory floor must not exist before a legitimate observation.");
+strategic.Pressure.ReportEventSignal(alienMemory, "alien_signal_detected", 0.20);
+AssertNear(alienMemory.GetPressure("alien_signal"), 9.0, 0.000001,
+    "20% event severity should produce a 9-point pulse from the 45-point event base.");
+strategic.Pressure.Advance(alienMemory, 10.0);
+AssertNear(alienMemory.GetPressure("alien_signal"), 5.0, 0.000001,
+    "Once activated, alien-signal Pressure should decay only to its configured historical memory floor of 5.");
+
+// Visible-only planning from a real 2050 start.
+var human = authority.ComposeReferenceProfile(
+    "strategic-human",
+    "reference_humanlike_solar_2050",
+    "human-population",
+    2050).State;
+var shortlist = strategic.Agenda.BuildVisibleShortlist(human);
+Assert(shortlist.Count <= 12, "AI shortlist must respect the 12-candidate bound.");
+Assert(shortlist.All(candidate => human.TryGetNodeState(candidate.NodeId, out var nodeState) && nodeState.Maturity == ResearchMaturity.Investigable),
+    "AI shortlist may contain only already-visible Investigable nodes.");
+Assert(shortlist.All(candidate => !human.ActiveProjects.ContainsKey(candidate.NodeId)),
+    "AI shortlist must not duplicate active directed projects.");
+Assert(shortlist.All(candidate => candidate.Components.Count > 0 && !string.IsNullOrWhiteSpace(candidate.Explanation)),
+    "Every AI candidate must retain inspectable utility components and an explanation.");
+
+strategic.Agenda.SetDomainPriority(human, "energy", "critical");
+strategic.Agenda.SetProblemPriority(human, "energy_shortage", "critical");
+strategic.Agenda.SetScientificCultureAxis(human, "curiosity", 77.0);
+strategic.Pressure.ReportMetricSignal(human, "unserved_energy_fraction", 0.9);
+strategic.Pressure.Advance(human, 1.0);
+var energyShortlist = strategic.Agenda.BuildVisibleShortlist(human);
+Assert(energyShortlist.Count <= 12, "Priority/Pressure changes must not expand the shortlist beyond its bound.");
+Assert(energyShortlist.All(candidate => human.NodeStates.ContainsKey(candidate.NodeId)),
+    "Agenda changes must never pull candidates from the hidden graph.");
+
+// Natural complacency/catch-up: no global rank or hidden enemy technology is supplied.
+var hegemon = authority.ComposeReferenceProfile(
+    "hegemon-check",
+    "reference_humanlike_solar_2050",
+    "hegemon-population",
+    2050).State;
+strategic.Agenda.SetScientificCultureAxis(hegemon, "complacency_tendency", 100);
+strategic.Agenda.SetScientificCultureAxis(hegemon, "institutional_conservatism", 100);
+strategic.Agenda.SetScientificCultureAxis(hegemon, "threat_sensitivity", 0);
+var complacent = strategic.Agenda.EvaluatePerceivedAdequacy(
+    hegemon,
+    new ResearchPerceivedAdequacyAssessment("military", 95, 0, 1.0));
+Assert(complacent.RecommendedPriorityId == "deprioritized",
+    "High perceived adequacy plus high complacency/conservatism and low recognized threat should permit military de-emphasis.");
+Assert(complacent.RelevantPressure <= strategic.AgendaCatalog.RuntimePolicy.LowRelevantPressureMaximum,
+    "Complacency de-emphasis must require low recognized Pressure, not hidden rank.");
+strategic.Agenda.ApplyRecommendation(hegemon, complacent, 2300, "AI strategic review from legitimate observations");
+
+strategic.Agenda.SetScientificCultureAxis(hegemon, "threat_sensitivity", 100);
+var challenged = strategic.Agenda.EvaluatePerceivedAdequacy(
+    hegemon,
+    new ResearchPerceivedAdequacyAssessment("military", 80, 90, 1.0));
+Assert(challenged.RecommendedPriorityId == "critical",
+    "A credible observed challenger plus maximum threat sensitivity should reverse complacency into Critical military attention.");
+Assert(challenged.ChallengeIndex >= strategic.AgendaCatalog.RuntimePolicy.CriticalChallengeThreshold,
+    "Critical reversal must be explained by the legitimate challenge index.");
+
+// Strategic snapshot v3 preserves only sparse support/agenda state and stays backward compatible.
+var strategicCodec = new AdaptiveResearchStrategicSnapshotCodec(strategic);
+var v3Json = strategicCodec.Serialize(human);
+var restoredHuman = strategicCodec.Deserialize(v3Json);
+var restoredAgenda = strategic.Agenda.GetState(restoredHuman);
+var restoredSupport = strategic.Pressure.GetSupportState(restoredHuman);
+Assert(restoredAgenda.GetDomainPriority("energy", strategic.AgendaCatalog.RuntimePolicy.DefaultPriorityId) == "critical",
+    "v3 snapshot must preserve nondefault domain priorities.");
+Assert(restoredAgenda.GetProblemPriority("energy_shortage", strategic.AgendaCatalog.RuntimePolicy.DefaultPriorityId) == "critical",
+    "v3 snapshot must preserve nondefault problem priorities.");
+AssertNear(restoredAgenda.GetCultureAxis("curiosity"), 77.0, 0.000001,
+    "v3 snapshot must preserve scientific-culture axes.");
+AssertNear(restoredSupport.GetMetricSignal("unserved_energy_fraction"), 0.9, 0.000001,
+    "v3 snapshot must preserve nonzero causal metric support.");
+Assert(restoredSupport.ActivePressureIds.Contains("energy_shortage"),
+    "v3 snapshot must preserve activated Pressure history.");
+Assert(restoredHuman.NodeStates.Count < authority.Catalog.Nodes.Count,
+    "v3 snapshot restore must remain a sparse materialized research horizon, not a graph copy.");
+
+var v2Codec = new AdaptiveResearchSnapshotV2Codec(authority);
+var v2Json = v2Codec.Serialize(human);
+var v2ThroughV3 = strategicCodec.Deserialize(v2Json);
+Assert(v2ThroughV3.CivilizationId == human.CivilizationId,
+    "Strategic v3 codec must continue loading v2 Adaptive Research snapshots.");
+Assert(strategic.Pressure.GetSupportState(v2ThroughV3).ActivePressureIds.Contains("energy_shortage"),
+    "Nonzero Pressure from an older snapshot must be treated as historically activated after restore.");
+
+var v1Codec = new AdaptiveResearchSnapshotCodec(authority.Kernel);
+var v1Json = v1Codec.Serialize(pressureState);
+var v1ThroughV3 = strategicCodec.Deserialize(v1Json);
+Assert(v1ThroughV3.CivilizationId == pressureState.CivilizationId,
+    "Strategic v3 codec must continue loading v1 Adaptive Research snapshots.");
+
+// 1,000-year strategic soak: a few real problems must not materialize all 59 support records or grow priority maps.
+var soak = authority.CreateCivilizationState("strategic-soak-1000y");
+var metricSignals = new[]
+{
+    "unserved_energy_fraction",
+    "construction_queue_delay",
+    "food_deficit_fraction",
+    "unknown_contact_fraction",
+};
+var maxActivePressureRecords = 0;
+var maxMetricRecords = 0;
+for (var year = 0; year < 1000; year++)
+{
+    var activeSignalIndex = (year / 25) % metricSignals.Length;
+    for (var index = 0; index < metricSignals.Length; index++)
+        strategic.Pressure.ReportMetricSignal(soak, metricSignals[index], index == activeSignalIndex ? 0.65 : 0.0);
+    strategic.Pressure.Advance(soak, 1.0);
+
+    strategic.Agenda.SetDomainPriority(soak, "energy", year % 100 < 50 ? "important" : "routine");
+    strategic.Agenda.SetFieldPriority(soak, "systems", year % 200 < 100 ? "strategic" : "routine");
+    strategic.Agenda.SetScientificCultureAxis(soak, "long_term_orientation", 40 + (year % 61));
+
+    var support = strategic.Pressure.GetSupportState(soak);
+    maxActivePressureRecords = Math.Max(maxActivePressureRecords, support.ActivePressureIds.Count);
+    maxMetricRecords = Math.Max(maxMetricRecords, support.MetricSignals.Count);
+}
+var soakSupport = strategic.Pressure.GetSupportState(soak);
+var soakAgenda = strategic.Agenda.GetState(soak);
+Assert(maxActivePressureRecords <= 4,
+    "A four-signal 1,000-year soak must not expand into unrelated Pressure support records.");
+Assert(maxMetricRecords <= 1,
+    "Zero support signals must be evicted so the soak keeps at most one live metric record.");
+Assert(soakAgenda.DomainPriorities.Count <= 1 && soakAgenda.FieldPriorities.Count <= 1,
+    "Repeated agenda reviews must overwrite sparse priorities rather than append history forever.");
+Assert(soakAgenda.CultureAxes.Count == 12,
+    "Scientific culture remains a fixed 12-axis vector even after 1,000 years.");
+var soakJson = strategicCodec.Serialize(soak);
+Assert(soakJson.Length < 20000,
+    "Strategic soak snapshot should stay compact and must not grow with every historical review.");
+
+Console.WriteLine(
+    $"Adaptive Research strategic checks OK: pressures={strategic.PressureCatalog.Rules.Count}, " +
+    $"activePressureRecords={strategic.Pressure.GetSupportState(pressureState).ActivePressureIds.Count}, " +
+    $"visibleShortlist={shortlist.Count}, energyPressure={human.GetPressure("energy_shortage"):0.#}, " +
+    $"complacency={complacent.ComplacencyIndex:0.#}->{challenged.ChallengeIndex:0.#} challenge, " +
+    $"priority={complacent.RecommendedPriorityId}->{challenged.RecommendedPriorityId}, " +
+    $"v3Bytes={v3Json.Length}, soakMaxPressureRecords={maxActivePressureRecords}, soakBytes={soakJson.Length}. ");

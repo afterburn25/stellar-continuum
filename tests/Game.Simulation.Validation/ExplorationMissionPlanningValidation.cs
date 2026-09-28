@@ -104,7 +104,7 @@ internal static class ExplorationMissionPlanningValidation
         Require(localScout.DestinationSystemId is null,
             "local survey order incorrectly created a zero-distance travel destination");
 
-        localSimulation.Advance(galaxy, 1.0);
+        localSimulation.Advance(galaxy, ExplorationSimulation.ScoutReconnaissanceDays);
         Require(galaxy.Knowledge.GetSystemSurveyLevel(player.Id, target.Id) >= SystemSurveyLevel.PartiallySurveyed,
             "accepted local scout order did not produce reconnaissance on advance");
     }

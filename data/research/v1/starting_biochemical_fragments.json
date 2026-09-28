@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Supplemental starting scientific-history fragments for unusual biochemistries. These are not races and do not define future trees.",
+  "fragments": [
+    {
+      "id":"history_ammonia_rich_biochemistry",
+      "kind":"scientific_history_fragment",
+      "description":"Native ammonia-rich biochemical science developed to an early-spacefaring level.",
+      "starting_applicability_traits":["metabolic_biology","carbon_centered_biochemistry","ammonia_rich_biology","heritable_genetics"],
+      "starting_node_states":{
+        "precision_medicine":"mature",
+        "closed_loop_recycling":"mature",
+        "local_resource_utilization":"mature",
+        "solvent_biochemistry_modeling":"mature",
+        "ammonia_solvent_homeostasis":"mature",
+        "biochemical_feedstock_engineering":"mature"
+      },
+      "starting_field_competence":{
+        "biology":{"theoretical":60,"experimental":58,"engineering":46},
+        "biochemistry":{"theoretical":66,"experimental":64,"engineering":54},
+        "chemistry":{"theoretical":58,"experimental":60,"engineering":50},
+        "medicine":{"theoretical":56,"experimental":58,"engineering":48},
+        "habitation":{"theoretical":46,"experimental":52,"engineering":54}
+      },
+      "starting_research_institutions":[{"institution_archetype_id":"biological_systems_institute","count":1}],
+      "starting_pressure_state":{"resource_scarcity":14,"life_support_losses":10},
+      "historical_notes":"The population already understands its native ammonia-rich biology. More advanced nutrient/ecosystem/industrial solutions remain adaptive research possibilities."
+    },
+    {
+      "id":"history_cryogenic_hydrocarbon_biochemistry",
+      "kind":"scientific_history_fragment",
+      "description":"Native cryogenic hydrocarbon-solvent biology with established low-temperature medicine and materials practice.",
+      "starting_applicability_traits":["metabolic_biology","carbon_centered_biochemistry","hydrocarbon_solvent_biology","cryogenic_biology","heritable_genetics"],
+      "starting_node_states":{
+        "precision_medicine":"mature",
+        "closed_loop_recycling":"mature",
+        "local_resource_utilization":"mature",
+        "cryogenic_materials":"mature",
+        "solvent_biochemistry_modeling":"mature",
+        "cryogenic_solvent_homeostasis":"mature",
+        "biochemical_feedstock_engineering":"mature"
+      },
+      "starting_field_competence":{
+        "biology":{"theoretical":58,"experimental":58,"engineering":44},
+        "biochemistry":{"theoretical":66,"experimental":66,"engineering":54},
+        "chemistry":{"theoretical":60,"experimental":62,"engineering":52},
+        "medicine":{"theoretical":54,"experimental":58,"engineering":46},
+        "materials":{"theoretical":54,"experimental":58,"engineering":56}
+      },
+      "starting_research_institutions":[{"institution_archetype_id":"biological_systems_institute","count":1},{"institution_archetype_id":"materials_prototyping_center","count":1}],
+      "starting_pressure_state":{"extreme_temperature":18,"resource_scarcity":12},
+      "historical_notes":"Cryogenic temperature is normal for this biology; pressure represents engineering/environmental burden, not a universal health penalty."
+    },
+    {
+      "id":"history_silicon_centered_biochemistry",
+      "kind":"scientific_history_fragment",
+      "description":"Rare speculative silicon-centered/mineral-structural biology with native biochemical and mineral-processing science.",
+      "starting_applicability_traits":["metabolic_biology","silicon_centered_biochemistry","mineral_structural_biology","heritable_genetics"],
+      "starting_node_states":{
+        "precision_medicine":"mature",
+        "closed_loop_recycling":"mature",
+        "local_resource_utilization":"mature",
+        "solvent_biochemistry_modeling":"mature",
+        "biochemical_feedstock_engineering":"mature",
+        "silicon_biochemical_frameworks":"mature",
+        "silicate_metabolic_cycles":"investigable",
+        "mineral_nutrient_processing":"investigable"
+      },
+      "starting_field_competence":{
+        "biology":{"theoretical":56,"experimental":54,"engineering":46},
+        "biochemistry":{"theoretical":68,"experimental":64,"engineering":56},
+        "chemistry":{"theoretical":64,"experimental":62,"engineering":56},
+        "materials":{"theoretical":62,"experimental":62,"engineering":60},
+        "medicine":{"theoretical":50,"experimental":52,"engineering":44}
+      },
+      "starting_research_institutions":[{"institution_archetype_id":"biological_systems_institute","count":1},{"institution_archetype_id":"materials_prototyping_center","count":1}],
+      "starting_pressure_state":{"resource_scarcity":18,"industrial_bottleneck":12},
+      "historical_notes":"Silicon-centered biology is treated as speculative rare life. The fragment does not imply universal heat tolerance, stone bodies, or a guaranteed mineral-biofabrication path."
+    }
+  ]
+}

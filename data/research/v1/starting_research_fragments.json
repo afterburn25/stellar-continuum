@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Reusable pre-campaign scientific-history fragments. These are not races and do not define future trees. Species/start definitions compose them with biology, home-system conditions, and physical starting infrastructure, then Adaptive Research recomputes the visible horizon.",
+  "composition_cap_per_competence_component": 78,
+  "fragments": [
+    {
+      "id": "base_early_space_science_2050",
+      "kind": "base_era",
+      "description": "Comparable early-spacefaring/pre-FTL scientific foundation appropriate to a mature technological civilization at the 2050 campaign anchor.",
+      "starting_node_states": {
+        "systems_engineering": "mature",
+        "computational_science": "mature",
+        "advanced_material_characterization": "mature",
+        "high_energy_physics": "mature",
+        "quantum_measurement": "mature",
+        "space_weather_science": "mature",
+        "exoplanetary_science": "mature",
+        "complex_systems_science": "mature"
+      },
+      "starting_field_competence": {
+        "physics": {"theoretical":62,"experimental":52,"engineering":42},
+        "mathematics": {"theoretical":66,"experimental":36,"engineering":32},
+        "systems": {"theoretical":58,"experimental":48,"engineering":52},
+        "science": {"theoretical":52,"experimental":48,"engineering":38}
+      },
+      "starting_research_institutions": [
+        {"institution_archetype_id":"general_research_laboratory","count":6}
+      ],
+      "starting_directed_program_stage": "single_priority_program",
+      "historical_notes": "The civilization already possesses mature scientific institutions and a broad modern physical/scientific foundation, but no FTL implementation is assumed."
+    },
+    {
+      "id": "history_orbital_industrialization",
+      "kind": "scientific_history_fragment",
+      "description": "Decades of launch, orbital construction, vacuum operations, and space-industry development.",
+      "starting_node_states": {
+        "reusable_launch": "mature",
+        "orbital_construction": "mature",
+        "in_space_assembly": "investigable"
+      },
+      "starting_field_competence": {
+        "space_engineering": {"theoretical":48,"experimental":56,"engineering":62},
+        "industry": {"theoretical":42,"experimental":50,"engineering":60},
+        "materials": {"theoretical":48,"experimental":52,"engineering":54},
+        "manufacturing": {"theoretical":42,"experimental":50,"engineering":58}
+      },
+      "historical_notes": "Routine orbital operations have produced strong practical space-engineering competence without implying a mature interstellar shipyard."
+    },
+    {
+      "id": "history_fission_and_storage_infrastructure",
+      "kind": "scientific_history_fragment",
+      "description": "Mature nuclear engineering and high-density power-storage experience.",
+      "starting_node_states": {
+        "advanced_fission": "mature",
+        "high_density_storage": "mature"
+      },
+      "starting_field_competence": {
+        "energy": {"theoretical":48,"experimental":52,"engineering":58},
+        "materials": {"theoretical":44,"experimental":48,"engineering":50}
+      },
+      "historical_notes": "Provides a credible mature power foundation without assuming practical fusion."
+    },
+    {
+      "id": "history_fusion_transition_program",
+      "kind": "scientific_history_fragment",
+      "description": "A civilization that has spent decades pushing fusion from laboratory science toward practical power systems.",
+      "starting_node_states": {
+        "fusion_power": "investigable"
+      },
+      "starting_field_competence": {
+        "energy": {"theoretical":58,"experimental":54,"engineering":42},
+        "physics": {"theoretical":64,"experimental":56,"engineering":40}
+      },
+      "starting_pressure_state": {
+        "reactor_limits": 22
+      },
+      "historical_notes": "Practical fusion is a live research program rather than a guaranteed 2050 mature technology."
+    },
+    {
+      "id": "history_computational_automation",
+      "kind": "scientific_history_fragment",
+      "description": "Heavy historical investment in computation, machine learning, distributed computing, robotics, and autonomy.",
+      "starting_node_states": {
+        "machine_learning": "mature",
+        "distributed_compute": "mature",
+        "industrial_robotics": "mature",
+        "autonomous_navigation": "mature",
+        "expert_systems": "investigable"
+      },
+      "starting_field_competence": {
+        "computing": {"theoretical":62,"experimental":56,"engineering":58},
+        "automation": {"theoretical":56,"experimental":58,"engineering":62},
+        "information": {"theoretical":54,"experimental":46,"engineering":48}
+      },
+      "historical_notes": "Automation is mature but persistent autonomous machine personhood is not implied."
+    },
+    {
+      "id": "history_deep_space_observation_and_comms",
+      "kind": "scientific_history_fragment",
+      "description": "Long-standing astronomy, planetary observation, radar, interferometry, and deep-space communication programs.",
+      "starting_node_states": {
+        "deep_space_radar": "mature",
+        "optical_interferometry": "mature",
+        "deep_space_comms": "mature",
+        "delay_tolerant_network": "investigable"
+      },
+      "starting_field_competence": {
+        "sensors": {"theoretical":58,"experimental":58,"engineering":48},
+        "communications": {"theoretical":52,"experimental":50,"engineering":54},
+        "physics": {"theoretical":58,"experimental":52,"engineering":40}
+      },
+      "historical_notes": "The civilization can observe and communicate across its home system but receives no hidden knowledge of alien civilizations."
+    },
+    {
+      "id": "history_closed_loop_metabolic_habitation",
+      "kind": "scientific_history_fragment",
+      "description": "A metabolic biological civilization with mature precision medicine, recycling, and controlled-environment food production from sustained off-world habitation.",
+      "starting_node_states": {
+        "precision_medicine": "mature",
+        "closed_loop_recycling": "mature",
+        "controlled_environment_agriculture": "mature"
+      },
+      "starting_applicability_traits": ["metabolic_biology"],
+      "starting_field_competence": {
+        "biology": {"theoretical":58,"experimental":56,"engineering":46},
+        "medicine": {"theoretical":58,"experimental":58,"engineering":50},
+        "habitation": {"theoretical":48,"experimental":54,"engineering":56},
+        "agriculture": {"theoretical":46,"experimental":50,"engineering":50}
+      },
+      "starting_research_institutions": [
+        {"institution_archetype_id":"biological_systems_institute","count":1}
+      ],
+      "historical_notes": "Supports established lunar/Mars-style settlements without assuming self-sustaining extrasolar biospheres."
+    },
+    {
+      "id": "history_advanced_structural_materials",
+      "kind": "scientific_history_fragment",
+      "description": "Mature experience with composites, ceramics, and cryogenic structures for demanding terrestrial and space engineering.",
+      "starting_node_states": {
+        "advanced_composites": "mature",
+        "ceramic_matrix": "mature",
+        "cryogenic_materials": "mature"
+      },
+      "starting_field_competence": {
+        "materials": {"theoretical":58,"experimental":60,"engineering":62},
+        "chemistry": {"theoretical":52,"experimental":56,"engineering":48},
+        "manufacturing": {"theoretical":42,"experimental":52,"engineering":60}
+      },
+      "starting_research_institutions": [
+        {"institution_archetype_id":"materials_prototyping_center","count":1}
+      ],
+      "historical_notes": "Creates a strong structural/material base without preselecting later armor, megastructure, or exotic-material branches."
+    },
+    {
+      "id": "history_distributed_economic_coordination",
+      "kind": "scientific_history_fragment",
+      "description": "Large-scale digital governance, logistics accounting, and resource coordination developed before interstellar expansion.",
+      "starting_node_states": {
+        "resource_accounting_systems": "investigable"
+      },
+      "starting_field_competence": {
+        "economics": {"theoretical":52,"experimental":38,"engineering":42},
+        "logistics": {"theoretical":48,"experimental":46,"engineering":52},
+        "governance": {"theoretical":48,"experimental":40,"engineering":42}
+      },
+      "historical_notes": "Represents institutional sophistication, not a universal economic bonus."
+    },
+    {
+      "id": "history_machine_origin_science",
+      "kind": "scientific_history_fragment",
+      "description": "Scientific history for a civilization whose persistent cognition is already synthetic/machine-based at campaign start.",
+      "starting_applicability_traits": ["machine_cognition_present"],
+      "starting_field_competence": {
+        "computing": {"theoretical":68,"experimental":62,"engineering":64},
+        "automation": {"theoretical":64,"experimental":62,"engineering":66},
+        "materials": {"theoretical":50,"experimental":54,"engineering":58}
+      },
+      "historical_notes": "The machine-cognition trait is a starting biological/civilizational fact. It does not require the civilization to have followed the human Synthetic Cognition node path."
+    },
+    {
+      "id": "history_high_gravity_biological_experience",
+      "kind": "environmental_history_fragment",
+      "description": "A gravity-sensitive metabolic population with long historical experience under substantially elevated surface gravity.",
+      "starting_applicability_traits": ["metabolic_biology","gravity_sensitive_biology","heritable_genetics"],
+      "starting_pressure_state": {
+        "high_gravity_health": 30,
+        "gravity_divergence": 18
+      },
+      "starting_field_competence": {
+        "medicine": {"theoretical":54,"experimental":58,"engineering":46},
+        "biology": {"theoretical":52,"experimental":56,"engineering":42}
+      },
+      "historical_notes": "Current unresolved health burden can expose high-gravity branches; the fragment does not hardcode which medical, cybernetic, or genetic solution will be chosen."
+    },
+    {
+      "id": "history_low_gravity_settlement_experience",
+      "kind": "environmental_history_fragment",
+      "description": "A gravity-sensitive metabolic population with multigenerational low-gravity settlement experience.",
+      "starting_applicability_traits": ["metabolic_biology","gravity_sensitive_biology","heritable_genetics"],
+      "starting_pressure_state": {
+        "low_gravity_health": 28,
+        "gravity_divergence": 20
+      },
+      "starting_field_competence": {
+        "medicine": {"theoretical":52,"experimental":56,"engineering":44},
+        "biology": {"theoretical":52,"experimental":54,"engineering":42},
+        "habitation": {"theoretical":46,"experimental":52,"engineering":54}
+      },
+      "historical_notes": "Creates legitimate need/evidence for low-gravity adaptation while leaving the solution path adaptive."
+    }
+  ]
+}

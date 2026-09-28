@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Stable runtime boundary for cross-polity joint research. Diplomacy owns agreements and political/legal consequences; Adaptive Research owns scientific contribution validation, joint progress, result delivery, and assimilation.",
+  "base_runtime_contract":"research_runtime_contract.json",
+  "collaboration_model":"research_collaboration_model.json",
+  "distributed_model":"distributed_research_continuity_model.json",
+  "secrecy_model":"research_secrecy_model.json",
+  "authoritative_sparse_state_extension": [
+    "active_joint_research_collaboration_records",
+    "validated_participant_contribution_snapshots",
+    "joint_project_progress_records",
+    "pending_result_delivery_records",
+    "participant_result_assimilation_state",
+    "bounded_collaboration_history"
+  ],
+  "external_input_events": [
+    {"id":"research_collaboration_agreement_changed","producer":"diplomacy/trade","payload":"collaboration id, participants, objective disclosure, contribution commitments, result rights, active/suspended/terminated state","effect":"create/update/terminate research collaboration record; no RP created by agreement"},
+    {"id":"research_collaboration_contribution_changed","producer":"economy/construction/population/research","payload":"participant + actual lab/facility/expert/data/material/context contribution added/removed/degraded/restored","effect":"revalidate only affected participant contribution and joint stage blockers"},
+    {"id":"research_collaboration_communication_changed","producer":"communications","payload":"participant/context path, latency, bandwidth, secure-channel availability","effect":"re-evaluate only affected coordination/data/result-delivery dependencies"},
+    {"id":"research_collaboration_security_changed","producer":"security/governance","payload":"collaboration/participant compartment or access-policy change","effect":"revalidate authorized contributions/result dissemination without changing scientific truth"},
+    {"id":"research_collaboration_participant_withdrew","producer":"diplomacy/governance","payload":"collaboration + participant + effective time + access/assets actually removed","effect":"remove future contribution, re-evaluate blockers/progress, preserve already delivered records"},
+    {"id":"research_collaboration_result_rights_changed","producer":"diplomacy/trade","payload":"participant-specific result package/right changes","effect":"update future result-delivery authorization; does not recall already delivered material"},
+    {"id":"research_collaboration_foreign_asset_changed","producer":"diplomacy/conquest/intelligence/research","payload":"jointly studied foreign asset/sample/record/expert access changed","effect":"re-evaluate joint foreign-tech/evidence/tacit contribution and each participant assessment"}
+  ],
+  "research_output_events": [
+    "joint_research_collaboration_materialized",
+    "joint_research_contribution_validated",
+    "joint_research_contribution_rejected",
+    "joint_research_project_started",
+    "joint_research_project_blocked",
+    "joint_research_project_unblocked",
+    "joint_research_project_paused",
+    "joint_research_stage_completed",
+    "joint_research_result_delivery_started",
+    "joint_research_result_delivered",
+    "joint_research_participant_assimilation_changed",
+    "joint_research_collaboration_archived"
+  ],
+  "external_queries": [
+    {"id":"collaboration_contribution_eligibility","consumer":"UI/AI/diplomacy","input":"participant + collaboration/objective + proposed contribution","output":"eligible/limited/ineligible plus concrete known blockers and opportunity-cost references"},
+    {"id":"collaboration_effective_capacity","consumer":"UI/AI/research","input":"collaboration + stage","output":"validated aggregate Effective Research Labs, facility/evidence/material/tacit availability, participating contexts, and blockers; no treaty bonus"},
+    {"id":"collaboration_participant_status","consumer":"UI/AI/diplomacy","input":"collaboration + participant","output":"actual current contributions, directed-program usage, result rights/access, known blockers, result-delivery state"},
+    {"id":"collaboration_result_preview","consumer":"UI/AI/diplomacy","input":"collaboration + participant","output":"known result components/rights expected for participant plus technical/applicability limitations; never hidden partner tree data"},
+    {"id":"collaboration_withdrawal_impact","consumer":"UI/AI/diplomacy","input":"collaboration + participant + proposed withdrawal","output":"known capacity/facility/material/integration losses and whether project would continue/slow/block/pause"},
+    {"id":"collaboration_partner_scientific_utility","consumer":"AI/diplomacy/UI","input":"collaboration objective + legitimately known offered partner contributions","output":"research utility based only on offered/known real assets/capabilities/readiness, not hidden partner tech"}
+  ],
+  "materialization_pipeline": [
+    "receive active diplomatic collaboration facts and objective disclosure",
+    "verify objective is legitimately visible/disclosed to each participant at required detail",
+    "validate each contribution independently against real participant state",
+    "reserve each active research participant's directed-program position where required",
+    "reserve/assign real Effective Research Labs/facilities/experts/materials/data without duplication",
+    "create one joint project progress record or collaboration-specific non-directed program record",
+    "emit concrete blockers for missing scientific/access/communications/security requirements"
+  ],
+  "progress_pipeline": [
+    "revalidate changed contributions event-driven",
+    "exclude withdrawn/unavailable/unauthorized contributions",
+    "aggregate eligible real labs under canonical diminishing returns",
+    "compute stage readiness from actual contributing competence/facility/evidence/tacit inputs without double-counting assets",
+    "respect material communications/coordination blockers only where real",
+    "advance one joint project stage work record",
+    "apply field competence/practice gain only to actual contributors",
+    "on stage/result transition create participant-specific result packages/delivery records"
+  ],
+  "result_delivery_pipeline": [
+    "derive participant package components/rights from collaboration agreement",
+    "apply secrecy/compartment authorization",
+    "transmit codified data through real communication paths/latency",
+    "move physical hardware/experts/tooling only through actual logistics if included",
+    "apply result to each participant using native co-development or normal foreign/tacit assimilation rules as appropriate",
+    "evaluate population/infrastructure applicability independently",
+    "remove redundant delivery records after participant state incorporates them"
+  ],
+  "native_co_development_rule": {
+    "requirements": [
+      "participant actually contributed scientific work to relevant stage(s)",
+      "participant consumed required directed-program capacity when actively directing research",
+      "participant had necessary objective access and applicability for its target context",
+      "participant receives the result records/rights necessary for its own scientific state",
+      "normal maturation stage result is reached by the joint project"
+    ],
+    "effect":"Participant may advance its own corresponding native node state because it co-developed the result; this is not a free technology grant.",
+    "passive_participant":"Funding/hosting/result receipt without scientific participation uses normal evidence/tacit/foreign-transfer assimilation instead."
+  },
+  "withdrawal": {
+    "remove_only_actual_future_contributions": true,
+    "do_not_recall_delivered_records": true,
+    "do_not_reverse_completed_scientific_work": true,
+    "recalculate_project_blockers_and_capacity": true,
+    "diplomatic_consequences_owned_elsewhere": true
+  },
+  "save_contract": {
+    "only_active_or_strategically_relevant_collaborations_detailed": true,
+    "aggregate_contribution_records": true,
+    "physical_assets_referenced_not_duplicated": true,
+    "no_partner_graph_copies": true,
+    "no_per_scientist_state": true,
+    "pending_result_deliveries_deduplicate_by_participant_and_revision": true,
+    "delivered_result_records_removed_after_application": true,
+    "completed_collaboration_history_compressed": true,
+    "terminated_inactive_records_archive": true
+  },
+  "fair_information": {
+    "AI_and_player_same_contribution_validation": true,
+    "AI_uses_only_known_offered_partner_assets": true,
+    "AI_does_not_see_partner_hidden_nodes_or_exact_unoffered_capacity": true,
+    "AI_withdrawal_and_result_predictions_use_same_queries_as_player_UI": true,
+    "harder_AI_gets_no_free_collaboration_RP_or_rights": true
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Research-facing specialist capacities for alternative-biochemistry projects. This extends, rather than duplicates, the base research facility model. Construction/economy owns physical implementation/costs.",
+  "facility_capabilities": [
+    {"id":"alternative_biochemistry_experimentation","name":"Alternative-Biochemistry Experimentation"},
+    {"id":"cryogenic_biochemistry_experimentation","name":"Cryogenic-Biochemistry Experimentation"},
+    {"id":"mineral_biochemistry_experimentation","name":"Mineral-Biochemistry Experimentation"},
+    {"id":"cross_biochemistry_containment","name":"Cross-Biochemistry Containment & Interface Testing"}
+  ],
+  "institution_archetypes": [
+    {
+      "id":"alternative_biochemistry_institute",
+      "name":"Alternative Biochemistry Institute",
+      "enabled_by":"solvent_biochemistry_modeling",
+      "effective_lab_units":4,
+      "specialized_fields":["biology","biochemistry","chemistry","medicine"],
+      "facility_capabilities":["general_experimentation","precision_measurement","wet_biology","biosafety_containment","alternative_biochemistry_experimentation"],
+      "description":"General laboratory/institution for nonstandard solvents/substrates and controlled biochemical-environment work."
+    },
+    {
+      "id":"cryogenic_biochemistry_institute",
+      "name":"Cryogenic Biochemistry Institute",
+      "enabled_by":"cryogenic_solvent_homeostasis",
+      "effective_lab_units":4,
+      "specialized_fields":["biology","biochemistry","chemistry","materials"],
+      "facility_capabilities":["general_experimentation","precision_measurement","alternative_biochemistry_experimentation","cryogenic_biochemistry_experimentation","materials_characterization"],
+      "description":"Maintains stable cryogenic solvent/temperature regimes for biological experiments and engineering."
+    },
+    {
+      "id":"mineral_biochemistry_institute",
+      "name":"Mineral Biochemistry Institute",
+      "enabled_by":"silicon_biochemical_frameworks",
+      "effective_lab_units":4,
+      "specialized_fields":["biology","biochemistry","chemistry","materials"],
+      "facility_capabilities":["general_experimentation","precision_measurement","alternative_biochemistry_experimentation","mineral_biochemistry_experimentation","materials_characterization","materials_prototyping"],
+      "description":"Supports silicon-centered and mineral-structural biological characterization, nutrient/process research, repair and growth experiments."
+    },
+    {
+      "id":"cross_biochemistry_interface_lab",
+      "name":"Cross-Biochemistry Interface Laboratory",
+      "enabled_by":"cross_solvent_biochemistry",
+      "effective_lab_units":5,
+      "specialized_fields":["xenoscience","biochemistry","biology","medicine","materials"],
+      "facility_capabilities":["precision_measurement","xenoscience_containment","biosafety_containment","alternative_biochemistry_experimentation","cross_biochemistry_containment","materials_characterization"],
+      "description":"Comparative biochemical containment/interface facility for genuinely different biological populations and foreign biological technology."
+    }
+  ],
+  "stage_requirements": {
+    "ammonia_bioregenerative_support":{"experimental":{"all_of":["alternative_biochemistry_experimentation","ecosystem_experimentation"]}},
+    "hydrocarbon_closed_ecology":{"experimental":{"all_of":["cryogenic_biochemistry_experimentation","ecosystem_experimentation"]}},
+    "silicon_life_support_cycles":{"experimental":{"all_of":["mineral_biochemistry_experimentation","alternative_biochemistry_experimentation"]}},
+    "mineral_biofabrication":{"engineering":{"all_of":["mineral_biochemistry_experimentation","materials_prototyping"]}},
+    "cross_biochemistry_medicine":{"experimental":{"all_of":["cross_biochemistry_containment","xenoscience_containment"]}},
+    "cross_biochemistry_biofabrication":{"engineering":{"all_of":["cross_biochemistry_containment","materials_prototyping"]}}
+  },
+  "rules": {
+    "extends_base_research_facility_model":true,
+    "facility_capabilities_are_physical_research_capacity_not_percentage_bonuses":true,
+    "native_biochemical_population_can_build_relevant_institute_after_enabling_knowledge":true,
+    "cross_biochemistry_work_requires_real_comparative_containment_when_explicitly_configured":true,
+    "institution_instances_can_be_aggregated_for_late_game_scaling":true
+  }
+}

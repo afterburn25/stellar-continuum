@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "design_status": "seed_balance_values_not_final",
+  "purpose": "Numeric runtime seed policy for competence practice/atrophy, specialist facility readiness, evidence readiness, and tacit-expertise assimilation. Values are explicit data so long-horizon balancing does not require hidden C# constants.",
+  "competence_practice_gain_per_completed_stage": {
+    "experimental": {"theoretical": 1.0, "experimental": 3.0, "engineering": 0.5},
+    "demonstrated": {"theoretical": 1.0, "experimental": 2.5, "engineering": 1.0},
+    "engineering": {"theoretical": 0.5, "experimental": 1.0, "engineering": 3.5}
+  },
+  "competence_gain_rules": {
+    "divide_direct_gain_across_required_fields": true,
+    "related_field_transfer_fraction": 0.12,
+    "diminishing_gain_near_100": true,
+    "diminishing_formula": "applied_gain = raw_gain * (1 - current_component / 120)",
+    "minimum_gain_factor": 0.15,
+    "disproven_hypothesis_stage_gain_retained": true
+  },
+  "annual_active_competence_atrophy_toward_preservation_floor": {
+    "theoretical": 0.25,
+    "experimental": 0.75,
+    "engineering": 1.25
+  },
+  "atrophy_rules": {
+    "only_after_years_without_meaningful_component_activity": 5.0,
+    "historical_peak_never_atrophies": true,
+    "mature_node_knowledge_never_removed_by_competence_atrophy": true,
+    "active_training_or_relevant_practice_resets_component_inactivity": true
+  },
+  "facility_readiness": {
+    "general_lab_matching_factor": 0.65,
+    "specialized_matching_factor": 1.0,
+    "nonmatching_specialist_factor": 0.35,
+    "score_formula": "100 * min(1, effective_matching_lab_units / max(assigned_labs, 1))",
+    "hard_stage_requirements_remain_separate_blockers": true,
+    "inactive_institutions_contribute_zero": true
+  },
+  "evidence_readiness": {
+    "score_per_instance": "100 * quality_0_1 * confidence_0_1",
+    "project_aggregation": "arithmetic_mean of relevant required evidence instances",
+    "irrelevant_evidence_contributes": false,
+    "missing_required_evidence_remains_hard_blocker": true
+  },
+  "tacit_assimilation_factors": {
+    "access": 0.35,
+    "interpreted": 0.50,
+    "codified": 0.65,
+    "trained": 0.85,
+    "native_practice": 1.00
+  },
+  "tacit_asset_score": {
+    "formula": "depth_0_100 * assimilation_factor * availability_0_1 * translation_context_quality_0_1 * training_continuity_0_1",
+    "project_aggregation": "0.70 * best_relevant_asset + 0.30 * arithmetic_mean_relevant_assets",
+    "no_relevant_assets": 0.0,
+    "no_per_person_objects": true
+  },
+  "preservation_floor": {
+    "formula": "max relevant tacit asset score for each supported competence component * floor_fraction",
+    "floor_fraction": 0.60,
+    "established_knowledge_theoretical_floor_fraction_of_historical_peak": 0.50,
+    "never_exceeds_historical_peak": true,
+    "practical_experimental_and_engineering_floors_still_require_real_preservation_assets_or_practice": true
+  },
+  "readiness_component_relevance": {
+    "field_competence": "always",
+    "facility_readiness": "always for directed experimental/demonstrated/engineering work",
+    "evidence_readiness": "required when the node explicitly requires evidence or its applicability requires evidence",
+    "tacit_expertise": "required for foreign/xenoscience work; otherwise included only when a scoped relevant tacit asset exists"
+  },
+  "performance": {
+    "competence_updates_on_stage_completion_or_explicit_meaningful_practice_events": true,
+    "atrophy_checked_on_low_frequency_maintenance_ticks": true,
+    "readiness_cached_per_active_project": true,
+    "readiness_recomputed_only_when_relevant_state_changes": true,
+    "no_full_field_or_graph_scan_per_simulation_tick": true
+  }
+}

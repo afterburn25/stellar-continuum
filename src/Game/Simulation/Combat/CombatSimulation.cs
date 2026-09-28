@@ -393,6 +393,7 @@ public sealed class CombatSimulation
             target.EmbarkedPopulationSpeciesId = null;
             target.IsActive = false;
             target.DestinationSystemId = null;
+            target.PlannedRouteSystemIds.Clear();
             target.DestinationPlanetaryBodyId = null;
             SetHold(targetState, preserveDisengagement: false);
 

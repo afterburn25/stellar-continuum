@@ -14,7 +14,7 @@ namespace Game.CoreRuntime.Validation;
 
 internal static class CampaignV9DiplomacyCombatBindingValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunCampaignV9DiplomacyCombatBindingChecks()
     {
         ValidateRestoredDiplomacyControlsCombatHostility();

@@ -11,7 +11,7 @@ namespace Game.Simulation.Validation;
 
 internal static class CombatOutcomeStepSyncValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunCombatOutcomeStepCheck()
     {
         var combatEvents = new CombatEvent[]

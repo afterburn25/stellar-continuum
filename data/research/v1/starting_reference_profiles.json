@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Reference compositions used to validate the starting research profile contract. They are examples and balance seeds, not playable-species tech trees. Species/start definitions may select different fragment combinations when historically justified.",
+  "profiles": [
+    {
+      "id": "reference_humanlike_solar_2050",
+      "kind": "civilization_reference_profile",
+      "description": "Reference for the established human-like 2050 direction: mature homeworld science, substantial orbital activity, permanent off-world settlement, carbon-centered water-solvent biology, but no mature practical fusion or FTL.",
+      "fragment_ids": ["base_early_space_science_2050","history_advanced_structural_materials","history_orbital_industrialization","history_fission_and_storage_infrastructure","history_fusion_transition_program","history_computational_automation","history_deep_space_observation_and_comms","history_closed_loop_metabolic_habitation"],
+      "additional_starting_applicability_traits": ["carbon_centered_biochemistry","water_solvent_biology","gravity_sensitive_biology","heritable_genetics"],
+      "additional_starting_pressure_state": {"long_duration_mission":18,"transport_delay":16,"orbital_growth":20},
+      "historical_notes": "The reference profile deliberately leaves fusion as Investigable and does not seed FTL hypotheses. Carbon-water biology is explicit historical context, not a universal biology assumption."
+    },
+    {
+      "id": "reference_synthetic_early_space",
+      "kind": "civilization_reference_profile",
+      "description": "Reference for a naturally or historically synthetic civilization that reaches a comparable early-space era through a machine-oriented scientific history.",
+      "fragment_ids": ["base_early_space_science_2050","history_advanced_structural_materials","history_orbital_industrialization","history_fission_and_storage_infrastructure","history_computational_automation","history_deep_space_observation_and_comms","history_machine_origin_science"],
+      "additional_starting_pressure_state": {"automation_demand":18,"maintenance_failures":12,"orbital_growth":18},
+      "historical_notes": "This profile begins with machine cognition as an existing civilization fact but does not claim the civilization researched the human Synthetic Cognition path."
+    },
+    {
+      "id": "reference_high_gravity_metabolic_early_space",
+      "kind": "civilization_reference_profile",
+      "description": "Reference for a carbon-water metabolic high-gravity civilization with strong medicine/materials needs and an otherwise comparable early-space scientific foundation.",
+      "fragment_ids": ["base_early_space_science_2050","history_advanced_structural_materials","history_orbital_industrialization","history_fission_and_storage_infrastructure","history_computational_automation","history_deep_space_observation_and_comms","history_closed_loop_metabolic_habitation","history_high_gravity_biological_experience"],
+      "additional_starting_applicability_traits": ["carbon_centered_biochemistry","water_solvent_biology"],
+      "additional_starting_pressure_state": {"launch_cost":24},
+      "historical_notes": "High-gravity pressure can expose several solutions, but the profile chooses none of them in advance."
+    },
+    {
+      "id": "reference_low_gravity_metabolic_early_space",
+      "kind": "civilization_reference_profile",
+      "description": "Reference for a carbon-water metabolic civilization whose settlement history has already produced serious low-gravity medical/developmental questions.",
+      "fragment_ids": ["base_early_space_science_2050","history_advanced_structural_materials","history_orbital_industrialization","history_fission_and_storage_infrastructure","history_computational_automation","history_deep_space_observation_and_comms","history_closed_loop_metabolic_habitation","history_low_gravity_settlement_experience"],
+      "additional_starting_applicability_traits": ["carbon_centered_biochemistry","water_solvent_biology"],
+      "additional_starting_pressure_state": {"long_duration_mission":22,"habitat_crowding":12},
+      "historical_notes": "Low-gravity experience changes the starting research horizon through pressure and competence rather than a species-specific tree."
+    },
+    {
+      "id": "reference_pelagic_high_pressure_early_space",
+      "kind": "civilization_reference_profile",
+      "description": "Reference for a carbon-water civilization native to a high-pressure liquid environment with a comparable early-space scientific foundation.",
+      "fragment_ids": ["base_early_space_science_2050","history_advanced_structural_materials","history_orbital_industrialization","history_fission_and_storage_infrastructure","history_computational_automation","history_deep_space_observation_and_comms","history_closed_loop_metabolic_habitation"],
+      "additional_starting_applicability_traits": ["carbon_centered_biochemistry","water_solvent_biology","liquid_medium_native","gravity_sensitive_biology","heritable_genetics"],
+      "additional_starting_pressure_state": {"high_pressure_environment":28,"long_duration_mission":18,"habitat_crowding":14},
+      "historical_notes": "Liquid-medium and pressure conditions shape the starting horizon without prescribing a separate future tree or granting advanced ocean habitats."
+    }
+  ],
+  "rules": {
+    "reference_profiles_are_not_playable_species_definitions": true,
+    "profile_future_tree_is_never_precomputed_or_stored": true,
+    "profile_composition_must_validate_node_prerequisites_and_public_references": true,
+    "species_start_workstream_can_compose_other_valid_fragment_sets": true
+  }
+}

@@ -2,34 +2,92 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Game.Simulation.Economy;
 using Game.Simulation.Exploration;
 using Game.Simulation.Models;
 using Game.Simulation.Species;
+using Game.Simulation.Shipbuilding;
 
 namespace Game.Simulation.Colonization;
 
 public sealed class ColonizationSimulation
 {
+    /// <summary>Strategic capital for landing infrastructure, habitats, and local administration.</summary>
+    public const double ColonyExpeditionCreditCost = 120.0;
+    public const double ColonyEstablishmentDays = 30;
+    public const double OutpostEstablishmentDays = 20;
+    public static double EstablishmentDays(FleetState fleet) =>
+        ResourceOutpostOpportunityPlanner.IsOutpostFleet(fleet) ? OutpostEstablishmentDays : ColonyEstablishmentDays;
+    public const double ResourceOutpostExpeditionCreditCost = 90.0;
     private readonly IInterstellarOperationalReachView _operationalReach;
     private readonly SpeciesPlanetaryHabitabilityEvaluator _habitability = new();
+    private readonly ColonizationOpportunityPlanner _opportunityPlanner;
+    private readonly ResourceOutpostOpportunityPlanner _outpostPlanner;
+    private readonly ColonySettlementBodyResolver _settlementBodies = new();
 
     public ColonizationSimulation(IInterstellarOperationalReachView? operationalReach = null)
     {
-        _operationalReach = operationalReach ?? new PrototypeInterstellarOperationalReachView();
+        _operationalReach = operationalReach ?? new LaneInterstellarOperationalReachView();
+        _opportunityPlanner = new ColonizationOpportunityPlanner(_operationalReach);
+        _outpostPlanner = new ResourceOutpostOpportunityPlanner(_operationalReach);
     }
 
-    public IReadOnlyList<ColonizationEvent> Advance(GalaxyState galaxy)
+    public IReadOnlyList<ColonizationEvent> Advance(GalaxyState galaxy, double simulationDays = 1)
     {
+        if (!double.IsFinite(simulationDays) || simulationDays < 0)
+            throw new ArgumentOutOfRangeException(nameof(simulationDays));
+        if (simulationDays == 0) return Array.Empty<ColonizationEvent>();
         var events = new List<ColonizationEvent>();
 
         foreach (var fleet in galaxy.Fleets.Where(fleet => fleet.IsActive && fleet.Role == FleetRole.Colony))
         {
+            if (fleet.HoldRequested) continue;
+            if (CivilizationOperatingCapacity.GetFundingFraction(galaxy, fleet.CivilizationId) <= 0.0000001)
+                continue;
+            if (fleet.PreventAutomaticSettlement) continue;
             var civilization = galaxy.Civilizations.First(c => c.Id == fleet.CivilizationId);
 
+            if (ResourceOutpostOpportunityPlanner.IsOutpostFleet(fleet))
+            {
+                if (fleet.TransitPhase == FleetTransitPhase.None && fleet.DestinationSystemId is null && fleet.CurrentSystemId is int outpostSystemId &&
+                    fleet.DestinationPlanetaryBodyId is int outpostBodyId)
+                {
+                    var assessment = _outpostPlanner.AssessOrder(galaxy, fleet.Id, outpostSystemId, outpostBodyId);
+                    if (assessment.Accepted)
+                    {
+                        if (!AdvanceEstablishment(galaxy, fleet, outpostBodyId, simulationDays)) continue;
+                        var body = galaxy.PlanetaryBodies.First(candidate => candidate.Id == outpostBodyId);
+                        var personnel = fleet.EmbarkedPopulationMillions;
+                        var speciesId = RequireEmbarkedPopulationSpecies(fleet);
+                        var colony = new ColonyState
+                        {
+                            Id = galaxy.Colonies.Count == 0 ? 0 : galaxy.Colonies.Max(c => c.Id) + 1,
+                            CivilizationId = fleet.CivilizationId,
+                            SystemId = outpostSystemId,
+                            PlanetaryBodyId = body.Id,
+                            Name = $"{civilization.Name} Resource Outpost {galaxy.Colonies.Count(c => c.CivilizationId == civilization.Id && c.Kind == SettlementKind.ResourceOutpost) + 1}",
+                            Kind = SettlementKind.ResourceOutpost,
+                            PopulationSpeciesId = speciesId,
+                            PopulationMillions = personnel,
+                            StoredFoodPopulationDaysMillions = personnel * ColonySustenanceReserves.MaximumFoodReserveDays,
+                            StoredWaterPopulationDaysMillions = personnel * ColonySustenanceReserves.MaximumWaterReserveDays,
+                            RemainingExtractableMaterials = ResourceOutpostOperations.InitialDepositReserve(body),
+                            Infrastructure = 0.15,
+                            Stability = 0.85,
+                        };
+                        galaxy.Colonies.Add(colony);
+                        ConsumeSettlementVessel(fleet);
+                        events.Add(new ColonizationEvent(fleet.CivilizationId, fleet.Id, outpostSystemId, colony.Id,
+                            $"{civilization.Name} established a sealed staffed resource outpost on {body.Name} with {personnel:0.0} million specialist personnel."));
+                    }
+                }
+                continue;
+            }
+
             // Found first when a populated colony ship has already arrived. Body-aware v8
-            // missions keep the exact target; legacy/in-memory missions without one select the
-            // best currently viable surveyed body in the arrival system.
-            if (fleet.DestinationSystemId is null &&
+            // missions keep the exact target; legacy/in-memory missions without one use the
+            // shared species-relative body-less resolver also consumed by read/status surfaces.
+            if (fleet.TransitPhase == FleetTransitPhase.None && fleet.DestinationSystemId is null &&
                 fleet.CurrentSystemId is int currentSystemId &&
                 fleet.EmbarkedPopulationMillions > 0.0)
             {
@@ -38,6 +96,7 @@ public sealed class ColonizationSimulation
                 if (targetBody is not null &&
                     IsColonizable(galaxy, fleet.CivilizationId, targetBody, speciesId))
                 {
+                    if (!AdvanceEstablishment(galaxy, fleet, targetBody.Id, simulationDays)) continue;
                     var colonists = fleet.EmbarkedPopulationMillions;
                     var assessment = _habitability.Evaluate(targetBody, speciesId);
                     var colony = new ColonyState
@@ -49,16 +108,14 @@ public sealed class ColonizationSimulation
                         Name = $"{civilization.Name} Colony {galaxy.Colonies.Count(c => c.CivilizationId == civilization.Id) + 1}",
                         PopulationSpeciesId = speciesId,
                         PopulationMillions = colonists,
+                        StoredFoodPopulationDaysMillions = colonists * ColonySustenanceReserves.MaximumFoodReserveDays,
+                        StoredWaterPopulationDaysMillions = colonists * ColonySustenanceReserves.MaximumWaterReserveDays,
                         Infrastructure = assessment.Viability == SpeciesColonizationViability.NaturallyViable ? 0.35 : 0.42,
                         Stability = assessment.Viability == SpeciesColonizationViability.NaturallyViable ? 0.92 : 0.88,
                     };
 
                     galaxy.Colonies.Add(colony);
-                    fleet.EmbarkedPopulationMillions = 0.0;
-                    fleet.EmbarkedPopulationSpeciesId = null;
-                    fleet.IsActive = false;
-                    fleet.DestinationSystemId = null;
-                    fleet.DestinationPlanetaryBodyId = null;
+                    ConsumeSettlementVessel(fleet);
 
                     var speciesName = SpeciesCatalog.Get(speciesId).DisplayName;
                     var mode = assessment.Viability == SpeciesColonizationViability.NaturallyViable
@@ -85,6 +142,89 @@ public sealed class ColonizationSimulation
         return events;
     }
 
+    private static bool AdvanceEstablishment(GalaxyState galaxy, FleetState fleet, int bodyId, double days)
+    {
+        if (fleet.SettlementBodyId != bodyId)
+        {
+            fleet.SettlementBodyId = bodyId;
+            fleet.SettlementDaysCompleted = 0;
+            return false; // Arrival cannot also count as a full step of construction.
+        }
+        var capacity = CivilizationOperatingCapacity.GetFundingFraction(galaxy, fleet.CivilizationId);
+        fleet.SettlementDaysCompleted = Math.Min(EstablishmentDays(fleet), fleet.SettlementDaysCompleted + days * capacity);
+        return fleet.SettlementDaysCompleted + 1e-9 >= EstablishmentDays(fleet);
+    }
+
+    public ColonyOrderResult IssueTransitOrder(GalaxyState galaxy, int civilizationId, int fleetId, int destinationSystemId)
+    {
+        var fleet = galaxy.Fleets.FirstOrDefault(f => f.Id == fleetId && f.IsActive && f.CivilizationId == civilizationId && f.Role == FleetRole.Colony);
+        if (fleet is null) return new(false, "Select an active colony or outpost ship you control.");
+        var reach = _operationalReach.Assess(galaxy, civilizationId, fleet, destinationSystemId, InterstellarMissionKind.Colony);
+        if (!reach.IsSupported) return new(false, reach.Reason);
+        FleetRouteOrders.Assign(galaxy, fleet, destinationSystemId, reach);
+        AbandonMissionForTransit(fleet);
+        return new(true, $"{fleet.Name}: course set. Colonists remain aboard until you right-click a surveyed world to authorize settlement. {reach.Reason}");
+    }
+
+    public ColonizationOpportunityPlan GetOpportunityPlan(
+        GalaxyState galaxy,
+        int fleetId,
+        int maximumCandidates = ColonizationOpportunityPlanner.DefaultMaximumCandidates) =>
+        _opportunityPlanner.BuildPlan(galaxy, fleetId, maximumCandidates);
+
+    /// <summary>Clears only mutable settlement target/progress; paid expedition accounting is retained.</summary>
+    public static void AbandonMissionForTransit(FleetState fleet)
+    {
+        ArgumentNullException.ThrowIfNull(fleet);
+        fleet.DestinationPlanetaryBodyId = null;
+        fleet.SettlementBodyId = null;
+        fleet.SettlementDaysCompleted = 0;
+        fleet.PreventAutomaticSettlement = true;
+    }
+
+    public ResourceOutpostOpportunityPlan GetResourceOutpostOpportunityPlan(
+        GalaxyState galaxy,
+        int fleetId,
+        int maximumCandidates = ResourceOutpostOpportunityPlanner.DefaultMaximumCandidates) =>
+        _outpostPlanner.BuildPlan(galaxy, fleetId, maximumCandidates);
+
+    public ColonyOrderResult IssueResourceOutpostFleetOrder(
+        GalaxyState galaxy,
+        int fleetId,
+        int destinationSystemId,
+        int planetaryBodyId)
+    {
+        var assessment = _outpostPlanner.AssessOrder(galaxy, fleetId, destinationSystemId, planetaryBodyId);
+        if (!assessment.Accepted)
+            return new ColonyOrderResult(false, assessment.Message);
+        var fleet = galaxy.Fleets.First(candidate => candidate.Id == fleetId && ResourceOutpostOpportunityPlanner.IsOutpostFleet(candidate));
+        var isNewMission = fleet.PreventAutomaticSettlement || (fleet.DestinationSystemId is null && fleet.DestinationPlanetaryBodyId is null && fleet.SettlementBodyId is null);
+        var economy = galaxy.Economies.First(state => state.CivilizationId == fleet.CivilizationId);
+        var currency = Game.Simulation.Economy.SovereignCurrencyCatalog.ForCivilization(galaxy, fleet.CivilizationId);
+        if (isNewMission && economy.Credits + 0.0001 < ResourceOutpostExpeditionCreditCost)
+            return new ColonyOrderResult(false, $"{currency.Format(ResourceOutpostExpeditionCreditCost)} is required to fund the resource-outpost expedition.");
+        if (isNewMission)
+            economy.Credits -= ResourceOutpostExpeditionCreditCost;
+        FleetRouteOrders.Assign(galaxy, fleet, destinationSystemId, assessment.Candidate!.Reach);
+        if (fleet.DestinationPlanetaryBodyId != planetaryBodyId)
+        {
+            fleet.SettlementBodyId = null;
+            fleet.SettlementDaysCompleted = 0;
+        }
+        fleet.DestinationPlanetaryBodyId = planetaryBodyId;
+        fleet.PreventAutomaticSettlement = false;
+        return new ColonyOrderResult(true, assessment.Message + (isNewMission
+            ? $" Expedition funded for {currency.Format(ResourceOutpostExpeditionCreditCost)}."
+            : " Destination updated; the original expedition authorization remains in effect."));
+    }
+
+    public ColonizationOrderAssessment AssessColonyOrder(
+        GalaxyState galaxy,
+        int fleetId,
+        int destinationSystemId,
+        int planetaryBodyId) =>
+        _opportunityPlanner.AssessOrder(galaxy, fleetId, destinationSystemId, planetaryBodyId);
+
     public ColonyOrderResult IssuePlayerColonyOrder(
         GalaxyState galaxy,
         int civilizationId,
@@ -102,7 +242,11 @@ public sealed class ColonizationSimulation
         if (speciesId is null)
             return new ColonyOrderResult(false, speciesError!);
 
-        var body = SelectBestBodyInSystem(galaxy, civilizationId, destinationSystemId, speciesId);
+        var body = _settlementBodies.ResolveBestAvailableBody(
+            galaxy,
+            civilizationId,
+            destinationSystemId,
+            speciesId);
         return body is null
             ? new ColonyOrderResult(
                 false,
@@ -111,10 +255,9 @@ public sealed class ColonizationSimulation
     }
 
     /// <summary>
-    /// Body-aware colony command. Directly viable worlds are determined from the embarked
-    /// species and authoritative surveyed planetary physics. The deterministic legacy candidate
-    /// remains a temporary habitat-supported fallback until research/construction/logistics own
-    /// explicit support capability and operating cost.
+    /// Compatibility civilization-scoped body order. When several populated colony fleets exist,
+    /// only a genuinely uncommitted fleet parked at a friendly founded colony is eligible for a
+    /// new implicit mission. Explicit fleet-ID orders remain the retargeting surface.
     /// </summary>
     public ColonyOrderResult IssuePlayerColonyOrder(
         GalaxyState galaxy,
@@ -126,65 +269,63 @@ public sealed class ColonizationSimulation
         if (validation is not null)
             return validation;
 
-        var system = galaxy.Systems.First(system => system.Id == destinationSystemId);
-        var body = galaxy.PlanetaryBodies.FirstOrDefault(candidate =>
-            candidate.Id == planetaryBodyId && candidate.SystemId == destinationSystemId);
-        if (body is null)
-            return new ColonyOrderResult(false, "That planetary body is not part of the surveyed destination system.");
-        if (!body.Environment.HasSolidSurface)
-            return new ColonyOrderResult(false, "The selected body has no solid settlement surface in the current colony model.");
-        if (body.HasPreWarpCivilization)
-            return new ColonyOrderResult(false, "A native pre-warp civilization already inhabits the selected world.");
-        if (galaxy.Colonies.Any(c => c.SystemId == destinationSystemId))
-            return new ColonyOrderResult(false, "That system already contains a founded colony in the current single-colony early-release model.");
-
         var fleet = FindAvailableColonyFleet(galaxy, civilizationId);
         if (fleet is null)
             return new ColonyOrderResult(false, "No colony ship carrying reserved colonists is available.");
 
-        var speciesId = RequireEmbarkedPopulationSpeciesForOrder(fleet, out var speciesError);
-        if (speciesId is null)
-            return new ColonyOrderResult(false, speciesError!);
+        return IssueColonyFleetOrder(galaxy, fleet.Id, destinationSystemId, planetaryBodyId);
+    }
 
-        var assessment = _habitability.Evaluate(body, speciesId);
-        if (!assessment.CanFoundCurrentColony)
+    /// <summary>
+    /// Explicit per-fleet colony command. Eligibility and the player-facing rejection reason come
+    /// from the same observer-safe opportunity assessment used by read-only planning and AI
+    /// eligibility filtering.
+    /// </summary>
+    public ColonyOrderResult IssueColonyFleetOrder(
+        GalaxyState galaxy,
+        int fleetId,
+        int destinationSystemId,
+        int planetaryBodyId)
+    {
+        var assessment = _opportunityPlanner.AssessOrder(
+            galaxy,
+            fleetId,
+            destinationSystemId,
+            planetaryBodyId);
+        if (!assessment.Accepted)
+            return new ColonyOrderResult(false, assessment.Message);
+
+        var fleet = galaxy.Fleets.First(f =>
+            f.Id == fleetId &&
+            f.IsActive &&
+            f.Role == FleetRole.Colony &&
+            f.EmbarkedPopulationMillions > 0.0);
+        var isNewMission = fleet.PreventAutomaticSettlement || (fleet.DestinationSystemId is null && fleet.DestinationPlanetaryBodyId is null && fleet.SettlementBodyId is null);
+        var economy = galaxy.Economies.First(e => e.CivilizationId == fleet.CivilizationId);
+        var currency = Game.Simulation.Economy.SovereignCurrencyCatalog.ForCivilization(galaxy, fleet.CivilizationId);
+        if (isNewMission && economy.Credits + 0.0001 < ColonyExpeditionCreditCost)
+            return new ColonyOrderResult(false, $"{currency.Format(ColonyExpeditionCreditCost)} is required to fund the colony expedition.");
+
+        if (isNewMission)
+            economy.Credits -= ColonyExpeditionCreditCost;
+        FleetRouteOrders.Assign(galaxy, fleet, destinationSystemId, assessment.Candidate!.Reach);
+        if (fleet.DestinationPlanetaryBodyId != planetaryBodyId)
         {
-            var speciesName = SpeciesCatalog.Get(speciesId).DisplayName;
-            return new ColonyOrderResult(
-                false,
-                $"{body.Name} is not currently viable for {speciesName}: natural habitability {assessment.Environment.NaturalHabitability:P0}, unprotected operational capacity {assessment.Environment.UnprotectedOperationalCapacity:P0}. Required habitat-support capabilities are not yet connected to colony construction/logistics.");
+            fleet.SettlementBodyId = null;
+            fleet.SettlementDaysCompleted = 0;
         }
-
-        var reach = AssessOperationalReach(galaxy, fleet, destinationSystemId);
-        if (!reach.IsSupported)
-            return new ColonyOrderResult(false, reach.Reason);
-
-        fleet.DestinationSystemId = destinationSystemId;
-        fleet.DestinationPlanetaryBodyId = body.Id;
-
-        var speciesDisplayName = SpeciesCatalog.Get(speciesId).DisplayName;
-        var supportNote = assessment.Viability == SpeciesColonizationViability.NaturallyViable
-            ? "naturally viable"
-            : "prototype habitat-supported fallback";
-        return new ColonyOrderResult(
-            true,
-            $"{fleet.Name}: colony course set for {body.Name} in {system.Name} with {fleet.EmbarkedPopulationMillions:0.0} million {speciesDisplayName} colonists aboard ({supportNote}).");
+        fleet.DestinationPlanetaryBodyId = planetaryBodyId;
+        fleet.PreventAutomaticSettlement = false;
+        return new ColonyOrderResult(true, assessment.Message + (isNewMission
+            ? $" Expedition funded for {currency.Format(ColonyExpeditionCreditCost)}."
+            : " Destination updated; the original expedition authorization remains in effect."));
     }
 
     public MissionReachAssessment AssessOperationalReach(
         GalaxyState galaxy,
         int fleetId,
-        int destinationSystemId)
-    {
-        var fleet = galaxy.Fleets.FirstOrDefault(f =>
-            f.Id == fleetId &&
-            f.IsActive &&
-            f.Role == FleetRole.Colony &&
-            f.EmbarkedPopulationMillions > 0.0);
-        return fleet is null
-            ? MissionReachAssessment.Unsupported("No populated colony ship is available.")
-            : AssessOperationalReach(galaxy, fleet, destinationSystemId);
-    }
+        int destinationSystemId) =>
+        _opportunityPlanner.AssessOperationalReach(galaxy, fleetId, destinationSystemId);
 
     /// <summary>
     /// Resolves the occupied physical body. New body-aware colonies use their explicit ID;
@@ -226,36 +367,55 @@ public sealed class ColonizationSimulation
         FleetState fleet,
         CivilizationState civilization)
     {
-        var speciesId = RequireEmbarkedPopulationSpecies(fleet);
         var systemsById = galaxy.Systems.ToDictionary(system => system.Id);
-        var candidate = galaxy.PlanetaryBodies
-            .Where(body => IsColonizable(galaxy, civilization.Id, body, speciesId))
-            .Where(body => AssessOperationalReach(galaxy, fleet, body.SystemId).IsSupported)
-            .Select(body =>
+        var bodiesById = galaxy.PlanetaryBodies.ToDictionary(body => body.Id);
+        var plan = _opportunityPlanner.BuildPlan(
+            galaxy,
+            fleet.Id,
+            ColonizationOpportunityPlanner.HardMaximumCandidates);
+
+        // The opportunity planner owns eligibility, including friendly mission reservations.
+        // Civilization AI's existing strategic weighting remains here so species/logistics facts
+        // are not turned into a second AI personality or destination policy.
+        var candidate = plan.Candidates
+            .Where(option => option.CanOrder)
+            .Where(option => systemsById.ContainsKey(option.SystemId) && bodiesById.ContainsKey(option.PlanetaryBodyId))
+            .Select(option =>
             {
-                var assessment = _habitability.Evaluate(body, speciesId);
+                var body = bodiesById[option.PlanetaryBodyId];
+                var system = systemsById[option.SystemId];
+                var physicalDistance = InterstellarDistance.FromFleet(galaxy, fleet, system);
+                var distance = system.GalacticDepthLightYears is null
+                    ? Vector2.DistanceSquared(fleet.Position, system.Position)
+                    : physicalDistance * physicalDistance;
+                var value =
+                    (option.ColonizationViability == SpeciesColonizationViability.NaturallyViable ? 14000.0 : 3500.0) +
+                    option.NaturalHabitability * 9000.0 +
+                    (body.HasRareResource ? 14000.0 : 0.0) +
+                    civilization.Traits.Territoriality * 6000.0 +
+                    civilization.Traits.Greed * (body.HasRareResource ? 9000.0 : 1500.0);
                 return new
                 {
                     Body = body,
-                    Assessment = assessment,
-                    System = systemsById[body.SystemId],
-                    Distance = Vector2.DistanceSquared(fleet.Position, systemsById[body.SystemId].Position),
-                    Value =
-                        (assessment.Viability == SpeciesColonizationViability.NaturallyViable ? 14000.0 : 3500.0) +
-                        assessment.Environment.NaturalHabitability * 9000.0 +
-                        (body.HasRareResource ? 14000.0 : 0.0) +
-                        civilization.Traits.Territoriality * 6000.0 +
-                        civilization.Traits.Greed * (body.HasRareResource ? 9000.0 : 1500.0),
+                    System = system,
+                    Reach = option.Reach,
+                    Distance = distance,
+                    Value = value,
                 };
             })
-            .OrderByDescending(candidate => candidate.Value - candidate.Distance)
-            .ThenBy(candidate => candidate.System.Id)
-            .ThenBy(candidate => candidate.Body.Id)
+            .OrderByDescending(option => option.Value - option.Distance)
+            .ThenBy(option => option.System.Id)
+            .ThenBy(option => option.Body.Id)
             .FirstOrDefault();
 
         if (candidate is not null)
         {
-            fleet.DestinationSystemId = candidate.System.Id;
+            // A replacement route cannot retain on-site work from an abandoned world.
+            // In particular, persisting that state would associate a stationary work site
+            // with a travelling fleet and make the next campaign load invalid.
+            fleet.SettlementBodyId = null;
+            fleet.SettlementDaysCompleted = 0;
+            FleetRouteOrders.Assign(galaxy, fleet, candidate.System.Id, candidate.Reach);
             fleet.DestinationPlanetaryBodyId = candidate.Body.Id;
         }
     }
@@ -272,37 +432,45 @@ public sealed class ColonizationSimulation
                 body.Id == bodyId && body.SystemId == currentSystemId);
         }
 
-        return SelectBestBodyInSystem(galaxy, fleet.CivilizationId, currentSystemId, speciesId);
+        return _settlementBodies.ResolveBestAvailableBody(
+            galaxy,
+            fleet.CivilizationId,
+            currentSystemId,
+            speciesId);
     }
 
-    private PlanetaryBodyState? SelectBestBodyInSystem(
-        GalaxyState galaxy,
-        int civilizationId,
-        int systemId,
-        string speciesId)
+    private static FleetState? FindAvailableColonyFleet(GalaxyState galaxy, int civilizationId)
     {
-        return galaxy.PlanetaryBodies
-            .Where(body => body.SystemId == systemId)
-            .Where(body => IsColonizable(galaxy, civilizationId, body, speciesId))
-            .Select(body => new
-            {
-                Body = body,
-                Assessment = _habitability.Evaluate(body, speciesId),
-            })
-            .OrderByDescending(candidate => candidate.Assessment.Viability)
-            .ThenByDescending(candidate => candidate.Assessment.Environment.NaturalHabitability)
-            .ThenByDescending(candidate => candidate.Assessment.Environment.UnprotectedOperationalCapacity)
-            .ThenBy(candidate => candidate.Body.Id)
-            .Select(candidate => candidate.Body)
+        var friendlyColonySystems = galaxy.Colonies
+            .Where(colony => colony.CivilizationId == civilizationId)
+            .Select(colony => colony.SystemId)
+            .ToHashSet();
+
+        return galaxy.Fleets
+            .Where(fleet =>
+                fleet.IsActive &&
+                fleet.CivilizationId == civilizationId &&
+                fleet.Role == FleetRole.Colony &&
+                fleet.DesignId != ShipDesignRegistry.ResourceOutpostShipId &&
+                fleet.EmbarkedPopulationMillions > 0.0 &&
+                fleet.DestinationSystemId is null &&
+                fleet.DestinationPlanetaryBodyId is null &&
+                fleet.CurrentSystemId is int currentSystemId &&
+                friendlyColonySystems.Contains(currentSystemId))
+            .OrderBy(fleet => fleet.Id)
             .FirstOrDefault();
     }
 
-    private static FleetState? FindAvailableColonyFleet(GalaxyState galaxy, int civilizationId) =>
-        galaxy.Fleets.FirstOrDefault(f =>
-            f.IsActive &&
-            f.CivilizationId == civilizationId &&
-            f.Role == FleetRole.Colony &&
-            f.EmbarkedPopulationMillions > 0.0);
+    private static void ConsumeSettlementVessel(FleetState fleet)
+    {
+        fleet.EmbarkedPopulationMillions = 0.0;
+        fleet.EmbarkedPopulationSpeciesId = null;
+        fleet.IsActive = false;
+        FleetRouteOrders.Clear(fleet);
+        fleet.DestinationPlanetaryBodyId = null;
+        fleet.SettlementBodyId = null;
+        fleet.SettlementDaysCompleted = 0;
+    }
 
     private static string RequireEmbarkedPopulationSpecies(FleetState fleet)
     {

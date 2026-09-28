@@ -10,8 +10,30 @@ public sealed record StarSystemState(
     bool HasHabitableWorld,
     bool HasAnomaly,
     bool HasRareResource,
-    bool HasPreWarpCivilization
+    bool HasPreWarpCivilization,
+    string? CatalogPresetId = null,
+    StellarPrimaryClass? StellarClass = null,
+    StellarPrimaryClass? SecondaryStellarClass = null,
+    StellarPrimaryClass? TertiaryStellarClass = null,
+    double? GalacticDepthLightYears = null,
+    string? StellarCatalogId = null
 );
+
+public enum StellarPrimaryClass
+{
+    MRedDwarf,
+    KOrangeDwarf,
+    GYellowDwarf,
+    FYellowWhiteDwarf,
+    AWhiteStar,
+    HotBlueStar,
+    Giant,
+    WhiteDwarf,
+    NeutronStar,
+    BlackHole,
+    Protostar,
+    Pulsar,
+}
 
 public enum StarArchetype
 {

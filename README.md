@@ -6,7 +6,7 @@ Public development repository for **Stellar Continuum**, an original realism-fir
 
 ## Current development
 
-Gameplay version: `0.0.6-dev.1`
+Gameplay version: `0.1.1 Alpha` (technical SemVer: `0.1.1-alpha`)
 
 Engine: Godot 4.7.2 .NET / C# (`net8.0`)
 
@@ -14,9 +14,22 @@ New campaigns begin on **January 1, 2050** with the player and normal major civi
 
 The current gameplay code is still a prototype. The canonical design direction is broader: a human-like 2050 start includes substantial orbital infrastructure, a permanent lunar presence, a young Mars colony, and meaningful solar-system development before practical interstellar expansion.
 
+## Player and Developer modes
+
+Development now targets one full game with separate Player and Developer campaigns.
+Player uses ordinary rules and knowledge. Developer adds explicit testing tools,
+a reproducible world seed and a 24x clock, with separate saves and a persistent
+tools-used marker. See [GAME_MODES.md](docs/GAME_MODES.md) for switching, saves and
+the remaining full-game priorities. This is an unfinished development build.
+
+Graphical navigation connects the Milky Way overview, stellar region, system,
+focused planet and a freely navigable 3D colony surface. See
+[map and surface controls](docs/CINEMATIC_MAP_AND_SURFACE.md).
+
 ## Adaptive Research — canonical direction
 
-The `0.0.6-dev.1` gameplay build still uses a temporary fixed research progression. That prototype is **not** the final research architecture.
+The Alpha runtime uses the Adaptive Research campaign, with visible eligibility,
+laboratory allocation, funding commitments and timed progress in the research workspace.
 
 Stellar Continuum uses an **Adaptive Research System**:
 
@@ -48,17 +61,12 @@ See:
 - [`docs/RESEARCH_ECONOMY.md`](docs/RESEARCH_ECONOMY.md)
 - [`docs/RESEARCH_CAPACITY_MODEL.md`](docs/RESEARCH_CAPACITY_MODEL.md)
 
-## Current prototype construction
+## Current alpha gameplay
 
-The existing prototype construction projects include:
-
-- Planetary Research Network
-- Industrial Automation Program
-- Orbital Launch Complex
-- Orbital Shipyard
-- Warp Test Facility
-
-These remain prototype gameplay. Future construction/research prerequisites must be reconciled with the adaptive capability/possibility architecture rather than preserving the old fixed chain simply because it exists in 0.0.6.
+The alpha loop uses adaptive capability costs and timers for research, construction,
+production, fleet travel and colony growth. The current campaign supports the mouse-driven
+map, diplomacy workspace, colony surface and ordinary Player/Developer save separation;
+the full continuous expedition and pacing review remain in progress.
 
 ## Project continuity records
 
@@ -80,23 +88,9 @@ Read these before resuming development:
 
 The repository is public. Exact hidden discovery triggers, rare probabilities, complete secret chains, intentionally hidden technologies, and rare secret-AI outcomes are not stored in public continuity or research data.
 
-## Prototype controls
+## Current controls and saves
 
-The following describe `0.0.6-dev.1` and will change as real player-facing UI replaces keyboard/debug interaction:
-
-- `Space` — pause/resume
-- `1` / `2` / `3` / `4` — simulation speed
-- `T` — cycle prototype research
-- `R` — start selected prototype research
-- `C` — cycle construction
-- `B` — begin selected construction project
-- left click — inspect astronomical target
-- right click — order scout after warp capability
-- `Shift` + right click — order colony ship after warp capability
-- mouse wheel — zoom
-- middle mouse drag — pan
-- `N` — generate a new 2050 campaign
-- `F6` — autosave
-- `F8` — export diagnostics/support bundle
-
-Save format v6 persists construction completion/progress, prototype research, civilization stages, fleets, colonies, economy, and fog-of-war knowledge.
+Player interaction is mouse-first through the adaptive map, sidebar, diplomacy and colony
+surfaces; keyboard shortcuts remain available for development and accessibility checks. See
+[map and surface controls](docs/CINEMATIC_MAP_AND_SURFACE.md) and [game modes](docs/GAME_MODES.md).
+Current save compatibility is v16/v17, with mode-separated Player and Developer saves.

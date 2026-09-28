@@ -1,0 +1,22 @@
+name: research-foreign-derived
+
+on:
+  push:
+    branches: [ "dev/adaptive-research" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate-adaptive-research-foreign-derived:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore foreign-derived research checks
+        run: dotnet restore tests/AdaptiveResearchForeignDerivedChecks/AdaptiveResearchForeignDerivedChecks.csproj
+      - name: Build foreign-derived research checks
+        run: dotnet build tests/AdaptiveResearchForeignDerivedChecks/AdaptiveResearchForeignDerivedChecks.csproj --configuration Release --no-restore
+      - name: Run foreign-derived research checks
+        run: dotnet run --project tests/AdaptiveResearchForeignDerivedChecks/AdaptiveResearchForeignDerivedChecks.csproj --configuration Release --no-build

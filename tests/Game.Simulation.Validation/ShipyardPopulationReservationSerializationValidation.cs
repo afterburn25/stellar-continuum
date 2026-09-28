@@ -8,7 +8,7 @@ namespace Game.Simulation.Validation;
 
 internal static class ShipyardPopulationReservationSerializationValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void Run()
     {
         ValidateV8AndV9RejectPopulationLosingShipyardState();

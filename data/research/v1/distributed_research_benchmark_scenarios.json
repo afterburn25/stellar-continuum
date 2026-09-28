@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Deterministic offline benchmark fixtures for distributed knowledge access, regional practice, political fracture, reintegration, archive continuity, and sparse long-run context state. These are design/CI fixtures, not gameplay balance promises.",
+  "scenarios": [
+    {
+      "id": "communication_latency_delivery",
+      "description": "A frontier research context is synchronized except for a new core discovery. Codified knowledge cannot be used locally before its communications path delivers the records.",
+      "source_context": "core",
+      "destination_context": "frontier",
+      "node_id": "field_theory",
+      "discovery_time_year": 2200.0,
+      "one_way_latency_years": 1.75,
+      "expected_delivery_year": 2201.75,
+      "pre_delivery_access": "absent",
+      "post_delivery_access": "codified",
+      "local_practice_after_delivery": "not_automatically_practiced",
+      "assertions": [
+        "destination cannot apply knowledge before delivery",
+        "delivery creates codified access only",
+        "expert/tooling/facility state is unchanged by data delivery"
+      ]
+    },
+    {
+      "id": "forty_year_partition_and_reintegration",
+      "description": "A remote scientific region remains physically intact but loses long-distance communications for forty years. Its archives preserve theory while some experimental/engineering practice atrophies because training and major programs contract.",
+      "context_id": "outer_science_region",
+      "partition_years": 40,
+      "initial_field_practice": {
+        "propulsion": {"theoretical": 70, "experimental": 68, "engineering": 72},
+        "materials": {"theoretical": 66, "experimental": 64, "engineering": 69}
+      },
+      "archive_class": "regional_redundant",
+      "practice_after_partition": {
+        "propulsion": {"theoretical": 68, "experimental": 54, "engineering": 48},
+        "materials": {"theoretical": 64, "experimental": 56, "engineering": 53}
+      },
+      "new_core_nodes_missed_during_partition": ["stable_warp_drive","field_energy_conversion","quantum_sensors"],
+      "reconnection_latency_years": 0.25,
+      "expected_access_after_reconnection": "codified",
+      "practice_recovery_years": 8,
+      "assertions": [
+        "archive-backed theoretical competence remains substantially preserved",
+        "engineering practice may fall when real training/deployment practice disappears",
+        "reconnection can restore missing records faster than it restores engineering practice",
+        "no universal isolation research penalty is applied"
+      ]
+    },
+    {
+      "id": "successor_state_asymmetric_inheritance",
+      "description": "A mature interstellar polity fractures. Two successors inherit heavily overlapping foundational archives but different recent specialist records, experts, facilities, and tooling according to real context location.",
+      "common_widely_replicated_nodes": [
+        "systems_engineering",
+        "computational_science",
+        "advanced_material_characterization",
+        "high_energy_physics",
+        "quantum_measurement",
+        "complex_systems_science",
+        "advanced_fission",
+        "deep_space_comms",
+        "distributed_compute",
+        "orbital_construction"
+      ],
+      "successor_a": {
+        "inherits_contexts": ["core","inner_industrial_belt"],
+        "local_specialist_nodes": ["fusion_power","superconducting_grid","orbital_manufacturing","autonomous_foundry","coordinated_research_networks"],
+        "located_assets": ["manufacturing_tooling","operating_institution","training_pipeline"]
+      },
+      "successor_b": {
+        "inherits_contexts": ["outer_science_region","xenoscience_frontier"],
+        "local_specialist_nodes": ["long_baseline_array","alien_signal_analysis","comparative_biology","xenochemical_methods"],
+        "located_assets": ["experimental_dataset","expert_cohort","operating_institution"]
+      },
+      "former_polity_recent_global_nodes_not_present_in_either_local_archive": ["antimatter_containment"],
+      "assertions": [
+        "both successors inherit shared widely replicated foundations",
+        "each successor inherits different specialist recent knowledge",
+        "neither successor receives the former polity complete technology set",
+        "located tacit assets follow inherited context rather than global ownership checkbox",
+        "missing former-polity recent knowledge may later be reacquired through normal research/exchange/recovery"
+      ]
+    },
+    {
+      "id": "isolated_archive_catastrophe_and_recovery",
+      "description": "An isolated context loses its only actionable local archive for a small set of recent technologies. Historical references survive, then an external archive copy later restores formal knowledge without restoring lost practical expertise.",
+      "context_id": "isolated_colony_cluster",
+      "archive_class_before": "local_only",
+      "affected_nodes": ["advanced_replication","delay_tolerant_network","autonomous_mining","radiation_shelters"],
+      "access_before": "codified",
+      "access_after_archive_loss": "reference_only",
+      "external_copy_recovered_after_years": 12,
+      "access_after_recovery": "codified",
+      "practice_after_recovery": "not_automatically_practiced",
+      "assertions": [
+        "genuine single-copy archive destruction can remove local actionable access",
+        "historical awareness can remain reference_only",
+        "external records can restore codified access",
+        "recovered records do not recreate experts, facilities, or engineering practice"
+      ]
+    },
+    {
+      "id": "distributed_context_state_soak_1000y",
+      "description": "Reference 1,000-year continuity-state workload for a large civilization. Most regions remain synchronized and therefore never become explicit research contexts.",
+      "years": 1000,
+      "regions_total": 120,
+      "max_materially_divergent_contexts": 12,
+      "max_node_access_exceptions_total": 320,
+      "max_field_practice_exceptions_total": 120,
+      "max_pending_transmissions": 192,
+      "max_recent_context_events": 384,
+      "max_archived_context_summaries": 96,
+      "rules": [
+        "normal synchronized regions allocate no explicit context",
+        "pending transmissions deduplicate by destination and revision",
+        "delivered transmissions are removed",
+        "reintegrated contexts merge once deviations disappear",
+        "old event detail compresses into summaries"
+      ]
+    }
+  ]
+}

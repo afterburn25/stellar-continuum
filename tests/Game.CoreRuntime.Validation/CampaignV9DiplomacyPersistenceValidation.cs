@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Game.Campaign;
 using Game.Persistence;
 using Game.Simulation.Diplomacy;
@@ -12,7 +13,7 @@ namespace Game.CoreRuntime.Validation;
 
 internal static class CampaignV9DiplomacyPersistenceValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunCampaignV9DiplomacyPersistenceChecks()
     {
         ValidateSessionRoundTripAndLegacyMigration();
@@ -71,7 +72,7 @@ internal static class CampaignV9DiplomacyPersistenceValidation
             session.Save(v9Path, fresh.Galaxy, fresh.Diplomacy, savedDays);
 
             var json = File.ReadAllText(v9Path);
-            Require(json.Contains("\"FormatVersion\": 9", StringComparison.Ordinal), "campaign session did not write format v9");
+            Require(json.Contains("\"FormatVersion\": 17", StringComparison.Ordinal), "campaign session did not write authoritative-catalog format v17");
             Require(json.Contains("\"Diplomacy\"", StringComparison.Ordinal), "format v9 save omitted Diplomacy");
 
             var loaded = session.LoadOrCreate(v9Path, fallbackSeed: 1L, fallbackSettings: settings);
@@ -85,6 +86,10 @@ internal static class CampaignV9DiplomacyPersistenceValidation
 
             var legacyPath = Path.Combine(directory, "legacy-v8.json");
             new CampaignSaveService().Save(legacyPath, fresh.Galaxy, savedDays);
+            var legacyRoot = JsonNode.Parse(File.ReadAllText(legacyPath))!.AsObject();
+            legacyRoot["FormatVersion"] = CampaignSaveService.LegacyFormatVersion;
+            legacyRoot["Galaxy"]!.AsObject().Remove("PlanetaryBodies");
+            File.WriteAllText(legacyPath, legacyRoot.ToJsonString());
             var legacyLoaded = new CampaignStatePersistenceService().Load(legacyPath);
             var migratedDiplomacy = legacyLoaded.Diplomacy.Snapshot();
             Require(migratedDiplomacy.Contacts.Length == 0, "v8 migration invented diplomatic contacts");

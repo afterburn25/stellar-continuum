@@ -35,6 +35,7 @@ Current node sources are strictly authoritative:
 - owned home-system colonies -> `Homeworld` / `PlanetarySettlement` nodes;
 - completed Orbital Launch Complex / Orbital Shipyard -> orbital logistics hub;
 - completed Orbital Shipyard -> shipyard node.
+- completed Asteroid Resource Network -> resource-site node connected to the orbital hub.
 
 Local surplus becomes supply offers and local import requirement becomes prioritized demand. `LogisticsRoutePlanner` finds routes on demand using a bounded cache, and `LogisticsFlowAllocator` performs aggregate daily allocation while respecting source availability, route capacity, disabled links, and demand priority.
 

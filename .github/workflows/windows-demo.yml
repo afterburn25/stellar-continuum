@@ -1,0 +1,162 @@
+name: Windows Playable Demo
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "work/testing-release", "work/core-game-integration" ]
+  pull_request:
+    branches: [ integration ]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GODOT_VERSION: 4.7.2
+      GODOT_EDITOR_SHA256: 129f82db7bafd54ae14bb5bb284041c73860e8c7a009a3a026ca5e946cbff247
+      GODOT_TEMPLATES_SHA256: 92f8681e349ef1f90891b792da95e3b2b0bd1ed610b78018c58feb2d87e15a9d
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Validate packaging contracts
+        run: python3 -B -m unittest discover -s tests/WindowsDemoChecks -p 'test_*.py'
+
+      - name: Restore and build shared game
+        run: |
+          set -euo pipefail
+          dotnet restore Game.csproj
+          dotnet build Game.csproj --configuration Release --no-restore
+          dotnet build Game.csproj --configuration Debug --no-restore
+
+      - name: Install pinned official .NET editor and export templates
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -L --fail --retry 3 "$base/Godot_v${GODOT_VERSION}-stable_mono_linux_x86_64.zip" -o "$RUNNER_TEMP/godot-editor.zip"
+          curl -L --fail --retry 3 "$base/Godot_v${GODOT_VERSION}-stable_mono_export_templates.tpz" -o "$RUNNER_TEMP/godot-templates.tpz"
+          echo "$GODOT_EDITOR_SHA256  $RUNNER_TEMP/godot-editor.zip" | sha256sum -c -
+          echo "$GODOT_TEMPLATES_SHA256  $RUNNER_TEMP/godot-templates.tpz" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/godot-editor.zip" -d "$RUNNER_TEMP/godot-editor"
+          unzip -q "$RUNNER_TEMP/godot-templates.tpz" -d "$RUNNER_TEMP/godot-templates"
+          mkdir -p "$RUNNER_TEMP/godot-data/godot/export_templates"
+          mv "$RUNNER_TEMP/godot-templates/templates" "$RUNNER_TEMP/godot-data/godot/export_templates/${GODOT_VERSION}.stable.mono"
+          GODOT_BIN="$(find "$RUNNER_TEMP/godot-editor" -type f -name "Godot_v${GODOT_VERSION}-stable_mono_linux.x86_64" -print -quit)"
+          test -n "$GODOT_BIN"
+          chmod +x "$GODOT_BIN"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+          echo "XDG_DATA_HOME=$RUNNER_TEMP/godot-data" >> "$GITHUB_ENV"
+
+      - name: Import assets and prove source startup
+        run: |
+          set -euo pipefail
+          mkdir -p demo-logs
+          timeout 120s "$GODOT_BIN" --headless --audio-driver Dummy --path . --editor --import 2>&1 | tee demo-logs/import.log
+          python3 scripts/validate_godot_smoke.py demo-logs/import.log
+          timeout 60s "$GODOT_BIN" --headless --audio-driver Dummy --path . -- --stellar-startup-smoke 2>&1 | tee demo-logs/source-runtime.log
+          python3 scripts/validate_godot_smoke.py demo-logs/source-runtime.log --require-runtime-ready
+
+      - name: Export Windows x64 and Linux smoke packages
+        run: |
+          set -euo pipefail
+          mkdir -p exports/windows exports/linux-smoke
+          timeout 600s "$GODOT_BIN" --headless --audio-driver Dummy --path . --export-release "Windows Demo" exports/windows/StellarContinuum.exe 2>&1 | tee demo-logs/windows-export.log
+          python3 scripts/validate_godot_smoke.py demo-logs/windows-export.log
+          timeout 600s "$GODOT_BIN" --headless --audio-driver Dummy --path . --export-release "Linux Package Smoke" exports/linux-smoke/StellarContinuum.x86_64 2>&1 | tee demo-logs/linux-export.log
+          python3 scripts/validate_godot_smoke.py demo-logs/linux-export.log
+          # Plain-C# catalog readers use filesystem paths; ship the same public data beside each export.
+          cp -a data exports/windows/data
+          cp -a data exports/linux-smoke/data
+          curl -L --fail --retry 3 https://raw.githubusercontent.com/godotengine/godot/4.7.2-stable/LICENSE.txt -o exports/windows/GODOT_LICENSE.txt
+          curl -L --fail --retry 3 https://raw.githubusercontent.com/godotengine/godot/4.7.2-stable/COPYRIGHT.txt -o exports/windows/GODOT_COPYRIGHT.txt
+          runtime_version="$(python3 -c 'import json; c=json.load(open("exports/windows/data_Game_windows_x86_64/Game.runtimeconfig.json")); print(next(f["version"] for f in c["runtimeOptions"]["includedFrameworks"] if f["name"] == "Microsoft.NETCore.App"))')"
+          curl -L --fail --retry 3 "https://raw.githubusercontent.com/dotnet/runtime/v$runtime_version/LICENSE.TXT" -o exports/windows/DOTNET_LICENSE.txt
+          curl -L --fail --retry 3 "https://raw.githubusercontent.com/dotnet/runtime/v$runtime_version/THIRD-PARTY-NOTICES.TXT" -o exports/windows/DOTNET_THIRD_PARTY_NOTICES.txt
+
+      - name: Smoke the Linux exported package outside the source tree
+        run: |
+          set -euo pipefail
+          smoke_dir="$RUNNER_TEMP/stellar-export-smoke"
+          mv exports/linux-smoke "$smoke_dir"
+          chmod +x "$smoke_dir/StellarContinuum.x86_64"
+          cd "$smoke_dir"
+          XDG_DATA_HOME="$RUNNER_TEMP/stellar-smoke-user" timeout 60s ./StellarContinuum.x86_64 --headless --audio-driver Dummy -- --stellar-startup-smoke 2>&1 | tee "$GITHUB_WORKSPACE/demo-logs/exported-linux-runtime.log"
+          python3 "$GITHUB_WORKSPACE/scripts/validate_godot_smoke.py" "$GITHUB_WORKSPACE/demo-logs/exported-linux-runtime.log" --require-runtime-ready
+
+      - name: Package Windows demo with provenance and file checksums
+        run: |
+          set -euo pipefail
+          python3 scripts/package_windows_demo.py exports/windows --output dist \
+            --revision "$GITHUB_SHA" \
+            --run-url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      - name: Upload candidate for hosted Windows validation
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellar-continuum-windows-candidate-${{ github.sha }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload export and smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-demo-logs-${{ github.run_number }}-${{ github.run_attempt }}
+          path: demo-logs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows-startup:
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: stellar-continuum-windows-candidate-${{ github.sha }}
+          path: demo-candidate
+
+      - name: Verify and smoke the actual Windows export
+        shell: pwsh
+        run: |
+          python scripts/smoke_windows_demo.py demo-candidate --output dist --log demo-logs/windows-runtime.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload playable Windows demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellar-continuum-windows-x64-${{ github.sha }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload Windows runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-demo-runtime-${{ github.run_number }}-${{ github.run_attempt }}
+          path: demo-logs/
+          if-no-files-found: ignore
+          retention-days: 14

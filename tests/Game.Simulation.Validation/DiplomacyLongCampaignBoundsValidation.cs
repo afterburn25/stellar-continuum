@@ -5,7 +5,7 @@ namespace Game.Simulation.Validation;
 
 internal static class DiplomacyLongCampaignBoundsValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunDiplomacyLongCampaignBoundsChecks()
     {
         ValidateContactStorageEvictsOnlyEligibleStaleUnknowns();

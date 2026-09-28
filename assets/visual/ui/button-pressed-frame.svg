@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+<defs><linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#3b3825"/><stop offset="1" stop-color="#24261e"/></linearGradient></defs>
+<path d="M3 1H125L127 3V125L125 127H3L1 125V3Z" fill="url(#metal)" fill-opacity=".96" stroke="#c1a069"/>
+<path d="M5 3H123" stroke="#c2d4ca" stroke-opacity=".1"/>
+</svg>

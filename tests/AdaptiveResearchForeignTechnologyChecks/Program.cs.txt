@@ -1,0 +1,273 @@
+using System;
+using System.Linq;
+using Game.Simulation.Research.Adaptive;
+
+static void Assert(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}
+
+static void AssertNear(double actual, double expected, double tolerance, string message)
+{
+    if (Math.Abs(actual - expected) > tolerance)
+        throw new InvalidOperationException($"{message} Actual={actual}, expected={expected}.");
+}
+
+var repoRoot = Directory.GetCurrentDirectory();
+var dataRoot = Path.Combine(repoRoot, "data", "research", "v1");
+var strategic = AdaptiveResearchStrategicRuntime.LoadFromDirectory(dataRoot);
+var authority = strategic.Authority;
+var foreignRuntime = strategic.ForeignTechnology;
+
+Assert(strategic.ForeignTechnologyCatalog.ConstraintIds.Count == 12, "Expected all 12 foreign-technology compatibility constraints.");
+Assert(strategic.ForeignTechnologyCatalog.Components.Count == 10, "Expected all 10 technology-transfer package components.");
+Assert(strategic.ForeignTechnologyCatalog.Rights.Count == 11, "Expected all 11 technology-transfer rights.");
+
+var holder = authority.CreateCivilizationState("foreign-tech-holder");
+var capturedDrive = new ForeignTechnologyPackageInput(
+    "pkg-captured-drive",
+    "foreign-drive-alpha",
+    "lineage-a",
+    new[] { "reference_hardware", "expert_assistance" },
+    new[] { "inspect", "internal_research" },
+    new[] { "propulsion", "physics" },
+    new[]
+    {
+        new ForeignTechnologyEvidenceTransfer(
+            "evidence-drive-alpha",
+            "foreign_propulsion_evidence",
+            "captured intact drive and telemetry",
+            1.0,
+            1.0),
+    },
+    new[] { "expertise_dependency" },
+    "captured battlefield hardware with cooperating technical crew",
+    0.80,
+    0.80,
+    0.80,
+    2310);
+
+var driveAssessment = foreignRuntime.AcquirePackage(holder, capturedDrive);
+var foreignState = foreignRuntime.GetState(holder);
+Assert(driveAssessment.Understanding == ForeignUnderstandingState.Observed,
+    "Reference hardware plus experts should prove/observe capability without automatically characterizing its engineering.");
+Assert(driveAssessment.Operability == ForeignOperabilityState.Unknown,
+    "Package possession must not guess whether the foreign drive works for the holder.");
+Assert(driveAssessment.Reproduction == ForeignReproductionState.None,
+    "Package possession must not infer reproduction capability.");
+Assert(!holder.NodeStates.Values.Any(node => node.Maturity == ResearchMaturity.Mature),
+    "Foreign package acquisition must never auto-Mature a native research node.");
+Assert(foreignState.Packages["pkg-captured-drive"].TacitAssetRefs.Count == 4,
+    "Two tacit-producing components across two scoped fields should create four aggregate tacit assets.");
+Assert(holder.Expertise.TacitAssets.Count == 4,
+    "Generated foreign tacit assets must live in the normal expertise state, not a parallel bonus system.");
+Assert(holder.EvidenceInstances.ContainsKey("evidence-drive-alpha"),
+    "Foreign package evidence must use the normal evidence system.");
+
+// Supported operation can exist while understanding is still only Observed.
+driveAssessment = foreignRuntime.RecordOperabilityFact(
+    holder,
+    "foreign-drive-alpha",
+    ForeignOperabilityState.SupportedOperation,
+    0.90,
+    2311);
+Assert(driveAssessment.Operability == ForeignOperabilityState.SupportedOperation &&
+       driveAssessment.Understanding == ForeignUnderstandingState.Observed,
+    "A foreign device may be operated with support before the holder understands its principles.");
+
+// Reproduction can depend on foreign process/tooling and regress if that dependency is later lost.
+driveAssessment = foreignRuntime.RecordReproductionFact(
+    holder,
+    "foreign-drive-alpha",
+    ForeignReproductionState.ForeignProcessReplication,
+    0.90,
+    2312);
+Assert(driveAssessment.Reproduction == ForeignReproductionState.ForeignProcessReplication,
+    "A preserved foreign process can temporarily provide reproduction.");
+driveAssessment = foreignRuntime.RecordReproductionFact(
+    holder,
+    "foreign-drive-alpha",
+    ForeignReproductionState.None,
+    0.90,
+    2325);
+Assert(driveAssessment.Reproduction == ForeignReproductionState.None &&
+       driveAssessment.Operability == ForeignOperabilityState.SupportedOperation,
+    "Losing reproduction dependencies may remove reproduction without erasing current supported operation or understanding.");
+
+// A documentation/tooling package can be well characterized and understood while still unreproducible.
+var sciencePackage = new ForeignTechnologyPackageInput(
+    "pkg-field-reactor-docs",
+    "foreign-reactor-beta",
+    "lineage-b",
+    new[]
+    {
+        "scientific_theory_dossier",
+        "engineering_blueprint_package",
+        "manufacturing_process_package",
+        "production_tooling_transfer",
+        "training_program",
+    },
+    new[] { "inspect", "internal_research", "modify" },
+    new[] { "energy", "physics", "materials" },
+    new[]
+    {
+        new ForeignTechnologyEvidenceTransfer(
+            "evidence-reactor-beta",
+            "foreign_power_device",
+            "licensed reactor records and tooling",
+            0.95,
+            0.95),
+        new ForeignTechnologyEvidenceTransfer(
+            "records-reactor-beta",
+            "foreign_scientific_records",
+            "translated source science archive",
+            0.90,
+            0.90),
+    },
+    new[] { "material_dependency", "manufacturing_dependency" },
+    "licensed but technically difficult foreign reactor package",
+    0.90,
+    0.85,
+    0.85,
+    2330);
+
+var reactorAssessment = foreignRuntime.AcquirePackage(holder, sciencePackage);
+Assert(reactorAssessment.Understanding == ForeignUnderstandingState.Characterized,
+    "Blueprint/process/tooling intake should reach Characterized, not instant principle mastery.");
+Assert(reactorAssessment.Adaptation == ForeignAdaptationState.ConceptualInspiration,
+    "Characterized foreign science should be allowed to inspire native work without reproducing the source.");
+Assert(reactorAssessment.Reproduction == ForeignReproductionState.None,
+    "Even a rich package does not assert successful reproduction until physical systems report it.");
+reactorAssessment = foreignRuntime.RecordAnalysisResult(
+    holder,
+    "foreign-reactor-beta",
+    ForeignUnderstandingState.PrincipleUnderstood,
+    0.70,
+    2335);
+reactorAssessment = foreignRuntime.RecordAnalysisResult(
+    holder,
+    "foreign-reactor-beta",
+    ForeignUnderstandingState.EngineeringUnderstood,
+    0.85,
+    2342);
+Assert(reactorAssessment.Understanding == ForeignUnderstandingState.EngineeringUnderstood &&
+       reactorAssessment.Reproduction == ForeignReproductionState.None,
+    "Engineering understanding must remain independent from manufacturability.");
+
+// Legal rights are metadata, not physics: a physical reproduction fact can exist even without a manufacture license.
+Assert(!foreignState.Packages["pkg-captured-drive"].RightIds.Contains("manufacture"),
+    "Captured-drive fixture intentionally has no manufacture right.");
+_ = foreignRuntime.RecordReproductionFact(
+    holder,
+    "foreign-drive-alpha",
+    ForeignReproductionState.ComponentReplication,
+    0.90,
+    2345);
+Assert(foreignRuntime.GetState(holder).Assessments["foreign-drive-alpha"].Reproduction == ForeignReproductionState.ComponentReplication,
+    "Missing legal manufacture rights must not act as an invisible technical force field; external law/diplomacy owns consequences.");
+
+// Tacit assimilation advances through real adjacent stages and stays scoped to the transferred fields.
+var reactorPackage = foreignState.Packages["pkg-field-reactor-docs"];
+Assert(reactorPackage.TacitAssetRefs.Count > 0, "Rich foreign package should create scoped tacit assets.");
+foreignRuntime.AdvancePackageTacitAssimilation(holder, reactorPackage.PackageId, ResearchTacitAssimilationStage.Interpreted);
+foreignRuntime.AdvancePackageTacitAssimilation(holder, reactorPackage.PackageId, ResearchTacitAssimilationStage.Codified);
+foreignRuntime.AdvancePackageTacitAssimilation(holder, reactorPackage.PackageId, ResearchTacitAssimilationStage.Trained);
+foreignRuntime.AdvancePackageTacitAssimilation(holder, reactorPackage.PackageId, ResearchTacitAssimilationStage.NativePractice);
+Assert(reactorPackage.TacitAssetRefs.All(assetId => holder.Expertise.TacitAssets[assetId].AssimilationStage == ResearchTacitAssimilationStage.NativePractice),
+    "Explicit high-quality training/translation should be able to internalize the package's scoped tacit assets.");
+Assert(reactorPackage.TacitAssetRefs.All(assetId =>
+    holder.Expertise.TacitAssets[assetId].ScopeKind == ResearchTacitScopeKind.KnowledgeField &&
+    reactorPackage.KnowledgeFieldIds.Contains(holder.Expertise.TacitAssets[assetId].ScopeRef)),
+    "Foreign tacit assets must remain scoped to actual transferred fields rather than become universal alien-tech bonuses.");
+
+// Holder-incompatible technology can still have large brokerage value to a suitable third party.
+reactorAssessment = foreignRuntime.ConfirmConstraint(holder, "foreign-reactor-beta", "biological_incompatibility", 2346);
+reactorAssessment = foreignRuntime.RecordOperabilityFact(
+    holder,
+    "foreign-reactor-beta",
+    ForeignOperabilityState.Unusable,
+    0.90,
+    2346);
+var brokerage = foreignRuntime.EvaluateRecipientValue(
+    foreignState.Packages["pkg-field-reactor-docs"],
+    new ForeignTechnologyRecipientValueContext(
+        CapabilityNovelty: 20,
+        StrategicNeed: 15,
+        ExpectedNativeWorkSaved: 20,
+        RecipientReadiness: 25,
+        RecipientOperabilityFit: 10,
+        DependencySafety: 20,
+        KnownThirdPartyDemand: 100,
+        PackageTransferability: 100,
+        ScarcityOrExclusivity: 95,
+        DependencyRisk: 80,
+        HazardRisk: 20),
+    holderCurrentlyUnusable: true);
+Assert(brokerage.HolderIncompatibilityCanStillBroker,
+    "A technology unusable to the holder must still retain brokerage value when legitimate third-party demand exists.");
+Assert(brokerage.ResaleOrBrokerageUtility > brokerage.ResearchUtility &&
+       brokerage.ResaleOrBrokerageUtility > brokerage.OperationalUtility,
+    "Brokerage fixture should be more valuable as a trade asset than for the incompatible holder's own use.");
+AssertNear(brokerage.ResaleOrBrokerageUtility, (100 + 100 + 95) / 3.0, 0.000001,
+    "Brokerage utility should follow recipient/market-specific inputs, not a universal tech price.");
+
+// Native derivative can advance without ever reproducing the original implementation.
+reactorAssessment = foreignRuntime.RecordAdaptationResult(
+    holder,
+    "foreign-reactor-beta",
+    ForeignAdaptationState.NativeDerivative,
+    0.85,
+    2360);
+Assert(reactorAssessment.Adaptation == ForeignAdaptationState.NativeDerivative &&
+       reactorAssessment.Reproduction == ForeignReproductionState.None,
+    "A civilization may derive native technology from foreign principles without cloning the source system.");
+
+// Snapshot v4 persists assessments/packages without replaying acquisition and duplicating assets.
+var codec = new AdaptiveResearchForeignTechnologySnapshotCodec(strategic);
+var v4Json = codec.Serialize(holder);
+var restored = codec.Deserialize(v4Json);
+var restoredForeign = strategic.ForeignTechnology.GetState(restored);
+Assert(restoredForeign.Assessments.Count == foreignState.Assessments.Count,
+    "v4 snapshot must preserve sparse foreign-technology assessments.");
+Assert(restoredForeign.Packages.Count == foreignState.Packages.Count,
+    "v4 snapshot must preserve package instances.");
+Assert(restored.EvidenceInstances.Count == holder.EvidenceInstances.Count,
+    "v4 restore must not replay package acquisition and duplicate evidence.");
+Assert(restored.Expertise.TacitAssets.Count == holder.Expertise.TacitAssets.Count,
+    "v4 restore must not duplicate foreign tacit assets.");
+Assert(restoredForeign.Assessments["foreign-reactor-beta"].Understanding == ForeignUnderstandingState.EngineeringUnderstood,
+    "v4 snapshot must preserve independent foreign-technology axes.");
+Assert(restoredForeign.Assessments["foreign-reactor-beta"].Adaptation == ForeignAdaptationState.NativeDerivative,
+    "v4 snapshot must preserve native-derivative progress.");
+
+// v4 remains backward compatible with strategic v3 snapshots.
+var v3Codec = new AdaptiveResearchStrategicSnapshotCodec(strategic);
+var v3Json = v3Codec.Serialize(authority.CreateCivilizationState("v3-compat"));
+var v3ThroughV4 = codec.Deserialize(v3Json);
+Assert(v3ThroughV4.CivilizationId == "v3-compat" && strategic.ForeignTechnology.GetState(v3ThroughV4).Assessments.Count == 0,
+    "v4 codec must load v3 research snapshots without inventing foreign technology state.");
+
+// Repeated reassessment over centuries updates one sparse record; it does not append one object per review.
+for (var year = 2361; year <= 3360; year++)
+{
+    _ = foreignRuntime.RecordOperabilityFact(
+        holder,
+        "foreign-drive-alpha",
+        year % 2 == 0 ? ForeignOperabilityState.SupportedOperation : ForeignOperabilityState.OriginOnly,
+        0.90,
+        year);
+}
+Assert(foreignState.Assessments.Count == 2,
+    "A 1,000-year reassessment loop must update sparse assessments rather than append per-review state objects.");
+Assert(foreignState.Packages.Count == 2,
+    "Long-run reassessment must not duplicate package instances.");
+var longRunJson = codec.Serialize(holder);
+Assert(longRunJson.Length < 50000,
+    "Two foreign technologies with 1,000 years of reassessment should remain a compact current-state snapshot.");
+
+Console.WriteLine(
+    $"Adaptive Research foreign-tech checks OK: assessments={foreignState.Assessments.Count}, packages={foreignState.Packages.Count}, " +
+    $"drive={foreignState.Assessments["foreign-drive-alpha"].Understanding}/{foreignState.Assessments["foreign-drive-alpha"].Operability}/{foreignState.Assessments["foreign-drive-alpha"].Reproduction}, " +
+    $"reactor={foreignState.Assessments["foreign-reactor-beta"].Understanding}/{foreignState.Assessments["foreign-reactor-beta"].Adaptation}, " +
+    $"brokerage={brokerage.ResaleOrBrokerageUtility:0.#}, v4Bytes={v4Json.Length}, longRunBytes={longRunJson.Length}.");

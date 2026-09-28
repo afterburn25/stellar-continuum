@@ -135,7 +135,7 @@ var detailedTerranCohorts = Enumerable.Range(0, 6)
     .ToArray();
 var detailedPopulation = detailedTerranCohorts.Sum(cohort => cohort.PopulationMillions);
 var reduced = reducer.Reduce(detailedTerranCohorts, maxAdaptationCohortsPerSpecies: 4);
-var reducedReversed = reducer.Reduce(detailedTerranCohorts.Reverse(), maxAdaptationCohortsPerSpecies: 4);
+var reducedReversed = reducer.Reduce(Enumerable.Reverse(detailedTerranCohorts), maxAdaptationCohortsPerSpecies: 4);
 
 Assert(reduced.Cohorts.Count == 4, "A species must be reduced to the configured maximum detailed adaptation cohorts.");
 Assert(reduced.MergeCount == 2, "Six same-species cohorts reduced to four should require exactly two merges.");
@@ -240,7 +240,7 @@ var invalidPath = savePath + ".invalid";
 try
 {
     saveService.Save(savePath, generated, simulationDays: 123.5);
-    Assert(CampaignSaveService.CurrentFormatVersion == 8, "Species identity persistence must use save format v8.");
+    Assert(CampaignSaveService.CurrentFormatVersion == 16 && CampaignSaveService.SurfaceFormatVersion == 12 && CampaignSaveService.PresetFormatVersion == 10 && CampaignSaveService.LegacyFormatVersion == 8, "planetary catalog persistence version contract changed");
 
     var roundTrip = saveService.Load(savePath);
     Assert(roundTrip.Galaxy.Civilizations.Select(civilization => civilization.SpeciesId).SequenceEqual(generatedSpecies),
@@ -249,6 +249,7 @@ try
     var legacyRoot = JsonNode.Parse(File.ReadAllText(savePath))?.AsObject()
         ?? throw new InvalidOperationException("Could not parse generated v8 save for migration check.");
     legacyRoot["FormatVersion"] = 7;
+    legacyRoot["Galaxy"]!.AsObject().Remove("PlanetaryBodies");
     foreach (var civilization in legacyRoot["Galaxy"]?["Civilizations"]?.AsArray()
                  ?? throw new InvalidOperationException("Generated save lacks civilization data."))
     {

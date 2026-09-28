@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Deterministic offline fixtures for real-capacity joint research, withdrawal, asymmetric result usability, classified collaboration, communication disruption, and bounded long-run collaboration state.",
+  "scenarios": [
+    {
+      "id":"real_labs_no_treaty_multiplier",
+      "description":"Two polities jointly pursue Stable Warp Drive. Both contribute real labs. Combined capacity uses the same single-project diminishing-return curve as domestic research; flags do not create separate scaling buckets.",
+      "node_id":"stable_warp_drive",
+      "participant_a_labs":20,
+      "participant_b_labs":12,
+      "combined_assigned_labs":32,
+      "base_rp_per_effective_lab_per_year":400,
+      "recommended_labs":16,
+      "expected_combined_scaled_lab_units":21.6,
+      "expected_joint_rp_before_readiness":8640.0,
+      "incorrect_separate_bucket_scaled_units":29.4,
+      "treaty_multiplier":1.0,
+      "assertions":["joint project is faster than either contribution alone because real capacity is combined","combined lab scaling is evaluated once for the project","multi-polity labels cannot bypass diminishing returns","agreement applies no extra RP multiplier"]
+    },
+    {
+      "id":"participant_withdrawal_removes_real_capacity",
+      "description":"A participant withdraws 8 labs from a joint Stable Warp Drive program after records from earlier work already exist. Project continues with remaining capacity but progresses more slowly; completed work/records are not reversed.",
+      "node_id":"stable_warp_drive",
+      "labs_before_withdrawal":24,
+      "withdrawn_labs":8,
+      "labs_after_withdrawal":16,
+      "scaled_units_before":18.8,
+      "scaled_units_after":16.0,
+      "completed_stage_progress_before":0.42,
+      "completed_stage_progress_after":0.42,
+      "delivered_records_recalled":false,
+      "expected_project_state":"continues_slower",
+      "assertions":["future contribution is removed","existing project progress is preserved","already delivered records remain","remaining participants can continue if hard requirements still exist"]
+    },
+    {
+      "id":"facility_withdrawal_blocks_stage",
+      "description":"A partner supplies the only authorized xenoscience-containment facility required by a joint Hazardous Foreign Technology Protocols experiment. Removing facility access blocks the stage even though enough labs remain.",
+      "node_id":"hazardous_foreign_tech_protocols",
+      "stage":"experimental",
+      "contributing_labs_remaining":10,
+      "required_facility_capability":"xenoscience_containment",
+      "facility_available_before":true,
+      "facility_available_after":false,
+      "expected_after_withdrawal":"blocked_missing_specialized_facility",
+      "assertions":["labs cannot substitute for a genuinely missing hard facility","withdrawal can block rather than merely slow a project","restoring equivalent legitimate facility access can unblock the stage"]
+    },
+    {
+      "id":"asymmetric_result_usability",
+      "description":"Two participants jointly study foreign biological manufacturing records and receive the same codified theory/data, but only the compatible metabolic participant has suitable biology/facilities to operate/adapt the process immediately.",
+      "collaboration_type":"joint_foreign_technology_study",
+      "result_package":["theory_and_models","experimental_datasets","engineering_blueprints"],
+      "participant_a_context":"compatible_metabolic_population",
+      "participant_b_context":"synthetic_population_without_metabolic_biology",
+      "participant_a_understanding":"engineering_understood",
+      "participant_b_understanding":"engineering_understood",
+      "participant_a_operability":"adapted_operation",
+      "participant_b_operability":"unusable",
+      "participant_a_reproduction":"subsystem_replication",
+      "participant_b_reproduction":"component_replication",
+      "native_node_maturity_granted":false,
+      "assertions":["equal record access does not imply equal operability","biology/infrastructure compatibility remains participant-specific","joint foreign-tech study does not mature a native node automatically"]
+    },
+    {
+      "id":"classified_joint_compartments",
+      "description":"A two-polity classified Field Defense project divides theory, prototype-test, manufacturing-process, and control records into compartments. Each participant contributes useful work, but only a designated integration context receives all engineering-critical compartments.",
+      "node_id":"field_defense",
+      "access_class":"special_access_compartment",
+      "compartments":["theory","prototype_design","manufacturing_process","software_or_control"],
+      "participant_a_access":["theory","prototype_design","software_or_control"],
+      "participant_b_access":["prototype_design","manufacturing_process"],
+      "integration_context_access":["theory","prototype_design","manufacturing_process","software_or_control"],
+      "participant_a_independent_complete_package":false,
+      "participant_b_independent_complete_package":false,
+      "joint_integration_possible":true,
+      "assertions":["joint program can integrate a result without every participant receiving every compartment","compartment restrictions do not split scientific truth","participants do not gain missing compartments merely because they contributed"]
+    },
+    {
+      "id":"communication_partition_pauses_dependency_not_whole_treaty",
+      "description":"A joint long-baseline sensor project loses its high-bandwidth cross-polity data path for three years. Local collection continues, but cross-site correlation work that requires the remote dataset pauses until the path returns.",
+      "node_id":"long_baseline_array",
+      "partition_years":3.0,
+      "local_observation_work_continues":true,
+      "cross_site_correlation_requires_remote_data":true,
+      "cross_site_correlation_state_during_partition":"blocked_pending_remote_dataset",
+      "generic_joint_research_penalty":false,
+      "records_already_local_remain_accessible":true,
+      "assertions":["communication failure blocks only dependencies that actually need the path","local scientific work can continue","there is no universal cross-polity penalty","reconnection resumes pending delivery rather than recreating completed local work"]
+    },
+    {
+      "id":"research_collaboration_state_soak_1000y",
+      "description":"Reference 1,000-year collaboration workload across many diplomatic relationships. Only active/strategically relevant collaborations stay detailed; completed/terminated records compress.",
+      "years":1000,
+      "max_active_collaborations":24,
+      "max_participant_contribution_records":80,
+      "max_pending_result_deliveries":96,
+      "max_recent_collaboration_events":384,
+      "max_archived_collaboration_summaries":192,
+      "rules":["inactive agreements with no scientific work allocate no detailed research record","completed collaboration detail compresses","delivered result-transfer records are removed after participant state application","terminated collaboration contributions are released","no participant technology graph is copied into collaboration state"]
+    }
+  ]
+}

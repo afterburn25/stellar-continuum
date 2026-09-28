@@ -7,14 +7,19 @@ namespace Game.Simulation.Shipbuilding;
 public sealed class ShipyardState
 {
     public const int MaxPendingBuilds = 8;
+    public const int MaxOrderIdLength = 128;
 
     private readonly List<ShipBuildOrderState> _queuedBuilds = new();
 
     public required int CivilizationId { get; init; }
+    public long NextOrderSequence { get; set; } = 1;
     public string? ActiveDesignId { get; set; }
+    public string? ActiveOrderId { get; set; }
     public double ActiveBuildProgress { get; set; }
+    public double ActiveAuthorizationCredits { get; set; }
     public double ReservedPopulationMillions { get; set; }
     public string? ReservedPopulationSpeciesId { get; set; }
+    public int? ReservedPopulationSourceColonyId { get; set; }
 
     /// <summary>
     /// Queue access validates only the invariants needed to prevent population-bearing build
@@ -31,6 +36,21 @@ public sealed class ShipyardState
     }
 
     public int PendingBuildCount => (ActiveDesignId is null ? 0 : 1) + _queuedBuilds.Count;
+
+    public static string FormatOrderId(int civilizationId, long sequence) =>
+        $"shipyard-{civilizationId}-{sequence}";
+
+    public static bool TryReadCanonicalSequence(string? orderId, int civilizationId, out long sequence)
+    {
+        sequence = 0;
+        var prefix = $"shipyard-{civilizationId}-";
+        return orderId is not null && orderId.StartsWith(prefix, StringComparison.Ordinal) &&
+               long.TryParse(orderId.AsSpan(prefix.Length), out sequence) && sequence > 0;
+    }
+
+    public static bool IsValidPersistedOrderId(string? orderId) =>
+        !string.IsNullOrWhiteSpace(orderId) && orderId.Length <= MaxOrderIdLength &&
+        orderId.All(character => character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '-' or '_');
 
     private void ValidatePopulationPersistenceSafety()
     {
@@ -117,7 +137,10 @@ public sealed class ShipyardState
 
 public sealed class ShipBuildOrderState
 {
+    public string OrderId { get; init; } = string.Empty;
     public required string DesignId { get; init; }
+    public double AuthorizationCredits { get; init; }
     public double ReservedPopulationMillions { get; init; }
     public string? ReservedPopulationSpeciesId { get; init; }
+    public int? ReservedPopulationSourceColonyId { get; init; }
 }

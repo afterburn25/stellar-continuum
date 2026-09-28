@@ -1,0 +1,22 @@
+name: research-foreign-technology
+
+on:
+  push:
+    branches: [ "dev/adaptive-research" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate-adaptive-research-foreign-technology:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore foreign technology checks
+        run: dotnet restore tests/AdaptiveResearchForeignTechnologyChecks/AdaptiveResearchForeignTechnologyChecks.csproj
+      - name: Build foreign technology checks
+        run: dotnet build tests/AdaptiveResearchForeignTechnologyChecks/AdaptiveResearchForeignTechnologyChecks.csproj --configuration Release --no-restore
+      - name: Run foreign technology checks
+        run: dotnet run --project tests/AdaptiveResearchForeignTechnologyChecks/AdaptiveResearchForeignTechnologyChecks.csproj --configuration Release --no-build

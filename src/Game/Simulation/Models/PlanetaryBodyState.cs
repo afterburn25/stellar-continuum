@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace Game.Simulation.Models;
 
@@ -6,6 +7,7 @@ public enum PlanetaryBodyKind
 {
     Planet,
     Moon,
+    DwarfPlanet,
 }
 
 /// <summary>
@@ -78,7 +80,9 @@ public sealed record PlanetaryBodyState(
     bool LegacyColonizationCandidate,
     bool HasRareResource,
     bool HasAnomaly,
-    bool HasPreWarpCivilization)
+    bool HasPreWarpCivilization,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] double OrbitalEccentricity = 0.0,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] double OrbitalInclinationDegrees = 0.0)
 {
     public PlanetaryBodyState Validated()
     {
@@ -86,10 +90,19 @@ public sealed record PlanetaryBodyState(
         if (SystemId < 0) throw new InvalidOperationException("Planetary body system IDs must be non-negative.");
         if (OrbitIndex < 0) throw new InvalidOperationException("Planetary body orbit indices must be non-negative.");
         if (string.IsNullOrWhiteSpace(Name)) throw new InvalidOperationException("Planetary bodies require a name.");
+        if (!Enum.IsDefined(Kind)) throw new InvalidOperationException("Planetary body kind is invalid.");
+        if ((Kind is PlanetaryBodyKind.Planet or PlanetaryBodyKind.DwarfPlanet) && ParentBodyId is not null)
+            throw new InvalidOperationException("Primary planetary bodies cannot have a parent body.");
+        if (Kind == PlanetaryBodyKind.Moon && ParentBodyId is null)
+            throw new InvalidOperationException("Moons require a parent body.");
         if (!double.IsFinite(RadiusEarth) || RadiusEarth <= 0.0)
             throw new InvalidOperationException("Planetary body radius must be finite and positive.");
         if (!double.IsFinite(MassEarth) || MassEarth <= 0.0)
             throw new InvalidOperationException("Planetary body mass must be finite and positive.");
+        if (!double.IsFinite(OrbitalEccentricity) || OrbitalEccentricity < 0.0 || OrbitalEccentricity >= 1.0)
+            throw new InvalidOperationException("Planetary body orbital eccentricity must be finite and in [0, 1).");
+        if (!double.IsFinite(OrbitalInclinationDegrees) || OrbitalInclinationDegrees < 0.0 || OrbitalInclinationDegrees > 180.0)
+            throw new InvalidOperationException("Planetary body orbital inclination must be finite and between 0 and 180 degrees.");
         Environment.Validated();
         return this;
     }

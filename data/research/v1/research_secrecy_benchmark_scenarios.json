@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Deterministic offline fixtures for classified research participation, compartment integration, capability observation, partial compromise, declassification/reclassification, and bounded long-run security state. They are design/CI guardrails, not final balance promises.",
+  "scenarios": [
+    {
+      "id":"restricted_capacity_no_magic_penalty",
+      "description":"A classified stealth-detection program has substantial polity research capacity, but only authorized labs/experts can participate. Slower progress comes from real eligible capacity, not a secrecy multiplier.",
+      "node_id":"stealth_detection",
+      "access_class":"classified",
+      "total_scientifically_eligible_labs":48,
+      "security_authorized_labs":14,
+      "authorized_expert_capacity":5,
+      "unauthorized_labs_excluded":34,
+      "direct_secrecy_rp_multiplier":1.0,
+      "assertions":[
+        "eligible classified capacity equals real authorized capacity",
+        "unauthorized labs contribute zero",
+        "classification itself does not modify RP efficiency"
+      ]
+    },
+    {
+      "id":"compartment_integration_blocker",
+      "description":"A field-defense engineering program splits theory, prototype, manufacturing, and control records into compartments. Engineering cannot integrate the design until an authorized integration context can access the necessary compartments.",
+      "node_id":"field_defense",
+      "access_class":"special_access_compartment",
+      "compartments":["theory","prototype_design","manufacturing_process","software_or_control"],
+      "engineering_required_compartments":["prototype_design","manufacturing_process","software_or_control"],
+      "initial_integration_access":["prototype_design","software_or_control"],
+      "initial_blocker":"missing_compartment_integration_access",
+      "later_integration_access":["prototype_design","manufacturing_process","software_or_control"],
+      "expected_after_access":"unblocked",
+      "assertions":[
+        "missing compartment access creates a concrete blocker",
+        "adding real authorized integration access removes the blocker",
+        "no generic compartment research penalty is used"
+      ]
+    },
+    {
+      "id":"classified_deployed_capability_observed",
+      "description":"A classified field-defense implementation is used in combat. A foreign observer legitimately detects its effect but acquires no implementation records.",
+      "node_id":"field_defense",
+      "existence_disclosure":"concealed_metadata",
+      "observed_capability":"field_defense",
+      "foreign_understanding_before":"unknown",
+      "foreign_understanding_after":"observed",
+      "foreign_reproduction_after":"none",
+      "records_acquired":[],
+      "assertions":[
+        "classification cannot hide a genuinely observed physical effect",
+        "observation creates capability evidence without implementation records",
+        "observation does not reveal the source research node to the observer by fiat"
+      ]
+    },
+    {
+      "id":"partial_blueprint_compromise",
+      "description":"A foreign actor acquires a classified antimatter-containment dataset and engineering blueprints but no production tooling, operating institution, expert cohort, or training pipeline.",
+      "node_id":"antimatter_containment",
+      "acquired_assets":["experimental_dataset","engineering_blueprints"],
+      "not_acquired_assets":["manufacturing_tooling","operating_institution","expert_cohort","training_pipeline"],
+      "foreign_understanding_before":"observed",
+      "foreign_understanding_after":"characterized",
+      "foreign_reproduction_after":"component_replication",
+      "foreign_operability_after":"unknown",
+      "native_node_maturity_granted":false,
+      "assertions":[
+        "partial records improve foreign assessment",
+        "missing tooling and experts limit reproduction",
+        "stolen records do not automatically make the native node Mature",
+        "owner does not automatically know the recipient unless compromise detection established it"
+      ]
+    },
+    {
+      "id":"declassification_increases_resilience_not_truth",
+      "description":"A mature technology is known in two classified research contexts. Declassification authorizes four additional synchronized contexts, which receive codified records through normal communications and create more independent archive copies.",
+      "node_id":"quantum_secure_comms",
+      "maturity_before":"mature",
+      "maturity_after":"mature",
+      "authorized_contexts_before":2,
+      "authorized_contexts_after":6,
+      "protected_archive_copies_before":2,
+      "archive_copies_after_dissemination":6,
+      "maximum_delivery_latency_years":0.5,
+      "practice_auto_granted":false,
+      "assertions":[
+        "declassification does not alter scientific maturity",
+        "newly authorized contexts still wait for real record delivery",
+        "additional copies improve archive resilience",
+        "practice does not appear automatically with records"
+      ]
+    },
+    {
+      "id":"reclassification_cannot_recall_existing_copies",
+      "description":"A previously normal scientific record exists as codified copies in four contexts. The polity reclassifies future dissemination to two contexts; policy stops future normal sharing but does not physically erase the two already distributed copies.",
+      "node_id":"quantum_sensors",
+      "codified_contexts_before":4,
+      "new_authorized_contexts":2,
+      "codified_contexts_immediately_after_reclassification":4,
+      "future_normal_dissemination_allowed":false,
+      "automatic_remote_deletion":false,
+      "assertions":[
+        "reclassification affects future access/dissemination policy",
+        "already distributed records remain until real deletion/recovery actions occur",
+        "classification policy is not a physical recall mechanism"
+      ]
+    },
+    {
+      "id":"research_security_state_soak_1000y",
+      "description":"Reference 1,000-year security-state workload. Most research remains normal scientific access and therefore has no explicit security record.",
+      "years":1000,
+      "catalog_nodes":370,
+      "max_nondefault_security_records":72,
+      "max_active_compartments":36,
+      "max_known_compromise_assessments":48,
+      "max_recent_security_events":256,
+      "max_archived_security_summaries":128,
+      "rules":[
+        "default normal-scientific access creates no per-node security record",
+        "declassified records return to normal state and delete redundant policy rows",
+        "compartment membership uses groups rather than people",
+        "known compromise detail compresses after strategic relevance fades",
+        "security records never duplicate the technology graph"
+      ]
+    }
+  ]
+}

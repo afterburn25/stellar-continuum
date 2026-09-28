@@ -1,246 +1,140 @@
 # Development History
 
-This is the concise chronological record of validated gameplay milestones and major design/data state changes. It keeps accepted design foundations separate from gameplay-version promotion.
+This is the concise chronological record of validated gameplay milestones and major research design/data changes. Research milestones do not promote gameplay VERSION.
 
-## Gameplay milestones through 0.0.6
+## Gameplay milestones known to this research workstream
 
-### 0.0.1 — Simulation foundation
+- 0.0.1 simulation foundation — merged/validated.
+- 0.0.2-dev.1 civilizations/fog — `2aaa6d3aeead400882c8214005e3bd78cfe17eaa`.
+- 0.0.3-dev.1 exploration/first contact — `8683acebb1860ff3d94838656c65c8a82cd90d68`.
+- 0.0.4-dev.1 colonies/basic economy — `ebcba9239a0d12d0c5c99f41937193176b6c8664`.
+- 0.0.5-dev.1 2050 Pre-Warp Dawn — `c457f5e57c51057e86b857d0d828ff42d75e8f8b`.
+- 0.0.6-dev.1 construction-driven development — gameplay baseline recorded here at `91a2204b96ed08c2178875cbc8d5b0bc378372ad`.
 
-Status: merged/validated.
+Other gameplay workstreams own later gameplay status if changed.
 
-Godot 4.7.2 .NET/C# foundation, plain-C# simulation core, deterministic galaxy generation, real-time clock/backlog protection, versioned persistence, diagnostics/support bundles, and .NET + pinned Godot CI.
+## Adaptive Research milestone history
 
-### 0.0.2-dev.1 — Civilizations / fog of war
+### #1 — possibility graph / RP + Pressure + Labs
 
-Status: merged/validated.
+**Merged/validated:** PR #11 -> `f70e122134e87c1449582b573c5e2db8b045d311`.
 
-Merge commit: `2aaa6d3aeead400882c8214005e3bd78cfe17eaa`
+Established the original hidden shared possibility graph, RP + contextual Pressure + physical Effective Research Labs, staged concurrency, and catalog validation.
 
-Added civilization archetypes, distributed homes, per-civilization knowledge, fair-information AI scaffolding, stale/uncertain observations, and save migration.
+### #2 — emergence / evidence / pressure dynamics
 
-### 0.0.3-dev.1 — Exploration / first contact
+**Merged/validated:** PR #12 -> `95fa5c9e77642479eecc8f4183c91c06b3709f7e`.
 
-Status: merged/validated.
+Established applicability/evidence, full pressure dynamics, sparse indexed emergence, no calendar unlocks/rank catch-up, and fair-information observations.
 
-Merge commit: `8683acebb1860ff3d94838656c65c8a82cd90d68`
+### #3 — capability interoperability / maturation
 
-Added physical scouts, player/AI exploration from legitimate knowledge, sensor discovery/survey, actual encounter-driven first contact, and persisted fleet/discovery state.
+**Merged/validated:** PR #13 -> `101b01a1d6407fee2912c7e8b9175f196bb75ca9`.
 
-### 0.0.4-dev.1 — Colonies / basic economy
+Established implementation knowledge vs cross-lineage functional capability requirements, scoped capabilities, maturation/hypothesis outcomes, setbacks, side discoveries, and knowledge-vs-deployment separation.
 
-Status: merged/validated.
+### #4 — competence / facilities / tacit knowledge
 
-Merge commit: `ebcba9239a0d12d0c5c99f41937193176b6c8664`
+**Merged/validated:** PR #17 -> `64a4aaa74ca526c8d6d69b9d905a2e9c3e3a6bc6`.
 
-Added home colonies, population, credits/industry/science, physical colony ships, knowledge-constrained AI colonization, and persisted colony/economy state.
+Established theory/experiment/engineering competence, specialist research facilities, tacit knowledge/expert cohorts/training, and bounded Project Readiness.
 
-### 0.0.5-dev.1 — 2050 Pre-Warp Dawn
+### #5 — foreign technology / exchange / research UI
 
-Status: merged/validated.
+**Merged/validated:** PR #30 -> `d7bdaa8ee67461ba1811121e9af4719de6583a8d`.
 
-Merge commit: `c457f5e57c51057e86b857d0d828ff42d75e8f8b`
+Established Understanding / Operability / Reproduction / Adaptation, compatibility dependencies, technology exchange/licensing/brokerage, buyer-specific value, and visible-only evolving research UI.
 
-Added Jan 1 2050 start, normal majors pre-warp, prototype fixed FTL progression, remote already-spacefaring neutral/non-expansionist old powers, and save-v5 calendar/research state.
+### #6 — starting histories / runtime / materialized view
 
-Later design substantially deepened the solar-system opening; this remains prototype gameplay.
+**Merged/validated:** PR #44 -> `859099ee3048a2788aa32b33c5ca46aeaee00df9`.
 
-### 0.0.6-dev.1 — Construction-driven development
+Established reusable starting scientific histories, prerequisite-closed starts, sparse event/query runtime boundary, materialized visible-only research view, and authoritative UI/AI command revalidation.
 
-Status: validated gameplay baseline recorded by this research workstream.
+### #7 — research agenda / scientific culture / fair AI planning
 
-Merge commit: `91a2204b96ed08c2178875cbc8d5b0bc378372ad`
+**Merged/validated:** PR #53 -> `8e47ef537af6d35f8d60e9cf2c9953064d6858ef`.
 
-Added industry-funded construction, prototype research/infrastructure dependencies, AI construction, save-v6 construction state, and full .NET/Godot validation.
+Established high-level priorities, 12 mutable scientific-culture axes, causal complacency/catch-up, explainable fair-information AI, and no hidden rank/leader bonuses.
 
-Other gameplay workstreams should update the canonical baseline if they merge later accepted gameplay versions.
+### #8 — long-horizon divergence / state soak
 
-## Other gameplay workstreams
+**Merged/validated:** PR #59 -> `d3916d3e6551c7a8b606716858d2d782581b1dac`.
 
-The Adaptive Research workstream does not own or reinterpret other gameplay branches. See `WORKSTREAMS.md`, current repository branches/PRs, and the owning chat for their latest state.
+Added deterministic offline design/CI benchmarks. Current 360-node baseline keeps a **0.457** minimum 500-year Mature-tree Jaccard distance, Mature catalog fractions **25.3% / 29.2% / 35.0%**, unique Mature nodes **11 / 36 / 68**, and bounded 1,000-year state at **81–105** node-state records per reference civilization.
 
-## Major design evolution relevant to research
+### #9 — alternative biochemistry / exotic biospheres
 
-Durable direction established after the early prototype includes:
+**Merged/validated:** PR #63 -> `1e69fa65c2ec0df2feef16bd30794b08f0b2000a`.
 
-- realism-first consequences instead of arbitrary restrictions
-- meaningful 2050 solar-system civilization phase
-- logistics/endurance/gravity/life support/radiation/food/fabrication alongside propulsion
-- species-relative habitability and biological diversity
-- Adaptive Research rather than fixed universal or per-species trees
-- foreign technology can be incompatible, dangerous, incomprehensible, dependent, or valuable to third parties
-- technology can become a diplomatic/economic commodity
-- long campaigns require bounded state and history compression
-- initial paid Early Access design horizon roughly 500 meaningful years with 1,000-year engineering soak testing
+Expanded the public seed to **360 nodes / 21 domains / 59 Pressures / 16 alternative-solution sets / 14 applicability traits / 36 fields / 17 cross-lineage capabilities**. Added a 30-node Alternative Biochemistry & Exotic Biospheres domain, species-neutral biochemical applicability, modular facilities/starts, and sparse multispecies context.
 
-## Adaptive Research milestone #1 — possibility graph / RP + Pressure + Labs
+Biochemical benchmark: human 4 shared/0 exotic-native; ammonia 10/6; cryogenic hydrocarbon 10/6; silicon/mineral 12/8; exotic native-specific pairwise Jaccard **1.000**.
 
-Status: **merged/validated design/data/tooling**.
+### #10 — distributed scientific knowledge / regional continuity
 
-PR: **#11**
+**Merged/validated:** PR #73 -> `6c832fc07359ebb4fbe40c4dc079f19e13c11fca`.
 
-Merge commit: **`f70e122134e87c1449582b573c5e2db8b045d311`**
+Established scientific truth vs codified access vs active practice vs deployment; sparse research contexts; communications-delayed dissemination; archive/practice continuity; successor inheritance; federation sharing without merged trees; and fair-information AI.
 
-Validation passed research catalog, .NET build, Godot editor smoke, and Godot runtime smoke.
+1,000-year / 120-region benchmark peaked at **5 contexts / 17 node-access exceptions / 10 field-practice exceptions / 9 pending transmissions**, ending with 3 contexts.
 
-Established:
+### #11 — research secrecy / compartments / compromised science
 
-- hidden Technology Possibility Graph
-- **330 normal/public possibilities**
-- **20 domains**
-- **59 Research Pressure types**
-- **15 alternative-solution sets**
-- RP generated by Effective Research Labs
-- pressure opt-in as a hard gate rather than implied by complexity
-- one early directed program, then 2 -> 4 -> lab-capacity-limited parallelism
-- `validate_research_catalog.py`
+**Merged/validated:** PR #78 -> `172c9c364b161e2e3deac88337429b5880a34e68`.
 
-Gameplay VERSION was not promoted.
+Established classification as sparse access policy on records/projects/assets rather than physics, special-access compartments, real security inputs, observed classified capability vs hidden implementation, partial compromise/foreign-tech interpretation, declassification/reclassification, distributed-context security, fair AI, and bounded security state.
 
-## Adaptive Research milestone #2 — emergence / evidence / pressure dynamics
+1,000-year secrecy soak peaked at **18 nondefault security records / 6 compartments / 3 known compromise assessments**.
 
-Status: **merged/validated design/data/tooling**.
+### #12 — cross-polity joint research / scientific collaboration
 
-PR: **#12**
+**Merged/validated:** PR #83 -> **`b56b47c1f23312abde93e04cd8ac9caf819f0176`**.
 
-Merge commit: **`95fa5c9e77642479eecc8f4183c91c06b3709f7e`**
+Final validated PR head: `a6e34f9b53ef3874e4ce95faabd548fc455d4b3b`.
 
 Established:
 
-- 6 public applicability traits
-- 9 public evidence types
-- generation/decay rules for all 59 pressures
-- sparse event/index candidate emergence
-- no calendar-year unlocks
-- no rank-based catch-up pressure
-- legitimate observation required for enemy-relative pressure
-- scoped population/species applicability
-- mutable civilization traits through real technological/deployment history
+- five collaboration forms: Joint Directed Project / Shared Observation / Shared Facility / Expert Exchange / Joint Foreign Technology Study
+- agreement = permission/coordination only; no treaty RP or research-speed multiplier
+- every contribution references real participant labs/facilities/experts/data/evidence/samples/materials/tooling/computation/context
+- joint directed work consumes each actively researching participant's own directed-program capacity
+- combined labs use one project-wide diminishing-return curve; multiple polities cannot create separate scaling buckets
+- contribution and result rights may be unequal
+- actual participating work can build competence; passive membership/payment/result receipt does not create practical competence
+- genuine co-developers advance through normal maturation; passive participants use normal transfer/assimilation
+- equal records can produce unequal operability/reproduction because compatibility, facilities, materials and tacit practice remain participant-specific
+- withdrawal removes real future contributions but cannot reverse completed work or recall delivered records
+- real facility loss can hard-block a stage; remaining labs do not bypass hard requirements
+- classified collaborations can divide compartments across partners while a designated integration context holds the complete engineering set
+- communication outages block only real remote-data dependencies while local work continues
+- runtime collaboration extension exposes **7 input events / 6 queries**
+- detailed state remains sparse/aggregate and never copies partner technology graphs
 
-Gameplay VERSION was not promoted.
+Collaboration benchmark:
 
-## Adaptive Research milestone #3 — capability interoperability / maturation
+- 20+12-lab Stable Warp consortium: A alone 17.4 scaled units, B alone 12.0, correct joint 32-lab project **21.6 units / 2160 RP/year before readiness**; incorrect separate-bucket exploit would be 29.4 and is rejected; treaty multiplier 1.0
+- withdrawal: 24 labs/18.8 units -> 16 labs/16.0 units; 2.8-unit capacity loss, stage progress preserved, records not recalled
+- hard facility loss: Hazardous Foreign Technology Protocols retains 10 labs but loses canonical xenoscience containment -> `blocked_missing_specialized_facility`
+- asymmetric foreign result: both Engineering Understood; compatible participant Adapted Operation/Subsystem Replication, incompatible synthetic participant Unusable/Component Replication; native maturity false
+- classified Field Defense: 4 compartments; each participant lacks different pieces while designated integration context has all; neither independently has complete package
+- 3-year communications partition: local observation continues, cross-site correlation waits for remote dataset, no generic penalty
+- 1,000-year collaboration soak: **112 collaborations created**, peak **4 active / 9 participant contributions / 4 pending result deliveries**, final active 2/pending 0; bounded history buffers
 
-Status: **merged/validated design/data/tooling**.
+Final #12 validation passed collaboration, secrecy, distributed, biochemical, all core research validators/benchmarks, and .NET build. Exactly seven research-owned files changed.
 
-PR: **#13**
+## Shared CI limitation — issue #61
 
-Merge commit: **`101b01a1d6407fee2912c7e8b9175f196bb75ca9`**
+GitHub issue **#61** tracks the existing false-positive Godot runtime smoke: it can log failure to instantiate `res://src/Game/Presentation/Main.cs` while returning exit 0.
 
-Final-head validation passed the catalog validator, maturation validator, .NET build, and both Godot smokes.
-
-Established:
-
-- persistent `dev/adaptive-research` workstream branch
-- implementation knowledge prerequisites vs functional cross-lineage capabilities
-- civilization/population/installation capability scopes
-- generic late systems no longer secretly force the default warp/industrial path
-- default Mature capability grants and explicit early/deployment grants
-- knowledge distinct from physical deployment
-- Experimental -> Demonstrated -> Engineering -> Mature/Archived maturation
-- supported/refined/disproven/anomalous hypotheses
-- non-destructive setbacks, bounded side discoveries, deterministic uncertainty
-- `validate_research_maturation.py`
-
-Gameplay VERSION was not promoted.
-
-## Adaptive Research milestone #4 — competence / institutions / tacit knowledge
-
-Status: **merged/validated design/data/tooling**.
-
-PR: **#17 — Adaptive Research competence, facilities, and tacit knowledge**
-
-Merge commit: **`64a4aaa74ca526c8d6d69b9d905a2e9c3e3a6bc6`**
-
-Final-head validation passed:
-
-- catalog validator
-- maturation validator
-- competence validator
-- .NET restore/build
-- Godot headless editor smoke
-- Godot headless runtime smoke
-
-Established:
-
-- **35 canonical knowledge fields** referenced by all 330 public nodes
-- theoretical / experimental / engineering field competence
-- sparse competence state, related-field transfer, and active-practice atrophy without deletion of archived knowledge
-- stage-specific, bottleneck-sensitive multidisciplinary readiness
-- specialist research institutions/facility capabilities as physical eligible lab capacity rather than `+research%` bonuses
-- hard stage facility requirements for genuinely specialized experiments/prototypes
-- tacit knowledge assets: records, datasets, protocols, prototypes, tooling, expert cohorts, operating institutions, training pipelines
-- foreign knowledge assimilation: Access -> Interpreted -> Codified -> Trained -> Native Practice
-- aggregate expert cohorts, not one object per scientist
-- base project RP + one bounded Project Readiness efficiency replacing contextual modifier stacking
-- Research Pressure remains urgency/availability, not a speed bonus
-- hard missing facilities/evidence/materials block or pause stages rather than becoming opaque RP taxes
-- `validate_research_competence.py`
-
-Gameplay VERSION was not promoted.
-
-## Adaptive Research milestone #5 — foreign technology / exchange / research UI
-
-Status: **current in-progress design/data/tooling milestone**.
-
-Persistent branch: **`dev/adaptive-research`**
-
-Current work adds:
-
-### Foreign technology compatibility / reproduction
-
-- four independent assessment axes: Understanding, Operability, Reproduction, Adaptation
-- real compatibility constraints: scientific/material/energy/manufacturing/infrastructure/biology/environment/interface/software/consumable/expertise/hazard
-- operation without understanding, understanding without reproduction, foreign-process reproduction without native-process mastery, and native derivatives without exact copying
-- foreign-tech reassessment is event-driven, not per tick
-- existing xenoscience/reverse-engineering nodes are the research interface
-
-### Technology exchange / licensing / brokerage
-
-- transfer packages are composed from observations, theory, datasets, blueprints, process docs, hardware, tooling, experts, training, and operating institutions
-- transfer components map to canonical tacit knowledge assets
-- legal rights are distinct from technical ability
-- licenses can cover research/operation/manufacture/modification/civilian/military/export/sublicense/resale rights
-- **license terms are law, not physics**; violations are technically possible when the holder has the capability and external systems own the consequences
-- no fixed universal technology value; value is buyer-specific based on need, compatibility, alternatives, readiness, package completeness, rights, dependencies, risk, scarcity, and legitimately known resale demand
-- unusable technology can still have third-party brokerage value
-
-### Research UI contract
-
-- unknown nodes/placeholder slots never render
-- only visible node links render
-- new branches attach near stable anchors without globally rearranging the current tree
-- viewport/selection preservation when branches emerge
-- early 2050 research UI stays simple; advanced simulation detail remains available on demand
-- visible pressure only for recognized fields
-- clear blocker explanations for labs/facilities/evidence/pressure/capabilities
-- foreign tech shows four assessment axes separately
-- technology exchange shows package contents, legal rights, and technical ability separately
-- mature/archive-heavy history collapses outside the active horizon
-- no per-frame full research-graph scan
-
-### Validation
-
-Milestone #5 adds `scripts/validate_research_transfer_ui.py` as a fourth research validator and wires it into CI before .NET/Godot.
-
-Canonical new files:
-
-- `foreign_technology_model.json`
-- `technology_exchange_model.json`
-- `research_ui_contract.json`
-- `RESEARCH_FOREIGN_TECH_MODEL.md`
-- `RESEARCH_UI_MODEL.md`
-- `validate_research_transfer_ui.py`
+This remains outside Adaptive Research ownership. Research acceptance treats the process smoke separately from semantic runtime health.
 
 ## Persistent workstream rule
 
-Adaptive Research/Technology uses **`dev/adaptive-research`**. After each validated research milestone merges, advance this same branch from the new `main` and continue rather than creating a new permanent research branch per feature.
+Adaptive Research uses `dev/adaptive-research` and remains owned by the dedicated research chat. Research design/data merges do not promote gameplay VERSION.
 
-## Update rule
+## Next research milestone
 
-After each validated Adaptive Research design/data merge:
+Milestone #13: **plain-C# Adaptive Research runtime implementation foundation**.
 
-1. record PR/merge commit here
-2. update `PROJECT_STATE.md`
-3. update durable research decisions
-4. advance `dev/adaptive-research` from the new `main`
-5. keep design/data acceptance distinct from gameplay VERSION promotion
+Reserve a dedicated research-owned simulation source path first, then implement immutable catalog/index loading, sparse per-civilization state, event/index-driven visibility/progression, capability/blocker/query APIs, materialized-view revisioning, deterministic runtime tests, and serialization guards without replacing the prototype gameplay research path yet.

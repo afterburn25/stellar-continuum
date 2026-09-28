@@ -8,7 +8,7 @@ namespace Game.Simulation.Validation;
 
 internal static class DiplomacyExplorationValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunDiplomacyExplorationChecks()
     {
         ValidatePhysicalEncounterFeedsDirectionalDiplomacy();

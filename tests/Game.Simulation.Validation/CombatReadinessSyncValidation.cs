@@ -8,7 +8,7 @@ namespace Game.Simulation.Validation;
 
 internal static class CombatReadinessSyncValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunCombatReadinessCheck()
     {
         var galaxy = new GalaxyGenerator().Generate(

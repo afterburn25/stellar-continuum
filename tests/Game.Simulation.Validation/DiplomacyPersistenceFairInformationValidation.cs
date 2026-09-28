@@ -6,7 +6,7 @@ namespace Game.Simulation.Validation;
 
 internal static class DiplomacyPersistenceFairInformationValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunDiplomacyPersistenceFairInformationChecks()
     {
         ValidateThirdPartySecretsSurviveRoundTripWithoutLeaking();

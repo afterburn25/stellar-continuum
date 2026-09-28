@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "design_status": "seed_balance_values_not_final",
+  "purpose": "Executable seed policy for foreign-technology package ingestion, assessment confidence, assimilation and recipient-specific research/brokerage utility. It never directly grants Mature native technology.",
+  "axis_order": {
+    "understanding": ["unknown","observed","characterized","principle_understood","engineering_understood"],
+    "operability": ["unknown","unusable","origin_only","supported_operation","adapted_operation","native_operation"],
+    "reproduction": ["none","component_replication","subsystem_replication","foreign_process_replication","native_process_replication"],
+    "adaptation": ["none","conceptual_inspiration","interface_adaptation","native_derivative","hybrid_lineage"]
+  },
+  "package_intake": {
+    "minimum_understanding_by_component": {
+      "observation_dossier":"observed",
+      "scientific_theory_dossier":"observed",
+      "experimental_data_package":"observed",
+      "engineering_blueprint_package":"characterized",
+      "manufacturing_process_package":"characterized",
+      "reference_hardware":"observed",
+      "production_tooling_transfer":"characterized",
+      "expert_assistance":"observed",
+      "training_program":"observed",
+      "operating_institution_transfer":"characterized"
+    },
+    "conceptual_inspiration_if_characterized": true,
+    "package_integrity_scales_generated_tacit_depth": true,
+    "package_components_do_not_assert_operability": true,
+    "package_components_do_not_assert_reproduction": true
+  },
+  "assimilation": {
+    "ordered_stages": ["access","interpreted","codified","trained","native_practice"],
+    "minimum_training_continuity_to_advance_to_trained": 0.5,
+    "minimum_translation_quality_to_advance_beyond_access": 0.35,
+    "native_practice_requires_explicit_assimilation_or_successful_native_process_fact": true,
+    "assimilation_never_matures_native_node": true
+  },
+  "confidence": {
+    "new_assessment_from_observation": 0.25,
+    "new_assessment_from_characterized_package": 0.45,
+    "successful_controlled_analysis_minimum": 0.60,
+    "successful_operational_or_reproduction_test_minimum": 0.75,
+    "engineering_understood_minimum": 0.80,
+    "bounded_range": [0,1]
+  },
+  "recipient_value": {
+    "outputs_range": [0,100],
+    "research_utility_formula": "mean(capability_novelty, strategic_need, expected_work_saved, recipient_readiness, package_completeness)",
+    "operational_utility_formula": "mean(recipient_operability_fit, package_completeness, dependency_safety)",
+    "resale_utility_formula": "mean(known_third_party_demand, package_transferability, scarcity_or_exclusivity)",
+    "dependency_risk_formula": "mean(known_material_energy_manufacturing_infrastructure_biology_software_consumable_expertise_constraints)",
+    "hazard_risk_formula": "known_hazard_severity_or_uncertainty",
+    "holder_incompatibility_does_not_reduce_third_party_value": true,
+    "no_fixed_currency_price": true
+  },
+  "performance": {
+    "store_only_acquired_or_legitimately_observed_foreign_technology": true,
+    "reassess_event_driven_only": true,
+    "no_scan_of_all_foreign_lineages": true,
+    "package_components_reference_shared_definitions": true,
+    "old_assessment_events_can_compress": true
+  }
+}

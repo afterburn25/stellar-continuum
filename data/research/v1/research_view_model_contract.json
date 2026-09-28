@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Defines the read-only materialized research projection consumed by player UI and AI explanation tooling. It contains only information the civilization legitimately knows and never exposes hidden possibility nodes or authoritative enemy research state.",
+  "civilization_research_view": {
+    "revision":"monotonic research-view revision used to invalidate UI cache",
+    "civilization_id":"stable civilization id",
+    "calendar_date":"current campaign date",
+    "directed_program_capacity":{
+      "stage_id":"current coordination stage",
+      "maximum_directed_programs":"integer or lab_capacity_only",
+      "active_program_count":"current active programs",
+      "free_effective_labs":"unassigned eligible aggregate lab capacity"
+    },
+    "agenda_summary":"ResearchAgendaView containing recognized priorities/orientations only",
+    "visible_nodes":"array of ResearchNodeView",
+    "visible_edges":"array of ResearchEdgeView connecting visible nodes only",
+    "active_projects":"array of ResearchProjectView",
+    "recognized_pressures":"array of recognized ResearchPressureView entries only",
+    "field_summaries":"optional on-demand recognized FieldCompetenceView entries",
+    "foreign_technology_summaries":"known ForeignTechnologyView entries only",
+    "capacity_requests":"bounded/paged ResearchCapacityRequestView entries when relevant",
+    "recent_research_events":"bounded recent player-relevant event summaries",
+    "history_summary":"paged/collapsed mature and archived research history"
+  },
+  "ResearchAgendaView": {
+    "domain_priorities":"recognized sparse priorities",
+    "field_priorities":"recognized sparse priorities",
+    "problem_priorities":"recognized Research Pressure priorities only",
+    "capability_priorities":"recognized capability priorities only",
+    "basic_vs_applied_orientation":"player-readable orientation/band",
+    "competence_preservation_policy":"player-readable orientation/band",
+    "portfolio_diversity_policy":"player-readable orientation/band",
+    "foreign_science_engagement":"player-readable orientation/band",
+    "scientific_culture_summary":"own civilization's high-level research-relevant institutional tendencies, not hidden exact AI weights",
+    "recent_reasoning":"bounded human-readable explanations for major agenda changes",
+    "rule":"Agenda displays only recognized targets; it never lists unknown nodes or future hidden capabilities."
+  },
+  "ResearchNodeView": {
+    "node_id":"stable public/known node id",
+    "display_name":"localized known name or uncertainty-safe label",
+    "state":"rumored | hypothesized | investigable | experimental | demonstrated | engineering | mature | archived",
+    "domain_id":"known domain",
+    "solution_family":"shown only when civilization understands the relationship",
+    "is_hypothesis":"known status when scientifically recognized",
+    "visibility_confidence":"optional confidence for rumor/foreign-derived interpretation",
+    "known_capabilities":"capabilities currently understood to follow from this node; never hidden future outputs",
+    "blockers":"recognized blockers only",
+    "minimum_labs":"shown once project is investigable",
+    "recommended_labs":"shown when estimable",
+    "assigned_labs":"if active",
+    "estimated_completion":"range/uncertainty or unavailable; never fake precision",
+    "readiness_summary":"compact player-readable breakdown without exposing hidden exact rolls",
+    "agenda_alignment":"player-readable explanation of why the visible project is currently emphasized/deemphasized; not a hidden score dump",
+    "pressure_context":"only recognized relevant pressure/gate information",
+    "evidence_summary":"only legitimate evidence known to civilization",
+    "facility_requirements":"recognized physical research requirements",
+    "target_applicability_context":"population/species/installation context where relevant",
+    "layout_anchor":"stable visible anchor/group hint, not absolute hidden-tree coordinate"
+  },
+  "ResearchEdgeView": {
+    "from_visible_node_id":"visible source",
+    "to_visible_node_id":"visible target",
+    "relationship":"known_prerequisite | known_alternative | known_derivative | historical",
+    "certainty":"certain or interpretation confidence",
+    "rule":"Both endpoints must already be visible. No edge may imply an unknown placeholder node."
+  },
+  "ResearchProjectView": {
+    "node_id":"active directed project",
+    "stage":"experimental | demonstrated | engineering",
+    "stage_progress":"0..1",
+    "total_rp_progress":"bounded project work progress",
+    "assigned_effective_labs":"current aggregate capacity",
+    "readiness_band":"poor | limited | adequate | strong | exceptional",
+    "current_blockers":"specific recognized blockers",
+    "recent_setback_summary":"optional",
+    "strategic_reason":"recognized explanation for why civilization/player is currently pursuing it",
+    "pause_allowed":true
+  },
+  "ResearchPressureView": {
+    "pressure_id":"recognized pressure only",
+    "display_value_or_band":"exact value or band according to UI policy",
+    "trend":"rising | stable | falling | unknown",
+    "known_causes":"recognized causal summaries only",
+    "hard_gate_targets":"only currently visible nodes affected by explicit pressure gates"
+  },
+  "FieldCompetenceView": {
+    "field_id":"recognized field",
+    "theoretical_band":"player-readable band",
+    "experimental_band":"player-readable band",
+    "engineering_band":"player-readable band",
+    "trend":"growing | stable | atrophying",
+    "active_sources":"high-level current activities/institutions",
+    "agenda_priority":"current recognized field priority",
+    "rule":"Field summaries do not reveal undiscovered nodes that use the field."
+  },
+  "ForeignTechnologyView": {
+    "foreign_asset_or_lineage_id":"known foreign technology record",
+    "display_label":"known/uncertain designation",
+    "understanding":"known axis state + confidence",
+    "operability":"known axis state + confidence",
+    "reproduction":"known axis state + confidence",
+    "adaptation":"known axis state + confidence",
+    "known_dependencies":"recognized dependencies only",
+    "known_hazards":"recognized hazards only",
+    "research_options":"visible xenoscience/adaptation projects only",
+    "exchange_packages":"packages actually possessed/known/negotiable through external systems"
+  },
+  "ResearchCapacityRequestView": {
+    "request_id":"stable planning request id",
+    "request_type":"general_labs | specialized_labs | facility | training | sample_or_asset | foreign_expertise_or_package",
+    "priority":"recognized agenda priority",
+    "target":"recognized field/capability/facility/asset need",
+    "reason":"player-readable causal explanation",
+    "status":"planning request state supplied by owning external system where known",
+    "rule":"Displaying a request never implies the requested building/expert/package has been created or funded."
+  },
+  "blocker_ids": [
+    "prerequisite_knowledge",
+    "applicability",
+    "evidence",
+    "research_pressure",
+    "functional_capability",
+    "minimum_labs",
+    "directed_program_capacity",
+    "specialized_facility",
+    "material_or_sample_access",
+    "tacit_expertise",
+    "hazard_containment"
+  ],
+  "projection_rules": {
+    "read_only":true,
+    "unknown_nodes_never_projected":true,
+    "hidden_node_count_never_exposed":true,
+    "visible_edges_only_between_projected_nodes":true,
+    "agenda_never_projects_unknown_targets":true,
+    "foreign_information_respects_confidence_and_provenance":true,
+    "estimated_completion_uses_range_when_readiness_or_hypothesis_uncertainty_is_material":true,
+    "view_does_not_contain_raw_secret_probability_or_outcome_roll":true,
+    "view_does_not_dump_hidden_AI_utility_scores":true,
+    "view_revision_changes_only_when_research_projection_materially_changes":true,
+    "UI_commands_reference_stable_visible_node_or_recognized_policy_ids_and_are_revalidated_authoritatively":true
+  },
+  "command_contract_from_UI_or_AI": [
+    {"id":"start_directed_research","payload":"visible node id + requested lab allocation + target context","validation":"authoritative research runtime rechecks visibility/blockers/capacity"},
+    {"id":"pause_directed_research","payload":"active project node id","validation":"project must be active/pauseable"},
+    {"id":"resume_directed_research","payload":"paused project node id + lab allocation","validation":"recheck current blockers/capacity"},
+    {"id":"reallocate_research_labs","payload":"active project node id + new aggregate lab assignment","validation":"cannot exceed eligible free capacity"},
+    {"id":"set_research_priority_policy","payload":"recognized field/domain/problem/capability priority or high-level research orientation","validation":"changes agenda/background/planning preference, never unlocks hidden nodes directly"}
+  ],
+  "performance": {
+    "projection_cached_until_revision_changes":true,
+    "paged_history_foreign_asset_and_capacity_request_lists":true,
+    "field_and_agenda_details_built_on_demand":true,
+    "no_per_frame_hidden_graph_query":true,
+    "large_mature_histories_collapsed_or_virtualized":true
+  }
+}

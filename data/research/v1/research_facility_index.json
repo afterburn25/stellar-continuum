@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Index of research-facing facility capability/institution catalogs. Facility catalogs may be extended by research domains without forcing one monolithic file; construction/economy owns physical build implementations.",
+  "facility_catalog_files": [
+    "research_facility_model.json",
+    "biochemical_research_facilities.json"
+  ],
+  "rules": {
+    "facility_ids_unique_across_catalogs": true,
+    "facility_capability_ids_unique_when_declared_by_extensions": true,
+    "extension_institutions_may_use_base_capabilities": true,
+    "all_hard_stage_requirements_need_at_least_one_provider": true,
+    "facilities_provide_capacity_not_flat_research_percentage_bonuses": true
+  }
+}

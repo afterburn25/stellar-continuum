@@ -89,7 +89,7 @@ internal static class SurveyOperationsValidation
         galaxy.Knowledge.RevealSystem(player.Id, target.Id);
         var scout = AddScoutFleet(galaxy, player.Id, target, 8101);
         var exploration = new ExplorationSimulation();
-        var events = exploration.Advance(galaxy, 1.0);
+        var events = exploration.Advance(galaxy, ExplorationSimulation.ScoutReconnaissanceDays);
 
         Require(galaxy.Knowledge.GetSystemSurveyLevel(player.Id, target.Id) == SystemSurveyLevel.PartiallySurveyed, "scout reconnaissance did not establish partial survey state");
         Require(!events.Any(evt => evt.Type is ExplorationEventType.ResourceSignatureDetected or ExplorationEventType.AnomalySignatureDetected or ExplorationEventType.ActivitySignatureDetected), "scout invented a positive discovery signature where authoritative bodies had none");
@@ -135,7 +135,7 @@ internal static class SurveyOperationsValidation
         galaxy.Knowledge.RevealSystem(player.Id, target.Id);
         var scout = AddScoutFleet(galaxy, player.Id, target, 8201);
         var exploration = new ExplorationSimulation();
-        var scoutEvents = exploration.Advance(galaxy, 1.0);
+        var scoutEvents = exploration.Advance(galaxy, ExplorationSimulation.ScoutReconnaissanceDays);
 
         foreach (var body in bodies)
         {

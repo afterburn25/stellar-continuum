@@ -5,7 +5,7 @@ namespace Game.Simulation.Validation;
 
 internal static class DiplomaticProposalLifecycleValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunDiplomaticProposalLifecycleChecks()
     {
         ValidateCallerDefinedProposalLifetimes();

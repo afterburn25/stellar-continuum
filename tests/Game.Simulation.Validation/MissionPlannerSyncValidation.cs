@@ -8,7 +8,7 @@ namespace Game.Simulation.Validation;
 /// </summary>
 internal static class MissionPlannerSyncValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunMissionPlannerSyncChecks()
     {
         ExplorationMissionPlanningValidation.ValidateBoundedObserverSafeMissionPlan();

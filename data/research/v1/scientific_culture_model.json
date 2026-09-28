@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Defines small mutable civilization-level scientific culture/institution tendencies that influence agenda formation and research behavior without acting as universal RP modifiers or species-locked bonuses.",
+  "axes": [
+    {"id":"curiosity","name":"Scientific Curiosity","range":[0,100],"meaning":"Willingness to sustain exploratory/basic science without immediate practical payoff.","behavioral_effects":["basic-science attention","tolerance for uncertain hypotheses","observatory/fundamental facility demand"]},
+    {"id":"risk_tolerance","name":"Research Risk Tolerance","range":[0,100],"meaning":"Willingness to commit resources to uncertain, difficult, or explicitly hazardous programs.","behavioral_effects":["frontier-project willingness","prototype aggressiveness","hazard-management posture"],"guardrail":"Does not change physical hazard probability merely because the civilization is brave."},
+    {"id":"institutional_conservatism","name":"Institutional Conservatism","range":[0,100],"meaning":"Preference for proven lineages/doctrine and established institutions over disruptive alternatives.","behavioral_effects":["incumbent-solution preference","switching inertia","retention of established programs"]},
+    {"id":"threat_sensitivity","name":"Threat Sensitivity","range":[0,100],"meaning":"How readily credible observed external threats alter strategic research attention.","behavioral_effects":["military/defense agenda reaction","speed of strategic review after credible foreign observations"],"guardrail":"Uses only legitimately observed threat information."},
+    {"id":"complacency_tendency","name":"Complacency Tendency","range":[0,100],"meaning":"Likelihood that long periods of perceived adequacy and success reduce attention to already-dominant capabilities.","behavioral_effects":["agenda de-emphasis under perceived adequacy","reduced willingness to replace successful doctrine/institutions"],"guardrail":"Never uses global rank or directly reduces RP production."},
+    {"id":"long_term_orientation","name":"Long-Term Orientation","range":[0,100],"meaning":"Willingness to fund scientific capacity whose payoff may be decades or generations away.","behavioral_effects":["competence preservation","fundamental infrastructure demand","long-horizon project preference"]},
+    {"id":"openness","name":"Scientific Openness","range":[0,100],"meaning":"Default willingness to publish, exchange, collaborate, and absorb external knowledge when politics permits.","behavioral_effects":["joint-science interest","foreign-expert engagement","data-sharing preference"]},
+    {"id":"secrecy","name":"Scientific Secrecy","range":[0,100],"meaning":"Preference for restricting strategically sensitive knowledge and compartmentalizing research.","behavioral_effects":["technology-package rights preferences","security/compartmentalization demand","reduced automatic publication"]},
+    {"id":"reproducibility_rigor","name":"Reproducibility Rigor","range":[0,100],"meaning":"Institutional emphasis on replication, metrology, verification, documentation, and safety evidence.","behavioral_effects":["facility/training demand","preference for stronger evidence before major commitment","tacit-knowledge codification effort"],"guardrail":"Does not become a free research-speed bonus."},
+    {"id":"competitive_prestige","name":"Scientific Prestige Competition","range":[0,100],"meaning":"Degree to which status, demonstration, and rivalry motivate visible scientific achievement.","behavioral_effects":["priority response to known peer breakthroughs","prestige megaproject interest","public demonstration preference"]},
+    {"id":"portfolio_diversity","name":"Scientific Portfolio Diversity","range":[0,100],"meaning":"Institutional preference for maintaining multiple fields/alternative solutions rather than optimizing narrowly around current leaders.","behavioral_effects":["alternative-solution retention","competence breadth","reduced overconcentration"]},
+    {"id":"commercialization_orientation","name":"Scientific Commercialization Orientation","range":[0,100],"meaning":"Willingness to treat knowledge, licensing, and technical services as economic assets.","behavioral_effects":["technology-exchange interest","licensing/tooling-package interest","brokerage evaluation attention"]}
+  ],
+  "state_rules": {
+    "scope":"civilization/institutional system, not immutable species biology",
+    "mutable_over_time":true,
+    "starting_bias_can_come_from_culture_government_history":"yes, but later experience/institutions can move the values",
+    "no_axis_directly_multiplies_RP":true,
+    "no_axis_reveals_unknown_nodes":true,
+    "no_axis_overrides_evidence_prerequisite_applicability_or_facility_rules":true,
+    "axes_are_behavioral_inputs_not_character_classes":true
+  },
+  "change_inputs_for_owning_social_governance_systems": [
+    "government reforms and funding institutions",
+    "major wars or existential scares",
+    "long periods of military/economic success",
+    "catastrophic research accidents",
+    "successful frontier breakthroughs",
+    "public scandals or reproducibility crises",
+    "foreign scientific cooperation or isolation",
+    "commercial success/failure of technology exchange",
+    "generational/leadership change",
+    "collapse, censorship, archive loss, or institutional rebuilding"
+  ],
+  "research_consumption_rules": {
+    "agenda_formation":"Culture biases priority/review behavior among recognized fields/problems/capabilities.",
+    "project_selection":"Culture helps rank visible projects but cannot make an invisible project selectable.",
+    "capacity_planning":"Culture influences requested labs/facilities/training/foreign access; physical fulfillment remains external.",
+    "hypothesis_behavior":"Curiosity/risk/rigor affect willingness to choose among visible uncertain projects and how much validation the civilization wants before deployment.",
+    "foreign_science":"Openness/secrecy/commercialization influence package/training/expert interest and desired license terms, subject to diplomacy/government.",
+    "knowledge_retention":"Long-term orientation/diversity/rigor can justify maintaining training/competence even when immediate pressure is low."
+  },
+  "natural_complacency_example": {
+    "scenario":"A civilization's warships have substantially outperformed all legitimately observed opponents for many decades.",
+    "possible_effects":[
+      "relevant military capability is assessed as adequate",
+      "low current losses and low observed threat keep military Research Pressure modest",
+      "high complacency plus institutional conservatism can lower military agenda priority and capacity requests",
+      "research resources may move toward medicine, economy, fundamental science, infrastructure, or other goals",
+      "when credible observations show a rival closing the gap, threat sensitivity and relevant pressure can reverse the agenda"
+    ],
+    "not_allowed":["hidden #1 ranking penalty","forced catch-up bonus for rivals","automatic military RP reduction independent of civilization decisions"]
+  },
+  "counterexamples": [
+    "A paranoid/high-threat-sensitivity civilization may continue aggressive military research while dominant.",
+    "A high-curiosity technocracy may keep advancing weapons because frontier science itself is prestigious even without a threat.",
+    "A commercially competitive civilization may innovate continuously because civilian/industrial markets reward it.",
+    "A complacent empire can remain ahead anyway if its existing lead is genuinely enormous."
+  ],
+  "performance": {
+    "small_fixed_axis_vector_per_civilization":true,
+    "culture_recomputed_only_on_meaningful_social_institutional_events_or_low_frequency_review":true,
+    "no_per_tick_personality_simulation":true
+  }
+}

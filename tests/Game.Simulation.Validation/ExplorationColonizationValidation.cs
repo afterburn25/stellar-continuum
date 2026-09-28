@@ -48,6 +48,9 @@ internal static class ExplorationColonizationValidation
         galaxy.Fleets.Add(scout);
 
         var exploration = new ExplorationSimulation();
+        exploration.Advance(galaxy, 1.0);
+        Require(galaxy.Knowledge.GetSystemSurveyLevel(player.Id, target.Id) == SystemSurveyLevel.Detected,
+            "scouting completed before its required on-site time");
         var scoutEvents = exploration.Advance(galaxy, 1.0);
 
         Require(
@@ -161,6 +164,7 @@ internal static class ExplorationColonizationValidation
             Require(SpeciesCatalog.TryGet(sourceSpeciesId, out _), "source colony did not carry a known species identity");
             var target = FindColonizationTarget(galaxy, player.Id);
             var colonyDesign = ShipDesignRegistry.All.First(design => design.Role == FleetRole.Colony);
+            var initialSourcePopulation = source.PopulationMillions;
             var initialPopulation = galaxy.Colonies
                 .Where(colony => colony.CivilizationId == player.Id)
                 .Sum(colony => colony.PopulationMillions);
@@ -177,7 +181,9 @@ internal static class ExplorationColonizationValidation
             var buildOrder = shipbuilding.StartBuild(galaxy, player.Id, colonyDesign.Id);
             Require(buildOrder.Accepted, "validation colony ship could not be ordered");
             Require(
-                Math.Abs(source.PopulationMillions - (initialPopulation - colonyDesign.PopulationCostMillions)) < 0.0000001,
+                Math.Abs(source.PopulationMillions - (initialSourcePopulation - colonyDesign.PopulationCostMillions)) < 0.0000001 &&
+                Math.Abs(galaxy.Colonies.Where(colony => colony.CivilizationId == player.Id).Sum(colony => colony.PopulationMillions) -
+                    (initialPopulation - colonyDesign.PopulationCostMillions)) < 0.0000001,
                 "colony ship order did not reserve real population from the source colony");
 
             var shipyard = galaxy.ShipyardStates.First(state => state.CivilizationId == player.Id);
@@ -188,7 +194,7 @@ internal static class ExplorationColonizationValidation
                 shipyard.ReservedPopulationSpeciesId == sourceSpeciesId,
                 "shipyard did not retain the source-colony species identity with reserved colonists");
 
-            shipbuilding.Advance(galaxy);
+            shipbuilding.Advance(galaxy, simulationDays: colonyDesign.IndustryCost / ShipbuildingSimulation.IndustryPerDay);
             var fleet = galaxy.Fleets.FirstOrDefault(candidate =>
                 candidate.IsActive &&
                 candidate.CivilizationId == player.Id &&
@@ -251,9 +257,12 @@ internal static class ExplorationColonizationValidation
             loadedFleet.Position = target.Position;
             loadedFleet.CurrentSystemId = target.Id;
             loadedFleet.DestinationSystemId = null;
+            loadedFleet.TransitPhase = FleetTransitPhase.None;
 
             var colonization = new ColonizationSimulation();
-            var events = colonization.Advance(loaded.Galaxy);
+            Require(colonization.Advance(loaded.Galaxy).Count == 0 && loadedFleet.IsActive,
+                "colony founded instantly on arrival");
+            var events = colonization.Advance(loaded.Galaxy, ColonizationSimulation.ColonyEstablishmentDays);
             var founded = loaded.Galaxy.Colonies.FirstOrDefault(colony =>
                 colony.CivilizationId == player.Id && colony.SystemId == target.Id)
                 ?? throw new InvalidOperationException("colony ship arrival did not establish the settlement");

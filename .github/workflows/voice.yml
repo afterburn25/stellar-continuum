@@ -1,0 +1,69 @@
+name: Offline voice validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      neural:
+        description: 'Download the optional Kokoro pack and run real neural speech checks'
+        type: boolean
+        default: false
+  pull_request:
+    branches: [ integration ]
+  push:
+    branches: [ work/voice-engine-tts ]
+
+jobs:
+  voice:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Validate speech engine and installed offline backend
+        run: dotnet run --project tests/VoiceCoreChecks/VoiceCoreChecks.csproj --configuration Release
+      - name: Validate portable voice pack paths
+        run: python -B -m unittest discover -s tools/voice -p 'test_*.py'
+      - name: Preserve voice proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-proof-${{ matrix.os }}
+          path: work/voice-core-proof/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  neural:
+    if: github.event_name == 'workflow_dispatch' && inputs.neural
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Install and verify optional offline pack
+        run: python tools/voice/setup_kokoro.py --target work/voice-pack
+      - name: Exercise actual neural provider, recovery and cache
+        shell: pwsh
+        run: |
+          $env:STELLAR_VOICE_PACK = (Resolve-Path 'work/voice-pack/pack.json').Path
+          $env:STELLAR_REQUIRE_KOKORO = '1'
+          & work/voice-pack/python/Scripts/python.exe tools/voice/check_worker.py --pack $env:STELLAR_VOICE_PACK
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project tests/VoiceCoreChecks/VoiceCoreChecks.csproj --configuration Release
+      - name: Preserve neural proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neural-voice-proof
+          path: work/voice-core-proof/
+          if-no-files-found: ignore
+          retention-days: 7

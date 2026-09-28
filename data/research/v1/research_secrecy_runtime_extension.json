@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Stable runtime event/query extension for research classification, compartmentalization, compromise interpretation, and declassification. Security/Intelligence owns how access is attacked or defended; Adaptive Research owns research-side access/dissemination consequences.",
+  "base_runtime_contract": "research_runtime_contract.json",
+  "distributed_continuity_model": "distributed_research_continuity_model.json",
+  "secrecy_model": "research_secrecy_model.json",
+  "authoritative_sparse_state_extension": [
+    "nondefault_research_security_policy_records",
+    "security_compartment_group_refs",
+    "known_compromise_assessments",
+    "protected_archive_refs",
+    "authorized_context_and_asset_refs",
+    "bounded_security_history"
+  ],
+  "external_input_events": [
+    {"id":"research_security_policy_changed","producer":"governance/security","payload":"target record/project/asset ref, access class, existence-disclosure policy, authorized group/context refs, external release policy","effect":"update authorized research participation and future dissemination only; scientific maturity unchanged"},
+    {"id":"research_security_service_changed","producer":"security/communications/construction","payload":"target/context + factual security service availability or degradation","effect":"update concrete secure participation/storage/communications blockers; no generic secrecy bonus"},
+    {"id":"research_compromise_reported","producer":"intelligence/security","payload":"affected record/asset/project refs, known scope, provenance, confidence, known recipients if legitimately established","effect":"update owner known-compromise state and create research evidence/asset consequences only for known factual scope"},
+    {"id":"research_records_acquired","producer":"intelligence/conquest/diplomacy/archaeology","payload":"recipient polity/context + exact acquired record/asset classes, provenance, integrity, source lineage","effect":"route acquired material through evidence/tacit/foreign-tech interpretation; never instant native maturity"},
+    {"id":"classified_research_asset_control_changed","producer":"governance/conquest/population/construction","payload":"expert/archive/facility/tooling/prototype ref + old/new controlling context/polity","effect":"update who can actually access/use the asset; policy labels do not move the physical object"},
+    {"id":"classified_capability_observed","producer":"sensors/combat/intelligence","payload":"observer + observed capability/performance + confidence/provenance","effect":"reuse legitimate foreign-capability observation/assessment path without revealing implementation records"},
+    {"id":"research_declassification_triggered","producer":"governance/security","payload":"target refs + new access/external release policy + authorization","effect":"expand normal dissemination according to real communication paths and archive rules; maturity unchanged"}
+  ],
+  "research_output_events": [
+    "research_security_policy_applied",
+    "classified_project_participation_changed",
+    "classified_record_dissemination_started",
+    "classified_record_dissemination_blocked",
+    "research_compromise_state_changed",
+    "protected_research_asset_access_changed",
+    "research_declassified",
+    "research_reclassified",
+    "classified_research_resilience_changed"
+  ],
+  "external_queries": [
+    {"id":"research_access_authorized","consumer":"research/UI/AI/construction","input":"viewer/participant ref + target record/project/asset + context","output":"yes/no/partial plus known authorization reason; does not bypass physical availability"},
+    {"id":"classified_project_eligible_capacity","consumer":"research/UI/AI","input":"project + context/compartment","output":"eligible authorized Effective Research Labs/facilities/expert assets only"},
+    {"id":"research_security_summary","consumer":"UI/AI/governance","input":"polity + target ref","output":"authorized known policy, resilience, material blockers, and known compromise state only"},
+    {"id":"research_compromise_assessment","consumer":"UI/AI/governance","input":"polity + target ref","output":"known suspected/confirmed/unknown-scope assessment with provenance/confidence; never omniscient recipient list"},
+    {"id":"declassification_impact_preview","consumer":"UI/AI/governance","input":"target ref + proposed policy","output":"authorized contexts newly eligible for dissemination, archive-resilience change, known coordination effects; maturity unchanged"},
+    {"id":"foreign_protected_technology_assessment","consumer":"research/UI/AI/diplomacy","input":"recipient + acquired/observed foreign protected asset","output":"legitimate Understanding/Operability/Reproduction/Adaptation consequences using existing foreign-tech model"}
+  ],
+  "project_integration": {
+    "assignment_rule":"A classified/compartmented project can assign only Effective Research Labs, facilities, expert/tacit assets, and contexts that are both scientifically eligible and security-authorized/physically available.",
+    "no_direct_secrecy_multiplier": true,
+    "independent_validation":"If a project/stage genuinely requires independent replication/review, restricted authorized institutions must actually provide it; otherwise show a concrete validation/readiness blocker.",
+    "compartment_integration":"Engineering work requiring multiple compartments needs an authorized integration context; missing integration access blocks the relevant work rather than multiplying RP cost.",
+    "result_rule":"A project result initially inherits its configured security policy/compartment distribution and then disseminates only through authorized real paths."
+  },
+  "distributed_context_integration": {
+    "classification_is_context_access_exception": true,
+    "authorized_contexts_still_obey_latency": true,
+    "declassification_creates_normal_dissemination_work_not_instant_global_sync": true,
+    "reclassification_does_not_delete_existing_context_copies": true,
+    "fracture_inherits_only_locally_controlled_protected_records_assets_and_people": true
+  },
+  "compromise_integration": {
+    "owner_knowledge_rule":"The owner only knows a compromise/recipient to the degree external intelligence/security evidence establishes it.",
+    "recipient_rule":"Acquired material becomes records/evidence/tacit/foreign assets with real scope and provenance; it never directly sets native technology Mature.",
+    "partial_record_rule":"A recipient may gain theory/blueprints while lacking protocols/tooling/experts/facilities, producing asymmetric foreign-tech assessment rather than one stolen-tech boolean.",
+    "observation_rule":"Observed deployed capability may create evidence/pressure/foreign assessment without any compromised record at all."
+  },
+  "view_extension": {
+    "authorized_own_view": [
+      "security/access class",
+      "existence-disclosure intent",
+      "authorized context/group summary",
+      "classified eligible capacity",
+      "archive/redundancy summary",
+      "known compromise state",
+      "known declassification effects"
+    ],
+    "foreign_or_unauthorized_view":"Only legitimately known rumor/evidence/observed capability/acquired records. Never project authoritative classification metadata merely because it exists.",
+    "project_blockers": [
+      "insufficient_authorized_labs",
+      "missing_authorized_facility",
+      "missing_authorized_expert_or_tacit_asset",
+      "missing_compartment_integration_access",
+      "insufficient_authorized_independent_validation",
+      "secure_communications_or_archive_unavailable"
+    ]
+  },
+  "save_contract": {
+    "default_normal_policy_not_serialized_per_node": true,
+    "only_nondefault_security_records_persist": true,
+    "compartment_membership_group_refs_only": true,
+    "no_per_person_clearance_lists": true,
+    "known_compromise_history_compressed": true,
+    "declassified_redundant_policy_records_removed": true,
+    "no_full_graph_security_state": true,
+    "physical_asset_refs_not_duplicated": true
+  },
+  "fair_information": {
+    "AI_and_player_use_same_authorization_rules": true,
+    "AI_does_not_know_undetected_leaks": true,
+    "AI_does_not_see_foreign_classification_metadata_without_intelligence": true,
+    "observed_foreign_capability_does_not_reveal_implementation": true,
+    "harder_AI_gets_no_free_access_to_classified_records": true
+  }
+}

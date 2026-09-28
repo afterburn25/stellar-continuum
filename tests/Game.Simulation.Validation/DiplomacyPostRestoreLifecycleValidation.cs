@@ -6,7 +6,7 @@ namespace Game.Simulation.Validation;
 
 internal static class DiplomacyPostRestoreLifecycleValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunDiplomacyPostRestoreLifecycleChecks()
     {
         ValidateRestoredStateContinuesLifecycleAndIdentityAllocation();

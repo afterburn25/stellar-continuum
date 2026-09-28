@@ -1,0 +1,20 @@
+name: research-secrecy
+
+on:
+  push:
+    branches: [ main, "dev/adaptive-research" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-research-secrecy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Validate research secrecy architecture
+        run: python3 scripts/validate_research_secrecy.py data/research/v1
+      - name: Run research secrecy benchmarks
+        run: python3 scripts/validate_research_secrecy_benchmarks.py data/research/v1

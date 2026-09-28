@@ -10,4 +10,5 @@
   <ItemGroup>
     <ProjectReference Include="../../Game.csproj" />
   </ItemGroup>
+  <ItemGroup><Compile Include="../ValidationSupport/RegressionRunner.cs" Link="RegressionRunner.cs" /></ItemGroup>
 </Project>

@@ -4,6 +4,21 @@ namespace Game.Simulation.Species;
 
 public static class SpeciesAssignmentPolicy
 {
+    /// <summary>Fresh starts have one human founding faction. Other factions reuse nonhuman
+    /// physiology profiles; those profiles do not imply a shared political identity/origin.</summary>
+    public static string AssignNewCampaign(long campaignSeed, int civilizationId)
+    {
+        if (civilizationId < 0) throw new ArgumentOutOfRangeException(nameof(civilizationId));
+        if (civilizationId == 0) return SpeciesCatalog.TerranBaselineId;
+        var mixed = Mix(unchecked((ulong)campaignSeed) ^ ((ulong)(uint)civilizationId * 0xD1B54A32D192ED03UL));
+        return (mixed % 3) switch
+        {
+            0 => SpeciesCatalog.PelagicHighPressureId,
+            1 => SpeciesCatalog.CompactHighGravityId,
+            _ => SpeciesCatalog.CryogenicHydrocarbonId,
+        };
+    }
+
     public static string Assign(long campaignSeed, int civilizationId)
     {
         if (civilizationId < 0)

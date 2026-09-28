@@ -1,0 +1,22 @@
+name: research-strategic
+
+on:
+  push:
+    branches: [ "dev/adaptive-research" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate-adaptive-research-strategic:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore Adaptive Research strategic checks
+        run: dotnet restore tests/AdaptiveResearchStrategicChecks/AdaptiveResearchStrategicChecks.csproj
+      - name: Build Adaptive Research strategic checks
+        run: dotnet build tests/AdaptiveResearchStrategicChecks/AdaptiveResearchStrategicChecks.csproj --configuration Release --no-restore
+      - name: Run Adaptive Research strategic checks
+        run: dotnet run --project tests/AdaptiveResearchStrategicChecks/AdaptiveResearchStrategicChecks.csproj --configuration Release --no-build

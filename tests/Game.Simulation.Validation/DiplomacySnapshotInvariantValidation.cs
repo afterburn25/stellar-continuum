@@ -6,7 +6,7 @@ namespace Game.Simulation.Validation;
 
 internal static class DiplomacySnapshotInvariantValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunDiplomacySnapshotInvariantChecks()
     {
         ValidateRepresentativeCurrentSnapshot();

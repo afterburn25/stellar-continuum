@@ -1,0 +1,55 @@
+{
+  "schema": "stellar-continuum.visual-tokens.v1",
+  "name": "Deep-Space Instrumentation",
+  "status": "production-candidate",
+  "colors": {
+    "canvas": "#050B12",
+    "surface_primary": "#07131F",
+    "surface_secondary": "#0D1D2B",
+    "surface_raised": "#13283A",
+    "keyline": "#274359",
+    "text_primary": "#E6F0F6",
+    "text_secondary": "#A9BBC8",
+    "text_muted": "#6F8494",
+    "selected": "#58CFFB",
+    "focus": "#93E2FF",
+    "success": "#64D6A5",
+    "caution": "#EBCB67",
+    "danger": "#FF716C",
+    "unknown": "#8B82A2",
+    "disabled": "#526574",
+    "exploration": "#58CFFB",
+    "science": "#AF8FFF",
+    "economy": "#E9B65C",
+    "construction": "#F1975B",
+    "diplomacy": "#5FD2C0",
+    "military": "#FF776E"
+  },
+  "geometry": {
+    "radius_small": 4,
+    "radius_standard": 6,
+    "keyline_px": 1,
+    "spacing": [
+      4,
+      8,
+      12,
+      16,
+      24,
+      32
+    ],
+    "icon_grid": 24,
+    "icon_safe_padding": 2,
+    "icon_stroke": 1.8
+  },
+  "typography": {
+    "ui_min_px": 12,
+    "ui_default_px": 14,
+    "section_px": 16,
+    "heading_px": 20,
+    "title_px": 28
+  },
+  "motion_ms": {
+    "micro": 120,
+    "standard": 180
+  }
+}

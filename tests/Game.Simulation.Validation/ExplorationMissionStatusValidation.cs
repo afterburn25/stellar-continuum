@@ -66,8 +66,8 @@ internal static class ExplorationMissionStatusValidation
         var scoutReady = evaluator.Build(galaxy, scout);
         Require(scoutReady.Phase == ExplorationMissionPhase.ReconnaissanceReady,
             "local scout at an unsurveyed target did not report ReconnaissanceReady");
-        Require(scoutReady.EstimatedTransitDaysRemaining == 0.0 && scoutReady.EstimatedSurveyDaysRemaining == 0.0,
-            "local reconnaissance invented nonzero travel or survey duration");
+        Require(scoutReady.EstimatedTransitDaysRemaining == 0.0 && scoutReady.EstimatedSurveyDaysRemaining == ExplorationSimulation.ScoutReconnaissanceDays,
+            "local scouting did not report its real remaining on-site duration");
 
         galaxy.Knowledge.RecordReconnaissance(player.Id, target.Id, 0.40);
         var scoutDone = evaluator.Build(galaxy, scout);
@@ -126,8 +126,8 @@ internal static class ExplorationMissionStatusValidation
         var ready = evaluator.Build(galaxy, fleet);
         Require(ready.Phase == ExplorationMissionPhase.ColonySettlementReady,
             "arrived populated colony fleet did not report ColonySettlementReady at its species-viable exact body target");
-        Require(ready.EstimatedMissionDaysRemaining == 0.0,
-            "settlement-ready colony fleet did not report zero remaining mission travel time");
+        Require(ready.EstimatedMissionDaysRemaining == Game.Simulation.Colonization.ColonizationSimulation.ColonyEstablishmentDays,
+            "arrived colony fleet did not include establishment time in its mission ETA");
         Require(ready.Summary.Contains(targetBody.Name, StringComparison.Ordinal),
             "settlement readiness summary did not name the exact selected planetary body");
         Require(ready.Summary.Contains(SpeciesCatalog.Get(player.SpeciesId).DisplayName, StringComparison.Ordinal),

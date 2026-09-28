@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Defines how biochemical substrate, solvent, temperature regime, and environmental medium affect Adaptive Research applicability and foreign biological compatibility without creating named-race technology trees.",
+  "dimensions": {
+    "metabolism": {"generic_trait":"metabolic_biology","meaning":"Population has active biological metabolism and homeostasis."},
+    "molecular_substrate": {"known_public_traits":["carbon_centered_biochemistry","silicon_centered_biochemistry"],"rule":"Substrate traits indicate important chemistry, not exclusive RPG classes; an organism may use mixed chemistry."},
+    "dominant_solvent": {"known_public_traits":["water_solvent_biology","ammonia_rich_biology","hydrocarbon_solvent_biology"],"rule":"Solvent compatibility strongly affects medicine, food/ecology, containment, habitat temperature, and biological manufacturing."},
+    "active_temperature_regime": {"known_public_traits":["cryogenic_biology"],"rule":"Temperature-regime traits layer on top of substrate/solvent chemistry rather than replacing them."},
+    "structural_growth": {"known_public_traits":["mineral_structural_biology"],"rule":"Mineral/inorganic biological structures can create unique repair/fabrication opportunities without implying silicon-centered metabolism."},
+    "native_medium": {"known_public_traits":["liquid_medium_native"],"rule":"Liquid-medium dependence is environmental/physiological and independent of biochemical substrate."}
+  },
+  "commonality_guidance": {
+    "carbon_water":"Expected to be the most common naturally evolved complex-life family in ordinary generation because of known chemical versatility; this is a generator weighting, not a research bonus.",
+    "alternative_carbon_solvents":"Uncommon and highly environment-dependent; examples may use ammonia-rich or hydrocarbon-rich chemistry.",
+    "silicon_centered":"Speculative and rare. Treat as chemically constrained alternative biology, not fantasy stone organisms.",
+    "synthetic":"Separate from naturally evolved biochemical families and already handled by machine-cognition/synthetic-system models."
+  },
+  "compatibility_assessment_axes": [
+    {"id":"solvent_compatibility","meaning":"Can biological processes/samples remain stable in the recipient's normal solvent/environment?"},
+    {"id":"temperature_compatibility","meaning":"Do active biochemical temperature ranges overlap enough for shared operation/containment?"},
+    {"id":"nutrient_feedstock_compatibility","meaning":"Can the recipient supply usable feedstock/mineral/chemical nutrients?"},
+    {"id":"molecular_interface_compatibility","meaning":"Can medicines, catalysts, signaling chemistry, or biofabrication interfaces interact meaningfully?"},
+    {"id":"ecological_compatibility","meaning":"Can organisms/ecologies coexist without catastrophic incompatibility or contamination?"},
+    {"id":"structural_biochemistry_compatibility","meaning":"Can biological structural/growth processes be serviced or reproduced using recipient materials/processes?"}
+  ],
+  "research_rules": {
+    "generic_biology_nodes_can_remain_species_neutral_when_the_capability_is_abstract_enough":true,
+    "chemistry_specific_nodes_require_relevant_traits":true,
+    "absence_of_trait_hides_inapplicable_specific_branch":true,
+    "foreign_contact_can_expose_comparative_branches_through_evidence_even_when_native_branch_is_inapplicable":true,
+    "one_civilization_can_support_multiple_biochemical_populations":true,
+    "population_scoped_capabilities_do_not_automatically_transfer_across_biochemical_contexts":true,
+    "biochemical_compatibility_can_improve_through_research_without_changing_species_origin_trait":true
+  },
+  "existing_pressure_mapping": {
+    "solvent_or_consumable_shortage":["water_shortage","food_shortage","resource_scarcity","life_support_losses"],
+    "cryogenic_or_thermal_mismatch":["extreme_temperature","colony_isolation","life_support_losses"],
+    "mineral_or_inorganic_feedstock_shortage":["resource_scarcity","industrial_bottleneck","colony_isolation"],
+    "foreign_biochemical_incompatibility":["alien_biology_encountered","disease_burden","ecological_damage","foreign_technology_observed"],
+    "habitat_medium_or_pressure_mismatch":["high_pressure_environment","oceanic_environment","life_support_losses","terraforming_need"]
+  },
+  "pressure_rule": "Reuse existing causal Research Pressures when they already represent the underlying problem. Do not create a new global pressure merely to label an exotic biochemical branch.",
+  "foreign_technology_interface": {
+    "description":"Biological foreign technology should feed these compatibility dimensions into the existing Understanding/Operability/Reproduction/Adaptation assessment rather than receiving a separate universal alien-biology score.",
+    "possible_results":["scientifically understandable but biologically unusable","operable only in origin-species environment","reproducible with imported feedstock/tooling","adaptable as a native derivative","valuable mainly to a third compatible species"]
+  },
+  "public_secret_boundary": {"normal_biochemistry_traits_and_research_families_public":true,"rare_secret_biochemical_discoveries_or_unique_artifact_life_public":false}
+}

@@ -6,7 +6,7 @@ namespace Game.Simulation.Validation;
 
 internal static class DiplomacyValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunDiplomacyChecks()
     {
         var tests = new (string Name, Action Run)[]

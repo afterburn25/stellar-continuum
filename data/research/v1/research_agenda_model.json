@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Defines high-level scientific agenda and priority policy. The agenda influences background attention, recommendations, capacity requests, and competence maintenance; it never directly grants hidden technology, bypasses prerequisites, or multiplies project RP as a generic bonus.",
+  "priority_levels": [
+    {"id":"deprioritized","rank":0,"meaning":"Maintain only essential awareness/competence unless circumstances force reconsideration."},
+    {"id":"routine","rank":1,"meaning":"Normal scientific attention and maintenance."},
+    {"id":"important","rank":2,"meaning":"Meaningful policy attention and capacity preference."},
+    {"id":"strategic","rank":3,"meaning":"High institutional attention and strong capacity-development preference."},
+    {"id":"critical","rank":4,"meaning":"Civilization-level urgent priority justified by recognized circumstances or explicit policy."}
+  ],
+  "agenda_state": {
+    "domain_priorities":"sparse map domain_id -> priority level",
+    "field_priorities":"sparse map knowledge_field_id -> priority level",
+    "problem_priorities":"sparse map recognized Research Pressure id -> priority level",
+    "capability_priorities":"sparse map recognized cross-lineage capability id -> priority level",
+    "basic_vs_applied_orientation":"0..100; low favors exploratory/basic science attention, high favors currently visible applied/engineering work",
+    "competence_preservation_policy":"0..100 willingness to preserve broad training/practice even when no immediate project uses it",
+    "portfolio_diversity_policy":"0..100 preference for maintaining multiple viable scientific solution families rather than overconcentrating",
+    "foreign_science_engagement":"0..100 willingness to analyze/buy/exchange foreign science when politically permitted",
+    "last_major_review":"campaign date",
+    "policy_provenance":"player/government/AI/institutional source summary"
+  },
+  "player_control": {
+    "can_set_high_level_priorities":true,
+    "cannot_select_unknown_technology":true,
+    "cannot_force_candidate_visibility":true,
+    "cannot_convert_priority_directly_to_rp":true,
+    "can_direct_visible_project_if_all_authoritative_requirements_met":true,
+    "can_request_capacity_focus":"Player policy can request more labs/facilities/training in a field; construction/economy/governance systems decide whether those physical investments occur.",
+    "reason":"The player guides civilization priorities without having supernatural knowledge of the hidden possibility graph."
+  },
+  "agenda_effects": {
+    "background_science_distribution": {
+      "description":"Unassigned lab/background-science effort is preferentially distributed among already recognized fields/problems according to agenda and scientific culture.",
+      "may_affect":"field competence growth, evidence processing attention, bounded basic-science review sampling among legitimately reachable fields",
+      "does_not":"directly expose a named unknown node or add a project RP multiplier"
+    },
+    "visible_project_recommendation": {
+      "description":"Agenda changes recommendation/ranking among currently visible Investigable projects.",
+      "does_not":"remove authoritative blockers or make an unavailable project researchable"
+    },
+    "capacity_demand": {
+      "description":"Agenda can generate desired capacity requests for labs, specialized facilities, training pipelines, samples, and foreign expertise.",
+      "output_interface":"research_capacity_requests",
+      "physical_fulfillment_owned_externally":true
+    },
+    "competence_maintenance": {
+      "description":"High preservation priority directs background effort/training toward keeping strategically valued active competence from atrophying.",
+      "bounded_by_actual_labs_institutions_and_training":true
+    },
+    "foreign_science_attention": {
+      "description":"Can prioritize evaluation/assimilation of legitimately known foreign packages/assets; cannot create knowledge of unknown foreign technology."
+    }
+  },
+  "research_capacity_requests": {
+    "outputs": [
+      "desired_general_effective_lab_capacity",
+      "desired_field_specialized_lab_capacity",
+      "desired_facility_capability",
+      "desired_training_pipeline_for_field_or_lineage",
+      "desired_sample_or_experimental_asset",
+      "desired_foreign_expert_or_technology_package_access"
+    ],
+    "fields":["request_id","reason","priority","target_field_or_capability","required_or_desired_quantity","recognized_problem_refs","candidate_project_refs_if_visible"],
+    "rule":"Requests are planning signals. Adaptive Research does not create buildings, money, materials, experts, or contracts itself."
+  },
+  "review_triggers": [
+    "player_or_government_policy_change",
+    "major Research Pressure band crossing",
+    "new major evidence or foreign capability observation",
+    "major war outcome or fleet-performance change",
+    "new strategic capability gained/lost",
+    "research facility or lab-capacity shock",
+    "major economic/resource constraint supplied by owning subsystem",
+    "government/culture change supplied by owning subsystem",
+    "periodic low-frequency strategic review"
+  ],
+  "complacency_interface": {
+    "description":"A field/capability can receive less strategic attention when the civilization legitimately perceives existing performance as adequate and sees little credible threat/need. This is emergent agenda behavior, not an ahead-of-pack penalty.",
+    "inputs":[
+      "own known capability performance",
+      "legitimately observed competitor/threat performance with uncertainty",
+      "recent losses/failures/incidents",
+      "current relevant Research Pressure",
+      "scientific culture threat sensitivity",
+      "scientific culture institutional conservatism",
+      "scientific culture complacency tendency",
+      "government/player priority"
+    ],
+    "forbidden_inputs":["global hidden technology rank","exact unseen enemy technology","secret catch-up target"],
+    "effect":"changes agenda attention/recommendations/capacity requests; never applies a direct research-speed penalty"
+  },
+  "priority_conflict_resolution": {
+    "description":"A civilization can want many things at once but lab capacity, institutions, economy, and political support are finite.",
+    "method":"Agenda produces ranked planning demands; actual active directed programs remain constrained by directed-program capacity and physical eligible labs.",
+    "no_magical_resource_creation":true
+  },
+  "performance": {
+    "sparse_priority_maps":true,
+    "no_per_tick_full_agenda_recalculation":true,
+    "event_or_low_frequency_review":true,
+    "visible_candidate_ranking_only":true,
+    "background_sampling_uses_field_pressure_indexes_not_full_graph_scan":true
+  }
+}

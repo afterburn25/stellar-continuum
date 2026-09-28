@@ -10,7 +10,7 @@ The goal is simple early research with much deeper late-game behavior as civiliz
 
 Research Points measure scientific/engineering work applied to an active project.
 
-Operational **Research Labs** generate RP. The current seed value is **100 RP per Effective Research Lab per in-game year**; this is a balancing starting point, not a locked release value.
+Operational **Research Labs** generate RP. The early playable balance is **400 RP per Effective Research Lab per in-game year**; later campaign tuning may refine it.
 
 RP normally flows from active laboratory capacity into projects instead of accumulating as a huge civilization-wide stockpile. A civilization should not save centuries of generic research and instantly complete a newly discovered field.
 

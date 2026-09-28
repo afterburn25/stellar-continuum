@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "source_ci_run": 34163593221,
+  "source_job": 101870178023,
+  "status": "passing_reference_baseline",
+  "not_final_game_balance": true,
+  "results": {
+    "divergent_same_origin_500y": {
+      "minimum_pairwise_mature_jaccard_distance": 0.457,
+      "common_mature_nodes": 47,
+      "mature_catalog_fraction": {
+        "orbital_industrialist": 0.276,
+        "defense_engineer": 0.318,
+        "biosphere_adaptor": 0.382
+      },
+      "unique_mature_nodes": {
+        "orbital_industrialist": 11,
+        "defense_engineer": 36,
+        "biosphere_adaptor": 68
+      }
+    },
+    "military_complacency_and_response_350y": {
+      "initial_hegemon_gap": 10.85,
+      "gap_at_year_180": -12.65,
+      "leader_military_attention_low": 1.0,
+      "leader_military_attention_late_high": 3.0,
+      "leader_final_military_score": 18.55,
+      "challenger_final_military_score": 33.40,
+      "forced_parity": false,
+      "hidden_catchup_multiplier": false,
+      "hidden_leader_penalty": false
+    },
+    "foreign_technology_asymmetric_value": {
+      "holder_metabolic": false,
+      "buyer_metabolic": true,
+      "package_components": 3,
+      "brokerage_value_possible": true,
+      "instant_native_maturity": false
+    },
+    "research_state_soak_1000y": {
+      "soak_generalist_a": {"node_states":89,"mature":89,"recent_events":124,"detailed_history":64},
+      "soak_generalist_b": {"node_states":105,"mature":105,"recent_events":156,"detailed_history":80},
+      "soak_specialist_c": {"node_states":81,"mature":81,"recent_events":108,"detailed_history":56},
+      "limits": {"node_states":330,"recent_events":256,"detailed_history":512}
+    }
+  }
+}

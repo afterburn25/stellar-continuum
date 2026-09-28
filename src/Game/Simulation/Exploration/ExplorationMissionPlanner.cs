@@ -25,7 +25,7 @@ public sealed class ExplorationMissionPlanner
         IInterstellarOperationalReachView? operationalReach = null,
         SurveyOperationsProfiler? surveyProfiler = null)
     {
-        _operationalReach = operationalReach ?? new PrototypeInterstellarOperationalReachView();
+        _operationalReach = operationalReach ?? new LaneInterstellarOperationalReachView();
         _surveyProfiler = surveyProfiler ?? new SurveyOperationsProfiler();
     }
 
@@ -78,7 +78,7 @@ public sealed class ExplorationMissionPlanner
     public ExplorationMissionOrderAssessment AssessOrder(
         GalaxyState galaxy,
         int fleetId,
-        int destinationSystemId)
+        int destinationSystemId, bool requireSurveyWork = true)
     {
         ArgumentNullException.ThrowIfNull(galaxy);
         var fleet = galaxy.Fleets.FirstOrDefault(candidate => candidate.Id == fleetId && candidate.IsActive);
@@ -90,7 +90,7 @@ public sealed class ExplorationMissionPlanner
         var system = galaxy.Systems.FirstOrDefault(candidate => candidate.Id == destinationSystemId);
         if (system is null)
             return ExplorationMissionOrderAssessment.Rejected("Unknown astronomical target.");
-        if (!NeedsSurveyWork(galaxy, fleet, destinationSystemId))
+        if (requireSurveyWork && !NeedsSurveyWork(galaxy, fleet, destinationSystemId))
         {
             return ExplorationMissionOrderAssessment.Rejected(
                 fleet.Role == FleetRole.Scout
@@ -103,6 +103,9 @@ public sealed class ExplorationMissionPlanner
             return ExplorationMissionOrderAssessment.Rejected(candidate.Reach.Reason, candidate);
 
         var local = fleet.CurrentSystemId == destinationSystemId && fleet.DestinationSystemId is null;
+        if (!NeedsSurveyWork(galaxy, fleet, destinationSystemId))
+            return ExplorationMissionOrderAssessment.Approve(local ? $"{fleet.Name} is already on station in {system.Name}." :
+                $"{fleet.Name}: course set for {system.Name}. {candidate.Reach.Reason}", candidate, local);
         var action = local
             ? fleet.Role == FleetRole.Scout ? "reconnaissance pass" : "detailed science survey"
             : fleet.Role == FleetRole.Scout ? "reconnaissance mission" : "science-survey mission";
@@ -125,6 +128,8 @@ public sealed class ExplorationMissionPlanner
         {
             FleetRole.Scout => InterstellarMissionKind.ScoutReconnaissance,
             FleetRole.Science => InterstellarMissionKind.ScienceSurvey,
+            FleetRole.Military => InterstellarMissionKind.MilitaryDeployment,
+            FleetRole.Logistics => InterstellarMissionKind.Logistics,
             _ => InterstellarMissionKind.ScoutReconnaissance,
         };
         return _operationalReach.Assess(
@@ -148,7 +153,7 @@ public sealed class ExplorationMissionPlanner
         double? remainingDays = fleet.Role == FleetRole.Science && profile is not null
             ? Math.Max(0.0, profile.EstimatedScienceSurveyDays * (1.0 - progress))
             : null;
-        var distance = Vector2.Distance(fleet.Position, system.Position);
+        var distance = InterstellarDistance.FromFleet(galaxy, fleet, system);
         var reach = AssessOperationalReach(galaxy, fleet, system.Id);
         var priority = SurveyPriority(fleet.Role, level);
 

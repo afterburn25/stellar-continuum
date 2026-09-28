@@ -153,6 +153,7 @@ public sealed class CivilizationStrategicPlanner
                 "A known colonization opportunity exists; logistics health moderates expansion appetite."));
         }
 
+        StrategicPriority? defensePriority = null;
         var strongestKnownThreat = EvaluateStrongestKnownThreat(traits, ownState, knowledge, nowTick);
         if (strongestKnownThreat is { } threat)
         {
@@ -161,11 +162,33 @@ public sealed class CivilizationStrategicPlanner
                                + (1.0 - threat.Assessment.IntelligenceConfidence) * 0.20
                                + traits.SurvivalPriority * 0.25;
 
-            priorities.Add(new StrategicPriority(
+            defensePriority = new StrategicPriority(
                 StrategicPriorityType.Defend,
                 defenseScore,
-                $"Known civilization {threat.CivilizationId} is a credible threat under current observed/estimated intelligence."));
+                $"Known civilization {threat.CivilizationId} is a credible threat under current observed/estimated intelligence.");
         }
+
+        // A persisted observer-visible war is itself sufficient reason to defend even when no
+        // lawful military-strength estimate exists. Do not manufacture a strength range merely
+        // to quantify that threat; use the known political fact and own survival priorities.
+        var unknownStrengthWar = knowledge.Civilizations.Values
+            .Where(known => known.KnownToBeAtWar && !known.HasMilitaryEstimate)
+            .OrderBy(known => known.CivilizationId)
+            .FirstOrDefault();
+        if (unknownStrengthWar is not null)
+        {
+            var warDefenseScore = 0.95 + traits.SurvivalPriority * 0.30;
+            if (defensePriority is null || warDefenseScore > defensePriority.Score)
+            {
+                defensePriority = new StrategicPriority(
+                    StrategicPriorityType.Defend,
+                    warDefenseScore,
+                    $"Civilization {unknownStrengthWar.CivilizationId} is known to be at war with us; enemy strength remains legitimately unknown.");
+            }
+        }
+
+        if (defensePriority is not null)
+            priorities.Add(defensePriority);
 
         if (ownState.CanBuildInterstellarShips && ownState.HasFleetCapacityShortfall)
         {
@@ -207,6 +230,9 @@ public sealed class CivilizationStrategicPlanner
         KnownThreat? strongest = null;
         foreach (var known in knowledge.Civilizations.Values)
         {
+            if (!known.HasMilitaryEstimate)
+                continue;
+
             var assessment = _decisionEvaluator.EvaluateWar(
                 traits,
                 ownState.MilitaryStrength,

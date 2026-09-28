@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Deterministic offline benchmark/soak scenarios for Adaptive Research design validation. These do not replace gameplay AI/runtime and may inspect public catalog data more directly than runtime is allowed to. They test structural divergence, causal agenda behavior, and bounded long-campaign state.",
+  "simulation_note": "Reference benchmark results are engineering/design guardrails, not final balance promises. Runtime remains event/index driven; offline benchmark tooling may scan the public graph for analysis.",
+  "shared_defaults": {
+    "start_year": 2050,
+    "starting_reference_profile": "reference_humanlike_solar_2050",
+    "annual_review_step_years": 1,
+    "lab_capacity_schedule": [
+      {"elapsed_year":0,"effective_labs":10},
+      {"elapsed_year":50,"effective_labs":16},
+      {"elapsed_year":100,"effective_labs":24},
+      {"elapsed_year":200,"effective_labs":40},
+      {"elapsed_year":350,"effective_labs":64},
+      {"elapsed_year":500,"effective_labs":90},
+      {"elapsed_year":750,"effective_labs":120}
+    ],
+    "background_science_fraction": 0.20,
+    "competence_learning_rate": 0.08,
+    "max_recent_event_records": 256,
+    "max_visible_history_detail_records": 512
+  },
+  "scenarios": [
+    {
+      "id":"divergent_same_origin_500y",
+      "duration_years":500,
+      "description":"Three civilizations begin from the same human-like 2050 history but experience different needs/priorities. Their Mature research sets should diverge substantially without changing the universal possibility catalog.",
+      "civilizations":[
+        {
+          "id":"orbital_industrialist",
+          "domain_attention":{"space_industry":4,"logistics":4,"materials":3,"energy":3,"research_infrastructure":2},
+          "pressure_schedule":[
+            {"from":0,"to":160,"pressure":"launch_cost","value":55},
+            {"from":40,"to":240,"pressure":"orbital_growth","value":65},
+            {"from":90,"to":320,"pressure":"asteroid_opportunity","value":60},
+            {"from":160,"to":500,"pressure":"industrial_bottleneck","value":55},
+            {"from":260,"to":500,"pressure":"supply_line_overstretch","value":48}
+          ]
+        },
+        {
+          "id":"biosphere_adaptor",
+          "domain_attention":{"life_medicine":4,"biosphere_agriculture":4,"biotechnology":3,"planetary":3,"cybernetics":2},
+          "pressure_schedule":[
+            {"from":0,"to":180,"pressure":"food_shortage","value":52},
+            {"from":20,"to":220,"pressure":"water_shortage","value":48},
+            {"from":60,"to":340,"pressure":"low_gravity_health","value":55},
+            {"from":130,"to":500,"pressure":"gravity_divergence","value":58},
+            {"from":220,"to":500,"pressure":"colony_isolation","value":55}
+          ]
+        },
+        {
+          "id":"defense_engineer",
+          "domain_attention":{"military":4,"sensors_comms":4,"computing":3,"materials":3,"propulsion":3},
+          "pressure_schedule":[
+            {"from":20,"to":220,"pressure":"missile_threat","value":62},
+            {"from":50,"to":260,"pressure":"fleet_losses","value":55},
+            {"from":80,"to":320,"pressure":"weapon_ineffectiveness","value":58},
+            {"from":160,"to":420,"pressure":"stealth_threat","value":48},
+            {"from":260,"to":500,"pressure":"enemy_speed_superiority","value":52}
+          ]
+        }
+      ],
+      "assertions": {
+        "minimum_pairwise_mature_jaccard_distance":0.22,
+        "minimum_unique_mature_nodes_per_civilization":8,
+        "maximum_catalog_fraction_mature_per_civilization":0.70,
+        "same_static_catalog":true
+      }
+    },
+    {
+      "id":"military_complacency_and_response_350y",
+      "duration_years":350,
+      "description":"A technologically dominant military civilization initially sees little need to keep prioritizing military research while a challenger faces real losses. The leader reacts only after a delayed legitimate observation indicates the gap is closing.",
+      "civilizations":[
+        {
+          "id":"established_hegemon",
+          "domain_attention":{"military":3,"propulsion":3,"energy":2,"life_medicine":2,"economic_trade":2},
+          "culture":{"complacency_tendency":78,"institutional_conservatism":68,"threat_sensitivity":35,"curiosity":52,"long_term_orientation":48},
+          "benchmark_start_grants":{"mature_nodes":["kinetic_intercept","point_defense","missile_guidance","coilgun","laser_weapon","layered_armor","electronic_warfare","fleet_battle_network"]},
+          "pressure_schedule":[
+            {"from":0,"to":130,"pressure":"fleet_losses","value":5},
+            {"from":0,"to":130,"pressure":"weapon_ineffectiveness","value":5},
+            {"from":190,"to":350,"pressure":"enemy_speed_superiority","value":42},
+            {"from":210,"to":350,"pressure":"weapon_ineffectiveness","value":38}
+          ],
+          "observed_peer_schedule":[
+            {"year":0,"peer":"rising_challenger","observation_quality":0.45},
+            {"year":150,"peer":"rising_challenger","observation_quality":0.60},
+            {"year":210,"peer":"rising_challenger","observation_quality":0.82},
+            {"year":280,"peer":"rising_challenger","observation_quality":0.88}
+          ]
+        },
+        {
+          "id":"rising_challenger",
+          "domain_attention":{"military":4,"sensors_comms":3,"computing":3,"materials":3,"propulsion":3},
+          "culture":{"complacency_tendency":22,"institutional_conservatism":32,"threat_sensitivity":82,"curiosity":58,"long_term_orientation":62},
+          "pressure_schedule":[
+            {"from":0,"to":180,"pressure":"fleet_losses","value":68},
+            {"from":0,"to":190,"pressure":"weapon_ineffectiveness","value":65},
+            {"from":20,"to":180,"pressure":"missile_threat","value":62},
+            {"from":80,"to":240,"pressure":"enemy_speed_superiority","value":58}
+          ]
+        }
+      ],
+      "assertions": {
+        "challenger_military_gap_narrows_before_leader_response":true,
+        "leader_military_attention_drops_during_low_threat_period":true,
+        "leader_military_attention_rises_after_legitimate_catchup_observation":true,
+        "no_hidden_catchup_multiplier":true,
+        "no_hidden_leader_penalty":true,
+        "no_forced_parity":true
+      }
+    },
+    {
+      "id":"foreign_technology_asymmetric_value",
+      "duration_years":120,
+      "description":"A civilization acquires a foreign biological industrial package that it cannot operate natively but can study and broker to a more compatible third party.",
+      "civilizations":[
+        {
+          "id":"machine_broker",
+          "starting_reference_profile":"reference_synthetic_early_space",
+          "domain_attention":{"xenoscience":4,"economic_trade":4,"materials":2,"computing":3},
+          "foreign_asset_fixture":{
+            "lineage_id":"benchmark_living_industry",
+            "understanding":"characterized",
+            "operability":"unusable",
+            "reproduction":"none",
+            "adaptation":"conceptual_inspiration",
+            "known_constraints":["biology_environment","manufacturing_process","expertise"],
+            "package_components":["scientific_theory_dossier","engineering_blueprint_package","reference_hardware"]
+          }
+        },
+        {
+          "id":"metabolic_buyer",
+          "starting_reference_profile":"reference_high_gravity_metabolic_early_space",
+          "domain_attention":{"biotechnology":4,"life_medicine":3,"economic_trade":2,"xenoscience":3}
+        }
+      ],
+      "assertions": {
+        "holder_direct_operability_below_buyer_expected_operability":true,
+        "holder_can_have_positive_research_or_brokerage_value":true,
+        "transfer_does_not_set_native_technology_mature":true,
+        "buyer_specific_value_not_universal":true
+      }
+    },
+    {
+      "id":"research_state_soak_1000y",
+      "duration_years":1000,
+      "description":"Long-run structural soak intended to detect unbounded research-state/history growth and accidental full-catalog per-civilization duplication.",
+      "civilizations":[
+        {"id":"soak_generalist_a","domain_attention":{"foundations":2,"energy":2,"space_industry":2,"life_medicine":2,"computing":2,"logistics":2,"research_infrastructure":2}},
+        {"id":"soak_generalist_b","domain_attention":{"materials":3,"planetary":2,"biosphere_agriculture":2,"economic_trade":3,"social_admin":2,"sensors_comms":2}},
+        {"id":"soak_specialist_c","domain_attention":{"propulsion":4,"research_infrastructure":3,"energy":3,"materials":2,"sensors_comms":2}}
+      ],
+      "assertions": {
+        "maximum_node_state_records_per_civilization":330,
+        "maximum_recent_event_records":256,
+        "maximum_detailed_history_records":512,
+        "static_catalog_copies_per_civilization":0,
+        "reconstructible_index_copies_per_civilization":0,
+        "UI_layout_cache_persisted_in_save":false,
+        "year_1000_completes_without_unbounded_record_growth":true
+      }
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Supplemental reference starting compositions demonstrating that unusual biochemistries use the same Adaptive Research graph. These are validation/balance seeds, not named playable species tech trees.",
+  "profiles": [
+    {
+      "id":"reference_ammonia_rich_early_space",
+      "kind":"civilization_reference_profile",
+      "description":"Comparable pre-FTL early-space civilization with native ammonia-rich carbon biochemistry.",
+      "fragment_ids":[
+        "base_early_space_science_2050",
+        "history_advanced_structural_materials",
+        "history_orbital_industrialization",
+        "history_fission_and_storage_infrastructure",
+        "history_computational_automation",
+        "history_deep_space_observation_and_comms",
+        "history_ammonia_rich_biochemistry"
+      ],
+      "additional_starting_pressure_state":{"long_duration_mission":16,"colony_isolation":12},
+      "historical_notes":"Begins with native ammonia biochemistry understood, but advanced ammonia nutrient synthesis, closed ecology, bioindustry, and biosphere branches remain to emerge from conditions/need."
+    },
+    {
+      "id":"reference_cryogenic_hydrocarbon_early_space",
+      "kind":"civilization_reference_profile",
+      "description":"Comparable pre-FTL early-space civilization with native cryogenic hydrocarbon-solvent carbon biology.",
+      "fragment_ids":[
+        "base_early_space_science_2050",
+        "history_advanced_structural_materials",
+        "history_orbital_industrialization",
+        "history_fission_and_storage_infrastructure",
+        "history_computational_automation",
+        "history_deep_space_observation_and_comms",
+        "history_cryogenic_hydrocarbon_biochemistry"
+      ],
+      "additional_starting_pressure_state":{"long_duration_mission":16,"colony_isolation":14,"resource_scarcity":16},
+      "historical_notes":"Cryogenic biology is normal for this population; warm terrestrial conditions may be the hostile environment rather than the reverse."
+    },
+    {
+      "id":"reference_silicon_centered_early_space",
+      "kind":"civilization_reference_profile",
+      "description":"Rare speculative silicon-centered/mineral-structural early-space civilization using the same public possibility graph.",
+      "fragment_ids":[
+        "base_early_space_science_2050",
+        "history_advanced_structural_materials",
+        "history_orbital_industrialization",
+        "history_fission_and_storage_infrastructure",
+        "history_computational_automation",
+        "history_deep_space_observation_and_comms",
+        "history_silicon_centered_biochemistry"
+      ],
+      "additional_starting_pressure_state":{"resource_scarcity":20,"industrial_bottleneck":16,"long_duration_mission":12},
+      "historical_notes":"Silicon-centered research begins from native scientific history, not from discovering alien silicon life. Its future mineral repair, biofabrication, habitat, and computation paths remain adaptive."
+    }
+  ],
+  "rules": {
+    "reference_profiles_are_not_species_ids":true,
+    "all_use_same_public_catalog":true,
+    "future_tree_not_stored":true,
+    "biochemical_traits_filter_specific_branches":true
+  }
+}

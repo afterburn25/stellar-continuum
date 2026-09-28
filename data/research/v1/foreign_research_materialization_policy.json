@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "design_status": "seed_behavior_not_final_balance",
+  "purpose": "Defines bounded foreign-contact awareness materialization into the existing public Adaptive Research graph. Foreign evidence may reveal possibilities as Rumored/Hypothesized; normal scientific eligibility alone promotes them to Investigable.",
+  "evidence_index_rules": {
+    "observed_minimum_state": "rumored",
+    "characterized_or_better_minimum_state": "hypothesized",
+    "candidate_source": "catalog.nodes_by_evidence_type",
+    "public_normal_research_only": true,
+    "no_full_graph_scan": true
+  },
+  "cross_lineage_method_candidates": [
+    {
+      "trigger_axis": "understanding",
+      "minimum_state": "characterized",
+      "node_ids": ["reverse_engineering_methods", "technology_compatibility_science"],
+      "awareness_state": "hypothesized"
+    },
+    {
+      "trigger_axis": "understanding",
+      "minimum_state": "principle_understood",
+      "node_ids": ["cross_lineage_engineering"],
+      "awareness_state": "hypothesized"
+    },
+    {
+      "trigger_axis": "understanding",
+      "minimum_state": "engineering_understood",
+      "node_ids": ["hybrid_design_methodology"],
+      "awareness_state": "hypothesized"
+    },
+    {
+      "trigger_axis": "adaptation",
+      "minimum_state": "native_derivative",
+      "node_ids": ["hybrid_design_methodology"],
+      "awareness_state": "hypothesized"
+    }
+  ],
+  "promotion_rules": {
+    "normal_eligibility_overrides_awareness_state_to_investigable": true,
+    "foreign_contact_never_directly_sets_experimental_or_higher": true,
+    "foreign_contact_never_directly_sets_native_node_mature": true,
+    "archived_disproven_hypothesis_may_reopen_if_new_foreign_evidence_legitimately_supports_awareness": true,
+    "mature_or_active_native_research_is_never_downgraded": true
+  },
+  "visibility_rules": {
+    "rumored_or_hypothesized_nodes_do_not_show_lab_costs": true,
+    "hidden_prerequisite_ids_remain_sanitized": true,
+    "known_capability_outputs_remain_hidden_until_demonstrated": true
+  }
+}

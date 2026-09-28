@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "design_status": "seed_balance_values_not_final",
+  "purpose": "Numeric runtime policy for converting normalized simulation facts/events into sparse Research Pressure without scanning research nodes or using hidden rank/catch-up mechanics.",
+  "metric_target": {
+    "normalized_signal_range": [0, 1],
+    "formula": "100 * (0.75 * strongest_nonzero_signal + 0.25 * arithmetic_mean_nonzero_signals)",
+    "no_nonzero_signals_target": 0,
+    "reason": "The strongest real problem dominates while multiple simultaneous burdens can reinforce urgency slightly without additive runaway."
+  },
+  "response": {
+    "rise_toward_metric_target_per_year": 40,
+    "metric_fall_uses_pressure_specific_decay": true,
+    "event_pulse_base_points": 45,
+    "event_pulse_formula": "event_pulse_base_points * normalized_severity_0_1",
+    "event_pulse_is_bounded": true,
+    "event_pulse_cannot_exceed_pressure_max": true,
+    "memory_floor_from_pressure_rule": true
+  },
+  "maintenance": {
+    "intended_review_interval_years": 0.25,
+    "coarse_dormant_review_interval_years": 1.0,
+    "iterate_only_pressures_with_nonzero_pressure_or_active_metric_support": true,
+    "drop_zero_metric_signal_records": true,
+    "drop_pressure_runtime_record_when_pressure_and_metric_support_are_zero_and_memory_floor_is_zero": true
+  },
+  "fair_information": {
+    "owning_subsystem_normalizes_signals": true,
+    "foreign_relative_signals_require_legitimate_observation": true,
+    "uncertain_observation_should_reduce_normalized_signal_or_confidence_before_reporting": true,
+    "global_hidden_rank_forbidden": true,
+    "unknown_enemy_statistics_forbidden": true
+  },
+  "research_interaction": {
+    "pressure_changes_only_through_authoritative_pressure_runtime_or_validated_start_migration": true,
+    "pressure_to_candidate_wakeup_uses_existing_static_index": true,
+    "pressure_never_directly_generates_research_points": true,
+    "pressure_never_directly_changes_project_readiness": true,
+    "hard_gate_only_where_node_requirement_explicitly_configures_threshold": true
+  }
+}

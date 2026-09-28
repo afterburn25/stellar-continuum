@@ -185,6 +185,13 @@ internal static class Program
             "completed orbital shipyard did not create exactly one shipyard node");
         Require(shipyardNetwork.Links.Count > launchNetwork.Links.Count,
             "represented shipyard did not add a logistics corridor to the orbital network");
+
+        construction.CompletedProjectIds.Add("asteroid_resource_network");
+        var resourceNetwork = view.Build(galaxy, civilization.Id);
+        Require(resourceNetwork.Nodes.Count(node => node.Kind == LogisticsNodeKind.ResourceSite) == 1,
+            "completed asteroid network did not create exactly one resource-site node");
+        Require(resourceNetwork.Links.Count == shipyardNetwork.Links.Count + 1,
+            "represented asteroid network did not connect to the orbital logistics hub");
     }
 
     private static void Require(bool condition, string message)

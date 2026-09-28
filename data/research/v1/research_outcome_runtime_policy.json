@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "design_status": "seed_balance_values_not_final",
+  "purpose": "Executable seed policy for normal public Adaptive Research experimental outcomes. It makes hypothesis/setback/partial/side-discovery behavior deterministic and replayable without exposing secret discovery tables.",
+  "determinism": {
+    "algorithm": "sha256_first_u64",
+    "stream_key_fields": ["catalog_id", "campaign_seed", "civilization_id", "node_id", "checkpoint_id", "attempt_index"],
+    "reload_reroll_forbidden": true
+  },
+  "profile_assignment": {
+    "scientific_hypothesis": "node.is_hypothesis == true",
+    "frontier_engineering_node_ids": [
+      "prototype_warp_drive",
+      "wormhole_stabilization",
+      "antimatter_containment",
+      "field_defense",
+      "synthetic_cognition",
+      "hybrid_propulsion_architecture",
+      "hybrid_power_architecture",
+      "hybrid_manufacturing_architecture",
+      "hybrid_biosystem_interface"
+    ],
+    "default_non_hypothesis": "established_extension",
+    "hazardous_node_ids": ["antimatter_containment"]
+  },
+  "checkpoint_rules": {
+    "scientific_hypothesis": ["experimental_boundary"],
+    "frontier_engineering": ["experimental_boundary"],
+    "established_extension": [],
+    "hazardous_foreign_or_anomalous": ["experimental_boundary"]
+  },
+  "public_seed_weights": {
+    "scientific_hypothesis": {
+      "hypothesis_supported": 45,
+      "hypothesis_refined": 25,
+      "hypothesis_disproven": 15,
+      "anomalous_result": 5,
+      "side_discovery": 10
+    },
+    "frontier_engineering": {
+      "progress": 60,
+      "partial_success": 18,
+      "setback": 15,
+      "side_discovery": 7
+    },
+    "established_extension": {
+      "progress": 80,
+      "partial_success": 10,
+      "setback": 8,
+      "side_discovery": 2
+    },
+    "hazardous_foreign_or_anomalous": {
+      "progress": 42,
+      "partial_success": 18,
+      "setback": 14,
+      "hazard_incident": 8,
+      "hypothesis_refined": 8,
+      "anomalous_result": 5,
+      "side_discovery": 5
+    }
+  },
+  "readiness_effects": {
+    "applies_to": ["setback", "partial_success", "hazard_incident", "anomalous_result"],
+    "does_not_change_fundamental_truth": true,
+    "high_readiness_reduces_setback_and_hazard_weight_max_fraction": 0.45,
+    "high_readiness_shifts_removed_weight_to": ["progress", "partial_success", "hypothesis_refined"],
+    "evidence_quality_is_already_part_of_project_readiness": true,
+    "culture_axes_do_not_modify_committed_experiment_physics": true
+  },
+  "effects": {
+    "setback_stage_progress_loss_fraction": 0.18,
+    "partial_success_stage_progress_credit_fraction": 0.08,
+    "refined_hypothesis_stage_progress_preserved_fraction": 0.75,
+    "outcome_competence_gain": {
+      "progress": [0.4, 0.8, 0.4],
+      "partial_success": [0.6, 1.2, 0.8],
+      "setback": [0.4, 0.8, 0.6],
+      "hypothesis_supported": [1.0, 1.4, 0.2],
+      "hypothesis_refined": [1.2, 1.4, 0.2],
+      "hypothesis_disproven": [1.2, 1.6, 0.1],
+      "anomalous_result": [1.0, 1.5, 0.2],
+      "hazard_incident": [0.4, 0.8, 0.4],
+      "side_discovery": [0.8, 1.0, 0.3]
+    }
+  },
+  "side_discovery": {
+    "max_candidates_per_resolution": 8,
+    "max_materialized_nodes_per_resolution": 1,
+    "candidate_order": ["direct_children", "alternative_solution_neighbors", "same_solution_family", "strongly_shared_knowledge_fields"],
+    "minimum_shared_knowledge_fields": 2,
+    "same_solution_family_graph_depth_window": 2,
+    "default_new_state": "hypothesized",
+    "promote_to_investigable_if_normal_eligibility_already_met": true,
+    "never_materialize_mature": true,
+    "never_evaluate_secret_content_from_public_catalog": true
+  },
+  "history": {
+    "max_recent_outcome_records": 64,
+    "max_per_node_recent_records": 8,
+    "older_events_compress_into_per_node_summary": true
+  },
+  "guardrails": {
+    "ordinary_engineering_fundamental_disproof_forbidden": true,
+    "setback_full_progress_reset_forbidden": true,
+    "side_discovery_full_graph_scan_forbidden": true,
+    "side_discovery_unknown_unrelated_mature_grant_forbidden": true,
+    "hazard_requires_explicit_hazard_profile": true,
+    "research_emits_hazard_fact_not_physical_damage": true,
+    "secret_exact_probabilities_not_defined_here": true
+  }
+}

@@ -1,0 +1,174 @@
+using System;
+using System.Linq;
+using Game.Simulation.Research.Adaptive;
+
+static void Assert(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}
+
+static void AssertNear(double actual, double expected, double tolerance, string message)
+{
+    if (Math.Abs(actual - expected) > tolerance)
+        throw new InvalidOperationException($"{message} Actual={actual}, expected={expected}.");
+}
+
+var repoRoot = Directory.GetCurrentDirectory();
+var dataRoot = Path.Combine(repoRoot, "data", "research", "v1");
+var authority = AdaptiveResearchAuthority.LoadFromDirectory(dataRoot);
+
+Assert(authority.ExpertiseCatalog.Fields.Count == 36, "Expected all 36 public knowledge fields in the expertise catalog.");
+Assert(authority.ExpertiseCatalog.TacitAssetTypes.Count == 8, "Expected all 8 public tacit asset types.");
+Assert(authority.ExpertiseCatalog.Institutions.Count == authority.Facilities.Institutions.Count, "Expertise institutions must match the facility catalog.");
+
+// Starting history: competence and actual research institutions become executable state.
+var humanStart = authority.ComposeReferenceProfile(
+    "expertise-human",
+    "reference_humanlike_solar_2050",
+    "human-population",
+    2050.0);
+var human = humanStart.State;
+Assert(human.Expertise.FieldCompetence.Count > 0, "Human-like 2050 start must seed active field competence.");
+Assert(human.Expertise.Institutions.Count == 3, "Human-like 2050 start should aggregate three institution archetype records.");
+AssertNear(human.TotalEffectiveResearchLabs, 12.0, 0.000001, "Starting institutions must reproduce 12 Effective Research Labs.");
+Assert(human.TryGetNodeState("fusion_power", out var fusionState) && fusionState.Maturity == ResearchMaturity.Investigable,
+    "Human-like 2050 should keep Practical Fusion Power Investigable.");
+Assert(!human.NodeStates.ContainsKey("prototype_warp_drive"), "Human-like 2050 must not expose Prototype Warp Drive.");
+
+var fusion = authority.Catalog.GetNode("fusion_power");
+var fusionLabs = Math.Max(fusion.ProjectRequirements.MinimumLabs, 2);
+var fusionBeforePressure = authority.GetProjectReadiness(human, "fusion_power", ResearchMaturity.Experimental, fusionLabs);
+authority.Kernel.SetPressure(human, "energy_shortage", 100.0);
+var fusionAfterPressure = authority.GetProjectReadiness(human, "fusion_power", ResearchMaturity.Experimental, fusionLabs);
+AssertNear(fusionBeforePressure.OverallReadinessScore, fusionAfterPressure.OverallReadinessScore, 0.000001,
+    "Research Pressure must not secretly increase Project Readiness/speed.");
+
+var startFusion = authority.StartDirectedResearch(human, "fusion_power", fusionLabs);
+Assert(startFusion.Accepted, "Authority should start visible Fusion research without caller-supplied readiness.");
+if (!human.ActiveProjects.TryGetValue("fusion_power", out var activeFusion))
+    throw new InvalidOperationException("Fusion project should be active.");
+AssertNear(activeFusion.ReadinessEfficiency, fusionBeforePressure.RpEfficiency, 0.000001,
+    "Stored project efficiency must be derived from authoritative readiness.");
+
+// Capacity and suitability are separate: equal lab counts can have different readiness for the same project.
+var facilityCase = authority.CreateCivilizationState("facility-readiness-case");
+authority.Expertise.SeedFieldCompetence(facilityCase, "energy", new ResearchCompetenceVector(60, 60, 60), 2050);
+authority.Expertise.SeedFieldCompetence(facilityCase, "physics", new ResearchCompetenceVector(60, 60, 60), 2050);
+authority.Expertise.SeedFieldCompetence(facilityCase, "materials", new ResearchCompetenceVector(60, 60, 60), 2050);
+authority.SetResearchInstitution(facilityCase, "general-pool", "general_research_laboratory", 4, 4);
+var generalReadiness = authority.GetProjectReadiness(facilityCase, "fusion_power", ResearchMaturity.Experimental, 4);
+AssertNear(facilityCase.TotalEffectiveResearchLabs, 4.0, 0.000001, "Four general labs should supply four Effective Research Labs.");
+authority.SetResearchInstitution(facilityCase, "general-pool", "general_research_laboratory", 0, 0);
+authority.SetResearchInstitution(facilityCase, "high-energy", "high_energy_research_complex", 1, 1);
+var specialistReadiness = authority.GetProjectReadiness(facilityCase, "fusion_power", ResearchMaturity.Experimental, 4);
+AssertNear(facilityCase.TotalEffectiveResearchLabs, 4.0, 0.000001, "One high-energy complex should also supply four Effective Research Labs.");
+Assert(specialistReadiness.FacilityReadinessScore > generalReadiness.FacilityReadinessScore,
+    "Matching specialist infrastructure must improve facility readiness without changing raw lab count.");
+Assert(specialistReadiness.OverallReadinessScore > generalReadiness.OverallReadinessScore,
+    "Specialist suitability must flow through one bounded readiness score, not a separate bonus stack.");
+
+// Tacit expertise helps only work it actually matches.
+var xeno = authority.CreateCivilizationState("xeno-readiness-case");
+foreach (var field in new[] { "xenoscience", "analysis", "systems" })
+    authority.Expertise.SeedFieldCompetence(xeno, field, new ResearchCompetenceVector(45, 45, 45), 2050);
+authority.SetResearchInstitution(xeno, "xeno-general", "general_research_laboratory", 4, 4);
+authority.Kernel.AddEvidence(xeno, "captured-device-1", "captured_foreign_device", "captured intact device", 1.0, 1.0);
+var xenoBeforeTacit = authority.GetProjectReadiness(xeno, "foreign_device_forensics", ResearchMaturity.Experimental, 2);
+Assert(xenoBeforeTacit.TacitExpertiseScore == 0.0, "Xenoscience without relevant tacit assets should expose a zero tacit component.");
+authority.SetTacitAsset(
+    xeno,
+    "foreign-device-experts",
+    "expert_cohort",
+    ResearchTacitScopeKind.TechnologyNode,
+    "foreign_device_forensics",
+    ResearchTacitAssimilationStage.NativePractice,
+    100.0,
+    1.0,
+    1.0,
+    1.0,
+    "cooperating foreign engineering team");
+var xenoAfterTacit = authority.GetProjectReadiness(xeno, "foreign_device_forensics", ResearchMaturity.Experimental, 2);
+Assert(xenoAfterTacit.TacitExpertiseScore is > 99.9, "Fully relevant native-practice expert cohort should provide near-100 tacit readiness.");
+Assert(xenoAfterTacit.OverallReadinessScore > xenoBeforeTacit.OverallReadinessScore,
+    "Relevant tacit expertise must improve the single derived readiness value.");
+var fusionWithIrrelevantXenoExperts = authority.GetProjectReadiness(xeno, "fusion_power", ResearchMaturity.Experimental, 2);
+Assert(fusionWithIrrelevantXenoExperts.TacitExpertiseScore is null,
+    "Foreign-device experts must not become a universal bonus to unrelated Fusion research.");
+
+// Stage completion grows actual practice, then the next stage is recalculated before more RP is spent.
+var progress = authority.CreateCivilizationState("competence-growth-case");
+foreach (var field in new[] { "physics", "mathematics", "systems" })
+    authority.Expertise.SeedFieldCompetence(progress, field, new ResearchCompetenceVector(60, 60, 60), 2050);
+authority.SetResearchInstitution(progress, "growth-general", "general_research_laboratory", 4, 4);
+authority.Kernel.ReviewBasicScienceCandidates(progress, new[] { "systems_engineering" });
+var physicsBefore = progress.Expertise.GetField("physics").Current;
+var startSystems = authority.StartDirectedResearch(progress, "systems_engineering", 2);
+Assert(startSystems.Accepted, "Systems Engineering should start through the authority facade.");
+var progressEvents = authority.AdvanceProjects(progress, 3.0, 2053.0);
+Assert(progress.TryGetNodeState("systems_engineering", out var systems) && systems.Maturity == ResearchMaturity.Mature,
+    "Competence-aware stage-boundary advancement should Mature the foundation project.");
+var physicsAfter = progress.Expertise.GetField("physics").Current;
+Assert(physicsAfter.Theoretical > physicsBefore.Theoretical ||
+       physicsAfter.Experimental > physicsBefore.Experimental ||
+       physicsAfter.Engineering > physicsBefore.Engineering,
+    "Completing real research stages must grow relevant scientific practice.");
+Assert(progressEvents.Any(value => value.Type == AdaptiveResearchRuntimeEventType.TechnologyMatured),
+    "Competence-aware advancement must preserve normal maturation events.");
+
+// Active practice can fade, but Mature knowledge preserves a theoretical floor and is not deleted.
+var physicsPeak = progress.Expertise.GetField("physics").HistoricalPeak;
+authority.SetResearchInstitution(progress, "growth-general", "general_research_laboratory", 4, 0);
+authority.ApplyCompetenceAtrophy(progress, 2200.0, 147.0);
+var physicsAtrophied = progress.Expertise.GetField("physics").Current;
+Assert(physicsAtrophied.Theoretical < physicsAfter.Theoretical,
+    "Long inactivity without institutions should reduce active theoretical competence.");
+Assert(physicsAtrophied.Experimental < physicsAfter.Experimental && physicsAtrophied.Engineering < physicsAfter.Engineering,
+    "Experimental and engineering practice should atrophy faster than theory.");
+Assert(physicsAtrophied.Theoretical + 0.000001 >= physicsPeak.Theoretical * authority.ExpertiseCatalog.RuntimePolicy.EstablishedKnowledgeTheoreticalFloorFraction,
+    "Established Mature knowledge must preserve the configured theoretical floor.");
+Assert(progress.HasEstablishedKnowledge("systems_engineering"), "Competence atrophy must never delete Mature technology knowledge.");
+
+// Institution loss below active allocations pauses for explicit reallocation instead of silently choosing a winner.
+var capacity = authority.ComposeReferenceProfile(
+    "capacity-loss-case",
+    "reference_humanlike_solar_2050",
+    "capacity-pop",
+    2050).State;
+var fusionMin = Math.Max(authority.Catalog.GetNode("fusion_power").ProjectRequirements.MinimumLabs, 2);
+Assert(authority.StartDirectedResearch(capacity, "fusion_power", fusionMin).Accepted, "Capacity-loss fixture should start Fusion research.");
+foreach (var institution in capacity.Expertise.Institutions.Values.ToArray())
+    authority.SetResearchInstitution(
+        capacity,
+        institution.InstitutionInstanceId,
+        institution.InstitutionArchetypeId,
+        institution.TotalCount,
+        0,
+        institution.ContextId);
+Assert(capacity.TotalEffectiveResearchLabs == 0.0, "Deactivating all institutions should remove Effective Research Lab capacity.");
+Assert(capacity.ActiveProjects["fusion_power"].Paused &&
+       capacity.ActiveProjects["fusion_power"].PauseReason == "research_capacity_reallocation_required",
+    "Capacity loss must pause active research for explicit reallocation rather than oversubscribe phantom labs.");
+
+// Preferred v2 snapshot persists expertise; v1 remains readable for compatibility.
+var v2Codec = new AdaptiveResearchSnapshotV2Codec(authority);
+var v2Json = v2Codec.Serialize(humanStart.State);
+var v2Restored = v2Codec.Deserialize(v2Json);
+Assert(v2Restored.Expertise.FieldCompetence.Count == humanStart.State.Expertise.FieldCompetence.Count,
+    "v2 snapshot must preserve sparse field competence.");
+Assert(v2Restored.Expertise.Institutions.Count == humanStart.State.Expertise.Institutions.Count,
+    "v2 snapshot must preserve aggregate research institutions.");
+AssertNear(v2Restored.TotalEffectiveResearchLabs, humanStart.State.TotalEffectiveResearchLabs, 0.000001,
+    "v2 snapshot institution restoration must reproduce Effective Research Lab capacity.");
+
+var v1Codec = new AdaptiveResearchSnapshotCodec(authority.Kernel);
+var v1Json = v1Codec.Serialize(facilityCase);
+var v1ViaV2 = v2Codec.Deserialize(v1Json);
+Assert(v1ViaV2.CivilizationId == facilityCase.CivilizationId, "v2 codec must continue loading milestone-13 v1 snapshots.");
+Assert(v1ViaV2.Expertise.FieldCompetence.Count == 0,
+    "A v1 snapshot has no expertise payload and must restore honestly rather than inventing historical competence.");
+
+Console.WriteLine(
+    $"Adaptive Research expertise checks OK: human fields={human.Expertise.FieldCompetence.Count}, labs={human.TotalEffectiveResearchLabs:0.#}, " +
+    $"fusion readiness={fusionBeforePressure.OverallReadinessScore:0.#}, general/specialist facility={generalReadiness.FacilityReadinessScore:0.#}/{specialistReadiness.FacilityReadinessScore:0.#}, " +
+    $"xeno tacit={xenoBeforeTacit.TacitExpertiseScore:0.#}->{xenoAfterTacit.TacitExpertiseScore:0.#}, v2 bytes={v2Json.Length}.");

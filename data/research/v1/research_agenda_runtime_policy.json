@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "design_status": "seed_balance_values_not_final",
+  "purpose": "Numeric runtime seed policy for agenda review and visible-only AI project ranking. It intentionally avoids a single fixed global utility weight vector.",
+  "defaults": {
+    "priority_level": "routine",
+    "basic_vs_applied_orientation": 50,
+    "competence_preservation_policy": 50,
+    "portfolio_diversity_policy": 50,
+    "foreign_science_engagement": 50,
+    "scientific_culture_axis": 50
+  },
+  "priority_scores": {
+    "deprioritized": 0,
+    "routine": 25,
+    "important": 50,
+    "strategic": 75,
+    "critical": 100
+  },
+  "visible_candidate_ranking": {
+    "aggregation": "arithmetic_mean_of_applicable_normalized_components",
+    "fixed_global_weight_vector": false,
+    "blocked_project_score_multiplier": 0.35,
+    "already_covered_solution_value": 20,
+    "novel_solution_value": 80,
+    "time_to_effect_half_value_years": 12,
+    "lab_cost_half_value_fraction_of_total_capacity": 0.35,
+    "deterministic_tie_break": "node_id_ordinal_after_equal_score"
+  },
+  "perceived_adequacy_review": {
+    "minimum_confidence_for_policy_change": 0.35,
+    "low_relevant_pressure_max": 25,
+    "high_adequacy_min": 75,
+    "complacency_index_formula": "adequacy * confidence * mean(complacency_tendency, institutional_conservatism, 100 - threat_sensitivity) / 100",
+    "deprioritize_threshold": 50,
+    "challenge_index_formula": "credible_challenge * confidence * threat_sensitivity / 100",
+    "important_challenge_threshold": 35,
+    "strategic_challenge_threshold": 60,
+    "critical_challenge_threshold": 80,
+    "rule": "Adequacy can reduce agenda attention only when relevant recognized pressure is low. Credible challenge can raise it. Neither directly changes RP speed."
+  },
+  "performance": {
+    "shortlist_from_visible_investigable_only": true,
+    "shortlist_bound_source": "research_ai_planning_contract.json",
+    "cache_until_material_revision_change": true,
+    "agenda_review_event_or_low_frequency_only": true,
+    "no_hidden_graph_scan": true,
+    "no_pairwise_global_technology_ranking": true
+  }
+}

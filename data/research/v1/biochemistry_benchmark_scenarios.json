@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Deterministic applicability/divergence benchmarks for normal-public alternative-biochemistry research. Tests shared-graph filtering, not full gameplay progression.",
+  "reference_profiles": [
+    {
+      "profile_id":"reference_humanlike_solar_2050",
+      "expected_traits":["metabolic_biology","carbon_centered_biochemistry","water_solvent_biology"],
+      "expected_native_specific_families":[],
+      "forbidden_native_specific_families":["ammonia_biology","ammonia_habitation","ammonia_bioindustry","ammonia_biosphere","cryogenic_hydrocarbon_biology","cryogenic_hydrocarbon_habitation","cryogenic_hydrocarbon_bioindustry","cryogenic_hydrocarbon_biosphere","silicon_biology","silicon_habitation","mineral_biology","mineral_bioindustry"]
+    },
+    {
+      "profile_id":"reference_ammonia_rich_early_space",
+      "expected_traits":["metabolic_biology","carbon_centered_biochemistry","ammonia_rich_biology"],
+      "expected_native_specific_families":["ammonia_biology","ammonia_habitation","ammonia_bioindustry","ammonia_biosphere"],
+      "forbidden_native_specific_families":["cryogenic_hydrocarbon_biology","cryogenic_hydrocarbon_habitation","cryogenic_hydrocarbon_bioindustry","cryogenic_hydrocarbon_biosphere","silicon_biology","silicon_habitation","mineral_biology","mineral_bioindustry"]
+    },
+    {
+      "profile_id":"reference_cryogenic_hydrocarbon_early_space",
+      "expected_traits":["metabolic_biology","carbon_centered_biochemistry","hydrocarbon_solvent_biology","cryogenic_biology"],
+      "expected_native_specific_families":["cryogenic_hydrocarbon_biology","cryogenic_hydrocarbon_habitation","cryogenic_hydrocarbon_bioindustry","cryogenic_hydrocarbon_biosphere"],
+      "forbidden_native_specific_families":["ammonia_biology","ammonia_habitation","ammonia_bioindustry","ammonia_biosphere","silicon_biology","silicon_habitation","mineral_biology","mineral_bioindustry"]
+    },
+    {
+      "profile_id":"reference_silicon_centered_early_space",
+      "expected_traits":["metabolic_biology","silicon_centered_biochemistry","mineral_structural_biology"],
+      "expected_native_specific_families":["silicon_biology","silicon_habitation","mineral_biology","mineral_bioindustry"],
+      "forbidden_native_specific_families":["ammonia_biology","ammonia_habitation","ammonia_bioindustry","ammonia_biosphere","cryogenic_hydrocarbon_biology","cryogenic_hydrocarbon_habitation","cryogenic_hydrocarbon_bioindustry","cryogenic_hydrocarbon_biosphere"]
+    }
+  ],
+  "assertions": {
+    "all_profiles_use_same_catalog_node_count":370,
+    "comparative_cross_biochemistry_requires_alien_biology_evidence":true,
+    "native_specific_nodes_require_profile_traits":true,
+    "incompatible_native_specific_nodes_not_applicable":true,
+    "human_reference_has_zero_exotic_native_specific_applicable_nodes":true,
+    "minimum_applicable_specific_nodes_for_each_exotic_profile":5,
+    "minimum_pairwise_specific_applicability_jaccard_distance":0.80,
+    "same_shared_foundation_nodes_exist_for_all_metabolic_profiles":true
+  }
+}

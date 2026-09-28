@@ -2,13 +2,14 @@
   "schema_version": 1,
   "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
   "design_status": "public_normal_emergence_rules",
-  "applicability_trait_count": 6,
+  "applicability_trait_count": 14,
   "evidence_type_count": 9,
   "pressure_rule_count": 59,
   "files": {
     "applicability_traits": "applicability_traits.json",
     "evidence_types": "evidence_types.json",
-    "pressure_dynamics": "pressure_dynamics.json"
+    "pressure_dynamics": "pressure_dynamics.json",
+    "biochemical_applicability": "biochemical_applicability_model.json"
   },
   "candidate_emergence_pipeline": [
     "relevant simulation subsystem changes a normalized condition signal or emits a meaningful event",
@@ -23,7 +24,7 @@
     "pressure_band_crossed": "A known pressure crosses a meaningful configured band and wakes only nodes indexed to that pressure.",
     "evidence_acquired": "A new evidence instance wakes only nodes indexed to its evidence type.",
     "prerequisite_matured": "A matured node wakes only direct child possibilities indexed by prerequisite ID.",
-    "applicability_changed": "A gained/lost mutable trait wakes only nodes indexed to that trait.",
+    "applicability_changed": "A gained/lost mutable trait or changed population biochemical context wakes only nodes indexed to that trait/context.",
     "basic_science_review": "Low-frequency review samples possibilities reachable through known fields without requiring practical pressure.",
     "foreign_capability_observed": "Legitimate sensor/intelligence evidence can create pressure and/or evidence without revealing hidden implementation details."
   },
@@ -34,7 +35,8 @@
     "rumors_can_have_uncertain_or_incorrect_interpretation_without_changing_authoritative_physics": true,
     "ai_uses_same_emergence_pipeline": true,
     "no_calendar_year_direct_unlocks": true,
-    "no_rank_based_catchup_unlocks": true
+    "no_rank_based_catchup_unlocks": true,
+    "incompatible_biochemistry_specific_branches_do_not_render": true
   },
   "persistence": {
     "static_catalog_not_copied_into_save": true,
@@ -45,6 +47,7 @@
       "sparse_nonzero_or_relevant_pressures",
       "evidence_instances",
       "mutable_civilization_applicability_traits",
+      "population_or_species_biochemical_applicability_contexts",
       "field_competence",
       "recent_research_discovery_history"
     ],

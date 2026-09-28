@@ -1,0 +1,230 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Game.Simulation.Research.Adaptive;
+
+static void Assert(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}
+
+var repoRoot = Directory.GetCurrentDirectory();
+var dataRoot = Path.Combine(repoRoot, "data", "research", "v1");
+var strategic = AdaptiveResearchStrategicRuntime.LoadFromDirectory(dataRoot);
+var authority = strategic.Authority;
+var contextId = "derived-human-pop";
+var foreignRef = "foreign-multisystem-reference";
+
+Assert(authority.Catalog.Nodes.Count == 370, "Milestone #18 public graph should contain exactly 370 nodes.");
+var derivativeIds = new[]
+{
+    "foreign_propulsion_derivative_engineering",
+    "foreign_power_derivative_engineering",
+    "foreign_material_derivative_engineering",
+    "foreign_manufacturing_derivative_engineering",
+    "foreign_control_derivative_engineering",
+    "foreign_biosystem_derivative_engineering",
+};
+var hybridIds = new[]
+{
+    "hybrid_propulsion_architecture",
+    "hybrid_power_architecture",
+    "hybrid_manufacturing_architecture",
+    "hybrid_biosystem_interface",
+};
+Assert(derivativeIds.All(authority.Catalog.Nodes.ContainsKey) && hybridIds.All(authority.Catalog.Nodes.ContainsKey),
+    "All six derivative and four hybrid research nodes must be in the shared catalog.");
+Assert(derivativeIds.All(id => authority.Catalog.GetNode(id).AwarenessSources.Contains("foreign_contact")),
+    "Derivative nodes should permit direct foreign-contact awareness.");
+Assert(hybridIds.All(id => !authority.Catalog.GetNode(id).AwarenessSources.Contains("foreign_contact") &&
+                          !authority.Catalog.GetNode(id).AwarenessSources.Contains("observation")),
+    "Deep hybrid architectures must not be leaked directly by foreign observation.");
+
+var control = authority.ComposeReferenceProfile(
+    "foreign-derived-control",
+    "reference_humanlike_solar_2050",
+    "control-pop",
+    2050).State;
+var state = authority.ComposeReferenceProfile(
+    "foreign-derived-main",
+    "reference_humanlike_solar_2050",
+    contextId,
+    2050).State;
+
+// Test fixture owns extensive physical scientific infrastructure; it does not seed any research node.
+foreach (var fieldId in authority.ExpertiseCatalog.Fields.Keys)
+    authority.Expertise.SeedFieldCompetence(state, fieldId, new ResearchCompetenceVector(85, 85, 85), 2100);
+var institutionSequence = 0;
+foreach (var definition in authority.ExpertiseCatalog.Institutions.Values)
+{
+    authority.SetResearchInstitution(
+        state,
+        $"derived-test:{definition.InstitutionArchetypeId}:{institutionSequence++}",
+        definition.InstitutionArchetypeId,
+        1,
+        1);
+}
+Assert(state.TotalEffectiveResearchLabs > 40,
+    "Foreign-derived progression fixture should have ample real Effective Research Lab capacity.");
+
+var richPackage = new ForeignTechnologyPackageInput(
+    "foreign-derived-rich-package",
+    foreignRef,
+    "lineage-foreign-derived",
+    new[]
+    {
+        "observation_dossier",
+        "scientific_theory_dossier",
+        "experimental_data_package",
+        "engineering_blueprint_package",
+        "manufacturing_process_package",
+        "reference_hardware",
+        "production_tooling_transfer",
+        "expert_assistance",
+        "training_program",
+    },
+    new[] { "inspect", "internal_research", "modify", "manufacture" },
+    new[] { "xenoscience", "analysis", "systems", "propulsion", "physics", "energy", "materials", "manufacturing", "industry", "computing", "information", "biology", "biotechnology" },
+    new[]
+    {
+        new ForeignTechnologyEvidenceTransfer("derived-evidence-device", "captured_foreign_device", "captured multi-system alien hardware", 1.0, 1.0),
+        new ForeignTechnologyEvidenceTransfer("derived-evidence-propulsion", "foreign_propulsion_evidence", "alien propulsion telemetry and hardware", 1.0, 1.0),
+        new ForeignTechnologyEvidenceTransfer("derived-evidence-power", "foreign_power_device", "alien power subsystem", 1.0, 1.0),
+        new ForeignTechnologyEvidenceTransfer("derived-evidence-records", "foreign_scientific_records", "translated foreign scientific archive", 1.0, 1.0),
+        new ForeignTechnologyEvidenceTransfer("derived-evidence-manufacturing", "foreign_manufacturing_sample", "foreign production sample and process records", 1.0, 1.0),
+        new ForeignTechnologyEvidenceTransfer("derived-evidence-sample", "alien_sample_or_device", "alien material/chemical sample", 1.0, 1.0),
+        new ForeignTechnologyEvidenceTransfer("derived-evidence-signal", "alien_signal", "recorded alien communications", 1.0, 1.0),
+        new ForeignTechnologyEvidenceTransfer("derived-evidence-biology", "alien_biology", "alien biological sample and records", 1.0, 1.0),
+    },
+    Array.Empty<string>(),
+    "comprehensive legitimate foreign scientific exchange package",
+    1.0,
+    1.0,
+    1.0,
+    2100,
+    contextId);
+
+var acquisition = strategic.ForeignDiscovery.AcquirePackage(state, richPackage);
+Assert(acquisition.Assessment.Understanding == ForeignUnderstandingState.Characterized,
+    "Rich package should begin Characterized, not as free native engineering knowledge.");
+Assert(derivativeIds.All(id => state.TryGetNodeState(id, out var node) && node.Maturity == ResearchMaturity.Hypothesized),
+    "Foreign evidence should reveal all six directly relevant derivative branches as hypotheses while cross-lineage prerequisites are missing.");
+Assert(hybridIds.All(id => !state.NodeStates.ContainsKey(id)),
+    "Deep hybrid architectures must remain completely absent immediately after foreign contact.");
+Assert(derivativeIds.All(id => !control.NodeStates.ContainsKey(id)) && hybridIds.All(id => !control.NodeStates.ContainsKey(id)),
+    "Uncontacted control must not receive derivative/hybrid branches from the shared static graph.");
+
+var visiting = new HashSet<string>(StringComparer.Ordinal);
+var researchOrder = new List<string>();
+double currentYear = 2100;
+
+void EnsureMature(string nodeId)
+{
+    if (state.HasEstablishedKnowledge(nodeId))
+        return;
+    if (!visiting.Add(nodeId))
+        throw new InvalidOperationException($"Recursive prerequisite loop while researching {nodeId}.");
+
+    var definition = authority.Catalog.GetNode(nodeId);
+    foreach (var prerequisiteId in definition.Prerequisites.AllOf)
+        EnsureMature(prerequisiteId);
+    if (definition.Prerequisites.AnyOf.Count > 0 && !definition.Prerequisites.AnyOf.Any(state.HasEstablishedKnowledge))
+        EnsureMature(definition.Prerequisites.AnyOf[0]);
+
+    // A real recognized need may expose problem-driven nodes; this is not a speed modifier.
+    foreach (var pressureId in definition.PressureAffinities)
+        authority.SetPressure(state, pressureId, 100.0, contextId);
+
+    // Reevaluate bounded foreign-aware candidates and, where appropriate, bounded basic science.
+    _ = strategic.ForeignDiscovery.Reevaluate(state, foreignRef, contextId);
+    if (definition.AwarenessSources.Contains("basic_science", StringComparer.Ordinal) ||
+        definition.AwarenessSources.Contains("theoretical_breakthrough", StringComparer.Ordinal))
+        authority.ReviewBasicScienceCandidates(state, new[] { nodeId }, contextId);
+
+    if (!state.TryGetNodeState(nodeId, out var visible) || visible.Maturity < ResearchMaturity.Investigable)
+    {
+        // Pressure-index wakeups may have occurred before the final prerequisite; re-issue one relevant
+        // pressure after prerequisites are mature so normal eligibility can materialize the node.
+        if (definition.PressureAffinities.Count > 0)
+            authority.SetPressure(state, definition.PressureAffinities[0], 99.0, contextId);
+        _ = strategic.ForeignDiscovery.Reevaluate(state, foreignRef, contextId);
+        authority.ReviewBasicScienceCandidates(state, new[] { nodeId }, contextId);
+    }
+
+    if (!state.TryGetNodeState(nodeId, out visible) || visible.Maturity != ResearchMaturity.Investigable)
+    {
+        var blockers = authority.Kernel.Eligibility.EvaluateScientificEligibility(state, nodeId, contextId).Blockers;
+        throw new InvalidOperationException($"{nodeId} failed to become Investigable after real prerequisites/evidence. Blockers: {string.Join(" | ", blockers.Select(b => b.Message))}");
+    }
+
+    var assignedLabs = Math.Max(
+        definition.ProjectRequirements.MinimumLabs,
+        Math.Min(definition.ProjectRequirements.RecommendedLabs, state.FreeEffectiveLabs));
+    var start = authority.StartDirectedResearch(state, nodeId, assignedLabs, contextId);
+    if (!start.Accepted)
+        throw new InvalidOperationException($"Could not start {nodeId}: {string.Join(" | ", start.Blockers.Select(b => b.Message))}");
+
+    var guard = 0;
+    while (!state.HasEstablishedKnowledge(nodeId) && guard++ < 12)
+    {
+        currentYear += 100.0;
+        _ = authority.AdvanceProjects(state, 100.0, currentYear);
+        if (state.ActiveProjects.TryGetValue(nodeId, out var active) && active.Paused)
+        {
+            if (string.Equals(active.PauseReason, "hypothesis_resolution_required", StringComparison.Ordinal))
+            {
+                var resolved = authority.ResolveHypothesis(state, nodeId, supported: true);
+                if (!resolved.Accepted)
+                    throw new InvalidOperationException($"Could not resolve supported hypothesis {nodeId}: {resolved.Message}");
+            }
+            else
+            {
+                throw new InvalidOperationException($"{nodeId} paused unexpectedly: {active.PauseReason}");
+            }
+        }
+    }
+
+    if (!state.HasEstablishedKnowledge(nodeId))
+        throw new InvalidOperationException($"{nodeId} did not Mature through normal RP progression.");
+    researchOrder.Add(nodeId);
+    visiting.Remove(nodeId);
+}
+
+// The source-analysis/cross-lineage chain must be researched normally before the derivative branch can mature.
+EnsureMature("cross_lineage_engineering");
+EnsureMature("alien_propulsion_analysis");
+Assert(state.TryGetNodeState("foreign_propulsion_derivative_engineering", out var derivativeReady) &&
+       derivativeReady.Maturity == ResearchMaturity.Investigable,
+    "Once Cross-Lineage Engineering and Alien Propulsion Analysis actually Mature, the foreign-derived propulsion branch should promote to Investigable through normal eligibility.");
+Assert(!state.HasEstablishedKnowledge("foreign_propulsion_derivative_engineering"),
+    "Derivative promotion must not skip RP/maturation.");
+EnsureMature("foreign_propulsion_derivative_engineering");
+Assert(state.HasEstablishedKnowledge("foreign_propulsion_derivative_engineering"),
+    "Foreign-Derived Propulsion Engineering should Mature through normal RP/Labs/Readiness.");
+
+// Hybrid architecture must stay hidden until the civilization itself develops Hybrid Technology Design.
+Assert(!state.NodeStates.ContainsKey("hybrid_propulsion_architecture"),
+    "Hybrid Propulsion Architecture should still be absent before Hybrid Technology Design is mature.");
+EnsureMature("hybrid_design_methodology");
+Assert(state.TryGetNodeState("hybrid_propulsion_architecture", out var hybridReady) &&
+       hybridReady.Maturity == ResearchMaturity.Investigable,
+    "Mature Hybrid Design + Mature foreign-derived propulsion + retained foreign evidence should reveal Hybrid Propulsion Architecture through ordinary prerequisite wakeup.");
+EnsureMature("hybrid_propulsion_architecture");
+Assert(state.HasEstablishedKnowledge("hybrid_propulsion_architecture"),
+    "Hybrid Propulsion Architecture should Mature through normal frontier research progression.");
+
+Assert(!control.NodeStates.ContainsKey("foreign_propulsion_derivative_engineering") &&
+       !control.NodeStates.ContainsKey("hybrid_propulsion_architecture"),
+    "The uncontacted control civilization must remain without the derivative/hybrid propulsion path after the contacted civilization develops it.");
+
+var contactedForeignNodes = derivativeIds.Concat(hybridIds).Count(state.NodeStates.ContainsKey);
+Assert(contactedForeignNodes <= 10,
+    "Milestone #18 foreign-derived content must remain bounded rather than opening unrelated graph sections.");
+
+Console.WriteLine(
+    $"Adaptive Research foreign-derived checks OK: catalog={authority.Catalog.Nodes.Count}, " +
+    $"labs={state.TotalEffectiveResearchLabs:0.#}, researched={researchOrder.Count}, " +
+    $"derivative={state.NodeStates["foreign_propulsion_derivative_engineering"].Maturity}, " +
+    $"hybrid={state.NodeStates["hybrid_propulsion_architecture"].Maturity}, " +
+    $"foreignVisible={contactedForeignNodes}, controlDerivative={control.NodeStates.ContainsKey("foreign_propulsion_derivative_engineering")}.");

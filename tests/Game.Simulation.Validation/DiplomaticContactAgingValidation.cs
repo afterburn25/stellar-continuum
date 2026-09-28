@@ -5,7 +5,7 @@ namespace Game.Simulation.Validation;
 
 internal static class DiplomaticContactAgingValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunDiplomaticContactAgingChecks()
     {
         ValidateObservationOnlyContactAgesAndReacquires();

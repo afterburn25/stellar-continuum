@@ -27,6 +27,13 @@ public sealed record KnownCivilization(
     bool HasDefenseTreatyWithObserver
 )
 {
+    /// <summary>
+    /// True only when EstimatedMilitaryLow/High originate from a legitimate observer-local
+    /// military intelligence source. Knowing a civilization diplomatically does not imply knowing
+    /// its fleet strength. Defaults true for existing explicit intelligence/test construction.
+    /// </summary>
+    public bool HasMilitaryEstimate { get; init; } = true;
+
     public double EstimatedMilitaryMidpoint => (EstimatedMilitaryLow + EstimatedMilitaryHigh) * 0.5;
 
     public double Freshness(long nowTick, long staleAfterTicks)

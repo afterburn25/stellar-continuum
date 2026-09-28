@@ -4,7 +4,7 @@ namespace Game.Simulation.Validation;
 
 internal static class CombatOutcomeSummarySyncValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunCombatOutcomeSummaryCheck()
     {
         CombatOutcomeSummaryValidation.ValidateCompactDeterministicCombatOutcomeSummary();

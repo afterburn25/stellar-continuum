@@ -15,7 +15,10 @@ public sealed record CivilizationState(
     bool ExpansionAllowed = true,
     bool NeutralUnlessProvoked = false,
     string SpeciesId = SpeciesCatalog.TerranBaselineId
-);
+)
+{
+    public CivilizationLeadershipState Leadership { get; init; } = new();
+}
 
 public enum CivilizationDevelopmentStage
 {

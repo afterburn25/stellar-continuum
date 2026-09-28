@@ -1,21 +1,33 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Game.Simulation.Colonization;
 using Game.Simulation.Knowledge;
 using Game.Simulation.Models;
+using Game.Simulation.Species;
 
 namespace Game.Simulation.Exploration;
+
+public enum ExplorationObservationConfidence
+{
+    None = 0,
+    Detection = 1,
+    Reconnaissance = 2,
+    Confirmed = 3,
+}
 
 /// <summary>
 /// Builds observer-local exploration state for presentation and strategic consumers.
 /// Detection exposes only the star target. Scout reconnaissance can expose a basic orbital
 /// catalog plus positive obvious signatures. Precise world environment/resource/native facts
 /// remain absent until the observing civilization has legitimately completed a science survey.
+/// Confidence metadata is derived from those same gates; it never promotes nullable/hidden facts.
 /// </summary>
 public sealed class ExplorationReadModel
 {
     private readonly SurveyOperationsProfiler _surveyProfiler;
     private readonly ExplorationMissionStatusEvaluator _missionStatusEvaluator;
+    private readonly ColonySettlementBodyResolver _settlementBodies = new();
 
     public ExplorationReadModel(SurveyOperationsProfiler? surveyProfiler = null)
     {
@@ -88,7 +100,11 @@ public sealed class ExplorationReadModel
             detailed ? system.HasAnomaly : null,
             detailed ? system.HasRareResource : null,
             detailed ? system.HasPreWarpCivilization : null,
-            visibleBodies);
+            visibleBodies,
+            detailed ? system.CatalogPresetId : null,
+            detailed ? system.StellarClass : null,
+            detailed ? system.SecondaryStellarClass : null,
+            detailed ? system.TertiaryStellarClass : null);
     }
 
     private static PlanetaryBodyExplorationView BuildBodyView(PlanetaryBodyState body, bool detailed)
@@ -121,14 +137,22 @@ public sealed class ExplorationReadModel
             detailed ? body.Environment.HasSolidSurface : null,
             detailed ? body.HasRareResource : null,
             detailed ? body.HasAnomaly : null,
-            detailed ? body.HasPreWarpCivilization : null);
+            detailed ? body.HasPreWarpCivilization : null,
+            body.OrbitalEccentricity,
+            body.OrbitalInclinationDegrees);
     }
 
-    private static int? ResolveMissionBody(GalaxyState galaxy, FleetState fleet)
+    private int? ResolveMissionBody(GalaxyState galaxy, FleetState fleet)
     {
-        if (fleet.Role != FleetRole.Colony || fleet.DestinationSystemId is not int systemId)
+        if (fleet.Role != FleetRole.Colony)
             return null;
 
+        var missionSystemId = fleet.DestinationSystemId ?? fleet.CurrentSystemId;
+        if (missionSystemId is not int systemId)
+            return null;
+
+        // Exact v8+ body intent survives arrival even though Exploration clears the system-level
+        // travel destination. Exact mission intent is never re-ranked by the body-less resolver.
         if (fleet.DestinationPlanetaryBodyId is int explicitBodyId)
         {
             return galaxy.PlanetaryBodies.Any(body => body.Id == explicitBodyId && body.SystemId == systemId)
@@ -136,12 +160,17 @@ public sealed class ExplorationReadModel
                 : null;
         }
 
-        // Legacy v7/in-memory missions did not persist a body ID. Preserve their one-body
-        // compatibility interpretation without applying that guess to new v8 missions.
-        return galaxy.PlanetaryBodies
-            .Where(body => body.SystemId == systemId)
-            .OrderBy(body => body.Id)
-            .FirstOrDefault(body => body.LegacyColonizationCandidate && body.Environment.HasSolidSurface)
+        if (fleet.EmbarkedPopulationMillions <= 0.0)
+            return null;
+        var speciesId = fleet.EmbarkedPopulationSpeciesId;
+        if (string.IsNullOrWhiteSpace(speciesId) || !SpeciesCatalog.TryGet(speciesId, out _))
+            return null;
+
+        // Legacy/body-less missions use the same observer-safe, species-relative deterministic
+        // settlement resolver as mission status and actual Colonization founding. The resolver
+        // withholds a target until the system is fully surveyed and returns none if occupied.
+        return _settlementBodies
+            .ResolveBestAvailableBody(galaxy, fleet.CivilizationId, systemId, speciesId)
             ?.Id;
     }
 }
@@ -163,10 +192,32 @@ public sealed record KnownSystemExplorationView(
     bool? HasAnomaly,
     bool? HasRareResource,
     bool? HasPreWarpCivilization,
-    IReadOnlyList<PlanetaryBodyExplorationView> PlanetaryBodies)
+    IReadOnlyList<PlanetaryBodyExplorationView> PlanetaryBodies,
+    string? CatalogPresetId = null,
+    StellarPrimaryClass? StellarClass = null,
+    StellarPrimaryClass? SecondaryStellarClass = null,
+    StellarPrimaryClass? TertiaryStellarClass = null)
 {
     public bool HasReconnaissanceCatalog => SurveyLevel >= SystemSurveyLevel.PartiallySurveyed;
     public bool HasDetailedSurvey => SurveyLevel == SystemSurveyLevel.FullySurveyed;
+
+    public ExplorationObservationConfidence ObservationConfidence => SurveyLevel switch
+    {
+        SystemSurveyLevel.FullySurveyed => ExplorationObservationConfidence.Confirmed,
+        SystemSurveyLevel.PartiallySurveyed => ExplorationObservationConfidence.Reconnaissance,
+        SystemSurveyLevel.Detected => ExplorationObservationConfidence.Detection,
+        _ => ExplorationObservationConfidence.None,
+    };
+
+    /// <summary>
+    /// System-level archetype/resource/anomaly/native/habitability fields are authoritative only
+    /// after full survey. Detection/reconnaissance confidence does not imply confidence in those
+    /// hidden detailed facts.
+    /// </summary>
+    public ExplorationObservationConfidence DetailedSystemFactsConfidence =>
+        HasDetailedSurvey
+            ? ExplorationObservationConfidence.Confirmed
+            : ExplorationObservationConfidence.None;
 }
 
 public sealed record PlanetaryBodyExplorationView(
@@ -190,9 +241,41 @@ public sealed record PlanetaryBodyExplorationView(
     bool? HasSolidSurface,
     bool? HasRareResource,
     bool? HasAnomaly,
-    bool? HasPreWarpCivilization)
+    bool? HasPreWarpCivilization,
+    double OrbitalEccentricity = 0.0,
+    double OrbitalInclinationDegrees = 0.0)
 {
     public bool HasDetailedEnvironment => GravityG is not null;
+
+    public ExplorationObservationConfidence OrbitalCatalogConfidence =>
+        HasDetailedEnvironment
+            ? ExplorationObservationConfidence.Confirmed
+            : ExplorationObservationConfidence.Reconnaissance;
+
+    public ExplorationObservationConfidence DetailedEnvironmentConfidence =>
+        HasDetailedEnvironment
+            ? ExplorationObservationConfidence.Confirmed
+            : ExplorationObservationConfidence.None;
+
+    public ExplorationObservationConfidence ResourceEvidenceConfidence =>
+        EvidenceConfidence(HasRareResource, HasRareResourceSignature);
+
+    public ExplorationObservationConfidence AnomalyEvidenceConfidence =>
+        EvidenceConfidence(HasAnomaly, HasAnomalySignature);
+
+    public ExplorationObservationConfidence ActivityEvidenceConfidence =>
+        EvidenceConfidence(HasPreWarpCivilization, HasActivitySignature);
+
+    private static ExplorationObservationConfidence EvidenceConfidence(bool? confirmed, bool? signature)
+    {
+        // Full survey confirms both presence and absence. At reconnaissance grade, only a positive
+        // signature is evidence; a null signature is "not observed", never a negative conclusion.
+        if (confirmed is not null)
+            return ExplorationObservationConfidence.Confirmed;
+        return signature == true
+            ? ExplorationObservationConfidence.Reconnaissance
+            : ExplorationObservationConfidence.None;
+    }
 }
 
 public sealed record ExplorationMissionView(

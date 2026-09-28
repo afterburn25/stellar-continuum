@@ -229,11 +229,13 @@ Current development discipline uses:
 1. checkout
 2. Adaptive Research catalog structural validation
 3. .NET restore
-4. Release build
+4. Release build plus the Debug assembly loaded by the ordinary Godot project runner
 5. pinned official Godot 4.7.2 .NET Linux download
 6. SHA-256 verification
-7. headless Godot editor/project-load smoke test
-8. headless runtime smoke test
+7. headless Godot editor/project-load smoke test with captured output and engine-error rejection
+8. headless runtime smoke test requiring the integrated campaign entry point to finish startup and process its first frame, with engine/script/managed-error rejection across the full captured output
+
+Godot can return exit 0 after failing to instantiate C# scene scripts (issue #61). Process success alone is not runtime acceptance. Keep the Release build gate, build Debug explicitly for the ordinary runner, and require both clean smoke output and the positive `STELLAR_RUNTIME_READY IntegratedMain` marker. Smoke log regressions must continue rejecting missing markers, missing/empty logs, and errors appearing before or after the marker. CI retains the editor/runtime logs for diagnosis; benign warning lines do not suppress actual errors.
 
 A milestone is not authoritative merely because source/data was written. It becomes baseline only after the validation gate passes and the branch/PR is intentionally merged/accepted.
 

@@ -11,6 +11,18 @@ public sealed class StrategicDecisionEvaluator
         long nowTick,
         bool honorCompelsBattle = false)
     {
+        if (!target.HasMilitaryEstimate)
+        {
+            // Knowing a civilization diplomatically is not military intelligence. Fail closed:
+            // no offensive recommendation may be produced from an absent estimate.
+            return new WarAssessment(
+                Score: -1.0,
+                PerceivedStrengthRatio: 1.0,
+                IntelligenceConfidence: 0.0,
+                SurvivalGateTriggered: true,
+                RecommendWar: false);
+        }
+
         var freshness = target.Freshness(nowTick, staleAfterTicks: 365);
         var confidence = Math.Clamp(target.EstimateConfidence * freshness, 0.05, 1.0);
 

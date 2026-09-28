@@ -9,7 +9,7 @@ namespace Game.Simulation.Validation;
 
 internal static class DiplomacyCombatIncidentValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunDiplomacyCombatIncidentChecks()
     {
         ValidateAttributableCombatCreatesBoundedDiplomaticConsequences();

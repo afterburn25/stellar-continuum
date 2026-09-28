@@ -8,7 +8,7 @@ namespace Game.Simulation.Validation;
 
 internal static class SystemMilitaryControlValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunSystemMilitaryControlCheck()
     {
         var galaxy = new GalaxyGenerator().Generate(

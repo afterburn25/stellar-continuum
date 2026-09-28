@@ -19,11 +19,21 @@ public sealed class PlanetaryBodyGenerator
     {
         ArgumentNullException.ThrowIfNull(systems);
         var result = new List<PlanetaryBodyState>(systems.Count * 8);
+        var balancedPlanetCounts = BuildBalancedPlanetCounts(campaignSeed, systems);
 
         foreach (var system in systems.OrderBy(system => system.Id))
         {
+            if (system.CatalogPresetId is not null)
+            {
+                if (!SolCatalogPreset.IsSol(system))
+                    throw new InvalidOperationException($"Unknown planetary catalog preset '{system.CatalogPresetId}' for system {system.Id}.");
+                result.AddRange(SolCatalogPreset.Create(system));
+                continue;
+            }
             var random = StableRandom.ForSystem(campaignSeed, system.Id);
-            var planetCount = ResolvePlanetCount(system.Archetype, ref random);
+            var planetCount = balancedPlanetCounts is not null
+                ? balancedPlanetCounts[system.Id]
+                : ResolvePlanetCount(system.Archetype, ref random);
             var legacyOrbit = system.HasHabitableWorld ? random.NextInt(planetCount) : -1;
             var rareOrbit = system.HasRareResource ? random.NextInt(planetCount) : -1;
             var anomalyOrbit = system.HasAnomaly ? random.NextInt(planetCount) : -1;
@@ -34,6 +44,7 @@ public sealed class PlanetaryBodyGenerator
                 var isLegacyCandidate = orbit == legacyOrbit;
                 var planetId = checked(system.Id * BodyIdStride + localId++);
                 var planet = CreatePlanet(
+                    campaignSeed,
                     planetId,
                     system,
                     orbit,
@@ -48,17 +59,23 @@ public sealed class PlanetaryBodyGenerator
                 for (var moon = 0; moon < moonCount; moon++)
                 {
                     var moonId = checked(system.Id * BodyIdStride + localId++);
-                    var body = CreateMoon(moonId, planet, moon, ref random);
+                    var body = CreateMoon(campaignSeed, moonId, planet, moon, system.StellarClass is not null, ref random);
                     result.Add(body.Validated());
                 }
             }
         }
 
-        ValidateCatalog(result, systems);
-        return result;
+        // Environmental diversity is part of the canonical deterministic catalog itself,
+        // not a fresh-generation-only post-process. Save/load reconstruction calls this same
+        // generator from seed + systems, so both paths must receive the identical conditioned
+        // physical catalog before any civilization/species assignment is considered.
+        var conditioned = new PlanetaryEnvironmentalDiversityPolicy().Apply(campaignSeed, systems, result);
+        ValidateCatalog(conditioned, systems);
+        return conditioned;
     }
 
     private static PlanetaryBodyState CreatePlanet(
+        long campaignSeed,
         int id,
         StarSystemState system,
         int orbit,
@@ -68,7 +85,9 @@ public sealed class PlanetaryBodyGenerator
         bool preWarp,
         ref StableRandom random)
     {
-        var name = $"{system.Name} {(char)('b' + orbit)}";
+        var name = system.StellarClass is not null
+            ? CelestialBodyNamer.PlanetName(campaignSeed, system.Id, orbit)
+            : $"{system.Name} {(char)('b' + orbit)}";
         if (legacyCandidate)
         {
             var radius = random.Range(0.78, 1.28);
@@ -80,7 +99,7 @@ public sealed class PlanetaryBodyGenerator
                 random.Range(62.0, 155.0),
                 random.NextDouble() < 0.82 ? PlanetaryAtmosphereRegime.OxygenNitrogen : PlanetaryAtmosphereRegime.OxygenRich,
                 PlanetarySolventRegime.Water,
-                Math.Clamp(BaseRadiation(system.Archetype) + random.Range(0.00, 0.10), 0.0, 0.35),
+                Math.Clamp(BaseRadiation(system) + random.Range(0.00, 0.10), 0.0, 0.35),
                 IsImmersedEnvironment: random.NextDouble() < 0.18,
                 HasSolidSurface: true);
 
@@ -109,7 +128,7 @@ public sealed class PlanetaryBodyGenerator
                 random.Range(7000.0, 180000.0),
                 gasAtmosphere,
                 gasSolvent,
-                Math.Clamp(BaseRadiation(system.Archetype) + random.Range(0.08, 0.32), 0.0, 1.0),
+                Math.Clamp(BaseRadiation(system) + random.Range(0.08, 0.32), 0.0, 1.0),
                 IsImmersedEnvironment: false,
                 HasSolidSurface: false);
 
@@ -134,7 +153,7 @@ public sealed class PlanetaryBodyGenerator
             pressure,
             atmosphere,
             solvent,
-            Math.Clamp(BaseRadiation(system.Archetype) + (pressure < 5.0 ? 0.20 : 0.04) + random.Range(0.00, 0.22), 0.0, 1.0),
+            Math.Clamp(BaseRadiation(system) + (pressure < 5.0 ? 0.20 : 0.04) + random.Range(0.00, 0.22), 0.0, 1.0),
             immersed,
             HasSolidSurface: true);
 
@@ -145,9 +164,11 @@ public sealed class PlanetaryBodyGenerator
     }
 
     private static PlanetaryBodyState CreateMoon(
+        long campaignSeed,
         int id,
         PlanetaryBodyState parent,
         int moonIndex,
+        bool useProperName,
         ref StableRandom random)
     {
         var radius = random.Range(0.07, Math.Min(0.78, Math.Max(0.13, parent.RadiusEarth * 0.22)));
@@ -174,7 +195,7 @@ public sealed class PlanetaryBodyGenerator
             parent.SystemId,
             parent.Id,
             moonIndex,
-            $"{parent.Name}-{moonIndex + 1}",
+            useProperName ? CelestialBodyNamer.MoonName(campaignSeed, parent, moonIndex) : $"{parent.Name}-{moonIndex + 1}",
             PlanetaryBodyKind.Moon,
             radius,
             mass,
@@ -190,6 +211,50 @@ public sealed class PlanetaryBodyGenerator
         var min = archetype is StarArchetype.BlackHole or StarArchetype.NeutronPulsar ? 1 : 2;
         var maxExclusive = archetype == StarArchetype.Nebula ? 6 : 8;
         return min + random.NextInt(Math.Max(1, maxExclusive - min));
+    }
+
+    private static IReadOnlyDictionary<int, int>? BuildBalancedPlanetCounts(
+        long campaignSeed,
+        IReadOnlyList<StarSystemState> systems)
+    {
+        var catalogScale = systems.Count % 100 == 0 && systems.Count is >= 500 and <= 2500 &&
+            (systems.All(system => system.StellarCatalogId is not null) ||
+             systems.All(system => system.StellarClass.HasValue)) ? systems.Count / 100 : 1;
+        if (systems.Count != 100 * catalogScale || catalogScale == 1 && systems.Any(system => system.StellarClass is null)) return null;
+        var random = new Random(unchecked((int)(campaignSeed ^ (campaignSeed >> 32) ^ 0x504C4E54)));
+        var nonSol = systems.Where(system => system.CatalogPresetId != SolCatalogPreset.PresetId).ToList();
+        Shuffle(nonSol, random);
+        var zeroIds = nonSol
+            .Where(system => !system.HasHabitableWorld)
+            .OrderBy(system => system.StellarClass is StellarPrimaryClass.BlackHole or StellarPrimaryClass.NeutronStar or StellarPrimaryClass.Pulsar or
+                StellarPrimaryClass.Protostar ? 0 : 1)
+            .Take(18 * catalogScale)
+            .Select(system => system.Id)
+            .ToHashSet();
+        if (zeroIds.Count != 18 * catalogScale)
+            throw new InvalidOperationException($"Balanced planetary architecture needs {18 * catalogScale} non-habitable planetless systems.");
+
+        var counts = zeroIds.ToDictionary(id => id, _ => 0);
+        var populated = nonSol.Where(system => !zeroIds.Contains(system.Id)).ToList();
+        var deck = new List<int>(systems.Count - zeroIds.Count - 1);
+        for (var index = 0; index < 22 * catalogScale; index++) deck.Add(1 + index % 2);
+        for (var index = 0; index < 42 * catalogScale; index++) deck.Add(3 + index % 4);
+        // Sol's authored eight planets occupy one of the fourteen 7–10-system slots.
+        for (var index = 0; index < 14 * catalogScale - 1; index++) deck.Add(7 + index % 4);
+        for (var index = 0; index < 4 * catalogScale; index++) deck.Add(11 + index % 4);
+        Shuffle(deck, random);
+        for (var index = 0; index < populated.Count; index++) counts[populated[index].Id] = deck[index];
+        counts[SolCatalogPreset.SystemId] = 8;
+        return counts;
+    }
+
+    private static void Shuffle<T>(IList<T> values, Random random)
+    {
+        for (var index = values.Count - 1; index > 0; index--)
+        {
+            var swap = random.Next(index + 1);
+            (values[index], values[swap]) = (values[swap], values[index]);
+        }
     }
 
     private static int ResolveMoonCount(PlanetaryBodyState planet, ref StableRandom random)
@@ -272,6 +337,19 @@ public sealed class PlanetaryBodyGenerator
         _ => 0.06,
     };
 
+    private static double BaseRadiation(StarSystemState system) => Math.Max(
+        BaseRadiation(system.Archetype),
+        system.StellarClass switch
+        {
+            StellarPrimaryClass.NeutronStar or StellarPrimaryClass.Pulsar => 0.62,
+            StellarPrimaryClass.BlackHole => 0.45,
+            StellarPrimaryClass.HotBlueStar => 0.40,
+            StellarPrimaryClass.Protostar => 0.31,
+            StellarPrimaryClass.Giant => 0.22,
+            StellarPrimaryClass.WhiteDwarf => 0.18,
+            _ => 0.06,
+        });
+
     private static void ValidateCatalog(
         IReadOnlyList<PlanetaryBodyState> bodies,
         IReadOnlyList<StarSystemState> systems)
@@ -342,5 +420,46 @@ public sealed class PlanetaryBodyGenerator
             _state = x;
             return x * 0x2545F4914F6CDD1DUL;
         }
+    }
+}
+
+public static class CelestialBodyNamer
+{
+    private static readonly string[] PlanetNames =
+    {
+        "Aestra", "Aion", "Arden", "Caelia", "Caligo", "Ceryn", "Damaris", "Eidra",
+        "Elara", "Eryon", "Hesper", "Ilyra", "Kaelis", "Liora", "Maeron", "Neris",
+        "Orison", "Phaedra", "Quillon", "Rhyssa", "Sereph", "Talora", "Thane", "Umbriel",
+        "Vesper", "Viridia", "Xanthe", "Yarrow", "Zephra", "Aurelia", "Corven", "Pelagos",
+    };
+
+    private static readonly string[] MoonEpithets =
+    {
+        "Ari", "Belen", "Cira", "Dysis", "Enna", "Faron", "Galen", "Hira",
+        "Ione", "Jora", "Kora", "Lume", "Mira", "Noma", "Oryn", "Prax",
+        "Quill", "Rhea", "Sola", "Tarin", "Una", "Vela", "Wren", "Xira",
+        "Yana", "Zori", "Aven", "Brin", "Cyra", "Doran", "Eris", "Fira",
+    };
+
+    public static string PlanetName(long seed, int systemId, int orbitIndex)
+    {
+        var offset = StableIndex(seed, systemId, 0x504C414E, PlanetNames.Length);
+        return PlanetNames[(offset + orbitIndex * 7) % PlanetNames.Length];
+    }
+
+    public static string MoonName(long seed, PlanetaryBodyState parent, int moonIndex)
+    {
+        var offset = StableIndex(seed, parent.Id, 0x4D4F4F4E, MoonEpithets.Length);
+        return $"{parent.Name} {MoonEpithets[(offset + moonIndex * 5) % MoonEpithets.Length]}";
+    }
+
+    private static int StableIndex(long seed, int identity, int salt, int count)
+    {
+        var mixed = unchecked((ulong)seed) ^ unchecked((ulong)(identity + 1)) * 0x9E3779B97F4A7C15UL;
+        mixed ^= unchecked((uint)salt);
+        mixed ^= mixed >> 30;
+        mixed *= 0xBF58476D1CE4E5B9UL;
+        mixed ^= mixed >> 27;
+        return (int)(mixed % (uint)count);
     }
 }

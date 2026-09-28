@@ -1,0 +1,24 @@
+name: research-expertise
+
+on:
+  push:
+    branches:
+      - dev/adaptive-research
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-adaptive-research-expertise:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore Adaptive Research expertise checks
+        run: dotnet restore tests/AdaptiveResearchExpertiseChecks/AdaptiveResearchExpertiseChecks.csproj
+      - name: Build Adaptive Research expertise checks
+        run: dotnet build tests/AdaptiveResearchExpertiseChecks/AdaptiveResearchExpertiseChecks.csproj --configuration Release --no-restore
+      - name: Run Adaptive Research expertise checks
+        run: dotnet run --project tests/AdaptiveResearchExpertiseChecks/AdaptiveResearchExpertiseChecks.csproj --configuration Release --no-build

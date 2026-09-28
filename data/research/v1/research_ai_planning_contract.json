@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Defines how AI civilizations choose research agendas, directed projects, and research-capacity requests using the same materialized Adaptive Research information available to player-facing systems. AI never queries hidden future nodes or exact unseen rival technology.",
+  "information_boundary": {
+    "allowed_inputs": [
+      "own materialized research view",
+      "own recognized Research Pressures and trends",
+      "own field competence/readiness",
+      "own labs/facilities/tacit assets",
+      "own known capabilities and gaps",
+      "own current strategy/goals supplied by AI strategy workstream",
+      "own scientific culture/institution values",
+      "legitimately observed foreign capabilities with confidence/age",
+      "known foreign technology packages/assets/market offers",
+      "known economic/resource constraints supplied by owning workstreams"
+    ],
+    "forbidden_inputs": [
+      "unknown Technology Possibility Graph nodes",
+      "exact hidden enemy node state",
+      "exact unseen enemy research projects",
+      "global hidden technology ranking",
+      "secret future event/technology triggers",
+      "omniscient third-party demand or package value"
+    ],
+    "same_authoritative_blockers_as_player":true
+  },
+  "planning_layers": [
+    {
+      "id":"agenda_review",
+      "frequency":"event-driven plus low-frequency strategic review",
+      "output":"research agenda priority changes and capacity requests",
+      "inputs":["recognized needs","strategy","scientific culture","current competence/capacity","known threats/opportunities"]
+    },
+    {
+      "id":"project_shortlist",
+      "frequency":"when directed slot/labs become available or current project changes state",
+      "output":"bounded shortlist of visible Investigable candidates",
+      "input":"materialized visible candidates only"
+    },
+    {
+      "id":"project_selection",
+      "frequency":"from shortlist when a directed program should start/change",
+      "output":"start/pause/resume/reallocate request",
+      "rule":"Authoritative research runtime revalidates the request exactly like player UI commands."
+    },
+    {
+      "id":"capacity_planning",
+      "frequency":"on agenda/capacity/blocker changes",
+      "output":"desired labs/facilities/training/samples/foreign-access requests to external systems"
+    }
+  ],
+  "visible_candidate_utility_components": [
+    {"id":"recognized_need","meaning":"How strongly current recognized problems/pressures would benefit from the visible project/capability."},
+    {"id":"strategic_alignment","meaning":"Fit with current government/AI strategic goals and explicit research agenda."},
+    {"id":"capability_gap_value","meaning":"Value of obtaining a capability the civilization legitimately knows it lacks."},
+    {"id":"readiness","meaning":"Current project readiness/feasibility using competence, facilities, evidence, and tacit expertise."},
+    {"id":"time_to_effect","meaning":"Estimated time until useful Demonstrated/Mature result, with uncertainty rather than fake precision."},
+    {"id":"lab_opportunity_cost","meaning":"Labs/program slots/facilities diverted from other visible priorities."},
+    {"id":"alternative_coverage","meaning":"Whether another visible/mature solution already adequately addresses the same recognized need."},
+    {"id":"portfolio_diversity","meaning":"Value of maintaining alternative solution families/fields when culture/strategy favors resilience."},
+    {"id":"uncertainty_risk","meaning":"Hypothesis/frontier uncertainty and explicit hazard/dependency risk relative to civilization tolerance."},
+    {"id":"long_horizon_value","meaning":"Expected durable scientific/institutional/capability value even without immediate pressure."},
+    {"id":"foreign_acquisition_option","meaning":"Whether a legitimately known trade/license/expert/package route is preferable to independent native research."},
+    {"id":"knowledge_spillover","meaning":"Expected competence/evidence/adjacent-field value from the visible project without assuming hidden nodes."}
+  ],
+  "scoring_policy": {
+    "no_single_global_fixed_weight_vector":true,
+    "description":"Weights are derived from current agenda, scientific culture, government/AI strategy, and context. They are bounded behavioral priorities, not research-speed multipliers.",
+    "normalize_components_before_comparison":true,
+    "uncertainty_preserved":true,
+    "tie_breaking":"campaign-seeded deterministic tie-breaking after stable strategic factors",
+    "explanation_required":true,
+    "explanation_examples":[
+      "High priority because missile losses are severe and Point Defense is currently feasible.",
+      "Deferred because required high-energy facility is absent and another energy project is more ready.",
+      "Maintained despite low immediate pressure because long-term scientific orientation is high.",
+      "Military propulsion deprioritized because observed opponents remain slower and current doctrine is judged adequate.",
+      "Military propulsion priority raised after legitimate observations show a rival approaching parity."
+    ]
+  },
+  "shortlist_policy": {
+    "bounded_candidate_count":12,
+    "source":"visible Investigable candidates indexed by current agenda fields/domains/problems/capabilities plus a bounded exploratory sample",
+    "never_expand_from_hidden_graph":true,
+    "reason":"AI should scale with the materialized horizon rather than evaluate every catalog node for every civilization."
+  },
+  "dominance_and_catchup": {
+    "leader_behavior":"A leading civilization can reduce agenda attention to a capability if it perceives adequate performance and low credible need; high complacency/conservatism makes this more likely.",
+    "challenger_behavior":"A weaker civilization can gain strong recognized need/evidence from actual losses, observed capability gaps, resource constraints, or foreign examples and may prioritize relevant visible research.",
+    "leader_response":"Legitimate evidence of a closing gap can raise threat perception/pressure and trigger agenda review.",
+    "forced_convergence":false,
+    "hidden_catchup_multiplier":false,
+    "hidden_leader_penalty":false,
+    "outcome":"Gaps can narrow naturally, remain stable, widen, or reverse depending on history, institutions, resources, choices, and information."
+  },
+  "project_switching": {
+    "avoid_thrashing":true,
+    "inertia_inputs":["existing RP progress","specialist team/facility setup","strategic continuity","institutional conservatism"],
+    "switch_triggers":["major new threat/pressure","hard blocker","project resolution/setback","strategic-goal change","dramatically better visible option"],
+    "rule":"Inertia affects whether a project is paused/reallocated; it does not create arbitrary sunk-cost bonuses."
+  },
+  "foreign_technology_planning": {
+    "compare_native_vs_foreign_routes":true,
+    "inputs":["known package contents/rights/costs from external diplomacy/economy","compatibility assessment","assimilation horizon","dependency/hazard risk","native project readiness","strategic urgency"],
+    "can_choose_brokerage":"AI can value buying/holding a package for known third-party resale/denial value if it legitimately knows the market.",
+    "no_omniscient_market":true
+  },
+  "capacity_request_policy": {
+    "research_outputs_requests_not_assets":true,
+    "examples":[
+      "request more propulsion-specialized lab capacity",
+      "request a high-energy research complex",
+      "request training pipeline to preserve materials engineering competence",
+      "request xenoscience containment before foreign-device experimentation",
+      "seek a foreign expert cohort or manufacturing-process package"
+    ],
+    "external_system_can_refuse_or_delay":true,
+    "AI_must_replan_after_refusal_or_constraint":true
+  },
+  "difficulty_policy": {
+    "higher_difficulty_improves":"planning horizon, candidate comparison, coordination, reaction quality, memory use, capacity planning, reduced self-defeating thrash",
+    "higher_difficulty_does_not_grant":"hidden graph access, exact enemy technology, free RP, free labs, free evidence, impossible prerequisite bypasses",
+    "optional_explicit_scenario_handicaps":"If future game modes offer economic handicaps, they must be transparent scenario rules and not secretly embedded in Adaptive Research AI."
+  },
+  "performance": {
+    "agenda_review_not_per_tick":true,
+    "shortlist_bounded":true,
+    "visible_candidates_only":true,
+    "cache_utility_until_material_input_changes":true,
+    "dormant_AI_can_use_coarser_review_interval":true,
+    "no_pairwise_all_civilizations_research_comparison":true
+  }
+}

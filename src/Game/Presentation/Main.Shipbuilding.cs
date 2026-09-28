@@ -11,11 +11,11 @@ namespace Game.Presentation;
 
 public partial class Main
 {
-    private readonly ShipbuildingSimulation _shipbuilding = new();
+    private ShipbuildingSimulation _shipbuilding = new();
     private readonly Dictionary<int, Label> _scienceFleetMarkers = new();
     private int _shipDesignCandidateIndex;
     private CanvasLayer? _shipbuildingUiLayer;
-    private Label? _shipbuildingHud;
+    public string UiShipbuildingSummary { get; private set; } = "Shipyard initializing…";
 
     private ShipyardState PlayerShipyard => _galaxy.ShipyardStates.First(state => state.CivilizationId == _galaxy.PlayerCivilizationId);
     private FleetState? PlayerScienceVessel => _galaxy.Fleets.FirstOrDefault(fleet => fleet.IsActive && fleet.CivilizationId == _galaxy.PlayerCivilizationId && fleet.Role == FleetRole.Science);
@@ -26,16 +26,16 @@ public partial class Main
         if (_galaxy is null)
             return;
 
-        if (_clock.Speed != SimulationClock.SpeedLevel.Paused)
-            HandleShipbuildingEvents(_shipbuilding.Advance(_galaxy));
-
-        EnsureShipbuildingHud();
-        UpdateShipbuildingHud();
+        EnsureScienceFleetMarkerLayer();
+        UpdateShipbuildingSummary();
         UpdateScienceFleetMarkers();
     }
 
     public override void _Input(InputEvent @event)
     {
+        if (ShouldBlockGameplayInput())
+            return;
+
         if (_galaxy is null)
             return;
 
@@ -56,14 +56,6 @@ public partial class Main
             }
         }
 
-        if (@event is InputEventMouseButton mouseButton &&
-            mouseButton.Pressed &&
-            mouseButton.ButtonIndex == MouseButton.Right &&
-            mouseButton.CtrlPressed)
-        {
-            IssueScienceOrderAt(mouseButton.Position);
-            GetViewport().SetInputAsHandled();
-        }
     }
 
     private void CycleShipDesignCandidate()
@@ -91,6 +83,8 @@ public partial class Main
         var result = _shipbuilding.StartBuild(_galaxy, _galaxy.PlayerCivilizationId, candidate.Id);
         SetStatus(result.Message, result.Accepted ? 6.0 : 7.0);
         SupportLogger.Log("shipbuilding-order", $"design={candidate.Id} accepted={result.Accepted} message={result.Message}");
+        if (result.Accepted)
+            PublishPlayerNotification("Ships", result.Message);
     }
 
     private ShipDesignDefinition? GetShipDesignCandidate()
@@ -113,30 +107,38 @@ public partial class Main
 
             _shipDesignCandidateIndex = 0;
             SetStatus(e.Message, 7.0);
+            PublishPlayerNotification("Ships", e.Message);
+            RouteShipCompletedVoice(e);
         }
     }
 
-    private void IssueScienceOrderAt(Vector2 mousePosition)
+    private void IssueExplorationOrder(FleetState? fleet, int targetSystemId, string vesselType)
     {
-        var science = PlayerScienceVessel;
-        if (science is null)
+        if (fleet is null)
         {
-            SetStatus("No active science vessel is available. Build one in the Orbital Shipyard.", 7.0);
+            SetStatus($"No active {vesselType} is available. Build one in the Orbital Shipyard.", 7.0);
             return;
         }
 
-        var target = FindNearestCatalogSystem(mousePosition, 16.0f);
-        if (target is null)
-            return;
-
-        if (_exploration.IssueMoveOrder(_galaxy, science.Id, target.Id))
+        if (!_galaxy.Systems.Any(system => system.Id == targetSystemId))
         {
-            var known = _galaxy.Knowledge.IsSystemKnown(_galaxy.PlayerCivilizationId, target.Id);
-            SetStatus($"{science.Name}: science course set for {(known ? target.Name : $"astronomical target {target.Id + 1:000}")}.");
+            SetStatus("Select a destination star on the regional map first.", 7.0);
+            return;
         }
+
+        // This is the same authoritative assessment used by IssueMoveOrder, including
+        // local surveys and range rejection. Keep its useful rejection message visible.
+        var result = _exploration.IssueTravelOrder(_galaxy, fleet.Id, targetSystemId);
+        var known = _galaxy.Knowledge.IsSystemKnown(_galaxy.PlayerCivilizationId, targetSystemId);
+        var message = result.Accepted && !known
+            ? $"{fleet.Name}: course set for {PublicCatalogSystemName(targetSystemId)}. {result.Candidate?.Reach.Reason}"
+            : result.Message;
+        SetStatus(message, result.Accepted ? 6.0 : 8.0);
+        SupportLogger.Log("exploration-order", $"fleet={fleet.Id} target={targetSystemId} accepted={result.Accepted} message={result.Message}");
+        QueueRedraw();
     }
 
-    private void EnsureShipbuildingHud()
+    private void EnsureScienceFleetMarkerLayer()
     {
         if (_shipbuildingUiLayer is not null)
             return;
@@ -147,24 +149,10 @@ public partial class Main
             Layer = 20,
         };
         AddChild(_shipbuildingUiLayer);
-
-        _shipbuildingHud = new Label
-        {
-            Name = "ShipbuildingHud",
-            Position = new Vector2(18, 198),
-            Size = new Vector2(1200, 24),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        _shipbuildingHud.AddThemeFontSizeOverride("font_size", 13);
-        _shipbuildingHud.AddThemeColorOverride("font_color", new Color(0.48f, 0.86f, 0.98f));
-        _shipbuildingUiLayer.AddChild(_shipbuildingHud);
     }
 
-    private void UpdateShipbuildingHud()
+    private void UpdateShipbuildingSummary()
     {
-        if (_shipbuildingHud is null)
-            return;
-
         var state = PlayerShipyard;
         var candidate = GetShipDesignCandidate();
         if (state.ActiveDesignId is { } activeDesignId)
@@ -172,14 +160,13 @@ public partial class Main
             var design = ShipDesignRegistry.Get(activeDesignId);
             var percent = design.IndustryCost <= 0.0 ? 100.0 : state.ActiveBuildProgress / design.IndustryCost * 100.0;
             var population = state.ReservedPopulationMillions > 0.0 ? $" | Colonists reserved {state.ReservedPopulationMillions:0}M" : string.Empty;
-            var next = candidate is null ? string.Empty : $" | Selected {candidate.Name} — V cycle, Y queue";
-            _shipbuildingHud.Text = $"Shipyard: {design.Name} — {state.ActiveBuildProgress:0}/{design.IndustryCost:0} ({percent:0.0}%){population} | Queue {state.PendingBuildCount}/{ShipyardState.MaxPendingBuilds}{next}";
+            UiShipbuildingSummary = $"Shipyard: {design.Name} — {state.ActiveBuildProgress:0}/{design.IndustryCost:0} ({percent:0.0}%){population} | Queue {state.PendingBuildCount}/{ShipyardState.MaxPendingBuilds} | Open Ships to add a named design";
             return;
         }
 
-        _shipbuildingHud.Text = candidate is null
-            ? "Shipyard: interstellar designs locked — develop compatible shipbuilding/transit capability + Orbital Shipyard | V cycle, Y build"
-            : $"Shipyard candidate: {candidate.Name} ({candidate.IndustryCost:0} industry) | Queue {state.PendingBuildCount}/{ShipyardState.MaxPendingBuilds} — V cycle, Y build | Ctrl+Right click: science vessel";
+        UiShipbuildingSummary = candidate is null
+            ? $"Shipyard locked: {ShipDesignRegistry.All[0].Name} {_shipbuilding.GetLockReason(_galaxy, _galaxy.PlayerCivilizationId, ShipDesignRegistry.All[0])}"
+            : $"Shipyard: {_shipbuilding.GetAvailableDesigns(_galaxy, _galaxy.PlayerCivilizationId).Count} designs available | Queue {state.PendingBuildCount}/{ShipyardState.MaxPendingBuilds} — open Ships and choose a named design | Select a ship icon, then right-click its destination";
     }
 
     private void UpdateScienceFleetMarkers()
@@ -217,6 +204,7 @@ public partial class Main
             }
 
             marker.Position = ToScreen(fleet.Position, center) - new Vector2(7, 11);
+            marker.Visible = !UiIsSystemSpatialView;
         }
     }
 }

@@ -16,8 +16,8 @@
   "effective_lab_unit": {
     "name": "Effective Research Lab",
     "description": "A normalized research-capacity unit. Early facilities commonly equal one effective lab. Later institutes, orbital complexes, biological research organisms, machine-science arrays, alien facilities, or other species-specific equivalents may contribute multiple effective units while remaining aggregate simulation objects.",
-    "base_rp_per_effective_lab_per_year": 100,
-    "note": "100 RP/year is a seed balancing value, not a final release number."
+    "base_rp_per_effective_lab_per_year": 400,
+    "note": "400 RP/year is the early playable balance value and remains subject to later campaign tuning."
   },
   "directed_program_model": {
     "description": "A directed program is a major research project explicitly selected by the player or AI. Civilizations still conduct diffuse scientific work outside directed programs.",

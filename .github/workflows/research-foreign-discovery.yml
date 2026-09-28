@@ -1,0 +1,22 @@
+name: research-foreign-discovery
+
+on:
+  push:
+    branches: [ "dev/adaptive-research" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate-adaptive-research-foreign-discovery:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore foreign discovery checks
+        run: dotnet restore tests/AdaptiveResearchForeignDiscoveryChecks/AdaptiveResearchForeignDiscoveryChecks.csproj
+      - name: Build foreign discovery checks
+        run: dotnet build tests/AdaptiveResearchForeignDiscoveryChecks/AdaptiveResearchForeignDiscoveryChecks.csproj --configuration Release --no-restore
+      - name: Run foreign discovery checks
+        run: dotnet run --project tests/AdaptiveResearchForeignDiscoveryChecks/AdaptiveResearchForeignDiscoveryChecks.csproj --configuration Release --no-build

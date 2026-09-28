@@ -1,0 +1,2 @@
+# The catalogue verifier compares reproducible UTF-8 bytes on every platform.
+data/astronomy/hyg-nearby-500-v1.json text eol=lf

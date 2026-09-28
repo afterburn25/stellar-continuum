@@ -1,7 +1,11 @@
 using Game.Diagnostics;
+using Game.Presentation;
 using Game.Simulation.AI;
 using Game.Simulation.Economy;
 using Game.Simulation.Generation;
+using Game.Simulation.Models;
+using Game.Simulation.Shipbuilding;
+using Godot;
 
 namespace Game.Quality.Validation;
 
@@ -18,10 +22,13 @@ internal static class Program
             ("logistics routing is shortest and cache-bounded", ValidateLogisticsRouting),
             ("strategic planner respects scheduled cache", ValidateStrategicPlannerScheduling),
             ("strategic intent restrains unsafe expansion", ValidateStrategicIntent),
+            ("ship artwork covers every production design", ValidateShipArtworkCoverage),
+            ("surface access roads route deterministically around footprints", ValidateSurfaceRoadRouting),
+            ("vertical-slice visual and audio assets are production-safe", ValidateVerticalSliceAssets),
             ("diagnostics buffer stays bounded", ValidateDiagnosticsBufferBounded),
         };
 
-        var failures = 0;
+        var failures = Game.Validation.RegressionRunner.Run(typeof(Program).Assembly);
         foreach (var test in tests)
         {
             try
@@ -32,12 +39,90 @@ internal static class Program
             catch (Exception ex)
             {
                 failures++;
-                Console.Error.WriteLine($"FAIL: {test.Name}: {ex.Message}");
+                Game.Validation.RegressionRunner.Report(test.Name, ex);
             }
         }
 
-        Console.WriteLine($"Quality validation: {tests.Length - failures}/{tests.Length} passed.");
+        Console.WriteLine($"Quality validation: {tests.Length + Game.Validation.RegressionRunner.Count - failures}/{tests.Length + Game.Validation.RegressionRunner.Count} passed.");
         return failures == 0 ? 0 : 1;
+    }
+
+    private static void ValidateShipArtworkCoverage()
+    {
+        var designPaths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var design in ShipDesignRegistry.All)
+        {
+            var path = ShipArtworkLibrary.PathForDesign(design.Id);
+            Require(path.StartsWith("res://", StringComparison.Ordinal) && File.Exists(path[6..]),
+                $"ship design {design.Id} points to missing artwork {path}");
+            Require(designPaths.Add(path), $"ship design {design.Id} reuses another design's artwork {path}");
+        }
+
+        foreach (var role in Enum.GetValues<FleetRole>())
+            Require(!string.IsNullOrWhiteSpace(ShipArtworkLibrary.PathForRole(role)),
+                $"fleet role {role} has no artwork mapping");
+    }
+
+    private static void ValidateSurfaceRoadRouting()
+    {
+        const float margin = 4.5f;
+        var obstacles = new[]
+        {
+            new SurfaceRoadObstacle(Vector2.Zero, 18),
+            new SurfaceRoadObstacle(new Vector2(48, 0), 10),
+        };
+        var start = new Vector2(-70, 0);
+        var end = new Vector2(70, 0);
+        Require(!SurfaceRoadRouting.RouteIsClear(obstacles, start, end, margin),
+            "direct surface road unexpectedly crossed the blocked test corridor");
+
+        var first = SurfaceRoadRouting.FindRoute(obstacles, start, end, margin);
+        var repeated = SurfaceRoadRouting.FindRoute(obstacles, start, end, margin);
+        Require(first.Count >= 3, "surface road did not dogleg around blocking footprints");
+        Require(first.SequenceEqual(repeated), "surface road routing changed across identical runs");
+        Require(first[0].IsEqualApprox(start) && first[^1].IsEqualApprox(end),
+            "surface road route lost its exact entrance anchors");
+        for (var index = 0; index < first.Count - 1; index++)
+            Require(SurfaceRoadRouting.RouteIsClear(obstacles, first[index], first[index + 1], margin),
+                $"surface road segment {index} clipped a footprint near an anchor");
+    }
+
+    private static void ValidateVerticalSliceAssets()
+    {
+        var scene = File.ReadAllText("scenes/Main.tscn");
+        Require(scene.Contains("AudioDirector.cs", StringComparison.Ordinal) &&
+                scene.Contains("[node name=\"AudioDirector\" type=\"Node\" parent=\".\"]", StringComparison.Ordinal),
+            "the audio director must be a scene child before menu setup begins");
+        var galaxy = "assets/visual/space/campaign-galaxy-four-arm-v1.png";
+        Require(File.Exists(galaxy) && new FileInfo(galaxy).Length > 1_000_000,
+            "the matched four-arm campaign galaxy artwork is missing or unexpectedly small");
+        foreach (var path in new[]
+        {
+            "assets/audio/music/menu-continuum.wav", "assets/audio/music/deep-space-operations.wav",
+            "assets/audio/sfx/ui-hover.wav", "assets/audio/sfx/ui-confirm.wav",
+            "assets/audio/sfx/construction-complete.wav", "assets/audio/sfx/discovery-reveal.wav",
+            "assets/audio/sfx/ship-launch.wav", "assets/audio/sfx/strategic-alert.wav",
+        })
+        {
+            Require(File.Exists(path) && new FileInfo(path).Length > 3_000, $"missing audio asset {path}");
+            using var stream = File.OpenRead(path);
+            Span<byte> header = stackalloc byte[12];
+            Require(stream.Read(header) == header.Length &&
+                    System.Text.Encoding.ASCII.GetString(header[..4]) == "RIFF" &&
+                    System.Text.Encoding.ASCII.GetString(header[8..]) == "WAVE",
+                $"audio asset is not a valid PCM wave container: {path}");
+        }
+        var mainScore = "assets/audio/music/claimed-by-the-void-loop.mp3";
+        Require(File.Exists(mainScore) && new FileInfo(mainScore).Length > 100_000,
+            "missing user-supplied main score MP3");
+        using (var stream = File.OpenRead(mainScore))
+        {
+            Span<byte> header = stackalloc byte[3];
+            Require(stream.Read(header) == header.Length &&
+                    (System.Text.Encoding.ASCII.GetString(header) == "ID3" ||
+                     (header[0] == 0xFF && (header[1] & 0xE0) == 0xE0)),
+                "main score is not a recognizable MP3 stream");
+        }
     }
 
     private static void ValidateKnowledgeFreshness()

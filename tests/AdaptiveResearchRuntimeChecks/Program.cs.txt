@@ -1,0 +1,136 @@
+using System;
+using System.IO;
+using System.Linq;
+using Game.Simulation.Research.Adaptive;
+
+static void Assert(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}
+
+var repoRoot = Directory.GetCurrentDirectory();
+var dataRoot = Path.Combine(repoRoot, "data", "research", "v1");
+var runtime = AdaptiveResearchRuntime.LoadFromDirectory(dataRoot);
+
+Assert(runtime.Catalog.Nodes.Count == runtime.Catalog.Metadata.DeclaredNodeCount, "Runtime catalog count must match index metadata.");
+Assert(runtime.Catalog.Nodes.Count >= 360, "Expected the current public Adaptive Research seed or a later expansion.");
+Assert(runtime.Catalog.Metadata.DomainCount >= 21, "Expected the current domain seed or a later expansion.");
+Assert(runtime.Applicability.Traits.Count == runtime.Catalog.Metadata.TraitCount, "Applicability catalog must match base trait count.");
+Assert(runtime.Facilities.FacilityCapabilityIds.Count >= 23, "Facility catalog must load base plus biochemical extension capabilities.");
+
+var state = runtime.CreateCivilizationState("runtime-check-civ");
+Assert(state.NodeStates.Count == 0, "A new civilization must not receive a full copy of the static possibility graph.");
+Assert(state.ActiveProjects.Count == 0, "A new research runtime state should have no implicit directed projects.");
+
+var initialEvents = runtime.ReviewBasicScienceCandidates(state, new[]
+{
+    "systems_engineering",
+    "computational_science",
+    "advanced_material_characterization",
+});
+Assert(initialEvents.Count == 3, "Three prerequisite-free foundation candidates should become Investigable.");
+Assert(state.NodeStates.Count == 3, "Only the reviewed eligible candidates should materialize into civilization state.");
+Assert(state.NodeStates.Values.All(node => node.Maturity == ResearchMaturity.Investigable), "Reviewed roots should be Investigable, not auto-Mature.");
+
+runtime.SetTotalEffectiveResearchLabs(state, 4);
+var startSystems = runtime.StartDirectedResearch(state, "systems_engineering", 2, readinessScore: 60);
+Assert(startSystems.Accepted, "Systems Engineering should start with two labs.");
+
+var concurrent = runtime.StartDirectedResearch(state, "computational_science", 2, readinessScore: 60);
+Assert(!concurrent.Accepted, "Starting-stage research must reject a second simultaneous directed program.");
+Assert(concurrent.Blockers.Any(blocker => blocker.Code == ResearchBlockerCode.DirectedProgramCapacity), "Second-project rejection should identify directed-program capacity.");
+
+runtime.AdvanceProjects(state, 2.0);
+Assert(state.TryGetNodeState("systems_engineering", out var systems) && systems.Maturity == ResearchMaturity.Mature, "Two labs for two years should mature the 250-RP foundation project at baseline readiness.");
+Assert(!state.ActiveProjects.ContainsKey("systems_engineering"), "Mature projects must release their directed slot/labs.");
+
+var startComputational = runtime.StartDirectedResearch(state, "computational_science", 2, readinessScore: 60);
+Assert(startComputational.Accepted, "Computational Science should start after the first project releases the slot.");
+runtime.AdvanceProjects(state, 2.0);
+Assert(state.TryGetNodeState("computational_science", out var computational) && computational.Maturity == ResearchMaturity.Mature, "Computational Science should Mature.");
+Assert(state.TryGetNodeState("complex_systems_science", out var complexVisible) && complexVisible.Maturity == ResearchMaturity.Investigable, "Maturing both foundation prerequisites should wake Complex Systems Science through the prerequisite index.");
+
+var startMaterial = runtime.StartDirectedResearch(state, "advanced_material_characterization", 2, readinessScore: 60);
+Assert(startMaterial.Accepted, "Advanced Material Characterization should start.");
+runtime.AdvanceProjects(state, 2.0);
+Assert(state.TryGetNodeState("advanced_material_characterization", out var material) && material.Maturity == ResearchMaturity.Mature, "Advanced Material Characterization should Mature.");
+
+var startComplex = runtime.StartDirectedResearch(state, "complex_systems_science", 2, readinessScore: 60);
+Assert(startComplex.Accepted, "Complex Systems Science should start after prerequisites are Mature.");
+runtime.AdvanceProjects(state, 2.0);
+Assert(state.TryGetNodeState("complex_systems_science", out var complex) && complex.Maturity == ResearchMaturity.Mature, "Complex Systems Science should Mature.");
+
+runtime.SetApplicabilityContextTraits(state, "population-a", new[] { "metabolic_biology" });
+runtime.SetApplicabilityContextTraits(state, "population-b", new[] { "gravity_sensitive_biology" });
+
+var solventA = runtime.Eligibility.EvaluateScientificEligibility(state, "solvent_biochemistry_modeling", "population-a");
+var solventB = runtime.Eligibility.EvaluateScientificEligibility(state, "solvent_biochemistry_modeling", "population-b");
+Assert(solventA.Allowed, "Metabolic population context should qualify for Alternative-Solvent Biochemistry once prerequisites exist.");
+Assert(!solventB.Allowed, "A different population context without metabolic_biology must not inherit population A's applicability.");
+Assert(solventB.Blockers.Any(blocker => blocker.Code == ResearchBlockerCode.MissingApplicabilityTrait), "Cross-context rejection should be an applicability blocker.");
+Assert(state.TryGetNodeState("solvent_biochemistry_modeling", out var solventVisible) && solventVisible.Maturity == ResearchMaturity.Investigable, "Eligible population context should wake the shared civilization research node without creating a per-population graph copy.");
+
+var prototypeFacilities = runtime.Facilities.GetStageRequirement("prototype_warp_drive", ResearchMaturity.Experimental);
+Assert(prototypeFacilities is not null, "Prototype Warp Drive should have an Experimental facility requirement.");
+Assert(prototypeFacilities!.AllOf.Contains("high_energy_experimentation"), "Prototype Warp requires high-energy experimentation.");
+Assert(prototypeFacilities.AllOf.Contains("field_physics_experimentation"), "Prototype Warp requires field-physics experimentation.");
+Assert(prototypeFacilities.AllOf.Contains("precision_measurement"), "Prototype Warp requires precision measurement.");
+
+var scaledThirtyTwo = runtime.Catalog.LabScaling.ScaleAssignedLabs(32, 16);
+Assert(Math.Abs(scaledThirtyTwo - 21.6) < 0.000001, "Runtime lab diminishing returns must match the validated 32-lab collaboration reference (21.6 scaled units).");
+
+var view = runtime.BuildView(state);
+var visibleIds = view.VisibleNodes.Select(node => node.NodeId).ToHashSet(StringComparer.Ordinal);
+Assert(view.VisibleNodes.Count == state.NodeStates.Count, "Materialized view must project only already-visible node state.");
+Assert(view.VisibleNodes.Count < runtime.Catalog.Nodes.Count, "Materialized view must not project the entire hidden possibility graph.");
+Assert(view.VisibleEdges.All(edge => visibleIds.Contains(edge.FromVisibleNodeId) && visibleIds.Contains(edge.ToVisibleNodeId)), "Every projected edge must connect two visible nodes.");
+Assert(view.RecognizedPressures.All(pressure => pressure.VisibleHardGateTargetNodeIds.All(visibleIds.Contains)), "Pressure view must never expose hidden hard-gate targets.");
+
+var codec = new AdaptiveResearchSnapshotCodec(runtime);
+var json = codec.Serialize(state);
+var restored = codec.Deserialize(json);
+Assert(restored.CivilizationId == state.CivilizationId, "Snapshot must preserve civilization identity.");
+Assert(restored.NodeStates.Count == state.NodeStates.Count, "Snapshot must preserve sparse visible node state.");
+Assert(restored.NodeStates.Count < runtime.Catalog.Nodes.Count, "Snapshot must not expand into a full catalog copy.");
+Assert(restored.TotalEffectiveResearchLabs == state.TotalEffectiveResearchLabs, "Snapshot must preserve lab-capacity cache/assignment context.");
+Assert(restored.HasApplicabilityTrait("population-a", "metabolic_biology"), "Snapshot must preserve population-scoped applicability traits.");
+Assert(!restored.HasApplicabilityTrait("population-b", "metabolic_biology"), "Snapshot round trip must preserve context isolation.");
+Assert(runtime.BuildView(restored).VisibleNodes.Count == view.VisibleNodes.Count, "Restored materialized view should contain the same visible-node count.");
+
+var composer = new AdaptiveResearchStartingProfileComposer(runtime, dataRoot);
+Assert(composer.ReferenceProfileIds.Count == 8, "Starting composer should load all eight reference profiles through the modular index.");
+Assert(composer.FragmentIds.Count == 15, "Starting composer should load all fifteen scientific-history fragments through the modular index.");
+
+var humanStart = composer.ComposeReferenceProfile(
+    "human-reference-runtime",
+    "reference_humanlike_solar_2050",
+    "primary-human-population");
+var humanState = humanStart.State;
+Assert(humanState.NodeStates.Count < runtime.Catalog.Nodes.Count, "Human 2050 composition must remain a sparse current horizon, not a stored future tree.");
+Assert(humanState.TryGetNodeState("fusion_power", out var fusion) && fusion.Maturity == ResearchMaturity.Investigable, "Human-like 2050 should begin with practical fusion power Investigable rather than Mature.");
+Assert(!humanState.NodeStates.ContainsKey("prototype_warp_drive"), "Human-like 2050 must not begin with Prototype Warp visible merely because it exists in the hidden graph.");
+Assert(humanState.HasApplicabilityTrait("primary-human-population", "metabolic_biology"), "Human-like starting history should include metabolic biology.");
+Assert(humanState.HasApplicabilityTrait("primary-human-population", "carbon_centered_biochemistry"), "Human-like starting history should be carbon-centered.");
+Assert(humanState.HasApplicabilityTrait("primary-human-population", "water_solvent_biology"), "Human-like starting history should be water-solvent biology.");
+Assert(humanState.HasApplicabilityTrait("primary-human-population", "gravity_sensitive_biology"), "Human-like starting history should retain gravity-sensitive biology.");
+Assert(Math.Abs(humanState.TotalEffectiveResearchLabs - 12.0) < 0.000001, "Human-like 2050 reference should aggregate 12 Effective Research Lab units from its starting institutions.");
+Assert(humanState.DirectedProgramStageId == "single_priority_program", "Human-like 2050 should begin with one directed major research program.");
+Assert(humanStart.Deferred.FieldCompetence.Count > 0, "Starting composition must preserve deferred field-competence seeds for later competence-runtime integration.");
+Assert(humanStart.Deferred.ResearchInstitutions.Any(seed => seed.InstitutionArchetypeId == "general_research_laboratory" && seed.Count == 6), "Starting composition must preserve the six general research laboratories as physical institution seeds.");
+
+var ammoniaStart = composer.ComposeReferenceProfile(
+    "ammonia-reference-runtime",
+    "reference_ammonia_rich_early_space",
+    "primary-ammonia-population");
+Assert(ammoniaStart.State.HasApplicabilityTrait("primary-ammonia-population", "ammonia_rich_biology"), "Ammonia-rich reference should seed native ammonia biology through applicability context.");
+Assert(ammoniaStart.State.TryGetNodeState("ammonia_solvent_homeostasis", out var ammoniaHomeostasis) && ammoniaHomeostasis.Maturity == ResearchMaturity.Mature, "Ammonia-rich native homeostasis science should begin Mature from historical development.");
+Assert(!ammoniaStart.State.HasApplicabilityTrait("primary-ammonia-population", "silicon_centered_biochemistry"), "Ammonia-rich population must not inherit silicon-centered biology from another reference start.");
+Assert(!ammoniaStart.State.NodeStates.ContainsKey("silicon_biochemical_frameworks"), "Same hidden graph must not make silicon-native science visible to an incompatible ammonia reference at start.");
+
+var humanSnapshot = codec.Serialize(humanState);
+var humanRestored = codec.Deserialize(humanSnapshot);
+Assert(humanRestored.NodeStates.Count == humanState.NodeStates.Count, "Composed human starting state must round-trip without expanding hidden research.");
+Assert(humanRestored.HasApplicabilityTrait("primary-human-population", "water_solvent_biology"), "Composed start snapshot must preserve biochemical context.");
+
+Console.WriteLine($"Adaptive Research runtime checks OK: catalog={runtime.Catalog.Nodes.Count}, visible={view.VisibleNodes.Count}, humanStart={humanState.NodeStates.Count}, ammoniaStart={ammoniaStart.State.NodeStates.Count}, lab scaling={scaledThirtyTwo:0.0}, snapshot bytes={json.Length}.");

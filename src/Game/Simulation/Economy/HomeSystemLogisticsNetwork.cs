@@ -120,6 +120,18 @@ public sealed class PrototypeHomeSystemLogisticsNetworkView : IHomeSystemLogisti
                 LogisticsNodeKind.Shipyard));
         }
 
+        int? resourceNodeId = null;
+        if (construction.CompletedProjectIds.Contains("asteroid_resource_network"))
+        {
+            resourceNodeId = nextNodeId++;
+            nodes.Add(new LogisticsNode(
+                resourceNodeId.Value,
+                civilizationId,
+                civilization.HomeSystemId,
+                "Asteroid Resource Network",
+                LogisticsNodeKind.ResourceSite));
+        }
+
         if (homeColonies.Length > 0 && orbitalHubNodeId is { } hubId)
         {
             var handlingCapacity = Math.Max(0.10, logistics.CargoHandlingCapacityPerDay);
@@ -144,6 +156,17 @@ public sealed class PrototypeHomeSystemLogisticsNetworkView : IHomeSystemLogisti
                     yardId,
                     handlingCapacity,
                     TransitDays: 0.03,
+                    Bidirectional: true));
+            }
+            if (resourceNodeId is { } resourceId)
+            {
+                links.Add(new LogisticsLink(
+                    nextLinkId++,
+                    civilizationId,
+                    resourceId,
+                    hubId,
+                    handlingCapacity,
+                    TransitDays: 0.35,
                     Bidirectional: true));
             }
         }

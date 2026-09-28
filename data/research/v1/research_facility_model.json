@@ -28,6 +28,18 @@
       "id":"general_research_laboratory","name":"General Research Laboratory","enabled_by":null,"effective_lab_units":1,"specialized_fields":[],"facility_capabilities":["general_experimentation"],"description":"Basic broad scientific capacity; suitable for ordinary early research but not a substitute for explicit specialist facilities."
     },
     {
+      "id":"surface_science_laboratory","name":"Surface Science Laboratory","enabled_by":null,"effective_lab_units":1,"specialized_fields":[],"facility_capabilities":["general_experimentation"]
+    },
+    {
+      "id":"surface_science_laboratory_district","name":"Surface Science Laboratory in Research District","enabled_by":null,"effective_lab_units":1.25,"specialized_fields":[],"facility_capabilities":["general_experimentation"]
+    },
+    {
+      "id":"advanced_surface_science_campus","name":"Advanced Surface Science Campus","enabled_by":null,"effective_lab_units":2.5,"specialized_fields":["science","computing","analysis"],"facility_capabilities":["general_experimentation"]
+    },
+    {
+      "id":"advanced_surface_science_campus_district","name":"Advanced Surface Science Campus in Research District","enabled_by":null,"effective_lab_units":3.125,"specialized_fields":["science","computing","analysis"],"facility_capabilities":["general_experimentation"]
+    },
+    {
       "id":"precision_metrology_center","name":"Precision Metrology Center","enabled_by":"precision_metrology","effective_lab_units":2,"specialized_fields":["metrology","physics","materials","sensors"],"facility_capabilities":["general_experimentation","precision_measurement","materials_characterization"]
     },
     {

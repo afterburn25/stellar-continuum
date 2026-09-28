@@ -19,6 +19,11 @@ public sealed class CivilizationSeeder
         new("Tarkesh Reach", CivilizationArchetype.Territorial, new CivilizationTraits(0.56, 0.92, 0.38, 0.32, 0.48, 1.00)),
         new("Seren Accord", CivilizationArchetype.Diplomatic, new CivilizationTraits(0.12, 0.08, 0.22, 0.52, 0.22, 1.00)),
         new("Kor Vow", CivilizationArchetype.HonorBound, new CivilizationTraits(0.66, 0.38, 0.16, 0.28, 0.78, 0.88, HonorBound: true)),
+        new("Namar Coalition", CivilizationArchetype.Adaptive, new CivilizationTraits(0.28, 0.24, 0.42, 0.48, 0.38, 1.00)),
+        new("Ilyr Concord", CivilizationArchetype.Diplomatic, new CivilizationTraits(0.10, 0.12, 0.30, 0.60, 0.20, 1.00)),
+        new("Vask Dominion", CivilizationArchetype.Militarist, new CivilizationTraits(0.76, 0.62, 0.24, 0.26, 0.58, 1.00)),
+        new("Pelagos Combine", CivilizationArchetype.Mercantile, new CivilizationTraits(0.18, 0.18, 0.76, 0.50, 0.26, 1.00)),
+        new("Thren Observatory", CivilizationArchetype.Scientific, new CivilizationTraits(0.14, 0.16, 0.22, 0.90, 0.24, 1.00)),
     };
 
     private static readonly CivilizationTemplate[] AncientTemplates =
@@ -28,65 +33,116 @@ public sealed class CivilizationSeeder
         new("Orison Keepers", CivilizationArchetype.AncientCustodian, new CivilizationTraits(0.10, 0.06, 0.03, 0.92, 0.12, 1.00)),
     };
 
-    public List<CivilizationState> Seed(IReadOnlyList<StarSystemState> systems, int preWarpCount, int ancientCount, long seed)
-    {
-        if (preWarpCount < 1 || preWarpCount > PreWarpTemplates.Length) throw new ArgumentOutOfRangeException(nameof(preWarpCount));
-        if (ancientCount < 0 || ancientCount > AncientTemplates.Length) throw new ArgumentOutOfRangeException(nameof(ancientCount));
-        if (systems.Count < preWarpCount + ancientCount) throw new InvalidOperationException("There are fewer star systems than seeded civilizations.");
+    /// <summary>
+    /// Compatibility overload for legacy migration/tests. Physical worlds are regenerated from
+    /// the same canonical deterministic planet catalog used by a live campaign, then the normal
+    /// species-relative homeworld planner is used.
+    /// </summary>
+    public List<CivilizationState> Seed(
+        IReadOnlyList<StarSystemState> systems,
+        int preWarpCount,
+        int ancientCount,
+        long seed) =>
+        Seed(
+            systems,
+            new PlanetaryBodyGenerator().Generate(seed, systems),
+            preWarpCount,
+            ancientCount,
+            seed);
 
-        var candidates = systems.Where(system => system.HasHabitableWorld && !system.HasPreWarpCivilization).ToList();
-        if (candidates.Count < preWarpCount + ancientCount) candidates = systems.Where(system => system.HasHabitableWorld).ToList();
-        if (candidates.Count < preWarpCount + ancientCount) candidates = systems.ToList();
+    public List<CivilizationState> Seed(
+        IReadOnlyList<StarSystemState> systems,
+        IReadOnlyList<PlanetaryBodyState> planetaryBodies,
+        int preWarpCount,
+        int ancientCount,
+        long seed,
+        string playerSpeciesId = SpeciesCatalog.TerranBaselineId)
+    {
+        ArgumentNullException.ThrowIfNull(systems);
+        ArgumentNullException.ThrowIfNull(planetaryBodies);
+
+        if (preWarpCount < 1 || preWarpCount > PreWarpTemplates.Length)
+            throw new ArgumentOutOfRangeException(nameof(preWarpCount));
+        if (ancientCount < 0 || ancientCount > AncientTemplates.Length)
+            throw new ArgumentOutOfRangeException(nameof(ancientCount));
+        if (!SpeciesCatalog.TryGet(playerSpeciesId, out _))
+            throw new ArgumentException($"Unknown player species '{playerSpeciesId}'.", nameof(playerSpeciesId));
+        var civilizationCount = preWarpCount + ancientCount;
+        if (systems.Count < civilizationCount)
+            throw new InvalidOperationException("There are fewer star systems than seeded civilizations.");
+
+        // Fresh canonical starts reserve the one human founding faction; other physiology
+        // remains deterministic. Legacy catalogs retain the original assignment policy.
+        // AI archetype/template selection is intentionally independent from biology.
+        var canonicalStarts = systems.Any(SolCatalogPreset.IsSol);
+        var speciesIds = Enumerable.Range(0, civilizationCount)
+            .Select(civilizationId => canonicalStarts
+                ? SpeciesAssignmentPolicy.AssignNewCampaign(seed, civilizationId)
+                : SpeciesAssignmentPolicy.Assign(seed, civilizationId))
+            .ToArray();
+        // Preserve the canonical Human faction whenever the player selected rivals. With zero
+        // rivals, a nonhuman player owns the sole founding faction instead of silently creating
+        // a Human opponent that contradicts the campaign option.
+        var playerCivilizationId = playerSpeciesId == SpeciesCatalog.TerranBaselineId || preWarpCount == 1 ? 0 : 1;
+        if (canonicalStarts && playerSpeciesId != SpeciesCatalog.TerranBaselineId)
+            speciesIds[playerCivilizationId] = playerSpeciesId;
+        var homeworlds = new SpeciesHomeworldPlanner()
+            .Plan(systems, planetaryBodies, speciesIds)
+            .ToDictionary(assignment => assignment.CivilizationId);
 
         var random = new Random(unchecked((int)((seed * 397) ^ (seed >> 32) ^ 0x51A7C0DE)));
-        var homes = PickSpreadHomes(candidates, preWarpCount + ancientCount, random);
         var preWarpDeck = PreWarpTemplates.OrderBy(_ => random.Next()).Take(preWarpCount).ToArray();
         var ancientDeck = AncientTemplates.OrderBy(_ => random.Next()).Take(ancientCount).ToArray();
-        var civilizations = new List<CivilizationState>(preWarpCount + ancientCount);
+        var civilizations = new List<CivilizationState>(civilizationCount);
 
         for (var i = 0; i < preWarpCount; i++)
         {
             var template = preWarpDeck[i];
             var civilizationId = civilizations.Count;
-            var speciesId = SpeciesAssignmentPolicy.Assign(seed, civilizationId);
+            var home = homeworlds[civilizationId];
             civilizations.Add(new CivilizationState(
-                civilizationId, template.Name, homes[i].Id, template.Archetype, template.Traits, i == 0,
-                CivilizationDevelopmentStage.PreWarp, false, true, false, speciesId));
+                civilizationId,
+                canonicalStarts && speciesIds[civilizationId] == SpeciesCatalog.TerranBaselineId && civilizationId == 0
+                    ? "Human Commonwealth"
+                    : template.Name,
+                home.SystemId,
+                template.Archetype,
+                template.Traits,
+                i == playerCivilizationId,
+                CivilizationDevelopmentStage.PreWarp,
+                false,
+                true,
+                false,
+                home.SpeciesId));
         }
 
         for (var i = 0; i < ancientCount; i++)
         {
             var template = ancientDeck[i];
             var civilizationId = civilizations.Count;
-            var speciesId = SpeciesAssignmentPolicy.Assign(seed, civilizationId);
+            var home = homeworlds[civilizationId];
             civilizations.Add(new CivilizationState(
-                civilizationId, template.Name, homes[preWarpCount + i].Id, template.Archetype, template.Traits, false,
-                CivilizationDevelopmentStage.AncientSpacefaring, true, false, true, speciesId));
+                civilizationId,
+                template.Name,
+                home.SystemId,
+                template.Archetype,
+                template.Traits,
+                false,
+                CivilizationDevelopmentStage.AncientSpacefaring,
+                true,
+                false,
+                true,
+                home.SpeciesId));
         }
 
-        return civilizations;
-    }
-
-    private static List<StarSystemState> PickSpreadHomes(IReadOnlyList<StarSystemState> candidates, int count, Random random)
-    {
-        var remaining = candidates.ToList();
-        var chosen = new List<StarSystemState>(count);
-        var firstIndex = random.Next(remaining.Count);
-        chosen.Add(remaining[firstIndex]);
-        remaining.RemoveAt(firstIndex);
-        while (chosen.Count < count)
+        return civilizations.Select(c => c with
         {
-            var best = remaining.Select(system => new
-                {
-                    System = system,
-                    MinimumDistance = chosen.Min(existing => System.Numerics.Vector2.DistanceSquared(existing.Position, system.Position)),
-                    Jitter = random.NextDouble() * 0.0001,
-                }).OrderByDescending(candidate => candidate.MinimumDistance + candidate.Jitter).First();
-            chosen.Add(best.System);
-            remaining.Remove(best.System);
-        }
-        return chosen;
+            Leadership = CivilizationLeadershipState.CreateFoundingRoster(c.Id, c.SpeciesId == SpeciesCatalog.TerranBaselineId),
+        }).ToList();
     }
 
-    private sealed record CivilizationTemplate(string Name, CivilizationArchetype Archetype, CivilizationTraits Traits);
+    private sealed record CivilizationTemplate(
+        string Name,
+        CivilizationArchetype Archetype,
+        CivilizationTraits Traits);
 }

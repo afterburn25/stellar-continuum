@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Models research classification, compartmentalization, protected records, controlled dissemination, compromise, and declassification as real information-access policy. It never changes scientific truth, creates magic invisibility, or takes ownership of espionage/security actions from their owning workstreams.",
+  "core_rules": {
+    "classification_attaches_to_records_projects_and_assets_not_physics": true,
+    "scientific_maturity_unchanged_by_classification": true,
+    "classification_does_not_make_deployed_capability_unobservable": true,
+    "classification_does_not_directly_modify_rp_generation_or_project_cost": true,
+    "classification_can_limit_eligible_participants_and_dissemination": true,
+    "legal_or_policy_restrictions_are_not_physical_force_fields": true,
+    "actual_protection_comes_from_real_security_controls": true,
+    "compromise_requires_factual_external_event_or_known_leak_not_hidden_assumption": true
+  },
+  "access_classes": [
+    {"id":"normal_scientific","name":"Normal Scientific Access","meaning":"Ordinary authorized scientific institutions/contexts within the polity can receive the codified result through normal dissemination rules.","default":true},
+    {"id":"restricted_program","name":"Restricted Program","meaning":"Only explicitly eligible institutions, roles, contexts, or collaborating parties receive detailed records; normal polity-wide dissemination is withheld."},
+    {"id":"classified","name":"Classified","meaning":"Detailed records require explicit security authorization and protected storage/communications under owning security-policy rules."},
+    {"id":"special_access_compartment","name":"Special-Access Compartment","meaning":"Detailed records are split into need-to-know compartments. Possessing one compartment does not imply access to all project records or implementation details."}
+  ],
+  "existence_disclosure_states": [
+    {"id":"acknowledged","meaning":"The program/knowledge record may be known to exist even when details are restricted."},
+    {"id":"restricted_metadata","meaning":"Existence/metadata is disclosed only to authorized internal roles/contexts; unauthorized observers may still infer it from physical evidence."},
+    {"id":"concealed_metadata","meaning":"Owning policy attempts to conceal the program/record's existence from unauthorized parties. This is an intent/access policy, not guaranteed invisibility."}
+  ],
+  "record_scope": {
+    "possible_targets": ["active_research_project","node_research_revision","experimental_dataset","engineering_blueprints","experimental_protocols","manufacturing_process_records","foreign_technology_assessment","tacit_asset_metadata","research_facility_program_metadata"],
+    "rule":"Apply security only to records/assets that materially need different access. Do not create one classification row for every normal research node."
+  },
+  "security_policy_record": {
+    "required_fields": ["security_record_id","target_ref","access_class","existence_disclosure","authorized_principal_or_group_refs","authorized_research_context_refs","external_release_policy","created_revision"],
+    "optional_fields": ["compartment_ids","required_security_service_refs","protected_archive_refs","authorized_facility_refs","authorized_expert_cohort_refs","expiry_or_review_date","known_compromise_state","declassification_conditions_summary"],
+    "sparse_only_when_nondefault": true
+  },
+  "external_release_policy": [
+    {"id":"none","meaning":"No deliberate external release; external parties can still learn through legitimate observation, sharing agreements, leaks, capture, or intelligence."},
+    {"id":"summary_only","meaning":"High-level existence/capability/scientific summary may be intentionally released without actionable implementation records."},
+    {"id":"scientific_records","meaning":"Selected codified theory/data may be externally published or shared; engineering/tacit assets remain separately controlled."},
+    {"id":"full_authorized_package","meaning":"A deliberate external package may include engineering records/assets according to technology-exchange rights and technical availability."}
+  ],
+  "compartment_model": {
+    "rule":"Compartments divide actual records/responsibilities. They do not split the underlying scientific truth into contradictory universes.",
+    "possible_compartment_scopes": ["theory","experimental_data","prototype_design","manufacturing_process","materials_or_feedstock","software_or_control","facility_operations","deployment_integration"],
+    "cross_compartment_integration": "Engineering stages may require an authorized integration context that can access the necessary compartments. Missing access is a concrete participation/blocker condition, not a generic RP penalty.",
+    "minimum_information_rule":"A compartment should exist only when there is genuinely separable information/need-to-know value; do not create decorative compartments."
+  },
+  "research_project_effects": {
+    "no_direct_percent_penalty": true,
+    "actual_effects": [
+      "only authorized Effective Research Labs can be assigned",
+      "only authorized expert/tacit assets contribute",
+      "only authorized facilities/contexts can participate",
+      "restricted cross-institution review can reduce evidence/reproducibility readiness only when the project genuinely requires independent validation",
+      "extra physical replication sites/archives must actually be built/maintained if security policy requires redundancy",
+      "communications security or compartment boundaries may delay specific coordination/data dependencies when external systems report them as material"
+    ],
+    "rule":"If secrecy makes a project slower, the slowdown must be explainable through reduced real eligible capacity, missing validation, communications/security constraints, or duplicated physical work—not an arbitrary secrecy multiplier."
+  },
+  "protection_inputs_owned_elsewhere": {
+    "security_services": ["identity_and_access_control","communications_confidentiality_and_authentication","archive_encryption_or_hardening","facility_physical_security","personnel_screening_and_audit","network_or_system_isolation","counterintelligence_monitoring"],
+    "rule":"Adaptive Research consumes factual service availability/limitations. It does not simulate spy actions, security personnel, cryptographic attacks, infiltration, interception, or counterintelligence operations."
+  },
+  "compromise_model": {
+    "known_states": ["no_known_compromise","suspected","confirmed_partial","confirmed_material","scope_unknown"],
+    "possible_external_fact_sources": ["detected leak","captured records or device","defector or recruited expert","compromised facility/archive","intercepted transmission","technology observed in foreign use","voluntary unauthorized disclosure"],
+    "research_effects": [
+      "create/update evidence with provenance when actual records/observations are acquired",
+      "create/update foreign-technology assessment when another polity's implementation becomes known",
+      "add tacit/record assets only for what was actually compromised",
+      "never directly set the recipient's native node Mature",
+      "never tell the owner who has the data unless detection/intelligence legitimately established that fact"
+    ],
+    "partial_compromise_rule":"Engineering blueprints without tooling/experts can improve understanding/reproduction assessment but do not imply native practical reproduction."
+  },
+  "observation_vs_records": {
+    "rule":"Physical observation of a classified deployed capability follows the existing legitimate_foreign_capability_observed path.",
+    "possible_result":"An observer can know that a capability exists or characterize performance while remaining ignorant of the source node, theory, manufacturing process, or complete design.",
+    "secrecy_limit":"A classification policy cannot suppress photons, debris, combat telemetry, emissions, trade effects, or other real observables. Other systems decide what can actually be sensed."
+  },
+  "declassification_and_reclassification": {
+    "declassification_rule":"Changing access policy expands authorized dissemination/archives. It does not change research maturity, retroactively create expert practice, or automatically export knowledge to foreign polities.",
+    "reclassification_rule":"Tightening policy stops future normal dissemination and can restrict access to protected records, but cannot erase copies already lawfully/physically distributed unless real deletion/recovery actions occur.",
+    "compromise_persistence":"Reclassification cannot un-leak records already outside control.",
+    "archive_rule":"Declassification can improve resilience by increasing independent codified copies; classification can reduce resilience if too few protected copies actually exist."
+  },
+  "distributed_research_interface": {
+    "base_model":"distributed_research_continuity_model.json",
+    "rules": [
+      "classification creates access exceptions only where policy differs from synchronized default",
+      "classified records can remain confined to selected research contexts even when communications paths exist",
+      "authorized contexts still obey real communications latency",
+      "reclassification does not delete existing context copies; real deletion or recovery actions are required",
+      "political fracture inherits classified knowledge only where protected records/assets/authorized people physically or administratively fall under successor control",
+      "a successor may know a classified program existed without inheriting actionable records"
+    ]
+  },
+  "technology_exchange_interface": {
+    "base_model":"technology_exchange_model.json",
+    "rule":"Deliberate sharing of protected knowledge uses the existing package/right model. Classification policy may restrict authorization to share, but it does not alter whether a copied record is technically copyable once acquired.",
+    "external_release_is_not_automatic_license": true
+  },
+  "view_and_explanation": {
+    "own_authorized_view": ["access class and existence-disclosure intent","authorized research contexts/groups","material coordination/redundancy blockers","known compromise state","known archive resilience","known declassification impact"],
+    "unauthorized_or_foreign_view":"Shows only legitimately known metadata, observed capabilities, rumors/evidence, or acquired assets. Never reveal classification records just because they exist authoritatively.",
+    "no_raw_security_rolls": true,
+    "no_omniscient_leak_indicator": true
+  },
+  "performance": {
+    "default_normal_scientific_access_not_stored_per_node": true,
+    "only_nondefault_security_records_persist": true,
+    "compartment_membership_uses_group_refs_not_per_person_lists": true,
+    "compromise_history_compressed_after_strategic_relevance_fades": true,
+    "declassified_redundant_records_merge_into_normal_access_state": true,
+    "no_full_graph_security_copy": true,
+    "security_reassessment_event_driven": true
+  },
+  "fair_information": {
+    "AI_and_player_same_classification_access_rules": true,
+    "AI_does_not_know_undetected_compromise": true,
+    "foreign_classified_programs_require_legitimate_evidence_or_intelligence": true,
+    "observed_capability_does_not_reveal_hidden_implementation": true,
+    "harder_AI_receives_no_secret_program_omniscience": true
+  },
+  "cross_workstream_ownership": {
+    "adaptive_research":"research record classification semantics, authorized research participation, dissemination consequences, research-side compromise interpretation, declassification/reclassification effects",
+    "intelligence_security":"espionage, infiltration, interception, theft, defection, compromise detection, counterintelligence, personnel/facility security actions",
+    "communications":"actual secure path, latency, bandwidth, interception surface, authentication/confidentiality services",
+    "governance":"who may set classification policy and political/legal consequences of leaks",
+    "diplomacy_trade":"authorized external sharing/license negotiations and consequences",
+    "construction_population":"physical secure archives/facilities and expert cohort location/control"
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Stable event/query extension for distributed scientific knowledge and regional research continuity. It extends research_runtime_contract.json without changing ownership of communications, politics, population, construction, diplomacy, or UI systems.",
+  "base_runtime_contract": "research_runtime_contract.json",
+  "continuity_model": "distributed_research_continuity_model.json",
+  "authoritative_sparse_state_extension": [
+    "research_contexts_only_when_materially_divergent",
+    "knowledge_access_exceptions_by_context",
+    "field_practice_exceptions_by_context",
+    "located_research_asset_refs",
+    "pending_knowledge_transmissions",
+    "archive_replica_summaries",
+    "compressed_context_continuity_history"
+  ],
+  "external_input_events": [
+    {"id":"research_communication_path_changed","producer":"communications/logistics","payload":"source context, destination context, path availability, one-way latency, material bandwidth constraints, confidence","effect":"create/cancel/recalculate only affected pending knowledge transmissions and isolation state"},
+    {"id":"research_information_policy_changed","producer":"governance/security","payload":"context, publication access/censorship/embargo/security policy","effect":"re-evaluate only affected dissemination permissions; does not destroy archives unless a separate physical event says so"},
+    {"id":"research_archive_replica_changed","producer":"construction/governance/disaster","payload":"context, archive class, added/lost/damaged/restored/inaccessible, integrity","effect":"update local codified-access preservation and archive-loss risk"},
+    {"id":"research_asset_location_changed","producer":"population/construction/logistics","payload":"tacit/facility/tooling/prototype asset ref, old context, new context, availability","effect":"update local practice/readiness only where asset actually moved or changed control"},
+    {"id":"research_context_polity_changed","producer":"governance/politics","payload":"context ids, old/new polity ownership, fracture/reintegration type","effect":"calculate successor/reintegrated research inheritance from factual local context state"},
+    {"id":"research_context_topology_changed","producer":"governance/communications","payload":"regions added/removed/merged/split, context relationship","effect":"create, merge, archive, or remap only materially divergent research contexts"},
+    {"id":"external_science_sharing_changed","producer":"diplomacy/trade","payload":"parties, sharing mode, rights, source/destination contexts, package/assets","effect":"route through existing exchange/knowledge dissemination rules without merging technology trees"}
+  ],
+  "research_output_events": [
+    "research_context_created",
+    "research_context_merged",
+    "research_context_archived",
+    "context_knowledge_access_changed",
+    "context_field_practice_changed",
+    "knowledge_dissemination_started",
+    "knowledge_dissemination_delivered",
+    "knowledge_dissemination_interrupted",
+    "local_research_capability_changed",
+    "successor_research_state_materialized",
+    "reintegrated_research_state_reconciled"
+  ],
+  "external_queries": [
+    {"id":"context_knowledge_access","consumer":"construction/UI/AI/governance","input":"polity + context + known node/asset id","output":"absent/reference_only/codified/practiced plus known reason/provenance summary"},
+    {"id":"context_can_apply_capability","consumer":"construction/logistics/military/population/etc.","input":"polity + context + capability + optional population/installation target","output":"yes/no/limited plus scope; combines global knowledge with local access/practice/deployment context"},
+    {"id":"context_field_practice","consumer":"UI/AI/research","input":"polity + context + field id","output":"local theoretical/experimental/engineering band or inherited synchronized default"},
+    {"id":"pending_knowledge_delivery","consumer":"UI/AI","input":"destination context + optional node/asset","output":"known pending transmissions, ETA/range when estimable, blockers when recognized"},
+    {"id":"successor_research_inheritance_preview","consumer":"governance/UI/AI","input":"proposed successor polity + inherited context/asset refs","output":"knowledge/access/practice inheritance summary based only on current factual local state"},
+    {"id":"research_context_divergence_summary","consumer":"UI/AI/governance","input":"polity + context","output":"bounded summary of material scientific access/practice differences; never hidden future graph content"}
+  ],
+  "node_state_transition_integration": {
+    "on_new_visible_or_mature_state": [
+      "record source research context when relevant",
+      "update source context access/practice",
+      "create dissemination records only for authorized destinations that lack equivalent revision",
+      "advance synchronized civilization default only after materially connected default contexts receive equivalent codified access",
+      "remove redundant exceptions after baseline synchronization"
+    ],
+    "rule": "Scientific validity is never re-rolled per region. Context state controls access/practice, not whether the underlying physics is different."
+  },
+  "project_integration": {
+    "active_project_context": "Directed research may have one or more contributing contexts, but every contributing lab/facility/expert asset must physically/informationally be available to the project.",
+    "coordination_rule": "Do not apply a universal distance penalty. Communications delay/bandwidth can block or constrain specific data/coordination dependencies when external systems report them as material.",
+    "result_origin": "Project output originates in participating context(s) and then disseminates normally."
+  },
+  "successor_materialization": {
+    "input_only": [
+      "contexts actually inherited",
+      "archives actually accessible",
+      "located tacit assets/facilities/tooling/prototypes",
+      "active training pipelines",
+      "locally received research revisions",
+      "accessible external sharing routes"
+    ],
+    "forbidden_shortcuts": [
+      "copy former polity complete known-node set",
+      "copy former polity complete competence map",
+      "grant all former capabilities regardless of local context",
+      "assume experts/factories move to new polity automatically"
+    ]
+  },
+  "view_extension": {
+    "context_summary": ["context label","sync/isolation state","material access/practice differences","archive resilience","known pending knowledge deliveries"],
+    "node_context_detail": ["source context if relevant","local access states for divergent contexts","known propagation status"],
+    "successor_preview": "show inherited records/practice/assets and uncertainties without exposing hidden future nodes",
+    "performance": "build on demand from context exceptions; do not replicate the full research tree per region in UI"
+  },
+  "save_contract": {
+    "store_only_materially_divergent_contexts": true,
+    "store_only_node_access_exceptions": true,
+    "store_only_field_practice_exceptions": true,
+    "pending_transmissions_deduplicate_by_destination_and_revision": true,
+    "delivered_transmissions_removed_after_application": true,
+    "archived_context_history_compressed": true,
+    "no_static_graph_copy": true,
+    "no_full_context_node_map": true
+  },
+  "fair_information": {
+    "AI_uses_same_context_access_and_delivery_state": true,
+    "isolated_AI_context_cannot_read_unsynchronized_core_discovery": true,
+    "successor_AI_gets_only_materialized_inherited_state": true,
+    "foreign_context_access_requires_legitimate_intelligence": true
+  }
+}

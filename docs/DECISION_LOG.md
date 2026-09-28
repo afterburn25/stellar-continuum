@@ -335,22 +335,9 @@ Canonical detail: `foreign_technology_model.json` and `RESEARCH_FOREIGN_TECH_MOD
 
 **Decision:** Technology exchange is not one universal “sell tech” token.
 
-A package can contain any composition of:
+A package can contain any composition of observations, scientific theory/records, experimental datasets, engineering blueprints, manufacturing/process documentation, reference hardware, production tooling, expert assistance, training, and operating institutions.
 
-- observations
-- scientific theory/records
-- experimental datasets
-- engineering blueprints
-- manufacturing/process documentation
-- reference hardware
-- production tooling
-- expert assistance
-- training
-- operating institutions
-
-These components map into the same evidence/tacit-knowledge assets used by conquest, archaeology, and reverse engineering.
-
-Different package completeness therefore creates different scientific and operational value.
+These components map into the same evidence/tacit-knowledge assets used by conquest, archaeology, and reverse engineering. Different package completeness therefore creates different scientific and operational value.
 
 ## 2026-09-07 — Technology licenses are law, not physics
 
@@ -364,21 +351,7 @@ Real copy protection must arise from actual technical measures such as encryptio
 
 **Decision:** Technology value is buyer-specific.
 
-Research-side value depends on legitimate knowledge of:
-
-- capability novelty and current need
-- existing alternatives
-- compatibility
-- expected research work/time saved
-- field readiness
-- facilities/materials/population compatibility
-- package completeness
-- experts/tooling
-- dependency/hazard risk
-- legal rights included
-- scarcity/exclusivity
-- rival-denial value
-- legitimately known third-party demand
+Research-side value depends on legitimate knowledge of capability novelty/current need, existing alternatives, compatibility, expected research work/time saved, field readiness, facilities/materials/population compatibility, package completeness, experts/tooling, dependency/hazard risk, legal rights, scarcity/exclusivity, rival-denial value, and legitimately known third-party demand.
 
 Technology unusable to the holder can be highly valuable to another species, enabling brokerage/arbitrage without a universal `Technology Value: 500` number.
 
@@ -388,13 +361,7 @@ Technology unusable to the holder can be highly valuable to another species, ena
 
 Visible states are Rumored / Hypothesized / Investigable / Experimental / Demonstrated / Engineering / Mature / Archived.
 
-When branches emerge:
-
-- attach them near stable visible anchors
-- preserve viewport/zoom/selection where possible
-- avoid globally rearranging unrelated branches
-- draw links only between visible nodes
-- collapse mature/archive-heavy historical branches outside the active horizon when useful
+When branches emerge, attach them near stable visible anchors, preserve viewport/zoom/selection where possible, avoid globally rearranging unrelated branches, draw links only between visible nodes, and collapse mature/archive-heavy historical branches outside the active horizon when useful.
 
 Early 2050 UI remains simple; competence/facility/evidence/tacit detail is available on demand.
 
@@ -404,13 +371,50 @@ Foreign-tech UI shows Understanding / Operability / Reproduction / Adaptation se
 
 Canonical detail: `research_ui_contract.json` and `RESEARCH_UI_MODEL.md`.
 
+## 2026-09-07 — Starting science is composed history, not a species tech tree
+
+**Decision:** A playable civilization's initial research state is composed from **one base-era scientific profile plus reusable historical fragments**, together with biology/home-system facts supplied through the starting-civilization interface.
+
+Fragments describe past/current knowledge, competence, institutions, pressure, evidence, capabilities, and tacit assets. They do **not** contain or precompute the civilization's future tree.
+
+Complete starting compositions must be historically prerequisite-closed. Starting institutions with explicit enabling technologies require those technologies to be Mature.
+
+Starting field competence combines by strongest justified component with a cap rather than additive percentage stacking.
+
+Reference profiles are validation/balance examples, not species-specific catalogs.
+
+**Guardrails:**
+
+- no future Unknown nodes/placeholders in starting profiles
+- no FTL hypothesis unlocked merely because the calendar says 2050
+- a synthetic civilization may begin with machine cognition as an existing historical fact without pretending it followed the human Synthetic Cognition lineage
+- high-/low-gravity starting histories create need/competence but do not preselect which solution branch wins
+
+Canonical detail: `RESEARCH_START_RUNTIME_MODEL.md`, `starting_research_profile_contract.json`, `starting_research_fragments.json`, and `starting_reference_profiles.json`.
+
+## 2026-09-07 — Adaptive Research integrates through events, queries, and materialized views
+
+**Decision:** Other workstreams do not directly mutate the hidden research graph or civilization research internals.
+
+Owning systems push normalized factual events/metrics such as shortages, environmental burdens, combat observations, evidence acquisition, research-facility changes, population applicability changes, deployments, and foreign-asset access.
+
+Other systems consume stable queries such as capability checks, visible technology maturity, blockers, eligible research capacity, foreign-tech assessments, technology-package utility, and the materialized research view.
+
+Functional consumers normally ask **whether a capability exists**, not which technology supplied it.
+
+The UI consumes a read-only visible-only projection; UI/AI commands are requests that authoritative research revalidates against current visibility, labs, facilities, evidence, pressure, capabilities, coordination, and applicability.
+
+**Performance guardrails:** static catalogs/indexes are shared, not copied into every civilization save; no full-graph per-tick scan; no per-frame view rebuild; starting-profile composition is initialization-only; dormant civilizations may use coarser research updates.
+
+Canonical detail: `research_runtime_contract.json`, `research_view_model_contract.json`, and `RESEARCH_START_RUNTIME_MODEL.md`.
+
 ## 2026-09-07 — Persistent Adaptive Research workstream ownership
 
 **Decision:** The dedicated Adaptive Research chat owns persistent branch **`dev/adaptive-research`** for technology/research development.
 
 Other concurrent branches may read and consume research interfaces/capabilities but should not independently edit the canonical research graph/schema files while this workstream is active without coordination. See `WORKSTREAMS.md`.
 
-Research milestone PRs merge this persistent branch to `main` after research validators plus normal .NET/Godot gates pass; the same branch is then advanced from the new `main` for continued research work.
+Research milestone PRs merge this persistent branch to `main` after research validators plus normal .NET/Godot gates pass; continued research remains on the same owned workstream.
 
 ## How to change a locked decision
 

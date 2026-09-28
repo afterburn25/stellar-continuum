@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Game.Simulation.Models;
 
@@ -37,11 +36,13 @@ public enum SystemMilitaryPosture
 /// Reconstructible, non-persisted calculation of combat-effective armed presence in one system.
 /// Retreating/disengaged/destroyed vessels do not exert military control. Political hostility
 /// is consulted once per represented foreign civilization rather than once per vessel.
+///
+/// Vessel readiness/strength is delegated to CombatReadinessCalculator's assembly-local evaluator
+/// so this compatibility surface cannot drift from exact-own readiness or the newer authoritative
+/// system-control view on invalid profiles, non-finite damage, retreat, or disengagement.
 /// </summary>
 public static class CombatSystemPresenceCalculator
 {
-    private const double Epsilon = 0.0000001;
-
     public static SystemMilitaryPresenceSummary Assess(
         GalaxyState galaxy,
         ICombatHostilityView hostilityView,
@@ -84,8 +85,10 @@ public static class CombatSystemPresenceCalculator
                 continue;
             }
 
-            // Interdiction against the assessed civilization exists only when the foreign
-            // civilization is currently politically permitted to initiate hostile Combat.
+            // This compatibility summary is directional: a foreign civilization is an
+            // interdictor only when it is permitted to initiate hostile Combat against the
+            // assessed civilization. The newer system-control view separately exposes the
+            // broader any-direction contested-system concept.
             if (hostilityView.AreHostile(group.Key, civilizationId))
             {
                 hostileCivilizations++;
@@ -120,36 +123,11 @@ public static class CombatSystemPresenceCalculator
 
     private static VesselPresence? TryBuildPresence(FleetState fleet)
     {
-        var source = fleet.Combat;
-        CombatProfileDefinition profile;
-        if (source is not null && CombatProfileRegistry.TryGet(source.ProfileId, out var resolvedProfile))
-            profile = resolvedProfile;
-        else
-            profile = CombatProfileRegistry.Get(CombatProfileRegistry.DefaultProfileId(fleet.Role));
-
-        if (!profile.HasWeapon)
+        var readiness = CombatReadinessCalculator.ReadFleet(fleet);
+        if (!readiness.IsArmed || !readiness.IsCombatEffective)
             return null;
 
-        var hull = source is null ? profile.MaxHull : Math.Clamp(source.Hull, 0.0, profile.MaxHull);
-        if (hull <= Epsilon)
-            return null;
-
-        var order = source is null || !Enum.IsDefined(source.Order)
-            ? MilitaryOrderType.Hold
-            : source.Order;
-        if (order == MilitaryOrderType.Retreat)
-            return null;
-
-        if (source is { IsDisengaged: true } && source.DisengagedSystemId == fleet.CurrentSystemId)
-            return null;
-
-        var shields = source is null ? profile.MaxShields : Math.Clamp(source.Shields, 0.0, profile.MaxShields);
-        var armor = source is null ? profile.MaxArmor : Math.Clamp(source.Armor, 0.0, profile.MaxArmor);
-        var currentDurability = shields + armor + hull;
-        var hullReadiness = profile.MaxHull <= Epsilon ? 0.0 : Math.Clamp(hull / profile.MaxHull, 0.0, 1.0);
-        var currentStrength = currentDurability + profile.SustainedDamagePerDay * 3.0 * hullReadiness;
-
-        return new VesselPresence(fleet.CivilizationId, currentStrength);
+        return new VesselPresence(fleet.CivilizationId, readiness.CurrentStrength);
     }
 
     private sealed record VesselPresence(int CivilizationId, double CurrentStrength);

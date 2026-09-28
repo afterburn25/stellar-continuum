@@ -5,7 +5,7 @@
   "research_model": {
     "research_points": {
       "description": "Research Points (RP) measure applied scientific work. Operational Research Labs generate RP and assigned labs apply that RP directly to active directed projects.",
-      "base_rp_per_effective_lab_per_year": 100,
+      "base_rp_per_effective_lab_per_year": 400,
       "stockpile_policy": "no_large_global_stockpile",
       "reason": "Scientific effort is generated continuously; civilizations should not bank centuries of generic points and instantly complete a newly discovered field.",
       "unassigned_lab_behavior": "Unassigned lab capacity contributes to basic science, field competence, hypothesis generation, evidence processing, and low-rate exploratory research rather than being completely wasted."

@@ -68,10 +68,8 @@ internal static class PlanetaryBodyValidation
             var service = new CampaignSaveService();
             service.Save(path, first, 288.0);
 
-            // Physical worlds remain reconstructible from Seed + Systems even though v8 now
-            // persists body IDs on missions/colonies that need exact references.
             var json = File.ReadAllText(path);
-            Require(!json.Contains("\"PlanetaryBodies\"", StringComparison.Ordinal), "v8 save redundantly serialized reconstructible planetary catalog state");
+            Require(json.Contains("\"PlanetaryBodies\"", StringComparison.Ordinal), "v16 save omitted authoritative planetary catalog state");
 
             var loaded = service.Load(path);
             Require(
@@ -206,7 +204,8 @@ internal static class PlanetaryBodyValidation
             loadedFleet.Position = loaded.Galaxy.Systems.First(system => system.Id == colonySystem.Id).Position;
             loadedFleet.CurrentSystemId = colonySystem.Id;
             loadedFleet.DestinationSystemId = null;
-            var events = colonization.Advance(loaded.Galaxy);
+            Require(colonization.Advance(loaded.Galaxy).Count == 0, "arrival completed colony construction instantly");
+        var events = colonization.Advance(loaded.Galaxy, ColonizationSimulation.ColonyEstablishmentDays);
             var founded = loaded.Galaxy.Colonies.FirstOrDefault(colony =>
                 colony.CivilizationId == player.Id && colony.SystemId == colonySystem.Id)
                 ?? throw new InvalidOperationException("arrival at the selected species-relative world did not found a colony");

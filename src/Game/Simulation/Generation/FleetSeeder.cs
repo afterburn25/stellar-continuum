@@ -41,16 +41,21 @@ public sealed class FleetSeeder
     {
         var home = systems.First(system => system.Id == civilization.HomeSystemId);
         var nextId = fleets.Count == 0 ? 0 : fleets.Max(f => f.Id) + 1;
+        var scoutDesign = ShipDesignRegistry.GetCurrentDesignForRole(FleetRole.Scout);
         fleets.Add(new FleetState
         {
             Id = nextId++,
             CivilizationId = civilization.Id,
             Name = civilization.IsPlayer ? "Pathfinder One" : $"{civilization.Name} Scout",
             Role = FleetRole.Scout,
+            DesignId = scoutDesign.Id,
             Position = home.Position,
             CurrentSystemId = home.Id,
-            StrategicSpeed = 22.0,
-            SensorRange = 135.0f,
+            StrategicSpeed = scoutDesign.StrategicSpeed,
+            MaximumLegRangeLightYears = scoutDesign.MaximumLegRangeLightYears,
+            FuelCapacityLightYears = scoutDesign.FuelEnduranceLightYears,
+            FuelRemainingLightYears = scoutDesign.FuelEnduranceLightYears,
+            SensorRange = scoutDesign.SensorRange,
             IsActive = true,
         });
 
@@ -81,9 +86,13 @@ public sealed class FleetSeeder
             CivilizationId = civilization.Id,
             Name = civilization.IsPlayer ? "Pioneer One" : $"{civilization.Name} Pioneer",
             Role = FleetRole.Colony,
+            DesignId = colonyDesign.Id,
             Position = home.Position,
             CurrentSystemId = home.Id,
             StrategicSpeed = colonyDesign.StrategicSpeed,
+            MaximumLegRangeLightYears = colonyDesign.MaximumLegRangeLightYears,
+            FuelCapacityLightYears = colonyDesign.FuelEnduranceLightYears,
+            FuelRemainingLightYears = colonyDesign.FuelEnduranceLightYears,
             SensorRange = colonyDesign.SensorRange,
             IsActive = true,
             EmbarkedPopulationMillions = colonyDesign.PopulationCostMillions,

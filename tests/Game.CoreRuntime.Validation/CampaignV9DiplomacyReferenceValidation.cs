@@ -11,7 +11,7 @@ namespace Game.CoreRuntime.Validation;
 
 internal static class CampaignV9DiplomacyReferenceValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunCampaignV9DiplomacyReferenceChecks()
     {
         ValidateDanglingCampaignReferencesAreRejected();

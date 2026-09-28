@@ -4,7 +4,7 @@ namespace Game.Simulation.Validation;
 
 internal static class ExplorationMissionStatusSyncValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunExplorationMissionStatusChecks()
     {
         ExplorationMissionStatusValidation.ValidateTransitEtaAndSurveyInformationBoundary();

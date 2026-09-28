@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
+  "purpose": "Defines how a new civilization's starting scientific history is seeded without assigning it a fixed future technology tree. Species/start definitions compose historical research fragments, biology/applicability traits, institutions, pressures, evidence, capabilities, and competence into a valid initial Adaptive Research state.",
+  "profile_shape": {
+    "id":"stable profile/fragment id",
+    "kind":"base_era | scientific_history_fragment | environmental_history_fragment | civilization_reference_profile",
+    "description":"human-readable design purpose",
+    "starting_node_states":"map node_id -> maturity state plus optional archive resolution",
+    "starting_field_competence":"map field_id -> theoretical/experimental/engineering 0..100",
+    "starting_applicability_traits":"trait ids",
+    "starting_capabilities":"capability ids with scope/context where required",
+    "starting_research_institutions":"institution archetype ids and aggregate counts/effective capacity",
+    "starting_pressure_state":"only recognized/relevant pressure seeds; normal unknown future pressure is not pre-created",
+    "starting_evidence":"only evidence the civilization could legitimately possess at campaign start",
+    "starting_tacit_assets":"only historically justified strategically meaningful knowledge assets",
+    "starting_directed_program_stage":"research-capacity stage",
+    "historical_notes":"optional public-facing historical summary"
+  },
+  "composition_rules": {
+    "one_base_era_profile_required":true,
+    "zero_or_more_history_fragments":true,
+    "reference_profile_can_demonstrate_a_complete_composition_but_is_not_a_species_tree":true,
+    "same_node_state_uses_most_advanced_non_conflicting_state":true,
+    "archived_disproven_conflicts_require_explicit_resolution":true,
+    "field_competence_combination":"take strongest justified seed per component then apply explicit composition cap; never sum percentages",
+    "trait_union":true,
+    "capability_union_with_scope":true,
+    "institution_counts_add":true,
+    "pressure_seed_uses_max_or_explicit_context_rule_not_sum":true,
+    "evidence_and_tacit_assets_union_by_provenance":true,
+    "composition_must_pass_normal_research_validators":true
+  },
+  "future_tree_rule": {
+    "starting_profile_lists_only_past_and_current_knowledge":true,
+    "starting_profile_must_not_list_hidden_future_nodes":true,
+    "future_research_remains_adaptive":true,
+    "profile_does_not_modify_universal_node_prerequisites":true,
+    "profile_does_not_create_species_specific_research_catalog":true
+  },
+  "comparable_era_rule": {
+    "campaign_calendar_start":"2050-01-01",
+    "meaning":"Playable starts can be broadly comparable early-spacefaring/pre-FTL civilizations without possessing identical technologies, infrastructure, or scientific competence.",
+    "not_required_to_match_human_history":true
+  },
+  "starting_visibility": {
+    "mature_and_archived_starting_nodes_visible_in_history":true,
+    "investigable_or_hypothesized_nodes_can_be_seeded_only_when_current knowledge/evidence legitimately supports them":true,
+    "unknown_future_nodes_not_seeded_as_placeholders":true,
+    "starting_research_horizon_is_recomputed_from_seed_state_after_composition":true
+  },
+  "cross_workstream_interface": {
+    "species_start_workstream_supplies":[
+      "biology/environment facts that map to public applicability traits",
+      "historical/infrastructure facts that select research-history fragments",
+      "starting physical research institution instances/capacity",
+      "starting home-system conditions that generate legitimate pressure/evidence"
+    ],
+    "adaptive_research_workstream_owns":[
+      "profile schema",
+      "research node/field/trait/capability/facility references",
+      "starting research-state validation",
+      "horizon recomputation rules"
+    ]
+  },
+  "performance": {
+    "profiles_loaded_only_at_new_game_or_migration_boundary":true,
+    "composed_profile_not_repeatedly_evaluated_during_campaign":true,
+    "campaign_persists_normal_compact_research_state_after_start":true
+  }
+}

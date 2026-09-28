@@ -1,59 +1,32 @@
 {
   "schema_version": 1,
   "catalog_id": "stellar_continuum.public.adaptive_research_possibility_graph.v1",
-  "purpose": "Defines ordinary public applicability traits referenced by Adaptive Research nodes. Traits describe biological/civilizational capabilities or constraints; they are not playable-race IDs.",
+  "purpose": "Defines ordinary public applicability traits referenced by Adaptive Research nodes. Traits describe biological/civilizational capabilities or constraints; they are not playable-race IDs. Biochemical traits are composable: solvent, backbone/substrate, temperature regime, and structural strategy are separate dimensions rather than RPG species classes.",
   "traits": [
-    {
-      "id": "metabolic_biology",
-      "name": "Metabolic Biology",
-      "scope": "population_or_species",
-      "mutable": false,
-      "description": "The relevant population is biological and depends on metabolism, biochemical homeostasis, nutrition, and biological health systems.",
-      "research_effect": "Enables ordinary biological medicine, life-support, agriculture, biotechnology, and other metabolic-organism research where applicable."
-    },
-    {
-      "id": "gravity_sensitive_biology",
-      "name": "Gravity-Sensitive Biology",
-      "scope": "population_or_species",
-      "mutable": false,
-      "description": "Long-term health or development changes materially with sustained acceleration/gravity environment.",
-      "research_effect": "Allows high/low-gravity health and adaptation branches to emerge when real gravity mismatch exists."
-    },
-    {
-      "id": "heritable_genetics",
-      "name": "Heritable Genetic System",
-      "scope": "population_or_species",
-      "mutable": false,
-      "description": "Biological traits are encoded in a heritable information system that can eventually be deliberately modified with sufficient understanding.",
-      "research_effect": "Enables heritable biological engineering and long-term directed adaptation."
-    },
-    {
-      "id": "metabolic_suppression_possible",
-      "name": "Metabolic Suppression Physiology",
-      "scope": "population_or_species",
-      "mutable": true,
-      "description": "The species' physiology can plausibly tolerate a deliberately induced low-metabolism state after adequate medical development. This can be innate or become possible after precursor biological engineering.",
-      "research_effect": "Makes induced torpor a viable implementation of long-duration habitation."
-    },
-    {
-      "id": "machine_cognition_present",
-      "name": "Machine Cognition Present",
-      "scope": "civilization",
-      "mutable": true,
-      "description": "The civilization contains autonomous machine/synthetic cognition sophisticated enough to exist as persistent agents, institutions, or populations.",
-      "research_effect": "Enables synthetic-civilization survival, identity, habitat, replication, and machine-population research. A biological civilization can gain this trait through its own technological history."
-    },
-    {
-      "id": "biological_fabrication_possible",
-      "name": "Biological Fabrication Capability",
-      "scope": "civilization",
-      "mutable": true,
-      "description": "The civilization has developed biological manufacturing capable of deliberately growing or assembling engineered structural/industrial material rather than merely modifying organisms for medicine or agriculture.",
-      "research_effect": "Allows living-material and living-vehicle branches to emerge after enabling biotechnology is actually mastered, even for a species that did not begin with biological fabrication traditions."
-    }
+    {"id":"metabolic_biology","name":"Metabolic Biology","scope":"population_or_species","mutable":false,"description":"The relevant population is biological and depends on metabolism, biochemical homeostasis, nutrition, and biological health systems.","research_effect":"Enables generic biological medicine, life-support, agriculture/food-system, biotechnology, and other metabolic-organism research where applicable."},
+    {"id":"gravity_sensitive_biology","name":"Gravity-Sensitive Biology","scope":"population_or_species","mutable":false,"description":"Long-term health or development changes materially with sustained acceleration/gravity environment.","research_effect":"Allows high/low-gravity health and adaptation branches to emerge when real gravity mismatch exists."},
+    {"id":"heritable_genetics","name":"Heritable Genetic System","scope":"population_or_species","mutable":false,"description":"Biological traits are encoded in a heritable information system that can eventually be deliberately modified with sufficient understanding. The information chemistry need not be terrestrial DNA unless the species specifically uses it.","research_effect":"Enables heritable biological engineering and long-term directed adaptation."},
+    {"id":"metabolic_suppression_possible","name":"Metabolic Suppression Physiology","scope":"population_or_species","mutable":true,"description":"The species' physiology can plausibly tolerate a deliberately induced low-metabolism state after adequate medical development. This can be innate or become possible after precursor biological engineering.","research_effect":"Makes induced torpor a viable implementation of long-duration habitation."},
+
+    {"id":"carbon_centered_biochemistry","name":"Carbon-Centered Biochemistry","scope":"population_or_species","mutable":false,"description":"The population's core molecular complexity is primarily carbon-centered. This does not specify solvent, atmosphere, temperature regime, or terrestrial compatibility.","research_effect":"Enables carbon-specific biochemical solution families where substrate chemistry matters."},
+    {"id":"water_solvent_biology","name":"Water-Solvent Biology","scope":"population_or_species","mutable":false,"description":"Liquid water is the dominant biological solvent over the population's normal active range.","research_effect":"Enables water-specific biochemical, medical, ecological, and habitat implementations where solvent chemistry is material."},
+    {"id":"ammonia_rich_biology","name":"Ammonia-Rich Solvent Biology","scope":"population_or_species","mutable":false,"description":"The population's active biochemistry uses ammonia-rich solvent chemistry substantially enough that water-optimized biological systems are not automatically compatible.","research_effect":"Enables ammonia-solvent metabolism, habitat, recycling, nutrient, and bioindustrial branches."},
+    {"id":"hydrocarbon_solvent_biology","name":"Hydrocarbon-Solvent Biology","scope":"population_or_species","mutable":false,"description":"The population relies on liquid hydrocarbon-rich solvents or membranes under cold conditions rather than ordinary water-based cellular chemistry.","research_effect":"Enables cryogenic hydrocarbon metabolism, habitat, ecology, and manufacturing branches."},
+    {"id":"silicon_centered_biochemistry","name":"Silicon-Centered Biochemistry","scope":"population_or_species","mutable":false,"description":"The population's evolved molecular/structural biochemistry depends substantially on silicon-centered chemistry. This is a speculative rare-life trait and does not imply literal stone organisms or universal high-temperature tolerance.","research_effect":"Enables silicon-specific metabolism, repair, structural growth, mineral nutrient, and biofabrication branches."},
+    {"id":"cryogenic_biology","name":"Cryogenic Active Biology","scope":"population_or_species","mutable":false,"description":"Normal biological activity occurs at temperatures where terrestrial liquid-water biology would be severely impaired or frozen.","research_effect":"Enables cryogenic metabolism, membrane, ecology, storage, and habitat branches; makes ordinary warm-biological assumptions potentially incompatible."},
+    {"id":"mineral_structural_biology","name":"Mineral-Structural Biology","scope":"population_or_species","mutable":false,"description":"Growth and repair rely heavily on controlled mineral/inorganic structural deposition as part of living tissue or analogous biological structure.","research_effect":"Enables mineral nutrient control, inorganic tissue repair, mineral biofabrication, and structurally grown habitat/material branches."},
+    {"id":"liquid_medium_native","name":"Liquid-Medium Native Biology","scope":"population_or_species","mutable":false,"description":"The population evolved to live and function primarily within a liquid medium rather than a gas-filled terrestrial surface environment.","research_effect":"Can expose fluid-medium habitation, pressure, locomotion, and environmental-interface research when relevant."},
+
+    {"id":"machine_cognition_present","name":"Machine Cognition Present","scope":"civilization","mutable":true,"description":"The civilization contains autonomous machine/synthetic cognition sophisticated enough to exist as persistent agents, institutions, or populations.","research_effect":"Enables synthetic-civilization survival, identity, habitat, replication, and machine-population research. A biological civilization can gain this trait through its own technological history."},
+    {"id":"biological_fabrication_possible","name":"Biological Fabrication Capability","scope":"civilization","mutable":true,"description":"The civilization has developed biological manufacturing capable of deliberately growing or assembling engineered structural/industrial material rather than merely modifying organisms for medicine or agriculture.","research_effect":"Allows living-material and living-vehicle branches to emerge after enabling biotechnology is mastered, even for a species that did not begin with biological fabrication traditions."}
   ],
   "rules": {
     "traits_are_not_species_ids": true,
+    "biochemical_traits_are_composable_dimensions": true,
+    "solvent_and_backbone_traits_are_separate": true,
+    "no_assumption_that_every_population_has_exactly_one_exotic_trait": true,
+    "carbon_water_expected_common_but_not_hardcoded_as_universal": true,
+    "silicon_centered_life_is_speculative_and_expected_rare_in_generation": true,
     "civilizations_can_gain_mutable_traits": true,
     "technology_can_grant_mutable_civilization_traits": true,
     "nodes_require_all_listed_traits": true,

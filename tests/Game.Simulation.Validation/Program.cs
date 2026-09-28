@@ -25,6 +25,11 @@ internal static class Program
             ("colonization requires full science survey", ExplorationColonizationValidation.ValidateColonizationRequiresFullSurvey),
             ("colony population and survey persistence", ExplorationColonizationValidation.ValidateColonyPopulationConservationAndPersistence),
             ("shared operational reach gate", OperationalReachValidation.ValidateSharedMissionReachGate),
+            ("lane-routed interstellar travel", InterstellarTravelValidation.ValidateLaneRoutingAndPersistence),
+            ("physical interstellar depth distance", InterstellarTravelValidation.ValidatePhysicalDepthDistanceAndPersistence),
+            ("resource outpost economy and support", OutpostFoundationValidation.ValidateOutpostRulesAndPersistence),
+            ("dedicated resource outpost vessel and founding", ResourceOutpostMissionValidation.ValidateDedicatedVesselAndFoundingFlow),
+            ("represented outpost freight collection and delivery", OutpostFreightValidation.ValidateRepresentedCollectionAndDelivery),
             ("directional first contact requires presence", FirstContactValidation.ValidateDirectionalContactRequiresPresence),
             ("deterministic planetary catalog", PlanetaryBodyValidation.ValidateDeterministicPhysicalCatalogAndSaveReconstruction),
             ("species-relative body colonization", PlanetaryBodyValidation.ValidateSurveyVisibilityAndBodyLevelColonization),
@@ -38,7 +43,7 @@ internal static class Program
             ("diplomacy political state controls combat", DiplomacyCombatValidation.ValidatePoliticalStateControlsCombat),
         };
 
-        var failures = 0;
+        var failures = Game.Validation.RegressionRunner.Run(typeof(Program).Assembly);
         foreach (var test in tests)
         {
             try
@@ -49,11 +54,11 @@ internal static class Program
             catch (Exception ex)
             {
                 failures++;
-                Console.Error.WriteLine($"FAIL: {test.Name}: {ex.Message}");
+                Game.Validation.RegressionRunner.Report(test.Name, ex);
             }
         }
 
-        Console.WriteLine($"Core simulation validation: {tests.Length - failures}/{tests.Length} passed.");
+        Console.WriteLine($"Core simulation validation: {tests.Length + Game.Validation.RegressionRunner.Count - failures}/{tests.Length + Game.Validation.RegressionRunner.Count} passed.");
         return failures == 0 ? 0 : 1;
     }
 
@@ -131,6 +136,35 @@ internal static class Program
         Require(acceptedDays < requestedDays, "backlog protection failed to throttle an oversized requested step");
         Require(clock.BacklogDays > 0.0, "oversized requested step did not create a bounded scalar backlog");
         Require(double.IsFinite(clock.SimulationDays) && double.IsFinite(clock.BacklogDays), "clock produced non-finite state");
+
+        foreach (var speed in new[]
+                 {
+                     SimulationClock.SpeedLevel.Normal, SimulationClock.SpeedLevel.Fast,
+                     SimulationClock.SpeedLevel.VeryFast, SimulationClock.SpeedLevel.Maximum,
+                 })
+        {
+            clock.SetSpeed(speed);
+            clock.SetSpeed(SimulationClock.SpeedLevel.Paused);
+            Require(clock.ResumeSpeed == speed, $"paused clock did not expose its remembered {speed} speed");
+            clock.Resume();
+            Require(clock.Speed == speed, $"pause/resume forgot permitted {speed} speed");
+        }
+
+        clock.SetSpeed(SimulationClock.SpeedLevel.Fast);
+        clock.SetSpeed(SimulationClock.SpeedLevel.Paused);
+        clock.SetSpeed(SimulationClock.SpeedLevel.Paused);
+        Require(clock.ResumeSpeed == SimulationClock.SpeedLevel.Fast, "repeated pause hid the last running speed");
+        clock.Resume();
+        Require(clock.Speed == SimulationClock.SpeedLevel.Fast, "repeated pause erased the last running speed");
+
+        clock.SetSpeed(SimulationClock.SpeedLevel.Demo);
+        clock.SetSpeed(SimulationClock.SpeedLevel.Paused);
+        clock.Resume();
+        Require(clock.Speed == SimulationClock.SpeedLevel.Demo, "Developer speed did not resume in its permitted context");
+        clock.SetSpeed(SimulationClock.SpeedLevel.Normal);
+        clock.SetSpeed(SimulationClock.SpeedLevel.Paused);
+        clock.Resume();
+        Require(clock.Speed == SimulationClock.SpeedLevel.Normal, "normal mode reset did not clear Developer speed memory");
     }
 
     private static void ValidateSaveRoundTrip()
@@ -138,6 +172,8 @@ internal static class Program
         WithTemporaryDirectory(directory =>
         {
             var galaxy = CreateValidationGalaxy();
+            galaxy.Colonies[0].StoredFoodPopulationDaysMillions = 1234.5;
+            galaxy.Colonies[0].StoredWaterPopulationDaysMillions = 345.6;
             var service = new CampaignSaveService();
             var path = Path.Combine(directory, "roundtrip.json");
             const double simulationDays = 713.25;
@@ -145,7 +181,7 @@ internal static class Program
             service.Save(path, galaxy, simulationDays);
             var loaded = service.Load(path);
 
-            Require(CampaignSaveService.CurrentFormatVersion == 8, "expected species-aware save format v8");
+            Require(CampaignSaveService.CurrentFormatVersion == 16 && CampaignSaveService.SurfaceFormatVersion == 12 && CampaignSaveService.PresetFormatVersion == 10 && CampaignSaveService.LegacyFormatVersion == 8, "planetary catalog persistence version contract changed");
             Require(loaded.Galaxy.Seed == galaxy.Seed, "save/load changed galaxy seed");
             Require(loaded.Galaxy.Systems.Count == galaxy.Systems.Count, "save/load changed system count");
             Require(loaded.Galaxy.PlanetaryBodies.SequenceEqual(galaxy.PlanetaryBodies), "save/load changed reconstructible planetary catalog");
@@ -159,14 +195,17 @@ internal static class Program
                 loaded.Galaxy.Colonies.OrderBy(c => c.Id).Select(c => c.PopulationSpeciesId)
                     .SequenceEqual(galaxy.Colonies.OrderBy(c => c.Id).Select(c => c.PopulationSpeciesId)),
                 "save/load changed colony population species identity");
+            Require(Math.Abs(loaded.Galaxy.Colonies[0].StoredFoodPopulationDaysMillions - 1234.5) < .000001 &&
+                Math.Abs(loaded.Galaxy.Colonies[0].StoredWaterPopulationDaysMillions - 345.6) < .000001,
+                "save/load changed colony food or potable-water reserves");
             Require(Math.Abs(loaded.SimulationDays - simulationDays) < 0.000001, "save/load changed simulation date");
 
             var json = File.ReadAllText(path);
-            Require(json.Contains("\"FormatVersion\": 8", StringComparison.Ordinal), "save file did not declare format v8");
+            Require(json.Contains("\"FormatVersion\": 16", StringComparison.Ordinal), "new save file did not declare authoritative catalog format v16");
             Require(json.Contains("\"SpeciesId\"", StringComparison.Ordinal), "save file did not persist civilization species identity");
             Require(json.Contains("\"PopulationSpeciesId\"", StringComparison.Ordinal), "save file did not persist colony population species identity");
             Require(json.Contains("\"PlanetaryBodyId\"", StringComparison.Ordinal), "save file did not expose v8 colony body field");
-            Require(!json.Contains("\"PlanetaryBodies\"", StringComparison.Ordinal), "save file redundantly serialized reconstructible planetary catalog");
+            Require(json.Contains("\"PlanetaryBodies\"", StringComparison.Ordinal), "save file omitted authoritative planetary catalog");
             Require(!File.Exists(path + ".tmp"), "atomic save left a temporary file behind");
         });
     }
@@ -184,6 +223,7 @@ internal static class Program
             var root = JsonNode.Parse(File.ReadAllText(currentPath))?.AsObject()
                 ?? throw new InvalidOperationException("could not parse generated v8 save");
             root["FormatVersion"] = 6;
+            root["Galaxy"]!.AsObject().Remove("PlanetaryBodies");
             var galaxyNode = root["Galaxy"]?.AsObject()
                 ?? throw new InvalidOperationException("generated save did not contain Galaxy");
             galaxyNode.Remove("ShipyardStates");
@@ -266,6 +306,7 @@ internal static class Program
             var root = JsonNode.Parse(File.ReadAllText(currentPath))?.AsObject()
                 ?? throw new InvalidOperationException("could not parse generated v8 save");
             root["FormatVersion"] = 7;
+            root["Galaxy"]!.AsObject().Remove("PlanetaryBodies");
             var galaxyNode = root["Galaxy"]?.AsObject()
                 ?? throw new InvalidOperationException("generated save did not contain Galaxy");
 

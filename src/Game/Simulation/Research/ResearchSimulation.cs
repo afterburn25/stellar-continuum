@@ -8,12 +8,18 @@ namespace Game.Simulation.Research;
 
 public sealed class ResearchSimulation
 {
-    public IReadOnlyList<ResearchEvent> Advance(GalaxyState galaxy)
+    public IReadOnlyList<ResearchEvent> Advance(GalaxyState galaxy) => AdvanceCore(galaxy, null);
+
+    public IReadOnlyList<ResearchEvent> AdvanceForCivilization(GalaxyState galaxy, int civilizationId) =>
+        AdvanceCore(galaxy, civilizationId);
+
+    private IReadOnlyList<ResearchEvent> AdvanceCore(GalaxyState galaxy, int? onlyCivilizationId)
     {
         var events = new List<ResearchEvent>();
 
         foreach (var civilization in galaxy.Civilizations.ToArray())
         {
+            if (onlyCivilizationId is int selected && civilization.Id != selected) continue;
             if (civilization.DevelopmentStage == CivilizationDevelopmentStage.AncientSpacefaring)
                 continue;
 
@@ -24,12 +30,12 @@ public sealed class ResearchSimulation
             if (state.ActiveResearchId is null && !civilization.IsPlayer)
                 state.ActiveResearchId = SelectAiResearch(civilization, state, construction)?.Id;
 
-            if (state.ActiveResearchId is null || economy.Science <= 0.0)
+            if (state.ActiveResearchId is null)
                 continue;
 
             var definition = TechnologyRegistry.Get(state.ActiveResearchId);
             var remaining = Math.Max(0.0, definition.ResearchCost - state.ActiveResearchProgress);
-            var spend = Math.Min(remaining, economy.Science);
+            var spend = Math.Min(remaining, Math.Max(0, economy.Science));
             economy.Science -= spend;
             state.ActiveResearchProgress += spend;
 

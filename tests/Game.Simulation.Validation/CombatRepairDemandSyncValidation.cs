@@ -4,7 +4,7 @@ namespace Game.Simulation.Validation;
 
 internal static class CombatRepairDemandSyncValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void RunCombatRepairDemandSyncCheck()
     {
         CombatRepairDemandValidation.ValidateNonMutatingCombatRepairDemand();

@@ -4,7 +4,7 @@ namespace Game.Simulation.Validation;
 
 internal static class PostSyncSharedValidation
 {
-    [ModuleInitializer]
+    [Game.Validation.RegressionCheck]
     internal static void Run()
     {
         CombatCasualtyValidation.ValidateEmbarkedPopulationCasualties();

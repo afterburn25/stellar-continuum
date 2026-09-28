@@ -1,0 +1,218 @@
+using System;
+using System.Linq;
+using Game.Simulation.Research.Adaptive;
+
+static void Assert(bool condition, string message)
+{
+    if (!condition)
+        throw new InvalidOperationException(message);
+}
+
+var repoRoot = Directory.GetCurrentDirectory();
+var dataRoot = Path.Combine(repoRoot, "data", "research", "v1");
+var strategic = AdaptiveResearchStrategicRuntime.LoadFromDirectory(dataRoot);
+var authority = strategic.Authority;
+
+Assert(strategic.ForeignDiscoveryCatalog.MethodRules.Count == 4,
+    "Foreign discovery materialization must remain a small explicit method-rule set.");
+
+// Two otherwise identical civilizations: only the one with legitimate foreign contact may grow the foreign-aware tree.
+var control = authority.ComposeReferenceProfile(
+    "foreign-discovery-control",
+    "reference_humanlike_solar_2050",
+    "control-pop",
+    2050).State;
+var contacted = authority.ComposeReferenceProfile(
+    "foreign-discovery-contacted",
+    "reference_humanlike_solar_2050",
+    "contact-pop",
+    2050).State;
+var initialControlCount = control.NodeStates.Count;
+var initialContactCount = contacted.NodeStates.Count;
+Assert(initialControlCount == initialContactCount,
+    "Control/contact fixtures should begin with the same research horizon before foreign evidence exists.");
+Assert(!control.NodeStates.ContainsKey("foreign_device_forensics") && !control.NodeStates.ContainsKey("reverse_engineering_methods"),
+    "Human-like 2050 should not pre-expose foreign-device research methods without contact.");
+
+var package = new ForeignTechnologyPackageInput(
+    "discovery-drive-package",
+    "observed-alien-drive",
+    "lineage-discovery-a",
+    new[] { "reference_hardware", "engineering_blueprint_package", "expert_assistance" },
+    new[] { "inspect", "internal_research" },
+    new[] { "propulsion", "physics" },
+    new[]
+    {
+        new ForeignTechnologyEvidenceTransfer(
+            "discovery-captured-device",
+            "captured_foreign_device",
+            "captured alien propulsion assembly",
+            1.0,
+            1.0),
+        new ForeignTechnologyEvidenceTransfer(
+            "discovery-propulsion-evidence",
+            "foreign_propulsion_evidence",
+            "measured alien transit/propulsion telemetry",
+            1.0,
+            1.0),
+    },
+    new[] { "expertise_dependency" },
+    "captured alien drive with partial engineering documentation",
+    0.90,
+    0.90,
+    0.90,
+    2100,
+    "contact-pop");
+
+var acquisition = strategic.ForeignDiscovery.AcquirePackage(contacted, package);
+Assert(acquisition.Assessment.Understanding == ForeignUnderstandingState.Characterized,
+    "Blueprint-bearing package should be Characterized under milestone #16 intake semantics.");
+Assert(acquisition.AwarenessEvents.Count > 0,
+    "Legitimate foreign package should change the contacted civilization's visible research horizon.");
+Assert(acquisition.AwarenessEvents.All(evt => evt.NewState <= ResearchMaturity.Investigable),
+    "Foreign discovery must never directly set Experimental-or-higher native research state.");
+Assert(contacted.NodeStates.Count > initialContactCount,
+    "Contacted civilization should materialize additional visible research nodes.");
+Assert(control.NodeStates.Count == initialControlCount,
+    "Uncontacted control civilization's research horizon must remain unchanged.");
+
+Assert(contacted.TryGetNodeState("foreign_device_forensics", out var forensics) &&
+       forensics.Maturity == ResearchMaturity.Investigable,
+    "Captured-device evidence plus already-mature human starting prerequisites should make Foreign Device Forensics Investigable.");
+Assert(contacted.TryGetNodeState("alien_propulsion_analysis", out var propulsionAnalysis) &&
+       propulsionAnalysis.Maturity == ResearchMaturity.Hypothesized,
+    "Alien Propulsion Analysis should become Hypothesized when its mechanism is evidenced but prerequisite forensic knowledge is not yet Mature.");
+Assert(contacted.TryGetNodeState("reverse_engineering_methods", out var reverseMethods) &&
+       reverseMethods.Maturity == ResearchMaturity.Hypothesized,
+    "Characterized foreign technology should expose Reverse-Engineering Methodology as a hypothesis, not a free technology.");
+Assert(contacted.TryGetNodeState("technology_compatibility_science", out var compatibility) &&
+       compatibility.Maturity == ResearchMaturity.Hypothesized,
+    "Characterized foreign technology should expose compatibility science as a bounded cross-lineage hypothesis.");
+Assert(!control.NodeStates.ContainsKey("alien_propulsion_analysis") &&
+       !control.NodeStates.ContainsKey("technology_compatibility_science"),
+    "Control civilization must not receive foreign-contact hypotheses through shared static catalog data.");
+
+var contactView = authority.Kernel.BuildView(contacted);
+var hypothesizedView = contactView.VisibleNodes.Single(node => node.NodeId == "alien_propulsion_analysis");
+Assert(hypothesizedView.MinimumLabs is null && hypothesizedView.RecommendedLabs is null,
+    "Rumored/Hypothesized foreign-aware nodes must not leak hidden project lab costs before Investigable.");
+Assert(hypothesizedView.KnownCapabilities.Count == 0,
+    "Foreign-aware hypotheses must not reveal native capability outputs before Demonstrated.");
+
+// Normal native research still controls promotion: Mature Forensics unlocks Reverse Engineering through ordinary eligibility.
+var forensicsDefinition = authority.Catalog.GetNode("foreign_device_forensics");
+var startForensics = authority.StartDirectedResearch(
+    contacted,
+    "foreign_device_forensics",
+    Math.Max(forensicsDefinition.ProjectRequirements.MinimumLabs, 2));
+Assert(startForensics.Accepted,
+    "Foreign Device Forensics should start through the normal authoritative project path.");
+_ = authority.AdvanceProjects(contacted, 100.0, 2200.0);
+Assert(contacted.HasEstablishedKnowledge("foreign_device_forensics"),
+    "Foreign Device Forensics should Mature through normal RP/stage progression.");
+Assert(contacted.TryGetNodeState("reverse_engineering_methods", out reverseMethods) &&
+       reverseMethods.Maturity == ResearchMaturity.Investigable,
+    "Once its real prerequisites and evidence are satisfied, a previously Hypothesized foreign-derived method should promote normally to Investigable.");
+Assert(!contacted.HasEstablishedKnowledge("reverse_engineering_methods"),
+    "Promotion to Investigable must not skip normal research/maturation.");
+
+// Deeper understanding reveals generic cross-lineage methods, still only as hypotheses when prerequisites are missing.
+var principle = strategic.ForeignDiscovery.RecordAnalysisResult(
+    contacted,
+    "observed-alien-drive",
+    ForeignUnderstandingState.PrincipleUnderstood,
+    0.75,
+    2210,
+    targetApplicabilityContextId: "contact-pop");
+Assert(principle.Assessment.Understanding == ForeignUnderstandingState.PrincipleUnderstood,
+    "Controlled foreign analysis should advance the foreign assessment independently.");
+Assert(contacted.TryGetNodeState("cross_lineage_engineering", out var crossLineage) &&
+       crossLineage.Maturity == ResearchMaturity.Hypothesized,
+    "Principle-understood foreign technology should make Cross-Lineage Engineering a visible hypothesis without satisfying its native prerequisites.");
+
+var engineering = strategic.ForeignDiscovery.RecordAnalysisResult(
+    contacted,
+    "observed-alien-drive",
+    ForeignUnderstandingState.EngineeringUnderstood,
+    0.90,
+    2220,
+    targetApplicabilityContextId: "contact-pop");
+Assert(engineering.Assessment.Understanding == ForeignUnderstandingState.EngineeringUnderstood,
+    "Foreign engineering understanding should remain separate from native maturity.");
+Assert(contacted.TryGetNodeState("hybrid_design_methodology", out var hybrid) &&
+       hybrid.Maturity == ResearchMaturity.Hypothesized,
+    "Engineering-understood foreign technology should expose Hybrid Technology Design as a hypothesis, not a free capability.");
+Assert(!control.NodeStates.ContainsKey("cross_lineage_engineering") && !control.NodeStates.ContainsKey("hybrid_design_methodology"),
+    "Uncontacted control must not see cross-lineage/hybrid method nodes.");
+
+// Biologically incompatible synthetic civilization can recognize alien biological science without becoming compatible with it.
+var synthetic = authority.ComposeReferenceProfile(
+    "synthetic-foreign-biology",
+    "reference_synthetic_early_space",
+    "synthetic-pop",
+    2050).State;
+Assert(!synthetic.HasApplicabilityTrait("synthetic-pop", "metabolic_biology"),
+    "Synthetic reference must not have metabolic-biology applicability.");
+var bioPackage = new ForeignTechnologyPackageInput(
+    "alien-bio-package",
+    "alien-biotech-gamma",
+    "lineage-biological-gamma",
+    new[] { "scientific_theory_dossier", "operating_institution_transfer" },
+    new[] { "inspect", "internal_research" },
+    new[] { "biology", "xenoscience" },
+    new[]
+    {
+        new ForeignTechnologyEvidenceTransfer(
+            "alien-biology-evidence",
+            "alien_biology",
+            "observed and sampled alien metabolic institution",
+            1.0,
+            1.0),
+    },
+    new[] { "biological_incompatibility" },
+    "foreign biological research institution incompatible with synthetic substrate",
+    0.90,
+    0.90,
+    0.90,
+    2300,
+    "synthetic-pop");
+var bioAcquisition = strategic.ForeignDiscovery.AcquirePackage(synthetic, bioPackage);
+Assert(bioAcquisition.Assessment.Understanding == ForeignUnderstandingState.Characterized,
+    "Operating-institution transfer should characterize the foreign biological technology.");
+Assert(synthetic.TryGetNodeState("xenobiological_compatibility", out var xenoCompatibility) &&
+       xenoCompatibility.Maturity == ResearchMaturity.Hypothesized,
+    "Synthetic civilization should be able to recognize Xenobiological Compatibility Science as a hypothesis despite its own biological incompatibility.");
+var xenoEligibility = authority.Kernel.Eligibility.EvaluateScientificEligibility(
+    synthetic,
+    "xenobiological_compatibility",
+    "synthetic-pop");
+Assert(!xenoEligibility.Allowed && xenoEligibility.Blockers.Any(blocker => blocker.Code == ResearchBlockerCode.MissingApplicabilityTrait),
+    "Biological incompatibility must still block native Investigable status where the node genuinely requires metabolic biology.");
+_ = strategic.ForeignTechnology.RecordOperabilityFact(
+    synthetic,
+    "alien-biotech-gamma",
+    ForeignOperabilityState.Unusable,
+    0.90,
+    2301);
+Assert(strategic.ForeignTechnology.GetState(synthetic).Assessments["alien-biotech-gamma"].Operability == ForeignOperabilityState.Unusable &&
+       synthetic.NodeStates.ContainsKey("xenobiological_compatibility"),
+    "Operational incompatibility must not erase legitimate scientific awareness.");
+
+// Awareness nodes persist through the existing v4 snapshot because they are ordinary sparse node state.
+var v4 = new AdaptiveResearchForeignTechnologySnapshotCodec(strategic);
+var saved = v4.Serialize(contacted);
+var restored = v4.Deserialize(saved);
+Assert(restored.TryGetNodeState("hybrid_design_methodology", out var restoredHybrid) &&
+       restoredHybrid.Maturity == ResearchMaturity.Hypothesized,
+    "Foreign-aware native tree materialization must persist through the existing v4 research snapshot without a new schema layer.");
+Assert(restored.NodeStates.Count < authority.Catalog.Nodes.Count,
+    "Foreign-aware persistence must remain a sparse horizon rather than a full 360-node graph copy.");
+
+var contactGrowth = contacted.NodeStates.Count - initialContactCount;
+Assert(contactGrowth < 20,
+    "One foreign technology contact should materialize a bounded handful of native possibilities, not dump a large fraction of the graph into visibility.");
+
+Console.WriteLine(
+    $"Adaptive Research foreign-discovery checks OK: initial={initialContactCount}, contacted={contacted.NodeStates.Count}, " +
+    $"growth={contactGrowth}, forensics={forensics.Maturity}->Mature, reverse={reverseMethods.Maturity}, " +
+    $"cross={crossLineage.Maturity}, hybrid={hybrid.Maturity}, syntheticBio={xenoCompatibility.Maturity}, snapshotBytes={saved.Length}.");

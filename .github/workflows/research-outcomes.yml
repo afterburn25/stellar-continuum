@@ -1,0 +1,22 @@
+name: research-outcomes
+
+on:
+  push:
+    branches: [ "dev/adaptive-research", "research/adaptive-research-m19", "reconcile/adaptive-research-m19-integration" ]
+  pull_request:
+    branches: [ "integration" ]
+
+jobs:
+  validate-adaptive-research-outcomes:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore research outcome checks
+        run: dotnet restore tests/AdaptiveResearchOutcomeChecks/AdaptiveResearchOutcomeChecks.csproj
+      - name: Build research outcome checks
+        run: dotnet build tests/AdaptiveResearchOutcomeChecks/AdaptiveResearchOutcomeChecks.csproj --configuration Release --no-restore
+      - name: Run research outcome checks
+        run: dotnet run --project tests/AdaptiveResearchOutcomeChecks/AdaptiveResearchOutcomeChecks.csproj --configuration Release --no-build
