@@ -106,6 +106,29 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   budget-aware (accepts the flat composite only when a 3D backdrop could
   not fit). `native_galaxy_backdrop` gained a stranded-ticket test
   (10/10). `--developer-smoke` green at 1280/1920/2560.
+- Follow-up (`bfbc64b3`): the same straggler hole was closed in every
+  remaining queue consumer — `stellar_art` (whose `pending_count()`
+  gates `artwork_ready()` unconditionally, so a stranded photosphere
+  ticket would have wedged settling outright), `planet_discs`, and
+  `small_body_assets` each gained the `poll()` convention, wired
+  per-frame in `scene()`. `eruption_art` already drained via
+  `begin_frame()`; `celestial_appearance` tickets cancel on workspace
+  close. Regression tests pin `poll()`-only draining for planet-disc
+  and stellar-art tickets.
+- Verification closure: `--system-travel-smoke` and
+  `--system-travel-reload-smoke` green at 2560×1440 on
+  `work/de-travel-r.json`; `--military-check` green at 2560×1440 on
+  `work/mil-fixture.json`; the platform chain (`--support-check`,
+  `--audio-check`, `--audio-settings-check`, `--general-settings-check`,
+  `--video-settings-check`) green at 2560×1440 and `--voice-check` at
+  1920×1080. Smoke hardening: `military_smoke` refreshes the fleet view
+  instead of dereferencing a disengaged optional and dumps row state on
+  fixture mismatch (`19e0ffb7`); the settings checks open the pause
+  menu themselves when the parent smoke left it closed (`85a28274`),
+  making the travel+audio-settings+voice combination runnable.
+- Fixture hazard recorded for future runs: stale `.bak`/`.integrity`
+  sidecars next to `--save-path` make the loader silently recover the
+  previous save — clean sidecars when swapping fixture paths.
 
 ## Known limitations
 
@@ -124,7 +147,6 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
 - `Window::set_scene3d_texture_budget` intentionally unwired — 192 MiB
   default vs. ~45 MB measured scene-texture demand; no settings consumer
   exists (audit closure ledger row, `24385dd2`).
-- `--military-check` and `--diplomacy-smoke` need dedicated fixtures
-  (owned armed fleet; fresh-authored proposal per run) — not exercised
-  this pass; both surfaces are domain workspaces with prior green
-  evidence.
+- `--diplomacy-smoke` authors its proposal fixture per run inside the
+  validator (green above). `test_galaxy_asset_import` still needs the
+  un-vendored `assets/source/galaxies-16x9/` PNGs (pre-existing gap).
