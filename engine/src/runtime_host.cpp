@@ -2596,6 +2596,9 @@ int RuntimeHost::run() {
           inst.material.band_diff = sf->band_diff;
           inst.material.orbital_beaming = sf->orbital_beaming;
           inst.material.forward_scatter = sf->forward_scatter;
+          inst.material.forward_scatter_back = sf->forward_scatter_back;
+          inst.material.forward_scatter_back_mix =
+              sf->forward_scatter_back_mix;
         }
         if (const auto *at = world.get<AtmosphereShell>(e))
           inst.material.atmosphere =

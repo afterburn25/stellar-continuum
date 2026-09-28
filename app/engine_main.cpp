@@ -2341,11 +2341,25 @@ void commit_scene3_field(Shell &shell) {
             next.accretion = {inner, outer, kelvin, beam};
           else valid = false;
           break; }
-  case 64:
-          try { a = std::stof(shell.scene3_buffer); }
-          catch (const std::exception &) { break; }
-          if (a >= -1.f && a <= 1.f) { next.forward_scatter = a; valid = true; }
-          break;
+  case 64: {
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> toks;
+          std::string tok;
+          while (std::getline(csv, tok, ',')) toks.push_back(tok);
+          float v[3]{};
+          int n = 0;
+          for (; n < 3 && n < (int)toks.size(); ++n) {
+            try { v[n] = std::stof(toks[n]); }
+            catch (const std::exception &) { n = -1; break; }
+          }
+          if (n > 0 && v[0] >= -1.f && v[0] <= 1.f && v[1] >= -1.f &&
+              v[1] <= 1.f && v[2] >= 0.f && v[2] <= 1.f) {
+            next.forward_scatter = v[0];
+            next.forward_scatter_back = n > 1 ? v[1] : 0.f;
+            next.forward_scatter_back_mix = n > 2 ? v[2] : 0.f;
+            valid = true;
+          }
+          break; }
   case 65: {
           float v[8]{};
           std::istringstream csv(shell.scene3_buffer);
@@ -2732,6 +2746,8 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       inst.material.band_diff = e.band_diff;
       inst.material.orbital_beaming = e.orbital_beaming;
       inst.material.forward_scatter = e.forward_scatter;
+      inst.material.forward_scatter_back = e.forward_scatter_back;
+      inst.material.forward_scatter_back_mix = e.forward_scatter_back_mix;
       // Emission volume: the entity texture is the emission image and
       // the volume branch requires transparency (mirrors runtime host).
       if (e.volume_depth > 0.f && inst.material.texture) {
@@ -3138,8 +3154,18 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
                : "",
         ed(63), "inner,outer,kelvin,beaming - annulus disc preset");
   field(shell.hit3_fwdscatter, "fwdScatter",
-        entity ? std::to_string(entity->forward_scatter) : "", ed(64),
-        "backlit brightening -1..1 - dusty rings, icy opposition");
+        entity ? std::to_string(entity->forward_scatter) +
+                     (entity->forward_scatter_back == 0.f &&
+                              entity->forward_scatter_back_mix == 0.f
+                          ? ""
+                          : "," + std::to_string(
+                                entity->forward_scatter_back) +
+                                "," +
+                                std::to_string(
+                                    entity->forward_scatter_back_mix))
+               : "",
+        ed(64),
+        "backlit brightening -1..1[,backLobe -1..1,mix 0..1] - dusty rings, icy opposition");
   field(shell.hit3_volume, "volume",
         entity && entity->volume_depth > 0.f
             ? std::to_string(entity->volume_depth) + "," +
@@ -7281,7 +7307,16 @@ int main(int argc, char **argv) {
                             std::to_string(se->accretion[2]) + "," +
                             std::to_string(se->accretion[3]));
             else if (shell.hit3_fwdscatter.contains(event.position) && se)
-              edit3(64, std::to_string(se->forward_scatter));
+              edit3(64, std::to_string(se->forward_scatter) +
+                            (se->forward_scatter_back == 0.f &&
+                                     se->forward_scatter_back_mix == 0.f
+                                 ? ""
+                                 : "," +
+                                       std::to_string(
+                                           se->forward_scatter_back) +
+                                       "," +
+                                       std::to_string(
+                                           se->forward_scatter_back_mix)));
             else if (shell.hit3_volume.contains(event.position) && se)
               edit3(65, std::to_string(se->volume_depth) + "," +
                             std::to_string(se->volume_density) + "," +

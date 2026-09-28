@@ -263,6 +263,12 @@ struct Scene3dEntity {
   // sheet (dusty rings), negative boosts opposition (icy regolith).
   // [-1,1]; 0 disables.
   float forward_scatter{0.f};
+  // Optional second HG lobe: asymmetry [-1,1] blended in by
+  // `forward_scatter_back_mix` [0,1] — pairs the narrow forward spike
+  // with a broad weak back lobe like real dust sheets; mix 0 keeps
+  // the single-lobe phase.
+  float forward_scatter_back{0.f};
+  float forward_scatter_back_mix{0.f};
   // Spectral-class star photosphere preset (K): derives blackbody tint,
   // emissive response, and a temperature-graded limb coefficient.
   // [100,100000]; 0 leaves the material untouched. Overrides `tint`

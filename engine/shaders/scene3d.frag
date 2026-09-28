@@ -59,6 +59,7 @@ struct Material {
     vec4 atmo_sunset; // terminator-transmitted tint rgb, blend strength
     vec4 env_flags; // x: bound environment map is RGBM-encoded HDR
     vec4 drift_options; // x: latitude-differential drift fraction
+    vec4 scatter_options; // x: HG secondary-lobe asymmetry, y: secondary-lobe weight
 };
 layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
@@ -823,18 +824,29 @@ void main() {
             result*=max(1.0+material.uv_options.z*dot(normalize(beam_v),V),0.0);
         }
     }
-    // Henyey–Greenstein single-scatter phase (atmo_shape.w = asymmetry g):
-    // p = (1-g^2)/(1+g^2-2g*cos)^(3/2) with cos = -(V.L) — g>0 peaks the
-    // sheet when it is backlit (dusty-ring forward scatter, Saturn E-ring
-    // look) with a lobe that sharpens as |g|->1, and g<0 inverts to an
-    // opposition backscatter surge (icy regolith). Unit-mean over
-    // directions, so the sheet's luminance is preserved on average; |g|
-    // clamps at .95 so the singular peak stays finite. Radiance-only —
-    // the atmosphere rim and alpha stay untouched.
-    if(material.atmo_shape.w!=0.0){
+    // Henyey–Greenstein single-scatter phase (atmo_shape.w = primary
+    // asymmetry g): p = (1-g^2)/(1+g^2-2g*cos)^(3/2) with cos = -(V.L) —
+    // g>0 peaks the sheet when it is backlit (dusty-ring forward
+    // scatter, Saturn E-ring look) with a lobe that sharpens as |g|->1,
+    // and g<0 inverts to an opposition backscatter surge (icy
+    // regolith). scatter_options = {g2, w}: when w>0 the phase becomes
+    // the two-term mix (1-w)*HG(g)+w*HG(g2) — real dust sheets pair a
+    // narrow forward spike with a broad weak back lobe, so the
+    // face-lit side keeps a faint residual glow instead of flattening
+    // to the unlit baseline (g2=0 degenerates to the isotropic
+    // filler). Unit-mean over directions, so the sheet's luminance is
+    // preserved on average; |g| clamps at .95 so the singular peaks
+    // stay finite. Radiance-only — the atmosphere rim and alpha stay
+    // untouched.
+    if(material.atmo_shape.w!=0.0||material.scatter_options.y>0.0){
         const float hg=clamp(material.atmo_shape.w,-.95,.95);
-        const float den=max(1.0+hg*hg+2.0*hg*dot(V,material.light_direction.xyz),1e-4);
-        result*=(1.0-hg*hg)*pow(den,-1.5);
+        const float gb=clamp(material.scatter_options.x,-.95,.95);
+        const float w2=clamp(material.scatter_options.y,0.0,1.0);
+        const float cosv=dot(V,material.light_direction.xyz);
+        const float den=max(1.0+hg*hg+2.0*hg*cosv,1e-4);
+        const float den2=max(1.0+gb*gb+2.0*gb*cosv,1e-4);
+        result*=(1.0-w2)*(1.0-hg*hg)*pow(den,-1.5)
+               +w2*(1.0-gb*gb)*pow(den2,-1.5);
     }
     // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
     // nightside floor, tied to the star's actual color.

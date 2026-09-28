@@ -64,6 +64,10 @@ m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
 m.forward_scatter = 0.6f;                   // [-1,1] HG phase asymmetry:
                                             // +backlit boost (dusty
                                             // rings), -opposition surge
+m.forward_scatter_back = -0.35f;            // [-1,1] optional second HG
+                                            // lobe (broad weak back lobe)
+m.forward_scatter_back_mix = 0.25f;         // [0,1] share of the second
+                                            // lobe; 0 = single-lobe phase
 ```
 
 `star_photosphere3d(kelvin)` builds a spectral-class star material in
@@ -596,9 +600,11 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   light-path extinction march through the same density field (plus
   occluder-sphere blocking) — no multi-scatter or shadow-map-grade
   resolution.
-- `forward_scatter` is a single Henyey-Greenstein lobe — no
-  multi-term phase functions or wavelength-dependent scattering; it
-  scales radiance only, not alpha.
+- `forward_scatter` is a bounded two-term Henyey-Greenstein phase
+  (`forward_scatter_back`/`_back_mix` blend a second lobe in, g2=0
+  degenerating to the isotropic filler) — no wavelength-dependent
+  scattering or >2-term phase functions; it scales radiance only, not
+  alpha.
 - One shared equirect env map per material, or the scene-level
   `environment` probe for opt-in PBR materials with no authored map;
   `environmentCapture` bakes six face views at an anchor into the slot

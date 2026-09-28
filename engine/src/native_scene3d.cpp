@@ -86,7 +86,9 @@ void validate_instance(const MeshInstance3D& i){
      !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0||!bounded(m.limb_darkening_q,1)||m.limb_darkening_q<0||
      !bounded(m.band_shear,.5f)||!bounded(m.band_waves,1.f)||m.band_waves<0||
      !bounded(m.band_drift,.25f)||!bounded(m.band_turbulence,8.f)||!bounded(m.band_diff,8.f)||
-     !bounded(m.orbital_beaming,1.f)||!bounded(m.forward_scatter,1.f))
+     !bounded(m.orbital_beaming,1.f)||!bounded(m.forward_scatter,1.f)||
+     !bounded(m.forward_scatter_back,1.f)||
+     !bounded(m.forward_scatter_back_mix,1.f)||m.forward_scatter_back_mix<0)
     throw std::invalid_argument("3D material lighting and opacity must be finite and bounded.");
   if(i.lod_meshes.size()>8||!bounded(i.lod_pixels,4096)||i.lod_pixels<1.f||
      !bounded(i.lod_fade,.5f)||i.lod_fade<0.f)

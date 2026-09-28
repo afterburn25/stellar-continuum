@@ -298,6 +298,15 @@ struct Material3D {
   // sheet's total luminance is preserved on average; |g| clamps to .95
   // in the shader so the singular peak stays finite. [-1,1]; 0 disables.
   float forward_scatter{};
+  // Two-term phase: `forward_scatter_back` is a second HG lobe g2
+  // [-1,1] blended in by `forward_scatter_back_mix` [0,1] — real dust
+  // sheets pair a narrow forward spike with a broad weak back lobe
+  // (g2 < 0 at low weight gives the faint opposition-side glow a
+  // single lobe cannot express). g2 = 0 degenerates to the isotropic
+  // filler, so a mix alone softens the primary lobe. mix = 0 keeps
+  // the single-lobe path unchanged.
+  float forward_scatter_back{};
+  float forward_scatter_back_mix{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;

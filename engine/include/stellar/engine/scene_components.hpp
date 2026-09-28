@@ -196,6 +196,10 @@ struct MaterialSurface {
   // sheet (dusty rings), negative boosts opposition (icy). [-1,1];
   // 0 disables.
   float forward_scatter{0.f};
+  // Optional second HG lobe: asymmetry [-1,1] blended by
+  // `forward_scatter_back_mix` [0,1]; mix 0 keeps the single-lobe phase.
+  float forward_scatter_back{0.f};
+  float forward_scatter_back_mix{0.f};
   // Zonal-wind harmonic strength [0,1] layered on `band_shear` for
   // alternating mid-latitude jets.
   float band_waves{0.f};

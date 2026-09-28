@@ -1639,6 +1639,18 @@ int main(int argc,char** argv)try{
     const int back_off=channel(*off_back,160,120,0),back_on=channel(*on_back,160,120,0),face_on=channel(*on_face,160,120,0);
     check(back_off>30&&back_on>back_off*3/2,"Forward scatter did not brighten the backlit ring");
     check(face_on<back_on*2/3,"Forward scatter did not dim the face-lit ring");
+    // Two-term phase: a broad weak back lobe (g2<0, partial mix) lifts
+    // the face-lit side the single spike leaves flat while the backlit
+    // side keeps most of its forward boost.
+    ring.material.forward_scatter_back=-.4f;
+    ring.material.forward_scatter_back_mix=.3f;
+    DrawList backlit3;backlit3.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,-1}),{0,0,320,320}});
+    window.draw(backlit3,folder/"ring-backlit-two.png");const auto two_back=decode_rgba_image(folder/"ring-backlit-two.png");
+    DrawList face3;face3.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,1}),{0,0,320,320}});
+    window.draw(face3,folder/"ring-facelit-two.png");const auto two_face=decode_rgba_image(folder/"ring-facelit-two.png");
+    const int back_two=channel(*two_back,160,120,0),face_two=channel(*two_face,160,120,0);
+    check(face_two>face_on*5/4,"Two-term back lobe did not lift the face-lit ring");
+    check(back_two>back_off,"Two-term mix lost the forward-scatter boost");
     std::cout<<"forward_scatter_gpu=backlit_boost_passed\n";
   }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
