@@ -7941,6 +7941,9 @@ class NativeCampaign final {
     system_background_.poll();
     phenomena_.poll();
     galaxy_assets_.poll();
+    stellar_art_.poll();
+    planet_discs_.poll();
+    small_body_assets_.poll();
     auto out=scene_content(width,height);if(developer_session()){phenomena_debug_.data(phenomena_debug_text());phenomena_debug_.render(out,width,height);if(background_debug_.visible()){const auto id=system_workspace_.system_id().value_or(selected_id_.value_or(session_->frame().runtime().world().campaign().systems.front().id));background_debug_.data(system_background_,id);background_debug_.render(out,width,height,system_background_);}}developer_panel_.render(out,width,height,session_->frame());developer_index_.render(out,width,height,session_->frame());developer_planet_index_.render(out,width,height);giant_test_panel_.render(out,width,height,session_->frame(),[this](const auto& a,int lod){return planet_material_cache_.request(a,lod);});stellar_activity_panel_.render(out,width,height,session_->frame());developer_diagnostics_.render(out,width,height,session_->frame(),developer_monitor_);developer_empires_.render(out,width,height,session_->frame());
     if(developer_session()&&developer_fault_capture_.latched()){
       const float s=std::clamp(static_cast<float>(height)/1080.f,.7f,1.5f);

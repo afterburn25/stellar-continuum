@@ -19,6 +19,9 @@ class Artwork final {
 public:
   explicit Artwork(std::filesystem::path root);
   void use_queue(std::shared_ptr<stellar::native_map::ImagePreparationQueue> queue){queue_=std::move(queue);}
+  // Releases completed preparation tickets even while no stellar artwork is
+  // being drawn; an uncollected ticket would hold its queue reservation.
+  void poll(){collect();}
   void begin_frame(){++frame_;std::erase_if(admitted_close_,[&](const auto& item){return item.second+1<frame_;});visible_close_.clear();frame_budgeted_=true;}
   // Only observer-approved identities enter this presentation boundary.
   void append(stellar::native_map::DrawList&,stellar::native_map::Point,float radius,
