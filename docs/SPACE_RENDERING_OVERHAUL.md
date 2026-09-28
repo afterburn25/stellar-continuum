@@ -169,7 +169,10 @@ same document headless-tested.
    Henyey–Greenstein phase function (backlit dusty rings brighten, icy
    opposition surges) — `forwardScatterBack`/`forwardScatterBackMix`
    blend in an optional second lobe so a narrow forward spike pairs
-   with a broad weak back lobe like real dust sheets — and
+   with a broad weak back lobe like real dust sheets, and
+   `forwardScatterHue` weights the lobes by the mean-normalized
+   Rayleigh (450/λ)⁴ spectrum so small-particle scatter reads icy blue
+   instead of achromatic — and
    `SurfaceEffect3D::volume_scatter` makes
    emission volumes read star-lit; volumes are document-authored via the
    `volume` block / `EmissionVolume` component (entity texture supplies

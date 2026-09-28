@@ -203,6 +203,9 @@ struct MaterialSurface {
   // `forward_scatter_back_mix` [0,1]; mix 0 keeps the single-lobe phase.
   float forward_scatter_back{0.f};
   float forward_scatter_back_mix{0.f};
+  // Rayleigh-style wavelength weight for the phase lobes [0,1] —
+  // blue-tilts the scattered light; 0 keeps achromatic scatter.
+  float forward_scatter_hue{0.f};
   // Zonal-wind harmonic strength [0,1] layered on `band_shear` for
   // alternating mid-latitude jets.
   float band_waves{0.f};

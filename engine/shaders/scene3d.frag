@@ -60,6 +60,7 @@ struct Material {
     vec4 env_flags; // x: bound environment map is RGBM-encoded HDR
     vec4 drift_options; // x: latitude-differential drift fraction
     vec4 scatter_options; // x: HG secondary-lobe asymmetry, y: secondary-lobe weight, z: three-term limb coefficient, w: doppler beaming tint
+    vec4 wave_options; // x: Rayleigh wavelength weight for the HG phase lobes
 };
 layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
@@ -856,8 +857,15 @@ void main() {
         const float cosv=dot(V,material.light_direction.xyz);
         const float den=max(1.0+hg*hg+2.0*hg*cosv,1e-4);
         const float den2=max(1.0+gb*gb+2.0*gb*cosv,1e-4);
-        result*=(1.0-w2)*(1.0-hg*hg)*pow(den,-1.5)
-               +w2*(1.0-gb*gb)*pow(den2,-1.5);
+        const float phase=(1.0-w2)*(1.0-hg*hg)*pow(den,-1.5)
+                          +w2*(1.0-gb*gb)*pow(den2,-1.5);
+        // wave_options.x weights the phase by the Rayleigh spectrum
+        // (450/lambda)^4 for 650/532/450nm, mean-normalized so the
+        // sheet's luminance is preserved while hue redistributes it
+        // blueward — small-particle scatter reads icy rather than
+        // achromatic. 0 keeps the achromatic phase.
+        const float rh=clamp(material.wave_options.x,0.0,1.0);
+        result*=phase*mix(vec3(1.0),vec3(0.395,0.881,1.724),rh);
     }
     // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
     // nightside floor, tied to the star's actual color.

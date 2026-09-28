@@ -2380,17 +2380,19 @@ void commit_scene3_field(Shell &shell) {
           std::vector<std::string> toks;
           std::string tok;
           while (std::getline(csv, tok, ',')) toks.push_back(tok);
-          float v[3]{};
+          float v[4]{};
           int n = 0;
-          for (; n < 3 && n < (int)toks.size(); ++n) {
+          for (; n < 4 && n < (int)toks.size(); ++n) {
             try { v[n] = std::stof(toks[n]); }
             catch (const std::exception &) { n = -1; break; }
           }
           if (n > 0 && v[0] >= -1.f && v[0] <= 1.f && v[1] >= -1.f &&
-              v[1] <= 1.f && v[2] >= 0.f && v[2] <= 1.f) {
+              v[1] <= 1.f && v[2] >= 0.f && v[2] <= 1.f &&
+              v[3] >= 0.f && v[3] <= 1.f) {
             next.forward_scatter = v[0];
             next.forward_scatter_back = n > 1 ? v[1] : 0.f;
             next.forward_scatter_back_mix = n > 2 ? v[2] : 0.f;
+            next.forward_scatter_hue = n > 3 ? v[3] : 0.f;
             valid = true;
           }
           break; }
@@ -2786,6 +2788,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       inst.material.forward_scatter = e.forward_scatter;
       inst.material.forward_scatter_back = e.forward_scatter_back;
       inst.material.forward_scatter_back_mix = e.forward_scatter_back_mix;
+      inst.material.forward_scatter_hue = e.forward_scatter_hue;
       // Emission volume: the entity texture is the emission image and
       // the volume branch requires transparency (mirrors runtime host).
       if (e.volume_depth > 0.f && inst.material.texture) {
@@ -3211,16 +3214,22 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
   field(shell.hit3_fwdscatter, "fwdScatter",
         entity ? std::to_string(entity->forward_scatter) +
                      (entity->forward_scatter_back == 0.f &&
-                              entity->forward_scatter_back_mix == 0.f
+                              entity->forward_scatter_back_mix == 0.f &&
+                              entity->forward_scatter_hue == 0.f
                           ? ""
                           : "," + std::to_string(
                                 entity->forward_scatter_back) +
                                 "," +
                                 std::to_string(
-                                    entity->forward_scatter_back_mix))
+                                    entity->forward_scatter_back_mix) +
+                                (entity->forward_scatter_hue == 0.f
+                                     ? ""
+                                     : "," +
+                                           std::to_string(
+                                               entity->forward_scatter_hue)))
                : "",
         ed(64),
-        "backlit brightening -1..1[,backLobe -1..1,mix 0..1] - dusty rings, icy opposition");
+        "backlit brightening -1..1[,backLobe -1..1,mix 0..1[,rayleigh hue 0..1]] - dusty rings, icy opposition");
   field(shell.hit3_volume, "volume",
         entity && entity->volume_depth > 0.f
             ? std::to_string(entity->volume_depth) + "," +
@@ -7381,14 +7390,20 @@ int main(int argc, char **argv) {
             else if (shell.hit3_fwdscatter.contains(event.position) && se)
               edit3(64, std::to_string(se->forward_scatter) +
                             (se->forward_scatter_back == 0.f &&
-                                     se->forward_scatter_back_mix == 0.f
+                                     se->forward_scatter_back_mix == 0.f &&
+                                     se->forward_scatter_hue == 0.f
                                  ? ""
                                  : "," +
                                        std::to_string(
                                            se->forward_scatter_back) +
                                        "," +
                                        std::to_string(
-                                           se->forward_scatter_back_mix)));
+                                           se->forward_scatter_back_mix) +
+                                       (se->forward_scatter_hue == 0.f
+                                            ? ""
+                                            : "," +
+                                                  std::to_string(
+                                                      se->forward_scatter_hue))));
             else if (shell.hit3_volume.contains(event.position) && se)
               edit3(65, std::to_string(se->volume_depth) + "," +
                             std::to_string(se->volume_density) + "," +

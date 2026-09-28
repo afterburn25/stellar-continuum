@@ -73,6 +73,10 @@ m.forward_scatter_back = -0.35f;            // [-1,1] optional second HG
                                             // lobe (broad weak back lobe)
 m.forward_scatter_back_mix = 0.25f;         // [0,1] share of the second
                                             // lobe; 0 = single-lobe phase
+m.forward_scatter_hue = 0.5f;               // [0,1] Rayleigh wavelength
+                                            // weight: scattered light
+                                            // blue-shifts, luminance
+                                            // preserved
 ```
 
 `star_photosphere3d(kelvin)` builds a spectral-class star material in
@@ -488,7 +492,7 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 ([-8,8] rad/s evolving warp) and `bandDiff` ([-8,8]
 latitude-differential drift term),
 `orbitalBeam`/`orbitalBeamTint`, `forwardScatter`/`forwardScatterBack`/
-`forwardScatterBackMix` ([-1,1]/[0,1]), `starKelvin`
+`forwardScatterBackMix`/`forwardScatterHue` ([-1,1]/[0,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
 (`{depth,density,seed,steps,scatter,flow,distort,blend,image2,occlude,flowRate}`
 — requires a `texture`), `lods` (array of
@@ -622,9 +626,10 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   resolution.
 - `forward_scatter` is a bounded two-term Henyey-Greenstein phase
   (`forward_scatter_back`/`_back_mix` blend a second lobe in, g2=0
-  degenerating to the isotropic filler) — no wavelength-dependent
-  scattering or >2-term phase functions; it scales radiance only, not
-  alpha.
+  degenerating to the isotropic filler) with one shared Rayleigh
+  wavelength weight (`forward_scatter_hue` — mean-normalized (450/λ)⁴
+  tilts the scattered light blue; no per-lobe spectra or Mie size split)
+  — no >2-term phase functions; it scales radiance only, not alpha.
 - One shared equirect env map per material, or the scene-level
   `environment` probe for opt-in PBR materials with no authored map;
   `environmentCapture` bakes six face views at an anchor into the slot

@@ -427,13 +427,20 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `(1−w)·HG(g)+w·HG(g2)` so real dust sheets pair the narrow forward
   spike with a broad weak back lobe (face-lit sides keep a faint
   residual glow; g2=0 degenerates to the isotropic filler and mix=0
-  keeps the single-lobe path identical). Authored via
-  `forwardScatter`/`forwardScatterBack`/`forwardScatterBackMix` doc
-  keys + `MaterialSurface` fields, runtime + editor `fwdScatter`
-  CSV row. GPU probe measures the backlit boost, face-lit dim, and
-  the two-term back-lobe face-lit lift on a tilted annulus.
-  Remaining: two-term HG maximum — no wavelength-dependent scattering
-  or multi-term phase functions; radiance only (alpha untouched).
+  keeps the single-lobe path identical). `forward_scatter_hue` [0,1]
+  adds the wavelength dependence on the `wave_options.x` lane: the
+  phase product is weighted by the mean-normalized Rayleigh spectrum
+  `(450/λ)⁴` → `vec3(0.395,0.881,1.724)`, so luminance is preserved
+  while hue redistributes the scattered light blueward — icy dust
+  reads blue instead of achromatic white. Authored via
+  `forwardScatter`/`forwardScatterBack`/`forwardScatterBackMix`/
+  `forwardScatterHue` doc keys + `MaterialSurface` fields, runtime +
+  editor `fwdScatter` CSV row. GPU probe measures the backlit boost,
+  face-lit dim, the two-term back-lobe face-lit lift, and the
+  unsaturated blue/red shift on a tilted annulus.
+  Remaining: two-term HG maximum — one Rayleigh weight shared by both
+  lobes (no per-lobe spectra, no Mie size-parameter split, no
+  multi-term phase functions); radiance only (alpha untouched).
 
 ### Follow-up: `EmissionVolume` document/component authoring
 

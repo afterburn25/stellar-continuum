@@ -276,6 +276,10 @@ struct Scene3dEntity {
   // the single-lobe phase.
   float forward_scatter_back{0.f};
   float forward_scatter_back_mix{0.f};
+  // Rayleigh-style wavelength weight for the phase lobes [0,1] —
+  // blue-tilts the scattered light (icy dust reads blue instead of
+  // achromatic white); 0 keeps achromatic scatter.
+  float forward_scatter_hue{0.f};
   // Spectral-class star photosphere preset (K): derives blackbody tint,
   // emissive response, and a temperature-graded limb coefficient.
   // [100,100000]; 0 leaves the material untouched. Overrides `tint`
