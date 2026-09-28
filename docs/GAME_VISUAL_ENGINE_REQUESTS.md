@@ -102,6 +102,110 @@ PERFORMANCE CONSTRAINT:
 FALLBACK IF NOT AVAILABLE:
   Disabled slots keep surfacing the authoritative domain status summary.
 
+### REQUEST: Channel-matrix post-process for color-blind simulation
+Status:        OPEN
+Requested:    2026-09-28
+WHY NEEDED:
+  The color-blind accessibility modes (Protanopia/Deuteranopia/Tritanopia,
+  Machado severity-1) remap every CPU-drawn surface — text, primitives,
+  image and mesh tints — but every rendered 3D scene stays unremapped:
+  planets, ships, eruption ribbons and the nebula emission volume keep
+  their authored channel balance while the surrounding chrome adapts,
+  so a low-vision player sees an inconsistent frame. The high-contrast
+  sibling already adopted `RenderOptions3D::contrast`/`sharpen` for the
+  same surfaces; color-blind simulation needs a 3x3 channel matrix the
+  scalar post-process terms cannot express.
+CURRENT GAME SCREEN:
+  `app/native_client/native_ui_theme.hpp` `apply_color_blind` — the pass
+  walks `DrawList` world+overlay and is the single integration point;
+  it would set a new per-view matrix option on each `Scene3DView`.
+DESIRED PUBLIC API:
+  `RenderOptions3D::color_matrix` (or `colorblind_matrix`) — a 3x3
+  post-tonemap channel-remap matrix applied in display space on the
+  resolved LDR frame (identity default; document whether it composes
+  before or after `contrast`/`saturation`/`sharpen`).
+PERFORMANCE CONSTRAINT:
+  One additional uniform + a 3x3 multiply per resolved fragment; no
+  extra passes, no simulation or save impact.
+FALLBACK IF NOT AVAILABLE:
+  `apply_color_blind` keeps covering the 2D chrome only — the 3D scene
+  gap is documented in the function's comment.
+
+### REQUEST: Nullable `SurfaceEffect3D::next_texture` for single-texture effects
+Status:        OPEN
+Requested:    2026-09-28
+WHY NEEDED:
+  Any `surface_effect` — including the nebula emission volume, which only
+  uses the volume fields — fails validation without a bound secondary
+  texture (`Invalid surface effect sequence or occlusion sphere`), so the
+  game binds the same composite twice as a no-op `blend=0` pair. The
+  second bind is harmless but misleading: readers assume a two-image
+  sequence where none exists.
+CURRENT GAME SCREEN:
+  `app/native_client/native_phenomena.cpp` — the local-nebula emission
+  volume binds `surface_effect.next_texture = composite` purely to
+  satisfy validation.
+DESIRED PUBLIC API:
+  Permit `next_texture == nullptr` whenever `blend <= 0`, keeping the
+  sequence validation only for actual two-image blends.
+PERFORMANCE CONSTRAINT:
+  Validation-only change; no render-path cost.
+FALLBACK IF NOT AVAILABLE:
+  The double-bind workaround stays — it is cheap and validated, just
+  obscure. Documented as a limitation in the ledger.
+
+### REQUEST: Flared / non-coplanar annulus geometry for protoplanetary discs
+Status:        OPEN
+Requested:    2026-09-28
+WHY NEEDED:
+  Protostars render their protoplanetary debris as a flat `annulus_mesh`,
+  but real young-star discs are flared (scale height grows with radius)
+  and optically thick — a flat sheet cannot show the rim shadow lane or
+  the warped silhouette that makes protostars read correctly. The same
+  geometry would benefit the black-hole accretion discs, which are also
+  coplanar today.
+CURRENT GAME SCREEN:
+  `app/native_client/native_system_workspace.cpp` — protostar debris
+  disc and both black-hole flow regimes consume `annulus_mesh` with
+  `accretion_disc_material3d`.
+DESIRED PUBLIC API:
+  A mesh primitive or mesh-loader spec for a flared disc (inner/outer
+  radius, flare exponent, radial+azimuth segments), ideally double-sided
+  so the far rim silhouettes through the inner gap; consumption is a
+  straight `annulus_mesh` swap on existing instances.
+PERFORMANCE CONSTRAINT:
+  One extra vertex batch per star; no new shaders or simulation data.
+FALLBACK IF NOT AVAILABLE:
+  The flat annulus with deterministic per-system inclination stays —
+  readable and physically motivated, just geometrically thin.
+
+### REQUEST: Time-evolved accretion shear (differential spiral advance)
+Status:        OPEN
+Requested:    2026-09-28
+WHY NEEDED:
+  Accretion disc spiral density waves are a static bake; the game
+  rotates the whole instance on `visual_seconds_`, which keeps the
+  doppler lane view-fixed but spins the arm pattern rigidly — inner
+  and outer edges orbit at the same angular rate, physically wrong for
+  a Keplerian flow (inner edge should lap the outer several times over).
+CURRENT GAME SCREEN:
+  `app/native_client/native_system_workspace.cpp` — black-hole annulus
+  (active `.32`, quiescent `.16` rad/s) and the protostar debris disc
+  (`.07` rad/s) compose the spin into the tilt.
+DESIRED PUBLIC API:
+  A `band_drift`-style time term on the disc material that advects the
+  spiral phase differentially with radius (e.g. `shear_rate` —
+  rad/s at unit radius, evaluated as `phase + t·shear_rate/r^1.5`),
+  preserving the authored bake as the t=0 shape.
+PERFORMANCE CONSTRAINT:
+  One extra multiply in the existing disc shader; zero CPU cost, no
+  new textures; freezes on pause with `options.time` like every
+  animated term.
+FALLBACK IF NOT AVAILABLE:
+  Rigid instance spin stays — it already animates the arms without
+  disturbing the doppler lane; the shear would only add inner-edge
+  differential motion.
+
 ## Delivered
 
 (none yet)
