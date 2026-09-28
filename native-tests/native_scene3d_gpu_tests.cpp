@@ -178,7 +178,26 @@ int main(int argc,char** argv)try{
     window.set_scene3d_texture_budget(0);
     (void)capture({dark},"stream-denied.png");
     check(window.scene3d_statistics().streamed_fallbacks>stream_base,"Fully denied texture did not fall back to the pinned texture");
+    // Residency debug view: a denied bind tints magenta (pinned fallback),
+    // a partial tail reads warm by base mip, and a fully resident texture
+    // reads green. The quad sits left of centre — sample inside it.
+    RenderOptions3D res_view;res_view.debug_view=DebugView3D::Residency;
+    auto res_capture=[&](const MeshInstance3D& m,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{m}),{0,0,320,320},res_view});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    {const auto fb=res_capture(dark,"residency-fallback.png");
+     check(channel(*fb,72,160,0)>200&&channel(*fb,72,160,2)>200&&channel(*fb,72,160,1)<140,
+         "Residency view did not mark the denied bind as fallback");}
+    window.set_scene3d_texture_budget(100000u);
+    {const auto tail=res_capture(dark,"residency-partial.png");
+     check(channel(*tail,72,160,0)>200&&channel(*tail,72,160,1)>50&&channel(*tail,72,160,1)<200&&channel(*tail,72,160,2)<120,
+         "Residency view did not mark the partial tail warm");}
     window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
+    // The 2x2 texture is upsampled at this footprint, so its demanded
+    // tail starts at mip 0 — the resident-bind green case.
+    {const auto full=res_capture(textured,"residency-full.png");
+     check(channel(*full,160,160,1)>140&&channel(*full,160,160,0)<160&&channel(*full,160,160,2)<160,
+         "Residency view did not mark the resident bind green");}
   }
   {
     std::vector<std::uint8_t> checks(1024u*1024u*4u,255);
@@ -342,6 +361,95 @@ int main(int argc,char** argv)try{
     clouds.cloud_offset.x=1.5f;const auto full_turn=capture({seam},"mip-cloud-full-turn.png");
     for(int x=70;x<260;++x)check(std::abs(channel(*wrap,x,160,0)-channel(*full_turn,x,160,0))<=1,"Cloud wrapping changed after a full turn");
   }
+  {
+    auto deck=lit;deck.material.tint={125,125,125,255};deck.material.ambient=.05f;deck.material.diffuse=.85f;
+    deck.material.surface_response=SurfaceResponse3D{};
+    auto& deck_surface=*deck.material.surface_response;
+    deck_surface.cloud_shadow=RgbaImage::create(1,1,{255,255,255,255});
+    deck_surface.cloud_opacity=1;deck_surface.cloud_albedo=1;
+    const auto deck_lit=capture({deck},"planet-cloud-deck.png");
+    check(channel(*deck_lit,160,160,0)>channel(*matte,160,160,0)+60,"Opaque cloud deck did not composite over the surface");
+    deck_surface.cloud_albedo=.25f;
+    const auto dim_deck=capture({deck},"planet-cloud-deck-dim.png");
+    check(channel(*dim_deck,160,160,0)<channel(*deck_lit,160,160,0)-60,"Cloud albedo did not scale the deck brightness");
+  }
+  {
+    // Raised cloud deck: height gives the layer view parallax — limb
+    // texels slide tangentially while the disc centre (deck displaced
+    // along the view axis) stays put.
+    auto lifted=lit;lifted.mesh=Mesh3D::uv_sphere(64,32);lifted.scale=.85f;
+    lifted.material.tint={125,125,125,255};lifted.material.ambient=.05f;lifted.material.diffuse=.85f;
+    lifted.material.light_direction=Vec3{0,0,1};
+    lifted.material.surface_response=SurfaceResponse3D{};
+    auto& rs=*lifted.material.surface_response;
+    std::vector<std::uint8_t> cpix(256*64*4);
+    for(int y=0;y<64;++y)for(int x=0;x<256;++x){
+      const std::uint8_t v=(x/16)%2?255:40;
+      cpix[(y*256+x)*4]=v;cpix[(y*256+x)*4+1]=v;cpix[(y*256+x)*4+2]=v;cpix[(y*256+x)*4+3]=255;
+    }
+    rs.cloud_shadow=RgbaImage::create(256,64,std::move(cpix));
+    rs.cloud_opacity=1;rs.cloud_albedo=1;
+    const auto flat=capture({lifted},"cloud-height-flat.png");
+    rs.cloud_height=.06f;
+    const auto raised=capture({lifted},"cloud-height-raised.png");
+    double inner=0,outer=0;int inner_px=0,outer_px=0;
+    for(int y=40;y<290;++y)for(int x=30;x<300;++x){
+      const double r=std::hypot(x-164.0,y-160.0);
+      if(r>130.0)continue;
+      const int d=std::abs(channel(*raised,x,y,0)-channel(*flat,x,y,0));
+      if(r<55.0){inner+=d;++inner_px;}
+      else if(r>95.0){outer+=d;++outer_px;}
+    }
+    check(outer>2.0*inner*(static_cast<double>(outer_px)/inner_px)&&outer>40000.0,
+          "Raised cloud deck showed no limb parallax");
+  }
+  {
+    auto wrapped=lit;wrapped.material.tint={255,255,255,255};wrapped.material.ambient=.05f;wrapped.material.diffuse=.95f;
+    wrapped.material.light_direction=Vec3{1,0,0};
+    const auto edge=capture({wrapped},"terminator-flat.png");
+    wrapped.material.terminator_wrap=.8f;
+    const auto wrapped_edge=capture({wrapped},"terminator-wrap.png");
+    check(channel(*wrapped_edge,160,160,0)>channel(*edge,160,160,0)+80,"Wrap diffuse did not light the terminator");
+    wrapped.material.light_direction=Vec3{0,0,1};
+    const auto lit_wrap=capture({wrapped},"terminator-wrap-lit.png");
+    wrapped.material.terminator_wrap=0;
+    const auto lit_flat=capture({wrapped},"terminator-flat-lit.png");
+    check(std::abs(channel(*lit_wrap,160,160,0)-channel(*lit_flat,160,160,0))<=2,"Wrap changed fully lit response");
+  }
+  {
+    // Self-luminous disc: limb darkening keeps the centre and dims the
+    // edge — the photosphere profile that separates a star from a flat
+    // neon circle.
+    auto star=lit;star.mesh=Mesh3D::uv_sphere(64,32);star.scale=.85f;
+    star.material.tint={255,255,255,255};star.material.ambient=0;star.material.diffuse=0;
+    star.material.pbr=PbrSurface3D{};star.material.pbr->emissive_strength=.5f;
+    const auto uniform_disc=capture({star},"star-uniform.png");
+    star.material.limb_darkening=.6f;
+    const auto limb_disc=capture({star},"star-limb.png");
+    check(std::abs(channel(*limb_disc,160,160,0)-channel(*uniform_disc,160,160,0))<=4,"Limb darkening changed the disc centre");
+    check(channel(*limb_disc,275,160,0)+15<channel(*uniform_disc,275,160,0),"Limb darkening did not dim the disc edge");
+    // Quadratic coefficient: the squared term steepens the falloff only
+    // at the very edge — the centre is untouched, mid-disc barely moves,
+    // and the extreme limb darkens beyond the linear profile.
+    star.material.limb_darkening_q=.5f;
+    const auto quad_disc=capture({star},"star-limb-quad.png");
+    check(std::abs(channel(*quad_disc,160,160,0)-channel(*limb_disc,160,160,0))<=4,
+        "Quadratic limb darkening changed the disc centre");
+    check(std::abs(channel(*quad_disc,220,160,0)-channel(*limb_disc,220,160,0))<20,
+        "Quadratic limb darkening disturbed mid-disc");
+    check(channel(*quad_disc,275,160,0)+8<channel(*limb_disc,275,160,0),
+        "Quadratic limb darkening did not deepen the extreme edge");
+    // Three-term law: the (1-μ^{3/2}) mid-curve term reaches further
+    // into the disc than the squared edge term — mid-disc dims past
+    // the quadratic profile while the centre stays untouched.
+    star.material.limb_darkening_mid=.3f;
+    const auto mid_disc=capture({star},"star-limb-mid.png");
+    check(std::abs(channel(*mid_disc,160,160,0)-channel(*quad_disc,160,160,0))<=4,
+        "Three-term limb darkening changed the disc centre");
+    check(channel(*mid_disc,220,160,0)+5<channel(*quad_disc,220,160,0),
+        "Three-term limb darkening did not reach mid-disc");
+    std::cout<<"limb_darkening_gpu=linear_quadratic_edge_passed\n";
+  }
   surface.cloud_opacity=0;surface.properties=RgbaImage::create(1,1,{50,255,0,128});
   const auto ocean=capture({response},"planet-ocean.png");
   check(channel(*ocean,160,160,0)>channel(*matte,160,160,0)+30,"Ocean roughness/specular mask is not evaluated");
@@ -412,6 +520,1148 @@ int main(int argc,char** argv)try{
   const auto rough=capture({ice},"optics-rough.png");
   check(channel(*polished,160,160,0)>60&&channel(*rough,160,160,0)<5,"GGX roughness did not broaden the sun highlight");
   std::cout<<"dielectric_gpu=fresnel_snell_absorption_frost_cache_passed\n";
+  {
+    // Metallic-workflow materials: emissive output independent of lighting,
+    // metallic kills diffuse and tints specular, cutout discards fragments,
+    // tiling repeats the surface, IBL feeds unlit surfaces.
+    auto flat=a;flat.mesh=quad(0,0);flat.material.tint={255,255,255,255};
+    flat.material.ambient=0;flat.material.diffuse=0;flat.material.light_intensity=0;
+    auto glow=flat;glow.material.pbr=PbrSurface3D{};
+    glow.material.pbr->emissive_strength=2;glow.material.pbr->emissive_tint={1,0,0};
+    const auto emissive=capture({glow},"pbr-emissive.png");
+    check(channel(*emissive,160,160,0)>200&&channel(*emissive,160,160,1)<10,
+        "Emissive material did not glow without incident light");
+    std::vector<std::uint8_t> glow_pixels(64*64*4,255);
+    for(int y=0;y<64;++y)for(int x=0;x<64;++x){const auto at=(y*64+x)*4;glow_pixels[at]=0;glow_pixels[at+1]=x<32?255:0;glow_pixels[at+2]=0;}
+    glow.material.pbr->emissive_tint={1,1,1};
+    glow.material.pbr->emissive=RgbaImage::create(64,64,std::move(glow_pixels));
+    const auto masked=capture({glow},"pbr-emissive-map.png");
+    check(channel(*masked,80,160,1)>200&&channel(*masked,240,160,1)<10,
+        "Emissive map did not mask the emitted radiance");
+    auto metal=flat;metal.material.diffuse=1;metal.material.light_direction=Vec3{0,0,1};
+    metal.material.light_intensity=1;metal.material.tint={200,60,40,255};
+    metal.material.pbr=PbrSurface3D{};metal.material.pbr->metallic=1;metal.material.pbr->roughness=.4f;
+    const auto metal_frame=capture({metal},"pbr-metal.png");
+    check(channel(*metal_frame,160,160,0)>channel(*metal_frame,160,160,1)+40,
+        "Metallic specular was not tinted by the surface albedo");
+    // Off the specular lobe a conductor loses all diffuse response — an
+    // off-axis normal keeps only the residual lobe energy.
+    auto off_axis_verts=quad(0,0)->vertices();for(auto& v:off_axis_verts)v.normal={.6f,0,.8f};
+    const auto off_axis_mesh=Mesh3D::create(off_axis_verts,{0,1,2,0,2,3});
+    auto off_axis=metal;off_axis.mesh=off_axis_mesh;
+    const auto metal_off=capture({off_axis},"pbr-metal-offaxis.png");
+    auto dielectric_off=off_axis;dielectric_off.material.pbr->metallic=0;
+    const auto dielectric_frame=capture({dielectric_off},"pbr-dielectric-offaxis.png");
+    check(channel(*metal_off,160,160,0)+80<channel(*dielectric_frame,160,160,0),
+        "Metallic surface kept dielectric-level diffuse response off the specular lobe");
+    auto cutout=flat;cutout.material.tint={255,255,255,255};cutout.material.ambient=1;cutout.material.diffuse=0;
+    std::vector<std::uint8_t> mask_pixels(64*4,255);
+    for(int x=0;x<64;++x)mask_pixels[x*4+3]=x<32?0:255;
+    cutout.material.texture=RgbaImage::create(64,1,std::move(mask_pixels));cutout.material.alpha_threshold=.5f;
+    const auto cut=capture({cutout},"pbr-cutout.png");
+    check(channel(*cut,80,160,0)==5&&channel(*cut,240,160,0)>200,
+        "Alpha cutout failed to discard sub-threshold fragments");
+    auto tiled=cutout;tiled.material.alpha_threshold=0;tiled.material.texture_tiling={2.f,1.f};
+    const auto tile=capture({tiled},"pbr-tiling.png");
+    check(channel(*tile,100,160,0)>200&&channel(*tile,168,160,0)==5&&channel(*tile,240,160,0)>200,
+        "UV tiling did not repeat the surface texture");
+    auto enviro=flat;enviro.material.ambient=0;enviro.material.diffuse=0;enviro.material.light_intensity=0;
+    enviro.material.pbr=PbrSurface3D{};enviro.material.pbr->environment_strength=.8f;
+    enviro.material.pbr->environment=RgbaImage::create(1,1,{0,255,0,255});
+    const auto ibl=capture({enviro},"pbr-ibl.png");
+    check(channel(*ibl,160,160,1)>40&&channel(*ibl,160,160,0)<30,
+        "Environment irradiance did not light an unlit PBR surface");
+    // Scene environment probe: a view-level equirect fills the IBL slot
+    // of materials that opted in (strength>0) but authored no map; an
+    // authored map still wins over the probe.
+    const auto probe_map=RgbaImage::create(1,1,{255,0,0,255});
+    auto probe_mat=enviro;probe_mat.material.pbr->environment.reset();
+    DrawList no_l;no_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{probe_mat}),{0,0,320,320}});
+    window.draw(no_l,folder/"pbr-ibl-none.png");const auto no_probe=decode_rgba_image(folder/"pbr-ibl-none.png");
+    DrawList scn_l;scn_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{probe_mat},{.42f,.2f,.87f},{},{},probe_map),{0,0,320,320}});
+    window.draw(scn_l,folder/"pbr-ibl-scene.png");const auto with_probe=decode_rgba_image(folder/"pbr-ibl-scene.png");
+    check(channel(*with_probe,160,160,0)>40&&channel(*with_probe,160,160,1)<30,
+        "Scene environment probe did not light an unlit PBR surface");
+    check(channel(*no_probe,160,160,0)<30&&channel(*no_probe,160,160,1)<30,
+        "PBR material lit with no environment map at all");
+    DrawList own_l;own_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{enviro},{.42f,.2f,.87f},{},{},probe_map),{0,0,320,320}});
+    window.draw(own_l,folder/"pbr-ibl-own.png");const auto own=decode_rgba_image(folder/"pbr-ibl-own.png");
+    check(channel(*own,160,160,1)>40&&channel(*own,160,160,0)<30,
+        "Authored environment map lost to the scene probe");
+    // Captured environment probe: environmentCapture bakes six face
+    // views at the anchor into an equirect and binds it as the scene
+    // env slot — opt-in materials reflect local geometry the authored
+    // map cannot know. The red sphere behind the camera is invisible
+    // to the view but dominates the probe's +Z hemisphere, which is
+    // the direction a camera-facing quad reflects.
+    {
+      auto mirror=enviro;mirror.material.pbr->environment.reset();
+      auto painter=mirror;painter.mesh=Mesh3D::uv_sphere(32,16);painter.scale=30;
+      painter.position={0,0,40};painter.material.tint={255,10,10,255};
+      // HDR bakes read pre-tonemap radiance — an ambient-lit body stays
+      // dim there; an emitter carries decisive luminance in both paths.
+      painter.material.ambient=0;painter.material.diffuse=0;
+      painter.material.pbr->environment_strength=0;painter.material.pbr->emissive_strength=6.f;
+      painter.material.pbr->emissive_tint={1.f,0.f,0.f};
+      const auto authored=RgbaImage::create(1,1,{0,0,255,255});
+      const auto bakes_before=window.scene3d_statistics().probe_bakes;
+      EnvironmentCapture3D capture_opts;capture_opts.enabled=true;capture_opts.face_resolution=64;
+      DrawList off_l;off_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{mirror,painter},{.42f,.2f,.87f},{},{},authored),{0,0,320,320}});
+      window.draw(off_l,folder/"pbr-probe-off.png");const auto off=decode_rgba_image(folder/"pbr-probe-off.png");
+      DrawList on_l;on_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{mirror,painter},{.42f,.2f,.87f},{},{},authored,capture_opts),{0,0,320,320}});
+      window.draw(on_l,folder/"pbr-probe-on.png");const auto on=decode_rgba_image(folder/"pbr-probe-on.png");
+      check(window.scene3d_statistics().probe_bakes==bakes_before+1,
+          "Captured environment probe did not bake");
+      check(channel(*on,160,160,0)>channel(*on,160,160,2)+40&&
+            channel(*on,160,160,0)>channel(*off,160,160,0)+40,
+          "Captured probe did not reflect scene geometry the authored map lacks");
+    }
+    // Roughness rides the prefiltered mip chain: a black stripe centred
+    // on the +Z reflection direction blurs into its white shoulders at
+    // roughness 1 — base-mip sampling returns stripe-black while the old
+    // five-tap cone leaked ~64; the mip level lands mid-gray. A crisp
+    // (roughness 0) copy stays stripe-black through the same map.
+    {
+      std::vector<std::uint8_t> stripe(64*32*4);
+      for(int y=0;y<32;++y)for(int x=0;x<64;++x){
+        const auto at=(static_cast<std::size_t>(y)*64+x)*4;
+        stripe[at]=stripe[at+1]=stripe[at+2]=(x>=27&&x<=37)?0:255;stripe[at+3]=255;}
+      const auto stripe_map=RgbaImage::create(64,32,std::move(stripe));
+      auto frosted=enviro;frosted.material.pbr->environment.reset();
+      frosted.material.pbr->metallic=1.f;frosted.material.pbr->roughness=1.f;
+      DrawList fr_l;fr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{frosted},{.42f,.2f,.87f},{},{},stripe_map),{0,0,320,320}});
+      window.draw(fr_l,folder/"pbr-mip-frost.png");const auto mip_frost=decode_rgba_image(folder/"pbr-mip-frost.png");
+      const int fr=channel(*mip_frost,160,160,0);
+      check(fr>60&&fr<190,"Roughness did not read the prefiltered environment mip");
+      auto crisp=frosted;crisp.material.pbr->roughness=.04f;
+      DrawList cr_l;cr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{crisp},{.42f,.2f,.87f},{},{},stripe_map),{0,0,320,320}});
+      window.draw(cr_l,folder/"pbr-mip-crisp.png");const auto cr=decode_rgba_image(folder/"pbr-mip-crisp.png");
+      check(channel(*cr,160,160,0)<40,"Mirror-sharp reflection lost the environment stripe");
+    }
+    // Energy-conserving split: the specular fresnel share comes out of
+    // diffuse irradiance — under a uniform environment a grazing
+    // dielectric reads the same as a face-on one. The unsplit sum
+    // double-counted the environment at grazing.
+    {
+      auto kf=enviro;kf.material.pbr->environment=RgbaImage::create(1,1,{140,140,140,255});
+      kf.material.pbr->environment_strength=1.f;kf.material.pbr->metallic=0;kf.material.pbr->roughness=.2f;
+      kf.scale=1.2f;
+      DrawList fl_l;fl_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{kf}),{0,0,320,320}});
+      window.draw(fl_l,folder/"pbr-env-flat.png");const auto fl=decode_rgba_image(folder/"pbr-env-flat.png");
+      kf.rotation=rotation_axis_angle({0,1,0},1.5f);
+      DrawList gr_l;gr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{kf}),{0,0,320,320}});
+      window.draw(gr_l,folder/"pbr-env-graze.png");const auto gr=decode_rgba_image(folder/"pbr-env-graze.png");
+      check(std::abs(channel(*gr,160,160,0)-channel(*fl,160,160,0))<20,
+          "Diffuse irradiance ignored the specular fresnel share (grazing over-counts the environment)");
+    }
+    // Callers that rebuild Scene3D per frame declare a stable probe
+    // epoch: the bake caches per (epoch, anchor, res) instead of the
+    // scene instance — three rebuilt views bake once, and bumping the
+    // epoch forces a refresh.
+    {
+      auto epoch_mat=enviro;epoch_mat.material.pbr->environment.reset();
+      EnvironmentCapture3D cap_epoch;cap_epoch.enabled=true;cap_epoch.face_resolution=32;
+      const auto bakes_epoch=window.scene3d_statistics().probe_bakes;
+      const auto epoch_draw=[&](std::uint64_t e,const char* name){
+        DrawList l;l.world.emplace_back(Scene3DView{Scene3D::create(camera,{epoch_mat},{.42f,.2f,.87f},{},{},nullptr,cap_epoch),{0,0,320,320}});
+        std::get<Scene3DView>(l.world.back()).probe_epoch=e;
+        window.draw(l,folder/name);};
+      epoch_draw(11,"pbr-epoch-0.png");epoch_draw(11,"pbr-epoch-1.png");epoch_draw(11,"pbr-epoch-2.png");
+      check(window.scene3d_statistics().probe_bakes==bakes_epoch+1,
+          "Probe rebaked per rebuilt scene despite a stable epoch");
+      epoch_draw(12,"pbr-epoch-bump.png");
+      check(window.scene3d_statistics().probe_bakes==bakes_epoch+2,
+          "Probe epoch bump did not force a rebake");
+      // An epoch-keyed entry lives only while some view declares its
+      // generation: a probe-less frame releases it, so the same epoch
+      // bakes again on return rather than accumulating stale entries.
+      DrawList gap_l;gap_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{epoch_mat},{.42f,.2f,.87f},{},{},nullptr),{0,0,320,320}});
+      window.draw(gap_l,folder/"pbr-epoch-gap.png");
+      epoch_draw(12,"pbr-epoch-return.png");
+      check(window.scene3d_statistics().probe_bakes==bakes_epoch+3,
+          "Undeclared probe epoch did not release its baked entry");
+    }
+    // HDR captured probe: when the device supports float targets the
+    // bake downloads the pre-tonemap RGBA16F faces and RGBM-encodes
+    // them, so a captured emitter keeps its headroom — an authored
+    // clamped-white map can only reflect display 1.0. The emissive
+    // sphere sits behind the camera: invisible to the view, dominant
+    // in the +Z hemisphere the camera-facing mirror reflects.
+    {
+      auto mirror=enviro;mirror.material.pbr->environment.reset();
+      mirror.material.pbr->metallic=1.f;mirror.material.pbr->roughness=.04f;
+      auto sun=mirror;sun.mesh=Mesh3D::uv_sphere(32,16);sun.scale=30;
+      sun.position={0,0,40};sun.material.pbr->environment_strength=0;
+      sun.material.pbr->emissive_strength=6.f;
+      const auto white=RgbaImage::create(1,1,{255,255,255,255});
+      EnvironmentCapture3D cap_hdr;cap_hdr.enabled=true;cap_hdr.face_resolution=64;
+      const auto hdr_before=window.scene3d_statistics().probe_bakes_hdr;
+      DrawList ldr_l;ldr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{mirror,sun},{.42f,.2f,.87f},{},{},white),{0,0,320,320}});
+      window.draw(ldr_l,folder/"pbr-probe-ldr.png");const auto ldr=decode_rgba_image(folder/"pbr-probe-ldr.png");
+      DrawList hdr_l;hdr_l.world.emplace_back(Scene3DView{Scene3D::create(camera,{mirror,sun},{.42f,.2f,.87f},{},{},nullptr,cap_hdr),{0,0,320,320}});
+      window.draw(hdr_l,folder/"pbr-probe-hdr.png");const auto hdr=decode_rgba_image(folder/"pbr-probe-hdr.png");
+      const int on=channel(*hdr,160,160,0),off=channel(*ldr,160,160,0);
+      if(window.scene3d_statistics().probe_bakes_hdr==hdr_before+1)
+        check(on>off+25,"HDR probe bake lost the emitter's radiance headroom");
+      else
+        check(on>off-15,"LDR probe bake fell below the authored clamp baseline");
+    }
+    std::cout<<"pbr_gpu=emissive_metallic_cutout_tiling_ibl_probe_passed\n";
+  }
+  {
+    // Scene point lights: windowed inverse-square falloff in view space.
+    auto plate=b;plate.material.tint={255,255,255,255};plate.material.ambient=0;plate.material.diffuse=1;
+    plate.material.light_intensity=0;plate.mesh=quad(0,0);
+    PointLight3D lamp;lamp.position={0,0,2.5};lamp.color={0,1,0};lamp.intensity=4;lamp.range=5;
+    DrawList lamps;lamps.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate},{0,0,1},{lamp}),{0,0,320,320}});
+    window.draw(lamps,folder/"point-light.png");const auto lit_point=decode_rgba_image(folder/"point-light.png");
+    check(channel(*lit_point,160,160,1)>100&&channel(*lit_point,160,160,0)<20,
+        "Point light did not illuminate the receiver with its color");
+    lamp.range=.2f;
+    DrawList dim;dim.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate},{0,0,1},{lamp}),{0,0,320,320}});
+    window.draw(dim,folder/"point-light-range.png");const auto dimmed=decode_rgba_image(folder/"point-light-range.png");
+    check(channel(*dimmed,160,160,1)<20,"Range window did not attenuate the point light");
+    // Spot cone: aimed at the plate with a tight cone the centre stays
+    // lit while the corners (≈27° off-axis, outside the ~8° outer edge)
+    // go dark; swung away it lights nothing, and a zero direction
+    // restores the omni footprint.
+    lamp.range=5;lamp.spot_direction={0,0,-1};lamp.spot_inner=.997f;lamp.spot_outer=.99f;
+    auto spot=[&](const char* name){
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate},{0,0,1},{lamp}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto spot_on=spot("point-light-spot.png");
+    check(channel(*spot_on,160,160,1)>100,"Spot cone did not light its axis");
+    check(channel(*spot_on,60,60,1)<20&&channel(*spot_on,60,60,1)<channel(*lit_point,60,60,1)/4,
+        "Spot cone leaked radiance outside its outer edge");
+    lamp.spot_direction={0,0,1};
+    const auto spot_away=spot("point-light-spot-away.png");
+    check(channel(*spot_away,160,160,1)<20,"Spot cone lit fragments behind its edge");
+    lamp.spot_direction={0,0,0};
+    const auto spot_omni=spot("point-light-spot-omni.png");
+    check(std::abs(channel(*spot_omni,160,160,1)-channel(*lit_point,160,160,1))<=4&&
+          std::abs(channel(*spot_omni,60,60,1)-channel(*lit_point,60,60,1))<=4,
+        "Zero spot direction did not restore the omni point light");
+    // Shadowed spot: an occluder inside the cone projects an umbra onto
+    // the plate's lit disc only when casts_shadow is set. The occluder
+    // is offset off-axis so its own lit shell sits beside the umbra.
+    MeshInstance3D occluder;occluder.mesh=Mesh3D::uv_sphere(16,8);
+    occluder.position={-.12f,0,1.6f};occluder.scale=.1f;
+    occluder.material.ambient=0;occluder.material.diffuse=.8f;
+    occluder.material.light_intensity=0;
+    lamp.spot_direction={0,0,-1};lamp.spot_inner=.999f;lamp.spot_outer=.985f;
+    lamp.casts_shadow=false;
+    auto spot_cast=[&](const char* name){
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder},{0,0,1},{lamp}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto spot_unshadowed=spot_cast("point-light-spot-noshadow.png");
+    lamp.casts_shadow=true;
+    const auto spot_shadowed=spot_cast("point-light-spot-shadow.png");
+    // Umbra lands left of centre (light ray through the off-axis occluder);
+    // census the darkest receiver texel in a left-hand strip vs right.
+    const auto census=[&](const RgbaImage& img,int x0,int x1){
+      int dark=0;for(int y=140;y<190;++y)for(int x=x0;x<x1;++x)
+        if(channel(img,x,y,1)<30)++dark;return dark;};
+    check(census(*spot_shadowed,120,155)>census(*spot_unshadowed,120,155)+20,
+        "Shadowed spot did not cut an umbra through the occluder");
+    // Non-vacuous: the cone's lit disc survives beside the umbra, so the
+    // darkening is occlusion rather than a dead spot light.
+    check(census(*spot_shadowed,165,195)<census(*spot_shadowed,120,155)-10&&
+          channel(*spot_shadowed,185,160,1)>channel(*spot_unshadowed,185,160,1)/2,
+        "Spot shadow extinguished the whole cone instead of the umbra");
+    // shadow_strength blends the map like ShadowMap3D::strength: a half-
+    // strength umbra darkens but never reaches the full cut's floor. Find
+    // a texel the full cut blacked out (lit unshadowed), then check the
+    // softened render lands near half its lit value.
+    lamp.shadow_strength=.5f;
+    const auto spot_soft=spot_cast("point-light-spot-softshadow.png");
+    int bx=-1,by=0;
+    for(int y=140;y<190&&bx<0;++y)for(int x=120;x<155;++x)
+      if(channel(*spot_shadowed,x,y,1)<10&&channel(*spot_unshadowed,x,y,1)>80){bx=x;by=y;break;}
+    check(bx>0,"Full-cut spot umbra had no blacked-out texel to soften");
+    const int us=channel(*spot_unshadowed,bx,by,1),fu=channel(*spot_shadowed,bx,by,1),so=channel(*spot_soft,bx,by,1);
+    check(so>fu+15&&so>us*0.35&&so<us*0.7,
+        "shadow_strength did not soften the spot umbra between full cut and lit");
+    lamp.shadow_strength=1.f;
+    // Two shadowed spots share the depth atlas — each cone's receiver
+    // projects into its own quadrant, so a second lamp tilting right
+    // cuts an umbra through its own occluder without touching the
+    // first light's strip. lamp2's axis tilts right; occluder2 sits
+    // off that axis so its umbra strips ~x195-245 (census left half).
+    auto lamp2=lamp;lamp2.spot_direction={.24f,0,-.97f};
+    auto occluder2=occluder;occluder2.position={.1f,0,1.6f};
+    auto spot_two=[&](bool a_cast,bool b_cast,const char* name){
+      lamp.casts_shadow=a_cast;lamp2.casts_shadow=b_cast;
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder,occluder2},{0,0,1},{lamp,lamp2}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto both_unshadowed=spot_two(false,false,"point-light-spot2-noshadow.png");
+    const auto casters_before=window.scene3d_statistics().shadow_casters;
+    const auto both_shadowed=spot_two(true,true,"point-light-spot2-shadow.png");
+    // lamp2 as the ONLY shadowed light: the full-map path through its
+    // own tilted cone, verifying the single-light projection stays intact
+    // when the casting slot isn't the first point light in the scene.
+    const auto b_only=spot_two(false,true,"point-light-spot2-bonly.png");
+    lamp.casts_shadow=true;lamp2.casts_shadow=true;
+    std::cout<<"spot2_casters="<<(window.scene3d_statistics().shadow_casters-casters_before)<<"\n";
+    check(census(*both_shadowed,120,155)>census(*both_unshadowed,120,155)+20,
+        "First lamp lost its umbra when a second spot casts");
+    check(census(*both_shadowed,175,215)>census(*both_unshadowed,175,215)+10,
+        "Second shadowed spot did not cut an umbra through its own cone");
+    check(census(*b_only,175,215)>census(*both_unshadowed,175,215)+10,
+        "Second spot's umbra vanishes when it is the only shadowed light");
+    check(channel(*both_shadowed,272,160,1)>channel(*both_unshadowed,272,160,1)/2,
+        "Spot atlas darkened lamp2's lit rim outside its umbra");
+    // The Shadows debug view folds spot depth-map terms into the same
+    // grayscale the key light uses: both umbra strips read black while
+    // the lit rim stays bright — authors can see spot footprints without
+    // waiting for the diffuse result to show them.
+    {RenderOptions3D dbg_opt;dbg_opt.debug_view=DebugView3D::Shadows;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder,occluder2},{0,0,1},{lamp,lamp2}),{0,0,320,320},dbg_opt});
+     window.draw(d,folder/"point-light-spot2-debug.png");
+     const auto spot_dbg=decode_rgba_image(folder/"point-light-spot2-debug.png");
+     check(census(*spot_dbg,120,155)>20&&census(*spot_dbg,175,215)>10,
+         "Shadows debug view did not darken inside either spot umbra");
+     check(channel(*spot_dbg,272,160,0)>200,
+         "Shadows debug view darkened a lit rim outside the spot umbrae");}
+    // receives_shadow=false on the receiver folds both spot map terms to
+    // lit — the plate keeps its lit census even inside both umbrae.
+    {auto blind=plate;blind.receives_shadow=false;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{blind,occluder,occluder2},{0,0,1},{lamp,lamp2}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-spot2-noreceive.png");
+     const auto blind_img=decode_rgba_image(folder/"point-light-spot2-noreceive.png");
+     check(std::abs(census(*blind_img,120,155)-census(*both_unshadowed,120,155))<=6&&
+           std::abs(census(*blind_img,175,215)-census(*both_unshadowed,175,215))<=6,
+         "receives_shadow=false receiver still showed spot umbrae");}
+    // casts_shadow=false on a spot occluder keeps it out of its light's
+    // quadrant — lamp2's umbra strip reopens while lamp1's stays closed.
+    {auto shy2=occluder2;shy2.casts_shadow=false;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder,shy2},{0,0,1},{lamp,lamp2}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-spot2-optout.png");
+     const auto shy_img=decode_rgba_image(folder/"point-light-spot2-optout.png");
+     check(std::abs(census(*shy_img,175,215)-census(*both_unshadowed,175,215))<=6,
+         "casts_shadow=false occluder still wrote lamp2's quadrant");
+     check(census(*shy_img,120,155)>census(*both_unshadowed,120,155)+20,
+         "Lamp1's umbra broke when lamp2's occluder opted out");}
+    lamp.casts_shadow=true;
+    // Shadowed omni light: the same off-axis occluder cuts an umbra
+    // through the omni footprint via the shared cube atlas — the
+    // receiver shader picks the face from the dominant axis of the
+    // view-space light offset and rebuilds its projective depth.
+    lamp.spot_direction={0,0,0};
+    auto omni_cast=[&](const char* name){
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder},{0,0,1},{lamp}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    lamp.casts_shadow=false;
+    const auto omni_unshadowed=omni_cast("point-light-omni-noshadow.png");
+    const auto omni_casters_off=window.scene3d_statistics().omni_shadow_casters;
+    lamp.casts_shadow=true;
+    const auto omni_shadowed=omni_cast("point-light-omni-shadow.png");
+    check(window.scene3d_statistics().omni_shadow_casters>omni_casters_off,
+        "Omni cube atlas recorded no caster submissions");
+    check(census(*omni_shadowed,120,155)>census(*omni_unshadowed,120,155)+20,
+        "Shadowed omni light did not cut an umbra through the occluder");
+    // Non-vacuous: the omni footprint keeps the rest of the plate lit —
+    // the darkening is occlusion, not a dead light or a mis-projected map.
+    check(channel(*omni_shadowed,272,160,1)>channel(*omni_unshadowed,272,160,1)/2,
+        "Omni shadow extinguished the whole footprint instead of the umbra");
+    // receives_shadow=false folds the omni map term to lit like every
+    // other depth-map term.
+    {auto blind=plate;blind.receives_shadow=false;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{blind,occluder},{0,0,1},{lamp}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-omni-noreceive.png");
+     const auto omni_blind=decode_rgba_image(folder/"point-light-omni-noreceive.png");
+     check(std::abs(census(*omni_blind,120,155)-census(*omni_unshadowed,120,155))<=6,
+         "receives_shadow=false receiver still showed the omni umbra");}
+    // A caster straddling a cube-face seam submits to both cells — the
+    // merged caster list per light carries one transform per face, so a
+    // 45-degree occluder records one more submission than the single-face
+    // occluder did.
+    MeshInstance3D seam=occluder;seam.position={.5f,0,2.f};seam.scale=.05f;
+    const auto one_face=window.scene3d_statistics().omni_shadow_casters;
+    {DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,seam},{0,0,1},{lamp}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-omni-seam.png");}
+    check(window.scene3d_statistics().omni_shadow_casters==one_face+1,
+        "Face-seam occluder did not reach multiple cube faces");
+    // Point-light shadow_normal_offset: lifting the receiver along its
+    // shading normal translates the projected depth lookup — a constant
+    // bias can never move a footprint laterally, so the shift is a
+    // strict discriminator. The plate tilts about Y so the lift carries
+    // a lateral component in both the cube face and the spot cone
+    // (a +Z lift under an axis lamp only rescales the radial lookup).
+    MeshInstance3D tilt=plate;tilt.rotation=rotation_axis_angle({0,1,0},.8f);
+    const auto umbra_centroid=[&](const RgbaImage&img){
+      double sx=0;int n=0;for(int y=120;y<200;++y)for(int x=60;x<260;++x)
+        if(channel(img,x,y,1)<25){sx+=x;++n;}
+      return n>8?sx/n:-1.0;};
+    auto offset_view=[&](const PointLight3D& l,float offset,const char* name){
+      auto with=l;with.shadow_normal_offset=offset;
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{tilt,occluder},{0,0,1},{with}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto omni_off0=offset_view(lamp,0.f,"point-light-omni-off0.png");
+    const auto omni_off8=offset_view(lamp,8.f,"point-light-omni-off8.png");
+    const double oc0=umbra_centroid(*omni_off0),oc8=umbra_centroid(*omni_off8);
+    const auto lookup_diff=[&](const RgbaImage&a,const RgbaImage&b){
+      int n=0;for(int y=120;y<200;++y)for(int x=60;x<260;++x)
+        if(std::abs(channel(a,x,y,1)-channel(b,x,y,1))>15)++n;return n;};
+    check(oc0>0.0&&oc8>0.0&&oc8<oc0-2.0&&lookup_diff(*omni_off0,*omni_off8)>200,
+        "Omni shadow_normal_offset did not translate the receiver's depth lookup");
+    // The spot path uses the same authored lift — the cone widens so a
+    // cell texel spans enough world to move the footprint measurably.
+    auto wide=lamp;wide.spot_direction={0,0,-1};wide.spot_inner=.9f;wide.spot_outer=.5f;
+    const auto spot_off0=offset_view(wide,0.f,"point-light-spot-off0.png");
+    const auto spot_off8=offset_view(wide,8.f,"point-light-spot-off8.png");
+    const double sc0=umbra_centroid(*spot_off0),sc8=umbra_centroid(*spot_off8);
+    check(sc0>0.0&&sc8>0.0&&sc8<sc0-2.0&&lookup_diff(*spot_off0,*spot_off8)>100,
+        "Spot shadow_normal_offset did not translate the receiver's depth lookup");
+    lamp.spot_direction={0,0,0};
+    // Mixed spot + omni shadows in one scene: the omni light must not
+    // claim a spot slot (its zero direction would normalize to NaN), so
+    // both atlases populate and each light keeps its own umbra strip.
+    auto mixed=[&](bool omni_cast,bool spot_cast,const char* name){
+      lamp.casts_shadow=omni_cast;lamp2.casts_shadow=spot_cast;
+      DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder,occluder2},{0,0,1},{lamp,lamp2}),{0,0,320,320}});
+      window.draw(d,folder/name);return decode_rgba_image(folder/name);};
+    const auto mixed_off=mixed(false,false,"point-light-mix-noshadow.png");
+    const auto mixed_on=mixed(true,true,"point-light-mix-shadow.png");
+    {const auto ms=window.scene3d_statistics();
+     check(ms.spot_shadow_casters>0&&ms.omni_shadow_casters>0,
+         "Mixed spot+omni scene did not populate both shadow atlases");}
+    check(census(*mixed_on,120,155)>census(*mixed_off,120,155)+20,
+        "Omni umbra vanished beside a shadowed spot");
+    check(census(*mixed_on,175,215)>census(*mixed_off,175,215)+10,
+        "Spot umbra vanished beside a shadowed omni light");
+    {const auto omni_only=mixed(true,false,"point-light-mix-omnionly.png");
+     check(census(*omni_only,120,155)>census(*mixed_off,120,155)+20&&
+           channel(*omni_only,272,160,1)>channel(*mixed_off,272,160,1)/2,
+         "Omni umbra broke or flooded the footprint beside a spot light");}
+    // A spot umbra only removes lamp2's own energy term — an unshadowed
+    // omni lamp covering the same area would keep the strip lit at full
+    // strength, so the spot-side probe dims the omni lamp until lamp2's
+    // cone dominates its strip.
+    lamp.intensity=.4f;lamp2.intensity=10;
+    {const auto dim_off=mixed(false,false,"point-light-mixdim-noshadow.png");
+     const auto dim_spot=mixed(false,true,"point-light-mixdim-spotonly.png");
+     check(census(*dim_spot,175,215)>census(*dim_off,175,215)+10,
+         "Spot umbra broke when an omni light shares the scene");}
+    // Two shadowed omni lights share the cube atlas — the second lamp
+    // gets its own six-face row (atlas height doubles) and its caster
+    // submissions land on the counter beside the first lamp's.
+    lamp.intensity=4;
+    {auto lamp3=lamp;lamp3.position={-.3f,.2f,2.2f};lamp3.color={1,0,0};
+     lamp.casts_shadow=true;lamp3.casts_shadow=true;lamp2.casts_shadow=false;
+     DrawList d;d.world.emplace_back(Scene3DView{Scene3D::create(camera,{plate,occluder},{0,0,1},{lamp,lamp2,lamp3}),{0,0,320,320}});
+     window.draw(d,folder/"point-light-omni2-shadow.png");
+     const auto two_omni=decode_rgba_image(folder/"point-light-omni2-shadow.png");
+     // Plate + occluder each sit in the -Z face of both lamps → ≥4
+     // face submissions across the two atlas rows.
+     check(window.scene3d_statistics().omni_shadow_casters>=4&&
+           census(*two_omni,120,155)>20,
+         "Second shadowed omni light broke the shared cube atlas");}
+    std::cout<<"point_lights_gpu=falloff_color_range_spot_shadow_strength_atlas_debug_receive_omni_passed\n";
+  }
+  {
+    // Atmosphere limb scattering: a tinted shell brightens the silhouette
+    // edge above the bare surface and fades to the night floor.
+    auto planet=a;planet.mesh=Mesh3D::uv_sphere(96,48);planet.scale=.85f;
+    planet.material.tint={120,120,120,255};planet.material.ambient=.05f;planet.material.diffuse=.9f;
+    planet.material.light_direction=Vec3{0,0,1};
+    const auto bare=capture({planet},"atmo-bare.png");
+    planet.material.atmosphere=Atmosphere3D{};planet.material.atmosphere->strength=3;planet.material.atmosphere->power=2.5f;
+    const auto limb=capture({planet},"atmo-limb.png");
+    check(channel(*limb,280,160,2)>channel(*bare,280,160,2)+12&&channel(*limb,280,160,2)>channel(*limb,280,160,0),
+        "Atmosphere did not brighten the limb with its tint");
+    // Terminator reddening: with the incident light at +X the dusk band
+    // sits ~72° up/down the right rim (limb x terminator), while the
+    // noon edge keeps the authored tint. White body light cancels in
+    // R-B; a sunset_strength=0 control rim stays uniformly tinted.
+    planet.material.light_direction=Vec3{1,0,0};
+    planet.material.atmosphere->tint={0,0,1};planet.material.atmosphere->sunset={1,0,0};
+    planet.material.atmosphere->sunset_strength=1.f;
+    const auto dusk=capture({planet},"atmo-dusk-on.png");
+    planet.material.atmosphere->sunset_strength=0;
+    const auto dusk_off=capture({planet},"atmo-dusk-off.png");
+    check(channel(*dusk,201,34,0)-channel(*dusk,201,34,2)>
+              channel(*dusk,292,160,0)-channel(*dusk,292,160,2)+25,
+        "Atmosphere rim did not redden toward the terminator");
+    check(channel(*dusk,201,34,0)>channel(*dusk_off,201,34,0)+20,
+        "Sunset strength 0 did not keep the authored rim tint");
+    std::cout<<"atmosphere_gpu=limb_tint_dayweight_terminator_passed\n";
+  }
+  if(window.scene3d_statistics().hdr){
+    // Post stack: exposure brightens, bloom spreads super-threshold light,
+    // Low tier skips bloom/sharpen, Ultra runs the MSAA resolve path.
+    // Exposure uses a mid-tone emitter (HDR 1.0 already sits at the tonemap
+    // knee), bloom and MSAA use a super-threshold one.
+    auto bright=a;bright.mesh=quad(0,0);bright.material.tint={255,255,255,255};
+    bright.material.ambient=0;bright.material.diffuse=0;bright.material.light_intensity=0;
+    bright.material.pbr=PbrSurface3D{};bright.material.pbr->emissive_strength=.4f;
+    auto hot=bright;hot.material.pbr->emissive_strength=3;
+    const auto options_view=[&](const MeshInstance3D& i,RenderOptions3D o,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{i}),{0,0,320,320},o});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto neutral=options_view(bright,{},"post-neutral.png");
+    RenderOptions3D exposed;exposed.exposure=2;
+    const auto exposed_frame=options_view(bright,exposed,"post-exposure.png");
+    check(channel(*exposed_frame,160,160,0)>channel(*neutral,160,160,0)+15,
+        "Exposure did not brighten the HDR image");
+    RenderOptions3D bloomed;bloomed.bloom_strength=1;bloomed.bloom_threshold=.1f;
+    const auto bloom_frame=options_view(hot,bloomed,"post-bloom.png");
+    const auto hot_neutral=options_view(hot,{},"post-bloom-off.png");
+    check(channel(*bloom_frame,14,160,0)>channel(*hot_neutral,14,160,0)+8,
+        "Bloom did not spread super-threshold light beyond the surface");
+    RenderOptions3D low=bloomed;low.quality=RenderQuality3D::Low;
+    const auto low_frame=options_view(hot,low,"post-low.png");
+    check(channel(*low_frame,14,160,0)<channel(*bloom_frame,14,160,0),
+        "Low quality tier still paid for bloom taps");
+    auto colored=bright;colored.material.pbr->emissive_tint={1,0,0};
+    RenderOptions3D graded;graded.exposure=1;graded.contrast=1.5f;graded.saturation=0;
+    const auto gray=options_view(colored,graded,"post-graded.png");
+    check(std::abs(int(channel(*gray,160,160,0))-int(channel(*gray,160,160,1)))<=3&&
+          std::abs(int(channel(*gray,160,160,1))-int(channel(*gray,160,160,2)))<=3,
+        "Zero saturation did not neutralize the channel spread");
+    RenderOptions3D ultra;ultra.quality=RenderQuality3D::Ultra;
+    const auto msaa=options_view(hot,ultra,"post-ultra-msaa.png");
+    check(channel(*msaa,160,160,0)>200,"Ultra tier MSAA resolve produced a blank frame");
+    // Vignette: a frame-filling quad so the corner falloff lands on the
+    // surface — post-tonemap, so the center keeps its resolved value.
+    auto framed=bright;framed.scale=4;
+    const auto vig_off=options_view(framed,{},"post-vignette-off.png");
+    RenderOptions3D vigned;vigned.vignette=1;
+    const auto vig_on=options_view(framed,vigned,"post-vignette.png");
+    check(channel(*vig_on,4,4,0)+20<channel(*vig_on,160,160,0),
+        "Vignette did not darken the frame corner");
+    check(channel(*vig_off,4,4,0)>channel(*vig_on,4,4,0)+15,
+        "Vignette corner was already dark without the option");
+    check(std::abs(int(channel(*vig_on,160,160,0))-int(channel(*vig_off,160,160,0)))<=4,
+        "Vignette shifted the frame center");
+    std::cout<<"post_gpu=exposure_bloom_quality_tiers_msaa_vignette_passed\n";
+  }
+  {
+    // Debug shading views isolate single channels for material review —
+    // assertions use channel ordering so they hold on HDR and UNORM paths.
+    const auto debug_view=[&](const MeshInstance3D& i,DebugView3D mode,const char* name){
+      DrawList list;RenderOptions3D o;o.debug_view=mode;
+      list.world.emplace_back(Scene3DView{Scene3D::create(camera,{i}),{0,0,320,320},o});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    auto plate=b;plate.mesh=quad(0,0);plate.material.tint={255,255,255,255};
+    plate.material.ambient=.15f;plate.material.diffuse=.85f;plate.material.light_intensity=.5f;
+    const auto lit_frame=debug_view(plate,DebugView3D::Lit,"debug-lit.png");
+    const auto unlit_frame=debug_view(plate,DebugView3D::Unlit,"debug-unlit.png");
+    check(channel(*unlit_frame,160,160,1)>channel(*lit_frame,160,160,1),
+        "Unlit debug view stayed under lighting");
+    const auto normals_frame=debug_view(plate,DebugView3D::Normals,"debug-normals.png");
+    check(channel(*normals_frame,160,160,2)>channel(*normals_frame,160,160,0),
+        "Normals view did not encode the view-space normal");
+    auto metal_plate=plate;metal_plate.material.pbr=PbrSurface3D{};
+    metal_plate.material.pbr->metallic=1;metal_plate.material.pbr->roughness=.25f;
+    const auto metal_view=debug_view(metal_plate,DebugView3D::Metallic,"debug-metallic.png");
+    const auto rough_view=debug_view(metal_plate,DebugView3D::Roughness,"debug-roughness.png");
+    check(channel(*metal_view,160,160,0)>channel(*rough_view,160,160,0)+60,
+        "Metallic/Roughness views did not report the GGX factors");
+    check(std::abs(int(channel(*rough_view,160,160,0))-int(channel(*rough_view,160,160,1)))<=4,
+        "Roughness view is not grayscale");
+    auto glow_plate=plate;glow_plate.material.pbr=PbrSurface3D{};
+    glow_plate.material.pbr->emissive_strength=2;glow_plate.material.pbr->emissive_tint={0,1,0};
+    const auto emissive_view=debug_view(glow_plate,DebugView3D::Emissive,"debug-emissive.png");
+    check(channel(*emissive_view,160,160,1)>channel(*emissive_view,160,160,0)+40,
+        "Emissive view did not isolate the emitted channel");
+    const auto lighting_view=debug_view(plate,DebugView3D::LightingOnly,"debug-lighting.png");
+    check(channel(*lighting_view,160,160,0)>40,
+        "Lighting-only view lost the scene illumination");
+    // Distance culling: beyond visible_range the instance submits nothing.
+    auto far=plate;far.visible_range=1.f;
+    const auto culled_before=window.scene3d_statistics().culled_instances;
+    const auto culled_frame=debug_view(far,DebugView3D::Lit,"debug-culled.png");
+    check(window.scene3d_statistics().culled_instances==culled_before+1&&channel(*culled_frame,160,160,0)==5,
+        "visible_range did not cull the distant instance");
+    std::cout<<"debug_views_gpu=channels_distance_cull_passed\n";
+  }
+  {
+    // Directional shadow mapping: an authored ortho volume on the key light.
+    // A 45-degree star displaces the occluder's footprint onto the receiver;
+    // coverage, bias, tier and distance policies all assert pixel probes.
+    camera.projection=Projection3D::Orthographic;camera.position={0,0,5};camera.orthographic_height=2;
+    Material3D diffuse;diffuse.tint={255,255,255,255};diffuse.ambient=0;diffuse.diffuse=1;diffuse.light_direction=Vec3{.7f,0,.7f};
+    MeshInstance3D receiver{quad(0,0),{},{},1,diffuse};
+    auto occluder=receiver;occluder.scale=.3f;occluder.position={.5f,0,.4f};
+    ShadowMap3D shadow;shadow.extent=4;shadow.distance=4;shadow.depth=8;shadow.resolution=512;
+    const Vec3 light{.7f,0,.7f};
+    const auto shadow_view=[&](std::vector<MeshInstance3D> objects,RenderOptions3D o,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},shadow),{0,0,320,320},o});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto open=shadow_view({receiver},{},"shadow-open.png");
+    const auto occluded=shadow_view({receiver,occluder},{},"shadow-blocked.png");
+    check(window.scene3d_statistics().shadow_casters==2,"Shadow pass did not submit receiver and occluder casters");
+    check(channel(*open,176,160,0)>100,"Lit receiver pixel was dark without any occluder");
+    check(channel(*occluded,176,160,0)<channel(*open,176,160,0)/2,"Blocker did not shadow the receiver");
+    check(channel(*occluded,60,160,0)>100,"Shadow volume darkened unoccluded receiver pixels");
+    // Bias stability: a lone receiver under the map stays as bright as a
+    // shadow-free render — no self-shadow acne.
+    {DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{receiver},light),{0,0,320,320}});
+     window.draw(list,folder/"shadow-reference.png");const auto reference=decode_rgba_image(folder/"shadow-reference.png");
+     check(std::abs(int(channel(*open,176,160,0))-int(channel(*reference,176,160,0)))<8,"Shadow map biased the lit receiver into acne");}
+    // Direction: moving the occluder left moves the shadow left with it.
+    auto shifted=occluder;shifted.position={-.1f,0,.4f};
+    const auto moved=shadow_view({receiver,shifted},{},"shadow-moved.png");
+    check(channel(*moved,80,160,0)<channel(*open,80,160,0)/2&&channel(*moved,176,160,0)>100,"Shadow did not follow the occluder");
+    // Quality tiers: Low pays no shadow pass at all; High keeps it via PCF.
+    RenderOptions3D low;low.quality=RenderQuality3D::Low;
+    const auto low_tier=shadow_view({receiver,occluder},low,"shadow-low.png");
+    check(channel(*low_tier,176,160,0)>100,"Low quality tier still evaluated the shadow map");
+    check(window.scene3d_statistics().shadow_casters==0,"Low tier still submitted shadow casters");
+    RenderOptions3D high;high.quality=RenderQuality3D::High;
+    const auto pcf=shadow_view({receiver,occluder},high,"shadow-pcf.png");
+    check(channel(*pcf,176,160,0)<channel(*open,176,160,0)/2,"High tier lost the shadow entirely");
+    // Distance policy: a culled caster stops occluding receivers.
+    auto ranged=occluder;ranged.visible_range=1.f;
+    const auto culled_caster=shadow_view({receiver,ranged},{},"shadow-culled.png");
+    check(channel(*culled_caster,176,160,0)>100,"Distance-culled caster still wrote the shadow map");
+    // Shadow-pass LOD: casters submit the level the lit pass picks. A
+    // level-1 substitute quad one third the full quad's extent writes a
+    // measurably smaller shadow — the centre stays occluded while the
+    // region only the full quad covered reopens.
+    const auto small_quad=Mesh3D::create({{{-.3f,-.3f,0},{0,0,1},{0,0}},{{.3f,-.3f,0},{0,0,1},{1,0}},{{.3f,.3f,0},{0,0,1},{1,1}},{{-.3f,.3f,0},{0,0,1},{0,1}}},{0,1,2,0,2,3});
+    auto chained=occluder;chained.lod_meshes={small_quad};chained.lod_pixels=4096;
+    const auto chained_shadow=shadow_view({receiver,chained},{},"shadow-lod.png");
+    check(window.scene3d_statistics().lod_instances==1,"Shadow test's lit pass did not pick the chain level");
+    check(channel(*chained_shadow,176,160,0)<channel(*open,176,160,0)/2,"LOD substitute caster did not write the shadow map");
+    check(channel(*chained_shadow,212,160,0)>100,"LOD caster still wrote the full mesh's footprint");
+    // Collapsed groups share one caster: the representative's proxy,
+    // scaled to the merged sphere and facing the light.
+    auto m1=occluder,m2=occluder,m3=occluder;
+    m1.position={.4f,0,.4f};m2.position={.5f,0,.4f};m3.position={.6f,0,.4f};
+    for(auto* m:{&m1,&m2,&m3}){m->lod_group="wing";m->lod_group_proxy=quad(0,0);m->lod_group_pixels=4096;}
+    const auto grouped=shadow_view({receiver,m1,m2,m3},{},"shadow-group.png");
+    check(window.scene3d_statistics().shadow_casters==2,"Collapsed group did not share one proxy caster");
+    check(channel(*grouped,176,160,0)<channel(*open,176,160,0)/2,"Group proxy caster did not shadow the receiver");
+    check(channel(*grouped,40,160,0)>100,"Group proxy shadow spilled far beyond the merged sphere");
+    // Transition bands thin the shadow silhouette with the same signed
+    // screen-door keep mask the lit pass uses: a mid-band chain instance
+    // submits both levels on complementary shares, so the region only
+    // the full mesh covers darkens ~its share instead of popping between
+    // the two hard picks. The steeper key light displaces the shadow
+    // clear of the caster's own screen footprint so the map's dither is
+    // measured directly, not through the occluder's lit draw.
+    const auto shade_census=[&](const RgbaImage&img,int x0,int x1,int y0,int y1){
+      int shaded=0;const int threshold=channel(*open,(x0+x1)/2,(y0+y1)/2,0)/2;
+      for(int y=y0;y<y1;++y)for(int x=x0;x<x1;++x)if(channel(img,x,y,0)<threshold)++shaded;
+      return shaded;};
+    const Vec3 steep_light{1.4f,0,.7f};
+    const auto steep_view=[&](std::vector<MeshInstance3D> objects,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),steep_light,{},shadow),{0,0,320,320}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    Material3D steep_mat=diffuse;steep_mat.light_direction=steep_light;
+    MeshInstance3D steep_receiver{quad(0,0),{},{},1,steep_mat};
+    auto steep_occluder=occluder;steep_occluder.material=steep_mat;
+    auto steep_chained=chained;steep_chained.material=steep_mat;
+    auto steep_banded=chained;steep_banded.material=steep_mat;steep_banded.lod_pixels=110;steep_banded.lod_fade=.25f; // d~122px sits mid-band
+    const auto steep_open=steep_view({steep_receiver},"shadow-steep-open.png");
+    const auto steep_full=steep_view({steep_receiver,steep_occluder},"shadow-steep-full.png");
+    const auto steep_small=steep_view({steep_receiver,steep_chained},"shadow-steep-small.png");
+    const auto steep_band=steep_view({steep_receiver,steep_banded},"shadow-steep-band.png");
+    check(window.scene3d_statistics().shadow_casters==3,"LOD band did not submit both transition partners as casters");
+    // Locate the displaced shadow horizontally inside the receiver band,
+    // then census the whole footprint: the dithered union must sit
+    // strictly between the two hard picks.
+    int sx0=320,sx1=0;for(int x=0;x<320;++x){bool hit=false;for(int y=130;y<200;y+=2)hit|=channel(*steep_full,x,y,0)<90;if(hit){sx0=std::min(sx0,x);sx1=x;}}
+    check(sx1>sx0+10,"Steep-light reference did not displace a measurable shadow");
+    const int full_c=shade_census(*steep_full,sx0-2,sx1+3,140,185),small_c=shade_census(*steep_small,sx0-2,sx1+3,140,185);
+    const int band_c=shade_census(*steep_band,sx0-2,sx1+3,140,185);
+    check(full_c>small_c&&band_c>small_c&&band_c<full_c,"Shadow silhouette did not screen-door inside the LOD band");
+    // Group collapse bands partition casters the same way: members keep
+    // 1-p, the rep submits the proxy on the complementary p.
+    auto b1=m1,b2=m2,b3=m3;
+    for(auto* m:{&b1,&b2,&b3}){m->lod_group_pixels=120;m->lod_fade=.4f;} // merged d~154px sits mid-band
+    auto u1=m1,u2=m2,u3=m3;
+    for(auto* m:{&u1,&u2,&u3}){m->lod_group.clear();m->lod_group_proxy.reset();}
+    const auto ungrouped=shadow_view({receiver,u1,u2,u3},{},"shadow-group-off.png");
+    const auto banded_group=shadow_view({receiver,b1,b2,b3},{},"shadow-group-band.png");
+    check(window.scene3d_statistics().shadow_casters==5,"Group band did not keep member casters plus the proxy share");
+    // Members sit at y=0 so only the merged-sphere proxy reaches the
+    // strip above their shadow band — dithered coverage lands between.
+    const int proxy_edge_full=shade_census(*grouped,150,200,104,116),proxy_edge_none=shade_census(*ungrouped,150,200,104,116);
+    const int proxy_edge_band=shade_census(*banded_group,150,200,104,116);
+    check(proxy_edge_full>proxy_edge_none&&proxy_edge_band>proxy_edge_none&&proxy_edge_band<proxy_edge_full,"Group collapse band did not partition the proxy shadow");
+    // Billboard casters face the light like the proxy card: rotated into
+    // the horizontal plane (truly edge-on to a y=0 star) the impostor
+    // still writes its card footprint instead of a zero-area line.
+    auto card_caster=occluder;card_caster.mesh=Mesh3D::billboard_card(1.8f,1.8f);
+    card_caster.rotation=rotation_axis_angle({1,0,0},1.570796327f);
+    const auto card_shadow=shadow_view({receiver,card_caster},{},"shadow-card.png");
+    check(channel(*card_shadow,176,160,0)<channel(*open,176,160,0)/2,"Billboard caster stayed edge-on to the light");
+    check(channel(*card_shadow,40,160,0)>100,"Card-facing shadow spread beyond its silhouette");
+    // Alpha-cutout casters: the depth pass samples the caster's own base
+    // texture under its threshold, so a holed quad writes a perforated
+    // silhouette instead of its full footprint. The occluder's u<.5 half
+    // (world x<.5) shadows receiver pixels left of screen x~176; its
+    // transparent half reopens the footprint up to where the lit occluder
+    // itself covers the receiver (~197).
+    auto hole=occluder;
+    std::vector<std::uint8_t> mask(8*4);for(int i=0;i<8;++i)mask[i*4]=mask[i*4+1]=mask[i*4+2]=255,mask[i*4+3]=i<4?255:0;
+    hole.material.texture=RgbaImage::create(8,1,std::move(mask));hole.material.alpha_threshold=.5f;
+    const auto cutout=shadow_view({receiver,hole},{},"shadow-cutout.png");
+    check(channel(*cutout,150,160,0)<channel(*open,150,160,0)/2,"Cutout caster's opaque half stopped writing the shadow map");
+    check(channel(*occluded,188,160,0)<channel(*open,188,160,0)/2,"Baseline solid shadow was already open at the cutout probe");
+    check(channel(*cutout,188,160,0)>100,"Cutout caster wrote a solid silhouette through its transparent half");
+    // Shadows debug view isolates the key-light occlusion term as
+    // grayscale: umbra texels go dark while lit receivers stay bright.
+    RenderOptions3D shadowdbg;shadowdbg.debug_view=DebugView3D::Shadows;
+    const auto dbg=shadow_view({receiver,occluder},shadowdbg,"shadow-debug.png");
+    check(channel(*dbg,176,160,0)<40&&channel(*dbg,60,160,0)>200,
+        "Shadows debug view did not isolate the occlusion term");
+    // Far cascade: a wider ortho tier sharing the directional box keeps
+    // coverage past the near window's extent. Shrinking the near extent
+    // below the shadow footprint means only the cascade can carry the
+    // umbra — single-tier leaves that receiver fragment lit.
+    auto narrow=shadow;narrow.extent=.3f;
+    const auto narrow_view=[&](std::vector<MeshInstance3D> objects,std::vector<float> tiers,const char* name){
+      auto tier=narrow;tier.cascade_extents=std::move(tiers);
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},tier),{0,0,320,320}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto near_only=narrow_view({receiver,occluder},{},"shadow-near-only.png");
+    const auto cascaded=narrow_view({receiver,occluder},{4},"shadow-cascade.png");
+    check(channel(*near_only,176,160,0)>100,"Near window covered a fragment outside its extent");
+    check(channel(*cascaded,176,160,0)<channel(*open,176,160,0)/2,"Far cascade did not carry the out-of-window shadow");
+    check(channel(*cascaded,60,160,0)>100,"Far cascade darkened a fragment inside the empty near window");
+    // Third tier: the umbra fragment sits at light-space x≈.78, so a mid
+    // cascade at .5 still misses it — only the second cascade window (4)
+    // covers. The mid-only capture staying lit proves the chain didn't
+    // smear.
+    const auto mid_only=narrow_view({receiver,occluder},{.5f},"shadow-cascade-mid.png");
+    const auto mid_stats=window.scene3d_statistics();
+    const auto tier3=narrow_view({receiver,occluder},{.5f,4.f},"shadow-cascade2.png");
+    const auto tier3_stats=window.scene3d_statistics();
+    // The receiver sits inside every window; the occluder's volume test
+    // passes tier 1 (.5+radius) even though its umbra lands past the map
+    // edge — so tier 1 collects two casters and only tier 2 adds new
+    // submissions. The per-tier counters must attribute accordingly.
+    check(mid_stats.shadow_casters==3&&mid_stats.shadow_cascade_casters[0]==2&&mid_stats.shadow_cascade_casters[1]==0,"Cascade counters misattributed the mid-tier submissions");
+    check(tier3_stats.shadow_casters==5&&tier3_stats.shadow_cascade_casters[0]==2&&tier3_stats.shadow_cascade_casters[1]==2,"Cascade counters misattributed the third-tier submissions");
+    check(channel(*mid_only,176,160,0)>100,"Mid cascade covered a fragment outside its extent");
+    check(channel(*tier3,176,160,0)<channel(*open,176,160,0)/2,"The third cascade tier did not carry the shadow");
+    check(channel(*tier3,60,160,0)>100,"The third cascade tier darkened an unoccluded fragment");
+    // Four authored tiers saturate the depth-array bound: every tier
+    // past the mid collects both casters, the widest→narrowest fold
+    // still resolves to the tightest covering tier, and the umbra
+    // keeps its full cut.
+    const auto tier4=narrow_view({receiver,occluder},{.5f,2.f,4.f,8.f},"shadow-cascade4.png");
+    const auto tier4_stats=window.scene3d_statistics();
+    check(tier4_stats.shadow_casters==9&&tier4_stats.shadow_cascade_casters==(std::array<std::uint64_t,4>{2,2,2,2}),"Four cascade tiers misattributed their caster submissions");
+    check(channel(*tier4,176,160,0)<channel(*open,176,160,0)/2,"The four-tier fold did not carry the shadow");
+    check(channel(*tier4,60,160,0)>100,"The four-tier fold darkened an unoccluded fragment");
+    // Outermost-edge fade: the widest covering band soft-lands at its
+    // authored boundary instead of hard-clipping the umbra. The umbra
+    // fragment sits at light-x .78, so a .82 tier puts it at .95 of the
+    // half-extent — inside the 10% fade band — and must read a midtone
+    // between the fully-cut (tier 4) and fully-missed (tier .5) poles.
+    const int open_umbra=channel(*open,176,160,0);
+    const auto fade_tier=narrow_view({receiver,occluder},{.82f},"shadow-edge-fade.png");
+    const int fade_px=channel(*fade_tier,176,160,0);
+    check(fade_px>40&&fade_px<open_umbra-30,"The widest tier's outer edge did not fade the umbra to a midtone");
+    // The near map alone is the outermost band as well — the same fade
+    // applies when no cascade tiers are authored.
+    auto edge_map=narrow;edge_map.extent=.82f;
+    {DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{receiver,occluder},light,{},edge_map),{0,0,320,320}});
+     window.draw(list,folder/"shadow-edge-near.png");const auto edge_near=decode_rgba_image(folder/"shadow-edge-near.png");
+     const int np=channel(*edge_near,176,160,0);
+     check(np>40&&np<open_umbra-30,"The single near map did not fade its outer edge");}
+    // Authored softness scales the tier PCF radius: 0 collapses the edge
+    // to a binary tap while 4 widens the penumbra band measurably — the
+    // umbra core keeps its full cut either way.
+    const auto soft_view=[&](float softness,const char* name){
+      auto tier=shadow;tier.softness=softness;
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{receiver,occluder},light,{},tier),{0,0,320,320},high});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto hard_edge=soft_view(0.f,"shadow-soft-0.png");
+    const auto soft_edge=soft_view(4.f,"shadow-soft-4.png");
+    const auto penumbra=[&](const RgbaImage&img){
+      int n=0;for(int x=110;x<240;++x){const int v=channel(img,x,160,0);if(v>30&&v<150)++n;}return n;};
+    check(penumbra(*hard_edge)<=4,"A zero softness edge still produced a penumbra band");
+    check(penumbra(*soft_edge)>penumbra(*hard_edge)+16,"Softness did not widen the shadow penumbra");
+    check(channel(*soft_edge,176,160,0)<channel(*open,176,160,0)/2,"Softness broke the umbra's full cut");
+    // Casting opt-out: casts_shadow=false keeps an opaque mesh lit-only —
+    // the receiver under it stays at its open-footprint value while a
+    // casting twin still darkens its half.
+    auto shy=occluder;shy.casts_shadow=false;
+    const auto optout=shadow_view({receiver,shy},{},"shadow-optout.png");
+    check(channel(*optout,176,160,0)>100,"A casts_shadow=false caster still wrote the depth pass");
+    check(channel(*optout,60,160,0)>100,"Caster opt-out darkened the wrong receiver region");
+    // Receiving opt-out: receives_shadow=false keeps the depth-map term
+    // lit on this mesh even inside the umbra footprint.
+    auto blind=receiver;blind.receives_shadow=false;
+    const auto unshadowed_receiver=shadow_view({blind,occluder},{},"shadow-noreceive.png");
+    check(channel(*unshadowed_receiver,176,160,0)>100,"A receives_shadow=false receiver still showed the umbra");
+    check(channel(*unshadowed_receiver,60,160,0)>100,"Receive opt-out brightened the wrong region");
+    // Receiver-side normal offset: lifting the lookup along the +Z plate
+    // normal moves it obliquely in light space, so the projected umbra
+    // footprint *translates* on the receiver — a constant depth bias can
+    // never slide a footprint laterally, which makes the move a strict
+    // discriminator for the authored lift reaching the shader. Two
+    // texels at this coarse 64-res map shifts the edge visibly.
+    auto coarse=shadow;coarse.resolution=64;
+    const auto offset_view=[&](std::vector<MeshInstance3D> objects,float offset,const char* name){
+      auto m=coarse;m.normal_offset=offset;
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects),light,{},m),{0,0,320,320}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto off_0=offset_view({receiver,occluder},0.f,"shadow-offset-0.png");
+    const auto off_2=offset_view({receiver,occluder},2.f,"shadow-offset-2.png");
+    const auto umbra_edge=[&](const RgbaImage&img){int lo=320,hi=0;for(int x=40;x<215;++x)if(channel(img,x,160,0)<channel(*open,x,160,0)/2){lo=std::min(lo,x);hi=x;}return lo+hi;};
+    check(std::abs(umbra_edge(*off_2)-umbra_edge(*off_0))>16,"normal_offset did not translate the receiver's depth lookup");
+    check(channel(*off_2,60,160,0)>100,"normal_offset darkened unoccluded receivers");
+    check(umbra_edge(*off_0)>0,"The coarse map lost the umbra before the offset probe");
+    // Camera-fitted coverage: with camera_fit the authored extent is a
+    // multiplier of the visible half-height, so the same authored chain
+    // covers different world spans at different zooms. Authored .5 → .5
+    // world of coverage at this ortho height (the .78-light-space umbra
+    // stays lit) and 1.0 world once the footprint doubles (the umbra
+    // lands inside). A fixed .5 extent stays lit at either zoom — only
+    // the fit flips coverage with the camera.
+    auto fitted=narrow;fitted.extent=.5f;fitted.camera_fit=true;
+    const auto fit_view=[&](Camera3D c,ShadowMap3D m,std::vector<MeshInstance3D> objects,const char* name){
+      DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(c,std::move(objects),light,{},m),{0,0,320,320}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    auto zoomed=camera;zoomed.orthographic_height=4.f;
+    const auto fit_near=fit_view(camera,fitted,{receiver,occluder},"shadow-fit-near.png");
+    const auto fit_far=fit_view(zoomed,fitted,{receiver,occluder},"shadow-fit-far.png");
+    auto fixed=fitted;fixed.camera_fit=false;
+    const auto fixed_far=fit_view(zoomed,fixed,{receiver,occluder},"shadow-fit-fixed.png");
+    // The plate covers [120,200]² at both zooms and the umbra lands
+    // inside that window; background navy stays outside it.
+    const auto umbra_area=[&](const RgbaImage&img){int n=0;for(int y=120;y<200;++y)for(int x=120;x<200;++x)if(channel(img,x,y,0)<60)++n;return n;};
+    check(umbra_area(*fit_near)<8,"Camera-fitted .5 still covered the umbra at the base zoom");
+    check(umbra_area(*fit_far)>32,"Camera-fitted coverage did not track the doubled footprint");
+    check(umbra_area(*fixed_far)<8,"A fixed .5 extent covered the umbra at the wider zoom");
+    // Perspective fit: the footprint is distance·tan(fov/2) at the box
+    // centre, so widening the fov grows coverage under the same authored
+    // multiplier — fov .4 keeps the umbra out (eff .41 vs the .78
+    // light-space umbra) while fov 1.6 covers it (eff 2.06), and the
+    // fixed .5 stays lit at either.
+    auto persp=camera;persp.projection=Projection3D::Perspective;persp.vertical_fov_radians=.4f;
+    auto persp_wide=persp;persp_wide.vertical_fov_radians=1.6f;
+    const auto fit_tight=fit_view(persp,fitted,{receiver,occluder},"shadow-fitp-tight.png");
+    const auto fit_wide=fit_view(persp_wide,fitted,{receiver,occluder},"shadow-fitp-wide.png");
+    const auto fixed_wide=fit_view(persp_wide,fixed,{receiver,occluder},"shadow-fitp-fixed.png");
+    // The plate stays inside [140,180]² at both fovs — no background in
+    // the window — so dark texels there are the umbra footprint.
+    const auto persp_umbra=[&](const RgbaImage&img){int n=0;for(int y=140;y<180;++y)for(int x=140;x<180;++x)if(channel(img,x,y,0)<60)++n;return n;};
+    check(persp_umbra(*fit_tight)<8,"Perspective fit still covered the umbra at fov .4");
+    check(persp_umbra(*fit_wide)>16,"Perspective fit did not grow coverage with the wider fov");
+    check(persp_umbra(*fixed_wide)<8,"A fixed .5 extent covered the umbra at fov 1.6");
+    std::cout<<"shadow_map_gpu=casters_bias_direction_tiers_range_lod_bands_card_cutout_debug_cascade_softness_optout_receive_normaloffset_camerafit_passed\n";
+  }
+  {
+    // Screen-space mesh LOD: the projected bounding-sphere diameter picks
+    // the chain level. A flat-quad proxy exposes the silhouette swap —
+    // the sphere reaches x=198 (radius 40px), the quad stops at 196.
+    auto fleet=a;fleet.mesh=Mesh3D::uv_sphere(64,32);fleet.scale=.25f;
+    fleet.lod_pixels=100;fleet.lod_meshes={quad(0,0)};
+    auto plain=fleet;plain.lod_meshes.clear();
+    const auto sphere_ref=capture({plain},"lod-full.png");
+    check(channel(*sphere_ref,198,160,0)>150,"Sphere LOD reference lost its silhouette");
+    const auto proxied=capture({fleet},"lod-proxy.png");
+    check(window.scene3d_statistics().lod_instances==1,"LOD pick did not substitute the proxy mesh");
+    check(channel(*proxied,198,160,0)==5,"LOD proxy kept the full mesh silhouette");
+    check(channel(*proxied,160,160,0)>150,"LOD proxy did not render the quad mesh");
+    auto wide=fleet;wide.scale=.5f;
+    const auto no_switch=capture({wide},"lod-noswitch.png");
+    check(channel(*no_switch,198,160,0)>150,"LOD switched while above the pixel threshold");
+    std::cout<<"lod_gpu=screen_size_pick_stat_passed\n";
+  }
+  {
+    // Screen-door LOD crossfade: at ~110px the instance sits inside the
+    // default 15% band above the 100px switch, so the sphere keeps ~2/3
+    // of its pixels and the quad the rest. The strip x>=210 is sphere
+    // territory the quad silhouette cannot reach — under a hard switch
+    // it is fully lit; under the fade it dithers.
+    auto fading=a;fading.mesh=Mesh3D::uv_sphere(64,32);fading.scale=.34375f;
+    fading.lod_pixels=100;fading.lod_meshes={quad(0,0)};
+    auto hard=fading;hard.lod_fade=0;
+    const auto hardref=capture({hard},"lod-fade-off.png");
+    check(window.scene3d_statistics().lod_fades==0,"Zero fade width still dual-submitted");
+    int hard_lit=0;
+    for(int y=150;y<170;++y)for(int x=210;x<214;++x)hard_lit+=channel(*hardref,x,y,0)>100;
+    check(hard_lit==80,"Hard-switch reference lost the sphere silhouette edge");
+    const auto crossfaded=capture({fading},"lod-fade.png");
+    check(window.scene3d_statistics().lod_fades==1,"Fade band did not count a dual submission");
+    int fade_lit=0;
+    for(int y=150;y<170;++y)for(int x=210;x<214;++x)fade_lit+=channel(*crossfaded,x,y,0)>100;
+    check(fade_lit>20&&fade_lit<80,"Screen-door LOD fade did not partition the silhouette");
+    std::cout<<"lod_fade_gpu=dithered_crossfade_passed\n";
+  }
+  {
+    // Visible-range fade-out: at dist 5 the sphere sits halfway through a
+    // 15%-of-range band ending at the range+radius cull edge — the single
+    // draw keeps ~1/2 of its pixels through the screen-door mask. A zero
+    // fade width keeps the hard cut: same range renders the full disc,
+    // a range short of the camera culls it entirely.
+    auto ranged=a;ranged.mesh=Mesh3D::uv_sphere(64,32);ranged.scale=.3f;
+    ranged.visible_range=5.081f;ranged.visible_fade=.15f;
+    auto hard=ranged;hard.visible_fade=0;
+    const auto hardref=capture({hard},"range-fade-off.png");
+    check(window.scene3d_statistics().visible_fades==0,"Zero range fade still thinned the draw");
+    int hard_lit=0;
+    for(int y=140;y<180;++y)for(int x=140;x<180;++x)hard_lit+=channel(*hardref,x,y,0)>100;
+    check(hard_lit==1600,"Hard-cut reference lost the sphere's lit pixels");
+    const auto faded=capture({ranged},"range-fade.png");
+    check(window.scene3d_statistics().visible_fades==1,"Range fade band did not count a thinned draw");
+    int keep_lit=0;
+    for(int y=140;y<180;++y)for(int x=140;x<180;++x)keep_lit+=channel(*faded,x,y,0)>100;
+    check(keep_lit>400&&keep_lit<1200,"Screen-door range fade did not thin the draw");
+    auto gone=ranged;gone.visible_range=4.5f;
+    const auto culled=capture({gone},"range-fade-out.png");
+    check(channel(*culled,160,160,0)==5,"Instance past the fade edge stayed visible");
+    std::cout<<"visible_fade_gpu=dithered_fadeout_passed\n";
+  }
+  {
+    // Billboard impostor: a card mesh ignores instance rotation — turn
+    // it edge-on and it still faces the camera, while an ordinary quad
+    // at the same rotation shrinks to an invisible line.
+    const auto edge_on=rotation_axis_angle({0,1,0},1.570796327f);
+    auto card=a;card.mesh=Mesh3D::billboard_card(1.8f,1.8f);card.scale=.4f;
+    card.rotation=edge_on;
+    const auto faced=capture({card},"impostor.png");
+    check(channel(*faced,160,160,0)>150&&channel(*faced,200,160,0)>150,
+        "Billboard card did not face the camera");
+    auto edge=a;edge.mesh=quad(0,0);edge.scale=.4f;edge.rotation=edge_on;
+    const auto edgeon=capture({edge},"impostor-edge.png");
+    check(channel(*edgeon,160,160,0)<50,"Ordinary quad billboarded without the card flag");
+    std::cout<<"impostor_gpu=billboard_facing_passed\n";
+  }
+  {
+    // Group proxy collapse: two members at +-0.4wu merge into one
+    // bounding sphere r=0.6wu at the origin — 192px projected on the
+    // 320px view. A 200px collapse size swaps both members for a single
+    // view-aligned proxy card covering the merged sphere, so the seam
+    // pixel between the members lights only under the collapse.
+    auto left=a;left.mesh=Mesh3D::uv_sphere(64,32);left.scale=.2f;left.position={-.4f,0,0};
+    auto right=left;right.position={.4f,0,0};
+    const auto proxy=Mesh3D::billboard_card(2.f,2.f);
+    left.lod_group=right.lod_group="fleet";left.lod_group_proxy=right.lod_group_proxy=proxy;
+    left.lod_group_pixels=right.lod_group_pixels=200;
+    const auto collapsed=capture({left,right},"lod-group.png");
+    check(window.scene3d_statistics().lod_groups==2,"Group members were not replaced by the proxy");
+    check(channel(*collapsed,160,160,0)>150,"Collapsed group proxy did not cover the merged sphere");
+    auto tight_left=left;tight_left.lod_group_pixels=10;
+    auto tight_right=right;tight_right.lod_group_pixels=10;
+    const auto separate=capture({tight_left,tight_right},"lod-group-off.png");
+    check(window.scene3d_statistics().lod_groups==0,"Group collapsed above the authored pixel size");
+    check(channel(*separate,160,160,0)==5,"Ungrouped members already covered the seam");
+    check(channel(*separate,96,160,0)>150&&channel(*separate,224,160,0)>150,"Group members lost their own silhouettes");
+    // Transition band: lod_fade .5 widens the 160px collapse to a
+    // [160,240] band — the merged 192px sits at share .6, so members
+    // thin to 40% while the proxy keeps the complementary 60%.
+    auto band_left=left;band_left.lod_group_pixels=160;band_left.lod_fade=.5f;
+    auto band_right=right;band_right.lod_group_pixels=160;band_right.lod_fade=.5f;
+    const auto banded=capture({band_left,band_right},"lod-group-fade.png");
+    check(window.scene3d_statistics().lod_fades==1,"Group fade did not submit the proxy share");
+    check(window.scene3d_statistics().lod_groups==0,"Banded group counted as collapsed");
+    int band_lit=0;
+    for(int y=60;y<260;++y)for(int x=60;x<260;++x)band_lit+=channel(*banded,x,y,0)>100;
+    check(band_lit>6424&&band_lit<18496,"Group fade band did not partition members and proxy");
+    // Lod debug view: the collapsed proxy tints magenta (class 10); a
+    // chain-substituted quad tints level-1 blue instead.
+    RenderOptions3D lod_view;lod_view.debug_view=DebugView3D::Lod;
+    {DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{left,right}),{0,0,320,320},lod_view});
+     window.draw(list,folder/"lod-group-debug.png");const auto dbg=decode_rgba_image(folder/"lod-group-debug.png");
+     check(channel(*dbg,160,160,0)>200&&channel(*dbg,160,160,2)>200&&channel(*dbg,160,160,1)<120,
+         "Lod view did not mark the group proxy magenta");}
+    {auto loded=a;loded.mesh=Mesh3D::uv_sphere(64,32);loded.scale=.25f;loded.lod_pixels=100;loded.lod_meshes={quad(0,0)};
+     DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{loded}),{0,0,320,320},lod_view});
+     window.draw(list,folder/"lod-level-debug.png");const auto dbg=decode_rgba_image(folder/"lod-level-debug.png");
+     check(channel(*dbg,160,160,2)>150&&channel(*dbg,160,160,0)<160,
+         "Lod view did not tint the chain proxy by level");}
+    // Transition marker: inside the screen-door band (|keep| in (0,1))
+    // the class tint lifts toward white — banded members and the proxy
+    // share read lifted while a hard pick stays flat.
+    {DrawList list;list.world.emplace_back(Scene3DView{Scene3D::create(camera,{band_left,band_right}),{0,0,320,320},lod_view});
+     window.draw(list,folder/"lod-group-fade-debug.png");const auto dbg=decode_rgba_image(folder/"lod-group-fade-debug.png");
+     int lifted_proxy=0,flat_proxy=0,lifted_member=0;
+     for(int y=40;y<280;++y)for(int x=40;x<280;++x){
+       const int cr=channel(*dbg,x,y,0),cg=channel(*dbg,x,y,1),cb=channel(*dbg,x,y,2);
+       if(cr>230&&cb>230&&cg>50)++lifted_proxy;      // magenta lifted: (1,.45,1)
+       if(cr>230&&cb>230&&cg<=50)++flat_proxy;       // hard-pick magenta: (1,.15,1)
+       if(cr>140&&cr<210&&std::abs(cr-cg)<25&&std::abs(cr-cb)<25)++lifted_member;} // gray lifted ~.64
+     check(lifted_proxy>200,"Lod view did not lift the banded proxy share");
+     check(lifted_member>200,"Lod view did not lift the banded member share");
+     check(flat_proxy==0,"Lod view showed a hard pick inside the transition band");}
+    std::cout<<"lod_group_gpu=merged_proxy_collapse_passed\n";
+  }
+  {
+    // Differential rotation: a longitude shear weighted by latitude —
+    // cos(2pi*v) is zero-mean and equator-symmetric, so the equator shifts
+    // one way while the polar rows shift the other on a striped sphere.
+    std::vector<std::uint8_t> stripes(64*64*4);
+    for(int px=0;px<64*64;++px){const bool left=(px%64)<32;stripes[px*4+0]=left?230:30;stripes[px*4+1]=left?30:60;stripes[px*4+2]=left?20:230;stripes[px*4+3]=255;}
+    Material3D striped;striped.ambient=1;striped.diffuse=0;striped.texture=RgbaImage::create(64,64,stripes);
+    MeshInstance3D giant{Mesh3D::uv_sphere(64,32),{},{},.85f,striped};
+    const auto uniform_bands=capture({giant},"bands-flat.png");
+    giant.material.band_shear=.3f;
+    const auto sheared_bands=capture({giant},"bands-sheared.png");
+    // Equator pixel: shear -0.3 at v=.5 pulls the blue half across it.
+    check(channel(*uniform_bands,170,160,2)>150&&channel(*sheared_bands,170,160,0)>150,
+        "Band shear did not displace the equatorial longitude");
+    // Polar-row pixel: +0.3 shear pushes the boundary off the disc limb —
+    // the red half visible here without shear disappears.
+    check(channel(*uniform_bands,150,290,0)>150&&channel(*sheared_bands,150,290,2)>150,
+        "Band shear did not displace polar latitude oppositely");
+    // The disc silhouette survives the warp — a longitude shift cannot
+    // move coverage; points well outside the limb stay background.
+    check(channel(*sheared_bands,160,160,3)==255&&channel(*sheared_bands,10,160,0)==5,
+        "Band shear distorted the disc silhouette");
+    // Zonal-wind harmonic: the cos(6πv) term reshapes the profile — the
+    // sign flips at mid latitudes, so waved pixels diverge from the
+    // single-cosine shear while the silhouette stays put.
+    giant.material.band_waves=.9f;
+    const auto waved_bands=capture({giant},"bands-waved.png");
+    int wave_px=0;
+    for(int y=30;y<330;++y)for(int x=40;x<280;++x)
+      if(std::abs(channel(*sheared_bands,x,y,0)-channel(*waved_bands,x,y,0))>8)++wave_px;
+    check(wave_px>300,"Band waves did not reshape the shear profile");
+    check(channel(*waved_bands,10,160,0)==5,"Band waves distorted the disc silhouette");
+    // Band drift: scene time scrolls the deck longitude — at t=0 the
+    // frame is identical, at t=5 a .25-u shift swaps the two stripe
+    // halves across the whole disc while the silhouette stays put.
+    giant.material.band_drift=.05f;
+    auto timed=[&](float t,const char* name){
+      DrawList list;RenderOptions3D o;o.time=t;
+      list.world.emplace_back(Scene3DView{Scene3D::create(camera,{giant}),{0,0,320,320},o});
+      list.overlay.emplace_back(FilledRectangle{{20,20,30,30},{40,50,240,255}});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto drift_t0=timed(0.f,"bands-drift-t0.png");
+    const auto drift_t5=timed(5.f,"bands-drift-t5.png");
+    int drift_px=0,still_same=0;
+    for(int y=30;y<330;++y)for(int x=40;x<280;++x){
+      if(std::abs(channel(*drift_t0,x,y,0)-channel(*drift_t5,x,y,0))>8)++drift_px;
+      if(std::abs(channel(*drift_t0,x,y,0)-channel(*waved_bands,x,y,0))>8)++still_same;}
+    check(still_same==0,"Band drift changed the frame at time zero");
+    check(drift_px>3000,"Band drift did not scroll the deck over scene time");
+    check(channel(*drift_t5,10,160,0)==5,"Band drift distorted the disc silhouette");
+    // Turbulence: a propagating cos(4πv) wave at half the shear
+    // amplitude reshapes the warp — the t=0 frame already differs from
+    // the static profile and keeps evolving over scene time while the
+    // silhouette stays put.
+    giant.material.band_drift=0;giant.material.band_turbulence=1.5f;
+    const auto turb_t0=timed(0.f,"bands-turb-t0.png");
+    const auto turb_t4=timed(4.f,"bands-turb-t4.png");
+    int turb_static=0,turb_drift=0;
+    for(int y=30;y<330;++y)for(int x=40;x<280;++x){
+      if(std::abs(channel(*turb_t0,x,y,0)-channel(*waved_bands,x,y,0))>8)++turb_static;
+      if(std::abs(channel(*turb_t4,x,y,0)-channel(*turb_t0,x,y,0))>8)++turb_drift;}
+    check(turb_static>200,"Band turbulence left the static warp unchanged");
+    check(turb_drift>200,"Band turbulence did not evolve the warp over scene time");
+    check(channel(*turb_t4,10,160,0)==5,"Band turbulence distorted the disc silhouette");
+    giant.material.band_turbulence=0;
+    const auto turb_off=timed(0.f,"bands-turb-off.png");
+    check(channel(*turb_off,10,160,0)==5&&
+          std::abs(channel(*turb_off,160,160,0)-channel(*waved_bands,160,160,0))<=8,
+        "Band turbulence=0 did not restore the static warp");
+    // Latitude-differential drift: at t=5 the authored .05 scroll moves
+    // all rows by .25 uv, pushing the texture's u=0.5 boundary past the
+    // visible window (the sampler clamps) — the rigid disc shows a
+    // uniform half. A negative differential counter-rotates boosted
+    // belts: cos²(latitude)≈1 at the equator flips the sign of the
+    // scroll there, dragging the boundary back into view, while polar
+    // rows (cos²≈0) keep the rigid .25 and stay uniform.
+    giant.material.band_waves=0;giant.material.band_shear=0;giant.material.band_drift=.05f;
+    const auto rigid5=timed(5.f,"bands-diff-rigid.png");
+    giant.material.band_diff=-1.5f;
+    const auto diff5=timed(5.f,"bands-diff-eq.png");
+    int eq_px=0,pol_px=0;
+    for(int x=55;x<280;++x){
+      for(int y=140;y<180;++y)
+        if(std::abs(channel(*rigid5,x,y,0)-channel(*diff5,x,y,0))>8)++eq_px;
+      for(int y=42;y<72;++y)
+        if(std::abs(channel(*rigid5,x,y,0)-channel(*diff5,x,y,0))>8)++pol_px;
+    }
+    check(eq_px>300&&eq_px>pol_px*3,
+        "Latitude-differential drift did not speed the equatorial belt");
+    check(channel(*diff5,10,160,0)==5,"Band differential distorted the disc silhouette");
+    std::cout<<"band_shear_gpu=equator_pole_antishear_passed\n";
+  }
+  {
+    // Orbital beaming: a tilted emissive annulus dims its receding lane
+    // and brightens its approaching lane; face-on stays symmetric since
+    // the orbital velocity is perpendicular to the view direction.
+    Material3D glow;glow.ambient=1;glow.diffuse=0;glow.tint={180,180,190,255};
+    MeshInstance3D disc{annulus_mesh(.45f,1.f,192),{},{},.9f,glow};
+    disc.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto flat_disc=capture({disc},"beam-flat.png");
+    disc.material.orbital_beaming=.9f;
+    const auto beamed_disc=capture({disc},"beam-tilted.png");
+    const int left_flat=channel(*flat_disc,30,160,0),right_flat=channel(*flat_disc,290,160,0);
+    const int left_beam=channel(*beamed_disc,30,160,0),right_beam=channel(*beamed_disc,290,160,0);
+    check(left_flat>120&&right_flat>120,"Annulus probe pixels missed the lit disc");
+    check(right_beam<right_flat*3/4,"Orbital beaming did not dim the receding lane");
+    check(left_beam>left_flat*5/4,"Orbital beaming did not brighten the approaching lane");
+    // Face-on: velocities lie in the view plane, so the asymmetry is zero.
+    disc.rotation=rotation_axis_angle({1,0,0},1.570796327f);
+    const auto face_on=capture({disc},"beam-faceon.png");
+    const int fo_left=channel(*face_on,30,160,0),fo_right=channel(*face_on,290,160,0);
+    check(fo_left>120&&fo_right>120&&fo_left-fo_right<30&&fo_right-fo_left<30,
+        "Orbital beaming broke face-on symmetry");
+    disc.material.orbital_beaming=0;disc.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto disc_ref=capture({disc},"beam-off.png");
+    check(channel(*disc_ref,30,160,0)==left_flat,"Beaming=0 did not restore the flat disc");
+    std::cout<<"orbital_beam_gpu=tilt_asymmetry_faceon_symmetric_passed\n";
+  }
+  {
+    // Spectral-class preset: a 3200 K dwarf disc shows the red Planckian
+    // tint plus its temperature-graded limb falloff.
+    MeshInstance3D dwarf{Mesh3D::uv_sphere(64,32),{},{},.85f,star_photosphere3d(3200)};
+    const auto star=capture({dwarf},"star-dwarf.png");
+    const int center_r=channel(*star,160,160,0),center_b=channel(*star,160,160,2);
+    check(center_r>150&&center_r>center_b*4/3,"Cool star lost its blackbody tint");
+    const int edge_r=channel(*star,290,160,0);
+    check(edge_r<center_r*3/4&&edge_r>10,"Star preset did not darken the limb");
+    std::cout<<"star_photosphere_gpu=blackbody_limb_passed\n";
+  }
+  {
+    // Accretion disc preset: the Shakura-Sunyaev radial texture burns
+    // brightest at the inner edge and cools/dims outward, while orbital
+    // beaming splits the approaching/receding lanes.
+    MeshInstance3D bh{annulus_mesh(.45f,1.f,192),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000)};
+    bh.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto disc=capture({bh},"accretion.png");
+    const int outer=channel(*disc,160,90,0),inner=channel(*disc,160,124,0);
+    check(inner>180&&outer<inner*2/3,
+        "Accretion disc lost its radial luminance falloff");
+    const int left=channel(*disc,70,160,0),right=channel(*disc,250,160,0);
+    check(left>150&&right<left*3/4,
+        "Accretion disc lost its beamed lane asymmetry");
+    std::cout<<"accretion_disc_gpu=radial_beaming_passed\n";
+  }
+  {
+    // Henyey-Greenstein phase: the same ring sheet brightens when
+    // backlit (g>0 forward scatter) and dims face-lit — the lobe
+    // sharpens as |g| approaches 1, so g=.8 saturates the backlit side.
+    MeshInstance3D ring{annulus_mesh(.45f,1.f,192),{},{},.9f,Material3D{}};
+    ring.material.tint={190,190,200,255};ring.material.two_sided_diffuse=true;
+    ring.material.ambient=.1f;ring.material.diffuse=.9f;
+    ring.rotation=rotation_axis_angle({1,0,0},.55f);
+    DrawList backlit;backlit.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,-1}),{0,0,320,320}});
+    window.draw(backlit,folder/"ring-backlit-off.png");const auto off_back=decode_rgba_image(folder/"ring-backlit-off.png");
+    ring.material.forward_scatter=.8f;
+    DrawList backlit2;backlit2.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,-1}),{0,0,320,320}});
+    window.draw(backlit2,folder/"ring-backlit-on.png");const auto on_back=decode_rgba_image(folder/"ring-backlit-on.png");
+    DrawList face2;face2.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,1}),{0,0,320,320}});
+    window.draw(face2,folder/"ring-facelit-on.png");const auto on_face=decode_rgba_image(folder/"ring-facelit-on.png");
+    const int back_off=channel(*off_back,160,120,0),back_on=channel(*on_back,160,120,0),face_on=channel(*on_face,160,120,0);
+    check(back_off>30&&back_on>back_off*3/2,"Forward scatter did not brighten the backlit ring");
+    check(face_on<back_on*2/3,"Forward scatter did not dim the face-lit ring");
+    // Two-term phase: a broad weak back lobe (g2<0, partial mix) lifts
+    // the face-lit side the single spike leaves flat while the backlit
+    // side keeps most of its forward boost.
+    ring.material.forward_scatter_back=-.4f;
+    ring.material.forward_scatter_back_mix=.3f;
+    DrawList backlit3;backlit3.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,-1}),{0,0,320,320}});
+    window.draw(backlit3,folder/"ring-backlit-two.png");const auto two_back=decode_rgba_image(folder/"ring-backlit-two.png");
+    DrawList face3;face3.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,1}),{0,0,320,320}});
+    window.draw(face3,folder/"ring-facelit-two.png");const auto two_face=decode_rgba_image(folder/"ring-facelit-two.png");
+    const int back_two=channel(*two_back,160,120,0),face_two=channel(*two_face,160,120,0);
+    check(face_two>face_on*5/4,"Two-term back lobe did not lift the face-lit ring");
+    check(back_two>back_off,"Two-term mix lost the forward-scatter boost");
+    std::cout<<"forward_scatter_gpu=backlit_boost_passed\n";
+  }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
   reversed.mesh=Mesh3D::create(b.mesh->vertices(),std::move(back_indices));
   const auto back=capture({reversed},"back-face.png");check(channel(*back,160,160,0)==5,"Back faces were not culled");
@@ -425,6 +1675,93 @@ int main(int argc,char** argv)try{
   for(int i=0;i<120;++i){FrameTiming timing;window.draw(orbit,std::nullopt,&timing);submission+=timing.submission_ms;}
   const auto elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-benchmark_start).count();
   std::cout<<"scene3d frames=120 cpu_submit_mean_ms="<<submission/120<<" frame_wall_mean_ms="<<elapsed/120<<" mesh_uploads="<<window.scene3d_statistics().mesh_uploads<<" gpu_driver="<<window.gpu_driver()<<'\n';
+  {
+    // Strategy-scale benchmark: a 1024-ship fleet spread over a depth sweep
+    // exercises the per-view LOD pick, instanced batching and submission
+    // cost. Rows step away from the camera so the near ranks keep the full
+    // hull while distant ranks swap to the quad proxy.
+    std::vector<MeshInstance3D> ships;ships.reserve(1024);
+    Material3D hull;hull.tint={200,200,210,255};hull.ambient=.3f;hull.diffuse=.7f;
+    const auto proxy=quad(0,0),hull_mesh=Mesh3D::uv_sphere(16,8);
+    for(int row=0;row<32;++row)for(int col=0;col<32;++col){
+      MeshInstance3D ship{hull_mesh,{},{},.5f,hull};
+      ship.position={(col-16)*2.5,(row-16)*1.4,-10.0-row*6.0};
+      ship.lod_pixels=8;ship.lod_meshes={proxy};
+      ships.push_back(std::move(ship));
+    }
+    DrawList armada;armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(ships)),{0,0,640,360}});
+    const auto fleet_start=std::chrono::steady_clock::now();double fleet_submit=0;
+    for(int i=0;i<60;++i){FrameTiming timing;window.draw(armada,std::nullopt,&timing);fleet_submit+=timing.submission_ms;}
+    const auto fleet_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-fleet_start).count();
+    const auto fleet_stats=window.scene3d_statistics();
+    check(fleet_stats.draw_calls==2,"Fleet did not collapse into one draw per LOD level");
+    check(fleet_stats.lod_instances>0&&fleet_stats.lod_instances<1024,"Fleet LOD pick did not partition by depth");
+    std::cout<<"fleet3d frames=60 instances=1024 cpu_submit_mean_ms="<<fleet_submit/60<<" frame_wall_mean_ms="<<fleet_wall/60
+      <<" draw_calls="<<fleet_stats.draw_calls<<" lod_instances="<<fleet_stats.lod_instances<<'\n';
+    // Same fleet under the shadow paths: the directional box plus a
+    // shadowed spot cone each re-submit the caster set, doubling the
+    // per-frame submission work the timing surfaces.
+    {std::vector<MeshInstance3D> lit_ships;lit_ships.reserve(1024);
+     for(int row=0;row<32;++row)for(int col=0;col<32;++col){
+       MeshInstance3D ship{hull_mesh,{},{},.5f,hull};
+       ship.position={(col-16)*2.5,(row-16)*1.4,-10.0-row*6.0};
+       ship.lod_pixels=8;ship.lod_meshes={proxy};
+       lit_ships.push_back(std::move(ship));
+     }
+     ShadowMap3D armada_shadow;armada_shadow.extent=200;armada_shadow.distance=120;armada_shadow.depth=400;
+     PointLight3D picket;picket.position={20,0,-40};picket.color={1.f,.9f,.8f};picket.intensity=3.f;
+     picket.range=220.f;picket.spot_direction={-.1f,0,-1};picket.spot_inner=.995f;picket.spot_outer=.97f;picket.casts_shadow=true;
+     DrawList lit_armada;lit_armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(lit_ships),{0,0,1},{picket},armada_shadow),{0,0,640,360}});
+     const auto lit_start=std::chrono::steady_clock::now();double lit_submit=0;
+     for(int i=0;i<60;++i){FrameTiming timing;window.draw(lit_armada,std::nullopt,&timing);lit_submit+=timing.submission_ms;}
+     const auto lit_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-lit_start).count();
+     const auto lit_stats=window.scene3d_statistics();
+     check(lit_stats.shadow_casters>0,"Shadowed fleet submitted no directional casters");
+     check(lit_stats.spot_shadow_casters>0,"Shadowed fleet submitted no spot casters");
+     std::cout<<"fleet3d_shadow frames=60 instances=1024 cpu_submit_mean_ms="<<lit_submit/60<<" frame_wall_mean_ms="<<lit_wall/60
+       <<" draw_calls="<<lit_stats.draw_calls<<" shadow_casters="<<lit_stats.shadow_casters
+       <<" spot_shadow_casters="<<lit_stats.spot_shadow_casters<<'\n';
+     // Three-tier chain: the same fleet through cascade/cascade2 windows
+     // re-collects the whole caster set per tier — the marginal cost of
+     // each coarser depth pass at strategy scale.
+     {std::vector<MeshInstance3D> cascade_ships;    cascade_ships.reserve(1024);
+      for(int row=0;row<32;++row)for(int col=0;col<32;++col){
+        MeshInstance3D ship{hull_mesh,{},{},.5f,hull};
+        ship.position={(col-16)*2.5,(row-16)*1.4,-10.0-row*6.0};
+        ship.lod_pixels=8;ship.lod_meshes={proxy};
+        cascade_ships.push_back(std::move(ship));
+      }
+      ShadowMap3D cascade_shadow=armada_shadow;cascade_shadow.cascade_extents={400,800,1600,3200};
+      DrawList cascade_armada;cascade_armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(cascade_ships),{0,0,1},{picket},cascade_shadow),{0,0,640,360}});
+      const auto cascade_start=std::chrono::steady_clock::now();double cascade_submit=0;
+      for(int i=0;i<60;++i){FrameTiming timing;window.draw(cascade_armada,std::nullopt,&timing);cascade_submit+=timing.submission_ms;}
+      const auto cascade_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-cascade_start).count();
+      const auto cascade_stats=window.scene3d_statistics();
+      check(cascade_stats.shadow_cascade_casters[0]>0&&cascade_stats.shadow_cascade_casters[1]>0&&cascade_stats.shadow_cascade_casters[2]>0&&cascade_stats.shadow_cascade_casters[3]>0,"Five-band shadow fleet submitted no far casters");
+      std::cout<<"fleet3d_shadow_cascade frames=60 instances=1024 cpu_submit_mean_ms="<<cascade_submit/60<<" frame_wall_mean_ms="<<cascade_wall/60
+        <<" draw_calls="<<cascade_stats.draw_calls<<" shadow_casters="<<cascade_stats.shadow_casters
+        <<" cascades="<<cascade_stats.shadow_cascade_casters[0]<<","<<cascade_stats.shadow_cascade_casters[1]<<","<<cascade_stats.shadow_cascade_casters[2]<<","<<cascade_stats.shadow_cascade_casters[3]
+        <<" spot_shadow_casters="<<cascade_stats.spot_shadow_casters<<'\n';}
+     // Omni receipt: the same picket with its cone removed collects into
+     // every cube face the fleet spans — per-light caster work scales
+     // with covering faces (≤6), not a flat six like a naive cubemap.
+     {std::vector<MeshInstance3D> omni_ships;omni_ships.reserve(1024);
+      for(int row=0;row<32;++row)for(int col=0;col<32;++col){
+        MeshInstance3D ship{hull_mesh,{},{},.5f,hull};
+        ship.position={(col-16)*2.5,(row-16)*1.4,-10.0-row*6.0};
+        ship.lod_pixels=8;ship.lod_meshes={proxy};
+        omni_ships.push_back(std::move(ship));
+      }
+      auto omni_picket=picket;omni_picket.spot_direction={0,0,0};
+      DrawList omni_armada;omni_armada.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(omni_ships),{0,0,1},{omni_picket},armada_shadow),{0,0,640,360}});
+      const auto omni_start=std::chrono::steady_clock::now();double omni_submit=0;
+      for(int i=0;i<60;++i){FrameTiming timing;window.draw(omni_armada,std::nullopt,&timing);omni_submit+=timing.submission_ms;}
+      const auto omni_wall=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-omni_start).count();
+      const auto omni_stats=window.scene3d_statistics();
+      check(omni_stats.omni_shadow_casters>0,"Shadowed fleet submitted no omni casters");
+      std::cout<<"fleet3d_shadow_omni frames=60 instances=1024 cpu_submit_mean_ms="<<omni_submit/60<<" frame_wall_mean_ms="<<omni_wall/60
+        <<" draw_calls="<<omni_stats.draw_calls<<" omni_shadow_casters="<<omni_stats.omni_shadow_casters<<'\n';}}
+  }
   DrawList invalid;invalid.world.emplace_back(Scene3DView{Scene3D::create(camera,{a}),{0,0,8192,8192}});
   bool rejected=false;try{window.draw(invalid);}catch(const std::length_error&){rejected=true;}check(rejected,"Oversized 3D target was accepted");
   window.draw(stable);check(window.scene3d_statistics().target_bytes==320u*320u*(window.scene3d_statistics().hdr?16u:8u),"Target budget did not recover after rejection/resize");
@@ -492,6 +1829,89 @@ int main(int argc,char** argv)try{
     plasma.material.surface_effect->view_sphere_center={0,0,-4};plasma.material.surface_effect->sphere_radius=1.8f;
     const auto hidden=capture({plasma},"plasma-volume-hidden.png");check(energy(*hidden)==0,"Volume shines through the foreground photosphere");
     check(channel(*edge,400,160,0)==5,"Volume escaped its viewport");
+    // Directional scatter: with light from view +x the volume's lit limb
+    // brightens while the far side dims — nebulae read star-lit.
+    plasma.rotation={};plasma.material.surface_effect->sphere_radius=0;
+    plasma.material.surface_effect->volume_steps=32;
+    const auto unlit=capture({plasma},"plasma-scatter-off.png");
+    plasma.material.surface_effect->volume_scatter=1.f;
+    DrawList lit_list;lit_list.world.emplace_back(Scene3DView{Scene3D::create(camera,{plasma},{1,0,0}),{0,0,320,320}});
+    window.draw(lit_list,folder/"plasma-scatter-lit.png");
+    const auto scatter_on=decode_rgba_image(folder/"plasma-scatter-lit.png");
+    const int lit_side=channel(*scatter_on,229,120,0),dark_side=channel(*scatter_on,90,120,0);
+    const int base_side=channel(*unlit,229,120,0),base_dark=channel(*unlit,90,120,0);
+    check(lit_side>dark_side*3&&lit_side>base_side*9/8&&dark_side<base_dark/2,
+        "Volume scatter did not brighten the light-facing limb");
+    // Secondary extinction: the shadow march along the light path dims
+    // filaments deep inside the cloud — the mid column between the limbs
+    // keeps only part of the position-only boost while the lit limb,
+    // whose light path exits almost immediately, keeps its lift.
+    const int mid_lit=channel(*scatter_on,160,120,0),mid_base=channel(*unlit,160,120,0);
+    check(mid_lit<mid_base*3/4&&lit_side>base_side,
+        "Secondary extinction did not shadow the volume interior");
+    // The authored occluder sphere blocks light crossing it: filaments
+    // behind the photosphere drop to the residual base level.
+    plasma.material.surface_effect->occlude=.15f;
+    DrawList occ_list;occ_list.world.emplace_back(Scene3DView{Scene3D::create(camera,{plasma},{1,0,0}),{0,0,320,320}});
+    window.draw(occ_list,folder/"plasma-scatter-occluded.png");
+    const auto scatter_occ=decode_rgba_image(folder/"plasma-scatter-occluded.png");
+    const int occ_px=channel(*scatter_occ,143,174,0),unocc_px=channel(*scatter_on,143,174,0);
+    check(occ_px<unocc_px*3/4,"Occluder sphere did not shadow the volume's light path");
+    plasma.material.surface_effect->occlude=0;
+    // Filament warp: a flow/distort re-pose must change the volume's
+    // pixels without changing its footprint — the authored variety knobs.
+    plasma.material.surface_effect->volume_scatter=0;
+    const auto still=capture({plasma},"plasma-flow-off.png");
+    plasma.material.surface_effect->flow_phase=2.5f;plasma.material.surface_effect->distortion=.08f;
+    const auto warped=capture({plasma},"plasma-flow-on.png");
+    int warped_px=0;
+    for(int y=30;y<200;++y)for(int x=80;x<245;++x)
+      if(std::abs(channel(*still,x,y,0)-channel(*warped,x,y,0))>8)++warped_px;
+    check(warped_px>500,"Flow/distort did not re-pose the volume filaments");
+    // Sequence blend: a second emission image mixes into the march —
+    // blend=1 swaps the orange filament texture for a blue one.
+    plasma.material.surface_effect->flow_phase=0;plasma.material.surface_effect->distortion=0;
+    plasma.material.surface_effect->next_texture=RgbaImage::create(1,1,{20,60,255,190});
+    const auto primary=capture({plasma},"plasma-blend-off.png");
+    plasma.material.surface_effect->blend=1.f;
+    const auto seq=capture({plasma},"plasma-blend-on.png");
+    check(channel(*primary,160,120,0)>channel(*primary,160,120,2)&&
+          channel(*seq,160,120,2)>channel(*seq,160,120,0),
+        "Volume blend did not swap the emission image");
+    // Authored occlusion sphere: radius .15 centred on the instance
+    // origin punches a hole in the volume's lower-centre (the photosphere
+    // a corona wraps) while the outer limb stays lit.
+    plasma.material.surface_effect->blend=0;plasma.material.surface_effect->occlude=.15f;
+    const auto occluded=capture({plasma},"plasma-occlude.png");
+    int hole=0;
+    for(int y=140;y<172;++y)for(int x=150;x<170;++x)
+      if(channel(*primary,x,y,0)-channel(*occluded,x,y,0)>12)++hole;
+    check(hole>80,"Authored occlude sphere did not mask the volume centre");
+    check(channel(*occluded,120,90,0)>30,"Occlude sphere removed the whole volume");
+    // Flow rate: scene time advances the filament phase — at t=0 the
+    // frame matches the static capture, at t=6 the marched folds have
+    // re-posed without changing the footprint.
+    plasma.material.surface_effect->occlude=0;plasma.material.surface_effect->flow_rate=.6f;
+    auto vol_timed=[&](float t,const char* name){
+      DrawList list;RenderOptions3D o;o.time=t;
+      list.world.emplace_back(Scene3DView{Scene3D::create(camera,{plasma}),{0,0,320,320},o});
+      window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto vol_t0=vol_timed(0.f,"plasma-flow-t0.png");
+    const auto vol_t6=vol_timed(6.f,"plasma-flow-t6.png");
+    int flow_px=0;
+    for(int y=30;y<200;++y)for(int x=80;x<245;++x)
+      if(std::abs(channel(*vol_t0,x,y,0)-channel(*vol_t6,x,y,0))>8)++flow_px;
+    check(flow_px>300,"Volume flow rate did not churn the filaments over time");
+    plasma.material.surface_effect->flow_rate=0;
+    // Camera inside the proxy: the volume marches its interior instead
+    // of popping out — backfaces of the exit wall carry the ray from the
+    // camera rather than the fragment.
+    plasma.material.surface_effect->occlude=0;
+    camera.position={0,0,.15f};
+    const auto inside=capture({plasma},"plasma-inside.png");
+    check(energy(*inside)>20000,"Volume vanished with the camera inside its proxy");
+    camera.position={0,0,5};
+    std::cout<<"volume_scatter_gpu=lit_limb_passed\n";
   }
   {
     DrawList text;Text label{{320,175},"ALIGNED ARROW",{240,240,240,255},20,0,UiRect{260,60,120,240},TextAlign::Center,FontFace::Interface,90};text.world.emplace_back(label);

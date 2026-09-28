@@ -353,3 +353,18 @@ all save/fixture differences harmless without inspecting their semantics.**
 Additional failed assertions in the machine-readable receipt remain open under
 their subsystem owners even if not individually root-caused here. The installed
 zoom-crash fix is documented separately; no user save was changed by this audit.
+
+## Toolchain defects encountered
+
+- **Ninja 1.12.1 dyndep assertion (worked around):** the VS BuildTools-bundled
+  `ninja.exe` crashes with `Assertion failed: edge && !edge->outputs_ready()`
+  at the first `CXX.dd` dyndep edge whenever a parallel build is interrupted
+  mid-scan (a killed build also leaves a zombie ninja holding `.ninja_deps`,
+  producing cascades of `0xC0000005` child minidumps on the next run). The
+  stale `CMakeFiles\*.dir\CXX.dd` scan files trip the assert even after
+  `.ninja_deps` is wiped. Workaround: kill any running `ninja.exe`, delete
+  `*.dd` + `.ninja_deps`, and build with a newer ninja —
+  `pip install ninja` provides 1.13.2, wrapped by `build-devin-113.bat`
+  (vcvars + `-C build-native/devin`). Ninja 1.13.2 rebuilds the log once
+  ("build log version is too old; starting over"), then incremental builds
+  work normally.

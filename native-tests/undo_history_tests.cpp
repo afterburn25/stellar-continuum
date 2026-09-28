@@ -62,6 +62,25 @@ int main() {
     require(oldest && *oldest == 7, "oldest retained entry should be 7");
     require(!capped.can_undo(), "evicted entries should stay evicted");
 
+    // revision() is a monotonic mutation serial — every commit, undo,
+    // redo and clear bumps it, and it survives clear() so a replaced
+    // document never collides with a prior generation.
+    UndoHistory<int> serial(8);
+    require(serial.revision() == 0, "fresh history should start at revision 0");
+    serial.commit(0);
+    serial.commit(1);
+    require(serial.revision() == 2, "commits did not bump the revision");
+    serial.undo(2);
+    require(serial.revision() == 3, "undo did not bump the revision");
+    serial.redo(0);
+    require(serial.revision() == 4, "redo did not bump the revision");
+    serial.clear();
+    require(serial.revision() == 5, "clear did not bump the revision");
+    serial.undo(0);
+    serial.redo(0);
+    require(serial.revision() == 5,
+            "empty undo/redo must not bump the revision");
+
     // clear() empties both stacks.
     capped.clear();
     require(!capped.can_undo() && !capped.can_redo(),

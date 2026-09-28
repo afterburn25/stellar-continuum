@@ -15,7 +15,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Window and platform | IMPLEMENTED BUT NEEDS POLISH | Engine `native_map_platform.cpp`, runtime paths/lease; App video controller | `native_client_platform`, `native_video_platform`, `native_video_controller` | Verified Windows x64 only; portable platform interface and device recovery need work |
 | Native input | IMPLEMENTED (rebinding) / PARTIALLY IMPLEMENTED (device policy) | Engine `native_map_platform.hpp` (keyboard/mouse/gamepad events), `input_actions.hpp` (`InputMapper`: stacked action contexts with exclusive fall-through, Button/Axis1D/Axis2D, chords, held gamepad-axis semantics, runtime `rebind()`, `bindings()` inspection, `save_contexts()` persisting the rebound map through the `load_contexts` schema — `RuntimeHost` feeds all normalized events through it, projects override via input-map JSON); App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `input_actions` (incl. rebind + save/load round-trip), `native_ui_layout` | In-app rebind UI landed: the settings hub Controls view lists every Button action of the GALAXY context (InputMapper::context/key_name/describe_bindings), activation captures the next non-modifier keypress, right-click or gamepad button as the primary binding (alternates survive, Ctrl/Shift/Alt fold into chord_keys, Escape/left-click cancel, a conflicting primary is stolen from its sibling action with a "reassigned from" notice), and the client persists the rebound map through save_contexts to galaxy-controls.json loaded over the defaults at startup. GamepadButton/MouseButton feeds are live in the client update loop under the same gameplay gate as keys (releases and axis state feed unconditionally so held bindings clear), and `--record`/`--replay` journals pad/mouse activations as `gamepad_button`/`mouse_button` commands so rebound sessions reproduce. Gamepad camera axes are live: the `GALAXY_PAD` context binds left-stick X/Y to `map_pan_x`/`map_pan_y` and right-stick Y to `map_zoom` (Axis1D over SDL axes 0/1/3, 0.18 dead zone, dt-scaled pan/zoom on the galaxy camera under the same surface gate as wheel input — the navigation smoke verifies stick pan/zoom end-to-end and that system view does not leak a galaxy-camera pan). Axis rebinding is live in the UI: the Controls view lists `GALAXY_PAD` Axis1D rows after the GALAXY buttons (a second context name on `set_input_mapper`), and capturing an axis row accepts a stick deflection past a 0.5 dead zone or a wheel scroll (discrete keys are swallowed — they cannot drive an axis); the same steal-on-conflict and persist path applies, and `load_user_bindings` injects the default pad context only when a saved map lacks it so user axis rebinds survive reload. Multi-pad is plumbed end-to-end: the platform opens up to four pads into stable slots, `InputEvent.gamepad_device`/`RawInputEvent.device` carry the slot, `InputBinding.device` pins a binding to one pad (`device` in the input-map JSON, omitted when unset), device-unset events stay wildcards so replayed recordings still match pinned bindings, and live stick values are keyed per (device, axis) — `input_actions` tests cover pin match/miss, wildcard matching, per-device axis sums and the save/load round-trip. Pad pinning is reachable in the UI: `kGamepadDeviceCount` names the shared slot bound, `describe_binding` renders a pin as `Pad N Btn/Axis M`, and a focused controls row cycles its gamepad-kind bindings through any→pad 1..4→any via D or right-click (`SETTINGS_CONTROLS_DEVICE*` announce/hint keys; the pin persists through the same `save_contexts` path). An accessibility input layer stays open; pin notices name the connected pad via `Window::gamepad_names()` (slot-number fallback) and flag a sibling action answering the same trigger on the target pad (`SETTINGS_CONTROLS_PIN_CONFLICT`). Pad UI navigation landed: `native_pad_input.hpp` translates dpad/south/east/start presses into arrow/Return/Escape events whenever a focus-ring surface owns input (`ui_owns_pad_input` mirrors the gameplay gate; rebind capture exempts itself) or when a navigable surface is merely showing and the pressed button is unbound — bindings win, so mapped gameplay pad actions still fire — giving every keyboard-navigable surface pad navigation without per-surface code; `native_client_input` covers the translation table and the navigation smoke exercises ring arming/back-out plus the bound-button policy. The startup entry loop applies the same translation unconditionally (no gameplay context exists pre-campaign; rebind capture stays exempt), so the entry/setup/settings screens are pad-drivable end-to-end. Held dpad directions auto-repeat as nav keys via `PadNavigationRepeater` (0.45 s initial delay, 0.09 s interval, per-device state, hitch-safe rescheduling, focus-loss disarm, emit-time ownership re-check) in both the campaign and startup loops. `PadStickNavigator` extends this to the left stick: a deflection past 0.5 synthesizes the matching dpad press through the same gate/translation/repeater (0.25 release hysteresis, reversal handling), and the bound-check is axis-aware — a camera-bound stick keeps panning in free play while a UI-owned one navigates (the smoke pins both halves). Still open: a deeper accessibility input layer |
 | 2D/UI renderer | IMPLEMENTED BUT NEEDS POLISH | Engine native map platform, UI skin and text fit | `native_text_measure`, `native_navigation_visual` | Shared helpers, but application-driven widgets/layout and no general UI scene framework |
-| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/OBB sim, GPU composite under 2D HUD); **HDR pipeline**: scenes render into RGBA16F targets and resolve through a fullscreen tonemap pass (`tonemap.vert/.frag` — C1-continuous knee+headroom curve preserving the SDR band, premultiply-aware) when `SDL_GPUTextureSupportsFormat` reports float color targets, with automatic UNORM fallback; `Scene3DStatistics::hdr` reports the active path | `engine_scene3d`, `native_scene3d_gpu` (incl. HDR-engaged pixel assertion + budget accounting), scale3d tests; `engine_project`/`engine_world` 3D doc+component coverage | Bounded CPU submission; SAT OBB collision over mesh local bounds (no per-triangle or rigid-body solver); instancing + DrawBatcher ordering + RenderGraph scheduling + TextureStreamer residency incl. partial mip tails wired (no indirect draw — per-batch pipeline/sampler binds keep draw_count=1) |
+| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/OBB sim, GPU composite under 2D HUD); **HDR pipeline**: scenes render into RGBA16F targets and resolve through a fullscreen tonemap pass (`tonemap.vert/.frag` — C1-continuous knee+headroom curve preserving the SDR band, premultiply-aware) when `SDL_GPUTextureSupportsFormat` reports float color targets, with automatic UNORM fallback; `Scene3DStatistics::hdr` reports the active path; **PBR + post**: per-material `PbrSurface3D` (metallic/roughness scalar+map, emissive map with nightside gate, equirect IBL for dielectric irradiance + specular, with a scene-level `environment` probe filling mapless opt-ins and an opt-in `environmentCapture` baking six pipeline face views at an anchor into that slot once per scene), `Atmosphere3D` limb scattering, ≤4 `PointLight3D` windowed inverse-square lights (optionally spot-cone gated), alpha cutout + UV tiling; per-view `RenderOptions3D` (quality tier Low/Medium/High/Ultra, exposure, mip-chain bloom, contrast/saturation/sharpen, vignette; Ultra = 4x MSAA when supported) + `DebugView3D` diagnostic shading (Lit/Unlit/Albedo/Normals/Roughness/Metallic/Emissive/LightingOnly/Lod/Residency/Shadows) and per-instance `visible_range` distance culling that also drops TextureStreamer demand; **directional shadow map** (`ShadowMap3D` on `Scene3D::create`): authored ortho coverage volume centred ahead of the camera, depth-only `scene3d_shadow` pass through the RenderGraph, 8-tap PCF at High/Ultra + single tap at Medium, tier-scaled resolution (1024/2048/4096), Low skips, up to four optional wider cascade tiers (`cascade_extents`, shared depth-array target + `sampler2DArray`) with margin crossfades, `Scene3DStatistics::shadow_casters` + per-tier `shadow_cascade_casters[]` workload counters; **surface detail**: `SurfaceResponse3D` subsets (normal/properties/cloud maps flag-gated, cloud-only legal), `cloud_albedo` lit deck composite over emissive under the atmosphere rim, `Material3D::terminator_wrap` wrap-diffuse across key/fill/point lights, `limb_darkening`/`limb_darkening_q` two-term (linear+quadratic transit law) N·V falloff for self-luminous discs (stars), `band_shear`+`band_waves` two-harmonic longitude warp (gas-giant differential rotation + zonal jets), `band_drift`/`band_turbulence` time-evolving deck scroll + warp, `band_diff` latitude-differential drift term (equatorial super-rotation), `orbital_beaming` first-order doppler asymmetry about local +Y (accretion discs), `accretion_disc_material3d` + `accretion`/`AccretionDisc` Shakura–Sunyaev radial-blackbody disc preset, `volume_scatter` directional limb-scatter for emission volumes, `forward_scatter`/`forwardScatter` Henyey–Greenstein phase (backlit dusty rings / opposition surge) with optional `forwardScatterBack`/`forwardScatterBackMix` second-lobe mix (narrow forward spike + broad weak back lobe), authored via `surface` + `terminatorWrap`/`limbDarken`/`bandShear`/`bandWaves`/`orbitalBeam` doc keys and `MaterialSurface`; **screen-space mesh LOD** — `MeshInstance3D::lod_meshes`/`lod_pixels` chains (≤8 halving levels) picked per-view from the projected bounding-sphere diameter via `select_lod3d_level`, shared between streamer demand and draw submission, `Scene3DStatistics::lod_instances` audit counter, `lods`/`lodPixels` doc keys + `MeshLods` component; tier gates: Low disables aniso/cubic sampling + caps volume ray-march at 16, Medium 32 — all authored through `Scene3dDocument` + components + editor controls | `engine_scene3d`, `native_scene3d_gpu` (incl. HDR-engaged pixel assertions, PBR/point-light/atmosphere/post probes + budget accounting), scale3d tests; `engine_project`/`engine_world`/`engine_runtime` 3D doc+component coverage | Bounded CPU submission; SAT OBB collision over mesh local bounds (no per-triangle or rigid-body solver); key-light ortho shadow map with up to two optional far cascade tiers + up-to-4 shadowed spot cones sharing one depth atlas + `casts_shadow` omni lights sharing a cube-face atlas (`casts_shadow`, per-instance `casts_shadow`/`receives_shadow` opt-outs); omni point lights unshadowed, capped at 4; atmosphere is a limb approximation; instancing + DrawBatcher ordering + RenderGraph scheduling + TextureStreamer residency incl. partial mip tails wired (no indirect draw — per-batch pipeline/sampler binds keep draw_count=1) |
 | Mesh/geometry and culling | IMPLEMENTED BUT NEEDS POLISH | Engine solid/triangle meshes, billboard batch, scene bounds | scene/triangle/scale tests | Procedural geometry and conservative limits, not a general imported geometry cooker |
 | Lighting/materials | IMPLEMENTED BUT NEEDS POLISH | Engine scene material/fragment shader; spherical material preparation | `engine_spherical_material`, `native_scene3d_gpu`, `native_planet_materials` | Approximate illumination/response from artwork; no full physically calibrated renderer |
 | Canonical planet classification/art | IMPLEMENTED | Core `planet_appearance.hpp/.cpp`, taxonomy/art catalogs | `planet_appearance`, `native_planet_materials` | Scoped registry/generation contract; 66 definitions do not mean every subclass has admitted art |
@@ -61,6 +61,930 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Mods/accessibility/editor | IMPLEMENTED / PARTIALLY IMPLEMENTED foundations | Package system (`PackageRegistry`, `mods/` scan, `write_save_package_manifest`/`verify_save_package_manifest` save attestation), input/settings, Developer tools/import CLI, standalone editor | `package_platform` (incl. manifest attestation cases), editor + settings tests | Mod loading is content-only: namespaced package ids, priority-based overrides, semver dependency constraints and protected base namespaces resolve through `PackageRegistry::resolve`; world saves record the resolved load plan in a `<save>.packages.json` sidecar and `RuntimeHost` verifies it on F9/`load_world_from_file` restores — missing or version-mismatched packages log through `RuntimeDiagnostics` (report-only; loading proceeds). Executable plugins stay untrusted by design. Accessibility/editor remain partial — see the roadmap |
 
 ## Implementation records (newest first)
+
+## Scene3D screen-space mesh LOD chains (2026-09-25)
+
+- **Purpose:** strategy fleets need vertex throughput to scale with
+  pixels on screen, not authored distance tables — a zoomed-out cruiser
+  at 30px should not submit its 60k-triangle hi-res mesh; and the level
+  swap must not pop when a fleet crosses a threshold.
+- **Modules:** `native_scene3d.hpp` (`MeshInstance3D::lod_meshes` +
+  `lod_pixels` + `lod_fade` + `lod_group`/`lod_group_proxy`/
+  `lod_group_pixels`, `select_lod3d_level`, `lod3d_fade_share`,
+  `Scene3DStatistics::lod_instances`/`lod_fades`/`lod_groups`),
+  `native_scene3d.cpp` (validation + selection/band policy),
+  `native_scene3d_gpu.cpp` (per-view pick in the streamer demand pass
+  and the draw loop, dual submission inside the band),
+  `scene3d.frag` (early screen-door discard on `uv_options.w`),
+  `scene_document.*` (`lods`/`lodPixels`/`lodFade` entity
+  keys), `scene_components.*` (`MeshLods` component + codec),
+  `runtime_host.cpp`, `app/engine_main.cpp`.
+- **Public interface:** `lod_meshes[i]` substitutes for `mesh` once the
+  projected bounding-sphere diameter drops below `lod_pixels/2^i` pixels
+  (≤ 8 levels, all non-null, `lod_pixels` in [1,4096], `lod_fade` in
+  [0,.5] — else `Scene3D::create` throws). `select_lod3d_level` is pure
+  policy shared by the streamer demand and the draw submission so both
+  agree which level is resident; the demand pass charges only the
+  submitted levels' geometry bytes. `lod_fade` widens each threshold
+  into a transition band of `lod_fade`×threshold pixels above it:
+  `lod3d_fade_share` returns the coarser level's share `p` rising
+  0→1 across the band, and inside it the view submits both levels with
+  complementary keep probabilities — the shader's signed IGN mask keeps
+  `1-p` of the selected level's pixels and `p` of the coarser's, an
+  exact per-pixel partition so opaque geometry crossfades with no
+  blending and no z-fighting.
+- **Policies:** selection is per-view screen space — identical footprint
+  convention as the texture streamer (px-per-world-unit × bounding
+  diameter / distance). Shadow casters share the lit pass's pick — a
+  chained instance casts its selected level (the shadow volume tracks
+  the camera, so a tiny-on-screen caster's shadow only carries
+  low-poly silhouette where its texels are already coarse) and a
+  collapsed group casts one light-facing proxy from the representative.
+  Each caster carries the lit pass's signed screen-door keep mask into
+  the depth pass, so banded transitions thin the shadow in lockstep;
+  `card:` impostor casters face the light like the proxy does.
+  Low tier and `lod_fade=0` keep the hard
+  switch (single draw, zero fade cost). A `visible_fade` band degrades a
+  fading pair to the selected level's single thinned draw — which level
+  shows stops mattering while the whole object dithers out.
+  `lod_instances`/`lod_fades` on
+  `Scene3DStatistics` audit substitutions and dual submissions per
+  frame. `lod_group` names a cluster impostor: every contributing
+  member (frustum- and range-visible, non-volume) merges its view-space
+  bounding sphere into a group sphere; once that sphere's projected
+  diameter drops below `lod_group_pixels` [1,4096] the whole group
+  renders as one view-aligned `lod_group_proxy` draw centred on the
+  merged sphere, scaled to cover it, shaded with the representative
+  member's material. The representative's `lod_fade` widens the
+  collapse into a screen-door band — members thin by `1-p` while the
+  proxy keeps the complementary `p` (audited via `lod_fades`); Low
+  tier and `lod_fade=0` keep the hard switch. The representative is
+  the first contributing member in instance order; `lod_groups` audits
+  replaced members.
+- **Persistence:** entity `lods` (spec array, ≤ 8 bounded strings) +
+  `lodPixels` [1,4096] + `lodFade` [0,.5] + `lodGroup` (≤64 chars) +
+  `lodProxy` (≤256-char spec) + `lodProxyPixels` [1,4096] round-trip
+  through `Scene3dDocument`; `MeshLods` component codecs spec count +
+  strings + switch size + fade + group name + proxy spec + collapse
+  size (truncated tails decode with defaults);
+  `spawn_scene3d` attaches it when `lods` or `lodGroup` is non-empty
+  and `scene3d_from_world` exports it back. Runtime/editor resolve specs
+  through the same path as `MeshRef` — an unresolvable spec drops just
+  that level; an unresolvable proxy drops just the collapse.
+- **Editor:** Scene3D tool `meshLods` (csv specs), `lodPixels`,
+  `lodFade` and `lodGroup` (`name;proxySpec;px`) rows edit the live
+  preview.
+- **Tests:** `native_scene3d_gpu` — silhouette probe: a quad proxy
+  exposes the swap (sphere pixels beyond the quad edge go background),
+  `lod_instances` stat delta, above-threshold frames keep the full mesh;
+  screen-door probe: a sphere fading to a quad inside the band dithers
+  its sphere-only silhouette (~2/3 lit of 80px vs fully lit hard-switch
+  control) and counts one `lod_fades` submission; impostor probe: an
+  edge-on `billboard_card` still renders face-on while an ordinary quad
+  at the same rotation vanishes; `fleet3d` benchmark
+  block — a 1024-ship depth-sweep fleet, 60 timed frames reporting
+  `cpu_submit_mean_ms`/`frame_wall_mean_ms` plus
+  `draw_calls`/`lod_instances` assertions (one instanced draw per LOD
+  level, depth-partitioned picks); group probe: two member spheres
+  below the authored merged diameter collapse into one proxy card —
+  `lod_groups` counts both and the seam pixel between the members
+  lights only under the collapse;
+  `engine_scene3d` — level-pick policy, band-share ramp across two
+  levels, zero-width disable, bound rejects;
+  `engine_project` — `lods`/`lodPixels`/`lodFade` round-trip + malformed
+  rejections; `engine_world` — `MeshLods` spawn/codec/export
+  round-trips.
+- **Impostors:** `Mesh3D::billboard_card(w,h)` (mesh spec `card:w,h`)
+  builds a camera-facing quad — `billboard()` collapses its view-space
+  rotation to uniform scale at draw time, so a chain's last level can be
+  an always-facing impostor card, and a primary `card:` mesh doubles as
+  a sprite marker. The flag is per-mesh, so a fading pair can mix a
+  card with solid geometry.
+- **Limitations:** flat halving chain — no mesh decimation or deeper
+  LOD trees beyond the named group collapse; the proxy shades with the
+  representative member's material, so groups should share materials;
+  merged members
+  still pay CPU prepare work (the collapse saves vertex/fragment and
+  uniform-record load, not the per-instance iteration); impostor cards
+  are flat quads (no baked view-dependent shading); the crossfade is a
+  per-pixel dither (stable while the camera holds still; reads as fine
+  noise on stills when a coarse proxy diverges sharply); shadow
+  casters carry the same signed keep mask through the depth pass, so
+  silhouettes dither in lockstep with the lit draw (each in-band level
+  adds one shadow submission — banded group members keep their own
+  casters while the representative adds the proxy's complementary
+  share).
+- **Consumers:** `Scene3dDocument` entities, `MeshLods` components and
+  the editor Scene3D tool are the intended drivers. The game client's
+  chart views (`native_small_body_renderer`, `native_battle_sprites`,
+  `native_system_workspace`, `native_stellar_eruptions`) deliberately
+  do not populate these fields: they all run top-down orthographic
+  cameras where `visible_range` can't express zoom culling (the camera
+  distance is fixed — `orthographic_height` carries the zoom), and
+  each already clip-culls instances against the viewport with
+  `view.scale`-driven size thresholds of its own; no alternate LOD or
+  proxy mesh content exists in shipped game assets. `visible_fade`/
+  `lod_*` remain perspective-scene features — the native globe view is
+  a single-instance closeup where they are inapplicable.
+
+## Scene3D surface detail — cloud decks and terminator wrap (2026-09-25)
+
+- **Purpose:** close the planet-detail gap in the generic renderer —
+  authored normal/property/cloud maps were already evaluated in the
+  shader but unreachable from authored scenes, and the terminator was a
+  hard Lambert edge.
+- **Modules:** `native_scene3d.hpp` (`SurfaceResponse3D::cloud_albedo`,
+  `Material3D::terminator_wrap`), `native_scene3d.cpp` (validation),
+  `scene3d.frag` (`response_options` uniform, wrap-diffuse lighting,
+  cloud-deck composite), `native_scene3d_gpu.cpp` (uniform fill, map
+  presence flags), `scene_document.*` (entity `surface` block +
+  `terminatorWrap`), `scene_components.*` (`MaterialSurface`),
+  `runtime_host.cpp`, `app/engine_main.cpp`, `CMakeLists.txt`
+  (`stellar_scene3d_tests` now links `stellar_native_image`).
+- **Public interface:** `SurfaceResponse3D` gains `cloud_albedo` [0,1] —
+  the cloud map's RGB composites as a lit deck over the surface at
+  `cloud_opacity` coverage; 0 keeps the map shadow-only (the pre-existing
+  behaviour). `Material3D::terminator_wrap` [0,1] widens the diffuse
+  lobe — `(N·L+w)/(1+w)` — applied identically to the key light,
+  additional directionals and point lights. `Material3D::limb_darkening`
+  [0,1] applies linear limb darkening `1 - u(1 - N·V)` to the body's
+  outgoing radiance (Sun ≈ 0.6) — the photosphere profile that keeps
+  emissive star discs from clipping flat; `limb_darkening_q` [0,1] adds
+  the standard quadratic term `q(1-μ)²` (two-parameter transit law),
+  steepening the very edge while mid-disc stays untouched, and
+  `limb_darkening_mid` [0,1] adds the Sing three-parameter law's
+  mid-curve term `m(1-μ^{3/2})` — a shallower falloff reaching further
+  inward for photospheres that flatten before the rim — the product
+  clamps at zero so aggressive coefficients never invert. Applied after
+  the cloud deck with the additive atmosphere rim exempt, on the
+  geometric normal.
+- **Map subset rule:** `SurfaceResponse3D` now accepts any single map —
+  a cloud-only or normal-only material is legal. The shader receives
+  presence flags (normal/properties/cloud bits in `response_options.z`)
+  and skips sampling absent maps; `SurfaceResponse3D` with no maps is
+  still rejected.
+- **Deck ordering:** the cloud composite runs after surface emissive —
+  cloud cover occludes night-side city lights — and before the
+  atmosphere rim so limb scatter stays above the deck. The deck is lit
+  by the same wrapped sunlight and shadowed by the same
+  analytic/shadow-map visibility as the surface.
+- **Persistence:** entity `surface` block `{normal, properties, cloud,
+  normalStrength, relief, cloudOpacity, cloudAlbedo, cloudHeight,
+  cloudOffset:[x,y]}` plus flat `terminatorWrap`/`limbDarken`/`limbDarkenQ`/`limbDarkenMid` round-trip
+  through `Scene3dDocument`; `surface` requires at least one map and
+  rejects out-of-range scalars. `MaterialSurface` component codecs the
+  same fields (`cloud_height` tails the payload after the map strings so
+  pre-field saves still decode); `spawn_scene3d` attaches it when any
+  field differs from defaults and `scene3d_from_world` exports it back.
+- **Deck height:** `SurfaceResponse3D::cloud_height` [0,.1] (object
+  units, scaled like `relief`) lifts the deck off the surface. In the
+  shader a least-squares UV jacobian maps view-space displacements to UV
+  shifts: the deck texel shifts by the projected normal offset (limb
+  parallax — limb clouds peek past the silhouette, disc centre stays
+  registered), the ground shadow samples `h·tan(zenith)` sunward along
+  the tangential light component (capped 4h), and a sin²(zenith)-gated
+  sunward tap shades the deck itself — overhead sun stays fully lit.
+  `texture_options.z` carries the world-space height; 0 keeps the
+  texture-space deck path untouched.
+- **Editor:** Scene3D tool entity rows `surfMaps`, `surfShape`,
+  `cloudDeck` (5th field = height), `termWrap`, `limbDark` (`u[,q[,m]]`)
+  edit the live preview.
+- **Tests:** `native_scene3d_gpu` — deck compositing brightness,
+  `cloud_albedo` scaling, wrap-diffuse lighting at the geometric
+  terminator, wrap invariance at the fully lit pole, limb-darkened disc
+  edge with unchanged centre, a quadratic-coefficient capture that
+  deepens the extreme limb while mid-disc stays untouched, a
+  three-term capture whose mid-curve coefficient dims mid-disc past
+  the quadratic profile, and a
+  `cloud_height` capture showing
+  limb-ring parallax against an unchanged disc centre; `engine_scene3d`
+  — cloud-only acceptance + scalar bound rejects; `engine_project` —
+  document round-trip + `surface`/`terminatorWrap`/`limbDarken`/
+  `limbDarkenQ`/`limbDarkenMid`/`cloudHeight` rejections; `engine_world` —
+  `MaterialSurface` spawn/codec/export round-trips.
+- **Limitations:** the deck remains a texture-space composite — the
+  height term is a bounded parallax/shadow approximation, not a
+  volumetric shell (no ray-marched interior, no per-layer thickness);
+  wrap is a single-coefficient law and limb darkening stops at the
+  three-term model — no wavelength-dependent or four-term (Claret)
+  laws yet.
+
+### Follow-up: `Material3D::band_shear` (same change set's successor)
+
+- Latitude-weighted longitude shear `u += s·(cos(2πv) + w·cos(6πv))`
+  applied to every equirect surface sample — the gas-giant
+  differential-rotation signature; equator-symmetric and zero-mean so
+  maps stay registered. `band_shear` [-0.5,0.5] is the amplitude,
+  `band_waves` [0,1] the zonal-jet harmonic share (w = 0 keeps the
+  single pole-vs-equator profile; w → 1 gives alternating mid-latitude
+  jets). Rides `emissive_tint.w` + `texture_options.y`; authored via
+  `bandShear`/`bandWaves` doc keys, `MaterialSurface::band_shear`/
+  `band_waves`, runtime + editor `bandShear`/`bandWaves` rows. GPU
+  probes assert antisymmetric equator/pole displacement plus a
+  harmonic-reshaped profile on a striped sphere; `engine_scene3d`
+  bounds, `engine_project`/`engine_world` round-trips.
+
+### Follow-up: `RenderOptions3D::time` render-time animation (same change set's successor)
+
+- A per-view scene-time scalar (`RenderOptions3D::time`, carried on
+  the free `ViewUniform::debug_mode.y`) drives two authored visual-only
+  rates through a new `anim_options` material lane: `band_drift`
+  [-0.25,0.25] scrolls equirect longitude at uv/s (super-rotating
+  decks slide over a fixed lit limb; the sampler's REPEAT wrap makes
+  the unbounded scroll safe), and `SurfaceEffect3D::flow_rate`
+  [-64,64] advances the volume march's filament phase so nebulae
+  churn instead of freezing. `RuntimeHost` accumulates
+  `time += dt·time_scale` per frame (so `--speed` slows animation
+  with the simulation clock) and the engine-shell preview keeps its
+  own accumulator; **default 0 keeps every capture deterministic** —
+  animation is purely visual, never read by the simulation or saves.
+  Authored via `bandDrift` / `volume.flowRate` doc keys,
+  `MaterialSurface::band_drift` / `EmissionVolume::flow_rate`
+  components, runtime + editor `bandDrift` row and the volume CSV's
+  11th field. GPU probes assert time-zero frames are pixel-identical
+  to static captures and nonzero time shifts >3000 band pixels /
+  re-poses >300 filament pixels while silhouettes stay fixed;
+  `engine_scene3d` bounds, `engine_project`/`engine_world`
+  round-trips including legacy-payload codec tails.
+  `Material3D::band_turbulence` [-8,8] (`anim_options.z`, rad/s)
+  evolves the warp itself — a propagating `cos(4πv + t·rate)`
+  mid-latitude wave at half the shear amplitude reshapes the jet
+  profile over time while staying zero-mean and equator-symmetric;
+  authored via `bandTurbulence` (entity doc field, `MaterialSurface`
+  tail slot, `bandDrift` row's second CSV term). GPU probes assert
+  the turbulence frame differs from the static warp at t=0, keeps
+  evolving at t>0, and returns to the static profile at rate 0.
+  `Material3D::band_diff` [-8,8] (`drift_options.x`) is the
+  latitude-differential term: the scroll multiplies by
+  `1 + diff·cos²(latitude)`, so equatorial belts super-rotate past
+  the poles like a real gas giant (diff<0 counter-rotates them);
+  diff=0 keeps the rigid scroll, silhouettes and registration are
+  untouched since it only retimes longitude uv. Authored via
+  `bandDiff` (entity doc field, `MaterialSurface` tail slot,
+  `bandDrift` row's third CSV term). GPU probe counter-rotates the
+  equatorial belt and asserts it diverges >3× from the rigid frame
+  vs the polar rows; `engine_scene3d` bounds,
+  `engine_project`/`engine_world` round-trips.
+  Remaining: volume churn is phase-only (the authored warp shape
+  persists).
+
+### Follow-up: `Material3D::orbital_beaming` (same change set's successor)
+
+- First-order orbital doppler asymmetry `1 + s·(v̂·V̂)` [-1,1] for
+  material orbiting local +Y — accretion discs get their asymmetric
+  approaching lane, rings their forward-scatter bias; face-on discs stay
+  symmetric since orbital velocity is perpendicular to the view. Rides
+  `uv_options.z`, reusing the stored model-view inverse
+  (`effect_from_view`, now also filled for beam-only materials).
+  Authored via `orbitalBeam` doc key, `MaterialSurface::orbital_beaming`,
+  runtime + editor `orbitalBeam` row. GPU probe asserts
+  receding-dims/approaching-brightens on a tilted annulus plus face-on
+  symmetry; `engine_scene3d` bounds, doc/component round-trips.
+  Remaining: brightness asymmetry only — no wavelength shift, redshift
+  or lensing.
+
+### Follow-up: `star_photosphere3d` spectral-class preset
+
+- `star_photosphere3d(kelvin)` derives a physically plausible star
+  material: blackbody disc tint (sRGB + `linear_light`), `ambient=1`
+  emissive-dominant response, the blackbody as `light_color`, and a
+  temperature-graded limb coefficient (`2.762 − 0.55·log10 K`, clamped
+  [0.2,0.95]). Games own the class-letter→kelvin mapping; the engine
+  takes kelvin. Authored via `starKelvin` doc key [100,100000] +
+  `StarPhotosphere` component (codec/spawn/export), runtime applies the
+  preset before explicit components so authored fields still win;
+  editor `starKelvin` row. GPU probe: a 3200 K sphere reads red with a
+  measurably darkened limb. Remaining: the two-term law ends at
+  quadratic (no three-term/nonlinear coefficients); no granulation or
+  activity variation (deliberately anti-procedural).
+
+### Follow-up: `accretion_disc_material3d` disc preset
+
+- `accretion_disc_material3d(inner,outer,kelvin,beaming)` generates the
+  radial blackbody column for an `annulus` mesh: Shakura–Sunyaev
+  `T ∝ r^(−3/4)`, flux ∝ T⁴, sRGB-encoded for `linear_light`;
+  emissive-dominant, double-sided, anisotropic, orbital-beaming seeded.
+  Implemented in `spherical_material_preparation.cpp` — generated
+  textures need `RgbaImage::create` (`stellar_native_image`), which
+  cannot be linked back into `stellar_engine` (it depends on it).
+  Authored via `accretion:[i,o,k,b]` doc key + `AccretionDisc`
+  component (codec/spawn/export), runtime + editor `accretion` row.
+  CPU test covers bounds/determinism/profile; GPU probe asserts the
+  radial falloff and the beamed lane asymmetry on a tilted annulus.
+  Remaining: azimuthally uniform texture (no spiral arm fluctuations),
+  no relativistic ray-bending, and the radii must be re-stated in the
+  `annulus:i,o` mesh spec — the engine does not derive them.
+
+### Follow-up: `SurfaceEffect3D::volume_scatter` directional scatter
+
+- Emission volumes gain a [0,1] directional single-scatter term: a limb
+  gradient against the object-space key light (`mix(1, .35+1.3·facing)`)
+  makes the star-facing side of a nebula ~1.65× brighter and the far
+  side ~0.35×, so volumes read illuminated instead of flat emissive.
+  Rides `atmo_shape.z` (inert on volume materials — `main()` early-
+  returns into `emission_volume`); validated [0,1]. The facing boost
+  now rides a coarse secondary-extinction march — four taps toward the
+  light through the same density field give `exp(-σ·τ)` transmittance
+  over the authored optical density, so deep filaments behind a dense
+  core keep only the residual base while the lit limb stays bright;
+  an authored occluder sphere (`effect_sphere`) crossing the light
+  path blocks the boost entirely. `engine_scene3d` bounds + GPU probe
+  measuring a ~4× lit/dark limb gradient, a ~0.6× interior shadow
+  factor, and a ~0.28× occluder shadow factor with light from view +x.
+  Remaining: the shadow taps are a coarse 4-sample estimate — no
+  multi-scatter or shadow-map-grade resolution.
+
+### Follow-up: `Material3D::forward_scatter` phase function
+
+- Henyey–Greenstein single-scatter phase
+  `(1−g²)/(1+g²+2g·(V̂·L̂))^(3/2)`, g in [-1,1]: positive peaks a sheet
+  when backlit (dusty-ring forward scatter — the E-ring look) with a
+  lobe that sharpens as |g|→1; negative inverts to an opposition surge
+  for icy regolith. Unit-mean over directions, so sheet luminance is
+  preserved on average; |g| clamps to .95 in the shader so the
+  singular peak stays finite. Complements `orbital_beaming` (velocity
+  asymmetry) — this term is the view/light phase, so a face-on ring
+  still responds. Rides `atmo_shape.w` (the atmosphere branch reads
+  only `.x/.y`). `forward_scatter_back` + `forward_scatter_back_mix`
+  add the optional second lobe — the phase becomes
+  `(1−w)·HG(g)+w·HG(g2)` so real dust sheets pair the narrow forward
+  spike with a broad weak back lobe (face-lit sides keep a faint
+  residual glow; g2=0 degenerates to the isotropic filler and mix=0
+  keeps the single-lobe path identical). Authored via
+  `forwardScatter`/`forwardScatterBack`/`forwardScatterBackMix` doc
+  keys + `MaterialSurface` fields, runtime + editor `fwdScatter`
+  CSV row. GPU probe measures the backlit boost, face-lit dim, and
+  the two-term back-lobe face-lit lift on a tilted annulus.
+  Remaining: two-term HG maximum — no wavelength-dependent scattering
+  or multi-term phase functions; radiance only (alpha untouched).
+
+### Follow-up: `EmissionVolume` document/component authoring
+
+- `SurfaceEffect3D`'s emission-volume march becomes authorable: the
+  `volume` entity block (`{depth,density,seed,steps,scatter,flow,
+  distort,blend,image2,occlude}`) maps to a new `EmissionVolume` component
+  (tolerant codec reads legacy 20-byte and 28-byte payloads with
+  zero-warp/no-blend defaults + spawn + world export), and
+  `RuntimeHost`/editor preview attach the surface effect using the
+  entity's own texture as the emission image — transparency is enabled
+  automatically, and a `volume` block without a `texture` fails parse.
+  `flow`/`distort` drive the shader's filament phase and UV warp lanes
+  so sibling volumes stop sharing a silhouette; `image2`+`blend` mix a
+  second authored emission image at the same warped UV — a morph
+  between two nebula silhouettes (`blend` requires `image2`; an
+  unloadable `image2` keeps the primary). Nebulae/star-lit plasma
+  clouds are document-authored instead of C++-only. Validated: doc
+  bounds (depth (0,.75], steps [8,64], scatter/blend [0,1], flow
+  |f|≤1e4, distort [0,.1]), `engine_project` round-trip + rejects,
+  `engine_world` codec/spawn/export, and GPU probes showing a
+  flow/distort re-pose, a blend=1 emission swap, and an authored
+  `occlude` sphere (corona masking the volume centre) change the marched
+  pixels. Remaining: explicit view-space sphere placement stays
+  C++-only (`SurfaceEffect3D::view_sphere_center`/`sphere_radius` still
+  win when set).
+- **Camera-inside volumes:** when the camera crosses the proxy's
+  bounding sphere the draw flips to the double-sided pipeline slot and
+  bit 7 of `volume_options.y` lifts the fragment's front-face gate; the
+  march then originates at the camera (ortho rays at their own x,y —
+  `view_position.xy,0`) instead of the exit-wall backface, so flying
+  through a nebula keeps rendering interior filaments instead of
+  popping to black. GPU probe: `plasma-inside.png` fills ~20k px where
+  the pre-change path discarded every fragment.
+
+## Scene3D directional shadow mapping (2026-09-25)
+
+- **Purpose:** give the generic renderer a real directional shadow path
+  sized for strategy scenes — ship/station occlusion under a sun key
+  light — with authored coverage that stays stable at system scale
+  (and an optional `camera_fit` mode that tracks zoom via footprint
+  multipliers instead of frustum-slice fitting).
+- **Modules:** `native_scene3d.hpp` (`ShadowMap3D`, `Scene3D::create`
+  parameter, `Scene3DStatistics::shadow_casters`/`spot_shadow_casters`/`omni_shadow_casters`),
+  `native_scene3d.cpp`
+  (validation), `scene3d_shadow.vert/.frag` (depth-only pass),
+  `scene3d.frag` (view→shadow-clip transform + PCF block),
+  `native_scene3d_gpu.cpp` (ortho fit, caster culling, depth pipeline,
+  RenderGraph pass, tier policy), `scene_document.*`
+  (`render.shadow` block), `runtime_host.cpp`, `app/engine_main.cpp`.
+- **Public interface:** `ShadowMap3D` — `extent` (ortho half-size),
+  `distance` (box centre along camera forward), `depth` (light-axis
+  range), `strength` [0,1], `bias` (NDC units), `resolution` (0 =
+  tier default: Medium 1024 / High 2048 / Ultra 4096),
+  `cascade_extents` (empty disables; up to
+  `maximum_scene3d_shadow_cascades`=4 progressively wider ortho tiers
+  sharing the same centre/depth so coverage survives extreme zoom-out —
+  entries must be finite, strictly increasing and each past `extent`),
+  `softness`
+  ([0,8] penumbra multiplier on the tier PCF radius — 0 forces the
+  hard single-tap edge),
+  `normal_offset` ([0,8] receiver-side lift along the shading normal in
+  map texels — clears slope-scaled self-shadow acne on surfaces angled
+  to the light without raising the constant `bias`; each cascade tier
+  applies its own texel-scaled amount),
+  `camera_fit` (reinterprets every authored extent as a multiplier of
+  the camera's visible half-height at the box centre —
+  `orthographic_height`/2 orthographic or `distance`·tan(fov/2)
+  perspective — so the chain tracks zoom with stable texel density).
+  Coverage is an authored policy: receivers outside every box stay lit;
+  the outermost covering band (the near map alone, or the widest
+  cascade tier) fades its term to lit over its outer 10% margin so the
+  authored boundary doesn't hard-clip the umbra; the box tracks the
+  camera so mid-zoom strategy views keep stable texel density.
+- **Shader contract:** view-level fragment uniform carries the
+  view→shadow-clip matrix plus {texel, PCF radius in texels, strength,
+  bias} and the world-units normal-offset lift; the fragment adds
+  `normal × lift` to its view-space position before projecting into
+  every tier (cascade tiers carry their own texel-scaled value in
+  `cascade_options`). 8-tap kernel at High (1-texel) and Ultra (1.5), single tap at
+  Medium. Per-tier matrix/options arrays (sized to the four-tier bound)
+  feed the cascade tiers: every tier renders its caster list into its
+  own layer of one shared depth-texture array, and the fragment folds
+  the enabled tiers widest→narrowest — sampling the tightest covering
+  layer and crossfading over each tier's outer 10% margin — before the
+  crisp near map's own margin handoff; fragments past every tier stay
+  lit. Depth-only pipeline shares the scene vertex layout
+  and a transform SSBO; fragments outside the ortho box are exempt.
+- **Policies:** Low tier skips the pass entirely; `transparent` blends
+  never cast; `visible_range`-culled instances don't cast (identical
+  rule to the camera draw); light-space AABB culls off-volume casters
+  while off-camera casters still write the map; casters share the lit
+  pass's screen-space LOD pick (a chained instance submits its selected
+  level; a collapsed `lodGroup` submits one light-facing proxy scaled
+  to the merged sphere from the representative member); billboard card
+  casters collapse rotation to face the light; `alpha_threshold`
+  casters bind their base texture per batch and the depth fragment
+  discards the same texels the lit pass drops (cutout parameter +
+  UV tiling ride the `ShadowCast` record), so a holed texture casts
+  a perforated silhouette instead of its full quad; casters batch
+  through `DrawBatcher` with the same instancing convention as the
+  scene pass (material_id interns the caster texture, so distinct
+  cutout images split batches but share instanced draws).
+- **Persistence:** `render.shadow` document block round-trips; extent
+  ≤ 0 disables. The authored chain emits as `cascades: […]` plus the
+  legacy `cascade`/`cascade2` scalars as a mirror; documents authoring
+  only the legacy scalars parse into the same vector. Rejects
+  nonpositive `depth`, `strength` outside [0,1],
+  `bias` outside [0,0.1], `resolution` outside [64,8192], any cascade
+  extent that is non-finite or not strictly past the previous tier, a
+  cascade list longer than four, `softness` outside [0,8], and
+  `normalOffset` non-finite or outside [0,8].
+- **Editor:** Scene3D tool `shadow` row edits all fields against
+  the live preview, trailing fields carrying up to four cascade tiers
+  then the normal-offset lift and camera-fit flag.
+- **Tests:** `native_scene3d_gpu` — casters/bias/direction/tiers/range
+  block with pixel probes (open vs blocked receiver, moved blocker
+  relocates the shadow, Low-tier skip, PCF tap delta, out-of-range
+  caster culling) + `shadow-open/blocked/reference/moved/low/pcf/
+  culled` captures; LOD probes (annulus chain substitute writes a ring
+  shadow with a hole where the full quad was solid; a collapsed group
+  shares one proxy caster — `shadow_casters` drops N+1→2 — and still
+  shadows the receiver) + `shadow-lod/group` captures; cutout probe
+  (`shadow-cutout` — a half-alpha-masked occluder keeps shading its
+  opaque side's footprint while the transparent half reopens); cascade
+  probe (`shadow-near-only`/`shadow-cascade` — an umbra outside the
+  near window stays lit single-tier and darkens through the far tier,
+  while a lit receiver inside the empty near window keeps its value);
+  three-tier probe (`shadow-cascade-mid`/`shadow-cascade2` — an umbra
+  between the mid and widest windows stays lit at two tiers and darkens
+  only once the widest layer covers it; per-tier
+  `shadow_cascade_casters[t]` attribution asserted);
+  softness probe (`shadow-soft-0/4` — a zero multiplier collapses the
+  penumbra to a binary edge, 4× grows an 80-pixel blend band while the
+  umbra core keeps its full cut); `fleet3d_shadow` benchmark — the
+  1024-instance fleet re-submitted through the directional box plus a
+  shadowed spot cone, printing timing + `shadow_casters` next to the
+  unshadowed `fleet3d` baseline, and a `fleet3d_shadow_cascade` variant
+  adding all four far tiers so per-tier caster overhead prints
+  separately (the `cascades=` counter list), plus a `fleet3d_shadow_omni`
+  variant showing omni caster work scales with covering faces (≈1 per
+  fleet caster for a near-planar fleet) rather than a flat six;
+  `engine_project` document round-trip + rejection coverage.
+- **Infrastructure fix bundled:** SDL fragment-set resource order —
+  the materials SSBO sits after the sampled textures (now binding 14)
+  because set 2 requires samplers to precede storage buffers; the
+  earlier collision produced `VK_ERROR_DEVICE_LOST`.
+- **Limitations:** key-light only — the chain is fixed at three
+  bands (near + up to two far tiers, no arbitrary split count), so
+  extreme zoom ranges still pick an authored coverage policy; authored
+  `bias` is a constant receiver-side NDC term (the rasterizer applies
+  a fixed 1.5 slope bias at cast time — no authored slope term);
+  analytic blockers remain the ring↔planet path; spot lights have a
+  separate one-map path (next record).
+
+## Scene3D spot-light shadow mapping (2026-10-07)
+
+- **Purpose:** let a spot cone cast a real umbra — a `casts_shadow`
+  spot light renders the scene's casters once from its own position
+  through a cone frustum, so occlusion, not just cone attenuation,
+  decides which receivers take the light.
+- **Modules:** `native_scene3d.hpp` (`PointLight3D::casts_shadow`),
+  `native_scene3d.cpp` (validation), `native_scene3d_gpu.cpp` (shared
+  depth-atlas target + RenderGraph pass sharing the `scene3d_shadow`
+  pipeline and the lit pass's caster policy via a shared collection),
+  `scene3d.frag` (`spot_shadow_map` sampler at `set=2,binding=11`,
+  plus `spot_from_view`/`spot_options`/`spot_bounds` arrays in the
+  view uniform),
+  `scene_document.*` (`castShadow`/`shadowStrength`/`shadowSoftness`
+  keys), `runtime_host.cpp`, `app/engine_main.cpp` (`pointLights`
+  row's 14th/15th/16th CSV fields; `shadowNormalOffset` rides the
+  17th on both spot and omni rows).
+- **Public interface:** set `casts_shadow` on a `PointLight3D` with a
+  nonzero `spot_direction` (omni casters take the cube-atlas path in
+  the next record). Every shadowed spot shares one depth atlas — a
+  full-size map for a single light, a quadrant each when more than
+  one casts (up to the four point-light slots). `shadow_strength`
+  [0,1] blends the umbra like `ShadowMap3D::strength` (1 = full cut);
+  `shadow_softness` [0,8] scales the PCF penumbra like
+  `ShadowMap3D::softness`; `shadow_normal_offset` [0,8] lifts
+  receivers along their shading normal in map texels — the upload
+  carries a per-unit-distance world scale (perspective texel size
+  grows with depth) the shader multiplies by the fragment's light
+  distance before projecting. The cone frustum spans the authored outer
+  cone (clamped to ~150 degrees map fov) out to `range`.
+- **Shader contract:** `spot_options[i]` carries {texel, PCF radius,
+  strength, bias} per light index and `spot_bounds[i]` clamps each
+  sample to its atlas cell so out-of-cone fragments stay lit instead
+  of sampling a neighbour quadrant; `spot_advanced[i]` supplies the
+  per-unit-distance world lift the shader applies along the shading
+  normal before projecting. The point-light loop blends the
+  sampled visibility into each flagged light's window.
+- **Policies:** identical caster rules to the directional pass —
+  no transparent casters, `visible_range` culls, shared LOD pick,
+  collapsed groups cast one light-facing proxy, billboards face the
+  light, keep masks partition banded transitions. Low tier skips;
+  tier-scaled resolution (512/1024/2048); bias is texel-scaled
+  (perspective depth compresses distant differences, so a flat NDC
+  bias eats narrow umbras — slope bias handles the geometric term);
+  alpha-cutout casters share the directional pass's texel masking
+  (the shared `collect_casters` feeds both).
+- **Persistence:** `castShadow` document key round-trips on coned and
+  omni lights alike. `shadowStrength` round-trips and rejects
+  outside [0,1]; `shadowNormalOffset` round-trips and rejects
+  outside [0,8].
+- **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed vs
+  half-strength spot captures (`point-light-spot-noshadow/shadow/
+  softshadow.png`) with a lit-cone umbra census, right-of-umbra lit
+  check and a ~half-latency umbra texel probe; the tilted-receiver
+  `shadow_normal_offset` probe (`point-light-spot-off0/off8.png`)
+  asserts the authored lift translates the projected lookup — a move
+  no constant bias can produce; a two-spot atlas probe
+  (`point-light-spot2-*.png`) censuses both umbrae, a lit rim outside
+  them, and the second light's umbra through the single-map path;
+  `engine_scene3d` accepts two shadowed spots and out-of-range
+  `shadow_strength` rejections; `engine_project` parses,
+  round-trips and rejects `castShadow`/`shadowStrength`.
+- **Limitations:** the shared atlas halves per-light resolution once
+  a second spot casts (2048² → 1024² cells at Ultra).
+
+## Scene3D omni point-light cube shadows (2026-10-08)
+
+- **Purpose:** close the point-light shadow gap — an omni `PointLight3D`
+  flagged `casts_shadow` (no `spot_direction`) now casts a real umbra
+  in every direction instead of being rejected, so station bays,
+  explosion lights and unshadowed interiors can opt into occlusion.
+- **Modules:** `native_scene3d.cpp` (omni `casts_shadow` accepted),
+  `native_scene3d_gpu.cpp` (shared cube atlas target + `omni-shadow`
+  RenderGraph pass sharing the `scene3d_shadow` pipeline and the same
+  `collect_casters` evaluation the directional/spot paths memoize),
+  `scene3d.frag` (`omni_shadow_map` at `set=2,binding=14`, analytic
+  dominant-axis face selection + projective-depth rebuild, the
+  materials SSBO moved to binding 15 to keep samplers ahead of
+  storage), `scene_document.cpp` (`castShadow` parses without
+  `spotDir`), `app/engine_main.cpp` (`pointLights` row accepts the
+  `0,0,0,1,0` cone sentinel so shadow fields can follow an omni light).
+- **Public interface:** set `casts_shadow` on a `PointLight3D` with no
+  `spot_direction`. Each shadowed omni light owns a row of six
+  90-degree cube faces in a shared atlas — one row per light, up to
+  the four point-light slots — with cell resolution tier-scaled
+  (256/512/1024). `shadow_strength`/`shadow_softness` keep the spot
+  semantics; `shadow_normal_offset` lifts receivers along their
+  shading normal in map texels, scaled by the fragment's dominant-axis
+  (face) distance; `range` bounds the face frusta (0 → 4096 fallback
+  like the spot path).
+- **Shader contract:** `omni_options[i]` = {atlas texel width (>0
+  enabled), PCF radius in cell texels, umbra strength, depth bias};
+  `omni_atlas[i]` = {row v0, row v1, pn, pq} — the light's view-space
+  position already lives in `material.point_position[i]`, so the
+  receiver picks its face by the dominant axis of the offset and
+  rebuilds `ndc_z = pn + pq/t` with no per-face matrices riding the
+  uniform. Face cells bake their NDC offset into each face's
+  `light_mvp` exactly like spot quadrants. `omni_advanced[i]` carries
+  the per-unit-distance world lift for `shadow_normal_offset` — the
+  shader scales it by the fragment's dominant-axis face distance
+  before offsetting the receiver.
+- **Policies:** identical caster rules to the other depth passes —
+  transparents never cast, `casts_shadow`/`receives_shadow` opt-outs,
+  `visible_range` culling, shared LOD pick, collapsed-group proxies,
+  billboard-facing, keep-mask thinning, alpha-cutout texel masking.
+  Low tier skips the atlas; the memoized per-view caster evaluation
+  is shared, so each light's six collections only transform, volume
+  test and emit.
+- **Persistence:** `castShadow`/`shadowStrength`/`shadowSoftness`/
+  `shadowNormalOffset` round-trip with or without `spotDir`; the
+  `0,0,0,1,0` CSV sentinel keeps the editor row unambiguous.
+- **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed omni
+  captures (`point-light-omni-noshadow/shadow.png`) with the umbra
+  census and a lit-footprint non-vacuity check, the
+  `omni_shadow_casters` counter asserted non-zero, and a
+  `receives_shadow=false` fold-to-lit probe
+  (`point-light-omni-noreceive.png`); the tilted-receiver
+  `shadow_normal_offset` probe (`point-light-omni-off0/off8.png`)
+  asserts the authored lift translates the cube-face lookup;
+  `engine_scene3d` accepts a shadowed omni light; `engine_project`
+  parses + round-trips omni `castShadow`.
+- **Performance:** six depth collections per shadowed omni light
+  against the shared caster evaluation — a light near dense geometry
+  submits each caster into every face it crosses;
+  `Scene3DStatistics::omni_shadow_casters` audits the summed
+  submissions.
+- **Limitations:** face seams can alias at exact 45-degree splits
+  (standard cube-map behaviour, PCF stays inside the cell); faces are
+  view-space-locked, so map content rotates with the camera basis;
+  unbounded `range==0` lights cap the frusta at 4096 units.
+
+## Scene3D scene-level environment probe (2026-10-07)
+
+- **Purpose:** one shared equirect IBL probe per scene (a system view's
+  starfield) instead of every PBR material authoring its own map.
+- **Modules:** `native_scene3d.hpp` (`Scene3D::create` sixth parameter +
+  `environment()`), `native_scene3d_gpu.cpp` (env-slot fallback at draw
+  record + full-chain residency/streaming for the probe),
+  `scene_document.*` (top-level `environment` key), `runtime_host.cpp`,
+  `app/engine_main.cpp` (`environment` scene row).
+- **Semantics:** the probe fills the environment slot only for PBR
+  materials that opted in (`environment_strength > 0`) and authored
+  no `environment` map — authored maps always win, strength zero still
+  disables IBL, dielectrics keep requiring their own map.
+- **Persistence:** top-level `environment` string round-trips; absent
+  key means no probe (all prior documents load identically).
+- **Tests:** `native_scene3d_gpu` — red probe lights a mapless
+  opt-in material, authored green map wins over the probe, no probe +
+  no map stays dark (`pbr-ibl-none/scene/own.png`); `engine_scene3d`
+  accessor round-trip; `engine_project` `environment` key round-trip.
+- **Limitations:** static authored equirect — a captured bake
+  (`environmentCapture`) overrides it when enabled; no per-view probe
+  selection (the probe is scene state, not a render option).
+
+## Scene3D captured environment probe (2026-10-21)
+
+- **Purpose:** let opt-in PBR materials reflect the local scene (sun
+  disc, lit planets, nebulae) instead of only an authored starfield —
+  the renderer bakes a probe once per scene rather than every
+  reflective material authoring a fake map.
+- **Modules:** `native_scene3d.hpp` (`EnvironmentCapture3D` +
+  `Scene3D::create` eighth parameter + `environment_capture()` +
+  `Scene3DStatistics::probe_bakes`), `native_map_platform.hpp`
+  (`Scene3DView::probe_epoch`), `native_scene3d_gpu.cpp`
+  (`Storage::bake_probe` + epoch/weak-scene-keyed `probe_cache`),
+  `undo_history.hpp` (`revision()` mutation serial),
+  `scene_document.*` (`probeCapture`/`probeAnchor`/`probeResolution`
+  keys), `runtime_host.cpp` (`Impl::probe3` + `scene3_epoch`),
+  `app/engine_main.cpp` (preview create + `probeCapture` scene row,
+  editor case 75, epoch from `scene3_history.revision()`).
+- **Semantics:** when enabled the renderer renders six 90-degree face
+  views at the anchor through the full pipeline (lights, shadows,
+  emission volumes, authored env response on opt-in materials),
+  downloads each face, CPU-resamples into the equirect layout
+  `environment()` samples, and binds it as the scene env slot —
+  overriding the authored `environment` map for mapless opt-ins while
+  authored maps still win. On HDR-capable devices the faces download
+  the pre-tonemap RGBA16F target and encode RGBM (rgb*a*8 — up to 8x
+  display white survives), so a captured sun or emissive body keeps
+  real radiance headroom that specular reflection and bloom can pick
+  up; `RgbaImage::hdr_rgbm` marks the image and a per-draw
+  `env_flags` lane selects the decode, leaving authored maps literal.
+  Without float-target support the bake keeps the tonemapped UNORM
+  composite. The authored key light is rotated through
+  world space so all faces light identically. The bake caches once per
+  key: `probe_epoch == 0` keys on the scene instance (weak, so a freed
+  scene's probe can never alias), while a nonzero epoch keys on the
+  caller's declared generation — hosts that rebuild `Scene3D` per frame
+  pass a stable serial so one logical scene bakes once, and bumping it
+  (runtime document load, editor history commit/undo/redo/clear)
+  refreshes the probe.
+- **Validation:** `Scene3D::create` rejects non-finite anchors and
+  face resolutions outside [16,512]; the document codec applies the
+  same bound on parse.
+- **Performance:** one-shot cost — six small renders + readbacks at
+  first frame (default 128px faces, 256x128 out). Per-frame cost is
+  the same env-texture bind the authored path already pays. The
+  bake's texture/mesh uploads join the persistent cache counters
+  while per-frame stats (draw calls, casters) are restored so a bake
+  never inflates frame audit counters; `probe_bakes` is cumulative.
+- **Persistence:** `probeCapture` bool, `probeAnchor` [x,y,z] and
+  `probeResolution` keys round-trip; absent keys mean no capture
+  (prior documents load identically).
+- **Tests:** `native_scene3d_gpu` — a red emissive sphere behind the
+  camera dominates the +Z face; a mapless opt-in quad reflects red
+  with capture on but authored-map blue with capture off, and
+  `probe_bakes` advances exactly once (`pbr-probe-off/on.png`); the
+  HDR probe asserts an emissive-6 sun decodes brighter than an
+  authored clamped-white map can reflect (`pbr-probe-hdr/ldr.png`,
+  `probe_bakes_hdr` gates the strict margin on HDR-capable devices);
+  the
+  epoch probe rebuilds the scene thrice under one epoch and asserts a
+  single bake, then asserts a bumped epoch rebakes
+  (`pbr-epoch-*.png`); `engine_scene3d` rejects bad
+  anchors/resolutions and round-trips the struct; `engine_project`
+  round-trips the document keys and rejects out-of-range resolution;
+  `undo_history` asserts `revision()` is monotonic across
+  commit/undo/redo/clear.
+- **Limitations:** static snapshot per declared epoch — orbiting
+  emitters and camera-fit shadow chains keep their bake-time pose
+  until the caller bumps the epoch (no per-frame auto-refresh by
+  design); one probe per scene, no probe grid or per-instance
+  selection; equirect output is bilinear-resampled (roughness response
+  shares the authored path's box-mip prefilter, not a true GGX
+  convolution); RGBM quantizes radiance into 8x display white — a
+  sun brighter than that still clips, and authored env maps remain
+  8-bit by provenance; each bake downloads six faces synchronously —
+  a hitch when an epoch flips, so editors should bump it per commit,
+  not per frame.
+
+## Scene3D debug views, quality gates and distance culling (2026-09-25)
+
+- **Purpose:** close the remaining phase-2 polish items for the Scene3D
+  renderer — diagnostic shading for material/lighting review, complete
+  the quality-tier policy so expensive sampling degrades by tier, and
+  add per-instance distance culling as the first LOD-policy hook for
+  strategy-scale scenes.
+- **Modules:** `native_map_platform.hpp` (`DebugView3D` +
+  `RenderOptions3D::debug_view`), `native_scene3d.hpp`
+  (`MeshInstance3D::visible_range`/`visible_fade`/`casts_shadow`/
+  `receives_shadow`,
+  `Scene3DStatistics::visible_fades`), `native_scene3d.cpp`
+  (validation + cull in `prepare_instance3d`),
+  `native_scene3d_gpu.cpp` (per-view debug uniform, tier-gated samplers,
+  volume step caps, culled instances skip streamer demand, range-fade
+  keep mask, cast-opt-out caster filter, receive flag on
+  `shadow_radii.w`),
+  `scene3d.frag` (diagnostic shading branches),
+  `scene_document.*`/`scene_components.*` (`range`/`castsShadow`/
+  `receivesShadow` entity keys, `VisibleRange`/`NoShadow`/
+  `NoShadowReceive` components, `render.debug`),
+  `runtime_host.cpp`, `app/engine_main.cpp`.
+- **Public interfaces:** `DebugView3D` — Lit (default), Unlit, Albedo,
+  Normals, Roughness, Metallic, Emissive, LightingOnly, Lod, Residency,
+  Shadows — applies per view inside the production fragment path. `Lod` tints each
+  draw by its submitted LOD class (gray full mesh, blue→green→
+  yellow→orange ramp for chain levels 1–4+, magenta group proxy) so
+  `lodPixels`/`lodGroup` thresholds and transitions can be tuned
+  visually; a screen-door band shows its dithered member/proxy
+  partition with both shares lifted toward white, so an
+  in-transition draw reads differently from a hard LOD pick. `Residency` tints by the surface texture's resident base
+  mip (green full chain, lime→amber→orange→red deeper tails, magenta
+  pinned fallback when a bind is denied outright) so streamer budget
+  pressure is visible per object. Both share the `texture_options.w`
+  class lane — the per-view mode selects the meaning. `Shadows` shows
+  the key-light occlusion term as grayscale (analytic blockers × the
+  directional map's visibility, strength-blended) folded with the
+  product of spot depth-map terms, so authored `extent`/`bias`/
+  `strength` and each `casts_shadow` cone's footprint read as umbra
+  extent rather than darkened albedo.
+  `visible_range` = world-unit
+  camera distance beyond which the instance culls (bounding-sphere
+  surface distance; 0 = unlimited; validated finite ≥ 0 ≤ 1e12).
+  `visible_fade` [0,.5] = fraction of `range` ahead of the cull edge over
+  which the draw dithers out via the same screen-door mask as the LOD
+  crossfade — no alpha blending, no extra submission; the disappearance
+  distance is unchanged. Low tier and `visible_fade=0` keep the hard
+  cut; a LOD pair inside the band degrades to one thinned draw;
+  `visible_fades` audits thinned submissions.
+  `casts_shadow` = per-instance shadow-cast opt-out (default true):
+  false keeps an opaque mesh out of the directional and spot depth
+  passes so backdrop shells/markers stay lit-only; a collapsed LOD
+  group casts only when its representative member does.
+  `receives_shadow` = per-instance shadow-receive opt-out (default
+  true): false folds the key-light and shadowed-spot depth-map terms
+  to fully lit on this mesh (rides the free `shadow_radii.w` material
+  lane into `mix(1, lit, strength*receive)`), so self-lit markers and
+  UI shells ignore umbrae while still casting and still receiving
+  analytic ellipsoid/annulus blocker attenuation — which is a material
+  property, not the flag's business.
+  Quality gates: Low disables anisotropic + cubic-magnification sampling
+  and caps emission-volume ray marching at 16 steps; Medium caps at 32;
+  bloom remains Medium+, sharpen High+, MSAA Ultra.
+- **Persistence:** entity `range` key (`>0` only is serialized; negative
+  rejected) plus `visibleFade` [0,.5] map to the `VisibleRange` world
+  component — its codec carries a trailing f32 fade that legacy 4-byte
+  payloads decode as 0 (the hard cut they were authored with);
+  `castsShadow` (bool, serialized only when false) maps to the
+  `NoShadow` marker component and `receivesShadow` (same convention)
+  to `NoShadowReceive` — zero-byte payloads like `hidden`/`oneway`;
+  `render.debug` validates against the eleven mode names (`lod`/
+  `residency`/`shadows` map to `DebugView3D::Lod`/`Residency`/`Shadows`
+  — the LOD/residency class travels on the per-draw `texture_options.w`
+  lane).
+- **Editor:** Scene3D tool gains `debugView` (scene), `visRange`,
+  `visFade`, `castShadow` and `receivesShadow` (entity) rows driving
+  the real preview path.
+- **Tests:** `engine_scene3d` (range validation + `prepare_instance3d`
+  cull), `native_scene3d_gpu` (debug-view pixel probes per channel,
+  culled-instance accounting, Lod view: a collapsed group proxy covers
+  its merged footprint in magenta while a chain-substituted mesh tints
+  by level; a banded collapse shows the white-lifted transition tint on
+  both the member and proxy shares; Residency view: denied bind
+  magenta, mip-3 tail orange, mip-0 green; Shadows view: the mapped
+  umbra goes black against the lit receiver and both spot-atlas umbrae
+  darken while the lit rim stays white; a `receives_shadow=false`
+  receiver stays at its open value inside the same umbra footprint),
+  `engine_project` (document round-trip +
+  malformed rejection), `engine_world` (`VisibleRange`/`NoShadow`/
+  `NoShadowReceive` spawn/codec/
+  export round-trip), `engine_runtime`; range-fade census probe — a
+  sphere halfway through the band lights ~1/2 its pixels (798/1600)
+  vs the hard-cut control's full disc and a fully culled zero.
+- **Bug fix bundled:** `native_scene3d_gpu.cpp` streamer registration is
+  now owner-verified via `weak_ptr` — a new `RgbaImage` reusing a dead
+  image's address no longer inherits the stale `TextureId` (wrong mip
+  desc/residency → missing promotions, the intermittent
+  "Footprint growth did not promote the resident mip tail" failure).
+- **Limitations:** debug views are per-view diagnostics only —
+  `Residency` reports the surface texture's resident tail, not
+  secondary map residency or evicted-not-yet-rebound states;
+  `visible_range` is distance culling, not
+  geometric LOD/impostors; LightingOnly divides by sampled albedo so
+  untextured surfaces clip to black.
+
+## Scene3D PBR/post/lighting overhaul (2026-09-25)
+
+- **Purpose:** extend the generic Scene3D renderer from a directional-only
+  diffuse path into a physically plausible material/post/lighting stack
+  for space-strategy consumers — ship/station metals, emissive windows
+  and colony lights, environment response, atmosphere limbs, HDR
+  post-processing and quality tiers — without a game-specific renderer
+  and without touching authored art.
+- **Modules:** `engine/include/stellar/engine/native_scene3d.hpp`
+  (`PbrSurface3D`, `Atmosphere3D`, `PointLight3D`, `Material3D`
+  extensions), `engine/include/stellar/engine/native_map_platform.hpp`
+  (`RenderOptions3D` on `Scene3DView`), `engine/src/native_scene3d.cpp`
+  (validation/budgets), `engine/src/native_scene3d_gpu.cpp` (HDR mip
+  chain, MSAA, extra samplers, per-view options), shaders
+  `scene3d.frag`/`tonemap.frag` + regenerated
+  `src/generated/scene3d_shaders.hpp`, `scene_document.*`,
+  `scene_components.*`, `runtime_host.cpp`, `app/engine_main.cpp`.
+- **Public interfaces:** `Material3D::pbr` (scalar metallic/roughness
+  plus optional metallic-roughness map, emissive map × `emissive_tint` ×
+  `emissive_strength` with `night_emissive` nightside gate, equirect
+  `environment` map with `environment_strength` driving dielectric
+  diffuse irradiance + roughness-mapped mip-prefiltered specular
+  response, split energy-conserving: the specular fresnel share is
+  subtracted from the diffuse irradiance term), `Material3D::atmosphere`
+  (wavelength-tinted `(1-N·V)^power` limb scattering, day-side weighting,
+  `night_floor`, opt-in `sunset`/`sunset_strength` terminator tint — the
+  rim blends toward a transmitted dusk color where limb meets
+  terminator), `alpha_threshold` cutout, `texture_tiling`;
+  `Scene3D::create(...)` accepts up to
+  `maximum_scene3d_point_lights` = 4 `PointLight3D`s (position/color/
+  intensity/range, windowed inverse-square with hard cutoff — range 0 =
+  unbounded; `spot_direction`+`spot_inner`/`spot_outer` cosines gate
+  any of them to a smooth spot cone — zero direction stays omni);
+  `RenderOptions3D` per view — `quality` (Low/Medium/High/
+  Ultra), `exposure`, `bloom`/`bloom_threshold` (HDR mip-chain bloom
+  that lifts alpha so halos composite over background), `contrast`,
+  `saturation`, `sharpen`, `vignette` (post-tonemap corner falloff —
+  free multiply, so all tiers keep it). Ultra requests 4x MSAA when
+  the device supports it; Low runs tonemap-only.
+- **Persistence:** `Scene3dDocument` gains per-entity material fields
+  (`metallic`, `roughness`, `metallic_roughness`, `emissive*`,
+  `environment*`, `alpha_cutout`, `uv_tile_*`, `atmo_*`), scene
+  `point_lights[]` and a `render` block; unknown quality tiers,
+  over-budget point lights and malformed arrays are rejected; unset
+  fields keep neutral defaults so existing documents load unchanged.
+  `MaterialPbr`/`AtmosphereShell` components snapshot/restore through
+  the world codec; `spawn_scene3d`/`scene3d_from_world` round-trip them;
+  `RuntimeHost` maps them onto `Material3D`, `PointLight3D` and
+  `Scene3DView::options`.
+- **Editor:** the engine-shell Scene3D tool exposes the new fields —
+  entity rows for PBR maps/scalars, emissive tint/strength/night gate,
+  environment, cutout, tiling, atmosphere tint/params; scene rows for
+  exposure, bloom, grading, quality tier and point-light entry
+  (pos/color/intensity/range + optional spot cone tail); the preview
+  renders through the same `Scene3D` path as `RuntimeHost`.
+- **Tests:** `engine_scene3d` (validation rejects for out-of-range
+  metallic/roughness/emissive/environment/atmosphere/cutout/tiling and
+  point-light count/fields), `native_scene3d_gpu` (pixel probes:
+  emissive map masking, metallic specular tinting + off-axis diffuse
+  loss, alpha cutout, UV tiling, IBL response, point-light
+  color/falloff/range, atmospheric limb + day weighting, exposure,
+  bloom spread, Low-tier gating, MSAA, spot cone axis/penumbra/
+  behind-cone and omni-restore probes), `engine_project` (document
+  round-trip + malformed rejection), `engine_world` (component spawn/
+  codec/export round-trip), `engine_runtime`.
+- **Save/performance impact:** +2 texture slots per material
+  (metallic-roughness, emissive) +1 shared environment sampler managed
+  by the same streamer/budgets; HDR mip chain adds ~33% of target bytes
+  only when bloom is on; MSAA 4x is Ultra-only and device-gated; PBR
+  environment/emissive/atmosphere fields are opt-in (zero-strength
+  defaults) so existing content renders identically.
+- **Limitations:** (superseded 2026-10-07 — the directional shadow map
+  and one `casts_shadow` spot cone now land real depth-map shadows; see
+  the newer records.) Point lights are capped at 4; atmosphere is a limb
+  approximation (no multi-scatter); bloom mips are box-blitted (no
+  wide-kernel polish); environment IBL is a single shared equirect per
+  material, not probes; Low tier disables bloom/sharpen rather than
+  degrading them; editor preview debug-view modes landed in the
+  follow-up record above.
 
 ## Native missions panel integration (2026-09-24)
 
@@ -1097,6 +2021,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
 - **Mesh sources:** `MeshRef::spec` accepts `box[:sx,sy,sz]` and
   `annulus:inner,outer[,segments]` primitives
   (native_geometry3d.hpp), `sphere[:cols,rows]` (`Mesh3D::uv_sphere`),
+  `card[:w,h]` (`Mesh3D::billboard_card` — a camera-facing quad for
+  impostor/marker use),
   or a content-relative `.obj` path loaded through `ContentResolver`
   (cooked bytes or loose file) by `load_obj_mesh` — a minimal Wavefront
   OBJ parser (v/vn/vt/f, fan triangulation, generated flat normals).
@@ -2073,7 +2999,7 @@ static portraits and the policy against added cloud layers remain unchanged.
   resource generation is deterministic; GPU submission stays on the owner thread.
 - **Performance:** no additional targets or passes; optical maps share the
   existing 128-entry/192 MiB texture budget, checked across all views before upload.
-  Optical pixels use bounded environment cone filtering; disabled materials skip it.
+  Optical pixels use the prefiltered environment mip chain (roughness-mapped lod); disabled materials skip it.
 - **Tests:** actual `native_scene3d_gpu` checks Fresnel, Snell bending, absorption,
   frost, GGX roughness, invalid optics and reuse; small-body tests cover real
   material integration, elongated forms and inclined chart-band alignment.
@@ -3711,7 +4637,7 @@ meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
 | 2 | Simulation scheduler + LOD | PARTIAL — `StrategicClock`, frame routing | **ENGINE-COMPLETE + LIVE CONSUMER** — `SimulationScheduler`/`SimulationExecutor`: tier policies (ACTIVE/NEARBY/DORMANT…), cadence, deterministic ordering, dormant analytic skip, budget-capped deferred execution, event/dirty wakes, versioned capture/restore. `GalaxySimulationStepCoordinator` runs the 12 step phases as Active-tier executor tasks dependency-chained in historical order (`campaign_coordinator_parity` verifies identical behavior). Phase tier demotion and parallel waves are future tuning, not yet enabled. | `engine/…/simulation_scheduler.hpp`, `simulation_executor.hpp` | `simulation_scheduler`, `simulation_executor`, `campaign_coordinator_parity` |
 | 3 | Job/threading system | PARTIAL — FIFO+futures | **ENGINE-COMPLETE + LIVE CONSUMERS** — priorities, cooperative cancellation, dependency graphs, named workers, per-tag stats, error propagation. All app/core/engine `std::async` sites migrated: save-writer (`PlayerCampaignSaveController`), image preparation, audio director, territory overlay, planet-material decode queue (`MaterialCache` — persistent tagged worker replacing a fresh thread per decode; `job_stats()` exposes per-tag counts), support-bundle export, and campaign-session load. Voice synthesis keeps a dedicated COM-initialized thread (SAPI apartment requirement). | `engine/…/foundation.hpp`, `foundation.cpp` | `job_system` |
 | 4 | Render graph | MISSING | **ENGINE-COMPLETE + LIVE CONSUMER** — `RenderGraph`: pass/resource declarations, single-writer validation, dependency+ordering edges, deterministic topological order. `native_scene3d_gpu` declares its per-frame resources (HDR scene target, color, depth) and passes (scene3d, tonemap — disabled without float-target support), compiles the DAG and executes passes in graph order; compile failure aborts the frame. | `engine/…/render_graph.hpp`, `native_scene3d_gpu.cpp` | `render_pipeline`, `native_scene3d_gpu` |
-| 5 | GPU-driven rendering | MISSING | **PARTIAL + LIVE CONSUMER** — `DrawBatcher`: stable opaque (layer,material,mesh) batching, back-to-front transparent sort, culling hooks. `native_scene3d_gpu` interns each draw's full GPU binding key (mesh + all eight bound textures + sampler/pipeline flags) into `material_id`/`mesh_id`, submits `DrawItem`s, and executes the emitted `DrawBatch` runs as instanced `SDL_DrawGPUIndexedPrimitives` calls with `first_instance` indexing SSBO uniform arrays — identical objects merge into one draw call. True indirect draw still requires an SDL_GPU follow-on. | `engine/…/draw_batcher.hpp`, `native_scene3d_gpu.cpp` | `batcher_ui`, `native_scene3d_gpu` (instanced-draw + pixel assertions) |
+| 5 | GPU-driven rendering | MISSING | **PARTIAL + LIVE CONSUMER** — `DrawBatcher`: stable opaque (layer,material,mesh) batching, back-to-front transparent sort, culling hooks. `native_scene3d_gpu` interns each draw's full GPU binding key (mesh + all eight bound textures + sampler/pipeline flags) into `material_id`/`mesh_id`, submits `DrawItem`s, and executes the emitted `DrawBatch` runs as instanced `SDL_DrawGPUIndexedPrimitives` calls with `first_instance` indexing SSBO uniform arrays — identical objects merge into one draw call. `SDL_DrawGPUIndexedPrimitivesIndirect` exists in the vendored SDL3, but it only merges batches sharing bound state — per-batch sampler binds mean the real enabler would be a texture-array/bindless surface set, so CPU-submitted draws stay the bound. | `engine/…/draw_batcher.hpp`, `native_scene3d_gpu.cpp` | `batcher_ui`, `native_scene3d_gpu` (instanced-draw + pixel assertions) |
 | 6 | Texture streaming | PARTIAL — bounded LRU caches, sync decode | **ENGINE-COMPLETE + LIVE CONSUMER** — `TextureStreamer`: mip residency, priorities, VRAM budget, pin/evict, per-frame load queue. `native_scene3d_gpu` registers each bound texture with real per-mip bytes (cooked/BC1/RGBA paths), declares the frame's demand with camera-distance priority during `prepare()`, applies the streamer's residency changes by granularity (demotions/promotions re-upload the new resident tail; denials evict), and uploads lazily on re-admission; `Window::set_scene3d_texture_budget` retunes the budget at runtime. **Per-mip partial residency + screen-footprint LOD are live**: requests carry a desired mip derived from the projected bounding-sphere footprint (perspective/ortho focal × mesh radius — the sampler never reaches finer levels, so tails upload only what this frame needs; `anisotropic_texture` materials keep full chains since the flag declares high-frequency content), a denied request degrades to the coarsest mip tail that fits (`streamed_partial_binds` counts tail binds; RGBA tails CPU-box-downsample the base, cooked/BC1 tails upload level ranges), and only a fully denied bind serves the pinned white fallback (`streamed_fallbacks`). Environment/optics/shadow maps inherit the surface footprint estimate — a heuristic, not a per-UV density analysis. | `engine/…/texture_streaming.hpp`, `native_scene3d_gpu.cpp`, `native_map_platform.*` | `render_pipeline`, `native_scene3d_gpu` (budget-pressure eviction + degraded-tail + fallback pixel assertions) |
 | 7 | Shader library + cache | MISSING — SDL built-ins only | **ENGINE-COMPLETE (management layer)** — `ShaderLibrary`: families, canonical variant keys, artifact hashes, version invalidation, diagnostics. Consumption pending SDL_GPU pipeline. | `engine/…/shader_library.hpp` | `render_pipeline` |
 | 8 | Particle/VFX framework | MISSING — procedural flares | **ENGINE-COMPLETE** — `VfxSystem`: data-driven emitters, deterministic per-instance RNG pools, gravity/integration, LOD rate scaling, curve-driven scale/opacity/tint. RuntimeHost steps it in sim time and renders particles as camera-transformed tinted rects; host.spawn_emitter supports entity attachment with auto-stop on death (generated starter trails embers from its spark). Flare migration pending. | `engine/…/vfx.hpp`, `vfx.cpp` | `render_pipeline` |
