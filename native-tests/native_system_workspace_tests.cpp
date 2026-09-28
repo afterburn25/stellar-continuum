@@ -195,6 +195,14 @@ int main(int argc,char**argv)try{
   (void)artwork_ui.handle({InputEventType::Wheel,star_position,{},1000},1280,720);
   legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
   require(artwork_ui.viewport()->scale==55.f&&observed_radius<=350.f&&observed_radius>=300.f,"Maximum system zoom invalid: scale="+std::to_string(artwork_ui.viewport()->scale)+" star radius="+std::to_string(observed_radius));
+  {
+    const auto photosphere=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.limb_darkening>0;});});
+    require(photosphere!=legacy_draw.world.end(),"Spectral Sol emitted no limb-darkened photosphere");
+    const auto&star_material=std::get<Scene3DView>(*photosphere).scene->instances().front().material;
+    require(star_material.limb_darkening_q>0&&star_material.limb_darkening_mid>0,"Photosphere lost its three-term limb profile");
+  }
   legacy.stellar_object=generate_stellar_physics(1,StellarObjectType::OHotBlueStar);
   artwork_ui.refresh(legacy);observed_art.clear();legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
   require(observed_art=="o-hot-blue","Physical stellar identity must take precedence over legacy class");
@@ -209,6 +217,17 @@ int main(int argc,char**argv)try{
     const auto value=static_cast<StellarClass>(spectral);
     const auto art=stellar::native_stellar::observed_stellar_artwork(SystemSurveyLevel::fully_surveyed,std::nullopt,value);
     require(art.has_value()==(value!=StellarClass::Protostar),"Legacy stellar class lost its supplied artwork mapping");
+  }
+  {
+    legacy.stellar_object.reset();legacy.primary_stellar_class=StellarClass::BlackHole;
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto disc_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(disc_view!=legacy_draw.world.end(),"Black-hole primary emitted no beamed accretion disc");
+    const auto&disc_material=std::ranges::find_if(std::get<Scene3DView>(*disc_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
+    require(disc_material.texture&&disc_material.texture->height()==64,"Accretion disc did not bake its spiral-arm texture");
+    require(disc_material.orbital_beaming_tint>0,"Accretion disc lost its paired doppler tint");
   }
   // Read-only preparation is bound to the exact admitted body and observer.
   NativeSystemWorkspace preparation_ui;
