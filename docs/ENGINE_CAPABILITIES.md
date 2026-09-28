@@ -64,6 +64,69 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Autonomous warfare coordination (2026-09-28)
+
+- Purpose: close the organic-war gap — diplomacy recorded first contacts and
+  combat incidents, but no civilization ever declared war because nothing
+  converted strategic knowledge into canonical diplomacy/military commands.
+- Modules: new `core/src/warfare_coordination.cpp` +
+  `core/include/stellar/core/warfare_coordination.hpp`
+  (`WarfareCoordinator`, `WarfareWorldView`, `WarfareStepResult`), invoked
+  each step by `IntegratedAdaptiveCampaignRuntime::advance` immediately
+  after `DiplomacyCampaignRuntimeCoordinator::process` so decisions observe
+  the freshest contacts and combat-incident relationship changes.
+- Public interfaces:
+  `WarfareCoordinator::advance(WarfareWorldView, DiplomacyCampaignRuntimeCoordinator&, diplomacy_tick)`
+  returning per-step counts (`trespasses_recorded`, `wars_declared`,
+  `engagement_orders`, `deployment_orders`); the result is surfaced on
+  `IntegratedAdaptiveCampaignStepResult::warfare` and the advance trace.
+- Behavior: for every AI-controlled civilization (player civs excluded via
+  `campaign_civilization_control`), on a per-civ review cadence — each
+  civilization reviews once per 7000-tick interval (~7 days), phase-shifted
+  by `id * 997` so reviews spread across the interval:
+  - Identified foreign military presence inside colony systems records a
+    canonical `record_trespass` diplomatic event.
+  - Offensive review builds `KnownCivilization` knowledge from the
+    diplomacy view (trust, borders measured as colony-system distance ≤
+    120 ly — just under the default 135 ly fleet sensor range — and
+    active peace/non-aggression/cooperation pacts) and fleet-power
+    observations in `combat_intelligence`; unobserved counterparts get a
+    neutral-strength prior at 0.10 confidence so
+    `StrategicDecisionEvaluator::evaluate_war` prices the uncertainty
+    instead of silently skipping war evaluation.
+  - A `recommend_war` result issues `ObserverDiplomacyCommandService::
+    declare_war` — the same command a player issues — terminating
+    agreements, denying access and recording the `war_declared` event.
+    At most one declaration per civilization per review tick.
+  - Every tick, armed fleets of at-war civilizations receive canonical
+    `CombatCommandRuntime::issue_engage_hostiles` orders when a hostile
+    fleet shares their system, and idle armed fleets route toward the
+    nearest hostile-occupied system via `assess_operational_reach` +
+    `assign_fleet_route` (`InterstellarMissionKind::MilitaryDeployment`).
+- Consumers: `IntegratedAdaptiveCampaignRuntime` — the headless campaign
+  host and all adaptive-campaign consumers gain organic wars; downstream
+  `CombatSimulation`/`CombatDiplomacyBridge` handle engagement and the
+  combat→diplomacy incident feedback unchanged.
+- Determinism: civilization, contact, intruder and fleet iteration are all
+  stable-id ordered; target tie-breaks use distance then lowest system id;
+  no unordered iteration reaches decisions or the journal.
+- Save/performance impact: none — the coordinator retains no state between
+  advances; `DiplomacyRuntimeSchedule` already covers diplomacy clocks and
+  combat orders persist in `FleetState::combat`. Per-tick cost is O(civs ×
+  identified contacts + armed fleets); war declaration cadence is bounded.
+- Tests: `warfare_coordination` — five scenarios on a synthetic world:
+  aggressive border contact declares war via the observer command and the
+  relationship transitions to `at_war`; a passive contact under identical
+  geometry does not; a co-located at-war fleet receives an `Attack` order;
+  an idle at-war fleet routes toward the nearest hostile system; foreign
+  military presence records a trespass.
+- Limitations: wars are currently durable — no autonomous peace/ceasefire
+  proposal-response loop yet (`peace_offer`/`ceasefire_offer` exist but
+  need a recipient-side evaluation pass); military estimates without
+  scanner research use a deliberately uncertain prior rather than real
+  intel; engagements only occur where fleets co-locate — there is no
+  operational war plan (no concentration, retreats, or orbital assault).
+
 ## Autonomous colony settlement completion (2026-09-28)
 
 - Purpose: close the last gap in the organic expansion chain — AI colony

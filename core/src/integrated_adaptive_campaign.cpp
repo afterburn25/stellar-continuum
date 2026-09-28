@@ -1,5 +1,6 @@
 #include <stellar/core/integrated_adaptive_campaign.hpp>
 
+#include <stellar/core/campaign_civilization_control.hpp>
 #include <stellar/core/campaign_event_history.hpp>
 
 #include <algorithm>
@@ -82,7 +83,8 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
   // eviction can't re-record already-chronicled entries.
   bool chronicle_diplomacy_backfill_done{};
   bool profiling_enabled{};
-  std::array<stellar::engine::PerformanceCounter,4> performance{};
+  std::array<stellar::engine::PerformanceCounter,5> performance{};
+  WarfareCoordinator warfare{};
 
   Storage(AdaptiveResearchStrategicRuntime runtime, FreshCampaignState campaign,
           DiplomacyState diplomacy_state,
@@ -158,7 +160,7 @@ std::vector<CampaignPerformanceSample> IntegratedAdaptiveCampaignRuntime::perfor
   std::vector<CampaignPerformanceSample> result;
   for(std::size_t i=0;i<GalaxySimulationStepCoordinator::phase_names.size();++i)
     result.push_back({GalaxySimulationStepCoordinator::phase_names[i],storage_->core.performance_counters()[i]});
-  constexpr std::array<std::string_view,4> names{"core_total","sensor_contacts","adaptive_research","diplomacy"};
+  constexpr std::array<std::string_view,5> names{"core_total","sensor_contacts","adaptive_research","diplomacy","warfare"};
   for(std::size_t i=0;i<names.size();++i)result.push_back({names[i],storage_->performance[i]});
   return result;
 }
@@ -284,6 +286,20 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   timing.finish(storage_->performance[3]);
   if (trace)
     trace->diplomacy = result.diplomacy;
+  {
+    auto &campaign = storage_->world.campaign();
+    result.warfare = storage_->warfare.advance(
+        {campaign.systems, campaign.civilizations, campaign.colonies,
+         campaign.fleets, campaign.combat_intelligence,
+         storage_->world.lanes(),
+         campaign_civilization_control(campaign)},
+        storage_->diplomacy_runtime, result.diplomacy.tick,
+        DiplomacyCampaignClock::from_simulation_days(
+            std::max(elapsed_days, 0.0)));
+  }
+  timing.finish(storage_->performance[4]);
+  if (trace)
+    trace->warfare = result.warfare;
   // Diplomatic journal entries emitted by this step's process() join
   // the chronicle too — the journal is authoritative, the watermark
   // keeps each entry recorded exactly once across advances and loads.
