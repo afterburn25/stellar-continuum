@@ -102,6 +102,35 @@ open renderer/core needs stay filed in
 [GAME_VISUAL_ENGINE_REQUESTS.md](GAME_VISUAL_ENGINE_REQUESTS.md). Suite: 327/327;
 live smokes green at every quality tier and both density extremes.
 
+Hardening contracts added late in the workstream that future changes must
+preserve:
+
+- `ImagePreparationQueue` consumers all follow the poll() convention — every
+  owner of a submitted ticket drains it per frame even while its view is
+  undrawn (`scene()` calls `galaxy_assets_`, `stellar_art_`, `planet_discs_`,
+  `small_body_assets_`, `system_background_`, `phenomena_` polls plus
+  `eruption_art_.begin_frame()`; `celestial_appearance_` cancels on workspace
+  close). A stranded completed ticket holds its byte reservation forever and
+  can starve a full-cap request (this was the `--developer-smoke` `sky=0`
+  failure). `artwork_status()` reports `queue=<jobs>/<bytes>` for diagnosis.
+- The frame-level 3D render-target budget
+  (`maximum_scene3d_target_bytes`, 128 MiB) is enforced by staged emission:
+  `scene_content` renders content views first, then commits the staged
+  backdrop in 3D only when the whole frame fits; otherwise dome + nebula
+  volume re-emit through authored 2D paths (flat `Image` with
+  crop/roll/mirror/blend/tint for the dome, composite sprite for the
+  volume). At 2560×1440 a fullscreen HDR target is ~59 MiB, so the gate
+  engages there. Smoke assertions must accept the flat fallback only when
+  the budget genuinely requires it.
+- Fixture hazards for smoke runs: stale `.bak`/`.integrity` sidecars beside
+  `--save-path` make the loader silently recover the previous save — delete
+  them when swapping fixtures; saves authored before `GenerationMetadata`
+  carry the key as null (the replay observer guards `is_object()`).
+- `--record`/`--replay`/`--replay-info`/`--replay-until`/`--replay-exit`
+  verified end-to-end including the divergence negative path (section-
+  localizing failure + leaf diff); the dated receipt lists every flag-legal
+  smoke/check/profile combination and the fixture each needs.
+
 **Space-strategy specialization (branch
 `engine/space-strategy-simulation-specialization`):** Stellar Engine is being
 specialized into a space strategy/simulation engine — see
