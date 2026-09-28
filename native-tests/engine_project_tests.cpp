@@ -442,6 +442,7 @@ int main() {
     cube.terminator_wrap = 0.4f;
     cube.limb_darkening = 0.6f;
     cube.limb_darkening_q = 0.35f;
+    cube.limb_darkening_mid = 0.25f;
     cube.band_shear = -0.25f;
     cube.band_waves = 0.6f;
     cube.band_drift = 0.08f;
@@ -606,6 +607,7 @@ int main() {
                 rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
                 rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f &&
                 rc.limb_darkening_q == 0.35f &&
+                rc.limb_darkening_mid == 0.25f &&
                 rc.band_shear == -0.25f && rc.band_waves == 0.6f &&
                 rc.band_drift == 0.08f && rc.band_turbulence == 1.25f &&
                 rc.orbital_beaming == 0.7f &&

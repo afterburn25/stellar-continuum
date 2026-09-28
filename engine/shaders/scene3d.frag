@@ -59,7 +59,7 @@ struct Material {
     vec4 atmo_sunset; // terminator-transmitted tint rgb, blend strength
     vec4 env_flags; // x: bound environment map is RGBM-encoded HDR
     vec4 drift_options; // x: latitude-differential drift fraction
-    vec4 scatter_options; // x: HG secondary-lobe asymmetry, y: secondary-lobe weight
+    vec4 scatter_options; // x: HG secondary-lobe asymmetry, y: secondary-lobe weight, z: three-term limb coefficient
 };
 layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
@@ -800,14 +800,17 @@ void main() {
     // edge (Sun u ~= 0.6), so HDR photosphere discs keep a physical
     // profile instead of clipping flat. anim_options.w adds the standard
     // quadratic term q·(1-μ)² (transit-photometry two-parameter law),
-    // steepening the very edge while mid-disc stays untouched; the
-    // product clamps at zero so aggressive coefficients never invert.
+    // steepening the very edge while mid-disc stays untouched, and
+    // scatter_options.z adds the Sing three-parameter law's mid-curve
+    // term m·(1-μ^{3/2}) — a shallower falloff reaching further inward
+    // for photospheres that flatten before the rim; the product clamps
+    // at zero so aggressive coefficients never invert.
     // The geometric normal decides the profile — normal-mapped detail
     // is not limb darkening. The additive atmosphere rim below is
     // exempt: it is a scattering shell, not the photosphere.
-    if(material.response_options.w>0.0||material.anim_options.w>0.0){
+    if(material.response_options.w>0.0||material.anim_options.w>0.0||material.scatter_options.z>0.0){
         float limb_mu=clamp(dot(normalize(view_normal),V),0.0,1.0);
-        result*=max(1.0-material.response_options.w*(1.0-limb_mu)-material.anim_options.w*(1.0-limb_mu)*(1.0-limb_mu),0.0);}
+        result*=max(1.0-material.response_options.w*(1.0-limb_mu)-material.anim_options.w*(1.0-limb_mu)*(1.0-limb_mu)-material.scatter_options.z*(1.0-pow(limb_mu,1.5)),0.0);}
     // Orbital beaming: a first-order doppler asymmetry for material
     // orbiting local +Y — radiance scales by 1 + s*(v.V) where v is the
     // tangential velocity. Face-on discs stay symmetric (v ⟂ view);

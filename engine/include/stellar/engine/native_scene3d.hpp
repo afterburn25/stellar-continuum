@@ -254,6 +254,12 @@ struct Material3D {
   // steepens the falloff at the very edge without touching mid-disc.
   // [0,1]; 0 keeps the single-coefficient linear profile.
   float limb_darkening_q{};
+  // Three-term limb-darkening coefficient: the Sing et al. nonlinear
+  // law's mid-curve term 1 - m(1-μ^{3/2}) — a shallower falloff that
+  // reaches further into mid-disc than the quadratic edge term, for
+  // photospheres whose measured profile flattens inward of the rim.
+  // [0,1]; 0 keeps the two-term profile.
+  float limb_darkening_mid{};
   // Differential rotation for banded bodies (gas giants): a latitude-
   // weighted longitude shear `u += s·cos(2πv)` applied to every equirect
   // surface sample — authored bands bow symmetrically equator vs poles,

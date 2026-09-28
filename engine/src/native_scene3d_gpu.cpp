@@ -699,10 +699,12 @@ struct Scene3DRenderer::Storage {
         // the volume branch, so the lane is free for volume materials.
         fragment.atmo_shape[2]=e.volume_scatter;}
       fragment.atmo_shape[3]=material.forward_scatter;
-      // Two-term HG rides its own lane: x = secondary-lobe asymmetry,
-      // y = secondary-lobe weight (0 keeps the single-lobe phase).
+      // Secondary terms ride one lane: x = HG secondary-lobe
+      // asymmetry, y = secondary-lobe weight (0 keeps the single-lobe
+      // phase), z = three-term limb-darkening mid-curve coefficient.
       fragment.scatter_options={material.forward_scatter_back,
-                                material.forward_scatter_back_mix,0.f,0.f};
+                                material.forward_scatter_back_mix,
+                                material.limb_darkening_mid,0.f};
       if((material.surface_effect&&material.surface_effect->volume_depth>0.f)||material.orbital_beaming!=0.f){
         // Model transforms use uniform scale and an orthonormal rotation.
         // Invert their camera-relative matrix once per draw, not per

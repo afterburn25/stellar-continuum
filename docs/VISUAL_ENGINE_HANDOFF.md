@@ -50,6 +50,8 @@ m.surface_response->cloud_offset = {.1f,0}; // UV drift, each |≤2|
 m.terminator_wrap = 0.4f;                   // [0,1] wrap-diffuse softening
 m.limb_darkening = 0.6f;                    // [0,1] N.V radiance falloff
 m.limb_darkening_q = 0.2f;                  // [0,1] quadratic edge term
+m.limb_darkening_mid = 0.15f;               // [0,1] three-term mid-curve
+                                            // (1-μ^{3/2}) — reaches mid-disc
 m.band_shear = -0.2f;                       // [-0.5,0.5] latitude-weighted
                                             // longitude shear (giants)
 m.band_waves = 0.7f;                        // [0,1] zonal-jet harmonic
@@ -290,9 +292,12 @@ cone for a shadowed omni light so per-face caster scaling is visible
   identically to the key light, additional directionals and point
   lights; 0 is exact Lambert.
 - `limb_darkening` applies limb darkening `1 - u(1 - N·V) -
-  q(1 - N·V)²` to the body's outgoing radiance — `limb_darkening_q`
-  [0,1] adds the standard quadratic transit-law term that steepens the
-  very edge (Sun ≈ u 0.6); the product clamps at zero. So HDR emissive
+  q(1 - N·V)² - m(1 - (N·V)^{3/2})` to the body's outgoing radiance —
+  `limb_darkening_q` [0,1] adds the standard quadratic transit-law
+  term that steepens the very edge (Sun ≈ u 0.6) and
+  `limb_darkening_mid` [0,1] adds the Sing three-parameter law's
+  mid-curve term that reaches further into mid-disc; the product
+  clamps at zero. So HDR emissive
   star discs keep a physical edge instead of clipping
   flat. Applied after the cloud deck; the additive atmosphere rim is
   exempt. Uses the geometric normal, not normal-map detail.
@@ -588,9 +593,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   latitude-differential rotation and `band_turbulence`
   reshapes the warp over scene time, while volume
   `flow_rate` re-poses filaments without evolving their shape.
-- Limb darkening is the two-term linear+quadratic transit law
-  (`limb_darkening`/`limb_darkening_q`) — no three-term/nonlinear
-  coefficients or wavelength-dependent profiles.
+- Limb darkening is the three-term linear+quadratic+mid-curve law
+  (`limb_darkening`/`limb_darkening_q`/`limb_darkening_mid`) — no
+  four-term Claret coefficients or wavelength-dependent profiles.
 - `orbital_beaming` is a first-order brightness asymmetry — no doppler
   color shift, gravitational redshift, or lensing.
 - `accretion_disc_material3d` is an azimuthally uniform thin-disc

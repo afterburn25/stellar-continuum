@@ -238,6 +238,10 @@ struct Scene3dEntity {
   // Quadratic limb-darkening coefficient [0,1] — steepens the edge
   // falloff (two-term transit-photometry law); 0 keeps linear.
   float limb_darkening_q{0.f};
+  // Three-term limb-darkening coefficient [0,1] — the Sing nonlinear
+  // law's mid-curve (1−μ^{3/2}) term; reaches further into mid-disc
+  // than the quadratic edge term. 0 keeps the two-term profile.
+  float limb_darkening_mid{0.f};
   // Gas-giant differential rotation: latitude-weighted longitude shear
   // of every surface map sample, UV units [-0.5,0.5]; 0 = rectilinear.
   float band_shear{0.f};

@@ -2589,6 +2589,7 @@ int RuntimeHost::run() {
           inst.material.terminator_wrap = sf->terminator_wrap;
           inst.material.limb_darkening = sf->limb_darkening;
           inst.material.limb_darkening_q = sf->limb_darkening_q;
+          inst.material.limb_darkening_mid = sf->limb_darkening_mid;
           inst.material.band_shear = sf->band_shear;
           inst.material.band_waves = sf->band_waves;
           inst.material.band_drift = sf->band_drift;

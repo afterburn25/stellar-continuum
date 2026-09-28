@@ -130,6 +130,11 @@ int main()try{
   rejects([&]{auto i=instance;i.material.limb_darkening_q=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.limb_darkening_q=.4f;const auto quad=Scene3D::create(camera,{i});
    check(close(quad->instances()[0].material.limb_darkening_q,.4f),"Quadratic limb coefficient did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.limb_darkening_mid=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.limb_darkening_mid=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.limb_darkening_mid=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.limb_darkening_mid=.3f;const auto three_term=Scene3D::create(camera,{i});
+   check(close(three_term->instances()[0].material.limb_darkening_mid,.3f),"Three-term limb coefficient did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.band_shear=.6f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.band_shear=-.6f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.band_shear=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});

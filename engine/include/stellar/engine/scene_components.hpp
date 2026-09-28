@@ -217,6 +217,9 @@ struct MaterialSurface {
   // Quadratic limb-darkening coefficient [0,1] — the two-term law's
   // squared edge falloff; 0 keeps the linear profile.
   float limb_darkening_q{0.f};
+  // Three-term limb-darkening coefficient [0,1] — the Sing nonlinear
+  // law's mid-curve (1−μ^{3/2}) term; 0 keeps the two-term profile.
+  float limb_darkening_mid{0.f};
   // Equator-vs-pole drift differential [-8,8] — the zonal scroll gains
   // diff·cos²(latitude) so equatorial belts super-rotate; 0 is rigid.
   float band_diff{0.f};

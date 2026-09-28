@@ -2287,16 +2287,22 @@ void commit_scene3_field(Shell &shell) {
           std::istringstream csv(shell.scene3_buffer);
           std::vector<std::string> parts;
           while (std::getline(csv, part, ',')) parts.push_back(part);
-          if (parts.size() >= 1 && parts.size() <= 2) {
+          if (parts.size() >= 1 && parts.size() <= 3) {
             try { a = std::stof(parts[0]); valid = a >= 0.f && a <= 1.f; }
             catch (const std::exception &) { break; }
             if (!valid) break;
             next.limb_darkening = a;
-            if (parts.size() == 2) {
+            if (parts.size() >= 2) {
               try { a = std::stof(parts[1]); }
               catch (const std::exception &) { valid = false; break; }
               if (!(a >= 0.f && a <= 1.f)) { valid = false; break; }
               next.limb_darkening_q = a;
+            }
+            if (parts.size() == 3) {
+              try { a = std::stof(parts[2]); }
+              catch (const std::exception &) { valid = false; break; }
+              if (!(a >= 0.f && a <= 1.f)) { valid = false; break; }
+              next.limb_darkening_mid = a;
             }
           }
           break; }
@@ -2739,6 +2745,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       inst.material.terminator_wrap = e.terminator_wrap;
       inst.material.limb_darkening = e.limb_darkening;
       inst.material.limb_darkening_q = e.limb_darkening_q;
+      inst.material.limb_darkening_mid = e.limb_darkening_mid;
       inst.material.band_shear = e.band_shear;
       inst.material.band_waves = e.band_waves;
       inst.material.band_drift = e.band_drift;
@@ -3100,7 +3107,11 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         "wrap-diffuse 0..1 - 0 keeps Lambert");
   field(shell.hit3_limbdark, "limbDark",
         entity ? std::to_string(entity->limb_darkening) + "," +
-                     std::to_string(entity->limb_darkening_q)
+                     std::to_string(entity->limb_darkening_q) +
+                     (entity->limb_darkening_mid == 0.f
+                          ? ""
+                          : "," +
+                                std::to_string(entity->limb_darkening_mid))
                : "",
         ed(57),
         "limb darkening u 0..1[, quadratic q 0..1] - sun ~0.6");
@@ -7273,7 +7284,12 @@ int main(int argc, char **argv) {
               edit3(56, std::to_string(se->terminator_wrap));
             else if (shell.hit3_limbdark.contains(event.position) && se)
               edit3(57, std::to_string(se->limb_darkening) + "," +
-                            std::to_string(se->limb_darkening_q));
+                            std::to_string(se->limb_darkening_q) +
+                            (se->limb_darkening_mid == 0.f
+                                 ? ""
+                                 : "," +
+                                       std::to_string(
+                                           se->limb_darkening_mid)));
             else if (shell.hit3_lods.contains(event.position) && se) {
               std::string v;
               for (const auto &spec : se->lod_meshes) {

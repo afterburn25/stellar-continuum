@@ -211,7 +211,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   outgoing radiance (Sun ≈ 0.6) — the photosphere profile that keeps
   emissive star discs from clipping flat; `limb_darkening_q` [0,1] adds
   the standard quadratic term `q(1-μ)²` (two-parameter transit law),
-  steepening the very edge while mid-disc stays untouched — the product
+  steepening the very edge while mid-disc stays untouched, and
+  `limb_darkening_mid` [0,1] adds the Sing three-parameter law's
+  mid-curve term `m(1-μ^{3/2})` — a shallower falloff reaching further
+  inward for photospheres that flatten before the rim — the product
   clamps at zero so aggressive coefficients never invert. Applied after
   the cloud deck with the additive atmosphere rim exempt, on the
   geometric normal.
@@ -227,7 +230,7 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   analytic/shadow-map visibility as the surface.
 - **Persistence:** entity `surface` block `{normal, properties, cloud,
   normalStrength, relief, cloudOpacity, cloudAlbedo, cloudHeight,
-  cloudOffset:[x,y]}` plus flat `terminatorWrap`/`limbDarken`/`limbDarkenQ` round-trip
+  cloudOffset:[x,y]}` plus flat `terminatorWrap`/`limbDarken`/`limbDarkenQ`/`limbDarkenMid` round-trip
   through `Scene3dDocument`; `surface` requires at least one map and
   rejects out-of-range scalars. `MaterialSurface` component codecs the
   same fields (`cloud_height` tails the payload after the map strings so
@@ -244,25 +247,27 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `texture_options.z` carries the world-space height; 0 keeps the
   texture-space deck path untouched.
 - **Editor:** Scene3D tool entity rows `surfMaps`, `surfShape`,
-  `cloudDeck` (5th field = height), `termWrap`, `limbDark` (`u[,q]`)
+  `cloudDeck` (5th field = height), `termWrap`, `limbDark` (`u[,q[,m]]`)
   edit the live preview.
 - **Tests:** `native_scene3d_gpu` — deck compositing brightness,
   `cloud_albedo` scaling, wrap-diffuse lighting at the geometric
   terminator, wrap invariance at the fully lit pole, limb-darkened disc
   edge with unchanged centre, a quadratic-coefficient capture that
-  deepens the extreme limb while mid-disc stays untouched, and a
+  deepens the extreme limb while mid-disc stays untouched, a
+  three-term capture whose mid-curve coefficient dims mid-disc past
+  the quadratic profile, and a
   `cloud_height` capture showing
   limb-ring parallax against an unchanged disc centre; `engine_scene3d`
   — cloud-only acceptance + scalar bound rejects; `engine_project` —
   document round-trip + `surface`/`terminatorWrap`/`limbDarken`/
-  `limbDarkenQ`/`cloudHeight` rejections; `engine_world` — `MaterialSurface`
-  spawn/codec/export round-trips.
+  `limbDarkenQ`/`limbDarkenMid`/`cloudHeight` rejections; `engine_world` —
+  `MaterialSurface` spawn/codec/export round-trips.
 - **Limitations:** the deck remains a texture-space composite — the
   height term is a bounded parallax/shadow approximation, not a
   volumetric shell (no ray-marched interior, no per-layer thickness);
   wrap is a single-coefficient law and limb darkening stops at the
-  two-term quadratic model — no wavelength-dependent or three-term
-  (nonlinear) laws yet.
+  three-term model — no wavelength-dependent or four-term (Claret)
+  laws yet.
 
 ### Follow-up: `Material3D::band_shear` (same change set's successor)
 

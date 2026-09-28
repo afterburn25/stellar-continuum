@@ -238,8 +238,10 @@ partner casters; Low tier keeps the hard switch). Planet surface detail is lande
 `SurfaceResponse3D` is reachable from authored documents/components
 (any map subset), `cloud_albedo` turns the cloud map into a lit deck,
 and `terminator_wrap` applies wrap-diffuse to all light types.
-Limb darkening (`Material3D::limb_darkening` + `limb_darkening_q`,
-two-term `1 - u(1-μ) - q(1-μ)²` transit law) keeps
+Limb darkening (`Material3D::limb_darkening` + `limb_darkening_q` +
+`limb_darkening_mid`, three-term `1 - u(1-μ) - q(1-μ)² - m(1-μ^{3/2})`
+transit law — the Sing nonlinear mid-curve term reaches further into
+mid-disc than the squared edge term) keeps
 self-luminous star discs from clipping flat; `star_photosphere3d(kelvin)`
 + `starKelvin`/`StarPhotosphere` derive a full spectral-class star
 material (blackbody tint, emissive-dominant, temperature-graded limb

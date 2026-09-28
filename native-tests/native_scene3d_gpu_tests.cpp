@@ -439,6 +439,15 @@ int main(int argc,char** argv)try{
         "Quadratic limb darkening disturbed mid-disc");
     check(channel(*quad_disc,275,160,0)+8<channel(*limb_disc,275,160,0),
         "Quadratic limb darkening did not deepen the extreme edge");
+    // Three-term law: the (1-μ^{3/2}) mid-curve term reaches further
+    // into the disc than the squared edge term — mid-disc dims past
+    // the quadratic profile while the centre stays untouched.
+    star.material.limb_darkening_mid=.3f;
+    const auto mid_disc=capture({star},"star-limb-mid.png");
+    check(std::abs(channel(*mid_disc,160,160,0)-channel(*quad_disc,160,160,0))<=4,
+        "Three-term limb darkening changed the disc centre");
+    check(channel(*mid_disc,220,160,0)+5<channel(*quad_disc,220,160,0),
+        "Three-term limb darkening did not reach mid-disc");
     std::cout<<"limb_darkening_gpu=linear_quadratic_edge_passed\n";
   }
   surface.cloud_opacity=0;surface.properties=RgbaImage::create(1,1,{50,255,0,128});
