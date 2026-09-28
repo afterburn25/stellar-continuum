@@ -296,6 +296,13 @@ struct Material3D {
   // edge-on discs peak. Accretion discs, ring forward-scatter. [-1,1];
   // negative spins retrograde; 0 disables.
   float orbital_beaming{};
+  // Doppler color shift paired with the beaming asymmetry [0,1]:
+  // the approaching lane blueshifts (red depletes, blue gains) and the
+  // receding lane redshifts, scaled by the same v̂·V̂ alignment — a
+  // first-order spectral-shift approximation so accretion discs read
+  // hot-and-fast on the bright lane, cool on the dim one. 0 keeps the
+  // brightness-only asymmetry; no effect without orbital_beaming.
+  float orbital_beaming_tint{};
   // Henyey–Greenstein single-scatter phase: radiance scales by
   // (1−g²)/(1+g²+2g·(V̂·L̂))^(3/2), so g > 0 peaks the sheet when it is
   // backlit (dusty-ring forward scatter — Saturn E-ring look) with a

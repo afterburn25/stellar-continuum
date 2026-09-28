@@ -1601,6 +1601,16 @@ int main(int argc,char** argv)try{
     disc.material.orbital_beaming=0;disc.rotation=rotation_axis_angle({1,0,0},.55f);
     const auto disc_ref=capture({disc},"beam-off.png");
     check(channel(*disc_ref,30,160,0)==left_flat,"Beaming=0 did not restore the flat disc");
+    // Doppler tint: the brightened lane blueshifts (B−R rises) while
+    // the dimmed lane redshifts (B−R falls) vs the untinted beam.
+    disc.material.orbital_beaming=.9f;disc.material.orbital_beaming_tint=.5f;
+    const auto tinted_disc=capture({disc},"beam-tinted.png");
+    const int ul_r=channel(*beamed_disc,30,160,0),ul_b=channel(*beamed_disc,30,160,2);
+    const int ur_r=channel(*beamed_disc,290,160,0),ur_b=channel(*beamed_disc,290,160,2);
+    const int tl_r=channel(*tinted_disc,30,160,0),tl_b=channel(*tinted_disc,30,160,2);
+    const int tr_r=channel(*tinted_disc,290,160,0),tr_b=channel(*tinted_disc,290,160,2);
+    check(tl_b-tl_r>ul_b-ul_r+10,"Doppler tint did not blueshift the approaching lane");
+    check(tr_b-tr_r<ur_b-ur_r-10,"Doppler tint did not redshift the receding lane");
     std::cout<<"orbital_beam_gpu=tilt_asymmetry_faceon_symmetric_passed\n";
   }
   {

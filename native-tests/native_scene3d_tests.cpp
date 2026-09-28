@@ -164,6 +164,11 @@ int main()try{
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.orbital_beaming=.8f;const auto beamed=Scene3D::create(camera,{i});
    check(close(beamed->instances()[0].material.orbital_beaming,.8f),"Orbital beaming did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.orbital_beaming_tint=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.orbital_beaming_tint=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.orbital_beaming_tint=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.orbital_beaming_tint=.5f;const auto tinted=Scene3D::create(camera,{i});
+   check(close(tinted->instances()[0].material.orbital_beaming_tint,.5f),"Doppler beaming tint did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.forward_scatter=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.forward_scatter=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.forward_scatter=-.6f;const auto phased=Scene3D::create(camera,{i});

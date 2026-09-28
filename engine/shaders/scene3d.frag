@@ -59,7 +59,7 @@ struct Material {
     vec4 atmo_sunset; // terminator-transmitted tint rgb, blend strength
     vec4 env_flags; // x: bound environment map is RGBM-encoded HDR
     vec4 drift_options; // x: latitude-differential drift fraction
-    vec4 scatter_options; // x: HG secondary-lobe asymmetry, y: secondary-lobe weight, z: three-term limb coefficient
+    vec4 scatter_options; // x: HG secondary-lobe asymmetry, y: secondary-lobe weight, z: three-term limb coefficient, w: doppler beaming tint
 };
 layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
@@ -814,8 +814,13 @@ void main() {
     // Orbital beaming: a first-order doppler asymmetry for material
     // orbiting local +Y — radiance scales by 1 + s*(v.V) where v is the
     // tangential velocity. Face-on discs stay symmetric (v ⟂ view);
-    // edge-on discs peak. The atmosphere rim below stays exempt — it is
-    // a scattering shell, not orbiting surface material.
+    // edge-on discs peak. scatter_options.w adds the paired spectral
+    // shift: the approaching lane blueshifts (red depletes, blue
+    // gains) and the receding lane redshifts by the same signed
+    // alignment — a linear wavelength-shift approximation, clamped so
+    // a strong shift can deplete a channel but never invert it. The
+    // atmosphere rim below stays exempt — it is a scattering shell,
+    // not orbiting surface material.
     if(material.uv_options.z!=0.0){
         vec3 local=(material.effect_from_view*vec4(view_position,1.0)).xyz;
         float orbit_r2=local.x*local.x+local.z*local.z;
@@ -824,7 +829,10 @@ void main() {
             // stores the inverse model_view linear part, so its transpose
             // carries object-space directions back into view space.
             vec3 beam_v=transpose(mat3(material.effect_from_view))*vec3(local.z,0.0,-local.x);
-            result*=max(1.0+material.uv_options.z*dot(normalize(beam_v),V),0.0);
+            float lane=dot(normalize(beam_v),V);
+            result*=max(1.0+material.uv_options.z*lane,0.0);
+            float shift=material.uv_options.z*lane*material.scatter_options.w;
+            result*=max(vec3(1.0-shift,1.0,1.0+shift),0.0);
         }
     }
     // Henyey–Greenstein single-scatter phase (atmo_shape.w = primary

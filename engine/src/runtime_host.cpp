@@ -2596,6 +2596,7 @@ int RuntimeHost::run() {
           inst.material.band_turbulence = sf->band_turbulence;
           inst.material.band_diff = sf->band_diff;
           inst.material.orbital_beaming = sf->orbital_beaming;
+          inst.material.orbital_beaming_tint = sf->orbital_beaming_tint;
           inst.material.forward_scatter = sf->forward_scatter;
           inst.material.forward_scatter_back = sf->forward_scatter_back;
           inst.material.forward_scatter_back_mix =

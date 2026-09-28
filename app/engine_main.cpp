@@ -2327,11 +2327,24 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= -0.5f && a <= 0.5f) { next.band_shear = a; valid = true; }
           break;
-  case 61:
-          try { a = std::stof(shell.scene3_buffer); }
-          catch (const std::exception &) { break; }
-          if (a >= -1.f && a <= 1.f) { next.orbital_beaming = a; valid = true; }
-          break;
+  case 61: {
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> parts;
+          std::string part;
+          while (std::getline(csv, part, ',')) parts.push_back(part);
+          if (parts.size() >= 1 && parts.size() <= 2) {
+            try { a = std::stof(parts[0]); valid = a >= -1.f && a <= 1.f; }
+            catch (const std::exception &) { break; }
+            if (!valid) break;
+            next.orbital_beaming = a;
+            if (parts.size() == 2) {
+              try { a = std::stof(parts[1]); }
+              catch (const std::exception &) { valid = false; break; }
+              if (!(a >= 0.f && a <= 1.f)) { valid = false; break; }
+              next.orbital_beaming_tint = a;
+            }
+          }
+          break; }
   case 62:
           try { a = std::stof(shell.scene3_buffer); }
           catch (const std::exception &) { break; }
@@ -2752,6 +2765,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       inst.material.band_turbulence = e.band_turbulence;
       inst.material.band_diff = e.band_diff;
       inst.material.orbital_beaming = e.orbital_beaming;
+      inst.material.orbital_beaming_tint = e.orbital_beaming_tint;
       inst.material.forward_scatter = e.forward_scatter;
       inst.material.forward_scatter_back = e.forward_scatter_back;
       inst.material.forward_scatter_back_mix = e.forward_scatter_back_mix;
@@ -3152,8 +3166,14 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         ed(70),
         "drift uv/s -0.25..0.25[,turbulence -8..8[,equator boost -8..8]]");
   field(shell.hit3_orbitbeam, "orbitalBeam",
-        entity ? std::to_string(entity->orbital_beaming) : "", ed(61),
-        "approaching-lane brightening -1..1 - accretion discs");
+        entity ? std::to_string(entity->orbital_beaming) +
+                     (entity->orbital_beaming_tint == 0.f
+                          ? ""
+                          : "," +
+                                std::to_string(
+                                    entity->orbital_beaming_tint))
+               : "", ed(61),
+        "approaching-lane brightening -1..1[,doppler tint 0..1] - accretion discs");
   field(shell.hit3_starkelvin, "starKelvin",
         entity ? std::to_string(static_cast<long long>(entity->star_kelvin)) : "", ed(62),
         "photosphere kelvin 100..100000 - blackbody tint + limb");
@@ -7314,7 +7334,12 @@ int main(int argc, char **argv) {
                             std::to_string(se->band_turbulence) + "," +
                             std::to_string(se->band_diff));
             else if (shell.hit3_orbitbeam.contains(event.position) && se)
-              edit3(61, std::to_string(se->orbital_beaming));
+              edit3(61, std::to_string(se->orbital_beaming) +
+                            (se->orbital_beaming_tint == 0.f
+                                 ? ""
+                                 : "," +
+                                       std::to_string(
+                                           se->orbital_beaming_tint)));
             else if (shell.hit3_starkelvin.contains(event.position) && se)
               edit3(62, std::to_string(static_cast<long long>(se->star_kelvin)));
             else if (shell.hit3_accretion.contains(event.position) && se)

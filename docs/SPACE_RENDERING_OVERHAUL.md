@@ -156,7 +156,8 @@ same document headless-tested.
    gives self-luminous bodies the photosphere's edge falloff.
    `band_shear`+`band_waves` (two-harmonic longitude warp — differential rotation + alternating jets)
    and `orbital_beaming` (first-order doppler asymmetry about local +Y —
-   accretion discs get their approaching-lane brightening)
+   accretion discs get their approaching-lane brightening, with
+   `orbitalBeamTint` adding the paired blue/red spectral shift)
    landed on top. Ring/scattering physics followed:
    `accretion_disc_material3d` + `accretion`/`AccretionDisc` generate a
    Shakura–Sunyaev radial disc for `annulus` meshes (black holes compose

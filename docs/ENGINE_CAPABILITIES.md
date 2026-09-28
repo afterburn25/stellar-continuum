@@ -336,12 +336,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   symmetric since orbital velocity is perpendicular to the view. Rides
   `uv_options.z`, reusing the stored model-view inverse
   (`effect_from_view`, now also filled for beam-only materials).
-  Authored via `orbitalBeam` doc key, `MaterialSurface::orbital_beaming`,
-  runtime + editor `orbitalBeam` row. GPU probe asserts
-  receding-dims/approaching-brightens on a tilted annulus plus face-on
-  symmetry; `engine_scene3d` bounds, doc/component round-trips.
-  Remaining: brightness asymmetry only — no wavelength shift, redshift
-  or lensing.
+  `orbital_beaming_tint` [0,1] adds the paired spectral shift on the
+  `scatter_options.w` lane: the approaching lane blueshifts (red
+  depletes, blue gains) and the receding lane redshifts by the same
+  signed v̂·V̂ alignment — a linear wavelength-shift approximation
+  clamped so a channel can deplete but never invert. Authored via
+  `orbitalBeam`/`orbitalBeamTint` doc keys,
+  `MaterialSurface::orbital_beaming`/`_tint`,
+  runtime + editor `orbitalBeam` CSV row. GPU probe asserts
+  receding-dims/approaching-brightens on a tilted annulus, face-on
+  symmetry, and per-lane blue/red channel shifts; `engine_scene3d`
+  bounds, doc/component round-trips.
+  Remaining: first-order shift only — no gravitational redshift,
+  relativistic aberration or lensing.
 
 ### Follow-up: `star_photosphere3d` spectral-class preset
 

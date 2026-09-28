@@ -263,6 +263,9 @@ struct Scene3dEntity {
   // First-order orbital beaming for material orbiting local +Y (accretion
   // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
+  // Doppler color shift paired with the beaming [0,1] — the bright
+  // lane blueshifts, the dim lane redshifts; 0 keeps brightness-only.
+  float orbital_beaming_tint{0.f};
   // Henyey–Greenstein scattering phase: positive brightens the backlit
   // sheet (dusty rings), negative boosts opposition (icy regolith).
   // [-1,1]; 0 disables.

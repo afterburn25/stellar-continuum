@@ -63,6 +63,9 @@ m.band_turbulence = 1.2f;                   // [-8,8] rad/s evolving
 m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
                                             // asymmetry (accretion discs,
                                             // ring forward-scatter)
+m.orbital_beaming_tint = 0.5f;              // [0,1] paired doppler color
+                                            // shift: bright lane blueshifts,
+                                            // dim lane redshifts
 m.forward_scatter = 0.6f;                   // [-1,1] HG phase asymmetry:
                                             // +backlit boost (dusty
                                             // rings), -opposition surge
@@ -477,7 +480,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `bandDrift` ([-0.25,0.25] uv/s scroll) and `bandTurbulence`
 ([-8,8] rad/s evolving warp) and `bandDiff` ([-8,8]
 latitude-differential drift term),
-`orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
+`orbitalBeam`/`orbitalBeamTint`, `forwardScatter`/`forwardScatterBack`/
+`forwardScatterBackMix` ([-1,1]/[0,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
 (`{depth,density,seed,steps,scatter,flow,distort,blend,image2,occlude,flowRate}`
 — requires a `texture`), `lods` (array of
@@ -596,8 +600,9 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - Limb darkening is the three-term linear+quadratic+mid-curve law
   (`limb_darkening`/`limb_darkening_q`/`limb_darkening_mid`) — no
   four-term Claret coefficients or wavelength-dependent profiles.
-- `orbital_beaming` is a first-order brightness asymmetry — no doppler
-  color shift, gravitational redshift, or lensing.
+- `orbital_beaming` is a first-order asymmetry — `orbital_beaming_tint`
+  adds a bounded linear doppler color shift (bright lane blueshifts,
+  dim lane redshifts); no gravitational redshift or lensing.
 - `accretion_disc_material3d` is an azimuthally uniform thin-disc
   profile — no spiral fluctuations, no relativistic ray-bending; the
   annulus radii must be re-stated in the `annulus:i,o` mesh spec.

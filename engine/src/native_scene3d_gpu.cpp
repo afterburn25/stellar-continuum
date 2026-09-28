@@ -701,10 +701,12 @@ struct Scene3DRenderer::Storage {
       fragment.atmo_shape[3]=material.forward_scatter;
       // Secondary terms ride one lane: x = HG secondary-lobe
       // asymmetry, y = secondary-lobe weight (0 keeps the single-lobe
-      // phase), z = three-term limb-darkening mid-curve coefficient.
+      // phase), z = three-term limb-darkening mid-curve coefficient,
+      // w = doppler beaming tint strength.
       fragment.scatter_options={material.forward_scatter_back,
                                 material.forward_scatter_back_mix,
-                                material.limb_darkening_mid,0.f};
+                                material.limb_darkening_mid,
+                                material.orbital_beaming_tint};
       if((material.surface_effect&&material.surface_effect->volume_depth>0.f)||material.orbital_beaming!=0.f){
         // Model transforms use uniform scale and an orthonormal rotation.
         // Invert their camera-relative matrix once per draw, not per

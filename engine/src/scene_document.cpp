@@ -488,6 +488,8 @@ std::string Scene3dDocument::to_json() const {
       item["bandTurbulence"] = e.band_turbulence;
     if (e.band_diff != 0.f) item["bandDiff"] = e.band_diff;
     if (e.orbital_beaming != 0.f) item["orbitalBeam"] = e.orbital_beaming;
+    if (e.orbital_beaming_tint != 0.f)
+      item["orbitalBeamTint"] = e.orbital_beaming_tint;
     if (e.forward_scatter != 0.f)
       item["forwardScatter"] = e.forward_scatter;
     if (e.forward_scatter_back != 0.f)
@@ -774,6 +776,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.orbital_beaming = item.value("orbitalBeam", 0.0f);
       if (!(e.orbital_beaming >= -1.f && e.orbital_beaming <= 1.f))
         return fail("orbitalBeam must be in [-1,1]");
+      e.orbital_beaming_tint = item.value("orbitalBeamTint", 0.0f);
+      if (!(e.orbital_beaming_tint >= 0.f && e.orbital_beaming_tint <= 1.f))
+        return fail("orbitalBeamTint must be in [0,1]");
       e.forward_scatter = item.value("forwardScatter", 0.0f);
       if (!(e.forward_scatter >= -1.f && e.forward_scatter <= 1.f))
         return fail("forwardScatter must be in [-1,1]");

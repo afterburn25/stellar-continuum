@@ -192,6 +192,9 @@ struct MaterialSurface {
   // First-order orbital beaming about local +Y (accretion discs, ring
   // forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
+  // Doppler color shift paired with the beaming [0,1] — bright lane
+  // blueshifts, dim lane redshifts; 0 keeps brightness-only.
+  float orbital_beaming_tint{0.f};
   // Henyey–Greenstein scattering phase: positive brightens the backlit
   // sheet (dusty rings), negative boosts opposition (icy). [-1,1];
   // 0 disables.

@@ -448,6 +448,7 @@ int main() {
     cube.band_drift = 0.08f;
     cube.band_turbulence = 1.25f;
     cube.orbital_beaming = 0.7f;
+    cube.orbital_beaming_tint = 0.4f;
     cube.star_kelvin = 3200.0;
     cube.accretion = {0.4f, 1.f, 9000.f, 0.8f};
     cube.forward_scatter = 0.5f;
@@ -611,6 +612,7 @@ int main() {
                 rc.band_shear == -0.25f && rc.band_waves == 0.6f &&
                 rc.band_drift == 0.08f && rc.band_turbulence == 1.25f &&
                 rc.orbital_beaming == 0.7f &&
+                rc.orbital_beaming_tint == 0.4f &&
                 rc.star_kelvin == 3200.0 && rc.accretion[0] == 0.4f &&
                 rc.accretion[1] == 1.f && rc.accretion[2] == 9000.f &&
                 rc.accretion[3] == 0.8f && rc.forward_scatter == 0.5f &&
