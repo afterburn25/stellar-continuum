@@ -1,4 +1,5 @@
 #include <stellar/engine/spherical_material_preparation.hpp>
+#include <stellar/engine/native_scene3d.hpp>
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -214,5 +215,38 @@ std::shared_ptr<const RgbaImage> spherical_material_thumbnail(const SphericalMat
   for(int k=0;k<3;++k)color[k]=(color[k]*(1-cloud)+cloud*.96)*light+(maps.emission?maps.emission->pixels()[at+k]/255.:0)*emissive;
   put(p,static_cast<std::size_t>(y)*size+x,color,smooth(0,.03,1-rr));
  }return RgbaImage::create(size,size,std::move(p));
+}
+Material3D accretion_disc_material3d(float inner,float outer,double kelvin,float beaming){
+ if(!std::isfinite(inner)||!std::isfinite(outer)||inner<=0.f||outer<=inner)
+  throw std::invalid_argument("Accretion disc radii must satisfy 0<inner<outer.");
+ if(!std::isfinite(kelvin)||kelvin<100||kelvin>100000)
+  throw std::invalid_argument("Accretion disc temperature must be between 100 and 100000 kelvin.");
+ if(!std::isfinite(beaming)||std::abs(beaming)>1.f)
+  throw std::invalid_argument("Accretion disc beaming must be in [-1,1].");
+ // Radial column: Shakura–Sunyaev thin-disc T ∝ r^(-3/4); emitted flux
+ // ∝ T^4 dims the outer rim while the blackbody curve shifts its hue.
+ // linear_light decodes texels as sRGB, so encode gamma here.
+ const auto srgb=[](double linear){
+  linear=std::clamp(linear,0.,1.);
+  const double s=linear<=0.0031308?12.92*linear:1.055*std::pow(linear,1./2.4)-0.055;
+  return static_cast<std::uint8_t>(std::lround(s*255.));
+ };
+ std::vector<std::uint8_t> pixels(256*4);
+ for(int i=0;i<256;++i){
+  const double r=inner+(outer-inner)*(i+.5)/256.;
+  const double t=kelvin*std::pow(r/inner,-.75);
+  const auto c=blackbody_light_color(std::clamp(t,100.,100000.));
+  const double flux=std::pow(std::clamp(t,100.,100000.)/kelvin,4.);
+  pixels[i*4+0]=srgb(c.x*flux);pixels[i*4+1]=srgb(c.y*flux);pixels[i*4+2]=srgb(c.z*flux);pixels[i*4+3]=255;
+ }
+ Material3D m;
+ m.texture=RgbaImage::create(256,1,std::move(pixels));
+ m.ambient=1.f;m.diffuse=0.f; // self-luminous plasma
+ m.light_color=blackbody_light_color(kelvin);
+ m.linear_light=true;
+ m.double_sided=true;         // the sheet reads from below the plane too
+ m.orbital_beaming=beaming;
+ m.anisotropic_texture=true;  // radial streaks minify to arcs
+ return m;
 }
 }
