@@ -1447,7 +1447,7 @@ class NativeCampaign final {
     const auto capture_planet=[&](std::wstring_view suffix){
       const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);int settled=0;
       do { route({{InputEventType::PointerMove,{0,0}}});(void)scene(width,height);settled=artwork_ready()?settled+1:0;
-        if(std::chrono::steady_clock::now()>deadline)throw std::runtime_error("Planetary inspection artwork failed to settle.");
+        if(std::chrono::steady_clock::now()>deadline)throw std::runtime_error("Planetary inspection artwork failed to settle. "+artwork_status());
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
       }while(settled<40);
       const auto rendered=scene(width,height);
@@ -1593,10 +1593,27 @@ class NativeCampaign final {
           const auto*view=std::get_if<Scene3DView>(&command);
           return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){
             return i.material.surface_effect&&i.material.surface_effect->volume_depth>0;});});
-        if(!volume)throw std::runtime_error("Nebulous system emitted no emission volume layer.");
-        draw(rendered,L"-local-nebula");
-        system_workspace_.close();
-        std::cout<<"local_nebula=emission_volume_submitted_passed\n";
+        if(!volume){
+          // The render-target budget gate swaps the raymarched volume for its
+          // authored 2D composite when the frame cannot fit the fullscreen
+          // backdrop views (dome + volume + workspaces at >=2560). Accept the
+          // flat layer only when a 3D backdrop truly could not have fit —
+          // in a fallback frame both layers are flat, so reconstruct the
+          // pre-gate footprint with two fullscreen targets.
+          const std::size_t fullscreen_bytes=static_cast<std::size_t>(width)*static_cast<std::size_t>(height)*16u;
+          const auto flat=std::ranges::any_of(rendered.world,[width,height](const auto& command){
+            const auto*image=std::get_if<Image>(&command);
+            return image&&image->destination.width>=static_cast<float>(width)*.95f&&image->destination.height>=static_cast<float>(height)*.95f;});
+          if(!flat||scene3d_target_bytes(rendered)+2u*fullscreen_bytes<=maximum_scene3d_target_bytes)
+            throw std::runtime_error("Nebulous system emitted no emission volume layer.");
+          draw(rendered,L"-local-nebula");
+          system_workspace_.close();
+          std::cout<<"local_nebula=flat_composite_budget_passed\n";
+        }else{
+          draw(rendered,L"-local-nebula");
+          system_workspace_.close();
+          std::cout<<"local_nebula=emission_volume_submitted_passed\n";
+        }
       }
     }
     if(!enter_system(sol_system_id,width,height))throw std::runtime_error("Small-body smoke cannot enter Sol.");
@@ -6473,7 +6490,7 @@ class NativeCampaign final {
     stellar::engine::MemoryTracker::instance().report(territory_overlay_memory_,territory_overlay_.cached_image_bytes(),NativeTerritoryOverlay::maximum_cached_image_bytes);
     if(image_preparation_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
       image_preparation_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("image-preparation");
-    stellar::engine::MemoryTracker::instance().report(image_preparation_memory_,image_preparation_->reserved_bytes(),ImagePreparationQueue::default_max_reserved_output_bytes);
+    stellar::engine::MemoryTracker::instance().report(image_preparation_memory_,image_preparation_->reserved_bytes(),image_preparation_max_bytes);
     // Recording sessions accumulate command payloads unboundedly — the
     // recorder's occupancy joins the census while one is active.
     if(replay_&&replay_->recorder){
@@ -7912,7 +7929,7 @@ class NativeCampaign final {
   }
 
   [[nodiscard]] std::string artwork_status()const{
-    return "planet="+std::to_string(planet_material_cache_.ready())+", sky="+std::to_string(system_background_.ready())+", phenomena="+std::to_string(phenomena_.ready())+", stellar="+std::to_string(stellar_art_.pending_count())+", eruptions="+std::to_string(eruption_art_.pending_count())+", system-visible="+std::to_string(system_workspace_.visible())+", system="+std::to_string(system_workspace_.artwork_ready())+", galaxy="+std::to_string(galaxy_backdrop_.artwork_ready())+", territory="+std::to_string(territory_overlay_.valid())+"/"+std::to_string(territory_overlay_.pending());
+    return "planet="+std::to_string(planet_material_cache_.ready())+", sky="+std::to_string(system_background_.ready())+", phenomena="+std::to_string(phenomena_.ready())+", stellar="+std::to_string(stellar_art_.pending_count())+", eruptions="+std::to_string(eruption_art_.pending_count())+", system-visible="+std::to_string(system_workspace_.visible())+", system="+std::to_string(system_workspace_.artwork_ready())+", galaxy="+std::to_string(galaxy_backdrop_.artwork_ready())+", territory="+std::to_string(territory_overlay_.valid())+"/"+std::to_string(territory_overlay_.pending())+", queue="+std::to_string(image_preparation_->outstanding_jobs())+"jobs/"+std::to_string(image_preparation_->reserved_bytes())+"B";
   }
 
   [[nodiscard]] DrawList scene(int width,int height){
@@ -7923,6 +7940,7 @@ class NativeCampaign final {
     const auto scene_scope=stellar::engine::Profiler::instance().span("scene","client");
     system_background_.poll();
     phenomena_.poll();
+    galaxy_assets_.poll();
     auto out=scene_content(width,height);if(developer_session()){phenomena_debug_.data(phenomena_debug_text());phenomena_debug_.render(out,width,height);if(background_debug_.visible()){const auto id=system_workspace_.system_id().value_or(selected_id_.value_or(session_->frame().runtime().world().campaign().systems.front().id));background_debug_.data(system_background_,id);background_debug_.render(out,width,height,system_background_);}}developer_panel_.render(out,width,height,session_->frame());developer_index_.render(out,width,height,session_->frame());developer_planet_index_.render(out,width,height);giant_test_panel_.render(out,width,height,session_->frame(),[this](const auto& a,int lod){return planet_material_cache_.request(a,lod);});stellar_activity_panel_.render(out,width,height,session_->frame());developer_diagnostics_.render(out,width,height,session_->frame(),developer_monitor_);developer_empires_.render(out,width,height,session_->frame());
     if(developer_session()&&developer_fault_capture_.latched()){
       const float s=std::clamp(static_cast<float>(height)/1080.f,.7f,1.5f);
@@ -7937,16 +7955,16 @@ class NativeCampaign final {
       stellar::native_ui::apply_color_blind(out,general_settings_->saved().accessibility.color_blind);
     return out;
   }
+  // Scene3DView render targets cost destination w*h*16 B when the device
+  // supports HDR (always true on the Vulkan path); worst-case keeps the
+  // budget gate conservative on hypothetical non-HDR devices.
+  [[nodiscard]] static std::size_t scene3d_target_bytes(const DrawList& draw){
+    std::size_t bytes=0;
+    const auto add=[&bytes](const Scene3DView& view){bytes+=static_cast<std::size_t>(std::ceil(view.destination.width))*static_cast<std::size_t>(std::ceil(view.destination.height))*16;};
+    for(const auto& command:draw.world)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+    for(const auto& command:draw.overlay)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+    return bytes;}
   [[nodiscard]] DrawList scene_content(int width,int height){
-    // Scene3DView render targets cost destination w*h*16 B when the device
-    // supports HDR (always true on the Vulkan path); worst-case keeps the
-    // budget gate conservative on hypothetical non-HDR devices.
-    const auto scene3d_target_bytes=[](const DrawList& draw){
-      std::size_t bytes=0;
-      const auto add=[&bytes](const Scene3DView& view){bytes+=static_cast<std::size_t>(std::ceil(view.destination.width))*static_cast<std::size_t>(std::ceil(view.destination.height))*16;};
-      for(const auto& command:draw.world)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
-      for(const auto& command:draw.overlay)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
-      return bytes;};
     if(battle_workspace_.visible()&&!menu_){
       DrawList tactical;
       battle_art_plan_.clear();
@@ -10223,7 +10241,12 @@ class NativeCampaign final {
   stellar::native_phenomena::PhenomenaDebug phenomena_debug_;
   std::optional<WorldPoint> pinned_phenomenon_;
   double fitted_pixels_per_world_{.01};
-  std::shared_ptr<ImagePreparationQueue> image_preparation_{std::make_shared<ImagePreparationQueue>()};
+  // The sky plate reserves the full 32 MiB default budget by itself, so any
+  // straggler ticket (e.g. an uncollected core-fog job) would starve it
+  // forever. 64 MiB leaves room for one full-size request plus in-flight
+  // composites; per-frame poll() drains still release admissions promptly.
+  static constexpr std::size_t image_preparation_max_bytes=64u*1024u*1024u;
+  std::shared_ptr<ImagePreparationQueue> image_preparation_{std::make_shared<ImagePreparationQueue>(ImagePreparationQueue::default_max_outstanding_jobs,image_preparation_max_bytes)};
   NativePlanetDiscAssets planet_discs_;
   stellar::native_system_ui::NativeSmallBodyAssets small_body_assets_;
   NativeShipArtAssets ship_art_;

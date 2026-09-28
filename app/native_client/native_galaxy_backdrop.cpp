@@ -260,6 +260,14 @@ void NativeGalaxyBackdropAssets::set_galaxy_layer_path(std::string path){
   require_owner();if(path.empty())path="assets/visual/space/spiral-galaxy-v3.png";
   if(path!=galaxy_layer_path_){cancel_preparation();galaxy_layer_.reset();galaxy_layer_path_=std::move(path);}
 }
+void NativeGalaxyBackdropAssets::poll() {
+  require_owner();
+  collect_ready();
+  if (core_fog_job_ && core_fog_job_->ready()) {
+    core_fog_ = core_fog_job_->take();
+    core_fog_job_.reset();
+  }
+}
 void NativeGalaxyBackdropAssets::cancel_preparation() noexcept { pending_.clear();core_fog_job_.reset(); }
 std::size_t NativeGalaxyBackdropAssets::pending_count() const noexcept { return pending_.size()+(core_fog_job_?1u:0u); }
 

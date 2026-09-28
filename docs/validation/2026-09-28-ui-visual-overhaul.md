@@ -95,6 +95,17 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
 - Note: `system_background_tests` exercises the fallback paths; the
   frame-level budget arithmetic in `scene_content` is covered live by
   the smokes above, not by a unit test (needs a real draw list).
+- Running `--developer-smoke` at >=1920x1080 surfaced a second,
+  unrelated defect: a completed-but-uncollected galaxy core-fog ticket
+  held 4 MiB of queue reservation while off-map, and the sky plate's
+  quality>=2 request reserves the entire default 32 MiB queue budget —
+  `system_background_.ready()` could never settle. Fixed by a per-frame
+  `NativeGalaxyBackdropAssets::poll()` drain (same contract as the sky's
+  own poll) plus a 64 MiB queue cap so one full-size request coexists
+  with in-flight composites. Dev smoke's nebula assertion is now
+  budget-aware (accepts the flat composite only when a 3D backdrop could
+  not fit). `native_galaxy_backdrop` gained a stranded-ticket test
+  (10/10). `--developer-smoke` green at 1280/1920/2560.
 
 ## Known limitations
 

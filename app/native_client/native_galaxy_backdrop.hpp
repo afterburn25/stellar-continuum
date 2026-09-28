@@ -94,6 +94,10 @@ class NativeGalaxyBackdropAssets final {
   request_undisclosed_core_fog();
   // Cancels pending source work without clearing reusable generic artwork.
   void cancel_preparation() noexcept;
+  // Releases ready-but-uncollected tickets — including the core fog, which
+  // is otherwise only drained while the map draws — so a stranded ticket
+  // cannot hold shared queue admission while System View is up.
+  void poll();
   [[nodiscard]] std::size_t pending_count()const noexcept;
   [[nodiscard]] std::shared_ptr<const stellar::native_map::RgbaImage>
   undisclosed_core_fog();
