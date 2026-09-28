@@ -170,6 +170,7 @@ int main(int argc,char** argv)try{
   check(rings.material.forward_scatter_hue>0,"Ringed sheet lost its Rayleigh wavelength weight");
   check(world.front().material.anisotropic_texture,"Giant band texture lost anisotropic limb sampling");
   check(world.front().material.cubic_magnification==(lod>=512),"Globe LOD lost cubic magnification (or a small render gained it)");
+  check(rings.material.cubic_magnification==(lod>=512),"Ring sheet magnification did not follow the globe LOD tier");
   check(rings.material.orbital_beaming>0&&rings.material.orbital_beaming_tint>0,"Ringed sheet lost its orbiting-grain doppler terms");
   for(const auto& i:world){
    if(i.material.diffuse==0){check(!i.material.shadow,"Emission layer has a reflected-light shadow");continue;}

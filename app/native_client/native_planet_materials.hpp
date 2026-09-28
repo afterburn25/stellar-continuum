@@ -296,7 +296,7 @@ inline void append_instances(std::vector<MeshInstance3D>& out,const PlanetAppear
     if(!rings.contains(cache_key)){if(rings.size()>=64)rings.erase(rings.begin());rings[cache_key]=annulus_mesh(ring_key.first*.01f,ring_key.second*.01f,segments,depth*.000001f);}
     AnalyticShadow3D s;s.position=p;s.rotation=rotation;s.scale=radius;
     s.radii={1,planet_polar_radius(a.oblateness),1};
-    Material3D m;m.texture=maps.rings;m.ambient=.17f;m.diffuse=.8f;m.transparent=true;m.double_sided=false;m.two_sided_diffuse=true;m.anisotropic_texture=true;
+    Material3D m;m.texture=maps.rings;m.ambient=.17f;m.diffuse=.8f;m.transparent=true;m.double_sided=false;m.two_sided_diffuse=true;m.anisotropic_texture=true;m.cubic_magnification=lod>=512;
     // Dusty sheets brighten when backlit — the HG forward lobe scaled by the
     // ring's authoritative reflectivity (icy stays near neutral, dusty
     // diffuse rings pick up the Saturn E-ring look).
