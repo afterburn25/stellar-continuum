@@ -31,6 +31,9 @@ public:
   void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;ring_=-1;refresh(monitor);}
   void close(){visible_=false;pressed_=-1;ring_=-1;dropdown_.close();entity_search_focused_=event_search_focused_=false;}
   bool visible()const{return visible_;}
+  // One-line renderer workload summary for the LIVE PERFORMANCE view —
+  // the window's per-frame Scene3DStatistics, formatted by the host.
+  void set_renderer_stats(std::string value){renderer_stats_=std::move(value);}
   bool wants_text_input()const{return visible_&&(entity_search_focused_||event_search_focused_);}
   // Keyboard-focus contract: Tab enters a ring over the chrome, the
   // view's search field (entities/events, classified Edit), the sortable
@@ -382,6 +385,8 @@ public:
         else if(const auto*shipyard_tag=projected.get<CampaignShipyardTag>(e)){line("tag campaign.shipyard",native_menu_style::cyan);line("civ "+std::to_string(shipyard_tag->civilization_id));}
       }else label(detail,"Select a row — the projected entity's index, refs and tag fields list here.",native_menu_style::muted);
     }else if(!events_){
+      if(!renderer_stats_.empty())
+        label({l.panel.x+20*s,l.panel.y+152*s,l.panel.width-40*s,24*s},renderer_stats_,native_menu_style::muted);
       const auto sort_mark=[&](std::string_view id){const auto &st=phase_table_.sort_state();return st&&st->first==id?(st->second?" ^":" v"):"";};
       label(phase_header_rect(l,0),std::string("Phase")+sort_mark("phase"),native_menu_style::muted);
       label(phase_header_rect(l,1),std::string("Samples")+sort_mark("samples"),native_menu_style::muted);
@@ -611,6 +616,7 @@ private:
   mutable std::size_t entity_shown_{};
   mutable std::vector<std::size_t> event_view_;
   mutable stellar::engine::VirtualizedList list_view_;mutable std::size_t list_rows_{};
+  std::string renderer_stats_;
   mutable stellar::engine::TableModel phase_table_;
 };
 }

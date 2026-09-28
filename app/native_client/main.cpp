@@ -1329,6 +1329,19 @@ class NativeCampaign final {
     if(developer_index_.visible()){developer_index_.close();return;}
     if(developer_session())developer_panel_.toggle();else (void)session_->request_new_campaign();
   }
+  // Last frame's renderer workload for the diagnostics performance view —
+  // the host feeds window.scene3d_statistics() after each draw.
+  void feed_renderer_stats(const stellar::native_map::Scene3DStatistics &stats){
+    if(!developer_diagnostics_.visible())return;
+    std::ostringstream out;
+    out<<"GPU scene3d: draws "<<stats.draw_calls
+       <<" · instances "<<stats.submitted_instances
+       <<" · culled "<<stats.culled_instances
+       <<" · shadows "<<stats.shadow_casters
+       <<" · lod "<<stats.lod_instances
+       <<" · stream-fallbacks "<<stats.streamed_fallbacks;
+    developer_diagnostics_.set_renderer_stats(out.str());
+  }
   [[nodiscard]] bool new_game_ready()const{return session_->new_campaign_transition()==NewCampaignTransition::Ready;}
   [[nodiscard]] bool new_game_pending()const{return session_->new_campaign_pending();}
   [[nodiscard]] const std::filesystem::path& save_path()const{return session_->save_path();}
@@ -10897,6 +10910,7 @@ int main(int argc,char **argv){
       if(waiting_for_artwork){screenshot.reset();if(++artwork_wait_frames>600){window.draw(scene,sidecar_path(*options.smoke_screenshot,L"-incomplete"));throw std::runtime_error("Map artwork did not finish preparation before capture: "+campaign.artwork_status());}}
       const auto uploads_before=cold_profile?window.image_upload_count():0;
       window.draw(scene,screenshot,(steady_profile||cold_profile)?&draw_timing:nullptr);
+      campaign.feed_renderer_stats(window.scene3d_statistics());
       const auto render_end=std::chrono::steady_clock::now();
       if(cold_profile)cold_profile->observe(frames,
         std::chrono::duration<double,std::milli>(update_end-update_begin).count(),
@@ -11092,6 +11106,14 @@ int main(int argc,char **argv){
                  <<",\"scene_texture_bytes\":"<<gpu_residency.texture_cache_bytes
                  <<",\"scene_mesh_bytes\":"<<gpu_residency.mesh_cache_bytes
                  <<",\"scene_render_target_bytes\":"<<gpu_residency.target_bytes<<"}\n";
+        std::cout<<"scene3d_stats={\"draw_calls\":"<<gpu_residency.draw_calls
+                 <<",\"submitted_instances\":"<<gpu_residency.submitted_instances
+                 <<",\"culled_instances\":"<<gpu_residency.culled_instances
+                 <<",\"shadow_casters\":"<<gpu_residency.shadow_casters
+                 <<",\"lod_instances\":"<<gpu_residency.lod_instances
+                 <<",\"mesh_uploads\":"<<gpu_residency.mesh_uploads
+                 <<",\"texture_uploads\":"<<gpu_residency.texture_uploads
+                 <<",\"streamed_fallbacks\":"<<gpu_residency.streamed_fallbacks<<"}\n";
         { // The client's bounded caches must be registered in the memory census.
           const auto census=stellar::engine::MemoryTracker::instance().snapshot();
           const auto tracked=[&](std::string_view name){
