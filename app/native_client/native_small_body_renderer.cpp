@@ -104,8 +104,13 @@ void NativeSmallBodyRenderer::render(DrawList& out,const NativeSystemSnapshot& s
       surface.light_intensity=s.au>1e-6f?std::clamp(std::pow(s.au,-1.2f),.22f,1.15f):1.f;
       surface.linear_light=true;
       const auto brightness=static_cast<std::uint8_t>(std::clamp(b.material_brightness*235,0.,255.));surface.tint={brightness,brightness,brightness,255};
-      instances.push_back({geometry_.mesh(b,s.radius>=28),{(s.p.x-clip.x-clip.width*.5f)*unit,(clip.y+clip.height*.5f-s.p.y)*unit,s.z*unit},
+      instances.push_back({geometry_.mesh(b,true),{(s.p.x-clip.x-clip.width*.5f)*unit,(clip.y+clip.height*.5f-s.p.y)*unit,s.z*unit},
         {float(q[0]),float(q[1]),float(q[2]),float(q[3])},s.radius*unit,surface});
+      // Engine LOD chain replaces the CPU hard-swap: the coarse tier
+      // substitutes below the 28px radius (56px diameter) threshold and
+      // lod_fade screen-door crossfades the band instead of popping.
+      instances.back().lod_meshes={geometry_.mesh(b,false)};
+      instances.back().lod_pixels=56.f;
       hits_.push_back({s.field,b.id,s.p,s.radius});
     }
     last_scene_=Scene3D::create(camera,std::move(instances));

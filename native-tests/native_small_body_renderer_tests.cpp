@@ -51,6 +51,7 @@ int main(){try{
   for(const auto& v:solid.mesh->vertices()){min_z=std::min(min_z,v.position.z);max_z=std::max(max_z,v.position.z);
     non_radial|=std::abs(v.normal.x*v.position.y-v.normal.y*v.position.x)>.02f;}
   check(max_z-min_z>.4f&&non_radial&&solid.material.diffuse>.7f,"Solid has no mass or surface lighting");
+  check(!solid.lod_meshes.empty()&&solid.lod_meshes.front()!=solid.mesh&&solid.lod_pixels==56.f&&solid.lod_fade>0,"Small bodies lost the crossfaded detail LOD");
   DrawList paused;renderer.render(paused,s,spatial,view,{0,0,1920,1080},0,false);
   const auto repeat=scene_of(paused);check(repeat->instances().front().mesh==solid.mesh&&repeat->instances().front().material.texture==solid.material.texture,"Paused rendering regenerated immutable geometry");
   check(repeat->instances().front().rotation.w==solid.rotation.w,"Paused spin drifted");
