@@ -57,3 +57,47 @@ automation enabled · 4 data-authored event chains loaded.
 - Colonization: 0 events — civilizations do not expand organically.
 - Verification peak memory includes the canonicalization parse trees;
   steady-state simulation memory is ~0.5 GB.
+
+## Follow-up: final-slot research scheduling (commit `fedf6bc4`)
+
+Diagnostic inspection of the century run above showed every pre-warp
+civilization maturing ~129 nodes yet never reaching
+`experimental_interstellar_transit`: at `single_priority_program` (one
+directed slot) deep frontier picks repeatedly won the visible shortlist
+while gateway prerequisites such as `field_theory` — the root of the
+`warp_metric_theory`→`exotic_energy_coupling`→`micro_field_distortion`→
+`warp_field_control`→`prototype_warp_drive` chain — starved investigable
+for decades. The campaign-simulation AI now defers over-horizon final-slot
+candidates while a bounded startable+affordable alternative exists
+(commitment horizon `max(2y, min(4x shortest startable, 15y))`), with the
+highest-utility deferred candidate still starting when nothing shorter
+qualifies. The shared research policy contract and its parity
+fingerprints are untouched; the rule consumes only materialized
+shortlist fields (`can_start`, `estimated_years_to_mature`).
+
+Re-run results:
+
+- Same command as above minus `--stress-fleets` (organic fleets only),
+  `--civilizations 25` + `--ancients 1` (26 civilizations):
+  `repeatFinalStatesDeterministic: true`,
+  `continuationDeterministic: true`,
+  hash `32dad3a5927bd5fb6ddd93b755db66b526136309007f4de1a2fac2dfdf1ce675`,
+  step mean 65.25 ms / p95 82.20 ms, working set 524.5 MB.
+  ~half the pre-warp civilizations matured 5/6 of the warp chain with
+  `prototype_warp_drive` investigable at the year-100 snapshot — the
+  chain unrolls but the capstone lands just past the horizon.
+- 2,500 systems / 12 pre-warp / 10,000 ticks (~137 years), seed 8374837:
+  **11 of 11 pre-warp civilizations promoted to warp-capable
+  organically**, 34 fleets built through canonical shipbuilding (11 of
+  them loaded colony ships), 11,168 exploration events, 34 diplomacy
+  events, 2 in-system colonization orders assigned at snapshot.
+  Colonization *events* still 0 — established colonies had not landed
+  inside the run; interstellar colony targets additionally require
+  explored/surveyed worlds, so organic multi-system colonization remains
+  the open edge rather than a proven outcome.
+
+Remaining honest limitations: wars still 0; completed organic
+colonization unproven (orders assigned, landfall not yet observed);
+pre-warp→warp promotion needs ~120+ years at this tech pacing; the
+50k-system headroom and research/diplomacy/sensor event feeds are
+unchanged gaps.
