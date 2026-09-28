@@ -82,7 +82,11 @@ public:
   const double e=p.exposure*transmission*(options.dark_test?.025:1);m.tint={byte(faint_starfield_tint.r*e*(1+p.color_temperature)),byte(faint_starfield_tint.g*e),byte(faint_starfield_tint.b*e*(1-p.color_temperature)),255};
   if(blend){m.surface_effect=SurfaceEffect3D{};m.surface_effect->next_texture=blend;m.surface_effect->blend=static_cast<float>(p.blend_strength);}
   Camera3D camera;camera.position={};camera.near_plane=.01f;camera.far_plane=2;
-  out.world.emplace_back(Scene3DView{Scene3D::create(camera,{std::move(dome)}),{0,0,static_cast<float>(width),static_cast<float>(height)}});
+  Scene3DView view{Scene3D::create(camera,{std::move(dome)}),{0,0,static_cast<float>(width),static_cast<float>(height)}};
+  // The engine's tier gate reads the view, not the material flag — without
+  // this the dome's anisotropic sampler keeps running on Low quality.
+  view.options.quality=static_cast<RenderQuality3D>(std::clamp(quality,0,3));
+  out.world.emplace_back(std::move(view));
  }
 };
 }

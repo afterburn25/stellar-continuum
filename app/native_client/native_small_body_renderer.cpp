@@ -124,7 +124,8 @@ void NativeSmallBodyRenderer::render(DrawList& out,const NativeSystemSnapshot& s
       hits_.push_back({s.field,b.id,s.p,s.radius});
     }
     last_scene_=Scene3D::create(camera,std::move(instances));
-    out.world.emplace_back(Scene3DView{last_scene_,clip});
+    Scene3DView scene_view{last_scene_,clip};scene_view.options.quality=quality_;
+    out.world.emplace_back(std::move(scene_view));
     statistics_.solid_bodies=solids.size();statistics_.batches+=solids.size();
   }
   std::erase_if(cache_,[&](const auto& item){return std::ranges::none_of(snapshot.small_body_fields,[&](const auto& f){return f.id==item.first;});});

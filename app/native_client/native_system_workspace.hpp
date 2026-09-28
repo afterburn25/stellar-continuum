@@ -81,6 +81,7 @@ public:
   // the phenomena pipeline feeds its composited local nebula field here.
   void set_scene_environment(std::shared_ptr<const stellar::native_map::RgbaImage> value){scene_environment_=std::move(value);}
   void set_small_body_images(SmallBodyImageProvider value){small_bodies_.set_images(std::move(value));}
+  void set_small_body_scene3d_quality(stellar::native_map::RenderQuality3D quality)noexcept{small_bodies_.set_scene3d_quality(quality);}
   void set_simulation_days(double days);
   [[nodiscard]] std::optional<int> tracked_body_id()const noexcept{return tracked_body_id_;}
   void set_motion_running(bool running)noexcept{motion_running_=running;}

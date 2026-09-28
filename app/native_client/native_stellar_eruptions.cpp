@@ -87,7 +87,8 @@ void EruptionArtwork::append(DrawList& out,Point center,float radius,const Stell
   SurfaceEffect3D effect;effect.next_texture=following;effect.blend=blend;effect.view_sphere_center={static_cast<float>(-camera.position.x),static_cast<float>(-camera.position.y),-10};effect.sphere_radius=1;
   m.surface_effect=std::move(effect);instances.push_back(std::move(instance));records_.push_back({e.id,e.visual_variant,static_cast<int>(sample.stage),progress});++count;
  }
- if(!instances.empty()){drawn_+=count;out.world.emplace_back(Scene3DView{Scene3D::create(camera,std::move(instances)),destination});}
+ if(!instances.empty()){drawn_+=count;Scene3DView eruption_view{Scene3D::create(camera,std::move(instances)),destination};
+  eruption_view.options.quality=static_cast<RenderQuality3D>(quality_);out.world.emplace_back(std::move(eruption_view));}
 }
 }
 

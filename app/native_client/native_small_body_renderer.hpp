@@ -12,6 +12,7 @@ struct SmallBodyHit{int field_id{};std::uint32_t body_index{};stellar::native_ma
 class NativeSmallBodyRenderer {
 public:
   void set_images(SmallBodyImageProvider p){images_=std::move(p);}
+  void set_scene3d_quality(stellar::native_map::RenderQuality3D quality)noexcept{quality_=quality;}
   // Cosmetic, visible-frame time. It never feeds orbital or resource physics.
   // There are no per-body timers or updates for off-screen systems.
   void advance_tumble(double seconds,bool running){if(running&&std::isfinite(seconds)&&seconds>0)tumble_seconds_+=std::min(seconds,.25);}
@@ -34,6 +35,7 @@ private:
   std::vector<SmallBodyHit> hits_;SmallBodyImageProvider images_;SmallBodyRenderStatistics statistics_;
   std::shared_ptr<const stellar::native_map::Scene3D> last_scene_;
   NativeSmallBodyGeometry geometry_;
+  stellar::native_map::RenderQuality3D quality_{stellar::native_map::RenderQuality3D::High};
   double tumble_seconds_{};
 };
 }

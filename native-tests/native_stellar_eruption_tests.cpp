@@ -34,6 +34,7 @@ int main(int argc,char** argv)try{
    for(int quality=0;quality<4;++quality){art.begin_frame(1,1,seconds++,true,quality);DrawList draw;art.append(draw,{400,300},110,s,0,clip);
      check(art.records().size()==1&&art.records()[0].id==id&&art.records()[0].variant==variant,"Coverage lost identity or variant");
      check(draw.world.size()==1&&std::holds_alternative<Scene3DView>(draw.world[0]),"Surface effect is not native 3D");
+     check(std::get<Scene3DView>(draw.world[0]).options.quality==static_cast<RenderQuality3D>(quality),"Eruption view ignored the quality tier");
      const auto& material=std::get<Scene3DView>(draw.world[0]).scene->instances().at(0).material;
      check(material.texture->width()==std::array{256,512,1024,1024}[quality],"High-quality artwork was downsampled below the prepared close-up tier");
      check(*s.stellar_activity==before,"Graphics quality changed simulation");
