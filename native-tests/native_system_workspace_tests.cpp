@@ -195,6 +195,7 @@ int main(int argc,char**argv)try{
   (void)artwork_ui.handle({InputEventType::Wheel,star_position,{},1000},1280,720);
   legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
   require(artwork_ui.viewport()->scale==55.f&&observed_radius<=350.f&&observed_radius>=300.f,"Maximum system zoom invalid: scale="+std::to_string(artwork_ui.viewport()->scale)+" star radius="+std::to_string(observed_radius));
+  float g_quadratic=0;
   {
     const auto photosphere=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
       const auto*view=std::get_if<Scene3DView>(&command);
@@ -202,10 +203,19 @@ int main(int argc,char**argv)try{
     require(photosphere!=legacy_draw.world.end(),"Spectral Sol emitted no limb-darkened photosphere");
     const auto&star_material=std::get<Scene3DView>(*photosphere).scene->instances().front().material;
     require(star_material.limb_darkening_q>0&&star_material.limb_darkening_mid>0,"Photosphere lost its three-term limb profile");
+    g_quadratic=star_material.limb_darkening_q;
   }
   legacy.stellar_object=generate_stellar_physics(1,StellarObjectType::OHotBlueStar);
   artwork_ui.refresh(legacy);observed_art.clear();legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
   require(observed_art=="o-hot-blue","Physical stellar identity must take precedence over legacy class");
+  {
+    const auto o_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.limb_darkening>0;});});
+    require(o_view!=legacy_draw.world.end(),"O-class primary emitted no limb-darkened photosphere");
+    const auto&o_material=std::ranges::find_if(std::get<Scene3DView>(*o_view).scene->instances(),[](const auto&i){return i.material.limb_darkening>0;})->material;
+    require(o_material.limb_darkening_q>g_quadratic,"Hot-star nonlinear limb term should exceed the cooler Sun's");
+  }
   for(const auto survey:{SystemSurveyLevel::unknown,SystemSurveyLevel::detected,SystemSurveyLevel::partially_surveyed}){
     require(!stellar::native_stellar::observed_stellar_artwork(survey,legacy.stellar_object,legacy.primary_stellar_class),"Incomplete survey leaked supplied stellar identity");
     if(survey==SystemSurveyLevel::partially_surveyed){

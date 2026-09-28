@@ -297,10 +297,13 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
       MeshInstance3D star;star.mesh=star_scene_mesh();
       star.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
       star.scale=radius;star.material=star_photosphere3d(kelvin);
-      // Sing three-term law on top of the preset's linear coefficient:
-      // the quadratic term steepens the rim while the mid-curve reaches
-      // further into the disc for a fuller transit profile.
-      star.material.limb_darkening_q=.18f;star.material.limb_darkening_mid=.12f;
+      // Sing three-term law on top of the preset's linear coefficient.
+      // The preset's linear term falls with temperature, so the nonlinear
+      // terms grow in compensation — hot stars carry a steeper mid-curve,
+      // cool dwarfs a flatter quadratic. Anchored so the Sun keeps the
+      // reviewed .18/.12 profile.
+      const float nonlinear=std::clamp(.55f*static_cast<float>(std::log10(kelvin))-1.65f,0.f,1.f);
+      star.material.limb_darkening_q=.10f+.20f*nonlinear;star.material.limb_darkening_mid=.08f+.10f*nonlinear;
       PbrSurface3D glow;glow.emissive_strength=.9f;star.material.pbr=glow;
       star_instances.push_back(std::move(star));
       if(cls==StellarClass::Protostar){
