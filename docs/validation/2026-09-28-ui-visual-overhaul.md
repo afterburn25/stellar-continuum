@@ -159,8 +159,12 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   granulation at 2054× zoom (`gal-star-system-maximum.bmp`), Earth PBR
   globe with terminator, night-side city lights and atmosphere rim
   (`pl-planetary-1.bmp`), Jupiter amber storm bands and Saturn's full
-  ring system (`work/fexp-{jupiter,saturn}-globe-front.bmp`), emissive
-  ship engine flames in the battle view (`bt.bmp`). `--planetary-smoke`
+  ring system (`work/fexp-{jupiter,saturn}-globe-front.bmp`), the
+  supermassive black hole's lensed accretion disc with photon ring and
+  doppler asymmetry on the galaxy map
+  (`work/fexp-central-black-hole.bmp`), a solar prominence arcing off
+  Sol's limb (`work/fexp-eruption-system.bmp`), and emissive ship
+  engine flames in the battle view (`bt.bmp`). `--planetary-smoke`
   green at 2560×1440 (review read-only, modal isolation, slot
   reservation, timed).
 
