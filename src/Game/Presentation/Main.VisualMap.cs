@@ -219,7 +219,11 @@ public partial class Main
                     DrawCircle(position, radius + 4.5f, MapAlpha(new Color("9a6bd5"), .12f));
             }
 
-            if (survey >= SystemSurveyLevel.Detected)
+            // At complete-galaxy scale the physical star point already shows a fully
+            // surveyed system. Keep progress arcs for incomplete surveys, and restore the
+            // complete ring as the camera approaches the high-detail regional view.
+            if (survey >= SystemSurveyLevel.Detected &&
+                (survey != SystemSurveyLevel.FullySurveyed || UiOverviewBlend < .65f))
             {
                 var extent = survey switch
                 {
@@ -228,13 +232,20 @@ public partial class Main
                     _ => MathF.PI * 2.0f,
                 };
                 var surveyRingGap = Mathf.Lerp(5.0f, 1.5f, UiOverviewBlend);
-                DrawArc(position, radius * 1.14f + surveyRingGap, -MathF.PI * 0.5f, -MathF.PI * 0.5f + extent, 40,
+                // At galaxy scale these rings are only a few pixels wide. Twelve segments
+                // stay visually round there and avoid tessellating 20,000 tiny line segments
+                // every frame in a fully surveyed 500-system catalogue.
+                var surveyRingSegments = (int)Mathf.Round(Mathf.Lerp(40, 12, UiOverviewBlend));
+                DrawArc(position, radius * 1.14f + surveyRingGap, -MathF.PI * 0.5f, -MathF.PI * 0.5f + extent, surveyRingSegments,
                     MapAlpha(survey == SystemSurveyLevel.FullySurveyed ? color : VisualPalette.TextSecondary, 0.48f), 1.0f, true);
             }
 
             if (selected)
                 DrawRegionalReticle(position, Math.Max(18.0f, radius + 11.0f), MapColor(VisualPalette.Selected));
-            if (selected || home || (survey >= SystemSurveyLevel.PartiallySurveyed && _zoom >= 0.88f))
+            // Hundreds of overlapping names are unreadable in the complete-galaxy view and
+            // dominate its draw cost. Full catalogue labels return continuously as the camera
+            // approaches regional scale; the selected and home systems always remain named.
+            if (selected || home || (survey >= SystemSurveyLevel.PartiallySurveyed && _zoom >= 0.88f && UiOverviewBlend < .65f))
             {
                 var label = PublicSystemName(system, playerId);
                 var labelColor = MapColor(selected ? VisualPalette.TextPrimary : VisualPalette.TextSecondary);

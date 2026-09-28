@@ -165,6 +165,12 @@ public partial class ScreenshotCapture : Node
             GD.Print("STELLAR_FOCUSED_PERFORMANCE_REVIEW_COMPLETE");
             return;
         }
+        if (focus == "territory")
+        {
+            await VerifyTerritorialInfluenceAsync(menu);
+            GD.Print("STELLAR_FOCUSED_TERRITORY_COMPLETE");
+            return;
+        }
         if (focus == "massive-combat-menu")
         {
             await VerifyMassiveCombatMenuLifecycleAsync(menu);

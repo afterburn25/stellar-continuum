@@ -3,6 +3,7 @@ using System.Text;
 using Game.Simulation.Exploration;
 using Game.Simulation.Knowledge;
 using Game.Simulation.Models;
+using Game.Simulation.Territory;
 
 namespace Game.Presentation;
 
@@ -156,7 +157,7 @@ public partial class Main
                     "COLONY STATUS UNKNOWN", "Detailed survey required");
             }
 
-            var facts = new[]
+            var facts = new System.Collections.Generic.List<UiInspectionFact>
             {
                 new UiInspectionFact("PRIMARY STAR", StellarClassLabel(inspection.StellarClass),
                     inspection.StellarClass.HasValue || inspection.Archetype.HasValue),
@@ -167,17 +168,64 @@ public partial class Main
                 new UiInspectionFact("RARE RESOURCES", YesNo(inspection.HasRareResource == true), inspection.HasRareResource == true),
                 new UiInspectionFact("PRE-WARP LIFE", YesNo(inspection.HasPreWarpCivilization == true), inspection.HasPreWarpCivilization == true),
             };
+            var territory = TerritorialRuntime.Peek(_galaxy);
+            var ownTerritory = territory?.Read(playerId, selected.Id);
+            if (ownTerritory is not null)
+            {
+                facts.Add(new("POLITICAL INFLUENCE", ownTerritory.Political.ToString("0.0"), ownTerritory.Political >= 4));
+                facts.Add(new("INFLUENCE SHARE", ownTerritory.Share.ToString("P0"), ownTerritory.Share >= TerritorialBalance.DominanceMinimumShare));
+                facts.Add(new("EFFECTIVE CONTROL", ownTerritory.EffectiveControl.ToString("P0"), ownTerritory.EffectiveControl >= .45));
+                facts.Add(new("ADMINISTRATION", ownTerritory.Administration.ToString("P0"), ownTerritory.Administration >= .12));
+                facts.Add(new("OPERATIONAL SUPPLY (NOT CARGO)", ownTerritory.Supply.ToString("P0"), ownTerritory.Supply >= .12));
+                facts.Add(new("TRADE REACH", ownTerritory.Trade.ToString("P0"), ownTerritory.Trade > 0));
+                facts.Add(new("MILITARY PROJECTION", ownTerritory.Military.ToString("P0"), ownTerritory.Military > 0));
+                facts.Add(new("EXPANSION REGION", ownTerritory.Expansion.ToString(), ownTerritory.Expansion != ExpansionRegion.Remote));
+                facts.Add(new("EXPEDITION COST", ownTerritory.ExpeditionMultiplier.ToString("0.00×"), ownTerritory.Expansion == ExpansionRegion.Established));
+                facts.Add(new("ESTABLISHMENT TIME", ownTerritory.EstablishmentMultiplier.ToString("0.00×"), ownTerritory.Expansion == ExpansionRegion.Established));
+                facts.Add(new("CONTROL VULNERABILITY", ownTerritory.InstabilityRisk.ToString("P0"), ownTerritory.InstabilityRisk < .35));
+                facts.Add(new("TAX COLLECTION", ownTerritory.TaxCollection.ToString("P0"), ownTerritory.TaxCollection >= .9));
+                facts.Add(new("ADMINISTRATION COST", ownTerritory.AdministrationMultiplier.ToString("0.00×"), ownTerritory.AdministrationMultiplier <= 1.1));
+                if (ownTerritory.Sources.Count > 0)
+                    facts.Add(new("CONTROL SOURCES", string.Join(" · ", ownTerritory.Sources.Select(source =>
+                        $"{source.Kind} {source.Political:0.0}/{source.Administration:P0}")), true));
+            }
+            SystemTerritory? regional = null;
+            if (territory?.Systems.TryGetValue(selected.Id, out var territorialSystem) == true)
+                regional = territorialSystem;
+            if (regional is not null)
+            {
+                var ownerId = regional.ControllerId ?? regional.Civilizations.FirstOrDefault()?.CivilizationId;
+                var controller = regional.ControllerId is int controllerId && _galaxy.Knowledge.IsCivilizationKnown(playerId, controllerId)
+                    ? _galaxy.Civilizations.First(c => c.Id == controllerId).Name : regional.ControllerId is null ? "No effective controller" : "Unconfirmed";
+                facts.Add(new("EFFECTIVE CONTROLLER", controller, regional.ControllerId == playerId));
+                if (ownerId == playerId)
+                    facts.Add(new("REGIONAL STATUS", regional.Status.ToString(), regional.Status != TerritorialControlStatus.Contested));
+                else if (ownerId is int foreignId && _galaxy.Knowledge.IsCivilizationKnown(playerId, foreignId))
+                    facts.Add(new("REGIONAL STATUS", regional.Status + " · " + _galaxy.Civilizations.First(c => c.Id == foreignId).Name,
+                        regional.Status != TerritorialControlStatus.Contested));
+                var knownShares = regional.Civilizations.Where(score => score.Share >= .005 && (score.CivilizationId == playerId ||
+                        _galaxy.Knowledge.IsCivilizationKnown(playerId, score.CivilizationId)))
+                    .Select(score => _galaxy.Civilizations.First(c => c.Id == score.CivilizationId).Name + " " + score.Share.ToString("P0"))
+                    .ToArray();
+                if (knownShares.Length > 1)
+                    facts.Add(new("KNOWN INFLUENCE SHARES", string.Join(" · ", knownShares), regional.Status != TerritorialControlStatus.Contested));
+            }
+            var claims = _diplomacyRuntime?.BuildView(playerId).Claims.Where(claim => claim.Active && claim.SystemId == selected.Id &&
+                (claim.ClaimantCivilizationId == playerId || _galaxy.Knowledge.IsCivilizationKnown(playerId, claim.ClaimantCivilizationId))).ToArray();
+            if (claims is { Length: > 0 })
+                facts.Add(new("CLAIMED BY", string.Join(" · ", claims.Select(claim =>
+                    _galaxy.Civilizations.First(civilization => civilization.Id == claim.ClaimantCivilizationId).Name)), false));
             var colony = _galaxy.Colonies.FirstOrDefault(candidate => candidate.SystemId == selected.Id);
             if (colony is null)
                 return new(inspection.CatalogName.ToUpperInvariant(), inspection.SurveyLevel.ToString(),
-                    inspection.SurveyProgress, true, "Detailed intelligence available.", facts,
+                    inspection.SurveyProgress, true, "Detailed intelligence available.", facts.ToArray(),
                     "NO KNOWN COLONY", "No represented settlement is known in this system.");
 
             var ownColony = colony.CivilizationId == playerId;
             var foreignColonyKnown = ownColony || _galaxy.Knowledge.IsCivilizationKnown(playerId, colony.CivilizationId);
             if (!foreignColonyKnown)
                 return new(inspection.CatalogName.ToUpperInvariant(), inspection.SurveyLevel.ToString(),
-                    inspection.SurveyProgress, true, "Detailed intelligence available.", facts,
+                    inspection.SurveyProgress, true, "Detailed intelligence available.", facts.ToArray(),
                     "COLONY PRESENCE UNIDENTIFIED", "Ownership and settlement details are not reliably known.");
 
             var colonyDetails = $"Population {colony.PopulationMillions:0.0}M · Infrastructure {colony.Infrastructure:0.00} · Stability {colony.Stability:P0}";
@@ -189,7 +237,7 @@ public partial class Main
                     colonyDetails += $" · Supply {logistics.Condition} · Local coverage {logistics.CoverageRatio:P0} · Imports {logistics.ImportedSupportRequiredPerDay:0.00}/day";
             }
             return new(inspection.CatalogName.ToUpperInvariant(), inspection.SurveyLevel.ToString(),
-                inspection.SurveyProgress, true, "Detailed intelligence available.", facts,
+                inspection.SurveyProgress, true, "Detailed intelligence available.", facts.ToArray(),
                 colony.Name.ToUpperInvariant(), colonyDetails);
         }
     }

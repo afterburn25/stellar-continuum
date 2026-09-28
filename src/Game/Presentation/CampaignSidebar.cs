@@ -55,6 +55,7 @@ public partial class CampaignSidebar : CanvasLayer
         var main = (Main)GetParent();
         AddNavigation(railItems, "home", "Home", VisualIconLibrary.NavHomeSemantic, "Center the home system.", main.UiSelectHomeSystem);
         AddNavigation(railItems, "inspection", "Inspect", VisualIconLibrary.NavInspection, "Inspect the selected system's known information.");
+        AddNavigation(railItems, "territory", "Territory", VisualIconLibrary.Info, "Show or hide the subtle territorial influence overlay.", main.UiToggleTerritoryMap).Name = "MapTerritory";
         AddNavigation(railItems, "zoom-in", "Zoom in", VisualIconLibrary.NavZoomIn, "Zoom toward the selected star or world.", main.UiZoomIn).Name = "MapZoomIn";
         AddNavigation(railItems, "zoom-out", "Zoom out", VisualIconLibrary.NavZoomOut, "Zoom out to the next map scale.", main.UiZoomOut).Name = "MapZoomOut";
         AddNavigation(railItems, "economy", "Economy", VisualIconLibrary.NavEconomy, "Review revenue, operating costs, and purchasing power.");

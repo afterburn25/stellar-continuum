@@ -124,6 +124,7 @@ public partial class Main
                 step.CombatEvents,
                 stepDay);
             HandleIntegratedDiplomacyRuntimeResult(diplomacyStep);
+            Game.Simulation.Territory.TerritorialDiplomacyBridge.Review(_galaxy, _diplomacyRuntime.State, diplomacyStep.Tick);
         }
 
         HandleConstructionEvents(step.ConstructionEvents);

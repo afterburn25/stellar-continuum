@@ -5,6 +5,7 @@ using Game.Simulation.Models;
 using Game.Simulation.Exploration;
 using Game.Simulation.Economy;
 using Game.Simulation.Colonization;
+using Game.Simulation.Territory;
 
 namespace Game.Presentation;
 
@@ -195,9 +196,12 @@ public partial class Main
                         : null;
                     var colony = outpost ? null : _colonization.AssessColonyOrder(_galaxy, fleet.Id, _selectedSystemId, bodyId);
                     if (!(assessment?.Accepted ?? colony!.Accepted)) return assessment?.Message ?? colony!.Message;
+                    var territorial = TerritorialExpansion.Quote(_galaxy, fleet, _selectedSystemId);
+                    if (!territorial.Allowed) return territorial.Reason;
                     var authorized = !fleet.PreventAutomaticSettlement && (fleet.DestinationPlanetaryBodyId is not null || fleet.SettlementBodyId is not null);
-                    var cost = authorized ? 0 : outpost ? ColonizationSimulation.ResourceOutpostExpeditionCreditCost : ColonizationSimulation.ColonyExpeditionCreditCost;
-                    return $"{UiFormatMoney(cost)} • At least {ColonizationSimulation.EstablishmentDays(fleet):0} game days\n" +
+                    var cost = authorized ? TerritorialExpansion.AdditionalCredits(_galaxy, fleet, territorial) : territorial.Credits;
+                    var days = authorized ? TerritorialExpansion.RequiredDays(_galaxy, fleet) : territorial.Days;
+                    return $"{UiFormatMoney(cost)} • At least {days:0} game days\n" +
                         (PlayerEconomy.Credits < cost ? "Additional funding required." : "Right-click this world to begin settlement.");
                 }
                 return fleet.Role == FleetRole.Colony ? "Point at a surveyed world to review settlement costs and requirements." :

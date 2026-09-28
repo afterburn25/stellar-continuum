@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -18,9 +19,19 @@ public partial class SystemInspectionPanel : CanvasLayer
     private GridContainer _facts = null!;
     private Label _colonyName = null!;
     private Label _colonyDetails = null!;
+    private VBoxContainer _territory = null!;
+    private string _territorySignature = "not-rendered";
+    private readonly Dictionary<int, TerritorialSiteControls> _territorialSiteControls = new();
+    private OptionButton? _territorialSelector;
+    private Label? _territorialPreview;
+    private Button? _territorialStart;
+    private int? _confirmDecommissionId;
+    private int _territoryKindIndex;
     private string _factSignature = "not-rendered";
     private int _lastSystemId = int.MinValue;
     private double _refreshTimer;
+
+    private sealed record TerritorialSiteControls(Label Name, ProgressBar Progress, Label Detail, Button Action);
 
     public override void _Ready()
     {
@@ -76,6 +87,16 @@ public partial class SystemInspectionPanel : CanvasLayer
         colonyRow.AddChild(colonyText);
         root.AddChild(colony);
 
+        var territoryHeading = new HBoxContainer { Name = "RegionalInfrastructureHeading" };
+        territoryHeading.AddChild(VisualUi.Text("REGIONAL INFRASTRUCTURE", 11, VisualUi.Accent));
+        var territoryRule = new ColorRect { Color = VisualPalette.Keyline, CustomMinimumSize = new Vector2(0, 1),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
+        territoryHeading.AddChild(territoryRule);
+        root.AddChild(territoryHeading);
+        _territory = new VBoxContainer { Name = "RegionalInfrastructure" };
+        _territory.AddThemeConstantOverride("separation", 6);
+        root.AddChild(_territory);
+
         _main.GetNode<CampaignSidebar>("CampaignSidebar").AddPanel(panel);
     }
 
@@ -90,6 +111,7 @@ public partial class SystemInspectionPanel : CanvasLayer
             return;
 
         _lastSystemId = _main.UiSelectedSystemId;
+        if (selectionChanged) _confirmDecommissionId = null;
         _refreshTimer = 0.0;
         RefreshIntelligence();
     }
@@ -103,6 +125,8 @@ public partial class SystemInspectionPanel : CanvasLayer
         _guidance.Text = intelligence.Guidance;
         _colonyName.Text = intelligence.ColonyName;
         _colonyDetails.Text = intelligence.ColonyDetails;
+
+        RefreshTerritorialInfrastructure();
 
         var signature = string.Join('|', intelligence.Facts.Select(fact => $"{fact.Label}:{fact.Value}:{fact.Positive}"));
         if (signature == _factSignature) return;
@@ -118,7 +142,7 @@ public partial class SystemInspectionPanel : CanvasLayer
         }
         foreach (var fact in intelligence.Facts)
         {
-            var card = new PanelContainer { CustomMinimumSize = new Vector2(260, 58),
+            var card = new PanelContainer { CustomMinimumSize = new Vector2(210, 58),
                 SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
             var factSurface = VisualUi.Surface(highlighted: fact.Positive, margin: 8);
             factSurface.BgColor = VisualPalette.SurfaceSecondary;
@@ -127,9 +151,126 @@ public partial class SystemInspectionPanel : CanvasLayer
             body.AddThemeConstantOverride("separation", 1);
             body.AddChild(VisualUi.Text(fact.Label, 9, VisualUi.Muted));
             body.AddChild(VisualUi.Text(fact.Value.ToUpperInvariant(), 14,
-                fact.Positive ? VisualUi.Accent : Colors.White));
+                fact.Positive ? VisualUi.Accent : Colors.White, wrap: true));
             card.AddChild(body);
             _facts.AddChild(card);
         }
+    }
+
+    private void RefreshTerritorialInfrastructure()
+    {
+        var sites = _main.UiSelectedTerritorialSites;
+        var options = _main.UiTerritorialInstallationOptions;
+        var signature = string.Join('|', options.Select(option => option.Kind)) +
+            $"/{string.Join(',', sites.Select(site => site.Id))}";
+        if (signature != _territorySignature)
+        {
+            _territorySignature = signature;
+            RebuildTerritorialInfrastructure(sites, options);
+        }
+        UpdateTerritorialInfrastructure(sites, options);
+    }
+
+    private void RebuildTerritorialInfrastructure(UiTerritorialSite[] sites, UiTerritorialInstallationOption[] options)
+    {
+        foreach (var child in _territory.GetChildren()) child.QueueFree();
+        _territorialSiteControls.Clear();
+        _territorialSelector = null;
+        _territorialPreview = null;
+        _territorialStart = null;
+
+        foreach (var site in sites)
+        {
+            var card = new PanelContainer { Name = "RegionalSiteProgress" };
+            card.AddThemeStyleboxOverride("panel", VisualUi.Surface(margin: 8));
+            var body = new VBoxContainer();
+            var name = VisualUi.Text(string.Empty, 13, Colors.White);
+            body.AddChild(name);
+            var progress = new ProgressBar { MaxValue = 100, ShowPercentage = false,
+                CustomMinimumSize = new Vector2(0, 8) };
+            body.AddChild(progress);
+            var detail = VisualUi.Text(string.Empty, 11, VisualUi.Muted, wrap: true);
+            body.AddChild(detail);
+            var remove = VisualUi.Button(string.Empty, string.Empty,
+                () =>
+                {
+                    var current = _main.UiSelectedTerritorialSites.FirstOrDefault(item => item.Id == site.Id);
+                    if (current is null) return;
+                    var confirming = _confirmDecommissionId == site.Id;
+                    if (current.Complete && !confirming) _confirmDecommissionId = site.Id;
+                    else { _main.UiRemoveTerritorialInstallation(site.Id, confirming); _confirmDecommissionId = null; }
+                    RefreshTerritorialInfrastructure();
+                });
+            body.AddChild(remove);
+            card.AddChild(body);
+            _territory.AddChild(card);
+            _territorialSiteControls[site.Id] = new TerritorialSiteControls(name, progress, detail, remove);
+        }
+
+        if (options.Length == 0)
+        {
+            _territory.AddChild(VisualUi.Text("Select a surveyed system to plan regional infrastructure.", 11, VisualUi.Muted, wrap: true));
+            return;
+        }
+        _territoryKindIndex = Math.Clamp(_territoryKindIndex, 0, options.Length - 1);
+        var selected = options[_territoryKindIndex];
+        var planning = new PanelContainer { Name = "TerritorialPlanning", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        planning.AddThemeStyleboxOverride("panel", VisualUi.Surface(margin: 7));
+        var planningBody = new VBoxContainer();
+        planningBody.AddChild(VisualUi.Text("PLAN A REGIONAL SITE", 12, VisualUi.Accent));
+        var selector = new OptionButton { Name = "TerritorialInstallationSelector" };
+        foreach (var option in options) selector.AddItem(option.Name);
+        selector.Selected = _territoryKindIndex;
+        selector.ItemSelected += index =>
+        {
+            _territoryKindIndex = (int)index;
+            UpdateTerritorialInfrastructure(_main.UiSelectedTerritorialSites, _main.UiTerritorialInstallationOptions);
+        };
+        planningBody.AddChild(selector);
+        var preview = VisualUi.Text(string.Empty, 10, VisualUi.Muted, wrap: true);
+        planningBody.AddChild(preview);
+        var start = VisualUi.Button(string.Empty, string.Empty, () =>
+        {
+            var current = _main.UiTerritorialInstallationOptions;
+            if (current.Length == 0) return;
+            _territoryKindIndex = Math.Clamp(_territoryKindIndex, 0, current.Length - 1);
+            _main.UiStartTerritorialInstallation(current[_territoryKindIndex].Kind);
+            RefreshTerritorialInfrastructure();
+        });
+        planningBody.AddChild(start);
+        planning.AddChild(planningBody);
+        _territory.AddChild(planning);
+        _territorialSelector = selector;
+        _territorialPreview = preview;
+        _territorialStart = start;
+    }
+
+    private void UpdateTerritorialInfrastructure(UiTerritorialSite[] sites, UiTerritorialInstallationOption[] options)
+    {
+        foreach (var site in sites)
+        {
+            if (!_territorialSiteControls.TryGetValue(site.Id, out var controls)) continue;
+            controls.Name.Text = site.Name.ToUpperInvariant();
+            controls.Name.Modulate = site.Complete ? VisualUi.Accent : Colors.White;
+            controls.Progress.Value = site.Progress * 100;
+            controls.Detail.Text = site.Detail;
+            controls.Detail.Modulate = site.Paused ? new Color("e4aa55") : VisualUi.Muted;
+            var confirming = _confirmDecommissionId == site.Id;
+            controls.Action.Text = site.Complete && !confirming ? "Decommission" :
+                site.Complete ? "Confirm decommission" : "Cancel construction";
+            controls.Action.TooltipText = site.Complete ? "Completed sites have no refund." :
+                "Cancel returns 80% of remaining paid capital and materials.";
+        }
+
+        if (options.Length == 0 || _territorialSelector is null || _territorialPreview is null || _territorialStart is null)
+            return;
+        _territoryKindIndex = Math.Clamp(_territoryKindIndex, 0, options.Length - 1);
+        _territorialSelector.Selected = _territoryKindIndex;
+        var selected = options[_territoryKindIndex];
+        _territorialPreview.Text = selected.Preview;
+        _territorialPreview.Modulate = selected.Available ? VisualUi.Muted : new Color("e4aa55");
+        _territorialStart.Text = selected.Available ? "Start project" : "Requirements";
+        _territorialStart.TooltipText = selected.Preview;
+        _territorialStart.Disabled = !selected.Available;
     }
 }

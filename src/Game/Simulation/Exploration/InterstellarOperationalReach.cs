@@ -86,6 +86,12 @@ public sealed class LaneInterstellarOperationalReachView : IInterstellarOperatio
             .ToDictionary(group => group.Key, group => group.Any(colony => colony.Kind == SettlementKind.Colony)
                 ? 1.0
                 : 0.5);
+        foreach (var site in galaxy.Territory?.Installations.Where(i => i.CivilizationId == civilizationId && i.IsComplete)
+                     ?? Enumerable.Empty<Game.Simulation.Territory.TerritorialInstallation>())
+        {
+            var level = Game.Simulation.Territory.TerritorialConstruction.Refueling(galaxy, civilizationId, site.SystemId);
+            if (level > 0) refuelingSystems[site.SystemId] = Math.Max(refuelingSystems.GetValueOrDefault(site.SystemId), level);
+        }
         var fuelRemaining = refuelingSystems.TryGetValue(originSystemId, out var originService)
             ? fleet.FuelCapacityLightYears * originService
             : fleet.FuelRemainingLightYears;

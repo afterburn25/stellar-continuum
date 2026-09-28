@@ -218,15 +218,19 @@ public sealed class ColonizationOpportunityPlanner
             hasSurface &&
             !native &&
             suitability.ColonizationViability != SpeciesColonizationViability.Unsuitable;
+        var territorial = Game.Simulation.Territory.TerritorialExpansion.Quote(galaxy, fleet, system.Id);
         var expeditionAffordable = fleet.DestinationSystemId is not null ||
             galaxy.Economies.First(economy => economy.CivilizationId == fleet.CivilizationId).Credits + 0.0001 >=
             ColonizationSimulation.ColonyExpeditionCreditCost;
+        if (galaxy.Territory is not null)
+            expeditionAffordable = galaxy.Economies.First(e => e.CivilizationId == fleet.CivilizationId).Credits + .0001 >=
+                Game.Simulation.Territory.TerritorialExpansion.AdditionalCredits(galaxy, fleet, territorial);
         var canOrder =
             biologicallyAvailable &&
             !occupied &&
             !reservedByFriendlyMission &&
             reach.IsSupported &&
-            expeditionAffordable;
+            expeditionAffordable && territorial.Allowed;
         var distance = InterstellarDistance.FromFleet(galaxy, fleet, system);
 
         string reason;
@@ -255,6 +259,10 @@ public sealed class ColonizationOpportunityPlanner
         {
             reason = reach.Reason;
         }
+        else if (!territorial.Allowed)
+        {
+            reason = territorial.Reason;
+        }
         else if (!expeditionAffordable)
         {
             reason = $"{Game.Simulation.Economy.SovereignCurrencyCatalog.ForCivilization(galaxy, fleet.CivilizationId).Format(ColonizationSimulation.ColonyExpeditionCreditCost)} is required to fund the colony expedition.";
@@ -267,6 +275,7 @@ public sealed class ColonizationOpportunityPlanner
             reason = $"{body.Name} is {mode} for {speciesName}. {reach.Reason}";
         }
 
+        if (territorial.Allowed && galaxy.Territory is not null) reason += " " + territorial.Reason;
         return new ColonizationOpportunityCandidate(
             system.Id,
             system.Name,

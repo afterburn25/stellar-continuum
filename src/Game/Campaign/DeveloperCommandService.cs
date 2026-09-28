@@ -23,9 +23,14 @@ public static class DeveloperCommandService
         new DeveloperCommandDefinition("unlock_technology", "Unlock gameplay technology", "Complete the current gameplay technology and empire project catalogs. Ships still need construction."),
         new DeveloperCommandDefinition("unlock_research", "Unlock research only", "Grant gameplay capabilities while preserving construction orders and project timers for testing."),
         new DeveloperCommandDefinition("advance_30_days", "Advance 30 days", "Run 30 days through normal simulation rules, including other civilizations and diplomacy."),
+        new DeveloperCommandDefinition("territory_recompute", "Refresh territorial control", "Rebuild derived influence from current sources without advancing time."),
+        new DeveloperCommandDefinition("territory_relay", "Add test relay at selection", "Developer only: add a completed owned relay to the selected system."),
+        new DeveloperCommandDefinition("territory_depot", "Add test depot at selection", "Developer only: add a completed owned supply depot to the selected system."),
+        new DeveloperCommandDefinition("territory_remove_sites", "Destroy selected test infrastructure", "Remove your regional installations in the selected system without a refund and recalculate their loss."),
+        new DeveloperCommandDefinition("territory_remove_colony", "Evacuate selected colony source", "Remove the population from your selected settlement to test source loss. Buildings and transport references remain valid in this Developer campaign."),
     });
 
-    public static DeveloperCommandResult Execute(GalaxyState galaxy, string commandId, Action<double>? advanceDays = null)
+    public static DeveloperCommandResult Execute(GalaxyState galaxy, string commandId, Action<double>? advanceDays = null, int? selectedSystemId = null)
     {
         ArgumentNullException.ThrowIfNull(galaxy);
         if (galaxy.DeveloperSession is null)
@@ -35,6 +40,29 @@ public static class DeveloperCommandService
         if (commandId == "advance_30_days" && advanceDays is null)
             return new(false, "The campaign simulation must be connected before advancing time.");
         var playerId = galaxy.PlayerCivilizationId;
+        if (commandId.StartsWith("territory_", StringComparison.Ordinal))
+        {
+            var system = selectedSystemId ?? galaxy.Civilizations.First(c => c.Id == playerId).HomeSystemId;
+            if (!galaxy.Systems.Any(s => s.Id == system)) return new(false, "Select a valid system first.");
+            galaxy.DeveloperSession = galaxy.DeveloperSession with { ToolsUsed = true };
+            var territory = Game.Simulation.Territory.TerritorialRuntime.Initialize(galaxy);
+            if (commandId is "territory_relay" or "territory_depot")
+            {
+                var kind = commandId == "territory_relay" ? Game.Simulation.Territory.TerritorialInstallationKind.Relay : Game.Simulation.Territory.TerritorialInstallationKind.SupplyDepot;
+                if (!galaxy.Territory!.Installations.Any(i => i.CivilizationId == playerId && i.SystemId == system && i.Kind == kind))
+                {
+                    var definition = Game.Simulation.Territory.TerritorialBalance.Definition(kind);
+                    galaxy.Territory.Installations.Add(new() { Id = galaxy.Territory.Installations.Select(i => i.Id).DefaultIfEmpty(0).Max() + 1,
+                        CivilizationId = playerId, SystemId = system, Kind = kind, BuilderFleetId = -1,
+                        RequiredDays = definition.Days, CompletedDays = definition.Days });
+                }
+            }
+            if (commandId == "territory_remove_sites") galaxy.Territory!.Installations.RemoveAll(i => i.CivilizationId == playerId && i.SystemId == system);
+            if (commandId == "territory_remove_colony")
+                foreach (var colony in galaxy.Colonies.Where(c => c.CivilizationId == playerId && c.SystemId == system)) colony.PopulationMillions = 0;
+            territory.Recompute(galaxy);
+            return new(true, "Developer territorial sources refreshed. Tools used is saved with this campaign.");
+        }
         var economy = galaxy.Economies.First(e => e.CivilizationId == playerId);
         if (!double.IsFinite(economy.Credits) || !double.IsFinite(economy.Industry) || !double.IsFinite(economy.Science) ||
             economy.Credits < 0 || economy.Industry < 0 || economy.Science < 0)

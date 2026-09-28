@@ -159,7 +159,8 @@ public sealed class EconomySimulation
                 var labor = ColonyLaborEconomy.GetSnapshot(colony, industrialAutomation,
                     Math.Min(surface.WorkforceAvailableMillions, surface.WorkforceDemandMillions));
                 colonyRevenue += labor.EmployedPopulationMillions / 1000.0 *
-                    EmploymentTaxCreditsPerBillionWorkersPerDay * infrastructure * stability;
+                    EmploymentTaxCreditsPerBillionWorkersPerDay * infrastructure * stability *
+                    (Game.Simulation.Territory.TerritorialRuntime.Peek(galaxy)?.Read(civilizationId, colony.SystemId)?.TaxCollection ?? 1);
             }
             if (colony.Kind == SettlementKind.Colony)
                 tradeRevenue += surface.CreditsPerDay;
@@ -167,7 +168,8 @@ public sealed class EconomySimulation
             // A tiny dependent outpost has real overhead without being charged as though it
             // were a self-governing world of hundreds of millions. Administration reaches the
             // established full-colony rate at 250 million inhabitants.
-            administration += GetAdministrationCost(colony.PopulationMillions);
+            administration += GetAdministrationCost(colony.PopulationMillions) *
+                (Game.Simulation.Territory.TerritorialRuntime.Peek(galaxy)?.Read(civilizationId, colony.SystemId)?.AdministrationMultiplier ?? 1);
             populationServices += populationFactor * PopulationServicesCreditsPerBillionPerDay * infrastructure;
             var burden = habitatBurden.Build(galaxy, colony.Id);
             habitatSupport += GetHabitatSupportCost(burden) * (1 - surface.HabitatSupportReduction);
@@ -185,6 +187,7 @@ public sealed class EconomySimulation
         var researchOperations = includeResearchOperations
             ? galaxy.Economies.First(state => state.CivilizationId == civilizationId).LastResearchSpendingPerDay
             : 0.0;
+        orbitalMaintenance += Game.Simulation.Territory.TerritorialConstruction.Upkeep(galaxy, civilizationId);
         return new(colonyRevenue, tradeRevenue, administration, populationServices, habitatSupport,
             fleetOperations, orbitalMaintenance, surfaceMaintenance, researchOperations);
     }

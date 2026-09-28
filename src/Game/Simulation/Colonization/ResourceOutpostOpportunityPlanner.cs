@@ -91,11 +91,15 @@ public sealed class ResourceOutpostOpportunityPlanner
             other.CivilizationId == fleet.CivilizationId && other.Role == FleetRole.Colony &&
             other.DestinationSystemId == system.Id);
         var harsh = suitability.ColonizationViability == SpeciesColonizationViability.Unsuitable;
+        var territorial = Game.Simulation.Territory.TerritorialExpansion.Quote(galaxy, fleet, system.Id);
         var expeditionAffordable = fleet.DestinationSystemId is not null ||
             galaxy.Economies.First(economy => economy.CivilizationId == fleet.CivilizationId).Credits + 0.0001 >=
             ColonizationSimulation.ResourceOutpostExpeditionCreditCost;
+        if (galaxy.Territory is not null)
+            expeditionAffordable = galaxy.Economies.First(e => e.CivilizationId == fleet.CivilizationId).Credits + .0001 >=
+                Game.Simulation.Territory.TerritorialExpansion.AdditionalCredits(galaxy, fleet, territorial);
         var canOrder = body.Environment.HasSolidSurface && body.HasRareResource && !body.HasPreWarpCivilization &&
-            harsh && !occupied && !reserved && reach.IsSupported && expeditionAffordable;
+            harsh && !occupied && !reserved && reach.IsSupported && expeditionAffordable && territorial.Allowed;
         string reason;
         if (!body.Environment.HasSolidSurface) reason = $"{body.Name} has no solid surface for the current outpost model.";
         else if (!body.HasRareResource) reason = $"{body.Name} has no confirmed rare-resource deposit.";
@@ -104,9 +108,11 @@ public sealed class ResourceOutpostOpportunityPlanner
         else if (occupied) reason = "That system already contains a settlement in the current single-settlement model.";
         else if (reserved) reason = "Another friendly settlement vessel is already committed to that system.";
         else if (!reach.IsSupported) reason = reach.Reason;
+        else if (!territorial.Allowed) reason = territorial.Reason;
         else if (!expeditionAffordable) reason = $"{Game.Simulation.Economy.SovereignCurrencyCatalog.ForCivilization(galaxy, fleet.CivilizationId).Format(ColonizationSimulation.ResourceOutpostExpeditionCreditCost)} is required to fund the resource-outpost expedition.";
         else reason = $"{body.Name} is too harsh for colonization but its confirmed deposit can support a sealed staffed outpost. {reach.Reason}";
 
+        if (territorial.Allowed && galaxy.Territory is not null) reason += " " + territorial.Reason;
         return new ResourceOutpostOpportunityCandidate(system.Id, system.Name, body.Id, body.Name,
             fleet.Id, suitability.SpeciesId, suitability.NaturalHabitability,
             suitability.UnprotectedOperationalCapacity, suitability.LimitingFactor,

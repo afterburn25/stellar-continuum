@@ -8,6 +8,7 @@ using Game.Persistence;
 using Game.Simulation.Models;
 using Game.Simulation.Time;
 using Game.Simulation.Research.Adaptive;
+using Game.Simulation.Territory;
 
 namespace Game.Presentation;
 
@@ -343,6 +344,10 @@ public partial class Main
         _diplomacyState = bootstrap.Diplomacy;
         _adaptiveResearch = bootstrap.AdaptiveResearch;
         AdaptiveResearchCampaignProgression.SynchronizeDevelopmentStages(_galaxy, _adaptiveResearch);
+        // Territory is a derived campaign cache. Initialize it once at the bootstrap boundary;
+        // map and inspection readers deliberately only Peek at this snapshot.
+        TerritorialRuntime.Initialize(_galaxy);
+        if (_diplomacyState is not null) TerritorialDiplomacyBridge.Bind(_galaxy, _diplomacyState);
         _clock.Restore(bootstrap.SimulationDays);
         ResetMassiveCombatHostForCampaign();
         _autosaveScheduler = UiIsDeveloperMode ? PlayableDemoScenario.CreateAutosaveScheduler() : new CampaignAutosaveScheduler();
@@ -356,6 +361,7 @@ public partial class Main
 
     private void ResetIntegratedCampaignPresentation()
     {
+        UiTerritoryMapVisible = true;
         _playerNotifications.Clear();
         _returnConfirmation = null;
         ResetVoicePresentation();

@@ -202,7 +202,7 @@ public partial class Main
         if (UiIsMenuOpen) return new(false, "Close the campaign menu before running Developer tools.");
         try
         {
-            var result = DeveloperCommandService.Execute(_galaxy, id, AdvanceDeveloperDays);
+            var result = DeveloperCommandService.Execute(_galaxy, id, AdvanceDeveloperDays, _selectedSystemId >= 0 ? _selectedSystemId : null);
             if (!result.Accepted) return new(false, result.Message);
             if (id is "unlock_technology" or "unlock_research" && _adaptiveResearch is not null)
             {

@@ -4,18 +4,22 @@ using System.Linq;
 using System.Numerics;
 using Game.Simulation.Diplomacy;
 using Game.Simulation.Models;
+using Game.Simulation.Territory;
 
 namespace Game.Presentation;
 
-/// <summary>Cached observer-safe political ownership cells. Claims stay separate from ownership.</summary>
+/// <summary>Cached observer-safe influence contours. Claims stay separate from control.</summary>
 public sealed class StrategicTerritoryProjection
 {
+    private sealed record CachedProjection(int Fingerprint, StrategicTerritoryProjection Projection);
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<GalaxyState, Dictionary<int, CachedProjection>> Projections = new();
     public IReadOnlyList<StrategicTerritoryRegion> Territories { get; }
     public IReadOnlyList<StrategicTerritoryClaimOutline> Claims { get; }
     public IReadOnlyList<StrategicTerritoryFillRun> FogRuns { get; }
     public IReadOnlyList<IReadOnlyList<Vector2>> FogContours { get; }
     public StrategicFogMask FogMask { get; }
     public IReadOnlySet<int> UnexploredSystemIds { get; }
+    public IReadOnlyList<StrategicTerritoryContestedSystem> ContestedSystems { get; }
     public int UnownedCellCount { get; }
     public int GridCellCount { get; }
     private StrategicTerritoryProjection(
@@ -26,7 +30,8 @@ public sealed class StrategicTerritoryProjection
         StrategicFogMask fogMask,
         IReadOnlySet<int> unexplored,
         int unownedCellCount,
-        int gridCellCount)
+        int gridCellCount,
+        IReadOnlyList<StrategicTerritoryContestedSystem> contestedSystems)
     {
         Territories = territories;
         Claims = claims;
@@ -36,6 +41,7 @@ public sealed class StrategicTerritoryProjection
         UnexploredSystemIds = unexplored;
         UnownedCellCount = unownedCellCount;
         GridCellCount = gridCellCount;
+        ContestedSystems = contestedSystems;
     }
 
     public static StrategicTerritoryProjection Build(GalaxyState galaxy, int observerId,
@@ -49,15 +55,10 @@ public sealed class StrategicTerritoryProjection
         // authoritative systems, ownership, diplomacy, or observer knowledge.
         var positions = galaxy.Systems.ToDictionary(system => system.Id, system => system.Position * coordinateScale);
         var civilizations = galaxy.Civilizations.ToDictionary(civilization => civilization.Id);
-        var settlementOwners = galaxy.Colonies
-            .GroupBy(colony => colony.SystemId)
-            .ToDictionary(group => group.Key, group => group.OrderBy(colony => colony.Id).First().CivilizationId);
+        var territorialSnapshot = TerritorialRuntime.Peek(galaxy);
         var anchors = new Dictionary<(int, int), StrategicTerritoryAnchor>();
 
-        bool Visible(int civilizationId, int systemId) =>
-            civilizationId == observerId
-            || galaxy.Knowledge.IsCivilizationKnown(observerId, civilizationId)
-            && galaxy.Knowledge.IsSystemFullySurveyed(observerId, systemId);
+        bool Visible(int civilizationId, int systemId) => TerritorialObservationMemory.CanObserve(galaxy, observerId, civilizationId, systemId);
 
         void Add(int civilizationId, int systemId, StrategicTerritoryAnchorKind kind)
         {
@@ -67,23 +68,75 @@ public sealed class StrategicTerritoryProjection
                 anchors[key] = new(civilizationId, systemId, positions[star.Id], kind);
         }
 
-        // A current settlement authority supersedes a former civilization's natal marker.
-        foreach (var civilization in civilizations.Values)
-            if (!settlementOwners.TryGetValue(civilization.HomeSystemId, out var owner)
-                || owner == civilization.Id
-                || !Visible(owner, civilization.HomeSystemId))
-                Add(civilization.Id, civilization.HomeSystemId, StrategicTerritoryAnchorKind.Home);
-        foreach (var colony in galaxy.Colonies)
-            Add(colony.CivilizationId, colony.SystemId, StrategicTerritoryAnchorKind.Settlement);
+        // A player always has direct knowledge of its represented, physical sources. This is
+        // not a natal marker: a source appears and disappears with its authoritative colony.
+        foreach (var colony in galaxy.Colonies.Where(colony => colony.CivilizationId == observerId && colony.PopulationMillions > 0))
+            Add(observerId, colony.SystemId, StrategicTerritoryAnchorKind.Control);
+
+        // Foreign control is current only when it is legitimately visible. If its live owner
+        // becomes hidden, retain only that system's prior reported owner; hidden activity in one
+        // place must never freeze unrelated player expansion or source loss elsewhere.
+        foreach (var territory in territorialSnapshot?.Systems.Values ?? Enumerable.Empty<SystemTerritory>())
+        {
+            var owner = territory.Status is TerritorialControlStatus.Controlled or TerritorialControlStatus.Dominant
+                ? territory.ControllerId ?? territory.Civilizations.FirstOrDefault()?.CivilizationId : null;
+            var remembered = TerritorialObservationMemory.Recall(galaxy, observerId, territory.SystemId);
+            var unobservedLocalInfluence = territory.Civilizations.Any(contender => contender.Political > 0 && !Visible(contender.CivilizationId, territory.SystemId));
+            if (owner == observerId)
+            {
+                // Project genuinely controlled empty systems too, once surveyed. Owning a
+                // station or projecting control never requires an inhabited planet.
+                // Unvisited catalogue points remain behind exploration fog.
+                TerritorialObservationMemory.Forget(galaxy, observerId, territory.SystemId);
+                if (galaxy.Knowledge.IsSystemFullySurveyed(observerId, territory.SystemId))
+                    Add(observerId, territory.SystemId, StrategicTerritoryAnchorKind.Control);
+                continue;
+            }
+            if (owner is null && remembered is not null && !unobservedLocalInfluence)
+                TerritorialObservationMemory.Forget(galaxy, observerId, territory.SystemId);
+            if (owner is int civilizationId && Visible(civilizationId, territory.SystemId))
+            {
+                TerritorialObservationMemory.Remember(galaxy, observerId, territory.SystemId, civilizationId, territory.Status);
+                Add(civilizationId, territory.SystemId, StrategicTerritoryAnchorKind.Control);
+            }
+            else if (TerritorialObservationMemory.Recall(galaxy, observerId, territory.SystemId) is { } rememberedAfter &&
+                     Visible(rememberedAfter.CivilizationId, rememberedAfter.SystemId))
+                Add(rememberedAfter.CivilizationId, rememberedAfter.SystemId, StrategicTerritoryAnchorKind.Control);
+        }
 
         var all = anchors.Values.OrderBy(anchor => anchor.CivilizationId).ThenBy(anchor => anchor.SystemId).ToArray();
+        var unknown = galaxy.Systems.Where(system => !galaxy.Knowledge.IsSystemKnown(observerId, system.Id))
+            .Select(system => system.Id).ToHashSet();
+        var contested = territorialSnapshot?.Systems.Values
+            .Where(item => item.Status == TerritorialControlStatus.Contested && systems.ContainsKey(item.SystemId) &&
+                item.Civilizations.Where(contender => contender.Share >= TerritorialBalance.ContestedMinimumShare)
+                    .All(contender => Visible(contender.CivilizationId, item.SystemId)))
+            .Select(item => new StrategicTerritoryContestedSystem(item.SystemId, positions[item.SystemId]))
+            .Where(item => galaxy.Knowledge.IsSystemFullySurveyed(observerId, item.SystemId))
+            .OrderBy(item => item.SystemId).ToArray() ?? Array.Empty<StrategicTerritoryContestedSystem>();
+        // Numerical control reviews need not retessellate an unchanged observer map.
+        // Cache only the exact visual inputs; changed ownership, survey, claims, names or
+        // positions invalidate this bounded per-campaign observer cache.
+        var fingerprint = new HashCode(); fingerprint.Add(coordinateScale);
+        foreach (var system in galaxy.Systems) { fingerprint.Add(system.Id); fingerprint.Add(system.Position); fingerprint.Add(system.GalacticDepthLightYears); fingerprint.Add(unknown.Contains(system.Id)); }
+        foreach (var anchor in all) { fingerprint.Add(anchor.CivilizationId); fingerprint.Add(anchor.SystemId); }
+        foreach (var civilization in galaxy.Civilizations) { fingerprint.Add(civilization.Id); fingerprint.Add(civilization.Name); }
+        foreach (var claim in observerClaims ?? Array.Empty<TerritorialClaimSnapshot>())
+        { fingerprint.Add(claim.ClaimantCivilizationId); fingerprint.Add(claim.SystemId); fingerprint.Add(claim.Active); fingerprint.Add(Visible(claim.ClaimantCivilizationId, claim.SystemId)); }
+        foreach (var item in contested) fingerprint.Add(item.SystemId);
+        var key = fingerprint.ToHashCode();
+        var observerCache = Projections.GetValue(galaxy, _ => new());
+        if (observerCache.TryGetValue(observerId, out var cached) && cached.Fingerprint == key) return cached.Projection;
         var grid = TerritoryGrid.Create(positions.Values);
+        var physicalCoordinates = galaxy.Systems.Any(system => system.GalacticDepthLightYears.HasValue);
         var radii = all.ToDictionary(
             anchor => (anchor.CivilizationId, anchor.SystemId),
-            anchor => Math.Max(Radius(anchor, all), grid.CellSize * .72f));
+            anchor => Math.Max(Radius(anchor, all, coordinateScale, physicalCoordinates), grid.CellSize * .72f));
         var cells = Assign(grid, all, radii);
         PreserveVisibleOwners(grid, cells, all);
-        var regions = Regions(grid, cells, all, radii, civilizations);
+        var field = new SmoothTerritoryField(grid, all, radii,
+            new Game.Simulation.Exploration.InterstellarLaneNetwork().Build(galaxy.Systems));
+        var regions = Regions(grid, cells, all, radii, civilizations, field);
         var claims = new List<StrategicTerritoryClaimOutline>();
         foreach (var claim in observerClaims ?? Array.Empty<TerritorialClaimSnapshot>())
             if (claim.Active
@@ -92,13 +145,9 @@ public sealed class StrategicTerritoryProjection
                 && Visible(claim.ClaimantCivilizationId, claim.SystemId))
                 claims.Add(new(claim.ClaimantCivilizationId, claim.SystemId, positions[star.Id], Math.Max(28f, grid.CellSize * 1.3f)));
 
-        var unknown = galaxy.Systems
-            .Where(system => !galaxy.Knowledge.IsSystemKnown(observerId, system.Id))
-            .Select(system => system.Id)
-            .ToHashSet();
         var unowned = cells.Cast<int>().Count(owner => owner < 0);
         var fogCells = BuildFogCells(grid, galaxy.Systems, positions, unknown);
-        return new(
+        var result = new StrategicTerritoryProjection(
             regions,
             claims.OrderBy(x => x.CivilizationId).ThenBy(x => x.SystemId).ToArray(),
             Runs(grid, fogCells, 1),
@@ -106,29 +155,35 @@ public sealed class StrategicTerritoryProjection
             BuildFogMask(grid, fogCells),
             unknown,
             unowned,
-            grid.Width * grid.Height);
+            grid.Width * grid.Height,
+            contested);
+        observerCache[observerId] = new(key, result);
+        return result;
     }
 
     private static int[,] Assign(TerritoryGrid grid, IReadOnlyList<StrategicTerritoryAnchor> anchors, IReadOnlyDictionary<(int CivilizationId, int SystemId), float> radii)
     {
         var cells = new int[grid.Width, grid.Height];
-        for (var x = 0; x < grid.Width; x++)
-            for (var y = 0; y < grid.Height; y++)
-            {
-                var bestOwner = -1;
-                var bestScore = 0f;
-                var point = grid.Center(x, y);
-                foreach (var anchor in anchors)
+        var scores = new float[grid.Width, grid.Height];
+        for (var x = 0; x < grid.Width; x++) for (var y = 0; y < grid.Height; y++) cells[x, y] = -1;
+        // Only examine cells inside an anchor's small radius. This preserves the old
+        // distance field while avoiding a grid-by-every-system pass in large campaigns.
+        foreach (var anchor in anchors)
+        {
+            var radius = radii[(anchor.CivilizationId, anchor.SystemId)];
+            var minimumX = Math.Max(0, (int)Math.Floor((anchor.Position.X - radius - grid.Origin.X) / grid.CellSize));
+            var maximumX = Math.Min(grid.Width - 1, (int)Math.Ceiling((anchor.Position.X + radius - grid.Origin.X) / grid.CellSize));
+            var minimumY = Math.Max(0, (int)Math.Floor((anchor.Position.Y - radius - grid.Origin.Y) / grid.CellSize));
+            var maximumY = Math.Min(grid.Height - 1, (int)Math.Ceiling((anchor.Position.Y + radius - grid.Origin.Y) / grid.CellSize));
+            for (var x = minimumX; x <= maximumX; x++)
+                for (var y = minimumY; y <= maximumY; y++)
                 {
-                    var score = radii[(anchor.CivilizationId, anchor.SystemId)] - Vector2.Distance(point, anchor.Position);
-                    if (score > bestScore || score == bestScore && score > 0 && (bestOwner < 0 || anchor.CivilizationId < bestOwner))
-                    {
-                        bestScore = score;
-                        bestOwner = anchor.CivilizationId;
-                    }
+                    var score = radius - Vector2.Distance(grid.Center(x, y), anchor.Position);
+                    if (score <= 0 || score < scores[x, y] || score == scores[x, y] && cells[x, y] >= 0 && cells[x, y] < anchor.CivilizationId) continue;
+                    scores[x, y] = score;
+                    cells[x, y] = anchor.CivilizationId;
                 }
-                cells[x, y] = bestOwner;
-            }
+        }
         return cells;
     }
 
@@ -170,7 +225,8 @@ public sealed class StrategicTerritoryProjection
             counts[group.Key] = 1;
         }
     }
-    private static float Radius(StrategicTerritoryAnchor anchor, IReadOnlyList<StrategicTerritoryAnchor> anchors)
+    private static float Radius(StrategicTerritoryAnchor anchor, IReadOnlyList<StrategicTerritoryAnchor> anchors,
+        float coordinateScale, bool physicalCoordinates)
     {
         var nearestFriendly = float.PositiveInfinity;
         foreach (var other in anchors)
@@ -178,7 +234,13 @@ public sealed class StrategicTerritoryProjection
                 nearestFriendly = Math.Min(nearestFriendly, Vector2.Distance(anchor.Position, other.Position));
 
         // Overlapping same-owner fields make connected settlements one patch; each cell has one winning owner, clipping opposing territory.
-        return Math.Clamp(float.IsFinite(nearestFriendly) ? Math.Max(48f, nearestFriendly * .58f) : 58f, 42f, 118f);
+        // Physical catalogue coordinates are enlarged by the camera adapter. The influence
+        // footprint must use that same scale; leaving a 48-unit visual radius unscaled made
+        // neighboring controlled systems look like isolated islands in the full galaxy.
+        var minimum = (physicalCoordinates ? 8f : 48f) * coordinateScale;
+        var maximum = (physicalCoordinates ? 18f : 118f) * coordinateScale;
+        return Math.Clamp(float.IsFinite(nearestFriendly) ? Math.Max(minimum, nearestFriendly * .58f) : minimum * 1.2f,
+            minimum, maximum);
     }
 
     private static IReadOnlyList<StrategicTerritoryRegion> Regions(
@@ -186,7 +248,7 @@ public sealed class StrategicTerritoryProjection
         int[,] cells,
         IReadOnlyList<StrategicTerritoryAnchor> anchors,
         IReadOnlyDictionary<(int CivilizationId, int SystemId), float> radii,
-        IReadOnlyDictionary<int, CivilizationState> civs)
+        IReadOnlyDictionary<int, CivilizationState> civs, SmoothTerritoryField field)
     {
         var result = new List<StrategicTerritoryRegion>();
         foreach (var owner in anchors.Select(anchor => anchor.CivilizationId).Distinct().OrderBy(owner => owner))
@@ -194,9 +256,9 @@ public sealed class StrategicTerritoryProjection
             var owned = anchors.Where(anchor => anchor.CivilizationId == owner).ToArray();
             var occupiedRuns = Runs(grid, cells, owner);
             if (occupiedRuns.Count == 0) continue;
-            var fill = SmoothFill(grid, anchors, radii, owner);
-            var largest = occupiedRuns.OrderByDescending(run => run.Size.X * run.Size.Y).First();
-            var label = largest.Position + largest.Size * .5f;
+            var fill = SmoothFill(grid, field, owner);
+            var largest = fill.Runs.OrderByDescending(run => run.Size.X * run.Size.Y).FirstOrDefault();
+            var label = largest is not null ? largest.Position + largest.Size * .5f : owned[0].Position;
             result.Add(new(owner, civs[owner].Name, owned, label,
                 fill.Runs, fill.Polygons, fill.Contours));
         }
@@ -205,8 +267,7 @@ public sealed class StrategicTerritoryProjection
 
     private static TerritoryFillGeometry SmoothFill(
         TerritoryGrid grid,
-        IReadOnlyList<StrategicTerritoryAnchor> anchors,
-        IReadOnlyDictionary<(int CivilizationId, int SystemId), float> radii,
+        SmoothTerritoryField field,
         int owner)
     {
         // Interpolate the same observer-safe influence field used by the cell oracle. Fully
@@ -216,7 +277,7 @@ public sealed class StrategicTerritoryProjection
         float Value(GridPoint point)
         {
             if (!values.TryGetValue(point, out var value))
-                values[point] = value = Dominance(grid.Node(point), owner, anchors, radii);
+                values[point] = value = field.Value(owner, point.X, point.Y, false);
             return value;
         }
 
@@ -236,7 +297,8 @@ public sealed class StrategicTerritoryProjection
                 };
                 var samples = corners.Select(Value).ToArray();
                 var center = (points[0] + points[2]) * .5f;
-                var centerValue = Dominance(center, owner, anchors, radii);
+                var centerValue = field.Value(owner, x, y, true);
+                if (centerValue <= 0f && samples.All(value => value <= 0f)) continue;
                 if (centerValue > 0f && samples.All(value => value > 0f))
                 {
                     if (x >= 0 && y >= 0 && x < grid.Width && y < grid.Height) full[x, y] = true;
@@ -260,21 +322,90 @@ public sealed class StrategicTerritoryProjection
         return new(Runs(grid, full), polygons, StitchContours(boundary));
     }
 
-    private static float Dominance(
-        Vector2 point,
-        int owner,
-        IReadOnlyList<StrategicTerritoryAnchor> anchors,
-        IReadOnlyDictionary<(int CivilizationId, int SystemId), float> radii)
+
+    /// <summary>Rasterize local analytic circles and lane corridors once per observer snapshot.
+    /// Boundary interpolation reads a constant-time field, never all anchors per triangle.</summary>
+    private sealed class SmoothTerritoryField
     {
-        var own = float.NegativeInfinity;
-        var rival = 0f;
-        foreach (var anchor in anchors)
+        private readonly Dictionary<int, float[]> _values = new();
+        private readonly int _width, _height;
+        private readonly float _step;
+        private readonly Vector2 _origin;
+        public SmoothTerritoryField(TerritoryGrid grid, IReadOnlyList<StrategicTerritoryAnchor> anchors,
+            IReadOnlyDictionary<(int CivilizationId, int SystemId), float> radii,
+            IReadOnlyList<Game.Simulation.Exploration.InterstellarLane> lanes)
         {
-            var influence = radii[(anchor.CivilizationId, anchor.SystemId)] - Vector2.Distance(point, anchor.Position);
-            if (anchor.CivilizationId == owner) own = Math.Max(own, influence);
-            else rival = Math.Max(rival, influence);
+            _width = (grid.Width + 4) * 2 + 1;
+            _height = (grid.Height + 4) * 2 + 1;
+            _step = grid.CellSize * .5f;
+            _origin = grid.Origin - new Vector2(grid.CellSize * 2);
+            foreach (var owner in anchors.Select(a => a.CivilizationId).Distinct())
+            {
+                _values[owner] = new float[_width * _height];
+                Array.Fill(_values[owner], -1f);
+            }
+            foreach (var anchor in anchors)
+                Stamp(anchor.CivilizationId, anchor.Position, anchor.Position,
+                    radii[(anchor.CivilizationId, anchor.SystemId)], 1f);
+            var bySystem = anchors.GroupBy(a => a.SystemId).ToDictionary(g => g.Key, g => g.ToArray());
+            foreach (var lane in lanes)
+            {
+                if (!bySystem.TryGetValue(lane.FirstSystemId, out var first) ||
+                    !bySystem.TryGetValue(lane.SecondSystemId, out var second)) continue;
+                foreach (var a in first)
+                foreach (var b in second)
+                {
+                    if (a.CivilizationId != b.CivilizationId) continue;
+                    var radius = Math.Min(radii[(a.CivilizationId, a.SystemId)], radii[(b.CivilizationId, b.SystemId)]);
+                    // Join local holdings along genuine lanes; never draw a claim across an
+                    // unsupported inter-arm gulf or swallow a rival anchor.
+                    if (Vector2.Distance(a.Position, b.Position) > radius * 3f) continue;
+                    Stamp(a.CivilizationId, a.Position, b.Position, radius * .72f, .72f);
+                }
+            }
+            var owners = _values.Keys.ToArray();
+            var strongest = new float[_width * _height];
+            var secondStrongest = new float[strongest.Length];
+            var winner = new int[strongest.Length];
+            Array.Fill(winner, -1);
+            foreach (var owner in owners)
+                for (var i = 0; i < strongest.Length; i++)
+                {
+                    var value = _values[owner][i];
+                    if (value > strongest[i]) { secondStrongest[i] = strongest[i]; strongest[i] = value; winner[i] = owner; }
+                    else if (value > secondStrongest[i]) secondStrongest[i] = value;
+                }
+            foreach (var owner in owners)
+                for (var i = 0; i < strongest.Length; i++)
+                    _values[owner][i] -= winner[i] == owner ? secondStrongest[i] : strongest[i];
         }
-        return own - rival;
+        private void Stamp(int owner, Vector2 start, Vector2 end, float radius, float strength)
+        {
+            var padding = radius + _step * 4;
+            var min = Vector2.Min(start, end) - new Vector2(padding);
+            var max = Vector2.Max(start, end) + new Vector2(padding);
+            var minX = Math.Clamp((int)MathF.Floor((min.X - _origin.X) / _step), 0, _width - 1);
+            var minY = Math.Clamp((int)MathF.Floor((min.Y - _origin.Y) / _step), 0, _height - 1);
+            var maxX = Math.Clamp((int)MathF.Ceiling((max.X - _origin.X) / _step), 0, _width - 1);
+            var maxY = Math.Clamp((int)MathF.Ceiling((max.Y - _origin.Y) / _step), 0, _height - 1);
+            var vector = end - start; var length = vector.LengthSquared(); var values = _values[owner];
+            for (var y = minY; y <= maxY; y++)
+            for (var x = minX; x <= maxX; x++)
+            {
+                var point = _origin + new Vector2(x * _step, y * _step);
+                var fraction = length > .000001f ? Math.Clamp(Vector2.Dot(point - start, vector) / length, 0, 1) : 0;
+                var value = strength * (1f - Vector2.Distance(point, start + vector * fraction) / radius);
+                var i = y * _width + x;
+                if (value > values[i]) values[i] = value;
+            }
+        }
+        public float Value(int owner, int x, int y, bool center)
+        {
+            var column = (x + 2) * 2 + (center ? 1 : 0);
+            var row = (y + 2) * 2 + (center ? 1 : 0);
+            return column >= 0 && column < _width && row >= 0 && row < _height
+                ? _values[owner][row * _width + column] : -1;
+        }
     }
 
     private static IReadOnlyList<Vector2> ClipPositiveTriangle(Vector2[] points, float[] values)
@@ -408,22 +539,70 @@ public sealed class StrategicTerritoryProjection
         IReadOnlyDictionary<int, Vector2> positions, IReadOnlySet<int> unknown)
     {
         var cells = new int[grid.Width, grid.Height];
+        var nearest = new NearestSystemLookup(systems, positions);
         for (var x = 0; x < grid.Width; x++)
             for (var y = 0; y < grid.Height; y++)
             {
-                var point = grid.Center(x, y);
-                var nearest = systems[0];
-                var bestDistance = Vector2.DistanceSquared(point, positions[nearest.Id]);
-                for (var index = 1; index < systems.Count; index++)
-                {
-                    var distance = Vector2.DistanceSquared(point, positions[systems[index].Id]);
-                    if (distance >= bestDistance) continue;
-                    bestDistance = distance;
-                    nearest = systems[index];
-                }
-                cells[x, y] = unknown.Contains(nearest.Id) ? 1 : 0;
+                var systemIndex = nearest.Find(grid.Center(x, y));
+                cells[x, y] = unknown.Contains(systems[systemIndex].Id) ? 1 : 0;
             }
         return cells;
+    }
+
+    // The fog oracle is nearest-system ownership, not an approximation.  The tree keeps the
+    // former catalogue-index tie rule so equal-distance masks are byte-for-byte stable.
+    private sealed class NearestSystemLookup
+    {
+        private readonly Node? _root;
+
+        public NearestSystemLookup(IReadOnlyList<StarSystemState> systems, IReadOnlyDictionary<int, Vector2> positions)
+        {
+            if (systems.Count == 0) throw new ArgumentException("Fog projection needs at least one system.", nameof(systems));
+            var entries = systems.Select((system, index) => new Entry(positions[system.Id], index)).ToArray();
+            _root = Build(entries, 0, entries.Length, 0);
+        }
+
+        public int Find(Vector2 point)
+        {
+            var bestIndex = int.MaxValue;
+            var bestDistance = float.PositiveInfinity;
+            Search(_root, point, ref bestIndex, ref bestDistance);
+            return bestIndex;
+        }
+
+        private static Node? Build(Entry[] entries, int start, int end, int depth)
+        {
+            if (start >= end) return null;
+            var axis = depth & 1;
+            Array.Sort(entries, start, end - start, Comparer<Entry>.Create((left, right) =>
+            {
+                var comparison = axis == 0 ? left.Position.X.CompareTo(right.Position.X) : left.Position.Y.CompareTo(right.Position.Y);
+                return comparison != 0 ? comparison : left.Index.CompareTo(right.Index);
+            }));
+            var middle = start + (end - start) / 2;
+            return new(entries[middle], axis, Build(entries, start, middle, depth + 1), Build(entries, middle + 1, end, depth + 1));
+        }
+
+        private static void Search(Node? node, Vector2 point, ref int bestIndex, ref float bestDistance)
+        {
+            if (node is null) return;
+            var distance = Vector2.DistanceSquared(point, node.Entry.Position);
+            if (distance < bestDistance || distance == bestDistance && node.Entry.Index < bestIndex)
+            {
+                bestDistance = distance;
+                bestIndex = node.Entry.Index;
+            }
+            var delta = node.Axis == 0 ? point.X - node.Entry.Position.X : point.Y - node.Entry.Position.Y;
+            var first = delta <= 0 ? node.Left : node.Right;
+            var second = delta <= 0 ? node.Right : node.Left;
+            Search(first, point, ref bestIndex, ref bestDistance);
+            // Equality must visit both halves because the older linear scan picked the first
+            // catalogue item at an exact bisector.
+            if (delta * delta <= bestDistance) Search(second, point, ref bestIndex, ref bestDistance);
+        }
+
+        private readonly record struct Entry(Vector2 Position, int Index);
+        private sealed record Node(Entry Entry, int Axis, Node? Left, Node? Right);
     }
 
     private static StrategicFogMask BuildFogMask(TerritoryGrid grid, int[,] cells)
@@ -555,7 +734,7 @@ public sealed class StrategicTerritoryProjection
                 max = Vector2.Max(max, iterator.Current);
             }
 
-            const float minimumCell = 12f;
+            const float minimumCell = 3f;
             const float margin = 105f;
             const float maximumCellsPerAxis = 160f;
             var span = max - min + new Vector2(margin * 2);
@@ -575,13 +754,14 @@ public sealed class StrategicTerritoryProjection
     }
 }
 
-public enum StrategicTerritoryAnchorKind { Home, Settlement }
+public enum StrategicTerritoryAnchorKind { Control }
 public sealed record StrategicTerritoryAnchor(int CivilizationId, int SystemId, Vector2 Position, StrategicTerritoryAnchorKind Kind);
 public sealed record StrategicTerritoryFillRun(Vector2 Position, Vector2 Size);
 public sealed record StrategicTerritoryFillPolygon(IReadOnlyList<Vector2> Points);
 public sealed record StrategicFogMask(Vector2 Position, Vector2 Size, int Width, int Height, byte[] Alpha);
 public sealed record StrategicTerritoryRegion(int CivilizationId, string CivilizationName, IReadOnlyList<StrategicTerritoryAnchor> Anchors, Vector2 LabelPosition, IReadOnlyList<StrategicTerritoryFillRun> FillRuns, IReadOnlyList<StrategicTerritoryFillPolygon> FillPolygons, IReadOnlyList<IReadOnlyList<Vector2>> Contours);
 public sealed record StrategicTerritoryClaimOutline(int CivilizationId, int SystemId, Vector2 Position, float Radius);
+public sealed record StrategicTerritoryContestedSystem(int SystemId, Vector2 Position);
 internal sealed record TerritoryFillGeometry(
     IReadOnlyList<StrategicTerritoryFillRun> Runs,
     IReadOnlyList<StrategicTerritoryFillPolygon> Polygons,

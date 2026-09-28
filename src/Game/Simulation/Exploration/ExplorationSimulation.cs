@@ -244,7 +244,8 @@ public sealed class ExplorationSimulation
             colony.CivilizationId == civilizationId && colony.SystemId == systemId);
         return settlements.Any(colony => colony.Kind == SettlementKind.Colony)
             ? 1.0
-            : settlements.Any(colony => colony.Kind == SettlementKind.ResourceOutpost) ? 0.5 : 0.0;
+            : settlements.Any(colony => colony.Kind == SettlementKind.ResourceOutpost) ? 0.5
+                : Game.Simulation.Territory.TerritorialConstruction.Refueling(galaxy, civilizationId, systemId);
     }
 
     /// <summary>

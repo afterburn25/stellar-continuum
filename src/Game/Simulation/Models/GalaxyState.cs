@@ -10,6 +10,7 @@ namespace Game.Simulation.Models;
 
 public sealed class GalaxyState
 {
+    public Game.Simulation.Territory.TerritorialState? Territory { get; set; }
     private IReadOnlyList<PlanetaryBodyState>? _planetaryBodies;
 
     /// <summary>Developer campaigns use their separate persistence envelope, never Player saves.</summary>

@@ -282,6 +282,9 @@ public sealed class GalaxySimulationStepCoordinator
         if (simulationDays <= 0.0)
             return SimulationStepResult.Empty;
 
+        var territory = Game.Simulation.Territory.TerritorialRuntime.Initialize(galaxy);
+        territory.Advance(galaxy, simulationDays);
+
         var existingIndustryReserves = galaxy.Economies.ToDictionary(
             economy => economy.CivilizationId,
             economy => economy.Industry);
@@ -316,6 +319,7 @@ public sealed class GalaxySimulationStepCoordinator
         _freight.Advance(galaxy, simulationDays);
         var combatEvents = _combat.Advance(galaxy, simulationDays);
         var colonizationEvents = _colonization.Advance(galaxy, simulationDays);
+        if (colonizationEvents.Count > 0 || combatEvents.Count > 0) territory.Recompute(galaxy);
         EconomySimulation.ApplyIndustryStorageCaps(galaxy, existingIndustryReserves);
 
         return new SimulationStepResult(

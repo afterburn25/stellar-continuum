@@ -111,6 +111,7 @@ public sealed class CampaignSaveService
                 Seed = galaxy.Seed,
                 GenerationMetadata = metadata,
                 GalacticCore = galacticCore,
+                Territory = Game.Simulation.Territory.TerritorialPersistence.Capture(galaxy),
                 Systems = ToSystemDtos(galaxy.Systems),
                 PlanetaryBodies = ToPlanetaryBodyDtos(galaxy.PlanetaryBodies),
                 Civilizations = ToCivilizationDtos(galaxy.Civilizations),
@@ -353,6 +354,7 @@ public sealed class CampaignSaveService
             Seed = envelope.Galaxy.Seed,
             GenerationMetadata = metadata,
             GalacticCore = galacticCore,
+            Territory = envelope.Galaxy.Territory,
             Systems = systems,
             PlanetaryBodies = planetaryBodies,
             Civilizations = civilizations,
@@ -370,6 +372,8 @@ public sealed class CampaignSaveService
 
         ValidatePlanetaryCatalog(galaxy.PlanetaryBodies, galaxy.Systems);
         ValidatePlanetaryReferences(galaxy);
+        Game.Simulation.Territory.TerritorialPersistence.Validate(galaxy);
+        if (galaxy.Territory is not null) Game.Simulation.Territory.TerritorialRuntime.Initialize(galaxy);
 
         return new LoadedCampaign(
             galaxy,
@@ -1245,7 +1249,7 @@ public sealed class CampaignSaveService
                 throw new InvalidDataException($"Fleet {fleet.Id} has an unsupported civilian return order.");
 
             if (!double.IsFinite(fleet.SettlementDaysCompleted) || fleet.SettlementDaysCompleted < 0 ||
-                fleet.SettlementDaysCompleted > ColonizationSimulation.EstablishmentDays(fleet) ||
+                fleet.SettlementDaysCompleted > Game.Simulation.Territory.TerritorialExpansion.RequiredDays(galaxy, fleet) ||
                 !double.IsFinite(fleet.ReconnaissanceDaysCompleted) || fleet.ReconnaissanceDaysCompleted < 0 ||
                 fleet.ReconnaissanceDaysCompleted > ExplorationSimulation.ScoutReconnaissanceDays)
                 throw new InvalidDataException($"Fleet {fleet.Id} has invalid local-work progress.");
@@ -1769,6 +1773,7 @@ public sealed class CampaignSaveEnvelope
 
 public sealed class GalaxySaveDto
 {
+    public Game.Simulation.Territory.TerritorialState? Territory { get; set; }
     public long Seed { get; set; }
     public GalaxyGenerationMetadata? GenerationMetadata { get; set; }
     public GalacticCoreMetadata? GalacticCore { get; set; }

@@ -83,6 +83,7 @@ public sealed class CivilizationStrategicInputBuilder
         var hasKnownColonizationOpportunity = galaxy.PlanetaryBodies.Any(body =>
             galaxy.Knowledge.IsSystemFullySurveyed(civilizationId, body.SystemId)
             && !colonizedSystemIds.Contains(body.SystemId)
+            && Game.Simulation.Territory.TerritorialRuntime.Peek(galaxy)?.Read(civilizationId, body.SystemId)?.Expansion != Game.Simulation.Territory.ExpansionRegion.Remote
             && populationSpeciesIds.Any(speciesId => _habitability.Evaluate(body, speciesId).CanFoundCurrentColony));
 
         var hasSpacecraftConstruction = _shipbuildingCapabilities.HasCivilizationCapability(

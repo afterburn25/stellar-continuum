@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Remove="tests/**/*.cs" />
     <EmbeddedResource Include="data/astronomy/hyg-nearby-500-v1.json" LogicalName="Game.Astronomy.Nearby500.json" />
+    <EmbeddedResource Include="data/territory/balance-v1.json" LogicalName="Game.Territory.Balance.json" />
     <Content Include="data/research/v1/**/*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>data/research/v1/%(RecursiveDir)%(Filename)%(Extension)</Link>

@@ -484,6 +484,7 @@ public sealed class ShipbuildingSimulation
     {
         FleetRole.Scout => !activeFleets.Any(fleet => fleet.Role == FleetRole.Scout),
         FleetRole.Science => !activeFleets.Any(fleet => fleet.Role == FleetRole.Science),
+        FleetRole.Logistics => !activeFleets.Any(fleet => fleet.Role == FleetRole.Logistics),
         FleetRole.Military => !activeFleets.Any(fleet => fleet.Role == FleetRole.Military),
         FleetRole.Colony => !deferNewColonization &&
                             civilization.ExpansionAllowed &&

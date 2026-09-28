@@ -79,7 +79,11 @@ public sealed class CivilizationStrategicRuntimeCoordinator
                 forceReview: false);
 
             _industryPriorities.Publish(review);
-            _shipbuildingPreferences.Publish(review);
+            var territoryDecision = Game.Simulation.Territory.TerritorialStrategicPlanner.Assess(galaxy, civilization.Id, review.Intent);
+            _shipbuildingPreferences.Publish(territoryDecision.NeedsLogisticsShip
+                ? review.Intent with { PreferredNewFleetRole = FleetRole.Logistics }
+                : review.Intent);
+            Game.Simulation.Territory.TerritorialStrategicPlanner.Execute(galaxy, territoryDecision);
             _nextReviewTick[civilization.Id] = review.Plan.ReviewAfterTick;
             reviews.Add(review);
         }

@@ -76,6 +76,9 @@ jobs:
       - name: Logistics flow validation
         run: dotnet run --project tests/Game.Logistics.Validation/Game.Logistics.Validation.csproj --configuration Release
 
+      - name: Territorial control, expansion, persistence, AI and scale validation
+        run: dotnet run --project tests/Game.Territory.Validation/Game.Territory.Validation.csproj --configuration Release
+
       - name: Restore species mechanics checks
         run: dotnet restore tests/SpeciesMechanicsChecks/SpeciesMechanicsChecks.csproj
 
