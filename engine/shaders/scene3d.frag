@@ -58,6 +58,7 @@ struct Material {
     vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
     vec4 atmo_sunset; // terminator-transmitted tint rgb, blend strength
     vec4 env_flags; // x: bound environment map is RGBM-encoded HDR
+    vec4 drift_options; // x: latitude-differential drift fraction
 };
 layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
@@ -362,8 +363,13 @@ void main() {
     if(material.anim_options.z!=0.0)
         uv.x+=material.emissive_tint.w*0.5*cos(4.0*PI*texture_uv.y+view_params.debug_mode.y*material.anim_options.z);
     // Zonal drift: scene time scrolls equirect longitude — a slowly
-    // super-rotating cloud deck sliding over a fixed lit limb.
-    if(material.anim_options.x!=0.0) uv.x+=view_params.debug_mode.y*material.anim_options.x;
+    // super-rotating cloud deck sliding over a fixed lit limb. The
+    // optional differential lifts the rate by diff·cos²(latitude), so
+    // equatorial belts super-rotate past the poles like a real giant.
+    if(material.anim_options.x!=0.0){
+        float lat_term=cos(PI*(texture_uv.y-0.5));
+        uv.x+=view_params.debug_mode.y*material.anim_options.x*(1.0+material.drift_options.x*lat_term*lat_term);
+    }
     // Evaluate derivatives before per-pixel alpha rejection; annulus horizon
     // rejection above is arithmetic so neighbouring fragments remain coherent.
     float visibility=direct_visibility(material.shadow_light.xyz);

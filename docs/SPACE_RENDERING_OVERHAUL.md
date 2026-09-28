@@ -174,7 +174,9 @@ same document headless-tested.
    march correctly with the camera inside the proxy (double-sided
    raster + camera-origin entry, so nebula fly-throughs don't pop).
    `RenderOptions3D::time` (host-accumulated, determinism-safe)
-   animates three authored rates: `bandDrift` scrolls deck longitude,
+   animates three authored rates: `bandDrift` scrolls deck longitude —
+   `bandDiff` multiplies the scroll by `1 + diff·cos²(latitude)` so
+   equatorial belts super-rotate past the poles like a real gas giant —
    `volume.flowRate` churns the filament phase, and `bandTurbulence`
    evolves the warp — a propagating cos(4πv) wave at half the shear
    amplitude reshapes the jets over time (zero-mean, equator-symmetric).

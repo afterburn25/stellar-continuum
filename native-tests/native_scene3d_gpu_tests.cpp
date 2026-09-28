@@ -1545,6 +1545,27 @@ int main(int argc,char** argv)try{
     check(channel(*turb_off,10,160,0)==5&&
           std::abs(channel(*turb_off,160,160,0)-channel(*waved_bands,160,160,0))<=8,
         "Band turbulence=0 did not restore the static warp");
+    // Latitude-differential drift: at t=5 the authored .05 scroll moves
+    // all rows by .25 uv, pushing the texture's u=0.5 boundary past the
+    // visible window (the sampler clamps) — the rigid disc shows a
+    // uniform half. A negative differential counter-rotates boosted
+    // belts: cos²(latitude)≈1 at the equator flips the sign of the
+    // scroll there, dragging the boundary back into view, while polar
+    // rows (cos²≈0) keep the rigid .25 and stay uniform.
+    giant.material.band_waves=0;giant.material.band_shear=0;giant.material.band_drift=.05f;
+    const auto rigid5=timed(5.f,"bands-diff-rigid.png");
+    giant.material.band_diff=-1.5f;
+    const auto diff5=timed(5.f,"bands-diff-eq.png");
+    int eq_px=0,pol_px=0;
+    for(int x=55;x<280;++x){
+      for(int y=140;y<180;++y)
+        if(std::abs(channel(*rigid5,x,y,0)-channel(*diff5,x,y,0))>8)++eq_px;
+      for(int y=42;y<72;++y)
+        if(std::abs(channel(*rigid5,x,y,0)-channel(*diff5,x,y,0))>8)++pol_px;
+    }
+    check(eq_px>300&&eq_px>pol_px*3,
+        "Latitude-differential drift did not speed the equatorial belt");
+    check(channel(*diff5,10,160,0)==5,"Band differential distorted the disc silhouette");
     std::cout<<"band_shear_gpu=equator_pole_antishear_passed\n";
   }
   {

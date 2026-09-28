@@ -700,6 +700,7 @@ int main() {
         turret.band_waves = 0.7f;
         turret.band_drift = 0.12f;
         turret.band_turbulence = 1.4f;
+        turret.band_diff = 0.6f;
         turret.orbital_beaming = 0.65f;
         turret.star_kelvin = 5800.0;
         turret.accretion = {0.3f, 1.f, 12000.f, -0.6f};
@@ -785,7 +786,8 @@ int main() {
                   ms->limb_darkening_q == 0.3f &&
                   ms->band_shear == -0.3f && ms->orbital_beaming == 0.65f &&
                   ms->forward_scatter == 0.4f && ms->band_waves == 0.7f &&
-                  ms->band_drift == 0.12f && ms->band_turbulence == 1.4f,
+                  ms->band_drift == 0.12f && ms->band_turbulence == 1.4f &&
+                  ms->band_diff == 0.6f,
               "spawn_scene3d materialsurface component");
         check(world3.get<MaterialSurface>(ship_e) == nullptr,
               "defaults do not attach a surface component");
@@ -886,6 +888,7 @@ int main() {
                       rms->band_waves == 0.7f &&
                       rms->band_drift == 0.12f &&
                       rms->band_turbulence == 1.4f &&
+                      rms->band_diff == 0.6f &&
                       rms->cloud_offset_y == 0.2f,
                   "materialsurface codec round-trips");
             const auto *rml = restored.get<MeshLods>(*re_turret);

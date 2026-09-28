@@ -948,6 +948,14 @@ int main() {
               .has_value(),
           "scene3d band turbulence below -8 rejected");
     check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandDiff":9}]})")
+              .has_value(),
+          "scene3d band differential above 8 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"bandDiff":-9}]})")
+              .has_value(),
+          "scene3d band differential below -8 rejected");
+    check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"orbitalBeam":-1.2}]})")
               .has_value(),
           "scene3d orbital beaming below -1 rejected");

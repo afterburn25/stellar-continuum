@@ -251,6 +251,11 @@ struct Scene3dEntity {
   // wave at half the shear amplitude; 0 freezes the warp, no effect
   // without bandShear.
   float band_turbulence{0.f};
+  // Latitude-differential drift fraction [-8,8] — equatorial belts
+  // super-rotate by diff·cos²(latitude) over the authored bandDrift
+  // rate; 0 scrolls all latitudes uniformly. No effect without
+  // bandDrift.
+  float band_diff{0.f};
   // First-order orbital beaming for material orbiting local +Y (accretion
   // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};

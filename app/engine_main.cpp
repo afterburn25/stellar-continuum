@@ -2395,16 +2395,22 @@ void commit_scene3_field(Shell &shell) {
           std::istringstream csv(shell.scene3_buffer);
           std::vector<std::string> parts;
           while (std::getline(csv, part, ',')) parts.push_back(part);
-          if (parts.size() >= 1 && parts.size() <= 2) {
+          if (parts.size() >= 1 && parts.size() <= 3) {
             try { a = std::stof(parts[0]); valid = a >= -0.25f && a <= 0.25f; }
             catch (const std::exception &) { break; }
             if (!valid) break;
             next.band_drift = a;
-            if (parts.size() == 2) {
+            if (parts.size() >= 2) {
               try { a = std::stof(parts[1]); }
               catch (const std::exception &) { valid = false; break; }
               if (!(a >= -8.f && a <= 8.f)) { valid = false; break; }
               next.band_turbulence = a;
+            }
+            if (parts.size() >= 3) {
+              try { a = std::stof(parts[2]); }
+              catch (const std::exception &) { valid = false; break; }
+              if (!(a >= -8.f && a <= 8.f)) { valid = false; break; }
+              next.band_diff = a;
             }
           }
           break; }
@@ -2723,6 +2729,7 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       inst.material.band_waves = e.band_waves;
       inst.material.band_drift = e.band_drift;
       inst.material.band_turbulence = e.band_turbulence;
+      inst.material.band_diff = e.band_diff;
       inst.material.orbital_beaming = e.orbital_beaming;
       inst.material.forward_scatter = e.forward_scatter;
       // Emission volume: the entity texture is the emission image and
@@ -3112,10 +3119,11 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         "zonal jet harmonic 0..1 - layered on bandShear");
   field(shell.hit3_banddrift, "bandDrift",
         entity ? std::to_string(entity->band_drift) + "," +
-                     std::to_string(entity->band_turbulence)
+                     std::to_string(entity->band_turbulence) + "," +
+                     std::to_string(entity->band_diff)
                : "",
         ed(70),
-        "drift uv/s -0.25..0.25[,turbulence rad/s -8..8]");
+        "drift uv/s -0.25..0.25[,turbulence -8..8[,equator boost -8..8]]");
   field(shell.hit3_orbitbeam, "orbitalBeam",
         entity ? std::to_string(entity->orbital_beaming) : "", ed(61),
         "approaching-lane brightening -1..1 - accretion discs");
@@ -7261,7 +7269,8 @@ int main(int argc, char **argv) {
               edit3(68, std::to_string(se->band_waves));
             else if (shell.hit3_banddrift.contains(event.position) && se)
               edit3(70, std::to_string(se->band_drift) + "," +
-                            std::to_string(se->band_turbulence));
+                            std::to_string(se->band_turbulence) + "," +
+                            std::to_string(se->band_diff));
             else if (shell.hit3_orbitbeam.contains(event.position) && se)
               edit3(61, std::to_string(se->orbital_beaming));
             else if (shell.hit3_starkelvin.contains(event.position) && se)

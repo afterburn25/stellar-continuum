@@ -213,6 +213,9 @@ struct MaterialSurface {
   // Quadratic limb-darkening coefficient [0,1] — the two-term law's
   // squared edge falloff; 0 keeps the linear profile.
   float limb_darkening_q{0.f};
+  // Equator-vs-pole drift differential [-8,8] — the zonal scroll gains
+  // diff·cos²(latitude) so equatorial belts super-rotate; 0 is rigid.
+  float band_diff{0.f};
 };
 // Spectral-class star photosphere — the component counterpart of the
 // entity document's `starKelvin` key. The runtime maps it through

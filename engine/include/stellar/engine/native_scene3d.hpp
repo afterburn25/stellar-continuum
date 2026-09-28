@@ -277,6 +277,12 @@ struct Material3D {
   // symmetric, so map registration is kept. Phase rate in rad/s,
   // [-8,8]; 0 freezes the warp. Only applies when band_shear != 0.
   float band_turbulence{};
+  // Latitude-differential drift: the zonal scroll rate gains
+  // diff·cos²(latitude) so equatorial belts super-rotate past the
+  // poles the way real gas giants shear — the authored drift stays the
+  // polar rate. Fraction of drift, [-8,8]; 0 scrolls all latitudes
+  // uniformly. No effect without band_drift.
+  float band_diff{};
   // Orbital beaming: material orbiting local +Y gains a first-order
   // doppler asymmetry — radiance scales by 1 + s·(v̂·V̂), so the
   // approaching lane brightens while the receding lane dims. Face-on

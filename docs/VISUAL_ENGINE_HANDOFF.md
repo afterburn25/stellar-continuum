@@ -92,7 +92,11 @@ super-rotating deck sliding over a fixed lit limb. `band_turbulence`
 [-8,8] rad/s adds a propagating `cos(4πv + t·rate)` wave at half the
 shear amplitude, so the jet profile reshapes over time; it needs
 `band_shear` (the term scales with it) and keeps the zero-mean,
-equator-symmetric invariants. The same view time
+equator-symmetric invariants. `band_diff` [-8,8] is the drift's
+latitude-differential term — the scroll multiplies by
+`1 + diff·cos²(latitude)`, so equatorial belts super-rotate past the
+poles like a real gas giant (diff<0 counter-rotates them; 0 keeps the
+rigid scroll). The same view time
 advances `SurfaceEffect3D::flow_rate` [-64,64], churning emission-volume
 filaments. Hosts accumulate `options.time` per frame (the runtime uses
 `dt·time_scale`); at 0 every term sits at its authored phase, so
@@ -458,7 +462,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `terminator_wrap`, `limb_darkening`/`limbDarkenQ`, `bandShear`
 ([-0.5,0.5]) with `bandWaves` ([0,1] jet harmonic) and
 `bandDrift` ([-0.25,0.25] uv/s scroll) and `bandTurbulence`
-([-8,8] rad/s evolving warp),
+([-8,8] rad/s evolving warp) and `bandDiff` ([-8,8]
+latitude-differential drift term),
 `orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
 (`{depth,density,seed,steps,scatter,flow,distort,blend,image2,occlude,flowRate}`
@@ -571,7 +576,8 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - The cloud deck is a texture-space composite with a bounded altitude
   term (`cloud_height` gives limb parallax, sun-displaced ground shadows
   and zenith-gated self-shading) — still no volumetric shell or
-  per-layer thickness; `band_drift` scrolls and `band_turbulence`
+  per-layer thickness; `band_drift` scrolls with `band_diff`
+  latitude-differential rotation and `band_turbulence`
   reshapes the warp over scene time, while volume
   `flow_rate` re-poses filaments without evolving their shape.
 - Limb darkening is the two-term linear+quadratic transit law
