@@ -154,7 +154,10 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `--inspection-check`, `--logistics-check`, `--economy-check` under
   `--smoke`; and `--campaign-profile --profile-frames 120`
   (16.9 ms steady-state frame mean at 1920×1080; 16.68 ms at
-  2560×1440 — update 0.47 ms, scene 0.19 ms, effectively vsync-bound).
+  2560×1440 — update 0.47 ms, scene 0.19 ms, effectively vsync-bound;
+  a 3600-frame sustained run at 2560×1440 shows no drift: update
+  0.42 ms / scene 0.20 ms steady, p99 frame 23.4 ms, 27 total image
+  uploads — no per-frame re-upload churn or residency growth).
 - Visual capture audit: marquee render paths confirmed by eye, not only
   by assertion — galaxy backdrop art (`nav.bmp`), Sol photosphere
   granulation at 2054× zoom (`gal-star-system-maximum.bmp`), Earth PBR
