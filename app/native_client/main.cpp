@@ -1552,6 +1552,27 @@ class NativeCampaign final {
         std::cout<<"relativistic_jets=luminous_spindle_submitted_passed\n";
       }
     }
+    {
+      const auto proto_system=std::ranges::find_if(revealed.systems,[&](const auto& s){
+        return s.primary==StellarClass::Protostar;});
+      if(proto_system==revealed.systems.end())std::cout<<"protostar=no_protostar_system_in_galaxy\n";
+      else{
+        if(!enter_system(proto_system->id,width,height))throw std::runtime_error("Protostar smoke cannot enter the protostar system.");
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);int settled=0;
+        do { route({{InputEventType::PointerMove,{0,0}}});(void)scene(width,height);settled=artwork_ready()?settled+1:0;
+          if(std::chrono::steady_clock::now()>deadline)throw std::runtime_error("Protostar system artwork failed to settle.");
+          std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }while(settled<40);
+        const auto rendered=scene(width,height);
+        const auto debris=std::ranges::any_of(rendered.world,[](const auto& command){
+          const auto*view=std::get_if<Scene3DView>(&command);
+          return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+        if(!debris)throw std::runtime_error("Protostar system emitted no protoplanetary debris disc.");
+        draw(rendered,L"-protostar-system");
+        system_workspace_.close();
+        std::cout<<"protostar=debris_disc_artwork_submitted_passed\n";
+      }
+    }
     if(!enter_system(sol_system_id,width,height))throw std::runtime_error("Small-body smoke cannot enter Sol.");
     capture_planet(L"-belts-sol-overview");
     const auto belts_launcher=trf("SMALLBODY_LAUNCHER",{""},"BELTS & DEBRIS  {0}");

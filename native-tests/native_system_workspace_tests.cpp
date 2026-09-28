@@ -256,7 +256,18 @@ int main(int argc,char**argv)try{
       return i.material.transparent&&i.material.ambient>0&&i.material.diffuse==0&&i.material.pbr&&i.material.pbr->emissive_strength>1.f;});
     require(jet_instance.material.texture&&jet_instance.material.texture->height()==64,"Jet spindle lost its base-glow gradient");
     require(jet_instance.scale>0,"Jet spindle submitted with no authoritative reach");
-    legacy.stellar_object.reset();
+    legacy.stellar_object.reset();legacy.primary_stellar_class=StellarClass::Protostar;
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto proto_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(proto_view!=legacy_draw.world.end(),"Protostar emitted no protoplanetary debris disc");
+    const auto&proto_scene=std::get<Scene3DView>(*proto_view).scene->instances();
+    require(std::ranges::any_of(proto_scene,[](const auto&i){return i.material.limb_darkening_mid>0;}),"Protostar lost its physical photosphere beneath the debris disc");
+    const auto&proto_disc=*std::ranges::find_if(proto_scene,[](const auto&i){return i.material.orbital_beaming>0;});
+    require(proto_disc.material.orbital_beaming_tint>0&&proto_disc.material.orbital_beaming_tint<disc_material.orbital_beaming_tint,
+      "Protoplanetary disc should carry a gentler doppler split than a relativistic flow");
+    legacy.primary_stellar_class=StellarClass::GYellowDwarf;
   }
   // Read-only preparation is bound to the exact admitted body and observer.
   NativeSystemWorkspace preparation_ui;

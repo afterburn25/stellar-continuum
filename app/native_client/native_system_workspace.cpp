@@ -302,7 +302,23 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
       // further into the disc for a fuller transit profile.
       star.material.limb_darkening_q=.18f;star.material.limb_darkening_mid=.12f;
       PbrSurface3D glow;glow.emissive_strength=.9f;star.material.pbr=glow;
-      star_instances.push_back(std::move(star));}
+      star_instances.push_back(std::move(star));
+      if(cls==StellarClass::Protostar){
+        // Young stellar objects keep a dusty protoplanetary disc: a cool
+        // optically thick annulus far cooler than the star, inclined per
+        // system rather than coplanar with every protostar alike. The
+        // debris is sub-Keplerian — weak beaming, a gentle doppler split,
+        // and a slow crawl instead of the relativistic flow's spin.
+        static const auto debris_mesh=annulus_mesh(.34f,1.f,192,.012f);
+        const float incline=.7f+.6f*static_cast<float>(mix(static_cast<std::uint32_t>(snapshot_->system_id)*11+component)%1000)/999.f;
+        const float debris_spin=static_cast<float>(std::fmod(visual_seconds_*.07,std::numbers::pi*2.));
+        MeshInstance3D debris;debris.mesh=debris_mesh;
+        debris.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
+        debris.rotation=compose_rotation(rotation_axis_angle({1.f,0.f,0.f},incline),rotation_axis_angle({0.f,1.f,0.f},debris_spin));
+        debris.scale=radius*2.6f;
+        debris.material=accretion_disc_material3d(.34f,1.f,1500.,.1f,.12f,2,.5f);
+        debris.material.orbital_beaming_tint=.12f;
+        star_instances.push_back(std::move(debris));}}
     else if(cls==StellarClass::BlackHole){
       // Shakura-Sunyaev accretion annulus beneath the authored hole art:
       // the relativistic disc carries orbital beaming plus the paired
