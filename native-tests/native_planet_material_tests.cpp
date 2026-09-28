@@ -168,6 +168,7 @@ int main(int argc,char** argv)try{
   check(world.front().material.shadow->opacity_map==rings.material.texture,"Shadow transparency differs from visible rings");
   check(rings.material.forward_scatter>0&&rings.material.forward_scatter_back<0&&rings.material.forward_scatter_back_mix>0,"Ringed sheet lost its two-lobe dust phase function");
   check(rings.material.forward_scatter_hue>0,"Ringed sheet lost its Rayleigh wavelength weight");
+  check(world.front().material.anisotropic_texture,"Giant band texture lost anisotropic limb sampling");
   check(rings.material.orbital_beaming>0&&rings.material.orbital_beaming_tint>0,"Ringed sheet lost its orbiting-grain doppler terms");
   for(const auto& i:world){
    if(i.material.diffuse==0){check(!i.material.shadow,"Emission layer has a reflected-light shadow");continue;}

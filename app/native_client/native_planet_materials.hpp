@@ -237,6 +237,10 @@ inline void append_instances(std::vector<MeshInstance3D>& out,const PlanetAppear
   using enum stellar::core::PlanetClass;
   const bool giant=a.primary_class==GasGiant||a.primary_class==IceGiant||a.primary_class==MiniNeptune||a.primary_class==HotJupiter;
   Material3D material;material.texture=maps.albedo;material.ambient=night?.008f:.045f;material.diffuse=night?.12f:.95f;lit(material);material.shadow=external_shadow?external_shadow:ring_shadow;
+  // Giant band textures stretch along longitude — anisotropic sampling keeps
+  // the authored stripes resolved at the grazing limb instead of blurring
+  // into mush (engine drops the sampler at Low quality anyway).
+  material.anisotropic_texture=giant;
   // Wrap-diffuse terminator: deep atmospheres soften the day/night edge,
   // airless bodies keep the hard Lambert falloff.
   material.terminator_wrap=giant?.42f:std::clamp(static_cast<float>(a.atmosphere.density)*.45f,0.f,.38f);
