@@ -310,10 +310,15 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
       ring.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
       ring.rotation=rotation_axis_angle({1.f,0.f,0.f},1.22f);
       ring.scale=radius*2.1f;
-      // Two-armed grand-design density waves bake into the disc texture:
-      // crests read hotter and brighter through compressional heating.
-      ring.material=accretion_disc_material3d(.34f,1.f,9800.,.7f,.5f,2,.9f);
-      ring.material.orbital_beaming_tint=.45f;
+      // The authoritative object type picks the flow regime: accreting and
+      // jet-launching holes keep the hot strongly beamed two-armed spiral,
+      // while quiescent holes run a radiatively inefficient cooler flow —
+      // dimmer, weaker density waves, a softer doppler split.
+      const auto type=physics?physics->type:StellarObjectType::QuiescentBlackHole;
+      const bool active=type==StellarObjectType::AccretingBlackHole||type==StellarObjectType::JetBlackHole;
+      ring.material=active?accretion_disc_material3d(.34f,1.f,9800.,.7f,.5f,2,.9f)
+                         :accretion_disc_material3d(.34f,1.f,5400.,.45f,.25f,2,.9f);
+      ring.material.orbital_beaming_tint=active?.45f:.3f;
       star_instances.push_back(std::move(ring));}
     if(stellar_art_&&artwork)stellar_art_(out,{screen.x,screen.y},radius,*artwork,presentation_seconds(),field);
     else celestial_appearance_.append_stellar_disc(out,{screen.x,screen.y},radius,{star_color(cls),cls==StellarClass::BlackHole,mix(static_cast<std::uint32_t>(snapshot_->system_id)*3+component)},presentation_seconds(),field);

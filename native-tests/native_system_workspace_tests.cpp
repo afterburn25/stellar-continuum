@@ -228,6 +228,15 @@ int main(int argc,char**argv)try{
     const auto&disc_material=std::ranges::find_if(std::get<Scene3DView>(*disc_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
     require(disc_material.texture&&disc_material.texture->height()==64,"Accretion disc did not bake its spiral-arm texture");
     require(disc_material.orbital_beaming_tint>0,"Accretion disc lost its paired doppler tint");
+    legacy.stellar_object=generate_stellar_physics(7,StellarObjectType::AccretingBlackHole);
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto active_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(active_view!=legacy_draw.world.end(),"Accreting black hole emitted no beamed disc");
+    const auto&active_material=std::ranges::find_if(std::get<Scene3DView>(*active_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
+    require(active_material.orbital_beaming_tint>disc_material.orbital_beaming_tint,"Accreting and quiescent discs are not differentiated");
+    legacy.stellar_object.reset();
   }
   // Read-only preparation is bound to the exact admitted body and observer.
   NativeSystemWorkspace preparation_ui;
