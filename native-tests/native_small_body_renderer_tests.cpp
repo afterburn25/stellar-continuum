@@ -1,5 +1,6 @@
 #include "native_small_body_renderer.hpp"
 #include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/stellar_object.hpp>
 #include <stellar/engine/native_triangle_mesh.hpp>
 #include <stellar/engine/texture_decal.hpp>
 #include <iostream>
@@ -53,6 +54,13 @@ int main(){try{
   DrawList paused;renderer.render(paused,s,spatial,view,{0,0,1920,1080},0,false);
   const auto repeat=scene_of(paused);check(repeat->instances().front().mesh==solid.mesh&&repeat->instances().front().material.texture==solid.material.texture,"Paused rendering regenerated immutable geometry");
   check(repeat->instances().front().rotation.w==solid.rotation.w,"Paused spin drifted");
+  s.stellar_object=generate_stellar_physics(3,StellarObjectType::OHotBlueStar);
+  DrawList hot;renderer.render(hot,s,spatial,view,{0,0,1920,1080},0,false);
+  const auto& lit=scene_of(hot)->instances().front().material;
+  check(lit.linear_light,"Small bodies did not move to linear-light shading");
+  check(lit.light_color.z>lit.light_color.x,"Blue-hot star failed to tint belt lighting");
+  check(lit.light_intensity>=.22f&&lit.light_intensity<=1.15f,"Heliocentric falloff escaped bounds");
+  s.stellar_object.reset();
   // Keep a single identified body in view so changed orientation cannot be
   // confused with a different selected instance after sorting by size.
   auto one=s;one.small_body_fields.resize(1);one.small_body_fields[0].visible_count=1;

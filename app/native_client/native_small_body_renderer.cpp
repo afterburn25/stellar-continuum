@@ -33,12 +33,17 @@ void NativeSmallBodyRenderer::render(DrawList& out,const NativeSystemSnapshot& s
   if(snapshot.survey_level!=SystemSurveyLevel::fully_surveyed){clear();return;}
   if(generation_!=snapshot.campaign_generation||system_!=snapshot.system_id){clear();generation_=snapshot.campaign_generation;system_=snapshot.system_id;}
   if(clip.width<=0||clip.height<=0)return;
-  struct Solid{const SmallBodyInstance* body;int field;Point p;float radius,z;};
+  struct Solid{const SmallBodyInstance* body;int field;Point p;float radius,z,au;};
   std::vector<Solid> solids;
   TriangleMesh particles;particles.color={255,255,255,255};particles.clip=clip;
   for(const auto& f:snapshot.small_body_fields){
     ++statistics_.fields;auto it=cache_.find(f.id);if(it==cache_.end()||it->second.field!=f){cache_[f.id]={f,small_body_instances(f,2048)};it=cache_.find(f.id);}
     const auto& bodies=it->second.bodies;statistics_.instances+=bodies.size();const Color tint=color(f.type);
+    // Planet-centered debris inherits the parent body's heliocentric
+    // distance for illumination falloff; belt bodies carry their own.
+    float parent_au=0;
+    if(f.planet_centered){const auto parent=std::ranges::find(spatial.bodies,f.associated_planet_id,&SystemSpatialBodyMarker::body_id);
+      if(parent!=spatial.bodies.end())parent_au=static_cast<float>(parent->physical_orbit_au);}
     // All visible rocks come from the canonical instances below. The former
     // far/dust photographs contained large painted asteroids that slid around
     // the star as flat strips and could never tumble, hiding the solid bodies.
@@ -60,7 +65,8 @@ void NativeSmallBodyRenderer::render(DrawList& out,const NativeSystemSnapshot& s
       }else {
         const auto orbit=stellar::engine::analytic_orbit_position(body.orbit,days-f.epoch_days);
         const float depth=static_cast<float>(orbit[2]/std::max(.000001,std::hypot(orbit[0],orbit[1])))*system_display_orbit_radius(spatial,std::hypot(orbit[0],orbit[1]))*view.scale;
-        solids.push_back({&body,f.id,p,radius,std::clamp(depth,-clip.height*10,clip.height*10)});
+        const float au=f.planet_centered?parent_au:static_cast<float>(std::hypot(orbit[0],orbit[1],orbit[2]));
+        solids.push_back({&body,f.id,p,radius,std::clamp(depth,-clip.height*10,clip.height*10),au});
       }
     }
     if(debug){for(double radius:{f.inner_radius_au,f.outer_radius_au}){TriangleMesh lines;lines.color={255,255,255,255};lines.clip=clip;
@@ -90,6 +96,13 @@ void NativeSmallBodyRenderer::render(DrawList& out,const NativeSystemSnapshot& s
       surface.dielectric=geometry_.optics(b);
       const float dx=star.x-s.p.x,dy=s.p.y-star.y,len=std::max(1.f,std::hypot(dx,dy));
       surface.light_direction=Vec3{dx/len,dy/len,.65f};
+      // Star-lit like every other consumer: blackbody color from the
+      // primary's temperature, heliocentric falloff on a softened power
+      // law so Kuiper belts dim without vanishing. Procedural albedos are
+      // sRGB-encoded — linear_light decodes them before shading.
+      if(snapshot.stellar_object)surface.light_color=blackbody_light_color(std::clamp(snapshot.stellar_object->effective_temperature_kelvin,100.,100000.));
+      surface.light_intensity=s.au>1e-6f?std::clamp(std::pow(s.au,-1.2f),.22f,1.15f):1.f;
+      surface.linear_light=true;
       const auto brightness=static_cast<std::uint8_t>(std::clamp(b.material_brightness*235,0.,255.));surface.tint={brightness,brightness,brightness,255};
       instances.push_back({geometry_.mesh(b,s.radius>=28),{(s.p.x-clip.x-clip.width*.5f)*unit,(clip.y+clip.height*.5f-s.p.y)*unit,s.z*unit},
         {float(q[0]),float(q[1]),float(q[2]),float(q[3])},s.radius*unit,surface});
