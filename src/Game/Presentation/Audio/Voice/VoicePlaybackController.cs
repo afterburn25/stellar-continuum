@@ -228,6 +228,11 @@ public partial class VoicePlaybackController : CanvasLayer
         _engine?.ClearPending(); FinishLine();
     }
     public void Stop() { StopCurrent(); _queue.Clear(); }
+    public void CancelCategory(string category)
+    {
+        _queue.RemoveAll(p => string.Equals(p.Request.Category, category, StringComparison.Ordinal));
+        if (string.Equals(_active?.Category, category, StringComparison.Ordinal)) StopCurrent();
+    }
     public void ResetCampaign() { Stop(); _recent.Clear(); _last = null; _text.Text = ""; HideVoiceSettings(); }
     public void ReplayLast()
     {

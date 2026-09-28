@@ -27,7 +27,7 @@ public partial class EmpireOverviewPanel : PanelContainer
 
     public void Refresh(Main main, bool drawerOpen)
     {
-        Visible = !main.UiIsMenuOpen && !main.UiIsDeveloperToolsOpen && !main.UiIsSurfaceOpen &&
+        Visible = !main.UiIsMenuOpen && !main.UiIsDeveloperToolsOpen && !main.UiIsSurfaceOpen && main.UiTutorial?.IsActive != true &&
             (!main.UiIsSystemSpatialView || main.UiSelectedFleetId.HasValue) && !drawerOpen;
         if (!Visible) return;
         var colonies = main.UiOwnedColonies;

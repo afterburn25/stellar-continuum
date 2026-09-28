@@ -177,6 +177,12 @@ public partial class ScreenshotCapture : Node
             GD.Print("STELLAR_FOCUSED_VOICE_REVIEW_COMPLETE");
             return; // Focused runtime evidence is intentionally separate from the release manifest.
         }
+        if (focus == "voice-tutorial")
+        {
+            await VerifyVoiceTutorialAsync(menu);
+            GD.Print("STELLAR_FOCUSED_VOICE_TUTORIAL_COMPLETE");
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("STELLAR_CAPTURE_FOCUS") == "playback")
         {
             await VerifyCompactPlaybackAsync(menu);

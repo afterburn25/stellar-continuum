@@ -171,6 +171,16 @@ public partial class ResearchWorkspaceView : PanelContainer
         if (_selectedKey is null) SelectDefault();
     }
 
+    public void SetTutorialSafeArea(bool active, float right, float bottom)
+    {
+        var nextRight = active ? -Math.Max(0, right) : 0;
+        var nextBottom = active ? -Math.Max(0, bottom) : 0;
+        var graphMinimum = active ? new Vector2(420, 180) : new Vector2(520, 380);
+        if (_graph.CustomMinimumSize != graphMinimum) _graph.CustomMinimumSize = graphMinimum;
+        if (Math.Abs(OffsetRight - nextRight) > .5f) OffsetRight = nextRight;
+        if (Math.Abs(OffsetBottom - nextBottom) > .5f) OffsetBottom = nextBottom;
+    }
+
     public void UpdateWorkspace(
         IReadOnlyList<UiResearchHorizonNode> visibleNodes,
         IReadOnlyList<UiResearchPreviewNode> lockedNodes,

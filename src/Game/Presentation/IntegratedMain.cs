@@ -53,6 +53,7 @@ public partial class IntegratedMain : Main
             InitializeSurfacePresentation();
             InitializeDeveloperTools();
             InitializeVoicePresentation();
+            InitializeVoiceTutorial();
             InitializeMassiveCombatPresentation();
             _runtimeReady = true;
         }

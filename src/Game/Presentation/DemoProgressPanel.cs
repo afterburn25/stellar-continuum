@@ -46,6 +46,12 @@ public partial class DemoProgressPanel : CanvasLayer
         panel.AddChild(content);
         content.AddChild(VisualUi.Icon(VisualIconLibrary.Colony, 74));
         content.AddChild(VisualUi.Text("THE FIRST LIGHT EXPEDITION", 23, wrap: true));
+        var tutorial = VisualUi.Button("Start / resume voice tutorial", "Your officers explain the controls and opening steps. Pauses the game on entry.",
+            () => _main.UiStartVoiceTutorial(), VisualIconLibrary.Info);
+        tutorial.Name = "VoiceTutorialStart"; content.AddChild(tutorial);
+        var restartTutorial = VisualUi.Button("Restart tutorial", "Return to the first spoken lesson without resetting your campaign.",
+            () => _main.UiStartVoiceTutorial(restart: true));
+        restartTutorial.Name = "VoiceTutorialRestart"; content.AddChild(restartTutorial);
         content.AddChild(VisualUi.Text("Fast-forward at 8× during long waits, then pause to review funding, materials, and orders. The current route takes about 12–13 active minutes at 8× before your decisions; travel and planning can extend it.", 13, VisualUi.Gold, wrap: true));
         _objective = VisualUi.Text("", 16, wrap: true);
         _research = VisualUi.Text("", 14, VisualUi.Muted, wrap: true);
