@@ -1087,8 +1087,8 @@ class NativeCampaign final {
           // both so checkpoint hashes compare simulation state only.
           auto document=encode_player_campaign_v17_document(payload);
           document.erase("SavedAtUtc");
-          if(const auto galaxy=document.find("Galaxy");galaxy!=document.end())
-            if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end())
+          if(const auto galaxy=document.find("Galaxy");galaxy!=document.end()&&galaxy->is_object())
+            if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end()&&meta->is_object())
               meta->erase("CreatedAtUtc");
           // Per-section checkpoints: a divergence names the subsystem
           // ("save:World.Fleets"), not just "state differs at tick N".
@@ -6821,8 +6821,8 @@ class NativeCampaign final {
           capture_player_campaign_v17(session_->frame().runtime(),
                                       capture_options));
       document.erase("SavedAtUtc");
-      if(const auto galaxy=document.find("Galaxy");galaxy!=document.end())
-        if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end())
+      if(const auto galaxy=document.find("Galaxy");galaxy!=document.end()&&galaxy->is_object())
+        if(const auto meta=galaxy->find("GenerationMetadata");meta!=galaxy->end()&&meta->is_object())
           meta->erase("CreatedAtUtc");
       std::string message="replay-until: canonical state at tick "+
           std::to_string(stop)+" dumped to ";
