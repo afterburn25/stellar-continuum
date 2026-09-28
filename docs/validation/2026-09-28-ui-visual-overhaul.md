@@ -54,6 +54,47 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
 - Per-commit record and the adopted-vs-declined engine-API inventory:
   `docs/UI_UX_OVERHAUL_PLAN.md` (commit hashes backfilled through
   `24385dd2`).
+- Packaged-validator audit and the 3D render-target budget gate are
+  recorded in the follow-up section below.
+
+## Follow-up: packaged validators and render-target budget gate
+
+- `validate_native_diplomacy_export` caught up to shipped features:
+  `chronicle` proof field, retained notification feed across save/load,
+  strictly-additive save migrations (`EventHistory`,
+  `Galaxy.StellarActivityDay`, `SmallBodyFields`, moon backfill rows,
+  `PlanetAppearance`). Unit suite 38/38. `b130f624`.
+- Dead validators removed — `--notification-smoke` and
+  `--logistics-smoke` were dropped from the client parser in merge
+  `0f6637a1`; their Python wrappers could never run. Coverage lives in
+  the diplomacy smokes and `--logistics-check`. `d10bd992`, `dec0be89`.
+- Live sweep of the remaining packaged validators green (client,
+  economy, inspection, supply, colony, navigation, research, support,
+  galaxy). `test_galaxy_asset_import` remains the sole tools failure —
+  requires un-vendored `assets/source/galaxies-16x9/` source PNGs.
+- `native_planetary_runtime` exposed a real player-facing overflow: at
+  2560×1440 HDR (~59 MB per fullscreen target), the system dome + local
+  nebula volume + workspace views + overlay globes (e.g. the colony
+  globe) exceeded the renderer's 128 MiB
+  `maximum_scene3d_target_bytes` cap — `--system-smoke` and
+  `--planetary-reload-smoke` threw at drawable sizes ≥2560.
+- Fix: the system backdrop (dome + local nebula volume) stages in its
+  own `DrawList` and the 3D-vs-2D decision defers to just before
+  `scene_content` returns, after every overlay workspace has emitted.
+  Over budget, the dome re-emits as a flat authored `Image` (crop, roll,
+  mirror, blend, exposure/tint preserved; tangent warp and aniso
+  dropped) and the nebula uses its existing 2D composite path
+  (`append_system(...,volumetric=false)`). The battle environment gates
+  inline since it returns early. Under budget the full 3D path is
+  unchanged.
+- Verified: `--system-smoke` 2560×1440 `scene_render_target_bytes`
+  88.1 MB < 128 MiB; `validate_native_planetary_export` green across
+  1280×720 fresh and 1920×1080/2560×1440 reload legs, 9 captures;
+  `stellar_system_background_tests` green including new flat-path
+  checks for both the dome and the nebula volume.
+- Note: `system_background_tests` exercises the fallback paths; the
+  frame-level budget arithmetic in `scene_content` is covered live by
+  the smokes above, not by a unit test (needs a real draw list).
 
 ## Known limitations
 

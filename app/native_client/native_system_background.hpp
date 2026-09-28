@@ -70,16 +70,38 @@ public:
   return p;
  }
  void preload(int id,int quality,int density){auto p=resolved(id);ready_=request(p.asset_id,quality,density)!=nullptr;if(!p.blend_asset_id.empty()&&!request(p.blend_asset_id,quality,density))ready_=false;}
- void append(DrawList& out,int id,int width,int height,int quality,int density,float camera_roll=0){
+ void append(DrawList& out,int id,int width,int height,int quality,int density,float camera_roll=0,bool render_3d=true){
   poll();
   auto p=resolved(id);auto image=request(p.asset_id,quality,density);auto blend=p.blend_asset_id.empty()?nullptr:request(p.blend_asset_id,quality,density);ready_=image&& (p.blend_asset_id.empty()||blend);if(!ready_)return;
   const float source_aspect=static_cast<float>(image->width())/image->height(),aspect=static_cast<float>(width)/height,roll=static_cast<float>(p.orientation)+camera_roll;
+  const auto byte=[](double x){return static_cast<std::uint8_t>(std::clamp(std::lround(x),0l,255l));};
+  const double transmission=p.local_nebula&&options.nebula?std::exp(-p.environment.dark_optical_depth*options.nebula_opacity):1;
+  const double e=p.exposure*transmission*(options.dark_test?.025:1);
+  const Color tint{byte(faint_starfield_tint.r*e*(1+p.color_temperature)),byte(faint_starfield_tint.g*e),byte(faint_starfield_tint.b*e*(1-p.color_temperature)),255};
+  if(!render_3d){
+    // Render-target budget fallback: emit the authored plate as a flat
+    // image. The tangent-space dome warp and anisotropic filtering are
+    // dropped, but crop, roll, mirror and the blend asset still apply so
+    // the sky reads the same. Image rotation rotates the destination, so
+    // enlarge it by the roll coverage factor the plate fit folds into UVs.
+    const float cs=std::cos(roll),sn=std::sin(roll);
+    const float cover=std::max(std::abs(cs)+std::abs(sn)/aspect,std::abs(sn)+std::abs(cs)/aspect);
+    const UiRect screen{0,0,static_cast<float>(width),static_cast<float>(height)};
+    const float sw=static_cast<float>(image->width()),sh=static_cast<float>(image->height());
+    UiRect source{0,0,sw,sh};
+    if(source_aspect>aspect){const float w2=sh*aspect;source.width=w2;source.x=std::clamp((sw-w2)*.5f+static_cast<float>(p.crop_x)*sw,0.f,sw-w2);}
+    else{const float h2=sw/aspect;source.height=h2;source.y=std::clamp((sh-h2)*.5f+static_cast<float>(p.crop_y)*sh,0.f,sh-h2);}
+    const float dw=screen.width*cover,dh=screen.height*cover;
+    UiRect dest{screen.x+(screen.width-dw)*.5f,screen.y+(screen.height-dh)*.5f,dw,dh};
+    Image base{image,dest,source,tint,screen,roll*180.f/std::numbers::pi_v<float>,p.mirror,false};
+    out.world.emplace_back(base);
+    if(blend)out.world.emplace_back(Image{blend,dest,source,{255,255,255,byte(p.blend_strength*255.)},screen,base.rotation_degrees,base.flip_horizontal,base.flip_vertical});
+    return;
+  }
   const auto key=std::tuple{source_aspect,aspect,roll,static_cast<float>(p.crop_x),static_cast<float>(p.crop_y),p.mirror};
   if(!mesh_||key!=mesh_key_){mesh_=celestial_plate_mesh(source_aspect,aspect,roll,{static_cast<float>(p.crop_x),static_cast<float>(p.crop_y)},p.mirror);mesh_key_=key;}
   MeshInstance3D dome;dome.mesh=mesh_;auto& m=dome.material;m.texture=image;m.ambient=1;m.diffuse=0;m.double_sided=true;m.anisotropic_texture=true;m.cubic_magnification=quality>=2;
-  const auto byte=[](double x){return static_cast<std::uint8_t>(std::clamp(std::lround(x),0l,255l));};
-  const double transmission=p.local_nebula&&options.nebula?std::exp(-p.environment.dark_optical_depth*options.nebula_opacity):1;
-  const double e=p.exposure*transmission*(options.dark_test?.025:1);m.tint={byte(faint_starfield_tint.r*e*(1+p.color_temperature)),byte(faint_starfield_tint.g*e),byte(faint_starfield_tint.b*e*(1-p.color_temperature)),255};
+  m.tint=tint;
   if(blend){m.surface_effect=SurfaceEffect3D{};m.surface_effect->next_texture=blend;m.surface_effect->blend=static_cast<float>(p.blend_strength);}
   Camera3D camera;camera.position={};camera.near_plane=.01f;camera.far_plane=2;
   Scene3DView view{Scene3D::create(camera,{std::move(dome)}),{0,0,static_cast<float>(width),static_cast<float>(height)}};

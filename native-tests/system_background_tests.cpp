@@ -87,6 +87,13 @@ int main(int argc,char** argv)try{
  auto scene=draw();scene.world.emplace_back(Circle{{640,360},40,{240,140,80,255}});scene.overlay.emplace_back(FilledRectangle{{0,0,140,80},{20,220,100,255}});window.draw(scene,output/"layer-order.png");const auto image=decode_rgba_image(output/"layer-order.png");check(image->pixels()[(360*1280+640)*4]>200&&image->pixels()[(40*1280+50)*4+1]>200,"Objects or UI were obscured by sky");
  const auto identity=sky.catalog.profile(id);for(int q=0;q<4;++q)for(int d=0;d<3;++d){const auto frame=draw(q,d);check(std::get<Scene3DView>(frame.world.front()).options.quality==static_cast<RenderQuality3D>(q),"Sky dome view did not propagate the quality tier");window.draw(frame,output/("quality-"+std::to_string(q)+"-density-"+std::to_string(d)+".png"));check(sky.catalog.profile(id)==identity,"Graphics preference changed generated identity");check(sky.cache_bytes()<=64u*1024*1024,"Unbounded sky cache");}
  sky.options.blend_test=true;sky.options.blend_scale=2;check(sky.resolved(id).blend_asset_id.empty(),"QA blend reintroduced a rejected bright secondary");window.draw(draw(),output/"blend-test.png");sky.options.blend_test=false;
+ // The render-target budget gate drops the dome to its authored 2D path when
+ // a frame cannot fit another fullscreen view: the image keeps the authored
+ // tint and covers the viewport, only the dome warp and aniso are lost.
+ {DrawList flat;sky.append(flat,id,1280,720,2,1,0.f,false);
+  check(!flat.world.empty()&&std::holds_alternative<Image>(flat.world.front()),"Budget fallback kept the dome as a 3D view");
+  const auto& plate=std::get<Image>(flat.world.front());
+  check(plate.resource&&plate.destination.width>=1280&&plate.destination.height>=720&&plate.tint.a==255,"Flat sky fallback lost its artwork or coverage");}
  NativeBackgroundDebug panel;panel.toggle(sky);panel.data(sky,id);scene=draw();panel.render(scene,1280,720,sky);window.draw(scene,output/"debug-panel.png");
  // Keyboard ring: the eight option/navigation buttons walk in (y,x) order
  // and Return/Space replay the same dispatch a pointer press takes.
@@ -118,6 +125,10 @@ int main(int argc,char** argv)try{
  {const auto& cloud=std::get<Scene3DView>(scene.world.back());check(cloud.scene->instances().size()==1,"Nebula volume scene must carry exactly one proxy");
   const auto& material=cloud.scene->instances().front().material;
   check(material.surface_effect&&material.surface_effect->volume_depth>0&&material.surface_effect->volume_scatter>0&&material.surface_effect->flow_rate>0&&material.transparent&&material.texture&&material.tint.a>0,"Local nebula did not emit an authored emission volume");}
+ // Budget-gated flat path: the same cloud emitted as a 2D sprite when the
+ // frame's 3D render-target budget cannot fit another fullscreen view.
+ {DrawList flat;nebula.append_system(flat,id,star.position.x,star.position.y,1280,720,1,visual,false,false);
+  check(!flat.world.empty()&&std::holds_alternative<Image>(flat.world.back()),"Budget fallback kept the raymarched volume view");}
  scene.world.emplace_back(Circle{{640,360},35,{240,140,80,255}});window.draw(scene,output/"generated-dark-nebula.png");const auto dark_scene=decode_rgba_image(output/"generated-dark-nebula.png");check(dark_scene->pixels()[(360*1280+640)*4]>200,"Real cloud obscured a later system object");
  // Put the canonical preset at a known generated cloud location. Its clear
  // local policy must skip both absorption and imagery in System and battle,

@@ -146,7 +146,7 @@ void NativePhenomena::append_map(DrawList& out,const Camera& camera,int w,int h,
   for(auto& label:surveyed_labels)out.world.emplace_back(std::move(label));
   for(auto& command:diagnostics.world)out.world.emplace_back(std::move(command));
 }
-void NativePhenomena::append_system(DrawList& out,int id,double x,double y,int w,int h,double zoom,const VisualOptions& options,bool combat){
+void NativePhenomena::append_system(DrawList& out,int id,double x,double y,int w,int h,double zoom,const VisualOptions& options,bool combat,bool volumetric){
   collect_art();if(!field_){ready_=true;return;}const auto& c=context(id,x,y);DeterministicRandom starfield(static_cast<std::uint64_t>(id)^0x53595354454dULL);
   if(options.background_stars)for(int i=0;i<220;++i){const Point at{static_cast<float>(starfield.unit_double()*w),static_cast<float>(starfield.unit_double()*h)};out.world.emplace_back(Circle{at,static_cast<float>(.35+starfield.unit_double()*.5),{160,186,211,static_cast<std::uint8_t>(50+starfield.unit_double()*85)}});}
   if(id!=local_system_){local_job_.reset();local_volume_job_.reset();local_.reset();local_volume_.reset();local_volume_scene_.reset();local_volume_source_=nullptr;local_system_=id;transition_=std::chrono::steady_clock::now();}if(!previous_system_){previous_system_=true;transition_=std::chrono::steady_clock::now();}
@@ -162,12 +162,12 @@ void NativePhenomena::append_system(DrawList& out,int id,double x,double y,int w
   }
   // The volume canvas is only prepared when the layer can actually render as
   // a volume; a mid-session density bump submits it lazily on the next frame.
-  if(options.density>0&&!local_volume_&&!local_volume_job_){auto layers=gather_layers();
+  if(volumetric&&options.density>0&&!local_volume_&&!local_volume_job_){auto layers=gather_layers();
     if(layers.size()==overlaps.size()){if(queue_)local_volume_job_=queue_->submit(static_cast<std::size_t>(volume_canvas)*volume_canvas*4u,[c,layers]{return composite_local(c,layers,volume_canvas,volume_canvas);});else local_volume_=composite_local(c,layers,volume_canvas,volume_canvas);}
   }
-  ready_=local_!=nullptr&&fade(transition_)>=1.&&(options.density<=0||local_volume_!=nullptr);if(!local_)return;
+  ready_=local_!=nullptr&&fade(transition_)>=1.&&(!volumetric||options.density<=0||local_volume_!=nullptr);if(!local_)return;
   const auto opacity=byte(255*std::clamp(options.local_opacity,0.,1.)*local_visual_multiplier(options,zoom,combat)*fade(transition_));const UiRect screen{0,0,static_cast<float>(w),static_cast<float>(h)};
-  if(options.density>0&&local_volume_){
+  if(volumetric&&options.density>0&&local_volume_){
     // The same authored composite, but integrated as an image-shaped
     // emission volume instead of a flat card: filaments gain real depth,
     // a slow authored churn and star-facing single scatter. The proxy box

@@ -7938,6 +7938,15 @@ class NativeCampaign final {
     return out;
   }
   [[nodiscard]] DrawList scene_content(int width,int height){
+    // Scene3DView render targets cost destination w*h*16 B when the device
+    // supports HDR (always true on the Vulkan path); worst-case keeps the
+    // budget gate conservative on hypothetical non-HDR devices.
+    const auto scene3d_target_bytes=[](const DrawList& draw){
+      std::size_t bytes=0;
+      const auto add=[&bytes](const Scene3DView& view){bytes+=static_cast<std::size_t>(std::ceil(view.destination.width))*static_cast<std::size_t>(std::ceil(view.destination.height))*16;};
+      for(const auto& command:draw.world)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+      for(const auto& command:draw.overlay)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+      return bytes;};
     if(battle_workspace_.visible()&&!menu_){
       DrawList tactical;
       battle_art_plan_.clear();
@@ -7960,7 +7969,16 @@ class NativeCampaign final {
       });
       const auto& battle_world=session_->frame().runtime().world().campaign();
       if(battle_world.active_combat_encounter){const auto sid=battle_world.active_combat_encounter->system_id;const auto star=std::ranges::find(battle_world.systems,sid,&StellarSystem::id);
-        if(star!=battle_world.systems.end()){DrawList environment;system_background_.append(environment,sid,width,height,starfield_quality(),starfield_density());phenomena_.append_system(environment,sid,star->position.x,star->position.y,width,height,1.,phenomena_options(sid),true);battle_sprites_.set_environment(phenomena_.local_environment());
+        if(star!=battle_world.systems.end()){DrawList environment;system_background_.append(environment,sid,width,height,starfield_quality(),starfield_density());phenomena_.append_system(environment,sid,star->position.x,star->position.y,width,height,1.,phenomena_options(sid),true);
+          // Same render-target budget gate as the system view: hull viewports
+          // plus two fullscreen background layers exceed the cap at large
+          // drawable sizes, so the dome/nebula fall back to their 2D paths.
+          if(scene3d_target_bytes(environment)+scene3d_target_bytes(tactical)>maximum_scene3d_target_bytes){
+            environment={};
+            system_background_.append(environment,sid,width,height,starfield_quality(),starfield_density(),0.f,false);
+            phenomena_.append_system(environment,sid,star->position.x,star->position.y,width,height,1.,phenomena_options(sid),true,false);
+          }
+          battle_sprites_.set_environment(phenomena_.local_environment());
           std::vector<UiOverlayCommand> commands;for(const auto& command:environment.world)std::visit([&](const auto& c){using T=std::decay_t<decltype(c)>;if constexpr(std::is_same_v<T,Image>||std::is_same_v<T,Scene3DView>)commands.emplace_back(c);},command);
           tactical.overlay.insert(tactical.overlay.begin()+std::min<std::size_t>(1,tactical.overlay.size()),commands.begin(),commands.end());
           if(!system_background_.ready()||!phenomena_.ready()){tactical={};tactical.overlay.emplace_back(Text{{static_cast<float>(width)*.5f,static_cast<float>(height)*.5f},tr("MAP_ENVIRONMENT_LOADING","Loading system environment…"),{170,207,227,255},20,500,std::nullopt,TextAlign::Center});}
@@ -7980,10 +7998,15 @@ class NativeCampaign final {
     stellar_art_.begin_frame();
     eruption_art_.begin_frame(session_->cache().generation,session_->frame().runtime().stellar_activity_day(),std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(),session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!general_settings_||!general_settings_->saved().accessibility.reduce_motion),general_settings_?general_settings_->saved().eruption_quality:2);
     DrawList out; std::optional<std::size_t> galaxy_marker_begin; const auto &world=session_->frame().runtime().world().campaign();const auto &cache=session_->cache(); const Color lane{49,74,108,125};
+    DrawList system_backdrop;int backdrop_sid=-1;const StellarSystem* backdrop_star=nullptr;
     if(system_workspace_.visible()){
       const auto sid=*system_workspace_.system_id();const auto system=std::ranges::find(world.systems,sid,&StellarSystem::id);
-      system_background_.append(out,sid,width,height,starfield_quality(),starfield_density());
-      if(system!=world.systems.end()){phenomena_.set_visual_seconds(system_workspace_.visual_seconds());phenomena_.append_system(out,sid,system->position.x,system->position.y,width,height,system_workspace_.viewport()?system_workspace_.viewport()->scale:1.,phenomena_options(sid));}
+      // Background layers stage separately: the frame's 3D render-target
+      // footprint is only known once every workspace has emitted, so the
+      // budget check and the world-order insert happen just before return.
+      backdrop_sid=sid;
+      system_background_.append(system_backdrop,sid,width,height,starfield_quality(),starfield_density());
+      if(system!=world.systems.end()){backdrop_star=&*system;phenomena_.set_visual_seconds(system_workspace_.visual_seconds());phenomena_.append_system(system_backdrop,sid,system->position.x,system->position.y,width,height,system_workspace_.viewport()?system_workspace_.viewport()->scale:1.,phenomena_options(sid));}
       system_workspace_.set_scene_environment(phenomena_.local_environment());
       system_workspace_.set_motion_running(session_->frame().clock().speed()!=StrategicSpeed::Paused&&!menu_&&(!general_settings_||!general_settings_->saved().accessibility.reduce_motion)&&(!world.active_combat_encounter||world.active_combat_encounter->reconciled));
       system_workspace_.set_simulation_days(session_->frame().clock().simulation_days());
@@ -8556,6 +8579,18 @@ class NativeCampaign final {
                 text_measurer_);
           break;
         }
+    if(backdrop_sid>=0&&system_background_.ready()&&phenomena_.ready()){
+      // Budget gate: every content view has emitted by now — overlay
+      // workspaces like the colony globe included. When the staged backdrop
+      // would push the frame past the renderer's target cap, the dome and
+      // local nebula re-emit through their authored 2D paths instead.
+      if(scene3d_target_bytes(system_backdrop)+scene3d_target_bytes(out)>maximum_scene3d_target_bytes){
+        system_backdrop={};
+        system_background_.append(system_backdrop,backdrop_sid,width,height,starfield_quality(),starfield_density(),0.f,false);
+        if(backdrop_star)phenomena_.append_system(system_backdrop,backdrop_sid,backdrop_star->position.x,backdrop_star->position.y,width,height,system_workspace_.viewport()?system_workspace_.viewport()->scale:1.,phenomena_options(backdrop_sid),false,false);
+      }
+      out.world.insert(out.world.begin(),std::make_move_iterator(system_backdrop.world.begin()),std::make_move_iterator(system_backdrop.world.end()));
+    }
     return out;
   }
  private:

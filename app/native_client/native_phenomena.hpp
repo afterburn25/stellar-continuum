@@ -31,7 +31,11 @@ public:
   void set_scene3d_quality(RenderQuality3D value)noexcept{scene3d_quality_=value;}
   void poll();
   void append_map(DrawList&,const Camera&,int,int,const VisualOptions&,const std::set<std::uint32_t>& surveyed);
-  void append_system(DrawList&,int system,double x,double y,int w,int h,double zoom,const VisualOptions&,bool combat=false);
+  // volumetric=false pins the local layer to the authored 2D composite —
+  // used when the frame's 3D render-target budget cannot fit another
+  // fullscreen view (the raymarched proxy is presentation-only sugar over
+  // the same composite).
+  void append_system(DrawList&,int system,double x,double y,int w,int h,double zoom,const VisualOptions&,bool combat=false,bool volumetric=true);
   void inspect(DrawList&,const Camera&,Point,int,int,const std::set<std::uint32_t>& surveyed,bool developer,bool pinned=false)const;
   const stellar::core::SystemPhenomenonContext& context(int,double,double);
   const stellar::core::GalaxyPhenomena* field()const{return field_?&*field_:nullptr;}
