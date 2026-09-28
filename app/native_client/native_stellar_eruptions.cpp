@@ -81,7 +81,7 @@ void EruptionArtwork::append(DrawList& out,Point center,float radius,const Stell
   MeshInstance3D instance;instance.mesh=meshes_[kind];instance.scale=extent;
   instance.position={normal.x*(1+travel),normal.y*(1+travel),normal.z*(1+travel)};instance.rotation=spherical_surface_rotation(e.latitude,e.longitude,e.orientation);
   auto& m=instance.material;m.texture=image;m.ambient=1;m.diffuse=0;m.transparent=true;m.double_sided=true;
-  m.opacity=std::clamp(amplitude*lod*exposure*static_cast<float>(e.brightness*(.75+.25*std::sqrt(e.magnitude)))*(.95f+.05f*std::sin(static_cast<float>(progress)*150.f+e.visual_variant)),0.f,1.f);
+  m.opacity=std::clamp(amplitude*lod*exposure*static_cast<float>(e.brightness*(.75+.25*std::sqrt(e.magnitude)))*(reduce_flashing_?1.f:(.95f+.05f*std::sin(static_cast<float>(progress)*150.f+e.visual_variant))),0.f,1.f);
   // Dedicated class artwork retains authored color. Generic gold effects also
   // retain their supplied palette; no blue/red replacement artwork is invented.
   SurfaceEffect3D effect;effect.next_texture=following;effect.blend=blend;effect.view_sphere_center={static_cast<float>(-camera.position.x),static_cast<float>(-camera.position.y),-10};effect.sphere_radius=1;
