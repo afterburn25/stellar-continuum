@@ -180,3 +180,30 @@ military estimates without scanner research use the uncertain prior;
 engagements require fleet co-location — there is no operational war
 plan (no concentration, retreats, or orbital assault); war declares
 happen at a 120 ly frontier-adjacency radius, not borders.
+
+Canonical-scale confirmation (5,000 systems / 24 pre-warp + 1 ancient /
+10,000 ticks / ~137 years, seed 8374837, organic fleets only, scripted
+event definitions loaded):
+
+- **wars: 2 organically** — `Sundered Pact` (civ 3) declared on `Avest
+  Dominion` (civ 21) at tick 43260000 and `Dravak Compact` (civ 6) on
+  `Omethe Synod` (civ 17) at tick 46290000 — both organic civ-vs-civ
+  declarations; plus 36 trespasses, 7 engagement orders, 4 deployment
+  orders, 15 combat events, 68 diplomacy events.
+- Organic expansion at scale: 51 colonies founded (78 total), 111
+  fleets built through canonical shipbuilding, 58 diplomatic contacts,
+  35 relationships, 17,600 exploration events.
+- `repeatFinalStatesDeterministic: true`; final hash
+  `252ad3fd80d4ec2a3d3bfa419ec89fca24dc57b82c473a2a059419cd645e46ab`.
+- Step mean 165.4 ms / p95 838.8 ms / peak 3,356 ms — late-game steps
+  are dominated by exploration at 5,000 systems once many civilizations
+  are interstellar; the warfare phase itself remains sub-millisecond.
+  Working set ~217 MB, peak ~366 MB.
+- The 100-year canonical run (same scale, 7,305 ticks,
+  `--verify-continuation-tick 3650`, `--repeat 2`): deterministic
+  (`eb7db25782ec849db581272e97d59546c9706820450058a8d1e2adafe8757387`),
+  continuation byte-identical, save 145,173,990 bytes, step mean
+  39.9 ms / p95 50.4 ms — but wars/colonies/fleets remain 0 inside the
+  century because pre-warp promotion lands just past 100 years at this
+  pacing. Organic wars at canonical scale are a ~137-year-horizon
+  result, not a century result.
