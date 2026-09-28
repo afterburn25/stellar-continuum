@@ -4,6 +4,8 @@
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/knowledge.hpp>
 #include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_classification.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -25,6 +27,7 @@ struct NativeSystemBodyDetails {
   stellar::core::PlanetarySolventRegime available_solvent{};
   double radiation_hazard{};
   bool is_immersed_environment{}, has_solid_surface{};
+  std::optional<stellar::core::StellarPlanetProperties> stellar_exposure;
 };
 
 struct NativeSystemBody {
@@ -38,8 +41,14 @@ struct NativeSystemBody {
   std::vector<NativePositiveSignature> positive_signatures;
   std::optional<NativeSystemBodyDetails> details;
   NativeSystemBodyVisualClass visual_class{NativeSystemBodyVisualClass::unknown_planet};
+  std::optional<stellar::core::PlanetaryWorldClass> world_class;
   // Present only for fully surveyed canonical Sol bodies with an approved asset.
   std::optional<std::string> sol_texture_key;
+  double orbit_au{};
+  std::optional<stellar::core::PlanetAppearance> appearance;
+  int stellar_host{};
+  std::optional<stellar::engine::AnalyticOrbit> stellar_orbit;
+  std::optional<stellar::core::SatelliteOrbit> satellite_orbit;
 };
 
 struct NativeSystemSnapshot {
@@ -52,6 +61,11 @@ struct NativeSystemSnapshot {
   std::optional<stellar::core::StellarClass> primary_stellar_class,
       secondary_stellar_class, tertiary_stellar_class;
   std::vector<NativeSystemBody> bodies;
+  std::optional<stellar::core::StellarPhysicalProperties> stellar_object;
+  std::vector<stellar::core::SmallBodyField> small_body_fields;
+  double simulation_days{};
+  bool developer{};
+  std::optional<stellar::core::StellarOrbitArchitecture> stellar_orbits;
 };
 
 struct NativeSystemViewResult {
@@ -84,21 +98,38 @@ struct SystemSpatialBodyMarker {
   double orbital_eccentricity{}, orbital_inclination_degrees{};
   std::vector<NativePositiveSignature> positive_signatures;
   std::optional<std::string> sol_texture_key;
+  double physical_orbit_au{};
+  int stellar_host{};
+  std::optional<stellar::core::SatelliteOrbit> satellite_orbit;
+  std::optional<stellar::engine::AnalyticOrbit> stellar_orbit;
 };
 struct SystemSpatialSnapshot {
   int system_id{};
   float design_radius{};
   std::vector<SystemSpatialBodyMarker> bodies;
+  std::vector<std::pair<double,float>> orbit_anchors;
+  std::array<SystemSpatialPoint,4> stellar_hosts{};
+  std::array<float,2> stellar_orbit_scales{};
+  std::array<std::vector<SystemSpatialPoint>,3> stellar_paths;
+  int belt_host{};
 };
+[[nodiscard]] float system_display_orbit_radius(const SystemSpatialSnapshot&,double au);
+[[nodiscard]] SystemSpatialPoint projected_orbit_point(const SystemSpatialSnapshot&,double au,float eccentricity,float inclination,float anomaly);
+[[nodiscard]] std::vector<SystemSpatialPoint> projected_orbit_path(const SystemSpatialSnapshot&,const SystemSpatialBodyMarker&);
 
 [[nodiscard]] float body_display_radius(double, stellar::core::PlanetaryBodyKind);
-[[nodiscard]] float star_screen_radius(float scale);
+// The chart keeps zooming for planets; stellar sprites stop at source detail.
+[[nodiscard]] float star_screen_radius(float scale,float visual_scale=1.f);
 [[nodiscard]] SystemSpatialPoint orbit_point(float radius, float eccentricity,
                                                float inclination_degrees,
                                                float eccentric_anomaly);
 [[nodiscard]] std::vector<SystemSpatialPoint>
 orbit_path(float radius, float eccentricity, float inclination_degrees);
+void update_system_motion(const NativeSystemSnapshot&,SystemSpatialSnapshot&);
+[[nodiscard]] stellar::core::StellarSystem snapshot_stellar_system(const NativeSystemSnapshot&);
 [[nodiscard]] SystemSpatialSnapshot project_system(const NativeSystemSnapshot &);
+
+double parent_facing_bearing(const SystemSpatialSnapshot&,const SystemSpatialBodyMarker&);
 
 struct SystemSpatialViewport {
   float center_x{}, center_y{}, scale{1};

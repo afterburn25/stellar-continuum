@@ -2,6 +2,7 @@
 #include <stellar/core/shipbuilding.hpp>
 #include <stellar/core/sovereign_currency.hpp>
 #include <stellar/core/species_environment.hpp>
+#include <stellar/core/fleet_transit.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -473,6 +474,7 @@ FleetState create_fleet(ShipbuildingReadView world,
           ? std::optional<std::string_view>(*design.combat_profile_id)
           : std::nullopt,
       design.role);
+  if(home.stellar_object)begin_fleet_local_transit(fleet,FleetTransitPhase::None,{}, {},&*home.stellar_object);
   return fleet;
 }
 std::vector<ShipbuildingEvent>
@@ -582,6 +584,85 @@ ShipbuildingStartAssessment assess_start_ship_build(
     ShipbuildingReadView world, const int civilization_id,
     const std::string_view design_id) {
   return prepare_ship_build(world, civilization_id, design_id).assessment;
+}
+
+namespace {
+struct StagedShipbuilding {
+  std::vector<ShipyardState> yards;
+  std::vector<Colony> colonies;
+  std::vector<CivilizationEconomy> economies;
+  std::vector<FleetState> fleets;
+  ShipbuildingReadView source;
+  explicit StagedShipbuilding(ShipbuildingReadView read)
+      : yards(read.shipyards.begin(), read.shipyards.end()),
+        colonies(read.colonies.begin(), read.colonies.end()),
+        economies(read.economies.begin(), read.economies.end()),
+        fleets(read.fleets.begin(), read.fleets.end()), source(read) {}
+  ShipbuildingWorld view() {
+    return {source.civilizations, source.systems, source.construction,
+        yards, colonies, economies, fleets, source.capabilities,
+        source.strategic_preferences, source.capability_query, source.preference_query};
+  }
+  void commit(ShipbuildingWorld destination) {
+    std::move(yards.begin(), yards.end(), destination.shipyards.begin());
+    std::move(colonies.begin(), colonies.end(), destination.colonies.begin());
+    std::move(economies.begin(), economies.end(), destination.economies.begin());
+  }
+};
+}
+
+std::vector<ShipbuildingBatchAssessment> assess_ship_build_batches(
+    ShipbuildingReadView world, int civilization_id, std::string_view design_id) {
+  StagedShipbuilding staged(world);
+  const auto available = available_ship_designs(world.designs(), civilization_id);
+  const auto design = std::ranges::find(available, design_id, &ShipDesignDefinition::id);
+  std::vector<ShipbuildingBatchAssessment> quotes;
+  quotes.reserve(maximum_pending_ship_builds);
+  std::optional<std::string> blocked;
+  for (int quantity = 1; quantity <= maximum_pending_ship_builds; ++quantity) {
+    ShipbuildingBatchAssessment quote;
+    quote.quantity = quantity;
+    if (design != available.end()) {
+      quote.credit_cost = design->credit_cost * quantity;
+      quote.industry_cost = design->industry_cost * quantity;
+      quote.population_cost_millions = design->population_cost_millions * quantity;
+      quote.minimum_build_days_at_full_shipyard_rate =
+          quote.industry_cost / shipbuilding_industry_per_day;
+    }
+    if (!blocked) {
+      const auto result = start_ship_build(staged.view(), civilization_id, design_id);
+      if (!result.accepted) blocked = result.message;
+    }
+    quote.can_start = !blocked;
+    quote.blocker = blocked;
+    quotes.push_back(std::move(quote));
+  }
+  return quotes;
+}
+
+ShipbuildingOrderResult start_ship_build_batch(ShipbuildingWorld world,
+    int civilization_id,std::string_view design_id,int quantity) {
+  if(quantity<1||quantity>maximum_pending_ship_builds)
+    return {false,"Choose a quantity within the shipyard queue capacity."};
+  if(quantity==1)return start_ship_build(world,civilization_id,design_id);
+  StagedShipbuilding staged(world.read());
+  for(int i=0;i<quantity;++i){const auto result=start_ship_build(staged.view(),civilization_id,design_id);
+    if(!result.accepted)return {false,"Batch not ordered: "+result.message};}
+  staged.commit(world);
+  return {true,std::to_string(quantity)+" vessels authorized. Industry is consumed as construction progresses."};
+}
+
+ShipbuildingOrderResult move_queued_ship_build(ShipbuildingWorld world,
+    int civilization_id,std::string_view order_id,int direction) {
+  if(direction!=-1&&direction!=1)return {false,"Invalid queue direction."};
+  const auto yard=std::ranges::find(world.shipyards,civilization_id,&ShipyardState::civilization_id);
+  if(yard==world.shipyards.end())return {false,"Shipyard is unavailable."};
+  const auto order=std::ranges::find(yard->queued_builds,order_id,&ShipBuildOrderState::order_id);
+  if(order==yard->queued_builds.end())return {false,"Only waiting orders can be reordered. The active vessel keeps its progress."};
+  if((direction<0&&order==yard->queued_builds.begin())||(direction>0&&order+1==yard->queued_builds.end()))
+    return {false,"That order is already at the end of the waiting queue."};
+  std::iter_swap(order,order+direction);
+  return {true,"Waiting build order updated."};
 }
 
 ShipbuildingCancellationAssessment
@@ -742,7 +823,7 @@ double shipbuilding_industry_demand(ShipbuildingReadView world,
 }
 void ensure_automatic_ship_orders(ShipbuildingWorld world) {
   for (const auto &civilization : world.civilizations) {
-    if (civilization.is_seeded_ancient || civilization.is_player)
+    if (civilization.is_seeded_ancient || !civilization_uses_ai(civilization,world.control))
       continue;
     auto &state = first(world.shipyards, [&](const auto &s) {
       return s.civilization_id == civilization.id;

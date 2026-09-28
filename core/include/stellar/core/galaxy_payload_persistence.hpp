@@ -74,6 +74,7 @@ struct GalaxyPayloadV16Dto {
   CivilizationKnowledgePersistenceInput knowledge;
   std::optional<CampaignMassiveEncounter> active_combat_encounter;
   std::optional<std::vector<FleetPowerObservation>> combat_intelligence;
+  std::optional<double> stellar_activity_day;
 };
 
 struct GalaxyPayloadCaptureOptions {

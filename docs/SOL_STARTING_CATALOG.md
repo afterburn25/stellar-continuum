@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](AGENT_HANDOFF.md) and
+> [verified project state](PROJECT_STATE.md).
+
 # Human origin and Sol starting catalog
 
 Fresh campaigns, including Play Demo, create one human founding civilization on Earth in Sol. The existing stable physiology ID remains `terran_baseline`; it is not reassigned on existing saves. Civilization 0 is the pre-warp human player. Its normal population, infrastructure, credits, industry, technology prerequisites and physical-ship requirements remain unchanged.

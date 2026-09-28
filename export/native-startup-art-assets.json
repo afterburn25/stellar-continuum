@@ -24,7 +24,32 @@
     "credits": {
       "source": "docs/engine/NATIVE_STARTUP_ART_SOURCES.md",
       "runtimePath": "Licenses/Startup-art-sources.md",
-      "sha256": "db174db14ea396c28286d381cd905c9a43f62f9fd9dbb61a094e19daa1ea51a4"
+      "sha256": "f57ce7df78932229e84d4bdd72227ca0fcdd64e28e7b83dfef2510044bb8687b"
+    },
+    "title-logo": {
+      "source": "assets/visual/branding/stellar-continuum-title-v1.png",
+      "runtimePath": "assets/visual/branding/stellar-continuum-title-v1.png",
+      "sha256": "9040a67106ccd463fb81af97b7d07ead79559347e80763bbe028aea2277eb124"
+    },
+    "galaxy-card": {
+      "source": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
+      "runtimePath": "assets/visual/space/campaign-galaxy-four-arm-v1.png",
+      "sha256": "f250eabcf2d70197bfacc419fc761e544d3b7d9fbdee15b267a7094936aca6b9"
+    },
+    "empire-emblem": {
+      "source": "assets/visual/branding/stellar-continuum-icon-v1.png",
+      "runtimePath": "assets/visual/branding/stellar-continuum-icon-v1.png",
+      "sha256": "5942d3e6a0e82947bf4d9553409585ebf79572cbfede16348482ac2ce38c6065"
+    },
+    "galaxy-view": {
+      "source": "assets/visual/hud/galaxy-view.png",
+      "runtimePath": "assets/visual/hud/galaxy-view.png",
+      "sha256": "774d9f90b6d9c31d6e7a207c6e4ac7201a6490407e37ce55d259a9b97fc86ab3"
+    },
+    "system-view": {
+      "source": "assets/visual/hud/system-view.png",
+      "runtimePath": "assets/visual/hud/system-view.png",
+      "sha256": "d56ece92092184ec231c1b643af3252ed6e69b4a85c49811ff702d9d9d337d5c"
     }
   }
 }

@@ -207,9 +207,10 @@ std::vector<SpeciesHomeworldAssignment> plan_species_homeworlds_with_nearby_expa
         canonical_sol = canonical_sol || (system.catalog_preset_id && *system.catalog_preset_id == sol_catalog_preset_id);
     }
     std::unordered_set<int> eligible;
-    for (const auto& system : systems) if (stable_expansion_star(system.primary) && std::any_of(bodies.begin(), bodies.end(), [&](const auto& body) {
-        return body.system_id == system.id && body.kind == PlanetaryBodyKind::Planet && body.environment.has_solid_surface && !body.has_pre_warp_civilization;
-    })) eligible.insert(system.id);
+    for (const auto& body : bodies)
+        if (body.kind == PlanetaryBodyKind::Planet && body.environment.has_solid_surface && !body.has_pre_warp_civilization &&
+            systems_by_id.contains(body.system_id) && stable_expansion_star(systems_by_id.at(body.system_id)->primary))
+            eligible.insert(body.system_id);
     struct HomeSet { int id; std::vector<Candidate> candidates; };
     std::vector<HomeSet> options;
     std::vector<int> missing;

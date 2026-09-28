@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <filesystem>
 #include <span>
+#include <functional>
+#include <string_view>
 #include <stdexcept>
 #include <system_error>
 
@@ -45,6 +47,13 @@ private:
   std::filesystem::path temporary_;
   bool recovery_file_retained_{};
 };
+
+using AtomicTextSink = std::function<void(std::string_view)>;
+using AtomicTextProducer = std::function<void(const AtomicTextSink&)>;
+// Producer failure removes the owned temporary and leaves destination/backup
+// untouched. Serialization streams through a bounded 64 KiB write buffer.
+void write_file_atomically_stream(const std::filesystem::path&,const AtomicTextProducer&,
+                                  AtomicFileWriteOptions options = {});
 
 // On Windows, writes an exclusively owned sibling temporary file, flushes its
 // complete contents to the device, and then moves or replaces the destination.

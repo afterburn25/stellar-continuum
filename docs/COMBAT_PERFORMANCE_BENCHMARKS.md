@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](AGENT_HANDOFF.md) and
+> [verified project state](PROJECT_STATE.md).
+
 # Massive combat performance benchmarks
 
 This benchmark exercises the plain deterministic combat engine without Godot or a renderer. It measures 25 cases: five fleet sizes and five tactical/loadout patterns. Every case advances 40 fixed 0.1-second ticks after a separate JIT warm-up. The formations are deliberately concentrated into at most four occupied spatial cells, which produces a dense targeting workload.

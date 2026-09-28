@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 2.86102294921875e-05,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.5,
+      1023.5,
+      877.5999999999999
+    ],
+    "id": "sol-umbriel",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      -0.3384632980732668,
+      -0.6689862397383183
+    ],
+    "seamError": 0.023599280888879574,
+    "usable": true
+  },
+  "id": "sol-umbriel",
+  "name": "Umbriel",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "a2ef4ca16ffa52fca4961fd1b2dbb6ca17246d10f090e5df97fbf68a1f0037b3",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Umbriel.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

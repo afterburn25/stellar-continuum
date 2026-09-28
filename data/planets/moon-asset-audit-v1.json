@@ -1,0 +1,329 @@
+{
+  "images": [
+    {
+      "id": "sol-io",
+      "name": "Io",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon -Io.png",
+      "sha256": "1d06f2dc20efd9339aee36aac48676d12cea55355f3c90e916942909b85b785e",
+      "primaryClass": "volcanic",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": false,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-europa",
+      "name": "Europa",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Europa.png",
+      "sha256": "55003737d9ac3e9e3ae35939d6326c2c1a4e2a28caab9a12aa64de4598f09545",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-ganymede",
+      "name": "Ganymede",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Ganymede.png",
+      "sha256": "a069fb576cb3f778b4c7f8154a0bebaaa63e3860e358480ae2f05bbd1096bd21",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-callisto",
+      "name": "Callisto",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Callisto.png",
+      "sha256": "550580768f5b6c45599f19ceadc3869fb9b22af1bfc9f270814f7a6c3b4eae7a",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-mimas",
+      "name": "Mimas",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Mimas.png",
+      "sha256": "4775d14e9b2cafe679dbdfcce149d3188051f7249e764c975cdb1999fd405645",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-enceladus",
+      "name": "Enceladus",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Enceladus.png",
+      "sha256": "f84aa8defb2949b79340440ad9b9d098f5456fc3d4eafd01b25df6e873c1fcee",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-tethys",
+      "name": "Tethys",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Tethys.png",
+      "sha256": "29bddabc94f7cf429f5eba84f3bcddc2e8c4c746cfaf63fe882ba52820bf7cd3",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-dione",
+      "name": "Dione",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Dione.png",
+      "sha256": "567385acfa7e262211ec847a934019e2306872f3a10774ad238cd9ce8ae7ac0a",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-rhea",
+      "name": "Rhea",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Rhea.png",
+      "sha256": "bc2a06f2733fcda62dfc4c0843ed6a6c20c3c6d471355ca63a291a72a23adc8b",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-titan",
+      "name": "Titan",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Titan.png",
+      "sha256": "a9322d1ce47180ef27726497cfc7f52dfaa0642de967846c0d6da4b29627e817",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": true,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": false,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-iapetus",
+      "name": "Iapetus",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Iapetus.png",
+      "sha256": "8c784af14df44966f8d8868626e2498960ca9da2193b99e87e5f96e1f9270e66",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.15,
+        "maximumDarkFraction": 0.12
+      }
+    },
+    {
+      "id": "sol-miranda",
+      "name": "Miranda",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Miranda.png",
+      "sha256": "0bd337bf55194c47e056ad8c03f30bd130a61988bec6bbf3870268b06203dcf0",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-ariel",
+      "name": "Ariel",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Ariel.png",
+      "sha256": "1aa3df47cf89195634b16aac746c0dfb37678b36bbf8fb7c99b7f7bc771368de",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-umbriel",
+      "name": "Umbriel",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Umbriel.png",
+      "sha256": "a2ef4ca16ffa52fca4961fd1b2dbb6ca17246d10f090e5df97fbf68a1f0037b3",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-titania",
+      "name": "Titania",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Titania.png",
+      "sha256": "2629ecd381dd72aa6efa3cfbb00b9ee797345e0f29b09e25589610916ce7d3fe",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-oberon",
+      "name": "Oberon",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Oberon.png",
+      "sha256": "19f2492578625eeec6f779265217fe100f90680afdb1225555328b2f84c62a30",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-triton",
+      "name": "Triton",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Triton.png",
+      "sha256": "38d7a8916fc61f9cce9597b29d1969c98e7d606878cb075199ef3fed49fee722",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    },
+    {
+      "id": "sol-charon",
+      "name": "Charon",
+      "status": "accepted",
+      "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Charon.png",
+      "sha256": "9516596b4e0f143f8e7d8575481fb351bb88585d4190472aa886a0fb1d8978f3",
+      "primaryClass": "frozen",
+      "preparation": {
+        "opaqueClouds": false,
+        "separateClouds": false,
+        "liquid": false,
+        "ice": true,
+        "emissive": false,
+        "rings": false,
+        "flattenCanopy": false,
+        "maximumLightGradient": 0.7
+      }
+    }
+  ]
+}

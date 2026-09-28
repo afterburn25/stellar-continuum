@@ -67,8 +67,22 @@ struct AdaptiveResearchFundingWorldView {
 
 class AdaptiveResearchCampaignCommands final {
 public:
+  // Simulation-owner entry point. Starts the ordered head through the same
+  // funding/eligibility command as a manual start; never skips a blocked head.
+  [[nodiscard]] static std::vector<AdaptiveResearchRuntimeEvent> start_queued_research(
+      AdaptiveResearchFundingWorldView world,
+      AdaptiveResearchCampaignState &campaign, int civilization_id);
   [[nodiscard]] static double
   credits_needed_to_start(const AdaptiveResearchFundingQuote &quote) noexcept;
+  // Empty means no active/paused program. Only unspent milestone reservations
+  // are refundable; authorization and operating costs have already been spent.
+  [[nodiscard]] static std::optional<double> cancellation_refund(
+      const AdaptiveResearchCampaignState &campaign, int civilization_id,
+      std::string_view node_id);
+  [[nodiscard]] static AdaptiveResearchCommandResult cancel_directed_research(
+      AdaptiveResearchFundingWorldView world,
+      AdaptiveResearchCampaignState &campaign, int civilization_id,
+      std::string_view node_id);
 
   [[nodiscard]] static AdaptiveResearchCommandResult start_directed_research(
       AdaptiveResearchFundingWorldView world,

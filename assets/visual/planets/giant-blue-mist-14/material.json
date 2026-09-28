@@ -1,0 +1,64 @@
+{
+  "conversion": {
+    "blackFraction": 6.866455078125e-05,
+    "clippedFraction": 0.018157958984375,
+    "disc": [
+      1022.5513894849297,
+      1047.8397206784389,
+      868.3130692114199
+    ],
+    "id": "giant-blue-mist-14",
+    "observedSurfaceFraction": 0.5,
+    "reason": "",
+    "removedLightGradient": [
+      -0.3659212728945837,
+      0.3171313147332774,
+      0.2520456748709731
+    ],
+    "seamError": 0.011317989958475353,
+    "usable": true
+  },
+  "filename": "afterburn25._fictional_photorealistic_gas_giant_planet_Blue_M_9d4410ce-105e-422c-b5e4-6b9620f2f5d9_1.png",
+  "folder": "Gas Giants/Gas Giant C - Blue Mist Giant",
+  "height": 2048,
+  "id": "giant-blue-mist-14",
+  "index": 70,
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": false,
+    "liquid": false,
+    "opaqueClouds": true,
+    "preserveZonalDetail": true,
+    "rings": false,
+    "separateClouds": false,
+    "sourceRollDegrees": 20
+  },
+  "preparationVersion": "spherical-oriented-atmosphere-v4",
+  "primaryClass": "gas-giant",
+  "reason": "",
+  "sha256": "9ee695ab6ef181fef869af53b72902a71db6fb967f4497d42104d0149e6e9722",
+  "source": "C:/Steller Continuum/Assets/Planets/Giants/Gas Giants/Gas Giant C - Blue Mist Giant/afterburn25._fictional_photorealistic_gas_giant_planet_Blue_M_9d4410ce-105e-422c-b5e4-6b9620f2f5d9_1.png",
+  "status": "candidate",
+  "subclass": "blue-mist",
+  "unseenHemisphere": "Latitude-aligned continuation of supplied hemisphere; no claim of recovered hidden geography.",
+  "visualAudit": {
+    "apparentAxis": "band-normal; source camera roll is not physical obliquity",
+    "artifacts": "none-disqualifying",
+    "atmosphereQuality": "layered-haze-and-bands",
+    "bandStructure": "latitude-aligned after recorded source roll",
+    "cropping": "uncropped",
+    "highlightSeverity": "restrained",
+    "inspected": true,
+    "lightingCleanable": true,
+    "materialCreated": false,
+    "orientationValid": true,
+    "realism": "credible-atmospheric-render",
+    "shadowSeverity": "moderate-cleanable",
+    "sheet": "sheet-05.png",
+    "sourceBandRollDegrees": 20,
+    "sphericalIntegrity": "complete-disc",
+    "stormStructure": "retain visible vortices in source coordinates"
+  },
+  "width": 2048
+}

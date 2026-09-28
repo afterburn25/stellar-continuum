@@ -1,0 +1,344 @@
+[
+  {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.5,
+      1023.5000000000001,
+      819.6000000000001
+    ],
+    "id": "sol-io",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.3545525505302041,
+      0.38983341584865105,
+      0.2541707933202789
+    ],
+    "seamError": 0.01113722103244876,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.0,
+    "clippedFraction": 4.76837158203125E-07,
+    "disc": [
+      1023.4999999999999,
+      1023.4999999999999,
+      903.5999999999998
+    ],
+    "id": "sol-europa",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.1053207641140695,
+      0.4430704638165906
+    ],
+    "seamError": 0.009988618371974994,
+    "usable": true
+  },
+  {
+    "blackFraction": 1.9073486328125E-06,
+    "clippedFraction": 0.00017213821411132812,
+    "disc": [
+      1024.5138231587114,
+      1023.526547893718,
+      996.5861771948912
+    ],
+    "id": "sol-ganymede",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.40766721175653564,
+      0.3549180672872138,
+      -0.7
+    ],
+    "seamError": 0.03377839686043218,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.00012874603271484375,
+    "clippedFraction": 7.05718994140625E-05,
+    "disc": [
+      1012.8987090115677,
+      1028.6372404584038,
+      917.7484326519127
+    ],
+    "id": "sol-callisto",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.48156966489741876,
+      -0.18351294825063094
+    ],
+    "seamError": 0.028859885306029648,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.0018754005432128906,
+    "clippedFraction": 2.8133392333984375E-05,
+    "disc": [
+      1024.3303688516232,
+      1026.055612544426,
+      825.3476806771864
+    ],
+    "id": "sol-mimas",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      -0.2924175609421338,
+      0.7
+    ],
+    "seamError": 0.032760775571388435,
+    "usable": true
+  },
+  {
+    "blackFraction": 4.76837158203125E-07,
+    "clippedFraction": 0.0008616447448730469,
+    "disc": [
+      1021.1563113600862,
+      1037.5544309880001,
+      820.7939462313366
+    ],
+    "id": "sol-enceladus",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.06354974060776719,
+      0.7
+    ],
+    "seamError": 0.012902040100422148,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0010991096496582031,
+    "disc": [
+      1024.4571639445,
+      1025.9934973249362,
+      955.4404885822802
+    ],
+    "id": "sol-tethys",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.24379987316894094,
+      0.7
+    ],
+    "seamError": 0.010295373809880609,
+    "usable": true
+  },
+  {
+    "blackFraction": 8.106231689453125E-06,
+    "clippedFraction": 0.0001468658447265625,
+    "disc": [
+      1024.8533110953044,
+      1038.4633978327108,
+      822.6841606496721
+    ],
+    "id": "sol-dione",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.03573452130412698,
+      0.7
+    ],
+    "seamError": 0.011298384159490742,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.09255218505859375,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.4999999999999,
+      1023.4999999999999,
+      903.6000000000001
+    ],
+    "id": "sol-iapetus",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.15,
+      0.15,
+      -0.15
+    ],
+    "seamError": 0.022331143979295098,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.0,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.3089370627708,
+      1030.796399201544,
+      840.063246748557
+    ],
+    "id": "sol-titan",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.19769088593113204,
+      0.7
+    ],
+    "seamError": 0.004685923088759069,
+    "usable": true
+  },
+  {
+    "blackFraction": 1.430511474609375E-06,
+    "clippedFraction": 2.002716064453125E-05,
+    "disc": [
+      1016.9206896586052,
+      1029.459199541446,
+      926.4314052282597
+    ],
+    "id": "sol-rhea",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      -0.2544068573014404,
+      0.7
+    ],
+    "seamError": 0.01594195305217888,
+    "usable": true
+  },
+  {
+    "blackFraction": 2.193450927734375E-05,
+    "clippedFraction": 0.0,
+    "disc": [
+      1025.5642367968258,
+      1031.3483608608644,
+      957.896923174087
+    ],
+    "id": "sol-miranda",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.4810695890671144,
+      0.6174127512627667
+    ],
+    "seamError": 0.028000819713960613,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.0,
+    "clippedFraction": 9.5367431640625E-07,
+    "disc": [
+      1023.5821841163715,
+      1031.10147757675,
+      842.7964918466408
+    ],
+    "id": "sol-ariel",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.5113605267816611,
+      0.6086423242055272,
+      0.7
+    ],
+    "seamError": 0.015065438365352658,
+    "usable": true
+  },
+  {
+    "blackFraction": 2.86102294921875E-05,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.5,
+      1023.5,
+      877.5999999999999
+    ],
+    "id": "sol-umbriel",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      -0.3384632980732668,
+      -0.6689862397383183
+    ],
+    "seamError": 0.023599280888879574,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.0,
+    "clippedFraction": 1.8596649169921875E-05,
+    "disc": [
+      1023.5,
+      1023.5000000000001,
+      949.6
+    ],
+    "id": "sol-titania",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.5674861831470162,
+      -0.05441103080908936,
+      0.1485745607942066
+    ],
+    "seamError": 0.02804052799936573,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.004891872406005859,
+    "clippedFraction": 1.9073486328125E-06,
+    "disc": [
+      1025.3249411237618,
+      1039.8023833077598,
+      911.788457258439
+    ],
+    "id": "sol-oberon",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      0.15512967894029472,
+      -0.3155440854993526
+    ],
+    "seamError": 0.03367984580004153,
+    "usable": true
+  },
+  {
+    "blackFraction": 0.00010395050048828125,
+    "clippedFraction": 0.0003008842468261719,
+    "disc": [
+      1023.894080614531,
+      1031.6804095011248,
+      829.1387879896313
+    ],
+    "id": "sol-triton",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.1998467745642219,
+      0.6043028735702906,
+      0.60149695206368
+    ],
+    "seamError": 0.005460179684426853,
+    "usable": true
+  },
+  {
+    "blackFraction": 5.6743621826171875E-05,
+    "clippedFraction": 2.002716064453125E-05,
+    "disc": [
+      1025.9339976092872,
+      1028.3962628078793,
+      878.8963808718955
+    ],
+    "id": "sol-charon",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.6783818279616309,
+      0.6841291780174374,
+      0.10238515856622225
+    ],
+    "seamError": 0.0297010549604898,
+    "usable": true
+  }
+]

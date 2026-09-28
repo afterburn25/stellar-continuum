@@ -66,6 +66,7 @@ enum class MassiveCombatEventType {
 struct MassivePoint {
   float x{};
   float y{};
+  float z{}; // Optional depth in old saves; zero retains their planar motion.
   [[nodiscard]] bool is_finite() const noexcept;
 };
 
@@ -205,6 +206,17 @@ inline constexpr int massive_combat_max_events_per_tick = 32;
 inline constexpr int massive_combat_max_active_salvos = 256;
 inline constexpr int massive_combat_max_catch_up_ticks = 600;
 inline constexpr int campaign_massive_max_engagement_evidence = 65'536;
+
+// Strategic fleet identity zero is valid, while tactical vessel identity zero
+// is reserved as "unset". Keep that fleet in a disjoint part of the Int64
+// vessel namespace so its identity remains stable through battle persistence.
+inline constexpr std::int64_t campaign_zero_fleet_vessel_id =
+    std::int64_t{1} << 32;
+[[nodiscard]] constexpr std::int64_t
+campaign_vessel_id_for_fleet(int fleet_id) noexcept {
+  return fleet_id == 0 ? campaign_zero_fleet_vessel_id
+                       : static_cast<std::int64_t>(fleet_id);
+}
 
 // Matches source Validate, including legacy InitialShipCount materialization.
 void validate_massive_combat_battle(MassiveCombatBattleState &battle);

@@ -63,6 +63,8 @@ public:
   void remove_civilization(int civilization_id) noexcept;
   void clear() noexcept;
   [[nodiscard]] std::size_t cached_plan_count() const noexcept;
+  [[nodiscard]] std::vector<CivilizationStrategicPlan> snapshot() const;
+  void restore(std::span<const CivilizationStrategicPlan> plans);
 
 private:
   StrategicDecisionEvaluator evaluator_;

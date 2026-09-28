@@ -14,6 +14,9 @@ struct PersistableFreshCampaignOptions {
   int pre_warp_civilization_count{6};
   int ancient_civilization_count{1};
   std::string player_species_id{"terran_baseline"};
+  std::optional<StellarPopulationOptions> stellar_population;
+  bool developer_full_coverage{};
+  std::optional<GalaxyGenerationConfig> configuration;
 };
 
 // Creates the canonical FullGalaxy new-campaign composition and attaches the

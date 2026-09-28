@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.0,
+    "clippedFraction": 4.76837158203125e-07,
+    "disc": [
+      1023.4999999999999,
+      1023.4999999999999,
+      903.5999999999998
+    ],
+    "id": "sol-europa",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.1053207641140695,
+      0.4430704638165906
+    ],
+    "seamError": 0.009988618371974994,
+    "usable": true
+  },
+  "id": "sol-europa",
+  "name": "Europa",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "55003737d9ac3e9e3ae35939d6326c2c1a4e2a28caab9a12aa64de4598f09545",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Europa.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

@@ -6,6 +6,7 @@
 #include <limits>
 #include <ranges>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -39,13 +40,6 @@ void pixel(std::vector<std::uint8_t> &rgba, int width, int x, int y,
   rgba[at] = byte(r); rgba[at + 1] = byte(g); rgba[at + 2] = byte(b);
   rgba[at + 3] = byte(a);
 }
-std::optional<std::pair<Point,Point>> clip_line(Point a,Point b,UiRect r){
-  float first=0,last=1;const float dx=b.x-a.x,dy=b.y-a.y;
-  const std::array p{-dx,dx,-dy,dy};
-  const std::array q{a.x-r.x,r.x+r.width-a.x,a.y-r.y,r.y+r.height-a.y};
-  for(std::size_t i=0;i<p.size();++i){if(p[i]==0){if(q[i]<0)return std::nullopt;continue;}const float value=q[i]/p[i];if(p[i]<0)first=std::max(first,value);else last=std::min(last,value);if(first>last)return std::nullopt;}
-  return std::pair{Point{a.x+first*dx,a.y+first*dy},Point{a.x+last*dx,a.y+last*dy}};
-}
 std::shared_ptr<const RgbaImage> make_star(Color color, bool black_hole,
                                            std::uint32_t seed) {
   constexpr int size = NativeCelestialAppearanceRenderer::stellar_texture_size;
@@ -64,7 +58,6 @@ std::shared_ptr<const RgbaImage> make_star(Color color, bool black_hole,
     const float px = (2.f * (x + .5f) / size - 1.f);
     const float py = (2.f * (y + .5f) / size - 1.f);
     const float radial = std::sqrt(px * px + py * py);
-    const float theta = std::atan2(py, px);
     if (black_hole) {
       const float horizon = 1.f - std::clamp((radial - .41f) / .025f, 0.f, 1.f);
       const float rim = std::max(0.f, 1.f - std::abs(radial - .455f) / .035f);
@@ -73,14 +66,29 @@ std::shared_ptr<const RgbaImage> make_star(Color color, bool black_hole,
       pixel(rgba, size, x, y, .015f + rim * .45f, .02f + rim * .34f,
             .04f + rim * .58f, alpha); continue;
     }
+    // Beyond the corona's outer fade, the original pixel is fully untouched.
+    if (radial >= 1.f) continue;
     const float disc_alpha = 1.f - std::clamp((radial - .448f) / .016f, 0.f, 1.f);
-    const float corona_distance = std::max(0.f, radial - .455f);
-    const float streamers = .75f + .13f * std::sin(theta * 9.f) +
+    // A solid photosphere completely covers the corona. Preserve the original
+    // corona calculation at the limb and outside it, where it affects pixels.
+    float corona{};
+    if (disc_alpha < 1.f) {
+      const float theta = std::atan2(py, px);
+      const float corona_distance = std::max(0.f, radial - .455f);
+      const float streamers = .75f + .13f * std::sin(theta * 9.f) +
                             .09f * std::sin(theta * 17.f + .6f) +
                             .06f * std::sin(theta * 31.f + std::sin(theta * 5.f));
-    const float corona = std::exp(-corona_distance * 10.f) * streamers *
+      corona = std::exp(-corona_distance * 10.f) * streamers *
                          (1.f - std::clamp((radial - .68f) / .32f, 0.f, 1.f)) * .42f;
+    }
     if (disc_alpha <= 0 && corona <= .002f) continue;
+    if (disc_alpha <= 0) {
+      // The original surface-to-corona blend is exactly zero here. Sunspots
+      // and granulation cannot affect these pixels; keep the same RGB/alpha
+      // without evaluating their expensive surface noise across the halo.
+      pixel(rgba, size, x, y, cr * .62f, cg * .58f, cb * .55f, corona);
+      continue;
+    }
     const float offset=static_cast<float>(seed&1023u)*.031f;
     const float warp_x = (noise(px * 8.f + offset, py * 8.f - offset) - .5f) * .055f;
     const float warp_y = (noise(px * 8.f - offset * .4f, py * 8.f + offset * .6f) - .5f) * .055f;
@@ -152,16 +160,41 @@ std::shared_ptr<const RgbaImage> make_ring(bool front) {
 struct NativeCelestialAppearanceRenderer::Storage {
   struct Key { Color color{}; std::uint32_t seed{}; bool black_hole{}, ring{}, front{}; bool operator==(const Key&other)const noexcept{return color.r==other.color.r&&color.g==other.color.g&&color.b==other.color.b&&color.a==other.color.a&&seed==other.seed&&black_hole==other.black_hole&&ring==other.ring&&front==other.front;} };
   struct Entry { Key key; std::shared_ptr<const RgbaImage> image; std::uint64_t use{}; };
+  struct Pending { Key key; ImagePreparationQueue::Ticket ticket; };
   std::vector<Entry> entries;std::size_t bytes{},generated{};std::uint64_t use{};
-  std::shared_ptr<const RgbaImage> obtain(Key key) {
-    const auto found=std::ranges::find(entries,key,&Entry::key);
-    if(found!=entries.end()){found->use=++use;return found->image;}
-    auto image=key.ring?make_ring(key.front):make_star(key.color,key.black_hole,key.seed);
+  std::shared_ptr<ImagePreparationQueue> preparation;
+  std::vector<Pending> pending;
+  std::thread::id owner{std::this_thread::get_id()};
+  bool deferred{};
+  void require_owner()const{if(std::this_thread::get_id()!=owner)throw std::logic_error("Celestial preparation must be used on its owner thread.");}
+  void retain(Key key,std::shared_ptr<const RgbaImage> image){
     while(!entries.empty()&&(entries.size()>=NativeCelestialAppearanceRenderer::maximum_cached_resources||bytes+image->byte_size()>NativeCelestialAppearanceRenderer::maximum_cached_bytes)){
       const auto oldest=std::ranges::min_element(entries,{},&Entry::use);bytes-=oldest->image->byte_size();entries.erase(oldest);
     }
     if(image->byte_size()>NativeCelestialAppearanceRenderer::maximum_cached_bytes)throw std::runtime_error("Celestial appearance resource exceeds its cache budget.");
-    bytes+=image->byte_size();entries.push_back({key,image,++use});++generated;return image;
+    bytes+=image->byte_size();entries.push_back({key,std::move(image),++use});++generated;
+  }
+  void collect(){
+    for(auto it=pending.begin();it!=pending.end();){
+      if(!it->ticket.ready()){++it;continue;}
+      const auto key=it->key;auto ticket=std::move(it->ticket);it=pending.erase(it);
+      retain(key,ticket.take());
+    }
+  }
+  std::shared_ptr<const RgbaImage> obtain(Key key) {
+    if(preparation){require_owner();collect();}
+    const auto found=std::ranges::find(entries,key,&Entry::key);
+    if(found!=entries.end()){found->use=++use;return found->image;}
+    if(preparation){
+      deferred=true;
+      if(std::ranges::find(pending,key,&Pending::key)!=pending.end())return {};
+      const auto size=static_cast<std::size_t>(key.ring?NativeCelestialAppearanceRenderer::ring_texture_size:NativeCelestialAppearanceRenderer::stellar_texture_size);
+      auto ticket=preparation->submit(size*size*4u,[key]{return key.ring?make_ring(key.front):make_star(key.color,key.black_hole,key.seed);});
+      if(ticket)pending.push_back({key,std::move(*ticket)});
+      return {};
+    }
+    auto image=key.ring?make_ring(key.front):make_star(key.color,key.black_hole,key.seed);
+    retain(key,image);return image;
   }
 };
 NativeCelestialAppearanceRenderer::NativeCelestialAppearanceRenderer():storage_(std::make_unique<Storage>()){}
@@ -171,23 +204,17 @@ NativeCelestialAppearanceRenderer&NativeCelestialAppearanceRenderer::operator=(N
 void NativeCelestialAppearanceRenderer::append_stellar_disc(DrawList&out,Point center,float radius,const NativeStellarDiscAppearance&a,double seconds,std::optional<UiRect>clip){
   if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0||!std::isfinite(seconds))throw std::invalid_argument("Stellar appearance geometry must be finite and positive.");
   const auto image=storage_->obtain({a.spectral_color,a.deterministic_seed,a.black_hole,false,false});const float extent=radius*2.20f;
+  if(!image){out.world.emplace_back(Circle{center,radius,{a.spectral_color.r,a.spectral_color.g,a.spectral_color.b,110}});return;}
   out.world.emplace_back(Image{image,{center.x-extent,center.y-extent,extent*2,extent*2},std::nullopt,{255,255,255,255},clip});
-  if(a.black_hole)return;
-  const float seed=static_cast<float>(a.deterministic_seed&65535u);
-  const float slot_length=9.5f+hash(seed,4.7f)*3.5f;
-  const float shifted=static_cast<float>(seconds)+hash(seed,17.1f)*slot_length;
-  const float epoch=std::floor(shifted/slot_length),phase=fract(shifted/slot_length);
-  const float roll=hash(seed*2.31f+epoch,31.7f),previous=hash(seed*2.31f+epoch-1.f,31.7f);
-  const bool enabled=roll>=.48f||previous<.48f;
-  const float start=.08f+hash(seed+epoch*1.17f,8.3f)*.12f;
-  const float duration=.29f+hash(seed*3.07f,epoch+12.4f)*.20f;
-  const float life=std::clamp((phase-start)/duration,0.f,1.f);
-  const auto smoothstep=[](float low,float high,float value){const float u=std::clamp((value-low)/(high-low),0.f,1.f);return u*u*(3.f-2.f*u);};
-  const float envelope=enabled?smoothstep(0,.28f,life)*(1.f-smoothstep(.58f,1.f,life)):0.f;
-  if(envelope>0){const float bearing=(hash(epoch*3.17f+seed,19.3f)-.5f)*tau;const float half_width=.12f+.12f*hash(epoch+4.2f,seed);const float height=.10f+.17f*hash(seed*1.9f,epoch+7.6f);for(int strand=0;strand<2;++strand){Point prior{};for(int segment=0;segment<=18;++segment){const float u=segment/18.f,signed_angle=(u*2.f-1.f)*half_width;const float arch=std::sqrt(std::max(0.f,1.f-(signed_angle/half_width)*(signed_angle/half_width)));const float irregular=(noise(signed_angle*24.f+epoch,static_cast<float>(seconds)*.075f+seed)-.5f)*.032f;const float r=radius*(.96f+arch*height+irregular+strand*.025f);const float theta=bearing+signed_angle;Point next{center.x+std::cos(theta)*r,center.y+std::sin(theta)*r};if(segment){const auto visible=clip?clip_line(prior,next,*clip):std::optional<std::pair<Point,Point>>{{prior,next}};if(visible)out.world.emplace_back(Line{visible->first,visible->second,{a.spectral_color.r,a.spectral_color.g,a.spectral_color.b,byte(envelope*(strand?.34f:.72f))}});}prior=next;}}}
+  // Eruptions are supplied by Core event state through EruptionArtwork.
+  // The fallback photosphere never spawns presentation-time flares.
 }
-void NativeCelestialAppearanceRenderer::append_ring_back(DrawList&out,Point center,float radius,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const float e=radius*2.30f;out.world.emplace_back(Image{storage_->obtain({{},0,false,true,false}),{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}
-void NativeCelestialAppearanceRenderer::append_ring_front(DrawList&out,Point center,float radius,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const float e=radius*2.30f;out.world.emplace_back(Image{storage_->obtain({{},0,false,true,true}),{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}
+void NativeCelestialAppearanceRenderer::append_ring_back(DrawList&out,Point center,float radius,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const auto image=storage_->obtain({{},0,false,true,false});if(!image)return;const float e=radius*2.30f;out.world.emplace_back(Image{image,{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}
+void NativeCelestialAppearanceRenderer::append_ring_front(DrawList&out,Point center,float radius,std::optional<UiRect>clip){if(!std::isfinite(center.x)||!std::isfinite(center.y)||!std::isfinite(radius)||radius<=0)throw std::invalid_argument("Ring geometry must be finite and positive.");const auto image=storage_->obtain({{},0,false,true,true});if(!image)return;const float e=radius*2.30f;out.world.emplace_back(Image{image,{center.x-e,center.y-e,e*2,e*2},std::nullopt,{255,255,255,255},clip});}
 NativeCelestialAppearanceStats NativeCelestialAppearanceRenderer::stats()const noexcept{return {storage_->entries.size(),storage_->bytes,storage_->generated};}
-void NativeCelestialAppearanceRenderer::clear()noexcept{storage_->entries.clear();storage_->bytes=0;}
+void NativeCelestialAppearanceRenderer::use_background_preparation(std::shared_ptr<ImagePreparationQueue> value){storage_->require_owner();cancel_preparation();storage_->preparation=std::move(value);}
+void NativeCelestialAppearanceRenderer::begin_frame()noexcept{storage_->deferred=false;}
+bool NativeCelestialAppearanceRenderer::preparation_pending()const noexcept{return storage_->deferred||!storage_->pending.empty();}
+void NativeCelestialAppearanceRenderer::cancel_preparation()noexcept{storage_->pending.clear();storage_->deferred=false;}
+void NativeCelestialAppearanceRenderer::clear()noexcept{cancel_preparation();storage_->entries.clear();storage_->bytes=0;}
 } // namespace stellar::native_system_ui

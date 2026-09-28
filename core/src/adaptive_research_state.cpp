@@ -307,6 +307,8 @@ struct AdaptiveResearchCivilizationState::Storage {
   SlotSet facilities;
   SlotSet deployments;
   SlotMap<ResearchProjectRuntimeState> projects;
+  SlotMap<ResearchProjectRuntimeState> cancelled;
+  std::vector<ResearchProjectRuntimeState> cancelled_cache;
   std::vector<ResearchNodeRuntimeState> node_cache;
   std::vector<ResearchPressureEntry> pressure_cache;
   std::vector<ResearchEvidenceInstance> evidence_cache;
@@ -332,6 +334,10 @@ struct AdaptiveResearchCivilizationState::Storage {
   void rebuild_projects() {
     project_cache.clear();
     projects.each([&](auto &, const auto &v) { project_cache.push_back(v); });
+  }
+  void rebuild_cancelled() {
+    cancelled_cache.clear();
+    cancelled.each([&](auto &, const auto &v) { cancelled_cache.push_back(v); });
   }
   void touch() {
     revision = detail::checked_next_research_state_revision(revision);
@@ -455,6 +461,14 @@ AdaptiveResearchCivilizationState::enabled_deployment_event_ids()
 std::span<const ResearchProjectRuntimeState>
 AdaptiveResearchCivilizationState::active_projects() const noexcept {
   return storage_->project_cache;
+}
+std::span<const ResearchProjectRuntimeState>
+AdaptiveResearchCivilizationState::cancelled_projects() const noexcept {
+  return storage_->cancelled_cache;
+}
+const ResearchProjectRuntimeState *
+AdaptiveResearchCivilizationState::cancelled_project(std::string_view id) const noexcept {
+  return storage_->cancelled.find(id);
 }
 std::vector<ResearchApplicabilityContextSnapshot>
 AdaptiveResearchCivilizationState::applicability_contexts() const {
@@ -819,5 +833,28 @@ bool AdaptiveResearchStateWriter::remove_project(State &s,
 void AdaptiveResearchStateWriter::mark_view_dirty(State &s) {
   s.storage_->view_revision =
       checked_next_research_state_revision(s.storage_->view_revision);
+}
+void AdaptiveResearchStateWriter::mark_state_changed(State &s) {
+  checked_next_research_state_revision(s.storage_->revision);
+  checked_next_research_state_revision(s.storage_->view_revision);
+  s.storage_->touch();
+}
+void AdaptiveResearchStateWriter::set_cancelled_project(State &s,
+                                                        ResearchProjectRuntimeState p) {
+  p.revision = checked_next_research_state_revision(s.storage_->revision);
+  checked_next_research_state_revision(s.storage_->view_revision);
+  auto id = p.node_id;
+  s.storage_->cancelled.set(std::move(id), std::move(p));
+  s.storage_->rebuild_cancelled();
+  s.storage_->touch();
+}
+bool AdaptiveResearchStateWriter::remove_cancelled_project(State &s, std::string_view id) {
+  if (!s.storage_->cancelled.contains(id)) return false;
+  checked_next_research_state_revision(s.storage_->revision);
+  checked_next_research_state_revision(s.storage_->view_revision);
+  s.storage_->cancelled.erase(id);
+  s.storage_->rebuild_cancelled();
+  s.storage_->touch();
+  return true;
 }
 } // namespace stellar::core::detail

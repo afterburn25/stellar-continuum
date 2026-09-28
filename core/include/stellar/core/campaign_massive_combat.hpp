@@ -42,7 +42,13 @@ public:
   // May materialize participant combat state before a later authored rejection.
   [[nodiscard]] CombatOrderResult begin(FreshCampaignState &galaxy,
                                         int civilization_id,
-                                        int actor_fleet_id, double day);
+                                        int actor_fleet_id, double day, bool spatial_deployment = false);
+
+  // Mirrors Main.UiIssueMassiveCombatOrder: rejects without an unreconciled
+  // encounter, otherwise forwards to the shared tactical engine.
+  [[nodiscard]] MassiveCombatOrderResult
+  issue_order(FreshCampaignState &galaxy, int civilization_id,
+              MassiveCombatOrder order);
 
   // Idempotently returns no events when no unreconciled encounter exists.
   [[nodiscard]] std::vector<CombatEvent>

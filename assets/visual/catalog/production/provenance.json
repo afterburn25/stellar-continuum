@@ -1,0 +1,2707 @@
+{
+  "schemaVersion": 1,
+  "createdDate": "2026-09-14",
+  "ownership": "Project-directed generated illustrations and renders of project-authored models. No third-party image downloads or reference images.",
+  "intendedUse": "Stellar Continuum commercial-game UI candidates; generated assets are not claimed to be exclusive or independently copyrightable.",
+  "processing": "Square sources resized with Godot Lanczos to 512 and 128 pixels; no crops, repainting or recoloring.",
+  "sources": {
+    "contentCommit": "3aeeb9a4",
+    "stationSource": "docs/content/HUMAN_STATION_DESIGN.json",
+    "fleetSource": "assets/models/alien-fleet-v2/fleet-manifest.json",
+    "note": "Committed content only. No balance or research unlocks are added by this presentation catalog."
+  },
+  "researchCoverage": "370 explicit technology bindings share 21 research-family illustrations. Module unlock bindings reserve the matching module illustration.",
+  "entries": [
+    {
+      "id": "research-foundations",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a precision physics experiment bench with optical lenses, laser interferometer, calibrated metal instruments and vacuum chamber. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-foundations.png",
+      "masterSha256": "3fa9813e5bc276700b416711a992bc1bceb0e4897ff935b030e79020d1b37f02",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-foundations.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "33f1a6beb71028d8d05697ac6baa6e3225626a29f259ecb263fadb4460a3f71a",
+          "bytes": 31018
+        },
+        "portraits": {
+          "path": "portraits/research-foundations.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "60b16d8fb46e8a50d4df96076008ab604195aa484d0eb74268967a64da1dac3a",
+          "bytes": 421993
+        }
+      }
+    },
+    {
+      "id": "research-energy",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept\nAsset type: square in-game research technology thumbnail for Stellar Continuum, original serious hard-science-fiction strategy game.\nSubject: advanced fusion reactor, a compact toroidal magnetic confinement chamber with machined steel housings, copper coils, ceramic insulators and a restrained blue-white plasma glow, photographed in a dark spacecraft engineering bay.\nStyle: photorealistic high-end industrial product visualization, convincing real metal construction, bolts, seams and cooling pipes; crisp silhouette readable as a small thumbnail.\nComposition: single primary apparatus centered, three-quarter view, fills 80% of square, dark navy backdrop, soft neutral key light and subtle warm rim light. No people.\nConstraints: no words, no letters, no numbers, no logo, no watermark, no borders, no cartoon, no plastic toy styling, no magical effects.",
+      "masterFile": "research-energy.png",
+      "masterSha256": "b59557465390184633b0c5eeb8641ba82f73065e63287e9169861f486c42e444",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-energy.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "3e059148e573e30a079a3ffb9471e79f962cc05706654f0c70fe0a21bca86b04",
+          "bytes": 35949
+        },
+        "portraits": {
+          "path": "portraits/research-energy.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "8d487c2c84ea6623911c858164fae1c4455d981382887a5e10a613f130927f58",
+          "bytes": 482194
+        }
+      }
+    },
+    {
+      "id": "research-propulsion",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a spacecraft propulsion engine, large machined bell nozzle, turbopump plumbing and heat-resistant ceramic liner. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-propulsion.png",
+      "masterSha256": "48ccec9f58328e3040aa5b15613a8d2616dda9b95d0a5da64da5667c75eeb7d4",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-propulsion.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "8ab809c0e59cdeb685c2449ef312c855cf4d74c6b7f0f38626e859a52d61eea5",
+          "bytes": 26604
+        },
+        "portraits": {
+          "path": "portraits/research-propulsion.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "756f10b59998176fedf8e3a75af799a94709eae4920653a90bc56579fb3754c6",
+          "bytes": 390460
+        }
+      }
+    },
+    {
+      "id": "research-space_industry",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: an orbital construction yard with a partially assembled metallic spacecraft inside a skeletal gantry, distant planet. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-space_industry.png",
+      "masterSha256": "f040069252c3322e8f8735e699a63cad377d8946fa0f7d37850eec437d33a01b",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-space_industry.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "e752e394b19b9d1c026f342f19d1ce841cd932db7eb67b9fe9af09c8e9f2315b",
+          "bytes": 33148
+        },
+        "portraits": {
+          "path": "portraits/research-space_industry.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "6aa3fed335fa37fe19d03e85aa18faff737d038c235c3fd6f37834784ee8a121",
+          "bytes": 473622
+        }
+      }
+    },
+    {
+      "id": "research-life_medicine",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a spacecraft medical laboratory with a sealed diagnostic bed, surgical instrument arms and sterile life support equipment, no patient. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-life_medicine.png",
+      "masterSha256": "dcad67f46a51769fc5011b449424ba80929acb1dfd50f78c3ee482313bce8dff",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-life_medicine.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "c6da33edddd0d90037f3f46a2348e40dabe4050c241609f80a93ff31b0557e30",
+          "bytes": 35213
+        },
+        "portraits": {
+          "path": "portraits/research-life_medicine.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "bc4ed825bcd9d5023c9113c677cae1241b46c8719084fa1aba635548bddbe8aa",
+          "bytes": 462307
+        }
+      }
+    },
+    {
+      "id": "research-planetary",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a sealed planetary settlement with metal pressure habitats, airlocks and atmospheric monitoring towers on a rocky plain. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-planetary.png",
+      "masterSha256": "f8e57fab7c3ea50a649b6438c374ee92a0af97e84aa6b4244bb2233e6ab3b51c",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-planetary.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "c9501690fe4ea8928177371ecde6e76375db34e955dc25298381b67e6d6413f9",
+          "bytes": 32184
+        },
+        "portraits": {
+          "path": "portraits/research-planetary.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "e46d3708e9aea5f3293b5cfa90c4087391ee52745ed37ac8d94ad66aaf9bf750",
+          "bytes": 469796
+        }
+      }
+    },
+    {
+      "id": "research-materials",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a close product study of layered titanium, ceramic and carbon composite material samples under a precision testing probe. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-materials.png",
+      "masterSha256": "6e788463274241b0902d9a62764d5ad09866b10ec4550779c36b1e2c3df113ed",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-materials.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "57ae746d52b907a45dd7d969ca91a8ac8b7147f26e03d668a3dc7a9508785efd",
+          "bytes": 33169
+        },
+        "portraits": {
+          "path": "portraits/research-materials.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "966663a0fe3120869da57388106fb98279d5b52da44f53a1e3113b84739d0451",
+          "bytes": 425646
+        }
+      }
+    },
+    {
+      "id": "research-computing",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a powerful computing core with intricate silicon chips, copper heat pipes and neatly routed optical data cables. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-computing.png",
+      "masterSha256": "e3792ae703b787b0308dee43bc21c7fcd90609cfc51aba3612aa37083aadc567",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-computing.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "0d8dd8315d64bd0226c5983fa2d50b12478f52066b22e03fa39fa9b918c90a1f",
+          "bytes": 33967
+        },
+        "portraits": {
+          "path": "portraits/research-computing.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "ec81a3da8fe875d917734e27690eac11e3854b15b161c21c34215bdfdc7ff3eb",
+          "bytes": 467569
+        }
+      }
+    },
+    {
+      "id": "research-sensors_comms",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a precision deep-space sensor array with a large parabolic dish, optical telescope lenses and antenna booms on a metal mount. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-sensors_comms.png",
+      "masterSha256": "6271b10a6539ba8aaf6b49107efd8e1fff86926619d4f25afed3a36154039f3b",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-sensors_comms.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "a442bd9dbf65fc2e7d259cf1c72bf6af2c0de5e6e0371bc1940b28ddc12a595a",
+          "bytes": 29219
+        },
+        "portraits": {
+          "path": "portraits/research-sensors_comms.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "e8fbcd8817a9658b6153fc5db4a8141940b9fa065830bcf599f68053f7b645f1",
+          "bytes": 402304
+        }
+      }
+    },
+    {
+      "id": "research-military",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a heavy spacecraft defense turret with paired electromagnetic rail barrels, armored base and visible cooling mechanisms. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-military.png",
+      "masterSha256": "b007e91f70a0d93e0d7428daf305408195841bcbe6f3ec711686e1705dbae5f1",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-military.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "f8dc14ab54df40c04f17f3749d2d154e3f2c0bc3c28eb3f73bd54c271bb87a05",
+          "bytes": 29902
+        },
+        "portraits": {
+          "path": "portraits/research-military.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "a77b2118318990397ef9d0fc1d55b211694e428921ecd4e966994191f4c2ede4",
+          "bytes": 421074
+        }
+      }
+    },
+    {
+      "id": "research-logistics",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a space freight transfer port with modular metal cargo containers, cargo tugs and articulated loading cranes. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-logistics.png",
+      "masterSha256": "724b5b0ac8b9d737d00c66f613676596c7a0e16956885a3e62c601344fd1d94b",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-logistics.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "3803c443229728594f994fe52b4f6f39446aa5d34538953bed1cb023c7806228",
+          "bytes": 31169
+        },
+        "portraits": {
+          "path": "portraits/research-logistics.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "a49ecd6b6adb697df8e082b8f543da5241e23c3e80d5c2550534acfc8a109a41",
+          "bytes": 446322
+        }
+      }
+    },
+    {
+      "id": "research-social_admin",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: an empty futuristic civic council chamber, elegant circular seating surrounding a physical city model, realistic architecture. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-social_admin.png",
+      "masterSha256": "b00b09116cd69f41dd5937116ab4330552abb5dd3a74367562caaeeae1315e00",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-social_admin.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "10c551f3eee3e3df082f93eba0ab7cc068cfaee393fb8a497646dea2b0895d05",
+          "bytes": 33124
+        },
+        "portraits": {
+          "path": "portraits/research-social_admin.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "d25d2f1338c64f69cca7c8a01168c44e1a38227774eb71a77fd3dcaa0f513789",
+          "bytes": 446391
+        }
+      }
+    },
+    {
+      "id": "research-xenoscience",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: an alien manufactured artifact with intricate unfamiliar machined metal geometry inside a sealed examination chamber, scientific instruments. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-xenoscience.png",
+      "masterSha256": "eba689abf05e706532e3f070be53e9565c4bac8d8c6220d9a50de051637d6b35",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-xenoscience.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "caf6a0cf88ddcde98aba9eef0d97496b039f01e9c6b483bc97257cab6cb869e5",
+          "bytes": 33785
+        },
+        "portraits": {
+          "path": "portraits/research-xenoscience.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "7804c1a0b842ccffc2405a750672abbf4a184d2800dea753f78db61cfae3eea5",
+          "bytes": 425774
+        }
+      }
+    },
+    {
+      "id": "research-biotechnology",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a precision biotechnology apparatus with glass bioreactor vessels, nutrient plumbing and a robotic micropipette examining cellular cultures. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-biotechnology.png",
+      "masterSha256": "e98fb21e0c6b4c4509824717c713f5a60c513707ee15f70724c2a4380d8f146a",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-biotechnology.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "9e3642eccec135b4215a87c892c3eac7615096c886c0bcb6f27ecacdec40613f",
+          "bytes": 33318
+        },
+        "portraits": {
+          "path": "portraits/research-biotechnology.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "11deb957a29a05ff1881b3a46df213523d09c5d2190fe666953a27130f1bccf4",
+          "bytes": 440051
+        }
+      }
+    },
+    {
+      "id": "research-synthetic_systems",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a sophisticated autonomous maintenance robot with articulated metal manipulators inspecting a rugged computing rack. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-synthetic_systems.png",
+      "masterSha256": "554802031f1ca0bf1c233e1615ff810b32d2c7612e2a95c140739a190008ab2a",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-synthetic_systems.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "82125fff095246200f683b57094993a8593f9226c31ba843e4d998b1b4f7874a",
+          "bytes": 31259
+        },
+        "portraits": {
+          "path": "portraits/research-synthetic_systems.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "8369f1c578542bf4218dc94d0067bb91afd12290d5376bf3183be6ea1ae22574",
+          "bytes": 449374
+        }
+      }
+    },
+    {
+      "id": "research-biosphere_agriculture",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a spacecraft hydroponic greenhouse with vivid green crops in metal planting trays, irrigation pipes and warm grow lights. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-biosphere_agriculture.png",
+      "masterSha256": "25b96c36e5bc434794fb002e38bd9219072ba007055b814820be5f442651e09a",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-biosphere_agriculture.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "4a6355828ffc85cb8ce29e9a713343e276966a1317b973111ebac8946e2b439b",
+          "bytes": 32416
+        },
+        "portraits": {
+          "path": "portraits/research-biosphere_agriculture.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "753eefa3729efebf81fadbea4330d77fa20055305ded25d70be2aa322c6206be",
+          "bytes": 451012
+        }
+      }
+    },
+    {
+      "id": "research-economic_trade",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a busy futuristic orbital trade terminal with organized freight pallets, autonomous loaders and a distant transport ship through an observation window. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-economic_trade.png",
+      "masterSha256": "64056bf96fb52fd9422e4edfe6f6acb5ae97250528111ec67218266b1ff7252f",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-economic_trade.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "efe8967a05461cbab60140a3da10e8e851702728d3521ff09dac705256038795",
+          "bytes": 36041
+        },
+        "portraits": {
+          "path": "portraits/research-economic_trade.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "8bf461f8b7a12696dcae6a127369eaa85b9bea7e84a2bf0f1511dce8ab27992e",
+          "bytes": 483122
+        }
+      }
+    },
+    {
+      "id": "research-cybernetics",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a highly engineered prosthetic hand and neural interface on a medical workbench, titanium joints, fine actuators and optical leads, no person. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-cybernetics.png",
+      "masterSha256": "cfb12a057702acf718fedc8c8ec4896f087eba08045a8248037e1c8b4ffb215b",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-cybernetics.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "b022c6a06cfea4969b9d6b2e424a1ffb873ac67d85dc3be9bd29eabd19a9575a",
+          "bytes": 34929
+        },
+        "portraits": {
+          "path": "portraits/research-cybernetics.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "9a71238a3a2f9de7d1ac7ad199751bd6dca9509c296ef3a935a530a64bb6806d",
+          "bytes": 435561
+        }
+      }
+    },
+    {
+      "id": "research-research_infrastructure",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a modern automated scientific laboratory with robotic experiment stations, microscopes, sample trays and precision instruments. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-research_infrastructure.png",
+      "masterSha256": "ab6a26a61accc26cd6a505ecaea80ec9c34db443c1eb48cf435c2df32f3557a4",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-research_infrastructure.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "28dcd9bbfb8d1aee92a781f7305b8d8ed45508987c82bb635601047917bbdd4d",
+          "bytes": 31517
+        },
+        "portraits": {
+          "path": "portraits/research-research_infrastructure.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "747d26f3ea18963669e85e52e06a1039b0d1e9acf8b81b3b31c7da10cb0a8725",
+          "bytes": 405225
+        }
+      }
+    },
+    {
+      "id": "research-stellar_engineering",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: immense realistic metal solar collector platforms in orbit around a warm star, panel trusses and construction craft convey scale. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-stellar_engineering.png",
+      "masterSha256": "df93f3dfea24ae1cf3327911867b74fdaa9dbd364a615551d595bad89c43a206",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-stellar_engineering.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "58e4614a9751d49390655f7c0991f428b7a08061fcd90d0fc3a1f1d1f878e516",
+          "bytes": 29632
+        },
+        "portraits": {
+          "path": "portraits/research-stellar_engineering.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "da727ad072c6d8d1096ba400584a8540500bf5114c8cd8d4920e60c7194d6dbc",
+          "bytes": 444714
+        }
+      }
+    },
+    {
+      "id": "research-alternative_biochemistry",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: research family illustration. Subject: a cryogenic chemistry laboratory with sealed amber liquid sample vessels, frosted metal plumbing and low-temperature analysis instruments. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "research-alternative_biochemistry.png",
+      "masterSha256": "5bca12afdbc4733c03785db430a11af9f5a10b292d81b94a095fce21ba5dbcef",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/research-alternative_biochemistry.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "88cdef6ca42a82a0c9a5a1f56f899fb8ead0c543c9e79f40bd6e723564a6e62a",
+          "bytes": 34177
+        },
+        "portraits": {
+          "path": "portraits/research-alternative_biochemistry.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "7d5b44079e09de69745e0e8f264de9e3e1e82d82630f74a5c5ad065a603b4801",
+          "bytes": 465965
+        }
+      }
+    },
+    {
+      "id": "human_station_docking--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station docking expansion and traffic module, upgrade level 1: Additional docking collar and traffic mast. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_docking--l1.png",
+      "masterSha256": "673ac628ed2312b1395b5597296bf06738e5fe9dc897654ec08dc9ce5d9bc6b3",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_docking--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "409b59b76a028f1ba8afc843b2bdaba466e968a297c9b4af8e535b397a525517",
+          "bytes": 24485
+        },
+        "portraits": {
+          "path": "portraits/human_station_docking--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "762fff5556cc50d4f786a8e4f86e6838777c7081317f923b4e5540e6e3b6c720",
+          "bytes": 350030
+        }
+      }
+    },
+    {
+      "id": "human_station_docking--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station docking expansion and traffic module, upgrade level 2: Branching dock pier and control booth. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_docking--l2.png",
+      "masterSha256": "eafaad23743632f1e28c3d91847207f3db2debb5b7ef57cb79dcb9ff046bc04a",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_docking--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "58ecfcc1e30be629dfd2459065c3fe9b84c1a7aeb2f6d9be88887cd250b5c5eb",
+          "bytes": 25736
+        },
+        "portraits": {
+          "path": "portraits/human_station_docking--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "db63c7e0b7337189c171cf1c4e819016e87bf7d0cc947745158a6cc36569e80a",
+          "bytes": 379241
+        }
+      }
+    },
+    {
+      "id": "human_station_docking--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station docking expansion and traffic module, upgrade level 3: Large traffic arm with separated docking structures. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_docking--l3.png",
+      "masterSha256": "674404a2cd9a7bcf0a0dd0dfe0c56b3d8c35df074484174c4abc3bb7dcd078bb",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_docking--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "98bc34711d634ffe49b468439371f71f782ca7678cc08c2e60a76fb2a87f8b12",
+          "bytes": 23334
+        },
+        "portraits": {
+          "path": "portraits/human_station_docking--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "e520513cd13b507dabd27a3730be7f713561cdffbb005c9caef9295f90d93952",
+          "bytes": 340540
+        }
+      }
+    },
+    {
+      "id": "human_station_habitat--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station habitat and life support module, upgrade level 1: Single sealed pressure pod. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_habitat--l1.png",
+      "masterSha256": "33709bc73db76d2ab237ac875576d1de5a52f77775f3c4c392e2918243fc105e",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_habitat--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "ae90f5aa5c4538eb94ef65ac4c05fa3f00d859cd798d5a18de1b07adbbbdee6e",
+          "bytes": 25805
+        },
+        "portraits": {
+          "path": "portraits/human_station_habitat--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "78818d7d6d9506b508a9f3a07654573c4a62679a6c70fd51a6676c012a752ccd",
+          "bytes": 355408
+        }
+      }
+    },
+    {
+      "id": "human_station_habitat--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station habitat and life support module, upgrade level 2: Multi-pod habitat block and service plant. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_habitat--l2.png",
+      "masterSha256": "fc8791ec697c08d97e1704dc631f14c0d09ff90f0f5af08fd95defaee6e8b526",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_habitat--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "08d95370c1bec88241680cd59dd9fe21af15a16be054e79f1fdf65e954cf451a",
+          "bytes": 28708
+        },
+        "portraits": {
+          "path": "portraits/human_station_habitat--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "6b2c0919b6be7e72598fb2e0043d18f9146a3136755672d90741be0b5204ea58",
+          "bytes": 412510
+        }
+      }
+    },
+    {
+      "id": "human_station_habitat--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station habitat and life support module, upgrade level 3: Large habitat cluster and environmental-control hardware. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_habitat--l3.png",
+      "masterSha256": "14057006b95dfe2b08e0e8a8ea172aa326f34f1e07485071702579ddb60bad34",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_habitat--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "d650affa95168ceb05eecb83c0608bf4504046c00df8bbe69c9f6468be535591",
+          "bytes": 27240
+        },
+        "portraits": {
+          "path": "portraits/human_station_habitat--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "121f4c6670889158186db606f8154951bcc2ac6257672189fa5b633e14cd8ded",
+          "bytes": 401951
+        }
+      }
+    },
+    {
+      "id": "human_station_power--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station power plant module, upgrade level 1: Compact power housing and collectors. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_power--l1.png",
+      "masterSha256": "60bdcb9cb59741233cbe0c08bfb27c7aa3389a7015af8406caad0d8ee10bf936",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_power--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "a4d265a0b083a087a64ed2514739ed81d5e97057b570df2031bcc496381e5eaf",
+          "bytes": 28312
+        },
+        "portraits": {
+          "path": "portraits/human_station_power--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "01a90a85594fb9736a4e3319fbf2f1dfc153f74445f75cef01acdc9b46cd1ca2",
+          "bytes": 399127
+        }
+      }
+    },
+    {
+      "id": "human_station_power--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station power plant module, upgrade level 2: Larger generator housing and collector/radiator surfaces. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_power--l2.png",
+      "masterSha256": "c5fe4d0045c2b0d55933bc721cb16893df53afb63faed7e74a76aa3d6e8687f5",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_power--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "d49c0ab8ad28c9efed7a3081c9f2085a78975ea00daa4ed3cb424523597694c9",
+          "bytes": 27692
+        },
+        "portraits": {
+          "path": "portraits/human_station_power--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "e403a8e67a223b7bab5ba968b9bebd69d321e42fdf070588c0e9f6a1e0c93005",
+          "bytes": 406921
+        }
+      }
+    },
+    {
+      "id": "human_station_power--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station power plant module, upgrade level 3: Reinforced power complex and distribution trunks. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_power--l3.png",
+      "masterSha256": "0c41eb670ab1cb04c64112a6416601de1fc1c841f530ac9bfc6f001a453f42b1",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_power--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "0fdf3a87ef447db7d3d96660a600dd98f002d7764daf36fd80732057f07883f6",
+          "bytes": 27319
+        },
+        "portraits": {
+          "path": "portraits/human_station_power--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "01170ed940e017a4e46a5ea1f9e8a8eb3169614697823f57f09b9aa93aef9cbb",
+          "bytes": 390705
+        }
+      }
+    },
+    {
+      "id": "human_station_thermal--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station thermal control module, upgrade level 1: Fold-out radiator pair. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_thermal--l1.png",
+      "masterSha256": "a3f04e04dc886c509e1eddb2e7bd082feb4be70a6fe9ba0520cc8e70783dea16",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_thermal--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "61f961d006f05273ed944d4ceb4cc2de8a2eabdefd64c724e3f1cc0ef56e91c1",
+          "bytes": 24255
+        },
+        "portraits": {
+          "path": "portraits/human_station_thermal--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "e82050f571144f0d10e4e47c0d35dcd6f7facc72998a7c5b50740a8eea44ee2f",
+          "bytes": 352533
+        }
+      }
+    },
+    {
+      "id": "human_station_thermal--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station thermal control module, upgrade level 2: Segmented radiator wing. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_thermal--l2.png",
+      "masterSha256": "13fdb31a3b799737f41c262e934ad244313e4dd92dcc2ad6b1a035262fd4a522",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_thermal--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "7b667e219de378a1c86ab06192ab31e70796de377ab63f93cb44d8a9fe3d4000",
+          "bytes": 23862
+        },
+        "portraits": {
+          "path": "portraits/human_station_thermal--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "478f0bdee2cde57fbca2ba4331b28abdda74d7067878f14ff301cb6cf0a9fca9",
+          "bytes": 373395
+        }
+      }
+    },
+    {
+      "id": "human_station_thermal--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station thermal control module, upgrade level 3: Multiple independently supported radiator banks. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_thermal--l3.png",
+      "masterSha256": "3e2c2bec48c698aca05cdf633c499f5be24b8cd8847775ce790e1e5d95258f00",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_thermal--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "84117c07fd1d95845f0be5dcc8d02ba258b8b87565369f4f670b1bd19b17f73a",
+          "bytes": 25008
+        },
+        "portraits": {
+          "path": "portraits/human_station_thermal--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "b2a3eded4f0fc520ed2254b4aa485c5ab8266d24331100377b89cd2f34d7736e",
+          "bytes": 363769
+        }
+      }
+    },
+    {
+      "id": "human_station_cargo--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station cargo and logistics module, upgrade level 1: Container rack. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_cargo--l1.png",
+      "masterSha256": "65687c77d512f4893f402782fa520f0ccf62a8715b7b0219e9b02a05557a689e",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_cargo--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "d14b34fc8ce982b82bb0bb5ec3747ea88d2653f877a9685dbf0b4f5b6489f013",
+          "bytes": 27911
+        },
+        "portraits": {
+          "path": "portraits/human_station_cargo--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "d1495d3aa1946158b52a2b127d7761c72e08f7a697a399af5208277ddd41d197",
+          "bytes": 380547
+        }
+      }
+    },
+    {
+      "id": "human_station_cargo--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station cargo and logistics module, upgrade level 2: Expanded racks and transfer equipment. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_cargo--l2.png",
+      "masterSha256": "4eab22e68a12830d5b4a4ad34465fefed11a777a551aaa410d45fc60a4b8bb6d",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_cargo--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "9144d69a8cca57c1787195eea05adaa5c30992e3c6e6af5d2a3046b81d8d88a4",
+          "bytes": 27205
+        },
+        "portraits": {
+          "path": "portraits/human_station_cargo--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "9452d2c4614a8f937819b1db449cf002ae5d08cab7054b7a9cf4568d825146e3",
+          "bytes": 384785
+        }
+      }
+    },
+    {
+      "id": "human_station_cargo--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station cargo and logistics module, upgrade level 3: Large cargo cluster and freight-transfer docks. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_cargo--l3.png",
+      "masterSha256": "369009103f88ae50b88e71a144a783e31f1920aeeba1264abdc881a6a31f8828",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_cargo--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "f304e1c88daaffe206c868c5d5edc676827e3f1d93ad1d26deba1a944005c6f9",
+          "bytes": 28204
+        },
+        "portraits": {
+          "path": "portraits/human_station_cargo--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "14511070c0691c6e134a5107cf9d1658815d8f7524d7937fd386f736a5baab91",
+          "bytes": 403637
+        }
+      }
+    },
+    {
+      "id": "human_station_sensors--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station sensors and communications module, upgrade level 1: Small mast and dish. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_sensors--l1.png",
+      "masterSha256": "732fef9a481e16ef57a06f6f664ba6da45beb403a6460de52a055b3f9a9c2733",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_sensors--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "4ef499e259659c3fe41a3e7843818cc1c606c28b924225c104c25c9fdf548164",
+          "bytes": 23527
+        },
+        "portraits": {
+          "path": "portraits/human_station_sensors--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "5bad17d0b36c93727beba3af162e2ee4d1bc5c6101a536021efcbbb07d519b42",
+          "bytes": 334106
+        }
+      }
+    },
+    {
+      "id": "human_station_sensors--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station sensors and communications module, upgrade level 2: Dish cluster and separated sensor booms. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_sensors--l2.png",
+      "masterSha256": "e8f6fe2b9e4f330b69c482646679b9c03e2607973474ea5c0307687e31df7c8d",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_sensors--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "c36db5c1829c07348f20f558f0801f215cee3f782bcd8684c03d365c38e2f330",
+          "bytes": 25001
+        },
+        "portraits": {
+          "path": "portraits/human_station_sensors--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "03f74365ef638e233f3da5eef2efe2c4c651f16130c5d282c5a9d4ae80c4ae35",
+          "bytes": 354837
+        }
+      }
+    },
+    {
+      "id": "human_station_sensors--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station sensors and communications module, upgrade level 3: Distributed instrument array. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_sensors--l3.png",
+      "masterSha256": "84687869dbcb9d273380697221539f2e1d1edbbca644f64df0b0ef642bda03f2",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_sensors--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "04cf924fdda912ce6ede88e799c48ffa2807f20a83afabac786c3502ccbdac32",
+          "bytes": 27627
+        },
+        "portraits": {
+          "path": "portraits/human_station_sensors--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "f59599b7b18cab7b2113cb15a0d04a2dc6283c91df2e76f4af998fba413ab948",
+          "bytes": 397649
+        }
+      }
+    },
+    {
+      "id": "human_station_research--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station research facilities module, upgrade level 1: Sealed laboratory pod. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_research--l1.png",
+      "masterSha256": "eb481d70cbcf69970c28bba6bff1ddd8a9850b4d4fa8eccaf6c3518b38a1ba18",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_research--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "9cefb04d32098ccac2a08e6a4d42a865bb6c1986717bd63eb172c8c928b1d870",
+          "bytes": 25072
+        },
+        "portraits": {
+          "path": "portraits/human_station_research--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "d7ae88a46415b7fd1a8f1258ef580d2eaf8d66435de94b058982ab59afee56ed",
+          "bytes": 344163
+        }
+      }
+    },
+    {
+      "id": "human_station_research--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station research facilities module, upgrade level 2: Larger laboratory block and instruments. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_research--l2.png",
+      "masterSha256": "20986eca19bd670ee206af911dc69f02c36a356e120944553cd7d5ae57221611",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_research--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "2918538b7515da4bd0b18797f69fdbde30f1c26084a7793c453d50d6e9e8675f",
+          "bytes": 27546
+        },
+        "portraits": {
+          "path": "portraits/human_station_research--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "8489c7399eeb01a6de9e1f320e7995ddcac7889ae949f0bf950d3790962ac684",
+          "bytes": 382744
+        }
+      }
+    },
+    {
+      "id": "human_station_research--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station research facilities module, upgrade level 3: Multi-lab complex with dedicated service connections. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_research--l3.png",
+      "masterSha256": "2572e5981f07e710ca031aa44558b86e9c7866573b6df70ac9e97567e937e1c5",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_research--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "2e9e0acdda9ef61571aff9ad32448546a4d84b85975739e17924f5a66b3b1599",
+          "bytes": 27200
+        },
+        "portraits": {
+          "path": "portraits/human_station_research--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "759220f29af7780539feb7e607bc70eed5e1ccf61a6a5bd84f034076e0a515f8",
+          "bytes": 381181
+        }
+      }
+    },
+    {
+      "id": "human_station_shipyard--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station shipyard and repair module, upgrade level 1: Open service cradle and repair arms. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_shipyard--l1.png",
+      "masterSha256": "2a0da2f91ceb41aec1059d8a799e9e71823d0ab9acb3df4d89717f1593fa86d7",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_shipyard--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "eef5a9e19bc206d3a4310e394a751166ff8a924e05c7b0fa91abb11f61ef7331",
+          "bytes": 27453
+        },
+        "portraits": {
+          "path": "portraits/human_station_shipyard--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "2cdebe2333708e79c03127e57a1fab864233c90fd74f17314d098a485278bc5f",
+          "bytes": 389962
+        }
+      }
+    },
+    {
+      "id": "human_station_shipyard--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station shipyard and repair module, upgrade level 2: Fabrication gantry with additional tooling. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_shipyard--l2.png",
+      "masterSha256": "aa2bcd3f95ccb66078bf233d89711fe9653e6495f162361ecee9cdb4d093ba97",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_shipyard--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "8b204ff909410baccb81aa94fba0ec7f263eb0604966301f17691ef8df667ea4",
+          "bytes": 28418
+        },
+        "portraits": {
+          "path": "portraits/human_station_shipyard--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "6c2f1ed93edfb391772dc4f9ff6a6eb9dd062e3b550f0921d059f10756e81f26",
+          "bytes": 391137
+        }
+      }
+    },
+    {
+      "id": "human_station_shipyard--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station shipyard and repair module, upgrade level 3: Large multi-section construction dock and cranes. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_shipyard--l3.png",
+      "masterSha256": "5fde918f219d6c69163e15b5fce1fc52c88b242485c58b50acc1a3c165eccfd9",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_shipyard--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "4178df8d433a0399fe8834b325a126aed13b81069a3afc1a7504e1534b3a48fd",
+          "bytes": 26968
+        },
+        "portraits": {
+          "path": "portraits/human_station_shipyard--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "948f1696e66bca8f1b35a7772317acc03420a14efad8b0b1a86b5a056e356e2d",
+          "bytes": 399954
+        }
+      }
+    },
+    {
+      "id": "human_station_industry--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station industry and fabrication module, upgrade level 1: Compact machinery enclosure. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_industry--l1.png",
+      "masterSha256": "18ccc68e5a3fd610770ac16bca4ed441196986258d222177e1664f5ddad0dca3",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_industry--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "7b154b028d8c13c49ad17763af81f3ba39c434dd073b2cd59c58c975653675c8",
+          "bytes": 26457
+        },
+        "portraits": {
+          "path": "portraits/human_station_industry--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "ce990da97a5f5aaf10d2c9109397a99179d7d209e2e7f49c65c4b75acd0b0e74",
+          "bytes": 355936
+        }
+      }
+    },
+    {
+      "id": "human_station_industry--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station industry and fabrication module, upgrade level 2: Expanded production block and handling fixtures. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_industry--l2.png",
+      "masterSha256": "bba3060a992f320ada5155039e78d8a1890163e181cb5b2fd0dc18c01bbcfc6d",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_industry--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "6596eb2c1244bc8ddd08ece7ccfc0e744554b4108aeeef3b8040ef33b0363c43",
+          "bytes": 26624
+        },
+        "portraits": {
+          "path": "portraits/human_station_industry--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "c74491fe9941286b2b33b56e662225f2c8ed967c6686de9b0145b88ad352f46b",
+          "bytes": 382472
+        }
+      }
+    },
+    {
+      "id": "human_station_industry--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station industry and fabrication module, upgrade level 3: Manufacturing cluster with expanded thermal and logistics hardware. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_industry--l3.png",
+      "masterSha256": "e9ae97432c5952df5c82349abde5489329179c2886bb236ca2743074eaf8de28",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_industry--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "45cf1ee9bd394ca7d5be3a89842c4b591c5b48ae44d8d933de11a890ac392dfb",
+          "bytes": 26141
+        },
+        "portraits": {
+          "path": "portraits/human_station_industry--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "3c9fe196c70271c3be09700edc5a41596df6b971193b734bf67c864b9d967905",
+          "bytes": 374135
+        }
+      }
+    },
+    {
+      "id": "human_station_protection--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station protection and armor module, upgrade level 1: Local reinforcement and covers. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_protection--l1.png",
+      "masterSha256": "2f52b0977e9b4b1d9b891e8ae30d12652b09a9c3d2408304a2d99c445bfbc9c4",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_protection--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "b1295a1ff85d4a773c9fa12738d84d8fcfdb8792a08658fabd1f54af99acfce4",
+          "bytes": 27850
+        },
+        "portraits": {
+          "path": "portraits/human_station_protection--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "58e217895e53b16b1ea6ccda8f939fa42b61e4a42aba818ff08769f8ad9efa7a",
+          "bytes": 397292
+        }
+      }
+    },
+    {
+      "id": "human_station_protection--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station protection and armor module, upgrade level 2: Deeper armor sections and protected services. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_protection--l2.png",
+      "masterSha256": "3f411266c5f2f67451f7ac5dc79e72f0afc92e98ae0aa49b9482d9b3c8f8f518",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_protection--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "69b9d2c5b3e777ad1df9fa9bc8a787f0011d0147cf5f3f1117d312ac2ddcddb8",
+          "bytes": 26756
+        },
+        "portraits": {
+          "path": "portraits/human_station_protection--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "07fa024fe0f3d805600fb20d925b362abfde3c0726760a35233e139dc7338289",
+          "bytes": 376190
+        }
+      }
+    },
+    {
+      "id": "human_station_protection--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station protection and armor module, upgrade level 3: Reinforced external structural plating. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_protection--l3.png",
+      "masterSha256": "2dcb8f520902263bd82b41f7a9b49d1c69edca5c4b83a40843075bbc4382341f",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_protection--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "7360f4f9fe633ef21e9d71f587809bee18ddaf04f89786494c8382edb8fa79b7",
+          "bytes": 27515
+        },
+        "portraits": {
+          "path": "portraits/human_station_protection--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "4b8dbef0e3f144f60f95386ee96b0c9e854456be0350871f4698bbc1c5f4124a",
+          "bytes": 402464
+        }
+      }
+    },
+    {
+      "id": "human_station_shields--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station shield generators module, upgrade level 1: Compact shield projector and visible emitter housing. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_shields--l1.png",
+      "masterSha256": "0f44253901399582aa1cfc7e71c8737e5f5d609e430dafb62244ccbdc3d06d7b",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_shields--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "90cd18b45207289f30740199fc4d74822eaab74ec771504ade84c4678a926a59",
+          "bytes": 27303
+        },
+        "portraits": {
+          "path": "portraits/human_station_shields--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "1a53077a21b764df6843e2f798527781ed2a7264aa43c38c2d2020d9073c9a5c",
+          "bytes": 371214
+        }
+      }
+    },
+    {
+      "id": "human_station_shields--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station shield generators module, upgrade level 2: Paired projector assembly with additional cooling and emitter heads. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_shields--l2.png",
+      "masterSha256": "10b3a10301d545163f2cc41c301fdf4a81d4a9118e3c75b15660ab169346904b",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_shields--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "49d21c153efe449b7be6b452001b4d85371ce49665ae04035a3dcc54c47be222",
+          "bytes": 31063
+        },
+        "portraits": {
+          "path": "portraits/human_station_shields--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "3580946fa0428b26e35d1d141acb00e09a4e78f437f8188da6af3aac344c68de",
+          "bytes": 433471
+        }
+      }
+    },
+    {
+      "id": "human_station_shields--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station shield generators module, upgrade level 3: Large distributed projector assembly with reinforced emitters and service hardware. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_shields--l3.png",
+      "masterSha256": "4c45ef8f374f0b94f7d5a99e6afb3067e94f3633d35f838fcb70b01dad971023",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_shields--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "7780e64185da5345073e1d046fb9d85c0d6add1c104d7046db8c33669d893d68",
+          "bytes": 30892
+        },
+        "portraits": {
+          "path": "portraits/human_station_shields--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "e6e64ba92fd86e39e014db867a9452462278b37b665d3b86b4444d77a7eca2ec",
+          "bytes": 427427
+        }
+      }
+    },
+    {
+      "id": "human_station_point_defense--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station point defense module, upgrade level 1: Compact single assembly on a standardized mount. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_point_defense--l1.png",
+      "masterSha256": "791c7f819c9ff354306b284121a9112802b89ee82b555fb484750c05efe695e3",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_point_defense--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "f8d1f9fc65ac03e4fa1a66474a0ee36a85f4780c698ebe3e438a421e1ee05a05",
+          "bytes": 26850
+        },
+        "portraits": {
+          "path": "portraits/human_station_point_defense--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "b5cb668928bcebb70e6518b1ff5d75f04997d85d1d368a1b0e68a434419e272d",
+          "bytes": 376681
+        }
+      }
+    },
+    {
+      "id": "human_station_point_defense--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station point defense module, upgrade level 2: Larger protected assembly with visible side cooling. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_point_defense--l2.png",
+      "masterSha256": "d35fb8bdfcd9e43779a0659d9428d695cde11d12e098ab2e638c22455a4baa21",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_point_defense--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "d102f52fca7ced9793f2930e20fae6f48be116bcd7066e40e863605497ef2da8",
+          "bytes": 27645
+        },
+        "portraits": {
+          "path": "portraits/human_station_point_defense--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "befad4e152abbc47f3473a2a3fcd7f878ec017c5f1cb0929f53b744d3f7fca2c",
+          "bytes": 387128
+        }
+      }
+    },
+    {
+      "id": "human_station_point_defense--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station point defense module, upgrade level 3: Reinforced weapon assembly with additional cooling and protection. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_point_defense--l3.png",
+      "masterSha256": "60ea6e631a90de91bb1b91f779742f7dbd1ba379884d63f32386e67ec8e16540",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_point_defense--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "804d0d3599bf46f3375be48a4765c776ae9b6cb128e9435ef371f57c22140497",
+          "bytes": 26000
+        },
+        "portraits": {
+          "path": "portraits/human_station_point_defense--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "12a11a7aa065a9ac795ea0f60b9cc248f161f61492b99f3321bd9d883b34d696",
+          "bytes": 364052
+        }
+      }
+    },
+    {
+      "id": "human_station_defense_turret--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station defense turret module, upgrade level 1: Compact single assembly on a standardized mount. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_defense_turret--l1.png",
+      "masterSha256": "572fc71f7a4bf51bd845fa5a9136197796f9cb8689968e85bb6c22bd0d9ea557",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_defense_turret--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "0fe8ddee316a3a4333f4eb3a16d45184371ed291a925539262e4f8e490ddce3c",
+          "bytes": 25730
+        },
+        "portraits": {
+          "path": "portraits/human_station_defense_turret--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "79261c7f8bb490368231767751922ff22e85ce7d88b399af62d5718de1c46b4c",
+          "bytes": 366650
+        }
+      }
+    },
+    {
+      "id": "human_station_defense_turret--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station defense turret module, upgrade level 2: Larger protected assembly with visible side cooling. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_defense_turret--l2.png",
+      "masterSha256": "fe78d26fa25020d5de0cfd6f3fcee99260c852d4993c92d4f9b13a67f1ed8804",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_defense_turret--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "3dfab2f67e7cf4c60af5fc8776a5362466bcc704b3eaf31e4373eec8a6257f26",
+          "bytes": 27048
+        },
+        "portraits": {
+          "path": "portraits/human_station_defense_turret--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "961bc286af8dcadf13d32d8495f495c7b3cfd1655e60493d171e137de10e5cb5",
+          "bytes": 377478
+        }
+      }
+    },
+    {
+      "id": "human_station_defense_turret--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station defense turret module, upgrade level 3: Reinforced weapon assembly with additional cooling and protection. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_defense_turret--l3.png",
+      "masterSha256": "7ac008d679d760950dceb6a8010ccce685be20c803faa0d9fb53554b5a280351",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_defense_turret--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "494ab2c775a135cb3770630c59f1c5e9b0c999de48ecffe0e992de7ef76a6b94",
+          "bytes": 29475
+        },
+        "portraits": {
+          "path": "portraits/human_station_defense_turret--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "f2bcdb3d8582f08e3704afdad274e9e814cd4445fa678058b650c46b576a65e2",
+          "bytes": 400429
+        }
+      }
+    },
+    {
+      "id": "human_station_heavy_battery--l1",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station heavy battery module, upgrade level 1: Compact single assembly on a standardized mount. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Heavy battery means a capital-ship artillery gun emplacement: one massive long electromagnetic railgun barrel, elevated on a broad rotating armored turret with a reinforced recoil cradle. It must clearly read as a heavy gun turret, not an electrical storage battery, cargo pod or engine. No firing or explosions. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_heavy_battery--l1.png",
+      "masterSha256": "a85229269923f10d5a53ee11c37244d971a8e10d65b21cecccfbce4bd6179ef9",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_heavy_battery--l1.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "f3e073cf9b59e9848c90ba2cbe8dd92e48dcf4fedfdc7475405f07674cae58fc",
+          "bytes": 26203
+        },
+        "portraits": {
+          "path": "portraits/human_station_heavy_battery--l1.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "d9f2e1dd7d75f8afb233da377cae30d16f1ad161007c6f1773e5ffd72ce7e774",
+          "bytes": 364749
+        }
+      }
+    },
+    {
+      "id": "human_station_heavy_battery--l2",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station heavy battery module, upgrade level 2: Larger protected assembly with visible side cooling. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Heavy battery means a capital-ship artillery gun emplacement: two massive long parallel electromagnetic railgun barrels and broad side radiators, elevated on a broad rotating armored turret with a reinforced recoil cradle. It must clearly read as a heavy gun turret, not an electrical storage battery, cargo pod or engine. No firing or explosions. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_heavy_battery--l2.png",
+      "masterSha256": "2cab2af1887acc271bd38182ca4ef0e0569ac5b0e85e02c3f78c0562754a4235",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_heavy_battery--l2.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "80cfef248e9b257698a773df3951acf8310793c7edf2fb5c99941ae951b12511",
+          "bytes": 27136
+        },
+        "portraits": {
+          "path": "portraits/human_station_heavy_battery--l2.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "1f02471560befcb6d843aa8e71dd2d6971b70faa4870ae35ff505ebd59342a3f",
+          "bytes": 390150
+        }
+      }
+    },
+    {
+      "id": "human_station_heavy_battery--l3",
+      "method": "OpenAI built-in image_gen; original text-to-image",
+      "prompt": "Use case: stylized-concept. Asset type: equipment catalog concept illustration. Subject: Human space station heavy battery module, upgrade level 3: Reinforced weapon assembly with additional cooling and protection. Show the detachable assembly with its hardpoint connector plate and mounting lugs; this is one module, not a complete station. Heavy battery means a capital-ship artillery gun emplacement: three massive long parallel electromagnetic railgun barrels, heavy layered armor and large cooling fins, elevated on a broad rotating armored turret with a reinforced recoil cradle. It must clearly read as a heavy gun turret, not an electrical storage battery, cargo pod or engine. No firing or explosions. Original serious hard-science-fiction Stellar Continuum game art. Photorealistic industrial visualization, real machined metal construction, bolts, seams, believable materials. Single clear subject in three-quarter view, centered with a little breathing room, readable at thumbnail size. Dark navy background with neutral key light and warm rim lighting; colorful material accents. Square composition. No text, letters, numbers, labels, logos, watermarks, UI, borders, people, cartoon styling or plastic toy surfaces.",
+      "masterFile": "human_station_heavy_battery--l3.png",
+      "masterSha256": "d15b6d9b0d601f6da0d01b2bc43cb350a3a260c62402c99d250a994a7d0c7344",
+      "masterDimensions": [
+        1254,
+        1254
+      ],
+      "sourceReferences": [],
+      "status": "Original generated concept illustration; runtime optimized",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/human_station_heavy_battery--l3.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "873cffbaf94aa4ffdc25af11966ea02655a981ecf739ce2369f34ad2be862257",
+          "bytes": 28644
+        },
+        "portraits": {
+          "path": "portraits/human_station_heavy_battery--l3.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "3f9ab898cfcabb222aabd2d4bed7c1ad4aebd430048500267136a082bf43381c",
+          "bytes": 391041
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--beam_turret",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--beam_turret.glb",
+      "modelSha256": "1c2229fd5c12bf11d788d53506046ff462cf1e817aea339dddfe1c850c106dd9",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--beam_turret.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "10855643d4e90a49f90670fa94924268dde556feb9450facf2d56860d91c096a",
+          "bytes": 9184
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--beam_turret.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "dc83649d3de104748376ee74564d11e97fe68c625538882121f811a9826ba4ed",
+          "bytes": 80387
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--kinetic_turret",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--kinetic_turret.glb",
+      "modelSha256": "bb4adcd1c83750e16bf65b908ac9a657cfb9dfecab7c1820556d8e8a8f3aa703",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--kinetic_turret.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "194b02bf44c50faff8a95e34f5be09b3d66b17aa1060eec800f6ac13fcfc8631",
+          "bytes": 8643
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--kinetic_turret.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "226378a3eb4dd8750791cb089bc125fdb47e56fd5e8e9eed0961818215461fe4",
+          "bytes": 73947
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--missile_pod",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--missile_pod.glb",
+      "modelSha256": "4987c5f78d96e60d811b33f4a602a4f5e6ac5bf4c373fb8ca0903ece34b52cac",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--missile_pod.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "d063433ebb661499e72300e768c36350b79d5944c4783adff7aa1d61a181f84a",
+          "bytes": 12548
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--missile_pod.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "18353eb233232c3f97132ab6dccbd0ef85b61f76c2aee04d6e1382c606f1fa70",
+          "bytes": 130918
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--point_defense",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--point_defense.glb",
+      "modelSha256": "cbf23eb1c17155c94d22606c6bf97f224b5d98af62272207da93b054575abb25",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--point_defense.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "c7eb7851ff58ad60c68af3477384556fa966673f98c72b922705277ec3e7d16e",
+          "bytes": 10938
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--point_defense.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "df8e7a704c5aa964991e94fd0ae1ecd014b6773841332c87229c9dc6e8f8537a",
+          "bytes": 91181
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--sensor_array",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--sensor_array.glb",
+      "modelSha256": "e15f5723a7963d228b67b8d3e6c4f5414d2843db4b4bca4e9d50325259cca751",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--sensor_array.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "8b4e9ae91fe27d8787e07c30fde90e8e6e22cb090a0572f5cc09b80250daf14b",
+          "bytes": 6637
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--sensor_array.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "6cade7669f00cad8ea1e5e1692311f26d47250da748a3c1bd0095adf071a1fd8",
+          "bytes": 43889
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--command_relay",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--command_relay.glb",
+      "modelSha256": "a5704532b6962d884c2f512861ed8ab8b6405d421356975f0c3702e50ca4fbb3",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--command_relay.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "bf9ca1882ff66bc9a6448d4d9478e8f13f36359f911887e576ae9fed92bc0759",
+          "bytes": 5526
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--command_relay.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "ef4cd0d8c3466e21c003a10f18c814c610fbaf5877c55a67757801f16a072412",
+          "bytes": 36725
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--shield_emitter",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--shield_emitter.glb",
+      "modelSha256": "671002242e946474c10e4ac9feae77b0e1f5b23889a85dba56292e642b0e5c3a",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--shield_emitter.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "887e41beba5bc1247b94493ea70b5bb93b81e9e7d748183637b177c057185d3e",
+          "bytes": 11682
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--shield_emitter.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "f5d385e2b5fd27888b891822be22ac4df5d94845ffc91a6e81164f18f3753160",
+          "bytes": 107737
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--armor_plate",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--armor_plate.glb",
+      "modelSha256": "67518f969addc8db76bcc4e68f857b5a2e945607caf1b9c265498671f860a01a",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--armor_plate.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "e6b639db470b8f508d255ddf8cd2c9367e1c5c9131cd2e46866c4ee51f9cb200",
+          "bytes": 12484
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--armor_plate.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "c1e062973605e63b8fad1668b4ed19e9e8668e7c9444c9b63bdeeff25b7fda9c",
+          "bytes": 125687
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--cargo_pod",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--cargo_pod.glb",
+      "modelSha256": "063e1cc8df57aee042e423fc0890f54cbfe48d4f7caec7989c34c57e070ca4e2",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--cargo_pod.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "eda07370eee5f589b557b32037738ed65013948e54e597a62f79114adadce29c",
+          "bytes": 16366
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--cargo_pod.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "2b1a53c0b4d2cecd55fb87993b3e949477abdb52b233d766d56e98c60a5b766d",
+          "bytes": 187542
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--habitat_pod",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--habitat_pod.glb",
+      "modelSha256": "c68be12e5e729042b7000b919b6485e811a4da0f582bf4f55ed943c395cf1a1b",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--habitat_pod.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "a6f658c0c0847d65986cfb68c8232d28300f23e53fcbb14cf5e13a80b6a68d24",
+          "bytes": 16415
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--habitat_pod.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "69435bdc63d9b65a88bb9403dc046555bb219aed8434acaeabddb92d508c8609",
+          "bytes": 186825
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--radiator",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--radiator.glb",
+      "modelSha256": "441feed3f643bfbd0111d8ac6b0e71b560e840fe332e79b491b10095bbbd887a",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--radiator.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "2aa34940c20e433f225cc039fdc7035ad240f50893f9c80a99f64bb15e603942",
+          "bytes": 10198
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--radiator.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "3efd0d23ea8d3fcb651a9f7f88fae5efadccab35f73a799ab5c901589eb37b30",
+          "bytes": 85946
+        }
+      }
+    },
+    {
+      "id": "pelagic_high_pressure--power_unit",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/pelagic_high_pressure--power_unit.glb",
+      "modelSha256": "9d91ee12d57fce1900ad5834513013fe7ccfd63776fd15e09e97eb48aa03b51a",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/pelagic_high_pressure--power_unit.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "0d3a7287391f6940ebc4a1106f3dac0723630631177e2ade70b6126a75a79995",
+          "bytes": 12367
+        },
+        "portraits": {
+          "path": "portraits/pelagic_high_pressure--power_unit.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "a360f6a0b39239fc7b994310795fa34985785fb03fb3e4fa7bccc29c4a87e147",
+          "bytes": 117818
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--beam_turret",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--beam_turret.glb",
+      "modelSha256": "0cf329f91145434b8ae12acd70d248a1a74218576e1c57064e8b39ccb5d2cb7a",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--beam_turret.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "3b791e800b0bb163f4be8e9d3203df00f7336a7131f5ce1893ff506d4bd75956",
+          "bytes": 9646
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--beam_turret.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "0ed854a015007e00635df50e151a1d547050909b087beff0a59b01d4f2ca0e74",
+          "bytes": 103217
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--kinetic_turret",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--kinetic_turret.glb",
+      "modelSha256": "d63c03e4f0a02e5fae185ebfc7d2358e1114253eccd8338643d156b9fa823f62",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--kinetic_turret.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "d006b66c7dff83d40de61009785d8423198ba0e49d6e83c806e21983ae007538",
+          "bytes": 8961
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--kinetic_turret.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "ced650959e93ca0e54ff364676e81b0604652f91345e5fce62b9f843d1a89391",
+          "bytes": 88853
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--missile_pod",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--missile_pod.glb",
+      "modelSha256": "58e4e1ba4e72d47c9bf0fb874ae87b7859d1b4f50c1dd9286bd9516bc2995856",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--missile_pod.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "caebc258e17e6a606476350c6ac370a82f73676b8519c1734848dc1f63eea6bd",
+          "bytes": 13431
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--missile_pod.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "05718af201b0ba90ee83c8ac4a77fe72ac64989007a4f7bbc8f4ad38880408ba",
+          "bytes": 169367
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--point_defense",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--point_defense.glb",
+      "modelSha256": "4f380fac9c00a86cb8c47a000183063816edb14abf2aca04ac7ac56847c79c20",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--point_defense.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "9dfdea0f20288b6158868ca130d3dd6f399a362ffca2370d8bd0e6ac7bad554c",
+          "bytes": 10948
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--point_defense.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "5a21073f7faa3a40a4952ef2e8930927860d6e4c8d506a4588ef29bb4e3383f7",
+          "bytes": 110994
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--sensor_array",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--sensor_array.glb",
+      "modelSha256": "8a299411ad5976e5baced835b8a1a6a44f20b99c78d7cd3fa3adb157caee32bb",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--sensor_array.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "4d902270502340016d7f278c1472110c57a65d83d3417ff0131cb65342152837",
+          "bytes": 5723
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--sensor_array.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "abaa63d3b62ba3d53e0697d0ad280a42aa088c0fe202a6a3c3e52415679fde05",
+          "bytes": 37361
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--command_relay",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--command_relay.glb",
+      "modelSha256": "ddcf2b8e33104196784eeb26061c72046fc16c7ca0c52fef4ecb9e5cc17886bc",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--command_relay.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "8ca8dacec2024db2a4e4c73130d6edef9584e852b18d90cc024d5fbc229a3628",
+          "bytes": 4918
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--command_relay.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "48b9bf753241b4ff34c3e18950651c47a4d28edf6890a666bd26fbc7a6be6e0f",
+          "bytes": 31746
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--shield_emitter",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--shield_emitter.glb",
+      "modelSha256": "b20e45af16228f6cf3c17648c52006babd5fe528af226f97d18d3c21effb7432",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--shield_emitter.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "705ffd38ab0a6ee3532dc4588ef768c7a852d72c772cf647e65e81d1878ed9e0",
+          "bytes": 10670
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--shield_emitter.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "3bfeb5f0ccde3fde1502b977314df54e886e93394b5d90587de29bb985352653",
+          "bytes": 98926
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--armor_plate",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--armor_plate.glb",
+      "modelSha256": "9e171af2f85702b3ff26c41ad61efab77f9171a579a45dfc76102555d7d872a0",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--armor_plate.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "ba1442ed34bc38b740fc4f33a8560d403261cbc1d7256d4c9fe082ec1ecdf21c",
+          "bytes": 12424
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--armor_plate.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "7f00c13a5eac79254f383d19e6fd9b1a7fbbdb3da296287a5eca7edf15166c31",
+          "bytes": 129841
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--cargo_pod",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--cargo_pod.glb",
+      "modelSha256": "48108e3a7cb2168061ae56a4f9574fa8a9ab9f740ec24cbdbf2b2c3c0445883c",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--cargo_pod.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "55bcc24377ca73c9e3e92f993129974588972ca3bfd5e1f0e7230863d5f96e66",
+          "bytes": 14952
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--cargo_pod.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "078d0d28ed6cfb82947b6a3ce2665bbc21c8a6505fc39c5b04ea90baec10be66",
+          "bytes": 188396
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--habitat_pod",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--habitat_pod.glb",
+      "modelSha256": "fb70e77a19dfe1ac0fd5b4fb17e1bcbd3bc52d1d4241f91f82c7eb5395af2844",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--habitat_pod.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "ef46e3f6d3d849468ca286381b3a08977ffe3ef4eb87268ee1355d5aca681456",
+          "bytes": 15245
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--habitat_pod.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "2e061b4a1626578dd2e6aba0a515ad2cf44ba8dddb092cfea489a25a7683d6cf",
+          "bytes": 188338
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--radiator",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--radiator.glb",
+      "modelSha256": "4b5a4075848b99a34a297359030548f211e25b2723d8c465f2713e4c66f7de41",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--radiator.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "9ab401e0c2a26cc6cd006db72d0118acc9b68480e31f82fdb262a3cd1e9ce323",
+          "bytes": 9753
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--radiator.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "3cc7a0c561c75937332cb563b0d400e94be5e71ef0318e69ee87d39d349f78ac",
+          "bytes": 82974
+        }
+      }
+    },
+    {
+      "id": "compact_high_gravity--power_unit",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/compact_high_gravity--power_unit.glb",
+      "modelSha256": "d5a73ad6c84c444eef543ff89db851e32ec58f9bc52134dc84753c05ce04903a",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/compact_high_gravity--power_unit.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "9a627294fd4afc1c50eb69da23d423e3a4e69655418200157766eb47af0ac5b5",
+          "bytes": 13183
+        },
+        "portraits": {
+          "path": "portraits/compact_high_gravity--power_unit.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "65ba66e9272143759366552c9c162f9f7b335517899cafff8bc75791d99189da",
+          "bytes": 157624
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--beam_turret",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--beam_turret.glb",
+      "modelSha256": "275259c84255371041b5b67f11a29b02a365099a32ef926542bc074a02be4db3",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--beam_turret.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "25ef0e57272aa0a87fac492b28af248dab455abc2cd8b2b00781c4ad5fc8585f",
+          "bytes": 9862
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--beam_turret.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "3ab62cf2bce9a4c36e124778438909941db47ee2bb56fdcc9ffe51c74e5392ab",
+          "bytes": 95641
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--kinetic_turret",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--kinetic_turret.glb",
+      "modelSha256": "ac08d48e10102fa92c647e25d04c575034319edff1b05fc36bab476f9eb058d4",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--kinetic_turret.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "3f1efaefd6a4d7ec0d071d13d06d9b9fd4aec609bed25bdc1b27aa5b05609874",
+          "bytes": 9164
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--kinetic_turret.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "68dd731206cd1095c8d15e0efb8da875cbd7d8b2b2f2b55fea24b1de9f96286d",
+          "bytes": 83639
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--missile_pod",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--missile_pod.glb",
+      "modelSha256": "a07b929f08849950ec0c85c8d43dda9fc635f7dab09995ed4f47bd4e9d515983",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--missile_pod.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "a26fef66f918fcb7fe71d7dc9f800e9dcf468967d844cbfbffb596f686810578",
+          "bytes": 12982
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--missile_pod.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "c38c4a9ecbf43f79dd97992600407a620e4afe4d6fea78b8e69e9033e8a895b0",
+          "bytes": 138275
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--point_defense",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--point_defense.glb",
+      "modelSha256": "daf52af2470fa65b680db7f2abcda317b593f1e451eaf1ce75ff19dbfbcb8404",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--point_defense.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "c96210b49b1795394bda898f3861994af01452f50a8e9cb451d08f85f816ee03",
+          "bytes": 11436
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--point_defense.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "a1cad834f749371824ceb076a8157cf13bc2e0ca6ede6e43aa8f00ae0bc229f7",
+          "bytes": 104584
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--sensor_array",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--sensor_array.glb",
+      "modelSha256": "c6ade9204c75692f81a629368438110f13457f68e81cdd8e218109acaef6f4d4",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--sensor_array.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "a03134a5ce10ff6662ded646e39bd5da9191c9440d313930f8d5c558a8d9ee06",
+          "bytes": 6653
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--sensor_array.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "b6768a40860cbe517285614e15e4741fbfe1998cfe72f7b8b9bbb629dd892f7c",
+          "bytes": 43072
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--command_relay",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--command_relay.glb",
+      "modelSha256": "b6368b6be95270c749494e0946ca5ab78853cf39ee200a529a70e65032cd088f",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--command_relay.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "a3f2022b0514235265090788b0af5575bcce4f71436ab79c5df685e97fdb5c2e",
+          "bytes": 5715
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--command_relay.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "23bb18c7847b7795938597590064d637e80a4c0b087090d7b3707a09524e4056",
+          "bytes": 36584
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--shield_emitter",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--shield_emitter.glb",
+      "modelSha256": "162ffbc9129d720c09f6c1fd80db16fd11df45452de2f9facb88fad60a932b2a",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--shield_emitter.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "20fd1e3515ec59a6a42902b620cbc82200c61515596a7d322bd3cc231019b8c0",
+          "bytes": 13012
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--shield_emitter.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "868bacdcf6a38763440b9047be2a65935e804ca5a2eb7f7498df51fe2188fdbf",
+          "bytes": 122539
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--armor_plate",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--armor_plate.glb",
+      "modelSha256": "b94edbc83479645623c7e1ec36981344805999e3180bcecb9d8f8e0977621d3d",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--armor_plate.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "62197bb01a3200d8a3f05170481e80d51a7a42c949dfdde6fbf38145ac479561",
+          "bytes": 12053
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--armor_plate.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "a34c0e03230a1f57e88c4267d7098975207c0ede4e377fffabb1ca643f50bc6a",
+          "bytes": 113566
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--cargo_pod",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--cargo_pod.glb",
+      "modelSha256": "ea3ea78e258a0abbd4c153e087f3b4a33b266057f4910fb52763b663d0dbb05d",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--cargo_pod.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "f0f0c3131ca3f64ceb0d2824bcdb1efce88e1f706fd1a7dd7aa0161dcec1dbd9",
+          "bytes": 14755
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--cargo_pod.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "e85f02eacc24dbca328a5cafb4357780cceb142088c91672640bf6cba641cc92",
+          "bytes": 178093
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--habitat_pod",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--habitat_pod.glb",
+      "modelSha256": "60125ea8dcf2f4f9209928b686c89acfbf9956d6d683ada7731977f37db64a08",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--habitat_pod.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "7759d7173c1a19f2a3b61c4fdc8fc169438dc07dc8f78e3a47a9649c3e10f54f",
+          "bytes": 14948
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--habitat_pod.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "802707172ab10df1db058949d0e5543f31ba70ec69992db3e4310f7c4735d8ad",
+          "bytes": 176549
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--radiator",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--radiator.glb",
+      "modelSha256": "b6bf7d6386480d856ea647760747856acd58a25a524adee2a2ee00049e311181",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--radiator.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "cb5c1a2a42de873c8c21b620ce7b280bd98caa3f974a432f92b4a5a0208f8d70",
+          "bytes": 10180
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--radiator.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "c5aff9ea97bc97d389230a167dca1472af714a225e5fdb7adc6a25537b716a25",
+          "bytes": 84377
+        }
+      }
+    },
+    {
+      "id": "cryogenic_hydrocarbon--power_unit",
+      "method": "Godot 4.7.2 native GLB studio render",
+      "model": "assets/models/alien-fleet-v2/Modules/cryogenic_hydrocarbon--power_unit.glb",
+      "modelSha256": "188cdfadb6af502a6c569a043176e9b1f90d4e0bce603c3b326f8f598a1a9615",
+      "renderer": "tools/CatalogArtBake.cs",
+      "status": "Render of existing project fleet candidate",
+      "delivery": {
+        "thumbnails": {
+          "path": "thumbnails/cryogenic_hydrocarbon--power_unit.png",
+          "width": 128,
+          "height": 128,
+          "sha256": "9ea5c04ef1639e1ccdf0594f95d3a6478882fd286e9443e5916aa24d8a8b2137",
+          "bytes": 13224
+        },
+        "portraits": {
+          "path": "portraits/cryogenic_hydrocarbon--power_unit.png",
+          "width": 512,
+          "height": 512,
+          "sha256": "9448c5f88b38ac708a437cd55a70f28ddeb5ae9121bcfac3c88d6ad3ce687d84",
+          "bytes": 121844
+        }
+      }
+    }
+  ]
+}

@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Solar Economy / Logistics — playable demo handoff
 
 Updated 2026-09-08. Existing branch `work/solar-economy-logistics` was safely fast-forwarded from accepted `c529a1a` to Core candidate `42bce3f`. Issue #26 history was reviewed. The initial audit added the maintained normal-progression test at cd5eeb9; the subsequent Core-authorized demo implementation is described below. No new logistics system, normal-campaign rebalance, save migration, push, or direct integration/main change was made.

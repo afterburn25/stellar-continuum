@@ -1,0 +1,4 @@
+#pragma once
+#include <string_view>
+inline constexpr std::string_view galaxy_visual_data=R"galaxydata(@STELLAR_GALAXY_VISUALS@)galaxydata";
+inline constexpr std::string_view galaxy_generation_data=R"galaxydata(@STELLAR_GALAXY_GENERATION@)galaxydata";

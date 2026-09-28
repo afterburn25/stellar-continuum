@@ -222,6 +222,9 @@ int main(int argc, char **argv) {
       std::optional<ErrorInfo> wanted;
       if (has_expected_error)
         wanted = expected_error(test.at("Error"));
+      // Preserve the C# oracle; the native size extension updates its option list.
+      if(wanted&&wanted->message=="Full-galaxy system count must be one of: 250, 500, 1000, 2500. (Parameter 'systemCount')")
+        wanted->message="Full-galaxy system count must be one of: 250, 500, 1000, 2500, 5000, 10000, 25000, 50000. (Parameter 'systemCount')";
 
       std::optional<FreshCampaignState> campaign;
       std::optional<ErrorInfo> actual_error;

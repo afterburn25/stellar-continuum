@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_starting_profiles.hpp>
 
 #include <stellar/core/detail/adaptive_research_state_writer.hpp>
@@ -152,7 +153,7 @@ const json &require_object(const json &value, std::string_view context) {
 }
 
 std::string read_file(const std::filesystem::path &path) {
-  std::ifstream input(path, std::ios::binary);
+  auto input=stellar::engine::resource_stream(path);
   if (!input)
     throw std::runtime_error("Could not find file '" + path.string() + "'.");
   return {std::istreambuf_iterator<char>(input), {}};
@@ -863,3 +864,4 @@ AdaptiveResearchStartingProfileComposer::compose_reference_profile(
 }
 
 } // namespace stellar::core
+

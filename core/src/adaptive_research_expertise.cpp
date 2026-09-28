@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_expertise.hpp>
 
 #include <nlohmann/json.hpp>
@@ -20,7 +21,7 @@ using Json = nlohmann::ordered_json;
 }
 
 Json read_json(const std::filesystem::path &path) {
-  std::ifstream input(path);
+  auto input=stellar::engine::resource_stream(path);
   if (!input) {
     fail("Unable to read Adaptive Research file: " + path.string());
   }
@@ -509,3 +510,4 @@ AdaptiveResearchExpertiseCatalog load_adaptive_research_expertise_catalog(
 }
 
 } // namespace stellar::core
+

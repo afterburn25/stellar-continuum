@@ -459,6 +459,72 @@ void replay(const Json &row) {
     require_equal(result, row.at("Result"), name, "result");
 }
 
+void catalog_validation_probes(const PlanetaryBody& base, const StellarSystem& system) {
+  const std::vector systems{system};
+  auto planet = base;
+  planet.id = 43;
+  auto moon = base;
+  moon.id = 7;
+  moon.kind = PlanetaryBodyKind::Moon;
+  moon.parent_body_id = planet.id;
+  auto sibling = moon;
+  sibling.id = 99;
+  const std::vector valid{moon, planet, sibling};
+  const auto snapshot = capture_planetary_bodies(valid, systems);
+  const auto restored = restore_planetary_bodies(snapshot, systems);
+  if (restored.size() != 3 || restored[0].id != 7 || restored[1].id != 43 ||
+      restored[2].id != 99 || restored[0].parent_body_id != 43 ||
+      restored[2].parent_body_id != 43)
+    throw std::runtime_error("sparse, shuffled catalog changed identity or order");
+
+  const auto reject = [&](const std::vector<PlanetaryBody>& bodies,
+                          std::string_view expected) {
+    PlanetaryBodyPersistenceInput input{true, {}};
+    for (const auto& body : bodies) input.bodies.emplace_back(body_dto(body_json(body)));
+    const auto check = [&](auto operation) {
+      try { operation(); }
+      catch (const PlanetaryBodyPersistenceDataError& error) {
+        if (error.what() == expected) return;
+        throw std::runtime_error("validation error order changed: " + std::string(error.what()));
+      }
+      throw std::runtime_error("malformed planetary catalog accepted");
+    };
+    check([&] { (void)capture_planetary_bodies(bodies, systems); });
+    check([&] { (void)restore_planetary_bodies(input, systems); });
+  };
+
+  auto cyclic = valid;
+  cyclic[1].parent_body_id = 99;
+  reject(cyclic, "Planetary body 7 belongs to a cyclic parent chain.");
+  auto invalid = cyclic;
+  invalid[0].kind = static_cast<PlanetaryBodyKind>(99);
+  reject(invalid, "Planetary body 7 has an unknown body kind.");
+  invalid = cyclic;
+  invalid[0].radius_earth = -1;
+  reject(invalid, "Planetary body 7 has invalid physical values.");
+  invalid = cyclic;
+  invalid[0].system_id = 1234;
+  reject(invalid, "Planetary body 7 references unknown system 1234.");
+  invalid = cyclic;
+  invalid[0].parent_body_id = 1001;
+  reject(invalid, "Planetary body 7 has an invalid or cross-system parent.");
+  invalid = valid;
+  invalid[0].kind = static_cast<PlanetaryBodyKind>(99);
+  invalid[2].id = invalid[0].id;
+  reject(invalid, "The authoritative planetary catalog contains duplicate body IDs.");
+
+  auto nullable = snapshot;
+  nullable.bodies.front()->environment.reset();
+  nullable.bodies.back().reset();
+  try { (void)restore_planetary_bodies(nullable, systems); }
+  catch (const PlanetaryBodyPersistenceDataError& error) {
+    if (std::string_view(error.what()) ==
+        "Format v16 planetary catalog contains a null body entry.") return;
+    throw std::runtime_error("null-entry validation order changed");
+  }
+  throw std::runtime_error("null catalog entry accepted");
+}
+
 void ownership_probes() {
   StellarSystem system{1, "System", {0, 0}, std::nullopt, std::nullopt,
                        std::nullopt, std::nullopt, std::nullopt,
@@ -503,6 +569,7 @@ void ownership_probes() {
   auto truncated_utf8 = body;
   truncated_utf8.name.assign(1, static_cast<char>(0xe2));
   validate_planetary_body(truncated_utf8);
+  catalog_validation_probes(body, system);
 }
 
 int run(const fs::path &fixture, const fs::path &source_root) {
@@ -550,7 +617,7 @@ int run(const fs::path &fixture, const fs::path &source_root) {
     throw std::runtime_error("fixture changed during replay");
 
   std::cout << "Campaign planetary native replay: 32/32 rows and ownership "
-               "probes passed.\n";
+               "and catalog validation probes passed.\n";
   return 0;
 }
 

@@ -233,6 +233,18 @@ void DiplomacyCampaignRuntimeCoordinator::reset(double simulation_days,
   storage_->maintenance.reset(tick, review_immediately);
   storage_->last_processed_tick = tick;
 }
+void DiplomacyRuntimeSchedule::validate() const {
+  maintenance.validate();
+  if(last_processed_tick< -1||maintenance.last_review_tick>last_processed_tick)
+    throw DiplomacyOperationError("Invalid diplomacy runtime schedule.");
+}
+DiplomacyRuntimeSchedule DiplomacyCampaignRuntimeCoordinator::schedule() const {
+  return {storage_->last_processed_tick,storage_->maintenance.snapshot()};
+}
+void DiplomacyCampaignRuntimeCoordinator::restore_schedule(const DiplomacyRuntimeSchedule &state){
+  state.validate();storage_->maintenance.restore(state.maintenance);
+  storage_->last_processed_tick=state.last_processed_tick;
+}
 DiplomacyCampaignRuntimeStepResult DiplomacyCampaignRuntimeCoordinator::process(
     std::span<const ExplorationEvent> exploration_events,
     std::span<const CombatEvent> combat_events, double simulation_days) {

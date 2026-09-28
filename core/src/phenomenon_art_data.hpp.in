@@ -1,0 +1,3 @@
+#pragma once
+inline constexpr const char* phenomenon_art_data=R"phenomenadata(@STELLAR_PHENOMENON_ART_DATA@)phenomenadata";
+inline constexpr const char* phenomenon_distribution_data=R"phenomenadata(@STELLAR_PHENOMENON_DISTRIBUTION_DATA@)phenomenadata";

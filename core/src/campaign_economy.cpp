@@ -1,5 +1,6 @@
 #include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/colony_operations.hpp>
+#include <stellar/core/settlement_body_index.hpp>
 
 #include <algorithm>
 #include <array>
@@ -61,8 +62,10 @@ double habitat_support_cost(const ColonyHabitatSupportBurden& burden) {
 double fleet_operating_cost(EconomyFleetRole role) {
     switch (role) { case EconomyFleetRole::Scout: return .08; case EconomyFleetRole::Science: return .12; case EconomyFleetRole::Colony: return .16; case EconomyFleetRole::Military: return .35; case EconomyFleetRole::Logistics: return .14; } return .12;
 }
-CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const Colony> colonies,
-    std::span<const CivilizationEconomy> economies, int civilization_id, bool include_research, double power_days) {
+namespace {
+CreditFlowSnapshot credit_flow(EconomyWorldView world, std::span<const Colony> colonies,
+    std::span<const CivilizationEconomy> economies, int civilization_id, bool include_research, double power_days,
+    const SettlementBodyIndex& body_index) {
     const auto& construction = construction_for(world.construction, civilization_id);
     CreditFlowSnapshot result;
     const bool automation = completed(construction, "industrial_automation");
@@ -80,7 +83,7 @@ CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const C
         result.surface_maintenance_per_day += surface.upkeep_credits_per_day;
         result.colony_administration_per_day += colony_administration_cost(colony.population_millions);
         result.population_services_per_day += population_factor * population_services_per_billion * infrastructure;
-        result.habitat_support_per_day += habitat_support_cost(colony_habitat_support(colony, world.bodies)) * (1.0 - surface.habitat_support_reduction);
+        result.habitat_support_per_day += habitat_support_cost(colony_habitat_support(colony, body_index.bodies_for(colony))) * (1.0 - surface.habitat_support_reduction);
     }
     for (const auto& fleet : world.fleets) if (fleet.is_active && fleet.civilization_id == civilization_id) result.fleet_operations_per_day += fleet_operating_cost(fleet.role);
     for (const auto& id : unique_projects(construction)) for (const auto& profile : construction_economic_profiles()) if (profile.id == id) result.orbital_maintenance_per_day += profile.upkeep_credits_per_day;
@@ -89,6 +92,12 @@ CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const C
     result.operating_costs_per_day = result.colony_administration_per_day + result.population_services_per_day + result.habitat_support_per_day + result.fleet_operations_per_day + result.orbital_maintenance_per_day + result.surface_maintenance_per_day + result.research_operations_per_day;
     result.net_credits_per_day = result.gross_income_per_day - result.operating_costs_per_day;
     return result;
+}
+}
+CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const Colony> colonies,
+    std::span<const CivilizationEconomy> economies, int civilization_id, bool include_research, double power_days) {
+    const SettlementBodyIndex body_index(colonies, world.bodies);
+    return credit_flow(world, colonies, economies, civilization_id, include_research, power_days, body_index);
 }
 double industry_storage_capacity(EconomyWorldView world, std::span<const Colony> colonies, int id) {
     const auto* civilization = civilization_for(world.civilizations, id); if (!civilization) throw std::out_of_range("Civilization is unavailable.");
@@ -115,9 +124,9 @@ void apply_industry_storage_caps(EconomyWorldView world, std::span<const Colony>
 }
 void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies, std::span<CivilizationEconomy> economies, double days, bool accrue_science) {
     if (days <= 0) return;
-
+    const SettlementBodyIndex body_index(colonies, world.bodies);
     for (auto& economy : economies) {
-        const auto flow = economy_credit_flow(world, colonies, economies, economy.civilization_id, false, days);
+        const auto flow = credit_flow(world, colonies, economies, economy.civilization_id, false, days, body_index);
         const double opening_arrears = std::max(0.0, economy.operating_arrears);
         const double available_funds = std::max(0.0, economy.credits) + flow.gross_income_per_day * days;
         const double current_operating_obligations = flow.operating_costs_per_day * days;
@@ -140,9 +149,10 @@ void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies
             const double population_factor = std::max(.01, colony.population_millions / 1000.0);
             const double infrastructure = std::clamp(colony.infrastructure, .1, 5.0);
             const double stability = std::clamp(colony.stability, .1, 1.2);
-            const auto demographic = colony_population_turnover(colony, world.bodies);
+            const auto colony_bodies = body_index.bodies_for(colony);
+            const auto demographic = colony_population_turnover(colony, colony_bodies);
 
-            advance_surface_condition(world.bodies, colony, operating_funding_fraction, days);
+            advance_surface_condition(colony_bodies, colony, operating_funding_fraction, days);
             const auto surface = surface_colony_output(colony, days);
             advance_surface_power_storage(colony, surface, days);
             if (colony.kind == SettlementKind::Colony) {
@@ -151,11 +161,11 @@ void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies
                 industry_per_day += surface.industry_per_day;
             }
             science_per_day += surface.science_per_day;
-            advance_resource_outpost(world.bodies, economies, colony, days, operating_funding_fraction);
+            advance_resource_outpost(colony_bodies, economies, colony, days, operating_funding_fraction);
 
             if (colony.kind == SettlementKind::Colony) {
                 const auto sustenance = colony_sustenance_capacity(
-                    world.bodies, colony, surface_sustenance_projection(surface));
+                    colony_bodies, colony, surface_sustenance_projection(surface));
                 const auto reserves = advance_colony_reserves(colony, sustenance, days);
                 const double population_rate = reserves.effective_support_ratio >= 1.0
                     ? .000055 * stability * demographic.effective_growth_pace_factor *

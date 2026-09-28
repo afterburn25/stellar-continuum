@@ -8,6 +8,7 @@ struct SurfaceBuilding {
     double industry_progress{}; bool is_complete{},is_enabled{true};
     std::optional<std::string> pending_upgrade_type_id;
     double upgrade_days_remaining{}; int operating_priority{}; double condition{1.0},stored_power_days{};
+    std::optional<int> slot_index; // Missing in historical free-placement saves.
 };
 struct Colony {
     int id{},civilization_id{},system_id{}; std::optional<int> planetary_body_id;

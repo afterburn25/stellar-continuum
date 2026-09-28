@@ -1,6 +1,10 @@
 #pragma once
 #include <stellar/core/interstellar_distance.hpp>
 #include <stellar/core/legacy_random.hpp>
+#include <stellar/core/stellar_object.hpp>
+#include <stellar/core/stellar_orbits.hpp>
+#include <stellar/core/stellar_activity.hpp>
+#include <stellar/core/small_body_fields.hpp>
 #include <array>
 #include <filesystem>
 #include <optional>
@@ -8,6 +12,14 @@
 #include <string>
 #include <vector>
 namespace stellar::core {
+// One shared size contract for generation, setup, and bounded presentation input.
+inline constexpr std::array<int, 8> full_galaxy_system_counts{250, 500, 1000, 2500, 5000, 10000, 25000, 50000};
+inline constexpr int maximum_full_galaxy_system_count = full_galaxy_system_counts.back();
+constexpr bool supported_full_galaxy_system_count(std::size_t count) noexcept {
+    for (int supported : full_galaxy_system_counts)
+        if (count == static_cast<std::size_t>(supported)) return true;
+    return false;
+}
 enum class StellarClass { MRedDwarf, KOrangeDwarf, GYellowDwarf, FYellowWhiteDwarf, AWhiteStar,
     HotBlueStar, Giant, WhiteDwarf, NeutronStar, BlackHole, Protostar, Pulsar };
 enum class GalaxyShape { LegacyDisk, BarredSpiral, SolarNeighborhood, FullGalaxy };
@@ -26,6 +38,12 @@ struct StellarSystem {
     std::optional<std::string> catalog_preset_id,stellar_catalog_id;
     StarArchetype archetype{StarArchetype::Standard};
     bool has_habitable_world{},has_anomaly{},has_rare_resource{},has_pre_warp_civilization{};
+    std::optional<StellarPhysicalProperties> stellar_object;
+    int engulfed_planets{};
+    std::optional<StellarRegion> stellar_region;
+    std::optional<std::vector<SmallBodyField>> small_body_fields;
+    std::optional<StellarOrbitArchitecture> stellar_orbits;
+  std::optional<std::vector<StellarActivityState>> stellar_activity;
 };
 std::optional<StellarClass> classify_spectral_type(const std::string& spectral_type);
 std::vector<CatalogStar> load_nearby_catalog(const std::filesystem::path& path);

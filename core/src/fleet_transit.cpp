@@ -61,6 +61,41 @@ const StellarSystem *find_system(std::span<const StellarSystem> systems,
                    [=](const auto &system) { return system.id == *id; });
   return found == systems.end() ? nullptr : &*found;
 }
+
+using StellarPath=std::vector<std::array<float,2>>;
+double stellar_path_length(const StellarPath& path) {
+  double length=0;for(std::size_t i=1;i<path.size();++i)length+=std::hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]);return length;
+}
+Vec2 stellar_path_position(const StellarPath& path,double travelled) {
+  for(std::size_t i=1;i<path.size();++i){const Vec2 a{path[i-1][0],path[i-1][1]},b{path[i][0],path[i][1]};const double length=distance(a,b);if(travelled<length)return lerp(a,b,static_cast<float>(travelled/length));travelled-=length;}
+  return {path.back()[0],path.back()[1]};
+}
+StellarPath stellar_safe_path(const StellarPhysicalProperties& physics,Vec2 start,Vec2 target) {
+  constexpr double pi=3.14159265358979323846;
+  const double scale=stellar_navigation_au_per_unit(physics);
+  const auto unsafe=[&](Vec2 p){return stellar_approach_unsafe(physics,p.x*scale,p.y*scale);};
+  const auto safe_endpoint=[&](Vec2 p){
+    if(!unsafe(p))return p;
+    // A system-centre order means a safe staging orbit, never the photosphere.
+    const double angle=physics.jet_axis_radians+pi*.5;
+    const double radius=std::max(.15,physics.safe_approach_au/scale*1.12);
+    return Vec2{static_cast<float>(std::cos(angle)*radius),static_cast<float>(std::sin(angle)*radius)};
+  };
+  start=safe_endpoint(start);target=safe_endpoint(target);
+  const double dx=target.x-start.x,dy=target.y-start.y,denom=dx*dx+dy*dy;
+  const double t=denom>0?std::clamp(-(start.x*dx+start.y*dy)/denom,0.,1.):0.;
+  bool blocked=std::hypot(start.x+t*dx,start.y+t*dy)*scale<=physics.safe_approach_au*1.01;
+  if(!blocked&&physics.jet_half_angle_radians>0)for(int i=0;i<=256&&!blocked;++i)blocked=unsafe(lerp(start,target,static_cast<float>(i)/256.f));
+  if(!blocked)return {{{start.x,start.y},{target.x,target.y}}};
+  // Outward radial legs and a sampled exterior arc avoid both the photosphere
+  // and directional jet cones. Stable waypoints make mid-flight saves exact.
+  const double radius=std::max({stellar_hazard_extent_au(physics)/scale*1.08,static_cast<double>(std::hypot(start.x,start.y)),static_cast<double>(std::hypot(target.x,target.y))});
+  const double a=std::atan2(start.y,start.x),delta=std::remainder(std::atan2(target.y,target.x)-a,2*pi);
+  const int steps=std::max(1,static_cast<int>(std::ceil(std::abs(delta)/(.04))));
+  StellarPath path{{start.x,start.y}};
+  for(int i=0;i<=steps;++i){const double angle=a+delta*i/steps;path.push_back({static_cast<float>(std::cos(angle)*radius),static_cast<float>(std::sin(angle)*radius)});}
+  path.push_back({target.x,target.y});return path;
+}
 } // namespace
 
 bool finite_fleet_chart_position(Vec2 value) {
@@ -86,7 +121,13 @@ Vec2 fleet_gate_towards(Vec2 source_system_position,
 }
 
 void begin_fleet_local_transit(FleetState &fleet, FleetTransitPhase phase,
-                               Vec2 start, Vec2 target) {
+                               Vec2 start, Vec2 target, const StellarPhysicalProperties* stellar) {
+  fleet.stellar_transit_path.clear();
+  if(stellar) {
+    const auto path=stellar_safe_path(*stellar,start,target);
+    fleet.stellar_transit_path=path;
+    start={path.front()[0],path.front()[1]};target={path.back()[0],path.back()[1]};
+  }
   fleet.transit_phase = phase;
   fleet.local_transit_start =
       finite_fleet_chart_position(start) ? start : Vec2{};
@@ -99,6 +140,14 @@ void begin_fleet_local_transit(FleetState &fleet, FleetTransitPhase phase,
 double advance_fleet_local_transit(FleetState &fleet, double available_days) {
   if (available_days <= 0 || !std::isfinite(available_days))
     return 0;
+  if(!fleet.stellar_transit_path.empty()) {
+    const double length=stellar_path_length(fleet.stellar_transit_path);
+    const double before=std::clamp(fleet.transit_progress,0.,1.);
+    const double rate=fleet_local_transit_rate(fleet);
+    fleet.transit_progress=length>0?std::min(1.,before+available_days*rate/length):1.;
+    fleet.local_transit_position=stellar_path_position(fleet.stellar_transit_path,length*fleet.transit_progress);
+    return (fleet.transit_progress-before)*length/rate;
+  }
   const auto start = finite_fleet_chart_position(fleet.local_transit_start)
                          ? fleet.local_transit_start
                          : Vec2{};
@@ -139,6 +188,7 @@ double fleet_local_transit_remaining_days(const FleetState &fleet) {
   if (fleet.transit_phase != FleetTransitPhase::LocalDeparture &&
       fleet.transit_phase != FleetTransitPhase::LocalArrival)
     return 0;
+  if(!fleet.stellar_transit_path.empty())return stellar_path_length(fleet.stellar_transit_path)*(1-std::clamp(fleet.transit_progress,0.,1.))/fleet_local_transit_rate(fleet);
   return distance(fleet.local_transit_position, fleet.local_transit_target) /
          fleet_local_transit_rate(fleet);
 }
@@ -172,7 +222,7 @@ double fleet_remaining_chart_distance(std::span<const StellarSystem> systems,
   float result =
       fleet.transit_phase == FleetTransitPhase::LocalDeparture ||
               fleet.transit_phase == FleetTransitPhase::LocalArrival
-          ? distance(fleet.local_transit_position, fleet.local_transit_target)
+          ? static_cast<float>(fleet_local_transit_remaining_days(fleet)*fleet_local_transit_rate(fleet))
           : 0;
   std::size_t start_index = 0;
   auto previous_id = fleet.transit_origin_system_id

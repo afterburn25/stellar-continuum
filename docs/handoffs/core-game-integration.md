@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Core integration — full-game modes, cinematic maps and colonies
 
 The current presentation and mouse-navigation candidate is recorded in [Cinematic presentation handoff](cinematic-presentation.md). It includes responsive 1080p/720p layout, organized inspectors, timed construction/upgrades, direct ship travel orders and 3D orbital structures. Consult its exact-commit validation record before release.

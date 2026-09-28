@@ -251,6 +251,116 @@ Json result_json(const AdaptiveResearchCommandResult &value) {
           {"Events", std::move(events)}, {"Blockers", std::move(blockers)}};
 }
 
+
+void cancellation_stage_retention(const AdaptiveResearchStrategicRuntime &runtime) {
+  using Access = detail::AdaptiveResearchCampaignStateAccess;
+  const auto &kernel=runtime.authority().kernel();
+  for(const auto desired:{ResearchMaturity::experimental,ResearchMaturity::demonstrated,ResearchMaturity::engineering}){
+    auto value=setup(runtime);
+    auto &state=Access::get_civilization(value.campaign,1);
+    for(const auto &id:kernel.facilities().facility_capability_ids())kernel.add_facility_capability(state,id);
+    const auto view=kernel.build_view(state,"species:terran_baseline");
+    const auto candidate=std::ranges::find_if(view.visible_nodes,[&](const auto &n){
+      return n.state==ResearchMaturity::investigable && n.blockers.empty() && n.minimum_labs &&
+          !kernel.catalog().get_node(n.node_id).is_hypothesis;
+    });
+    require(candidate!=view.visible_nodes.end(),"No ordinary candidate for stage retention.");
+    const auto node_id=candidate->node_id;
+    const auto &node=kernel.catalog().get_node(node_id);
+    const double labs=*candidate->minimum_labs;
+    require(AdaptiveResearchCampaignCommands::start_directed_research({value.civilizations,value.economies},value.campaign,1,node_id,labs,"species:terran_baseline").accepted,"Stage start failed.");
+    const auto initial=*std::ranges::find(state.active_projects(),node_id,&ResearchProjectRuntimeState::node_id);
+    double work=0.;
+    for(const auto stage:{ResearchMaturity::experimental,ResearchMaturity::demonstrated,ResearchMaturity::engineering}){
+      work+=kernel.progress_policy().get_stage_work(node,stage)*(stage==desired?.1:1.);
+      if(stage==desired)break;
+    }
+    const double annual=kernel.catalog().lab_scaling().scale_assigned_labs(labs,node.project_requirements.recommended_labs)*
+        kernel.catalog().metadata().base_rp_per_effective_lab_per_year*initial.readiness_efficiency;
+    (void)kernel.advance_projects(state,work/annual);
+    const auto retained=*std::ranges::find(state.active_projects(),node_id,&ResearchProjectRuntimeState::node_id);
+    require(retained.stage==desired,"Progress fixture did not reach its requested stage.");
+    const std::vector<ResearchCapabilityKey> capabilities(state.capabilities().begin(),state.capabilities().end());
+    require(AdaptiveResearchCampaignCommands::cancel_directed_research({value.civilizations,value.economies},value.campaign,1,node_id).accepted,"Stage cancellation failed.");
+    require(std::ranges::equal(capabilities,state.capabilities()),"Cancellation removed an earned capability.");
+    require(AdaptiveResearchCampaignCommands::start_directed_research({value.civilizations,value.economies},value.campaign,1,node_id,labs,"species:terran_baseline").accepted,"Stage restart failed.");
+    const auto &restarted=*std::ranges::find(state.active_projects(),node_id,&ResearchProjectRuntimeState::node_id);
+    require(restarted.stage==desired && restarted.total_research_points==retained.total_research_points &&
+        restarted.stage_research_points==retained.stage_research_points,"Restart reset an earned stage or its work.");
+  }
+}
+
+void cancellation_contract(const AdaptiveResearchStrategicRuntime &runtime) {
+  using Access = detail::AdaptiveResearchCampaignStateAccess;
+  const auto &authority = runtime.authority();
+  AdaptiveResearchSnapshotCodec core_codec(authority.catalog(), authority.kernel().applicability(), authority.kernel().facilities());
+  for (int consumed_count = 0; consumed_count <= 3; ++consumed_count) {
+    auto value = setup(runtime);
+    auto &state = Access::get_civilization(value.campaign, 1);
+    const AdaptiveResearchFundingWorldView world{value.civilizations, value.economies};
+    auto start = AdaptiveResearchCampaignCommands::start_directed_research(world, value.campaign, 1,
+        value.node_id, value.labs, "species:terran_baseline");
+    require(start.accepted, "Cancellation setup could not start: " + start.message);
+    (void)authority.kernel().advance_projects(state, .001);
+    if (consumed_count == 1)
+      require(AdaptiveResearchCampaignCommands::pause_directed_research(value.campaign, 1, value.node_id).accepted,
+          "Cancellation pause setup failed.");
+    for (int i=0;i<consumed_count;++i)
+      (void)Access::consume_project_milestone(value.campaign, 1, value.node_id, i==2);
+    const auto retained = *std::ranges::find(state.active_projects(), value.node_id, &ResearchProjectRuntimeState::node_id);
+    const auto refund = *AdaptiveResearchCampaignCommands::cancellation_refund(value.campaign, 1, value.node_id);
+    const double credits = value.economies.front().credits;
+    const double free_labs = state.free_effective_labs();
+    const auto before = core_codec.serialize(state);
+    auto missing = AdaptiveResearchCampaignCommands::cancel_directed_research({value.civilizations,{}},value.campaign,1,value.node_id);
+    require(!missing.accepted && core_codec.serialize(state)==before, "Missing treasury mutated research.");
+    auto result = AdaptiveResearchCampaignCommands::cancel_directed_research(world, value.campaign, 1, value.node_id);
+    require(result.accepted && result.events.front().type==AdaptiveResearchRuntimeEventType::project_cancelled,
+        "Canonical cancellation failed.");
+    require(value.economies.front().credits==credits+refund && value.campaign.project_funding(1).empty(),
+        "Cancellation refunded spent costs or retained a reservation.");
+    require(state.active_projects().empty() && state.cancelled_project(value.node_id) &&
+        state.cancelled_project(value.node_id)->total_research_points==retained.total_research_points &&
+        state.cancelled_project(value.node_id)->target_applicability_context_id==retained.target_applicability_context_id &&
+        state.free_effective_labs()==free_labs+(retained.paused?0:value.labs),
+        "Cancellation failed to free labs or preserve work/context.");
+    const auto saved = core_codec.serialize(state);
+    require(Json::parse(saved).at("schemaVersion")==6,"Cancelled work did not use the new core snapshot format.");
+    auto restored = core_codec.deserialize(saved);
+    require(core_codec.serialize(restored)==saved,"Cancelled scientific work did not round trip.");
+    (void)authority.kernel().advance_projects(restored, 10.);
+    require(core_codec.serialize(restored)==saved,"Cancelled research continued progressing.");
+    AdaptiveResearchCampaignSnapshotCodec campaign_codec(runtime);
+    auto loaded = campaign_codec.restore(value.civilizations, campaign_codec.capture(value.campaign));
+    auto &loaded_state = Access::get_civilization(loaded,1);
+    const auto repeated = AdaptiveResearchCampaignCommands::cancel_directed_research(world,loaded,1,value.node_id);
+    require(!repeated.accepted && value.economies.front().credits==credits+refund,
+        "Repeated cancellation after reload generated another refund.");
+    auto wrong_context = AdaptiveResearchCampaignCommands::start_directed_research(world,loaded,1,value.node_id,value.labs,std::nullopt);
+    require(!wrong_context.accepted && loaded_state.cancelled_project(value.node_id),
+        "Restart transferred scientific work into a different context.");
+    const auto quote = AdaptiveResearchFundingPolicy::quote(authority.catalog().get_node(value.node_id),value.labs,authority.catalog());
+    const auto restarted = AdaptiveResearchCampaignCommands::start_directed_research(world,loaded,1,value.node_id,value.labs,"species:terran_baseline");
+    require(restarted.accepted && loaded_state.cancelled_projects().empty() &&
+        loaded_state.active_projects().front().stage==retained.stage &&
+        loaded_state.active_projects().front().stage_research_points==retained.stage_research_points &&
+        std::abs(value.economies.front().credits-(credits+refund-quote.authorization_credits-quote.milestone_commitment_credits))<1e-9,
+        "Restart failed to preserve scientific work or fund its new commitment.");
+    require(Json::parse(core_codec.serialize(loaded_state)).at("schemaVersion")==1,
+        "Campaign without cancellation records no longer uses legacy-compatible encoding.");
+    for(int fault=0;fault<4;++fault){
+      auto invalid=Json::parse(saved);
+      auto &project=invalid["cancelledProjects"][0];
+      if(fault==0)invalid["cancelledProjects"].push_back(project);
+      if(fault==1)invalid["activeProjects"].push_back(project);
+      if(fault==2)project["totalResearchPoints"]=-1.;
+      if(fault==3)project["targetApplicabilityContextId"]="species:missing";
+      bool rejected=false;try{(void)core_codec.deserialize(invalid.dump());}catch(const std::exception&){rejected=true;}
+      require(rejected,"Invalid cancelled-project snapshot was accepted.");
+    }
+  }
+}
+
 } // namespace
 
 int main(int argc, char **argv) try {
@@ -267,6 +377,8 @@ int main(int argc, char **argv) try {
   require(fingerprint(research_path) == canonical,
           "Runtime load changed canonical inputs.");
 
+  cancellation_stage_retention(runtime);
+  cancellation_contract(runtime);
   std::size_t count{};
   for (const auto &row : fixture.at("Rows")) {
     const auto name = row.at("Name").get<std::string>();

@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.0018754005432128906,
+    "clippedFraction": 2.8133392333984375e-05,
+    "disc": [
+      1024.3303688516232,
+      1026.055612544426,
+      825.3476806771864
+    ],
+    "id": "sol-mimas",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.7,
+      -0.2924175609421338,
+      0.7
+    ],
+    "seamError": 0.032760775571388435,
+    "usable": true
+  },
+  "id": "sol-mimas",
+  "name": "Mimas",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "4775d14e9b2cafe679dbdfcce149d3188051f7249e764c975cdb1999fd405645",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Mimas.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

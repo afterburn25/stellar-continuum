@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "chief-scientist": {
+      "source": "assets/visual/leaders/chief-scientist.jpg",
+      "runtimePath": "assets/visual/leaders/chief-scientist.jpg",
+      "sha256": "b9bd92c0a0081df7b67c02ed5a028bea0016ded5ba91d31365506c6310957e4d"
+    },
+    "fleet-commander": {
+      "source": "assets/visual/leaders/fleet-commander.jpg",
+      "runtimePath": "assets/visual/leaders/fleet-commander.jpg",
+      "sha256": "2ba82896709422a67435cb63592e3e4e9f35adc37758bf1855aa4e0a55576195"
+    },
+    "planetary-governor": {
+      "source": "assets/visual/leaders/planetary-governor.jpg",
+      "runtimePath": "assets/visual/leaders/planetary-governor.jpg",
+      "sha256": "5ee63cef583bcc9a76979b7db1dcca1d3abbad8faf00209c132df75410b51927"
+    },
+    "credits": {
+      "source": "docs/engine/NATIVE_LEADER_ART_SOURCES.md",
+      "runtimePath": "Licenses/Leader-art-sources.md",
+      "sha256": "552189cffb5ba3fe9b651cf8eb83f6c94583e5bcda117880c4d443de7b0c73bf"
+    }
+  }
+}

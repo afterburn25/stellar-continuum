@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Shipyard order recovery
 
 New shipyard orders persist a stable order ID, paid authorization quote, and exact population-source colony. Cancellation uses that identity so a stale control cannot cancel a promoted duplicate design. Queued orders refund their recorded quote; active orders refund only the unbuilt material fraction. Reserved colonists return only to the same owned colony with the same species. If that source cannot be proven, cancellation is rejected without changing credits, population, or the order.

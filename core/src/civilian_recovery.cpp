@@ -51,42 +51,11 @@ CivilianFleetReturnOrderResult paid_confirmation(const FleetState &fleet) {
               "Confirm return to continue."};
 }
 
-struct BaseChoice {
-  int system_id{};
-  MissionReachAssessment reach;
-};
-
-std::optional<BaseChoice> nearest_base(CivilianRecoveryWorldView world,
+std::optional<RefuelingReach> nearest_base(CivilianRecoveryWorldView world,
                                        const FleetState &fleet) {
-  std::unordered_set<int> seen;
-  std::vector<int> candidates;
-  for (const auto &colony : world.colonies)
-    if (colony.civilization_id == fleet.civilization_id &&
-        seen.insert(colony.system_id).second)
-      candidates.push_back(colony.system_id);
-
-  std::vector<BaseChoice> supported;
-  for (const int system_id : candidates) {
-    auto reach = assess_operational_reach(
-        {world.systems, world.colonies, world.lanes}, fleet.civilization_id,
-        fleet, system_id,
-        fleet.role == FleetRole::Colony
-            ? InterstellarMissionKind::Colony
-            : InterstellarMissionKind::ScoutReconnaissance);
-    if (reach.is_supported)
-      supported.push_back({system_id, std::move(reach)});
-  }
-  if (supported.empty())
-    return std::nullopt;
-  std::stable_sort(supported.begin(), supported.end(),
-                   [](const auto &first, const auto &second) {
-    if (first.reach.route_distance_light_years !=
-        second.reach.route_distance_light_years)
-      return first.reach.route_distance_light_years <
-             second.reach.route_distance_light_years;
-    return first.system_id < second.system_id;
-  });
-  return supported.front();
+  OperationalReachBatch batch({world.systems,world.colonies,world.lanes},fleet.civilization_id);
+  return batch.nearest_refueling(fleet,fleet.role==FleetRole::Colony?
+      InterstellarMissionKind::Colony:InterstellarMissionKind::ScoutReconnaissance);
 }
 
 CivilianFleetReturnOrderResult activate(CivilianRecoveryWorldView world,

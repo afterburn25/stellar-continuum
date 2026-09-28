@@ -155,6 +155,13 @@ struct DiplomacyCampaignMaintenanceResult {
   bool operator==(const DiplomacyCampaignMaintenanceResult &) const = default;
 };
 
+struct DiplomacyMaintenanceSnapshot {
+  DiplomacyCampaignMaintenancePolicy policy;
+  std::int64_t next_review_tick{}, last_review_tick{-1};
+  bool initialized{};
+  void validate() const;
+};
+
 class DiplomacyCampaignMaintenanceScheduler final {
 public:
   explicit DiplomacyCampaignMaintenanceScheduler(
@@ -175,6 +182,8 @@ public:
   [[nodiscard]] std::int64_t next_review_tick() const noexcept;
   [[nodiscard]] std::int64_t last_review_tick() const noexcept;
   void reset(std::int64_t now_tick, bool review_immediately = true);
+  [[nodiscard]] DiplomacyMaintenanceSnapshot snapshot() const;
+  void restore(const DiplomacyMaintenanceSnapshot &);
   [[nodiscard]] DiplomacyCampaignMaintenanceResult
   review_if_due(std::int64_t now_tick);
 

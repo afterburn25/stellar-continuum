@@ -1,7 +1,9 @@
 #include "native_shipyard_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <iostream>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -109,7 +111,10 @@ void layout_is_contained_and_action_stays_visible() {
     const auto layout = ShipyardWorkspaceLayout::for_viewport(width, height);
     const UiRect viewport{0, 0, static_cast<float>(width),
                           static_cast<float>(height)};
+    const auto navigation = NativeUiLayout::for_viewport(width, height);
     REQUIRE(contains(viewport, layout.surface));
+    REQUIRE(layout.surface.x >=
+            navigation.inspect.x + navigation.inspect.width);
     for (const auto bounds : {layout.designs, layout.design_details,
                               layout.orders, layout.readiness,
                               layout.feedback, layout.action})
@@ -152,11 +157,13 @@ void start_and_cancel_use_real_mouse_hit_bounds() {
   refreshed.orders = {order()};
   workspace.set_view(std::move(refreshed));
   REQUIRE(workspace.arm_cancel_confirmation(command.id));
+  REQUIRE(workspace.confirmation_open());
   auto changed_quote = view();
   changed_quote.shipyard_revision = 6;
   changed_quote.orders = {order()};
   changed_quote.orders.front().formatted_refund = "$8.00 SOL";
   workspace.set_view(std::move(changed_quote));
+  REQUIRE(!workspace.confirmation_open());
   command = workspace.handle(
       {InputEventType::LeftPressed, center(layout.action)}, 1280, 720);
   REQUIRE(command.kind == ShipyardWorkspaceCommandKind::PrepareCancel);
@@ -246,6 +253,44 @@ void full_720p_content_keeps_cost_feedback_and_action_clipped() {
   REQUIRE(cost && readiness && action && capped_error);
 }
 
+void stale_order_notice_clears_only_when_the_canonical_order_changes() {
+  NativeShipyardWorkspace workspace;workspace.open();auto queued=view();queued.orders={order("science-order")};queued.orders.front().active=false;
+  workspace.set_view(queued);workspace.set_notice("Queued Deep-Space Science Vessel.",true);
+  auto progressing=queued;progressing.shipyard_revision++;progressing.orders.front().progress_fraction=.75;workspace.set_view(progressing);
+  DrawList retained;workspace.render(retained,1280,720);
+  REQUIRE(std::ranges::any_of(retained.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value.contains("Queued Deep-Space");}));
+  auto completed=progressing;completed.shipyard_revision++;completed.orders.clear();completed.pending_build_count=0;workspace.set_view(completed);
+  DrawList cleared;workspace.render(cleared,1280,720);
+  REQUIRE(std::ranges::none_of(cleared.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value.contains("Queued Deep-Space");}));
+  REQUIRE(std::ranges::any_of(cleared.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value=="No ships are under construction.";}));
+}
+
+void stale_cancellation_quote_clears_when_its_revision_changes() {
+  NativeShipyardWorkspace workspace;
+  workspace.open();
+  auto quoted = view();
+  quoted.orders = {order()};
+  workspace.set_view(quoted);
+  REQUIRE(workspace.arm_cancel_confirmation("order-1"));
+  DrawList before;
+  workspace.render(before, 1280, 720);
+  REQUIRE(std::ranges::any_of(before.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value.contains("Confirm cancellation");
+  }));
+  auto refreshed = quoted;
+  refreshed.shipyard_revision++;
+  refreshed.orders.front().formatted_refund = "$8.00 SOL";
+  workspace.set_view(refreshed);
+  DrawList after;
+  workspace.render(after, 1280, 720);
+  REQUIRE(!workspace.confirmation_open());
+  REQUIRE(std::ranges::none_of(after.overlay, [](const auto &item) {
+    const auto *label = std::get_if<Text>(&item);
+    return label && label->value.contains("Confirm cancellation");
+  }));
+}
+
 } // namespace
 
 int run_tests() {
@@ -254,6 +299,26 @@ int run_tests() {
   campaign_replacement_discards_old_order_context();
   empty_and_locked_states_render_without_invented_items();
   full_720p_content_keeps_cost_feedback_and_action_clipped();
+  stale_order_notice_clears_only_when_the_canonical_order_changes();
+  stale_cancellation_quote_clears_when_its_revision_changes();
+  NativeShipyardWorkspace batch;batch.open();auto projection=view();
+  auto& known=projection.available_designs.front();
+  known.batch_quotes={{1,true,{},12.345,100.,.025,5.},{2,true,{},24.69,200.,.05,10.},{3,false,"Not enough reserved population.",37.035,300.,.075,15.},{4,false,"Queue full.",49.38,400.,.1,20.}};
+  batch.set_view(projection);const auto layout=ShipyardWorkspaceLayout::for_viewport(1920,1080);
+  REQUIRE(layout.surface.width<1920*.9f&&layout.surface.height<1080*.9f);
+  REQUIRE(layout.surface.y>=native_workspace_top(1920,1080));
+  (void)batch.handle({InputEventType::LeftPressed,center(layout.plus)},1920,1080);
+  auto command=batch.handle({InputEventType::LeftPressed,center(layout.action)},1920,1080);
+  REQUIRE(command.kind==ShipyardWorkspaceCommandKind::Start&&command.quantity==2);
+  (void)batch.handle({InputEventType::LeftPressed,center(layout.plus)},1920,1080);
+  REQUIRE(batch.handle({InputEventType::LeftPressed,center(layout.action)},1920,1080).kind==ShipyardWorkspaceCommandKind::None);
+  DrawList blocked;batch.render(blocked,1920,1080);
+  REQUIRE(std::ranges::any_of(blocked.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value.contains("Not enough reserved population.");}));
+  (void)batch.handle({InputEventType::LeftPressed,center(layout.search)},1920,1080);REQUIRE(batch.wants_text_input());
+  InputEvent typing{InputEventType::TextEntered};typing.text="nonexistent";(void)batch.handle(typing,1920,1080);
+  REQUIRE(!batch.design_bounds("scout",1920,1080));
+  (void)batch.handle({InputEventType::LeftPressed,center(layout.sort)},1920,1080);REQUIRE(batch.popover_open());
+  (void)batch.handle({InputEventType::EscapePressed},1920,1080);REQUIRE(batch.visible()&&!batch.popover_open());
   return 0;
 }
 

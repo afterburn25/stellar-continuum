@@ -2,6 +2,8 @@
 
 #include <stellar/core/exploration_planning.hpp>
 #include <stellar/core/industry_allocation.hpp>
+#include <stellar/core/civilization_control.hpp>
+#include <stellar/core/galaxy_phenomena.hpp>
 
 #include <optional>
 #include <span>
@@ -44,6 +46,8 @@ struct ExplorationAdvanceWorldView {
   std::span<const CivilizationEconomy> economies;
   CivilizationKnowledgeState &knowledge;
   InterstellarLaneNetwork &lanes;
+  CivilizationControlQuery control;
+  const GalaxyPhenomena* phenomena{};
 };
 
 struct ExplorationOrderWorldView {
@@ -69,7 +73,8 @@ public:
   static constexpr double scout_reconnaissance_days = 2.0;
 
   explicit ExplorationSimulation(
-      ExplorationReachAssessment operational_reach = {});
+      ExplorationReachAssessment operational_reach = {},
+      MissionFuelPolicy ai_fuel_policy=MissionFuelPolicy::ReachDestination);
 
   [[nodiscard]] MissionReachAssessment
   assess_operational_reach(ExplorationPlanningWorldView world, int fleet_id,
@@ -89,6 +94,7 @@ private:
   issue_order(ExplorationOrderWorldView world, int fleet_id,
               int destination_system_id, bool require_survey_work) const;
   ExplorationMissionPlanner mission_planner_;
+  MissionFuelPolicy ai_fuel_policy_;
   SurveyOperationsProfiler survey_profiler_;
 };
 

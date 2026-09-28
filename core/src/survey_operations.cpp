@@ -10,26 +10,12 @@ double SurveyOperationsProfile::progress_per_day() const {
   return 1.0 / estimated_science_survey_days;
 }
 
-SurveyOperationsProfile
-SurveyOperationsProfiler::build(std::span<const StellarSystem> systems,
-                                std::span<const PlanetaryBody> bodies,
-                                int system_id) const {
-  const auto system = std::find_if(
-      systems.begin(), systems.end(),
-      [system_id](const auto &item) { return item.id == system_id; });
-  if (system == systems.end())
-    throw std::runtime_error("Unknown system " + std::to_string(system_id) +
-                             ".");
-
-  int planets = 0;
-  int moons = 0;
-  int anomalies = 0;
-  int rare_resources = 0;
-  bool has_physical_hazard = false;
-  double physical_hazard = 0.0;
-  for (const auto &body : bodies) {
-    if (body.system_id != system_id)
-      continue;
+namespace {
+struct SurveySummary {
+  int planets{}, moons{}, anomalies{}, rare_resources{};
+  bool has_physical_hazard{};
+  double physical_hazard{};
+  void add(const PlanetaryBody& body) {
     if (body.kind == PlanetaryBodyKind::Moon)
       ++moons;
     else
@@ -48,7 +34,9 @@ SurveyOperationsProfiler::build(std::span<const StellarSystem> systems,
     }
     has_physical_hazard = true;
   }
-
+};
+SurveyOperationsProfile finish(const StellarSystem* system, const SurveySummary& summary) {
+  const auto& [planets,moons,anomalies,rare_resources,has_physical_hazard,physical_hazard]=summary;
   double days = 8.0 + planets * 0.85 + moons * 0.35;
   double content_days = 0.0;
   switch (system->archetype) {
@@ -99,7 +87,7 @@ SurveyOperationsProfiler::build(std::span<const StellarSystem> systems,
   days += std::max(content_days, stellar_days);
   days += std::min(2.4, anomalies * 0.8);
   days += std::min(1.5, rare_resources * 0.5);
-  days = std::clamp(days, minimum_survey_days, maximum_survey_days);
+  days = std::clamp(days, SurveyOperationsProfiler::minimum_survey_days, SurveyOperationsProfiler::maximum_survey_days);
 
   const bool severe_star =
       (system->primary && (*system->primary == StellarClass::NeutronStar ||
@@ -119,7 +107,34 @@ SurveyOperationsProfiler::build(std::span<const StellarSystem> systems,
                       : elevated_star || physical_hazard >= 0.40
                           ? SurveyOperationalHazard::Elevated
                           : SurveyOperationalHazard::Routine;
-  return {system_id, planets, moons, days, hazard};
+  return {system->id, planets, moons, days, hazard};
+}
+} // namespace
+
+SurveyOperationsProfile SurveyOperationsProfiler::build(
+    std::span<const StellarSystem> systems,std::span<const PlanetaryBody> bodies,int system_id) const {
+  const auto system=std::find_if(systems.begin(),systems.end(),[=](const auto& s){return s.id==system_id;});
+  if(system==systems.end())throw std::runtime_error("Unknown system "+std::to_string(system_id)+".");
+  SurveySummary summary;
+  for(const auto& body:bodies)if(body.system_id==system_id)summary.add(body);
+  return finish(&*system,summary);
+}
+
+SurveyOperationsProfile SurveyOperationsBatch::build(int system_id) {
+  if(!prepared_){
+    std::unordered_map<int,SurveySummary> summaries;
+    summaries.reserve(systems_.size());
+    for(const auto& system:systems_)summaries.try_emplace(system.id);
+    // Preserve source order, including legacy NaN maximum semantics. Bodies
+    // whose parent system is absent do not enter the profile table.
+    for(const auto& body:bodies_)if(auto it=summaries.find(body.system_id);it!=summaries.end())it->second.add(body);
+    std::unordered_map<int,SurveyOperationsProfile> profiles;
+    profiles.reserve(systems_.size());
+    for(const auto& system:systems_)profiles.try_emplace(system.id,finish(&system,summaries.at(system.id)));
+    profiles_=std::move(profiles);prepared_=true;
+  }
+  if(auto it=profiles_.find(system_id);it!=profiles_.end())return it->second;
+  throw std::runtime_error("Unknown system "+std::to_string(system_id)+".");
 }
 
 } // namespace stellar::core

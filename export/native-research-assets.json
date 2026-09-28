@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "411910f1",
+  "assets": [
+    {
+      "path": "assets/visual/catalog/catalog.json",
+      "sha256": "212fad8dc43c9ce0126bca6d126bb927de5428816f68ef5f28b78c1fd73a3bb0"
+    },
+    {
+      "path": "assets/visual/catalog/production/provenance.json",
+      "sha256": "0e1fe7c9998cece3b99e69debdd4bf7e69df7fbc7970569f37b4545883fe8079"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-alternative_biochemistry.png",
+      "sha256": "88cdef6ca42a82a0c9a5a1f56f899fb8ead0c543c9e79f40bd6e723564a6e62a"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-alternative_biochemistry.png",
+      "sha256": "7d5b44079e09de69745e0e8f264de9e3e1e82d82630f74a5c5ad065a603b4801"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-biosphere_agriculture.png",
+      "sha256": "4a6355828ffc85cb8ce29e9a713343e276966a1317b973111ebac8946e2b439b"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-biosphere_agriculture.png",
+      "sha256": "753eefa3729efebf81fadbea4330d77fa20055305ded25d70be2aa322c6206be"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-biotechnology.png",
+      "sha256": "9e3642eccec135b4215a87c892c3eac7615096c886c0bcb6f27ecacdec40613f"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-biotechnology.png",
+      "sha256": "11deb957a29a05ff1881b3a46df213523d09c5d2190fe666953a27130f1bccf4"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-computing.png",
+      "sha256": "0d8dd8315d64bd0226c5983fa2d50b12478f52066b22e03fa39fa9b918c90a1f"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-computing.png",
+      "sha256": "ec81a3da8fe875d917734e27690eac11e3854b15b161c21c34215bdfdc7ff3eb"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-cybernetics.png",
+      "sha256": "b022c6a06cfea4969b9d6b2e424a1ffb873ac67d85dc3be9bd29eabd19a9575a"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-cybernetics.png",
+      "sha256": "9a71238a3a2f9de7d1ac7ad199751bd6dca9509c296ef3a935a530a64bb6806d"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-economic_trade.png",
+      "sha256": "efe8967a05461cbab60140a3da10e8e851702728d3521ff09dac705256038795"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-economic_trade.png",
+      "sha256": "8bf461f8b7a12696dcae6a127369eaa85b9bea7e84a2bf0f1511dce8ab27992e"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-energy.png",
+      "sha256": "3e059148e573e30a079a3ffb9471e79f962cc05706654f0c70fe0a21bca86b04"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-energy.png",
+      "sha256": "8d487c2c84ea6623911c858164fae1c4455d981382887a5e10a613f130927f58"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-foundations.png",
+      "sha256": "33f1a6beb71028d8d05697ac6baa6e3225626a29f259ecb263fadb4460a3f71a"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-foundations.png",
+      "sha256": "60b16d8fb46e8a50d4df96076008ab604195aa484d0eb74268967a64da1dac3a"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-life_medicine.png",
+      "sha256": "c6da33edddd0d90037f3f46a2348e40dabe4050c241609f80a93ff31b0557e30"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-life_medicine.png",
+      "sha256": "bc4ed825bcd9d5023c9113c677cae1241b46c8719084fa1aba635548bddbe8aa"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-logistics.png",
+      "sha256": "3803c443229728594f994fe52b4f6f39446aa5d34538953bed1cb023c7806228"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-logistics.png",
+      "sha256": "a49ecd6b6adb697df8e082b8f543da5241e23c3e80d5c2550534acfc8a109a41"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-materials.png",
+      "sha256": "57ae746d52b907a45dd7d969ca91a8ac8b7147f26e03d668a3dc7a9508785efd"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-materials.png",
+      "sha256": "966663a0fe3120869da57388106fb98279d5b52da44f53a1e3113b84739d0451"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-military.png",
+      "sha256": "f8dc14ab54df40c04f17f3749d2d154e3f2c0bc3c28eb3f73bd54c271bb87a05"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-military.png",
+      "sha256": "a77b2118318990397ef9d0fc1d55b211694e428921ecd4e966994191f4c2ede4"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-planetary.png",
+      "sha256": "c9501690fe4ea8928177371ecde6e76375db34e955dc25298381b67e6d6413f9"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-planetary.png",
+      "sha256": "e46d3708e9aea5f3293b5cfa90c4087391ee52745ed37ac8d94ad66aaf9bf750"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-propulsion.png",
+      "sha256": "8ab809c0e59cdeb685c2449ef312c855cf4d74c6b7f0f38626e859a52d61eea5"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-propulsion.png",
+      "sha256": "756f10b59998176fedf8e3a75af799a94709eae4920653a90bc56579fb3754c6"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-research_infrastructure.png",
+      "sha256": "28dcd9bbfb8d1aee92a781f7305b8d8ed45508987c82bb635601047917bbdd4d"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-research_infrastructure.png",
+      "sha256": "747d26f3ea18963669e85e52e06a1039b0d1e9acf8b81b3b31c7da10cb0a8725"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-sensors_comms.png",
+      "sha256": "a442bd9dbf65fc2e7d259cf1c72bf6af2c0de5e6e0371bc1940b28ddc12a595a"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-sensors_comms.png",
+      "sha256": "e8fbcd8817a9658b6153fc5db4a8141940b9fa065830bcf599f68053f7b645f1"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-social_admin.png",
+      "sha256": "10c551f3eee3e3df082f93eba0ab7cc068cfaee393fb8a497646dea2b0895d05"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-social_admin.png",
+      "sha256": "d25d2f1338c64f69cca7c8a01168c44e1a38227774eb71a77fd3dcaa0f513789"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-space_industry.png",
+      "sha256": "e752e394b19b9d1c026f342f19d1ce841cd932db7eb67b9fe9af09c8e9f2315b"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-space_industry.png",
+      "sha256": "6aa3fed335fa37fe19d03e85aa18faff737d038c235c3fd6f37834784ee8a121"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-stellar_engineering.png",
+      "sha256": "58e4614a9751d49390655f7c0991f428b7a08061fcd90d0fc3a1f1d1f878e516"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-stellar_engineering.png",
+      "sha256": "da727ad072c6d8d1096ba400584a8540500bf5114c8cd8d4920e60c7194d6dbc"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-synthetic_systems.png",
+      "sha256": "82125fff095246200f683b57094993a8593f9226c31ba843e4d998b1b4f7874a"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-synthetic_systems.png",
+      "sha256": "8369f1c578542bf4218dc94d0067bb91afd12290d5376bf3183be6ea1ae22574"
+    },
+    {
+      "path": "assets/visual/catalog/thumbnails/research-xenoscience.png",
+      "sha256": "caf6a0cf88ddcde98aba9eef0d97496b039f01e9c6b483bc97257cab6cb869e5"
+    },
+    {
+      "path": "assets/visual/catalog/portraits/research-xenoscience.png",
+      "sha256": "7804c1a0b842ccffc2405a750672abbf4a184d2800dea753f78db61cfae3eea5"
+    }
+  ]
+}

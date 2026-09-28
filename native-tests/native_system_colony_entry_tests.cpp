@@ -112,7 +112,7 @@ int main() {
     workspace.render(draw, 1280, 720);
     REQUIRE(std::ranges::none_of(draw.overlay, [](const auto &item) {
       const auto *label = std::get_if<Text>(&item);
-      return label && label->value == "OPEN COLONY";
+      return label && label->value == "MANAGE PLANET";
     }));
 
     workspace.set_colony_body(9);
@@ -120,7 +120,7 @@ int main() {
     workspace.render(draw, 1280, 720);
     REQUIRE(std::ranges::any_of(draw.overlay, [](const auto &item) {
       const auto *label = std::get_if<Text>(&item);
-      return label && label->value == "OPEN COLONY";
+      return label && label->value == "MANAGE PLANET";
     }));
     command = workspace.handle(
         {InputEventType::LeftPressed, center(layout.colony_action)}, 1280, 720);

@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 2.193450927734375e-05,
+    "clippedFraction": 0.0,
+    "disc": [
+      1025.5642367968258,
+      1031.3483608608644,
+      957.896923174087
+    ],
+    "id": "sol-miranda",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.4810695890671144,
+      0.6174127512627667
+    ],
+    "seamError": 0.028000819713960613,
+    "usable": true
+  },
+  "id": "sol-miranda",
+  "name": "Miranda",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "0bd337bf55194c47e056ad8c03f30bd130a61988bec6bbf3870268b06203dcf0",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Miranda.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

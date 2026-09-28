@@ -198,6 +198,73 @@ double AdaptiveResearchCampaignCommands::credits_needed_to_start(
          quote.operating_credits_per_day;
 }
 
+std::optional<double> AdaptiveResearchCampaignCommands::cancellation_refund(
+    const AdaptiveResearchCampaignState &campaign, int id, std::string_view node_id) {
+  const auto &state = campaign.get_civilization(id);
+  if (!find_project(state, node_id)) return std::nullopt;
+  for (const auto &funding : campaign.project_funding(id))
+    if (funding.node_id == node_id)
+      return std::max(0., funding.reserved_milestone_credits - funding.consumed_milestone_credits);
+  return 0.;
+}
+
+AdaptiveResearchCommandResult AdaptiveResearchCampaignCommands::cancel_directed_research(
+    AdaptiveResearchFundingWorldView world, AdaptiveResearchCampaignState &campaign,
+    int id, std::string_view node_id) {
+  const std::string owned_node(node_id);
+  AdaptiveResearchCivilizationState *state{};
+  std::optional<double> refund;
+  try {
+    state = &detail::AdaptiveResearchCampaignStateAccess::get_civilization(campaign, id);
+    refund = cancellation_refund(campaign, id, owned_node);
+  } catch (const AdaptiveResearchCampaignMissingState &error) {
+    return AdaptiveResearchCommandResult::rejected(error.what());
+  }
+  if (!refund) return AdaptiveResearchCommandResult::rejected("No active research project exists for that node.");
+  auto *economy = single_economy(world.economies, id);
+  if (!economy || !std::isfinite(economy->credits) || !std::isfinite(economy->credits + *refund))
+    return AdaptiveResearchCommandResult::rejected("No valid treasury is available to receive the research refund.");
+  const auto currency = sovereign_currency_for_civilization(world.civilizations, id);
+  auto result = campaign.runtime().authority().cancel_directed_research(*state, owned_node);
+  if (!result.accepted) return result;
+  detail::AdaptiveResearchCampaignStateAccess::release_project_funding(campaign, id, owned_node);
+  economy->credits += *refund;
+  // Remove explicit waiting intent too, so cancellation cannot restart on the
+  // next queue tick. AI takeover remains an independently authorized controller.
+  const auto &queue = campaign.plan(id).queue;
+  if (std::ranges::find(queue, owned_node) != queue.end())
+    (void)campaign.edit_plan(id, ResearchPlanCommand::RemoveQueued, owned_node);
+  result.message += " Refunded " + currency.format(*refund) +
+      " in unused milestone funds. Authorization and operating costs are not refundable. "
+      "Restarting requires new authorization and milestone funding.";
+  if (!result.events.empty()) result.events.front().message = result.message;
+  return result;
+}
+
+std::vector<AdaptiveResearchRuntimeEvent> AdaptiveResearchCampaignCommands::start_queued_research(
+    AdaptiveResearchFundingWorldView world,AdaptiveResearchCampaignState &campaign,int id){
+  std::vector<AdaptiveResearchRuntimeEvent> events;
+  const auto &state=campaign.get_civilization(id);
+  while(!campaign.plan(id).queue.empty()){
+    const auto node_id=campaign.plan(id).queue.front();
+    const auto *node_state=state.try_get_node_state(node_id);
+    if(!node_state||node_state->maturity<ResearchMaturity::investigable)break;
+    const bool active=std::any_of(state.active_projects().begin(),state.active_projects().end(),
+        [&](const auto &p){return p.node_id==node_id;});
+    if(!active&&node_state->maturity<ResearchMaturity::mature){
+      const auto &node=campaign.runtime().authority().catalog().get_node(node_id);
+      const double labs=std::min<double>(node.project_requirements.recommended_labs,state.free_effective_labs());
+      auto started=start_directed_research(world,campaign,id,node_id,labs,
+          campaign.get_start(id).applicability_context_id);
+      if(!started.accepted)break;
+      events.insert(events.end(),started.events.begin(),started.events.end());
+    }
+    const auto removed=campaign.edit_plan(id,ResearchPlanCommand::RemoveQueued,node_id);
+    if(!removed.accepted)break;
+  }
+  return events;
+}
+
 AdaptiveResearchCommandResult
 AdaptiveResearchCampaignCommands::start_directed_research(
     AdaptiveResearchFundingWorldView world,

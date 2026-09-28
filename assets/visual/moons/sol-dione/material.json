@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 8.106231689453125e-06,
+    "clippedFraction": 0.0001468658447265625,
+    "disc": [
+      1024.8533110953044,
+      1038.4633978327108,
+      822.6841606496721
+    ],
+    "id": "sol-dione",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.03573452130412698,
+      0.7
+    ],
+    "seamError": 0.011298384159490742,
+    "usable": true
+  },
+  "id": "sol-dione",
+  "name": "Dione",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "567385acfa7e262211ec847a934019e2306872f3a10774ad238cd9ce8ae7ac0a",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Dione.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

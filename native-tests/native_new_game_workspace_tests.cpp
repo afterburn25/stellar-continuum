@@ -1,4 +1,5 @@
 #include "native_new_game_workspace.hpp"
+#include "native_developer_access.hpp"
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
@@ -37,17 +38,20 @@ NativeNewCampaignSetupView setup(){
   v.species[3].gravity_g={.14,.08,.25};
   v.size_presets={{250,"Small - 250 systems",false},{500,"Medium - 500 systems",true},{1000,"Large - 1,000 systems",false},{2500,"Huge - 2,500 systems",false}};
   v.default_species_id="terran_baseline";v.default_system_count=500;
-  v.fixed_pre_warp_civilization_count=6;v.fixed_ancient_civilization_count=1;return v;
+  v.pre_warp_civilization_presets={{1,"None",false},{4,"Sparse · 3",false},{6,"Standard · 5",true},{9,"Crowded · 8",false},{13,"Packed · 12",false}};
+  v.ancient_civilization_presets={{0,"None",false},{1,"Rare",true},{2,"Standard",false}};
+  v.default_pre_warp_civilization_count=6;v.default_ancient_civilization_count=1;return v;
 }
 
 void responsive_layout(){
   for(const auto [w,h]:{std::pair{1280,720},{1920,1080},{2560,1440},{3840,2160},{1280,1080}}){
     NativeNewGameWorkspace workspace;workspace.set_view(setup());const auto measured=workspace.measure_layout(w,h,measure);const auto&l=measured.base;
-    for(const auto r:{l.heading,l.cancel,l.mode_story,l.mode_sandbox,l.species,l.details,l.size_group,l.seed_input,l.create})require(contains(l.panel,r),"setup control escaped its panel");
+    for(const auto r:{l.heading,l.cancel,l.mode_story,l.mode_sandbox,l.species,l.details,l.size_group,l.seed_input,l.randomize_seed,l.restore_defaults,l.create})require(contains(l.panel,r),"setup control escaped its panel");
     require(l.mode_story.x+l.mode_story.width<=l.mode_sandbox.x,"campaign mode cards overlap");
     require(l.species.x+l.species.width<=l.details.x,"species list overlaps details");
+    require(l.species.y<l.mode_story.y&&l.details.y<l.mode_sandbox.y,"species selection is not the first setup decision");
     require(l.species.y+l.species.height<=l.seed_label.y,"species list overlaps setup controls");
-    require(l.seed_input.x+l.seed_input.width<=l.size_group.x,"seed overlaps sizes");
+    require(l.randomize_seed.x+l.randomize_seed.width<=l.size_group.x,"seed controls overlap sizes");
     for(const auto button:l.size_buttons)require(contains(l.size_group,button),"size button escaped its group");
     for(std::size_t index=1;index<measured.species_rows.size();++index)require(measured.species_rows[index-1].y+measured.species_rows[index-1].height<measured.species_rows[index].y,"measured species rows overlap");
   }
@@ -59,25 +63,78 @@ void presentations(){
   require(species_presentation("pelagic_high_pressure").has_value()&&species_presentation("compact_high_gravity").has_value()&&species_presentation("cryogenic_hydrocarbon").has_value(),"preserved species presentation absent");
   require(!species_presentation("future_unknown"),"future species received invented presentation");
 }
+void galaxy_flow(){
+  using namespace stellar::core;
+  for(const auto [width,height]:{std::pair{1280,720},{1920,1080},{2560,1440},{3440,1440},{3840,2160}}){
+    NativeNewGameWorkspace w;w.set_view(setup());w.begin_sandbox();
+    const auto l=GalaxyChoiceLayout::for_viewport(width,height);
+    const auto click=[&](UiRect r){return w.handle({InputEventType::LeftPressed,center(r)},width,height,measure);};
+    require(w.page()==SandboxPage::GalaxyType&&!w.selected_morphology()&&w.requested_population()==PopulationSelection::Random,"Sandbox initial page or selection is wrong");
+    (void)click(l.next);require(w.page()==SandboxPage::GalaxyType,"Next accepted no morphology");
+    for(int i=0;i<6;++i){require(contains(l.panel,l.cards[i]),"Galaxy card escaped panel");if(i%3)require(l.cards[i].y==l.cards[i-1].y&&l.cards[i].x>=l.cards[i-1].x+l.cards[i-1].width,"Galaxy cards are not 3 by 2");}
+    require(l.cards[3].y>=l.cards[0].y+l.cards[0].height,"Galaxy rows overlap");
+    std::unordered_set<std::string> paths;auto resource=RgbaImage::create(2,1,std::vector<std::uint8_t>(8,255));
+    NativeNewGameWorkspace::PortraitProvider provider=[&](std::string_view path){require(path.find("stars_included")!=std::string_view::npos,"Gas-dust used on a selection card");paths.emplace(path);return resource;};
+    DrawList draw;w.render(draw,width,height,measure,&provider);require(paths.size()==6,"Six distinct morphology previews were not rendered");
+    const std::array order{GalaxyMorphology::Spiral,GalaxyMorphology::BarredSpiral,GalaxyMorphology::Elliptical,GalaxyMorphology::Lenticular,GalaxyMorphology::Irregular,GalaxyMorphology::Ring};
+    for(int i=0;i<6;++i){(void)click(l.cards[i]);require(w.selected_morphology()==order[i],"Card selection or order is wrong");}
+    (void)click(l.next);require(w.page()==SandboxPage::Population,"Next did not open population page");
+    const auto seed=w.seed_text();const auto original=w.generation_configuration();
+    (void)click(l.population);DrawList menu;w.render(menu,width,height,measure,&provider);
+    std::unordered_set<std::string> options;for(const auto& item:menu.overlay)if(const auto* t=std::get_if<Text>(&item))for(int i=0;i<6;++i)if(t->value==population_selection_label(static_cast<PopulationSelection>(i)))options.emplace(t->value);
+    require(options.size()==6,"Population dropdown does not contain all six choices");
+    stellar::native_ui::Dropdown dropdown;dropdown.open(0,{"Random","Starburst","Active","Mature","Aging","Quiescent"},0);
+    (void)click(dropdown.layout(l.population,width,height).rows[5]);require(w.requested_population()==PopulationSelection::Quiescent,"Population choice was not retained");
+    require(w.generation_configuration()->resolved_population==PopulationState::Quiescent,"Explicit population did not reach canonical configuration");
+    (void)click(l.back);require(w.page()==SandboxPage::GalaxyType&&w.selected_morphology()==GalaxyMorphology::Ring&&w.seed_text()==seed,"Back lost configuration");
+    (void)click(l.next);(void)click(l.next);require(w.page()==SandboxPage::Configuration,"Population Next did not open existing settings");
+    const auto setup_layout=NativeNewGameLayout::for_viewport(width,height);
+    const auto create=click(setup_layout.create);require(create.requested_population==PopulationSelection::Quiescent&&create.stellar_population.morphology==GalaxyMorphology::Ring,"Create lost authoritative choices");
+    (void)click(setup_layout.restore_defaults);require(!w.selected_morphology()&&w.page()==SandboxPage::GalaxyType&&w.requested_population()==PopulationSelection::Random,"Reset did not reset the complete workflow");
+  }
+}
+NativeNewGameIntent choose_count(NativeNewGameWorkspace& w,UiRect anchor,bool ancient){
+  (void)w.handle({InputEventType::LeftPressed,center(anchor)},1280,720,measure);
+  const auto choices=ancient?setup().ancient_civilization_presets:setup().pre_warp_civilization_presets;
+  int index{};for(int i=0;i<static_cast<int>(choices.size());++i)if(choices[i].count==(ancient?2:9))index=i;
+  stellar::native_ui::Dropdown menu;menu.open(0,std::vector<std::string>(choices.size(),"count"),0);
+  return w.handle({InputEventType::LeftPressed,center(menu.layout(anchor,1280,720).rows[index])},1280,720,measure);
+}
 void mouse_and_text(){
   NativeNewGameWorkspace w;w.set_view(setup());require(w.selected_species_id()=="terran_baseline"&&w.selected_system_count()==500,"detached defaults not selected");
   const auto measured=w.measure_layout(1280,720,measure);const auto&l=measured.base;
-  require(w.handle({InputEventType::LeftPressed,center(l.mode_story)},1280,720,measure).kind==NativeNewGameIntentKind::None,"locked Story card emitted an action");
+  w.randomize_seed();
+  require(!w.seed_text().empty(),"fresh sandbox setup did not receive a numeric seed");
+  auto intent=w.handle({InputEventType::LeftPressed,center(l.randomize_seed)},1280,720,measure);
+  require(intent.kind==NativeNewGameIntentKind::RandomizeSeed&&intent.seed_text==w.seed_text()&&!w.seed_text().empty(),"Randomize did not provide a seed");
+  require(choose_count(w,l.mode_story,false).kind==NativeNewGameIntentKind::SelectRivals&&w.selected_pre_warp_civilization_count()==9,"rival selection did not advance through supported counts");
+  require(choose_count(w,l.mode_sandbox,true).kind==NativeNewGameIntentKind::SelectAncients&&w.selected_ancient_civilization_count()==2,"ancient selection did not advance through supported counts");
   const Point gap{measured.species_rows[0].x+10,measured.species_rows[0].y+measured.species_rows[0].height+2};
   require(w.handle({InputEventType::LeftPressed,gap},1280,720,measure).kind==NativeNewGameIntentKind::None&&w.selected_species_id()=="terran_baseline","species row gap selected a species");
-  auto intent=w.handle({InputEventType::LeftPressed,center(measured.species_rows[1])},1280,720,measure);
+  intent=w.handle({InputEventType::LeftPressed,center(measured.species_rows[1])},1280,720,measure);
   require(intent.kind==NativeNewGameIntentKind::SelectSpecies&&intent.species_id=="pelagic_high_pressure","mouse species selection failed");
   intent=w.handle({InputEventType::LeftPressed,center(l.size_buttons[3])},1280,720,measure);
   require(intent.kind==NativeNewGameIntentKind::SelectSize&&intent.system_count==2500,"mouse size selection failed");
+  intent=w.handle({InputEventType::LeftPressed,center(l.restore_defaults)},1280,720,measure);
+  require(intent.kind==NativeNewGameIntentKind::RestoreDefaults&&intent.system_count==500&&intent.pre_warp_civilization_count==6&&intent.ancient_civilization_count==1&&intent.species_id.empty(),"Restore defaults did not return canonical selections");
+  const auto flow=GalaxyChoiceLayout::for_viewport(1280,720);
+  for(auto r:{flow.cards[0],flow.next,flow.next})(void)w.handle({InputEventType::LeftPressed,center(r)},1280,720,measure);
+  (void)w.handle({InputEventType::LeftPressed,center(measured.species_rows[1])},1280,720,measure);
+  (void)w.handle({InputEventType::LeftPressed,center(l.size_buttons[3])},1280,720,measure);
+  (void)choose_count(w,l.mode_story,false);
+  (void)choose_count(w,l.mode_sandbox,true);
   (void)w.handle({InputEventType::LeftPressed,center(l.seed_input)},1280,720,measure);
   require(w.seed_focused(),"seed field did not focus");
   (void)w.handle({InputEventType::TextEntered,{}, {},0,"-9223372036854775808"},1280,720,measure);
   (void)w.handle({InputEventType::BackspacePressed},1280,720,measure);
   (void)w.handle({InputEventType::TextEntered,{}, {},0,"8"},1280,720,measure);
   require(w.seed_text()=="-9223372036854775808","seed editing was not exact");
+  intent=w.handle({InputEventType::LeftPressed,center(l.copy_setup)},1280,720,measure);
+  require(intent.kind==NativeNewGameIntentKind::CopySetup&&intent.species_id=="pelagic_high_pressure"&&intent.system_count==2500&&intent.seed_text==w.seed_text()&&intent.pre_warp_civilization_count==9&&intent.ancient_civilization_count==2,"Copy setup omitted selected values");
   intent=w.handle({InputEventType::LeftPressed,center(l.create)},1280,720,measure);
-  require(intent.kind==NativeNewGameIntentKind::Create&&intent.species_id=="pelagic_high_pressure"&&intent.system_count==2500&&intent.seed_text==w.seed_text(),"Create omitted setup input");
-  require(w.handle({InputEventType::EscapePressed},1280,720,measure).kind==NativeNewGameIntentKind::Cancel&&!w.seed_focused(),"Escape did not cancel and clear focus");
+  require(intent.kind==NativeNewGameIntentKind::Create&&intent.species_id=="pelagic_high_pressure"&&intent.system_count==2500&&intent.seed_text==w.seed_text()&&intent.pre_warp_civilization_count==9&&intent.ancient_civilization_count==2,"Create omitted setup input");
+  require(w.handle({InputEventType::EscapePressed},1280,720,measure).captured&&!w.seed_focused()&&w.page()==SandboxPage::Population,"Escape did not go back and clear focus");
+  (void)w.handle({InputEventType::LeftPressed,center(flow.next)},1280,720,measure);
   (void)w.handle({InputEventType::LeftPressed,center(l.seed_input)},1280,720,measure);
   require(w.handle({InputEventType::PointerCancelled},1280,720,measure).captured&&!w.seed_focused(),"focus loss retained seed focus or press ownership");
   (void)w.handle({InputEventType::LeftPressed,center(l.seed_input)},1280,720,measure);
@@ -88,12 +145,12 @@ void rendered_facts(){
   NativeNewGameWorkspace w;auto v=setup();v.species.front().display_name="Terran Baseline With A Deliberately Long Existing Display Name";
   v.species.front().biochemistry_label="Carbon and water chemistry with a deliberately long authored label that must wrap";w.set_view(std::move(v));
   DrawList draw;w.render(draw,1280,720,measure);const auto l=NativeNewGameLayout::for_viewport(1280,720);
-  bool story=false,sandbox=false,gravity=false,survival=false,size=false,bio=false,hint=false;
+  bool rivals=false,ancients=false,gravity=false,survival=false,size=false,bio=false,hint=false;
   for(const auto &c:draw.overlay)if(const auto *t=std::get_if<Text>(&c)){
-    story|=t->value=="COMING SOON";sandbox|=t->value=="SANDBOX";gravity|=t->value.find("Comfortable gravity")!=std::string::npos;survival|=t->value.find("Survival gravity")!=std::string::npos;size|=t->value=="Huge\n2,500 systems";bio|=t->value.find("oxygen-breathing")!=std::string::npos;hint|=t->value=="SCROLL FOR MORE";
+    rivals|=t->value=="RIVAL EMPIRES";ancients|=t->value=="ANCIENT EMPIRES";gravity|=t->value.find("Comfortable gravity")!=std::string::npos;survival|=t->value.find("Survival gravity")!=std::string::npos;size|=t->value=="Huge · 2,500";bio|=t->value.find("oxygen-breathing")!=std::string::npos;hint|=t->value=="SCROLL FOR MORE";
     if(t->value.find("Comfortable ")!=std::string::npos||t->value.find("Radiation tolerance")!=std::string::npos)require(t->clip&&contains(l.details,*t->clip),"species fact escaped details clip");
   }
-  require(story&&sandbox&&gravity&&survival&&size&&bio&&hint,"render omitted an authoritative field or scroll affordance");
+  require(rivals&&ancients&&gravity&&survival&&size&&bio&&hint,"render omitted an authoritative field or scroll affordance");
   (void)w.handle({InputEventType::Wheel,center(l.details),{},-100},1280,720,measure);
   require(w.detail_scroll()>0,"measured detail content did not produce scroll at 720p");
   DrawList scrolled;w.render(scrolled,1280,720,measure);bool last=false,chemistry=false,radiation=false,header=false;
@@ -116,5 +173,45 @@ void physical_range_presentation(){
   for(const auto&command:draw.overlay)if(const auto*label=std::get_if<Text>(&command);label&&label->value.starts_with("Survival gravity")){clamped|=label->value.find("0.00–")!=std::string::npos;negative|=label->value.find("-")!=std::string::npos;}
   require(clamped&&!negative,"displayed survival range escaped the physical gravity domain");
 }
+void developer_research_controls(){
+  stellar::engine::DeveloperAccess denied;
+  require(!denied.set_active(true)&&!denied.active(),"Ordinary process enabled developer access.");
+  stellar::engine::DeveloperAccess allowed(true);
+  require(!allowed.active()&&allowed.set_active(true)&&allowed.active(),"Developer gate skipped eligibility or explicit activation.");
+  InputEvent chord;chord.type=InputEventType::KeyPressed;chord.key=0x40000045u;chord.control=true;chord.shift=true;
+  require(is_developer_shortcut(chord),"Developer chord not recognized.");
+  chord.shift=false;require(!is_developer_shortcut(chord),"Partial shortcut enabled developer tools.");
+  for(const auto dimensions:{std::pair{1280,720},std::pair{1920,1080},std::pair{3840,2160}}){
+    const auto [width,height]=dimensions;NativeNewGameWorkspace w;
+    auto view=setup();w.set_view(view);const auto l=NativeNewGameLayout::for_viewport(width,height);
+    const auto click=[&](UiRect r){return w.handle({InputEventType::LeftPressed,center(r)},width,height,measure);};
+    (void)click(l.developer_normal_research);
+    require(!click(l.create).developer_research.complete_normal_research,"Invisible developer checkbox accepted ordinary input.");
+    (void)click(l.developer_exploration);
+    require(!click(l.create).developer_full_exploration,"Hidden exploration option accepted player input.");
+    view.developer_mode=true;w.set_view(view);
+    require(!click(l.create).developer_research.complete_normal_research,"Developer setup defaulted to fully researched.");
+    (void)click(l.developer_normal_research);
+    require(click(l.create).developer_research.complete_normal_research,"Normal research checkbox did not reach create intent.");
+    (void)click(l.developer_special_research);
+    require(click(l.create).developer_research.complete_special_research,"Special research checkbox did not reach create intent.");
+    (void)click(l.developer_coverage);
+    require(click(l.create).developer_full_coverage&&contains(l.panel,l.developer_coverage),"Coverage checkbox did not reach create intent or escaped viewport.");
+    require(!click(l.create).developer_full_exploration,"Coverage silently enabled full exploration.");
+    (void)click(l.developer_exploration);
+    require(click(l.create).developer_full_exploration&&click(l.copy_setup).developer_full_exploration&&contains(l.panel,l.developer_exploration),
+        "Exploration option did not reach Create/Copy or escaped the viewport.");
+    require(l.developer_exploration.y+l.developer_exploration.height<=l.create.y&&
+        l.developer_coverage.x+l.developer_coverage.width<=l.developer_exploration.x,
+        "Exploration option overlaps another control.");
+    require(contains(l.panel,l.developer_normal_research)&&contains(l.panel,l.developer_special_research),"Developer controls escaped setup viewport.");
+    view.developer_mode=false;w.set_view(view);
+    require(!click(l.create).developer_full_coverage,"Developer coverage leaked into ordinary setup.");
+    require(!click(l.create).developer_full_exploration,"Full exploration leaked into ordinary setup.");
+    const auto cleared=click(l.create).developer_research;
+    require(!cleared.complete_normal_research&&!cleared.complete_special_research,"Developer settings leaked into ordinary setup.");
+  }
 }
-int main()try{responsive_layout();presentations();mouse_and_text();rendered_facts();portrait_provider();physical_range_presentation();std::cout<<"native new-game workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
+
+}
+int main()try{galaxy_flow();developer_research_controls();responsive_layout();presentations();mouse_and_text();rendered_facts();portrait_provider();physical_range_presentation();std::cout<<"native new-game workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}

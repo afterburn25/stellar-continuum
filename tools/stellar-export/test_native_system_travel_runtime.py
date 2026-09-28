@@ -10,7 +10,7 @@ from native_system_travel_runtime import validate_native_system_travel_export
 
 
 class NativeSystemTravelExportTests(unittest.TestCase):
-    def exercise(self, fault=None):
+    def exercise(self, fault=None, *, voice_check=False):
         source = {"FormatVersion": 17, "SavedAtUtc": "source", "SimulationDays": 0,
                   "Galaxy": {"PlayerCivilizationId": 0, "Systems": [0, 1, 2],
                              "Knowledge": [{"CivilizationId": 0, "KnownSystemIds": [0],
@@ -34,13 +34,22 @@ class NativeSystemTravelExportTests(unittest.TestCase):
                 capture = Path(args[-1])
                 calls.append(args)
                 marker = ""
+                voice_marker = ""
                 if "--fleet-smoke" in args:
+                    self.assertNotIn("--audio-check", args)
+                    self.assertNotIn("--voice-check", args)
                     payload["SimulationDays"] = 1
                     fleet.update(DestinationSystemId=2, MissionOrderRevision=1, TransitPhase=1,
                                  PlannedRouteSystemIds=[1, 2], LocalTransitPositionX=.1)
                     marker = " fleet=7:2:1:0.1"
                     if fault == "preparation": fleet["TransitPhase"] = 2
                 elif "--system-travel-smoke" in args or "--system-travel-reload-smoke" in args:
+                    if voice_check:
+                        self.assertIn("--audio-check", args)
+                        self.assertIn("--voice-check", args)
+                    else:
+                        self.assertNotIn("--audio-check", args)
+                        self.assertNotIn("--voice-check", args)
                     observer=payload["Galaxy"]["Knowledge"][0]
                     self.assertEqual(observer["KnownSystemIds"], [0, 1])
                     self.assertNotIn(2, observer["KnownSystemIds"])
@@ -63,21 +72,35 @@ class NativeSystemTravelExportTests(unittest.TestCase):
                     if fault == "foreign": fleet["CivilizationId"] = 1
                     if fault == "clock": payload["SimulationDays"] = 3
                     marker = " system_travel=" + json.dumps(state)
+                    if voice_check:
+                        audio = {"assets_loaded": True, "music_starts": 1,
+                                 "confirm_count": 0, "queued_music_bytes": 2048,
+                                 "boot_services": 0, "stopped": True}
+                        voice = {"available": True, "played": 1, "unknown_denied": True,
+                                 "overlap_prevented": True, "queue_bounded": True, "stopped": True}
+                        if fault == "voice": voice["unknown_denied"] = False
+                        voice_marker = ("audio_check=" + json.dumps(audio, separators=(",", ":")) + "\n" +
+                                        "voice_check=" + json.dumps(voice, separators=(",", ":")) + "\n")
                 else:
                     if fault == "reload": payload["Galaxy"]["Economies"][0]["Credits"] += 1
                 payload["SavedAtUtc"] = "later-" + str(len(calls))
                 save.write_text(json.dumps(payload))
                 if fault != "capture": capture.write_bytes(b"BM"+bytes(54))
-                stdout = "gpu_driver=vulkan systems=3 save=ok screenshot=test.bmp"+marker
+                stdout = voice_marker + "gpu_driver=vulkan systems=3 save=ok screenshot=test.bmp"+marker
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
             with mock.patch("native_system_travel_runtime._source_row", return_value=copy.deepcopy(source)), \
                  mock.patch("native_system_travel_runtime.subprocess.run", side_effect=run):
-                result = validate_native_system_travel_export(package, {}, Path("source"))
+                result = validate_native_system_travel_export(package, {}, Path("source"), voice_check=voice_check)
             self.assertEqual(len(calls), 3)
             self.assertTrue(result["nativeSystemTravelInput"])
             self.assertTrue(result["nativeSystemLocalTransit"])
             self.assertTrue(result["nativeSystemTravelPausedReload"])
+            if voice_check:
+                self.assertTrue(result["nativeScientistVoice"])
+                self.assertEqual(result["nativeScientistVoiceDiagnostics"]["moved"]["voice"]["played"], 1)
+            else:
+                self.assertNotIn("nativeScientistVoice", result)
 
     def test_real_input_motion_and_full_paused_reload(self): self.exercise()
     def test_route_must_be_in_local_departure(self):
@@ -106,6 +129,9 @@ class NativeSystemTravelExportTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): self.exercise("reload")
     def test_missing_capture_is_rejected(self):
         with self.assertRaises(RuntimeError): self.exercise("capture")
+    def test_voice_check_routes_only_moved_and_paused_reload(self): self.exercise(voice_check=True)
+    def test_voice_evidence_is_strict_when_requested(self):
+        with self.assertRaises(RuntimeError): self.exercise("voice", voice_check=True)
 
 
 if __name__ == "__main__": unittest.main()

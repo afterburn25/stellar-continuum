@@ -87,7 +87,7 @@ std::string survey_reason(FleetRole role, SystemSurveyLevel level,
 
 ExplorationMissionPlanner::ExplorationMissionPlanner(
     ExplorationReachAssessment operational_reach)
-    : operational_reach_(std::move(operational_reach)) {
+    : uses_canonical_reach_(!operational_reach),operational_reach_(std::move(operational_reach)) {
   if (!operational_reach_)
     operational_reach_ = [](OperationalReachWorldView world,
                             int civilization_id, const FleetState &fleet,
@@ -132,14 +132,14 @@ MissionReachAssessment ExplorationMissionPlanner::assess_operational_reach(
 ExplorationMissionCandidate
 ExplorationMissionPlanner::build_candidate(ExplorationPlanningWorldView world,
                                            const FleetState &fleet,
-                                           const StellarSystem &system) const {
+                                           const StellarSystem &system,OperationalReachBatch *batch,MissionFuelPolicy fuel_policy,SurveyOperationsBatch *surveys) const {
   const auto level =
       world.knowledge.system_survey_level(fleet.civilization_id, system.id);
   const auto progress =
       world.knowledge.system_survey_progress(fleet.civilization_id, system.id);
   std::optional<SurveyOperationsProfile> profile;
   if (level >= SystemSurveyLevel::partially_surveyed)
-    profile = survey_profiler_.build(world.systems, world.bodies, system.id);
+    profile = surveys?surveys->build(system.id):survey_profiler_.build(world.systems, world.bodies, system.id);
   std::optional<double> remaining_days;
   if (fleet.role == FleetRole::Science && profile) {
     const auto remaining =
@@ -149,7 +149,7 @@ ExplorationMissionPlanner::build_candidate(ExplorationPlanningWorldView world,
   }
   const auto distance =
       interstellar_distance_from_fleet(world.systems, fleet, system);
-  auto reach = assess_operational_reach(world, fleet, system.id);
+  auto reach = batch?batch->assess(fleet,system.id,mission_kind(fleet.role),fuel_policy):assess_operational_reach(world, fleet, system.id);
   const auto priority = survey_priority(fleet.role, level);
   return {system.id,
           system.name,
@@ -166,7 +166,9 @@ ExplorationMissionPlanner::build_candidate(ExplorationPlanningWorldView world,
 ExplorationMissionPlan
 ExplorationMissionPlanner::build_plan(ExplorationPlanningWorldView world,
                                       int fleet_id,
-                                      int maximum_candidates) const {
+                                      int maximum_candidates,MissionFuelPolicy fuel_policy) const {
+  if(fuel_policy!=MissionFuelPolicy::ReachDestination&&!uses_canonical_reach_)
+    throw std::invalid_argument("Return fuel planning requires the canonical operational reach provider.");
   maximum_candidates =
       std::clamp(maximum_candidates, 1, hard_maximum_candidates);
   const auto fleet =
@@ -183,9 +185,12 @@ ExplorationMissionPlanner::build_plan(ExplorationPlanningWorldView world,
         fleet_id, fleet->name + " is not a scout or science survey vessel.");
 
   std::vector<ExplorationMissionCandidate> candidates;
+  SurveyOperationsBatch surveys(world.systems,world.bodies);
+  std::optional<OperationalReachBatch> batch;
+  if(uses_canonical_reach_)batch.emplace(OperationalReachWorldView{world.systems,world.colonies,world.lanes},fleet->civilization_id);
   for (const auto &system : world.systems)
     if (needs_survey_work(world.knowledge, *fleet, system.id))
-      candidates.push_back(build_candidate(world, *fleet, system));
+      candidates.push_back(build_candidate(world, *fleet, system,batch?&*batch:nullptr,fuel_policy,&surveys));
   std::stable_sort(
       candidates.begin(), candidates.end(),
       [](const auto &left, const auto &right) {
@@ -278,7 +283,7 @@ ExplorationAiMissionCoordinator::ExplorationAiMissionCoordinator(
     : mission_planner_(mission_planner) {}
 
 ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
-    ExplorationPlanningWorldView world, const FleetState &fleet) const {
+    ExplorationPlanningWorldView world, const FleetState &fleet,MissionFuelPolicy fuel_policy) const {
   if (!fleet.is_active ||
       (fleet.role != FleetRole::Scout && fleet.role != FleetRole::Science))
     return {fleet.id,
@@ -288,7 +293,7 @@ ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
             "Only active scout/science fleets participate in AI exploration "
             "coordination."};
   const auto plan = mission_planner_.build_plan(
-      world, fleet.id, ExplorationMissionPlanner::hard_maximum_candidates);
+      world, fleet.id, ExplorationMissionPlanner::hard_maximum_candidates,fuel_policy);
   std::vector<const ExplorationMissionCandidate *> supported;
   for (const auto &candidate : plan.candidates)
     if (candidate.reach.is_supported)

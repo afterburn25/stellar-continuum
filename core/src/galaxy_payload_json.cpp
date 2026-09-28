@@ -1,7 +1,13 @@
 #include <stellar/core/galaxy_payload_json.hpp>
 
 #include "json_ordered_value.hpp"
+#include "stellar_object_json.hpp"
+#include "stellar_activity_json.hpp"
+#include "planet_appearance_json.hpp"
+#include "small_body_json.hpp"
+#include "galaxy_phenomena_json.hpp"
 #include "galaxy_payload_json_internal.hpp"
+#include "json_encode_validation.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -195,16 +201,17 @@ template <typename T, typename Decode>
 std::vector<T> list(const Value &value, const std::string &path, Decode decode,
                     bool nullable_elements = false) {
   std::vector<T> result;
-  const auto &items = array(value, path);
-  result.reserve(items.size());
-  for (std::size_t index = 0; index != items.size(); ++index) {
+  const auto count = json_detail::array_size(value);
+  if (!count) (void)array(value, path);
+  result.reserve(*count);
+  json_detail::visit_array(value, [&](const Value& item, std::size_t index) {
     const auto item_path = path + '[' + std::to_string(index) + ']';
-    if (is_null(items[index]) && !nullable_elements)
-      json_error(GalaxyPayloadJsonErrorPhase::Representability, items[index],
+    if (is_null(item) && !nullable_elements)
+      json_error(GalaxyPayloadJsonErrorPhase::Representability, item,
                  item_path,
                  "System.Text.Json accepted a null list element that the native DTO cannot retain.");
-    result.push_back(decode(items[index], item_path));
-  }
+    result.push_back(decode(item, item_path));
+  });
   return result;
 }
 
@@ -358,6 +365,20 @@ Enum enumeration(const Value &value, const std::string &path) {
   return static_cast<Enum>(integer<int>(value, path));
 }
 
+Json extension_json(const Value& v) {
+  if (auto n=std::get_if<Value::Number>(&v.data)) return Json::parse(n->text);
+  if (auto a=std::get_if<Value::DeferredArray>(&v.data)) return Json::parse(a->source);
+  if (auto a=std::get_if<Array>(&v.data)) { Json j=Json::array();for(const auto& x:*a)j.push_back(extension_json(x));return j; }
+  if (auto o=std::get_if<Object>(&v.data)) { Json j=Json::object();for(const auto& [k,x]:*o)j[k]=extension_json(x);return j; }
+  if (auto b=std::get_if<bool>(&v.data))return *b;
+  if (auto t=std::get_if<std::string>(&v.data))return *t;
+  return nullptr;
+}
+template<class T> T decode_stellar_extension(const Value& v,const std::string& path) {
+  try { return extension_json(v).template get<T>(); }
+  catch(const std::exception& e) { json_error(GalaxyPayloadJsonErrorPhase::Parse,v,path,std::string("Invalid stellar extension: ")+e.what()); }
+}
+
 GalacticCoreMetadata decode_core_value(const Value &value,
                                        const std::string &path) {
   GalacticCoreMetadata result;
@@ -371,6 +392,7 @@ GalacticCoreMetadata decode_core_value(const Value &value,
     else if (name == "X") result.x = single(member, member_path);
     else if (name == "Y") result.y = single(member, member_path);
     else if (name == "ExclusionRadius") result.exclusion_radius = single(member, member_path);
+    else if (name == "BlackHole") result.black_hole = decode_stellar_extension<CentralBlackHoleProperties>(member,member_path);
   }
   if (!landmark_key)
     json_error(GalaxyPayloadJsonErrorPhase::Representability, value,
@@ -401,6 +423,10 @@ GalaxyGenerationMetadata decode_metadata_value(const Value &value,
     else if (name == "CreatedAtUtc") result.created_at_utc = canonical_datetime_offset(member, p);
     else if (name == "SystemCount") result.system_count = integer<int>(member, p);
     else if (name == "GalaxyShape") { result.galaxy_shape = string(member, p); galaxy_shape = true; }
+    else if (name == "Configuration") result.configuration=decode_stellar_extension<GalaxyGenerationConfig>(member,p);
+    else if (name == "Phenomena") result.phenomena=decode_stellar_extension<GalaxyPhenomena>(member,p);
+    else if (name == "StellarPopulation") result.stellar_population=decode_stellar_extension<StellarPopulationOptions>(member,p);
+    else if (name == "StellarProfileVersion") result.stellar_profile_version=string(member,p);
     else if (name == "StellarVariety") { result.stellar_variety = string(member, p); stellar_variety = true; }
     else if (name == "PlanetBearingSystems") { result.planet_bearing_systems = string(member, p); planet_bearing = true; }
     else if (name == "HabitableWorlds") { result.habitable_worlds = string(member, p); habitable_worlds = true; }
@@ -450,6 +476,12 @@ StellarSystemPersistenceDto decode_system(const Value &value,
     else if (name == "X") result.x = single(member, p);
     else if (name == "Y") result.y = single(member, p);
     else if (name == "GalacticDepthLightYears") result.galactic_depth_light_years = optional_value<double>(member, p, number);
+    else if (name == "StellarObject") result.stellar_object=decode_stellar_extension<StellarPhysicalProperties>(member,p);
+    else if (name == "EngulfedPlanets") result.engulfed_planets=integer<int>(member,p);
+    else if (name == "StellarRegion") result.stellar_region=decode_stellar_extension<StellarRegion>(member,p);
+    else if (name == "StellarActivity") result.stellar_activity=decode_stellar_extension<std::vector<StellarActivityState>>(member,p);
+    else if (name == "StellarOrbits") result.stellar_orbits=decode_stellar_extension<StellarOrbitArchitecture>(member,p);
+    else if (name == "SmallBodyFields") result.small_body_fields=decode_stellar_extension<std::vector<SmallBodyField>>(member,p);
     else if (name == "StellarCatalogId") result.stellar_catalog_id = optional_value<std::string>(member, p, string);
     else if (name == "Archetype") result.archetype = enumeration<StarArchetype>(member, p);
     else if (name == "HasHabitableWorld") result.has_habitable_world = boolean(member, p);
@@ -504,6 +536,9 @@ PlanetaryBodyPersistenceDto decode_body(const Value &value,
     else if (name == "HasRareResource") { result.has_rare_resource = boolean(member, p); rare = true; }
     else if (name == "HasAnomaly") { result.has_anomaly = boolean(member, p); anomaly = true; }
     else if (name == "HasPreWarpCivilization") { result.has_pre_warp_civilization = boolean(member, p); prewarp = true; }
+    else if (name == "StellarExposure") result.stellar_exposure=decode_stellar_extension<StellarPlanetProperties>(member,p);
+    else if (name == "CrackedWorld") result.cracked_world=boolean(member,p);
+    else if (name == "PlanetAppearance") result.appearance=decode_stellar_extension<PlanetAppearance>(member,p);
     else if (name == "OrbitalEccentricity") result.orbital_eccentricity = number(member, p);
     else if (name == "OrbitalInclinationDegrees") result.orbital_inclination_degrees = number(member, p);
   }
@@ -594,6 +629,7 @@ SurfaceBuilding decode_surface_building(const Value &value,
     else if (name == "OperatingPriority") result.operating_priority = integer<int>(member, p);
     else if (name == "Condition") result.condition = number(member, p);
     else if (name == "StoredPowerDays") result.stored_power_days = number(member, p);
+    else if (name == "SlotIndex") result.slot_index = optional_value<int>(member, p, integer<int>);
   }
   return result;
 }
@@ -791,6 +827,7 @@ MassivePoint decode_point(const Value &value, const std::string &path) {
     const auto p = child(path, name);
     if (name == "X") result.x = single(member, p);
     else if (name == "Y") result.y = single(member, p);
+    else if (name == "Z") result.z = single(member, p);
   }
   return result;
 }
@@ -934,6 +971,7 @@ FleetSaveDto decode_fleet(const Value &value, const std::string &path) {
     else if (name == "LocalTransitStartY") result.local_transit_start_y = single(member, p);
     else if (name == "LocalTransitPositionX") result.local_transit_position_x = single(member, p);
     else if (name == "LocalTransitPositionY") result.local_transit_position_y = single(member, p);
+    else if (name == "StellarTransitPath") result.stellar_transit_path = decode_stellar_extension<std::vector<std::array<float,2>>>(member,p);
     else if (name == "LocalTransitTargetX") result.local_transit_target_x = single(member, p);
     else if (name == "LocalTransitTargetY") result.local_transit_target_y = single(member, p);
     else if (name == "PlannedRouteSystemIds") result.planned_route_system_ids = optional_value<std::vector<int>>(member, p, int_list);
@@ -1209,17 +1247,24 @@ void decode_galaxy(GalaxyPayloadV16Dto &result, const Value &value,
     if (name == "Seed") result.seed = integer<std::int64_t>(member, p);
     else if (name == "GenerationMetadata") result.generation_metadata = decode_metadata(member, p);
     else if (name == "GalacticCore") result.galactic_core = decode_core(member, p);
+    else if (name == "StellarActivityDay") {
+      result.stellar_activity_day=is_null(member)?std::nullopt:std::optional<double>{number(member,p)};
+      validate_stellar_activity_clock(result.stellar_activity_day);
+    }
     else if (name == "Systems") decode_optional_collection(result.systems, member, p, decode_system);
     else if (name == "PlanetaryBodies") {
       result.planetary_bodies.bodies.clear();
       result.planetary_bodies.bodies_present = !is_null(member);
       if (result.planetary_bodies.bodies_present) {
-        const auto &items = array(member, p);
-        for (std::size_t index = 0; index != items.size(); ++index)
+        const auto count = json_detail::array_size(member);
+        if (!count) (void)array(member, p);
+        result.planetary_bodies.bodies.reserve(*count);
+        json_detail::visit_array(member, [&](const Value& item, std::size_t index) {
           result.planetary_bodies.bodies.push_back(
               optional_value<PlanetaryBodyPersistenceDto>(
-                  items[index], p + '[' + std::to_string(index) + ']',
+                  item, p + '[' + std::to_string(index) + ']',
                   decode_body));
+        });
       }
     } else if (name == "Civilizations") decode_optional_collection(result.civilizations, member, p, decode_civilization);
     else if (name == "Fleets") decode_optional_collection(result.fleets, member, p, decode_fleet);
@@ -1263,6 +1308,7 @@ void decode_galaxy(GalaxyPayloadV16Dto &result, const Value &value,
 void replace_galaxy(GalaxyPayloadV16Dto &target,
                     GalaxyPayloadV16Dto replacement) {
   target.seed = replacement.seed;
+  target.stellar_activity_day = replacement.stellar_activity_day;
   target.generation_metadata = std::move(replacement.generation_metadata);
   target.galactic_core = std::move(replacement.galactic_core);
   target.systems = std::move(replacement.systems);
@@ -1360,10 +1406,12 @@ Json encode_optional_list(const std::optional<std::vector<T>> &values,
 }
 
 Json encode_core(const GalacticCoreMetadata &value) {
-  return {{"LandmarkKey", value.landmark_key},
+  Json result{{"LandmarkKey", value.landmark_key},
           {"X", value.x},
           {"Y", value.y},
           {"ExclusionRadius", value.exclusion_radius}};
+  if(value.black_hole) result["BlackHole"]=*value.black_hole;
+  return result;
 }
 
 std::string ascii_lower(std::string value) {
@@ -1398,6 +1446,10 @@ Json encode_metadata(const GalaxyGenerationMetadata &value) {
               {"GalacticCore", value.galactic_core
                                     ? encode_core(*value.galactic_core)
                                     : Json(nullptr)}};
+  if(value.configuration)result["Configuration"]=*value.configuration;
+  if(value.phenomena)result["Phenomena"]=*value.phenomena;
+  if(value.stellar_population)result["StellarPopulation"]=*value.stellar_population;
+  if(value.stellar_profile_version)result["StellarProfileVersion"]=*value.stellar_profile_version;
   result["SpoilerFreeSummary"] =
       std::to_string(value.system_count) + " systems · " +
       ascii_lower(value.stellar_variety) + " stellar variety · " +
@@ -1415,6 +1467,11 @@ Json encode_system(const StellarSystemPersistenceDto &value) {
     result["GalacticDepthLightYears"] = *value.galactic_depth_light_years;
   if (value.stellar_catalog_id)
     result["StellarCatalogId"] = *value.stellar_catalog_id;
+  if(value.stellar_object) {result["StellarObject"]=*value.stellar_object;result["EngulfedPlanets"]=value.engulfed_planets;}
+  if(value.stellar_region)result["StellarRegion"]=*value.stellar_region;
+  if(value.stellar_orbits)result["StellarOrbits"]=*value.stellar_orbits;
+  if(value.stellar_activity)result["StellarActivity"]=*value.stellar_activity;
+  if(value.small_body_fields)result["SmallBodyFields"]=*value.small_body_fields;
   result["Archetype"] = static_cast<int>(value.archetype);
   result["HasHabitableWorld"] = value.has_habitable_world;
   result["HasAnomaly"] = value.has_anomaly;
@@ -1461,6 +1518,9 @@ Json encode_body(const PlanetaryBodyPersistenceDto &value) {
               {"HasRareResource", value.has_rare_resource},
               {"HasAnomaly", value.has_anomaly},
               {"HasPreWarpCivilization", value.has_pre_warp_civilization}};
+  if(value.stellar_exposure)result["StellarExposure"]=*value.stellar_exposure;
+  if(value.cracked_world)result["CrackedWorld"]=true;
+  if(value.appearance)result["PlanetAppearance"]=*value.appearance;
   if (value.orbital_eccentricity != 0)
     result["OrbitalEccentricity"] = value.orbital_eccentricity;
   if (value.orbital_inclination_degrees != 0)
@@ -1506,7 +1566,7 @@ Json encode_civilization(const CivilizationPersistenceDto &value) {
 }
 
 Json encode_surface_building(const SurfaceBuilding &value) {
-  return {{"Id", value.id},
+  Json result = {{"Id", value.id},
           {"TypeId", value.type_id},
           {"X", value.x},
           {"Z", value.z},
@@ -1519,6 +1579,8 @@ Json encode_surface_building(const SurfaceBuilding &value) {
           {"OperatingPriority", value.operating_priority},
           {"Condition", value.condition},
           {"StoredPowerDays", value.stored_power_days}};
+  if(value.slot_index)result["SlotIndex"]=*value.slot_index;
+  return result;
 }
 
 Json encode_colony(const ColonySaveDto &value) {
@@ -1653,8 +1715,10 @@ Json encode_shipyard(const ShipyardPersistenceDto &value) {
 }
 
 Json encode_point(const MassivePoint &value) {
-  return {{"X", value.x}, {"Y", value.y}, {"Vector", Json::object()},
+  Json result{{"X", value.x}, {"Y", value.y}, {"Vector", Json::object()},
           {"IsFinite", value.is_finite()}};
+  if(value.z!=0)result["Z"]=value.z;
+  return result;
 }
 
 Json encode_weapon(const MassiveWeaponGroup &value) {
@@ -1799,6 +1863,7 @@ Json encode_fleet(const FleetSaveDto &value) {
                optional_json(value.embarked_population_species_id)},
               {"Combat", value.combat ? encode_fleet_combat(*value.combat)
                                        : Json(nullptr)}};
+  if(!value.stellar_transit_path.empty())result["StellarTransitPath"]=value.stellar_transit_path;
   if (value.tactical_loadout)
     result["TacticalLoadout"] = encode_loadout(*value.tactical_loadout);
   if (value.tactical_vessel)
@@ -2008,6 +2073,8 @@ Json encode_galaxy(const GalaxyPayloadV16Dto &value) {
   if (value.combat_intelligence)
     result["CombatIntelligence"] =
         encode_list(*value.combat_intelligence, encode_observation);
+  validate_stellar_activity_clock(value.stellar_activity_day);
+  if(value.stellar_activity_day)result["StellarActivityDay"]=*value.stellar_activity_day;
   return result;
 }
 
@@ -2044,15 +2111,17 @@ const std::optional<std::size_t> &GalaxyPayloadJsonError::byte() const noexcept 
 GalaxyPayloadV16Dto
 decode_galaxy_payload_v16_json(std::string_view utf8_json) {
   try {
-    return decode_root(json_detail::parse_ordered_json(utf8_json));
+    constexpr std::array<std::string_view, 2> arrays{
+        "/Galaxy/Systems", "/Galaxy/PlanetaryBodies"};
+    return decode_root(json_detail::parse_ordered_json(utf8_json, {arrays}));
   } catch (const json_detail::ParseFailure &error) {
     throw GalaxyPayloadJsonError(GalaxyPayloadJsonErrorPhase::Parse,
                                  error.what(), {}, error.line, error.byte);
   }
 }
 
-std::string
-encode_galaxy_payload_v16_json(const GalaxyPayloadV16Dto &payload) {
+nlohmann::ordered_json detail::encode_galaxy_payload_v16_document(
+    const GalaxyPayloadV16Dto &payload) {
   try {
     const auto saved_at =
         validate_encoded_datetime(payload.saved_at_utc, "$.SavedAtUtc");
@@ -2070,8 +2139,8 @@ encode_galaxy_payload_v16_json(const GalaxyPayloadV16Dto &payload) {
                   {"SimulationSeconds", 0.0},
                   {"Galaxy", std::move(galaxy)}};
     reject_nonfinite(envelope, "$");
-    return envelope.dump(2, ' ', true,
-                         nlohmann::json::error_handler_t::strict);
+    json_detail::validate_encoded_text(envelope);
+    return envelope;
   } catch (const nlohmann::json::exception &error) {
     throw GalaxyPayloadJsonError(
         GalaxyPayloadJsonErrorPhase::Encode,
@@ -2079,6 +2148,48 @@ encode_galaxy_payload_v16_json(const GalaxyPayloadV16Dto &payload) {
             std::string(error.what()),
         "$");
   }
+}
+
+void detail::stream_galaxy_members(JsonStreamWriter& out,const GalaxyPayloadV16Dto& v,int format_version){
+  try {
+    const auto checked=[&](const Json& value,const std::string& path){reject_nonfinite(value,path);json_detail::validate_encoded_text(value);out.value(value);};
+    const auto field=[&](const char* key,const Json& value){out.member(key);checked(value,std::string("$.Galaxy.")+key);};
+    out.field("FormatVersion",format_version);
+    out.member("GameVersion");checked(v.game_version,"$.GameVersion");
+    out.field("SavedAtUtc",validate_encoded_datetime(v.saved_at_utc,"$.SavedAtUtc"));
+    out.member("SimulationDays");checked(v.simulation_days,"$.SimulationDays");
+    out.field("SimulationSeconds",0.0);
+    out.member("Galaxy");out.begin_object();
+    field("Seed",v.seed);
+    auto metadata=v.generation_metadata?encode_metadata(*v.generation_metadata):Json(nullptr);
+    if(v.generation_metadata)metadata["CreatedAtUtc"]=validate_encoded_datetime(v.generation_metadata->created_at_utc,"$.Galaxy.GenerationMetadata.CreatedAtUtc");
+    field("GenerationMetadata",metadata);field("GalacticCore",v.galactic_core?encode_core(*v.galactic_core):Json(nullptr));
+    const auto list=[&](const char* key,const auto& values,const auto& encode){
+      out.member(key);if(!values){out.value(nullptr);return;}out.begin_array();std::size_t i=0;
+      for(const auto& value:*values){out.item();checked(encode(value),std::string("$.Galaxy.")+key+"["+std::to_string(i++)+"]");}out.end_array();
+    };
+    list("Systems",v.systems,encode_system);
+    out.member("PlanetaryBodies");
+    if(!v.planetary_bodies.bodies_present)out.value(nullptr);else{out.begin_array();std::size_t i=0;
+      for(const auto& body:v.planetary_bodies.bodies){out.item();checked(body?encode_body(*body):Json(nullptr),"$.Galaxy.PlanetaryBodies["+std::to_string(i++)+"]");}out.end_array();}
+    list("Civilizations",v.civilizations,encode_civilization);list("Fleets",v.fleets,encode_fleet);
+    list("Colonies",v.colonies,encode_colony);list("Economies",v.economies,encode_economy);
+    list("Technologies",v.technologies,encode_technology);list("ConstructionStates",v.construction_states,encode_construction);
+    list("ShipyardStates",v.shipyard_states,encode_shipyard);field("PlayerCivilizationId",v.player_civilization_id);
+    out.member("Knowledge");
+    if(!v.knowledge.entries_present)out.value(nullptr);else{out.begin_array();std::size_t i=0;
+      for(const auto& entry:v.knowledge.entries){out.item();checked(entry?encode_knowledge(*entry):Json(nullptr),"$.Galaxy.Knowledge["+std::to_string(i++)+"]");}out.end_array();}
+    if(v.active_combat_encounter)field("ActiveCombatEncounter",encode_encounter(*v.active_combat_encounter));
+    if(v.combat_intelligence)list("CombatIntelligence",v.combat_intelligence,encode_observation);
+    validate_stellar_activity_clock(v.stellar_activity_day);
+    if(v.stellar_activity_day)field("StellarActivityDay",*v.stellar_activity_day);
+    out.end_object();
+  }catch(const nlohmann::json::exception& error){throw GalaxyPayloadJsonError(GalaxyPayloadJsonErrorPhase::Encode,error.what(),"$");}
+}
+
+std::string encode_galaxy_payload_v16_json(const GalaxyPayloadV16Dto &payload) {
+  return detail::encode_galaxy_payload_v16_document(payload).dump(
+      2, ' ', true, nlohmann::json::error_handler_t::strict);
 }
 
 } // namespace stellar::core

@@ -1,4 +1,5 @@
 #include <stellar/core/massive_combat_engine.hpp>
+#include <stellar/core/galaxy_payload_json.hpp>
 
 #define main gate079_massive_combat_persistence_unused_main
 #include "massive_combat_persistence_tests.cpp"
@@ -275,6 +276,17 @@ void native_probes(const Json &fixture) {
       });
   require(row != fixture.at("Rows").end(), "missing move fixture row");
   auto state = battle(row->at("Before"));
+  {
+    auto spatial=clone_massive_combat_battle(state);MassiveCombatEngine engine;
+    for(auto& formation:spatial.formations){formation.position.z=static_cast<float>(formation.id)*40.f;formation.objective=formation.position;formation.objective.z+=500;formation.order=MassiveCombatOrderType::Advance;}
+    GalaxyPayloadV16Dto saved;saved.saved_at_utc="2050-03-21T00:00:00Z";saved.active_combat_encounter=CampaignMassiveEncounter{};saved.active_combat_encounter->battle=spatial;
+    auto resumed=decode_galaxy_payload_v16_json(encode_galaxy_payload_v16_json(saved)).active_combat_encounter->battle;
+    require(resumed.formations.front().position.z==spatial.formations.front().position.z,"Battle depth lost through JSON persistence");
+    const auto before=spatial.formations.front().position.z;
+    (void)engine.advance(spatial,.2);(void)engine.advance(resumed,.1);(void)engine.advance(resumed,.1);
+    require(spatial.formations.front().position.z!=before,"Authoritative 3D motion stayed planar");
+    for(std::size_t i=0;i<spatial.formations.size();++i)require(spatial.formations[i].position.z==resumed.formations[i].position.z,"3D tick batching diverged");
+  }
   int calls = 0;
   auto owner = std::make_unique<int>(73);
   MassiveCombatEngine original([&](int first, int second) {

@@ -224,7 +224,9 @@ class NativeRecovery(unittest.TestCase):
         self.assertEqual(Path(report["assetPath"]).resolve(),(self.exe.parent/"Data/astronomy/hyg-nearby-500-v1.json").resolve())
         self.assertEqual(len(data["systems"]),250)
         self.assertEqual(data["systems"][0]["name"],"Sol")
-        self.assertEqual(data["solBodies"][-1]["name"],"Pluto")
+        sol_primaries=[b for b in data["solBodies"] if b["parentBodyId"] is None]
+        self.assertEqual(sol_primaries[-1]["name"],"Pluto")
+        self.assertEqual(data["solBodies"][-1]["name"],"Charon")
         self.assertGreater(report["planetaryBodies"],10)
         self.assertEqual(report["planetaryBodies"],len(data["planetaryBodies"]))
         self.assertEqual(data["phase"],"physical-before-civilizations")

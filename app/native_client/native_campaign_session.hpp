@@ -5,6 +5,7 @@
 #include <stellar/core/lane_network.hpp>
 #include <stellar/core/player_campaign_recovery.hpp>
 #include <stellar/core/player_campaign_save.hpp>
+#include <stellar/engine/foundation.hpp>
 
 #include <cstdint>
 #include <filesystem>
@@ -27,6 +28,7 @@ enum class SessionNoticeKind {
   Saved,
   Loaded,
   Recovered,
+  Status,
   Failure,
 };
 
@@ -35,6 +37,9 @@ struct SessionNotice {
   std::string message;
   double progress{};
 };
+
+// Only this transition's own capture/write may unlock setup; older writes cannot.
+enum class NewCampaignTransition { Inactive, Waiting, Saving, Ready, Failed };
 
 struct NativeCampaignCache {
   // Pointers borrow the current live CampaignFrame. They become invalid as soon
@@ -53,9 +58,10 @@ using NativeCampaignLoader = std::function<stellar::core::LoadedPlayerCampaignV1
 
 struct NativeCampaignSessionDependencies {
   stellar::core::PlayerCampaignPreparedWriter save_writer{
-      stellar::core::write_prepared_player_campaign};
+      stellar::core::write_prepared_campaign};
   NativeCampaignLoader loader{stellar::core::load_existing_player_campaign_v17};
   std::function<void(stellar::core::CampaignFrame &)> validate_candidate;
+  bool developer_session{};
 };
 
 class NativeCampaignSession final {
@@ -97,9 +103,13 @@ public:
   [[nodiscard]] const SessionNotice &notice() const;
   [[nodiscard]] bool load_pending() const;
   [[nodiscard]] bool exit_ready() const;
+  [[nodiscard]] NewCampaignTransition new_campaign_transition() const;
+  [[nodiscard]] bool new_campaign_pending() const;
+  [[nodiscard]] bool request_new_campaign();
+  void cancel_new_campaign();
 
   [[nodiscard]] stellar::core::CampaignFrameResult
-  advance(double real_delta_seconds, const std::string &saved_at_utc);
+  advance(double real_delta_seconds, const std::string &saved_at_utc, bool developer_single_step = false);
   void request_save();
   void request_load();
   void request_exit();
@@ -108,6 +118,18 @@ public:
   // when a fully validated load candidate replaced the live session.
   [[nodiscard]] bool service(const std::string &saved_at_utc,
                              bool menu_open);
+
+  // Forwards a capture observer onto the live save controller. Reinstall after
+  // service() replaces the live session (replay recording/verification).
+  void set_save_capture_observer(
+      stellar::core::PlayerCampaignCaptureObserver observer);
+
+  // Reference SetStatus: a transient status line for keyboard and
+  // command-driven feedback (candidate cycling, speed changes, rejections).
+  void publish_status(std::string message) {
+    require_owner();
+    notice_ = {SessionNoticeKind::Status, std::move(message), 1.};
+  }
 
 private:
   struct Live;
@@ -127,6 +149,8 @@ private:
   void begin_load();
   void publish_save_result(const stellar::core::PlayerCampaignSaveResult &,
                            std::string success_message);
+  void publish_background_save_result(
+      const stellar::core::PlayerCampaignSaveResult &);
   void publish_failure(std::string message);
   void require_owner() const;
   [[nodiscard]] bool drain_live_save();
@@ -137,11 +161,16 @@ private:
   NativeCampaignSessionDependencies dependencies_;
   std::thread::id owner_{std::this_thread::get_id()};
   std::unique_ptr<PendingLoad> pending_load_;
+  // Persistent tagged worker for campaign load instead of a fresh std::async
+  // thread per request.
+  stellar::engine::JobSystem load_jobs_{1};
   SessionNotice notice_;
   bool save_requested_{};
   bool exit_requested_{};
   bool exit_ready_{};
   bool manual_capture_ready_{};
+  bool manual_save_pending_{};
+  NewCampaignTransition new_campaign_transition_{NewCampaignTransition::Inactive};
 };
 
 [[nodiscard]] std::filesystem::path default_native_campaign_save_path();

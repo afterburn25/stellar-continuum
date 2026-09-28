@@ -151,21 +151,40 @@ std::string format_interstellar_metric_speed(double light_years_per_day) {
          " ly/day";
 }
 
-MissionReachAssessment
-assess_operational_reach(OperationalReachWorldView world, int civilization_id,
-                         const FleetState &fleet, int target_system_id,
-                         InterstellarMissionKind /*mission_kind*/) {
-  if (fleet.civilization_id != civilization_id)
+void OperationalReachBatch::prepare() {
+  if(prepared_)return;
+  std::unordered_map<int, const StellarSystem *> systems;
+  systems.reserve(world_.systems.size());
+  for (const auto &system : world_.systems)
+    if (!systems.emplace(system.id, &system).second)
+      throw std::invalid_argument(
+          "An item with the same key has already been added. Key: " +
+          std::to_string(system.id));
+
+  std::unordered_map<int, double> refueling;
+  for (const auto &colony : world_.colonies) {
+    if (colony.civilization_id != civilization_id_)
+      continue;
+    auto &service = refueling[colony.system_id];
+    service =
+        std::max(service, colony.kind == SettlementKind::Colony ? 1.0 : 0.5);
+  }
+  systems_=std::move(systems);refueling_=std::move(refueling);prepared_=true;
+}
+
+MissionReachAssessment OperationalReachBatch::assess(const FleetState &fleet,
+    int target_system_id,InterstellarMissionKind /*mission_kind*/,MissionFuelPolicy fuel_policy) {
+  if (fleet.civilization_id != civilization_id_)
     return unsupported_mission_reach(
         "That fleet is not controlled by this civilization.");
-  if (!find_system(world.systems, target_system_id))
+  if (prepared_?!systems_.contains(target_system_id):!find_system(world_.systems, target_system_id))
     return unsupported_mission_reach("Unknown mission target.");
   if (!fleet.current_system_id)
     return unsupported_mission_reach(
         "The fleet must finish its current lane leg before receiving a new "
         "interstellar route.");
 
-  auto route = world.lanes.find_shortest_route(
+  auto route = world_.lanes.find_shortest_route(
       *fleet.current_system_id, target_system_id,
       fleet.maximum_leg_range_light_years);
   if (route.empty())
@@ -175,31 +194,29 @@ assess_operational_reach(OperationalReachWorldView world, int civilization_id,
             fleet.maximum_leg_range_light_years) +
         " maximum leg range.");
 
-  std::unordered_map<int, const StellarSystem *> systems;
-  systems.reserve(world.systems.size());
-  for (const auto &system : world.systems)
-    if (!systems.emplace(system.id, &system).second)
-      throw std::invalid_argument(
-          "An item with the same key has already been added. Key: " +
-          std::to_string(system.id));
-
-  std::unordered_map<int, double> refueling;
-  for (const auto &colony : world.colonies) {
-    if (colony.civilization_id != civilization_id)
-      continue;
-    auto &service = refueling[colony.system_id];
-    service =
-        std::max(service, colony.kind == SettlementKind::Colony ? 1.0 : 0.5);
+  auto reach=evaluate_route(fleet,std::move(route));
+  if(reach.is_supported&&fuel_policy==MissionFuelPolicy::RetainReturnToService){
+    auto projected=fleet;
+    projected.current_system_id=target_system_id;
+    projected.fuel_remaining_light_years=*reach.arrival_fuel_light_years;
+    if(!has_return_service_route(projected))
+      return unsupported_mission_reach("The outward route is reachable, but would leave insufficient fuel to reach any owned refuelling settlement.");
   }
+  return reach;
+}
+
+MissionReachAssessment OperationalReachBatch::evaluate_route(
+    const FleetState &fleet,std::vector<int> route) {
+  prepare();
   auto fuel = fleet.fuel_remaining_light_years;
-  if (const auto service = refueling.find(*fleet.current_system_id);
-      service != refueling.end())
+  if (const auto service = refueling_.find(*fleet.current_system_id);
+      service != refueling_.end())
     fuel = fleet.fuel_capacity_light_years * service->second;
 
   double distance = 0.0;
   for (std::size_t index = 1; index < route.size(); ++index) {
-    const auto first = systems.at(route[index - 1]);
-    const auto second = systems.at(route[index]);
+    const auto first = systems_.at(route[index - 1]);
+    const auto second = systems_.at(route[index]);
     const auto leg = distance_light_years(first->position, second->position);
     if (leg > fuel + 1e-9)
       return unsupported_mission_reach(
@@ -209,8 +226,8 @@ assess_operational_reach(OperationalReachWorldView world, int civilization_id,
           " available before refueling.");
     fuel -= leg;
     distance += leg;
-    if (const auto service = refueling.find(second->id);
-        service != refueling.end())
+    if (const auto service = refueling_.find(second->id);
+        service != refueling_.end())
       fuel = fleet.fuel_capacity_light_years * service->second;
   }
 
@@ -225,7 +242,41 @@ assess_operational_reach(OperationalReachWorldView world, int civilization_id,
                               fleet.maximum_leg_range_light_years) +
                           "; projected fuel reserve " +
                           format_interstellar_metric_primary(fuel) + ".";
-  return {true, true, std::move(reason), std::move(route), distance};
+  return {true, true, std::move(reason), std::move(route), distance, fuel};
+}
+
+bool OperationalReachBatch::has_return_service_route(const FleetState &fleet) {
+  if(refueling_.contains(*fleet.current_system_id))return true;
+  for(const auto &[id,service]:refueling_){
+    // Lanes are undirected. Query outward from each service and reverse the
+    // route so a large target scan reuses the service's cached route tree,
+    // rather than constructing one tree per prospective destination.
+    auto route=world_.lanes.find_shortest_route(id,*fleet.current_system_id,fleet.maximum_leg_range_light_years);
+    if(route.empty())continue;
+    std::reverse(route.begin(),route.end());
+    if(evaluate_route(fleet,std::move(route)).is_supported)return true;
+  }
+  return false;
+}
+
+std::optional<RefuelingReach> OperationalReachBatch::nearest_refueling(
+    const FleetState &fleet,InterstellarMissionKind kind) {
+  if(fleet.civilization_id!=civilization_id_||!fleet.current_system_id)return std::nullopt;
+  prepare();
+  std::optional<RefuelingReach> nearest;
+  for(const auto &[id,service]:refueling_){
+    auto reach=assess(fleet,id,kind);
+    if(!reach.is_supported)continue;
+    if(!nearest||reach.route_distance_light_years<nearest->reach.route_distance_light_years||
+        (reach.route_distance_light_years==nearest->reach.route_distance_light_years&&id<nearest->system_id))
+      nearest=RefuelingReach{id,std::move(reach)};
+  }
+  return nearest;
+}
+
+MissionReachAssessment assess_operational_reach(OperationalReachWorldView world,
+    int civilization_id,const FleetState &fleet,int target_system_id,InterstellarMissionKind kind) {
+  return OperationalReachBatch(world,civilization_id).assess(fleet,target_system_id,kind);
 }
 
 void assign_fleet_route(OperationalReachWorldView world, FleetState &fleet,
@@ -273,7 +324,8 @@ void assign_fleet_route(OperationalReachWorldView world, FleetState &fleet,
     begin_fleet_local_transit(
         fleet, FleetTransitPhase::LocalDeparture, fleet.local_transit_position,
         fleet_gate_towards(Vec2{next->position.x, next->position.y},
-                           Vec2{current->position.x, current->position.y}));
+                           Vec2{current->position.x, current->position.y}),
+        current->stellar_object?&*current->stellar_object:nullptr);
   }
 }
 
@@ -288,7 +340,7 @@ void clear_fleet_route(FleetState &fleet) {
   if (fleet.current_system_id &&
       fleet.transit_phase != FleetTransitPhase::None) {
     begin_fleet_local_transit(fleet, FleetTransitPhase::LocalArrival,
-                              fleet.local_transit_position, Vec2{});
+                              fleet.local_transit_position, fleet.stellar_transit_path.empty()?Vec2{}:fleet.local_transit_position);
     fleet.transit_target_system_id.reset();
   } else if (fleet.transit_phase != FleetTransitPhase::InterstellarWarp) {
     fleet.transit_phase = FleetTransitPhase::None;

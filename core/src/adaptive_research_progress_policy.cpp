@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_progress_policy.hpp>
 
 #include <nlohmann/json.hpp>
@@ -16,7 +17,7 @@ using Json = nlohmann::ordered_json;
 std::string maturity_name(ResearchMaturity stage) { switch(stage) { case ResearchMaturity::rumored: return "Rumored"; case ResearchMaturity::hypothesized: return "Hypothesized"; case ResearchMaturity::investigable: return "Investigable"; case ResearchMaturity::experimental: return "Experimental"; case ResearchMaturity::demonstrated: return "Demonstrated"; case ResearchMaturity::engineering: return "Engineering"; case ResearchMaturity::mature: return "Mature"; case ResearchMaturity::archived: return "Archived"; default: return std::to_string(static_cast<int>(stage)); } }
 std::string dotnet_double(double value) { char buffer[64]; const auto result=std::to_chars(buffer,buffer+sizeof(buffer),value); std::string text(buffer,result.ptr); const auto exponent=text.find('e'); if(exponent!=std::string::npos) { text[exponent]='E'; auto digits=exponent+1; if(digits<text.size() && (text[digits]=='+' || text[digits]=='-')) ++digits; if(text.size()-digits==1) text.insert(digits,"0"); } return text; }
 Json read_json(const std::filesystem::path &path) {
-  std::ifstream input(path);
+  auto input=stellar::engine::resource_stream(path);
   if (!input) fail("Unable to read Adaptive Research file: " + path.string());
   try { return Json::parse(input); }
   catch (const Json::exception &) { fail("Malformed Adaptive Research JSON in " + path.string()); }
@@ -102,3 +103,4 @@ AdaptiveResearchProgressPolicy load_adaptive_research_progress_policy(const std:
   return AdaptiveResearchProgressPolicy(std::move(storage));
 }
 } // namespace stellar::core
+

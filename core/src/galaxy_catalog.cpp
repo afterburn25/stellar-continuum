@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -45,7 +46,7 @@ std::optional<StellarClass> classify_spectral_type(const std::string& source) {
 }
 std::vector<CatalogStar> load_nearby_catalog(const std::filesystem::path& path) {
     try {
-        std::ifstream stream(path);
+        auto stream=stellar::engine::resource_stream(path);
         if(!stream) throw std::runtime_error("file is missing or unreadable");
         const auto doc=nlohmann::json::parse(stream);
         if(doc.at("catalogVersion")!="hyg-nearby-500-v1" || !doc.at("systems").is_array() || doc.at("systems").size()!=500)
@@ -92,9 +93,16 @@ std::vector<std::string> procedural_system_names(std::int64_t seed,int count) {
     static constexpr std::string_view prefixes[]={"Al","An","Ar","Bel","Cael","Cer","Cor","Del","Eri","Gal","Hal","Io","Ka","Ke","Ly","Mar","Mer","Na","Nex","Ori","Pel","Pro","Qua","Rin","Sa","Ser","Tal","Tau","Ul","Va","Vel","Xi","Za"};
     static constexpr std::string_view suffixes[]={"bara","caris","dara","dos","dris","lia","lion","lora","maris","mora","nara","nor","phos","ra","rian","ris","ron","rus","sara","tar","thera","tis","tor","vara","vega","von","xis","yra","zen","zora"};
     static constexpr std::string_view infixes[]={"a","e","i","o","u","ae","ia","or"};
-    if(count<1 || count>33*30*9) throw std::invalid_argument("Procedural name count is outside supported bounds");
+    if(count<1 || count>maximum_full_galaxy_system_count) throw std::invalid_argument("Procedural name count is outside supported bounds");
     LegacyRandom random(population_seed(seed,0x4E414D45)); std::vector<std::string> names; std::set<std::string> used;
     while(names.size()<static_cast<std::size_t>(count)) {
+        // Bound rejection sampling before the finite syllable pool saturates.
+        // Existing campaigns keep their original name stream unchanged.
+        if(names.size()>=5000) {
+            const auto index=names.size()-5000;
+            names.push_back(names[index%5000]+" "+std::to_string(2+index/5000));
+            continue;
+        }
         // Sequential draws are intentional: C++ operand evaluation order must not reorder the stream.
         std::string name(prefixes[random.next(33)]);
         if(names.size()>=990) name+=infixes[random.next(8)];
@@ -143,3 +151,4 @@ std::vector<StellarSystem> generate_stellar_catalog(std::int64_t seed,int count,
     return result;
 }
 }
+

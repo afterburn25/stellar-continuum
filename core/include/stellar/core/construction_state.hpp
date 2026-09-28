@@ -1,5 +1,6 @@
 #pragma once
 #include <stellar/core/campaign_economy.hpp>
+#include <stellar/core/civilization_control.hpp>
 #include <functional>
 #include <string_view>
 
@@ -31,6 +32,7 @@ struct ConstructionWorld {
     std::span<CivilizationEconomy> economies;
     std::span<const CivilizationConstructionCapabilities> capabilities;
     std::function<bool(int, std::string_view)> capability_query;
+    CivilizationControlQuery control;
     ConstructionReadView read() const { return {civilizations,bodies,construction,colonies,economies,capabilities,capability_query}; }
 };
 bool construction_has_capability(ConstructionReadView world, int civilization_id, std::string_view id);

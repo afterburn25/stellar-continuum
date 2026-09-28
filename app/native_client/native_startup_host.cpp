@@ -14,19 +14,19 @@ NativeStartupHost::NativeStartupHost(
       startup_(std::move(dependencies), std::move(generator)) {}
 
 NativeNewCampaignSetupView NativeStartupHost::setup() const {
-  return setup_controller_.build();
+  return setup_controller_.build(developer_mode_);
 }
 NativeStartupSaveSlots NativeStartupHost::slots() const {
-  return list_native_startup_save_slots(config_.default_save_path);
+  return list_native_startup_save_slots(active_save_path());
 }
 StartupHostResult NativeStartupHost::start_new(
     const NativeNewCampaignSetupInput &input) {
-  auto assessment = setup_controller_.prepare(input);
+  auto assessment = setup_controller_.prepare(input,developer_mode_);
   if (!assessment.accepted || !assessment.prepared)
     return {false, std::move(assessment.message)};
   const auto started = startup_.start_new(
       *assessment.prepared, config_.research_root, config_.catalog_path,
-      config_.default_save_path, config_.game_version);
+      active_save_path(), config_.game_version);
   request_id_ = started.request_id;
   return {started.accepted, started.message};
 }
@@ -36,6 +36,12 @@ StartupHostResult NativeStartupHost::start_load(
       startup_.start_load(path, config_.research_root, config_.game_version);
   request_id_ = started.request_id;
   return {started.accepted, started.message};
+}
+std::filesystem::path NativeStartupHost::active_save_path() const {
+  return developer_mode_?config_.default_save_path.parent_path()/"developer"/"campaign.dev17.json":config_.default_save_path;
+}
+void NativeStartupHost::set_developer_mode(bool enabled){
+  startup_.set_developer_mode(enabled);developer_mode_=enabled;
 }
 void NativeStartupHost::service() { startup_.service(); }
 NativeStartupView NativeStartupHost::poll() const { return startup_.poll(); }

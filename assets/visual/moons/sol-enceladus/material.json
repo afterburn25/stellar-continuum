@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 4.76837158203125e-07,
+    "clippedFraction": 0.0008616447448730469,
+    "disc": [
+      1021.1563113600862,
+      1037.5544309880001,
+      820.7939462313366
+    ],
+    "id": "sol-enceladus",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.7,
+      0.06354974060776719,
+      0.7
+    ],
+    "seamError": 0.012902040100422148,
+    "usable": true
+  },
+  "id": "sol-enceladus",
+  "name": "Enceladus",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "f84aa8defb2949b79340440ad9b9d098f5456fc3d4eafd01b25df6e873c1fcee",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Enceladus.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

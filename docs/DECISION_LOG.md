@@ -1,3 +1,12 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> This is a scoped historical record; later corrections may supersede its status,
+> counts, visuals, controls or limitations. It is not the current startup handoff.
+> Start with [the current handoff](AGENT_HANDOFF.md) and
+> [verified project state](PROJECT_STATE.md).
+
 # Design Decision Log
 
 This file records durable project decisions that should not be casually reversed in later chats. New decisions that supersede older ones must say so explicitly. This repository is public: never record exact secret-discovery probabilities, hidden artifact triggers, rare secret-AI eligibility, or intentionally undisclosed technology chains here.

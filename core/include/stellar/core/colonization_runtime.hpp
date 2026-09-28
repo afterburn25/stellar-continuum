@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/settlement_planning.hpp>
+#include <stellar/core/civilization_control.hpp>
 
 #include <functional>
 #include <optional>
@@ -16,6 +17,7 @@ struct ColonizationWorldView {
   std::span<CivilizationEconomy> economies;
   const CivilizationKnowledgeState &knowledge;
   InterstellarLaneNetwork &lanes;
+  CivilizationControlQuery control;
 
   [[nodiscard]] SettlementPlanningWorldView planning() const {
     return {systems, bodies,    civilizations, colonies,

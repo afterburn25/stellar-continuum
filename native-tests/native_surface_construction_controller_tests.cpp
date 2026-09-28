@@ -6,6 +6,7 @@
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/player_campaign_persistence.hpp>
+#include <stellar/core/player_campaign_json.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -51,6 +52,14 @@ CivilizationEconomy &economy(CampaignFrame &frame) {
 Colony &colony(CampaignFrame &frame, const int colony_id) {
   auto &colonies = frame.runtime().world().campaign().colonies;
   return *std::ranges::find(colonies, colony_id, &Colony::id);
+}
+
+ConstructionState &construction(CampaignFrame &frame) {
+  auto &states = frame.runtime().world().campaign().construction;
+  const auto civilization_id =
+      frame.runtime().world().campaign().player_civilization_id;
+  return *std::ranges::find(states, civilization_id,
+                            &ConstructionState::civilization_id);
 }
 
 std::string surface_signature(const Colony &value) {
@@ -120,6 +129,12 @@ void quote_and_progress_tests(const fs::path &research_root,
   require(surface_signature(colony(frame, selected.colony.colony_id)) == sites_before &&
               economy(frame).credits == credits_before,
           "placement preview mutated campaign state");
+  const auto expected_preview =
+      "Authorize construction for " + quote.formatted_authorization +
+      ". Materials are consumed as work progresses.";
+  require(quote.message == expected_preview &&
+              quote.message.find("placed and authorized") == std::string::npos,
+          "accepted placement preview used committed-construction wording");
   const auto superseded = quote;
   const auto denied_preview = controller.preview_placement(
       frame, 1, selected.colony, "not-a-building", 0.f, 0.f, 0.f);
@@ -141,6 +156,10 @@ void quote_and_progress_tests(const fs::path &research_root,
   require(placed.accepted &&
               std::abs(economy(frame).credits - (credits_before - charge)) < 1e-9,
           "canonical placement did not deduct the quoted authorization");
+  require(placed.message == quote.building_name + " placed and authorized for " +
+                                 quote.formatted_authorization +
+                                 ". Construction uses available materials.",
+          "confirmed placement did not retain the canonical commit message");
   const auto site_id =
       colony(frame, selected.colony.colony_id).surface_buildings.back().id;
   const auto progress_before =
@@ -244,6 +263,234 @@ void changed_world_tests(const fs::path &research_root,
           "foreign colony view produced an accepted surface quote");
 }
 
+void management_quote_tests(const fs::path &research_root,
+                            const fs::path &catalog) {
+  auto frame = make_frame(research_root, catalog);
+  NativeSystemViewController systems;
+  NativeColonyController colonies;
+  const auto selected = select_home(frame, 12, systems, colonies);
+  NativeSurfaceConstructionController controller;
+  auto &owned = colony(frame, selected.colony.colony_id);
+  auto &funds = economy(frame);
+  funds.credits = 10000.;
+  funds.industry = 10000.;
+  constexpr int building_id = 910001;
+  owned.surface_buildings.push_back(
+      {.id = building_id,
+       .type_id = "science_lab",
+       .is_complete = true,
+       .is_enabled = true,
+       .condition = .5});
+  auto site = [&]() -> SurfaceBuilding & {
+    return *std::ranges::find(owned.surface_buildings, building_id,
+                              &SurfaceBuilding::id);
+  };
+
+  const auto before_preview = surface_signature(owned);
+  const auto credits_before_preview = funds.credits;
+  const auto industry_before_preview = funds.industry;
+  const auto cancelled = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::RepairBuilding,
+      building_id);
+  require(cancelled.accepted && cancelled.industry_cost > 0. &&
+              !cancelled.formatted_authorization.empty() &&
+              surface_signature(owned) == before_preview &&
+              funds.credits == credits_before_preview &&
+              funds.industry == industry_before_preview &&
+              controller.cancel_quote(12, cancelled.quote_revision),
+          "management preview or cancellation changed campaign state");
+  require(!controller.confirm_management(frame, 12, cancelled).accepted &&
+              surface_signature(owned) == before_preview,
+          "cancelled management quote remained confirmable");
+
+  const auto invalid = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::RepairBuilding,
+      -1);
+  require(!invalid.accepted, "missing management target produced a quote");
+  auto foreign = selected.colony;
+  ++foreign.player_civilization_id;
+  require(!controller
+               .preview_management(frame, 12, foreign,
+                                   NativeSurfaceManagementAction::RepairBuilding,
+                                   building_id)
+               .accepted,
+          "foreign colony view produced a management quote");
+
+  auto repair = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::RepairBuilding,
+      building_id);
+  require(repair.accepted && repair.building_name == "Science lab" &&
+              repair.industry_cost == surface_repair_industry_cost(site()) &&
+              !controller.confirm_management(frame, 13, repair).accepted,
+          "stale generation management quote was accepted");
+  repair = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::RepairBuilding,
+      building_id);
+  const auto repaired_cost = repair.industry_cost;
+  const auto industry_before_repair = funds.industry;
+  require(controller.confirm_management(frame, 12, repair).accepted &&
+              site().condition == 1. &&
+              std::abs(funds.industry - (industry_before_repair - repaired_cost)) <
+                  1e-9 &&
+              !controller.confirm_management(frame, 12, repair).accepted,
+          "repair management quote did not charge exactly once");
+
+  auto priority = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::SetPriority,
+      building_id, true);
+  auto tampered = priority;
+  tampered.description += " changed";
+  require(priority.accepted &&
+              !controller.confirm_management(frame, 12, tampered).accepted &&
+              site().operating_priority == 0,
+          "tampered management quote changed the building");
+  priority = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::SetPriority,
+      building_id, true);
+  require(controller.confirm_management(frame, 12, priority).accepted &&
+              site().operating_priority == 1,
+          "priority management quote did not use the canonical order");
+
+  auto enabled = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::SetEnabled,
+      building_id, false);
+  site().condition = .8;
+  require(enabled.accepted &&
+              !controller.confirm_management(frame, 12, enabled).accepted &&
+              site().is_enabled,
+          "changed building state accepted a stale management quote");
+  enabled = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::SetEnabled,
+      building_id, false);
+  require(controller.confirm_management(frame, 12, enabled).accepted &&
+              !site().is_enabled,
+          "enabled management quote did not use the canonical order");
+
+  auto unaffordable = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::RepairBuilding,
+      building_id);
+  funds.industry = 0.;
+  require(unaffordable.accepted &&
+              !controller.confirm_management(frame, 12, unaffordable).accepted &&
+              site().condition == .8,
+          "changed affordability accepted a repair quote");
+  funds.industry = 10000.;
+  repair = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::RepairBuilding,
+      building_id);
+  require(controller.confirm_management(frame, 12, repair).accepted &&
+              site().condition == 1.,
+          "repair was not recoverable after an affordability refresh");
+
+  const auto upgrade = controller.preview_management(
+      frame, 12, selected.colony,
+      NativeSurfaceManagementAction::UpgradeBuilding, building_id);
+  const auto credits_before_upgrade = funds.credits;
+  const auto industry_before_upgrade = funds.industry;
+  require(upgrade.accepted && upgrade.authorization_budget_units > 0. &&
+              upgrade.industry_cost > 0. &&
+              controller.confirm_management(frame, 12, upgrade).accepted &&
+              site().pending_upgrade_type_id.has_value() &&
+              std::abs(funds.credits -
+                       (credits_before_upgrade -
+                        upgrade.authorization_budget_units)) < 1e-9 &&
+              std::abs(funds.industry -
+                       (industry_before_upgrade - upgrade.industry_cost)) <
+                  1e-9,
+          "building upgrade did not preserve its quoted canonical costs");
+
+  owned.surface_hub_level = 1;
+  owned.surface_hub_upgrade_days_remaining = 0.;
+  auto &projects = construction(frame).completed_project_ids;
+  std::erase(projects, "industrial_automation");
+  projects.push_back("industrial_automation");
+  auto hub = controller.preview_management(
+      frame, 12, selected.colony, NativeSurfaceManagementAction::UpgradeHub);
+  std::erase(projects, "industrial_automation");
+  require(hub.accepted &&
+              !controller.confirm_management(frame, 12, hub).accepted &&
+              owned.surface_hub_upgrade_days_remaining == 0.,
+          "changed hub prerequisite accepted a stale quote");
+  projects.push_back("industrial_automation");
+  hub = controller.preview_management(frame, 12, selected.colony,
+                                      NativeSurfaceManagementAction::UpgradeHub);
+  const auto credits_before_hub = funds.credits;
+  const auto industry_before_hub = funds.industry;
+  require(hub.accepted && hub.authorization_budget_units > 0. &&
+              hub.industry_cost > 0. &&
+              controller.confirm_management(frame, 12, hub).accepted &&
+              owned.surface_hub_upgrade_days_remaining > 0. &&
+              std::abs(funds.credits -
+                       (credits_before_hub - hub.authorization_budget_units)) <
+                  1e-9 &&
+              std::abs(funds.industry -
+                       (industry_before_hub - hub.industry_cost)) < 1e-9,
+          "hub upgrade did not preserve its quoted canonical costs");
+}
+
+void body_membership_tests(const fs::path &research_root,
+                           const fs::path &catalog) {
+  {
+    auto frame = make_frame(research_root, catalog);
+    NativeSystemViewController systems;
+    NativeColonyController colonies;
+    const auto selected = select_home(frame, 15, systems, colonies);
+    NativeSurfaceConstructionController controller;
+    auto &owned = colony(frame, selected.colony.colony_id);
+    owned.surface_hub_level = 1;
+    owned.surface_hub_upgrade_days_remaining = 0.;
+    economy(frame).credits = 10000.;
+    economy(frame).industry = 10000.;
+    auto &projects = construction(frame).completed_project_ids;
+    std::erase(projects, "industrial_automation");
+    projects.push_back("industrial_automation");
+    const auto quote = controller.preview_management(
+        frame, 15, selected.colony, NativeSurfaceManagementAction::UpgradeHub);
+    require(quote.accepted, "deleted-body fixture could not quote a hub upgrade");
+    auto &bodies = frame.runtime().world().campaign().bodies;
+    std::erase_if(bodies, [&](const PlanetaryBody &body) {
+      return body.id == selected.colony.body_id;
+    });
+    require(!controller.confirm_management(frame, 15, quote).accepted &&
+                !controller
+                     .preview_management(frame, 15, selected.colony,
+                                         NativeSurfaceManagementAction::UpgradeHub)
+                     .accepted,
+            "a deleted planetary body retained surface-management authority");
+  }
+
+  {
+    auto frame = make_frame(research_root, catalog);
+    NativeSystemViewController systems;
+    NativeColonyController colonies;
+    const auto selected = select_home(frame, 16, systems, colonies);
+    NativeSurfaceConstructionController controller;
+    auto &owned = colony(frame, selected.colony.colony_id);
+    owned.surface_hub_level = 1;
+    owned.surface_hub_upgrade_days_remaining = 0.;
+    economy(frame).credits = 10000.;
+    economy(frame).industry = 10000.;
+    auto &projects = construction(frame).completed_project_ids;
+    std::erase(projects, "industrial_automation");
+    projects.push_back("industrial_automation");
+    const auto quote = controller.preview_management(
+        frame, 16, selected.colony, NativeSurfaceManagementAction::UpgradeHub);
+    require(quote.accepted,
+            "moved-body fixture could not quote a hub upgrade");
+    auto &bodies = frame.runtime().world().campaign().bodies;
+    const auto body = std::ranges::find(bodies, selected.colony.body_id,
+                                        &PlanetaryBody::id);
+    require(body != bodies.end(), "moved-body fixture lost the selected body");
+    ++body->system_id;
+    require(!controller.confirm_management(frame, 16, quote).accepted &&
+                !controller
+                     .preview_management(frame, 16, selected.colony,
+                                         NativeSurfaceManagementAction::UpgradeHub)
+                     .accepted,
+            "a body moved to another system retained surface-management authority");
+  }
+}
+
 void paused_reload_test(const fs::path &research_root,
                         const fs::path &catalog) {
   auto frame = make_frame(research_root, catalog);
@@ -278,6 +525,62 @@ void paused_reload_test(const fs::path &research_root,
               sites_before,
           "paused reloaded campaign changed surface construction state");
 }
+
+void planetary_slot_tests(const fs::path& research_root,const fs::path& catalog){
+  auto frame=make_frame(research_root,catalog);
+  NativeSystemViewController systems;NativeColonyController colonies;
+  auto selected=select_home(frame,42,systems,colonies);
+  auto& owned=colony(frame,selected.colony.colony_id);
+  NativeSurfaceConstructionController controller;
+  const auto legacy_seed=accepted_quote(controller,frame,42,selected.colony,selected.colony.available_buildings.front().type_id);
+  require(controller.confirm_placement(frame,42,legacy_seed).accepted,"Unable to seed legacy building");
+  for(auto& b:owned.surface_buildings)b.slot_index.reset();
+  const auto legacy=planetary_building_slots(owned);
+  require(!legacy.empty(),"Legacy homeworld lost its buildings");
+  for(const auto& b:owned.surface_buildings)require(!b.slot_index,"Read-only legacy projection assigned persisted slots");
+  const auto type=selected.colony.available_buildings.front().type_id;
+  const int slot=selected.colony.building_capacity-1;
+  auto quote=controller.preview_placement(frame,42,selected.colony,type,0,0,0,slot);
+  require(quote.accepted&&quote.slot_index==slot,"Explicit empty slot rejected");
+  const auto before=economy(frame).credits;
+  require(controller.cancel_quote(42,quote.quote_revision),"Slot review did not cancel");
+  require(!controller.confirm_placement(frame,42,quote).accepted&&economy(frame).credits==before,"Cancelled slot quote spent credits");
+  quote=controller.preview_placement(frame,42,selected.colony,type,0,0,0,slot);
+  require(controller.confirm_placement(frame,42,quote).accepted,"Slot construction failed");
+  require(owned.surface_buildings.back().slot_index==slot&&!owned.surface_buildings.back().is_complete,"Slot was not reserved for timed construction");
+  for(const auto& b:owned.surface_buildings)if(legacy.contains(b.id))require(b.slot_index==legacy.at(b.id),"Legacy building moved slots");
+  require(!controller.preview_placement(frame,42,selected.colony,type,0,0,0,slot).accepted,"Reserved slot accepted duplicate construction");
+  auto collision=owned;collision.surface_buildings[0].slot_index=slot;
+  bool rejected=false;try{validate_surface_construction(collision);}catch(const std::exception&){rejected=true;}
+  require(rejected,"Duplicate saved slots passed validation");
+  frame.clock().set_speed(StrategicSpeed::Paused);
+  const auto encoded=encode_player_campaign_v17_json(capture_player_campaign_v17(frame.runtime(),{0,"test","2044-05-06T07:08:09Z"}));
+  auto restored=restore_player_campaign_v17_json(load_adaptive_research_strategic_runtime(research_root),encoded);
+  StrategicClock clock;clock.set_speed(StrategicSpeed::Paused);
+  CampaignFrame loaded(std::move(restored).activate(),std::move(clock),CampaignFramePolicy::Player);
+  const auto& loaded_colony=colony(loaded,owned.id);
+  require(planetary_building_slots(loaded_colony)==planetary_building_slots(owned),"Slots changed after JSON save/reload");
+  (void)loaded.advance(.25);
+  require(loaded_colony.surface_buildings.back().industry_progress==0,"Paused load advanced construction");
+  frame.clock().set_speed(StrategicSpeed::Demo);(void)frame.advance(1.);
+  require(owned.surface_buildings.back().industry_progress>0,"Timed slot did not progress");
+
+  // A newly settled world must construct its own Command Center, without
+  // changing established worlds or granting a completed hub instantly.
+  owned.surface_buildings.clear();owned.surface_hub_level=0;owned.surface_hub_upgrade_days_remaining=0;
+  economy(frame).credits=10000;economy(frame).industry=10000;
+  selected=select_home(frame,42,systems,colonies);
+  require(selected.colony.building_capacity==0,"Foundation exposed unlocked slots");
+  require(!controller.preview_placement(frame,42,selected.colony,type,0,0,0,0).accepted,"Hub-free world allowed a building");
+  const auto hub=controller.preview_management(frame,42,selected.colony,NativeSurfaceManagementAction::UpgradeHub);
+  require(hub.accepted&&hub.industry_cost>0,"Command Center foundation could not be quoted");
+  require(controller.confirm_management(frame,42,hub).accepted&&owned.surface_hub_level==0&&owned.surface_hub_upgrade_days_remaining>0,"Foundation completed instantly");
+  frame.clock().set_speed(StrategicSpeed::Paused);const auto remaining=owned.surface_hub_upgrade_days_remaining;
+  (void)frame.advance(1.);require(owned.surface_hub_upgrade_days_remaining==remaining,"Paused foundation progressed");
+  frame.clock().set_speed(StrategicSpeed::Demo);
+  for(int i=0;i<10&&owned.surface_hub_level==0;++i)(void)frame.advance(1.);
+  require(owned.surface_hub_level==1&&surface_building_capacity(owned)==16,"Funded Command Center did not unlock 16 slots");
+}
 } // namespace
 
 int main(int argc, char **argv) try {
@@ -287,8 +590,11 @@ int main(int argc, char **argv) try {
   const auto catalog = fs::absolute(argv[2]);
   quote_and_progress_tests(research_root, catalog);
   changed_world_tests(research_root, catalog);
+  management_quote_tests(research_root, catalog);
+  body_membership_tests(research_root, catalog);
   paused_reload_test(research_root, catalog);
-  std::cout << "native surface controller: 3/3 bounded cases passed\n";
+  planetary_slot_tests(research_root,catalog);
+  std::cout << "native surface controller: 6/6 bounded cases passed\n";
   return 0;
 } catch (const std::exception &error) {
   std::cerr << "native surface controller failed: " << error.what() << '\n';

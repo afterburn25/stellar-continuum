@@ -1,0 +1,10 @@
+# Embedded shaders keep runtime and ordinary builds independent of an SDK.
+file(READ "${CMAKE_SOURCE_DIR}/engine/shaders/scene3d-manifest.json" SCENE3D_MANIFEST)
+foreach(PATH engine/shaders/scene3d.vert engine/shaders/scene3d.frag engine/src/generated/scene3d_shaders.hpp)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/${PATH}")
+  string(JSON EXPECTED GET "${SCENE3D_MANIFEST}" files "${PATH}")
+  file(SHA256 "${CMAKE_SOURCE_DIR}/${PATH}" ACTUAL)
+  if(NOT ACTUAL STREQUAL EXPECTED)
+    message(FATAL_ERROR "3D shader source/binary changed: regenerate with tools/compile_scene3d_shaders.py (${PATH})")
+  endif()
+endforeach()

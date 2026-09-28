@@ -3,6 +3,7 @@
 #include <stellar/core/campaign_frame.hpp>
 #include <stellar/core/fleet_role.hpp>
 #include <stellar/core/sovereign_currency.hpp>
+#include <stellar/core/shipbuilding.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -34,6 +35,9 @@ struct NativeShipDesign {
   std::optional<int> population_source_colony_id;
   std::optional<std::string> population_species_id;
   std::optional<double> population_source_current_millions;
+  double hull{},armor{},shields{},weapon_damage{},weapon_interval_days{},cargo_capacity{};
+  int crew{};
+  std::vector<stellar::core::ShipbuildingBatchAssessment> batch_quotes;
 };
 
 struct NativeShipyardOrder {
@@ -69,6 +73,7 @@ struct NativeShipyardView {
   int maximum_pending_builds{};
   std::vector<NativeShipDesign> available_designs;
   std::vector<NativeShipyardOrder> orders;
+  std::string yard_name;
 };
 
 struct NativeShipyardCommandOutcome {
@@ -86,7 +91,10 @@ public:
   [[nodiscard]] NativeShipyardCommandOutcome
   start(stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
         std::uint64_t expected_shipyard_revision,
-        std::string_view design_id);
+        std::string_view design_id,int quantity=1);
+  [[nodiscard]] NativeShipyardCommandOutcome reorder(stellar::core::CampaignFrame &,
+      std::uint64_t campaign_generation,std::uint64_t expected_shipyard_revision,
+      std::string_view order_id,int direction);
   [[nodiscard]] NativeShipyardCommandOutcome
   cancel(stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
          std::uint64_t expected_shipyard_revision,

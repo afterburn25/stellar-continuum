@@ -11,6 +11,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+from native_bmp import validate_bmp
 
 
 def _finite(value, label):
@@ -46,24 +47,61 @@ def _diagnostic(stdout: str, expected_mode: str):
     return state
 
 
-def _bmp(path: Path, width: int, height: int):
-    data = path.read_bytes() if path.is_file() else b""
-    if len(data) < 54 or data[:2] != b"BM":
-        raise RuntimeError("Native colony did not capture a BMP frame")
-    declared_size, pixel_offset = struct.unpack_from("<II", data, 2)[0], struct.unpack_from("<I", data, 10)[0]
-    header_size = struct.unpack_from("<I", data, 14)[0]
-    actual_width, actual_height, planes, bits = struct.unpack_from("<iiHH", data, 18)
-    compression = struct.unpack_from("<I", data, 30)[0]
-    row_bytes = ((actual_width * bits + 31) // 32) * 4 if actual_width > 0 else 0
-    required_pixels = row_bytes * abs(actual_height)
-    if (declared_size != len(data) or pixel_offset < 54 or header_size < 40 or
-            actual_width != width or abs(actual_height) != height or planes != 1 or
-            bits not in (24, 32) or compression not in (0, 3) or
-            required_pixels <= 0 or pixel_offset + required_pixels > len(data)):
-        raise RuntimeError("Native colony capture has invalid renderer geometry")
-    pixels = data[pixel_offset:]
-    if not pixels or min(pixels) == max(pixels):
-        raise RuntimeError("Native colony capture contains no rendered variation")
+def _colony_roster(stdout: str, payload, state):
+    lines = [line for line in stdout.splitlines() if "colony_roster=" in line]
+    if len(lines) != 1:
+        raise RuntimeError("Native colony did not report exactly one colony roster proof")
+    line = lines[0]
+    match = re.fullmatch(r"colony_roster=(\{.*\})", line)
+    if not match:
+        raise RuntimeError("Native colony roster proof is malformed")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON key")
+            result[key] = value
+        return result
+
+    try:
+        roster = json.loads(match.group(1), object_pairs_hook=unique_object)
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError("Native colony roster proof is malformed") from error
+    expected = {"player_id", "colony_id", "rows", "opened", "selected", "readonly",
+                "exclusive", "scrolled"}
+    if not isinstance(roster, dict) or set(roster) != expected:
+        raise RuntimeError("Native colony roster proof has the wrong schema")
+    for key in ("player_id", "colony_id"):
+        if type(roster[key]) is not int or roster[key] < 0:
+            raise RuntimeError(f"Native colony roster reported invalid {key}")
+    if type(roster["rows"]) is not int or roster["rows"] <= 0:
+        raise RuntimeError("Native colony roster reported invalid rows")
+    for key in ("opened", "selected", "readonly", "exclusive", "scrolled"):
+        if roster[key] is not True:
+            raise RuntimeError(f"Native colony roster did not prove {key}")
+
+    galaxy = payload.get("Galaxy", {})
+    player_id = galaxy.get("PlayerCivilizationId")
+    if type(player_id) is not int or player_id < 0 or roster["player_id"] != player_id:
+        raise RuntimeError("Native colony roster has the wrong player identity")
+    if roster["colony_id"] != state["colony_id"]:
+        raise RuntimeError("Native colony roster has the wrong selected colony")
+    owned = [colony for colony in galaxy.get("Colonies", [])
+             if colony.get("CivilizationId") == player_id and
+             type(colony.get("PlanetaryBodyId")) is int and
+             colony["PlanetaryBodyId"] >= 0]
+    if roster["colony_id"] not in [colony.get("Id") for colony in owned]:
+        raise RuntimeError("Native colony roster selected colony is not owned")
+    if roster["rows"] != len(owned):
+        raise RuntimeError("Native colony roster row count differs from the save")
+    if sum(colony.get("Id") == roster["colony_id"] for colony in owned) != 1:
+        raise RuntimeError("Native colony roster selected colony is not unique")
+    return roster
+
+
+def _bmp(path: Path, width: int, height: int, stdout: str | None = None):
+    return validate_bmp(path, width, height, "colony", stdout=stdout)
 
 
 def _owned_colony(payload, state):
@@ -120,7 +158,7 @@ def _normalized(payload):
 def validate_native_colony_export(folder: Path, env: dict[str, str]):
     system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
     clean = dict(env, PATH=str(system_root / "System32") + os.pathsep + str(system_root))
-    captures, diagnostics, payloads, states = [], [], [], []
+    captures, roster_captures, diagnostics, payloads, states = [], [], [], [], []
     with tempfile.TemporaryDirectory(prefix="stellar-native-colony-") as temporary:
         work = Path(temporary)
         save = work / "colony.player17.json"
@@ -128,6 +166,7 @@ def validate_native_colony_export(folder: Path, env: dict[str, str]):
                 (1280, 720, "--colony-smoke", "fresh", False),
                 (1920, 1080, "--colony-reload-smoke", "paused_reload", True)):
             capture = work / f"colony-{width}x{height}.bmp"
+            roster_capture = work / f"{capture.stem}-colony-roster.bmp"
             args = [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
                     "--save-path", str(save), "--width", str(width), "--height", str(height),
                     mode, str(capture)]
@@ -145,7 +184,6 @@ def validate_native_colony_export(folder: Path, env: dict[str, str]):
             if not uploads or int(uploads.group(1)) < 1:
                 raise RuntimeError("Native colony did not prove rendered orbital image uploads")
             state = _diagnostic(result.stdout, label)
-            _bmp(capture, width, height)
             if not save.is_file():
                 raise RuntimeError("Native colony did not write its isolated Player17 save")
             payload = json.loads(save.read_text(encoding="utf-8-sig"))
@@ -158,9 +196,15 @@ def validate_native_colony_export(folder: Path, env: dict[str, str]):
             if not payload.get("SavedAtUtc"):
                 raise RuntimeError("Native colony did not timestamp its Player17 save")
             _owned_colony(payload, state)
+            _colony_roster(result.stdout, payload, state)
+            _bmp(capture, width, height, result.stdout)
+            _bmp(roster_capture, width, height, result.stdout)
             evidence = folder.parent / f"{folder.name}-colony-{width}x{height}.bmp"
+            roster_evidence = folder.parent / f"{folder.name}-colony-{width}x{height}-colony-roster.bmp"
             shutil.copy2(capture, evidence)
+            shutil.copy2(roster_capture, roster_evidence)
             captures.append(str(evidence))
+            roster_captures.append(str(roster_evidence))
             diagnostics.append(result.stdout.strip())
             payloads.append(payload)
             states.append(state)
@@ -172,4 +216,5 @@ def validate_native_colony_export(folder: Path, env: dict[str, str]):
     if any(states[0][key] != states[1][key] for key in stable):
         raise RuntimeError("Native colony paused reload changed its projected telemetry")
     return {"nativeColonyPlayerInput": True, "nativeColonyPausedReload": True,
-            "colonyCaptures": captures, "colonyDiagnostics": diagnostics}
+            "nativeColonyRoster": True, "colonyCaptures": captures,
+            "colonyRosterCaptures": roster_captures, "colonyDiagnostics": diagnostics}

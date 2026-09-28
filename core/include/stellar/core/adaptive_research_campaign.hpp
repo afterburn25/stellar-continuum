@@ -36,6 +36,20 @@ struct AdaptiveResearchProjectFundingSnapshot {
   double authorization_credits{};
 };
 
+// Campaign-owned player intent. Execution remains in the normal research/funding
+// pipeline; these ordered IDs never reserve resources or bypass discovery.
+struct AdaptiveResearchPlan {
+  std::vector<std::string> favorites;
+  std::vector<std::string> queue;
+  bool suggestions{true};
+  bool operator==(const AdaptiveResearchPlan &) const = default;
+};
+
+enum class ResearchPlanCommand {
+  AddFavorite, RemoveFavorite, Enqueue, RemoveQueued, MoveUp, MoveDown,
+  SuggestionsOn, SuggestionsOff
+};
+
 struct AdaptiveResearchCampaignCivilizationSnapshot {
   int civilization_id{};
   std::string species_id;
@@ -43,6 +57,7 @@ struct AdaptiveResearchCampaignCivilizationSnapshot {
   std::string applicability_context_id;
   AdaptiveResearchStateSnapshotV5 research;
   std::vector<AdaptiveResearchProjectFundingSnapshot> project_funding;
+  AdaptiveResearchPlan plan;
 };
 
 struct AdaptiveResearchCampaignSnapshot {
@@ -103,6 +118,10 @@ public:
   get_start(int civilization_id) const;
   [[nodiscard]] std::span<const AdaptiveResearchProjectFundingState>
   project_funding(int civilization_id) const;
+  [[nodiscard]] const AdaptiveResearchPlan &plan(int civilization_id) const;
+  [[nodiscard]] AdaptiveResearchCommandResult edit_plan(
+      int civilization_id, ResearchPlanCommand command,
+      std::string_view node_id = {});
 
 private:
   struct Storage;
@@ -147,7 +166,7 @@ private:
 // values and returns a campaign that borrows the same runtime.
 class AdaptiveResearchCampaignSnapshotCodec final {
 public:
-  static constexpr int current_schema_version = 2;
+  static constexpr int current_schema_version = 3;
 
   explicit AdaptiveResearchCampaignSnapshotCodec(
       const AdaptiveResearchStrategicRuntime &runtime);

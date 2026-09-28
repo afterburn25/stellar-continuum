@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Stellar Continuum engine migration inventory
 
 Baseline audited: branch `engine/stellar-engine-migration`, commit `97091aee` (tagged `migration-baseline/stellar-continuum-0.1.7`), version `0.1.7-alpha`. This is an inventory for a controlled C++23/SDL3/Vulkan migration. Existing gameplay and save compatibility are the constraints; this document does not authorize a rewrite. The pending territorial influence work remains separate on `feature/territorial-influence` / PR #323 (tip observed as `27eb67ff`) and is not part of this baseline.

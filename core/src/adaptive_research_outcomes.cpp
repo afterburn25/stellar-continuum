@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -69,7 +70,7 @@ const Json &require_array(const Json &value) {
   throw AdaptiveResearchOutcomeJsonError(kind, e.what());
 }
 std::string bytes(const std::filesystem::path &path) {
-  std::ifstream input(path, std::ios::binary);
+  auto input=stellar::engine::resource_stream(path);
   if (!input)
     throw AdaptiveResearchOutcomeFileError("Could not find file '" +
                                            path.string() + "'.");
@@ -1229,3 +1230,4 @@ detail::AdaptiveResearchOutcomeRuntimeTestAccess::apply(
 }
 
 } // namespace stellar::core
+

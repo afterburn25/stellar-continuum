@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Diplomacy and Adaptive Research campaign integration contract
 
 Status: source review and integration design. Low-level native Diplomacy state is implemented in gate068; integrated Diplomacy runtime and player-save parity remain open. Preserve the existing Godot/C# playable baseline and native legacy coordinator until the replacement composition passes actual-source comparisons.

@@ -6,6 +6,28 @@ coordinate area, reserved hub footprint, existing sites and actual construction
 progress. This is a functional top-down view; detailed 3D terrain, roads and
 building artwork remain separate migration work.
 
+The 0.1.58 Codex candidate adds the existing approved ground albedo to this
+top-down workspace. The app decodes one immutable source through its shared
+image-preparation queue, with a 16 MiB maximum; the workspace receives only that
+image and never accesses files, a worker, or Core to draw it. A missing/invalid
+source retains its terminal exception until explicit queue reinitialization,
+so repeated polling cannot create a retry loop.
+
+Ground tiles use the same world coordinates as placement and drag/zoom. Their
+base span is 512 units; a power-of-two level bounds the visible draw list to 64
+images at extreme zoom-out. Every image is clipped to the terrain field. The
+generic source is desaturated because the current surface view does not provide
+environment classification; it does not assert that alien worlds have Earth's
+climate or biology. Grids, hub, sites, placement previews and costs remain above
+the artwork. Detailed buildings, roads and true 3D terrain are still outstanding.
+
+Build and export paths verify the exact image and provenance note in
+`export/native-surface-art-assets.json`. The source note has a pinned Git line
+ending so a fresh Windows checkout preserves its reviewed hash. The focused
+`native_surface_art` CTest checks actual asynchronous decode/reuse, terminal
+errors, owner-thread access and clipped camera-aligned tiles from 720p to 4K.
+See `NATIVE_SURFACE_ART_SOURCES.md` for the unchanged image's provenance.
+
 The palette uses only the colony controller's available buildings and their
 descriptions, sovereign authorization, industry, workforce, power and footprint
 data. Left-drag pans and wheel zoom stays anchored at the pointer. An exact
@@ -18,7 +40,9 @@ discards a detached quote without spending money. An unfinished site's removal
 shows cancellation/refund wording; a completed site's removal shows demolition
 and its canonical zero refund. Research, available materials and authoritative
 construction progression remain in charge. The interface invents no completion
-time, instant construction, upgrade or repair operation.
+time or instant construction. The current candidate adds reviewed canonical
+upgrade, repair, operation and priority controls; see NATIVE_SURFACE_MANAGEMENT.md
+for authorization, UI and updated validation contracts.
 
 Generation and revision changes invalidate stale quotes. Integration review
 fixed a queued pointer preview overwriting a confirmation revision, cleared

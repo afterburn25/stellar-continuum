@@ -1,0 +1,27 @@
+{
+  "version": "starfields-v2-faint-map-reference",
+  "categories": [
+    "Blue-white dominant star background",
+    "Dense star background",
+    "High-contrast bright-star background",
+    "Medium-density star background",
+    "Old quiet region background",
+    "Rich cluster-region background",
+    "Sparse star background",
+    "Very distant galactic-plane style starfield",
+    "Very faint distant-star background",
+    "Warm-toned star background"
+  ],
+  "assets": [
+    {
+      "id": "starfield-map-reference",
+      "category": "Very faint distant-star background",
+      "categoryKey": "faint",
+      "path": "assets/visual/starfields/faint-map-reference.png",
+      "density": 0.12,
+      "colorBias": "mixed",
+      "band": false,
+      "cluster": false
+    }
+  ]
+}

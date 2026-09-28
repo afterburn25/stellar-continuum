@@ -1,0 +1,3 @@
+#pragma once
+#include <string_view>
+inline constexpr std::string_view small_body_configuration_json=R"fields(@STELLAR_SMALL_BODY_CONFIGURATION@)fields";

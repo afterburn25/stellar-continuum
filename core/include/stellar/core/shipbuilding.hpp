@@ -7,6 +7,7 @@
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/shipyard_state.hpp>
+#include <stellar/core/civilization_control.hpp>
 
 #include <functional>
 #include <limits>
@@ -55,6 +56,7 @@ struct ShipbuildingWorld {
   std::span<const ShipbuildingStrategicPreference> strategic_preferences;
   std::function<bool(int, std::string_view)> capability_query;
   std::function<ShipbuildingStrategicPreference(int)> preference_query;
+  CivilizationControlQuery control;
   ShipbuildingReadView read() const {
     return {civilizations, systems,      construction,
             shipyards,     colonies,     economies,
@@ -86,6 +88,17 @@ struct ShipbuildingCancellationAssessment {
   double refund_credits{};
   std::optional<std::string> blocker;
 };
+struct ShipbuildingBatchAssessment {
+  int quantity{};
+  bool can_start{};
+  std::optional<std::string> blocker;
+  double credit_cost{}, industry_cost{}, population_cost_millions{};
+  double minimum_build_days_at_full_shipyard_rate{};
+};
+// Quotes each quantity from 1 through the existing queue capacity in one
+// staged admission pass. Costs and population reservations use canonical rules.
+std::vector<ShipbuildingBatchAssessment> assess_ship_build_batches(
+    ShipbuildingReadView world, int civilization_id, std::string_view design_id);
 struct ShipbuildingCancellationResult {
   bool accepted{};
   std::string message;
@@ -99,6 +112,12 @@ struct ShipbuildingEvent {
 ShipbuildingOrderResult start_ship_build(ShipbuildingWorld world,
                                          int civilization_id,
                                          std::string_view design_id);
+// Batch admission is atomic: all normal authorization/population rules are
+// evaluated before any live treasury, colony or queue is changed.
+ShipbuildingOrderResult start_ship_build_batch(ShipbuildingWorld world,
+    int civilization_id,std::string_view design_id,int quantity);
+ShipbuildingOrderResult move_queued_ship_build(ShipbuildingWorld world,
+    int civilization_id,std::string_view order_id,int direction);
 ShipbuildingStartAssessment assess_start_ship_build(
     ShipbuildingReadView world, int civilization_id,
     std::string_view design_id);

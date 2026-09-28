@@ -17,10 +17,16 @@ class StrategicClock {
   double requested_multiplier() const;
   double backlog_days() const noexcept { return backlog_days_; }
 
+  // Presentation cadence; all simulation durations and saves remain in days.
+  void set_days_per_second(double value);
+  double days_per_second() const noexcept { return days_per_second_; }
   void set_speed(StrategicSpeed speed) noexcept;
+  void set_maximum_multiplier(double multiplier);
   void resume() noexcept;
   void select_resume_speed(StrategicSpeed speed);
   void restore(double simulation_days) noexcept;
+  // Commit only completed authoritative fixed steps; keep diagnostic backlog.
+  void record_fixed_advance(double days,double real_seconds,double backlog_days);
   double advance(double real_delta_seconds, double maximum_step_days = .25);
   double advance_bounded_frame(double real_delta_seconds, double maximum_days = 1.,
                                double maximum_backlog_days = 2.);
@@ -32,6 +38,8 @@ class StrategicClock {
   double simulation_days_ = 0.;
   double effective_multiplier_ = 1.;
   double backlog_days_ = 0.;
+  double days_per_second_ = 1.; // Legacy replay default; native sessions select 1/24.
+  double maximum_multiplier_ = 8.; // Legacy replay default; native player profile uses 4x.
 };
 
 class CampaignAutosavePolicy {

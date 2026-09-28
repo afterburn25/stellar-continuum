@@ -1,4 +1,5 @@
 #include "native_colony_workspace.hpp"
+#include "native_ui_layout.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -100,6 +101,8 @@ NativeColonyView view(std::uint64_t generation = 1) {
   result.upkeep_credits_per_day = .08;
   result.industry_per_day = 3.5;
   result.science_per_day = 2.0;
+  result.active_research_facilities = 2;
+  result.active_research_lab_units = 3.5;
   result.required_habitat_systems = 1;
   result.specialization_name = "Balanced settlement";
   result.specialization_description = "No dominant surface specialization";
@@ -107,157 +110,78 @@ NativeColonyView view(std::uint64_t generation = 1) {
   return result;
 }
 
-void responsive_layout_is_contained_and_nonoverlapping() {
-  for (const auto [width, height] :
-       {std::pair{1280, 720}, std::pair{1920, 1080},
-        std::pair{3840, 2160}}) {
-    const auto layout = ColonyWorkspaceLayout::for_viewport(width, height);
-    const UiRect viewport{0, 0, static_cast<float>(width),
-                          static_cast<float>(height)};
-    REQUIRE(contains(viewport, layout.surface));
-    for (const auto bounds : {layout.details, layout.summary,
-                              layout.sustenance, layout.sites,
-                              layout.site_rows, layout.close})
-      REQUIRE(contains(layout.surface, bounds));
-    REQUIRE(!overlaps(layout.summary, layout.sustenance));
-    REQUIRE(!overlaps(layout.sustenance, layout.operations));
-    REQUIRE(!overlaps(layout.operations, layout.sites));
-    REQUIRE(!overlaps(layout.summary, layout.sites));
-  }
-}
-
-void rendering_uses_canonical_sections_and_clipped_progress() {
-  NativeColonyWorkspace workspace;
-  workspace.open(view());
-  DrawList draw;
-  workspace.render(draw, 1280, 720);
-  const auto layout = ColonyWorkspaceLayout::for_viewport(1280, 720);
-  bool support{}, projected{}, local_currency{}, power{}, modules{}, progress{};
-  for (const auto &command : draw.overlay) {
-    if (const auto *label = std::get_if<Text>(&command)) {
-      support |= label->value == "SUPPORT & LABOR";
-      projected |= label->value.find("Projected surface production") !=
-                   std::string::npos;
-      local_currency |= label->value.find("+$1.3M UED/day") !=
-                        std::string::npos;
-      power |= label->value.find("Power 12.0 supplied / 8.0 required") !=
-               std::string::npos;
-      modules |= label->value == "SURFACE MODULES & CONSTRUCTION";
-      if (label->value.find("Power Generator") != std::string::npos)
-        REQUIRE(label->clip && contains(layout.site_rows, *label->clip));
+ColonyWorkspaceCommand click_label(NativeColonyWorkspace& workspace,std::string_view label,int width,int height){
+  for(int attempt=0;attempt<30;++attempt){
+    DrawList draw;workspace.render(draw,width,height);
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item);t&&t->value==label){
+      Point p{t->at.x+12,t->at.y+3};if(t->clip&&t->clip->contains(p)){
+        (void)workspace.handle({InputEventType::LeftPressed,p},width,height);
+        return workspace.handle({InputEventType::LeftReleased,p},width,height);
+      }
     }
-    if (const auto *rectangle = std::get_if<FilledRectangle>(&command)) {
-      REQUIRE(std::isfinite(rectangle->bounds.x));
-      REQUIRE(std::isfinite(rectangle->bounds.y));
-      REQUIRE(std::isfinite(rectangle->bounds.width));
-      REQUIRE(std::isfinite(rectangle->bounds.height));
-      if (rectangle->bounds.height <= 5.01f * layout.scale &&
-          contains(layout.site_rows, rectangle->bounds))
-        progress = true;
-    }
+    (void)workspace.handle({InputEventType::Wheel,center(PlanetaryLayout::make(width,height).details),{},-2.f},width,height);
   }
-  REQUIRE(support && projected && local_currency && power && modules && progress);
+  throw std::runtime_error("Unreachable planetary action: "+std::string(label));
 }
 
-void detail_scroll_reaches_outpost_rows_and_keeps_text_clipped() {
-  auto content = view();
-  content.resource_outpost = true;
-  content.population_millions = .042;
-  content.outpost_status = "Confirmed extraction site";
-  content.deposit_material_name = "Helium-3";
-  content.deposit_grade = "Rich";
-  content.has_confirmed_deposit = true;
-  content.extraction_per_day = 2.5;
-  content.stored_extracted_materials = 8.0;
-  content.extracted_material_capacity = 20.0;
-  content.cargo_transfer_capacity_per_day = 1.5;
-  NativeColonyWorkspace workspace;
-  workspace.open(std::move(content));
-  const auto layout = ColonyWorkspaceLayout::for_viewport(1280, 720);
-  REQUIRE(workspace.handle({.type = InputEventType::Wheel,
-                            .position = center(layout.details),
-                            .wheel_y = -100.f},
-                           1280, 720).captured);
-  DrawList draw;
-  workspace.render(draw, 1280, 720);
-  bool population{}, cargo{};
-  for (const auto &item : draw.overlay) {
-    const auto *label = std::get_if<Text>(&item);
-    if (!label) continue;
-    population |= label->value.find("42.0K") != std::string::npos;
-    cargo |= label->value.find("Cargo transfer 1.5/day") != std::string::npos;
-    if (label->clip && overlaps(*label->clip, layout.details))
-      REQUIRE(contains(layout.details, *label->clip));
+void only_planetary_screen_is_rendered(){
+  for(const auto [width,height]:{std::pair{1280,720},std::pair{1920,1080},std::pair{3840,2160}}){
+    NativeColonyWorkspace workspace;workspace.open(view());
+    DrawList draw;workspace.render(draw,width,height);
+    REQUIRE(std::ranges::any_of(draw.overlay,[](const auto& item){return std::holds_alternative<Scene3DView>(item);}));
+    REQUIRE(std::ranges::none_of(draw.overlay,[](const auto& item){const auto* t=std::get_if<Text>(&item);return t&&(t->value=="SURFACE MODULES & CONSTRUCTION"||t->value=="Open Surface");}));
+    (void)click_label(workspace,"Build",width,height);
+    (void)click_label(workspace,"Available slot",width,height);
+    auto command=workspace.handle({InputEventType::EscapePressed},width,height);
+    REQUIRE(workspace.visible()); // backs out of the slot first
+    command=workspace.handle({InputEventType::EscapePressed},width,height);
+    REQUIRE(command.kind==ColonyWorkspaceCommandKind::Close&&!workspace.visible());
+    workspace.open(view());workspace.discard_campaign();REQUIRE(!workspace.visible()&&!workspace.view());
   }
-  REQUIRE(cargo);
-  // The compact personnel value is verified before scrolling the summary away.
-  NativeColonyWorkspace fresh;
-  auto compact = view();
-  compact.population_millions = .042;
-  fresh.open(std::move(compact));
-  DrawList initial;
-  fresh.render(initial, 1280, 720);
-  population = std::ranges::any_of(initial.overlay, [](const auto &item) {
-    const auto *label = std::get_if<Text>(&item);
-    return label && label->value.find("42.0K") != std::string::npos;
-  });
-  REQUIRE(population);
 }
 
-void wheel_reaches_last_site_and_escape_closes() {
-  auto content = view();
-  content.construction_sites.clear();
-  for (int id = 1; id <= 20; ++id)
-    content.construction_sites.push_back(site(id));
-  NativeColonyWorkspace workspace;
-  workspace.open(std::move(content));
-  const auto layout = ColonyWorkspaceLayout::for_viewport(1280, 720);
-  const auto command = workspace.handle(
-      {.type = InputEventType::Wheel,
-       .position = center(layout.site_rows),
-       .wheel_y = -100.f},
-      1280, 720);
-  REQUIRE(command.captured);
-  DrawList draw;
-  workspace.render(draw, 1280, 720);
-  REQUIRE(std::ranges::any_of(draw.overlay, [](const auto &item) {
-    const auto *label = std::get_if<Text>(&item);
-    return label && label->value.ends_with("20");
-  }));
-  auto reduced = view();
-  reduced.construction_sites = {site(1)};
-  workspace.set_view(std::move(reduced));
-  DrawList reduced_draw;
-  workspace.render(reduced_draw, 1280, 720);
-  REQUIRE(std::ranges::any_of(reduced_draw.overlay, [](const auto &item) {
-    const auto *label = std::get_if<Text>(&item);
-    return label && label->value.ends_with("1");
-  }));
-  const auto closed = workspace.handle({InputEventType::EscapePressed},
-                                       1280, 720);
-  REQUIRE(closed.kind == ColonyWorkspaceCommandKind::Close &&
-          closed.captured && !workspace.visible());
+void freight_review_input_and_layout() {
+  for (const auto size : {Point{1280,720},Point{1920,1080},Point{3840,2160}}) {
+    const auto width=static_cast<int>(size.x),height=static_cast<int>(size.y);
+    const auto layout=ColonyWorkspaceLayout::for_viewport(width,height);
+    REQUIRE(contains(layout.surface,layout.freight_review));
+    REQUIRE(contains(layout.freight_review,layout.freight_text));
+    REQUIRE(contains(layout.freight_review,layout.freight_confirm));
+    REQUIRE(!overlaps(layout.freight_text,layout.freight_confirm));
+    REQUIRE(!overlaps(layout.freight_cancel,layout.freight_confirm));
+    NativeColonyWorkspace workspace;auto owned=view();owned.resource_outpost=true;
+    workspace.open(owned);
+    const auto click=[&](UiRect bounds){const auto point=center(bounds);(void)workspace.handle({InputEventType::LeftPressed,point},width,height);return workspace.handle({InputEventType::LeftReleased,point},width,height);};
+    (void)click_label(workspace,"Economy",width,height);
+    REQUIRE(click_label(workspace,"Collect materials",width,height).kind==ColonyWorkspaceCommandKind::ReviewFreight);
+    NativeOutpostFreightPreview quote;quote.campaign_generation=owned.campaign_generation;quote.revision=19;
+    quote.player_civilization_id=owned.player_civilization_id;quote.colony_id=owned.colony_id;
+    quote.body_id=owned.body_id;quote.system_id=owned.system_id;quote.accepted=true;
+    quote.fleet_name="Mercury Freight";quote.home_name="Earth";quote.outpost_name="Mining Depot";
+    quote.cargo_capacity=1000;quote.stored_materials=100;quote.extraction_per_day=2;
+    workspace.set_freight_preview(quote);REQUIRE(workspace.freight_preview().has_value());
+    // A drag across different buttons must not dispatch.
+    (void)workspace.handle({InputEventType::LeftPressed,center(layout.freight_cancel)},width,height);
+    REQUIRE(workspace.handle({InputEventType::LeftReleased,center(layout.freight_confirm)},width,height).kind==ColonyWorkspaceCommandKind::None);
+    const auto confirmed=click(layout.freight_confirm);
+    REQUIRE(confirmed.kind==ColonyWorkspaceCommandKind::ConfirmFreight&&confirmed.quote_revision==19);
+    REQUIRE(click(layout.freight_cancel).kind==ColonyWorkspaceCommandKind::CancelFreight);
+    REQUIRE(!workspace.freight_preview()&&workspace.visible());
+    quote.accepted=false;quote.message="No idle freighter available.";workspace.set_freight_preview(quote);
+    REQUIRE(click(layout.freight_confirm).kind==ColonyWorkspaceCommandKind::None);
+    DrawList denied;workspace.render(denied,width,height);
+    REQUIRE(std::ranges::none_of(denied.overlay,[](const auto& item){const auto* t=std::get_if<Text>(&item);return t&&t->value=="DISPATCH FREIGHTER";}));
+    REQUIRE(workspace.handle({InputEventType::EscapePressed},width,height).kind==ColonyWorkspaceCommandKind::CancelFreight);
+    REQUIRE(workspace.visible()&&!workspace.freight_preview());
+    quote.accepted=true;workspace.set_freight_preview(quote);
+    (void)workspace.handle({InputEventType::PointerCancelled},width,height);REQUIRE(!workspace.freight_preview());
+    workspace.set_freight_preview(quote);auto changed=owned;changed.player_civilization_id++;
+    workspace.set_view(changed);REQUIRE(!workspace.freight_preview());
+    workspace.open(owned);workspace.set_freight_preview(quote);workspace.close();REQUIRE(!workspace.freight_preview());
+  }
 }
 
-void campaign_replacement_clears_owned_snapshot() {
-  NativeColonyWorkspace workspace;
-  workspace.open(view(7));
-  workspace.discard_campaign();
-  REQUIRE(!workspace.visible() && !workspace.view());
-}
 } // namespace
-
-int main() {
-  try {
-    responsive_layout_is_contained_and_nonoverlapping();
-    rendering_uses_canonical_sections_and_clipped_progress();
-    detail_scroll_reaches_outpost_rows_and_keeps_text_clipped();
-    wheel_reaches_last_site_and_escape_closes();
-    campaign_replacement_clears_owned_snapshot();
-    std::cout << "native colony workspace tests passed\n";
-    return 0;
-  } catch (const std::exception &error) {
-    std::cerr << error.what() << '\n';
-    return 1;
-  }
-}
+int main(){try{only_planetary_screen_is_rendered();freight_review_input_and_layout();
+  std::cout<<"Planetary workspace and freight checks passed\n";return 0;
+}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

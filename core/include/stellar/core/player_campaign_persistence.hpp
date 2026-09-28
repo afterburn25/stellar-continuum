@@ -103,6 +103,7 @@ public:
   [[nodiscard]] double simulation_days() const noexcept;
   [[nodiscard]] std::string_view game_version() const noexcept;
   [[nodiscard]] std::string_view saved_at_utc() const noexcept;
+  void set_runtime_continuation(CampaignRuntimeContinuation);
 
   // Always consumes this owner. After return or exception, the source object
   // may only be destroyed or move-assigned; no previously returned borrow is

@@ -1,4 +1,28 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Stellar Engine Windows export
+
+
+Current locally validated alpha: **0.1.13 Alpha / Engine 0.1.62**. See
+`../releases/0.1.13-alpha-validation.md` for its archive and verification. Use
+`windows-native-preview` for the playable native alpha. The native version comes
+from `export/runtime-config.json`; the preserved reference's `VERSION` is separate.
+The package contains the current planetary interface, 50,000-system setup, fixed
+regional star background and 3D consumers. See `../releases/0.1.13-alpha.md` and
+`../NATIVE_3D_SCALE_INTEGRATION_REPORT.md`. Export runs all maintained native and
+Python checks, then actual relocated gameplay/save/input validation. ZIP names
+include the game version; successful exports include a SHA-256 sidecar. Failed
+folders retain `EXPORT_FAILED.txt` and are never zipped as validated.
+
+The records below are historical milestones. Their old surface-screen and
+missing-settings statements do not describe the current alpha. Full graphical
+parity and clean-device certification remain separate gates.
+
 
 Engine0.1.54 adds maintained new-game input, independent-save and paused-reload export validation. The package includes four pinned species portraits and their scoped credits; missing or altered assets fail packaging. All43flags,143CTest,245Python checks and28Vulkan launches passed in combined validation. Clean-commit export repeats the checks. See NATIVE_STARTUP_FLOW.md.
 

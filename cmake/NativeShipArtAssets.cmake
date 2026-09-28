@@ -2,19 +2,20 @@
 file(READ "${CMAKE_SOURCE_DIR}/export/native-ship-art-assets.json" STELLAR_SHIP_ART_ASSETS)
 string(JSON STELLAR_SHIP_ART_SCHEMA GET "${STELLAR_SHIP_ART_ASSETS}" schemaVersion)
 string(JSON STELLAR_SHIP_ART_COUNT LENGTH "${STELLAR_SHIP_ART_ASSETS}" assets)
-if(NOT STELLAR_SHIP_ART_SCHEMA EQUAL 1 OR NOT STELLAR_SHIP_ART_COUNT EQUAL 7)
+if(NOT STELLAR_SHIP_ART_SCHEMA EQUAL 1 OR NOT STELLAR_SHIP_ART_COUNT EQUAL 8)
   message(FATAL_ERROR "Unsupported native ship art asset declaration")
 endif()
 add_custom_target(stellar_native_ship_art_assets)
 foreach(STELLAR_SHIP_ART_KEY IN ITEMS pathfinder-scout deep-space-science-vessel
     patrol-corvette interstellar-colony-ship resource-outpost-ship
-    interstellar-bulk-freighter credits)
+    interstellar-bulk-freighter patrol-corvette-tactical-v1 credits)
   if(STELLAR_SHIP_ART_KEY STREQUAL "credits")
     set(STELLAR_SHIP_ART_EXPECTED_SOURCE "docs/engine/NATIVE_SHIP_ART_SOURCES.md")
     set(STELLAR_SHIP_ART_EXPECTED_RUNTIME "Licenses/Ship-art-sources.md")
   else()
     if(STELLAR_SHIP_ART_KEY STREQUAL "resource-outpost-ship" OR
-       STELLAR_SHIP_ART_KEY STREQUAL "interstellar-bulk-freighter")
+       STELLAR_SHIP_ART_KEY STREQUAL "interstellar-bulk-freighter" OR
+       STELLAR_SHIP_ART_KEY STREQUAL "patrol-corvette-tactical-v1")
       set(STELLAR_SHIP_ART_EXTENSION "png")
     else()
       set(STELLAR_SHIP_ART_EXTENSION "jpg")

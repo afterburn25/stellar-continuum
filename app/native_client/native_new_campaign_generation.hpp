@@ -45,6 +45,7 @@ struct NativeNewCampaignGenerationStart {
 struct NativeDetachedNewCampaign {
   stellar::core::FreshCampaignState world;
   stellar::core::AdaptiveResearchStrategicRuntime research;
+  stellar::core::DeveloperResearchOptions developer_research;
 };
 
 using NativeNewCampaignPhaseSink =
@@ -74,6 +75,7 @@ public:
   NativeNewCampaignGenerationController &
   operator=(NativeNewCampaignGenerationController &&) = delete;
 
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept;
   [[nodiscard]] NativeNewCampaignGenerationStart start(
       const NativePreparedNewCampaign &, std::filesystem::path research_root,
       std::filesystem::path catalog_path);

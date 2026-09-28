@@ -1,4 +1,5 @@
 #include <stellar/core/planetary_body_persistence.hpp>
+#include <stellar/engine/parent_chain_index.hpp>
 
 #include <cmath>
 #include <cstdint>
@@ -36,7 +37,7 @@ bool environment_valid(const PlanetaryBody &body) noexcept {
 }
 PlanetaryBody materialize(const PlanetaryBodyPersistenceDto &body) {
   const auto &environment = *body.environment;
-  return {
+  PlanetaryBody result{
       body.id,
       body.system_id,
       body.parent_body_id,
@@ -59,7 +60,12 @@ PlanetaryBody materialize(const PlanetaryBodyPersistenceDto &body) {
       body.has_pre_warp_civilization,
       body.orbital_eccentricity,
       body.orbital_inclination_degrees,
+      body.stellar_exposure,
+      body.cracked_world,
+      body.appearance,
   };
+  migrate_giant_appearance(result);
+  return result;
 }
 
 void validate_physical(const PlanetaryBody &body) {
@@ -102,31 +108,50 @@ PlanetaryBodyPersistenceDto project(const PlanetaryBody &body) {
       body.has_pre_warp_civilization,
       body.orbital_eccentricity,
       body.orbital_inclination_degrees,
+      body.stellar_exposure,
+      body.cracked_world,
+      body.appearance,
   };
 }
 
 template <typename Body>
-void validate_catalog(std::span<const Body> bodies,
+const Body& catalog_body(const Body& body) { return body; }
+template <typename Body>
+const Body& catalog_body(const std::optional<Body>& body) { return *body; }
+
+template <typename StoredBody>
+void validate_catalog(std::span<const StoredBody> bodies,
                       std::span<const StellarSystem> systems) {
   if (bodies.empty())
     throw PlanetaryBodyPersistenceDataError(
         "The authoritative planetary catalog is missing or empty.");
 
-  std::unordered_set<int> distinct_ids;
-  for (const auto &body : bodies)
-    distinct_ids.insert(body.id);
-  if (distinct_ids.size() != bodies.size())
+  std::unordered_map<int, std::size_t> by_id;
+  by_id.reserve(bodies.size());
+  for (std::size_t i = 0; i < bodies.size(); ++i)
+    by_id.emplace(catalog_body(bodies[i]).id, i);
+  if (by_id.size() != bodies.size())
     throw PlanetaryBodyPersistenceDataError(
         "The authoritative planetary catalog contains duplicate body IDs.");
 
   std::unordered_set<int> system_ids;
+  system_ids.reserve(systems.size());
   for (const auto &system : systems)
     system_ids.insert(system.id);
-  std::unordered_map<int, const Body *> by_id;
-  for (const auto &body : bodies)
-    by_id.emplace(body.id, &body);
+  std::vector<std::optional<std::size_t>> parents(bodies.size());
+  for (std::size_t i = 0; i < bodies.size(); ++i) {
+    const auto parent = catalog_body(bodies[i]).parent_body_id;
+    if (parent) {
+      const auto found = by_id.find(*parent);
+      if (found != by_id.end()) parents[i] = found->second;
+    }
+  }
+  // Analyze once without changing the per-body validation/error order below.
+  // Unknown parents end a chain here and are rejected by the existing rule.
+  const stellar::engine::ParentChainIndex chains(parents);
 
-  for (const auto &body : bodies) {
+  for (std::size_t index = 0; index < bodies.size(); ++index) {
+    const auto& body = catalog_body(bodies[index]);
     if (!valid(body.kind))
       throw PlanetaryBodyPersistenceDataError(
           "Planetary body " + std::to_string(body.id) +
@@ -144,19 +169,10 @@ void validate_catalog(std::span<const Body> bodies,
           " references unknown system " + std::to_string(body.system_id) +
           ".");
 
-    std::unordered_set<int> visited{body.id};
-    auto *ancestor = &body;
-    while (ancestor->parent_body_id) {
-      const auto ancestor_id = *ancestor->parent_body_id;
-      if (!visited.insert(ancestor_id).second)
-        throw PlanetaryBodyPersistenceDataError(
-            "Planetary body " + std::to_string(body.id) +
-            " belongs to a cyclic parent chain.");
-      const auto found = by_id.find(ancestor_id);
-      if (found == by_id.end())
-        break;
-      ancestor = found->second;
-    }
+    if (chains.reaches_cycle(index))
+      throw PlanetaryBodyPersistenceDataError(
+          "Planetary body " + std::to_string(body.id) +
+          " belongs to a cyclic parent chain.");
 
     if ((body.kind == PlanetaryBodyKind::Planet ||
          body.kind == PlanetaryBodyKind::DwarfPlanet) &&
@@ -171,8 +187,8 @@ void validate_catalog(std::span<const Body> bodies,
     if (body.parent_body_id) {
       const auto found = by_id.find(*body.parent_body_id);
       if (found == by_id.end() ||
-          found->second->kind != PlanetaryBodyKind::Planet ||
-          found->second->system_id != body.system_id)
+          catalog_body(bodies[found->second]).kind == PlanetaryBodyKind::Moon ||
+          catalog_body(bodies[found->second]).system_id != body.system_id)
         throw PlanetaryBodyPersistenceDataError(
             "Planetary body " + std::to_string(body.id) +
             " has an invalid or cross-system parent.");
@@ -213,17 +229,17 @@ std::vector<PlanetaryBody> restore_planetary_bodies(
       throw PlanetaryBodyPersistenceDataError(
           "Format v16 planetary catalog contains a null body entry.");
 
-  std::vector<PlanetaryBodyPersistenceDto> materialized;
-  materialized.reserve(input.bodies.size());
-  for (const auto &body : input.bodies)
-    materialized.push_back(*body);
-
   validate_catalog(
-      std::span<const PlanetaryBodyPersistenceDto>(materialized), systems);
+      std::span<const std::optional<PlanetaryBodyPersistenceDto>>(input.bodies), systems);
   std::vector<PlanetaryBody> result;
-  result.reserve(materialized.size());
-  for (const auto &body : materialized)
-    result.push_back(materialize(body));
+  result.reserve(input.bodies.size());
+  for (const auto &body : input.bodies)
+    result.push_back(materialize(*body));
+  // One-time visual migration only: preserve saved environment, orbits and IDs.
+  std::unordered_map<int,const StellarPhysicalProperties*> stars;
+  for(const auto& s:systems)if(s.stellar_object)stars.emplace(s.id,&*s.stellar_object);
+  for(auto& b:result)if(!b.appearance){const auto star=stars.find(b.system_id);
+    b.appearance=planet_appearance_for_existing(0,b,star==stars.end()?nullptr:star->second);}
   return result;
 }
 
@@ -232,15 +248,10 @@ PlanetaryBodyPersistenceInput capture_planetary_bodies(
     std::span<const StellarSystem> systems) {
   validate_catalog(bodies, systems);
 
-  std::vector<PlanetaryBodyPersistenceDto> values;
-  values.reserve(bodies.size());
-  for (const auto &body : bodies)
-    values.push_back(project(body));
-
   PlanetaryBodyPersistenceInput result{true, {}};
-  result.bodies.reserve(values.size());
-  for (auto &body : values)
-    result.bodies.emplace_back(std::move(body));
+  result.bodies.reserve(bodies.size());
+  for (const auto &body : bodies)
+    result.bodies.emplace_back(project(body));
   return result;
 }
 

@@ -3,11 +3,13 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cwctype>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 
 #if defined(_WIN32)
 #define NOMINMAX
@@ -89,6 +91,16 @@ std::wstring extended_path(const std::filesystem::path &path) {
 std::error_code windows_error(DWORD value = GetLastError()) {
   return {static_cast<int>(value), std::system_category()};
 }
+
+// A destination another process just published or is scanning can be
+// transiently locked (antivirus, indexer); these errors usually clear quickly.
+bool transient_lock_error(DWORD error) {
+  return error == ERROR_ACCESS_DENIED || error == ERROR_SHARING_VIOLATION ||
+         error == ERROR_LOCK_VIOLATION;
+}
+
+constexpr int kTransientLockAttempts = 50;
+constexpr auto kTransientLockDelay = std::chrono::milliseconds(20);
 
 std::wstring guid_token() {
   GUID guid{};
@@ -239,9 +251,13 @@ bool AtomicFileWriteError::recovery_file_retained() const noexcept {
   return recovery_file_retained_;
 }
 
-void write_file_atomically(const std::filesystem::path &path,
-                           std::span<const std::byte> bytes,
-                           AtomicFileWriteOptions options) {
+void write_file_atomically(const std::filesystem::path& path,std::span<const std::byte> bytes,AtomicFileWriteOptions options){
+  write_file_atomically_stream(path,[&](const AtomicTextSink& sink){sink({reinterpret_cast<const char*>(bytes.data()),bytes.size()});},options);
+}
+void write_file_atomically_stream(const std::filesystem::path &path,
+                                  const AtomicTextProducer& producer,
+                                  AtomicFileWriteOptions options) {
+  if(!producer)throw std::invalid_argument("An atomic write producer is required");
 #if !defined(_WIN32)
   throw AtomicFileWriteError(
       std::make_error_code(std::errc::operation_not_supported),
@@ -329,6 +345,7 @@ void write_file_atomically(const std::filesystem::path &path,
         AtomicFileWriteOperation::create_temporary, primary, backup,
         temporary, false);
 
+  const auto write_chunk=[&](std::string_view bytes){
   std::size_t offset = 0;
   while (offset < bytes.size()) {
     auto remaining = bytes.size() - offset;
@@ -363,6 +380,22 @@ void write_file_atomically(const std::filesystem::path &path,
                 AtomicFileWriteOperation::write_temporary, primary, backup,
                 temporary, handle);
 #endif
+  }
+  };
+  try {
+    std::string buffer;buffer.reserve(65536);
+    producer([&](std::string_view bytes){
+      while(!bytes.empty()){
+        const auto count=std::min<std::size_t>(65536-buffer.size(),bytes.size());
+        buffer.append(bytes.data(),count);bytes.remove_prefix(count);
+        if(buffer.size()==65536){write_chunk(buffer);buffer.clear();}
+      }
+    });
+    if(!buffer.empty())write_chunk(buffer);
+  }catch(...){
+    if(handle.valid())CloseHandle(handle.release());
+    DeleteFileW(extended_path(temporary).c_str());
+    throw;
   }
 
 #if defined(STELLAR_ATOMIC_FILE_WRITE_TESTING)
@@ -409,10 +442,18 @@ void write_file_atomically(const std::filesystem::path &path,
       }
     }
 #endif
-    if (!MoveFileExW(extended_path(temporary).c_str(),
-                     extended_path(primary).c_str(), MOVEFILE_WRITE_THROUGH))
-      fail(windows_error(), AtomicFileWriteOperation::move_new, primary,
-           backup, temporary, false);
+    DWORD move_error = ERROR_SUCCESS;
+    for (int attempt = 0;; ++attempt) {
+      if (MoveFileExW(extended_path(temporary).c_str(),
+                      extended_path(primary).c_str(), MOVEFILE_WRITE_THROUGH))
+        break;
+      move_error = GetLastError();
+      if (!transient_lock_error(move_error) ||
+          attempt >= kTransientLockAttempts)
+        fail(windows_error(move_error), AtomicFileWriteOperation::move_new,
+             primary, backup, temporary, false);
+      std::this_thread::sleep_for(kTransientLockDelay);
+    }
     return;
   }
 
@@ -425,17 +466,26 @@ void write_file_atomically(const std::filesystem::path &path,
 
   // Keep owned storage alive for the duration of ReplaceFileW.
   const auto backup_native = extended_path(backup);
-  if (!ReplaceFileW(extended_path(primary).c_str(),
-                    extended_path(temporary).c_str(),
-                    options.preserve_existing_backup
-                        ? nullptr
-                        : backup_native.c_str(),
-                    REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr)) {
-    const auto error = GetLastError();
-    const bool ambiguous = error == ERROR_UNABLE_TO_MOVE_REPLACEMENT ||
-                           error == ERROR_UNABLE_TO_MOVE_REPLACEMENT_2;
-    fail(windows_error(error), AtomicFileWriteOperation::replace_existing,
-         primary, backup, temporary, ambiguous);
+  DWORD replace_error = ERROR_SUCCESS;
+  for (int attempt = 0;; ++attempt) {
+    if (ReplaceFileW(extended_path(primary).c_str(),
+                     extended_path(temporary).c_str(),
+                     options.preserve_existing_backup
+                         ? nullptr
+                         : backup_native.c_str(),
+                     REPLACEFILE_IGNORE_MERGE_ERRORS, nullptr, nullptr))
+      break;
+    replace_error = GetLastError();
+    if (!transient_lock_error(replace_error) ||
+        attempt >= kTransientLockAttempts) {
+      const bool ambiguous =
+          replace_error == ERROR_UNABLE_TO_MOVE_REPLACEMENT ||
+          replace_error == ERROR_UNABLE_TO_MOVE_REPLACEMENT_2;
+      fail(windows_error(replace_error),
+           AtomicFileWriteOperation::replace_existing, primary, backup,
+           temporary, ambiguous);
+    }
+    std::this_thread::sleep_for(kTransientLockDelay);
   }
 #endif
 }

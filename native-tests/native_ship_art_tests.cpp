@@ -124,6 +124,18 @@ void fleet_workspace_thumbnails(const std::filesystem::path &root) {
   workspace.render(without_art, 1280, 720, {});
   REQUIRE(workspace.last_ship_art_rows() == 0);
   REQUIRE(overlay_images(without_art) == 0);
+  NativeFleetWorkspace commands{FleetWorkspacePresentation::SelectedCommands};
+  commands.set_view(fleet_view());
+  DrawList selected;
+  commands.render(selected, 1280, 720, {}, &assets);
+  REQUIRE(commands.last_ship_art_rows() == 1);
+  REQUIRE(overlay_images(selected) == 1);
+  auto unselected = fleet_view();
+  unselected.selected_fleet_id.reset();
+  commands.set_view(std::move(unselected));
+  DrawList hidden;
+  commands.render(hidden, 1280, 720, {}, &assets);
+  REQUIRE(commands.last_ship_art_rows() == 0 && overlay_images(hidden) == 0);
 }
 
 NativeShipyardView shipyard_view() {

@@ -277,7 +277,7 @@ CampaignMassiveCombat &CampaignMassiveCombat::operator=(
 CombatOrderResult CampaignMassiveCombat::begin(FreshCampaignState &galaxy,
                                                 int civilization_id,
                                                 int actor_fleet_id,
-                                                double day) {
+                                                double day, bool spatial_deployment) {
   if (!std::isfinite(day) || day < 0)
     return {false, "Combat time is invalid."};
   if (galaxy.active_combat_encounter &&
@@ -329,6 +329,7 @@ CombatOrderResult CampaignMassiveCombat::begin(FreshCampaignState &galaxy,
     auto tactical = fleet->tactical_vessel
                         ? clone_vessel(*fleet->tactical_vessel)
                         : vessel(*fleet, combat, profile_value);
+    tactical.id = campaign_vessel_id_for_fleet(fleet->id);
     tactical.name = fleet->name;
     tactical.hull_fraction = static_cast<float>(std::clamp(
         combat.hull / std::max(1.0, profile_value.max_hull), 0.0, 1.0));
@@ -421,6 +422,7 @@ CombatOrderResult CampaignMassiveCombat::begin(FreshCampaignState &galaxy,
       formation.name = "Task Force " + grouped(id);
       formation.position = {side * 420.F,
                             (static_cast<int>(formations.size()) % 24 - 12) * 55.F};
+      if(spatial_deployment)formation.position.z = static_cast<float>(static_cast<int>(formation.id % 5) - 2) * 40.F;
       formation.heading = {-side, 0};
       formation.order = group.first.military ? MassiveCombatOrderType::Engage
                                              : MassiveCombatOrderType::Retreat;
@@ -515,9 +517,19 @@ CampaignMassiveCombat::reconcile(FreshCampaignState &galaxy) {
     for (const auto &[id, vessel_value] : tracked) {
       if (vessel_value.destroyed)
         continue;
+      if (id == campaign_zero_fleet_vessel_id) {
+        const auto binding = std::ranges::find(bound, 0,
+                                               &CampaignCombatBinding::fleet_id);
+        if (binding == bound.end())
+          throw std::invalid_argument(
+              "Campaign combat participant does not match its persistent vessel.");
+        survivors.push_back(0);
+        continue;
+      }
       if (id < std::numeric_limits<int>::min() ||
           id > std::numeric_limits<int>::max())
-        throw std::overflow_error("Arithmetic operation resulted in an overflow.");
+        throw std::overflow_error(
+            "Arithmetic operation resulted in an overflow.");
       survivors.push_back(static_cast<int>(id));
     }
     int cohort_survivors = 0;
@@ -531,7 +543,8 @@ CampaignMassiveCombat::reconcile(FreshCampaignState &galaxy) {
       cohort_survivors = static_cast<int>(next);
     }
     for (const auto &binding : bound)
-      if (!tracked.contains(binding.fleet_id) && cohort_survivors > 0) {
+      if (!tracked.contains(campaign_vessel_id_for_fleet(binding.fleet_id)) &&
+          cohort_survivors > 0) {
         survivors.push_back(binding.fleet_id);
         --cohort_survivors;
       }
@@ -554,13 +567,15 @@ CampaignMassiveCombat::reconcile(FreshCampaignState &galaxy) {
       const auto &profile_value = profile(fleet);
       auto &combat = ensure_fleet_combat_state(fleet);
       const auto alive = survived(fleet.id);
-      auto vessel_value = tracked.contains(fleet.id)
-                              ? clone_vessel(tracked.at(fleet.id))
+      const auto tactical_vessel_id = campaign_vessel_id_for_fleet(fleet.id);
+      auto vessel_value = tracked.contains(tactical_vessel_id)
+                              ? clone_vessel(tracked.at(tactical_vessel_id))
                               : (fleet.tactical_vessel
                                      ? clone_vessel(*fleet.tactical_vessel)
                                      : clone_vessel(
                                            vessel(fleet, combat, profile_value)));
       vessel_value.name = fleet.name;
+      vessel_value.id = tactical_vessel_id;
       vessel_value.destroyed = !alive;
       vessel_value.escaped = alive && formation.escaped;
       vessel_value.battles_fought =
@@ -622,6 +637,18 @@ CampaignMassiveCombat::reconcile(FreshCampaignState &galaxy) {
                     0,
                     "Tactical encounter concluded. Damage and losses are persistent."});
   return events;
+}
+
+MassiveCombatOrderResult CampaignMassiveCombat::issue_order(
+    FreshCampaignState &galaxy, int civilization_id,
+    MassiveCombatOrder order) {
+  auto *encounter = galaxy.active_combat_encounter
+                        ? &*galaxy.active_combat_encounter
+                        : nullptr;
+  if (!encounter || encounter->reconciled)
+    return {false, "There is no active tactical encounter."};
+  return storage_->engine.issue_order(encounter->battle, civilization_id,
+                                      std::move(order));
 }
 
 MassiveCombatSnapshot CampaignMassiveCombat::observe(
@@ -894,7 +921,8 @@ MassiveCombatSnapshot build_massive_combat_snapshot(
       observed.progress_01 = progress;
       const auto inverse = 1.F - progress;
       observed.current_position = MassivePoint{salvo->launch_position->x * inverse + target->second->position.x * progress,
-                                                salvo->launch_position->y * inverse + target->second->position.y * progress};
+                                                salvo->launch_position->y * inverse + target->second->position.y * progress,
+                                                salvo->launch_position->z * inverse + target->second->position.z * progress};
     }
     if (source_known) { const auto spread = uncertainty(salvo->missile_count, source_own || source_confidence >= .999F, source_confidence);
       observed.count_low = std::max(0, salvo->missile_count - spread); observed.count_high = salvo->missile_count + spread; }
@@ -924,15 +952,15 @@ std::vector<MassiveCombatOrder> decide_massive_combat_doctrine(
         if (value->is_interdicting) hostile_interdictors.push_back(value);
       const auto source = std::ranges::min_element(hostile_interdictors, {}, [&](const auto *value) {
         const auto dx = value->position.x - formation->position.x, dy = value->position.y - formation->position.y;
-        return dx * dx + dy * dy; });
+        const auto dz=value->position.z-formation->position.z;return dx * dx + dy * dy + dz*dz; });
       if (source != hostile_interdictors.end())
         orders.push_back({formation->formation_id, MassiveCombatOrderType::Breakout, (*source)->formation_id, std::nullopt, MassiveFormationShape::Breakout});
       else {
-        const auto squared = formation->position.x * formation->position.x + formation->position.y * formation->position.y;
+        const auto squared = formation->position.x * formation->position.x + formation->position.y * formation->position.y + formation->position.z*formation->position.z;
         const auto length = std::sqrt(squared);
         const auto x = squared > .01F ? formation->position.x / length : 1.F, y = squared > .01F ? formation->position.y / length : 0.F;
         orders.push_back({formation->formation_id, MassiveCombatOrderType::EmergencyRetreat, std::nullopt,
-                          MassivePoint{formation->position.x + x * 2000.F, formation->position.y + y * 2000.F}, MassiveFormationShape::RetreatColumn});
+                          MassivePoint{formation->position.x + x * 2000.F, formation->position.y + y * 2000.F, formation->position.z+(squared>.01F?formation->position.z/length*2000.F:0)}, MassiveFormationShape::RetreatColumn});
       }
     } else if (interdictor != own.end() && formation->formation_id != (*interdictor)->formation_id &&
                (formation->shape == MassiveFormationShape::Screen || formation->shape == MassiveFormationShape::Escort)) {
@@ -940,7 +968,7 @@ std::vector<MassiveCombatOrder> decide_massive_combat_doctrine(
     } else if (!hostile.empty()) {
       const auto target = std::ranges::min_element(hostile, {}, [&](const auto *value) {
         const auto dx = value->position.x - formation->position.x, dy = value->position.y - formation->position.y;
-        return std::pair{dx * dx + dy * dy, value->formation_id}; });
+        const auto dz=value->position.z-formation->position.z;return std::pair{dx * dx + dy * dy + dz*dz, value->formation_id}; });
       orders.push_back({formation->formation_id, MassiveCombatOrderType::Engage, (*target)->formation_id});
     }
   }

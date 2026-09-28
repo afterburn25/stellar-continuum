@@ -95,6 +95,22 @@ void actual_handoff_and_main_owner_test(const fs::path &research_root,
           "main-thread save capture failed after detached handoff");
 }
 
+void explored_developer_handoff(const fs::path &research_root,const fs::path &catalog_path){
+  NativeNewCampaignSetupController setup;
+  NativeNewCampaignSetupInput input{"139500",250,"terran_baseline","2044-05-06T07:08:09Z"};
+  input.developer_full_exploration=true;
+  const auto prepared=setup.prepare(input,true);require(prepared.accepted,"Explored developer setup was rejected.");
+  NativeNewCampaignGenerationController generation;
+  const auto request=generation.start(*prepared.prepared,research_root,catalog_path);
+  require(request.accepted&&wait_terminal(generation).ready,"Explored background generation failed.");
+  auto runtime=generation.activate_ready(request.request_id);require(runtime.has_value(),"Explored generation did not activate.");
+  const auto &world=runtime->world().campaign();
+  require(world.developer_provenance&&world.developer_provenance->full_exploration,
+      "Background generation lost exploration provenance.");
+  for(const auto &system:world.systems)require(world.knowledge.is_system_fully_surveyed(world.player_civilization_id,system.id),
+      "Background generation did not reveal the actual campaign knowledge.");
+}
+
 void take_and_repeat_500_test(const fs::path &research_root,
                               const fs::path &catalog_path) {
   NativeNewCampaignGenerationController controller;
@@ -309,13 +325,14 @@ int main(int argc, char **argv) try {
   const auto research_root = fs::absolute(argv[1]);
   const auto catalog_path = fs::absolute(argv[2]);
   actual_handoff_and_main_owner_test(research_root, catalog_path);
+  explored_developer_handoff(research_root,catalog_path);
   take_and_repeat_500_test(research_root, catalog_path);
   cancellation_and_owner_test(research_root, catalog_path);
   launch_failure_and_retry_test(research_root, catalog_path);
   activation_failure_test(research_root, catalog_path);
   failure_preserves_live_runtime_test(research_root, catalog_path);
   ready_discard_and_join_test(research_root, catalog_path);
-  std::cout << "native async campaign generation: 7/7 bounded cases passed\n";
+  std::cout << "native async campaign generation: 8/8 bounded cases passed\n";
   return 0;
 } catch (const std::exception &error) {
   std::cerr << "native async campaign generation failed: " << error.what()

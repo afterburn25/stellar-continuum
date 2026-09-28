@@ -367,7 +367,7 @@ AdaptiveResearchCivilizationState AdaptiveResearchOutcomeSnapshotCodec::deserial
   if (schema == root.end())
     fail("Adaptive Research snapshot is missing schemaVersion.");
   const auto version = checked_int32(*schema);
-  if (version >= 1 && version <= 4)
+  if ((version >= 1 && version <= 4) || version == AdaptiveResearchSnapshotCodec::current_schema_version)
     return storage_->v4.deserialize(text);
   if (version != current_schema_version)
     fail("Unsupported Adaptive Research outcome snapshot schema " +

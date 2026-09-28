@@ -1,10 +1,14 @@
+#include "planet_appearance_json.hpp"
+#include <stellar/core/developer_planet_index.hpp>
 #include <stellar/core/player_campaign_json.hpp>
+#include <stellar/core/developer_campaign.hpp>
 
 #include <stellar/core/detail/player_campaign_persistence_restore.hpp>
 #include <stellar/core/diplomacy_snapshot_invariants.hpp>
 #include <stellar/core/galaxy_payload_json.hpp>
 
 #include "galaxy_payload_json_internal.hpp"
+#include "json_encode_validation.hpp"
 #include "player_campaign_json_diplomacy.hpp"
 #include "player_campaign_json_research.hpp"
 
@@ -106,6 +110,10 @@ void append_object(std::string &output, const OrderedObject &object,
 }
 
 void append_json(std::string &output, const OrderedValue &value) {
+  if (const auto* array = std::get_if<OrderedValue::DeferredArray>(&value.data)) {
+    output += array->source;
+    return;
+  }
   if (std::holds_alternative<std::nullptr_t>(value.data)) {
     output += "null";
   } else if (const auto *boolean = std::get_if<bool>(&value.data)) {
@@ -867,17 +875,10 @@ PlayerCampaignJsonError::byte() const noexcept {
   return byte_;
 }
 
-RestoredPlayerCampaignV17 restore_player_campaign_v17_json_impl(
+static RestoredPlayerCampaignV17 restore_player_campaign_v17_ordered(
     AdaptiveResearchStrategicRuntime research_runtime,
-    std::string_view utf8_json, const PlayerCampaignJsonRestoreHooks &hooks) {
-  report_restore_stage(hooks, PlayerCampaignJsonStage::Parse);
-  OrderedValue root_value;
-  try {
-    root_value = json_detail::parse_ordered_json(utf8_json);
-  } catch (const json_detail::ParseFailure &error) {
-    fail(PlayerCampaignJsonStage::Parse, "JsonReaderException", error.what(),
-         std::nullopt, std::nullopt, {}, error.byte);
-  }
+    const OrderedValue& root_value, const PlayerCampaignJsonRestoreHooks &hooks,
+    std::optional<CampaignDeveloperProvenance> developer = std::nullopt) {
   const auto *root = std::get_if<OrderedObject>(&root_value.data);
   if (!root)
     fail(PlayerCampaignJsonStage::Envelope, "InvalidOperationException",
@@ -886,6 +887,12 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17_json_impl(
   if (member(*root, "DeveloperFormatVersion"))
     fail(PlayerCampaignJsonStage::Envelope, "InvalidDataException",
          "Developer campaign envelopes cannot be opened as Player saves.");
+  const auto *developer_member=member(*root,"DeveloperSession");
+  if(developer){
+    if(!developer_member||!typed_bool(*developer_member,"$.DeveloperSession"))
+      fail(PlayerCampaignJsonStage::Envelope,"InvalidDataException","Developer campaign payload is missing its provenance marker.");
+  }else if(developer_member)
+    fail(PlayerCampaignJsonStage::Envelope,"InvalidDataException","Developer campaign payloads cannot be opened as Player saves.");
   const auto *format_member = member(*root, "FormatVersion");
   if (!format_member ||
       std::holds_alternative<std::nullptr_t>(format_member->data))
@@ -947,6 +954,8 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17_json_impl(
   std::optional<RestoredGalaxyPayloadV16> restored;
   try {
     restored.emplace(restore_galaxy_payload_v16(galaxy_payload));
+    restored->galaxy.developer_provenance=developer;
+    validate_developer_coverage(restored->galaxy);
   } catch (const GalaxyPayloadPersistenceArgumentNullError &error) {
     fail(PlayerCampaignJsonStage::GalaxyRestore, "ArgumentNullException",
          error.what());
@@ -962,6 +971,9 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17_json_impl(
   }
 
   const auto *research_member = member(*root, "AdaptiveResearch");
+  // The restored galaxy owns its state; release the intermediate DTO before
+  // research restoration builds its indexes and runtime objects.
+  galaxy_payload = {};
   bool research_decode_started = false;
   try {
     PlayerCampaignRestoreHooks restore_hooks;
@@ -1015,42 +1027,60 @@ RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
     AdaptiveResearchStrategicRuntime research_runtime, std::string_view utf8_json,
     const PlayerCampaignJsonRestoreHooks &hooks) {
   try {
-    return restore_player_campaign_v17_json_impl(
-        std::move(research_runtime), utf8_json, hooks);
+    report_restore_stage(hooks, PlayerCampaignJsonStage::Parse);
+    OrderedValue root;
+    try {
+      constexpr std::array<std::string_view, 2> arrays{
+          "/Galaxy/Systems", "/Galaxy/PlanetaryBodies"};
+      root = json_detail::parse_ordered_json(utf8_json, {arrays});
+    } catch (const json_detail::ParseFailure &error) {
+      fail(PlayerCampaignJsonStage::Parse, "JsonReaderException", error.what(),
+           std::nullopt, std::nullopt, {}, error.byte);
+    }
+    return restore_player_campaign_v17_ordered(
+        std::move(research_runtime), root, hooks);
   } catch (const RestoreProgressCallbackFailure &failure) {
     std::rethrow_exception(failure.error());
   }
 }
 
-std::string
-encode_player_campaign_v17_json(const PlayerCampaignPayloadV17Dto &payload) {
-  if (payload.format_version != 17)
-    fail(PlayerCampaignJsonStage::Representability,
-         "NativeRepresentabilityException",
-         "Current Player JSON persistence represents format 17 only.");
-  try {
-    auto root = Json::parse(encode_galaxy_payload_v16_json(payload.galaxy));
-    root["FormatVersion"] = payload.format_version;
-    root["GalaxyFormatVersion"] = payload.galaxy_format_version
+namespace {
+Json encode_player_campaign_tail(const PlayerCampaignPayloadV17Dto& payload){
+    Json tail=Json::object();
+    tail["GalaxyFormatVersion"] = payload.galaxy_format_version
                                       ? Json(*payload.galaxy_format_version)
                                       : Json(nullptr);
     if (payload.diplomacy) {
       auto diplomacy = player_json_detail::jsnapshot(*payload.diplomacy);
       reject_nonfinite_numbers(diplomacy, "$/Diplomacy", "Diplomacy");
-      root["Diplomacy"] = std::move(diplomacy);
+      tail["Diplomacy"] = std::move(diplomacy);
     } else {
-      root["Diplomacy"] = nullptr;
+      tail["Diplomacy"] = nullptr;
     }
     if (payload.adaptive_research) {
       validate_research_finite(*payload.adaptive_research);
       auto research =
           player_json_detail::encode_research(*payload.adaptive_research);
       reject_research_numeric_nulls(research, "$/AdaptiveResearch");
-      root["AdaptiveResearch"] = std::move(research);
+      tail["AdaptiveResearch"] = std::move(research);
     } else {
-      root["AdaptiveResearch"] = nullptr;
+      tail["AdaptiveResearch"] = nullptr;
     }
-    return root.dump(2);
+    json_detail::validate_encoded_text(tail["Diplomacy"]);
+    json_detail::validate_encoded_text(tail["AdaptiveResearch"]);
+    return tail;
+}
+Json encode_player_campaign_document(const PlayerCampaignPayloadV17Dto &payload) {
+  if (payload.format_version != 17)
+    fail(PlayerCampaignJsonStage::Representability,
+         "NativeRepresentabilityException",
+         "Current Player JSON persistence represents format 17 only.");
+  try {
+    auto root = detail::encode_galaxy_payload_v16_document(payload.galaxy);
+    root["FormatVersion"] = payload.format_version;
+    auto tail=encode_player_campaign_tail(payload);
+    for(auto& [key,value]:tail.items())root[key]=std::move(value);
+    return root;
   } catch (const GalaxyPayloadJsonError &error) {
     fail(error.phase() == GalaxyPayloadJsonErrorPhase::Representability
              ? PlayerCampaignJsonStage::Representability
@@ -1062,6 +1092,218 @@ encode_player_campaign_v17_json(const PlayerCampaignPayloadV17Dto &payload) {
   } catch (const nlohmann::json::exception &error) {
     fail(PlayerCampaignJsonStage::Encode, "JsonException", error.what());
   }
+}
+} // namespace
+
+std::string encode_player_campaign_v17_json(const PlayerCampaignPayloadV17Dto &payload) {
+  try {
+    return encode_player_campaign_document(payload).dump(2);
+  } catch (const nlohmann::json::exception &error) {
+    fail(PlayerCampaignJsonStage::Encode, "JsonException", error.what());
+  }
+}
+
+namespace {
+Json encode_runtime_continuation(const CampaignRuntimeContinuation &state){
+  Json plans=Json::array();
+  for(const auto &plan:state.strategic.plans){
+    Json priorities=Json::array();
+    for(const auto &priority:plan.priorities)priorities.push_back({{"Type",static_cast<int>(priority.type)},
+        {"Score",priority.score},{"Reason",priority.reason}});
+    plans.push_back({{"CivilizationId",plan.civilization_id},{"GeneratedAt",plan.generated_at_tick},
+        {"ReviewAfter",plan.review_after_tick},{"Priorities",std::move(priorities)}});
+  }
+  Json strategic={{"Days",state.strategic.strategic_days},{"Plans",std::move(plans)}};
+  if(state.strategic.campaign_seed)strategic["CampaignSeed"]=*state.strategic.campaign_seed;
+  const auto &d=state.diplomacy;const auto &m=d.maintenance;
+  return {{"Version",1},{"Strategic",std::move(strategic)},
+    {"Diplomacy",{{"LastProcessed",d.last_processed_tick},{"Initialized",m.initialized},
+      {"NextReview",m.next_review_tick},{"LastReview",m.last_review_tick},
+      {"ReviewInterval",m.policy.review_interval_ticks},{"ContactStaleAfter",m.policy.contact_stale_after_ticks},
+      {"ProposalLifetime",m.policy.proposal_lifetime_ticks}}}};
+}
+CampaignRuntimeContinuation decode_runtime_continuation(const OrderedValue &value){
+  const auto object=[](const OrderedValue &v)->const OrderedObject&{
+    const auto &o=typed_object(v,"$.RuntimeContinuation");reject_root_duplicates(o);return o;
+  };
+  const auto field=[](const OrderedObject &o,const char *name)->const OrderedValue&{
+    if(const auto *v=member(o,name))return *v;
+    throw PlayerCampaignPersistenceDataError(std::string("Incomplete runtime continuation: ")+name);
+  };
+  const auto integer_field=[&](const OrderedObject &o,const char *name){
+    return typed_integer<std::int64_t>(field(o,name),std::string("$.RuntimeContinuation.")+name);
+  };
+  const auto &root=object(value);
+  if(integer_field(root,"Version")!=1)throw PlayerCampaignPersistenceDataError("Unsupported runtime continuation.");
+  CampaignRuntimeContinuation result;
+  const auto &s=object(field(root,"Strategic"));
+  result.strategic.strategic_days=typed_double(field(s,"Days"),"$.RuntimeContinuation.Strategic.Days");
+  if(member(s,"CampaignSeed"))result.strategic.campaign_seed=integer_field(s,"CampaignSeed");
+  const auto &plans=typed_array(field(s,"Plans"),"$.RuntimeContinuation.Strategic.Plans");
+  if(plans.size()>4096)throw PlayerCampaignPersistenceDataError("Too many strategic plans.");
+  for(const auto &entry:plans){
+    const auto &p=object(entry);CivilizationStrategicPlan plan;
+    plan.civilization_id=typed_integer<int>(field(p,"CivilizationId"),"$.RuntimeContinuation.CivilizationId");
+    plan.generated_at_tick=integer_field(p,"GeneratedAt");plan.review_after_tick=integer_field(p,"ReviewAfter");
+    const auto &priorities=typed_array(field(p,"Priorities"),"$.RuntimeContinuation.Priorities");
+    if(priorities.size()>8)throw PlayerCampaignPersistenceDataError("Too many strategic priorities.");
+    for(const auto &entry_priority:priorities){
+      const auto &a=object(entry_priority);
+      const auto type=integer_field(a,"Type");
+      if(type<0||type>7)throw PlayerCampaignPersistenceDataError("Unknown strategic priority.");
+      plan.priorities.push_back({static_cast<StrategicPriorityType>(type),
+        typed_double(field(a,"Score"),"$.RuntimeContinuation.Score"),
+        typed_string(field(a,"Reason"),"$.RuntimeContinuation.Reason")});
+    }
+    result.strategic.plans.push_back(std::move(plan));
+  }
+  const auto &d=object(field(root,"Diplomacy"));
+  result.diplomacy.last_processed_tick=integer_field(d,"LastProcessed");
+  auto &m=result.diplomacy.maintenance;
+  m.initialized=typed_bool(field(d,"Initialized"),"$.RuntimeContinuation.Initialized");
+  m.next_review_tick=integer_field(d,"NextReview");m.last_review_tick=integer_field(d,"LastReview");
+  m.policy={integer_field(d,"ReviewInterval"),integer_field(d,"ContactStaleAfter"),integer_field(d,"ProposalLifetime")};
+  return result;
+}
+}
+
+DeveloperCampaignPayload capture_developer_campaign(
+    IntegratedAdaptiveCampaignRuntime &campaign,const PlayerCampaignCaptureOptions &options){
+  auto &world=campaign.world().campaign();
+  if(!world.developer_provenance)
+    throw PlayerCampaignPersistenceOperationError("Developer persistence requires an explicitly marked campaign.");
+  if(!std::isfinite(options.simulation_days)||options.simulation_days<0)
+    throw PlayerCampaignPersistenceRangeError("Invalid developer simulation time.");
+  const auto diplomacy=campaign.diplomacy().snapshot();
+  (void)DiplomacySnapshotInvariantValidator::validate(diplomacy);
+  DiplomacyCampaignReferenceValidator::validate(world,diplomacy);
+  PlayerCampaignPayloadV17Dto common;
+  common.galaxy=capture_galaxy_payload_v16(world,{options.simulation_days,options.game_version,options.saved_at_utc,true});
+  common.diplomacy=diplomacy;
+  common.adaptive_research=AdaptiveResearchCampaignSnapshotCodec(campaign.research_runtime()).capture(campaign.research());
+  auto continuation=campaign.continuation();
+  validate_developer_coverage(world);
+  validate_campaign_runtime_continuation(continuation,world,options.simulation_days);
+  return {std::move(common),*world.developer_provenance,std::move(continuation)};
+}
+
+namespace {
+Json developer_envelope(const DeveloperCampaignPayload &snapshot,Json payload){
+  const auto &provenance=snapshot.provenance;
+  validate_developer_simulation_state(provenance.simulation);
+  if(!provenance.tools_used&&(provenance.normal_research_completed||provenance.special_research_completed||provenance.player_ai_control||provenance.full_exploration))
+    throw PlayerCampaignPersistenceDataError("Developer overrides require ToolsUsed provenance.");
+  if(payload.is_object())payload["DeveloperSession"]=true;
+  Json envelope={{"DeveloperFormatVersion",1},{"Mode","Developer"},{"DeveloperSession",true},
+    {"ToolsUsed",provenance.tools_used},{"NormalResearchCompleted",provenance.normal_research_completed},
+    {"SpecialResearchCompleted",provenance.special_research_completed},
+    {"PlayerAiControl",provenance.player_ai_control},
+    {"Simulation",{{"FixedTicks",provenance.simulation.fixed_ticks},{"Speed",provenance.simulation.speed},
+       {"CompletedTicks",provenance.simulation.completed_ticks},{"BacklogNanoseconds",provenance.simulation.backlog_nanoseconds},
+       {"TacticalCompletedTicks",provenance.simulation.tactical_completed_ticks},
+       {"TacticalBacklogNanoseconds",provenance.simulation.tactical_backlog_nanoseconds}}},
+    {"Campaign",std::move(payload)}};
+  if(provenance.giant_test){const auto& lab=*provenance.giant_test;const auto& q=lab.controls;
+    envelope["GiantLaboratory"]={{"Version",1},{"Class",static_cast<int>(q.type)},{"Subclass",q.subclass},{"PlanetVariant",q.planet_variant},{"RingVariant",q.ring_variant},{"Rings",q.rings},{"RingFamily",q.ring_family},{"Tilt",q.axial_tilt_degrees},{"Distance",q.distance_scale},{"Star",static_cast<int>(q.star_type)},{"Appearance",lab.appearance}};
+  }
+  if(provenance.full_exploration)envelope["FullExploration"]=true;
+  if(snapshot.continuation)envelope["RuntimeContinuation"]=encode_runtime_continuation(*snapshot.continuation);
+  if(provenance.full_celestial_coverage)envelope["CelestialCoverage"]={{"Enabled",true},{"Version",provenance.coverage_generation_version},{"ForcedSystemIds",provenance.coverage_forced_system_ids}};
+  return envelope;
+}
+}
+
+std::string encode_developer_campaign_json(const DeveloperCampaignPayload& snapshot){
+  return developer_envelope(snapshot,encode_player_campaign_document(snapshot.campaign)).dump(2);
+}
+namespace {
+void stream_player(detail::JsonStreamWriter& out,const PlayerCampaignPayloadV17Dto& payload,bool developer){
+  if(payload.format_version!=17)fail(PlayerCampaignJsonStage::Representability,"NativeRepresentabilityException","Current Player JSON persistence represents format 17 only.");
+  try{
+    auto tail=encode_player_campaign_tail(payload);
+    out.begin_object();detail::stream_galaxy_members(out,payload.galaxy,payload.format_version);
+    for(const auto& [key,value]:tail.items())out.field(key,value);
+    if(developer)out.field("DeveloperSession",true);
+    out.end_object();
+  }catch(const GalaxyPayloadJsonError& error){
+    fail(error.phase()==GalaxyPayloadJsonErrorPhase::Representability?PlayerCampaignJsonStage::Representability:PlayerCampaignJsonStage::Encode,
+      error.phase()==GalaxyPayloadJsonErrorPhase::Representability?"NativeRepresentabilityException":"JsonException",error.what(),std::nullopt,std::nullopt,error.path(),error.byte());
+  }catch(const nlohmann::json::exception& error){fail(PlayerCampaignJsonStage::Encode,"JsonException",error.what());}
+}
+}
+void stream_player_campaign_v17_json(const PlayerCampaignPayloadV17Dto& payload,const stellar::engine::AtomicTextSink& sink){
+  detail::JsonStreamWriter out(sink);stream_player(out,payload,false);
+}
+void stream_developer_campaign_json(const DeveloperCampaignPayload& snapshot,const stellar::engine::AtomicTextSink& sink){
+  const auto envelope=developer_envelope(snapshot,nullptr);detail::JsonStreamWriter out(sink);out.begin_object();
+  for(const auto& [key,value]:envelope.items()){
+    out.member(key);if(key=="Campaign")stream_player(out,snapshot.campaign,true);else out.value(value);
+  }out.end_object();
+}
+
+std::string capture_developer_campaign_json(
+    IntegratedAdaptiveCampaignRuntime &campaign,const PlayerCampaignCaptureOptions &options){
+  return encode_developer_campaign_json(capture_developer_campaign(campaign,options));
+}
+
+RestoredPlayerCampaignV17 restore_developer_campaign_json(
+    AdaptiveResearchStrategicRuntime runtime,std::string_view text,
+    const PlayerCampaignJsonRestoreHooks &hooks){
+  constexpr std::array<std::string_view, 2> arrays{
+      "/Campaign/Galaxy/Systems", "/Campaign/Galaxy/PlanetaryBodies"};
+  const auto ordered=json_detail::parse_ordered_json(text, {arrays});
+  const auto &root=typed_object(ordered,"$");reject_root_duplicates(root);
+  const auto *version=member(root,"DeveloperFormatVersion"),*mode=member(root,"Mode"),
+    *session=member(root,"DeveloperSession"),*used=member(root,"ToolsUsed"),
+    *normal=member(root,"NormalResearchCompleted"),*special=member(root,"SpecialResearchCompleted"),
+    *payload=member(root,"Campaign");
+  if(!version||integer(*version,"DeveloperFormatVersion")!=1||!mode||typed_string(*mode,"$.Mode")!="Developer"||
+     !session||!typed_bool(*session,"$.DeveloperSession")||!used||!normal||!special||!payload)
+    throw PlayerCampaignPersistenceDataError("Unsupported or incomplete developer campaign envelope.");
+  CampaignDeveloperProvenance provenance{typed_bool(*used,"$.ToolsUsed"),
+    typed_bool(*normal,"$.NormalResearchCompleted"),typed_bool(*special,"$.SpecialResearchCompleted")};
+  if(const auto *simulation=member(root,"Simulation")){
+    const auto &fields=typed_object(*simulation,"$.Simulation");reject_root_duplicates(fields);
+    const auto *fixed=member(fields,"FixedTicks"),*speed=member(fields,"Speed"),
+      *ticks=member(fields,"CompletedTicks"),*backlog=member(fields,"BacklogNanoseconds");
+    if(!fixed||!speed||!ticks||!backlog)throw PlayerCampaignPersistenceDataError("Incomplete developer simulation state.");
+    provenance.simulation={typed_bool(*fixed,"$.Simulation.FixedTicks"),typed_integer<std::uint32_t>(*speed,"$.Simulation.Speed"),
+      typed_integer<std::uint64_t>(*ticks,"$.Simulation.CompletedTicks"),typed_integer<std::int64_t>(*backlog,"$.Simulation.BacklogNanoseconds")};
+    const auto *battle_ticks=member(fields,"TacticalCompletedTicks"),*battle_backlog=member(fields,"TacticalBacklogNanoseconds");
+    if(battle_ticks||battle_backlog){
+      if(!battle_ticks||!battle_backlog)throw PlayerCampaignPersistenceDataError("Incomplete tactical simulation state.");
+      provenance.simulation.tactical_completed_ticks=typed_integer<std::uint64_t>(*battle_ticks,"$.Simulation.TacticalCompletedTicks");
+      provenance.simulation.tactical_backlog_nanoseconds=typed_integer<std::int64_t>(*battle_backlog,"$.Simulation.TacticalBacklogNanoseconds");
+    }
+  }
+  validate_developer_simulation_state(provenance.simulation);
+  if(const auto *ai=member(root,"PlayerAiControl"))provenance.player_ai_control=typed_bool(*ai,"$.PlayerAiControl");
+  if(const auto *exploration=member(root,"FullExploration"))provenance.full_exploration=typed_bool(*exploration,"$.FullExploration");
+  if(const auto *coverage=member(root,"CelestialCoverage")){
+    const auto &fields=typed_object(*coverage,"$.CelestialCoverage");reject_root_duplicates(fields);
+    const auto *enabled=member(fields,"Enabled"),*coverage_version=member(fields,"Version"),*ids=member(fields,"ForcedSystemIds");
+    if(!enabled||!coverage_version||!ids)throw PlayerCampaignPersistenceDataError("Incomplete coverage metadata.");
+    provenance.full_celestial_coverage=typed_bool(*enabled,"$.CelestialCoverage.Enabled");
+    provenance.coverage_generation_version=typed_string(*coverage_version,"$.CelestialCoverage.Version");
+    const auto &array=typed_array(*ids,"$.CelestialCoverage.ForcedSystemIds");
+    if(array.size()>stellar_object_type_count)throw PlayerCampaignPersistenceDataError("Too many forced stellar objects.");
+    for(const auto &id:array)provenance.coverage_forced_system_ids.push_back(typed_integer<int>(id,"$.CelestialCoverage.ForcedSystemIds[]"));
+  }
+  if(!provenance.tools_used&&(provenance.normal_research_completed||provenance.special_research_completed||provenance.player_ai_control||provenance.full_exploration))
+    throw PlayerCampaignPersistenceDataError("Developer overrides require ToolsUsed provenance.");
+  try{
+    report_restore_stage(hooks, PlayerCampaignJsonStage::Parse);
+    auto restored=restore_player_campaign_v17_ordered(std::move(runtime),*payload,hooks,provenance);
+    if(const auto* lab=member(root,"GiantLaboratory")){
+      const auto j=nlohmann::json::parse(raw_json(*lab));if(j.at("Version").get<int>()!=1)throw PlayerCampaignPersistenceDataError("Unsupported giant laboratory version");
+      DeveloperGiantTestRequest q;q.type=static_cast<PlanetClass>(j.at("Class").get<int>());q.subclass=j.at("Subclass");q.planet_variant=j.at("PlanetVariant");q.ring_variant=j.at("RingVariant");q.rings=j.at("Rings");q.ring_family=j.at("RingFamily");q.axial_tilt_degrees=j.at("Tilt");q.distance_scale=j.at("Distance");q.star_type=static_cast<StellarObjectType>(j.at("Star").get<int>());
+      auto& world=restored.galaxy();world.developer_provenance->giant_test=DeveloperGiantTestState{q,j.at("Appearance").get<PlanetAppearance>()};(void)build_developer_giant_test(world);
+    }
+    if(const auto *continuation=member(root,"RuntimeContinuation"))
+      restored.set_runtime_continuation(decode_runtime_continuation(*continuation));
+    return restored;
+  }
+  catch(const RestoreProgressCallbackFailure &failure){std::rethrow_exception(failure.error());}
 }
 
 } // namespace stellar::core

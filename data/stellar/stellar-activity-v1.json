@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "note": "Tunable visible-event model, not a calibrated population flare census. Spectral order O B A F G K M; types prominence flare major superflare CME.",
+  "base_events_per_day": 3.0,
+  "spectral_rates": [0.020, 0.025, 0.04, 0.18, 0.30, 0.45, 1.0],
+  "activity_multipliers": [0.20, 1.0, 4.0, 10.0, 20.0],
+  "retention_myr": [30, 100, 400, 1000, 2500, 5000, 10000],
+  "rotation_reference_days": [3, 4, 6, 12, 25, 30, 40],
+  "simultaneous_caps": [1, 2, 4, 6, 8],
+  "type_weights": [[75,23,1.8,0.02,0.18],[62,30,6.5,0.1,1.4],[55,28,13,0.8,3.2],[48,28,18,1.5,4.5],[46,28,19,2,5]],
+  "cme_probabilities": [0.01, 0.10, 0.30, 0.65, 0.0],
+  "m_cme_escape": 0.45,
+  "giant_rate": 0.35,
+  "supergiant_rate": 0.16,
+  "history_days": 2.0,
+  "timings": [
+    {"minimum_minutes":[3,3,10,15],"maximum_minutes":[20,25,180,120],"min_display_seconds":6},
+    {"minimum_minutes":[1,1,1,10],"maximum_minutes":[10,10,15,90],"min_display_seconds":6},
+    {"minimum_minutes":[5,5,5,30],"maximum_minutes":[20,20,30,180],"min_display_seconds":9},
+    {"minimum_minutes":[10,10,10,60],"maximum_minutes":[60,60,60,720],"min_display_seconds":15},
+    {"minimum_minutes":[5,15,30,60],"maximum_minutes":[30,90,180,360],"min_display_seconds":12}
+  ]
+}

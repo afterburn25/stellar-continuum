@@ -1,0 +1,128 @@
+#include "native_developer_celestial_index.hpp"
+#include "native_developer_planet_index.hpp"
+#include "native_developer_simulation_panel.hpp"
+#include "native_stellar_observation.hpp"
+#include <stellar/core/persistable_fresh_campaign.hpp>
+#include <iostream>
+
+using namespace stellar::native_map;
+using namespace stellar::core;
+void check(bool ok,const char *message){if(!ok)throw std::runtime_error(message);}
+Point control(const DrawList &draw,std::string_view label){
+  for(const auto &command:draw.overlay)if(const auto *text=std::get_if<Text>(&command);text&&text->value.starts_with(label)&&text->clip){
+    const auto &r=*text->clip;return {r.x+r.width*.5f,r.y+std::min(r.height*.5f,10.f)};
+  }
+  throw std::runtime_error("Missing visible control: "+std::string(label));
+}
+int main(int argc,char **argv)try{
+  check(argc==3,"Expected catalog/research paths.");
+  for(const auto size:std::array<std::pair<int,int>,3>{{{1280,720},{1920,1080},{3840,2160}}}){
+    const auto [w,h]=size;
+    const auto central_radius=[&](double zoom){return stellar::native_stellar::central_black_hole_map_radius(60.,zoom,w,h);};
+    check(std::abs(central_radius(.01)-55.*std::clamp(h/1080.,.67,2.))<.01,"Central black hole lost its prominent overview size.");
+    check(central_radius(3.)>central_radius(.01)*1.4,"Central black hole failed to enlarge with map zoom.");
+    check(std::abs(central_radius(3.)-162.)<.01,"Central black hole no longer uses the enlarged world scale.");
+    check(std::abs(central_radius(1000.)-.34*std::min(w,h))<.01,"Central black hole exceeds its close-zoom viewport bound.");
+    auto world=seed_persistable_fresh_campaign(-9142050,load_nearby_catalog(argv[1]),
+        {"2050-03-21T00:00:00Z",250,3,0,"terran_baseline",StellarPopulationOptions{},true});
+    auto runtime=IntegratedAdaptiveCampaignRuntime::create_fresh(load_adaptive_research_strategic_runtime(argv[2]),std::move(world));
+    CampaignFrame frame(std::move(runtime),StrategicClock{},CampaignFramePolicy::Developer);
+    NativeDeveloperCelestialIndex index;
+    NativeDeveloperSimulationPanel panel;
+    const auto saved=[&]{return capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"});};
+    const auto original=saved();
+    panel.toggle();DrawList draw;panel.render(draw,w,h,frame);
+    auto export_button=control(draw,"EXPORT DIAGNOSTIC BUNDLE");
+    (void)panel.handle({InputEventType::LeftPressed,export_button},w,h,frame);
+    (void)panel.handle({InputEventType::PointerCancelled},w,h,frame);
+    (void)panel.handle({InputEventType::LeftReleased,export_button},w,h,frame);
+    check(!panel.take_export_request(),"Cancelled export click was accepted.");
+    (void)panel.handle({InputEventType::LeftPressed,export_button},w,h,frame);
+    (void)panel.handle({InputEventType::LeftReleased,export_button},w,h,frame);
+    check(panel.take_export_request()&&!panel.take_export_request(),"Export request missing or sticky.");
+    panel.set_export_busy(true);
+    (void)panel.handle({InputEventType::LeftPressed,export_button},w,h,frame);
+    (void)panel.handle({InputEventType::LeftReleased,export_button},w,h,frame);
+    check(!panel.take_export_request()&&saved()==original,"Busy export duplicated request or mutated state.");
+    auto button=control(draw,"CELESTIAL INDEX");
+    (void)panel.handle({InputEventType::LeftPressed,button},w,h,frame);
+    check(!panel.take_index_request(),"Index opened before matching release.");
+    (void)panel.handle({InputEventType::LeftReleased,button},w,h,frame);
+    check(panel.take_index_request()&&!panel.take_index_request(),"Index request was missing or sticky.");
+    index.open(frame.runtime().world().campaign());
+    const auto render=[&]{DrawList result;index.render(result,w,h,frame);return result;};
+    draw=render();
+    for(const auto &command:draw.overlay)if(const auto *text=std::get_if<Text>(&command);text&&text->clip){
+      const auto &r=*text->clip;
+      check(r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h,"Index text escaped viewport.");
+    }
+    auto click=[&](Point p){check(index.handle({InputEventType::LeftPressed,p},w,h,frame),"Index press leaked through modal.");
+      check(index.handle({InputEventType::LeftReleased,p},w,h,frame),"Index release leaked through modal.");};
+    click(control(draw,"Search name"));
+    (void)index.handle({InputEventType::TextEntered,{}, {},0,"Galactic center"},w,h,frame);
+    draw=render();(void)control(draw,"Class  Central Supermassive Black Hole");
+    check(saved()==original,"Index search/render mutated campaign or discovery.");
+    click(control(draw,"Central state:"));
+    draw=render();click(control(draw,"Relativistic Jets"));
+    check(frame.runtime().world().campaign().galactic_core->black_hole->state==CentralBlackHoleState::RelativisticJets,"Inspector failed to use canonical central-state command.");
+    const auto changed=saved();
+    button=control(render(),"CENTER GALAXY MAP");
+    (void)index.handle({InputEventType::LeftPressed,button},w,h,frame);
+    (void)index.handle({InputEventType::PointerCancelled},w,h,frame);
+    (void)index.handle({InputEventType::LeftReleased,button},w,h,frame);
+    check(!index.take_focus_request()&&index.visible(),"Cancelled click centered map.");
+    click(button);auto target=index.take_focus_request();
+    check(target&&target->central&&!target->system_id&&!index.visible(),"Central navigation target is incorrect.");
+    check(saved()==changed,"Index navigation changed exploration or simulation.");
+    index.open(frame.runtime().world().campaign());
+    check(!index.take_focus_request(),"Reopened index retained old navigation.");
+    click(control(render(),"Search name"));
+    (void)index.handle({InputEventType::TextEntered,{}, {},0,"no matching object"},w,h,frame);
+    click(control(render(),"CENTER GALAXY MAP"));
+    check(!index.take_focus_request()&&index.visible(),"Empty search activated navigation.");
+    (void)index.handle({InputEventType::EscapePressed},w,h,frame);
+    check(!index.visible()&&!index.handle({InputEventType::LeftPressed},w,h,frame),"Closed index captured gameplay input.");
+    NativeDeveloperPlanetIndex planet_index;planet_index.open(frame.runtime().world().campaign());
+    const auto planet_render=[&]{DrawList d;planet_index.render(d,w,h);return d;};
+    auto planet_click=[&](Point point){check(planet_index.handle({InputEventType::LeftPressed,point},w,h,frame),"Planet index leaked input");check(planet_index.handle({InputEventType::LeftReleased,point},w,h,frame),"Planet index release leaked input");};
+    const auto before_planets=saved();planet_click(control(planet_render(),"Ancient Grey Crater"));
+    const auto& indexed_world=frame.runtime().world().campaign();
+    std::size_t imported_count=0,habitable_count=0;
+    for(const auto& entry:build_developer_planet_index(indexed_world,DeveloperPlanetFilter::ImportedArtwork))if(entry.example){
+      check(!entry.example->appearance->source_asset_id.empty()&&!entry.example->appearance->source_asset_id.starts_with("sol:"),"Imported filter selected a fallback or Sol");imported_count+=entry.count;
+    }
+    const auto player=std::ranges::find(indexed_world.civilizations,indexed_world.player_civilization_id,&Civilization::id);
+    for(const auto& entry:build_developer_planet_index(indexed_world,DeveloperPlanetFilter::Habitable))if(entry.example){
+      check(assess_species_planet(species_environment_profile(player->species_id),*entry.example).naturally_colonizable,"Habitable index bypassed species rules");habitable_count+=entry.count;
+    }
+    check(imported_count>0&&habitable_count>0,"Campaign artwork or habitable worlds cannot be found");
+    (void)control(planet_render(),"Source:");check(saved()==before_planets,"Planet inspection changed state");
+    planet_click(control(planet_render(),"VIEW RULES"));
+    const auto rules_draw=planet_render();for(const auto label:{"Base class:","Subclass:","Orbital zones:","Surface temperature:","Atmosphere:","Pressure:","Water allowed:","Volcanism allowed:","Within class:","Image pools:"})(void)control(rules_draw,label);
+    for(const auto& command:rules_draw.overlay)if(const auto* text=std::get_if<Text>(&command);text&&text->clip){const auto& r=*text->clip;check(r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h,"Planet rules escaped viewport");}
+    check(saved()==before_planets,"Reading planet registry mutated campaign");planet_click(control(rules_draw,"VIEW EXAMPLE"));(void)control(planet_render(),"Source:");
+    const auto count=frame.runtime().world().campaign().bodies.size();planet_click(control(planet_render(),"GENERATE SUBCLASS"));
+    check(frame.runtime().world().campaign().bodies.size()==count+1,"Planet subclass control failed to create its example");
+    const auto created=frame.runtime().world().campaign().bodies.back();check(created.appearance&&created.appearance->subclass=="ancient-grey-crater","Planet control generated wrong subtype");
+    check(planet_appearance_contradictions(created).empty(),"Developer control bypassed physical eligibility");
+    planet_click(control(planet_render(),"GO TO EXAMPLE"));const auto planet_target=planet_index.take_focus_request();
+    check(planet_target&&planet_target->second==created.id&&!planet_index.visible(),"Planet navigation did not target the newly created body");
+    // Running the authoritative campaign after appending a planet exercises
+    // borrowed simulation views and ensures no stale vector pointers survive.
+    (void)frame.runtime().advance(.25,.25);
+    auto observed=frame.runtime().world().campaign();
+    check(!stellar::native_stellar::observed_central_artwork(observed,observed.player_civilization_id),"Developer state command revealed central artwork.");
+    observed.knowledge.unlock_galactic_core_access(observed.player_civilization_id);
+    check(!stellar::native_stellar::observed_central_artwork(observed,observed.player_civilization_id),"Unlock revealed unexplored central artwork.");
+    observed.knowledge.record_galactic_core_exploration(observed.player_civilization_id);
+    for(const auto &[state,asset]:std::array<std::pair<CentralBlackHoleState,std::string_view>,3>{{
+        {CentralBlackHoleState::Quiescent,"central-supermassive-black-hole"},
+        {CentralBlackHoleState::Accreting,"accreting-black-hole"},
+        {CentralBlackHoleState::RelativisticJets,"jet-black-hole"}}}){
+      observed.galactic_core->black_hole=central_black_hole_with_state(*observed.galactic_core->black_hole,state);
+      check(stellar::native_stellar::observed_central_artwork(observed,observed.player_civilization_id)==asset,"Discovered central state did not select matching artwork.");
+      check(!stellar::native_stellar::observed_central_artwork(observed,9999),"Artwork leaked to a different observer.");
+    }
+  }
+  std::cout<<"native developer celestial index tests passed\n";return 0;
+}catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}

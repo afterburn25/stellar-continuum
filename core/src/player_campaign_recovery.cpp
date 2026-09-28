@@ -1,4 +1,9 @@
 #include <stellar/core/player_campaign_recovery.hpp>
+#include <stellar/core/developer_campaign.hpp>
+#include <stellar/core/player_campaign_save.hpp>
+
+#include <stellar/engine/save_history.hpp>
+#include <stellar/engine/save_integrity.hpp>
 
 #include <algorithm>
 #include <fstream>
@@ -71,10 +76,13 @@ PlayerCampaignLoadError::PlayerCampaignLoadError(
 const std::vector<PlayerCampaignLoadAttempt> &
 PlayerCampaignLoadError::attempts() const noexcept { return attempts_; }
 
-LoadedPlayerCampaignV17 load_existing_player_campaign_v17(
+static LoadedPlayerCampaignV17 load_existing_campaign(
     const std::filesystem::path &save_path,
     const PlayerCampaignRuntimeFactory &make_runtime,
-    const std::function<void(const PlayerCampaignRestorationProgress &)> &progress) {
+    const std::function<void(const PlayerCampaignRestorationProgress &)> &progress,
+    bool developer) {
+  if(developer&&!is_developer_campaign_save_path(save_path))
+    throw std::invalid_argument("Developer campaigns require a .dev17.json save path.");
   const auto &native_path = save_path.native();
   if (native_path.empty() || std::ranges::all_of(native_path, [](const auto value) {
         return value == ' ' || value == '\t' || value == '\r' || value == '\n' ||
@@ -90,8 +98,20 @@ LoadedPlayerCampaignV17 load_existing_player_campaign_v17(
     if (!progress) return;
     progress({latest, std::move(status)});
   };
+  const auto label = [](PlayerCampaignLoadOrigin origin, std::size_t slot) {
+    switch (origin) {
+    case PlayerCampaignLoadOrigin::Primary:
+      return std::string("Primary autosave");
+    case PlayerCampaignLoadOrigin::Backup:
+      return std::string("Backup autosave");
+    case PlayerCampaignLoadOrigin::History:
+      return "History autosave (slot " + std::to_string(slot) + ")";
+    }
+    return std::string("Autosave");
+  };
   const auto attempt = [&](const std::filesystem::path &path,
                            PlayerCampaignLoadOrigin origin,
+                           std::size_t slot,
                            std::vector<PlayerCampaignLoadAttempt> &failures)
       -> std::optional<LoadedPlayerCampaignV17> {
     std::error_code probe_error;
@@ -99,11 +119,20 @@ LoadedPlayerCampaignV17 load_existing_player_campaign_v17(
       failures.push_back({origin, path, PlayerCampaignLoadAttemptKind::Missing,
           origin == PlayerCampaignLoadOrigin::Primary
               ? "Primary autosave was missing."
-              : "No backup autosave was available.", {}});
+              : origin == PlayerCampaignLoadOrigin::Backup
+                    ? "No backup autosave was available."
+                    : "No " + label(origin, slot) + " was available.",
+          {}});
       return std::nullopt;
     }
     try {
       report(.04, "Reading saved campaign");
+      // A present-but-mismatched integrity sidecar marks corruption; absent
+      // sidecars (older saves) load unchecked.
+      if (stellar::engine::verify_integrity(path) ==
+          stellar::engine::IntegrityStatus::Mismatch)
+        throw std::runtime_error(
+            "Campaign save failed its integrity check.");
       auto json = read_utf8_file(path);
       const auto staged = [&](PlayerCampaignJsonStage stage) {
         switch (stage) {
@@ -116,38 +145,42 @@ LoadedPlayerCampaignV17 load_existing_player_campaign_v17(
         default: break;
         }
       };
-      auto campaign = restore_player_campaign_v17_json(make_runtime(), json, {staged});
+      auto campaign = developer?restore_developer_campaign_json(make_runtime(),json,{staged})
+          :restore_player_campaign_v17_json(make_runtime(), json, {staged});
       return LoadedPlayerCampaignV17{std::move(campaign), origin, save_path, path,
                                      std::move(failures)};
     } catch (const std::exception &failure) {
       failures.push_back({origin, path, PlayerCampaignLoadAttemptKind::Failed,
           origin == PlayerCampaignLoadOrigin::Primary
               ? "Primary autosave failed:\n" + exception_text(failure)
-              : "Backup autosave also failed:\n" + exception_text(failure),
+              : label(origin, slot) +
+                    " also failed:\n" + exception_text(failure),
           std::current_exception()});
       return std::nullopt;
     } catch (...) {
       failures.push_back({origin, path, PlayerCampaignLoadAttemptKind::Failed,
           origin == PlayerCampaignLoadOrigin::Primary
               ? "Primary autosave failed:\nUnknown native exception."
-              : "Backup autosave also failed:\nUnknown native exception.",
+              : label(origin, slot) +
+                    " also failed:\nUnknown native exception.",
           std::current_exception()});
       return std::nullopt;
     }
   };
 
   std::vector<PlayerCampaignLoadAttempt> failures;
-  if (auto loaded = attempt(save_path, PlayerCampaignLoadOrigin::Primary, failures))
+  if (auto loaded =
+          attempt(save_path, PlayerCampaignLoadOrigin::Primary, 0, failures))
     return std::move(*loaded);
-  auto backup_path = save_path;
-  backup_path += ".bak";
+  const auto backup_path =
+      stellar::engine::history_slot_path(save_path, 1);
   std::error_code backup_probe_error;
   if (std::filesystem::is_regular_file(backup_path, backup_probe_error)) {
     try {
       report(std::max(latest, .12),
              "Primary save unavailable; restoring backup");
       if (auto loaded = attempt(backup_path, PlayerCampaignLoadOrigin::Backup,
-                                failures))
+                                1, failures))
         return std::move(*loaded);
     } catch (const std::exception &failure) {
       failures.push_back({PlayerCampaignLoadOrigin::Backup, backup_path,
@@ -166,6 +199,22 @@ LoadedPlayerCampaignV17 load_existing_player_campaign_v17(
         "No backup autosave was available.", {}});
   }
 
+  // Rolling history: probe deeper ".bak.<k>" slots that exist, oldest of the
+  // surviving chain last. Only existing slots attempt a load — absent slots
+  // would just add noise to the failure report.
+  for (std::size_t slot = 2;
+       slot <= stellar::engine::k_default_save_history_depth; ++slot) {
+    const auto history_path =
+        stellar::engine::history_slot_path(save_path, slot);
+    std::error_code history_probe_error;
+    if (!std::filesystem::is_regular_file(history_path, history_probe_error))
+      continue;
+    report(std::max(latest, .16), "Restoring an older autosave");
+    if (auto loaded = attempt(history_path, PlayerCampaignLoadOrigin::History,
+                              slot, failures))
+      return std::move(*loaded);
+  }
+
   std::ostringstream message;
   for (std::size_t i = 0; i < failures.size(); ++i) {
     if (i) message << '\n';
@@ -174,4 +223,14 @@ LoadedPlayerCampaignV17 load_existing_player_campaign_v17(
   throw PlayerCampaignLoadError(message.str(), std::move(failures));
 }
 
+LoadedPlayerCampaignV17 load_existing_player_campaign_v17(
+    const std::filesystem::path &path,const PlayerCampaignRuntimeFactory &factory,
+    const std::function<void(const PlayerCampaignRestorationProgress &)> &progress){
+  return load_existing_campaign(path,factory,progress,false);
+}
+LoadedPlayerCampaignV17 load_existing_developer_campaign(
+    const std::filesystem::path &path,const PlayerCampaignRuntimeFactory &factory,
+    const std::function<void(const PlayerCampaignRestorationProgress &)> &progress){
+  return load_existing_campaign(path,factory,progress,true);
+}
 } // namespace stellar::core

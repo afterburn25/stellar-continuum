@@ -1,4 +1,5 @@
 #include <stellar/core/campaign_massive_combat.hpp>
+#include <stellar/core/galaxy_reference_validation.hpp>
 
 #define main gate079_unused_main
 #include "massive_combat_persistence_tests.cpp"
@@ -326,6 +327,88 @@ int run(const fs::path &fixture_path, const fs::path &source_root) {
       hostility_calls <= calls_before_assignment_probe)
     throw std::runtime_error(
         "Move assignment did not preserve the owned hostility callback.");
+
+  auto zero_world = world(begin_row->at("Before"));
+  auto zero_actor = std::ranges::find(zero_world.state.fleets, 1,
+                                      &FleetState::id);
+  if (zero_actor == zero_world.state.fleets.end() ||
+      !zero_actor->tactical_vessel)
+    throw std::runtime_error("Zero-identity probe source fleet is missing.");
+  zero_actor->id = 0;
+  zero_actor->tactical_vessel->id = 0;
+  auto positive_actor = std::ranges::find(zero_world.state.fleets, 2,
+                                          &FleetState::id);
+  if (positive_actor == zero_world.state.fleets.end() ||
+      !positive_actor->tactical_vessel)
+    throw std::runtime_error("Positive-identity probe source fleet is missing.");
+  positive_actor->tactical_vessel->is_flagship = true;
+  CampaignMassiveCombat zero_runtime(
+      [](int first_id, int second_id) { return first_id != second_id; });
+  const auto zero_begin = zero_runtime.begin(
+      zero_world.state, call.at("CivilizationId"), 0, number(call.at("Day")));
+  if (!zero_begin.accepted || !zero_world.state.active_combat_encounter)
+    throw std::runtime_error("Fleet zero could not enter massive combat.");
+
+  auto &zero_encounter = *zero_world.state.active_combat_encounter;
+  const auto zero_formation = std::ranges::find_if(
+      zero_encounter.battle.formations, [](const MassiveFormationState &value) {
+        return value.fleet_id == 0;
+      });
+  if (zero_formation == zero_encounter.battle.formations.end() ||
+      zero_formation->important_vessels.size() != 1 ||
+      zero_formation->important_vessels.front().id !=
+          campaign_zero_fleet_vessel_id)
+    throw std::runtime_error(
+        "Fleet zero did not receive its reserved tactical vessel identity.");
+  const auto positive_formation = std::ranges::find_if(
+      zero_encounter.battle.formations, [](const MassiveFormationState &value) {
+        return value.fleet_id == 2;
+      });
+  if (positive_formation == zero_encounter.battle.formations.end() ||
+      positive_formation->important_vessels.size() != 1 ||
+      positive_formation->important_vessels.front().id != 2)
+    throw std::runtime_error(
+        "A positive fleet identity changed during tactical binding.");
+
+  const auto own_snapshot = zero_runtime.observe(zero_world.state, 1, false);
+  const auto observed_zero = std::ranges::find_if(
+      own_snapshot.formations, [](const MassiveObservedFormation &value) {
+        return std::ranges::any_of(
+            value.important_vessels, [](const MassiveObservedVessel &vessel) {
+              return vessel.vessel_id == campaign_zero_fleet_vessel_id;
+            });
+      });
+  if (observed_zero == own_snapshot.formations.end())
+    throw std::runtime_error(
+        "Fleet zero's tactical vessel identity was lost to observation.");
+
+  auto restored_encounter = encounter(encounter_json(zero_encounter));
+  validate_campaign_massive_encounter(
+      restored_encounter,
+      {zero_world.state.systems, zero_world.state.fleets});
+  const auto restored_zero = std::ranges::find_if(
+      restored_encounter.battle.formations,
+      [](const MassiveFormationState &value) { return value.fleet_id == 0; });
+  if (restored_zero == restored_encounter.battle.formations.end() ||
+      restored_zero->important_vessels.front().id !=
+          campaign_zero_fleet_vessel_id)
+    throw std::runtime_error(
+        "Fleet zero's tactical vessel identity did not round trip.");
+  zero_world.state.active_combat_encounter = std::move(restored_encounter);
+  for (auto &formation :
+       zero_world.state.active_combat_encounter->battle.formations)
+    formation.escaped = true;
+  static_cast<void>(zero_runtime.reconcile(zero_world.state));
+  zero_actor = std::ranges::find(zero_world.state.fleets, 0, &FleetState::id);
+  if (zero_actor == zero_world.state.fleets.end() ||
+      !zero_actor->tactical_vessel ||
+      zero_actor->tactical_vessel->id != campaign_zero_fleet_vessel_id)
+    throw std::runtime_error(
+        "Fleet zero's tactical vessel identity was not reconciled safely.");
+  zero_actor->tactical_vessel->validate();
+  const std::array<FleetState, 1> persisted_fleets{*zero_actor};
+  validate_galaxy_references(
+      {{}, {}, {}, {}, {}, persisted_fleets, {}, nullptr});
 
   try {
     CampaignMassiveCombat invalid({});

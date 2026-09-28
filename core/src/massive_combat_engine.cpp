@@ -1,4 +1,5 @@
 #include <stellar/core/massive_combat_engine.hpp>
+#include <stellar/engine/physics3d.hpp>
 
 #include <algorithm>
 #include <bit>
@@ -17,25 +18,20 @@ namespace {
 
 constexpr float epsilon = .0001F;
 
-struct Vector {
-  float x{};
-  float y{};
-};
-
-Vector vector(MassivePoint value) { return {value.x, value.y}; }
-MassivePoint point(Vector value) { return {value.x, value.y}; }
-Vector add(Vector a, Vector b) { return {a.x + b.x, a.y + b.y}; }
-Vector subtract(Vector a, Vector b) { return {a.x - b.x, a.y - b.y}; }
-Vector multiply(Vector value, float scale) {
-  return {value.x * scale, value.y * scale};
-}
-float length_squared(Vector value) {
-  return value.x * value.x + value.y * value.y;
-}
-float length(Vector value) { return std::sqrt(length_squared(value)); }
-Vector normalize(Vector value) {
-  const auto magnitude = length(value);
-  return {value.x / magnitude, value.y / magnitude};
+using Vector = stellar::engine::PhysicsVector3;
+Vector vector(MassivePoint value) { return {value.x,value.y,value.z}; }
+MassivePoint point(Vector value) { return {value.x,value.y,value.z}; }
+using stellar::engine::add;
+using stellar::engine::subtract;
+using stellar::engine::multiply;
+using stellar::engine::length;
+using stellar::engine::length_squared;
+Vector normalize_direction(Vector value){
+  const auto magnitude=length(value);
+  // Legacy planar extreme-coordinate saves used IEEE division even when the
+  // squared norm overflowed. Keep that behavior at this compatibility edge.
+  if(value.z==0.f && std::isinf(magnitude))return {value.x/magnitude,value.y/magnitude,0};
+  return stellar::engine::normalize(value);
 }
 float distance_squared(MassivePoint a, MassivePoint b) {
   return length_squared(subtract(vector(a), vector(b)));
@@ -240,9 +236,9 @@ float mass_mobility(const MassiveFormationState &formation) {
 
 Vector safe_direction(Vector value, Vector fallback) {
   if (length_squared(value) > epsilon)
-    return normalize(value);
+    return normalize_direction(value);
   if (length_squared(fallback) > epsilon)
-    return normalize(fallback);
+    return normalize_direction(fallback);
   return {1, 0};
 }
 
@@ -300,14 +296,17 @@ struct TickMetrics {
 struct Cell {
   int x{};
   int y{};
+  int z{};
   auto operator<=>(const Cell &) const = default;
 };
 
 class SpatialIndex {
 public:
   explicit SpatialIndex(const std::vector<MassiveFormationState *> &formations) {
-    for (auto *formation : formations)
+    for (auto *formation : formations) {
       cells_[cell(formation->position)].push_back(formation);
+      planar_ = planar_ && formation->position.z == 0.f;
+    }
     for (auto &[key, values] : cells_) {
       static_cast<void>(key);
       std::ranges::sort(values, {}, &MassiveFormationState::id);
@@ -326,9 +325,12 @@ public:
     const auto last_y = unchecked_add(origin.y, radius);
     const auto first_x = unchecked_add(origin.x, -radius);
     const auto last_x = unchecked_add(origin.x, radius);
+    const auto first_z = planar_ ? 0 : unchecked_add(origin.z, -radius);
+    const auto last_z = planar_ ? 0 : unchecked_add(origin.z, radius);
+    for (auto z = first_z; z <= last_z; z = unchecked_add(z, 1))
     for (auto y = first_y; y <= last_y; y = unchecked_add(y, 1)) {
       for (auto x = first_x; x <= last_x; x = unchecked_add(x, 1)) {
-        const auto found = cells_.find({x, y});
+        const auto found = cells_.find({x, y, z});
         if (found == cells_.end())
           continue;
         for (auto *formation : found->second) {
@@ -343,9 +345,11 @@ public:
 private:
   static Cell cell(MassivePoint value) {
     return {unchecked_float_to_int(std::floor(value.x / massive_combat_spatial_cell_size)),
-            unchecked_float_to_int(std::floor(value.y / massive_combat_spatial_cell_size))};
+            unchecked_float_to_int(std::floor(value.y / massive_combat_spatial_cell_size)),
+            unchecked_float_to_int(std::floor(value.z / massive_combat_spatial_cell_size))};
   }
   std::map<Cell, std::vector<MassiveFormationState *>> cells_;
+  bool planar_{true};
 };
 
 MassiveModuleState *active_interdictor(MassiveFormationState &formation) {
@@ -415,19 +419,16 @@ void move(MassiveFormationState &formation,
   const auto delta = subtract(desired_point, at);
   const auto desired_velocity = length_squared(delta) < 4
                                     ? Vector{}
-                                    : multiply(normalize(delta), speed_for(formation));
-  auto velocity = vector(formation.velocity);
-  auto change = subtract(desired_velocity, velocity);
+                                    : multiply(normalize_direction(delta), speed_for(formation));
   const auto limit = formation.loadout.acceleration * mass_mobility(formation) *
                      static_cast<float>(massive_combat_tick_seconds) *
                      std::clamp(formation.cohesion, .2F, 1.0F);
-  if (length(change) > limit)
-    change = multiply(normalize(change), limit);
-  velocity = add(velocity, change);
-  formation.position = point(add(at, multiply(velocity, static_cast<float>(massive_combat_tick_seconds))));
-  formation.velocity = point(velocity);
+  const auto moved=stellar::engine::move_toward_velocity({at,vector(formation.velocity)},desired_velocity,
+      limit,static_cast<float>(massive_combat_tick_seconds));
+  const auto velocity=moved.velocity;
+  formation.position=point(moved.position);formation.velocity=point(velocity);
   if (length_squared(velocity) > .01F)
-    formation.heading = point(normalize(velocity));
+    formation.heading = point(normalize_direction(velocity));
 }
 
 void update_power_and_heat(MassiveFormationState &formation) {

@@ -172,7 +172,8 @@ class NativeShipArtAssetTests(unittest.TestCase):
 
     def test_declaration_packages_exact_files(self):
         files = self.exercise()
-        self.assertEqual(len(files), 7)
+        self.assertEqual(len(files), 8)
+        self.assertIn("assets/visual/ships/patrol-corvette-tactical-v1.png", files)
         self.assertIn("Licenses/Ship-art-sources.md", files)
         self.assertIn("assets/visual/ships/patrol-corvette.jpg", files)
 

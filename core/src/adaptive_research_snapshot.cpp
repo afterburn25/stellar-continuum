@@ -291,9 +291,8 @@ Json to_json(const AdaptiveResearchStateSnapshot &s) {
   j["facilityCapabilities"] = s.facility_capabilities;
   j["enabledDeploymentEventIds"] = s.enabled_deployment_event_ids;
   j["activeProjects"] = Json::array();
-  for (const auto &v : s.active_projects)
-    j["activeProjects"].push_back(
-        {{"nodeId", v.node_id},
+  const auto project_json = [](const AdaptiveResearchProjectSnapshot &v) {
+    return Json({{"nodeId", v.node_id},
          {"stage", maturity_json(v.stage)},
          {"targetApplicabilityContextId",
           v.target_applicability_context_id
@@ -306,6 +305,12 @@ Json to_json(const AdaptiveResearchStateSnapshot &s) {
           v.pause_reason ? Json(*v.pause_reason) : Json(nullptr)},
          {"stageResearchPoints", json_number(v.stage_research_points)},
          {"totalResearchPoints", json_number(v.total_research_points)}});
+  };
+  for (const auto &v : s.active_projects) j["activeProjects"].push_back(project_json(v));
+  if (s.schema_version == AdaptiveResearchSnapshotCodec::current_schema_version) {
+    j["cancelledProjects"] = Json::array();
+    for (const auto &v : s.cancelled_projects) j["cancelledProjects"].push_back(project_json(v));
+  }
   return j;
 }
 AdaptiveResearchStateSnapshot from_json(const Json &j) {
@@ -366,6 +371,18 @@ AdaptiveResearchStateSnapshot from_json(const Json &j) {
          optional<std::string>(v, "pauseReason"),
          scalar_or_default<double>(v, "stageResearchPoints"),
          scalar_or_default<double>(v, "totalResearchPoints")});
+  if (s.schema_version == AdaptiveResearchSnapshotCodec::current_schema_version) {
+  for (const auto &v : collection(j, "cancelledProjects", false))
+    s.cancelled_projects.push_back(
+        {required_record_string(v, "nodeId"), maturity_or_default(v, "stage"),
+         optional<std::string>(v, "targetApplicabilityContextId"),
+         scalar_or_default<double>(v, "assignedEffectiveLabs"),
+         scalar_or_default<double>(v, "readinessEfficiency"),
+         scalar_or_default<bool>(v, "paused"),
+         optional<std::string>(v, "pauseReason"),
+         scalar_or_default<double>(v, "stageResearchPoints"),
+         scalar_or_default<double>(v, "totalResearchPoints")});
+  }
   return s;
 }
 } // namespace
@@ -405,7 +422,7 @@ AdaptiveResearchSnapshotCodec::AdaptiveResearchSnapshotCodec(
 AdaptiveResearchStateSnapshot AdaptiveResearchSnapshotCodec::capture(
     const AdaptiveResearchCivilizationState &state) const {
   AdaptiveResearchStateSnapshot s;
-  s.schema_version = current_schema_version;
+  s.schema_version = state.cancelled_projects().empty() ? 1 : current_schema_version;
   s.catalog_id = catalog_->metadata().catalog_id;
   s.civilization_id = state.civilization_id();
   s.directed_program_stage_id = state.directed_program_stage_id();
@@ -465,6 +482,14 @@ AdaptiveResearchStateSnapshot AdaptiveResearchSnapshotCodec::capture(
   std::ranges::sort(s.active_projects, [&](const auto &a, const auto &b) {
     return ordinal_less(a.node_id, b.node_id);
   });
+  for (const auto &v : state.cancelled_projects())
+    s.cancelled_projects.push_back(
+        {v.node_id, v.stage, v.target_applicability_context_id,
+         v.assigned_effective_labs, v.readiness_efficiency, v.paused,
+         v.pause_reason, v.stage_research_points, v.total_research_points});
+  std::ranges::sort(s.cancelled_projects, [&](const auto &a, const auto &b) {
+    return ordinal_less(a.node_id, b.node_id);
+  });
   return s;
 }
 std::string AdaptiveResearchSnapshotCodec::serialize(
@@ -488,7 +513,7 @@ AdaptiveResearchSnapshotCodec::deserialize(std::string_view value) const {
       const auto schema = root.find("schemaVersion");
       const auto schema_version =
           schema == root.end() ? 0 : checked_int32(*schema);
-      if (schema_version != current_schema_version)
+      if (schema_version != 1 && schema_version != current_schema_version)
         fail("Unsupported Adaptive Research snapshot schema " +
              std::to_string(schema_version) + "; expected 1.");
       const auto catalog_id = string_or_empty(root, "catalogId");
@@ -509,7 +534,7 @@ AdaptiveResearchSnapshotCodec::deserialize(std::string_view value) const {
 AdaptiveResearchCivilizationState AdaptiveResearchSnapshotCodec::restore(
     const AdaptiveResearchStateSnapshot &s) const {
   using W = detail::AdaptiveResearchStateWriter;
-  if (s.schema_version != current_schema_version)
+  if (s.schema_version != 1 && s.schema_version != current_schema_version)
     fail("Unsupported Adaptive Research snapshot schema " +
          std::to_string(s.schema_version) + "; expected 1.");
   if (s.catalog_id != catalog_->metadata().catalog_id)
@@ -624,6 +649,38 @@ AdaptiveResearchCivilizationState AdaptiveResearchSnapshotCodec::restore(
                     v.assigned_effective_labs, v.readiness_efficiency, v.paused,
                     v.pause_reason, v.stage_research_points,
                     v.total_research_points, state.revision() + 1});
+  }
+  if (s.schema_version == 1 && !s.cancelled_projects.empty())
+    fail("Legacy research snapshot cannot contain cancelled projects.");
+  if (s.cancelled_projects.size() > s.nodes.size())
+    fail("Cancelled research exceeds known node count.");
+  for (const auto &v : s.cancelled_projects) {
+    const auto &definition = catalog_->get_node(v.node_id);
+    const auto *node = state.try_get_node_state(v.node_id);
+    if (!node || node->maturity != v.stage ||
+        (v.stage != ResearchMaturity::experimental && v.stage != ResearchMaturity::demonstrated &&
+         v.stage != ResearchMaturity::engineering) || !v.paused ||
+        (v.pause_reason != "cancelled_by_order" && v.pause_reason != "hypothesis_resolution_required") ||
+        (v.pause_reason == "hypothesis_resolution_required" &&
+         (!definition.is_hypothesis || v.stage != ResearchMaturity::experimental)) ||
+        !std::isfinite(v.assigned_effective_labs) ||
+        v.assigned_effective_labs < definition.project_requirements.minimum_labs ||
+        !std::isfinite(v.readiness_efficiency) || v.readiness_efficiency <= 0 ||
+        !std::isfinite(v.stage_research_points) || v.stage_research_points < 0 ||
+        !std::isfinite(v.total_research_points) || v.total_research_points < v.stage_research_points ||
+        v.total_research_points > definition.project_requirements.base_research_points + .000001 ||
+        std::abs(node->stage_research_points-v.stage_research_points) > .000001 ||
+        std::abs(node->total_research_points-v.total_research_points) > .000001 ||
+        state.cancelled_project(v.node_id) ||
+        std::ranges::any_of(state.active_projects(), [&](const auto &p){return p.node_id==v.node_id;}))
+      fail("Invalid or duplicate cancelled research project '" + v.node_id + "'.");
+    if (v.target_applicability_context_id &&
+        std::ranges::none_of(state.applicability_contexts(), [&](const auto &c){
+          return c.context_id == *v.target_applicability_context_id;}))
+      fail("Cancelled research references an unknown applicability context.");
+    W::set_cancelled_project(state, {v.node_id, v.stage, v.target_applicability_context_id,
+        v.assigned_effective_labs, v.readiness_efficiency, true, v.pause_reason,
+        v.stage_research_points, v.total_research_points, 0});
   }
   if (state.assigned_effective_labs() >
       state.total_effective_research_labs() + .000001)

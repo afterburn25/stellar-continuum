@@ -9,6 +9,11 @@ NATIVE_SPECIES_SOURCES = {
     key: (f"assets/visual/species/{key}.jpg", f"assets/visual/species/{key}.jpg")
     for key in ('terran-baseline', 'pelagic-high-pressure', 'compact-high-gravity', 'cryogenic-hydrocarbon')
 }
+NATIVE_SPECIES_SOURCES.update({
+    key: (f"assets/visual/species/{key}.png", f"assets/visual/species/{key}.png")
+    for key in ('terran-baseline-communications-v2', 'pelagic-high-pressure-communications-v2',
+                'compact-high-gravity-communications-v2', 'cryogenic-hydrocarbon-communications-v2')
+})
 NATIVE_SPECIES_SOURCES["credits"] = (
     "docs/engine/NATIVE_SPECIES_ART_SOURCES.md", "Licenses/Species-visual-sources.md")
 

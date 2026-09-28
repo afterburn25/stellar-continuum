@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](../AGENT_HANDOFF.md) and
+> [verified project state](../PROJECT_STATE.md).
+
 # Shipyard commands and fleet production
 
 This follows the complete fleet-value/combat-helper gate and the independently verified shipyard-state guard. Use the existing six ship definitions, native sovereign currency, colonies, economies, construction records and explicit resolved shipbuilding capabilities. Do not introduce another writable fleet representation or a second economy store.

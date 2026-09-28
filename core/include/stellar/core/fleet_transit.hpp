@@ -12,7 +12,7 @@ double fleet_local_transit_rate(const FleetState &fleet);
 Vec2 fleet_gate_towards(Vec2 source_system_position,
                         Vec2 current_system_position);
 void begin_fleet_local_transit(FleetState &fleet, FleetTransitPhase phase,
-                               Vec2 start, Vec2 target);
+                               Vec2 start, Vec2 target, const StellarPhysicalProperties* stellar=nullptr);
 double advance_fleet_local_transit(FleetState &fleet, double available_days);
 bool fleet_local_transit_complete(const FleetState &fleet);
 double fleet_local_transit_remaining_days(const FleetState &fleet);

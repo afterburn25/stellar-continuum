@@ -1,0 +1,39 @@
+{
+  "conversion": {
+    "blackFraction": 0.00010395050048828125,
+    "clippedFraction": 0.0003008842468261719,
+    "disc": [
+      1023.894080614531,
+      1031.6804095011248,
+      829.1387879896313
+    ],
+    "id": "sol-triton",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      -0.1998467745642219,
+      0.6043028735702906,
+      0.60149695206368
+    ],
+    "seamError": 0.005460179684426853,
+    "usable": true
+  },
+  "id": "sol-triton",
+  "name": "Triton",
+  "preparation": {
+    "emissive": false,
+    "flattenCanopy": false,
+    "ice": true,
+    "liquid": false,
+    "maximumLightGradient": 0.7,
+    "opaqueClouds": false,
+    "rings": false,
+    "separateClouds": false
+  },
+  "preparationVersion": "spherical-source-patch-v2",
+  "primaryClass": "frozen",
+  "sha256": "38d7a8916fc61f9cce9597b29d1969c98e7d606878cb075199ef3fed49fee722",
+  "source": "C:\\Users\\after\\Downloads\\Moons\\Moon - Triton.png",
+  "status": "candidate",
+  "unseenHemisphere": "Deterministic spherical source-patch synthesis; not recovered photographic geography."
+}

@@ -46,17 +46,23 @@ FoundingCatalog create_founding_catalog(std::int64_t seed, std::span<const Stell
     FoundingCatalog result;
     result.systems.assign(physical_systems.begin(), physical_systems.end());
     const auto original_systems = result.systems;
-    result.bodies = generate_planetary_catalog(seed, result.systems);
+    const auto generate_bodies=[&]{
+        std::map<int,int> removed;
+        auto bodies=generate_planetary_catalog(seed,result.systems,&removed);
+        for(auto& system:result.systems)system.engulfed_planets=removed[system.id];
+        return bodies;
+    };
+    result.bodies = generate_bodies();
     result.civilizations = seed_civilizations(result.systems, result.bodies, pre_warp_count, ancient_count, seed, player_species_id);
     rename_homes_and_ensure_unique(result.systems, result.civilizations);
-    result.bodies = generate_planetary_catalog(seed, result.systems);
+    result.bodies = generate_bodies();
     try {
         result.bodies = apply_nearby_habitable_guarantees(seed, result.systems, result.bodies, result.civilizations, 2);
     } catch (const std::exception& error) {
         if (!nearby_placement_failure(error)) throw;
         result.used_constrained_home_fallback = true;
         result.systems = original_systems;
-        result.bodies = generate_planetary_catalog(seed, result.systems);
+        result.bodies = generate_bodies();
         std::vector<std::string> species_ids;
         species_ids.reserve(result.civilizations.size());
         std::vector<const Civilization*> ordered_civilizations;
@@ -80,7 +86,7 @@ FoundingCatalog create_founding_catalog(std::int64_t seed, std::span<const Stell
             civilization.home_system_id = found->second;
         }
         rename_homes_and_ensure_unique(result.systems, result.civilizations);
-        result.bodies = generate_planetary_catalog(seed, result.systems);
+        result.bodies = generate_bodies();
         result.bodies = apply_nearby_habitable_guarantees(seed, result.systems, result.bodies, result.civilizations, 2);
     }
     return result;

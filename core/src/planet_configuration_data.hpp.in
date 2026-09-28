@@ -1,0 +1,8 @@
+#pragma once
+#include <string_view>
+namespace stellar::core::planet_data {
+inline constexpr std::string_view types=R"planetconfig(@STELLAR_PLANET_TYPES@)planetconfig";
+inline constexpr std::string_view art=R"planetconfig(@STELLAR_PLANET_ART@)planetconfig";
+inline constexpr std::string_view rings=R"planetconfig(@STELLAR_RING_TYPES@)planetconfig";
+inline constexpr std::string_view retired_giants=R"planetconfig(@STELLAR_RETIRED_GIANTS@)planetconfig";
+}

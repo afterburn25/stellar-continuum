@@ -34,6 +34,8 @@ void CivilizationStrategicDirector::invalidate(int id) noexcept { planner_.inval
 void CivilizationStrategicDirector::remove_civilization(int id) noexcept { planner_.remove_civilization(id); }
 void CivilizationStrategicDirector::clear() noexcept { planner_.clear(); }
 std::size_t CivilizationStrategicDirector::cached_plan_count() const noexcept { return planner_.cached_plan_count(); }
+std::vector<CivilizationStrategicPlan> CivilizationStrategicDirector::snapshot() const { return planner_.snapshot(); }
+void CivilizationStrategicDirector::restore(std::span<const CivilizationStrategicPlan> plans){planner_.restore(plans);}
 
 CivilizationStrategicRuntimeCoordinator::CivilizationStrategicRuntimeCoordinator(
     CivilizationStrategicDirector director, StrategicKnowledgeQuery knowledge)
@@ -58,10 +60,14 @@ CivilizationStrategicRuntimeCoordinator::advance(StrategicRuntimeWorldView world
 
   std::vector<const Civilization *> civilizations;
   for (const auto &civilization : world.input.civilizations)
-    if (!civilization.is_player && !civilization.is_seeded_ancient)
+    if (civilization_uses_ai(civilization,world.control) && !civilization.is_seeded_ancient)
       civilizations.push_back(&civilization);
   std::stable_sort(civilizations.begin(), civilizations.end(),
                    [](const auto *left, const auto *right) { return left->id < right->id; });
+  std::vector<int> inactive;
+  for(const auto &[id,tick]:next_review_tick_)
+    if(std::ranges::none_of(civilizations,[&](const auto *c){return c->id==id;}))inactive.push_back(id);
+  for(const auto id:inactive)remove_civilization(id);
 
   std::vector<CivilizationStrategicReview> reviews;
   for (const auto *civilization : civilizations) {
@@ -91,6 +97,29 @@ std::optional<std::int64_t> CivilizationStrategicRuntimeCoordinator::campaign_se
 void CivilizationStrategicRuntimeCoordinator::reset() noexcept {
   campaign_seed_.reset(); strategic_days_ = 0.0; next_review_tick_.clear();
   director_.clear(); industry_.clear(); shipbuilding_.clear();
+}
+
+void CivilizationStrategicRuntimeCoordinator::remove_civilization(int id) noexcept {
+  director_.remove_civilization(id);next_review_tick_.erase(id);industry_.remove(id);shipbuilding_.remove(id);
+}
+StrategicRuntimeSnapshot CivilizationStrategicRuntimeCoordinator::snapshot() const {
+  return {campaign_seed_,strategic_days_,director_.snapshot()};
+}
+void CivilizationStrategicRuntimeCoordinator::restore(const StrategicRuntimeSnapshot &state){
+  if(!std::isfinite(state.strategic_days)||state.strategic_days<0||state.strategic_days>=0x1p63||
+      (!state.campaign_seed&&(state.strategic_days!=0||!state.plans.empty())))
+    throw std::invalid_argument("Invalid strategic runtime clock.");
+  decltype(next_review_tick_) reviews;
+  StrategicIndustryPriorityProvider industry;StrategicShipbuildingPreferenceProvider ships;
+  CivilizationStrategicIntentBuilder intents;
+  for(const auto &plan:state.plans){
+    if(plan.generated_at_tick>std::floor(state.strategic_days))throw std::invalid_argument("Strategic plan originates in the future.");
+    reviews.emplace(plan.civilization_id,plan.review_after_tick);
+    const auto intent=intents.build(plan);industry.publish(intent);ships.publish(intent);
+  }
+  director_.restore(state.plans);
+  campaign_seed_=state.campaign_seed;strategic_days_=state.strategic_days;
+  next_review_tick_=std::move(reviews);industry_=std::move(industry);shipbuilding_=std::move(ships);
 }
 
 void CivilizationStrategicRuntimeCoordinator::ensure_campaign(std::int64_t seed) noexcept {

@@ -11,8 +11,8 @@
 namespace stellar::core {
 namespace {
 void validate_count(std::size_t count) {
-    if (count != 250 && count != 500 && count != 1000 && count != 2500)
-        throw std::invalid_argument("Full-galaxy traits require 250, 500, 1000, or 2500 systems");
+    if (!supported_full_galaxy_system_count(count))
+        throw std::invalid_argument("Unsupported full-galaxy traits system count");
 }
 
 StarArchetype align_compact_archetype(StellarClass stellar_class, StarArchetype archetype) {

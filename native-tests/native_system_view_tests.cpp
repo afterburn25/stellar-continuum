@@ -70,7 +70,7 @@ void controller_gates(const fs::path &research,const fs::path &catalog) {
           recon.snapshot->primary_stellar_class==std::nullopt,"reconnaissance exposed stellar class");
   require(!recon.snapshot->bodies.empty(),"reconnaissance lost the orbital catalog");
   bool retained_positive=false;for(const auto &item:recon.snapshot->bodies) {
-    require(!item.details&&!item.sol_texture_key,"reconnaissance exposed detailed body fields or textures");
+    require(!item.details&&!item.sol_texture_key&&!item.world_class,"reconnaissance exposed detailed body fields or textures");
     require(item.visual_class==NativeSystemBodyVisualClass::unknown_planet||
             item.visual_class==NativeSystemBodyVisualClass::unknown_moon,
             "reconnaissance inferred a hidden body class");
@@ -100,7 +100,13 @@ void controller_gates(const fs::path &research,const fs::path &catalog) {
   require(sol.snapshot&&sol.snapshot->survey_level==SystemSurveyLevel::fully_surveyed,
           "fresh home Sol is not fully surveyed");
   for(const auto &item:sol.snapshot->bodies) {
-    if(item.id==pluto_body_id) require(!item.sol_texture_key,"Pluto received an invented texture");
+    if(item.name == "Earth") require(item.world_class == PlanetaryWorldClass::Continental, "Earth is not classified Continental");
+    if(item.name == "Mercury" || item.name == "Moon") require(item.world_class == PlanetaryWorldClass::Barren, "Airless Sol world is not Barren");
+    if(item.name == "Venus") require(item.world_class == PlanetaryWorldClass::Greenhouse, "Venus lost greenhouse classification");
+    if(item.id>=pluto_body_id) {
+      require(item.appearance&&item.appearance->source_asset_id=="sol:"+std::string(item.id==pluto_body_id?"pluto":sol_moon_definition(item.id)->key),"Supplied Sol material identity missing for "+item.name+": "+(item.appearance?item.appearance->source_asset_id:"no appearance"));
+      if(item.kind==PlanetaryBodyKind::Moon)require(item.satellite_orbit.has_value(),"Supplied moon has no physical orbit");
+    }
     else require(item.sol_texture_key.has_value(),"fully surveyed approved Sol body lost texture eligibility");
   }
   (void)controller.build(campaign,2,sol_system_id);
@@ -111,11 +117,34 @@ void controller_gates(const fs::path &research,const fs::path &catalog) {
   bool wrong_thread=false;std::thread worker([&]{try{(void)controller.build(campaign,3,sol_system_id);}catch(const std::logic_error&){wrong_thread=true;}});worker.join();
   require(wrong_thread&&controller.is_current_generation(2),"wrong-thread call mutated the bound generation");
 }
+void world_classes() {
+  PlanetaryBody b; b.mass_earth=1; b.radius_earth=1;
+  auto& e=b.environment; e.has_solid_surface=true; e.temperature_kelvin=288;
+  e.pressure_kpa=101.3; e.atmosphere=PlanetaryAtmosphereRegime::OxygenNitrogen;
+  e.available_solvent=PlanetarySolventRegime::Water;
+  require(classify_planetary_world(b)==PlanetaryWorldClass::Continental, "Temperate land/water class");
+  e.is_immersed_environment=true;
+  require(classify_planetary_world(b)==PlanetaryWorldClass::Ocean, "Immersed world confused with Continental");
+  e.pressure_kpa=250;
+  require(classify_planetary_world(b)==PlanetaryWorldClass::HighPressureOcean, "High pressure ocean boundary");
+  e.is_immersed_environment=false;e.available_solvent=PlanetarySolventRegime::None;
+  require(classify_planetary_world(b)==PlanetaryWorldClass::Desert, "Dry warm class");
+  e.pressure_kpa=.09;
+  require(classify_planetary_world(b)==PlanetaryWorldClass::Barren, "Near-vacuum mislabeled Desert");
+  e.temperature_kelvin=120;
+  require(classify_planetary_world(b)==PlanetaryWorldClass::Barren, "Cold vacuum inferred unmeasured ice");
+  e.pressure_kpa=1;
+  require(classify_planetary_world(b)==PlanetaryWorldClass::Frozen, "Cold volatile-bearing class");
+  e.has_solid_surface=false;b.mass_earth=100;b.radius_earth=10;
+  require(classify_planetary_world(b)==PlanetaryWorldClass::GasGiant, "Cold gas giant confused with ice giant");
+  b.mass_earth=15;b.radius_earth=4;
+  require(classify_planetary_world(b)==PlanetaryWorldClass::IceGiant, "Ice giant proxy");
+}
 void geometry() {
-  require(body_display_radius(std::numeric_limits<double>::quiet_NaN(),PlanetaryBodyKind::Planet)==4,
+  require(std::abs(body_display_radius(std::numeric_limits<double>::quiet_NaN(),PlanetaryBodyKind::Planet)-4*small_body_configuration().planet_scale)<1e-5,
           "nonfinite radius was not sanitized");
-  require(body_display_radius(.01,PlanetaryBodyKind::Moon)==1.8f&&
-          body_display_radius(100,PlanetaryBodyKind::Moon)==24,"moon radius clamps changed");
+  require(std::abs(body_display_radius(.01,PlanetaryBodyKind::Moon)-1.8*small_body_configuration().moon_scale)<1e-5&&
+          std::abs(body_display_radius(100,PlanetaryBodyKind::Moon)-24*small_body_configuration().moon_scale)<1e-5,"moon radius clamps changed");
   const auto peri=orbit_point(100,.2444f,17.16f,0),apo=orbit_point(100,.2444f,17.16f,3.14159265358979323846f);
   require(std::hypot(peri.x,peri.y)<std::hypot(apo.x,apo.y),"Pluto focus ellipse lost eccentricity");
   require(orbit_path(100,.2444f,17.16f).size()==193,"orbit path point count changed");
@@ -157,6 +186,6 @@ void geometry() {
 }
 int main(int argc,char **argv)try{
   require(argc==3,"Usage: native_system_view_tests <research-root> <catalog>");
-  controller_gates(fs::absolute(argv[1]),fs::absolute(argv[2]));geometry();
+  controller_gates(fs::absolute(argv[1]),fs::absolute(argv[2]));world_classes();geometry();
   std::cout<<"native system observer and geometry cases passed\n";return 0;
 }catch(const std::exception &error){std::cerr<<"native system view failed: "<<error.what()<<'\n';return 1;}

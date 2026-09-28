@@ -447,6 +447,19 @@ void DiplomacyCampaignMaintenanceScheduler::reset(std::int64_t now_tick,
           : saturating_add(now_tick, policy_.review_interval_ticks);
   initialized_ = true;
 }
+void DiplomacyMaintenanceSnapshot::validate() const {
+  policy.validate();
+  if(next_review_tick<0||last_review_tick< -1||last_review_tick>next_review_tick||
+      (!initialized&&(next_review_tick!=0||last_review_tick!=-1)))
+    throw DiplomacyArgumentRangeError("Invalid diplomacy maintenance schedule.");
+}
+DiplomacyMaintenanceSnapshot DiplomacyCampaignMaintenanceScheduler::snapshot() const {
+  return {policy_,next_review_tick_,last_review_tick_,initialized_};
+}
+void DiplomacyCampaignMaintenanceScheduler::restore(const DiplomacyMaintenanceSnapshot &state){
+  state.validate();policy_=state.policy;next_review_tick_=state.next_review_tick;
+  last_review_tick_=state.last_review_tick;initialized_=state.initialized;
+}
 DiplomacyCampaignMaintenanceResult
 DiplomacyCampaignMaintenanceScheduler::review_if_due(std::int64_t now_tick) {
   if (now_tick < 0)

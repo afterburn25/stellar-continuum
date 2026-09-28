@@ -1,0 +1,21 @@
+[
+  {
+    "blackFraction": 0.09255218505859375,
+    "clippedFraction": 0.0,
+    "disc": [
+      1023.4999999999999,
+      1023.4999999999999,
+      903.6000000000001
+    ],
+    "id": "sol-iapetus",
+    "observedSurfaceFraction": 0.2924998847116595,
+    "reason": "",
+    "removedLightGradient": [
+      0.15,
+      0.15,
+      -0.15
+    ],
+    "seamError": 0.022331143979295098,
+    "usable": true
+  }
+]

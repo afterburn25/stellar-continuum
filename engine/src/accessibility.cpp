@@ -1,0 +1,83 @@
+#include <stellar/engine/accessibility.hpp>
+
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
+#include <cmath>
+
+namespace stellar::engine {
+namespace {
+
+float clamp_scale(float value) noexcept {
+  if (!std::isfinite(value))
+    return 1.0f;
+  return std::clamp(value, 0.75f, 2.0f);
+}
+
+ColorBlindMode parse_mode(const std::string &name) {
+  if (name == "protanopia")
+    return ColorBlindMode::Protanopia;
+  if (name == "deuteranopia")
+    return ColorBlindMode::Deuteranopia;
+  if (name == "tritanopia")
+    return ColorBlindMode::Tritanopia;
+  return ColorBlindMode::None;
+}
+
+const char *mode_name(ColorBlindMode mode) {
+  switch (mode) {
+  case ColorBlindMode::Protanopia: return "protanopia";
+  case ColorBlindMode::Deuteranopia: return "deuteranopia";
+  case ColorBlindMode::Tritanopia: return "tritanopia";
+  default: return "none";
+  }
+}
+
+} // namespace
+
+void AccessibilitySettings::sanitize() {
+  ui_scale = clamp_scale(ui_scale);
+  text_scale = clamp_scale(text_scale);
+  subtitle_scale = clamp_scale(subtitle_scale);
+}
+
+std::string AccessibilitySettings::to_json() const {
+  nlohmann::json doc;
+  doc["ui_scale"] = ui_scale;
+  doc["text_scale"] = text_scale;
+  doc["high_contrast"] = high_contrast;
+  doc["color_blind"] = mode_name(color_blind);
+  doc["reduce_motion"] = reduce_motion;
+  doc["reduce_flashing"] = reduce_flashing;
+  doc["subtitles_enabled"] = subtitles_enabled;
+  doc["subtitle_scale"] = subtitle_scale;
+  return doc.dump();
+}
+
+AccessibilitySettings
+AccessibilitySettings::from_json(std::string_view document) {
+  AccessibilitySettings result;
+  nlohmann::json doc;
+  try {
+    doc = nlohmann::json::parse(document);
+  } catch (...) {
+    return result;
+  }
+  if (!doc.is_object())
+    return result;
+  result.ui_scale = doc.value("ui_scale", result.ui_scale);
+  result.text_scale = doc.value("text_scale", result.text_scale);
+  result.high_contrast = doc.value("high_contrast", result.high_contrast);
+  result.color_blind = parse_mode(doc.value("color_blind", std::string{}));
+  result.reduce_motion = doc.value("reduce_motion", result.reduce_motion);
+  result.reduce_flashing =
+      doc.value("reduce_flashing", result.reduce_flashing);
+  result.subtitles_enabled =
+      doc.value("subtitles_enabled", result.subtitles_enabled);
+  result.subtitle_scale =
+      doc.value("subtitle_scale", result.subtitle_scale);
+  result.sanitize();
+  return result;
+}
+
+} // namespace stellar::engine

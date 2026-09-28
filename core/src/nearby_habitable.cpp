@@ -13,6 +13,14 @@ namespace stellar::core {
 namespace {
 constexpr double maximum_opening_distance = 340.0;
 
+void align_guaranteed_environment(PlanetaryBody& body,const StellarSystem& system) {
+    if(!system.stellar_object)return;
+    const auto& p=*system.stellar_object;
+    const auto temperature=std::max(3.,body.environment.temperature_kelvin);
+    const double orbit=std::sqrt(p.luminosity_solar)*std::pow(278.5/temperature,2);
+    if(orbit>p.safe_approach_au)body.stellar_exposure=stellar_planet_exposure(p,orbit);
+    if(body.appearance)body.appearance=planet_appearance_for_existing(body.appearance->visual_seed,body,&p);
+}
 bool stable_star(const std::optional<StellarClass>& primary) {
     return primary != StellarClass::BlackHole && primary != StellarClass::NeutronStar && primary != StellarClass::Pulsar &&
         primary != StellarClass::HotBlueStar && primary != StellarClass::Giant && primary != StellarClass::Protostar;
@@ -56,7 +64,22 @@ std::unordered_map<int, PlanetaryBody> bodies_by_id(std::span<const PlanetaryBod
     return result;
 }
 
-std::vector<Candidate> candidates_for(std::int64_t seed, std::span<const StellarSystem> systems, std::span<const PlanetaryBody> bodies,
+using EligiblePlanets = std::unordered_map<int, std::vector<const PlanetaryBody*>>;
+
+EligiblePlanets index_eligible_planets(std::span<const PlanetaryBody> bodies) {
+    EligiblePlanets result;
+    for (const auto& body : bodies)
+        if (body.kind == PlanetaryBodyKind::Planet && body.environment.has_solid_surface &&
+            !body.has_pre_warp_civilization)
+            result[body.system_id].push_back(&body);
+    for (auto& [system_id, planets] : result) {
+        (void)system_id;
+        std::sort(planets.begin(), planets.end(), [](const auto* l, const auto* r) { return l->id < r->id; });
+    }
+    return result;
+}
+
+std::vector<Candidate> candidates_for(std::int64_t seed, std::span<const StellarSystem> systems, const EligiblePlanets& eligible,
     const std::unordered_map<int, PlanetaryBody>& result, const std::unordered_set<int>& excluded, const Civilization& civilization,
     bool sort_natural) {
     const auto home_it = std::find_if(systems.begin(), systems.end(), [&](const auto& s) { return s.id == civilization.home_system_id; });
@@ -67,14 +90,9 @@ std::vector<Candidate> candidates_for(std::int64_t seed, std::span<const Stellar
         if (excluded.contains(system.id) || !stable_star(system.primary)) continue;
         const auto distance = distance_light_years(home_system.position, system.position);
         if (distance > maximum_opening_distance) continue;
-        std::vector<const PlanetaryBody*> planets;
-        for (const auto& body : bodies) {
-            if (body.system_id == system.id && body.kind == PlanetaryBodyKind::Planet &&
-                body.environment.has_solid_surface && !body.has_pre_warp_civilization)
-                planets.push_back(&body);
-        }
-        std::sort(planets.begin(), planets.end(), [](const auto* l, const auto* r) { return l->id < r->id; });
-        if (planets.empty()) continue;
+        const auto found = eligible.find(system.id);
+        if (found == eligible.end()) continue;
+        const auto& planets = found->second;
         const PlanetaryBody* natural_body = nullptr;
         for (const auto* body : planets) {
             if (natural(result.at(body->id), civilization.species_id)) {
@@ -106,9 +124,12 @@ bool try_assign(const Requirement* requirement, std::unordered_map<int, const Re
 
 std::vector<PlanetaryBody> apply_nearby_habitable_guarantees(std::int64_t seed, std::span<StellarSystem> systems,
     std::span<const PlanetaryBody> bodies, std::span<const Civilization> civilizations, int guaranteed) {
+    if (guaranteed <= 0) return std::vector<PlanetaryBody>(bodies.begin(), bodies.end());
+    // Immutable input membership is shared by greedy and fallback planning.
+    // Viability still reads the current staged body after each assignment.
+    const auto eligible = index_eligible_planets(bodies);
     auto original = std::vector<StellarSystem>(systems.begin(), systems.end());
     const auto greedy = [&]() {
-        if (guaranteed <= 0) return std::vector<PlanetaryBody>(bodies.begin(), bodies.end());
         auto result = bodies_by_id(bodies);
         std::unordered_set<int> reserved;
         for (const auto& civilization : civilizations) reserved.insert(civilization.home_system_id);
@@ -119,7 +140,7 @@ std::vector<PlanetaryBody> apply_nearby_habitable_guarantees(std::int64_t seed, 
         std::sort(ordinary.begin(), ordinary.end(), [](const auto* l, const auto* r) { return l->id < r->id; });
         for (const auto* civ : ordinary) {
             const auto& home = home_body(bodies, *civ);
-            const auto candidates = candidates_for(seed, systems, bodies, result, reserved, *civ, false);
+            const auto candidates = candidates_for(seed, systems, eligible, result, reserved, *civ, false);
             int accepted = 0;
             for (const auto& candidate : candidates) {
                 if (!candidate.natural_body) continue;
@@ -132,6 +153,7 @@ std::vector<PlanetaryBody> apply_nearby_habitable_guarantees(std::int64_t seed, 
                 changed.mass_earth = std::max(.0005,
                     home.environment.gravity_g * changed.radius_earth * changed.radius_earth);
                 changed.environment = home.environment;
+                align_guaranteed_environment(changed,*candidate.system);
                 result[changed.id] = changed;
                 const auto system = std::find_if(systems.begin(), systems.end(),
                     [&](const auto& value) { return value.id == candidate.system->id; });
@@ -168,7 +190,7 @@ std::vector<PlanetaryBody> apply_nearby_habitable_guarantees(std::int64_t seed, 
     std::sort(ordinary.begin(), ordinary.end(), [](const auto* l, const auto* r) { return l->id < r->id; });
     for (const auto* civilization : ordinary) {
         const auto& home = home_body(bodies, *civilization);
-        const auto choices = candidates_for(seed, systems, bodies, result, homes, *civilization, true);
+        const auto choices = candidates_for(seed, systems, eligible, result, homes, *civilization, true);
         for (int slot = 0; slot < guaranteed; ++slot)
             requirements.push_back({civilization, &home, slot, choices});
     }
@@ -208,6 +230,7 @@ std::vector<PlanetaryBody> apply_nearby_habitable_guarantees(std::int64_t seed, 
         changed.mass_earth = std::max(.0005,
             requirement->home->environment.gravity_g * changed.radius_earth * changed.radius_earth);
         changed.environment = requirement->home->environment;
+        align_guaranteed_environment(changed,*candidate->system);
         result[changed.id] = changed;
         const auto system = std::find_if(systems.begin(), systems.end(),
             [&](const auto& value) { return value.id == system_id; });

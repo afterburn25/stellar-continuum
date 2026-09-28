@@ -96,6 +96,16 @@ std::vector<PlanetaryBody> apply_environmental_diversity(std::int64_t seed, std:
             throw std::invalid_argument("Environmental diversity requires unique planetary body IDs");
     }
 
+    std::unordered_map<int, const PlanetaryBody*> targets;
+    for (const auto& body : bodies) {
+        if (body.kind != PlanetaryBodyKind::Planet) continue;
+        auto& target = targets[body.system_id];
+        const auto rank = [](const PlanetaryBody& b) {
+            return std::tuple{b.has_pre_warp_civilization, !b.environment.has_solid_surface,
+                              !b.legacy_colonization_candidate, b.id};
+        };
+        if (!target || rank(body) < rank(*target)) target = &body;
+    }
     std::vector<const StellarSystem*> ordered_systems;
     ordered_systems.reserve(systems.size());
     for (const StellarSystem& system : systems) ordered_systems.push_back(&system);
@@ -107,15 +117,7 @@ std::vector<PlanetaryBody> apply_environmental_diversity(std::int64_t seed, std:
         const auto profile = resolve_profile(system->id);
         if (!profile) continue;
 
-        const PlanetaryBody* target = nullptr;
-        for (const PlanetaryBody& body : bodies) {
-            if (body.system_id != system->id || body.kind != PlanetaryBodyKind::Planet) continue;
-            if (!target || std::tuple{body.has_pre_warp_civilization, !body.environment.has_solid_surface,
-                               !body.legacy_colonization_candidate, body.id} <
-                    std::tuple{target->has_pre_warp_civilization, !target->environment.has_solid_surface,
-                        !target->legacy_colonization_candidate, target->id})
-                target = &body;
-        }
+        const PlanetaryBody* target = targets[system->id];
         if (!target) {
             if (system->primary || system->stellar_catalog_id) continue;
             throw std::runtime_error("System has no planet available for its diversity anchor");

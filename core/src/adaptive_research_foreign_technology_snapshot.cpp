@@ -439,7 +439,7 @@ AdaptiveResearchForeignTechnologySnapshotCodec::deserialize(
   if (schema == root.end())
     fail("Adaptive Research snapshot is missing schemaVersion.");
   const auto version = checked_int32(*schema);
-  if (version >= 1 && version <= 3)
+  if ((version >= 1 && version <= 3) || version == AdaptiveResearchSnapshotCodec::current_schema_version)
     return storage_->v3.deserialize(text);
   if (version != current_schema_version)
     fail("Unsupported Adaptive Research foreign-technology snapshot schema " +

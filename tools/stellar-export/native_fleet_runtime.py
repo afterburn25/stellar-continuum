@@ -87,6 +87,10 @@ def validate_native_fleet_export(folder: Path, env: dict[str, str],
                     f"Native fleet did not confirm renderer/campaign: {result.stdout}")
             if "save=ok " not in result.stdout:
                 raise RuntimeError("Native fleet did not confirm an actual manual save")
+            if not re.search(r"(?:^|\s)civilian_recovery=1(?:\s|$)", result.stdout):
+                raise RuntimeError("Native fleet did not prove civilian hold/resume input")
+            if not re.search(r"(?:^|\s)fleet_located=1(?:\s|$)", result.stdout):
+                raise RuntimeError("Native fleet did not prove read-only Locate input")
             if (not capture.is_file() or capture.stat().st_size < 54 or
                     capture.read_bytes()[:2] != b"BM"):
                 raise RuntimeError("Native fleet did not capture its rendered workspace")
@@ -148,6 +152,7 @@ def validate_native_fleet_export(folder: Path, env: dict[str, str],
             diagnostics.append(result.stdout.strip())
 
         return {"nativeFleetPlayerInput": True,
+                "nativeFleetLocate": True,
                 "nativeFleetTransitAdvanced": True,
                 "nativeFleetProgressReload": True,
                 "fleetCaptures": captures,

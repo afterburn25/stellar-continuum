@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "assets/visual/moons/sol-io/albedo.png",
+      "sha256": "d75702ec4dbd31e900e954a31b88422ec684e1d620ce568f0aedac836cdbb646"
+    },
+    {
+      "path": "assets/visual/moons/sol-io/normal.png",
+      "sha256": "546377046e8b1c03c8bbe9e4fbcbea609e2ab0fd548787f53fb29c9908948729"
+    },
+    {
+      "path": "assets/visual/moons/sol-io/properties.png",
+      "sha256": "a81bf36b39891249c54c24c97b248eb681de83dc1e453addc88df2d8750ba6de"
+    },
+    {
+      "path": "assets/visual/moons/sol-europa/albedo.png",
+      "sha256": "83c3a36e2785851aae36d575169d1898c712bcae2cce0a3bf270429f573384f0"
+    },
+    {
+      "path": "assets/visual/moons/sol-europa/normal.png",
+      "sha256": "6fac4d550ca63fd866ceed44e2ddf9091a636fb062fa39b83f39f4d6d227ad50"
+    },
+    {
+      "path": "assets/visual/moons/sol-europa/properties.png",
+      "sha256": "f66544a9288c497ea8479a17206cefc89e3762c36bc0f001cd1a795b96a3c0fd"
+    },
+    {
+      "path": "assets/visual/moons/sol-ganymede/albedo.png",
+      "sha256": "156c88a03c3adf6bf4b68961033bdb3f5fc9fd2bf60552525ef178ed4779ed85"
+    },
+    {
+      "path": "assets/visual/moons/sol-ganymede/normal.png",
+      "sha256": "75b1f72ff73c368d32dbd6d3154487016b2f870dcb7de82b08f0d6c6d14a800d"
+    },
+    {
+      "path": "assets/visual/moons/sol-ganymede/properties.png",
+      "sha256": "f44bd6d476ae374f1cc6e9f5fe956d73c402d3c6028273df1713555b035e9a37"
+    },
+    {
+      "path": "assets/visual/moons/sol-callisto/albedo.png",
+      "sha256": "34ca813a6ff7affdf20c54dd5128406e021ac42a5a9352896ded876825917e1c"
+    },
+    {
+      "path": "assets/visual/moons/sol-callisto/normal.png",
+      "sha256": "74e1674f35ecfa4d3a7333c3c884cc013b675da371a5ce9a47499ebe8c3f855a"
+    },
+    {
+      "path": "assets/visual/moons/sol-callisto/properties.png",
+      "sha256": "858170cefbd75d694977245d34f30f66a8e543c85c72454117024a3ec2e6b687"
+    },
+    {
+      "path": "assets/visual/moons/sol-mimas/albedo.png",
+      "sha256": "8a0aa148363ec53ccba156e4d12189d394ebba6e552d7ac5dbba713076a1195c"
+    },
+    {
+      "path": "assets/visual/moons/sol-mimas/normal.png",
+      "sha256": "c6a8730836a8540e06ea2fce8d306f52cab577ff33d7ad75c358f734b0b951c9"
+    },
+    {
+      "path": "assets/visual/moons/sol-mimas/properties.png",
+      "sha256": "d2e92972652243d1004d8cac3d68b84963a65b05f267ae3dad64d59dd3db51f4"
+    },
+    {
+      "path": "assets/visual/moons/sol-enceladus/albedo.png",
+      "sha256": "44c902536619e6b1e7c59a8e0c60fd5daf6ba9fe8184a9e18ba3726345e48e0c"
+    },
+    {
+      "path": "assets/visual/moons/sol-enceladus/normal.png",
+      "sha256": "4a83a4c1bfb8c332f519bdaffb54bea2a2e56d0a63989a1422d5d203c1a1c68f"
+    },
+    {
+      "path": "assets/visual/moons/sol-enceladus/properties.png",
+      "sha256": "0e933c6042cfa599957f718d230128013f42fc55f5add28ad21ed1e5f8b07cf8"
+    },
+    {
+      "path": "assets/visual/moons/sol-tethys/albedo.png",
+      "sha256": "74870c86c1b311e8b54bb8ea9f460270ffc35043495fbecc789ad795b258f9c8"
+    },
+    {
+      "path": "assets/visual/moons/sol-tethys/normal.png",
+      "sha256": "87720a0df3f7d8292a0b40246ec2061d2bff0284491d3956d091fbbfa349869e"
+    },
+    {
+      "path": "assets/visual/moons/sol-tethys/properties.png",
+      "sha256": "e5ee284462859780191a92fa110f3dc802cfd86ef69cbf1ccabfe2d5152875a9"
+    },
+    {
+      "path": "assets/visual/moons/sol-dione/albedo.png",
+      "sha256": "9f9adf1ada8275d1f051236aac045b7c5fc61d9ba3afaa4d2a13ba4860274d54"
+    },
+    {
+      "path": "assets/visual/moons/sol-dione/normal.png",
+      "sha256": "eaf5f7331c0152372f915bab303be00c5ab2e7a6b2d9809acc6789157836e777"
+    },
+    {
+      "path": "assets/visual/moons/sol-dione/properties.png",
+      "sha256": "404ec5ad2fe595c8646dc850208f53300da4d626809750713f7021e0b31c8c83"
+    },
+    {
+      "path": "assets/visual/moons/sol-rhea/albedo.png",
+      "sha256": "d0b1f29bc54ddee0cbb2c1f79cde372294f1c145876b9423314043824fe7d692"
+    },
+    {
+      "path": "assets/visual/moons/sol-rhea/normal.png",
+      "sha256": "ed5968fc77b9924e7f398482bcef47c6bdd0f21165fd5c175e97a0bc8329277f"
+    },
+    {
+      "path": "assets/visual/moons/sol-rhea/properties.png",
+      "sha256": "24d5707d2bc613d8c9cff3d97ccc966ab99ebc719d686da70ca874f3db34351e"
+    },
+    {
+      "path": "assets/visual/moons/sol-titan/albedo.png",
+      "sha256": "8aa21b120bbb1457d99aa461fb3d0cb4fc64ca41d1146107cabdbeda5e8fbd13"
+    },
+    {
+      "path": "assets/visual/moons/sol-titan/normal.png",
+      "sha256": "294ec6b82b7b32be566f820c88c56a8d7ffa1ad2d1468a9d9398ed5b768d8b95"
+    },
+    {
+      "path": "assets/visual/moons/sol-titan/properties.png",
+      "sha256": "05f54d402820bc445da758f92dde6e950114c18993470243902cf6f9988d815d"
+    },
+    {
+      "path": "assets/visual/moons/sol-iapetus/albedo.png",
+      "sha256": "b4719358bce954c639bc49c49fc486fc121e9efb10830299baa5f04b4a8a421a"
+    },
+    {
+      "path": "assets/visual/moons/sol-iapetus/normal.png",
+      "sha256": "eda8997e50dffd7228216849951c7f7946f04524cccba76d0a23380289b9fb1f"
+    },
+    {
+      "path": "assets/visual/moons/sol-iapetus/properties.png",
+      "sha256": "8412d2f6e79359234b7dbfc6d962f52b98bb2f72a5759ed7dc320c49339434a6"
+    },
+    {
+      "path": "assets/visual/moons/sol-miranda/albedo.png",
+      "sha256": "dfa84c3ea5348dce32dcc814d9cc201fe18bb09b921fd40e736c91a52e5ce3ad"
+    },
+    {
+      "path": "assets/visual/moons/sol-miranda/normal.png",
+      "sha256": "2ae1a263c096a2c38c214da005bf746a6ed704e6889aba0a7f60d72ff5b74838"
+    },
+    {
+      "path": "assets/visual/moons/sol-miranda/properties.png",
+      "sha256": "8b44e23c03fc53b787f9110c6db492afad63c82be36ddf405bdab52b18928386"
+    },
+    {
+      "path": "assets/visual/moons/sol-ariel/albedo.png",
+      "sha256": "b1f8cc8cd61d97af89edd5db854b5cb1bb45674072fa157203ae1e79500483fd"
+    },
+    {
+      "path": "assets/visual/moons/sol-ariel/normal.png",
+      "sha256": "c7a1443f57b89c09128323de95dab457b8d6daa4dfd166bca459ca87d1a2a1d6"
+    },
+    {
+      "path": "assets/visual/moons/sol-ariel/properties.png",
+      "sha256": "e50836ebc20af07c210ce54796d88589789a59d6646956880ce57d5ad00d01d8"
+    },
+    {
+      "path": "assets/visual/moons/sol-umbriel/albedo.png",
+      "sha256": "9da1782d16515be1b32450554f2fcd49727f72200b021d12f5d4acb66e4596ab"
+    },
+    {
+      "path": "assets/visual/moons/sol-umbriel/normal.png",
+      "sha256": "dd2b9b8ecf347d352a11d0cbe3427649e51c035b1194d54c34bf5e8471f9712e"
+    },
+    {
+      "path": "assets/visual/moons/sol-umbriel/properties.png",
+      "sha256": "b9f5f34e44b2306c159af7664fb8b287903b2cf3b999cda49606bb50becfc008"
+    },
+    {
+      "path": "assets/visual/moons/sol-titania/albedo.png",
+      "sha256": "d59b185d8c5c2a0099c357b6be19eaa31db20296de682c834be12226d2d9ffb0"
+    },
+    {
+      "path": "assets/visual/moons/sol-titania/normal.png",
+      "sha256": "f5cee05e717968e7aab22896ba74cc34420b44cbd0d72007dd1accf3ecfd1821"
+    },
+    {
+      "path": "assets/visual/moons/sol-titania/properties.png",
+      "sha256": "916b7fc6fff0723c63493ecbc7926f1fb383899db4b0f300b00bf22675c4534b"
+    },
+    {
+      "path": "assets/visual/moons/sol-oberon/albedo.png",
+      "sha256": "fa41a7a8880e26932b2e71ccec0de257c94572d49220ee2433ff74f5325b9920"
+    },
+    {
+      "path": "assets/visual/moons/sol-oberon/normal.png",
+      "sha256": "3774b48ea5cc55774ae388ede6df20266ad5ef4c380ecb968a5e1d5e99ee05cd"
+    },
+    {
+      "path": "assets/visual/moons/sol-oberon/properties.png",
+      "sha256": "14877bf75d7bff1bdc11c126b3783ab1bf63aae77e91dfcb09557ff99be34602"
+    },
+    {
+      "path": "assets/visual/moons/sol-triton/albedo.png",
+      "sha256": "923ac6488093b01f80345f39ca97ecf01bbd8f09bc5aaf3e123656ffce621ef1"
+    },
+    {
+      "path": "assets/visual/moons/sol-triton/normal.png",
+      "sha256": "fa67d0bb1c1b0df7f878150a3462b3f41bd0b56bdbcda29609753320577c86af"
+    },
+    {
+      "path": "assets/visual/moons/sol-triton/properties.png",
+      "sha256": "4d45fb1adace15be472ee65ddf30ef38002fe0ac59c221e3df8362a6efa951ef"
+    },
+    {
+      "path": "assets/visual/moons/sol-charon/albedo.png",
+      "sha256": "d931a844b7059b5abe5ca20aa266d93cf9a4c80f44f757fc52f737dd1be43104"
+    },
+    {
+      "path": "assets/visual/moons/sol-charon/normal.png",
+      "sha256": "70fcdb5dd74b222547e991f1c23e449cadb94e8fbbd9b98fe968997168ca8b1d"
+    },
+    {
+      "path": "assets/visual/moons/sol-charon/properties.png",
+      "sha256": "35c5e2fe4e6a6b1ed62b072b89acd69c3b161ca21d9230bdb794bf16e6511695"
+    }
+  ]
+}

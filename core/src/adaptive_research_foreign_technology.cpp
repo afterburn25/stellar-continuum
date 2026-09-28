@@ -1,3 +1,4 @@
+#include <stellar/engine/asset_registry.hpp>
 #include <stellar/core/adaptive_research_foreign_technology.hpp>
 #include <stellar/core/detail/adaptive_research_foreign_technology_support_access.hpp>
 
@@ -43,7 +44,7 @@ using StringSet =
     std::unordered_set<std::string, TransparentHash, TransparentEqual>;
 
 Json read_json(const std::filesystem::path &path) {
-  std::ifstream input(path, std::ios::binary);
+  auto input=stellar::engine::resource_stream(path);
   if (!input)
     throw std::runtime_error("Could not open " + path.string());
   Json result;
@@ -1172,3 +1173,4 @@ AdaptiveResearchForeignTechnologyRuntime::evaluate_recipient_value(
 }
 
 } // namespace stellar::core
+

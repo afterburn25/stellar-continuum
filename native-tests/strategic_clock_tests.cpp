@@ -86,6 +86,19 @@ void apply_autosave(CampaignAutosaveScheduler &autosave, const Json &row, Json &
   else throw std::runtime_error("Unknown autosave operation");
 }
 int run(const fs::path &fixture_path, const fs::path &source_root) {
+  // Native play speeds cap at 4x; historical replay retains its 8x default.
+  StrategicClock native_clock;
+  native_clock.set_maximum_multiplier(4.);
+  native_clock.set_speed(StrategicSpeed::Maximum);
+  equal(native_clock.advance_bounded_frame(.125, 1., 2.), .5, "Native 4x elapsed days");
+  native_clock.set_speed(StrategicSpeed::Paused);
+  equal(native_clock.advance_bounded_frame(.125, 1., 2.), 0., "Native paused clock");
+  native_clock.resume();
+  equal(native_clock.requested_multiplier(), 4., "Native resumed 4x speed");
+  bool invalid_multiplier_rejected=false;
+  try { native_clock.set_maximum_multiplier(0.); }
+  catch(const std::invalid_argument&) { invalid_multiplier_rejected=true; }
+  if(!invalid_multiplier_rejected)throw std::runtime_error("Invalid native speed multiplier accepted.");
   const auto fixture_bytes = read_bytes(fixture_path); const auto fixture_hash = sha256(fixture_bytes);
   const auto fixture = Json::parse(fixture_bytes);
   if (fixture.at("SchemaVersion") != 1 || fixture.at("RowCount").get<int>() != static_cast<int>(fixture.at("Rows").size()))

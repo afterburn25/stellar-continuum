@@ -125,6 +125,7 @@ int surface_essential_service_priority(std::string_view type_id) {
     return 0;
 }
 int surface_building_capacity(const Colony& colony) {
+    if (colony.surface_hub_level <= 0) return 0;
     if (colony.kind == SettlementKind::ResourceOutpost) return 8;
     if (colony.surface_hub_level == 1) return 16;
     if (colony.surface_hub_level == 2) return 32;

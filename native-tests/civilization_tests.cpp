@@ -1,10 +1,13 @@
 #include <stellar/core/civilization_catalog.hpp>
+#include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/planetary_satellites.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <unordered_set>
 using namespace stellar::core;
 using Json=nlohmann::json;
 namespace {
@@ -117,7 +120,20 @@ int main(int argc,char** argv) {
                 ++failures;
             } else check(error.empty(),name+": unexpected native failure: "+error);
             if(c.contains("ExpectedSystems")) equal(project(systems,system_json),c.at("ExpectedSystems"),name+".Systems");
-            if(c.contains("ExpectedBodies")) { equal(project(bodies,body_json),c.at("ExpectedBodies"),name+".Bodies"); body_count+=bodies.size(); }
+            if(c.contains("ExpectedBodies")) {
+                // The oracle predates the canonical Sol expansion; filter
+                // exactly the reviewed moon/Pluto additions absent from it.
+                std::unordered_set<int> expected_ids;
+                for(const auto& j:c.at("ExpectedBodies"))expected_ids.insert(j.at(0).get<int>());
+                std::vector<PlanetaryBody> comparable;
+                for(const auto& b:bodies){
+                    const auto* moon=sol_moon_definition(b.id);
+                    if(b.system_id==sol_system_id&&((moon&&b.id!=moon_body_id)||b.id==pluto_body_id)&&
+                        !expected_ids.contains(b.id))continue;
+                    comparable.push_back(b);
+                }
+                equal(project(comparable,body_json),c.at("ExpectedBodies"),name+".Bodies"); body_count+=comparable.size();
+            }
             if(c.contains("ExpectedCivilizations")) {
                 equal(project(civilizations,civilization_json),c.at("ExpectedCivilizations"),name+".Civilizations"); civilization_count+=civilizations.size();
                 const std::vector<std::string> offices={"FleetCommander","ChiefScientist","Diplomat","Governor","EconomicAdvisor","OperationsOfficer","ExpeditionCommander"};

@@ -1,3 +1,10 @@
+<!-- native-architecture-notice-20260920 -->
+> **Current architecture (2026-09-20): custom Stellar Engine / C++23 engine / C++23 game.**
+> Godot/C#/.NET references below are legacy implementation or fixture provenance,
+> not the current runtime or instructions to restore it.
+> Start with [the current handoff](AGENT_HANDOFF.md) and
+> [verified project state](PROJECT_STATE.md).
+
 # Branch recovery inventory — 2026-09-08
 
 Snapshot baseline: `integration` at `c529a1a765776c0940f88002410bc70db740d05a`. All 96 remote branches were fetched and inspected before new development. Counts below are ancestry counts, not counts of missing features. A branch can retain unique merge/reconciliation commits after equivalent work was accepted.

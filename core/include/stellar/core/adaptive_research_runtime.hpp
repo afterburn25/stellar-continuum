@@ -33,6 +33,7 @@ enum class AdaptiveResearchRuntimeEventType {
   civilization_trait_granted,
   directed_program_stage_changed,
   deployment_event_unlocked,
+  project_cancelled,
 };
 
 struct AdaptiveResearchRuntimeEvent {
@@ -162,6 +163,8 @@ public:
   [[nodiscard]] AdaptiveResearchCommandResult pause_directed_research(
       AdaptiveResearchCivilizationState &state,
       std::string_view node_id) const;
+  [[nodiscard]] AdaptiveResearchCommandResult cancel_directed_research(
+      AdaptiveResearchCivilizationState &state, std::string_view node_id) const;
   [[nodiscard]] AdaptiveResearchCommandResult resume_directed_research(
       AdaptiveResearchCivilizationState &state, std::string_view node_id,
       double requested_assigned_labs, double readiness_score) const;
@@ -176,6 +179,13 @@ public:
   [[nodiscard]] AdaptiveResearchCommandResult resolve_hypothesis(
       AdaptiveResearchCivilizationState &state, std::string_view node_id,
       bool supported) const;
+
+  // Authored scenario/developer setup only, not a player research command.
+  // Establishes knowledge through the same maturity/capability grant pipeline.
+  // The owning campaign must isolate developer provenance and reconcile funding.
+  [[nodiscard]] AdaptiveResearchCommandResult establish_technology(
+      AdaptiveResearchCivilizationState &state, std::string_view node_id,
+      std::string_view target_context_id) const;
 
 private:
   struct Storage;
