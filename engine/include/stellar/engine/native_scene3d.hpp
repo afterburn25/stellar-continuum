@@ -254,6 +254,12 @@ struct Material3D {
   // steepens the falloff at the very edge without touching mid-disc.
   // [0,1]; 0 keeps the single-coefficient linear profile.
   float limb_darkening_q{};
+  // Three-term limb-darkening coefficient: the Sing et al. nonlinear
+  // law's mid-curve term 1 - m(1-μ^{3/2}) — a shallower falloff that
+  // reaches further into mid-disc than the quadratic edge term, for
+  // photospheres whose measured profile flattens inward of the rim.
+  // [0,1]; 0 keeps the two-term profile.
+  float limb_darkening_mid{};
   // Differential rotation for banded bodies (gas giants): a latitude-
   // weighted longitude shear `u += s·cos(2πv)` applied to every equirect
   // surface sample — authored bands bow symmetrically equator vs poles,
@@ -290,6 +296,13 @@ struct Material3D {
   // edge-on discs peak. Accretion discs, ring forward-scatter. [-1,1];
   // negative spins retrograde; 0 disables.
   float orbital_beaming{};
+  // Doppler color shift paired with the beaming asymmetry [0,1]:
+  // the approaching lane blueshifts (red depletes, blue gains) and the
+  // receding lane redshifts, scaled by the same v̂·V̂ alignment — a
+  // first-order spectral-shift approximation so accretion discs read
+  // hot-and-fast on the bright lane, cool on the dim one. 0 keeps the
+  // brightness-only asymmetry; no effect without orbital_beaming.
+  float orbital_beaming_tint{};
   // Henyey–Greenstein single-scatter phase: radiance scales by
   // (1−g²)/(1+g²+2g·(V̂·L̂))^(3/2), so g > 0 peaks the sheet when it is
   // backlit (dusty-ring forward scatter — Saturn E-ring look) with a
@@ -298,6 +311,15 @@ struct Material3D {
   // sheet's total luminance is preserved on average; |g| clamps to .95
   // in the shader so the singular peak stays finite. [-1,1]; 0 disables.
   float forward_scatter{};
+  // Two-term phase: `forward_scatter_back` is a second HG lobe g2
+  // [-1,1] blended in by `forward_scatter_back_mix` [0,1] — real dust
+  // sheets pair a narrow forward spike with a broad weak back lobe
+  // (g2 < 0 at low weight gives the faint opposition-side glow a
+  // single lobe cannot express). g2 = 0 degenerates to the isotropic
+  // filler, so a mix alone softens the primary lobe. mix = 0 keeps
+  // the single-lobe path unchanged.
+  float forward_scatter_back{};
+  float forward_scatter_back_mix{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;

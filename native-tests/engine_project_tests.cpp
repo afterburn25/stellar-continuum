@@ -442,14 +442,18 @@ int main() {
     cube.terminator_wrap = 0.4f;
     cube.limb_darkening = 0.6f;
     cube.limb_darkening_q = 0.35f;
+    cube.limb_darkening_mid = 0.25f;
     cube.band_shear = -0.25f;
     cube.band_waves = 0.6f;
     cube.band_drift = 0.08f;
     cube.band_turbulence = 1.25f;
     cube.orbital_beaming = 0.7f;
+    cube.orbital_beaming_tint = 0.4f;
     cube.star_kelvin = 3200.0;
     cube.accretion = {0.4f, 1.f, 9000.f, 0.8f};
     cube.forward_scatter = 0.5f;
+    cube.forward_scatter_back = -0.35f;
+    cube.forward_scatter_back_mix = 0.3f;
     cube.volume_depth = 0.3f;
     cube.volume_density = 6.f;
     cube.volume_seed = 2.f;
@@ -604,12 +608,16 @@ int main() {
                 rc.cloud_offset_x == 0.25f && rc.cloud_offset_y == -0.5f &&
                 rc.terminator_wrap == 0.4f && rc.limb_darkening == 0.6f &&
                 rc.limb_darkening_q == 0.35f &&
+                rc.limb_darkening_mid == 0.25f &&
                 rc.band_shear == -0.25f && rc.band_waves == 0.6f &&
                 rc.band_drift == 0.08f && rc.band_turbulence == 1.25f &&
                 rc.orbital_beaming == 0.7f &&
+                rc.orbital_beaming_tint == 0.4f &&
                 rc.star_kelvin == 3200.0 && rc.accretion[0] == 0.4f &&
                 rc.accretion[1] == 1.f && rc.accretion[2] == 9000.f &&
-                rc.accretion[3] == 0.8f && rc.forward_scatter == 0.5f,
+                rc.accretion[3] == 0.8f && rc.forward_scatter == 0.5f &&
+                rc.forward_scatter_back == -0.35f &&
+                rc.forward_scatter_back_mix == 0.3f,
             "scene3d surface-response fields round-trip");
       check(rc.lod_meshes.size() == 2 &&
                 rc.lod_meshes[0] == "models/crate_mid.obj" &&

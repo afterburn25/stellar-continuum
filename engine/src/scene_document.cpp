@@ -479,6 +479,8 @@ std::string Scene3dDocument::to_json() const {
     if (e.terminator_wrap != 0.f) item["terminatorWrap"] = e.terminator_wrap;
     if (e.limb_darkening != 0.f) item["limbDarken"] = e.limb_darkening;
     if (e.limb_darkening_q != 0.f) item["limbDarkenQ"] = e.limb_darkening_q;
+    if (e.limb_darkening_mid != 0.f)
+      item["limbDarkenMid"] = e.limb_darkening_mid;
     if (e.band_shear != 0.f) item["bandShear"] = e.band_shear;
     if (e.band_waves != 0.f) item["bandWaves"] = e.band_waves;
     if (e.band_drift != 0.f) item["bandDrift"] = e.band_drift;
@@ -486,8 +488,14 @@ std::string Scene3dDocument::to_json() const {
       item["bandTurbulence"] = e.band_turbulence;
     if (e.band_diff != 0.f) item["bandDiff"] = e.band_diff;
     if (e.orbital_beaming != 0.f) item["orbitalBeam"] = e.orbital_beaming;
+    if (e.orbital_beaming_tint != 0.f)
+      item["orbitalBeamTint"] = e.orbital_beaming_tint;
     if (e.forward_scatter != 0.f)
       item["forwardScatter"] = e.forward_scatter;
+    if (e.forward_scatter_back != 0.f)
+      item["forwardScatterBack"] = e.forward_scatter_back;
+    if (e.forward_scatter_back_mix != 0.f)
+      item["forwardScatterBackMix"] = e.forward_scatter_back_mix;
     if (e.star_kelvin != 0.0) item["starKelvin"] = e.star_kelvin;
     if (e.accretion[2] != 0.f) item["accretion"] = e.accretion;
     if (e.volume_depth != 0.f)
@@ -747,6 +755,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.limb_darkening_q = item.value("limbDarkenQ", 0.0f);
       if (!(e.limb_darkening_q >= 0.f && e.limb_darkening_q <= 1.f))
         return fail("limbDarkenQ must be in [0,1]");
+      e.limb_darkening_mid = item.value("limbDarkenMid", 0.0f);
+      if (!(e.limb_darkening_mid >= 0.f && e.limb_darkening_mid <= 1.f))
+        return fail("limbDarkenMid must be in [0,1]");
       e.band_shear = item.value("bandShear", 0.0f);
       if (!(e.band_shear >= -0.5f && e.band_shear <= 0.5f))
         return fail("bandShear must be in [-0.5,0.5]");
@@ -765,9 +776,20 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.orbital_beaming = item.value("orbitalBeam", 0.0f);
       if (!(e.orbital_beaming >= -1.f && e.orbital_beaming <= 1.f))
         return fail("orbitalBeam must be in [-1,1]");
+      e.orbital_beaming_tint = item.value("orbitalBeamTint", 0.0f);
+      if (!(e.orbital_beaming_tint >= 0.f && e.orbital_beaming_tint <= 1.f))
+        return fail("orbitalBeamTint must be in [0,1]");
       e.forward_scatter = item.value("forwardScatter", 0.0f);
       if (!(e.forward_scatter >= -1.f && e.forward_scatter <= 1.f))
         return fail("forwardScatter must be in [-1,1]");
+      e.forward_scatter_back = item.value("forwardScatterBack", 0.0f);
+      if (!(e.forward_scatter_back >= -1.f && e.forward_scatter_back <= 1.f))
+        return fail("forwardScatterBack must be in [-1,1]");
+      e.forward_scatter_back_mix =
+          item.value("forwardScatterBackMix", 0.0f);
+      if (!(e.forward_scatter_back_mix >= 0.f &&
+            e.forward_scatter_back_mix <= 1.f))
+        return fail("forwardScatterBackMix must be in [0,1]");
       e.star_kelvin = item.value("starKelvin", 0.0);
       if (!(e.star_kelvin == 0.0 ||
             (e.star_kelvin >= 100.0 && e.star_kelvin <= 100000.0)))

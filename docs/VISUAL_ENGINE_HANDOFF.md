@@ -50,6 +50,8 @@ m.surface_response->cloud_offset = {.1f,0}; // UV drift, each |≤2|
 m.terminator_wrap = 0.4f;                   // [0,1] wrap-diffuse softening
 m.limb_darkening = 0.6f;                    // [0,1] N.V radiance falloff
 m.limb_darkening_q = 0.2f;                  // [0,1] quadratic edge term
+m.limb_darkening_mid = 0.15f;               // [0,1] three-term mid-curve
+                                            // (1-μ^{3/2}) — reaches mid-disc
 m.band_shear = -0.2f;                       // [-0.5,0.5] latitude-weighted
                                             // longitude shear (giants)
 m.band_waves = 0.7f;                        // [0,1] zonal-jet harmonic
@@ -61,9 +63,16 @@ m.band_turbulence = 1.2f;                   // [-8,8] rad/s evolving
 m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
                                             // asymmetry (accretion discs,
                                             // ring forward-scatter)
+m.orbital_beaming_tint = 0.5f;              // [0,1] paired doppler color
+                                            // shift: bright lane blueshifts,
+                                            // dim lane redshifts
 m.forward_scatter = 0.6f;                   // [-1,1] HG phase asymmetry:
                                             // +backlit boost (dusty
                                             // rings), -opposition surge
+m.forward_scatter_back = -0.35f;            // [-1,1] optional second HG
+                                            // lobe (broad weak back lobe)
+m.forward_scatter_back_mix = 0.25f;         // [0,1] share of the second
+                                            // lobe; 0 = single-lobe phase
 ```
 
 `star_photosphere3d(kelvin)` builds a spectral-class star material in
@@ -131,10 +140,14 @@ a dark sphere inside the annulus — not an engine concept.
 
 `SurfaceEffect3D::volume_scatter` [0,1] adds directional single-scatter
 to the emission-volume march: each sample's emission scales by a limb
-gradient `mix(1, .35+1.3·facing, scatter)` where `facing` measures the
+gradient `mix(1, .35+1.3·facing·T, scatter)` where `facing` measures the
 sample's proxy-center direction against the object-space key light —
 the star-lit side brightens ~1.65×, the far side dims to ~0.35, so
-nebulae read illuminated rather than uniformly self-glowing. It rides
+nebulae read illuminated rather than uniformly self-glowing. `T` is a
+secondary-extinction term: four coarse taps toward the light through
+the same density field give `exp(-σ·τ)` transmittance over the authored
+optical density, so filaments deep in the cloud lose the boost and an
+authored occluder sphere crossing the path blocks it entirely. It rides
 the `atmo_shape.z` lane: `main()` early-returns into `emission_volume`
 whenever `volume_depth > 0`, so atmosphere lanes are inert on volume
 materials and free to carry it. Authored scenes use the `volume` entity
@@ -282,9 +295,12 @@ cone for a shadowed omni light so per-face caster scaling is visible
   identically to the key light, additional directionals and point
   lights; 0 is exact Lambert.
 - `limb_darkening` applies limb darkening `1 - u(1 - N·V) -
-  q(1 - N·V)²` to the body's outgoing radiance — `limb_darkening_q`
-  [0,1] adds the standard quadratic transit-law term that steepens the
-  very edge (Sun ≈ u 0.6); the product clamps at zero. So HDR emissive
+  q(1 - N·V)² - m(1 - (N·V)^{3/2})` to the body's outgoing radiance —
+  `limb_darkening_q` [0,1] adds the standard quadratic transit-law
+  term that steepens the very edge (Sun ≈ u 0.6) and
+  `limb_darkening_mid` [0,1] adds the Sing three-parameter law's
+  mid-curve term that reaches further into mid-disc; the product
+  clamps at zero. So HDR emissive
   star discs keep a physical edge instead of clipping
   flat. Applied after the cloud deck; the additive atmosphere rim is
   exempt. Uses the geometric normal, not normal-map detail.
@@ -464,7 +480,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `bandDrift` ([-0.25,0.25] uv/s scroll) and `bandTurbulence`
 ([-8,8] rad/s evolving warp) and `bandDiff` ([-8,8]
 latitude-differential drift term),
-`orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
+`orbitalBeam`/`orbitalBeamTint`, `forwardScatter`/`forwardScatterBack`/
+`forwardScatterBackMix` ([-1,1]/[0,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
 (`{depth,density,seed,steps,scatter,flow,distort,blend,image2,occlude,flowRate}`
 — requires a `texture`), `lods` (array of
@@ -580,19 +597,24 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
   latitude-differential rotation and `band_turbulence`
   reshapes the warp over scene time, while volume
   `flow_rate` re-poses filaments without evolving their shape.
-- Limb darkening is the two-term linear+quadratic transit law
-  (`limb_darkening`/`limb_darkening_q`) — no three-term/nonlinear
-  coefficients or wavelength-dependent profiles.
-- `orbital_beaming` is a first-order brightness asymmetry — no doppler
-  color shift, gravitational redshift, or lensing.
+- Limb darkening is the three-term linear+quadratic+mid-curve law
+  (`limb_darkening`/`limb_darkening_q`/`limb_darkening_mid`) — no
+  four-term Claret coefficients or wavelength-dependent profiles.
+- `orbital_beaming` is a first-order asymmetry — `orbital_beaming_tint`
+  adds a bounded linear doppler color shift (bright lane blueshifts,
+  dim lane redshifts); no gravitational redshift or lensing.
 - `accretion_disc_material3d` is an azimuthally uniform thin-disc
   profile — no spiral fluctuations, no relativistic ray-bending; the
   annulus radii must be re-stated in the `annulus:i,o` mesh spec.
-- `volume_scatter` is a limb-gradient approximation — no real
-  light-path extinction march inside the volume.
-- `forward_scatter` is a single Henyey-Greenstein lobe — no
-  multi-term phase functions or wavelength-dependent scattering; it
-  scales radiance only, not alpha.
+- `volume_scatter` attenuates its limb boost by a coarse 4-tap
+  light-path extinction march through the same density field (plus
+  occluder-sphere blocking) — no multi-scatter or shadow-map-grade
+  resolution.
+- `forward_scatter` is a bounded two-term Henyey-Greenstein phase
+  (`forward_scatter_back`/`_back_mix` blend a second lobe in, g2=0
+  degenerating to the isotropic filler) — no wavelength-dependent
+  scattering or >2-term phase functions; it scales radiance only, not
+  alpha.
 - One shared equirect env map per material, or the scene-level
   `environment` probe for opt-in PBR materials with no authored map;
   `environmentCapture` bakes six face views at an anchor into the slot

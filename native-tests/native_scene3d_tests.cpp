@@ -130,6 +130,11 @@ int main()try{
   rejects([&]{auto i=instance;i.material.limb_darkening_q=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.limb_darkening_q=.4f;const auto quad=Scene3D::create(camera,{i});
    check(close(quad->instances()[0].material.limb_darkening_q,.4f),"Quadratic limb coefficient did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.limb_darkening_mid=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.limb_darkening_mid=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.limb_darkening_mid=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.limb_darkening_mid=.3f;const auto three_term=Scene3D::create(camera,{i});
+   check(close(three_term->instances()[0].material.limb_darkening_mid,.3f),"Three-term limb coefficient did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.band_shear=.6f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.band_shear=-.6f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.band_shear=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
@@ -159,10 +164,24 @@ int main()try{
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.orbital_beaming=.8f;const auto beamed=Scene3D::create(camera,{i});
    check(close(beamed->instances()[0].material.orbital_beaming,.8f),"Orbital beaming did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.orbital_beaming_tint=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.orbital_beaming_tint=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.orbital_beaming_tint=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.orbital_beaming_tint=.5f;const auto tinted=Scene3D::create(camera,{i});
+   check(close(tinted->instances()[0].material.orbital_beaming_tint,.5f),"Doppler beaming tint did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.forward_scatter=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.forward_scatter=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.forward_scatter=-.6f;const auto phased=Scene3D::create(camera,{i});
    check(close(phased->instances()[0].material.forward_scatter,-.6f),"Forward scatter did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.forward_scatter_back=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter_back_mix=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter_back_mix=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter_back=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.forward_scatter_back=-.4f;i.material.forward_scatter_back_mix=.3f;
+   const auto phased=Scene3D::create(camera,{i});
+   check(close(phased->instances()[0].material.forward_scatter_back,-.4f)&&
+         close(phased->instances()[0].material.forward_scatter_back_mix,.3f),
+         "Forward-scatter back lobe did not survive scene creation");}
   {const auto tex=RgbaImage::create(1,1,{255,255,255,255});
    MeshInstance3D plasma;plasma.mesh=volume;plasma.material.transparent=true;plasma.material.texture=tex;
    SurfaceEffect3D effect;effect.next_texture=tex;effect.volume_depth=.3f;

@@ -439,6 +439,15 @@ int main(int argc,char** argv)try{
         "Quadratic limb darkening disturbed mid-disc");
     check(channel(*quad_disc,275,160,0)+8<channel(*limb_disc,275,160,0),
         "Quadratic limb darkening did not deepen the extreme edge");
+    // Three-term law: the (1-μ^{3/2}) mid-curve term reaches further
+    // into the disc than the squared edge term — mid-disc dims past
+    // the quadratic profile while the centre stays untouched.
+    star.material.limb_darkening_mid=.3f;
+    const auto mid_disc=capture({star},"star-limb-mid.png");
+    check(std::abs(channel(*mid_disc,160,160,0)-channel(*quad_disc,160,160,0))<=4,
+        "Three-term limb darkening changed the disc centre");
+    check(channel(*mid_disc,220,160,0)+5<channel(*quad_disc,220,160,0),
+        "Three-term limb darkening did not reach mid-disc");
     std::cout<<"limb_darkening_gpu=linear_quadratic_edge_passed\n";
   }
   surface.cloud_opacity=0;surface.properties=RgbaImage::create(1,1,{50,255,0,128});
@@ -1592,6 +1601,16 @@ int main(int argc,char** argv)try{
     disc.material.orbital_beaming=0;disc.rotation=rotation_axis_angle({1,0,0},.55f);
     const auto disc_ref=capture({disc},"beam-off.png");
     check(channel(*disc_ref,30,160,0)==left_flat,"Beaming=0 did not restore the flat disc");
+    // Doppler tint: the brightened lane blueshifts (B−R rises) while
+    // the dimmed lane redshifts (B−R falls) vs the untinted beam.
+    disc.material.orbital_beaming=.9f;disc.material.orbital_beaming_tint=.5f;
+    const auto tinted_disc=capture({disc},"beam-tinted.png");
+    const int ul_r=channel(*beamed_disc,30,160,0),ul_b=channel(*beamed_disc,30,160,2);
+    const int ur_r=channel(*beamed_disc,290,160,0),ur_b=channel(*beamed_disc,290,160,2);
+    const int tl_r=channel(*tinted_disc,30,160,0),tl_b=channel(*tinted_disc,30,160,2);
+    const int tr_r=channel(*tinted_disc,290,160,0),tr_b=channel(*tinted_disc,290,160,2);
+    check(tl_b-tl_r>ul_b-ul_r+10,"Doppler tint did not blueshift the approaching lane");
+    check(tr_b-tr_r<ur_b-ur_r-10,"Doppler tint did not redshift the receding lane");
     std::cout<<"orbital_beam_gpu=tilt_asymmetry_faceon_symmetric_passed\n";
   }
   {
@@ -1639,6 +1658,18 @@ int main(int argc,char** argv)try{
     const int back_off=channel(*off_back,160,120,0),back_on=channel(*on_back,160,120,0),face_on=channel(*on_face,160,120,0);
     check(back_off>30&&back_on>back_off*3/2,"Forward scatter did not brighten the backlit ring");
     check(face_on<back_on*2/3,"Forward scatter did not dim the face-lit ring");
+    // Two-term phase: a broad weak back lobe (g2<0, partial mix) lifts
+    // the face-lit side the single spike leaves flat while the backlit
+    // side keeps most of its forward boost.
+    ring.material.forward_scatter_back=-.4f;
+    ring.material.forward_scatter_back_mix=.3f;
+    DrawList backlit3;backlit3.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,-1}),{0,0,320,320}});
+    window.draw(backlit3,folder/"ring-backlit-two.png");const auto two_back=decode_rgba_image(folder/"ring-backlit-two.png");
+    DrawList face3;face3.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,1}),{0,0,320,320}});
+    window.draw(face3,folder/"ring-facelit-two.png");const auto two_face=decode_rgba_image(folder/"ring-facelit-two.png");
+    const int back_two=channel(*two_back,160,120,0),face_two=channel(*two_face,160,120,0);
+    check(face_two>face_on*5/4,"Two-term back lobe did not lift the face-lit ring");
+    check(back_two>back_off,"Two-term mix lost the forward-scatter boost");
     std::cout<<"forward_scatter_gpu=backlit_boost_passed\n";
   }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());
@@ -1819,8 +1850,24 @@ int main(int argc,char** argv)try{
     const auto scatter_on=decode_rgba_image(folder/"plasma-scatter-lit.png");
     const int lit_side=channel(*scatter_on,229,120,0),dark_side=channel(*scatter_on,90,120,0);
     const int base_side=channel(*unlit,229,120,0),base_dark=channel(*unlit,90,120,0);
-    check(lit_side>dark_side*3&&lit_side>base_side*5/4&&dark_side<base_dark/2,
+    check(lit_side>dark_side*3&&lit_side>base_side*9/8&&dark_side<base_dark/2,
         "Volume scatter did not brighten the light-facing limb");
+    // Secondary extinction: the shadow march along the light path dims
+    // filaments deep inside the cloud — the mid column between the limbs
+    // keeps only part of the position-only boost while the lit limb,
+    // whose light path exits almost immediately, keeps its lift.
+    const int mid_lit=channel(*scatter_on,160,120,0),mid_base=channel(*unlit,160,120,0);
+    check(mid_lit<mid_base*3/4&&lit_side>base_side,
+        "Secondary extinction did not shadow the volume interior");
+    // The authored occluder sphere blocks light crossing it: filaments
+    // behind the photosphere drop to the residual base level.
+    plasma.material.surface_effect->occlude=.15f;
+    DrawList occ_list;occ_list.world.emplace_back(Scene3DView{Scene3D::create(camera,{plasma},{1,0,0}),{0,0,320,320}});
+    window.draw(occ_list,folder/"plasma-scatter-occluded.png");
+    const auto scatter_occ=decode_rgba_image(folder/"plasma-scatter-occluded.png");
+    const int occ_px=channel(*scatter_occ,143,174,0),unocc_px=channel(*scatter_on,143,174,0);
+    check(occ_px<unocc_px*3/4,"Occluder sphere did not shadow the volume's light path");
+    plasma.material.surface_effect->occlude=0;
     // Filament warp: a flow/distort re-pose must change the volume's
     // pixels without changing its footprint — the authored variety knobs.
     plasma.material.surface_effect->volume_scatter=0;

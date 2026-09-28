@@ -2589,13 +2589,18 @@ int RuntimeHost::run() {
           inst.material.terminator_wrap = sf->terminator_wrap;
           inst.material.limb_darkening = sf->limb_darkening;
           inst.material.limb_darkening_q = sf->limb_darkening_q;
+          inst.material.limb_darkening_mid = sf->limb_darkening_mid;
           inst.material.band_shear = sf->band_shear;
           inst.material.band_waves = sf->band_waves;
           inst.material.band_drift = sf->band_drift;
           inst.material.band_turbulence = sf->band_turbulence;
           inst.material.band_diff = sf->band_diff;
           inst.material.orbital_beaming = sf->orbital_beaming;
+          inst.material.orbital_beaming_tint = sf->orbital_beaming_tint;
           inst.material.forward_scatter = sf->forward_scatter;
+          inst.material.forward_scatter_back = sf->forward_scatter_back;
+          inst.material.forward_scatter_back_mix =
+              sf->forward_scatter_back_mix;
         }
         if (const auto *at = world.get<AtmosphereShell>(e))
           inst.material.atmosphere =

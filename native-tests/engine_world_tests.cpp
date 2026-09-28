@@ -696,15 +696,19 @@ int main() {
         turret.terminator_wrap = 0.5f;
         turret.limb_darkening = 0.6f;
         turret.limb_darkening_q = 0.3f;
+        turret.limb_darkening_mid = 0.2f;
         turret.band_shear = -0.3f;
         turret.band_waves = 0.7f;
         turret.band_drift = 0.12f;
         turret.band_turbulence = 1.4f;
         turret.band_diff = 0.6f;
         turret.orbital_beaming = 0.65f;
+        turret.orbital_beaming_tint = 0.35f;
         turret.star_kelvin = 5800.0;
         turret.accretion = {0.3f, 1.f, 12000.f, -0.6f};
         turret.forward_scatter = 0.4f;
+        turret.forward_scatter_back = -0.35f;
+        turret.forward_scatter_back_mix = 0.25f;
         turret.texture = "maps/turret.png";
         turret.volume_depth = 0.3f;
         turret.volume_density = 6.f;
@@ -784,8 +788,12 @@ int main() {
                   ms->cloud_offset_x == 0.1f && ms->cloud_offset_y == 0.2f &&
                   ms->terminator_wrap == 0.5f && ms->limb_darkening == 0.6f &&
                   ms->limb_darkening_q == 0.3f &&
+                  ms->limb_darkening_mid == 0.2f &&
                   ms->band_shear == -0.3f && ms->orbital_beaming == 0.65f &&
+                  ms->orbital_beaming_tint == 0.35f &&
                   ms->forward_scatter == 0.4f && ms->band_waves == 0.7f &&
+                  ms->forward_scatter_back == -0.35f &&
+                  ms->forward_scatter_back_mix == 0.25f &&
                   ms->band_drift == 0.12f && ms->band_turbulence == 1.4f &&
                   ms->band_diff == 0.6f,
               "spawn_scene3d materialsurface component");
@@ -882,9 +890,13 @@ int main() {
                       rms->terminator_wrap == 0.5f &&
                       rms->limb_darkening == 0.6f &&
                       rms->limb_darkening_q == 0.3f &&
+                      rms->limb_darkening_mid == 0.2f &&
                       rms->band_shear == -0.3f &&
                       rms->orbital_beaming == 0.65f &&
+                      rms->orbital_beaming_tint == 0.35f &&
                       rms->forward_scatter == 0.4f &&
+                      rms->forward_scatter_back == -0.35f &&
+                      rms->forward_scatter_back_mix == 0.25f &&
                       rms->band_waves == 0.7f &&
                       rms->band_drift == 0.12f &&
                       rms->band_turbulence == 1.4f &&
@@ -952,13 +964,17 @@ int main() {
                   out.entities[1].terminator_wrap == 0.5f &&
                   out.entities[1].limb_darkening == 0.6f &&
                   out.entities[1].limb_darkening_q == 0.3f &&
+                  out.entities[1].limb_darkening_mid == 0.2f &&
                   out.entities[1].band_shear == -0.3f &&
                   out.entities[1].orbital_beaming == 0.65f &&
+                  out.entities[1].orbital_beaming_tint == 0.35f &&
                   out.entities[1].star_kelvin == 5800.0 &&
                   out.entities[1].accretion[0] == 0.3f &&
                   out.entities[1].accretion[2] == 12000.f &&
                   out.entities[1].accretion[3] == -0.6f &&
                   out.entities[1].forward_scatter == 0.4f &&
+                  out.entities[1].forward_scatter_back == -0.35f &&
+                  out.entities[1].forward_scatter_back_mix == 0.25f &&
                   out.entities[1].band_waves == 0.7f &&
                   out.entities[1].band_drift == 0.12f &&
                   out.entities[1].band_turbulence == 1.4f,

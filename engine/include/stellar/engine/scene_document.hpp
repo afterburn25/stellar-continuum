@@ -238,6 +238,10 @@ struct Scene3dEntity {
   // Quadratic limb-darkening coefficient [0,1] — steepens the edge
   // falloff (two-term transit-photometry law); 0 keeps linear.
   float limb_darkening_q{0.f};
+  // Three-term limb-darkening coefficient [0,1] — the Sing nonlinear
+  // law's mid-curve (1−μ^{3/2}) term; reaches further into mid-disc
+  // than the quadratic edge term. 0 keeps the two-term profile.
+  float limb_darkening_mid{0.f};
   // Gas-giant differential rotation: latitude-weighted longitude shear
   // of every surface map sample, UV units [-0.5,0.5]; 0 = rectilinear.
   float band_shear{0.f};
@@ -259,10 +263,19 @@ struct Scene3dEntity {
   // First-order orbital beaming for material orbiting local +Y (accretion
   // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
+  // Doppler color shift paired with the beaming [0,1] — the bright
+  // lane blueshifts, the dim lane redshifts; 0 keeps brightness-only.
+  float orbital_beaming_tint{0.f};
   // Henyey–Greenstein scattering phase: positive brightens the backlit
   // sheet (dusty rings), negative boosts opposition (icy regolith).
   // [-1,1]; 0 disables.
   float forward_scatter{0.f};
+  // Optional second HG lobe: asymmetry [-1,1] blended in by
+  // `forward_scatter_back_mix` [0,1] — pairs the narrow forward spike
+  // with a broad weak back lobe like real dust sheets; mix 0 keeps
+  // the single-lobe phase.
+  float forward_scatter_back{0.f};
+  float forward_scatter_back_mix{0.f};
   // Spectral-class star photosphere preset (K): derives blackbody tint,
   // emissive response, and a temperature-graded limb coefficient.
   // [100,100000]; 0 leaves the material untouched. Overrides `tint`

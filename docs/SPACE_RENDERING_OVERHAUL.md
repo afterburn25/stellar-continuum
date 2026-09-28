@@ -156,13 +156,17 @@ same document headless-tested.
    gives self-luminous bodies the photosphere's edge falloff.
    `band_shear`+`band_waves` (two-harmonic longitude warp — differential rotation + alternating jets)
    and `orbital_beaming` (first-order doppler asymmetry about local +Y —
-   accretion discs get their approaching-lane brightening)
+   accretion discs get their approaching-lane brightening, with
+   `orbitalBeamTint` adding the paired blue/red spectral shift)
    landed on top. Ring/scattering physics followed:
    `accretion_disc_material3d` + `accretion`/`AccretionDisc` generate a
    Shakura–Sunyaev radial disc for `annulus` meshes (black holes compose
    with a dark sphere), `forward_scatter`/`forwardScatter` adds a
    Henyey–Greenstein phase function (backlit dusty rings brighten, icy
-   opposition surges), and `SurfaceEffect3D::volume_scatter` makes
+   opposition surges) — `forwardScatterBack`/`forwardScatterBackMix`
+   blend in an optional second lobe so a narrow forward spike pairs
+   with a broad weak back lobe like real dust sheets — and
+   `SurfaceEffect3D::volume_scatter` makes
    emission volumes read star-lit; volumes are document-authored via the
    `volume` block / `EmissionVolume` component (entity texture supplies
    the emission image; `flow`/`distort` re-pose the marched filaments and
@@ -235,8 +239,10 @@ partner casters; Low tier keeps the hard switch). Planet surface detail is lande
 `SurfaceResponse3D` is reachable from authored documents/components
 (any map subset), `cloud_albedo` turns the cloud map into a lit deck,
 and `terminator_wrap` applies wrap-diffuse to all light types.
-Limb darkening (`Material3D::limb_darkening` + `limb_darkening_q`,
-two-term `1 - u(1-μ) - q(1-μ)²` transit law) keeps
+Limb darkening (`Material3D::limb_darkening` + `limb_darkening_q` +
+`limb_darkening_mid`, three-term `1 - u(1-μ) - q(1-μ)² - m(1-μ^{3/2})`
+transit law — the Sing nonlinear mid-curve term reaches further into
+mid-disc than the squared edge term) keeps
 self-luminous star discs from clipping flat; `star_photosphere3d(kelvin)`
 + `starKelvin`/`StarPhotosphere` derive a full spectral-class star
 material (blackbody tint, emissive-dominant, temperature-graded limb
@@ -314,4 +320,7 @@ documented per-frame but accumulated. See
   for the SDL_GPU forward renderer; approximations land per-phase with
   quality budgets. Volumetric nebulae land as the existing bounded
   emission-volume march plus `SurfaceEffect3D::volume_scatter` — a
-  directional limb gradient that makes the cloud read star-lit.
+  directional limb gradient that makes the cloud read star-lit, now
+  attenuated by a coarse light-path extinction march through the same
+  density field (deep filaments behind a dense core lose the boost,
+  and the authored occluder sphere blocks it outright).

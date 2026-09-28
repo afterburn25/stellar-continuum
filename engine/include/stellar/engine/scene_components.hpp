@@ -192,10 +192,17 @@ struct MaterialSurface {
   // First-order orbital beaming about local +Y (accretion discs, ring
   // forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
+  // Doppler color shift paired with the beaming [0,1] — bright lane
+  // blueshifts, dim lane redshifts; 0 keeps brightness-only.
+  float orbital_beaming_tint{0.f};
   // Henyey–Greenstein scattering phase: positive brightens the backlit
   // sheet (dusty rings), negative boosts opposition (icy). [-1,1];
   // 0 disables.
   float forward_scatter{0.f};
+  // Optional second HG lobe: asymmetry [-1,1] blended by
+  // `forward_scatter_back_mix` [0,1]; mix 0 keeps the single-lobe phase.
+  float forward_scatter_back{0.f};
+  float forward_scatter_back_mix{0.f};
   // Zonal-wind harmonic strength [0,1] layered on `band_shear` for
   // alternating mid-latitude jets.
   float band_waves{0.f};
@@ -213,6 +220,9 @@ struct MaterialSurface {
   // Quadratic limb-darkening coefficient [0,1] — the two-term law's
   // squared edge falloff; 0 keeps the linear profile.
   float limb_darkening_q{0.f};
+  // Three-term limb-darkening coefficient [0,1] — the Sing nonlinear
+  // law's mid-curve (1−μ^{3/2}) term; 0 keeps the two-term profile.
+  float limb_darkening_mid{0.f};
   // Equator-vs-pole drift differential [-8,8] — the zonal scroll gains
   // diff·cos²(latitude) so equatorial belts super-rotate; 0 is rigid.
   float band_diff{0.f};

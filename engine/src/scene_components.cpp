@@ -477,6 +477,10 @@ void register_scene_components(World &world) {
         put_f32(out, m.band_turbulence);
         put_f32(out, m.limb_darkening_q);
         put_f32(out, m.band_diff);
+        put_f32(out, m.forward_scatter_back);
+        put_f32(out, m.forward_scatter_back_mix);
+        put_f32(out, m.limb_darkening_mid);
+        put_f32(out, m.orbital_beaming_tint);
         return out;
       },
       [](const std::vector<std::uint8_t> &b) {
@@ -512,6 +516,10 @@ void register_scene_components(World &world) {
         if (b.size() - at >= 4) m.band_turbulence = f();
         if (b.size() - at >= 4) m.limb_darkening_q = f();
         if (b.size() - at >= 4) m.band_diff = f();
+        if (b.size() - at >= 4) m.forward_scatter_back = f();
+        if (b.size() - at >= 4) m.forward_scatter_back_mix = f();
+        if (b.size() - at >= 4) m.limb_darkening_mid = f();
+        if (b.size() - at >= 4) m.orbital_beaming_tint = f();
         return m;
       });
   world.register_component<AtmosphereShell>(
@@ -995,18 +1003,23 @@ std::vector<EntityId> spawn_scene3d(World &world,
         s.forward_scatter != 0.f || s.band_waves != 0.f ||
         s.cloud_height != 0.f || s.band_drift != 0.f ||
         s.band_turbulence != 0.f || s.limb_darkening_q != 0.f ||
-        s.band_diff != 0.f)
+        s.band_diff != 0.f || s.forward_scatter_back != 0.f ||
+        s.forward_scatter_back_mix != 0.f || s.limb_darkening_mid != 0.f ||
+        s.orbital_beaming_tint != 0.f)
       world.add(entity,
                 MaterialSurface{s.normal_strength, s.relief,
                                 s.cloud_opacity, s.cloud_albedo,
                                 s.cloud_offset_x, s.cloud_offset_y,
                                 s.terminator_wrap, s.limb_darkening,
                                 s.band_shear, s.orbital_beaming,
-                                s.forward_scatter, s.band_waves,
+                                s.orbital_beaming_tint, s.forward_scatter,
+                                s.forward_scatter_back,
+                                s.forward_scatter_back_mix, s.band_waves,
                                 s.normal_map, s.properties_map,
                                 s.cloud_map, s.cloud_height,
                                 s.band_drift, s.band_turbulence,
-                                s.limb_darkening_q, s.band_diff});
+                                s.limb_darkening_q, s.limb_darkening_mid,
+                                s.band_diff});
     if (s.atmo_strength != 0.f)
       world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
                                         s.atmo_strength, s.atmo_power,
@@ -1127,13 +1140,17 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.limb_darkening = sf->limb_darkening;
       s.band_shear = sf->band_shear;
       s.orbital_beaming = sf->orbital_beaming;
+      s.orbital_beaming_tint = sf->orbital_beaming_tint;
       s.forward_scatter = sf->forward_scatter;
       s.band_waves = sf->band_waves;
       s.cloud_height = sf->cloud_height;
       s.band_drift = sf->band_drift;
       s.band_turbulence = sf->band_turbulence;
       s.limb_darkening_q = sf->limb_darkening_q;
+      s.limb_darkening_mid = sf->limb_darkening_mid;
       s.band_diff = sf->band_diff;
+      s.forward_scatter_back = sf->forward_scatter_back;
+      s.forward_scatter_back_mix = sf->forward_scatter_back_mix;
     }
     if (const auto *at = world.get<AtmosphereShell>(entity)) {
       s.atmo_r = at->r;
