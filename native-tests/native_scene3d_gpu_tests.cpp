@@ -1638,7 +1638,26 @@ int main(int argc,char** argv)try{
     const int left=channel(*disc,70,160,0),right=channel(*disc,250,160,0);
     check(left>150&&right<left*3/4,
         "Accretion disc lost its beamed lane asymmetry");
-    std::cout<<"accretion_disc_gpu=radial_beaming_passed\n";
+    // Spiral density waves bake azimuthal structure into the generated
+    // texture: with beaming disabled the flat twin stays lane-uniform
+    // while the spiral disc splits into brighter crests and cooler
+    // troughs at the same radii — the diff must carry both signs.
+    MeshInstance3D flat{annulus_mesh(.45f,1.f,192),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000,0.f)};
+    flat.rotation=rotation_axis_angle({1,0,0},.55f);
+    MeshInstance3D arms{annulus_mesh(.45f,1.f,192),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000,0.f,.7f,2,.9f)};
+    arms.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto flat_cap=capture({flat},"accretion-flat.png");
+    const auto arms_cap=capture({arms},"accretion-arms.png");
+    int crest=0,trough=0;
+    for(int y=60;y<170;++y)for(int x=40;x<280;++x){
+        const int d=channel(*arms_cap,x,y,0)-channel(*flat_cap,x,y,0);
+        if(d>8)++crest;else if(d<-8)++trough;
+    }
+    check(crest>400&&trough>400,
+        "Spiral arms produced no azimuthal crest/trough modulation");
+    std::cout<<"accretion_disc_gpu=radial_beaming_spiral_passed\n";
   }
   {
     // Henyey-Greenstein phase: the same ring sheet brightens when

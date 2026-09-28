@@ -579,14 +579,41 @@ void register_scene_components(World &world) {
       "starphotosphere",
       encode_fields<StarPhotosphere, &StarPhotosphere::kelvin>,
       decode_fields<StarPhotosphere, &StarPhotosphere::kelvin>);
+  // f32 inner/outer/kelvin/beaming + appended f32 spiral/arms/turns —
+  // decode tolerates the legacy 16-byte payload so older saves keep the
+  // uniform-disc defaults they had.
   world.register_component<AccretionDisc>(
       "accretiondisc",
-      encode_fields<AccretionDisc, &AccretionDisc::inner,
-                    &AccretionDisc::outer, &AccretionDisc::kelvin,
-                    &AccretionDisc::beaming>,
-      decode_fields<AccretionDisc, &AccretionDisc::inner,
-                    &AccretionDisc::outer, &AccretionDisc::kelvin,
-                    &AccretionDisc::beaming>);
+      [](const AccretionDisc &m) {
+        std::vector<std::uint8_t> out;
+        put_f32(out, m.inner);
+        put_f32(out, m.outer);
+        put_f32(out, m.kelvin);
+        put_f32(out, m.beaming);
+        put_f32(out, m.spiral);
+        put_f32(out, m.spiral_arms);
+        put_f32(out, m.spiral_turns);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        AccretionDisc m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        if (b.size() < 16) return m;
+        m.inner = f();
+        m.outer = f();
+        m.kelvin = f();
+        m.beaming = f();
+        if (b.size() - at >= 4) m.spiral = f();
+        if (b.size() - at >= 4) m.spiral_arms = f();
+        if (b.size() - at >= 4) m.spiral_turns = f();
+        return m;
+      });
   // f32 depth/density/seed/scatter + i32 steps + f32 flow/distort —
   // decode tolerates the legacy 20-byte payload so older saves keep
   // their authored volume with the zero-warp defaults they had.
@@ -1034,7 +1061,9 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, StarPhotosphere{s.star_kelvin});
     if (s.accretion[2] >= 100.f)
       world.add(entity, AccretionDisc{s.accretion[0], s.accretion[1],
-                                      s.accretion[2], s.accretion[3]});
+                                      s.accretion[2], s.accretion[3],
+                                      s.accretion[4], s.accretion[5],
+                                      s.accretion[6]});
     // The volume's emission image is the entity texture — without one
     // the component would export a `volume` block that fails to parse.
     if (s.volume_depth > 0.f && !s.texture.empty())
@@ -1173,7 +1202,8 @@ Scene3dDocument scene3d_from_world(const World &world) {
     if (const auto *sp = world.get<StarPhotosphere>(entity))
       s.star_kelvin = sp->kelvin;
     if (const auto *ad = world.get<AccretionDisc>(entity))
-      s.accretion = {ad->inner, ad->outer, ad->kelvin, ad->beaming};
+      s.accretion = {ad->inner, ad->outer, ad->kelvin, ad->beaming,
+                     ad->spiral, ad->spiral_arms, ad->spiral_turns};
     // An orphan volume (no TextureRef) would emit a `volume` block the
     // parser rejects — skip it rather than write an unloadable document.
     if (const auto *ev = world.get<EmissionVolume>(entity);

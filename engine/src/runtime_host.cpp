@@ -2547,7 +2547,8 @@ int RuntimeHost::run() {
             ad->kelvin >= 100.f && ad->kelvin <= 100000.f &&
             std::abs(ad->beaming) <= 1.f)
           inst.material = accretion_disc_material3d(
-              ad->inner, ad->outer, ad->kelvin, ad->beaming);
+              ad->inner, ad->outer, ad->kelvin, ad->beaming, ad->spiral,
+              static_cast<int>(ad->spiral_arms), ad->spiral_turns);
         if (tint)
           inst.material.tint = Color{tint->r, tint->g, tint->b, 255};
         inst.material.opacity = op ? op->value : 1.f;

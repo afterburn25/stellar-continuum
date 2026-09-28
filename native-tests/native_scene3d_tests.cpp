@@ -2,6 +2,7 @@
 #include <stellar/engine/native_solid_mesh.hpp>
 #include <stellar/engine/native_geometry3d.hpp>
 #include <stellar/engine/surface_attachment.hpp>
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -208,6 +209,11 @@ int main()try{
   rejects([&]{(void)accretion_disc_material3d(2,1,8000);});
   rejects([&]{(void)accretion_disc_material3d(0.5f,1,50);});
   rejects([&]{(void)accretion_disc_material3d(0.5f,1,8000,2.f);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,-.1f);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,1.2f);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,.5f,0);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,.5f,5);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,.5f,2,5.f);});
   {const auto disc=accretion_disc_material3d(0.5f,1.f,8000);
    check(disc.texture&&disc.texture->width()==256&&disc.texture->height()==1,
        "Accretion disc did not generate its radial texture");
@@ -222,6 +228,25 @@ int main()try{
        "Accretion outer rim did not cool redward of the inner edge");
    const auto repeat=accretion_disc_material3d(0.5f,1.f,8000);
    check(repeat.texture->pixels()==disc.texture->pixels(),"Accretion texture is not deterministic");}
+  {const auto arm=accretion_disc_material3d(0.5f,1.f,8000,.8f,.6f,2,.75f);
+   check(arm.texture&&arm.texture->width()==256&&arm.texture->height()==64,
+       "Spiral disc did not grow its azimuthal texture");
+   const auto &apx=arm.texture->pixels();
+   const auto alum=[&](int u,int v){
+    const auto at=(static_cast<std::size_t>(v)*256+u)*4;
+    return apx[at]*3+apx[at+1]*4+apx[at+2];};
+   int lo=1<<30,hi=0;
+   for(int v=0;v<64;++v){const int l=alum(128,v);lo=std::min(lo,l);hi=std::max(hi,l);}
+   check(hi>lo*5/4,"Spiral arms produced no azimuthal modulation");
+   check(std::abs(alum(128,63)-alum(128,0))<(hi-lo)/4,
+       "Spiral arms broke the integral azimuth wrap");
+   check(alum(8,10)>alum(248,10),"Spiral disc lost its radial falloff");
+   const auto arepeat=accretion_disc_material3d(0.5f,1.f,8000,.8f,.6f,2,.75f);
+   check(arepeat.texture->pixels()==arm.texture->pixels(),
+       "Spiral texture is not deterministic");
+   const auto flat=accretion_disc_material3d(0.5f,1.f,8000,.8f,0.f,0,0.f);
+   check(flat.texture->height()==1,
+       "Zero spiral tail did not keep the compact radial row");}
   {PointLight3D light;light.position={0,0,1};light.intensity=2;light.range=50;
    const auto lit=Scene3D::create(camera,{instance},{0,0,1},{light});
    check(lit->point_lights().size()==1,"Scene dropped its point light");}

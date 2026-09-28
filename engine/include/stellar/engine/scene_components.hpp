@@ -240,6 +240,10 @@ struct StarPhotosphere {
 // texture + orbital beaming on an `annulus` mesh at matching radii.
 struct AccretionDisc {
   float inner{0.f}, outer{0.f}, kelvin{0.f}, beaming{0.85f};
+  // Spiral density-wave tail (appended — older 16-byte payloads decode
+  // with the uniform-disc defaults): depth [0,1], integral m-mode
+  // 1..4, log-spiral winding [-4,4] trailing-positive.
+  float spiral{0.f}, spiral_arms{0.f}, spiral_turns{0.f};
 };
 // Image-shaped emission volume (nebula, plasma plume, accretion glow) —
 // the component counterpart of the entity document's `volume` block.

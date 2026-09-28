@@ -359,9 +359,16 @@ struct Material3D {
 // bypasses light_color), and `orbital_beaming` applies the first-order
 // doppler asymmetry — the approaching lane reads brighter, which is the
 // signature look of a relativistic disc. beaming in [-1,1].
+// `spiral` [0,1] bakes grand-design density-wave arms into the texture
+// as compressional heating: `spiral_arms` (1..4) is the azimuthal m-mode
+// and `spiral_turns` [-4,4] the total inner→outer winding of the log
+// spiral (trailing positive). Arm crests read slightly hotter and
+// brighter, troughs cooler — the azimuth wrap stays seamless because
+// the arm count is integral. 0 keeps the uniform one-row texture.
 [[nodiscard]] Material3D accretion_disc_material3d(
     float inner_radius, float outer_radius, double kelvin,
-    float beaming = .85f);
+    float beaming = .85f, float spiral = 0.f, int spiral_arms = 2,
+    float spiral_turns = .75f);
 struct MeshInstance3D {
   std::shared_ptr<const Mesh3D> mesh;
   Position3 position;

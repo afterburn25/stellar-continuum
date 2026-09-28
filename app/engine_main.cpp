@@ -2351,14 +2351,29 @@ void commit_scene3_field(Shell &shell) {
           if (a >= 100.f && a <= 100000.f) { next.star_kelvin = a; valid = true; }
           break;
   case 63: {
-          float inner, outer, kelvin, beam;
-          valid = parse_quad(shell.scene3_buffer, inner, outer, kelvin,
-                             beam);
-          if (valid && inner > 0.f && outer > inner &&
-              kelvin >= 100.f && kelvin <= 100000.f &&
-              beam >= -1.f && beam <= 1.f)
-            next.accretion = {inner, outer, kelvin, beam};
-          else valid = false;
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> parts;
+          std::string part;
+          while (std::getline(csv, part, ',')) parts.push_back(part);
+          if (parts.size() >= 4 && parts.size() <= 7) {
+            float v[7]{};
+            int n = 0;
+            for (; n < (int)parts.size(); ++n) {
+              try { v[n] = std::stof(parts[n]); }
+              catch (const std::exception &) { n = -1; break; }
+            }
+            if (n >= 4 && v[0] > 0.f && v[1] > v[0] &&
+                v[2] >= 100.f && v[2] <= 100000.f &&
+                v[3] >= -1.f && v[3] <= 1.f && v[4] >= 0.f &&
+                v[4] <= 1.f && v[5] >= 0.f && v[5] <= 4.f &&
+                std::floor(v[5]) == v[5] &&
+                (v[4] == 0.f || v[5] >= 1.f) &&
+                std::abs(v[6]) <= 4.f) {
+              next.accretion = {v[0], v[1], v[2], v[3],
+                                v[4], v[5], v[6]};
+              valid = true;
+            }
+          }
           break; }
   case 64: {
           std::istringstream csv(shell.scene3_buffer);
@@ -2703,7 +2718,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
           e.accretion[1] > e.accretion[0] &&
           std::abs(e.accretion[3]) <= 1.f) {
         const auto disc = accretion_disc_material3d(
-            e.accretion[0], e.accretion[1], e.accretion[2], e.accretion[3]);
+            e.accretion[0], e.accretion[1], e.accretion[2],
+            e.accretion[3], e.accretion[4],
+            static_cast<int>(e.accretion[5]), e.accretion[6]);
         if (e.texture.empty()) inst.material.texture = disc.texture;
         inst.material.ambient = disc.ambient;
         inst.material.diffuse = disc.diffuse;
@@ -3181,9 +3198,16 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->accretion[0]) + "," +
                      std::to_string(entity->accretion[1]) + "," +
                      std::to_string(entity->accretion[2]) + "," +
-                     std::to_string(entity->accretion[3])
+                     std::to_string(entity->accretion[3]) +
+                     (entity->accretion[4] == 0.f &&
+                              entity->accretion[5] == 0.f &&
+                              entity->accretion[6] == 0.f
+                          ? ""
+                          : "," + std::to_string(entity->accretion[4]) +
+                                "," + std::to_string(entity->accretion[5]) +
+                                "," + std::to_string(entity->accretion[6]))
                : "",
-        ed(63), "inner,outer,kelvin,beaming - annulus disc preset");
+        ed(63), "inner,outer,kelvin,beaming[,spiral 0..1,arms 1..4,turns -4..4] - annulus disc preset");
   field(shell.hit3_fwdscatter, "fwdScatter",
         entity ? std::to_string(entity->forward_scatter) +
                      (entity->forward_scatter_back == 0.f &&
@@ -7346,7 +7370,14 @@ int main(int argc, char **argv) {
               edit3(63, std::to_string(se->accretion[0]) + "," +
                             std::to_string(se->accretion[1]) + "," +
                             std::to_string(se->accretion[2]) + "," +
-                            std::to_string(se->accretion[3]));
+                            std::to_string(se->accretion[3]) +
+                            (se->accretion[4] == 0.f &&
+                                     se->accretion[5] == 0.f &&
+                                     se->accretion[6] == 0.f
+                                 ? ""
+                                 : "," + std::to_string(se->accretion[4]) +
+                                       "," + std::to_string(se->accretion[5]) +
+                                       "," + std::to_string(se->accretion[6])));
             else if (shell.hit3_fwdscatter.contains(event.position) && se)
               edit3(64, std::to_string(se->forward_scatter) +
                             (se->forward_scatter_back == 0.f &&
