@@ -64,6 +64,33 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Adaptive research shared credit-flow index (2026-09-28)
+
+- Purpose: the adaptive research phase ran `economy_credit_flow` once per
+  civilization per tick, and each call rebuilt `SettlementBodyIndex` — a
+  full scan of the ~50k-body catalog — plus `economic_construction_projection`
+  and `economic_fleet_projection`, all invariant across the whole advance.
+  Profiling showed funding was 87% of the phase (~106.8s of ~123s over
+  20,000 calls; adaptive_research mean ~6.2 ms).
+- Modules: `core/include/stellar/core/campaign_economy.hpp` /
+  `core/src/campaign_economy.cpp` — new overload of `economy_credit_flow`
+  accepting a caller-built `const SettlementBodyIndex&`; the original
+  overload keeps constructing a local index so existing callers are
+  untouched, and both delegate to the same `credit_flow` helper.
+  `core/src/adaptive_research_campaign_simulation.cpp` —
+  `AdaptiveResearchCampaignSimulation::advance` now builds the body
+  index and the construction/fleet economic projections once before the
+  per-civilization loop and passes them through the funding pass.
+- Semantics: unchanged — the index is read-only and civ-invariant, the
+  projections are rebuilt per advance exactly as before, and all credit
+  math, rounding, event emission and economy mutation order are
+  preserved.
+- Save/performance impact: none persisted. Measured (2500 systems, seed
+  8374837, 10,000 ticks x 2 repeats): funding falls from ~106.8s to
+  ~4.95s total (~21x), adaptive_research mean ~6.2 ms to ~1.0 ms, whole
+  step ~17.5 ms to ~12.4 ms mean; the final campaign hash is
+  bit-identical and repeat runs stay deterministic.
+
 ## Strategic input lazy exploration probe (2026-09-28)
 
 - Purpose: every strategic review ran the default exploration query — a

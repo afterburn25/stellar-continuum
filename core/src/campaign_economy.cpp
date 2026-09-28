@@ -99,6 +99,11 @@ CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const C
     const SettlementBodyIndex body_index(colonies, world.bodies);
     return credit_flow(world, colonies, economies, civilization_id, include_research, power_days, body_index);
 }
+CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const Colony> colonies,
+    std::span<const CivilizationEconomy> economies, int civilization_id,
+    const SettlementBodyIndex& body_index, bool include_research, double power_days) {
+    return credit_flow(world, colonies, economies, civilization_id, include_research, power_days, body_index);
+}
 double industry_storage_capacity(EconomyWorldView world, std::span<const Colony> colonies, int id) {
     const auto* civilization = civilization_for(world.civilizations, id); if (!civilization) throw std::out_of_range("Civilization is unavailable.");
     if (civilization->is_seeded_ancient) return 50000.0;

@@ -232,6 +232,13 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
     if (!c.is_seeded_ancient)
       civs.push_back(&c);
   std::stable_sort(civs.begin(), civs.end(), [](auto *a, auto *b) { return a->id < b->id; });
+  // Civ-invariant inputs for the per-civ funding pass: construction and
+  // fleet projections plus the colony->body index are built once instead
+  // of inside every civilization's credit-flow call.
+  const auto ec = economic_construction_projection(w.construction);
+  const auto ef = economic_fleet_projection(w.fleets);
+  const EconomyWorldView ew{w.civilizations, w.bodies, ec, ef};
+  const SettlementBodyIndex body_index(w.colonies, w.bodies);
   for (auto *c : civs) {
     auto &state = detail::AdaptiveResearchCampaignStateAccess::get_civilization(campaign, c->id);
     facilities(w, c->id, campaign, state);
@@ -316,6 +323,7 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
         (void)try_start(*deferred);
     }
     std::vector<ResearchProjectRuntimeState> active;
+    double fraction = 1.;
     for (auto &p : state.active_projects())
       if (!p.paused)
         active.push_back(p);
@@ -327,16 +335,13 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
                     .operating_credits_per_day;
     double requested = perday * days,
            funded = source_min(source_max(0., economy->credits), requested),
-           fraction = requested <= .0000001 ? 1. : source_clamp(funded / requested, 0., 1.),
            previous = economy->last_research_funding_fraction;
+    fraction = requested <= .0000001 ? 1. : source_clamp(funded / requested, 0., 1.);
     economy->credits = source_max(0., economy->credits - funded);
     economy->last_research_spending_per_day = days <= 0 ? 0 : funded / days;
     economy->last_research_funding_fraction = fraction;
-    auto ec = economic_construction_projection(w.construction);
-    auto ef = economic_fleet_projection(w.fleets);
-    EconomyWorldView ew{w.civilizations, w.bodies, ec, ef};
     economy->last_credits_per_second =
-        economy_credit_flow(ew, w.colonies, w.economies, c->id, false).net_credits_per_day -
+        economy_credit_flow(ew, w.colonies, w.economies, c->id, body_index, false).net_credits_per_day -
         economy->last_research_spending_per_day;
     if (!active.empty() && previous >= .999999 && fraction < .999999)
       for (auto &p : active)
