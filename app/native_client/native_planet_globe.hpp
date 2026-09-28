@@ -37,6 +37,7 @@ class NativePlanetGlobe {
   void set_materials(stellar::native_planets::MaterialProvider provider){reset();materials_=std::move(provider);}
   void set_visual_seconds(double seconds){visual_seconds_=seconds;hit_key_.reset();}
   void set_simulation_days(double days){days_=days;hit_key_.reset();}
+  void set_scene3d_quality(RenderQuality3D value)noexcept{scene3d_quality_=value;}
   void reset(){identity_={};appearance_.reset();material_set_.reset();albedo_.reset();night_.reset();mesh_.reset();hit_key_.reset();regions_.clear();yaw_=.25f;pitch_=.18f;roll_=0;zoom_=1.f;dragging_=false;selected_=-1;night_view_=false;}
   void bind(const stellar::native_colony::NativeColonyView& v){
     parent_bearing_=v.rotation_parent_bearing;locked_rotation_=v.stellar_lighting?v.stellar_lighting->locked_rotation:std::nullopt;hit_key_.reset();
@@ -159,6 +160,7 @@ class NativePlanetGlobe {
   stellar::native_planets::MaterialProvider materials_;
   std::shared_ptr<const stellar::native_planets::MaterialSet> material_set_;
   std::optional<stellar::core::PlanetAppearance> appearance_;double days_{},visual_seconds_{},parent_bearing_{};
+  RenderQuality3D scene3d_quality_{RenderQuality3D::High};
   std::optional<Quaternion> locked_rotation_;
   static Vec3 rotate(Quaternion q,Vec3 v){const Vec3 t{2*(q.y*v.z-q.z*v.y),2*(q.z*v.x-q.x*v.z),2*(q.x*v.y-q.y*v.x)};return {v.x+q.w*t.x+q.y*t.z-q.z*t.y,v.y+q.w*t.y+q.z*t.x-q.x*t.z,v.z+q.w*t.z+q.x*t.y-q.y*t.x};}
   Quaternion manual_rotation()const{return compose_rotation(rotation_axis_angle({0,0,1},roll_),compose_rotation(rotation_axis_angle({1,0,0},pitch_),rotation_axis_angle({0,1,0},-yaw_)));}
@@ -211,7 +213,7 @@ class NativePlanetGlobe {
       const auto light=v.stellar_lighting.value_or(stellar::native_planets::lighting(v.illumination_x,v.illumination_y,v.illumination_star?&*v.illumination_star:nullptr,v.planet.details&&v.planet.details->stellar_exposure?v.planet.details->stellar_exposure->incident_flux:1));
       stellar::native_planets::append_instances(instances,*appearance_,*material_set_,{},1,1024,days_,light,manual_rotation(),night_view_,v.population_millions>0,visual_seconds_,parent_bearing_);
       Scene3DView scene{Scene3D::create(camera,std::move(instances)),area};
-      scene.options.exposure=1.08f;scene.options.bloom_strength=.22f;scene.options.bloom_threshold=.95f;
+      scene.options.quality=scene3d_quality_;scene.options.exposure=1.08f;scene.options.bloom_strength=.22f;scene.options.bloom_threshold=.95f;
       scene.options.time=static_cast<float>(std::fmod(std::max(0.,visual_seconds_),512.));
       out.overlay.emplace_back(std::move(scene));return;}
     const auto rotation=compose_rotation(rotation_axis_angle({0,0,1},roll_),compose_rotation(rotation_axis_angle({1,0,0},pitch_),rotation_axis_angle({0,1,0},-yaw_)));
@@ -251,7 +253,7 @@ class NativePlanetGlobe {
     instances.push_back({mesh,{},rotation,1,surface});
     if(known_&&texture_key_)for(auto ring:stellar::native_system_ui::planet_ring_instances(*texture_key_)){ring.rotation=rotation;instances.push_back(std::move(ring));}
     Scene3DView scene{Scene3D::create(camera,std::move(instances)),area};
-    scene.options.exposure=1.08f;scene.options.bloom_strength=.22f;scene.options.bloom_threshold=.95f;
+    scene.options.quality=scene3d_quality_;scene.options.exposure=1.08f;scene.options.bloom_strength=.22f;scene.options.bloom_threshold=.95f;
     scene.options.time=static_cast<float>(std::fmod(std::max(0.,visual_seconds_),512.));
     out.overlay.emplace_back(std::move(scene));
   }
