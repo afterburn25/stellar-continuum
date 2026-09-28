@@ -861,6 +861,7 @@ class NativeCampaign final {
     const stellar::native_planets::MaterialProvider planet_provider=[this](const stellar::core::PlanetAppearance& a,int width){return planet_material_cache_.request(a,width);};
     system_workspace_.set_planet_materials(planet_provider);
     system_workspace_.set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
+    battle_sprites_.set_render_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
     colony_workspace_.planetary().globe().set_materials(planet_provider);
     system_workspace_.use_background_preparation(image_preparation_);
 
@@ -7845,7 +7846,14 @@ class NativeCampaign final {
         for(const auto& sprite:battle_art_plan_)
           targets.push_back({sprite.formation_id,sprite.center,sprite.size.x,sprite.heading_degrees});
         battle_workspace_.set_ship_targets(std::move(targets),width,height);
-        if(!battle_art_suppressed_)battle_sprites_.append(layer,battle_art_plan_);
+        if(!battle_art_suppressed_){
+          const StellarPhysicalProperties* key_star=nullptr;
+          const auto& campaign=session_->frame().runtime().world().campaign();
+          if(campaign.active_combat_encounter)
+            if(const auto sys=std::ranges::find(campaign.systems,campaign.active_combat_encounter->system_id,&StellarSystem::id);sys!=campaign.systems.end()&&sys->stellar_object)
+              key_star=&*sys->stellar_object;
+          battle_sprites_.append(layer,battle_art_plan_,key_star);
+        }
       });
       const auto& battle_world=session_->frame().runtime().world().campaign();
       if(battle_world.active_combat_encounter){const auto sid=battle_world.active_combat_encounter->system_id;const auto star=std::ranges::find(battle_world.systems,sid,&StellarSystem::id);
