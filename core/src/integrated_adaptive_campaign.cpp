@@ -130,7 +130,8 @@ std::vector<TravelingCmeLaunch> IntegratedAdaptiveCampaignRuntime::advance_stell
 
 CampaignRuntimeContinuation IntegratedAdaptiveCampaignRuntime::continuation() const {
   return {storage_->core.strategic_runtime().snapshot(),storage_->diplomacy_runtime.schedule(),
-          storage_->core.automation().capture_state()};
+          storage_->core.automation().capture_state(),
+          storage_->core.scripted_events().capture_state()};
 }
 void IntegratedAdaptiveCampaignRuntime::restore_continuation(
     const CampaignRuntimeContinuation &state,double day){
@@ -138,6 +139,14 @@ void IntegratedAdaptiveCampaignRuntime::restore_continuation(
   storage_->core.strategic_runtime().restore(state.strategic);
   storage_->diplomacy_runtime.restore_schedule(state.diplomacy);
   storage_->core.automation().restore_state(state.automation);
+  // Scripted-event instances must already have their definitions loaded
+  // (the data set is part of runtime configuration, not the save); an
+  // empty document leaves a fresh coordinator untouched.
+  if(!state.scripted_events.empty()){
+    std::string failure;
+    if(!storage_->core.scripted_events().restore_state(state.scripted_events,&failure))
+      throw std::invalid_argument("Scripted event continuation: "+failure);
+  }
 }
 void IntegratedAdaptiveCampaignRuntime::set_profiling_enabled(bool enabled) noexcept {
   storage_->profiling_enabled=enabled;storage_->core.set_profiling_enabled(enabled);

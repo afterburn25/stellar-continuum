@@ -12,6 +12,7 @@
 #include <stellar/core/freight.hpp>
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/core/legacy_research.hpp>
+#include <stellar/core/scripted_events.hpp>
 #include <stellar/core/shipbuilding.hpp>
 #include <stellar/core/strategic_runtime.hpp>
 #include <stellar/engine/phase_timing.hpp>
@@ -281,6 +282,17 @@ issue_civilian_return_to_base_order(
   [[nodiscard]] CivilizationAutomationCoordinator &automation() noexcept;
   [[nodiscard]] const CivilizationAutomationCoordinator &
   automation() const noexcept;
+  // Data-authored event chains: step domain events feed
+  // engine::MissionRuntime, stage timers track simulated days and
+  // choice effects apply through canonical commands. Inert until a
+  // definition is loaded.
+  [[nodiscard]] ScriptedEventCoordinator &scripted_events() noexcept;
+  [[nodiscard]] const ScriptedEventCoordinator &
+  scripted_events() const noexcept;
+  // Operator path: resolves a pending stage choice and applies its
+  // authored effects through canonical commands on live state.
+  bool choose_scripted_event(std::uint64_t instance_id,
+                             std::string_view choice_id);
   [[nodiscard]] CombatSimulation &combat_simulation() noexcept;
   [[nodiscard]] const CombatSimulation &combat_simulation() const noexcept;
 
@@ -315,6 +327,7 @@ private:
       shipbuilding_capability_;
   CivilizationStrategicRuntimeCoordinator strategic_;
   CivilizationAutomationCoordinator automation_;
+  ScriptedEventCoordinator scripted_events_;
   std::variant<CombatCommandRuntime, CombatSimulation> combat_;
   CampaignSubsystemRuntime subsystems_;
 };

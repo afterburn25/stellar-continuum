@@ -475,6 +475,8 @@ int run_galaxy_catalog(int argc, char **argv) {
   std::int64_t pre_warp_count = 6, ancient_count = 1;
   std::int64_t simulation_ticks = 40, autosave_every = 0, stress_fleets = 0;
   bool no_automation = false;
+  bool scripted_player_auto_choose = true;
+  std::filesystem::path events_root;
   double step_days = 0.25;
   bool plan_homes = false, found_civilizations = false,
        founding_options = false, constrained_fallback = false,
@@ -532,10 +534,18 @@ int run_galaxy_catalog(int argc, char **argv) {
       simulation_options = true;
       continue;
     }
+    if (arg == "--no-scripted-player-auto-choose") {
+      scripted_player_auto_choose = false;
+      simulation_options = true;
+      continue;
+    }
     if (i + 1 == argc)
       throw std::invalid_argument("Missing value for " + arg);
     const std::string value = argv[++i];
-    if (arg == "--seed")
+    if (arg == "--events-root") {
+      events_root = value;
+      simulation_options = true;
+    } else if (arg == "--seed")
       seed = signed_number(value);
     else if (arg == "--systems")
       count = signed_number(value);
@@ -614,6 +624,13 @@ int run_galaxy_catalog(int argc, char **argv) {
   if (no_automation && !simulate_adaptive_campaign)
     throw std::invalid_argument(
         "--no-automation requires --simulate-adaptive-campaign");
+  if (!events_root.empty() && !simulate_adaptive_campaign)
+    throw std::invalid_argument(
+        "--events-root requires --simulate-adaptive-campaign");
+  if (!scripted_player_auto_choose && !simulate_adaptive_campaign)
+    throw std::invalid_argument(
+        "--no-scripted-player-auto-choose requires "
+        "--simulate-adaptive-campaign");
   if (founding_options && !found_civilizations)
     throw std::invalid_argument(
         "Civilization options require --found-civilizations");
@@ -638,6 +655,8 @@ int run_galaxy_catalog(int argc, char **argv) {
          .autosave_every = static_cast<int>(autosave_every),
          .stress_fleets = static_cast<int>(stress_fleets),
          .civilization_automation = !no_automation,
+         .events_root = events_root,
+         .scripted_player_auto_choose = scripted_player_auto_choose,
          .asset_root = asset_root,
          .output = output},
         catalog,

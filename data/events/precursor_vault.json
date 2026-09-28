@@ -1,0 +1,44 @@
+{
+  "id": "precursor_vault",
+  "triggers": [
+    {
+      "event": "exploration.anomaly_surveyed",
+      "stage": "signal"
+    }
+  ],
+  "stages": {
+    "signal": {
+      "title_key": "EV_VAULT_SIGNAL_TITLE",
+      "body_key": "EV_VAULT_SIGNAL_BODY",
+      "choices": [
+        { "id": "investigate", "next": "approach" },
+        { "id": "ignore", "next": "" }
+      ]
+    },
+    "approach": {
+      "title_key": "EV_VAULT_APPROACH_TITLE",
+      "body_key": "EV_VAULT_APPROACH_BODY",
+      "timer_days": 20,
+      "timeout_stage": "vault"
+    },
+    "vault": {
+      "title_key": "EV_VAULT_CHAMBER_TITLE",
+      "body_key": "EV_VAULT_CHAMBER_BODY",
+      "choices": [
+        {
+          "id": "excavate",
+          "next": "",
+          "effects": [
+            "grant_credits:$civ:250",
+            "start_project:$civ:research_network"
+          ]
+        },
+        {
+          "id": "seal",
+          "next": "",
+          "effects": ["adjust_stability:first_of_civ:0.05"]
+        }
+      ]
+    }
+  }
+}

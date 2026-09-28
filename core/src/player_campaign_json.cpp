@@ -1190,7 +1190,10 @@ Json encode_runtime_continuation(const CampaignRuntimeContinuation &state){
       {"Journal",std::move(journal)}});
   }
   automation["Civilizations"]=std::move(civilizations);
+  // Scripted-event coordinator state is an opaque serialized document
+  // validated by ScriptedEventCoordinator::restore_state at restore time.
   return {{"Version",1},{"Strategic",std::move(strategic)},{"Automation",std::move(automation)},
+    {"ScriptedEvents",state.scripted_events},
     {"Diplomacy",{{"LastProcessed",d.last_processed_tick},{"Initialized",m.initialized},
       {"NextReview",m.next_review_tick},{"LastReview",m.last_review_tick},
       {"ReviewInterval",m.policy.review_interval_ticks},{"ContactStaleAfter",m.policy.contact_stale_after_ticks},
@@ -1370,6 +1373,11 @@ CampaignRuntimeContinuation decode_runtime_continuation(const OrderedValue &valu
     }catch(const std::invalid_argument &error){
       throw PlayerCampaignPersistenceDataError(std::string("Invalid automation state: ")+error.what());
     }
+  }
+  if(const auto *scripted=member(root,"ScriptedEvents")){
+    result.scripted_events=typed_string(*scripted,"$.RuntimeContinuation.ScriptedEvents");
+    if(result.scripted_events.size()>4u*1024u*1024u)
+      throw PlayerCampaignPersistenceDataError("Scripted event state too large.");
   }
   return result;
 }

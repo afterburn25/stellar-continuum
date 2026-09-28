@@ -41,7 +41,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Economy/production | IMPLEMENTED BUT NEEDS POLISH | Core economy/industry/construction/shipbuilding/biology | economy/production parity, 5k colony scale | Not a generic resource graph; combined late-game load unverified |
 | Research | IMPLEMENTED BUT NEEDS POLISH | Core `adaptive_research_*` catalogs/services/snapshots | native adaptive research parity family | Existing domain runtime, not proof that every advanced research design is fully exposed in UI |
 | Strategic AI | PARTIALLY IMPLEMENTED | Core strategic intent/planning and fleet intelligence | strategic/campaign/exploration tests | Correctness coverage does not demonstrate effective complete long-game AI |
-| Civilization automation | PARTIALLY IMPLEMENTED | Engine `automation.hpp` (`AutomationController`: Off/Advisory/Assisted/Automatic domain modes, policy+constraint knobs, operator override locks, bounded explainable journal, hysteresis/cooldown shared with `StrategicMind`, sorted capture/restore); Core `civilization_automation.hpp` (`CivilizationAutomationCoordinator` — per-civ controllers, colonies + player construction domains, canonical assess→commit surface/industry commands, driven by the `automatic_orders` phase before the legacy AI order helpers, opt-in defaults preserve pre-automation parity); runtime continuation + developer-save JSON carry policies/locks/incumbents/cooldowns/journals | `automation`, `civilization_automation`; campaign parity suite unchanged under default-off | Colony placements only (repair/enable/hub/placement + empire project queue); economy/logistics/research/fleet/diplomacy automation, scripted-event runtime, player-facing automation UI, and save-path coverage beyond the developer continuation envelope remain open |
+| Scripted event chains | PARTIALLY IMPLEMENTED | Engine `mission_graph.hpp` (`MissionRuntime`: JSON definitions, conditional triggers, timed stages, choices, EventBus effects, serialize/restore — previously unconsumed); Core `scripted_events.hpp` (`ScriptedEventCoordinator`: feeds every accepted step's typed domain events as named triggers + scalar JSON payloads, binds trigger context per instance, interprets authored `grant_credits`/`charge_credits`/`adjust_stability`/`damage_building`/`set_building_enabled`/`start_project` effects through canonical commands, AI/headless deterministic auto-choice, pending surface for UI, continuation + developer-save persistence); shipped `data/events/*.json` chains fire on real campaign events | `scripted_events`, `mission_graph`; parity suite unchanged (inert without definitions) | Player-facing chain UI and adaptive-research/diplomacy/sensor event families unfed; effect vocabulary covers treasury/stability/buildings/projects only — no fleet/anomaly spawning yet |
+| Civilization automation | PARTIALLY IMPLEMENTED | Engine `automation.hpp` (`AutomationController`: Off/Advisory/Assisted/Automatic domain modes, policy+constraint knobs, operator override locks, bounded explainable journal, hysteresis/cooldown shared with `StrategicMind`, sorted capture/restore); Core `civilization_automation.hpp` (`CivilizationAutomationCoordinator` — per-civ controllers, colonies + player construction domains, canonical assess→commit surface/industry commands, driven by the `automatic_orders` phase before the legacy AI order helpers, opt-in defaults preserve pre-automation parity); runtime continuation + developer-save JSON carry policies/locks/incumbents/cooldowns/journals | `automation`, `civilization_automation`; campaign parity suite unchanged under default-off | Colony placements only (repair/enable/hub/placement + empire project queue); economy/logistics/research/fleet/diplomacy automation, player-facing automation UI, and save-path coverage beyond the developer continuation envelope remain open |
 | Diplomacy | IMPLEMENTED BUT NEEDS POLISH | Core diplomacy lifecycle/runtime/observer commands; App workspace | diplomacy parity and native controller/workspace | Current game feature set, not all design ambitions |
 | Combat | PARTIALLY IMPLEMENTED | Core combat/massive combat state and 3D motion; App battle workspace | combat/massive persistence/engine/lifecycle tests | Large combined AI/fleet/tactical performance and final gameplay breadth unverified |
 | Save/recovery | IMPLEMENTED BUT NEEDS POLISH | Core Player17 DTO/JSON/recovery; Engine atomic files | persistence/recovery/save tests | Large JSON latency/memory, no incremental world DB/cloud-save service |
@@ -62,6 +63,55 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Mods/accessibility/editor | IMPLEMENTED / PARTIALLY IMPLEMENTED foundations | Package system (`PackageRegistry`, `mods/` scan, `write_save_package_manifest`/`verify_save_package_manifest` save attestation), input/settings, Developer tools/import CLI, standalone editor | `package_platform` (incl. manifest attestation cases), editor + settings tests | Mod loading is content-only: namespaced package ids, priority-based overrides, semver dependency constraints and protected base namespaces resolve through `PackageRegistry::resolve`; world saves record the resolved load plan in a `<save>.packages.json` sidecar and `RuntimeHost` verifies it on F9/`load_world_from_file` restores — missing or version-mismatched packages log through `RuntimeDiagnostics` (report-only; loading proceeds). Executable plugins stay untrusted by design. Accessibility/editor remain partial — see the roadmap |
 
 ## Implementation records (newest first)
+
+## Scripted event chains — campaign consumer for MissionRuntime (2026-09-28)
+
+- Purpose: make data-authored multi-stage event chains first-class
+  campaign content — real domain events trigger chains, timed stages
+  follow the simulation clock, operator or AI choices apply authored
+  effects through the same authoritative state/commands as manual play,
+  and everything persists. Reuses engine::MissionRuntime (previously an
+  unconsumed framework) rather than a second chain engine.
+- Modules: `core/include/stellar/core/scripted_events.hpp` +
+  `core/src/scripted_events.cpp` (coordinator, trigger-name map, effect
+  interpreter, pending surface, continuation codec);
+  `core/src/campaign_coordinator.cpp` end-of-step feed (not a phase —
+  consumes accepted step output, inert without definitions);
+  `data/events/` shipped chains; host options + diagnostic counters.
+- Public interfaces: `ScriptedEventCoordinator::load_definition` /
+  `load_directory` (sorted deterministic registration),
+  `advance(ConstructionWorld&, const SimulationStepResult&, days)`,
+  `choose(world, instance, choice)`, `pending()`, `set_auto_choose_ai` /
+  `set_auto_choose_player`, `capture_state` / `restore_state`, bounded
+  `journal()`; `GalaxySimulationStepCoordinator::scripted_events()` and
+  `choose_scripted_event()`; `AdaptiveCampaignHostOptions::events_root` +
+  `scripted_player_auto_choose`; CLI `--events-root`,
+  `--no-scripted-player-auto-choose`. Trigger names and the effect
+  vocabulary are documented on the header (data contract).
+- Consumers: headless `adaptive_campaign_host` loads `--events-root`
+  and reports definitions/instances/pending/journal counters in the
+  campaign diagnostic; AI civs auto-resolve choice stages (first
+  authored choice), player civs await `choose()` unless the host opts in.
+- Tests: `scripted_events` (embedded + shipped definitions): real
+  `ConstructionWorld` fixture — trigger→auto-choice→timer→effect chain
+  end-to-end, player pending/operator choice, save/restore continuation
+  determinism, unaffordable-charge rejection, player auto-choose opt-in,
+  shipped `data/events` load. Headless campaign verification: 500
+  systems / 5000 days — `infrastructure_breakthrough` chains fired on
+  real `construction.project_completed` events (90 journaled effects),
+  deterministic across `--repeat 2`.
+- Save/performance impact: continuation rides
+  `CampaignRuntimeContinuation::scripted_events` (serialized document
+  validated by `restore_state`; developer save JSON carries it as an
+  optional bounded member). Per-step cost is proportional to emitted
+  domain events + live instances; contexts prune on instance completion;
+  journal caps at 128 entries; decoder bounds contexts/instances at 2048
+  and the document at 4 MiB.
+- Limitations: feeds the core SimulationStepResult families only —
+  adaptive research, diplomacy and sensor-contact events are not yet
+  mission triggers; effect verbs cover treasury/stability/buildings/
+  empire projects (no fleet or anomaly spawning); pending chains have
+  no native UI surface; localization keys are data contract only.
 
 ## Civilization automation framework + colony domain (2026-09-28)
 

@@ -30,6 +30,11 @@ struct CampaignRuntimeContinuation {
   // Civilization automation — per-civilization domain policies, operator
   // locks, action histories and the explainable decision journal.
   CivilizationAutomationCoordinator::State automation;
+  // Scripted event chains — running instances, bound trigger contexts,
+  // timers, auto-choice policy and the applied-effects journal, as the
+  // coordinator's serialized document. Empty when no definitions are
+  // loaded or no snapshot exists.
+  std::string scripted_events;
 };
 void validate_campaign_runtime_continuation(const CampaignRuntimeContinuation &,
     const FreshCampaignState &, double simulation_days);

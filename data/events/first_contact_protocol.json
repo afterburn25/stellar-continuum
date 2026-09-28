@@ -1,0 +1,48 @@
+{
+  "id": "first_contact_protocol",
+  "triggers": [
+    {
+      "event": "exploration.first_contact",
+      "stage": "contact"
+    }
+  ],
+  "stages": {
+    "contact": {
+      "title_key": "EV_CONTACT_TITLE",
+      "body_key": "EV_CONTACT_BODY",
+      "choices": [
+        {
+          "id": "welcome",
+          "next": "relations",
+          "effects": ["grant_credits:$civ:100"]
+        },
+        {
+          "id": "wary",
+          "next": "relations",
+          "effects": ["adjust_stability:first_of_civ:-0.02"]
+        }
+      ]
+    },
+    "relations": {
+      "title_key": "EV_CONTACT_RELATIONS_TITLE",
+      "body_key": "EV_CONTACT_RELATIONS_BODY",
+      "timer_days": 30,
+      "timeout_stage": "aftermath"
+    },
+    "aftermath": {
+      "title_key": "EV_CONTACT_AFTERMATH_TITLE",
+      "body_key": "EV_CONTACT_AFTERMATH_BODY",
+      "choices": [
+        {
+          "id": "exchange",
+          "next": "",
+          "effects": [
+            "charge_credits:$civ:40",
+            "grant_credits:$civ:120"
+          ]
+        },
+        { "id": "withdraw", "next": "" }
+      ]
+    }
+  }
+}

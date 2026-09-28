@@ -185,6 +185,20 @@ Json adaptive_diagnostic(IntegratedAdaptiveCampaignRuntime &runtime,
   result["research"] = research_json(runtime);
   result["diplomacy"] = diplomacy_json(runtime);
   result["combatIntelligence"] = intelligence_json(runtime);
+  const auto &scripted = runtime.core().scripted_events();
+  Json scripted_json = {
+      {"definitions", scripted.definition_count()},
+      {"instances", scripted.runtime().instances().size()},
+      {"journalEntries", scripted.journal().size()}};
+  Json pending = Json::array();
+  for (const auto &stage : scripted.pending())
+    pending.push_back({{"instance", stage.instance_id},
+                       {"mission", stage.mission_id},
+                       {"stage", stage.stage_id},
+                       {"civilizationId", stage.context.civilization_id},
+                       {"choices", stage.choice_ids}});
+  scripted_json["pending"] = std::move(pending);
+  result["scriptedEvents"] = std::move(scripted_json);
   return result;
 }
 
@@ -372,6 +386,15 @@ int run_adaptive_campaign_host(
     if (options.civilization_automation)
       runtime.core().automation().defaults().ai_colonies =
           stellar::engine::AutomationMode::Automatic;
+    if (!options.events_root.empty()) {
+      std::string events_error;
+      (void)runtime.core().scripted_events().load_directory(
+          options.events_root, &events_error);
+      if (!events_error.empty())
+        throw std::runtime_error("scripted events: " + events_error);
+      runtime.core().scripted_events().set_auto_choose_player(
+          options.scripted_player_auto_choose);
+    }
     runtime.set_profiling_enabled(true);
     const auto &world = runtime.world().campaign();
     const auto research_civilizations =

@@ -26,6 +26,12 @@ struct AdaptiveCampaignHostOptions {
   // civilization automation coordinator (canonical construction
   // commands). Disable for parity-strict comparisons.
   bool civilization_automation{true};
+  // Data-authored event-chain definitions root (e.g. data/events).
+  // Empty disables the scripted-event feed entirely.
+  std::filesystem::path events_root;
+  // Headless runs resolve player-bound chain choices deterministically;
+  // AI civilizations always auto-resolve.
+  bool scripted_player_auto_choose{true};
   std::filesystem::path asset_root;
   std::filesystem::path output;
 };

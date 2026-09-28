@@ -261,6 +261,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/player_campaign_recovery.cpp
   core/src/player_campaign_save.cpp
   core/src/save_preview.cpp
+  core/src/scripted_events.cpp
   core/src/legacy_campaign_recovery.cpp)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/planets/planet-types-v1.json" "${CMAKE_SOURCE_DIR}/data/planets/planet-art-v1.json")
 file(READ "${CMAKE_SOURCE_DIR}/data/planets/planet-types-v1.json" STELLAR_PLANET_TYPES)
@@ -732,6 +733,9 @@ if(BUILD_TESTING)
   add_executable(stellar_civilization_automation_tests native-tests/civilization_automation_tests.cpp)
   target_link_libraries(stellar_civilization_automation_tests PRIVATE stellar_core)
   add_test(NAME civilization_automation COMMAND stellar_civilization_automation_tests)
+  add_executable(stellar_scripted_events_tests native-tests/scripted_events_tests.cpp)
+  target_link_libraries(stellar_scripted_events_tests PRIVATE stellar_core)
+  add_test(NAME scripted_events COMMAND stellar_scripted_events_tests "${CMAKE_SOURCE_DIR}")
   add_executable(stellar_warfare_tests native-tests/warfare_tests.cpp)
   target_link_libraries(stellar_warfare_tests PRIVATE stellar_engine)
   add_test(NAME warfare COMMAND stellar_warfare_tests)

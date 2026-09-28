@@ -836,7 +836,26 @@ SimulationStepResult GalaxySimulationStepCoordinator::advance(
     executor_.consume_tick();
     throw;
   }
+  // Data-authored event chains consume the accepted step's discrete
+  // domain events and apply stage choices through canonical commands.
+  // Host-level consumption of step output rather than a simulation
+  // phase: it integrates no span and stays inert with no definitions
+  // loaded, so the seeded cadence oracle and parity fixtures are
+  // unaffected.
+  if (scripted_events_.definition_count() > 0) {
+    auto world = construction_world(campaign, construction_capability_);
+    (void)scripted_events_.advance(world, result, simulation_days);
+  }
   return result;
+}
+
+bool GalaxySimulationStepCoordinator::choose_scripted_event(
+    std::uint64_t instance_id, std::string_view choice_id) {
+  if (step_.state == nullptr)
+    return false;
+  auto &campaign = step_.state->campaign();
+  auto world = construction_world(campaign, construction_capability_);
+  return scripted_events_.choose(world, instance_id, choice_id);
 }
 
 bool GalaxySimulationStepCoordinator::has_matched_combat_runtime() const
@@ -862,6 +881,16 @@ GalaxySimulationStepCoordinator::automation() noexcept {
 const CivilizationAutomationCoordinator &
 GalaxySimulationStepCoordinator::automation() const noexcept {
   return automation_;
+}
+
+ScriptedEventCoordinator &
+GalaxySimulationStepCoordinator::scripted_events() noexcept {
+  return scripted_events_;
+}
+
+const ScriptedEventCoordinator &
+GalaxySimulationStepCoordinator::scripted_events() const noexcept {
+  return scripted_events_;
 }
 
 CombatSimulation &
