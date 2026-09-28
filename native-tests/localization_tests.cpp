@@ -178,6 +178,14 @@ int main() {
         "DATA_PHENOMENON_DESC_",      // dynamic prefix: phenomenon descriptions
         "DATA_PROJECT_NAME_",         // dynamic prefix: construction project names
         "DATA_PROJECT_DESC_",         // dynamic prefix: project descriptions
+        "DATA_DESIGN_",               // dynamic prefix: ship design names
+        "DATA_DESIGN_DESC_",          // dynamic prefix: ship design descriptions
+        "DATA_BUILDING_",             // dynamic prefix: surface building names
+        "DATA_BUILDING_DESC_",        // dynamic prefix: building descriptions
+        "DATA_CAPABILITY_",           // dynamic prefix: shipbuilding capability names
+        "DATA_SPEC_",                 // dynamic prefix: colony specialization names
+        "DATA_SPEC_OUT_",             // dynamic prefix: specialization output names
+        "DATA_STAGE_",                // dynamic prefix: construction stage names
     };
     const auto key_shaped = [](const std::string &text) {
       if (text.size() < 5 || text.find('_') == std::string::npos)

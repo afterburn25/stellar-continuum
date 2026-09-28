@@ -1,4 +1,5 @@
 #pragma once
+#include "native_data_names.hpp"
 #include <stellar/engine/localization.hpp>
 #include <initializer_list>
 #include <optional>
@@ -51,19 +52,33 @@ namespace stellar::native_shipbuilding {
     if (!text.ends_with(suffix)) return std::nullopt;
     return text.substr(0, text.size() - suffix.size());
   };
+  // Authored names embedded in composed skeletons (design, project,
+  // capability and upgrade-requirement names) resolve through their stable
+  // catalog keys so localized blockers don't embed English fragments.
+  const auto localize_fragment = [&](std::string_view text) {
+    std::string out =
+        stellar::native_data::localized_authored_fragment(locale, text);
+    if (out.starts_with("one of "))
+      out = tr("SHIPYARD_REQ_ONE_OF", "one of ") + out.substr(7);
+    for (std::size_t at = out.find(" or "); at != std::string::npos;
+         at = out.find(" or "))
+      out.replace(at, 4, tr("SHIPYARD_REQ_OR", " or "));
+    return out;
+  };
   // "{design} requires {list}." — locked designs embed a requirement list.
   if (const auto p = divide(message, " requires "))
     if (const auto list = strip_suffix(p->second, "."))
       return trf("SHIPYARD_DESIGN_REQUIRES",
-                 {std::string(p->first), std::string(*list)},
+                 {localize_fragment(p->first), localize_fragment(*list)},
                  "{0} requires {1}.");
   if (const auto list = strip_prefix(message, "requires "))
-    return trf("SHIPYARD_REQUIRES", {std::string(*list)}, "requires {0}");
+    return trf("SHIPYARD_REQUIRES", {localize_fragment(*list)},
+               "requires {0}");
   // "{cost} is required to authorize {design}."
   if (const auto p = divide(message, " is required to authorize "))
     if (const auto name = strip_suffix(p->second, "."))
       return trf("SHIPYARD_AUTH_REQUIRED",
-                 {std::string(p->first), std::string(*name)},
+                 {std::string(p->first), localize_fragment(*name)},
                  "{0} is required to authorize {1}.");
   // "At least {n} million population is required before reserving colonists
   //  for this ship."
@@ -87,7 +102,7 @@ namespace stellar::native_shipbuilding {
     if (const auto q = divide(*rest, ". Authorized for "))
       if (const auto cost = strip_suffix(q->second, "."))
         return trf("SHIPYARD_MSG_STARTED",
-                   {std::string(q->first), std::string(*cost)},
+                   {localize_fragment(q->first), std::string(*cost)},
                    "Ship construction started: {0}. Authorized for {1}.");
   if (const auto rest = strip_prefix(message, "Queued "))
     if (const auto q = divide(*rest, " for "))
@@ -95,7 +110,7 @@ namespace stellar::native_shipbuilding {
         if (const auto n = strip_suffix(
                 t->second, "/8 pending vessel slots are now in use."))
           return trf("SHIPYARD_MSG_QUEUED",
-                     {std::string(q->first), std::string(t->first),
+                     {localize_fragment(q->first), std::string(t->first),
                       std::string(*n)},
                      "Queued {0} for {1}. {2}/8 pending vessel slots are now "
                      "in use.");

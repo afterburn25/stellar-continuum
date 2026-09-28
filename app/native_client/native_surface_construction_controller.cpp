@@ -1,4 +1,5 @@
 #include "native_surface_construction_controller.hpp"
+#include "native_data_names.hpp"
 
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
 #include <stellar/engine/localization.hpp>
@@ -9,6 +10,7 @@
 #include <iomanip>
 #include <limits>
 #include <locale>
+#include <optional>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
@@ -173,10 +175,208 @@ std::string localized_denial(
       {"That surface building no longer exists.", "SURFACE_DENY_REMOVE_GONE"},
       {"That surface building has an unknown type and cannot be removed safely.",
        "SURFACE_DENY_REMOVE_UNKNOWN"},
+      {"Extreme stellar irradiation prevents surface operations.",
+       "SURFACE_DENY_IRRADIATION_OPS"},
+      {"You can upgrade buildings only in a colony you own.",
+       "SURFACE_DENY_UPGRADE_OWNED"},
+      {"Complete construction before upgrading this building.",
+       "SURFACE_DENY_UPGRADE_INCOMPLETE"},
+      {"This building is already being upgraded.",
+       "SURFACE_DENY_UPGRADE_RUNNING"},
+      {"This building has no further upgrade available.",
+       "SURFACE_DENY_UPGRADE_NONE"},
+      {"You can upgrade only a colony you own.", "SURFACE_DENY_HUB_OWNED"},
+      {"A Command Center requires an owned settlement on a solid surface.",
+       "SURFACE_DENY_HUB_SOLID"},
+      {"The hub expansion is already under construction.",
+       "SURFACE_DENY_HUB_RUNNING"},
+      {"A sealed resource outpost must be terraformed before it can become a "
+       "full colony command center.",
+       "SURFACE_DENY_HUB_OUTPOST"},
+      {"This planetary hub is already at maximum capacity.",
+       "SURFACE_DENY_HUB_MAX"},
+      {"You can repair buildings only in a colony you own.",
+       "SURFACE_DENY_REPAIR_OWNED"},
+      {"Complete construction before repairing this building.",
+       "SURFACE_DENY_REPAIR_INCOMPLETE"},
+      {"That surface building has an unknown type and cannot be repaired "
+       "safely.",
+       "SURFACE_DENY_REPAIR_UNKNOWN"},
+      {"The colony has no maintenance economy.",
+       "SURFACE_DENY_NO_MAINTENANCE"},
+      {"You can manage buildings only in a colony you own.",
+       "SURFACE_DENY_MANAGE_OWNED"},
+      {"Complete construction before changing operating status.",
+       "SURFACE_DENY_STATE_INCOMPLETE"},
+      {"That surface building has an unknown type and cannot be managed "
+       "safely.",
+       "SURFACE_DENY_MANAGE_UNKNOWN"},
+      {"You can prioritize buildings only in a colony you own.",
+       "SURFACE_DENY_PRIORITY_OWNED"},
+      {"Complete construction before assigning operating priority.",
+       "SURFACE_DENY_PRIORITY_INCOMPLETE"},
+      {"This building already has priority.", "SURFACE_DENY_ALREADY_PRIORITY"},
+      {"This building already has normal priority.",
+       "SURFACE_DENY_ALREADY_NORMAL"},
   };
   for (const auto &[literal, key] : table)
     if (message == literal) return resolve(locale, key, message);
-  return message;
+  const auto frag = [&](std::string_view text) {
+    return stellar::native_data::localized_authored_fragment(locale, text);
+  };
+  const auto between = [&](std::string_view head, std::string_view tail)
+      -> std::optional<std::string_view> {
+    if (message.size() <= head.size() + tail.size() ||
+        !message.starts_with(head) || !message.ends_with(tail))
+      return std::nullopt;
+    return std::string_view(message).substr(
+        head.size(), message.size() - head.size() - tail.size());
+  };
+  const auto split_and = [&](std::string_view text)
+      -> std::optional<std::pair<std::string_view, std::string_view>> {
+    const auto at = text.rfind(" and ");
+    if (at == std::string_view::npos) return std::nullopt;
+    return std::pair{text.substr(0, at), text.substr(at + 5)};
+  };
+  // "{name} upgrade started: {d} game days. Existing facilities remain
+  //  operational until completion."
+  constexpr std::string_view upgrade_started_mid = " upgrade started: ";
+  constexpr std::string_view upgrade_started_tail =
+      " game days. Existing facilities remain operational until completion.";
+  if (const auto at = message.find(upgrade_started_mid);
+      at != std::string::npos && at > 0 &&
+      message.ends_with(upgrade_started_tail)) {
+    const auto days = std::string_view(message).substr(
+        at + upgrade_started_mid.size(),
+        message.size() - at - upgrade_started_mid.size() -
+            upgrade_started_tail.size());
+    return resolved(
+        locale, "SURFACE_MGMT_UPGRADE_STARTED",
+        {frag(std::string_view(message).substr(0, at)), std::string(days)},
+        "{0} upgrade started: {1} game days. Existing facilities remain "
+        "operational until completion.");
+  }
+  // "Upgrading to {name} requires {money} and {n} available materials."
+  if (const auto rest = between("Upgrading to ", " available materials.");
+      rest && message.ends_with(" available materials.")) {
+    if (const auto at = rest->find(" requires ");
+        at != std::string_view::npos)
+      if (const auto parts =
+              split_and(rest->substr(at + 10)))
+        return resolved(
+            locale, "SURFACE_MGMT_UPGRADE_REQUIRES",
+            {frag(rest->substr(0, at)), std::string(parts->first),
+             std::string(parts->second)},
+            "Upgrading to {0} requires {1} and {2} available materials.");
+  }
+  // "Hub expansion requires {money} and {n} materials."
+  if (const auto rest = between("Hub expansion requires ", " materials.");
+      rest && message.ends_with(" materials.") &&
+      !message.starts_with("Hub expansion authorized:"))
+    if (const auto parts = split_and(*rest))
+      return resolved(locale, "SURFACE_MGMT_HUB_REQUIRES",
+                      {std::string(parts->first), std::string(parts->second)},
+                      "Hub expansion requires {0} and {1} materials.");
+  // "Hub expansion authorized: {d} game days. Capacity increases when
+  //  construction completes."
+  if (const auto days =
+          between("Hub expansion authorized: ",
+                  " game days. Capacity increases when construction "
+                  "completes."))
+    return resolved(
+        locale, "SURFACE_MGMT_HUB_STARTED", {std::string(*days)},
+        "Hub expansion authorized: {0} game days. Capacity increases when "
+        "construction completes.");
+  // "Repairing {name} requires {money} and {n} materials."
+  if (const auto rest = between("Repairing ", " materials.");
+      rest && message.ends_with(" materials.")) {
+    if (const auto at = rest->find(" requires ");
+        at != std::string_view::npos)
+      if (const auto parts = split_and(rest->substr(at + 10)))
+        return resolved(locale, "SURFACE_MGMT_REPAIR_REQUIRES",
+                        {frag(rest->substr(0, at)), std::string(parts->first),
+                         std::string(parts->second)},
+                        "Repairing {0} requires {1} and {2} materials.");
+  }
+  // "{name} restored to full condition using {money} and {n} materials."
+  if (const auto at =
+          message.find(" restored to full condition using ");
+      at != std::string::npos && message.ends_with(" materials.")) {
+    const auto rest =
+        std::string_view(message).substr(at + 33,
+                                         message.size() - at - 33 - 11);
+    if (const auto parts = split_and(rest))
+      return resolved(
+          locale, "SURFACE_MGMT_REPAIR_DONE",
+          {frag(std::string_view(message).substr(0, at)),
+           std::string(parts->first), std::string(parts->second)},
+          "{0} restored to full condition using {1} and {2} materials.");
+  }
+  // "{name} is already at full condition."
+  if (const auto name = between("", " is already at full condition.");
+      name && !name->empty())
+    return resolved(locale, "SURFACE_MGMT_REPAIR_FULL", {frag(*name)},
+                    "{0} is already at full condition.");
+  // "{name} is already operating." / "{name} is already shut down."
+  if (const auto name = between("", " is already operating.");
+      name && !name->empty())
+    return resolved(locale, "SURFACE_MGMT_ALREADY_ON", {frag(*name)},
+                    "{0} is already operating.");
+  if (const auto name = between("", " is already shut down.");
+      name && !name->empty())
+    return resolved(locale, "SURFACE_MGMT_ALREADY_OFF", {frag(*name)},
+                    "{0} is already shut down.");
+  // "{name} restarted. ..." / "{name} shut down. ..."
+  if (const auto name = between(
+          "",
+          " restarted. Staffing, power demand, output and upkeep resume "
+          "when capacity is available.");
+      name && !name->empty())
+    return resolved(
+        locale, "SURFACE_MGMT_RESTARTED", {frag(*name)},
+        "{0} restarted. Staffing, power demand, output and upkeep resume "
+        "when capacity is available.");
+  if (const auto name = between(
+          "",
+          " shut down. Its staffing, power demand, output and upkeep are "
+          "suspended.");
+      name && !name->empty())
+    return resolved(
+        locale, "SURFACE_MGMT_SHUTDOWN", {frag(*name)},
+        "{0} shut down. Its staffing, power demand, output and upkeep are "
+        "suspended.");
+  // "{name} prioritized. It receives available workers and power before
+  //  normal buildings."
+  if (const auto name = between(
+          "",
+          " prioritized. It receives available workers and power before "
+          "normal buildings.");
+      name && !name->empty())
+    return resolved(
+        locale, "SURFACE_MGMT_PRIORITIZED", {frag(*name)},
+        "{0} prioritized. It receives available workers and power before "
+        "normal buildings.");
+  // "{name} returned to normal operating priority."
+  if (const auto name = between("", " returned to normal operating priority.");
+      name && !name->empty())
+    return resolved(locale, "SURFACE_MGMT_NORMAL", {frag(*name)},
+                    "{0} returned to normal operating priority.");
+  // Hub/building upgrade lock reasons share the colony-view resolver.
+  const std::string locked =
+      stellar::native_data::surface_lock_reason(locale, message);
+  return locked != message ? locked : message;
+}
+
+// Assessment and quote records carry the authored English building name;
+// resolve it through the stable type id at this display boundary so
+// comparisons and rendered text stay consistent in every locale.
+std::string localized_building_name(
+    const stellar::engine::LocalizationTable *locale, std::string_view type_id,
+    std::string_view authored) {
+  const auto *definition = find_surface_building(type_id);
+  return definition
+             ? stellar::native_data::surface_building_name(locale, *definition)
+             : std::string(authored);
 }
 
 std::string placement_preview_message(
@@ -359,8 +559,11 @@ NativeSurfaceManagementQuote assess_management(
   } else if (const auto *building = find_one(colony->surface_buildings,
                                                building_id, &SurfaceBuilding::id)) {
     if (const auto *definition = find_surface_building(building->type_id)) {
-      quote.building_name = definition->name;
-      quote.description = definition->description;
+      quote.building_name =
+          stellar::native_data::surface_building_name(locale, *definition);
+      quote.description =
+          stellar::native_data::surface_building_description(locale,
+                                                             *definition);
     } else {
       quote.building_name = resolve(locale, "SURFACE_BUILDING_NAME", "Surface building");
       quote.description = resolve(locale, "SURFACE_DESC_REVIEW",
@@ -498,7 +701,8 @@ NativeSurfaceConstructionController::preview_placement(
       : assess_surface_building_placement(current.command.read(), current.player.id, view.colony_id, type_id, x, z, rotation_degrees);
   result.slot_index = assessment.slot_index;
   result.type_id = assessment.type_id;
-  result.building_name = assessment.building_name;
+  result.building_name = localized_building_name(
+      locale_, assessment.type_id, assessment.building_name);
   result.x = assessment.x;
   result.z = assessment.z;
   result.normalized_rotation_degrees = assessment.normalized_rotation_degrees;
@@ -542,7 +746,8 @@ NativeSurfaceRemovalQuote NativeSurfaceConstructionController::preview_removal(
   auto assessment = assess_surface_building_removal(
       current.command.read(), current.player.id, view.colony_id, building_id);
   result.type_id = assessment.type_id;
-  result.building_name = assessment.building_name;
+  result.building_name = localized_building_name(
+      locale_, assessment.type_id, assessment.building_name);
   result.accepted = assessment.accepted;
   result.cancellation = assessment.cancellation;
   result.refund_budget_units = assessment.refund;
@@ -574,7 +779,9 @@ NativeSurfaceConstructionController::confirm_placement(
       quote.colony_revision != record.colony_revision ||
       quote.colony_id != assessment.colony_id || quote.system_id != record.system_id ||
       quote.body_id != record.body_id || quote.type_id != assessment.type_id ||
-      quote.building_name != assessment.building_name || quote.x != assessment.x ||
+      quote.building_name != localized_building_name(locale_, assessment.type_id,
+                                                     assessment.building_name) ||
+      quote.x != assessment.x ||
       quote.z != assessment.z ||
       quote.normalized_rotation_degrees != assessment.normalized_rotation_degrees ||
       quote.prepared_building_id != assessment.prepared_building_id ||
@@ -593,7 +800,9 @@ NativeSurfaceConstructionController::confirm_placement(
   if (result.accepted)
     result.message = resolved(
         locale_, "SURFACE_PLACEMENT_ORDERED",
-        {assessment.building_name, assessment.formatted_authorization},
+        {localized_building_name(locale_, assessment.type_id,
+                                 assessment.building_name),
+         assessment.formatted_authorization},
         "{0} placed and authorized for {1}. Construction uses available "
         "materials.");
   else
@@ -621,7 +830,8 @@ NativeSurfaceConstructionController::confirm_removal(
       quote.colony_id != assessment.colony_id || quote.system_id != record.system_id ||
       quote.body_id != record.body_id || quote.building_id != assessment.building_id ||
       quote.type_id != assessment.type_id ||
-      quote.building_name != assessment.building_name ||
+      quote.building_name != localized_building_name(locale_, assessment.type_id,
+                                                     assessment.building_name) ||
       quote.cancellation != assessment.cancellation ||
       quote.refund_budget_units != assessment.refund ||
       quote.formatted_refund != assessment.formatted_refund ||
@@ -632,17 +842,19 @@ NativeSurfaceConstructionController::confirm_removal(
                     record.body_id, assessment.colony_id))
     return stale(locale_);
   auto result = commit_surface_building_removal(current.command, assessment);
-  if (result.accepted)
+  if (result.accepted) {
+    const auto building_name = localized_building_name(
+        locale_, assessment.type_id, assessment.building_name);
     result.message = assessment.cancellation
         ? resolved(locale_, "SURFACE_REMOVAL_CANCELLED",
-                   {assessment.building_name, assessment.formatted_refund},
+                   {building_name, assessment.formatted_refund},
                    "{0} construction cancelled. {1} was recovered; spent "
                    "industry was not recoverable.")
         : resolved(locale_, "SURFACE_REMOVAL_DEMOLISHED",
-                   {assessment.building_name},
+                   {building_name},
                    "{0} demolished. Its power use and production have "
                    "stopped.");
-  else
+  } else
     result.message = localized_denial(locale_, result.message);
   return {result.accepted, result.message};
 }

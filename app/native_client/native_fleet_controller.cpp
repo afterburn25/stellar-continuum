@@ -1,4 +1,5 @@
 #include "native_fleet_controller.hpp"
+#include "native_data_names.hpp"
 #include "native_military_messages.hpp"
 #include "native_route_messages.hpp"
 #include <stellar/core/campaign_observation.hpp>
@@ -247,7 +248,8 @@ NativeFleetMapView NativeFleetController::build(
       item.combat_status = status->second;
     if (fleet.design_id)
       if (const auto *design = find_ship_design(*fleet.design_id))
-        item.design_name = design->name;
+        item.design_name =
+            stellar::native_data::ship_design_name(locale_, *design);
     item.cargo_materials = fleet.cargo_materials;
     item.cargo_material_capacity = fleet.cargo_material_capacity;
     item.embarked_population_millions = fleet.embarked_population_millions;
