@@ -425,7 +425,9 @@ int run_adaptive_campaign_host(
                 diplomacy_events = 0, industry_allocations = 0,
                 construction_events = 0, shipbuilding_events = 0,
                 exploration_events = 0, combat_events = 0,
-                colonization_events = 0;
+                colonization_events = 0, warfare_trespasses = 0,
+                warfare_wars_declared = 0, warfare_engagement_orders = 0,
+                warfare_deployment_orders = 0;
   double initialization_total_ms = 0.0, step_total_ms = 0.0;
   std::vector<double> step_times;
   std::vector<double> autosave_times;
@@ -501,6 +503,10 @@ int run_adaptive_campaign_host(
       exploration_events += result.core.exploration_events.size();
       combat_events += result.core.combat_events.size();
       colonization_events += result.core.colonization_events.size();
+      warfare_trespasses += result.warfare.trespasses_recorded;
+      warfare_wars_declared += result.warfare.wars_declared;
+      warfare_engagement_orders += result.warfare.engagement_orders;
+      warfare_deployment_orders += result.warfare.deployment_orders;
       if (repeat == 0 && options.verify_continuation_tick > 0 &&
           tick + 1 == options.verify_continuation_tick)
         continuation_save = capture_developer_campaign_json(
@@ -671,6 +677,10 @@ int run_adaptive_campaign_host(
         {"combatEvents", combat_events},
         {"colonizationEvents", colonization_events},
         {"diplomacyEvents", diplomacy_events},
+        {"warfareTrespasses", warfare_trespasses},
+        {"warfareWarsDeclared", warfare_wars_declared},
+        {"warfareEngagementOrders", warfare_engagement_orders},
+        {"warfareDeploymentOrders", warfare_deployment_orders},
         {"sensorContactsRecorded", sensor_contacts}}},
       {"finalStateCounts",
        {{"researchCivilizations",
