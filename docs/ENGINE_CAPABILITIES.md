@@ -64,6 +64,46 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Autonomous colony settlement completion (2026-09-28)
+
+- Purpose: close the last gap in the organic expansion chain — AI colony
+  fleets built by shipbuilding carried embarked population and received
+  planner route orders, but never founded colonies in century-scale runs.
+- Root cause: `ColonizationSimulation::advance` only `continue`d after a
+  settlement tick when the colony was actually created. An in-progress
+  establishment (`advance_establishment` accumulating the 30-day interval)
+  fell through to the AI opportunity planner, which reset
+  `settlement_body_id`/`settlement_days_completed` and re-issued the route
+  order — so settlement progress never survived a second tick and
+  same-system orders deadlocked permanently.
+- Modules: `core/src/colonization_runtime.cpp` — the colony establishment
+  gate is now computed once (`can_establish`) and a valid target consumes
+  the tick whether or not the establishment interval is complete. Invalid
+  or vanished targets still fall through to the planner, which can re-order
+  to a different surveyed body; player-issued colony orders are unchanged
+  (they use the same `destination_planetary_body_id` mission field and the
+  same establishment checks).
+- Public interfaces: none added; `issue_colony_fleet_order`,
+  `issue_transit_order` and the opportunity planner semantics are intact.
+- Consumers: the autonomous planner branch in `ColonizationSimulation::advance`
+  (campaign colonization phase) for civilizations where
+  `civilization_uses_ai` holds.
+- Tests: `colonization_ai_settlement` — seeds a real campaign world, stations
+  an autonomous colony ship in a surveyed system holding an orderable body,
+  then drives the real `ExplorationSimulation` transit +
+  `ColonizationSimulation` establishment phases: asserts the planner issues
+  the order, the transit leg clears `destination_system_id`, settlement
+  days accumulate across ticks, the colony is created on the selected body
+  and the vessel is consumed. Verified to fail against the pre-fix code
+  (settlement never completes).
+- Save/performance impact: none — no new persisted state; the per-tick work
+  is identical (the planner scan is skipped while a settlement is in
+  progress, a minor improvement).
+- Limitations: the same fall-through hazard does not exist for resource
+  outposts (that branch already `continue`s); stale same-system orders still
+  ride one departure/arrival transit leg before clearing, which is harmless
+  but costs a tick.
+
 ## Adaptive research AI final-slot scheduling (2026-09-28)
 
 - Purpose: stop a single-slot directed program office from committing its

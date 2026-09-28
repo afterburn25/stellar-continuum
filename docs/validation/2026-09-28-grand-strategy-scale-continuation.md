@@ -96,8 +96,37 @@ Re-run results:
   explored/surveyed worlds, so organic multi-system colonization remains
   the open edge rather than a proven outcome.
 
-Remaining honest limitations: wars still 0; completed organic
-colonization unproven (orders assigned, landfall not yet observed);
-pre-warp→warp promotion needs ~120+ years at this tech pacing; the
-50k-system headroom and research/diplomacy/sensor event feeds are
-unchanged gaps.
+## Follow-up: autonomous colony settlement completion
+
+The 137-year run above also surfaced a colonization-runtime defect: AI
+colony ships held same-system orders whose establishment tick fell
+through to the opportunity planner, which reset settlement progress and
+re-issued the route every tick (`colonization_runtime.cpp` — the
+establishment branch only `continue`d on completion, never on progress).
+A valid settlement target now consumes the tick for the whole
+establishment interval; stale targets still fall through to re-planning.
+
+Native coverage: `colonization_ai_settlement` (same-system order →
+transit clear → settlement accumulation → colony creation → vessel
+consumption, plus an idle-fleet full-plan scenario); the regression was
+verified to fail against the pre-fix runtime.
+
+Re-run results (fixed binary):
+
+- 2,500 systems / 12 pre-warp / 10,000 ticks (~137 years), seed 8374837:
+  11/11 pre-warp civilizations promoted organically, 66 fleets built
+  (43 colony ships), and **32 colonies founded through the organic
+  chain** — `Thren Observatory` (civ 2) founded 17 and `Ilyr Concord`
+  (civ 6) founded 15 across distinct surveyed systems. Vessels were
+  consumed and re-tasked correctly; expansion is bounded by survey
+  coverage, which is why only the two earliest-promoted civilizations
+  completed colonies inside the horizon.
+  Final hash `5644146d629a2a28fbe84b7eb0c5bb457fde5dafbdf5fccd9b490e3d3156a3b6`,
+  step mean 56.3 ms / p95 280.1 ms, working set ~118 MB (run used
+  `--ancients 0`; deterministic repeat unchanged for identical configs).
+
+Remaining honest limitations: wars still 0; expansion is gated by
+organic survey coverage so only the earliest warp-capable civilizations
+colonized within the run; pre-warp→warp promotion needs ~120+ years at
+this tech pacing; the 50k-system headroom and research/diplomacy/sensor
+event feeds are unchanged gaps.

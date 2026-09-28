@@ -320,49 +320,58 @@ ColonizationSimulation::advance(ColonizationWorldView world,
                       [&](const auto &colony) {
                         return colony.system_id == *fleet.current_system_id;
                       });
-      if (body && !(body->stellar_exposure && body->stellar_exposure->baked) &&
+      const bool can_establish =
+          body && !(body->stellar_exposure && body->stellar_exposure->baked) &&
           world.knowledge.system_survey_level(fleet.civilization_id,
                                               body->system_id) ==
               SystemSurveyLevel::fully_surveyed &&
           species_colonization_assessment(species, *body)
               .can_found_current_colony &&
-          !occupied &&
-          advance_establishment(world, fleet, body->id, simulation_days)) {
-        const auto colonists = fleet.embarked_population_millions;
-        const auto assessment = species_colonization_assessment(species, *body);
-        Colony colony;
-        colony.id = next_colony_id(world.colonies);
-        colony.civilization_id = fleet.civilization_id;
-        colony.system_id = *fleet.current_system_id;
-        colony.planetary_body_id = body->id;
-        colony.name =
-            civilization.name + " Colony " +
-            std::to_string(
-                1 + std::count_if(world.colonies.begin(), world.colonies.end(),
-                                  [&](const auto &c) {
-                                    return c.civilization_id == civilization.id;
-                                  }));
-        colony.population_species_id = species;
-        colony.population_millions = colonists;
-        colony.stored_food_population_days_millions =
-            colonists * maximum_food_reserve_days;
-        colony.stored_water_population_days_millions =
-            colonists * maximum_water_reserve_days;
-        const bool natural = assessment.viability ==
-                             SpeciesColonizationViability::NaturallyViable;
-        colony.infrastructure = natural ? .35 : .42;
-        colony.stability = natural ? .92 : .88;
-        world.colonies.push_back(colony);
-        consume_settlement_vessel(fleet);
-        const auto &profile = species_environment_profile(species);
-        events.push_back(
-            {fleet.civilization_id, fleet.id, colony.system_id, colony.id,
-             civilization.name + " established " + colony.name + " on " +
-                 body->name + " with " +
-                 detail::legacy_custom_fixed(colonists, 1, 1) + " million " +
-                 profile.display_name + " colonists using " +
-                 (natural ? "natural environmental viability."
-                          : "prototype habitat support.")});
+          !occupied;
+      if (can_establish) {
+        if (advance_establishment(world, fleet, body->id, simulation_days)) {
+          const auto colonists = fleet.embarked_population_millions;
+          const auto assessment =
+              species_colonization_assessment(species, *body);
+          Colony colony;
+          colony.id = next_colony_id(world.colonies);
+          colony.civilization_id = fleet.civilization_id;
+          colony.system_id = *fleet.current_system_id;
+          colony.planetary_body_id = body->id;
+          colony.name =
+              civilization.name + " Colony " +
+              std::to_string(
+                  1 +
+                  std::count_if(world.colonies.begin(), world.colonies.end(),
+                                [&](const auto &c) {
+                                  return c.civilization_id == civilization.id;
+                                }));
+          colony.population_species_id = species;
+          colony.population_millions = colonists;
+          colony.stored_food_population_days_millions =
+              colonists * maximum_food_reserve_days;
+          colony.stored_water_population_days_millions =
+              colonists * maximum_water_reserve_days;
+          const bool natural = assessment.viability ==
+                               SpeciesColonizationViability::NaturallyViable;
+          colony.infrastructure = natural ? .35 : .42;
+          colony.stability = natural ? .92 : .88;
+          world.colonies.push_back(colony);
+          consume_settlement_vessel(fleet);
+          const auto &profile = species_environment_profile(species);
+          events.push_back(
+              {fleet.civilization_id, fleet.id, colony.system_id, colony.id,
+               civilization.name + " established " + colony.name + " on " +
+                   body->name + " with " +
+                   detail::legacy_custom_fixed(colonists, 1, 1) + " million " +
+                   profile.display_name + " colonists using " +
+                   (natural ? "natural environmental viability."
+                            : "prototype habitat support.")});
+        }
+        // A valid settlement target consumes the tick whether or not the
+        // establishment interval is complete; falling through to the
+        // opportunity planner here would reset settlement progress and
+        // re-issue a route order every tick, deadlocking the fleet.
         continue;
       }
     }

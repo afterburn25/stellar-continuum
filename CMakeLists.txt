@@ -1089,6 +1089,11 @@ if(BUILD_TESTING)
   add_test(NAME adaptive_research_ai_scheduling COMMAND stellar_research_ai_scheduling_tests
     "${CMAKE_SOURCE_DIR}/data/research/v1")
   set_tests_properties(adaptive_research_ai_scheduling PROPERTIES TIMEOUT 60)
+  add_executable(stellar_colonization_ai_settlement_tests native-tests/colonization_ai_settlement_tests.cpp)
+  target_link_libraries(stellar_colonization_ai_settlement_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME colonization_ai_settlement COMMAND stellar_colonization_ai_settlement_tests
+    "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+  set_tests_properties(colonization_ai_settlement PROPERTIES TIMEOUT 60)
   add_executable(stellar_diplomacy_state_tests native-tests/diplomacy_state_tests.cpp)
   target_link_libraries(stellar_diplomacy_state_tests PRIVATE stellar_core stellar_json)
   add_test(NAME diplomacy_state_parity COMMAND stellar_diplomacy_state_tests
