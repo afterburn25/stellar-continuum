@@ -84,6 +84,15 @@ void NativeSmallBodyRenderer::render(DrawList& out,const NativeSystemSnapshot& s
     std::vector<MeshInstance3D> instances;instances.reserve(solids.size());
     const auto host=spatial.stellar_hosts[spatial.belt_host];
     const auto star=view.world_to_screen(host.x,host.y);
+    // Host-star physics: a belt bound to a companion inherits that star's
+    // blackbody color and luminosity; a circumbinary belt (host 3) sums
+    // the pair's output while the direction still keys the barycentre.
+    const auto* host_physics=snapshot.stellar_object?&*snapshot.stellar_object:nullptr;
+    double host_luminosity=host_physics?host_physics->luminosity_solar:1.;
+    if(spatial.belt_host>=1&&snapshot.stellar_orbits&&spatial.belt_host<=static_cast<int>(snapshot.stellar_orbits->companions.size()))
+      {host_physics=&snapshot.stellar_orbits->companions[static_cast<std::size_t>(spatial.belt_host)-1];host_luminosity=host_physics->luminosity_solar;}
+    else if(spatial.belt_host==3&&snapshot.stellar_orbits)
+      for(const auto& companion:snapshot.stellar_orbits->companions)host_luminosity+=companion.luminosity_solar;
     for(const auto& s:solids){
       const auto& b=*s.body;auto spin=b.spin;
       // One revolution in roughly 90–180 real seconds, regardless of strategic
@@ -97,11 +106,12 @@ void NativeSmallBodyRenderer::render(DrawList& out,const NativeSystemSnapshot& s
       const float dx=star.x-s.p.x,dy=s.p.y-star.y,len=std::max(1.f,std::hypot(dx,dy));
       surface.light_direction=Vec3{dx/len,dy/len,.65f};
       // Star-lit like every other consumer: blackbody color from the
-      // primary's temperature, heliocentric falloff on a softened power
-      // law so Kuiper belts dim without vanishing. Procedural albedos are
-      // sRGB-encoded — linear_light decodes them before shading.
-      if(snapshot.stellar_object)surface.light_color=blackbody_light_color(std::clamp(snapshot.stellar_object->effective_temperature_kelvin,100.,100000.));
-      surface.light_intensity=s.au>1e-6f?std::clamp(std::pow(s.au,-1.2f),.22f,1.15f):1.f;
+      // host star's temperature, its luminosity on a softened power-law
+      // falloff so companion belts dim correctly without vanishing.
+      // Procedural albedos are sRGB-encoded — linear_light decodes them
+      // before shading.
+      if(host_physics)surface.light_color=blackbody_light_color(std::clamp(host_physics->effective_temperature_kelvin,100.,100000.));
+      surface.light_intensity=s.au>1e-6f?std::clamp(static_cast<float>(host_luminosity)*std::pow(s.au,-1.2f),.22f,1.15f):1.f;
       surface.linear_light=true;
       const auto brightness=static_cast<std::uint8_t>(std::clamp(b.material_brightness*235,0.,255.));surface.tint={brightness,brightness,brightness,255};
       instances.push_back({geometry_.mesh(b,true),{(s.p.x-clip.x-clip.width*.5f)*unit,(clip.y+clip.height*.5f-s.p.y)*unit,s.z*unit},

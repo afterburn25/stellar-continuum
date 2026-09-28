@@ -61,7 +61,14 @@ int main(){try{
   check(lit.linear_light,"Small bodies did not move to linear-light shading");
   check(lit.light_color.z>lit.light_color.x,"Blue-hot star failed to tint belt lighting");
   check(lit.light_intensity>=.22f&&lit.light_intensity<=1.15f,"Heliocentric falloff escaped bounds");
-  s.stellar_object.reset();
+  // A belt bound to a companion star must inherit THAT star's physics —
+  // same direction (belt-host position) but the companion's blackbody.
+  StellarOrbitArchitecture architecture;architecture.companions.push_back(generate_stellar_physics(3,StellarObjectType::MRedDwarf));
+  s.stellar_orbits=architecture;auto companion_spatial=spatial;companion_spatial.belt_host=1;
+  DrawList companion;renderer.render(companion,s,companion_spatial,view,{0,0,1920,1080},0,false);
+  const auto& companion_lit=scene_of(companion)->instances().front().material;
+  check(companion_lit.light_color.x>companion_lit.light_color.z,"Companion-host belt kept the primary's blackbody tint");
+  s.stellar_orbits.reset();s.stellar_object.reset();
   // Keep a single identified body in view so changed orientation cannot be
   // confused with a different selected instance after sorting by size.
   auto one=s;one.small_body_fields.resize(1);one.small_body_fields[0].visible_count=1;
