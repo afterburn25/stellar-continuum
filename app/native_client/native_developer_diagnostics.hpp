@@ -25,6 +25,7 @@ const char *campaign_domain_name(std::int64_t domain){
   }
   return "domain";
 }
+constexpr std::array<std::string_view,11> kShadingNames{"Lit","Unlit","Albedo","Normals","Roughness","Metallic","Emissive","Lighting only","LOD","Residency","Shadows"};
 } // namespace
 class NativeDeveloperDiagnostics {
 public:
@@ -110,7 +111,11 @@ public:
   bool handle(const InputEvent &e,int w,int h,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     if(!visible_)return false;const auto l=layout(w,h);pointer_=e.position;
     if(dropdown_.visible()){
-      if(const auto choice=dropdown_.handle(e,l.detail,w,h))monitor.history().set_detail(static_cast<stellar::engine::DiagnosticDetail>(*choice));
+      const int drop=dropdown_.id();
+      if(const auto choice=dropdown_.handle(e,drop==1?l.shading:l.detail,w,h)){
+        if(drop==1)shading_=static_cast<DebugView3D>(*choice);
+        else monitor.history().set_detail(static_cast<stellar::engine::DiagnosticDetail>(*choice));
+      }
       return true;
     }
     if(e.type==InputEventType::EscapePressed){if(entity_search_focused_||event_search_focused_){entity_search_focused_=event_search_focused_=false;return true;}if(ring_>=0){ring_=-1;return true;}close();return true;}
@@ -125,6 +130,7 @@ public:
     if(e.type==InputEventType::LeftPressed){
       ring_=-1;
       if(l.detail.contains(e.position)){open_detail_dropdown(monitor);return true;}
+      if(l.shading.contains(e.position)){open_shading_dropdown();return true;}
       pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
       entity_search_focused_=entities_&&header_search_rect(l).contains(e.position);
       event_search_focused_=events_&&header_search_rect(l).contains(e.position);
@@ -234,6 +240,16 @@ public:
     button(l.close,"CLOSE");button(l.performance,"LIVE PERFORMANCE");button(l.events,"RECENT EVENTS");button(l.refresh,"REFRESH EVENTS");button(l.generation,"GALAXY DETAILS");button(l.assets,"COOKED ASSETS");button(l.entities,"ENTITIES");
     const std::array<std::string,4> levels{"Errors only","Normal","Detailed","Trace"};
     button(l.detail,"Record: "+levels.at(static_cast<std::size_t>(monitor.history().detail()))+" ▾");
+    button(l.shading,"Shading: "+std::string(kShadingNames[static_cast<std::size_t>(shading_)])+" ▾");
+    // Diagnostic shading applies to every scene already submitted this
+    // frame — planets, ships, eruptions and the nebula volume — while
+    // chrome and text stay lit.
+    if(shading_!=DebugView3D::Lit){
+      for(auto& command:out.world)
+        if(auto*view=std::get_if<Scene3DView>(&command))view->options.debug_view=shading_;
+      for(auto& command:out.overlay)
+        if(auto*view=std::get_if<Scene3DView>(&command))view->options.debug_view=shading_;
+    }
     if(assets_){
       if(auto registry=stellar::engine::mounted_asset_registry()){
         const auto d=registry->diagnostics();const auto& records=registry->records();
@@ -457,14 +473,15 @@ public:
         out.overlay.emplace_back(StrokedRectangle{r,native_menu_style::cyan});
       }
     }
-    if(dropdown_.visible())dropdown_.render(out,l.detail,w,h,font);
+    if(dropdown_.visible())dropdown_.render(out,dropdown_.id()==1?l.shading:l.detail,w,h,font);
   }
 private:
-  struct Layout {float scale;UiRect panel,close,performance,events,refresh,detail,list,generation,assets,entities;};
+  struct Layout {float scale;UiRect panel,close,performance,events,refresh,detail,shading,list,generation,assets,entities;};
   static Layout layout(int w,int h){
     const float s=std::clamp(std::min(w/1920.f,h/1080.f),.67f,2.f);const UiRect p{w*.5f-550*s,h*.5f-370*s,1100*s,740*s};
     return {s,p,{p.x+984*s,p.y+12*s,96*s,32*s},{p.x+20*s,p.y+64*s,242*s,38*s},
       {p.x+276*s,p.y+64*s,242*s,38*s},{p.x+532*s,p.y+64*s,242*s,38*s},{p.x+788*s,p.y+64*s,292*s,38*s},
+      {p.x+788*s,p.y+110*s,292*s,34*s},
       {p.x+20*s,p.y+186*s,1060*s,445*s},{p.x+20*s,p.y+110*s,242*s,34*s},{p.x+276*s,p.y+110*s,242*s,34*s},
       {p.x+532*s,p.y+110*s,242*s,34*s}};
   }
@@ -478,7 +495,7 @@ private:
       if(r.width>0&&r.height>0)out.push_back({r,hit,c,std::move(label)});};
     push(l.close,0,"Close diagnostics");
     push(l.performance,1,"Live performance");push(l.events,2,"Recent events");push(l.refresh,3,"Refresh events");
-    push(l.detail,7,"Record detail level");
+    push(l.detail,7,"Record detail level");push(l.shading,8,"Shading debug view");
     push(l.generation,4,"Galaxy details");push(l.assets,5,"Cooked assets");push(l.entities,6,"Entities");
     if(entities_){
       push(header_search_rect(l),50,"Search entities",stellar::engine::AnnouncementControl::Edit);
@@ -509,6 +526,11 @@ private:
   void open_detail_dropdown(stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));
   }
+  void open_shading_dropdown(){
+    std::vector<std::string> names;names.reserve(kShadingNames.size());
+    for(const auto name:kShadingNames)names.emplace_back(name);
+    dropdown_.open(1,std::move(names),static_cast<int>(shading_));
+  }
   void activate_phase_header(int col){
     static constexpr std::string_view ids[]{"phase","samples","mean","maximum"};
     const auto &state=phase_table_.sort_state();
@@ -535,6 +557,7 @@ private:
     if(t.hit==50){entity_search_focused_=true;ring_=-1;}
     else if(t.hit==51){event_search_focused_=true;ring_=-1;}
     else if(t.hit==7)open_detail_dropdown(monitor);
+    else if(t.hit==8)open_shading_dropdown();
     else if(t.hit>=200)activate_phase_header(t.hit-200);
     else if(t.hit>=100)activate_entity_row(t.hit-100);
     else activate_button(t.hit,monitor);
@@ -611,6 +634,7 @@ private:
   }
   static std::string number(double value){std::ostringstream out;out<<std::fixed<<std::setprecision(3)<<value;return out.str();}
   std::vector<stellar::engine::DiagnosticRecord> snapshot_;stellar::native_ui::Dropdown dropdown_;
+  DebugView3D shading_{DebugView3D::Lit};
   bool visible_{},events_{};int pressed_{-1},ring_{-1};Point pointer_{};
   std::string entity_search_,event_search_;bool entity_search_focused_{},event_search_focused_{};
   mutable std::size_t entity_shown_{};
