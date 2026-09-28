@@ -52,6 +52,11 @@ private:
   StrategicLogisticsQuery logistics_;
   StrategicShipbuildingCapabilityQuery shipbuilding_capabilities_;
   StrategicExplorationPlanQuery exploration_;
+  // When a caller injects an exploration query it stays authoritative for the
+  // supported-work check (providers may observe call order or synthesize
+  // plans). The default path answers the same existence question with the
+  // planner's lazy probe instead of building a full plan per fleet.
+  bool exploration_injected_{};
 };
 
 } // namespace stellar::core

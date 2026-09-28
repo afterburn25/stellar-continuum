@@ -64,6 +64,35 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Strategic input lazy exploration probe (2026-09-28)
+
+- Purpose: every strategic review ran the default exploration query — a
+  full all-systems `ExplorationMissionPlanner::build_plan` — for each
+  exploration fleet of the reviewing civilization just to answer "does
+  this fleet have any supported survey work". At canonical scale each
+  call assesses thousands of route targets (~48 ms), and reviews are
+  cadence-gated so the cost arrived as periodic multi-civ spikes
+  (strategic_ai mean 7.1 ms, max ~308 ms).
+- Modules: `core/src/exploration_planning.cpp` — new
+  `ExplorationMissionPlanner::has_supported_mission_target(world,
+  fleet_id, fuel_policy)` enumerates survey targets in the exact
+  `build_plan` comparator order and assesses them lazily through the
+  same `OperationalReachBatch`/injected-provider path, stopping at the
+  first supported target. `core/src/strategic_input_builder.cpp` —
+  `CivilizationStrategicInputBuilder` records whether the exploration
+  query was caller-injected; the injected provider remains authoritative
+  (call order and synthesized plans preserved), while the default path
+  answers the existence question with the probe.
+- Semantics: unchanged — `build_plan` sorts supported candidates first,
+  so "any supported in the truncated window" is exactly "any supported
+  target exists"; subject selection (stored fleet, active, survey role)
+  and the canonical-reach guard match `build_plan`.
+- Save/performance impact: none persisted. Measured (2500 systems, 137
+  simulated years, seed 8374837): `strategic_ai` drops from 7.1 ms to
+  1.2 ms mean (~5.8x) and the whole step to 17.6 ms mean; the campaign's
+  final state hash is bit-identical to the pre-optimization run and
+  save/restore/continue stays byte-identical.
+
 ## Colonization settlement catalog indexing (2026-09-28)
 
 - Purpose: remove per-call catalog scans from the colonization phase. Every

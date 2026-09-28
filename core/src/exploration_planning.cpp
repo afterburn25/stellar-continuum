@@ -352,6 +352,69 @@ ExplorationMissionPlanner::select_supported_candidate(
                          fuel_policy, &surveys, &systems_index);
 }
 
+bool ExplorationMissionPlanner::has_supported_mission_target(
+    ExplorationPlanningWorldView world, int fleet_id,
+    MissionFuelPolicy fuel_policy) const {
+  if(fuel_policy!=MissionFuelPolicy::ReachDestination&&!uses_canonical_reach_)
+    throw std::invalid_argument("Return fuel planning requires the canonical operational reach provider.");
+  // Same subject selection as build_plan: the stored fleet, not a caller
+  // reference, and unavailable for missing/inactive/non-survey vessels.
+  const auto fleet =
+      std::find_if(world.fleets.begin(), world.fleets.end(),
+                   [fleet_id](const auto &candidate) {
+                     return candidate.id == fleet_id && candidate.is_active;
+                   });
+  if (fleet == world.fleets.end() ||
+      (fleet->role != FleetRole::Scout && fleet->role != FleetRole::Science))
+    return false;
+  const auto &subject = *fleet;
+  std::unordered_map<int, const StellarSystem *> systems_index;
+  systems_index.reserve(world.systems.size());
+  for (const auto &system : world.systems)
+    systems_index.emplace(system.id, &system);
+  std::optional<OperationalReachBatch> batch;
+  if(uses_canonical_reach_)batch.emplace(OperationalReachWorldView{world.systems,world.colonies,world.lanes},subject.civilization_id);
+  struct RankedTarget {
+    const StellarSystem *system;
+    int priority_band;
+    double distance;
+  };
+  std::vector<RankedTarget> targets;
+  targets.reserve(world.systems.size());
+  for (const auto &system : world.systems) {
+    if (!needs_survey_work(world.knowledge, subject, system.id))
+      continue;
+    targets.push_back(
+        {&system,
+         survey_priority(
+             subject.role,
+             world.knowledge.system_survey_level(subject.civilization_id,
+                                                 system.id)),
+         indexed_distance_from_fleet(systems_index, subject, system)});
+  }
+  std::stable_sort(targets.begin(), targets.end(),
+                   [](const RankedTarget &left, const RankedTarget &right) {
+                     if (left.priority_band != right.priority_band)
+                       return left.priority_band < right.priority_band;
+                     const bool left_nan = std::isnan(left.distance);
+                     const bool right_nan = std::isnan(right.distance);
+                     if (left_nan != right_nan)
+                       return left_nan;
+                     if (!left_nan && left.distance != right.distance)
+                       return left.distance < right.distance;
+                     return left.system->id < right.system->id;
+                   });
+  for (const auto &target : targets) {
+    const auto reach =
+        batch ? batch->assess(subject, target.system->id,
+                              mission_kind(subject.role), fuel_policy)
+              : assess_operational_reach(world, subject, target.system->id);
+    if (reach.is_supported)
+      return true;
+  }
+  return false;
+}
+
 ExplorationMissionOrderAssessment
 ExplorationMissionPlanner::assess_order(ExplorationPlanningWorldView world,
                                         int fleet_id, int destination_system_id,

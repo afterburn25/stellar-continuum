@@ -51,7 +51,8 @@ CivilizationStrategicInputBuilder::CivilizationStrategicInputBuilder(
     StrategicExplorationPlanQuery exploration)
     : logistics_(std::move(logistics)),
       shipbuilding_capabilities_(std::move(shipbuilding_capabilities)),
-      exploration_(std::move(exploration)) {
+      exploration_(std::move(exploration)),
+      exploration_injected_(static_cast<bool>(exploration_)) {
   if (!logistics_)
     logistics_ = [](const StrategicInputWorldView &world, int civilization_id) {
       std::vector<EconomyConstructionState> construction;
@@ -137,13 +138,26 @@ CivilizationOwnState CivilizationStrategicInputBuilder::build(
                      return left->id < right->id;
                    });
   bool has_supported_exploration_work = false;
+  ExplorationMissionPlanner probe;
   for (const auto *fleet : exploration_fleets) {
-    const auto plan = exploration_(world.exploration_view(), fleet->id,
-                                   ExplorationMissionPlanner::hard_maximum_candidates);
-    if (std::any_of(plan.candidates.begin(), plan.candidates.end(),
-                    [](const auto &candidate) {
-                      return candidate.reach.is_supported;
-                    })) {
+    // Injected providers stay authoritative; the default query answers the
+    // same "any supported candidate in the plan" question — supported
+    // entries always sort first, so the candidate cap can never hide one —
+    // with the planner's lazy first-supported probe instead of building a
+    // full all-systems plan per fleet per review.
+    const bool any_supported = [&] {
+      if (!exploration_injected_)
+        return probe.has_supported_mission_target(world.exploration_view(),
+                                                  fleet->id);
+      const auto plan =
+          exploration_(world.exploration_view(), fleet->id,
+                       ExplorationMissionPlanner::hard_maximum_candidates);
+      return std::any_of(plan.candidates.begin(), plan.candidates.end(),
+                         [](const auto &candidate) {
+                           return candidate.reach.is_supported;
+                         });
+    }();
+    if (any_supported) {
       has_supported_exploration_work = true;
       break;
     }

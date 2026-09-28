@@ -100,6 +100,16 @@ public:
                              const std::unordered_set<int> &reservation_set,
                              bool &used_shared_fallback) const;
 
+  // Cheaper existence probe matching "the full plan has a supported
+  // candidate": supported entries always sort first in build_plan, so any
+  // supported target is present in every planning window regardless of the
+  // candidate cap. Assesses targets in plan order and stops at the first
+  // supported one instead of building every candidate.
+  [[nodiscard]] bool has_supported_mission_target(
+      ExplorationPlanningWorldView world, int fleet_id,
+      MissionFuelPolicy fuel_policy =
+          MissionFuelPolicy::ReachDestination) const;
+
   static bool needs_survey_work(const CivilizationKnowledgeState &knowledge,
                                 const FleetState &fleet, int system_id);
   static int survey_priority(FleetRole role, SystemSurveyLevel level);
