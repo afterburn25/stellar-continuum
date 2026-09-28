@@ -2,6 +2,7 @@
 #include "native_ui_layout.hpp"
 #include "native_ui_theme.hpp"
 #include <stellar/engine/localization.hpp>
+#include <stellar/engine/native_scene3d.hpp>
 
 #include <array>
 #include <chrono>
@@ -628,9 +629,12 @@ int main() {
       DrawList sample;
       sample.text.push_back(Text{{0,0},"dim",Color{111,132,148,255},15});
       sample.overlay.emplace_back(Text{{0,0},"bright",Color{230,240,246,255},15});
+      Camera3D camera;sample.overlay.emplace_back(Scene3DView{Scene3D::create(camera,{}),UiRect{0,0,64,64}});
       stellar::native_ui::apply_high_contrast(sample);
       require(sample.text.front().color.r>200,"High contrast pass left dim text dim");
       require(std::get_if<Text>(&sample.overlay.front())->color.r==230,"High contrast pass recolored bright text");
+      const auto* view=std::get_if<Scene3DView>(&sample.overlay.back());
+      require(view&&view->options.contrast>1.f&&view->options.sharpen>0.f,"High contrast pass left the 3D scene at default post-processing");
     }
     {
       NativeGeneralSettings colorblind(temp.path/"colorblind.json");const auto l=GeneralSettingsLayout::for_viewport(1280,720);

@@ -22,6 +22,7 @@ using native_map::Image;
 using native_map::FontFace;
 using native_map::Line;
 using native_map::Point;
+using native_map::Scene3DView;
 using native_map::StrokedRectangle;
 using native_map::Text;
 using native_map::TextAlign;
@@ -80,17 +81,28 @@ namespace type {
 // Global high-contrast pass over a finished DrawList: snaps low-luminance
 // text to the primary ink so every surface gains readability without
 // per-screen palette plumbing. Colored accents above the threshold keep
-// their semantic hue; dim labels/disabled text become legible.
+// their semantic hue; dim labels/disabled text become legible. Rendered
+// 3D scenes get the same treatment through the post-tonemap contrast and
+// unsharp terms on their render options, so planets, ships and nebula
+// volumes sharpen together with the surrounding chrome.
 inline void apply_high_contrast(DrawList &draw) {
   const auto boost = [](Color &c) {
     const float luminance = .299f * c.r + .587f * c.g + .114f * c.b;
     if (luminance < 160.f) c = color::text_primary;
   };
+  const auto punch = [](Scene3DView &view) {
+    view.options.contrast = std::max(view.options.contrast, 1.35f);
+    view.options.sharpen = std::max(view.options.sharpen, .3f);
+  };
   for (auto &text : draw.text) boost(text.color);
-  for (auto &command : draw.overlay)
+  for (auto &command : draw.overlay) {
     if (auto *text = std::get_if<Text>(&command)) boost(text->color);
-  for (auto &command : draw.world)
+    if (auto *view = std::get_if<Scene3DView>(&command)) punch(*view);
+  }
+  for (auto &command : draw.world) {
     if (auto *text = std::get_if<Text>(&command)) boost(text->color);
+    if (auto *view = std::get_if<Scene3DView>(&command)) punch(*view);
+  }
 }
 
 // Every color-bearing field a draw-command variant can hold. Shared by the
@@ -109,7 +121,9 @@ inline void for_each_command_color(Command &command, const Fn &fn) {
 // mode still perceives (blue + luminance) — semantic accent hues stay
 // distinguishable instead of merely being simulated away. Covers every
 // CPU-side surface (text, primitives, image tints, mesh tints); GPU-rendered
-// 3D scene content is out of scope until a post-process pass exists.
+// 3D scene content stays unremapped — Machado simulation needs a channel
+// matrix the render post-process does not provide (contrast/saturation/
+// sharpen are scalar).
 inline void apply_color_blind(DrawList &draw, engine::ColorBlindMode mode) {
   if (mode == engine::ColorBlindMode::None) return;
   const float *m;
