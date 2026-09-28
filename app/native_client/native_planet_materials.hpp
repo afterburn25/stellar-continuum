@@ -241,6 +241,10 @@ inline void append_instances(std::vector<MeshInstance3D>& out,const PlanetAppear
   // the authored stripes resolved at the grazing limb instead of blurring
   // into mush (engine drops the sampler at Low quality anyway).
   material.anisotropic_texture=giant;
+  // Globe-zoom LODs magnify authored albedo texels — Catmull-Rom
+  // reconstruction keeps close-up surfaces smooth without touching
+  // the canonical source art (minification path untouched).
+  material.cubic_magnification=lod>=512;
   // Wrap-diffuse terminator: deep atmospheres soften the day/night edge,
   // airless bodies keep the hard Lambert falloff.
   material.terminator_wrap=giant?.42f:std::clamp(static_cast<float>(a.atmosphere.density)*.45f,0.f,.38f);
