@@ -2536,7 +2536,7 @@ class NativeCampaign final {
     InputSnapshot back_input;back_input.drawable_width=width;back_input.drawable_height=height;back_input.pointer={back_point.x+31,back_point.y+17};back_input.events={{InputEventType::LeftPressed,back_point},{InputEventType::PointerMove,back_input.pointer,{31,17}},{InputEventType::LeftReleased,back_input.pointer}};(void)update(back_input,width,height,0.,false);
     smoke_system_back_=!system_workspace_.visible();
     smoke_system_gesture_cleared_=camera_.center.x==map_center_before_back.x&&camera_.center.y==map_center_before_back.y;
-    if(!smoke_system_reset_||!smoke_system_back_||!smoke_system_gesture_cleared_)throw std::runtime_error("System smoke Back/Reset or galaxy gesture ownership failed.");
+    if(!smoke_system_reset_||!smoke_system_back_||!smoke_system_gesture_cleared_)throw std::runtime_error(std::format("System smoke Back/Reset or galaxy gesture ownership failed. reset={} back={} gesture_cleared={}",smoke_system_reset_,smoke_system_back_,smoke_system_gesture_cleared_));
     const auto reentry=expose_smoke_map_point(found->second->position.x,found->second->position.y,width,height);
     InputSnapshot reenter;reenter.drawable_width=width;reenter.drawable_height=height;reenter.pointer=reentry;
     reenter.events={{InputEventType::LeftPressed,reentry,{},0,{},2},{InputEventType::LeftReleased,reentry}};
@@ -2658,7 +2658,7 @@ class NativeCampaign final {
     for(int index=0;index<4;++index)click(center(ui.speed));
     smoke_colony_speed_retained_=colony_workspace_.visible()&&frame.clock().speed()==StrategicSpeed::Normal;
     click(center(ui.pause));
-    if(!smoke_colony_selected_||!smoke_colony_opened_||!smoke_colony_back_||!smoke_colony_pause_retained_||!smoke_colony_speed_retained_||frame.clock().speed()!=StrategicSpeed::Paused||frame.clock().simulation_days()!=smoke_colony_day_)throw std::runtime_error("Colony smoke input routing or paused state was not preserved.");
+    if(!smoke_colony_selected_||!smoke_colony_opened_||!smoke_colony_back_||!smoke_colony_pause_retained_||!smoke_colony_speed_retained_||frame.clock().speed()!=StrategicSpeed::Paused||frame.clock().simulation_days()!=smoke_colony_day_)throw std::runtime_error(std::format("Colony smoke input routing or paused state was not preserved. selected={} opened={} back={} pause_retained={} speed_retained={} paused={} day={:.6g} expected_day={:.6g}",smoke_colony_selected_,smoke_colony_opened_,smoke_colony_back_,smoke_colony_pause_retained_,smoke_colony_speed_retained_,frame.clock().speed()==StrategicSpeed::Paused,frame.clock().simulation_days(),smoke_colony_day_));
     prepare_colony_roster_smoke(width,height);
   }
 
@@ -2752,7 +2752,7 @@ class NativeCampaign final {
         colony_workspace_.view()->colony_id==target.colony_id&&system_workspace_.selected_body_id()==target.body_id;
     const bool readonly=canonical()==before&&fleet_controller_.selection()==fleet_before&&
         camera_.center.x==camera_before.center.x&&camera_.center.y==camera_before.center.y&&camera_.pixels_per_world==camera_before.pixels_per_world;
-    if(!exclusive||!selected||!readonly||!scrolled||colony_roster_.visible())throw std::runtime_error("Roster navigation changed state or failed input isolation.");
+    if(!exclusive||!selected||!readonly||!scrolled||colony_roster_.visible())throw std::runtime_error(std::format("Roster navigation changed state or failed input isolation. exclusive={} selected={} readonly={} scrolled={} roster_visible={}",exclusive,selected,readonly,scrolled,colony_roster_.visible()));
     std::ostringstream proof;proof<<"{\"player_id\":"<<target.player_civilization_id<<",\"colony_id\":"<<target.colony_id
       <<",\"rows\":"<<row_count<<",\"opened\":true,\"selected\":true,\"readonly\":true,\"exclusive\":true,\"scrolled\":true}";
     smoke_colony_roster_evidence_=proof.str();
@@ -3914,7 +3914,7 @@ class NativeCampaign final {
     const bool unchanged=canonical==smoke_battle_canonical_;
     const bool paused=frame.tactical_clock().speed_multiplier()==0.;
     const bool day=frame.clock().simulation_days()==smoke_battle_day_;
-    if(!unchanged||!paused||!day)throw std::runtime_error("Battle changed while paused before capture.");
+    if(!unchanged||!paused||!day)throw std::runtime_error(std::format("Battle changed while paused before capture. unchanged={} paused={} day={}",unchanged,paused,day));
     std::ostringstream out;out<<"{\"reload\":"<<(smoke_battle_reload_?"true":"false")
         <<",\"paused_speed\":"<<(smoke_battle_paused_speed_?"true":"false")
         <<",\"menu_pause\":"<<(smoke_battle_menu_pause_?"true":"false")
