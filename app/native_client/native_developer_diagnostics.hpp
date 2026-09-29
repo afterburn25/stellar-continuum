@@ -234,7 +234,9 @@ public:
       const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor)const{
     if(!visible_)return;const auto l=layout(w,h);const auto s=l.scale;const int font=std::max(12,static_cast<int>(16*s));
     native_menu_style::panel(out,l.panel,s);
-    const auto label=[&](UiRect r,std::string value,Color color=native_menu_style::ink){native_menu_style::text(out,r,std::move(value),font,color);};
+    const auto label=[&](UiRect r,std::string value,Color color=native_menu_style::ink,std::optional<UiRect> clip={}){
+      const auto c=clip?intersection(r,*clip):r;if(c.height<=0||c.width<=0)return;
+      out.overlay.emplace_back(Text{{r.x,r.y},std::move(value),color,font,r.width,c,TextAlign::Left,FontFace::Interface});};
     const auto button=[&](UiRect r,std::string name){native_menu_style::button(out,r,std::move(name),font,r.contains(pointer_),true,s);};
     label({l.panel.x+20*s,l.panel.y+16*s,850*s,28*s},"DEVELOPER · PERFORMANCE & DIAGNOSTICS",native_menu_style::cyan);
     button(l.close,"CLOSE");button(l.performance,"LIVE PERFORMANCE");button(l.events,"RECENT EVENTS");button(l.refresh,"REFRESH EVENTS");button(l.generation,"GALAXY DETAILS");button(l.assets,"COOKED ASSETS");button(l.entities,"ENTITIES");
@@ -256,8 +258,9 @@ public:
         label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(d.assets)+" assets / "+std::to_string(d.packages)+" packages · Reads "+std::to_string(d.reads)+" · Errors "+std::to_string(d.failures)+" · Read "+number(d.bytes_read/1048576.)+" MiB",native_menu_style::muted);
         const auto range=scroll_window(l,61.f,records.size(),7);
         for(auto i=range.first;i<range.last;++i){const auto&r=records[i];std::uint64_t size=0;for(const auto&c:r.chunks)size+=c.stored_bytes;const auto y=l.list.y+static_cast<float>(i)*61*s-list_view_.scroll_offset;
-          label({l.list.x,y,l.list.width,25*s},r.id);
-          label({l.list.x,y+27*s,l.list.width,25*s},r.format+" · "+std::to_string(r.width)+" × "+std::to_string(r.height)+" · "+std::to_string(r.chunks.size())+" chunks · "+number(size/1048576.)+" MiB · "+r.chunks.front().package,native_menu_style::muted);
+          const auto clip=intersection({l.list.x,y,l.list.width,61*s},l.list);if(clip.height<=0)continue;
+          label({l.list.x,y,l.list.width,25*s},r.id,native_menu_style::ink,l.list);
+          label({l.list.x,y+27*s,l.list.width,25*s},r.format+" · "+std::to_string(r.width)+" × "+std::to_string(r.height)+" · "+std::to_string(r.chunks.size())+" chunks · "+number(size/1048576.)+" MiB · "+r.chunks.front().package,native_menu_style::muted,l.list);
         }
       }else label(l.list,"Development source mode. Cook and launch a packaged build to inspect runtime compression and package reads.");
     }else if(generation_){
@@ -373,12 +376,13 @@ public:
       for(auto i=range.first;i<range.last;++i){
         const auto &[node,depth]=entity_flat_[i];
         const auto y=l.list.y+static_cast<float>(i)*33*s-list_view_.scroll_offset;
+        const auto clip=intersection({rows_rect.x,y,rows_rect.width,31*s},l.list);if(clip.height<=0)continue;
         const bool selected=node->id==entity_selected_;
-        if(selected)out.overlay.emplace_back(FilledRectangle{{rows_rect.x,y,rows_rect.width,31*s},{24,64,88,230}});
-        else if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{{rows_rect.x,y,rows_rect.width,31*s},{12,32,45,210}});
+        if(selected)out.overlay.emplace_back(FilledRectangle{clip,{24,64,88,230}});
+        else if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{clip,{12,32,45,210}});
         const float indent=8*s+static_cast<float>(depth)*20*s;
         const std::string glyph=node->children.empty()?"· ":(node->expanded?"▾ ":"› ");
-        label({rows_rect.x+indent,y+4*s,rows_rect.width-indent-8*s,25*s},glyph+node->label_key,selected?native_menu_style::cyan:native_menu_style::ink);
+        label({rows_rect.x+indent,y+4*s,rows_rect.width-indent-8*s,25*s},glyph+node->label_key,selected?native_menu_style::cyan:native_menu_style::ink,l.list);
       }
       if(entity_flat_.empty())label(rows_rect,"The campaign projected no entities.");
       if(const auto sel=entity_for_node(entity_selected_);sel&&projected.alive(*sel)){
@@ -427,11 +431,12 @@ public:
       const auto range=scroll_window(l,33.f,rows.size(),14);
       for(auto i=range.first;i<range.last;++i){
         const auto &cells=rows[i]->second;const auto y=l.list.y+static_cast<float>(i)*33*s-list_view_.scroll_offset;
-        if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
-        label({l.list.x+8*s,y+4*s,400*s,25*s},cells[0].text);
-        label({l.list.x+430*s,y+4*s,140*s,25*s},cells[1].text);
-        label({l.list.x+600*s,y+4*s,170*s,25*s},cells[2].text);
-        label({l.list.x+810*s,y+4*s,190*s,25*s},cells[3].text);
+        const auto clip=intersection({l.list.x,y,l.list.width,31*s},l.list);if(clip.height<=0)continue;
+        if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{clip,{12,32,45,210}});
+        label({l.list.x+8*s,y+4*s,400*s,25*s},cells[0].text,native_menu_style::ink,l.list);
+        label({l.list.x+430*s,y+4*s,140*s,25*s},cells[1].text,native_menu_style::ink,l.list);
+        label({l.list.x+600*s,y+4*s,170*s,25*s},cells[2].text,native_menu_style::ink,l.list);
+        label({l.list.x+810*s,y+4*s,190*s,25*s},cells[3].text,native_menu_style::ink,l.list);
       }
     }else{
       // The filter maps onto a stable index list so hit-testing, scroll
@@ -449,11 +454,12 @@ public:
       const auto range=scroll_window(l,57.f,event_view_.size(),8);
       for(auto i=range.first;i<range.last;++i){
         const auto &r=snapshot_[event_view_[i]];const auto y=l.list.y+static_cast<float>(i)*57*s-list_view_.scroll_offset;
-        out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,54*s},{12,32,45,210}});
+        const auto clip=intersection({l.list.x,y,l.list.width,54*s},l.list);if(clip.height<=0)continue;
+        out.overlay.emplace_back(FilledRectangle{clip,{12,32,45,210}});
         const auto color=r.severity>=stellar::engine::DiagnosticSeverity::Error?Color{255,135,112,255}:
             r.severity==stellar::engine::DiagnosticSeverity::Warning?Color{245,199,113,255}:native_menu_style::cyan;
-        label({l.list.x+8*s,y+3*s,l.list.width-16*s,23*s},r.game_date+" · tick "+std::to_string(r.tick)+(r.civilization_id?" · empire "+std::to_string(*r.civilization_id):"")+" · "+r.subsystem+" / "+r.event_type,color);
-        label({l.list.x+8*s,y+28*s,l.list.width-16*s,23*s},r.message);
+        label({l.list.x+8*s,y+3*s,l.list.width-16*s,23*s},r.game_date+" · tick "+std::to_string(r.tick)+(r.civilization_id?" · empire "+std::to_string(*r.civilization_id):"")+" · "+r.subsystem+" / "+r.event_type,color,l.list);
+        label({l.list.x+8*s,y+28*s,l.list.width-16*s,23*s},r.message,native_menu_style::ink,l.list);
       }
       if(snapshot_.empty())label(l.list,"No retained events at the chosen recording level. This does not certify a clean simulation.",native_menu_style::muted);
       else if(event_view_.empty())label(l.list,"No retained events match the search.",native_menu_style::muted);
@@ -488,6 +494,9 @@ private:
   // In the entities view the list splits: rows left, selected-entity
   // detail right — row hit-testing bounds to the rows region.
   static UiRect entity_rows_rect(const Layout &l){return {l.list.x,l.list.y,l.list.width*.62f,l.list.height};}
+  // A tail-pinned scroll offset stays fractional, so the first/last
+  // visible row can straddle the list edge — clip row geometry to it.
+  static UiRect intersection(UiRect a,UiRect b){const float x=std::max(a.x,b.x),y=std::max(a.y,b.y);return {x,y,std::max(0.f,std::min(a.x+a.width,b.x+b.width)-x),std::max(0.f,std::min(a.y+a.height,b.y+b.height)-y)};}
   struct FocusTarget{UiRect rect;int hit{-1};stellar::engine::AnnouncementControl control{stellar::engine::AnnouncementControl::Button};std::string label;};
   std::vector<FocusTarget> focusables(const Layout &l)const{
     std::vector<FocusTarget> out;
@@ -504,7 +513,7 @@ private:
         auto range=list_view_.visible_range();range.last=std::min(range.last,range.first+14);
         const auto rows=entity_rows_rect(l);
         for(auto i=range.first;i<range.last&&i<entity_flat_.size();++i)
-          push({rows.x,l.list.y+static_cast<float>(i)*33.f*l.scale-list_view_.scroll_offset,rows.width,31.f*l.scale},100+static_cast<int>(i),entity_flat_[i].first->label_key);
+          push(intersection({rows.x,l.list.y+static_cast<float>(i)*33.f*l.scale-list_view_.scroll_offset,rows.width,31.f*l.scale},l.list),100+static_cast<int>(i),entity_flat_[i].first->label_key);
       }
     }else if(events_)push(header_search_rect(l),51,"Search events",stellar::engine::AnnouncementControl::Edit);
     if(!events_&&!generation_&&!assets_&&!entities_){

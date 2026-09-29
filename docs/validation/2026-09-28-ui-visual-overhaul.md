@@ -381,6 +381,15 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `batcher_ui` pins both cases (general remainder keeps `max_scroll`
   and exposes row 15 fully; mid-list offsets still snap), and the
   header contract documents the behavior.
+- Diagnostics clip follow-up: the tail-pin introduced fractional
+  draw-time offsets where rows previously always aligned, so the one
+  unclipped absolute-position consumer (developer diagnostics, all
+  four views) could bleed a partial first row above the list edge.
+  Rows, banding fills, labels, and entity focusable rects now clip to
+  `l.list` via the planetary `intersection`/`clip.value_or(r)`
+  convention — per-label intersection preserves `clip.x` (the entity
+  row's depth indent that tests decode). `native_developer_diagnostics`
+  caught the first attempt's indent regression; green on the fix.
 
 ## Known limitations
 
