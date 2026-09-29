@@ -51,6 +51,25 @@ int main(int argc,char** argv)try{
     check(tex->current_bytes==residency.texture_cache_bytes&&meshes->current_bytes==residency.mesh_cache_bytes&&targets->current_bytes==residency.target_bytes,"Attributed VRAM bytes do not match renderer residency");
     check(find("ui-image-cache")!=snapshot.subsystems.end()&&find("ui-text-cache")!=snapshot.subsystems.end(),"2D image/text caches are not attributed to MemoryTracker subsystems");
   }
+  { // render_scale shrinks the offscreen target; composite() upscales the
+    // same destination rect linearly, and target-byte accounting follows
+    // the scaled extent.
+    DrawList half;half.world.emplace_back(Scene3DView{Scene3D::create(camera,{a,b}),{0,0,320,320}});
+    std::get_if<Scene3DView>(&half.world.front())->render_scale=.5f;
+    window.draw(half,folder/"render-scale-half.png");
+    const auto scaled_stats=window.scene3d_statistics();
+    const auto bpp=scaled_stats.hdr?16u:8u;
+    check(scaled_stats.target_bytes==160u*160u*bpp,"render_scale did not shrink the render target");
+    check(window.scene3d_target_bytes(half)==scaled_stats.target_bytes,"Target-byte estimator diverged from prepare() accounting");
+    const auto scaled_cap=decode_rgba_image(folder/"render-scale-half.png");
+    check(channel(*scaled_cap,80,160,0)>200&&channel(*scaled_cap,240,160,1)>200,"Scaled 3D viewport did not upscale to fill its destination");
+    check(channel(*scaled_cap,400,160,0)==5,"Scaled 3D viewport escaped its destination rectangle");
+    for(float bad_scale:{.1f,1.5f,std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity()}){
+      DrawList bad;bad.world.emplace_back(Scene3DView{Scene3D::create(camera,{a,b}),{0,0,320,320}});
+      std::get_if<Scene3DView>(&bad.world.front())->render_scale=bad_scale;
+      bool threw=false;try{window.draw(bad,folder/"render-scale-bad.png");}catch(const std::invalid_argument&){threw=true;}
+      check(threw,"render_scale outside [0.25,1] was not rejected");}
+  }
   {
     std::vector<std::uint8_t> pixels(64*64*4);
     for(int y=0;y<64;++y)for(int x=0;x<64;++x){const auto i=(y*64+x)*4;pixels[i]=x<32?255:0;pixels[i+1]=x>=32?255:0;pixels[i+3]=255;}

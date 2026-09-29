@@ -413,6 +413,10 @@ struct Scene3DRenderer::Storage {
     // Per-view policy is resolved once: quality gates expensive sampling
     // (aniso, cubic magnification, emission-volume steps) before uniform
     // fill, and the post/debug uniforms feed the pass below.
+    // Render resolution is the target's — render_scale shrinks it below
+    // the destination extent and composite() upscales linearly.
+    const auto res_w=static_cast<std::uint32_t>(target.width),res_h=static_cast<std::uint32_t>(target.height);
+    const float res_aspect=static_cast<float>(res_w)/static_cast<float>(res_h);
     const auto& opt=view.options;
     const bool low_tier=opt.quality==RenderQuality3D::Low;
     struct Draw {const MeshInstance3D* instance;PreparedInstance3D transform;std::shared_ptr<Geometry> mesh;std::shared_ptr<Texture> image,optical,environment,normal,properties,cloud,shadow,next,emissive,mr;
@@ -428,8 +432,8 @@ struct Scene3DRenderer::Storage {
     // Screen-space LOD uses the same px-per-world-unit convention as the
     // streamer footprint so both agree on which level is submitted.
     const auto& lod_camera=view.scene->camera();
-    const float lod_focal=lod_camera.projection==Projection3D::Orthographic?view.destination.height/std::max(lod_camera.orthographic_height,1e-6f)
-      :view.destination.height/std::max(2.f*std::tan(lod_camera.vertical_fov_radians*.5f),1e-6f);
+    const float lod_focal=lod_camera.projection==Projection3D::Orthographic?static_cast<float>(res_h)/std::max(lod_camera.orthographic_height,1e-6f)
+      :static_cast<float>(res_h)/std::max(2.f*std::tan(lod_camera.vertical_fov_radians*.5f),1e-6f);
     // Group proxy collapse: each named group accumulates the merged
     // view-space bounding sphere of its contributing members (frustum-
     // and range-culled members neither contribute nor collapse). When
@@ -444,7 +448,7 @@ struct Scene3DRenderer::Storage {
     for(const auto& instance:view.scene->instances()){
       if(instance.lod_group.empty()||!instance.lod_group_proxy||instance.lod_group_pixels<=0.f)continue;
       if(instance.material.surface_effect&&instance.material.surface_effect->volume_depth>0.f)continue;
-      const auto prepared=prepare_instance3d(lod_camera,instance,view.destination.width/view.destination.height);
+      const auto prepared=prepare_instance3d(lod_camera,instance,res_aspect);
       if(!prepared.visible)continue;
       const double gx=prepared.model_view.values[12],gy=prepared.model_view.values[13],gz=prepared.model_view.values[14];
       const double radius=static_cast<double>(instance.scale)*instance.mesh->bounding_radius();
@@ -483,7 +487,7 @@ struct Scene3DRenderer::Storage {
         if(const auto it=probe_cache.find(probe_key(view));it!=probe_cache.end())return texture(it->second);
       return view.scene->environment()?texture(view.scene->environment()):nullptr;}();
     for(const auto& instance:view.scene->instances()){
-      auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
+      auto prepared=prepare_instance3d(view.scene->camera(),instance,res_aspect);
       if(!prepared.visible){++stats.culled_instances;continue;}
       // A card mesh is camera-facing: its view-space rotation collapses
       // to uniform scale (position and depth stay) so the impostor always
@@ -494,7 +498,7 @@ struct Scene3DRenderer::Storage {
         if(mesh->billboard()){
           for(int c=0;c<3;++c)for(int r=0;r<3;++r)
             out.model_view.values[c*4+r]=c==r?instance.scale:0.f;
-          out.model_view_projection=multiply(projection3d_matrix(lod_camera,view.destination.width/view.destination.height),out.model_view);
+          out.model_view_projection=multiply(projection3d_matrix(lod_camera,res_aspect),out.model_view);
         }
         return out;};
       std::shared_ptr<const Mesh3D> drawn_mesh=instance.mesh;
@@ -570,7 +574,7 @@ struct Scene3DRenderer::Storage {
           proxy_t.model_view.values[13]=static_cast<float>(g.y);
           proxy_t.model_view.values[14]=static_cast<float>(g.z);
           proxy_t.model_view.values[15]=1.f;
-          proxy_t.model_view_projection=multiply(projection3d_matrix(lod_camera,view.destination.width/view.destination.height),proxy_t.model_view);
+          proxy_t.model_view_projection=multiply(projection3d_matrix(lod_camera,res_aspect),proxy_t.model_view);
           proxy_t.camera_depth=static_cast<float>(-g.z);proxy_t.visible=true;
           draws.push_back({&instance,proxy_t,geometry(proxy_mesh),surface,
             optical?texture(optical->surface):surface,
@@ -1223,7 +1227,6 @@ struct Scene3DRenderer::Storage {
     // dependencies are declared per frame, compile() validates the DAG and
     // emits the execution order, and the backend binds routines by tag.
     engine::RenderGraph graph;
-    const auto res_w=static_cast<std::uint32_t>(view.destination.width),res_h=static_cast<std::uint32_t>(view.destination.height);
     const auto hdr_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"hdr-scene",res_w,res_h,"rgba16f",true});
     const auto color_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"color",res_w,res_h,"rgba8",true});
     const auto depth_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"depth",res_w,res_h,"d32",true});
@@ -1700,16 +1703,21 @@ void Scene3DRenderer::prepare(const DrawList& list){
   std::size_t geometry_bytes=0,texture_bytes=0;
   for(const auto* view:s.views){const auto r=view->destination;
     if(!view->scene||!std::isfinite(r.x)||!std::isfinite(r.y)||std::abs(r.x)>65536||std::abs(r.y)>65536||
-       !std::isfinite(r.width)||!std::isfinite(r.height)||r.width<1||r.height<1||r.width>8192||r.height>8192)
-      throw std::invalid_argument("3D viewport requires a scene and finite bounded dimensions.");
-    total+=static_cast<std::size_t>(std::ceil(r.width))*static_cast<std::size_t>(std::ceil(r.height))*(s.hdr?16u:8u);
+       !std::isfinite(r.width)||!std::isfinite(r.height)||r.width<1||r.height<1||r.width>8192||r.height>8192||
+       !std::isfinite(view->render_scale)||view->render_scale<.25f||view->render_scale>1.f)
+      throw std::invalid_argument("3D viewport requires a scene, finite bounded dimensions and render_scale in [0.25,1].");
+    const auto extent=scene3d_view_target_extent(*view);
+    total+=extent[0]*extent[1]*(s.hdr?16u:8u);
     const auto& cam=view->scene->camera();const auto& camera=cam.position;
     // Projected px per world unit: the sampler only reaches the mip whose
     // texel density matches the on-screen footprint, so the resident tail
     // can start there. Bounding-sphere diameter overestimates surface texel
     // density — the choice errs finer, never blurrier than the full chain.
-    const float focal=cam.projection==Projection3D::Orthographic?r.height/std::max(cam.orthographic_height,1e-6f)
-      :r.height/std::max(2.f*std::tan(cam.vertical_fov_radians*.5f),1e-6f);
+    // render_scale shrinks the actual target: demand follows the rendered
+    // height, not the destination's.
+    const float res_h=static_cast<float>(extent[1]);
+    const float focal=cam.projection==Projection3D::Orthographic?res_h/std::max(cam.orthographic_height,1e-6f)
+      :res_h/std::max(2.f*std::tan(cam.vertical_fov_radians*.5f),1e-6f);
     for(const auto& instance:view->scene->instances()){
       // Distance-culled instances never submit — no residency demand either.
       const auto dx=instance.position.x-camera.x,dy=instance.position.y-camera.y,dz=instance.position.z-camera.z;
@@ -1776,14 +1784,17 @@ void Scene3DRenderer::prepare(const DrawList& list){
   }
   for(const auto& [id,demand]:stream_demand)s.streamer.request(id,demand.second,demand.first);
   s.apply_streaming();
-  if(total>maximum_scene3d_target_bytes)throw std::length_error("3D viewports exceed their 128 MiB target budget.");
+  if(total>maximum_scene3d_target_bytes){
+    std::string detail="3D viewports exceed their 128 MiB target budget ("+std::to_string(total)+" B across "+std::to_string(s.views.size())+" views:";
+    for(const auto* view:s.views){detail+=" "+std::to_string(static_cast<int>(view->destination.width))+"x"+std::to_string(static_cast<int>(view->destination.height))+"@"+std::to_string(view->render_scale);}
+    throw std::length_error(detail+")");}
   if(meshes.size()>maximum_scene3d_resource_entries||textures.size()>maximum_scene3d_resource_entries||geometry_bytes>maximum_mesh3d_cache_bytes||texture_bytes>maximum_scene3d_texture_cache_bytes)
     throw std::length_error("Combined 3D views exceed their resident resource budget.");
   // SDL's GPU renderer keeps its command buffer until present. Flush alone
   // does not submit it: render all independent 3D targets before any 2D work.
   // One target per view prevents an earlier viewport sampling a later view.
   s.targets.resize(s.views.size());
-  for(std::size_t i=0;i<s.views.size();++i){const auto r=s.views[i]->destination;const int w=static_cast<int>(std::ceil(r.width)),h=static_cast<int>(std::ceil(r.height));
+  for(std::size_t i=0;i<s.views.size();++i){const auto e=scene3d_view_target_extent(*s.views[i]);const int w=static_cast<int>(e[0]),h=static_cast<int>(e[1]);
     if(!s.targets[i]||s.targets[i]->width!=w||s.targets[i]->height!=h)s.targets[i]=s.target(w,h);
     s.render(*s.views[i],*s.targets[i]);
   }
@@ -1795,6 +1806,7 @@ void Scene3DRenderer::composite(const Scene3DView& view){
   checked(SDL_RenderTexture(s.renderer,s.targets[s.next_view++]->composite,nullptr,&destination),"3D viewport composition failed");
 }
 void Scene3DRenderer::set_texture_budget(std::uint64_t bytes){auto& s=*storage_;s.require_owner();s.streamer.set_budget(bytes);}
-Scene3DStatistics Scene3DRenderer::statistics()const noexcept{auto result=storage_->stats;result.mesh_cache_entries=storage_->meshes.size();result.texture_cache_entries=storage_->textures.size();result.hdr=storage_->hdr;return result;}
+Scene3DStatistics Scene3DRenderer::statistics()const noexcept{auto result=storage_->stats;result.renderer_active=true;result.mesh_cache_entries=storage_->meshes.size();result.texture_cache_entries=storage_->textures.size();result.hdr=storage_->hdr;return result;}
+std::size_t Scene3DRenderer::bytes_per_pixel()const noexcept{return storage_->hdr?16u:8u;}
 } // namespace stellar::native_map
 

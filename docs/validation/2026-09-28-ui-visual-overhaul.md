@@ -241,12 +241,30 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `engine_world_tests`, and the `accretion-flare` GPU silhouette check
   (flared rim extends past the flat disc's, inner gap stays open) all
   green; full suite re-run recorded in the ledger.
+- Render-scale delivered (fifth and final renderer request):
+  `Scene3DView::render_scale` ([0.25,1], validated in `prepare()`)
+  allocates the view target at `ceil(destination*scale)` while
+  `composite()` upscales the full destination rect with the existing
+  linear filtering. Shared accounting:
+  `scene3d_view_target_extent`/`scene3d_view_target_bytes` +
+  `Window::scene3d_target_bytes` use the device's real bytes-per-pixel;
+  `Scene3DStatistics::renderer_active` fixes the pre-first-3D-draw bpp
+  estimate that under-counted at 8 B/px (root cause of a 2560×1440
+  dev-smoke budget throw). Game gates scale backdrops before the 2D
+  fallback; `scene()` runs a final multiplicative clamp so late
+  developer-panel views cannot push a frame over the cap. Verified:
+  extent/bytes unit tests, half-scale GPU allocation + estimator parity
+  + destination-clip assertions, out-of-range/NaN/inf rejection;
+  `--developer-smoke`, `--system-smoke`, `--battle-smoke` at 2560×1440
+  and `--developer-smoke` at 1920×1080 all green with no budget
+  exception; suite re-run recorded in the ledger.
 
 ## Known limitations
 
-- One renderer request remains filed (`GAME_VISUAL_ENGINE_REQUESTS.md`):
-  Scene3DView render-scale under budget pressure.
-  Delivered so far: nullable `SurfaceEffect3D::next_texture` (validation
+- All five renderer requests are delivered
+  (`GAME_VISUAL_ENGINE_REQUESTS.md` — nothing open on the renderer
+  lane).
+  Delivered: nullable `SurfaceEffect3D::next_texture` (validation
   requires it only when `blend > 0`; the nebula volume's double-bind is
   removed; `native_scene3d_tests` covers both branches), the
   color-blind channel matrix (`RenderOptions3D::color_matrix` — a
@@ -259,7 +277,15 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   (`Material3D::shear_rate`/`shear_ratio` scroll the azimuthal V at
   `rho^(-3/2)`; `fract()` keeps the V-periodic bake seamless under
   clamped sampling; `accretion-shear` GPU test asserts inner-band
-  motion exceeds outer; zero-rate is bit-identical over scene time).
+  motion exceeds outer; zero-rate is bit-identical over scene time),
+  the flared annulus primitive (`flared_annulus_mesh` mirrored curved
+  sheets + `flared_annulus` loader spec; protostar debris and BH
+  discs consume it; geometry/loader/GPU-silhouette tests green), and
+  Scene3DView render-scale (`render_scale` [0.25,1] shrinks the
+  offscreen target, `composite()` upscales linearly; shared
+  extent/bytes accounting incl. the real HDR bpp; backdrop gates
+  scale before the 2D fallback and `scene()` applies a final
+  multiplicative clamp).
   Three core-lane
   projections remain open: fleet composition, interstellar logistics
   route graph, per-action diplomacy blockers.

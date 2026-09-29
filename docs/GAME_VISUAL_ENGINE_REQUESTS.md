@@ -102,39 +102,6 @@ PERFORMANCE CONSTRAINT:
 FALLBACK IF NOT AVAILABLE:
   Disabled slots keep surfacing the authoritative domain status summary.
 
-### REQUEST: Render-scale for Scene3DView targets under budget pressure
-Status:        OPEN
-Requested:    2026-09-28
-WHY NEEDED:
-  The renderer enforces a 128 MiB aggregate cap on 3D render-target
-  memory (`maximum_scene3d_target_bytes`, w*h*16 B per HDR view). The
-  game now gates whole layers on that budget: past ~2560x1440 the
-  fullscreen celestial dome and the local-nebula emission volume drop
-  to their authored 2D paths so content views (planets, globes, hulls)
-  keep their targets. That is an all-or-nothing trade — at cap pressure
-  the sky loses the tangent warp and the cloud loses raymarching even
-  though a half-res 3D target would still look visibly better than the
-  flat composite.
-CURRENT GAME SCREEN:
-  `app/native_client/main.cpp` — `scene_content` stages the system
-  backdrop and picks 3D-vs-2D once the frame's total target bytes are
-  known; the battle environment gates identically at its early return.
-  `native_system_background.hpp` (flat `Image` path) and
-  `native_phenomena.cpp` (`volumetric=false`) carry the 2D sides.
-DESIRED PUBLIC API:
-  A `render_scale` (0.25..1) field on `Scene3DView` that allocates the
-  target at `destination * scale` and upscales on composite — cheaper
-  targets that keep the volumetric/warped shading. Bonus: a
-  `scene3d_target_bytes(const DrawList&)`-equivalent accessor so the
-  game mirrors the engine's real accounting (HDR flag included)
-  instead of assuming 16 B/px worst-case.
-PERFORMANCE CONSTRAINT:
-  Strictly reduces target memory; upscale is one blit pass the
-  compositor already performs per view.
-FALLBACK IF NOT AVAILABLE:
-  The shipped whole-layer gate stays — visuals degrade stepwise but
-  never crash.
-
 ## Delivered
 
 ### REQUEST: Nullable `SurfaceEffect3D::next_texture` for single-texture effects
@@ -216,3 +183,41 @@ malformed-input rejection; `engine_world_tests` loader spec
 resolution; `native_scene3d_gpu_tests` `accretion-flare` asserts the
 flared rim silhouette extends beyond the flat disc's while the inner
 gap stays open (`…_shear_flare_passed`).
+
+### REQUEST: Render-scale for Scene3DView targets under budget pressure
+Status:        DELIVERED
+Requested:    2026-09-28
+Delivered:    2026-09-29 on `game/ui-visual-overhaul` —
+`Scene3DView::render_scale` ([0.25,1], validated in `prepare()`;
+non-finite/out-of-range throws) allocates the per-view target at
+`ceil(destination*scale)` per axis while `composite()` keeps blitting
+the full destination rect, so the existing `SDL_SCALEMODE_LINEAR`
+upscale preserves the volumetric/warped shading at a fraction of the
+memory. Accounting shares one formula end-to-end:
+`scene3d_view_target_extent`/`scene3d_view_target_bytes` in
+`native_map_platform.hpp` drive `prepare()`'s budget charge and
+allocation, and the new `Window::scene3d_target_bytes(DrawList)`
+mirrors it with the device's real bytes-per-pixel
+(`Scene3DRenderer::bytes_per_pixel`, 16 worst-case before the first
+3D draw). `Scene3DStatistics::renderer_active` distinguishes a live
+renderer from the default-constructed stats a window reports before
+its first 3D frame — the game-side bpp mirror gates on it so a
+pre-renderer frame estimates conservatively at 16 B/px instead of
+under-counting at 8 and letting an over-budget list through.
+Streamed-texture mip/LOD demand follows the rendered (scaled)
+resolution; aspect and composite coordinates stay destination-space
+so picking/UI are unchanged. Game gates (`main.cpp`) now try
+`fit_backdrop_within_budget` — scale the backdrop to fit — before the
+authored 2D fallback, and `scene()` runs a final multiplicative
+clamp over every view so late developer-panel views cannot push a
+frame over the cap. Tests: `native_scene3d_tests` extent/bytes
+accounting (default 1, .25/.5/interior, ceil, invalid scales
+estimate as unscaled); `native_scene3d_gpu_tests` — half-scale
+allocates the expected target, the estimator matches
+`statistics().target_bytes` exactly, the upscale fills the
+destination rect and clips at its edge, out-of-range/NaN/inf scales
+throw. End-to-end: `--developer-smoke` 2560×1440 — previously threw
+the 128 MiB budget exception on a 210 MiB six-view frame — now
+completes green with all captures (`scene_render_target_bytes` ≈ 40
+MiB); `--system-smoke` and `--battle-smoke` 2560×1440 and the 1920
+dev smoke all green.

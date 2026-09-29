@@ -710,6 +710,13 @@ int Window::drawable_width()const noexcept{return storage_->width;}int Window::d
 std::size_t Window::text_cache_entries()const noexcept{return storage_->text_cache.size();}std::size_t Window::text_cache_bytes()const noexcept{return storage_->text_cache_bytes;}
 std::size_t Window::image_cache_entries()const noexcept{return storage_->image_cache.size();}std::size_t Window::image_cache_resident_bytes()const noexcept{return storage_->image_cache_resident_bytes;}std::uint64_t Window::image_upload_count()const noexcept{return storage_->image_uploads;}
 Scene3DStatistics Window::scene3d_statistics()const noexcept{return storage_->scene3d?storage_->scene3d->statistics():Scene3DStatistics{};}
+std::size_t Window::scene3d_target_bytes(const DrawList& draw)const noexcept{
+  const std::size_t bytes_per_pixel=storage_->scene3d?storage_->scene3d->bytes_per_pixel():16u;
+  std::size_t total=0;
+  const auto add=[bytes_per_pixel,&total](const Scene3DView& view){total+=scene3d_view_target_bytes(view,bytes_per_pixel);};
+  for(const auto& command:draw.world)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+  for(const auto& command:draw.overlay)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+  return total;}
 void Window::set_scene3d_texture_budget(std::uint64_t bytes){if(storage_->scene3d)storage_->scene3d->set_texture_budget(bytes);}
 } // namespace stellar::native_map
 

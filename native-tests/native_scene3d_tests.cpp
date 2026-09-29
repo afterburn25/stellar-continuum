@@ -38,6 +38,22 @@ int main()try{
   rejects([]{(void)flared_annulus_mesh(1,2,.0f);});
   rejects([]{(void)flared_annulus_mesh(1,2,3.f);});
   rejects([]{(void)flared_annulus_mesh(1,2,.2f,0.f);});
+  // render_scale target accounting: the extent follows the scaled
+  // destination (ceil, one-pixel floor) and invalid scales estimate
+  // conservatively at full resolution.
+  {Scene3DView view;view.destination={0,0,320,200};
+   check(view.render_scale==1.f,"render_scale default is not 1");
+   auto e=scene3d_view_target_extent(view);check(e[0]==320&&e[1]==200,"Unscaled view extent is not the destination size");
+   view.render_scale=.5f;e=scene3d_view_target_extent(view);check(e[0]==160&&e[1]==100,"Half-scale extent did not halve the target");
+   view.destination={0,0,101,77};e=scene3d_view_target_extent(view);check(e[0]==51&&e[1]==39,"Scaled extent did not ceil odd destination sizes");
+   view.destination={0,0,320,200};
+   view.render_scale=.4f;e=scene3d_view_target_extent(view);check(e[0]==128&&e[1]==80,"Scaled extent did not ceil the destination product");
+   view.render_scale=.25f;e=scene3d_view_target_extent(view);check(e[0]==80&&e[1]==50,"Floor-scale extent wrong");
+   view.render_scale=.1f;e=scene3d_view_target_extent(view);check(e[0]==320&&e[1]==200,"Under-floor scale did not estimate as unscaled");
+   view.render_scale=1.5f;e=scene3d_view_target_extent(view);check(e[0]==320&&e[1]==200,"Supersampled scale did not estimate as unscaled");
+   view.render_scale=std::numeric_limits<float>::quiet_NaN();e=scene3d_view_target_extent(view);check(e[0]==320&&e[1]==200,"NaN scale did not estimate as unscaled");
+   view.render_scale=.5f;check(scene3d_view_target_bytes(view,16)==160ull*100ull*16ull,"Scaled view target bytes did not follow the extent");
+   check(scene3d_view_target_bytes(view,8)==160ull*100ull*8ull,"Scaled view target bytes ignored the bytes-per-pixel parameter");}
   const auto solid=directional_solid_mesh([](Vec3 p){return Vec3{p.x*2,p.y*.6f,p.z};},32,16);
   for(const auto& v:solid->vertices()){
     const Vec3 expected{v.position.x/4,v.position.y/.36f,v.position.z};const float norm=std::hypot(expected.x,expected.y,expected.z);

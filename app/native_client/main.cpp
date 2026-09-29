@@ -1334,6 +1334,12 @@ class NativeCampaign final {
   // Last frame's renderer workload for the diagnostics performance view —
   // the host feeds window.scene3d_statistics() after each draw.
   void feed_renderer_stats(const stellar::native_map::Scene3DStatistics &stats){
+    // Refresh the real bytes-per-px for the render-target budget mirror.
+    // Before the renderer exists (no 3D view drawn yet) statistics() is a
+    // default instance — gating on renderer_active keeps the conservative
+    // 16 B/px instead of under-counting at 8 and letting an over-budget
+    // frame through to prepare().
+    if(stats.renderer_active)scene3d_bytes_per_pixel_=stats.hdr?16u:8u;
     if(!developer_diagnostics_.visible())return;
     std::ostringstream out;
     out<<"GPU scene3d: draws "<<stats.draw_calls
@@ -7949,6 +7955,15 @@ class NativeCampaign final {
     planet_discs_.poll();
     small_body_assets_.poll();
     auto out=scene_content(width,height);if(developer_session()){phenomena_debug_.data(phenomena_debug_text());phenomena_debug_.render(out,width,height);if(background_debug_.visible()){const auto id=system_workspace_.system_id().value_or(selected_id_.value_or(session_->frame().runtime().world().campaign().systems.front().id));background_debug_.data(system_background_,id);background_debug_.render(out,width,height,system_background_);}}developer_panel_.render(out,width,height,session_->frame());developer_index_.render(out,width,height,session_->frame());developer_planet_index_.render(out,width,height);giant_test_panel_.render(out,width,height,session_->frame(),[this](const auto& a,int lod){return planet_material_cache_.request(a,lod);});stellar_activity_panel_.render(out,width,height,session_->frame());developer_diagnostics_.render(out,width,height,session_->frame(),developer_monitor_);developer_empires_.render(out,width,height,session_->frame());
+    // Final render-target budget clamp: developer panels and other late
+    // views append after scene_content()'s per-layer gates, so a frame
+    // can still exceed the cap (prepare() would throw). Scale every view
+    // down multiplicatively — the composite upscale keeps all layers
+    // visible — iterating while ceil-rounding or the .25 floor re-checks
+    // the total.
+    for(int pass=0;pass<4&&scene3d_target_bytes(out)>stellar::native_map::maximum_scene3d_target_bytes;++pass){
+      const float fit=static_cast<float>(std::sqrt(static_cast<double>(stellar::native_map::maximum_scene3d_target_bytes)*.98/static_cast<double>(scene3d_target_bytes(out))));
+      apply_render_scale(out,fit);}
     if(developer_session()&&developer_fault_capture_.latched()){
       const float s=std::clamp(static_cast<float>(height)/1080.f,.7f,1.5f);
       const UiRect banner{12.f*s,static_cast<float>(height)-70.f*s,static_cast<float>(width)-24.f*s,58.f*s};
@@ -7962,15 +7977,34 @@ class NativeCampaign final {
       stellar::native_ui::apply_color_blind(out,general_settings_->saved().accessibility.color_blind);
     return out;
   }
-  // Scene3DView render targets cost destination w*h*16 B when the device
-  // supports HDR (always true on the Vulkan path); worst-case keeps the
-  // budget gate conservative on hypothetical non-HDR devices.
-  [[nodiscard]] static std::size_t scene3d_target_bytes(const DrawList& draw){
+  // Scene3DView render targets cost ceil(destination*render_scale)^2*bpp;
+  // the engine-side formula (scene3d_view_target_bytes) is mirrored with
+  // the device's real bytes-per-pixel — refreshed from
+  // window.scene3d_statistics().hdr in feed_renderer_stats, conservative
+  // 16 B/px before the first frame.
+  [[nodiscard]] std::size_t scene3d_target_bytes(const DrawList& draw)const{
     std::size_t bytes=0;
-    const auto add=[&bytes](const Scene3DView& view){bytes+=static_cast<std::size_t>(std::ceil(view.destination.width))*static_cast<std::size_t>(std::ceil(view.destination.height))*16;};
+    const auto add=[&bytes,this](const Scene3DView& view){bytes+=stellar::native_map::scene3d_view_target_bytes(view,scene3d_bytes_per_pixel_);};
     for(const auto& command:draw.world)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
     for(const auto& command:draw.overlay)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
     return bytes;}
+  // Shrink every Scene3DView's offscreen target by `factor` (clamped to
+  // the [0.25,1] contract) — composite() upscales linearly, so the
+  // volumetric/warped shading survives at a fraction of the memory.
+  static void apply_render_scale(DrawList& draw,float factor){
+    const auto visit=[factor](Scene3DView& view){view.render_scale=std::clamp(view.render_scale*factor,.25f,1.f);};
+    for(auto& command:draw.world)if(auto* view=std::get_if<Scene3DView>(&command))visit(*view);
+    for(auto& command:draw.overlay)if(auto* view=std::get_if<Scene3DView>(&command))visit(*view);}
+  // Fit `backdrop` under the renderer's target cap alongside the rest of
+  // the frame by shrinking its view targets; returns false when even a
+  // quarter-scale render cannot fit (whole-layer 2D fallback follows).
+  [[nodiscard]] bool fit_backdrop_within_budget(DrawList& backdrop,std::size_t other_bytes)const{
+    const std::size_t backdrop_bytes=scene3d_target_bytes(backdrop);
+    if(other_bytes+backdrop_bytes<=stellar::native_map::maximum_scene3d_target_bytes)return true;
+    if(backdrop_bytes==0||other_bytes>=stellar::native_map::maximum_scene3d_target_bytes)return false;
+    const float fit=static_cast<float>(std::sqrt(static_cast<double>(stellar::native_map::maximum_scene3d_target_bytes-other_bytes)/static_cast<double>(backdrop_bytes)));
+    apply_render_scale(backdrop,std::min(fit,1.f));
+    return scene3d_target_bytes(backdrop)+other_bytes<=stellar::native_map::maximum_scene3d_target_bytes;}
   [[nodiscard]] DrawList scene_content(int width,int height){
     if(battle_workspace_.visible()&&!menu_){
       DrawList tactical;
@@ -7997,8 +8031,10 @@ class NativeCampaign final {
         if(star!=battle_world.systems.end()){DrawList environment;system_background_.append(environment,sid,width,height,starfield_quality(),starfield_density());phenomena_.append_system(environment,sid,star->position.x,star->position.y,width,height,1.,phenomena_options(sid),true);
           // Same render-target budget gate as the system view: hull viewports
           // plus two fullscreen background layers exceed the cap at large
-          // drawable sizes, so the dome/nebula fall back to their 2D paths.
-          if(scene3d_target_bytes(environment)+scene3d_target_bytes(tactical)>maximum_scene3d_target_bytes){
+          // drawable sizes. Render-scale shrinks the backdrop targets first
+          // so the dome/nebula keep their volumetric shading; only when even
+          // a quarter-scale render cannot fit do the authored 2D paths run.
+          if(!fit_backdrop_within_budget(environment,scene3d_target_bytes(tactical))){
             environment={};
             system_background_.append(environment,sid,width,height,starfield_quality(),starfield_density(),0.f,false);
             phenomena_.append_system(environment,sid,star->position.x,star->position.y,width,height,1.,phenomena_options(sid),true,false);
@@ -8607,9 +8643,11 @@ class NativeCampaign final {
     if(backdrop_sid>=0&&system_background_.ready()&&phenomena_.ready()){
       // Budget gate: every content view has emitted by now — overlay
       // workspaces like the colony globe included. When the staged backdrop
-      // would push the frame past the renderer's target cap, the dome and
-      // local nebula re-emit through their authored 2D paths instead.
-      if(scene3d_target_bytes(system_backdrop)+scene3d_target_bytes(out)>maximum_scene3d_target_bytes){
+      // would push the frame past the renderer's target cap, render-scale
+      // shrinks its view targets first so the dome and local nebula keep
+      // their volumetric/warped shading; the authored 2D paths run only
+      // when even a quarter-scale render cannot fit.
+      if(!fit_backdrop_within_budget(system_backdrop,scene3d_target_bytes(out))){
         system_backdrop={};
         system_background_.append(system_backdrop,backdrop_sid,width,height,starfield_quality(),starfield_density(),0.f,false);
         if(backdrop_star)phenomena_.append_system(system_backdrop,backdrop_sid,backdrop_star->position.x,backdrop_star->position.y,width,height,system_workspace_.viewport()?system_workspace_.viewport()->scale:1.,phenomena_options(backdrop_sid),false,false);
@@ -10261,6 +10299,10 @@ class NativeCampaign final {
   std::vector<native_battle_art::BattleArtBinding> battle_art_bindings_;
   std::vector<native_battle_art::BattleArtSprite> battle_art_plan_;
   bool battle_art_suppressed_{};
+  // Bytes per render-target pixel on the live device (16 HDR / 8 UNORM),
+  // refreshed by feed_renderer_stats; the pre-first-frame worst case keeps
+  // the budget gate conservative.
+  std::size_t scene3d_bytes_per_pixel_{16};
   bool smoke_battle_ship_selected_{};
   SystemTextMeasurer text_measurer_;
   NativeSystemWorkspace system_workspace_;

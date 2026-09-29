@@ -62,6 +62,59 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Scene3DView render-scale under the target budget (2026-09-29)
+
+- **Purpose:** the renderer enforces a 128 MiB aggregate cap on 3D
+  render-target memory, and at ≥2560×1440 a frame carrying several
+  fullscreen views (celestial dome, emission volumes) plus content
+  views blew past it — forcing an all-or-nothing drop to authored 2D
+  layers that discarded volumetric/warped shading entirely. A
+  reduced-resolution target upscaled during composition keeps the
+  shading model at a fraction of the memory.
+- **Modules:** `engine/include/stellar/engine/native_map_platform.hpp`
+  (`Scene3DView::render_scale`, `scene3d_view_target_extent`,
+  `scene3d_view_target_bytes`, `Window::scene3d_target_bytes`),
+  `engine/include/stellar/engine/native_scene3d.hpp`
+  (`Scene3DStatistics::renderer_active`),
+  `engine/src/native_scene3d_gpu.cpp` (validation, scaled allocation,
+  scaled stream/LOD demand),
+  `engine/src/native_map_platform.cpp` (accounting accessor),
+  `app/native_client/main.cpp` (budget gates, final clamp).
+- **Public interface:** `Scene3DView::render_scale` (default 1,
+  [0.25,1], finite — `prepare()` throws otherwise) sizes the
+  offscreen target at `ceil(destination*scale)` per axis, one pixel
+  minimum; `composite()` still blits the full destination rect via
+  the existing `SDL_SCALEMODE_LINEAR` pass. `scene3d_view_target_*`
+  helpers share the accounting formula (`prepare()`'s charge is
+  literally `extent[0]*extent[1]*bpp`); `Window::scene3d_target_bytes`
+  evaluates a whole `DrawList` at the device's real bytes-per-pixel
+  (HDR 16 / UNORM 8, worst-case 16 before the renderer exists).
+  `Scene3DStatistics::renderer_active` marks statistics from a live
+  renderer so pre-first-3D-draw estimates cannot silently halve.
+- **Consumers:** `NativeCampaign` mirrors the accounting via
+  `scene3d_bytes_per_pixel_` (refreshed from `statistics().hdr` only
+  when `renderer_active`); `fit_backdrop_within_budget` scales the
+  system/battle backdrop before the authored-2D fallback, and
+  `scene()` runs a final multiplicative clamp so developer-panel
+  views appended after the gates cannot push a frame over the cap.
+- **Tests:** `native_scene3d_tests` — extent/bytes formula (default,
+  .25/.5/interior, odd-size ceil, invalid scales estimate unscaled);
+  `native_scene3d_gpu_tests` — half-scale allocates the expected
+  target, the estimator equals `statistics().target_bytes`, the
+  upscale fills and clips at the destination rect, out-of-range/
+  NaN/inf scales throw.
+- **Save/performance impact:** none persisted; strictly reduces
+  target memory and rasterization cost (the upscale is the one blit
+  `composite()` already performed); mip/LOD demand follows the
+  rendered resolution.
+- **Limitations:** uniform scale only (aspect preserved);
+  destination-space input/picking unaffected; pathological frames
+  that cannot fit even at .25 still throw (with a byte/view
+  diagnostic) — the per-layer 2D fallback covers reachable cases.
+- **Future reuse:** any view layer under memory or bandwidth
+  pressure can trade resolution for retained 3D shading —
+  picture-in-picture globes, diagnostics panels, low-spec tiers.
+
 ## Flared annulus mesh primitive (2026-09-29)
 
 - **Purpose:** `annulus_mesh` produces a flat coplanar sheet, but

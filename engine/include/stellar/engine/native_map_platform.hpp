@@ -1,5 +1,7 @@
 #pragma once
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -143,7 +145,25 @@ struct Scene3DView { std::shared_ptr<const Scene3D> scene;UiRect destination;Ren
   // loads, the editor preview) pass a stable serial so one logical scene
   // bakes once — bump it when the probe content should refresh. Zero keys
   // the bake to this scene instance (ad-hoc views).
-  std::uint64_t probe_epoch{}; };
+  std::uint64_t probe_epoch{};
+  // Fraction of the destination size the offscreen render target is
+  // allocated at ([0.25,1]; composite upscales linearly). A frame over
+  // the render-target budget can shrink backdrop views and keep their
+  // volumetric/warped shading instead of dropping whole layers to 2D.
+  float render_scale{1.f}; };
+// Effective offscreen-target pixel extent for a view — prepare()
+// allocates ceil(destination*render_scale) per axis (one pixel minimum).
+// prepare() rejects scales outside [0.25,1]; the estimator treats an
+// invalid scale as unscaled so a malformed view is never under-budgeted.
+[[nodiscard]] inline std::array<std::size_t,2> scene3d_view_target_extent(const Scene3DView& view){
+  const float scale=std::isfinite(view.render_scale)&&view.render_scale>=.25f&&view.render_scale<=1.f?view.render_scale:1.f;
+  const auto extent=[scale](float e){return static_cast<std::size_t>(std::max(1,static_cast<int>(std::ceil(e*scale))));};
+  return {extent(view.destination.width),extent(view.destination.height)};}
+// The prepare()-time render-target charge for a view — bytes_per_pixel is
+// 16 on the HDR path, 8 on the UNORM fallback
+// (Window::scene3d_statistics().hdr reports the live device path).
+[[nodiscard]] inline std::size_t scene3d_view_target_bytes(const Scene3DView& view,std::size_t bytes_per_pixel=16){
+  const auto e=scene3d_view_target_extent(view);return e[0]*e[1]*bytes_per_pixel;}
 using WorldCommand=std::variant<Line,Circle,Text,Image,TriangleMesh,Scene3DView>;
 using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image,TriangleMesh,Scene3DView>;
 // A completed scene is immutable at this boundary. Coordinates are drawable
@@ -259,6 +279,12 @@ class Window final {
   [[nodiscard]] std::size_t image_cache_resident_bytes() const noexcept;
   [[nodiscard]] std::uint64_t image_upload_count() const noexcept;
   [[nodiscard]] Scene3DStatistics scene3d_statistics() const noexcept;
+  // Predicts the prepare()-time render-target accounting for a draw list
+  // — scene3d_view_target_bytes per Scene3DView in world + overlay at the
+  // device's real bytes-per-pixel (HDR aware; 16 B/px conservatively
+  // before a renderer exists). Lets hosts gate or rescale views against
+  // maximum_scene3d_target_bytes before submission.
+  [[nodiscard]] std::size_t scene3d_target_bytes(const DrawList& draw) const noexcept;
   // Retunes the 3D texture-streaming byte budget; takes effect next frame.
   void set_scene3d_texture_budget(std::uint64_t bytes);
  private:

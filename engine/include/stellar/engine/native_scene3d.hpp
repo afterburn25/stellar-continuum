@@ -554,6 +554,10 @@ struct PreparedShadow3D { Matrix4 from_model;Vec3 light; };
 // even when both blocker and receiver are at astronomical world coordinates.
 [[nodiscard]] PreparedShadow3D prepare_shadow3d(const Camera3D&,const MeshInstance3D&,Vec3 light);
 struct Scene3DStatistics {
+  // True when a live renderer produced these counters — a window that has
+  // not yet drawn 3D returns a default instance, so callers inferring
+  // device properties (e.g. hdr) must gate on this flag.
+  bool renderer_active{};
   std::uint64_t mesh_uploads{},texture_uploads{},draw_calls{},culled_instances{};
   // Instanced batches submitted this frame — diverges from draw_calls only
   // in counting (they are equal), kept for fleet-scale batching audits.
