@@ -286,6 +286,8 @@ class Window final {
   // maximum_scene3d_target_bytes before submission.
   [[nodiscard]] std::size_t scene3d_target_bytes(const DrawList& draw) const noexcept;
   // Retunes the 3D texture-streaming byte budget; takes effect next frame.
+  // The request persists — a renderer lazily created on the first 3D frame
+  // inherits the last requested budget.
   void set_scene3d_texture_budget(std::uint64_t bytes);
  private:
   struct Storage; Storage *storage_{};

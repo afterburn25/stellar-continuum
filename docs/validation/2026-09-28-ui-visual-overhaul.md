@@ -265,6 +265,17 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   (the scaled volume stays raymarched; the flat-layer smoke assertion
   now accepts a composite only when quarter-scale could not fit);
   suite re-run recorded in the ledger.
+- Quality-settings follow-up: STARFIELD QUALITY now reaches the 3D
+  renderers — `NativeCampaign` pushed `RenderQuality3D` while
+  `video_settings_` was still null and no Apply/Revert path re-pushed
+  it; `sync_scene3d_quality` re-pushes all six consumers whenever the
+  live setting drifts, and the constructor seeds it from the saved
+  tier. `Window::set_scene3d_texture_budget` is now a live consumer
+  (Low 48 / Medium 96 / High+ 192 MiB streamer budget) and persists
+  through the lazily created renderer instead of silently dropping
+  pre-first-3D calls. Verified: `native_scene3d_gpu` pre-renderer
+  budget test, `--video-settings-check` (Apply/preview/Revert/Keep),
+  dev smoke re-run in the ledger.
 
 ## Known limitations
 

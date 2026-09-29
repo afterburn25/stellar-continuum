@@ -197,6 +197,10 @@ struct Window::Storage {
     return -1;
   }
   std::unique_ptr<Scene3DRenderer> scene3d;
+  // The requested 3D texture-streaming budget survives until the renderer is
+  // lazily created on the first 3D frame — the setter is not silently dropped
+  // when hosts retune before any Scene3DView draws.
+  std::uint64_t scene3d_texture_budget{maximum_scene3d_texture_cache_bytes};
   // MemoryTracker VRAM attribution — the 3D backend reports its resident
   // texture/mesh/render-target bytes once a scene3d view draws.
   engine::MemoryTracker::SubsystemId gpu_texture_subsystem{engine::MemoryTracker::invalid_subsystem},
@@ -608,7 +612,9 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
   const auto elapsed_ms=[](const auto started){return std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();};
   const auto submission_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;
   const auto has_3d=[](const auto& commands){return std::any_of(commands.begin(),commands.end(),[](const auto& c){return std::holds_alternative<Scene3DView>(c);});};
-  if(!storage_->scene3d&&(has_3d(draw_list.world)||has_3d(draw_list.overlay)))storage_->scene3d=std::make_unique<Scene3DRenderer>(storage_->device,storage_->renderer);
+  if(!storage_->scene3d&&(has_3d(draw_list.world)||has_3d(draw_list.overlay))){
+    storage_->scene3d=std::make_unique<Scene3DRenderer>(storage_->device,storage_->renderer);
+    storage_->scene3d->set_texture_budget(storage_->scene3d_texture_budget);}
   if(storage_->scene3d){
     storage_->scene3d->prepare(draw_list);
     // VRAM attribution: report the backend's resident texture, mesh and
@@ -717,6 +723,8 @@ std::size_t Window::scene3d_target_bytes(const DrawList& draw)const noexcept{
   for(const auto& command:draw.world)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
   for(const auto& command:draw.overlay)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
   return total;}
-void Window::set_scene3d_texture_budget(std::uint64_t bytes){if(storage_->scene3d)storage_->scene3d->set_texture_budget(bytes);}
+void Window::set_scene3d_texture_budget(std::uint64_t bytes){
+  storage_->scene3d_texture_budget=bytes;
+  if(storage_->scene3d)storage_->scene3d->set_texture_budget(bytes);}
 } // namespace stellar::native_map
 

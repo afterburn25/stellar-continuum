@@ -168,6 +168,17 @@ struct ProfileFrameGuard {
   }
 };
 
+// STARFIELD QUALITY also retunes the 3D texture-streaming budget: lower tiers
+// admit less resident texture data so denied requests degrade to coarser mip
+// tails instead of holding the full 192 MiB cache cap.
+[[nodiscard]] constexpr std::uint64_t scene3d_texture_budget_for(int quality) noexcept {
+  switch(std::clamp(quality,0,3)) {
+    case 0: return 48u*1024u*1024u;
+    case 1: return 96u*1024u*1024u;
+    default: return maximum_scene3d_texture_cache_bytes;
+  }
+}
+
 using namespace stellar::native_construction;
 using namespace stellar::native_construction_ui;
 using namespace stellar::native_diplomacy;
@@ -860,12 +871,8 @@ class NativeCampaign final {
     planet_material_cache_.set_root(asset_root_/"assets/visual");
     const stellar::native_planets::MaterialProvider planet_provider=[this](const stellar::core::PlanetAppearance& a,int width){return planet_material_cache_.request(a,width);};
     system_workspace_.set_planet_materials(planet_provider);
-    system_workspace_.set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
-    fleet_workspace_.set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
-    battle_sprites_.set_render_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
-    colony_workspace_.planetary().globe().set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
-    phenomena_.set_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
-    system_workspace_.set_small_body_scene3d_quality(static_cast<stellar::native_map::RenderQuality3D>(std::clamp(starfield_quality(),0,3)));
+    video_settings_=video_settings;
+    sync_scene3d_quality();
     colony_workspace_.planetary().globe().set_materials(planet_provider);
     system_workspace_.use_background_preparation(image_preparation_);
 
@@ -876,7 +883,6 @@ class NativeCampaign final {
     refresh_fleets(true);
     audio_confirm_=std::move(audio_confirm);
     audio_settings_=audio_settings;
-    video_settings_=video_settings;
     general_settings_=general_settings;
     if(general_settings_){const auto& preferences=general_settings_->saved();assets_.set_preferences({preferences.asset_categories_collapsed,preferences.assets_hidden});
       assets_.set_persist([this](const stellar::native_assets::Preferences& p){auto prefs=general_settings_->saved();prefs.asset_categories_collapsed=p.collapsed;prefs.assets_hidden=p.hidden;return general_settings_->save(prefs);});}
@@ -7948,6 +7954,7 @@ class NativeCampaign final {
     stellar::engine::Profiler::instance().begin_frame();
     const ProfileFrameGuard profile_guard{};
     const auto scene_scope=stellar::engine::Profiler::instance().span("scene","client");
+    sync_scene3d_quality();
     system_background_.poll();
     phenomena_.poll();
     galaxy_assets_.poll();
@@ -10130,6 +10137,20 @@ class NativeCampaign final {
   }
   int starfield_quality()const{return video_settings_?video_settings_->active().starfield_quality:2;}
   int starfield_density()const{return video_settings_?video_settings_->active().starfield_density:1;}
+  // STARFIELD QUALITY feeds the 3D renderers' RenderQuality3D tier. Apply and
+  // preview/rollback change active() without rebuilding this campaign, so the
+  // tier is re-pushed whenever the live value drifts from the last push.
+  void sync_scene3d_quality(){
+    const int tier=std::clamp(starfield_quality(),0,3);
+    if(tier==scene3d_quality_tier_)return;
+    scene3d_quality_tier_=tier;
+    const auto quality=static_cast<stellar::native_map::RenderQuality3D>(tier);
+    system_workspace_.set_scene3d_quality(quality);
+    fleet_workspace_.set_scene3d_quality(quality);
+    battle_sprites_.set_render_quality(quality);
+    colony_workspace_.planetary().globe().set_scene3d_quality(quality);
+    phenomena_.set_scene3d_quality(quality);
+    system_workspace_.set_small_body_scene3d_quality(quality);}
   stellar::native_phenomena::VisualOptions phenomena_options(std::optional<int> system_id={}){
     auto options=developer_session()?phenomena_debug_.options:stellar::native_phenomena::VisualOptions{};
     if(system_id)options.local_nebula=system_background_.catalog.profile(*system_id).local_nebula;
@@ -10482,6 +10503,9 @@ class NativeCampaign final {
   stellar::native_audio::NativeVoiceSettings* voice_settings_{};
   stellar::native_client::NativeAccessibilityBridge* accessibility_bridge_{};
   stellar::native_video_settings::NativeVideoController* video_settings_{};
+  // Last RenderQuality3D tier pushed to the workspaces — sync_scene3d_quality
+  // re-pushes when the live starfield-quality setting drifts (Apply/Revert).
+  int scene3d_quality_tier_{-1};
   stellar::native_audio::NativeAudioSettings* audio_settings_{};
   bool menu_{};int menu_focus_{-1};int map_focus_group_{-1};int hud_focus_{-1};bool smoke_save_pending_{};bool smoke_shortcut_{};Point pointer_{};PointerGesture gesture_; StrategicSpeed pre_menu_speed_{StrategicSpeed::Paused};
   bool smoke_galaxy_mode_{},smoke_galaxy_reload_{},smoke_galaxy_paused_{},smoke_galaxy_wheel_input_{},smoke_galaxy_system_entry_{};
@@ -10626,6 +10650,7 @@ int main(int argc,char **argv){
           value.display==VideoDisplayMode::Exclusive?WindowDisplayMode::ExclusiveFullscreen:
           WindowDisplayMode::Borderless,value.width,value.height,value.refresh_hz);
         window.set_scene_quality(value.scene_resolution_percent,value.scene_samples);
+        window.set_scene3d_texture_budget(scene3d_texture_budget_for(value.starfield_quality));
         window.set_vsync(value.vsync==VideoVsync::Off?0:value.vsync==VideoVsync::On?1:-1);
         if(value.frame_cap==VideoFrameCap::Automatic)window.set_auto_frame_cap();
         else window.set_frame_cap(value.frame_cap==VideoFrameCap::Fps60?60.:value.frame_cap==VideoFrameCap::Fps120?120.:

@@ -62,6 +62,48 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Starfield-quality live propagation + streamer budget (2026-09-29)
+
+- **Purpose:** the STARFIELD QUALITY video setting was wired to the
+  3D renderers in name only — `NativeCampaign` pushed
+  `RenderQuality3D` once in its constructor while `video_settings_`
+  was still null (so the saved tier never applied), and no Apply or
+  Revert path ever re-pushed it. Separately,
+  `Window::set_scene3d_texture_budget` was silently dropped when
+  called before the lazily-created renderer existed, leaving the
+  documented runtime-retune knob unreachable from settings.
+- **Modules:** `app/native_client/main.cpp`
+  (`NativeCampaign::sync_scene3d_quality`,
+  `scene3d_texture_budget_for`),
+  `engine/src/native_map_platform.cpp` (`Storage::scene3d_texture_budget`,
+  persisted into the lazy `Scene3DRenderer`),
+  `engine/include/stellar/engine/native_map_platform.hpp`.
+- **Public interface:** unchanged — `Window::set_scene3d_texture_budget`
+  now persists the request on `Window::Storage` so a renderer created
+  on the first 3D frame inherits the last requested budget;
+  `NativeCampaign` re-pushes `RenderQuality3D` to all six 3D consumers
+  (system/fleet/battle/globe/phenomena/small-body) whenever
+  `video_settings_->active().starfield_quality` drifts from the last
+  pushed tier — Apply, preview and Revert all take effect live.
+- **Consumers:** the video-settings apply callback additionally calls
+  `window.set_scene3d_texture_budget` with
+  `scene3d_texture_budget_for(quality)` — Low 48 MiB, Medium 96 MiB,
+  High/Ultra the full 192 MiB streamer budget — so lower quality tiers
+  shed VRAM residency by degrading to coarser mip tails.
+- **Tests:** `native_scene3d_gpu_tests` — a budget set to zero before
+  the first 3D frame reaches the lazily created renderer (denied bind
+  serves the pinned fallback); existing streaming-pressure cases still
+  pass. `--video-settings-check` smoke exercises Apply/preview/
+  Revert/Keep end-to-end.
+- **Save/performance impact:** settings-only; the persisted
+  `video-settings.json` schema is unchanged (starfield_quality already
+  serialized). Lower tiers trade texture residency for VRAM.
+- **Limitations:** budget changes apply at the next `prepare()`
+  (streamer residency recomputes per frame); tiers above High cannot
+  exceed the hard 192 MiB texture-cache cap.
+- **Future reuse:** a dedicated quality preset or auto-tuner can drive
+  both `render_scale` and the streamer budget through the same knobs.
+
 ## Scene3DView render-scale under the target budget (2026-09-29)
 
 - **Purpose:** the renderer enforces a 128 MiB aggregate cap on 3D
@@ -4857,7 +4899,7 @@ meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
 | 3 | Job/threading system | PARTIAL — FIFO+futures | **ENGINE-COMPLETE + LIVE CONSUMERS** — priorities, cooperative cancellation, dependency graphs, named workers, per-tag stats, error propagation. All app/core/engine `std::async` sites migrated: save-writer (`PlayerCampaignSaveController`), image preparation, audio director, territory overlay, planet-material decode queue (`MaterialCache` — persistent tagged worker replacing a fresh thread per decode; `job_stats()` exposes per-tag counts), support-bundle export, and campaign-session load. Voice synthesis keeps a dedicated COM-initialized thread (SAPI apartment requirement). | `engine/…/foundation.hpp`, `foundation.cpp` | `job_system` |
 | 4 | Render graph | MISSING | **ENGINE-COMPLETE + LIVE CONSUMER** — `RenderGraph`: pass/resource declarations, single-writer validation, dependency+ordering edges, deterministic topological order. `native_scene3d_gpu` declares its per-frame resources (HDR scene target, color, depth) and passes (scene3d, tonemap — disabled without float-target support), compiles the DAG and executes passes in graph order; compile failure aborts the frame. | `engine/…/render_graph.hpp`, `native_scene3d_gpu.cpp` | `render_pipeline`, `native_scene3d_gpu` |
 | 5 | GPU-driven rendering | MISSING | **PARTIAL + LIVE CONSUMER** — `DrawBatcher`: stable opaque (layer,material,mesh) batching, back-to-front transparent sort, culling hooks. `native_scene3d_gpu` interns each draw's full GPU binding key (mesh + all eight bound textures + sampler/pipeline flags) into `material_id`/`mesh_id`, submits `DrawItem`s, and executes the emitted `DrawBatch` runs as instanced `SDL_DrawGPUIndexedPrimitives` calls with `first_instance` indexing SSBO uniform arrays — identical objects merge into one draw call. `SDL_DrawGPUIndexedPrimitivesIndirect` exists in the vendored SDL3, but it only merges batches sharing bound state — per-batch sampler binds mean the real enabler would be a texture-array/bindless surface set, so CPU-submitted draws stay the bound. | `engine/…/draw_batcher.hpp`, `native_scene3d_gpu.cpp` | `batcher_ui`, `native_scene3d_gpu` (instanced-draw + pixel assertions) |
-| 6 | Texture streaming | PARTIAL — bounded LRU caches, sync decode | **ENGINE-COMPLETE + LIVE CONSUMER** — `TextureStreamer`: mip residency, priorities, VRAM budget, pin/evict, per-frame load queue. `native_scene3d_gpu` registers each bound texture with real per-mip bytes (cooked/BC1/RGBA paths), declares the frame's demand with camera-distance priority during `prepare()`, applies the streamer's residency changes by granularity (demotions/promotions re-upload the new resident tail; denials evict), and uploads lazily on re-admission; `Window::set_scene3d_texture_budget` retunes the budget at runtime. **Per-mip partial residency + screen-footprint LOD are live**: requests carry a desired mip derived from the projected bounding-sphere footprint (perspective/ortho focal × mesh radius — the sampler never reaches finer levels, so tails upload only what this frame needs; `anisotropic_texture` materials keep full chains since the flag declares high-frequency content), a denied request degrades to the coarsest mip tail that fits (`streamed_partial_binds` counts tail binds; RGBA tails CPU-box-downsample the base, cooked/BC1 tails upload level ranges), and only a fully denied bind serves the pinned white fallback (`streamed_fallbacks`). Environment/optics/shadow maps inherit the surface footprint estimate — a heuristic, not a per-UV density analysis. | `engine/…/texture_streaming.hpp`, `native_scene3d_gpu.cpp`, `native_map_platform.*` | `render_pipeline`, `native_scene3d_gpu` (budget-pressure eviction + degraded-tail + fallback pixel assertions) |
+| 6 | Texture streaming | PARTIAL — bounded LRU caches, sync decode | **ENGINE-COMPLETE + LIVE CONSUMER** — `TextureStreamer`: mip residency, priorities, VRAM budget, pin/evict, per-frame load queue. `native_scene3d_gpu` registers each bound texture with real per-mip bytes (cooked/BC1/RGBA paths), declares the frame's demand with camera-distance priority during `prepare()`, applies the streamer's residency changes by granularity (demotions/promotions re-upload the new resident tail; denials evict), and uploads lazily on re-admission; `Window::set_scene3d_texture_budget` retunes the budget at runtime — the request persists through the lazily created renderer, and the video STARFIELD QUALITY tier drives it (Low 48 / Medium 96 / High+ 192 MiB). **Per-mip partial residency + screen-footprint LOD are live**: requests carry a desired mip derived from the projected bounding-sphere footprint (perspective/ortho focal × mesh radius — the sampler never reaches finer levels, so tails upload only what this frame needs; `anisotropic_texture` materials keep full chains since the flag declares high-frequency content), a denied request degrades to the coarsest mip tail that fits (`streamed_partial_binds` counts tail binds; RGBA tails CPU-box-downsample the base, cooked/BC1 tails upload level ranges), and only a fully denied bind serves the pinned white fallback (`streamed_fallbacks`). Environment/optics/shadow maps inherit the surface footprint estimate — a heuristic, not a per-UV density analysis. | `engine/…/texture_streaming.hpp`, `native_scene3d_gpu.cpp`, `native_map_platform.*` | `render_pipeline`, `native_scene3d_gpu` (budget-pressure eviction + degraded-tail + fallback pixel assertions) |
 | 7 | Shader library + cache | MISSING — SDL built-ins only | **ENGINE-COMPLETE (management layer)** — `ShaderLibrary`: families, canonical variant keys, artifact hashes, version invalidation, diagnostics. Consumption pending SDL_GPU pipeline. | `engine/…/shader_library.hpp` | `render_pipeline` |
 | 8 | Particle/VFX framework | MISSING — procedural flares | **ENGINE-COMPLETE** — `VfxSystem`: data-driven emitters, deterministic per-instance RNG pools, gravity/integration, LOD rate scaling, curve-driven scale/opacity/tint. RuntimeHost steps it in sim time and renders particles as camera-transformed tinted rects; host.spawn_emitter supports entity attachment with auto-stop on death (generated starter trails embers from its spark). Flare migration pending. | `engine/…/vfx.hpp`, `vfx.cpp` | `render_pipeline` |
 | 9 | Physics layer | MISSING — combat-only grid | **ENGINE-COMPLETE** — `PhysicsWorld`: circle/AABB/segment primitives, broadphase over SpatialGrid, overlap/raycast/sweep, trigger enter/stay/exit events; versioned `capture_state`/`restore_state` round-trips bodies, id counter and the live overlap set (no phantom ENTER on restore) with `framework_state_json` codecs. Consumed by the shell PHYSICS inspector; game-path adoption pending. | `engine/…/physics.hpp`, `physics.cpp` | `spatial_physics`, `framework_persistence`, `framework_state_codec` |

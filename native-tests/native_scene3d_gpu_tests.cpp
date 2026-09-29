@@ -36,6 +36,16 @@ int main(int argc,char** argv)try{
     list.overlay.emplace_back(FilledRectangle{{20,20,30,30},{40,50,240,255}});
     auto path=folder/name;window.draw(list,path);return decode_rgba_image(path);
   };
+  { // A texture budget set before the first 3D frame persists through the
+    // lazily-created renderer instead of being silently dropped — a zero
+    // budget denies the first bind outright (pinned white fallback serves it).
+    window.set_scene3d_texture_budget(0);
+    auto early=a;early.material.tint={255,255,255,255};
+    early.material.texture=RgbaImage::create(2,2,{255,0,0,255,0,255,0,255,0,0,255,255,255,255,255,255});
+    (void)capture({early},"budget-pre-renderer.png");
+    check(window.scene3d_statistics().streamed_fallbacks>0,"Pre-renderer texture budget did not reach the lazily created renderer");
+    window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
+  }
   const auto first=capture({a,b},"depth-forward.png"),second=capture({b,a},"depth-reverse.png");
   check(first->pixels()==second->pixels(),"3D occlusion depends on triangle submission order");
   const auto channel=[](const RgbaImage& p,int x,int y,int c){return p.pixels()[(static_cast<std::size_t>(y)*p.width()+x)*4+c];};

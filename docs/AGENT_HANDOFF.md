@@ -569,7 +569,10 @@ asserts one instanced call renders two objects correctly), `DrawBatcher`
 owns submission ordering/batching (full GPU binding key interned into
 material_id), `RenderGraph` schedules the scene→tonemap pass chain per
 frame, and `TextureStreamer` owns texture residency under a runtime-tunable
-byte budget (`Window::set_scene3d_texture_budget`) with pinned-fallback
+byte budget (`Window::set_scene3d_texture_budget` — the request persists
+through the lazily created renderer; the video STARFIELD QUALITY tier
+drives it at 48/96/192 MiB and live-pushes `RenderQuality3D` to all 3D
+consumers via `NativeCampaign::sync_scene3d_quality`) with pinned-fallback
 pop-in on denied binds (`Scene3DStatistics::streamed_fallbacks`,
 `streamed_evicted_bytes`, `Window::set_scene3d_texture_budget`), per-mip
 partial residency (denied requests degrade to the coarsest fitting mip
