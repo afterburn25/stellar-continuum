@@ -319,7 +319,7 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
         debris.position={screen.x-field.x-field.width*.5f,field.height*.5f-(screen.y-field.y),-20000.f};
         debris.rotation=compose_rotation(rotation_axis_angle({1.f,0.f,0.f},incline),rotation_axis_angle({0.f,1.f,0.f},debris_spin));
         debris.scale=radius*2.6f;
-        debris.material=accretion_disc_material3d(.34f,1.f,1500.,.1f,.12f,2,.5f);
+        debris.material=accretion_disc_material3d(.34f,1.f,1500.,.1f,.12f,2,.5f,.12f);
         debris.material.orbital_beaming_tint=.12f;
         star_instances.push_back(std::move(debris));}}
     else if(cls==StellarClass::BlackHole){
@@ -342,8 +342,8 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
       const float spin=static_cast<float>(std::fmod(visual_seconds_*(active?.32:.16),std::numbers::pi*2.));
       ring.rotation=compose_rotation(rotation_axis_angle({1.f,0.f,0.f},1.22f),rotation_axis_angle({0.f,1.f,0.f},spin));
       ring.scale=radius*2.1f;
-      ring.material=active?accretion_disc_material3d(.34f,1.f,9800.,.7f,.5f,2,.9f)
-                         :accretion_disc_material3d(.34f,1.f,5400.,.45f,.25f,2,.9f);
+      ring.material=active?accretion_disc_material3d(.34f,1.f,9800.,.7f,.5f,2,.9f,.8f)
+                         :accretion_disc_material3d(.34f,1.f,5400.,.45f,.25f,2,.9f,.4f);
       ring.material.orbital_beaming_tint=active?.45f:.3f;
       star_instances.push_back(std::move(ring));}
     if(physics&&physics->jet_half_angle_radians>0){

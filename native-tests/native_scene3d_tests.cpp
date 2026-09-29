@@ -160,6 +160,14 @@ int main()try{
   rejects([&]{auto i=instance;i.material.band_diff=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.band_diff=2.f;const auto diffed=Scene3D::create(camera,{i});
    check(close(diffed->instances()[0].material.band_diff,2.f),"Band differential did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.shear_rate=9.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.shear_rate=-9.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.shear_rate=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.shear_ratio=.9f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.shear_ratio=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.shear_rate=.8f;i.material.shear_ratio=3.f;const auto sheared=Scene3D::create(camera,{i});
+   check(close(sheared->instances()[0].material.shear_rate,.8f)&&close(sheared->instances()[0].material.shear_ratio,3.f),
+       "Accretion shear did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.orbital_beaming=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=-1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});

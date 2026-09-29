@@ -10,6 +10,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <numbers>
 #include <set>
 #include <stdexcept>
 #include <thread>
@@ -671,7 +672,11 @@ struct Scene3DRenderer::Storage {
       // flow rate advances the filament phase — both scaled by the
       // view's scene time on debug_mode.y.
       fragment.anim_options={material.band_drift,material.surface_effect?material.surface_effect->flow_rate:0.f,material.band_turbulence,material.limb_darkening_q};
-      fragment.drift_options[0]=material.band_diff;
+      fragment.drift_options={material.band_diff,
+        // Azimuthal shear as turns/s at the inner edge (rad/s ÷ 2π);
+        // the shader scales it by rho^-3/2 and folds it into V.
+        material.shear_rate*(.5f/std::numbers::pi_v<float>),
+        material.shear_ratio,0.f};
       if(material.shadow){const auto& s=*material.shadow;
         fragment.shadow_light={shadow.light.x,shadow.light.y,shadow.light.z,s.shape==AnalyticShadowShape3D::Ellipsoid?1.f:2.f};
         fragment.shadow_radii={s.radii.x,s.radii.y,s.radii.z,0};

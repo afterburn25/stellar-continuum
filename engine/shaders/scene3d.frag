@@ -58,7 +58,7 @@ struct Material {
     vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
     vec4 atmo_sunset; // terminator-transmitted tint rgb, blend strength
     vec4 env_flags; // x: bound environment map is RGBM-encoded HDR
-    vec4 drift_options; // x: latitude-differential drift fraction
+    vec4 drift_options; // x: latitude-differential drift fraction, y: azimuthal shear turns/s at inner edge, z: outer/inner radius
     vec4 scatter_options; // x: HG secondary-lobe asymmetry, y: secondary-lobe weight, z: three-term limb coefficient, w: doppler beaming tint
     vec4 wave_options; // x: Rayleigh wavelength weight for the HG phase lobes
 };
@@ -403,6 +403,16 @@ void main() {
     if(material.anim_options.x!=0.0){
         float lat_term=cos(PI*(texture_uv.y-0.5));
         uv.x+=view_params.debug_mode.y*material.anim_options.x*(1.0+material.drift_options.x*lat_term*lat_term);
+    }
+    // Keplerian shear for annular flows (annulus_mesh: radial U,
+    // azimuthal V): the azimuth scroll falls off as rho^-3/2 in
+    // inner-edge radii, so the hot inner rim laps the cool outer edge
+    // instead of the baked spiral spinning rigidly. The disc bake is
+    // V-periodic (integral arm count), so fract keeps the wrap seamless
+    // under the clamped surface sampler.
+    if(material.drift_options.y!=0.0){
+        float rho=1.0+(material.drift_options.z-1.0)*texture_uv.x;
+        uv.y=fract(uv.y+view_params.debug_mode.y*material.drift_options.y*pow(rho,-1.5));
     }
     // Evaluate derivatives before per-pixel alpha rejection; annulus horizon
     // rejection above is arithmetic so neighbouring fragments remain coherent.

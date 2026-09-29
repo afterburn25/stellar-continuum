@@ -217,7 +217,8 @@ std::shared_ptr<const RgbaImage> spherical_material_thumbnail(const SphericalMat
  }return RgbaImage::create(size,size,std::move(p));
 }
 Material3D accretion_disc_material3d(float inner,float outer,double kelvin,float beaming,
-                                     float spiral,int spiral_arms,float spiral_turns){
+                                     float spiral,int spiral_arms,float spiral_turns,
+                                     float shear_rate){
  if(!std::isfinite(inner)||!std::isfinite(outer)||inner<=0.f||outer<=inner)
   throw std::invalid_argument("Accretion disc radii must satisfy 0<inner<outer.");
  if(!std::isfinite(kelvin)||kelvin<100||kelvin>100000)
@@ -232,6 +233,8 @@ Material3D accretion_disc_material3d(float inner,float outer,double kelvin,float
   throw std::invalid_argument("Accretion disc spiral arms must be in [1,4].");
  if(spiral>0.f&&(!std::isfinite(spiral_turns)||std::abs(spiral_turns)>4.f))
   throw std::invalid_argument("Accretion disc spiral turns must be in [-4,4].");
+ if(!std::isfinite(shear_rate)||std::abs(shear_rate)>8.f)
+  throw std::invalid_argument("Accretion disc shear rate must be in [-8,8].");
  // Radial column: Shakura–Sunyaev thin-disc T ∝ r^(-3/4); emitted flux
  // ∝ T^4 dims the outer rim while the blackbody curve shifts its hue.
  // linear_light decodes texels as sRGB, so encode gamma here.
@@ -271,6 +274,8 @@ Material3D accretion_disc_material3d(float inner,float outer,double kelvin,float
  m.double_sided=true;         // the sheet reads from below the plane too
  m.orbital_beaming=beaming;
  m.anisotropic_texture=true;  // radial streaks minify to arcs
+ m.shear_rate=shear_rate;
+ m.shear_ratio=outer/inner;
  return m;
 }
 }

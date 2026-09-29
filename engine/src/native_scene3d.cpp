@@ -86,6 +86,7 @@ void validate_instance(const MeshInstance3D& i){
      !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0||!bounded(m.limb_darkening_q,1)||m.limb_darkening_q<0||!bounded(m.limb_darkening_mid,1)||m.limb_darkening_mid<0||
      !bounded(m.band_shear,.5f)||!bounded(m.band_waves,1.f)||m.band_waves<0||
      !bounded(m.band_drift,.25f)||!bounded(m.band_turbulence,8.f)||!bounded(m.band_diff,8.f)||
+     !bounded(m.shear_rate,8.f)||!bounded(m.shear_ratio,1024.f)||m.shear_ratio<1.f||
      !bounded(m.orbital_beaming,1.f)||!bounded(m.orbital_beaming_tint,1.f)||m.orbital_beaming_tint<0||
      !bounded(m.forward_scatter,1.f)||
      !bounded(m.forward_scatter_back,1.f)||

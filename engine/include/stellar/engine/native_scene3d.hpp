@@ -291,6 +291,17 @@ struct Material3D {
   // polar rate. Fraction of drift, [-8,8]; 0 scrolls all latitudes
   // uniformly. No effect without band_drift.
   float band_diff{};
+  // Differential (Keplerian) shear for annular flows: scrolls the
+  // azimuthal V coordinate by rate·t·rho^(-3/2) turns/second where
+  // rho = 1 + (shear_ratio-1)·u is the radius in inner-edge units, so
+  // the inner rim laps the outer edge instead of the baked pattern
+  // spinning rigidly. rad/s at the inner edge, [-8,8]; 0 freezes.
+  // shear_ratio carries the annulus's outer/inner radius, [1,1024]
+  // (1 = uniform scroll, equivalent to rigid rotation). Only
+  // meaningful on meshes with radial U / azimuthal V, e.g.
+  // annulus_mesh; the surface texture must be V-periodic.
+  float shear_rate{};
+  float shear_ratio{1.f};
   // Orbital beaming: material orbiting local +Y gains a first-order
   // doppler asymmetry — radiance scales by 1 + s·(v̂·V̂), so the
   // approaching lane brightens while the receding lane dims. Face-on
@@ -373,10 +384,13 @@ struct Material3D {
 // spiral (trailing positive). Arm crests read slightly hotter and
 // brighter, troughs cooler — the azimuth wrap stays seamless because
 // the arm count is integral. 0 keeps the uniform one-row texture.
+// `shear_rate` [-8,8] rad/s at the inner edge adds Keplerian
+// differential rotation — azimuth scrolls as (r/inner)^(-3/2) so the
+// hot rim laps the cool edge over scene time; 0 keeps the rigid bake.
 [[nodiscard]] Material3D accretion_disc_material3d(
     float inner_radius, float outer_radius, double kelvin,
     float beaming = .85f, float spiral = 0.f, int spiral_arms = 2,
-    float spiral_turns = .75f);
+    float spiral_turns = .75f, float shear_rate = 0.f);
 struct MeshInstance3D {
   std::shared_ptr<const Mesh3D> mesh;
   Position3 position;

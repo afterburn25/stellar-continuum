@@ -235,19 +235,24 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
 
 ## Known limitations
 
-- Three renderer requests remain filed (`GAME_VISUAL_ENGINE_REQUESTS.md`):
-  flared/non-coplanar annulus geometry, time-evolved differential
-  accretion shear, and Scene3DView render-scale under budget pressure.
+- Two renderer requests remain filed (`GAME_VISUAL_ENGINE_REQUESTS.md`):
+  flared/non-coplanar annulus geometry and Scene3DView render-scale
+  under budget pressure.
   Delivered so far: nullable `SurfaceEffect3D::next_texture` (validation
   requires it only when `blend > 0`; the nebula volume's double-bind is
-  removed; `native_scene3d_tests` covers both branches) and the
+  removed; `native_scene3d_tests` covers both branches), the
   color-blind channel matrix (`RenderOptions3D::color_matrix` — a
   column-major 3×3 post-tonemap remap gated on non-identity finite
   values, `PostUniform` a..e/80 B, applied in `tonemap.frag`;
   `apply_color_blind` composes its identical linear map onto every
   `Scene3DView`; `post_gpu` channel-swap + settings-view assertions
   green; `--system-smoke` under `colorBlind:2` remapped 82% of lit
-  3D-region pixels vs baseline). Three core-lane
+  3D-region pixels vs baseline), and Keplerian accretion shear
+  (`Material3D::shear_rate`/`shear_ratio` scroll the azimuthal V at
+  `rho^(-3/2)`; `fract()` keeps the V-periodic bake seamless under
+  clamped sampling; `accretion-shear` GPU test asserts inner-band
+  motion exceeds outer; zero-rate is bit-identical over scene time).
+  Three core-lane
   projections remain open: fleet composition, interstellar logistics
   route graph, per-action diplomacy blockers.
 - `irregular_rock_mesh`/`card:` spec docs are uncommitted in the

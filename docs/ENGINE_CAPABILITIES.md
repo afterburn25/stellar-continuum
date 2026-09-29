@@ -62,6 +62,41 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Material3D Keplerian accretion shear (2026-09-28)
+
+- **Purpose:** accretion discs rotated their baked spiral texture
+  rigidly — inner and outer rims orbited at the same angular rate,
+  physically wrong for a Keplerian flow. A differential shear term
+  scrolls the azimuthal texture coordinate at `rho^(-3/2)` so the hot
+  inner rim laps the cool outer edge.
+- **Modules:** `engine/include/stellar/engine/native_scene3d.hpp`
+  (`Material3D::shear_rate`/`shear_ratio`, `accretion_disc_material3d`
+  parameter), `engine/src/native_scene3d.cpp` (validation),
+  `engine/src/native_scene3d_gpu.cpp` (`drift_options.y/z` fill),
+  `engine/shaders/scene3d.frag` (azimuth scroll),
+  `engine/src/spherical_material_preparation.cpp` (factory).
+- **Public interface:** `shear_rate` is rad/s at the inner edge
+  ([-8,8], signed for retrograde); `shear_ratio` is the annulus's
+  outer/inner radius ([1,1024], 1 = uniform scroll). The shader adds
+  `t·rate·rho^(-3/2)` to V with `rho = 1+(ratio-1)·u`; the disc bake
+  is V-periodic (integral arm count) so `fract()` keeps the wrap
+  seamless under clamped sampling. `accretion_disc_material3d`
+  accepts a trailing `shear_rate` and derives `shear_ratio` itself.
+- **Consumers:** `native_system_workspace.cpp` — BH annulus `.8`
+  active / `.4` quiescent, protostar debris `.12`, all layered on the
+  authored rigid spins (the doppler lane is unaffected either way).
+- **Tests:** `native_scene3d_tests` validation (rate/ratio bounds,
+  NaN, round-trip); `native_scene3d_gpu_tests` — sheared t0/t4 frames
+  diverge with the inner-rim band changing more than the outer, and a
+  zero-rate disc is bit-identical across scene time.
+- **Save/performance impact:** none persisted; one gated
+  `pow`+`fract` per fragment on sheared materials only; freezes on
+  pause via the shared `options.time` clock.
+- **Limitations:** the ECS `AccretionDisc` component does not expose
+  `shear_rate` — entity-document schema work if an author needs it.
+  The `options.time` 512 s wrap produces a sub-frame snap in the
+  scrolled phase (same convention as every animated term).
+
 ## RenderOptions3D post-tonemap color matrix (2026-09-28)
 
 - **Purpose:** the color-blind accessibility modes remap every CPU-drawn

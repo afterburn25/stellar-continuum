@@ -127,33 +127,6 @@ FALLBACK IF NOT AVAILABLE:
   The flat annulus with deterministic per-system inclination stays —
   readable and physically motivated, just geometrically thin.
 
-### REQUEST: Time-evolved accretion shear (differential spiral advance)
-Status:        OPEN
-Requested:    2026-09-28
-WHY NEEDED:
-  Accretion disc spiral density waves are a static bake; the game
-  rotates the whole instance on `visual_seconds_`, which keeps the
-  doppler lane view-fixed but spins the arm pattern rigidly — inner
-  and outer edges orbit at the same angular rate, physically wrong for
-  a Keplerian flow (inner edge should lap the outer several times over).
-CURRENT GAME SCREEN:
-  `app/native_client/native_system_workspace.cpp` — black-hole annulus
-  (active `.32`, quiescent `.16` rad/s) and the protostar debris disc
-  (`.07` rad/s) compose the spin into the tilt.
-DESIRED PUBLIC API:
-  A `band_drift`-style time term on the disc material that advects the
-  spiral phase differentially with radius (e.g. `shear_rate` —
-  rad/s at unit radius, evaluated as `phase + t·shear_rate/r^1.5`),
-  preserving the authored bake as the t=0 shape.
-PERFORMANCE CONSTRAINT:
-  One extra multiply in the existing disc shader; zero CPU cost, no
-  new textures; freezes on pause with `options.time` like every
-  animated term.
-FALLBACK IF NOT AVAILABLE:
-  Rigid instance spin stays — it already animates the arms without
-  disturbing the doppler lane; the shear would only add inner-edge
-  differential motion.
-
 ### REQUEST: Render-scale for Scene3DView targets under budget pressure
 Status:        OPEN
 Requested:    2026-09-28
@@ -225,3 +198,23 @@ real shader; `native_general_settings_tests` asserts the pass sets a
 non-identity matrix on a view and that `None` leaves it identity.
 End-to-end: `--system-smoke` under `colorBlind:2` remapped 82% of lit
 3D-region pixels vs the `colorBlind:0` baseline capture.
+
+### REQUEST: Time-evolved accretion shear (differential spiral advance)
+Status:        DELIVERED
+Requested:    2026-09-28
+Delivered:    2026-09-28 on `game/ui-visual-overhaul` —
+`Material3D::shear_rate` (rad/s at the inner edge, [-8,8]) +
+`shear_ratio` (outer/inner, [1,1024]) scroll the azimuthal V
+coordinate by `rate·t·rho^(-3/2)` in `scene3d.frag`, packed through
+`drift_options.y` (turns/s at inner edge) and `.z` (ratio). The disc
+bake is V-periodic so `fract()` keeps the wrap seamless under the
+clamped surface sampler; zero rate is bit-identical.
+`accretion_disc_material3d` takes a trailing `shear_rate` parameter
+and fills `shear_ratio` from its radii. Consumers:
+`native_system_workspace.cpp` — black-hole annulus `.8` active /
+`.4` quiescent, protostar debris `.12` (sub-Keplerian crawl), each
+layered on the existing rigid spins. Tests: `native_scene3d_tests`
+validation (rate/ratio bounds + NaN + round-trip);
+`native_scene3d_gpu_tests` — `accretion-shear-t0/t4` diverge with the
+inner-rim band changing more than the outer, and a zero-shear disc is
+bit-identical at t=0 vs t=4 (`…_shear_passed`).

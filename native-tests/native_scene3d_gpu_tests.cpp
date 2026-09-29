@@ -1668,7 +1668,33 @@ int main(int argc,char** argv)try{
     }
     check(crest>400&&trough>400,
         "Spiral arms produced no azimuthal crest/trough modulation");
-    std::cout<<"accretion_disc_gpu=radial_beaming_spiral_passed\n";
+    // Differential shear: scene time scrolls the azimuth at rho^-3/2 in
+    // inner-edge radii, so the inner rim laps the outer edge — the
+    // sheared frame must diverge over time, most strongly near the inner
+    // rim, while a zero-rate material stays frozen at any time.
+    MeshInstance3D shearing{annulus_mesh(.45f,1.f,192),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000,0.f,.7f,2,.9f,.8f)};
+    shearing.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto timed_disc=[&](const MeshInstance3D& i,float t,const char* name){
+        DrawList list;RenderOptions3D o;o.time=t;
+        list.world.emplace_back(Scene3DView{Scene3D::create(camera,{i}),{0,0,320,320},o});
+        list.overlay.emplace_back(FilledRectangle{{20,20,30,30},{40,50,240,255}});
+        window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto shear_t0=timed_disc(shearing,0.f,"accretion-shear-t0.png");
+    const auto shear_t4=timed_disc(shearing,4.f,"accretion-shear-t4.png");
+    const auto still_t4=timed_disc(arms,4.f,"accretion-shear-off.png");
+    check(still_t4->pixels()==arms_cap->pixels(),
+        "Static disc moved under scene time without shear");
+    int inner_px=0,outer_px=0;
+    for(int x=40;x<280;++x){
+        for(int y=118;y<138;++y)  // inner rim band
+          if(std::abs(channel(*shear_t0,x,y,0)-channel(*shear_t4,x,y,0))>8)++inner_px;
+        for(int y=52;y<78;++y)    // outer rim band
+          if(std::abs(channel(*shear_t0,x,y,0)-channel(*shear_t4,x,y,0))>8)++outer_px;
+    }
+    check(inner_px>200,"Accretion shear did not advect the inner rim");
+    check(inner_px>outer_px,"Accretion shear was not differential by radius");
+    std::cout<<"accretion_disc_gpu=radial_beaming_spiral_shear_passed\n";
   }
   {
     // Henyey-Greenstein phase: the same ring sheet brightens when
