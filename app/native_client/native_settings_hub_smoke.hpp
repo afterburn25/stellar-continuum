@@ -147,6 +147,49 @@ void check_controls_settings(NativeSettingsHub& hub,
               rebound.front().code == static_cast<int>(probe),
           "Rebind did not install the probe as the row's primary binding.");
 
+  // Every button-row trigger kind captures through the same path:
+  // right-click lands a MouseButton:3 primary, a pad button press lands
+  // GamepadButton — both verified in-mapper.
+  click(first);
+  require(hub.capturing());
+  const Point row_center{first.x + first.width * .5f,
+                         first.y + first.height * .5f};
+  route({InputEventType::RightPressed, row_center});
+  route({InputEventType::RightReleased, row_center});
+  const auto mouse_bound = mapper.bindings(rows[0]);
+  require(!mouse_bound.empty() &&
+              mouse_bound.front().kind ==
+                  stellar::engine::RawInputEvent::Kind::MouseButton &&
+              mouse_bound.front().code == 3,
+          "Right-click did not capture as a MouseButton binding.");
+  click(first);
+  require(hub.capturing());
+  {
+    InputEvent pad_press{};
+    pad_press.type = InputEventType::GamepadPressed;
+    pad_press.gamepad_button = 13; // unbound in the shipped maps
+    route(pad_press);
+  }
+  const auto pad_bound = mapper.bindings(rows[0]);
+  require(!pad_bound.empty() &&
+              pad_bound.front().kind ==
+                  stellar::engine::RawInputEvent::Kind::GamepadButton &&
+              pad_bound.front().code == 13,
+          "A pad button press did not capture as a GamepadButton binding.");
+
+  // Left-click and pointer loss both disarm without touching bindings —
+  // pointer loss matches the codebase's cancel-pending convention.
+  click(first);
+  require(hub.capturing());
+  route({InputEventType::LeftPressed, {1.f, 1.f}});
+  route({InputEventType::LeftReleased, {1.f, 1.f}});
+  require(!hub.capturing(), "Left-click did not cancel an armed capture.");
+  click(first);
+  require(hub.capturing());
+  route({InputEventType::PointerCancelled});
+  require(!hub.capturing(),
+          "Pointer loss did not disarm an armed rebind capture.");
+
   // Steal: capture row 0 again and press a key bound to a sibling — the
   // sibling must lose it and the hub must surface the steal notice.
   int victim_row = -1, victim_code = 0;
@@ -159,6 +202,7 @@ void check_controls_settings(NativeSettingsHub& hub,
       }
   bool stole = false;
   bool noticed = false;
+  const bool all_triggers = true; // reaching here means every leg above passed
   std::optional<std::string> steal_notice;
   if (victim_row >= 0) {
     click(first);
@@ -259,6 +303,23 @@ void check_controls_settings(NativeSettingsHub& hub,
       require(device_of() == 1, "D did not advance the pin to pad 2.");
       for (int step = 0; step < 3; ++step) key('d');
       require(device_of() < 0, "Pin cycle did not wrap back to any pad.");
+      // Axis rows swallow discrete keys (a bound key produces no axis
+      // output) and accept the wheel as an axis trigger — both verified
+      // live through the same armed capture.
+      click(*tail_rect);
+      require(hub.capturing());
+      const auto pre_wheel = mapper.bindings(tail_name);
+      key('x');
+      require(hub.capturing() &&
+                  same_bindings(mapper.bindings(tail_name), pre_wheel),
+              "A discrete key leaked into axis capture instead of being "
+              "swallowed.");
+      route(wheel);
+      const auto wheel_bound = mapper.bindings(tail_name);
+      require(!wheel_bound.empty() &&
+                  wheel_bound.front().kind ==
+                      stellar::engine::RawInputEvent::Kind::MouseWheel,
+              "A wheel scroll did not capture on the axis row.");
       // Axis steal: recapture the row with an axis a sibling already owns.
       int victim_axis_row = -1, victim_axis = 0;
       for (std::size_t i = 0; i < rows.size() &&
@@ -339,6 +400,7 @@ void check_controls_settings(NativeSettingsHub& hub,
             << ",\"axis_captured\":" << (scrolled ? "true" : "false")
             << ",\"pinned\":" << (scrolled ? "true" : "false")
             << ",\"noticed\":" << (noticed ? "true" : "false")
+            << ",\"triggers\":" << (all_triggers ? "true" : "false")
             << ",\"stole\":" << (stole ? "true" : "false")
             << ",\"file_preexisted\":" << (file_preexisted ? "true" : "false")
             << ",\"restored\":true}\n";

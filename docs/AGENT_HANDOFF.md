@@ -1492,7 +1492,11 @@ in-campaign path. The notices are observable too: `update` drains
 `take_notice()` into `AccessibilityAnnouncer` as Status items pending
 until `scene()`'s caption pass, so the check peeks
 `NativeCampaign::announcer().latest()` and asserts the steal and pin
-announcements land.
+announcements land. Every trigger kind is covered live — right-click
+(MouseButton:3), `GamepadPressed`, wheel-on-axis, the discrete-key
+swallow, left-click cancel — and that sweep caught pointer loss leaving
+an armed capture active; `PointerCancelled` now disarms like every
+other surface's cancel-pending convention.
 Multi-pad is plumbed end-to-end: the platform opens up to four pads into
 stable slots, `InputEvent.gamepad_device`/`RawInputEvent.device` carry
 the slot, and `InputBinding.device` pins a binding to one pad via the

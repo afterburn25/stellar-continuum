@@ -342,9 +342,19 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `take_notice()` into `AccessibilityAnnouncer` as Status items that
   stay pending until `scene()`'s caption pass, so the check asserts a
   non-empty announcement follows the steal and a *different* one
-  follows each pin step (content stays locale-agnostic). Pad-axis
-  capture, device pinning, and the a11y notice path are now exercised
-  end-to-end, not just unit-tested.
+  follows each pin step (content stays locale-agnostic). The remaining
+  trigger kinds are covered too: right-click lands MouseButton:3, a
+  `GamepadPressed` event lands GamepadButton, left-click disarms
+  without touching bindings, a wheel scroll captures on an armed axis
+  row, and a discrete keypress on an axis row is swallowed while
+  capture stays armed. That sweep caught a real defect: an armed
+  capture survived `PointerCancelled` (window focus loss), so the next
+  keypress after refocus would be eaten by a stale capture — pointer
+  loss now disarms, matching every other surface's cancel-pending
+  convention (pinned in `native_startup_workspace` and live-verified).
+  Pad-axis capture, device pinning, the a11y notice path, and every
+  capture/cancel trigger kind are now exercised end-to-end, not just
+  unit-tested.
 
 ## Known limitations
 

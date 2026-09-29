@@ -359,6 +359,13 @@ void menu_hover_feedback(){
     InputEvent scroll{};scroll.type=InputEventType::Wheel;scroll.wheel_y=1.f;
     require(hub.handle(scroll,w,h)&&mapper.bindings("map_zoom")[0].kind==stellar::engine::RawInputEvent::Kind::MouseWheel,
             "wheel scroll did not capture on an axis row");
+    // Pointer loss disarms an armed capture — the cancel-pending
+    // convention every other surface already follows.
+    require(key(kReturn)&&hub.capturing(),"axis recapture did not arm for the pointer-loss check");
+    require(hub.handle({InputEventType::PointerCancelled},w,h),"pointer loss was not consumed");
+    require(!hub.capturing(),"pointer loss left the rebind capture armed");
+    require(mapper.bindings("map_zoom")[0].kind==stellar::engine::RawInputEvent::Kind::MouseWheel,
+            "pointer loss disturbed the bound map");
     DrawList draw;hub.render(draw,w,h);
   }
   // Clipped controls page: more actions than fit must render only the

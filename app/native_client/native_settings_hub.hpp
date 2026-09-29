@@ -123,7 +123,7 @@ public:
   bool handle(const InputEvent&e,int width,int height){
     if(!showing_categories())return false;
     if(e.type==InputEventType::PointerMove)pointer_=e.position;
-    if(e.type==InputEventType::PointerCancelled){pointer_={};return true;}
+    if(e.type==InputEventType::PointerCancelled){pointer_={};capture_=-1;return true;}
     const auto l=HubLayout::for_viewport(width,height);
     auto target=stellar::native_menu_audio::hit(e.position,{l.back});
     if(!controls_)for(std::size_t i=0;i<l.categories.size();++i)if(l.categories[i].contains(e.position))target=10+i;
