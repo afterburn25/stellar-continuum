@@ -235,6 +235,18 @@ void check_controls_settings(NativeSettingsHub& hub,
                       stellar::engine::RawInputEvent::Kind::GamepadAxis &&
                   axis_bound.front().code == probe_axis,
               "Stick deflection did not capture on the scrolled axis row.");
+      // Device pin: 'd' on the focused row cycles the pad slot
+      // any → pad 1..4 → any — exercise two steps plus the wrap.
+      const auto device_of = [&] {
+        const auto bound = mapper.bindings(tail_name);
+        return bound.empty() ? -2 : bound.front().device;
+      };
+      key('d');
+      require(device_of() == 0, "D did not pin the axis binding to pad 1.");
+      key('d');
+      require(device_of() == 1, "D did not advance the pin to pad 2.");
+      for (int step = 0; step < 3; ++step) key('d');
+      require(device_of() < 0, "Pin cycle did not wrap back to any pad.");
       // Axis steal: recapture the row with an axis a sibling already owns.
       int victim_axis_row = -1, victim_axis = 0;
       for (std::size_t i = 0; i < rows.size() &&
@@ -313,6 +325,7 @@ void check_controls_settings(NativeSettingsHub& hub,
             << "\",\"opened\":true,\"capture_cancel\":true,\"rebound\":true"
             << ",\"scrolled\":" << (scrolled ? "true" : "false")
             << ",\"axis_captured\":" << (scrolled ? "true" : "false")
+            << ",\"pinned\":" << (scrolled ? "true" : "false")
             << ",\"stole\":" << (stole ? "true" : "false")
             << ",\"file_preexisted\":" << (file_preexisted ? "true" : "false")
             << ",\"restored\":true}\n";

@@ -334,8 +334,11 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   paged in — and, since the tail rows are the pad-axis rows, it feeds a
   synthetic `GamepadAxis` deflection (unbound axis code, 0.9 > dead
   zone) through `campaign.update`, asserting the live capture lands a
-  `GamepadAxis` binding, plus a cross-row axis steal. Pad-axis capture
-  is now exercised end-to-end, not just unit-tested.
+  `GamepadAxis` binding, plus a cross-row axis steal. The focused row
+  then exercises the D-key pad-pin cycle live (any → pad 1 → pad 2 →
+  wrap to any, asserted through `InputBinding::device`). Pad-axis
+  capture and device pinning are now exercised end-to-end, not just
+  unit-tested.
 
 ## Known limitations
 
