@@ -218,6 +218,13 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   was test-side. Fixed by capturing the point before the re-render;
   60/60 clean runs after the fix (P(flake surviving unseen) ~4.6% at
   the old rate).
+- The `campaign_phase_cadence_oracle` timeout was budget starvation,
+  not a defect: the oracle runs many seeded 250-system traces with
+  per-step payload digests (~82 s standalone) against a 120 s timeout —
+  ~1.5x headroom, exceeded under `-j8` scheduling contention. Timeout
+  raised to 300 s in `CMakeLists.txt`. With both anomalies resolved,
+  the first fully clean parallel pass on this binary: **327/327 under
+  `ctest -j8`** (597.5 s wall), no serial fallback needed.
 
 ## Known limitations
 
