@@ -290,6 +290,17 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `pause`, where the capture lambda's `campaign.scene()` call runs
   `sync_scene3d_quality` against a live campaign. Persisted
   `video-settings.json` verified restored after each run.
+- Voice-settings check: `--voice-settings-check` +
+  `check_voice_settings` close the last settings-panel gap — the hub's
+  Voice category (index 3) previously had no smoke coverage. The check
+  previews every control (all five toggles, all three sliders, both
+  dropdowns), exercises Replay/Stop/Defaults, verifies Cancel restores
+  the saved values byte-identically, saves and reloads through a fresh
+  `NativeVoiceSettings`, then restores the original preferences (slider
+  fractions assert the .01 tolerance used by the audio check — a
+  fraction of exactly 0/1 lands on the track's half-open bounds and is
+  clamped). Green at both harness locations at 2560×1440 and 1920×1080
+  (`pause` under `--load --smoke`, `startup` under `--new-game-smoke`).
 
 ## Known limitations
 
