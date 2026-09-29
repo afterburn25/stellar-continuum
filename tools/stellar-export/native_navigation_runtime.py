@@ -132,7 +132,32 @@ def validate_native_navigation_export(folder: Path, env: dict[str, str],
                 verified["checkpoints"] != recorded.get("checkpoints")):
             raise RuntimeError(
                 "Native navigation replay verified a different journal than recorded")
+        # --replay-info re-verifies each retained expected sidecar against the
+        # journaled section hashes — a stale capture poisons later leaf-diffs.
+        info = subprocess.run([str(folder / "stellar-continuum-native.exe"),
+                               "--asset-root", str(folder),
+                               "--replay-info", str(journal)],
+                              cwd=work, env=clean_env, capture_output=True,
+                              text=True, timeout=90)
+        if info.returncode:
+            raise RuntimeError(f"Native navigation replay-info failed ({info.returncode}): {info.stderr}")
+        inventory = re.search(r"replay_info=(\{[^\n]+\})\s*$", info.stdout, re.MULTILINE)
+        if not inventory:
+            raise RuntimeError("Native navigation replay-info did not report its inventory")
+        inventory = json.loads(inventory.group(1))
+        if (inventory.get("commands") != recorded.get("commands") or
+                not inventory.get("commands_ordered") or
+                not inventory.get("checkpoints_ordered") or
+                inventory.get("pointer_out_of_bounds") != 0 or
+                inventory.get("unverified_tail_commands") != 0):
+            raise RuntimeError("Native navigation replay-info reported an unsound journal")
+        checkpoints = inventory.get("checkpoints")
+        if (not isinstance(checkpoints, list) or not checkpoints or
+                any(not row.get("expected_document") or not row.get("expected_verified")
+                    for row in checkpoints)):
+            raise RuntimeError("Native navigation replay-info found a stale expected sidecar")
         return {"nativeNavigationInput": True, "nativeNavigationPausedReload": True,
                 "nativeNavigationReplayVerified": True,
                 "nativeNavigationReplay": verified,
+                "nativeNavigationReplayInfoVerified": True,
                 "navigationCaptures": captures, "navigationDiagnostics": diagnostics}
