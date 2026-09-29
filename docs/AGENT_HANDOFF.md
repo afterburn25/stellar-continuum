@@ -130,6 +130,11 @@ preserve:
   verified end-to-end including the divergence negative path (section-
   localizing failure + leaf diff); the dated receipt lists every flag-legal
   smoke/check/profile combination and the fixture each needs.
+- Draw-list test hazard: elements of `DrawList::overlay`/`world` are
+  vector-backed — a held `Text*`/`UiRect*` dangles after the next
+  `draw={}`/render. Copy `->at`/rects before re-rendering (the
+  `native_planetary_screen` chip-click flake + parallel SEGFAULT was a
+  test-side UAF of exactly this shape, `d910cd6b`).
 
 **Space-strategy specialization (branch
 `engine/space-strategy-simulation-specialization`):** Stellar Engine is being

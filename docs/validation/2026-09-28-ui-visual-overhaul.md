@@ -209,6 +209,15 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   (timeout) and `native_planetary_screen` (SEGFAULT under load); both
   pass serially. Effective 327/327 — same load-contention signature as
   earlier sweeps; no regression.
+- The `native_planetary_screen` instability was root-caused
+  (`d910cd6b`): the test held a `Text*` into `draw.overlay` across a
+  `draw={}` reassignment, then read `chip->at` for the issue-chip click
+  — a use-after-free that intermittently clicked a stale coordinate
+  (~1/20 standalone failure rate: "Issue chip did not select the
+  affected structure"). The screen's hit dispatch is sound; the defect
+  was test-side. Fixed by capturing the point before the re-render;
+  60/60 clean runs after the fix (P(flake surviving unseen) ~4.6% at
+  the old rate).
 
 ## Known limitations
 
