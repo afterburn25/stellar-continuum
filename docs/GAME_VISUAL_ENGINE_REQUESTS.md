@@ -102,31 +102,6 @@ PERFORMANCE CONSTRAINT:
 FALLBACK IF NOT AVAILABLE:
   Disabled slots keep surfacing the authoritative domain status summary.
 
-### REQUEST: Flared / non-coplanar annulus geometry for protoplanetary discs
-Status:        OPEN
-Requested:    2026-09-28
-WHY NEEDED:
-  Protostars render their protoplanetary debris as a flat `annulus_mesh`,
-  but real young-star discs are flared (scale height grows with radius)
-  and optically thick — a flat sheet cannot show the rim shadow lane or
-  the warped silhouette that makes protostars read correctly. The same
-  geometry would benefit the black-hole accretion discs, which are also
-  coplanar today.
-CURRENT GAME SCREEN:
-  `app/native_client/native_system_workspace.cpp` — protostar debris
-  disc and both black-hole flow regimes consume `annulus_mesh` with
-  `accretion_disc_material3d`.
-DESIRED PUBLIC API:
-  A mesh primitive or mesh-loader spec for a flared disc (inner/outer
-  radius, flare exponent, radial+azimuth segments), ideally double-sided
-  so the far rim silhouettes through the inner gap; consumption is a
-  straight `annulus_mesh` swap on existing instances.
-PERFORMANCE CONSTRAINT:
-  One extra vertex batch per star; no new shaders or simulation data.
-FALLBACK IF NOT AVAILABLE:
-  The flat annulus with deterministic per-system inclination stays —
-  readable and physically motivated, just geometrically thin.
-
 ### REQUEST: Render-scale for Scene3DView targets under budget pressure
 Status:        OPEN
 Requested:    2026-09-28
@@ -218,3 +193,26 @@ validation (rate/ratio bounds + NaN + round-trip);
 `native_scene3d_gpu_tests` — `accretion-shear-t0/t4` diverge with the
 inner-rim band changing more than the outer, and a zero-shear disc is
 bit-identical at t=0 vs t=4 (`…_shear_passed`).
+
+### REQUEST: Flared / non-coplanar annulus geometry for protoplanetary discs
+Status:        DELIVERED
+Requested:    2026-09-28
+Delivered:    2026-09-29 on `game/ui-visual-overhaul` —
+`flared_annulus_mesh(inner, outer, flare, exponent=2,
+azimuthal=192, radial=8)` in `native_geometry3d.hpp` builds two
+mirrored curved sheets y = ±flare·(r/outer)^exponent — the trumpet
+silhouette — with radial-U/azimuthal-V coordinates identical to
+`annulus_mesh` so `accretion_disc_material3d`, the spiral bake, and
+the shear scroll transfer verbatim. Mirrored winding keeps the lower
+sheet front-facing (double-sided silhouette through the inner gap);
+normals follow the true surface slope for correct rim lighting.
+Loader spec `flared_annulus:i,o,flare[,exponent[,azimuthal[,radial]]]`
+in `mesh3d_loader.cpp`. Consumers: `native_system_workspace.cpp` —
+protostar debris (flare .16, exponent 2 — puffy rim) and both
+black-hole flow regimes (flare .07, exponent 1.6 — subtle slim-disc
+curve) swapped from `annulus_mesh`; one mesh instance per star, no
+new shaders or simulation data. Tests: `native_scene3d_tests` geometry invariants +
+malformed-input rejection; `engine_world_tests` loader spec
+resolution; `native_scene3d_gpu_tests` `accretion-flare` asserts the
+flared rim silhouette extends beyond the flat disc's while the inner
+gap stays open (`…_shear_flare_passed`).

@@ -1694,7 +1694,20 @@ int main(int argc,char** argv)try{
     }
     check(inner_px>200,"Accretion shear did not advect the inner rim");
     check(inner_px>outer_px,"Accretion shear was not differential by radius");
-    std::cout<<"accretion_disc_gpu=radial_beaming_spiral_shear_passed\n";
+    // Flared geometry: the rim sheet climbs off the midplane, so the far
+    // edge of a flared disc silhouettes higher on screen than the flat
+    // annulus carrying the identical material.
+    MeshInstance3D flared{flared_annulus_mesh(.45f,1.f,.3f,1.8f),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000,0.f,.7f,2,.9f)};
+    flared.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto flared_cap=capture({flared},"accretion-flared.png");
+    const auto topmost=[&](const RgbaImage& p){
+        for(int y=0;y<320;++y)for(int x=64;x<320;++x)
+          if(channel(p,x,y,0)+channel(p,x,y,1)+channel(p,x,y,2)>90)return y;
+        return 320;};
+    check(topmost(*flared_cap)+3<topmost(*arms_cap),
+        "Flared annulus did not lift the rim silhouette");
+    std::cout<<"accretion_disc_gpu=radial_beaming_spiral_shear_flare_passed\n";
   }
   {
     // Henyey-Greenstein phase: the same ring sheet brightens when

@@ -233,11 +233,19 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   0.6 s standalone vs. 120 s/90 s budgets); neither reproduced in the
   clean `-j8` pass or standalone reruns.
 
+- Flared annulus delivered (fourth renderer request): `flared_annulus_mesh`
+  in `native_geometry3d.hpp` + `flared_annulus` loader spec; protostar
+  debris and both BH disc regimes swapped in `native_system_workspace.cpp`.
+  Geometry tests (mirrored sheets, radial height progression, winding,
+  malformed-input rejection), loader-spec resolution in
+  `engine_world_tests`, and the `accretion-flare` GPU silhouette check
+  (flared rim extends past the flat disc's, inner gap stays open) all
+  green; full suite re-run recorded in the ledger.
+
 ## Known limitations
 
-- Two renderer requests remain filed (`GAME_VISUAL_ENGINE_REQUESTS.md`):
-  flared/non-coplanar annulus geometry and Scene3DView render-scale
-  under budget pressure.
+- One renderer request remains filed (`GAME_VISUAL_ENGINE_REQUESTS.md`):
+  Scene3DView render-scale under budget pressure.
   Delivered so far: nullable `SurfaceEffect3D::next_texture` (validation
   requires it only when `blend > 0`; the nebula volume's double-bind is
   removed; `native_scene3d_tests` covers both branches), the

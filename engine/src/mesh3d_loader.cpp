@@ -200,6 +200,14 @@ resolve_mesh_spec(std::string_view spec, const ContentResolver *content) {
       return native_map::annulus_mesh(
           args[0], args[1],
           args.size() > 2 ? static_cast<int>(args[2]) : 64);
+    // Flared variant: i,o,rim height[,exponent[,azimuthal[,radial]]] —
+    // two mirrored trumpet sheets, radial U / azimuthal V like annulus.
+    if (head == "flared_annulus" && args.size() >= 3)
+      return native_map::flared_annulus_mesh(
+          args[0], args[1], args[2],
+          args.size() > 3 ? args[3] : 2.f,
+          args.size() > 4 ? static_cast<int>(args[4]) : 192,
+          args.size() > 5 ? static_cast<int>(args[5]) : 8);
     // Camera-facing card — an LOD impostor or marker sprite.
     if (head == "card")
       return Mesh3D::billboard_card(

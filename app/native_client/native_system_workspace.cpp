@@ -312,7 +312,7 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
         // system rather than coplanar with every protostar alike. The
         // debris is sub-Keplerian — weak beaming, a gentle doppler split,
         // and a slow crawl instead of the relativistic flow's spin.
-        static const auto debris_mesh=annulus_mesh(.34f,1.f,192,.012f);
+        static const auto debris_mesh=flared_annulus_mesh(.34f,1.f,.16f,2.f);
         const float incline=.7f+.6f*static_cast<float>(mix(static_cast<std::uint32_t>(snapshot_->system_id)*11+component)%1000)/999.f;
         const float debris_spin=static_cast<float>(std::fmod(visual_seconds_*.07,std::numbers::pi*2.));
         MeshInstance3D debris;debris.mesh=debris_mesh;
@@ -326,7 +326,7 @@ out.overlay.emplace_back(Line{vertex(geometry.apex),vertex(geometry.base_b),hove
       // Shakura-Sunyaev accretion annulus beneath the authored hole art:
       // the relativistic disc carries orbital beaming plus the paired
       // doppler tint, so the approaching lane reads hotter and brighter.
-      static const auto disc=annulus_mesh(.34f,1.f,192,.012f);
+      static const auto disc=flared_annulus_mesh(.34f,1.f,.07f,1.6f);
       // The authoritative object type picks the flow regime: accreting and
       // jet-launching holes keep the hot strongly beamed two-armed spiral,
       // while quiescent holes run a radiatively inefficient cooler flow —

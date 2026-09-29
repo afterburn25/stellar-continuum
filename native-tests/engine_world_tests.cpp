@@ -1039,6 +1039,9 @@ int main() {
         check(card != nullptr && card->billboard() &&
                   card->bounds_max().x == 1.f,
               "resolve_mesh_spec card spec did not build a billboard");
+        const auto flared = resolve_mesh_spec("flared_annulus:.4,1,.2", nullptr);
+        check(flared != nullptr && flared->bounds_max().y > 0.1f,
+              "resolve_mesh_spec flared_annulus spec did not build a flared disc");
         // Ray straight down over the ship: box:2,1,1 scaled 2, yaw 90 —
         // top face sits at y = 5 + 0.5*2 = 6 → distance 4 from y=10.
         const auto down = raycast_world3d(restored, entities3d(restored),

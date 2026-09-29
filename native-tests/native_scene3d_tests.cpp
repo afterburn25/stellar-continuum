@@ -19,6 +19,25 @@ int main()try{
     const Vec3 u{b.x-a.position.x,b.y-a.position.y,b.z-a.position.z},v{c.x-a.position.x,c.y-a.position.y,c.z-a.position.z};
     check((u.y*v.z-u.z*v.y)*a.normal.x+(u.z*v.x-u.x*v.z)*a.normal.y+(u.x*v.y-u.y*v.x)*a.normal.z>0,"Ring thickness has inward faces");}
   rejects([]{(void)annulus_mesh(1,2,64,-.1f);});
+  // Flared annulus: two mirrored trumpet sheets — rim rises symmetrically
+  // off the midplane, UVs keep the radial U / azimuthal V convention so
+  // the accretion material transfers verbatim.
+  const auto flared=flared_annulus_mesh(.4f,1.f,.2f,2.f,32,4);
+  check(flared->vertices().size()==2*5*33ull,"Flared annulus lost its mirrored sheet vertices");
+  {float top=-1.f,bottom=1.f,inner_top=-1.f;
+   for(const auto& v:flared->vertices()){
+     const float r=std::hypot(v.position.x,v.position.z);
+     if(r>.95f){top=std::max(top,v.position.y);bottom=std::min(bottom,v.position.y);}
+     if(r<.45f)inner_top=std::max(inner_top,std::abs(v.position.y));}
+   check(close(top,.2f)&&close(bottom,-.2f),"Flared annulus rim did not reach the flare height");
+   check(inner_top<.05f,"Flared annulus inner edge left the midplane too early");}
+  for(const auto& v:flared->vertices())check(close(v.uv.x,std::clamp(v.uv.x,0.f,1.f))&&v.uv.y>=0.f&&v.uv.y<=1.f,"Flared annulus UV escaped [0,1]");
+  for(std::size_t i=0;i<flared->indices().size();i+=3){const auto& a=flared->vertices()[flared->indices()[i]];const auto b=flared->vertices()[flared->indices()[i+1]].position,c=flared->vertices()[flared->indices()[i+2]].position;
+    const Vec3 u{b.x-a.position.x,b.y-a.position.y,b.z-a.position.z},v{c.x-a.position.x,c.y-a.position.y,c.z-a.position.z};
+    check((u.y*v.z-u.z*v.y)*a.normal.x+(u.z*v.x-u.x*v.z)*a.normal.y+(u.x*v.y-u.y*v.x)*a.normal.z>-1e-4f,"Flared annulus has inward faces");}
+  rejects([]{(void)flared_annulus_mesh(1,2,.0f);});
+  rejects([]{(void)flared_annulus_mesh(1,2,3.f);});
+  rejects([]{(void)flared_annulus_mesh(1,2,.2f,0.f);});
   const auto solid=directional_solid_mesh([](Vec3 p){return Vec3{p.x*2,p.y*.6f,p.z};},32,16);
   for(const auto& v:solid->vertices()){
     const Vec3 expected{v.position.x/4,v.position.y/.36f,v.position.z};const float norm=std::hypot(expected.x,expected.y,expected.z);
