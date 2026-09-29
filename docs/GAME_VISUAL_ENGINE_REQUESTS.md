@@ -207,10 +207,12 @@ under-counting at 8 and letting an over-budget list through.
 Streamed-texture mip/LOD demand follows the rendered (scaled)
 resolution; aspect and composite coordinates stay destination-space
 so picking/UI are unchanged. Game gates (`main.cpp`) now try
-`fit_backdrop_within_budget` — scale the backdrop to fit — before the
-authored 2D fallback, and `scene()` runs a final multiplicative
-clamp over every view so late developer-panel views cannot push a
-frame over the cap. Tests: `native_scene3d_tests` extent/bytes
+`fit_backdrop_within_budget` — scale the backdrop to fit, iterating
+past ceil-rounding overshoots — before the authored 2D fallback, which
+now runs only when the whole frame cannot fit even with every view at
+the .25 floor (`scene3d_min_target_bytes`); residual over-budget is
+absorbed by `scene()`'s final multiplicative clamp over every view so
+late developer-panel views cannot push a frame over the cap. Tests: `native_scene3d_tests` extent/bytes
 accounting (default 1, .25/.5/interior, ceil, invalid scales
 estimate as unscaled); `native_scene3d_gpu_tests` — half-scale
 allocates the expected target, the estimator matches
@@ -219,5 +221,7 @@ destination rect and clips at its edge, out-of-range/NaN/inf scales
 throw. End-to-end: `--developer-smoke` 2560×1440 — previously threw
 the 128 MiB budget exception on a 210 MiB six-view frame — now
 completes green with all captures (`scene_render_target_bytes` ≈ 40
-MiB); `--system-smoke` and `--battle-smoke` 2560×1440 and the 1920
-dev smoke all green.
+MiB) and `local_nebula=emission_volume_submitted_passed` — the
+raymarched volume stays a scaled 3D view instead of flattening;
+`--system-smoke` and `--battle-smoke` 2560×1440 and the 1920 dev
+smoke all green.

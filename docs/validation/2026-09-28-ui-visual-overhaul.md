@@ -251,13 +251,20 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `Scene3DStatistics::renderer_active` fixes the pre-first-3D-draw bpp
   estimate that under-counted at 8 B/px (root cause of a 2560×1440
   dev-smoke budget throw). Game gates scale backdrops before the 2D
-  fallback; `scene()` runs a final multiplicative clamp so late
-  developer-panel views cannot push a frame over the cap. Verified:
+  fallback — `fit_backdrop_within_budget` iterates past ceil-rounding
+  overshoots and attaches a floored backdrop whenever the frame could
+  fit at .25, reserving the flat path for frames whose
+  `scene3d_min_target_bytes` floor still exceeds the cap; `scene()` runs
+  a final multiplicative clamp so late developer-panel views cannot push
+  a frame over the cap. Verified:
   extent/bytes unit tests, half-scale GPU allocation + estimator parity
   + destination-clip assertions, out-of-range/NaN/inf rejection;
   `--developer-smoke`, `--system-smoke`, `--battle-smoke` at 2560×1440
   and `--developer-smoke` at 1920×1080 all green with no budget
-  exception; suite re-run recorded in the ledger.
+  exception — `local_nebula=emission_volume_submitted_passed` at 2560
+  (the scaled volume stays raymarched; the flat-layer smoke assertion
+  now accepts a composite only when quarter-scale could not fit);
+  suite re-run recorded in the ledger.
 
 ## Known limitations
 

@@ -1600,17 +1600,17 @@ class NativeCampaign final {
           return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){
             return i.material.surface_effect&&i.material.surface_effect->volume_depth>0;});});
         if(!volume){
-          // The render-target budget gate swaps the raymarched volume for its
-          // authored 2D composite when the frame cannot fit the fullscreen
-          // backdrop views (dome + volume + workspaces at >=2560). Accept the
-          // flat layer only when a 3D backdrop truly could not have fit —
-          // in a fallback frame both layers are flat, so reconstruct the
-          // pre-gate footprint with two fullscreen targets.
-          const std::size_t fullscreen_bytes=static_cast<std::size_t>(width)*static_cast<std::size_t>(height)*16u;
+          // The render-target budget scales the backdrop's view targets to
+          // [0.25,1] before the authored 2D composite runs — the raymarched
+          // volume drops flat only when even quarter-scale backdrop targets
+          // cannot fit beside the content views. In a fallback frame both
+          // layers are flat, so reconstruct the pre-gate footprint with two
+          // quarter-scale fullscreen targets.
+          const std::size_t fullscreen_bytes=static_cast<std::size_t>(width)*static_cast<std::size_t>(height)*scene3d_bytes_per_pixel_;
           const auto flat=std::ranges::any_of(rendered.world,[width,height](const auto& command){
             const auto*image=std::get_if<Image>(&command);
             return image&&image->destination.width>=static_cast<float>(width)*.95f&&image->destination.height>=static_cast<float>(height)*.95f;});
-          if(!flat||scene3d_target_bytes(rendered)+2u*fullscreen_bytes<=maximum_scene3d_target_bytes)
+          if(!flat||scene3d_target_bytes(rendered)+2u*fullscreen_bytes/16u<=maximum_scene3d_target_bytes)
             throw std::runtime_error("Nebulous system emitted no emission volume layer.");
           draw(rendered,L"-local-nebula");
           system_workspace_.close();
@@ -7995,16 +7995,37 @@ class NativeCampaign final {
     const auto visit=[factor](Scene3DView& view){view.render_scale=std::clamp(view.render_scale*factor,.25f,1.f);};
     for(auto& command:draw.world)if(auto* view=std::get_if<Scene3DView>(&command))visit(*view);
     for(auto& command:draw.overlay)if(auto* view=std::get_if<Scene3DView>(&command))visit(*view);}
-  // Fit `backdrop` under the renderer's target cap alongside the rest of
-  // the frame by shrinking its view targets; returns false when even a
-  // quarter-scale render cannot fit (whole-layer 2D fallback follows).
-  [[nodiscard]] bool fit_backdrop_within_budget(DrawList& backdrop,std::size_t other_bytes)const{
-    const std::size_t backdrop_bytes=scene3d_target_bytes(backdrop);
-    if(other_bytes+backdrop_bytes<=stellar::native_map::maximum_scene3d_target_bytes)return true;
-    if(backdrop_bytes==0||other_bytes>=stellar::native_map::maximum_scene3d_target_bytes)return false;
-    const float fit=static_cast<float>(std::sqrt(static_cast<double>(stellar::native_map::maximum_scene3d_target_bytes-other_bytes)/static_cast<double>(backdrop_bytes)));
-    apply_render_scale(backdrop,std::min(fit,1.f));
-    return scene3d_target_bytes(backdrop)+other_bytes<=stellar::native_map::maximum_scene3d_target_bytes;}
+  // Bytes if every Scene3DView in the list sat at the .25 floor — the
+  // "cannot possibly fit" bound that gates the authored-2D fallback.
+  [[nodiscard]] std::size_t scene3d_min_target_bytes(const DrawList& draw)const{
+    std::size_t bytes=0;
+    const auto add=[&bytes,this](const Scene3DView& view){
+      const auto extent=[](float e){return static_cast<std::size_t>(std::max(1,static_cast<int>(std::ceil(e*.25f))));};
+      bytes+=extent(view.destination.width)*extent(view.destination.height)*scene3d_bytes_per_pixel_;};
+    for(const auto& command:draw.world)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+    for(const auto& command:draw.overlay)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+    return bytes;}
+  // Shrink `backdrop`'s view targets so the frame fits the renderer's
+  // target cap; the authored 2D fallback (return false) is reserved for
+  // frames where even every view at the .25 floor cannot fit. Residual
+  // over-budget is absorbed by scene()'s multiplicative clamp, which
+  // scales every view in the frame together — attaching a floored
+  // backdrop keeps its volumetric shading instead of dropping the layer.
+  [[nodiscard]] bool fit_backdrop_within_budget(DrawList& backdrop,const DrawList& other)const{
+    const std::size_t cap=stellar::native_map::maximum_scene3d_target_bytes;
+    const std::size_t other_bytes=scene3d_target_bytes(other);
+    std::size_t backdrop_bytes=scene3d_target_bytes(backdrop);
+    if(other_bytes+backdrop_bytes<=cap)return true;
+    if(scene3d_min_target_bytes(backdrop)+scene3d_min_target_bytes(other)>cap)return false;
+    if(other_bytes>=cap){apply_render_scale(backdrop,.25f);return true;}
+    for(int pass=0;pass<8&&backdrop_bytes+other_bytes>cap;++pass){
+      const float fit=static_cast<float>(std::sqrt(static_cast<double>(cap-other_bytes)*.98/static_cast<double>(backdrop_bytes)));
+      apply_render_scale(backdrop,std::min(fit,1.f));
+      const std::size_t next=scene3d_target_bytes(backdrop);
+      if(next>=backdrop_bytes)break;  // floored at .25 — cannot shrink further
+      backdrop_bytes=next;
+    }
+    return true;}
   [[nodiscard]] DrawList scene_content(int width,int height){
     if(battle_workspace_.visible()&&!menu_){
       DrawList tactical;
@@ -8034,7 +8055,7 @@ class NativeCampaign final {
           // drawable sizes. Render-scale shrinks the backdrop targets first
           // so the dome/nebula keep their volumetric shading; only when even
           // a quarter-scale render cannot fit do the authored 2D paths run.
-          if(!fit_backdrop_within_budget(environment,scene3d_target_bytes(tactical))){
+          if(!fit_backdrop_within_budget(environment,tactical)){
             environment={};
             system_background_.append(environment,sid,width,height,starfield_quality(),starfield_density(),0.f,false);
             phenomena_.append_system(environment,sid,star->position.x,star->position.y,width,height,1.,phenomena_options(sid),true,false);
@@ -8647,7 +8668,7 @@ class NativeCampaign final {
       // shrinks its view targets first so the dome and local nebula keep
       // their volumetric/warped shading; the authored 2D paths run only
       // when even a quarter-scale render cannot fit.
-      if(!fit_backdrop_within_budget(system_backdrop,scene3d_target_bytes(out))){
+      if(!fit_backdrop_within_budget(system_backdrop,out)){
         system_backdrop={};
         system_background_.append(system_backdrop,backdrop_sid,width,height,starfield_quality(),starfield_density(),0.f,false);
         if(backdrop_star)phenomena_.append_system(system_backdrop,backdrop_sid,backdrop_star->position.x,backdrop_star->position.y,width,height,system_workspace_.viewport()?system_workspace_.viewport()->scale:1.,phenomena_options(backdrop_sid),false,false);

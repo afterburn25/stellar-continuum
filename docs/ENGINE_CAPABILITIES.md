@@ -94,8 +94,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Consumers:** `NativeCampaign` mirrors the accounting via
   `scene3d_bytes_per_pixel_` (refreshed from `statistics().hdr` only
   when `renderer_active`); `fit_backdrop_within_budget` scales the
-  system/battle backdrop before the authored-2D fallback, and
-  `scene()` runs a final multiplicative clamp so developer-panel
+  system/battle backdrop (iterating past ceil-rounding overshoots)
+  and attaches a floored backdrop whenever the whole frame could fit
+  at .25 — the authored-2D fallback runs only when
+  `scene3d_min_target_bytes` of backdrop+frame exceeds the cap —
+  while `scene()` runs a final multiplicative clamp so developer-panel
   views appended after the gates cannot push a frame over the cap.
 - **Tests:** `native_scene3d_tests` — extent/bytes formula (default,
   .25/.5/interior, odd-size ceil, invalid scales estimate unscaled);
