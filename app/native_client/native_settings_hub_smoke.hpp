@@ -177,6 +177,42 @@ void check_controls_settings(NativeSettingsHub& hub,
     stole = true;
   }
 
+  // Overflowing lists scroll: tail rows (the pad-axis entries in the
+  // shipped map) carry no hitbox until a wheel tick pages them in —
+  // before the list scrolled they were invisible and unclickable.
+  bool scrolled = false;
+  {
+    int on_page = 0;
+    while (hub.control_row_bounds(on_page, width, height).has_value())
+      ++on_page;
+    const int tail = static_cast<int>(rows.size()) - 1;
+    if (on_page <= tail) {
+      require(!hub.control_row_bounds(tail, width, height).has_value(),
+              "Off-page tail row reported a hitbox before scrolling");
+      InputEvent wheel{};
+      wheel.type = InputEventType::Wheel;
+      wheel.position = {first.x + first.width * .5f,
+                        first.y + first.height * .5f};
+      wheel.wheel_y = -1.f;
+      for (int tick = 0; tick < 8 &&
+                      !hub.control_row_bounds(tail, width, height).has_value();
+           ++tick)
+        route(wheel);
+      const auto tail_rect = hub.control_row_bounds(tail, width, height);
+      require(tail_rect.has_value(),
+              "Wheel scrolling did not reach the last rebind row.");
+      click(*tail_rect);
+      require(hub.capturing(),
+              "Scrolled tail row did not arm rebind capture.");
+      route(InputEvent{InputEventType::EscapePressed});
+      require(!hub.capturing());
+      require(same_bindings(mapper.bindings(rows[static_cast<std::size_t>(tail)]),
+                            snapshot[rows[static_cast<std::size_t>(tail)]]),
+              "Scrolled-row capture cancel changed bindings.");
+      scrolled = true;
+    }
+  }
+
   // Restore every snapshotted binding through the mapper (un-steal has no
   // UI path), persist, then prove the file round-trips through a fresh
   // mapper — semantic equality per action, not bytes.
@@ -214,6 +250,7 @@ void check_controls_settings(NativeSettingsHub& hub,
 
   std::cout << "controls_settings_check={\"location\":\"" << location
             << "\",\"opened\":true,\"capture_cancel\":true,\"rebound\":true"
+            << ",\"scrolled\":" << (scrolled ? "true" : "false")
             << ",\"stole\":" << (stole ? "true" : "false")
             << ",\"file_preexisted\":" << (file_preexisted ? "true" : "false")
             << ",\"restored\":true}\n";

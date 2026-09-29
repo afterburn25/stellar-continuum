@@ -320,6 +320,18 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `NativeSettingsHub::control_row_bounds` exposes row hitboxes for the
   harness. Green under `--load --smoke` at 1280×720 on both
   fresh-file and pre-existing `galaxy-controls.json` paths.
+  Follow-up: the page clip also made the three `GALAXY_PAD` axis rows
+  unreachable — the shipped map's 15 rows exceed the ~12-row page at
+  every viewport, and no scroll path existed. The list now scrolls on
+  the shared `VirtualizedList` (`controls_scroll_`): wheel ticks page
+  the rows (intersect-clipped slivers keep partially visible rows
+  clickable), Tab/arrow/Home/End focus-follows via `ensure_visible`,
+  and capture is untouched (wheel stays an axis-capture trigger while
+  armed). Offsets are intentionally unsnapped — row-snapping the
+  scroll offset would strand the tail row under the fractional
+  viewport remainder. Scroll resets on open/close and category entry.
+  The smoke's scroll leg verifies the tail row is hitbox-free until
+  paged in, then arms and cancels capture on it.
 
 ## Known limitations
 

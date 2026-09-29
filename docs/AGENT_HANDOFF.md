@@ -1475,7 +1475,15 @@ page (UB when the action list overflows the view); the loop now bounds
 on the page, and `NativeSettingsHub::control_row_bounds` exposes row
 hitboxes to the harness. Pause location only — the mapper binds to the
 hub once the campaign exists, so a startup run would see the static
-help card.
+help card. The same fix revealed the shipped 15-row list overflows the
+~12-row page at every viewport — the three `GALAXY_PAD` axis rows were
+permanently off-page. `controls_scroll_` (shared `VirtualizedList`)
+pages the list: wheel ticks scroll (suspended while capture is armed —
+wheel is an axis trigger), keyboard focus-follow uses `ensure_visible`,
+offsets stay unsnapped (row-snapping strands the tail under a
+fractional viewport remainder), and rows are intersect-clipped so
+partial slivers stay clickable — the same convention as the startup
+load list.
 Multi-pad is plumbed end-to-end: the platform opens up to four pads into
 stable slots, `InputEvent.gamepad_device`/`RawInputEvent.device` carry
 the slot, and `InputBinding.device` pins a binding to one pad via the

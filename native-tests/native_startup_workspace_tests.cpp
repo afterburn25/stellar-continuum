@@ -388,6 +388,18 @@ void menu_hover_feedback(){
     int visible=0;
     while(hub.control_row_bounds(visible,w,h).has_value())++visible;
     require(visible>0&&visible<20,"controls page did not clip the row list");
+    require(!hub.control_row_bounds(19,w,h).has_value(),"tail row had a hitbox before scrolling");
+    // Wheel pages the list — the tail row gains a hitbox, the head loses it.
+    InputEvent wheel{};wheel.type=InputEventType::Wheel;wheel.wheel_y=-1.f;
+    for(int i=0;i<8&&!hub.control_row_bounds(19,w,h).has_value();++i)
+      require(hub.handle(wheel,w,h),"controls view did not consume the wheel");
+    require(hub.control_row_bounds(19,w,h).has_value(),"wheel did not reach the tail row");
+    require(!hub.control_row_bounds(0,w,h).has_value(),"row 0 stayed on-page after scrolling");
+    // Focus-follow: keyboard focus on an off-page row scrolls it into view.
+    auto key=[&](std::uint32_t k){
+      InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=k;return hub.handle(ev,w,h);};
+    constexpr std::uint32_t kHome=0x4000004au;
+    require(key(kHome)&&hub.control_row_bounds(0,w,h).has_value(),"Home did not scroll back to the first row");
     DrawList draw;hub.render(draw,w,h);
     for(const auto& command:draw.overlay)
       if(const auto* label=std::get_if<Text>(&command))
