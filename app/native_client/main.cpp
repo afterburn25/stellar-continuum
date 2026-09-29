@@ -3858,6 +3858,7 @@ class NativeCampaign final {
     const auto own=std::ranges::find_if(battle_workspace_.snapshot()->formations,[&](const auto& f){
       return f.civilization_id==frame.runtime().world().campaign().player_civilization_id;});
     if(own==battle_workspace_.snapshot()->formations.end())throw std::runtime_error("Battle replay lacks an owned formation.");
+    if(battle_art_bindings_.empty())throw std::runtime_error("Battle replay bound no patrol_corvette art (non-terran observer or drained fixture).");
     diplomacy_smoke_click(battle_workspace_.project(own->position,width,height),width,height);
     if(battle_workspace_.selection().empty())throw std::runtime_error("Battle replay did not select the owned formation.");
     const auto layout=native_battle_ui::BattleWorkspaceLayout::for_viewport(width,height);
@@ -3881,7 +3882,7 @@ class NativeCampaign final {
     }
     refresh_battle(width,height,.1);
     (void)scene(width,height); // Bind hit geometry from the actual drawn ship.
-    if(battle_art_plan_.size()!=1)throw std::runtime_error("Battle replay lacks its bound corvette.");
+    if(battle_art_plan_.size()!=1)throw std::runtime_error("Battle replay art plan has "+std::to_string(battle_art_plan_.size())+" sprites, expected one bound corvette.");
     const auto ship_point=battle_art_plan_.front().center;
     const auto ship_formation=battle_art_plan_.front().formation_id;
     diplomacy_smoke_click({width*.45f,height*.72f},width,height);

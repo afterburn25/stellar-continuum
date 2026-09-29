@@ -136,6 +136,13 @@ preserve:
   `--save-path` make the loader silently recover the previous save — delete
   them when swapping fixtures; saves authored before `GenerationMetadata`
   carry the key as null (the replay observer guards `is_object()`).
+- Save-anchored smokes F6-save back over their own fixture, so they
+  self-mutate between runs: `--battle-smoke` must run on a freshly authored
+  `tools/author_battle_save.py <save>` copy (the advance+save drains the
+  fixture's vessels across runs; "bound no patrol_corvette art" is the tell),
+  and `--system-smoke` needs a save whose player civ knows Sol (a generated
+  new-game save usually won't — the smoke now fails fast with "observer does
+  not know Sol").
 - `--record`/`--replay`/`--replay-info`/`--replay-until`/`--replay-exit`
   verified end-to-end including the divergence negative path (section-
   localizing failure + leaf diff); the dated receipt lists every flag-legal
