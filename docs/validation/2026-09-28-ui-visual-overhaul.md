@@ -225,6 +225,13 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   raised to 300 s in `CMakeLists.txt`. With both anomalies resolved,
   the first fully clean parallel pass on this binary: **327/327 under
   `ctest -j8`** (597.5 s wall), no serial fallback needed.
+- Timeout-headroom audit (CTestCostData vs. registered TIMEOUT):
+  tightest remaining margins are `campaign_phase_cadence_oracle` ~3.6x
+  (post-raise) and `galaxy_configuration` ~6.9x; all other tests sit
+  above ~7x. The historical `developer_qa_host`/`native_research_
+  controller` timeouts were extreme-contention phenomena (2.6 s and
+  0.6 s standalone vs. 120 s/90 s budgets); neither reproduced in the
+  clean `-j8` pass or standalone reruns.
 
 ## Known limitations
 
