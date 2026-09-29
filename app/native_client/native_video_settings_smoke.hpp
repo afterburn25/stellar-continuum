@@ -50,6 +50,9 @@ void check_video_settings(NativeVideoController& controller,
     stellar::native_ui::Dropdown menu;menu.open(static_cast<int>(row),std::vector<std::string>(count,"item"),0);
     click(menu.layout(layout.choice_buttons[row],width,height).rows[target]);
   };
+  // STARFIELD QUALITY drives the 3D RenderQuality3D tier and the streamer
+  // budget through the same apply path — cycle it off the saved tier.
+  const auto quality_target = initial.starfield_quality == 0 ? 1 : 0;
   const auto choose_preview = [&](const NativeVideoSettings& from) {
     // No display or resolution click occurs here: platform coverage owns mode
     // changes, while this smoke check exercises the same visible four-row UI.
@@ -57,10 +60,12 @@ void check_video_settings(NativeVideoController& controller,
              static_cast<int>(VideoVsync::Off));
     cycle_to(3, 5, static_cast<int>(from.frame_cap),
              static_cast<int>(VideoFrameCap::Fps60));
+    cycle_to(6, 4, from.starfield_quality, quality_target);
     click(layout.apply);
     require(controller.previewing() && controller.active().vsync == VideoVsync::Off &&
-                controller.active().frame_cap == VideoFrameCap::Fps60,
-            "Video preview did not apply the expected frame pacing values.");
+                controller.active().frame_cap == VideoFrameCap::Fps60 &&
+                controller.active().starfield_quality == quality_target,
+            "Video preview did not apply the expected frame pacing/quality values.");
   };
 
   open();
@@ -81,7 +86,8 @@ void check_video_settings(NativeVideoController& controller,
                                       .refresh_hz = initial.refresh_hz,
                                       .vsync = VideoVsync::Off,
                                       .frame_cap = VideoFrameCap::Fps60,
-                                      .scene_resolution_percent=initial.scene_resolution_percent, .scene_samples=initial.scene_samples};
+                                      .scene_resolution_percent=initial.scene_resolution_percent, .scene_samples=initial.scene_samples,
+                                      .starfield_quality=quality_target, .starfield_density=initial.starfield_density};
   require(!controller.previewing() && !controller.visible() &&
               NativeVideoSettings::load(settings_path) == previewed,
           "Keeping video settings did not atomically persist the preview.");
@@ -91,6 +97,7 @@ void check_video_settings(NativeVideoController& controller,
            static_cast<int>(initial.vsync));
   cycle_to(3, 5, static_cast<int>(VideoFrameCap::Fps60),
            static_cast<int>(initial.frame_cap));
+  cycle_to(6, 4, quality_target, static_cast<int>(initial.starfield_quality));
   click(layout.apply);
   require(controller.previewing() && controller.active() == initial,
           "Video settings could not stage restoration of the original values.");
@@ -102,7 +109,8 @@ void check_video_settings(NativeVideoController& controller,
   std::cout << "video_settings_check={\"location\":\"" << location
             << "\",\"opened\":true,\"four_rows\":true,\"previewed\":true,"
                "\"normal_capture\":true,\"confirm_capture\":true,"
-               "\"escape_reverted\":true,\"kept\":true,\"restored\":true}\n";
+               "\"escape_reverted\":true,\"kept\":true,\"restored\":true,"
+               "\"quality_cycled\":true}\n";
 }
 
 } // namespace stellar::native_video_settings

@@ -279,6 +279,15 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `native_scene3d_gpu` pre-renderer budget test + live-budget stat,
   `--video-settings-check` (Apply/preview/Revert/Keep),
   dev smoke re-run in the ledger.
+- Settings-smoke extension: `check_video_settings` now cycles the
+  STARFIELD QUALITY row off the saved tier (and restores it) through
+  the same Apply/preview/Escape/Keep path. Green at both harness
+  locations at 2560×1440: `startup` — the tiered budget lands on
+  `Window::Storage` before the lazily created renderer exists — and
+  `pause`, where the capture lambda's `campaign.scene()` call runs
+  `sync_scene3d_quality` against a live campaign. Persisted
+  `video-settings.json` verified restored (starfieldQuality back to
+  the saved value) after each run.
 
 ## Known limitations
 
