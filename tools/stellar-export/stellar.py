@@ -526,7 +526,8 @@ def export(preset_name):
             smoke.update(validate_native_new_game_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json",
                 audio_check=True, audio_settings_check=True,
-                video_settings_check=True, general_settings_check=True))
+                video_settings_check=True, general_settings_check=True,
+                voice_settings_check=True, controls_settings_check=True))
             smoke.update(validate_native_system_travel_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json",
                 replay_check=True))
