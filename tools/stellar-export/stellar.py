@@ -524,7 +524,9 @@ def export(preset_name):
                 output / "Data/astronomy/hyg-nearby-500-v1.json"))
             smoke.update(validate_native_settlement_export(output, env))
             smoke.update(validate_native_new_game_export(output, env,
-                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+                ROOT / "native-tests/fixtures/player-campaign-json.json",
+                audio_check=True, audio_settings_check=True,
+                video_settings_check=True, general_settings_check=True))
             smoke.update(validate_native_system_travel_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json",
                 replay_check=True))

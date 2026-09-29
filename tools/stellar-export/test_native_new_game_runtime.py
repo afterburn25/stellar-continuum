@@ -7,7 +7,8 @@ import tempfile
 import unittest
 from unittest import mock
 
-from native_new_game_runtime import _video_diagnostic, validate_native_new_game_export
+from native_new_game_runtime import (_general_diagnostic, _video_diagnostic,
+                                     validate_native_new_game_export)
 
 
 def fixture(path):
@@ -83,6 +84,50 @@ class VideoDiagnosticTests(unittest.TestCase):
     def test_wrong_video_location_is_rejected(self):
         with self.assertRaises(RuntimeError):
             _video_diagnostic(self.stdout(location="pause"), self.location)
+
+
+class GeneralDiagnosticTests(unittest.TestCase):
+    location = "pause"
+
+    def stdout(self, **overrides):
+        report = {"location": self.location, "opened": True, "capture": True,
+                  "text_scale": True, "cancel_restored": True, "saved": True,
+                  "restored": True}
+        report.update(overrides)
+        return "general_settings_check=" + json.dumps(report, separators=(",", ":"))
+
+    def test_valid_general_diagnostic(self):
+        self.assertEqual(_general_diagnostic(self.stdout(), self.location)["location"],
+                         self.location)
+
+    def test_missing_general_diagnostic_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic("gpu_driver=vulkan", self.location)
+
+    def test_missing_general_field_is_rejected(self):
+        report = json.loads(self.stdout().removeprefix("general_settings_check="))
+        del report["text_scale"]
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic("general_settings_check=" + json.dumps(report), self.location)
+
+    def test_false_general_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic(self.stdout(restored=False), self.location)
+
+    def test_integer_general_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic(self.stdout(text_scale=1), self.location)
+
+    def test_duplicate_general_key_is_rejected(self):
+        duplicate = ('general_settings_check={"location":"pause","opened":true,'
+                     '"opened":true,"capture":true,"text_scale":true,'
+                     '"cancel_restored":true,"saved":true,"restored":true}')
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic(duplicate, self.location)
+
+    def test_wrong_general_location_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic(self.stdout(location="startup"), self.location)
 
 
 class NativeNewGameRuntimeTests(unittest.TestCase):
