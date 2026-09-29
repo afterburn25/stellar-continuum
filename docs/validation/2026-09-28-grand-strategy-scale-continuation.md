@@ -279,3 +279,47 @@ automatic-orders body index):
 - Metrics unchanged in shape: 25 civilizations / 27 colonies / 150 fleets
   / 0 wars; 4 scripted event definitions / 128 journal entries; research
   37,570 / diplomacy 18 events.
+
+## 200-year endurance extension (2026-09-29)
+
+Same host command with `--ticks 14600 --verify-continuation-tick 7300`
+(200 simulated years, mid-run restore at year 100). Two purposes: prove
+determinism at 2x horizon and measure late-game step-time growth.
+
+Baseline run (pre dense-route work, capacity-bumped lane cache) and the
+final run (dense `RouteTree`, component-membership pruning,
+contact-presence index, planning work memos) both produced
+`finalStateHash e5a1d5bf768174022efc4bbbb7f058dbc2365ce2e448ea739565c2ddf2f4095a`
+with `repeatFinalStatesDeterministic: true` and
+`continuationDeterministic: true` — identical flags including
+`--events-root data/events` are required for a valid A/B (an events-off
+control run produced `a69d93b6…`, a different-but-valid trajectory with
+72 colonies / 257 fleets / 0 scripted definitions; byte-identical
+autosave checkpoints at ticks 11,680 and 13,140 plus a stashed-binary
+A/B confirmed the two code trains are simulation-equivalent).
+
+| Metric | Baseline | Dense-route + presence-index | Δ |
+|---|---|---|---|
+| Step mean | 76.8 ms | 74.2 ms | −3.4% |
+| Step p95 | 344.7 ms | 388.5 ms | +13% (load noise) |
+| Step peak | 3,114 ms | 1,486 ms | −52% |
+| Peak working set | 3.29 GB | 2.86 GB | −13% |
+| `exploration` phase | 46.2 ms | 43.2 ms | −6.6% |
+| `strategic_ai` phase | 12.5 ms | 13.0 ms | ~noise |
+| `colonization` phase | 8.5 ms | 8.2 ms | −3% |
+| `core_total` | 71.8 ms | 69.1 ms | −3.8% |
+
+`STELLAR_EXPL_PROF=1` sub-phase attribution (per advance): mission
+`select` remains dominant (~20 ms/selection vs ~24 ms baseline),
+`transit` contact cost fell 0.67 → 0.29 ms per warp hop via the
+presence index; refuel/recovery are sub-ms. Metrics: 25 civs / 78
+colonies / 264 fleets / 0 wars; 4 scripted definitions / 128 journal
+entries; 54,094 adaptive-research events; continuation save
+~150 MB.
+
+Late-game honest note: step time still grows ~14x from the year-100
+mean (5.35 ms) to the year-200 mean (74 ms); the growth concentrates in
+per-idle-fleet mission selection. The remaining term is bounded
+(heap-ordered lazy assessment + revision-gated work memos) but further
+gains need either per-target assess elimination or work-list revision
+buckets per civilization.

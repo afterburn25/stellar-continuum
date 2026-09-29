@@ -71,6 +71,10 @@ CivilizationStrategicRuntimeCoordinator::advance(StrategicRuntimeWorldView world
 
   std::vector<CivilizationStrategicReview> reviews;
   bool bodies_index_attached = false;
+  // Scoped to this advance: its reach batches snapshot the colony set, so
+  // it cannot outlive a call (unlike the catalog bodies index, which is
+  // keyed on immutable geometry).
+  ExplorationPlanningSharedIndex planning_shared;
   for (const auto *civilization : civilizations) {
     const auto next = next_review_tick_.find(civilization->id);
     if (next != next_review_tick_.end() && now_tick < next->second) continue;
@@ -99,6 +103,7 @@ CivilizationStrategicRuntimeCoordinator::advance(StrategicRuntimeWorldView world
         bodies_index_back_id_ = bodies_back;
       }
       world.input.bodies_index = &*bodies_index_;
+      world.input.planning_shared = &planning_shared;
       bodies_index_attached = true;
     }
     auto knowledge = knowledge_(civilization->id, now_tick);

@@ -149,8 +149,9 @@ CivilizationOwnState CivilizationStrategicInputBuilder::build(
     // full all-systems plan per fleet per review.
     const bool any_supported = [&] {
       if (!exploration_injected_)
-        return probe.has_supported_mission_target(world.exploration_view(),
-                                                  fleet->id);
+        return probe.has_supported_mission_target(
+            world.exploration_view(), fleet->id,
+            MissionFuelPolicy::ReachDestination, world.planning_shared);
       const auto plan =
           exploration_(world.exploration_view(), fleet->id,
                        ExplorationMissionPlanner::hard_maximum_candidates);

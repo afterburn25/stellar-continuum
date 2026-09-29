@@ -358,6 +358,70 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   per surveying fleet by design since positions mutate mid-step; the
   lane route cache still clears wholesale at capacity.
 
+## Dense route trees, reachability pruning, contact-presence index (2026-09-29)
+
+- Purpose: the late-game exploration profile (5,000 systems, ~200
+  simulated years, `STELLAR_EXPL_PROF=1`) showed mission selection
+  spending most of its time building `unordered_map`-keyed Dijkstra
+  route trees that thrashed the (origin, leg-range) cache, and warp
+  arrival re-scanning every civilization's colonies and fleets for
+  first-contact checks.
+- Modules: `core/src/lane_network.cpp` — `RouteTree` is now dense
+  `std::vector<double> distance` / `std::vector<int> prior` storage
+  indexed by stable system slot (`Impl::slot_of`, populated in
+  `ensure_built`), replacing per-node hash maps; the pending queue still
+  orders pops by (distance, system id) so exact-tie predecessor
+  semantics are preserved. A per-leg-range union-find
+  `component_membership` index answers unreachable origin/destination
+  pairs before any tree is built (unreachable queries neither build nor
+  cache a tree), and the plain route cache capacity is
+  `clamp(8388608/systems, 64, 4096)` entries — large enough for the
+  real late-game working set. Policy routing keeps the sparse
+  `PolicyRouteTree`: permission-filtered queries are rare and never
+  share the plain cache. `core/src/exploration_advance.cpp` —
+  `ContactPresenceIndex` (system → civilization → count maps for
+  colonies and fleets, built once per `advance`) replaces the per-call
+  O(civs × (colonies + fleets)) scan inside
+  `detect_civilization_contacts`; fleet counts are maintained at the
+  three transit sites that assign or clear
+  `FleetState::current_system_id`, and colonies are immutable
+  mid-advance. The same file carries the env-gated `STELLAR_EXPL_PROF`
+  sub-timers (off by default, relaxed-atomic reads when enabled).
+- Semantics: unchanged — verified by byte-identical autosave
+  checkpoints at ticks 11,680 and 13,140 and identical 14,600-tick
+  final hashes versus the pre-change binary on identical flags; note
+  `--events-root` changes the campaign trajectory, so A/B hashes must
+  pin it (an events-off run produced a different-but-valid hash
+  `a69d93b6…` that briefly masqueraded as a code regression).
+  Permission-filtered route queries are never written to the shared
+  cache; unreachable-pair queries return before caching, so the
+  diagnostic `cached_route_tree_count` no longer counts unreachable
+  ranges (`lane_network_parity` fixture updated to match).
+- Save/performance impact: none persisted — slot maps, component
+  membership and the presence index live per network/advance. 200-year
+  canonical A/B (5,000 systems / 22+3 civs / stress-fleets 50 /
+  events on, seed 8374837, identical flags): step mean 76.8 → 74.2 ms,
+  exploration phase 46.2 → 43.2 ms, peak step 3,114 → 1,486 ms,
+  working set 3.29 → 2.86 GB; per-warp-hop contact cost 0.67 →
+  0.29 ms and per-selection cost ~24 → ~20 ms under
+  `STELLAR_EXPL_PROF`. Host additions: campaign tick bound raised to
+  100,000 and `--autosave-every N` writes a periodic developer save for
+  checkpoint diffing.
+- Tests: `lane_network_parity` (53 C#-parity cases + capacity smoke),
+  `exploration_advance_parity`, `exploration_planning_parity`,
+  `exploration_orders_parity`, `exploration_fuel_safety`,
+  `operational_reach_batch`, `fleet_reach_parity`,
+  `fleet_transit_parity`, `knowledge_parity`,
+  `settlement_knowledge_parity`, `campaign_frame_parity` — all green;
+  full native suite 290/290.
+- Limitations: `select_mission`'s per-idle-fleet candidate assessment
+  remains the dominant late-game term (its
+  `OperationalReachBatch::assess` route queries are cached but not
+  eliminated); the route cache still clears wholesale at capacity;
+  `component_membership` recomputes per distinct leg-range on first
+  use; `ContactPresenceIndex` is rebuilt each advance (O(colonies +
+  fleets) once per tick instead of once per contact probe).
+
 ## Autonomous warfare coordination (2026-09-28)
 
 - Purpose: close the organic-war gap — diplomacy recorded first contacts and

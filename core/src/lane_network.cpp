@@ -46,7 +46,16 @@ struct RouteKeyHash {
     return result;
   }
 };
+// Plain-distance route trees are dense vectors indexed by system slot —
+// fleets probing many origins need hundreds of these cached at once, so
+// per-node hash maps are too heavy. Slots are Impl::systems positions.
 struct RouteTree {
+  std::vector<double> distance;
+  std::vector<int> prior;
+};
+// Policy queries keep the sparse tree: they run rarely and their
+// permitted/blocked filters do not share the plain cache.
+struct PolicyRouteTree {
   std::unordered_map<int, double> distance;
   std::unordered_map<int, int> prior;
 };
@@ -150,7 +159,12 @@ struct InterstellarLaneNetwork::Impl {
   std::vector<InterstellarLane> lanes;
   std::unordered_map<int, const LaneSystem *> by_id;
   std::unordered_map<int, std::vector<InterstellarLane>> adjacency;
+  // System id -> index into systems (the route-tree slot).
+  std::unordered_map<int, int> slot_of;
   std::unordered_map<RouteKey, RouteTree, RouteKeyHash> routes;
+  // Connected components per distinct leg-range: unreachable-pair queries
+  // resolve here without building a route tree at all.
+  std::unordered_map<std::uint64_t, std::vector<int>> component_membership;
   bool built{};
   bool source_is_null{};
   std::thread::id owner{std::this_thread::get_id()};
@@ -172,6 +186,10 @@ struct InterstellarLaneNetwork::Impl {
     std::vector<InterstellarLane> next_lanes;
     std::unordered_map<int, const LaneSystem *> next_by_id;
     std::unordered_map<int, std::vector<InterstellarLane>> next_adjacency;
+    std::unordered_map<int, int> next_slot_of;
+    next_slot_of.reserve(systems.size());
+    for (std::size_t index = 0; index < systems.size(); ++index)
+      next_slot_of.emplace(systems[index].id, static_cast<int>(index));
 
     if (systems.size() >= 2) {
       std::vector<const LaneSystem *> ordered;
@@ -327,40 +345,77 @@ struct InterstellarLaneNetwork::Impl {
     lanes = std::move(next_lanes);
     by_id = std::move(next_by_id);
     adjacency = std::move(next_adjacency);
+    slot_of = std::move(next_slot_of);
     routes.clear();
+    component_membership.clear();
     built = true;
+  }
+
+  const std::vector<int> &components_for(double range) {
+    const auto key = std::bit_cast<std::uint64_t>(range);
+    auto found = component_membership.find(key);
+    if (found != component_membership.end())
+      return found->second;
+    std::vector<int> parent(systems.size());
+    std::iota(parent.begin(), parent.end(), 0);
+    const auto root = [&](int node) {
+      while (parent[node] != node) {
+        parent[node] = parent[parent[node]];
+        node = parent[node];
+      }
+      return node;
+    };
+    for (const auto &lane : lanes) {
+      if (lane.length_light_years > range + tie_tolerance)
+        continue;
+      const auto first = root(slot_of.at(lane.first_system_id));
+      const auto second = root(slot_of.at(lane.second_system_id));
+      if (first != second)
+        parent[std::max(first, second)] = std::min(first, second);
+    }
+    std::vector<int> membership(systems.size());
+    for (std::size_t index = 0; index < systems.size(); ++index)
+      membership[index] = root(static_cast<int>(index));
+    return component_membership.emplace(key, std::move(membership))
+        .first->second;
   }
 
   RouteTree build_route_tree(int origin, double range,
                              const std::unordered_set<int> *permitted) const {
     RouteTree tree;
-    std::unordered_set<int> remaining;
-    for (const auto &[id, ignored] : by_id) {
-      (void)ignored;
-      if (permitted == nullptr || permitted->contains(id)) {
-        tree.distance.emplace(id, std::numeric_limits<double>::infinity());
-        remaining.insert(id);
-      }
-    }
-    tree.distance.at(origin) = 0;
-    using Pending=std::pair<double,int>;
-    std::priority_queue<Pending,std::vector<Pending>,std::greater<Pending>> pending;
-    pending.emplace(0.,origin);
+    tree.distance.assign(systems.size(),
+                         std::numeric_limits<double>::infinity());
+    tree.prior.assign(systems.size(), -1);
+    tree.distance[slot_of.at(origin)] = 0;
+    // Pop order is (distance, system id): among equal-distance candidates
+    // the first settled predecessor wins the recorded route, so ordering
+    // must match the legacy id-keyed queue exactly.
+    using Pending = std::pair<double, int>;
+    std::priority_queue<Pending, std::vector<Pending>, std::greater<Pending>>
+        pending;
+    pending.emplace(0., origin);
+    std::vector<char> settled(systems.size(), 0);
     while (!pending.empty()) {
-      const auto [current_distance,current]=pending.top();pending.pop();
-      if(!remaining.contains(current)||current_distance!=tree.distance.at(current))continue;
-      remaining.erase(current);
-      for (const auto &lane : adjacency.at(current)) {
+      const auto [current_distance, current_id] = pending.top();
+      pending.pop();
+      const int current = slot_of.at(current_id);
+      if (settled[current] || current_distance != tree.distance[current])
+        continue;
+      settled[current] = 1;
+      for (const auto &lane : adjacency.at(current_id)) {
         if (lane.length_light_years > range + tie_tolerance)
           continue;
-        const int next = lane.other(current);
-        if (!remaining.contains(next))
+        const int next_id = lane.other(current_id);
+        if (permitted != nullptr && !permitted->contains(next_id))
+          continue;
+        const int next = slot_of.at(next_id);
+        if (settled[next])
           continue;
         const auto candidate = current_distance + lane.length_light_years;
-        if (candidate < tree.distance.at(next) - tie_tolerance) {
+        if (candidate < tree.distance[next] - tie_tolerance) {
           tree.distance[next] = candidate;
           tree.prior[next] = current;
-          pending.emplace(candidate,next);
+          pending.emplace(candidate, next_id);
         }
       }
     }
@@ -370,10 +425,10 @@ struct InterstellarLaneNetwork::Impl {
   // Policy-aware Dijkstra: blocked systems are never entered, leg cost is
   // length * traversal_cost_scale(destination-of-leg). Deterministic
   // min-id tie-breaking mirrors build_route_tree.
-  RouteTree build_policy_tree(int origin, int destination,
+  PolicyRouteTree build_policy_tree(int origin, int destination,
                               const InterstellarLaneNetwork::RoutePolicy &policy)
       const {
-    RouteTree tree;
+    PolicyRouteTree tree;
     std::unordered_set<int> remaining;
     for (const auto &[id, ignored] : by_id) {
       (void)ignored;
@@ -496,6 +551,7 @@ std::vector<int> InterstellarLaneNetwork::find_shortest_route(
        !permitted_system_ids->contains(destination_system_id)))
     return {};
 
+  const int destination_slot = impl_->slot_of.at(destination_system_id);
   RouteTree temporary;
   const RouteTree *tree = nullptr;
   if (permitted_system_ids != nullptr) {
@@ -504,6 +560,13 @@ std::vector<int> InterstellarLaneNetwork::find_shortest_route(
                                         permitted_system_ids);
     tree = &temporary;
   } else {
+    // Unreachable pairs resolve via union-find membership — no route tree
+    // is built or cached for them.
+    const auto &membership =
+        impl_->components_for(maximum_leg_range_light_years);
+    if (membership[impl_->slot_of.at(origin_system_id)] !=
+        membership[destination_slot])
+      return {};
     const RouteKey key{origin_system_id,
                        std::bit_cast<std::uint64_t>(maximum_leg_range_light_years)};
     auto found = impl_->routes.find(key);
@@ -511,18 +574,18 @@ std::vector<int> InterstellarLaneNetwork::find_shortest_route(
       auto built = impl_->build_route_tree(origin_system_id,
                                            maximum_leg_range_light_years,
                                            nullptr);
-      if (impl_->routes.size() >= std::clamp<std::size_t>(262144 / std::max<std::size_t>(1,impl_->systems.size()),1,64))
+      if (impl_->routes.size() >= std::clamp<std::size_t>(8388608 / std::max<std::size_t>(1,impl_->systems.size()),64,4096))
         impl_->routes.clear();
       found = impl_->routes.emplace(key, std::move(built)).first;
     }
     tree = &found->second;
   }
-  const auto distance = tree->distance.find(destination_system_id);
-  if (distance == tree->distance.end() || !std::isfinite(distance->second))
+  if (!std::isfinite(tree->distance[destination_slot]))
     return {};
   std::vector<int> result{destination_system_id};
   while (result.back() != origin_system_id)
-    result.push_back(tree->prior.at(result.back()));
+    result.push_back(
+        impl_->systems[tree->prior[impl_->slot_of.at(result.back())]].id);
   std::reverse(result.begin(), result.end());
   return result;
 }

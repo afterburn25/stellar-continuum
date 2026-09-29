@@ -71,7 +71,9 @@ using ExplorationReachAssessment = std::function<MissionReachAssessment(
 // role) survey-work lists memoize the needs_survey_work + priority-band
 // filter keyed on the knowledge survey-level revision, so a mid-advance
 // survey level change rebuilds exactly once on the next query — never
-// stale. Callers that omit it keep the original per-call scans.
+// stale. reach_batches memoizes the per-civilization O(systems + colonies)
+// OperationalReachBatch::prepare() so every fleet mission selection does
+// not rebuild it. Callers that omit it keep the original per-call scans.
 struct ExplorationPlanningSharedIndex {
   SurveyCatalogIndex catalog;
   struct SurveyWorkList {
@@ -82,6 +84,18 @@ struct ExplorationPlanningSharedIndex {
     std::vector<std::pair<const StellarSystem *, int>> entries;
   };
   std::unordered_map<std::int64_t, SurveyWorkList> survey_work;
+  // One lazily-prepared OperationalReachBatch per civilization. Colonies
+  // cannot change while a planning index is alive, so the batch's
+  // refueling snapshot stays correct for its scope.
+  OperationalReachBatch &reach_batch(const OperationalReachWorldView &world,
+                                     int civilization_id) {
+    return reach_batches_
+        .try_emplace(civilization_id, world, civilization_id)
+        .first->second;
+  }
+
+private:
+  std::unordered_map<int, OperationalReachBatch> reach_batches_;
 };
 
 class ExplorationMissionPlanner {
@@ -129,7 +143,8 @@ public:
   [[nodiscard]] bool has_supported_mission_target(
       ExplorationPlanningWorldView world, int fleet_id,
       MissionFuelPolicy fuel_policy =
-          MissionFuelPolicy::ReachDestination) const;
+          MissionFuelPolicy::ReachDestination,
+      ExplorationPlanningSharedIndex *shared = nullptr) const;
 
   static bool needs_survey_work(const CivilizationKnowledgeState &knowledge,
                                 const FleetState &fleet, int system_id);

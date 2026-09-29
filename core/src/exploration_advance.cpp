@@ -6,10 +6,15 @@
 #include <stellar/core/interstellar_distance.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <bit>
+#include <chrono>
 #include <cstdint>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -260,26 +265,48 @@ void emit_confirmed_discoveries(AdvanceIndex &index,
   }
 }
 
+// Presence index for first-contact detection, scoped to one advance.
+// system -> civilization -> count: colonies never move mid-advance, and
+// fleet counts are maintained at the three transit-hop sites that assign
+// or clear FleetState::current_system_id.
+struct ContactPresenceIndex {
+  std::unordered_map<int, std::unordered_map<int, int>> colonies;
+  std::unordered_map<int, std::unordered_map<int, int>> fleets;
+  bool colony_present(int system_id, int civilization_id) const {
+    const auto by_civilization = colonies.find(system_id);
+    return by_civilization != colonies.end() &&
+           by_civilization->second.contains(civilization_id);
+  }
+  bool fleet_present(int system_id, int civilization_id) const {
+    const auto by_civilization = fleets.find(system_id);
+    return by_civilization != fleets.end() &&
+           by_civilization->second.contains(civilization_id);
+  }
+  void record_departure(const FleetState &fleet) {
+    if (!fleet.current_system_id)
+      return;
+    auto &by_civilization = fleets[*fleet.current_system_id];
+    if (--by_civilization.at(fleet.civilization_id) <= 0)
+      by_civilization.erase(fleet.civilization_id);
+  }
+  void record_arrival(const FleetState &fleet) {
+    if (fleet.current_system_id)
+      ++fleets[*fleet.current_system_id][fleet.civilization_id];
+  }
+};
+
 void detect_civilization_contacts(ExplorationAdvanceWorldView world,
                                   const FleetState &fleet,
-                                  std::vector<ExplorationEvent> &events) {
+                                  std::vector<ExplorationEvent> &events,
+                                  const ContactPresenceIndex &presence) {
   if (!fleet.current_system_id)
     return;
   for (const auto &other : world.civilizations) {
     if (other.id == fleet.civilization_id ||
         world.knowledge.is_civilization_known(fleet.civilization_id, other.id))
       continue;
-    const bool colony_present =
-        std::ranges::any_of(world.colonies, [&](const auto &colony) {
-          return colony.civilization_id == other.id &&
-                 colony.system_id == *fleet.current_system_id;
-        });
-    const bool fleet_present =
-        std::ranges::any_of(world.fleets, [&](const auto &candidate) {
-          return candidate.is_active && candidate.civilization_id == other.id &&
-                 candidate.current_system_id == fleet.current_system_id;
-        });
-    if (!colony_present && !fleet_present)
+    if (!presence.colony_present(*fleet.current_system_id, other.id) &&
+        !presence.fleet_present(*fleet.current_system_id, other.id))
       continue;
     world.knowledge.reveal_civilization(fleet.civilization_id, other.id);
     events.push_back({ExplorationEventType::FirstContact,
@@ -384,7 +411,8 @@ bool process_local_survey(AdvanceIndex &index,
 
 bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
                     FleetState &fleet, const StellarSystem &target,
-                    std::vector<ExplorationEvent> &events) {
+                    std::vector<ExplorationEvent> &events,
+                    const ContactPresenceIndex &presence) {
   const auto service = refueling_service_level(
       index, world, fleet.civilization_id, target.id);
   if (service > 0)
@@ -437,13 +465,53 @@ bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
                       "Sensors added " + std::to_string(revealed) + " system" +
                           (revealed == 1 ? "" : "s") +
                           " to the local chart."});
-  detect_civilization_contacts(world, fleet, events);
+  detect_civilization_contacts(world, fleet, events, presence);
   if (!fleet.return_to_base_requested)
     return false;
   (void)activate_queued_civilian_return_at_system(
       {world.systems, world.colonies, world.fleets, world.lanes}, fleet);
   return true;
 }
+
+// Temporary exploration-phase sub-timers for late-game profiling. Enabled
+// with STELLAR_EXPL_PROF=1; prints a totals summary on process exit.
+struct ExplProf {
+  ExplProf() : enabled(std::getenv("STELLAR_EXPL_PROF") != nullptr) {}
+  std::atomic<bool> enabled;
+  std::atomic<long long> svc_ns{0}, survey_ns{0}, select_ns{0},
+      recovery_ns{0}, transit_ns{0}, hops{0}, selects{0}, surveys{0};
+  ~ExplProf() {
+    if (!enabled.load()) return;
+    std::fprintf(stderr,
+                 "EXPL-PROF svc=%lldms survey=%lldms select=%lldms "
+                 "recovery=%lldms transit=%lldms | hops=%lld selects=%lld "
+                 "surveys=%lld\n",
+                 svc_ns.load() / 1000000, survey_ns.load() / 1000000,
+                 select_ns.load() / 1000000, recovery_ns.load() / 1000000,
+                 transit_ns.load() / 1000000, hops.load(), selects.load(),
+                 surveys.load());
+  }
+};
+ExplProf &expl_prof() {
+  static ExplProf prof;
+  return prof;
+}
+struct ExplProfScope {
+  std::atomic<long long> &slot;
+  std::chrono::steady_clock::time_point t0;
+  explicit ExplProfScope(std::atomic<long long> &slot) : slot(slot) {
+    t0 = std::chrono::steady_clock::now();
+  }
+  ~ExplProfScope() {
+    slot += std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - t0)
+                .count();
+  }
+};
+#define EXPL_PROF(slot)                                                  \
+  std::optional<ExplProfScope> expl_scope_;                              \
+  if (expl_prof().enabled.load(std::memory_order_relaxed))               \
+    expl_scope_.emplace(expl_prof().slot);
 
 } // namespace
 
@@ -527,6 +595,13 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
   ExplorationPlanningSharedIndex planning_shared;
   SurveyOperationsBatch surveys(world.systems, world.bodies,
                                 &planning_shared.catalog);
+  ContactPresenceIndex presence;
+  for (const auto &colony : world.colonies)
+    ++presence.colonies[colony.system_id][colony.civilization_id];
+  for (const auto &candidate : world.fleets)
+    if (candidate.is_active && candidate.current_system_id)
+      ++presence.fleets[*candidate.current_system_id]
+                     [candidate.civilization_id];
   for (auto &fleet : world.fleets) {
     if (!fleet.is_active)
       continue;
@@ -536,13 +611,16 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
         civilization_operating_funding(world.economies, fleet.civilization_id);
     if (capacity <= 0.0000001)
       continue;
-    if (fleet.current_system_id) {
-      const auto service = refueling_service_level(
-          index, world, fleet.civilization_id, *fleet.current_system_id);
-      if (service > 0)
-        fleet.fuel_remaining_light_years = max_preserving_nan(
-            fleet.fuel_remaining_light_years,
-            fleet.fuel_capacity_light_years * service);
+    {
+      EXPL_PROF(svc_ns)
+      if (fleet.current_system_id) {
+        const auto service = refueling_service_level(
+            index, world, fleet.civilization_id, *fleet.current_system_id);
+        if (service > 0)
+          fleet.fuel_remaining_light_years = max_preserving_nan(
+              fleet.fuel_remaining_light_years,
+              fleet.fuel_capacity_light_years * service);
+      }
     }
     if (fleet.hold_requested && fleet.current_system_id &&
         fleet.transit_phase != FleetTransitPhase::InterstellarWarp)
@@ -550,30 +628,41 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
 
     if (fleet.transit_phase == FleetTransitPhase::None &&
         !fleet.destination_system_id && is_survey_fleet(fleet) &&
-        fleet.current_system_id &&
-        process_local_survey(index, world, fleet, *fleet.current_system_id,
-                             simulation_delta * capacity, surveys,
-                             events)) {
-      detect_civilization_contacts(world, fleet, events);
-      continue;
+        fleet.current_system_id) {
+      EXPL_PROF(survey_ns)
+      expl_prof().surveys++;
+      if (process_local_survey(index, world, fleet, *fleet.current_system_id,
+                               simulation_delta * capacity, surveys,
+                               events)) {
+        detect_civilization_contacts(world, fleet, events, presence);
+        continue;
+      }
     }
 
     if (fleet.transit_phase == FleetTransitPhase::None &&
         !fleet.destination_system_id && civilization_uses_ai(civilization,world.control) &&
         is_survey_fleet(fleet)) {
       ExplorationAiMissionCoordinator coordinator(mission_planner_);
-      const auto selection = coordinator.select_mission(
-          {world.systems, world.bodies, world.fleets, world.colonies,
-           world.knowledge, world.lanes},
-          fleet,ai_fuel_policy_,&planning_shared);
+      ExplorationAiMissionSelection selection;
+      {
+        EXPL_PROF(select_ns)
+        expl_prof().selects++;
+        selection = coordinator.select_mission(
+            {world.systems, world.bodies, world.fleets, world.colonies,
+             world.knowledge, world.lanes},
+            fleet,ai_fuel_policy_,&planning_shared);
+      }
       if (selection.candidate)
         assign_fleet_route({world.systems, world.colonies, world.lanes}, fleet,
                            selection.candidate->system_id,
                            selection.candidate->reach);
       else if(ai_fuel_policy_==MissionFuelPolicy::RetainReturnToService&&fleet.current_system_id&&
           refueling_service_level(index,world,fleet.civilization_id,*fleet.current_system_id)<=0){
-        const auto recovery=request_civilian_fleet_return(
+        const auto recovery=[&]{
+          EXPL_PROF(recovery_ns)
+          return request_civilian_fleet_return(
             {world.systems,world.colonies,world.fleets,world.lanes},fleet.civilization_id,fleet.id);
+        }();
         // Do not manufacture fuel for old saves that are already stranded.
         // Persist an actionable explanation and retry when the world changes.
         if(!recovery.accepted)fleet.return_to_base_failure_reason=recovery.message;
@@ -607,6 +696,8 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
 
     auto remaining_days = simulation_delta * capacity;
     while (fleet.destination_system_id && remaining_days > 0.0000001) {
+      EXPL_PROF(transit_ns)
+      expl_prof().hops++;
       const auto movement_target_id =
           !fleet.planned_route_system_ids.empty()
               ? fleet.planned_route_system_ids.front()
@@ -639,6 +730,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
         if (fleet.transit_phase == FleetTransitPhase::LocalDeparture) {
           fleet.transit_phase = FleetTransitPhase::InterstellarWarp;
           fleet.transit_progress = 0;
+          presence.record_departure(fleet);
           fleet.current_system_id.reset();
           continue;
         }
@@ -656,6 +748,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
                   : fleet.destination_system_id;
           fleet.transit_phase = FleetTransitPhase::InterstellarWarp;
           fleet.transit_progress = 0;
+          presence.record_departure(fleet);
           fleet.current_system_id.reset();
           continue;
         }
@@ -724,6 +817,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
       const auto arrival_approach = fleet.position;
       fleet.position = chart_position(target);
       fleet.current_system_id = target.id;
+      presence.record_arrival(fleet);
       const auto origin_position = physical_origin
                                        ? chart_position(*physical_origin)
                                        : arrival_approach;
@@ -741,7 +835,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
       }
       begin_fleet_local_transit(fleet, FleetTransitPhase::LocalArrival, inbound,
                                 final_target,target.stellar_object?&*target.stellar_object:nullptr);
-      if (handle_inbound(index, world, fleet, target, events))
+      if (handle_inbound(index, world, fleet, target, events, presence))
         break;
       if (fleet.hold_requested)
         break;

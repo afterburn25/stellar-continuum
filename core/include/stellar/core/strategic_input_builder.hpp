@@ -28,6 +28,10 @@ struct StrategicInputWorldView {
   // colonization-opportunity probe iterates surveyed systems instead of
   // rescanning `bodies`. Must describe the same catalog.
   const SettlementBodiesIndex *bodies_index{nullptr};
+  // Optional caller-shared exploration planning index; when set, the
+  // supported-mission-target probe reuses its memoized survey-work lists
+  // and per-civilization reach batches instead of rescanning `systems`.
+  ExplorationPlanningSharedIndex *planning_shared{nullptr};
 
   [[nodiscard]] ExplorationPlanningWorldView exploration_view() const {
     return {systems, bodies, fleets, colonies, knowledge, lanes};

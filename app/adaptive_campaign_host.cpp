@@ -377,7 +377,7 @@ int run_adaptive_campaign_host(
     throw std::invalid_argument(
         "Adaptive campaign diagnostic builder is required");
   if (options.repeats < 1 || options.repeats > 10 ||
-      options.simulation_ticks < 1 || options.simulation_ticks > 10000 ||
+      options.simulation_ticks < 1 || options.simulation_ticks > 100000 ||
       !std::isfinite(options.step_days) || options.step_days <= 0.0 ||
       !std::isfinite(options.step_days * options.simulation_ticks) ||
       !std::isfinite(options.step_days * options.simulation_ticks *

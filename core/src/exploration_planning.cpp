@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <queue>
 #include <stdexcept>
 #include <tuple>
 #include <unordered_map>
@@ -292,8 +293,19 @@ ExplorationMissionPlanner::select_supported_candidate(
       local_systems_index.emplace(system.id, &system);
     systems_index = &local_systems_index;
   }
-  std::optional<OperationalReachBatch> batch;
-  if(uses_canonical_reach_)batch.emplace(OperationalReachWorldView{world.systems,world.colonies,world.lanes},subject.civilization_id);
+  std::optional<OperationalReachBatch> local_batch;
+  OperationalReachBatch *batch = nullptr;
+  if (uses_canonical_reach_)
+    batch = shared ? &shared->reach_batch(
+                         OperationalReachWorldView{world.systems,
+                                                   world.colonies,
+                                                   world.lanes},
+                         subject.civilization_id)
+                   : &local_batch.emplace(
+                         OperationalReachWorldView{world.systems,
+                                                   world.colonies,
+                                                   world.lanes},
+                         subject.civilization_id);
 
   // Light ranking identical to the build_plan comparator restricted to the
   // supported subsequence: (priority band, distance with NaN last, id).
@@ -301,6 +313,22 @@ ExplorationMissionPlanner::select_supported_candidate(
     const StellarSystem *system;
     int priority_band;
     double distance;
+  };
+  const auto ranked_less = [](const RankedTarget &left,
+                              const RankedTarget &right) {
+    if (left.priority_band != right.priority_band)
+      return left.priority_band < right.priority_band;
+    const bool left_nan = std::isnan(left.distance);
+    const bool right_nan = std::isnan(right.distance);
+    if (left_nan != right_nan)
+      return left_nan;
+    if (!left_nan && left.distance != right.distance)
+      return left.distance < right.distance;
+    return left.system->id < right.system->id;
+  };
+  const auto ranked_greater = [&](const RankedTarget &left,
+                                 const RankedTarget &right) {
+    return ranked_less(right, left);
   };
   // The (system, band) filter depends only on the fleet's civilization and
   // role plus survey LEVELS — memoizable per shared index while the
@@ -342,18 +370,12 @@ ExplorationMissionPlanner::select_supported_candidate(
     targets.push_back({system, band,
                        indexed_distance_from_fleet(*systems_index, subject,
                                                    *system)});
-  std::stable_sort(targets.begin(), targets.end(),
-                   [](const RankedTarget &left, const RankedTarget &right) {
-                     if (left.priority_band != right.priority_band)
-                       return left.priority_band < right.priority_band;
-                     const bool left_nan = std::isnan(left.distance);
-                     const bool right_nan = std::isnan(right.distance);
-                     if (left_nan != right_nan)
-                       return left_nan;
-                     if (!left_nan && left.distance != right.distance)
-                       return left.distance < right.distance;
-                     return left.system->id < right.system->id;
-                   });
+  // The (band, distance-with-NaN-last, id) order is total — heap pops yield
+  // exactly the stable_sort sequence, but only the handful of entries the
+  // lazy assessment below actually consumes pay the ordering cost.
+  std::priority_queue<RankedTarget, std::vector<RankedTarget>,
+                      decltype(ranked_greater)>
+      queue(ranked_greater, std::move(targets));
 
   // Assess lazily in plan order. The plan truncates to
   // hard_maximum_candidates entries with supported candidates first, so only
@@ -361,9 +383,11 @@ ExplorationMissionPlanner::select_supported_candidate(
   const StellarSystem *first_supported = nullptr;
   const StellarSystem *chosen = nullptr;
   int supported_seen = 0;
-  for (const auto &target : targets) {
+  while (!queue.empty()) {
     if (supported_seen >= hard_maximum_candidates)
       break;
+    const RankedTarget target = queue.top();
+    queue.pop();
     const auto reach =
         batch ? batch->assess(subject, target.system->id,
                               mission_kind(subject.role), fuel_policy)
@@ -386,13 +410,14 @@ ExplorationMissionPlanner::select_supported_candidate(
   }
   SurveyOperationsBatch surveys(world.systems, world.bodies,
                                 shared ? &shared->catalog : nullptr);
-  return build_candidate(world, subject, *chosen, batch ? &*batch : nullptr,
+  return build_candidate(world, subject, *chosen, batch,
                          fuel_policy, &surveys, systems_index);
 }
 
 bool ExplorationMissionPlanner::has_supported_mission_target(
     ExplorationPlanningWorldView world, int fleet_id,
-    MissionFuelPolicy fuel_policy) const {
+    MissionFuelPolicy fuel_policy,
+    ExplorationPlanningSharedIndex *shared) const {
   if(fuel_policy!=MissionFuelPolicy::ReachDestination&&!uses_canonical_reach_)
     throw std::invalid_argument("Return fuel planning requires the canonical operational reach provider.");
   // Same subject selection as build_plan: the stored fleet, not a caller
@@ -406,47 +431,54 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
       (fleet->role != FleetRole::Scout && fleet->role != FleetRole::Science))
     return false;
   const auto &subject = *fleet;
-  std::unordered_map<int, const StellarSystem *> systems_index;
-  systems_index.reserve(world.systems.size());
-  for (const auto &system : world.systems)
-    systems_index.emplace(system.id, &system);
-  std::optional<OperationalReachBatch> batch;
-  if(uses_canonical_reach_)batch.emplace(OperationalReachWorldView{world.systems,world.colonies,world.lanes},subject.civilization_id);
-  struct RankedTarget {
-    const StellarSystem *system;
-    int priority_band;
-    double distance;
-  };
-  std::vector<RankedTarget> targets;
-  targets.reserve(world.systems.size());
-  for (const auto &system : world.systems) {
-    if (!needs_survey_work(world.knowledge, subject, system.id))
-      continue;
-    targets.push_back(
-        {&system,
-         survey_priority(
-             subject.role,
-             world.knowledge.system_survey_level(subject.civilization_id,
-                                                 system.id)),
-         indexed_distance_from_fleet(systems_index, subject, system)});
+  std::optional<OperationalReachBatch> local_batch;
+  OperationalReachBatch *batch = nullptr;
+  if (uses_canonical_reach_)
+    batch = shared ? &shared->reach_batch(
+                         OperationalReachWorldView{world.systems,
+                                                   world.colonies,
+                                                   world.lanes},
+                         subject.civilization_id)
+                   : &local_batch.emplace(
+                         OperationalReachWorldView{world.systems,
+                                                   world.colonies,
+                                                   world.lanes},
+                         subject.civilization_id);
+  // The result is existence-only, so the assess order cannot change it —
+  // reuse the memoized (civilization, role) survey-work list and skip the
+  // plan-order sort entirely.
+  std::vector<std::pair<const StellarSystem *, int>> local_work;
+  const std::vector<std::pair<const StellarSystem *, int>> *work;
+  if (shared) {
+    const std::int64_t key =
+        (static_cast<std::int64_t>(subject.civilization_id) << 32) |
+        static_cast<std::uint32_t>(static_cast<int>(subject.role));
+    auto &entry = shared->survey_work[key];
+    if (!entry.valid ||
+        entry.level_revision != world.knowledge.survey_level_revision()) {
+      entry.entries.clear();
+      for (const auto &system : world.systems)
+        if (needs_survey_work(world.knowledge, subject, system.id))
+          entry.entries.push_back(
+              {&system,
+               survey_priority(subject.role,
+                               world.knowledge.system_survey_level(
+                                   subject.civilization_id, system.id))});
+      entry.level_revision = world.knowledge.survey_level_revision();
+      entry.valid = true;
+    }
+    work = &entry.entries;
+  } else {
+    for (const auto &system : world.systems)
+      if (needs_survey_work(world.knowledge, subject, system.id))
+        local_work.push_back({&system, 0});
+    work = &local_work;
   }
-  std::stable_sort(targets.begin(), targets.end(),
-                   [](const RankedTarget &left, const RankedTarget &right) {
-                     if (left.priority_band != right.priority_band)
-                       return left.priority_band < right.priority_band;
-                     const bool left_nan = std::isnan(left.distance);
-                     const bool right_nan = std::isnan(right.distance);
-                     if (left_nan != right_nan)
-                       return left_nan;
-                     if (!left_nan && left.distance != right.distance)
-                       return left.distance < right.distance;
-                     return left.system->id < right.system->id;
-                   });
-  for (const auto &target : targets) {
+  for (const auto &[system, ignored_band] : *work) {
     const auto reach =
-        batch ? batch->assess(subject, target.system->id,
+        batch ? batch->assess(subject, system->id,
                               mission_kind(subject.role), fuel_policy)
-              : assess_operational_reach(world, subject, target.system->id);
+              : assess_operational_reach(world, subject, system->id);
     if (reach.is_supported)
       return true;
   }
