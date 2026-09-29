@@ -173,7 +173,8 @@ void OperationalReachBatch::prepare() {
 }
 
 MissionReachAssessment OperationalReachBatch::assess(const FleetState &fleet,
-    int target_system_id,InterstellarMissionKind /*mission_kind*/,MissionFuelPolicy fuel_policy) {
+    int target_system_id,InterstellarMissionKind /*mission_kind*/,MissionFuelPolicy fuel_policy,
+    bool explain) {
   if (fleet.civilization_id != civilization_id_)
     return unsupported_mission_reach(
         "That fleet is not controlled by this civilization.");
@@ -188,21 +189,89 @@ MissionReachAssessment OperationalReachBatch::assess(const FleetState &fleet,
       *fleet.current_system_id, target_system_id,
       fleet.maximum_leg_range_light_years, route_scratch_);
   if (route_scratch_.empty())
-    return unsupported_mission_reach(
-        "No connected lane route is available within this fleet's " +
-        format_interstellar_metric_primary(
-            fleet.maximum_leg_range_light_years) +
-        " maximum leg range.");
+    return explain
+               ? unsupported_mission_reach(
+                     "No connected lane route is available within this fleet's " +
+                     format_interstellar_metric_primary(
+                         fleet.maximum_leg_range_light_years) +
+                     " maximum leg range.")
+               : MissionReachAssessment{false, true, {}, std::nullopt, 0.0};
 
-  auto reach=evaluate_route(fleet,route_scratch_);
+  auto reach = explain ? evaluate_route(fleet, route_scratch_)
+                       : evaluate_route_verdict(fleet, route_scratch_);
   if(reach.is_supported&&fuel_policy==MissionFuelPolicy::RetainReturnToService){
     auto projected=fleet;
     projected.current_system_id=target_system_id;
     projected.fuel_remaining_light_years=*reach.arrival_fuel_light_years;
     if(!has_return_service_route(projected))
-      return unsupported_mission_reach("The outward route is reachable, but would leave insufficient fuel to reach any owned refuelling settlement.");
+      return explain
+                 ? unsupported_mission_reach("The outward route is reachable, but would leave insufficient fuel to reach any owned refuelling settlement.")
+                 : MissionReachAssessment{false, true, {}, std::nullopt, 0.0};
   }
   return reach;
+}
+
+// Verdict-only evaluation for the scan loops: identical is_supported
+// semantics to evaluate_route, but skips reason/route materialization and
+// memoizes each node's post-arrival fuel per system id. Because every
+// candidate route is a path in the same cached shortest tree, sibling
+// targets share ancestors — a drain visits each tree node once instead of
+// re-walking every full route. The fuel arithmetic below is applied in the
+// same order as evaluate_route (leg compare against running fuel, subtract,
+// then refuel top-up), so boundary verdicts are bit-identical.
+MissionReachAssessment OperationalReachBatch::evaluate_route_verdict(
+    const FleetState &fleet, std::span<const int> route) {
+  prepare();
+  const int origin = *fleet.current_system_id;
+  if (!feas_key_valid_ || feas_origin_ != origin ||
+      feas_fuel_ != fleet.fuel_remaining_light_years ||
+      feas_capacity_ != fleet.fuel_capacity_light_years ||
+      feas_leg_range_ != fleet.maximum_leg_range_light_years) {
+    feas_memo_.clear();
+    feas_origin_ = origin;
+    feas_fuel_ = fleet.fuel_remaining_light_years;
+    feas_capacity_ = fleet.fuel_capacity_light_years;
+    feas_leg_range_ = fleet.maximum_leg_range_light_years;
+    feas_key_valid_ = true;
+  }
+  auto fuel = fleet.fuel_remaining_light_years;
+  if (const auto service = refueling_.find(origin); service != refueling_.end())
+    fuel = fleet.fuel_capacity_light_years * service->second;
+  double arrival_fuel = fuel;
+  bool feasible = true;
+  for (std::size_t index = 1; index < route.size(); ++index) {
+    const int next_id = route[index];
+    if (const auto memo = feas_memo_.find(next_id); memo != feas_memo_.end()) {
+      if (!memo->second.feasible) {
+        feasible = false;
+        break;
+      }
+      fuel = memo->second.fuel_after;
+      arrival_fuel = fuel;
+      continue;
+    }
+    const auto first = systems_.at(route[index - 1]);
+    const auto second = systems_.at(next_id);
+    const auto leg = distance_light_years(first->position, second->position);
+    FeasibilityNode node{};
+    if (leg <= fuel + 1e-9) {
+      fuel -= leg;
+      if (const auto service = refueling_.find(second->id);
+          service != refueling_.end())
+        fuel = fleet.fuel_capacity_light_years * service->second;
+      node.fuel_after = fuel;
+      node.feasible = true;
+      arrival_fuel = fuel;
+    } else {
+      feasible = false;
+    }
+    feas_memo_.emplace(second->id, node);
+    if (!feasible)
+      break;
+  }
+  if (!feasible)
+    return {false, true, {}, std::nullopt, 0.0};
+  return {true, true, {}, std::nullopt, 0.0, arrival_fuel};
 }
 
 MissionReachAssessment OperationalReachBatch::evaluate_route(

@@ -473,9 +473,13 @@ ExplorationMissionPlanner::select_supported_candidate(
     queue.pop();
     if (profiling)
       ++prof.pops;
+    // Verdict-only on the canonical path — the loop discards everything
+    // but is_supported, so skipping reason materialization and sharing
+    // memoized route-prefix feasibility cuts the per-pop cost sharply.
     const auto reach =
         batch ? batch->assess(subject, target.system->id,
-                              mission_kind(subject.role), fuel_policy)
+                              mission_kind(subject.role), fuel_policy,
+                              /*explain=*/false)
               : assess_operational_reach(world, subject, target.system->id);
     if (profiling)
       ++prof.assess_calls;
@@ -610,7 +614,8 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
       continue;
     const auto reach =
         batch ? batch->assess(subject, system->id,
-                              mission_kind(subject.role), fuel_policy)
+                              mission_kind(subject.role), fuel_policy,
+                              /*explain=*/false)
               : assess_operational_reach(world, subject, system->id);
     if (reach.is_supported)
       return true;

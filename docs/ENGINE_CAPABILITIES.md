@@ -476,6 +476,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   object identities). Reservations only veto supported targets and can
   never create one, so the verdict is reservation-independent; it is
   consulted only on the canonical reach path and is never persisted.
+  `OperationalReachBatch::assess` gains an `explain` flag: the scan
+  loops pass `explain=false`, which skips reason-string materialization
+  and evaluates fuel feasibility through `evaluate_route_verdict` — a
+  per-(origin, fuel, capacity, leg-range) memo of post-arrival fuel per
+  system id along the shared shortest-tree prefixes. Verdicts replicate
+  `evaluate_route`'s arithmetic in identical order, so they are
+  bit-identical; `RetainReturnToService` still runs the full return-hop
+  check on outward-feasible candidates using the memoized arrival fuel.
 - Semantics: unchanged — the prune mirrors Dijkstra reachability
   (same leg-range predicate as the cached trees) and skips only
   candidates that could never be supported; the suitability memo key
@@ -494,7 +502,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   selection and eligibility probes).
 - Tests: `settlement_shared_index` (new — plan parity shared vs
   unshared, suitability-memo invalidation across survey-level bumps,
-  reach-batch rebuild after colony-vector growth); full native suite
+  reach-batch rebuild after colony-vector growth); `operational_reach_batch`
+  extended — `explain=false` verdict + arrival-fuel parity across all
+  systems, fuel states, and both fuel policies; full native suite
   291/291 green.
 - Save/performance impact: none persisted — all structures are
   per-advance or per-query. Colonization-phase suitability lists and
@@ -507,14 +517,16 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   fuel-policy assessment of connected-but-unaffordable targets, which
   only a route walk can reject; the prune's value is confined to
   fragmented-graph workloads (small leg ranges, dense subsets).
-  The drain memo is the measured win on the canonical run: select
-  total 773.6 s → 406.7 s (−47%), pops 31.5M → 25.5M, drains
-  7,776 → 6,252; step mean 57.6 ms → 42.4 ms.
+  The drain memo is the first measured win on the canonical run:
+  select 773.6 s → 406.7 s (−47%), pops 31.5M → 25.5M; the verdict
+  prefix memo follows with select 236.7 s, step mean 31.3 ms (vs
+  74.2 ms at the dense-route baseline, −58%).
 - Limitations: `select_mission`'s per-pop `assess` remains the
-  dominant late-game term — eliminating it needs an exact fuel-bound
-  shortcut that does not yet exist (refuel-at-colony hops make fuel
-  reachability non-monotone in distance); `has_return_service_route`
-  still walks the colony set per pop on fuel-constrained fleets; the
+  dominant late-game term even after prefix memoization — the heap pop
+  itself and the route-cache lookup are now the floor, and verdicts
+  still require touching each candidate once per changed fleet state;
+  `has_return_service_route` still walks the colony set per pop on
+  fuel-constrained fleets; the
   prune only applies on the canonical reach path (injected providers
   keep the un-pruned loop); `SettlementPlanningSharedIndex` is manual
   plumbing — callers that omit it keep per-call behavior.

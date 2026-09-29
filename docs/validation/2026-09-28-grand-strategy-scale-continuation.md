@@ -359,3 +359,27 @@ produces the different-but-deterministic `7e32a1a7…` trajectory):
   25.5M (vs 31.5M, −19%); drains 6,252 (vs 7,776) — subsequent selects
   on unchanged draining fleets replay the memoized verdict instead of
   re-scanning ~4,300 candidates; transit 112.4 s; survey 54.0 s.
+
+Follow-up pass 2 (same canonical flags): `OperationalReachBatch::assess`
+gains an `explain` flag — the selection scan loops call it with
+`explain=false`, skipping reason-string materialization and evaluating
+fuel feasibility through `evaluate_route_verdict`, a per-(origin, fuel,
+capacity, leg-range) memo of post-arrival fuel per system id along the
+shared shortest-tree prefixes. Verdicts replicate `evaluate_route`'s
+arithmetic in identical order (bit-identical boundaries);
+`RetainReturnToService` still runs the full return-hop check using the
+memoized arrival fuel. Canonical verification:
+
+- `finalStateHash e5a1d5bf…` — bit-identical again; deterministic
+  repeat + save/load continuation; save size identical.
+- `EXPL-PROF`: select total 236.7 s (vs 406.7 s, −42%; vs 773.6 s
+  pre-memo, −69%), select loop 196.6 s (vs 363.4 s, −46%); pops/drains
+  unchanged — the same 25.5M assesses now resolve largely through
+  memoized prefix fuel rather than full per-route walks.
+- Clean-machine timing: step mean 31.3 ms (vs 42.4 ms at `f354f235`,
+  −26%; vs 74.2 ms at the dense-route baseline, −58%), step total
+  457 s, exploration phase 14.4 ms mean, strategic_ai 3.2 ms,
+  colonization 6.1 ms, core_total 27.4 ms; peak working set 2.87 GB.
+- `operational_reach_batch` test extended: `explain=false` verdict +
+  arrival-fuel parity across all systems, three fuel states, and both
+  fuel policies; full suite 291/291.

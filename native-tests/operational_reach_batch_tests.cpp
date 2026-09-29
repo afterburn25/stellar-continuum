@@ -23,10 +23,26 @@ int main(int argc,char **argv)try{
     for(const auto &target:world.systems){
       const auto expected=assess_operational_reach(view,fleet.civilization_id,fleet,target.id,InterstellarMissionKind::ScoutReconnaissance);
       check(same(expected,batch.assess(fleet,target.id,InterstellarMissionKind::ScoutReconnaissance)),"Batched reach changed routes, fuel or explanations.");
+      // explain=false must return the identical verdict and arrival fuel
+      // for every target — the prefix memo must never change semantics.
+      const auto quick=batch.assess(fleet,target.id,InterstellarMissionKind::ScoutReconnaissance,
+          MissionFuelPolicy::ReachDestination,false);
+      check(quick.is_supported==expected.is_supported&&
+          quick.arrival_fuel_light_years==expected.arrival_fuel_light_years,
+          "Verdict-only assess changed support or arrival fuel.");
+      const auto kept= batch.assess(fleet,target.id,InterstellarMissionKind::ScoutReconnaissance,
+          MissionFuelPolicy::RetainReturnToService);
+      const auto kept_quick=batch.assess(fleet,target.id,InterstellarMissionKind::ScoutReconnaissance,
+          MissionFuelPolicy::RetainReturnToService,false);
+      check(kept.is_supported==kept_quick.is_supported,"Verdict-only assess changed return-service gating.");
     }
     fleet.fuel_remaining_light_years=0;
     for(int i=0;i<20;++i)check(same(assess_operational_reach(view,fleet.civilization_id,fleet,world.systems[i].id,InterstellarMissionKind::ScienceSurvey),
         batch.assess(fleet,world.systems[i].id,InterstellarMissionKind::ScienceSurvey)),"Batch reused stale fleet fuel.");
+    for(int i=0;i<20;++i)check(batch.assess(fleet,world.systems[i].id,InterstellarMissionKind::ScienceSurvey,
+        MissionFuelPolicy::ReachDestination,false).is_supported==
+        batch.assess(fleet,world.systems[i].id,InterstellarMissionKind::ScienceSurvey).is_supported,
+        "Verdict-only assess used a stale fuel key.");
     check(!batch.assess(fleet,999999,InterstellarMissionKind::Colony).is_supported,"Batch accepted absent target.");
     ++fleet.civilization_id;check(!batch.assess(fleet,world.systems[0].id,InterstellarMissionKind::Logistics).is_supported,"Batch crossed civilization authority.");--fleet.civilization_id;
   }
