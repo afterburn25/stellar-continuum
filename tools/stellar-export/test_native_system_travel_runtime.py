@@ -85,6 +85,14 @@ class NativeSystemTravelExportTests(unittest.TestCase):
                     if fault == "reload": payload["Galaxy"]["Economies"][0]["Credits"] += 1
                 payload["SavedAtUtc"] = "later-" + str(len(calls))
                 save.write_text(json.dumps(payload))
+                if "--fleet-smoke" in args:
+                    # The real atomic save leaves .bak/.integrity sidecars that
+                    # the validator's recon rewrite must clear before relaunch.
+                    Path(str(save) + ".bak").write_text("{}")
+                    Path(str(save) + ".integrity").write_text("{}")
+                if "--system-travel" in args:
+                    self.assertFalse(list(save.parent.glob(save.name + ".*")),
+                                     "stale save sidecars survived the recon rewrite")
                 if fault != "capture": capture.write_bytes(b"BM"+bytes(54))
                 stdout = voice_marker + "gpu_driver=vulkan systems=3 save=ok screenshot=test.bmp"+marker
                 return subprocess.CompletedProcess(args, 0, stdout, "")
